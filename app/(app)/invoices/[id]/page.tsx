@@ -1,11 +1,12 @@
 // app/(app)/invoices/[id]/page.tsx — Invoice (screen record): one invoice or
 // credit memo with its lines and total, the buyer's questions about it with
 // Mark answered (resolve_invoice_question, mark-answered.tsx), and for an
-// invoice still owed or paid (invoiceIsCreditable) a credit memo against a
-// subset of lines (credit-memo-form.tsx).
+// invoice still owed or paid (invoiceIsCreditable) Return in the closing
+// Correct a shipment section: a credit memo against a subset of lines
+// (credit-memo-form.tsx).
 // QuickBooks mapping, exact retry, corrected re-push and local write-off use
 // the same registered commands as the API. An unknown id renders not-found.
-import { InvoiceView } from "@/components/mgr/views/invoice";
+import { InvoiceReturnButton, InvoiceView } from "@/components/mgr/views/invoice";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { canRun } from "@/lib/commands/registry";
@@ -13,8 +14,6 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { invoiceMappingRows, toInvoiceViewProps } from "@/lib/mgr/invoice-view";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { MarkAnswered } from "./mark-answered";
 import { qboInvoicePresentation, type QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
 import { invoiceIsCreditable } from "@/lib/mgr/invoice-state";
@@ -35,8 +34,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   ])) as [{ invoice: Invoice; lines: InvoiceLine[]; hasPendingPush: boolean; quickbooksLink: QboStaffInvoiceLink | null }, Question[], { connected: boolean; state: string; realmId?: string; realmLabel: string | null; depositItemId?: string | null; oneWayFeeItemId?: string | null } | null];
   const credit = invoice.kind === "credit_memo";
   const memo = invoiceIsCreditable(invoice) && canRun(ctx, "return_shipment")
-    ? <Button size="sm" variant="outline" asChild><Link href={`/invoices/${invoice.id}/return`}>Return</Link></Button>
-    : undefined;
+    ? <InvoiceReturnButton href={`/invoices/${invoice.id}/return`} />
+    : null;
   const realm = health?.connected ? health.realmId : null;
   const missingMappings = !invoice.customers?.qbo_customer_id || (realm && invoice.customers.qbo_realm_id !== realm)
     || lines.some(line => line.kind === "sku" ? !line.skus?.qbo_item_id || (realm && line.skus.qbo_realm_id !== realm) : /keg_deposit/.test(line.kind) ? !health?.depositItemId : line.kind === "one_way_keg_fee" && !health?.oneWayFeeItemId);
@@ -48,9 +47,9 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     <InvoiceView
       model={model}
       staffLink={quickbooksLink}
-      headerAction={memo}
+      correction={memo}
       questionAction={(q) => <MarkAnswered questionId={q.id} />}
-      quickbooks={{ detail: presentation.detail, balanceCents: invoice.qbo_balance_cents, healthy: invoice.qbo_sync_status === "pushed" && invoice.qbo_remote_state === "live" && !invoice.qbo_accountant_drift }}
+      quickbooks={{ detail: presentation.detail }}
       accountingActions={<QboInvoiceActions invoiceId={invoice.id} invoiceLabel={model.title} actions={presentation.actions} />}
     />
   );

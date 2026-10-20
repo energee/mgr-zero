@@ -1,17 +1,41 @@
-// components/mgr/views/invoice.tsx — Invoice drawing. Inventory and the live
-// page share returned mapping facts; adapters supply authorized action controls.
-import { Fragment, type ReactNode } from "react";
+// components/mgr/views/invoice.tsx — the Invoice screen drawing, read as a
+// document (#977): number, state and customer, then Issued/Due beside the
+// price summary (stacked on the phone, summary before the lines), a line
+// table on the desk and labeled line records on the phone, QuickBooks and
+// accounting, buyer questions, and Return in a closing section. Inventory and
+// the live page both pass toInvoiceViewProps(get_invoice-shaped data); the
+// live page supplies authorized actions through the slots (an explicit null
+// suppresses a slot; omitted draws the inert fixture control).
+import type { ReactNode } from "react";
+import Link from "next/link";
 import { E } from "@/components/mgr/e";
-import { money } from "@/lib/mgr/money";
+import { FactsGrid } from "@/components/mgr/views/facts-grid";
+import { PriceSummary } from "@/components/mgr/views/price-summary";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { QboStaffInvoiceLinkView } from "./accounting";
 import type { QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
 import type { InvoiceQuestionView, InvoiceViewModel } from "@/lib/mgr/invoice-view";
+import { cn } from "@/lib/utils";
 
 export type { InvoiceViewModel };
 
+const H2 = "text-base font-semibold";
+const LEGEND = "text-xs text-muted-foreground";
+const NUMBER_COLUMNS = [["Quantity", "qty"], ["Unit price", "unitPrice"]] as const;
+
+/** The Return button: a link to the return form on the live page, inert in the inventory. */
+export const InvoiceReturnButton = ({ href }: { href?: string }) => (
+  <Button variant="outline" type="button" className="w-full md:w-auto" asChild={Boolean(href)}>
+    {href ? <Link href={href}>Return</Link> : "Return"}
+  </Button>
+);
+
+const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
 export function InvoiceView({
   model,
-  headerAction,
+  correction,
   questionAction,
   mappings = model.mappings,
   pushDisabled = true,
@@ -22,42 +46,147 @@ export function InvoiceView({
   staffLink,
 }: {
   model: InvoiceViewModel;
-  headerAction?: ReactNode;
+  /** The closing Correct a shipment control. Omitted: the inert Return button; null: no section. */
+  correction?: ReactNode;
   questionAction?: ReactNode | ((question: InvoiceQuestionView) => ReactNode);
   mappings?: InvoiceViewModel["mappings"];
   pushDisabled?: boolean;
+  /** Replaces the whole QuickBooks region; null draws none. */
   qbo?: ReactNode;
-  /** Live QuickBooks row, or a gate message while integration is unavailable. */
+  /** A gate message while integration is unavailable. */
   qboGate?: ReactNode;
-  quickbooks?: { detail: string; balanceCents: number | null; healthy: boolean };
+  /** qboInvoicePresentation's detail: the invoice's accounting state, said once. */
+  quickbooks?: { detail: string };
   accountingActions?: ReactNode;
   staffLink?: QboStaffInvoiceLink | null;
 }) {
   const mappingRows = qbo !== undefined || qboGate ? undefined : mappings;
   const unanswered = (q: InvoiceQuestionView) => {
     if (typeof questionAction === "function") return questionAction(q);
-    return questionAction !== undefined ? questionAction : E.act("Mark answered", "success");
+    return questionAction !== undefined ? questionAction : <Button variant="outline" size="sm" type="button">Mark answered</Button>;
   };
+  const actions = accountingActions !== undefined ? accountingActions
+    : mappingRows?.length ? E.btn("Push invoice to QuickBooks Online", pushDisabled ? "irr disabled" : "irr") : null;
+  const showLink = Boolean(quickbooks || mappingRows?.length);
+  const hasAccounting = qbo !== undefined ? qbo != null : Boolean(qboGate || quickbooks || mappingRows?.length || actions);
+  const openCount = model.questions.filter((q) => !q.answered).length;
   return (
-    <>
-      {E.back("Invoices", model.title, headerAction, model.backHref)}
-      {E.row(model.customer, model.summary, model.total, model.headerTone)}
-      {model.lines.map((line) => (
-        <Fragment key={line.key}>{E.row(line.name, line.detail, line.amount)}</Fragment>
-      ))}
-      {qbo !== undefined ? qbo : (typeof qboGate === "string" ? E.gated("QuickBooks", qboGate) : qboGate)}
-      {qbo === undefined && quickbooks && E.row("QuickBooks", `${quickbooks.detail}${quickbooks.balanceCents != null && quickbooks.balanceCents > 0 && !quickbooks.detail.includes(money(quickbooks.balanceCents)) ? ` · ${money(quickbooks.balanceCents)} balance` : ""}`, "", quickbooks.healthy ? "ok" : "w")}
-      {qbo === undefined && (quickbooks || !!mappingRows?.length) && <QboStaffInvoiceLinkView link={staffLink} />}
-      {mappingRows?.map((row) => (
-        <Fragment key={row.key}>{E.row(row.title, row.detail, row.unavailable ? E.status("Mapping unavailable", "w") : E.act("Fix", "attention", row.href), row.tone ?? "")}</Fragment>
-      ))}
-      {mappingRows?.some(row => row.tone === "w") ? E.info("Push becomes available after every customer and item has a QuickBooks match.") : null}
-      {model.questions.map((q) => (
-        <Fragment key={q.key}>
-          {E.row("Buyer asked about this invoice", q.detail, q.answered ? "answered" : unanswered(q), q.answered ? "ok" : "w")}
-        </Fragment>
-      ))}
-      {qbo === undefined && (accountingActions !== undefined ? accountingActions : mappingRows?.length ? E.btn("Push invoice to QuickBooks Online", pushDisabled ? "irr disabled" : "irr") : null)}
-    </>
+    <div className="flex flex-col gap-6 [overflow-wrap:anywhere]">
+      <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_18rem] md:gap-8">
+        <div className="min-w-0">
+          <header>
+            {E.back("Invoices", <span className="flex flex-wrap items-center gap-2">{model.title}{E.status(model.state.label, model.state.tone)}</span>, undefined, model.backHref)}
+            <p className="mt-1.5 text-base font-semibold">{model.customer}</p>
+          </header>
+          <section aria-labelledby="invoice-details" className="mt-2">
+            <h2 id="invoice-details" className="sr-only">Invoice details</h2>
+            <FactsGrid facts={model.facts} />
+          </section>
+        </div>
+        <PriceSummary model={model.summary} />
+      </div>
+
+      <section aria-labelledby="invoice-lines" className="border-t pt-5">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 id="invoice-lines" className={H2}>Line items</h2>
+          <span className={LEGEND}>{model.lines.length} {model.lines.length === 1 ? "line" : "lines"}</span>
+        </div>
+        <div className="mt-2 hidden md:block">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-0 text-xs">Description</TableHead>
+                {NUMBER_COLUMNS.map(([label]) => <TableHead key={label} className="text-right text-xs">{label}</TableHead>)}
+                <TableHead className="pr-0 text-right text-xs">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {model.lines.map((line) => (
+                <TableRow key={line.key}>
+                  <TableCell className="py-3.5 pl-0 whitespace-normal">
+                    <span className="font-medium">{line.name}</span>
+                    {line.description ? <p className={LEGEND}>{line.description}</p> : null}
+                  </TableCell>
+                  {NUMBER_COLUMNS.map(([label, field]) => <TableCell key={label} className="text-right tabular-nums">{line[field]}</TableCell>)}
+                  <TableCell className="pr-0 text-right font-semibold tabular-nums">{line.amount}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <ul className="mt-1 divide-y md:hidden">
+          {model.lines.map((line) => (
+            <li key={line.key} className="py-4">
+              <p className="text-sm font-semibold">{line.name}</p>
+              {line.description ? <p className={LEGEND}>{line.description}</p> : null}
+              <dl className="mt-3 grid grid-cols-3 gap-x-4">
+                {([["Quantity", line.qty], ["Unit price", line.unitPrice], ["Amount", line.amount]] as const).map(([label, value]) => (
+                  <div key={label} className="min-w-0">
+                    <dt className={LEGEND}>{label}</dt>
+                    <dd className={cn("mt-0.5 text-sm tabular-nums", label === "Amount" ? "font-semibold" : "font-medium")}>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {hasAccounting ? (
+        <section aria-labelledby="invoice-accounting" className="flex flex-col gap-3 border-t pt-5">
+          <h2 id="invoice-accounting" className={H2}>QuickBooks and accounting</h2>
+          {qbo !== undefined ? qbo : (
+            <>
+              {typeof qboGate === "string" ? E.gated("QuickBooks", qboGate) : qboGate}
+              {quickbooks || actions || staffLink?.href ? (
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  {quickbooks ? <p className="text-sm font-semibold">{sentence(quickbooks.detail)}</p> : null}
+                  <div className="flex flex-col gap-2 md:ml-auto md:items-end">
+                    {showLink && staffLink?.href ? <QboStaffInvoiceLinkView link={staffLink} /> : null}
+                    {actions}
+                  </div>
+                </div>
+              ) : null}
+              {showLink && !staffLink?.href ? <QboStaffInvoiceLinkView link={staffLink} /> : null}
+              {mappingRows?.length ? (
+                <div className="flex flex-col">
+                  {mappingRows.map((row) => (
+                    <div key={row.key}>{E.row(row.title, row.detail, row.unavailable ? E.status("Mapping unavailable", "w") : E.act("Fix", "attention", row.href), row.tone ?? "")}</div>
+                  ))}
+                </div>
+              ) : null}
+            </>
+          )}
+        </section>
+      ) : null}
+
+      {model.questions.length ? (
+        <section aria-labelledby="invoice-questions" className="border-t pt-5">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 id="invoice-questions" className={H2}>Buyer questions</h2>
+            <span className={LEGEND}>{openCount} unanswered · {model.questions.length - openCount} answered</span>
+          </div>
+          <ul className="mt-1 divide-y">
+            {model.questions.map((q) => (
+              <li key={q.key} className="flex flex-col gap-2 py-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className={LEGEND}>Asked {q.askedOn}</p>
+                  {q.answered ? E.status("Answered", "ok") : null}
+                </div>
+                <p className="text-sm">“{q.body}”</p>
+                {q.answered ? null : <div>{unanswered(q)}</div>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {correction === null ? null : (
+        <section aria-labelledby="invoice-correction" className="flex flex-col gap-3 border-t pt-5 md:flex-row md:items-center md:justify-between">
+          <h2 id="invoice-correction" className={H2}>Correct a shipment</h2>
+          {correction ?? <InvoiceReturnButton />}
+        </section>
+      )}
+    </div>
   );
 }
