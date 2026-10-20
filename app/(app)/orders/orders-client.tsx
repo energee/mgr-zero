@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
-import { LinkTabs, WORK_CHIPS, workHrefsFor } from "@/components/mgr/work-tabs";
+import { LinkTabs, workHrefsFor } from "@/components/mgr/work-tabs";
 import { OrdersView } from "@/components/mgr/views/orders-list";
 import { useCommandQuery } from "@/components/mgr/query-provider";
 import { QueryFeedback } from "@/components/mgr/query-feedback";
@@ -21,7 +21,6 @@ export function OrdersClient({ roles, timeZone, status, customerId, customerName
   // get_customer can fail (a stale or malformed link); say so rather than invent a name.
   const customer = customerId ? customerName ?? page.rows[0]?.customers?.name ?? "Customer unavailable" : undefined;
   const canWrite = hasAnyRole(roles, salesRoles); // create_order's roles
-  const workHrefs = workHrefsFor(roles);
   const orderHref = (nextStatus?: string) => {
     const query = new URLSearchParams();
     if (customerId) query.set("customerId", customerId);
@@ -36,12 +35,10 @@ export function OrdersClient({ roles, timeZone, status, customerId, customerName
       feedback={result.data ? <QueryFeedback timeZone={timeZone} error={result.error} fetching={result.isFetching} paused={result.isPaused} updatedAt={result.dataUpdatedAt} retry={() => void result.refetch()} /> : undefined}
       pagination={page.pagination}
       linkRows
+      workHrefs={workHrefsFor(roles)}
       filters={(
         <>
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <LinkTabs items={WORK_CHIPS.filter(([label]) => label in workHrefs)} current="orders" className="w-full md:w-fit" />
-          <LinkTabs items={[["all", orderHref()], ...STATUSES.map((s): [string, string] => [s, orderHref(s)])]} current={status ?? "all"} className="w-full justify-start overflow-x-auto md:w-fit" />
-        </div>
+        <LinkTabs items={[["all", orderHref()], ...STATUSES.map((s): [string, string] => [s, orderHref(s)])]} current={status ?? "all"} className="w-full justify-start overflow-x-auto md:w-fit" />
         {customer && E.row("Customer filter", customer, E.act("Clear", undefined, status ? `/orders?status=${status}` : "/orders"))}
         </>
       )}

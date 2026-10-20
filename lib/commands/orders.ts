@@ -298,8 +298,9 @@ defineQuery({
     const order = await unwrap(ctx.db.from("orders").select("*, customers(name), ship_tos(label, country, city, state)")
       .eq("brewery_id", ctx.breweryId).eq("id", i.orderId).single());
     if (!order) throw new CommandError("Order not found", 404, "not_found");
-    const [ln, events, shipment, deposits] = await Promise.all([
-      unwrap(ctx.db.from("order_lines").select("*, skus(name)").eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId)),
+    const [lines, events, shipment, deposits] = await Promise.all([
+      completeRows("Order lines", start => ctx.db.from("order_lines").select("*, skus(name)", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId).order("sku_id").range(start, start + PAGE_SIZE - 1)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
       unwrap(ctx.db.from("shipments").select().eq("order_id", i.orderId).maybeSingle()),
       completeRows("Order deposits", start => ctx.db.from("order_deposit_lines")
@@ -309,7 +310,6 @@ defineQuery({
     // Both aggregate views have one row per selected key. Restrict each request
     // to this order's SKUs in bounded batches so PostgREST's row cap cannot turn
     // an omitted balance into a false zero on the confirmation screen.
-    const lines = ln ?? [];
     const skuIds = [...new Set(lines.map((line: { sku_id: string }) => line.sku_id))];
     const [atp, sourceOnHand] = await Promise.all([
       inChunks(skuIds, async batch => (await unwrap(ctx.db.from("atp").select("brewery_id, sku_id, qty").eq("brewery_id", ctx.breweryId).in("sku_id", batch))) ?? []),
@@ -401,7 +401,8 @@ defineQuery({
   handler: async (ctx, i) => {
     const [invoice, invLines, pendingPush] = await Promise.all([
       unwrap(ctx.db.from("invoices").select("*, customers(id,name,qbo_customer_id,qbo_realm_id)").eq("id", i.invoiceId).eq("brewery_id", ctx.breweryId).single()),
-      unwrap(ctx.db.from("invoice_lines").select("*, skus(name,qbo_item_id,qbo_realm_id)").eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId)),
+      completeRows("Invoice lines", start => ctx.db.from("invoice_lines").select("*, skus(name,qbo_item_id,qbo_realm_id)", { count: "exact" })
+        .eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).order("kind").order("id").range(start, start + PAGE_SIZE - 1)),
       unwrap(ctx.db.from("qbo_pushes").select("id").eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).eq("status", "pending").maybeSingle()),
     ]);
     if (!invoice) throw new Error("Invoice not found");

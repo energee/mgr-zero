@@ -53,7 +53,7 @@ export type TodaySnapshot = {
   rows?: TodayRowView[];
   items?: TodayItem[];
   taproom?: TaproomTodayRow[];
-  /** breweries.timezone; required when any item carries a timed dueAt. */
+  /** breweries.timezone; required when any item carries a dueAt (timed or a ship/route date). */
   timeZone?: string;
   /** The clock that decides overdue versus due; tests pin it. */
   now?: Date;
@@ -103,21 +103,24 @@ export function toTodayViewProps(s: TodaySnapshot): TodayViewModel {
     };
   }
   const now = s.now ?? new Date();
+  const today = s.timeZone ? breweryDate(s.timeZone, now) : undefined;
   return {
     date: s.date,
     rows: items.map((it) => {
       const [verb, tone] = TODAY_VERB[it.reason];
+      if (it.dueAt && !s.timeZone) throw new Error(`toTodayViewProps: ${it.safeLabel} has a dueAt and needs the brewery time zone`);
       const timed = it.dueAt && TIMED_DUE.includes(it.reason) ? it.dueAt : null;
-      if (timed && !s.timeZone) throw new Error(`toTodayViewProps: ${it.safeLabel} has a dueAt and needs the brewery time zone`);
+      // A ship or route date is past due once its brewery day is before today's (#993).
+      const pastDay = Boolean(it.dueAt && !timed && breweryDate(s.timeZone!, new Date(it.dueAt)) < today!);
       return {
         key: `${it.reason}:${it.subjectId}`,
         title: it.safeLabel,
-        detail: timed ? `${it.detail} · ${dueText(timed, s.timeZone!, now)}` : it.detail,
+        detail: timed ? `${it.detail} · ${dueText(timed, s.timeZone!, now)}` : pastDay ? `${it.detail} · overdue` : it.detail,
         ...(it.dueAt ? { dueAt: it.dueAt } : {}),
         verb,
         tone,
         href: it.href,
-        warning: tone === "attention" || it.reason === "pick_due",
+        warning: tone === "attention" || it.reason === "pick_due" || pastDay,
         icon: SUBJECT_ICON[it.subjectType],
       };
     }),

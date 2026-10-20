@@ -8,6 +8,7 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toPlanningViewProps, type MaterialRequirementSnapshot } from "@/lib/mgr/planning-view";
+import { breweryDate } from "@/lib/date-format";
 import "@/lib/commands/all";
 import { DraftButton } from "./draft-button";
 
@@ -19,6 +20,6 @@ export default async function PlanningPage() {
   const vendors = new Set(buyable.map((g) => g.vendor_id));
   const canDraft = brewery.roles.includes("admin") || brewery.roles.includes("warehouse");
 
-  return <PlanningView model={toPlanningViewProps({ requirements: gaps })}
+  return <PlanningView model={toPlanningViewProps({ requirements: gaps, today: breweryDate(brewery.timeZone) })}
     footer={canDraft ? <DraftButton materialIds={buyable.map((g) => g.material_id)} vendorCount={vendors.size} /> : null} />;
 }

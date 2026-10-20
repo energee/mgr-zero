@@ -55,6 +55,11 @@ describe("pull request template", () => {
     for (const prompt of ["`TO` + `DO: <exact TODO.md item text>`", "`DOCS` + `: none`", "`API` + `: none`"]) expect(template).toContain(prompt);
   });
 
+  it("prompts for a closing keyword so a finished issue closes on merge", () => {
+    // Seven register PRs merged with their issues left open (#942–#975).
+    expect(template).toMatch(/^Closes #$/m);
+  });
+
   it("never carries a live directive, which would fire on every PR left unedited", () => {
     // pr-directives matches ^TODO: lines; the workflows match the substrings below.
     expect(template).not.toMatch(/^TODO:/m);

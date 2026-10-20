@@ -4,9 +4,9 @@
 // destination; a fixture row has no href, so its name is an inert tap.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { TabBar } from "@/components/mgr/qty";
 import { RecordTable } from "@/components/mgr/views/record-table";
 import type { BatchesRowView, BatchesViewModel, BatchOccupancyView, BatchVesselView } from "@/lib/mgr/batches-view";
+import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 
 export type { BatchesViewModel };
 
@@ -71,10 +71,9 @@ function VesselTable({ vessels }: { vessels: BatchVesselView[] }) {
 export function BatchesView({ model, createAction, workHrefs, newVesselHref }: {
   model: BatchesViewModel; createAction?: ReactNode; workHrefs?: Record<string, string>; newVesselHref?: string;
 }) {
-  const names = workHrefs ? model.workChips.filter(name => workHrefs[name]) : model.workChips;
   return <>
     {E.hd(model.title, "", createAction !== undefined ? createAction : E.btn("New batch"))}
-    <TabBar names={names} on={names.indexOf(model.workChips[model.workChipIndex])} cls="w-full overflow-x-auto" to={model.workTabs} hrefs={workHrefs} />
+    <WorkKindTabs chips={model.workChips} current={model.workChips[model.workChipIndex]} tabs={model.workTabs} hrefs={workHrefs} />
     {model.empty ? E.blank(model.empty) : <>
       {([["Planned", model.planned], ["Active", model.active], ["Completed", model.completed ?? []], ["Cancelled", model.cancelled ?? []]] as const).map(([title, rows]) => {
         return rows.length ? <Fragment key={title}>
