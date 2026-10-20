@@ -1900,7 +1900,7 @@ export const SCREENS: Screen[] = [
     name: "Vendors",
     to: { Edit: "Vendor" },
     job: "List suppliers and open one supplier's terms",
-    reads: "list_vendors_and_contracts",
+    reads: "list_vendors_and_contracts · list_vendors [while a search is on: the new-contract vendor picker still offers every vendor]",
     writes: "none [creation and editing happen on Vendor]",
     states: [["permission", "warehouse or brewer required", 1], ["active", "available for purchase orders"], ["contract", "committed quantity summarized"], ["empty", "Add vendor is the only action"]],
     spec: "Materials, vendors and contracts are separate lists so each row has one predictable destination.",
