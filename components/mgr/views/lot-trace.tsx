@@ -30,7 +30,6 @@ export function LotTraceView({
       {model.ingredients.length ? model.ingredients.map(row => <Fragment key={row.key}>{row.tracked ? E.nav(row.title, row.detail, "", undefined, row.href) : E.fld(row.title, row.detail ?? "")}</Fragment>) : E.blank("No recorded ingredient lots")}
       {E.ttl("Member batches")}
       {model.memberBatches.map(row => <Fragment key={row.key}>{E.fld(row.title, row.detail ?? "")}</Fragment>)}
-      {E.note("Recorded membership, not percentages or estimated shares.")}
       {model.sourceTransfers.length > 0 && <>
         {E.ttl("Recorded source transfers")}
         {model.sourceTransfers.map(row => <Fragment key={row.key}>{E.fld(row.title, [row.detail, row.trailing].filter(Boolean).join(" · "))}</Fragment>)}
@@ -50,7 +49,7 @@ export function LotTraceView({
           {movement.reference && <p>{movement.creditMemo ? (movement.referenceHref ? <Link className="underline" href={movement.referenceHref}>Credit memo {movement.reference}</Link> : `Credit memo ${movement.reference}`) : `Reference ${movement.reference}`}</p>}
         </div>)}
       </> : null)}
-      {E.note(model.note)}
+      {E.info(model.note)}
     </>
   );
 }

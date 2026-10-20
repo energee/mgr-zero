@@ -33,7 +33,7 @@ describe("Confirm order view loop", () => {
     expect(model.state).toBe("Submitted · ships Sep 10, 2026");
     expect(model.fulfillmentSource).toBe("Warehouse");
     expect(model.lines[1]?.tone).toBe("w");
-    expect(model.oversellNotes[0]).toMatch(/Pils · 16 oz case/);
+    expect(model.shortageNote).toMatch(/Pils · 16 oz case/);
   });
 
   it("distinguishes source stock from brewery ATP without inventing another stocked location", () => {
@@ -45,8 +45,8 @@ describe("Confirm order view loop", () => {
     });
     expect(model.lines[0].trailing).toBe("4 · 0 at Warehouse · brewery ATP 5");
     expect(model.lines[0].tone).toBe("w");
-    expect(model.oversellNotes).toEqual([expect.stringMatching(/Replenish Warehouse.*Warehouse cannot pick/i)]);
-    expect(model.oversellNotes[0]).not.toMatch(/another location/i);
+    expect(model.shortageNote).toMatch(/Replenish Warehouse.*Warehouse cannot pick/i);
+    expect(model.shortageNote).not.toMatch(/another location/i);
   });
 
   it("does not claim other-location stock for a single-location shortage", () => {
@@ -57,8 +57,9 @@ describe("Confirm order view loop", () => {
       atp: [{ sku_id: sku.sku_id, qty: 3 }],
       sourceOnHand: [{ sku_id: sku.sku_id, qty: 3 }],
     });
-    expect(model.oversellNotes).toEqual([expect.stringMatching(/Only 3 .* at Warehouse.*Replenish Warehouse.*Warehouse cannot pick/i)]);
-    expect(model.oversellNotes[0]).not.toMatch(/another location/i);
+    expect(model.lines[0].trailing).toMatch(/3 at Warehouse/);
+    expect(model.shortageNote).toMatch(/Short at Warehouse: .*Replenish Warehouse.*Warehouse cannot pick/i);
+    expect(model.shortageNote).not.toMatch(/another location/i);
   });
 
   it("warns when this order's own quantity takes ATP negative (#415)", () => {
@@ -72,7 +73,8 @@ describe("Confirm order view loop", () => {
       sourceOnHand: [{ sku_id: sku.sku_id, qty: 10 }],
     });
     expect(model.lines[0].tone).toBe("w");
-    expect(model.oversellNotes).toEqual([expect.stringMatching(/ATP for .* is 5.*confirming 10 leaves −5/i)]);
+    expect(model.lines[0].trailing).toMatch(/brewery ATP 5 · leaves −5$/);
+    expect(model.shortageNote).toMatch(/^Confirming oversells ATP for .*; that stays your call\.$/);
   });
 
   it("does not warn when ATP covers this order exactly", () => {
@@ -84,7 +86,7 @@ describe("Confirm order view loop", () => {
       sourceOnHand: [{ sku_id: sku.sku_id, qty: 10 }],
     });
     expect(model.lines[0].tone).toBe("");
-    expect(model.oversellNotes).toEqual([]);
+    expect(model.shortageNote).toBeNull();
   });
 
   it("does not claim other-location stock for a never-stocked SKU", () => {
@@ -95,8 +97,8 @@ describe("Confirm order view loop", () => {
       atp: [],
       sourceOnHand: [],
     });
-    expect(model.oversellNotes).toEqual([expect.stringMatching(/Only 0 .* at Warehouse.*Replenish Warehouse.*Warehouse cannot pick/i)]);
-    expect(model.oversellNotes[0]).not.toMatch(/another location/i);
+    expect(model.shortageNote).toMatch(/Short at Warehouse: .*Replenish Warehouse.*Warehouse cannot pick/i);
+    expect(model.shortageNote).not.toMatch(/another location/i);
   });
 
   it("the inventory record is ConfirmOrderView painted from that fixture", () => {

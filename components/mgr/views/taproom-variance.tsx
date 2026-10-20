@@ -16,7 +16,6 @@ export function TaproomVarianceView({ model }: { model: TaproomVarianceViewModel
       {report.rows.length === 0 ? E.blank(report.reason === "no_completed_periods" ? "No completed count periods in this window" : "No comparable brand totals yet") : E.tbl(["Brand", "Expected", "Actual", "Destroyed", "Variance"], report.rows.map(row => [row.brand_name, bbl(row.expected_bbl), bbl(row.actual_bbl), bbl(row.destroyed_bbl), bbl(row.variance_bbl)]), ["l", "r", "r", "r", "r"])}
       {model.trend ? E.nav(model.trend.brand, model.trend.detail, "", undefined, model.trend.href) : E.gated("Recurring brand trend", "The report returns brand totals and period coverage, not brand-by-period trends.")}
       {E.info("A brand short every week points at one line or one shift. A single short week is noise.")}
-      {E.note("Reported, never posted. The count already wrote sold depletion or destruction; this is the explanation for it.")}
       <p className="text-sm text-muted-foreground">Completed count endings {formatDate(report.window_start)} through {formatDate(report.window_end)} · as of <time dateTime={report.as_of}>{formatDateTime(report.as_of, model.timeZone)}</time>. Variance is expected minus actual.</p>
       {report.rows.map(row => <div key={row.brand_id} className="rounded-xl border p-3 text-sm">
         <p className="font-medium">{row.brand_name} · {row.compared_periods} completed {row.compared_periods === 1 ? "period" : "periods"}</p>

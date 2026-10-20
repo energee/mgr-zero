@@ -279,7 +279,7 @@ defineQuery({
       balances: [...balances.values()], on_hand_bbl: moves.reduce((n, m) => n + m.bbl, 0), recipients,
       // Compatibility only when all units are the same SKU; never sum package units.
       on_hand: new Set(moves.map(m => m.sku_id)).size <= 1 ? moves.reduce((n, m) => n + m.qty, 0) : null,
-      warning: "Only recorded lot identities are traced. Historical untracked stock and consumption cannot be assigned to this lot.",
+      warning: "Stock recorded without this lot code is not traced here.",
     };
   },
 });

@@ -1,6 +1,5 @@
 // tests/new-recipe.test.ts — a recipe is created on the Recipe surface, not
-// on a page of its own: the parent fields (name, style gated, optional brand
-// and note) are one shared component, mounted by the inventory Recipe record
+// on a page of its own: the parent fields (name, optional brand and note) are one shared component, mounted by the inventory Recipe record
 // in RecipeView's parentForm slot and by the live version form when it has
 // no recipe yet. /recipes/new is that editor; one save writes create_recipe
 // then create_recipe_version and lands on the recipe.
@@ -21,10 +20,10 @@ const src = (f: string) => readFileSync(f, "utf8");
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("Recipe creation", () => {
-  it("the parent fields are name, a gated style, optional brand and note, with no form of their own", () => {
+  it("the parent fields are name, optional brand and note, with no form of their own", () => {
     const html = renderToStaticMarkup(createElement(NewRecipeFieldsView, { brands: [{ id: "b1", name: "Hazy IPA" }] }));
     expect(html).toMatch(/>Name</);
-    expect(html).toMatch(/data-gated[^>]*>[\s\S]*Style/);
+    expect(html).not.toMatch(/Style/);
     expect(html).toMatch(/Brand · optional/);
     expect(html).toMatch(/Note · optional/);
     expect(html).not.toMatch(/<form\b|<button[^>]*type="submit"/);

@@ -61,6 +61,7 @@ describe("Licenses", () => {
     expect(html).not.toMatch(/tablist/);
     expect(html).not.toMatch(/Hazy IPA|COLA|registration/);
     expect(html).toMatch(/PA brewery/);
+    expect(html).not.toMatch(/Order confirmation does not read licenses/);
   });
 
   it("the live licenses page mounts LicensesView and slots the license form only", () => {
@@ -217,7 +218,8 @@ describe("Lot trace", () => {
     const html = htmlOf(createElement(LotTraceView, { model }));
     expect(html).toMatch(/Member batches/);
     expect(html).toMatch(/Recorded source transfers/);
-    expect(html).toMatch(/Recorded membership, not percentages or estimated shares/);
+    expect(html).not.toMatch(/Recorded membership/);
+    expect(html).toMatch(/Stock recorded without this lot code is not traced here\./);
     expect(html).not.toMatch(/\d+%/);
   });
 

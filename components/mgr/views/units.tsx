@@ -37,7 +37,7 @@ export function UnitsView({
   return (
     <>
       {E.back(backLabel, "Units", undefined, model.backHref)}
-      {E.info("Gravity is always stored in °Plato. This changes only how it is shown and typed.")}
+      {E.info("This changes only how gravity is shown and typed.")}
       {controls !== undefined ? controls : <GravityUnitControls model={model} />}
       {E.fld("A 12.5 °P reading shows as", model.example)}
     </>
