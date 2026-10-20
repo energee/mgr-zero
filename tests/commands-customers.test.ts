@@ -182,5 +182,9 @@ describe("country, alias and search", () => {
     expect(await ids(`${tag}*`)).toEqual([aliased, star]);
     expect(await ids("*")).not.toContain(plain);
     expect(await ids(`${tag}, (inc`)).toEqual([comma]);
+    const quote = await add(`Quote"Brand ${tag}`);
+    const slash = await add(`Back\\Slash ${tag}`);
+    expect(await ids(`e"B`)).toEqual([quote]);
+    expect(await ids("k\\S")).toEqual([slash]);
   });
 });

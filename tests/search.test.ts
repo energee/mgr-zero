@@ -68,6 +68,13 @@ describe("search_entities", () => {
     expect((await search("star*", adminCtx, ["customer"])).map((h) => h.id)).toEqual([star.id]);
     expect((await search("tar*", adminCtx, ["customer"])).map((h) => h.id)).toEqual([]);
     expect((await search("wild*", adminCtx, ["sku"])).map((h) => h.id)).toEqual([sku.id]);
+    const run = await ins("packaging_runs", { brewery_id: b.id, brand_id: brand.id, planned_on: "2026-09-01", created_by: adminCtx.userId });
+    const lot = await ins("lots", { brewery_id: b.id, packaging_run_id: run.id, brand_id: brand.id, code: "STAR*LOT", packaged_on: "2026-09-01" });
+    const material = await ins("materials", { brewery_id: b.id, name: "Star hops", category: "hop", base_uom: "lb", purchase_uom: "lb" });
+    const materialLot = await ins("material_lots", { brewery_id: b.id, material_id: material.id, lot_code: "STAR*HOP", received_on: "2026-09-01" });
+    expect(await search("*", adminCtx, ["lot", "material_lot"])).toEqual([]);
+    expect((await search("star*l", adminCtx, ["lot", "material_lot"])).map((h) => h.id)).toEqual([lot.id]);
+    expect((await search("star*h", adminCtx, ["lot", "material_lot"])).map((h) => h.id)).toEqual([materialLot.id]);
   });
   it("a document number past the column's range is no match, not an error", async () => {
     await expect(search("ORD-99999999999999999999")).resolves.toEqual([]);

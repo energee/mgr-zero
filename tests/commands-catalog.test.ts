@@ -107,6 +107,12 @@ describe("list_brands filters", () => {
     expect(names(await runCommand("list_brands", { q: "z, (d" }, own))).toEqual(["Fizz, (Dry)"]);
     expect(names(await runCommand("list_brands", { q: "." }, own))).toEqual([]);
   });
+  it("q keeps \" and \\ literal through the or() double escape (#1029)", async () => {
+    const own = await makeStaffCtx((await makeBrewery()).id, "sales");
+    for (const name of ['Quote"Brand', "Back\\Slash", "Plain Pils"]) await runCommand("upsert_brand", { name, style: "Ale" }, own);
+    expect(names(await runCommand("list_brands", { q: 'e"B' }, own))).toEqual(['Quote"Brand']);
+    expect(names(await runCommand("list_brands", { q: "k\\S" }, own))).toEqual(["Back\\Slash"]);
+  });
   it("sorts by ABV high to low with no ABV last, and by newest", async () => {
     expect(names(await runCommand("list_brands", { sort: "abv" }, ctx))).toEqual(["Big Stout", "Amber", "Crisp 100% Lager"]);
     expect(names(await runCommand("list_brands", { sort: "newest" }, ctx))).toEqual(["Crisp 100% Lager", "Big Stout", "Amber"]);
