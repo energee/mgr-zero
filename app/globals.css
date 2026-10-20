@@ -141,9 +141,11 @@
 }
 
 /* Aardvark Blue: ground #102040, text #dddddd, muted #bebebe (ANSI 7), black
-   #191919 for ink on bright fills, and the scheme's bright ANSI hues. Card,
-   popover, muted, accent, border and the tint surfaces are navy steps
-   derived from the ground, since the scheme defines only one. */
+   #191919 for ink on bright fills, and the scheme's bright ANSI hues, except
+   --destructive, lifted from red #f05b50 to #ff7a70 to pass AA as text on
+   card and popover. Card, popover, muted, accent, border and the tint
+   surfaces are navy steps derived from the ground, since the scheme defines
+   only one. */
 .dark {
   --background: #102040;
   --foreground: #dddddd;
@@ -159,7 +161,7 @@
   --muted-foreground: #bebebe;
   --accent: #233c6e;
   --accent-foreground: #dddddd;
-  --destructive: #f05b50;
+  --destructive: #ff7a70;
   --destructive-foreground: #191919;
   --border: #2a4478;
   --input: #2a4478;
@@ -174,7 +176,7 @@
   --sidebar-ring: #60a4ec;
   --chart-1: #60a4ec;
   --chart-2: #60b6cb;
-  --chart-3: #f05b50;
+  --chart-3: #e26be2;
   --chart-4: #95dc55;
   --chart-5: #ffe763;
   --success: #183a2c;

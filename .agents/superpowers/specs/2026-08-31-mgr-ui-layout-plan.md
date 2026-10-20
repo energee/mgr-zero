@@ -373,6 +373,7 @@ recorded. It is an audit surface, not decoration, and never implies a row can be
 | `--foreground` | `#1E1F1A` | `#dddddd` | Text |
 | `--primary` | `#6F4FD6` | `#60a4ec` | Mutable primary action, active nav, progress |
 | `--irreversible` | `#0F6B78` | `#60b6cb` | Append-only, filed, external, sign-out actions only |
+| `--destructive` | `#B52D51` | `#ff7a70` | Errors and destructive actions; passes AA as text on card and popover |
 | `--warning` / `--warning-foreground` | `#FDECD2` / `#8A4A00` | `#2f3326` / `#ffe763` | Attention surface and text; never yellow on white |
 | `--border` | `#E3E3DC` | `#2a4478` | Hairline dividers |
 
