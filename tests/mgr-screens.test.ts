@@ -872,7 +872,8 @@ describe("SCREENS", () => {
     // one-option chip group, a link and a role editor.
     const html = (name: string) =>
       renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
-    for (const name of ["Chat settings", "Menu", "Tap board", "Variance by brand"]) {
+    // Tap board's taproom choice is a Location select since #973 (tests/location-scope.test.ts).
+    for (const name of ["Chat settings", "Menu", "Variance by brand"]) {
       expect(html(name), name).toContain("tablist");
     }
     for (const name of ["Work", "Orders", "Transfers", "Batches", "Packaging runs", "Purchase orders", "Routes"]) {
