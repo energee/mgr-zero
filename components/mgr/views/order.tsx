@@ -5,8 +5,10 @@
 // charges, cost, history, and a quiet Cancel at the bottom. Inventory and the
 // live page both pass toOrderViewProps(get_order-shaped data); sample orders
 // live in lib/mgr/fixtures/orders.ts. Verbs come in through `actions` and
-// `footer`: fixtures pass inert E buttons, the live page its LifecycleButtons
-// and CancelOrderAction (app/(app)/orders/[id]/lifecycle-buttons.tsx).
+// `footer`: fixtures pass inert E buttons and leave `footer` out (an inert
+// Cancel order row draws); the live page passes its LifecycleButtons and
+// CancelOrderAction (app/(app)/orders/[id]/lifecycle-buttons.tsx), and
+// footer={null} draws no bottom row.
 import type { ComponentProps, ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { PriceSummary } from "@/components/mgr/views/price-summary";
@@ -57,7 +59,7 @@ export function OrderView({
   model: OrderViewModel;
   /** The state's verbs, primary first; drawn in the header. */
   actions?: ReactNode;
-  /** The bottom row, normally an OrderCancelRow; omitted when the order cannot be cancelled. */
+  /** The bottom row. Omitted: the inventory's inert Cancel order row; null: none. */
   footer?: ReactNode;
   adjustLines?: boolean;
   showAddLine?: boolean;
@@ -205,7 +207,7 @@ export function OrderView({
         )}
       </section>
 
-      {footer}
+      {footer === undefined ? <OrderCancelRow><CancelOrderButton /></OrderCancelRow> : footer}
     </div>
   );
 }
