@@ -1209,7 +1209,6 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Customers",
-    to: { Open: "Customer detail" },
     job: "Manage accounts, addresses and portal users",
     reads: "list_customers · get_customer",
     writes: "invite_customer_user [existing] · upsert_customer · upsert_ship_to",
@@ -1218,7 +1217,6 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 5, slice: 1, tab: "More", name: "Customers missing email",
-    to: { Open: "Customer detail" },
     job: "Review customer accounts without a current portal login email",
     reads: "list_customers [missingPortalEmail]",
     writes: "none [Invite and Remove access on Customer detail correct portal access]",
@@ -1795,7 +1793,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["blended", "member batches and stored source transfers, without percentages", 1], ["still on hand", "unsold units are the part a recall can actually stop"], ["no shipments", "no recorded shipment of this lot", 1], ["unknown lot", "not found"]],
     spec: "The lot is one packaging run. Ingredients link to material-lot recall; exact reversals are excluded and additions from every recorded member batch are included before its downstream departure. Trace follows recorded transfers backward from its tank before run close, tightening the time cutoff at every upstream transfer. Member batches and original transfer quantities are shown without proportional attribution or estimated shares; later arrivals are excluded. Trace lists every movement carrying the lot: the production that made it, samples and losses pulled from it. Shipping records explicit bin/lot allocations per order line; returns and transfers preserve them. Trace shows actual customer recipients, ship-to addresses, orders and invoices, and balances per SKU/bin plus barrels. Historical untracked consumption cannot be assigned to a lot. It does not descend into POS sale lines, because a sale posts nothing to the ledger and would imply a per-pint traceability MGR does not have.",
-    body: <LotTraceView model={toLotTraceViewProps(lotTraceHazy)} />,
+    body: <LotTraceView model={toLotTraceViewProps(lotTraceHazy, DEMO_TIME_ZONE)} />,
   },
   {
     step: 7, slice: 5, tab: "Beer", group: "Global", name: "Material lot trace",
@@ -1804,7 +1802,7 @@ export const SCREENS: Screen[] = [
     to: { "L-240831-HZ": "Lot trace" },
     states: [["still on hand", "remaining recorded material can be quarantined", 1], ["unpackaged batch", "consumption without a finished lot remains visible"], ["no shipments", "no recorded customer shipments"], ["unknown lot", "not found"]],
     spec: "Header Search finds material lot codes, even when exhausted, for Admin and Sales. Trace follows effective consumption into every brew turn and cellar addition, packaging-material consumption and recorded blend membership, then finished lots and actual recipients. Exact reversed consumptions are excluded. Unlinked tracked consumption is shown explicitly; historical untracked material cannot be assigned a lot. Quantities show recorded use, not estimated shares. The same MaterialLotTraceView serves inventory and live reads.",
-    body: <MaterialLotTraceView model={toMaterialLotTraceViewProps(materialLotTraceCitra)} />,
+    body: <MaterialLotTraceView model={toMaterialLotTraceViewProps(materialLotTraceCitra, DEMO_TIME_ZONE)} />,
   },
   {
     step: 7,
@@ -2409,7 +2407,7 @@ export const SCREENS: Screen[] = [
     slice: 8,
     group: "Desk",
     name: "Planning",
-    to: { "Can labels": "Material", "Hazy ATP negative 9/9": "Pars and allocation", "Draft 1 purchase order": "New PO", "Lindenmeyr Munroe": "Vendor", "Blue Label": "Vendor" },
+    to: { "Can labels": "Material", "Hazy ATP negative Sep 9, 2026": "Pars and allocation", "Draft 1 purchase order": "New PO", "Lindenmeyr Munroe": "Vendor", "Blue Label": "Vendor" },
     job: "See demand gaps and draft one purchase order per vendor, without priority state",
     reads: "get_material_requirements",
     writes: "draft_purchase_order_from_requirements [one RPC: one draft PO per resolved vendor + lines; the buy-by date is needed-by less the vendor's lead time]",
@@ -2468,7 +2466,7 @@ export const SCREENS: Screen[] = [
     writes: "unlink_chat_user",
     states: [["permission", "admin only", 1], ["linked", "three people"], ["unlinked", "personal messages stop for that person", 1]],
     spec: "A brewery admin can remove a stale identity link without disconnecting Slack for everyone.",
-    body: <ChatLinkedPeopleView people={linkedChatPeople} />,
+    body: <ChatLinkedPeopleView people={linkedChatPeople} timeZone={DEMO_TIME_ZONE} />,
   },
   {
     step: 8,
@@ -3024,8 +3022,8 @@ export const SCREENS: Screen[] = [
     spec: "Rows are rebuilt from owning MGR queries. App Home remains current during quiet hours and is optional for future providers.",
     body: (<>
       {S.h("Today · 4 waiting")}
-      {S.sa("*ORD-0231 · Review submitted order*\nrequested Thu · sales", "Open")}
-      {S.sa("*ORD-0235 · Pick due*\nships Fri · warehouse", "Open")}
+      {S.sa("*ORD-0231 · Review submitted order*\nsubmitted · ships Sep 3, 2026 · sales", "Open")}
+      {S.sa("*ORD-0235 · Pick due*\nships Sep 4, 2026 · warehouse", "Open")}
       {S.sa("*Route A · next stop*\nassigned to you · 9:30 AM", "Open")}
       {S.sa("*FV2 · reading overdue*\nlast reading 26 h ago · brewer", "Open")}
       {S.acts([["Open Today in MGR", "pri"]])}
@@ -3102,7 +3100,7 @@ export const SCREENS: Screen[] = [
     spec: "Future phase only. This fixture intentionally carries an ATP warning, so Slack cannot confirm it.",
     body: (<>
       {S.ctx("Future phase only")}
-      {S.f([["Order", "ORD-0231 · 3 lines · requested Thu · Submitted"], ["Warning", "Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR."]])}
+      {S.f([["Order", "ORD-0231 · 3 lines · ships Sep 3, 2026 · Submitted"], ["Warning", "Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR."]])}
       {S.dis("Confirm order", "This order needs the full MGR review")}
     </>),
   },

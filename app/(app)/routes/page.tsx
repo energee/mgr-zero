@@ -5,6 +5,7 @@
 import { E } from "@/components/mgr/e";
 import { RoutesView } from "@/components/mgr/views/routes";
 import { getActiveBrewery } from "@/lib/brewery";
+import { formatDate } from "@/lib/date-format";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { workHrefsFor } from "@/components/mgr/work-tabs";
@@ -18,7 +19,7 @@ export default async function RoutesPage() {
   const { routes, unassigned } = (await runCommand("list_routes", {}, ctx)) as RouteList;
   return <RoutesView model={toRoutesViewProps({ title: "Work", subtitle: "routes", rows: [
     ...routes.map(route => ({
-      key: route.id, title: (route.name ?? "Route") + " · " + route.delivery_date,
+      key: route.id, title: (route.name ?? "Route") + " · " + formatDate(route.delivery_date),
       detail: route.departed_at ? "departed · " + route.stops.filter(stop => stop.delivered_at).length + " of " + route.stops.length + " delivered" : route.stops.length + (route.stops.length === 1 ? " stop · " : " stops · ") + driverLabel(route.driver_user_id),
       verb: route.departed_at ? "Resume" : route.driver_user_id ? "Open" : "Assign",
       tone: route.departed_at ? "info" as const : route.driver_user_id ? "primary" as const : "attention" as const,

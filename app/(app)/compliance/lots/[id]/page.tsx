@@ -15,5 +15,5 @@ export default async function LotTracePage({ params }: { params: Promise<{ id: s
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const trace = (await orNotFound(runCommand("trace_lot", { lotId: id }, ctx))) as LotTraceSnapshot;
-  return <LotTraceView model={toLotTraceViewProps(trace, "/compliance")} tape={null} />;
+  return <LotTraceView model={toLotTraceViewProps(trace, brewery.timeZone, "/compliance")} tape={null} />;
 }

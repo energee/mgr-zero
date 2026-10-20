@@ -24,8 +24,8 @@ export const todayEmpty: TodayViewModel = {
 export const todaySales: TodayViewModel = {
   date: DATE,
   rows: [
-    { key: "ord1", title: "ORD-0231 · Ridgeline", detail: "submitted · ships Thu", verb: "Confirm", tone: "success", warning: true, icon: "package" },
-    { key: "ord2", title: "ORD-0235 · Teresa’s", detail: "submitted · ships Fri", verb: "Confirm", tone: "success", icon: "package" },
+    { key: "ord1", title: "ORD-0231 · Ridgeline", detail: "submitted · ships Sep 3, 2026", verb: "Confirm", tone: "success", warning: true, icon: "package" },
+    { key: "ord2", title: "ORD-0235 · Teresa’s", detail: "submitted · ships Sep 4, 2026", verb: "Confirm", tone: "success", icon: "package" },
     { key: "pils", title: "Pils · 16 oz case", detail: "Not enough Pils for 2 orders", verb: "Choose who gets it", tone: "attention", warning: true },
     { key: "hazy", title: "Hazy IPA · ½ bbl", detail: "11 ready · fine" },
     { key: "oh", title: "Al’s Bar · OH", detail: "Al’s Bar can’t receive Stout in OH", verb: "Fix registration", tone: "attention", warning: true },
@@ -37,7 +37,7 @@ export const todayBrewer: TodayViewModel = {
   date: DATE,
   rows: [
     { key: "fv3", title: "FV3 · Stout", detail: "reading overdue 31 h", verb: "Reading", tone: "info", warning: true, icon: "thermo" },
-    { key: "brew", title: "B-0416 · Hazy IPA v4", detail: "brew day Fri 9/4 · 15 bbl", verb: "Start", tone: "info", icon: "beer" },
+    { key: "brew", title: "B-0416 · Hazy IPA v4", detail: "brew day Sep 4, 2026 · 15 bbl", verb: "Start", tone: "info", icon: "beer" },
     { key: "run", title: "RUN-0031 · Hazy cans", detail: "packaged today · close due", verb: "Close", tone: "info", warning: true, icon: "package" },
     { key: "fv1", title: "FV1 · Pils", detail: "1.9 °P · read 4 h ago", icon: "thermo" },
   ],

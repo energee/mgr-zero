@@ -158,7 +158,8 @@ the rendered page (step 4), and:
    <text>` names the open `TODO.md` item this PR finishes, and CI rejects one
    that does not match exactly one item; the literal `DOCS: none` skips the
    documentation agent, and `API: none` skips the HTTP API agent.
-   `.github/pull_request_template.md` prompts for all three. Both doc agents
+   `.github/pull_request_template.md` prompts for all three, plus a
+   `Closes #<n>` line so a finished issue closes on merge. Both doc agents
    also re-audit weekly, and `.github/workflows/doc-agent-watch.yml` opens an
    issue when any doc workflow or `hosted jobs` fails, or no dream lands for
    3 days.
@@ -199,6 +200,6 @@ approval before touching anything.
 ## Working files
 
 - `scripts/worktree.sh <branch> [base]` creates `.agents/worktrees/<branch>/`, the only place for worktrees; plain `git worktree add` cannot run `vitest` or `next dev`.
-- `scripts/land-pr.sh <pr> [--merge]` lands one PR: merges origin/main, regenerates the migration lock and API docs, proves, pushes, waits for CI, merges. One session merges at a time.
+- `scripts/land-pr.sh <pr> [--merge]` lands one PR: merges origin/main, regenerates the migration lock and API docs, proves, pushes, waits for CI, and merges only after `claude-code-review.yml` ran: its `simplify` job (Claude Code's `/simplify`, pushing fixes to the branch) and its `claude-review` job both succeeded in one run. It marks a draft ready so that runs, and waits for it before syncing. One session merges at a time.
 - `.claude/settings.json` is the shared allowlist: exact proof commands and plain `git fetch` only. Never add interpreters, shells, `bun run *`, pushes, other writes, or a trailing `*` on a command whose flags can run code.
 - `.agents/MEMORY.md`, `.agents/PROGRESS.md`, `.agents/DRIFT.md` are written by the dreaming PR (operating loop step 6). The full list of agent files is in `.agents/ARCHITECTURE.md` "Working files".

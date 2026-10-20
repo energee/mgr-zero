@@ -6,7 +6,7 @@ import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 export function PackagingRunsView({ model, actions, workHrefs }: { model: PackagingRunsViewModel; actions?: ReactNode; workHrefs?: Record<string, string> }) {
   const rows = (title: string, items: PackagingRunsViewModel["upcoming"]) => items.length ? <>
     {E.ttl(title)}
-    {items.map((row) => <Fragment key={row.key}>{E.row(row.title, row.detail, row.verb ? E.act(row.verb, row.tone, row.href) : "", row.warning ? "w" : "")}</Fragment>)}
+    {items.map((row) => <Fragment key={row.key}>{row.verb ? E.row(row.title, row.detail, E.act(row.verb, row.tone, row.href), row.warning ? "w" : "") : E.nav(row.title, row.detail, row.warning ? "w" : "", undefined, row.href)}</Fragment>)}
   </> : null;
   return <>
     {E.hd("Packaging", "", actions !== undefined ? actions : E.btn("Schedule run"))}

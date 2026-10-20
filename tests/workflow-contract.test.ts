@@ -272,6 +272,19 @@ describe("production-readiness workflow contract", () => {
     expect(review).toContain("github.event.pull_request.user.type != 'Bot'");
   });
 
+  it("runs /simplify before the code review, and land-pr requires both", () => {
+    const landPr = readFileSync(resolve(__dirname, "..", "scripts", "land-pr.sh"), "utf8");
+    const jobs = parse(review).jobs;
+    const simplify = jobs.simplify.steps.find((step: { name?: string }) => step.name === "Run Claude /simplify");
+    expect(simplify.with.prompt).toMatch(/^\/simplify /);
+    expect(simplify.with.claude_args).toContain('--disallowedTools "Edit(.git/**),Edit(.github/**)"');
+    expect(jobs.simplify.permissions.contents).toBe("write");
+    expect(jobs["claude-review"].needs).toBe("simplify");
+    expect(jobs["claude-review"].steps.at(-1).with.claude_args).toContain("## Code review");
+    expect(landPr).toContain("= claude-review,simplify ]");
+    expect(landPr).toContain("gh pr ready");
+  });
+
   it("treats GitHub Actions as trusted workflow context for dreaming", () => {
     expect(dreaming).toContain(
       "You are running inside GitHub Actions (GITHUB_ACTIONS=true); the CI-only guard is satisfied"
