@@ -515,7 +515,7 @@ Admin and Sales can run the QuickBooks invoice sync. It freezes the eligible inv
 
 Admin opens **Settings → Accounting** to connect, reconnect, inspect safe connection health, manage mappings and choose whether future QuickBooks invoices allow bank transfer, card, or both. Admin and Sales can open **Fix mapping** from an invoice and enter an exact customer or item ID they verified in the connected QuickBooks company; MGR never selects a record from a matching name. After a mapping saves, reopening it shows the ID the server retained. The payment choices are copied when the next invoice is pushed and do not change invoices already there. Every push, exact retry, corrected push, or re-push first opens a confirmation that names the invoice and the operation. Closing it sends nothing. Selecting its **Confirm** action invokes the registered command; an exact retry still uses the previously saved request and replay identity. QuickBooks payment, edit, void, and deletion status remains visible after disconnect. After sync confirms an invoice was voided or deleted in its original QuickBooks company, Admin may mark it **Written off** with a reason even while QuickBooks is disconnected. Credit memos never offer write-off. That status records who acted and when inside MGR; it does not change QuickBooks, record cash, or create a credit.
 
-Accounting shares the explorer's connection, online-payment status, and **Bank transfer (ACH)** / **Card** switches. Select **Save push defaults** while connected; saved settings remain read-only during recovery. If a refresh credential has expired or QuickBooks rejects it as revoked, MGR marks the connection as needing recovery and shows the authorization error. Admin can reconnect or disconnect. A temporary provider failure leaves the connection state unchanged. **Customers missing an email** offers **Review**, but its count is unavailable from the current health query. **Disconnect QuickBooks** opens a confirmation sheet, including for a connection that needs recovery. Disconnecting deletes MGR's stored credential first, then asks QuickBooks to revoke it. If QuickBooks confirms, you land on Connect QuickBooks; if it does not, the sheet stays open and says the credential is deleted but revocation was not confirmed, so remove MGR's access in QuickBooks or reconnect. Closing the sheet changes nothing.
+Accounting shares the explorer's connection, online-payment status, and **Bank transfer (ACH)** / **Card** switches. Select **Save push defaults** while connected; saved settings remain read-only during recovery. If a refresh credential has expired or QuickBooks rejects it as revoked, MGR marks the connection as needing recovery and shows the authorization error. Admin can reconnect or disconnect. A temporary provider failure leaves the connection state unchanged. **Customers missing a portal login email** offers **Review**, but its count is unavailable from the current health query. **Disconnect QuickBooks** opens a confirmation sheet, including for a connection that needs recovery. Disconnecting deletes MGR's stored credential first, then asks QuickBooks to revoke it. If QuickBooks confirms, you land on Connect QuickBooks; if it does not, the sheet stays open and says the credential is deleted but revocation was not confirmed, so remove MGR's access in QuickBooks or reconnect. Closing the sheet changes nothing.
 
 The **QuickBooks mappings** list separates customers, SKUs, the deposit/refund item, and the one-way keg fee item. **Map** or **Change** opens **Mapping conflict** from Accounting, or **Fix mapping** from an invoice's mapping list. Each sheet identifies the local record and accepts the exact QuickBooks customer or item ID, without changing leading zeroes or guessing from names. **Save mapping** is unavailable while the ID is blank or a save is pending. Closing discards unsaved edits. A company claimed by another brewery must be disconnected there first; a mapping cannot override that claim. A QuickBooks customer maps to one MGR customer per company: saving an ID another customer already uses in the same company is refused with "That already exists. Use a different name or value." Remap the other customer first.
 
@@ -831,7 +831,7 @@ Below the vendors, **Contracts** lists commitments: one vendor, one material, a 
 
 Stock totals include every recorded material-and-bin balance, even in a large inventory. If MGR cannot read the complete list, reload before using its totals. A failed stock read is not a zero balance.
 
-**Count** on a material row opens a cycle count for one bin: pick the location and bin, type what you counted in base units, and **Record count**. The count is always recorded, even when it matches. Only the variance posts, as a count adjustment. When the material holds several lots, a shortage comes off the earliest best-by lots first and an overage lands on the newest lot; a shortage crossing two lots writes one adjustment per lot. The live preview shows the system total and variance for the selected bin. **Lot allocation preview** is marked unavailable because the read query does not return the lot split; allocation happens in the command. Enter base units only: automatic whole-roll conversion is not available.
+**Count** on a material row opens a cycle count for one bin: pick the location and bin, type what you counted in base units, and **Record count**. The count is always recorded, even when it matches. Only the variance posts, as a count adjustment. When the material holds several lots, a shortage comes off the earliest best-by lots first and an overage lands on the newest lot; a shortage crossing two lots writes one adjustment per lot. The live preview shows the system total and variance for the selected bin. Enter base units only: automatic whole-roll conversion is not available.
 
 ### Purchase orders
 
@@ -933,6 +933,21 @@ For an eligible live invoice with a current positive QuickBooks balance, the cus
 <Screen name="Permission denied" />
 
 Navigation hides what your role cannot open, but a bookmarked address still lands on the page. When the page's first read is refused, MGR shows **No access** with what was refused, who you are signed in as, and the role that would satisfy it, plus **Back to Today** and **Go to Beer**. An admin can change your role in Settings, then Team.
+
+## Menu [#menu]
+
+<Screen name="Menu" />
+
+**Menu** (More; Admin and Warehouse) turns one mapped Square location into a menu of poured beers. A beer appears only when its bin holds active packaged keg stock. To set it up:
+
+1. Pick the mapped Square location.
+2. Choose its **MGR bin** and **Sales channel**. **Publish changes** appears once a bin is chosen.
+3. Check each row. **Pours from** lists the kegs in that bin. **Availability** shows **In the selected bin** or **Off register · no selected-bin stock**.
+4. To price one pour differently at this location, open the item, type a **Price override**, and select **Save override**. Leave it empty to follow the **Format price**. **Reset to format price** clears the override.
+5. On the same item, tick **Publish on website** to show that row on the public taproom feed. The box is unavailable when the row is off register.
+6. Select **Publish changes** to send the whole location menu to Square, or **Publish item to Square** to send one beer.
+
+The retry and conflict rules for publishing are under [Settings](#settings).
 
 ## Sale channels [#channels]
 
