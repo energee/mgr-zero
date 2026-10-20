@@ -174,7 +174,7 @@ export function PosMenuView({ model, bins = [], channels = [], busy, error, noti
   const mapped = Boolean(model.selectedLocationId);
   return <>
     {E.back("More", model.title ?? "Menu", undefined, backHref)}
-    {model.setup && <>{E.blank(model.setup)}{model.setup.action && E.btn(model.setup.action.label, "p", model.setup.action.href)}</>}
+    {model.setup && E.blank(model.setup, undefined, model.setup.action && E.btn(model.setup.action.label, "p", model.setup.action.href))}
     {mapped && <div role="tablist" aria-label="Square location" className="flex flex-wrap gap-2">{model.locations.map(location => <Button role="tab" aria-selected={location.id === model.selectedLocationId} key={location.id} variant={location.id === model.selectedLocationId ? "default" : "outline"} size="sm" asChild={Boolean(location.href)}>{location.href ? <a href={location.href}>{location.label}</a> : location.label}</Button>)}</div>}
     {model.message && E.note(model.message)}
     {model.selectedLocationId && !model.binName && <form className="flex flex-col gap-3 rounded-lg border p-3" onSubmit={configure}>

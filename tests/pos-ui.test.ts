@@ -153,6 +153,11 @@ describe("Menu with no mapped Square location (#997)", () => {
     expect(html).not.toContain("No mapped Square location is available.");
   });
 
+  it("draws the setup action inside the empty state, under its message (#1020 review)", () => {
+    const html = unmapped(0, true);
+    expect(html).toMatch(/data-slot="empty-content"[^>]*>(?:(?!<\/div>)[\s\S])*Set up Square/);
+  });
+
   it("sends an admin to map a location when Square locations exist but none is mapped", () => {
     const html = unmapped(2, true);
     expect(html).not.toContain("Connect Square");
