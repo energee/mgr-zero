@@ -1,6 +1,8 @@
 import { expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 const state = vi.hoisted(() => ({ roles: ["warehouse"], calls: [] as [string, unknown][], gates: [] as [string, string | undefined][], source: null as { id: string; name: string } | null, locations: null as { id: string; name: string; uses: string[] }[] | null, reservations: null as { id: string; source: string; ref: string; qty: number; orderId?: string; orderNo?: number }[] | null }));
+// The Orders Status pick navigates with the app router; outside Next it needs a stand-in.
+vi.mock("next/navigation", async (original) => ({ ...await original<typeof import("next/navigation")>(), useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", roles: state.roles, timeZone: "America/Los_Angeles" }) }));
 vi.mock("@/lib/portal", () => {
   const customer = { breweryId: "brewery", customerId: "buyer", customerName: "Buyer" };
@@ -56,8 +58,8 @@ it("preserves customer filtering, default destinations, active SKUs and Warehous
   expect(readonly.props.createAction).toBeNull();
   expect(state.calls).toContainEqual(["list_orders", { customerId: "buyer", status: "draft", cursor: undefined }]);
   expect(state.calls).toContainEqual(["get_customer", { customerId: "buyer" }]);
-  expect(renderToStaticMarkup(readonly.props.filters)).toContain("customerId=buyer");
-  expect(renderToStaticMarkup(readonly.props.filters)).toContain("Buyer");
+  expect(readonly.props.model.statusOptions.every((o: { href: string }) => o.href.includes("customerId=buyer"))).toBe(true);
+  expect(readonly.props.model.customer.name).toBe("Buyer");
   state.roles = ["sales"];
   // New order is its own route now; the list only links to it, and the route
   // itself carries the create_order gate and the picker options.

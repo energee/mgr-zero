@@ -1,36 +1,65 @@
-// components/mgr/views/orders-list.tsx — Work → Orders list. The Work kind
-// strip is the shared WorkKindTabs; live passes OrderForm as createAction and
-// the status LinkTabs as filters; inventory uses the fixture verbs and E.tabs.
-import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
-import { Fragment, type ReactNode } from "react";
+// components/mgr/views/orders-list.tsx — the Work → Orders register. One
+// drawing for inventory and live: the shared WorkKindTabs, a labeled Status
+// pick (ScopePick, so the URL holds it), the customer scope line, and a
+// RecordTable whose order number is the one link to the order. Live passes
+// OrderForm as createAction and the adapter's hrefs; the inventory's stay inert.
+import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import type { OrdersListViewModel } from "@/lib/mgr/orders-list-view";
+import { ScopePick } from "@/components/mgr/scope-pick";
+import type { OrdersListRowView, OrdersListViewModel } from "@/lib/mgr/orders-list-view";
+import { sentenceCase } from "@/lib/mgr/labels";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
+import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
+import { RecordTable } from "./record-table";
 import { WorkKindTabs } from "./work-kind-tabs";
 
 export type { OrdersListViewModel };
 
-const ORDER_STATES = ["all states", "draft", "submitted", "confirmed", "picked", "shipped"];
+const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
+
+/** Lifecycle status, and staged restock as a second worded badge so color is never the only signal. */
+const statusCell = (row: OrdersListRowView) => (
+  <span className="inline-flex flex-wrap gap-1.5">
+    {E.status(sentenceCase(row.status))}
+    {row.restock && E.status("Restock staged", "w")}
+  </span>
+);
+
+function Register({ rows }: { rows: OrdersListRowView[] }) {
+  return (
+    <RecordTable
+      // The action column needs no visible header: its button names the verb.
+      headers={["Order", "Customer", "Requested ship date", "Status", <span key="action" className="sr-only">Next action</span>]}
+      align={["l", "l", "l", "l", "l"]}
+      rows={rows.map((row) => ({
+        key: row.key,
+        href: row.href,
+        to: "Order",
+        cells: [
+          row.orderNo,
+          row.customer ? <span className="font-medium">{row.customer}</span> : muted("transfer"),
+          row.shipDate ?? muted("Not scheduled"),
+          statusCell(row),
+          row.action && E.act(row.action.verb, row.action.tone, row.action.href),
+        ],
+      }))}
+    />
+  );
+}
 
 export function OrdersView({
   model,
   pagination,
   createAction,
-  filters,
   workHrefs,
-  linkRows,
   listStatus,
   feedback,
 }: {
   pagination?: HistoryNavigationProps;
   model: OrdersListViewModel;
   createAction?: ReactNode;
-  /** The status filter under the Work kind strip; inventory draws inert state tabs. */
-  filters?: ReactNode;
   /** Live: the Work chips this role may open. */
   workHrefs?: Record<string, string>;
-  /** Live list: row verbs are links. Inventory leaves them unlabeled taps. */
-  linkRows?: boolean;
   listStatus?: ReactNode;
   feedback?: ReactNode;
 }) {
@@ -38,15 +67,16 @@ export function OrdersView({
     <>
       {E.hd("Orders", undefined, createAction !== undefined ? createAction : E.btn("New order"))}
       <WorkKindTabs chips={WORK_CHIPS} current="orders" tabs={WORK_TABS} hrefs={workHrefs} />
-      {filters !== undefined ? filters : E.tabs(ORDER_STATES, 0, "w-full justify-start overflow-x-auto md:w-fit")}
+      <div className="md:w-64">
+        <ScopePick label="Status" value={model.status} options={model.statusOptions} />
+      </div>
+      {model.customer && (
+        <p className="text-sm">
+          Customer: <strong className="font-medium wrap-anywhere">{model.customer.name}</strong> · {E.link("Clear", "Orders", model.customer.clearHref)}
+        </p>
+      )}
       {feedback}
-      {listStatus ?? (model.empty
-        ? E.blank(model.empty)
-        : model.rows.map((row) => (
-          <Fragment key={row.key}>
-            {E.row(row.title, row.detail, E.act(row.verb, row.tone, linkRows ? row.href : undefined), row.warning ? "w" : "")}
-          </Fragment>
-        )))}
+      {listStatus ?? (model.empty ? E.blank(model.empty) : <Register rows={model.rows} />)}
       <HistoryNavigation {...pagination} />
     </>
   );
