@@ -55,6 +55,7 @@ describe("get_today (registered reader)", () => {
 
     const forSales = await today(sales, noon);
     expect(forSales.map((i) => [i.reason, i.subjectId])).toEqual([["submitted_order", submitted]]);
+    expect(forSales[0].detail).toBe("submitted · ships Sep 5, 2026");
     const forWarehouse = await today(warehouse, noon);
     expect(forWarehouse.map((i) => [i.reason, i.subjectId])).toEqual([["pick_due", confirmed]]);
     expect((await today(adminCtx, noon)).map((i) => i.reason).sort()).toEqual(["pick_due", "submitted_order"]);

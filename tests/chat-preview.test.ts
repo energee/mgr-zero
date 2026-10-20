@@ -29,7 +29,7 @@ describe("chat preview fixtures", () => {
     expect(new Set(CHAT_PREVIEW_FIXTURES.map((fixture) => fixture.id)).size).toBe(CHAT_PREVIEW_FIXTURES.length);
   });
 
-  it("App Home's submitted-order row copies Today's live ship-date wording (#991)", () => {
+  it("App Home and Personal queue fixtures show the formatDate ship-date wording (#991)", () => {
     const appHome = CHAT_PREVIEW_FIXTURES.find((fixture) => fixture.id === "app-home")!;
     const submitted = appHome.items.find((item) => item.reason === "submitted_order")!;
     expect(submitted.detail).toMatch(/^submitted · ships Sep 3, 2026/);

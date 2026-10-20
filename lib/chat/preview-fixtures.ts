@@ -123,7 +123,7 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
     eyebrow: "Close",
     status: { label: "Future phase only", tone: "attention" },
     fields: [
-      { label: "Order", value: "ORD-0231 · 3 lines · requested Thu · Submitted" },
+      { label: "Order", value: "ORD-0231 · 3 lines · ships Sep 3, 2026 · Submitted" },
       { label: "Warning", value: "Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR." },
     ],
     items: [],
