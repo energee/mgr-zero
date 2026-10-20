@@ -2,7 +2,9 @@
 // observed lead time (list_vendors_and_contracts), each editable in
 // vendor-form.tsx → upsert_vendor, and below them the Contracts list with the
 // four drawdown numbers (committed · received · on order · available),
-// editable in contract-form.tsx → upsert_material_contract.
+// editable in contract-form.tsx → upsert_material_contract. ?q= narrows the
+// vendors (and so their contracts) by name, as Catalog's search does.
+import { z } from "zod";
 import { E } from "@/components/mgr/e";
 import { ContractsView } from "@/components/mgr/views/contracts";
 import { VendorsView } from "@/components/mgr/views/vendors";
@@ -14,6 +16,8 @@ import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
 import "@/lib/commands/all";
 import { VendorForm, type Vendor } from "./vendor-form";
 import { ContractForm, type Contract } from "./contract-form";
+import { ListControls } from "@/components/mgr/list-controls";
+import { listParams } from "@/lib/mgr/list-params";
 
 type Observed = { sent_via: string; n: number; avg_lead_days: number; avg_late_days: number | null };
 type VendorRow = Vendor & {
@@ -30,13 +34,18 @@ function leadLine(v: VendorRow) {
   return [typed, ...obs, `${v.contracts.length} ${v.contracts.length === 1 ? "contract" : "contracts"}`].join(" · ");
 }
 
-export default async function VendorsPage() {
+const vendorsParams = z.object({ q: z.string().trim().max(100).catch("") });
+
+export default async function VendorsPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> } = {}) {
+  const { params } = listParams(vendorsParams, (await searchParams) ?? {});
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [vendors, materials] = (await Promise.all([
-    runCommand("list_vendors_and_contracts", {}, ctx), runCommand("list_materials", {}, ctx),
-  ])) as [VendorRow[], Material[]];
-  const options = vendors.map((v) => ({ id: v.id, name: v.name }));
+  const [vendors, materials, allVendors] = (await Promise.all([
+    runCommand("list_vendors_and_contracts", params, ctx), runCommand("list_materials", {}, ctx),
+    // A search narrows the list, but a new contract may still name any vendor.
+    params.q ? runCommand("list_vendors", {}, ctx) : null,
+  ])) as [VendorRow[], Material[], { id: string; name: string }[] | null];
+  const options = (allVendors ?? vendors).map((v) => ({ id: v.id, name: v.name }));
   const contracts = vendors.flatMap((v) => v.contracts.map((c) => ({
     ...c,
     vendor_name: v.name,
@@ -54,8 +63,10 @@ export default async function VendorsPage() {
           verb: "Edit",
           disabled: !v.active,
         })),
+        filtered: Boolean(params.q),
       })}
       header={E.hd("Vendors", "", <VendorForm />)}
+      controls={vendors.length || params.q ? <ListControls search={{ label: "Search vendors", value: params.q, keep: {} }} rows={[]} /> : undefined}
       rowTrailing={(row) => {
         const v = vendors.find((x) => x.id === row.key)!;
         return <VendorForm vendor={v} />;
@@ -71,6 +82,7 @@ export default async function VendorsPage() {
               verb: "Edit",
               warning: c.qty_available <= 0,
             })),
+            filtered: Boolean(params.q),
           })}
           header={E.hd("Contracts", "", <ContractForm vendors={options} materials={materials} />)}
           rowTrailing={(row) => {

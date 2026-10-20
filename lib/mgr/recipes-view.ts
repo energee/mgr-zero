@@ -24,20 +24,24 @@ export type RecipesSnapshot = {
   createHref?: string;
   rows?: RecipesRowView[];
   recipes?: { id: string; name: string; brand?: string | null; latest_version: number | null }[];
+  /** A search is on, so an empty list means no match, not no recipes. */
+  filtered?: boolean;
 };
 
 const NO_RECIPES: EmptyState = { title: "No recipes yet", description: "A recipe is the grain and hop bill a batch is brewed from." };
+const NO_MATCH: EmptyState = { title: "No recipes match", description: "Clear the search to see every recipe." };
 
 export function toRecipesViewProps(s: RecipesSnapshot): RecipesViewModel {
   const { backHref, createHref } = s;
+  const empty = (count: number) => count > 0 ? undefined : s.filtered ? NO_MATCH : NO_RECIPES;
   if (s.rows) {
-    return { backHref, createHref, rows: s.rows, empty: s.rows.length === 0 ? NO_RECIPES : undefined };
+    return { backHref, createHref, rows: s.rows, empty: empty(s.rows.length) };
   }
   const recipes = s.recipes ?? [];
   return {
     backHref,
     createHref,
-    empty: recipes.length === 0 ? NO_RECIPES : undefined,
+    empty: empty(recipes.length),
     rows: recipes.map((r) => {
       const href = `/recipes/${r.id}`;
       if (r.latest_version === null) {

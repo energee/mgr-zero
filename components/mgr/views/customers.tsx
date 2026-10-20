@@ -16,7 +16,7 @@ export function CustomersView({
 }: {
   model: CustomersViewModel;
   createAction?: ReactNode;
-  /** Live has no search yet; pass null to hide. Inventory draws E.search. */
+  /** The search strip (components/mgr/list-controls.tsx), in live and inventory alike. */
   search?: ReactNode;
   linkRows?: boolean;
   backHref?: string;
@@ -25,7 +25,7 @@ export function CustomersView({
     <>
       {E.back("More", "Customers", createAction !== undefined ? createAction : E.btn("Add customer"), backHref)}
       {model.missingPortalEmail && E.info("Customers without a current portal login email. Open a customer and use Invite to add buyer access; Remove access replaces an obsolete login. Email presence is a readiness check, not proof of delivery or sending.")}
-      {search !== undefined ? search : E.search("Search customers")}
+      {search}
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (
