@@ -69,7 +69,7 @@ describe("timestamps use the shared formatters (#253)", () => {
 
   it("the Weekly count draft dates the server day through the shared formatter", () => {
     const html = htmlOf(SCREENS.find((screen) => screen.name === "Weekly count")!.body);
-    expect(html).toMatch(/Server date Sep 8, 2026/);
-    expect(html).not.toMatch(/Server date 2026-09-08/);
+    expect(html).toMatch(/Count whole packages for Sep 8, 2026; a partly full keg counts as one\. Enter 0 for none\./);
+    expect(html).not.toMatch(/for 2026-09-08/);
   });
 });

@@ -1209,7 +1209,6 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Customers",
-    to: { Open: "Customer detail" },
     job: "Manage accounts, addresses and portal users",
     reads: "list_customers · get_customer",
     writes: "invite_customer_user [existing] · upsert_customer · upsert_ship_to",
@@ -1218,7 +1217,6 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 5, slice: 1, tab: "More", name: "Customers missing email",
-    to: { Open: "Customer detail" },
     job: "Review customer accounts without a current portal login email",
     reads: "list_customers [missingPortalEmail]",
     writes: "none [Invite and Remove access on Customer detail correct portal access]",

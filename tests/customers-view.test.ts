@@ -41,9 +41,18 @@ describe("Customers list", () => {
     expect(body.props.search?.props.search.label).toBe("Search customers");
   });
 
-  it("the inventory list still offers Add customer and Open", () => {
-    expect(html(screen("Customers").body)).toMatch(/>Add customer</);
-    expect(html(screen("Customers").body)).toMatch(/>Open</);
+  it("the inventory list offers Add customer, and each row opens by its arrow, not an Open verb (#996)", () => {
+    const markup = html(screen("Customers").body);
+    expect(markup).toMatch(/>Add customer</);
+    expect(markup).not.toMatch(/>Open</);
+    expect(markup).toContain('aria-label="Open"');
+  });
+
+  it("a live customer row is one link to its detail page (#996)", () => {
+    const model = toCustomersViewProps(customersList);
+    const markup = html(createElement(CustomersView, { model, linkRows: true, createAction: null, search: null }));
+    expect(markup).toContain(`href="${model.rows[0]!.href}"`);
+    expect(markup).not.toMatch(/>Open</);
   });
 
   it("the live Customers page mounts CustomersView with no second E.* tree", () => {

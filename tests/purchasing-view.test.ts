@@ -26,7 +26,7 @@ import {
 } from "../lib/mgr/fixtures/purchasing";
 import { toContractsViewProps } from "../lib/mgr/contracts-view";
 import { toMaterialsOnHandViewProps } from "../lib/mgr/materials-on-hand-view";
-import { toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
+import { purchaseOrderNext, toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
 import { receiptBillPresentation, receiptBillRequest, toPostedReceiptViewProps, type ReceiptSnapshot } from "../lib/mgr/receipt-view";
 import { toVendorsViewProps } from "../lib/mgr/vendors-view";
 import { poLineCounts } from "../lib/mgr/new-po-view";
@@ -38,6 +38,24 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
 
 describe("Purchase orders", () => {
+  it("a closed order with no next action is a row link, not an Open verb (#996)", () => {
+    const model = toPurchaseOrdersViewProps({ title: "Work", subtitle: "every order", rows: [
+      { key: "po", title: "PO-0012 · Hop Co", detail: "received", href: "/purchase-orders/po" },
+    ] });
+    const markup = renderToStaticMarkup(createElement(PurchaseOrdersView, { model, linkRows: true, createAction: null }));
+    expect(markup).toContain('href="/purchase-orders/po"');
+    expect(markup).toContain('aria-label="Open"');
+    expect(markup).not.toMatch(/>Open</);
+  });
+
+  it("each order status names its next action; received and cancelled have none (#996)", () => {
+    expect(purchaseOrderNext("draft")).toEqual({ verb: "Mark sent", tone: "info" });
+    expect(purchaseOrderNext("sent")).toEqual({ verb: "Receive", tone: "info" });
+    expect(purchaseOrderNext("partially_received")).toEqual({ verb: "Receive", tone: "attention" });
+    expect(purchaseOrderNext("received")).toBeUndefined();
+    expect(purchaseOrderNext("cancelled")).toBeUndefined();
+  });
+
   it("the Purchase orders inventory record is PurchaseOrdersView", () => {
     const body = screen("Purchase orders").body as { type: unknown; props: { model: unknown } };
     expect(isValidElement(screen("Purchase orders").body)).toBe(true);

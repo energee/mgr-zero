@@ -158,7 +158,8 @@ the rendered page (step 4), and:
    <text>` names the open `TODO.md` item this PR finishes, and CI rejects one
    that does not match exactly one item; the literal `DOCS: none` skips the
    documentation agent, and `API: none` skips the HTTP API agent.
-   `.github/pull_request_template.md` prompts for all three. Both doc agents
+   `.github/pull_request_template.md` prompts for all three, plus a
+   `Closes #<n>` line so a finished issue closes on merge. Both doc agents
    also re-audit weekly, and `.github/workflows/doc-agent-watch.yml` opens an
    issue when any doc workflow or `hosted jobs` fails, or no dream lands for
    3 days.
