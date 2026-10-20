@@ -8,7 +8,7 @@ import { completeRows, defineCommand, defineQuery, cents, PAGE_SIZE, phone, unwr
 import { isoDate } from "./packaging";
 import { PAYMENT_TERMS } from "@/lib/mgr/enums";
 import { OPEN_PO_STATUSES } from "@/lib/mgr/receive-po-view";
-import { escapeLike } from "@/lib/escape-like";
+import { escapeRegex } from "@/lib/escape-regex";
 
 const PURCHASING = ["admin", "warehouse", "brewer"] as const;
 const MATERIAL_CATEGORIES = ["malt", "hop", "yeast", "adjunct", "chemical", "packaging", "other"] as const;
@@ -104,7 +104,7 @@ defineQuery({
   input: z.object({ q: z.string().trim().max(100).optional().describe("Only vendors whose name contains this text") }), roles: [...PURCHASING],
   handler: async (ctx, i) => {
     let vendorQuery = ctx.db.from("vendors").select("id, name, email, phone, payment_terms, lead_time_days, active").eq("brewery_id", ctx.breweryId);
-    if (i.q) vendorQuery = vendorQuery.ilike("name", `%${escapeLike(i.q)}%`);
+    if (i.q) vendorQuery = vendorQuery.regexIMatch("name", escapeRegex(i.q));
     const [vendors, contracts, balances, observed] = await Promise.all([
       unwrap(vendorQuery.order("name")),
       unwrap(ctx.db.from("material_contracts").select("id, vendor_id, material_id, contract_no, unit_cost_cents, starts_on, ends_on, materials(name)").eq("brewery_id", ctx.breweryId).order("created_at")),
@@ -148,7 +148,7 @@ defineQuery({
       .select("id, name, category, base_uom, purchase_uom, purchase_uom_factor, lot_tracked, default_vendor_id, reorder_point, extract_potential, active")
       .eq("brewery_id", ctx.breweryId).order("name");
     if (!i.includeInactive) q = q.eq("active", true);
-    if (i.q) q = q.ilike("name", `%${escapeLike(i.q)}%`);
+    if (i.q) q = q.regexIMatch("name", escapeRegex(i.q));
     return unwrap(q);
   },
 });

@@ -77,6 +77,20 @@ describe("vendors, materials, contracts", () => {
     expect(await materials("e_m")).toEqual(["Pale_Malt"]);
   });
 
+  it("list_vendors_and_contracts and list_materials q treat * as literal text (#1029)", async () => {
+    const own = await makeStaffCtx((await makeBrewery()).id, "warehouse");
+    for (const name of ["Plain Supply", "Star*Hops"]) await runCommand("upsert_vendor", { name }, own);
+    const vendors = async (q: string) => ((await runCommand("list_vendors_and_contracts", { q }, own)) as { name: string }[]).map((v) => v.name);
+    expect(await vendors("*")).toEqual(["Star*Hops"]);
+    expect(await vendors("(")).toEqual([]);
+    for (const name of ["Plain Malt", "Star*Malt"]) {
+      await runCommand("upsert_material", { name, category: "other", baseUom: "lb", purchaseUom: "lb", purchaseUomFactor: 1 }, own);
+    }
+    const materials = async (q: string) => ((await runCommand("list_materials", { q }, own)) as { name: string }[]).map((m) => m.name);
+    expect(await materials("*")).toEqual(["Star*Malt"]);
+    expect(await materials("r*m")).toEqual(["Star*Malt"]);
+  });
+
   it("a sales user may not edit vendors", async () => {
     const sales = await makeStaffCtx(b.id, "sales");
     await expect(runCommand("upsert_vendor", { name: "Nope" }, sales)).rejects.toThrow(/permission/i);

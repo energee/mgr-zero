@@ -387,6 +387,8 @@ describe("Vendors and Materials on hand search", () => {
     // A vendor search narrows Contracts too, so its empty footer is a no-match, not no contracts.
     expect(toContractsViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No contracts match", description: "Clear the search to see every contract." });
     expect(toContractsViewProps({ rows: [] }).empty?.title).toBe("No contracts yet");
+    // These are vendor contracts: a material bought, not beer promised to a customer (#1029).
+    expect(toContractsViewProps({ rows: [] }).empty?.description).toBe("A contract records a quantity of a material a vendor commits to supply, which purchase orders then draw down.");
   });
 });
 

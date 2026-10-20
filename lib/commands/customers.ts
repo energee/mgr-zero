@@ -4,7 +4,7 @@
 import { z } from "zod";
 import { cents, CommandError, completeRows, countryCode, defineCommand, defineQuery, PAGE_SIZE, stateCode, unwrap } from "./registry";
 import { CUSTOMER_TYPES, PAYMENT_TERMS } from "@/lib/mgr/enums";
-import { escapeLike } from "@/lib/escape-like";
+import { escapeRegex } from "@/lib/escape-regex";
 import { hasAnyRole } from "@/lib/mgr/roles";
 
 const roles = ["admin", "sales"] as const;
@@ -95,14 +95,15 @@ defineQuery({
   // Paged past PostgREST's 1000-row cap (#475); id breaks name ties so pages never overlap.
   handler: (ctx, i) => {
     if (i.missingPortalEmail && !hasAnyRole(ctx.roles, ["admin", "sales"])) throw new CommandError("permission denied", 403, "permission_denied");
-    // A PostgREST or() value is double-quoted, so `"` and `\` (including escapeLike's) are escaped again, as list_brands does.
-    const pattern = i.q && `"%${escapeLike(i.q).replace(/["\\]/g, (c) => `\\${c}`)}%"`;
+    // An unanchored imatch is a case-insensitive contains. A PostgREST or() value is double-quoted, so `"` and `\`
+    // (including escapeRegex's) are escaped again, as list_brands does.
+    const pattern = i.q && `"${escapeRegex(i.q).replace(/["\\]/g, (c) => `\\${c}`)}"`;
     return completeRows("Customer list", start => {
     const columns = i.includeShipTos ? "*, sale_channels(name), shipTos:ship_tos(id, label, is_default)" : "*, sale_channels(name)";
     const base = i.missingPortalEmail
       ? ctx.db.rpc("customers_missing_portal_email", { p_brewery: ctx.breweryId }, { count: "exact" }).select(columns)
       : ctx.db.from("customers").select(columns, { count: "exact" }).eq("brewery_id", ctx.breweryId);
-    const query = (pattern ? base.or(`name.ilike.${pattern},alias.ilike.${pattern}`) : base).order("name").order("id");
+    const query = (pattern ? base.or(`name.imatch.${pattern},alias.imatch.${pattern}`) : base).order("name").order("id");
     return (i.includeShipTos ? query.order("label", { referencedTable: "shipTos" }) : query).range(start, start + PAGE_SIZE - 1);
     });
   },
