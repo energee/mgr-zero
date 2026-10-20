@@ -50,8 +50,6 @@ import { BrandApprovalView } from "@/components/mgr/views/brand-approval";
 import { BrandView } from "@/components/mgr/views/brand";
 import { CatalogView } from "@/components/mgr/views/catalog";
 import { ListControls } from "@/components/mgr/list-controls";
-import { BRAND_SORTS } from "@/lib/mgr/enums";
-import { BRAND_SORT_LABEL } from "@/lib/mgr/labels";
 import { ChannelView } from "@/components/mgr/views/channel";
 import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
 import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
@@ -222,7 +220,7 @@ import { toBatchesViewProps } from "@/lib/mgr/batches-view";
 import { toBeerViewProps } from "@/lib/mgr/beer-view";
 import { toBinViewProps } from "@/lib/mgr/bin-view";
 import { toBrandViewProps } from "@/lib/mgr/brand-view";
-import { toCatalogViewProps } from "@/lib/mgr/catalog-view";
+import { toCatalogScopes, toCatalogViewProps } from "@/lib/mgr/catalog-view";
 import { toChannelViewProps } from "@/lib/mgr/channel-view";
 import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
 import { toContractsViewProps } from "@/lib/mgr/contracts-view";
@@ -1392,7 +1390,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_brand · create_sku · update_sku",
     states: DEFAULT_STATES,
     spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix.",
-    body: <CatalogView model={toCatalogViewProps(catalogBrands)} controls={<ListControls search={{ label: "Search brands or aliases", value: "", keep: {} }} rows={[{ label: "Sort", names: BRAND_SORTS.map(value => BRAND_SORT_LABEL[value]), on: 0 }, { label: "Category", names: ["All", "Core", "Seasonal"], on: 0 }]} />} formats={toFormatsViewProps({ ...formatsInventory, formats: formatsInventory.formats.filter(format => format.basis === "packaged") })} />,
+    body: <CatalogView model={toCatalogViewProps(catalogBrands)} controls={<ListControls search={{ label: "Search brands or aliases", value: "", keep: {} }} scopes={toCatalogScopes({ sort: "name", category: "", categories: ["Core", "Seasonal"] })} rows={[]} />} formats={toFormatsViewProps({ ...formatsInventory, formats: formatsInventory.formats.filter(format => format.basis === "packaged") })} />,
   },
   {
     step: 5,

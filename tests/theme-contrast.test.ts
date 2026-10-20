@@ -10,16 +10,28 @@ const luminance = (hex: string) => {
   });
   return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
 };
+const contrast = (x: string, y: string) => {
+  const [a, b] = [luminance(x), luminance(y)];
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+};
 
 for (const mode of [":root", ".dark"]) {
+  const block = css.slice(css.indexOf(`${mode} {`)).split("}")[0];
+  const tokens = Object.fromEntries([...block.matchAll(/--([\w-]+):\s*(#[a-f\d]{6})/gi)].map((m) => [m[1], m[2]]));
+
   it(`${mode} semantic text pairs meet AA contrast`, () => {
-    const block = css.slice(css.indexOf(`${mode} {`)).split("}")[0];
-    const tokens = Object.fromEntries([...block.matchAll(/--([\w-]+):\s*(#[a-f\d]{6})/gi)].map((m) => [m[1], m[2]]));
     for (const role of ["primary", "destructive", "irreversible", "warning", "success", "attention", "info"]) {
       expect(tokens[role], role).toBeDefined();
-      const a = luminance(tokens[role]);
-      const b = luminance(tokens[`${role}-foreground`]);
-      expect((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), `${role} contrast`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(tokens[role], tokens[`${role}-foreground`]), `${role} contrast`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  // These three also render as text (row actions, error copy, links) on every surface.
+  it(`${mode} primary, destructive and irreversible meet AA as text on every surface`, () => {
+    for (const role of ["primary", "destructive", "irreversible"]) {
+      for (const surface of ["background", "card", "popover"]) {
+        expect(contrast(tokens[role], tokens[surface]), `${role} on ${surface}`).toBeGreaterThanOrEqual(4.5);
+      }
     }
   });
 }

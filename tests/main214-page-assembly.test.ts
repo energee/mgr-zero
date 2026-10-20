@@ -188,8 +188,12 @@ it("passes Catalog's URL filters to list_brands", async () => {
   expect(state.brandInput).toEqual({ q: "hazy", sort: "name", category: "Core" });
   const html = render(page);
   expect(html).toContain('value="hazy"');
-  expect(html).toContain('href="/catalog?q=hazy&amp;sort=abv&amp;category=Core"');
-  expect(html).toContain('href="/catalog?q=hazy"');
+  // Sort and Category are ScopePick selects (#965): each option carries the
+  // link that changes only that setting, keeping the search and the other one.
+  const scopes = page.props.controls.props.scopes as { label: string; options: { value: string; href?: string }[] }[];
+  const href = (label: string, value: string) => scopes.find((s) => s.label === label)?.options.find((o) => o.value === value)?.href;
+  expect(href("Sort", "abv")).toBe("/catalog?q=hazy&sort=abv&category=Core");
+  expect(href("Category", "")).toBe("/catalog?q=hazy");
 });
 it("routes list: an assigned route not yet departed is a row link; Resume and Assign stay verbs (#1026)", async () => {
   const html = render(await RoutesPage());

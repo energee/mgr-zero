@@ -4,10 +4,11 @@
 // them. Packaged and poured SKUs are managed together under each brand. Add format
 // opens format-form.tsx; a format's name links to its components and Package BOM.
 // ?q=, ?sort= and ?category= narrow and order the brands in list_brands
-// (docs/plans/list-filters.md); ListControls draws them as a GET form and link tabs.
+// (docs/plans/list-filters.md); ListControls draws them as a GET form and
+// labeled Sort and Category picks whose options are links (toCatalogScopes).
 import { z } from "zod";
 import { CatalogView } from "@/components/mgr/views/catalog";
-import { toCatalogViewProps } from "@/lib/mgr/catalog-view";
+import { toCatalogScopes, toCatalogViewProps } from "@/lib/mgr/catalog-view";
 import { toFormatsViewProps } from "@/lib/mgr/formats-view";
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -18,7 +19,6 @@ import { FormatForm } from "./format-form";
 import { ListControls } from "@/components/mgr/list-controls";
 import { listParams } from "@/lib/mgr/list-params";
 import { BRAND_SORTS } from "@/lib/mgr/enums";
-import { BRAND_SORT_LABEL } from "@/lib/mgr/labels";
 
 type PriceGroup = { id: string; name: string };
 type Sku = { id: string; name: string; format_id: string; active: boolean; upc: string | null };
@@ -40,21 +40,11 @@ export default async function CatalogPage({ searchParams }: { searchParams?: Pro
     runCommand("list_brands", params, ctx) as Promise<Brand[]>, runCommand("list_formats", { basis: "packaged" }, ctx) as Promise<Format[]>, runCommand("list_price_groups", {}, ctx) as Promise<PriceGroup[]>,
     runCommand("list_catalog_categories", {}, ctx) as Promise<{ name: string }[]>,
   ]);
-  // Each tab links to this page with that one choice changed; the other params stay.
-  const sortRow = {
-    label: "Sort", names: BRAND_SORTS.map(value => BRAND_SORT_LABEL[value]),
-    on: BRAND_SORTS.indexOf(params.sort),
-    hrefs: Object.fromEntries(BRAND_SORTS.map(value => [BRAND_SORT_LABEL[value], hrefWith("/catalog", { sort: value })])),
-  };
-  const categoryNames = ["All", ...categories.map(c => c.name)];
-  const categoryRow = {
-    label: "Category", names: categoryNames,
-    on: Math.max(0, categoryNames.indexOf(params.category)),
-    hrefs: Object.fromEntries(categoryNames.map(name => [name, hrefWith("/catalog", { category: name === "All" ? "" : name })])),
-  };
+  // Each option links to this page with that one setting changed; the other params stay.
+  const scopes = toCatalogScopes({ ...params, categories: categories.map(c => c.name), href: patch => hrefWith("/catalog", patch) });
   // The search form resubmits only q, so it carries every other non-default param along.
   const keep = Object.fromEntries(queryWith({ q: "" }));
-  const controls = <ListControls search={{ label: "Search brands or aliases", value: params.q, keep }} rows={categories.length ? [sortRow, categoryRow] : [sortRow]} />;
+  const controls = <ListControls search={{ label: "Search brands or aliases", value: params.q, keep }} scopes={scopes} rows={[]} />;
   return (
     <CatalogView
       model={toCatalogViewProps({ brands, priceGroups: groups, backHref: "/more", filtered: Boolean(params.q || params.category) })}
@@ -63,9 +53,6 @@ export default async function CatalogPage({ searchParams }: { searchParams?: Pro
       linkRows
       formats={toFormatsViewProps({ formats, formatHref: format => `/catalog/formats/${format.id}` })}
       formatAction={canWrite ? <FormatForm componentOptions={formats.filter(format => format.bbl_per_unit !== null)} /> : null}
-      footer={<>
-        {E.nav("Water profiles", "the water you start from and the waters you aim at", "", undefined, "/catalog/water-profiles")}
-      </>}
     />
   );
 }
