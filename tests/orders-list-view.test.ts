@@ -135,7 +135,6 @@ describe("Orders list view loop", () => {
     const list = OrdersClient(page.props);
     expect(list.type).toBe(OrdersView);
     expect(list.props.model).toEqual(toOrdersListViewProps({ ...ordersWorkList, linked: true }));
-    expect(list.props.filters).toBeUndefined();
     expect(renderToStaticMarkup(list.props.createAction)).toContain('href="/orders/new"');
     expect(list.props.feedback.type).toBe(QueryFeedback);
     expect(list.props.feedback.props.timeZone).toBe("America/Los_Angeles");

@@ -84,6 +84,7 @@ export function toOrdersListViewProps({ roles, status, customer, customerId, lin
         status: o.status,
         restock: o.needs_restock,
         href: link(`/orders/${o.id}`),
+        // Open is nextAction's documented fallback (no permitted next step, or nothing left to do) and the only verb that repeats the order link.
         action: verb === "Open" ? undefined : { verb, tone, href: link(href) },
       };
     }),

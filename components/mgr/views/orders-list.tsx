@@ -3,6 +3,7 @@
 // pick (ScopePick, so the URL holds it), the customer scope line, and a
 // RecordTable whose order number is the one link to the order. Live passes
 // OrderForm as createAction and the adapter's hrefs; the inventory's stay inert.
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { ScopePick } from "@/components/mgr/scope-pick";
@@ -72,7 +73,9 @@ export function OrdersView({
       </div>
       {model.customer && (
         <p className="text-sm">
-          Customer: <strong className="font-medium wrap-anywhere">{model.customer.name}</strong> · {E.link("Clear", "Orders", model.customer.clearHref)}
+          Customer: <strong className="font-medium wrap-anywhere">{model.customer.name}</strong> ·{" "}
+          {/* The shared 48px target on coarse pointers; the inventory's Clear stays inert. */}
+          <Link href={model.customer.clearHref ?? "#"} data-to="Orders" className="inline-flex min-h-6 items-center text-muted-foreground underline pointer-coarse:min-h-12">Clear</Link>
         </p>
       )}
       {feedback}
