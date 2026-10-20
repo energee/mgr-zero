@@ -35,3 +35,20 @@ it("Tap board labels its Location select with the selected taproom", () => {
 it("the Tap board inventory offers only taprooms, as the live route asks for", () => {
   expect(tapBoardRecord.props.navigation.locations.map((option) => option.label)).not.toContain("Warehouse");
 });
+
+/** True when the Location label comes before `heading` in the markup: the scope control sits above the list's heading, not between it and the list. */
+function selectBeforeHeading(node: ReactNode, heading: string) {
+  const html = renderToStaticMarkup(createElement("div", null, node));
+  const select = html.search(/<label[^>]*>Location<\/label>/), title = html.indexOf(`>${heading}<`);
+  expect(select, "Location label").toBeGreaterThan(-1);
+  expect(title, heading).toBeGreaterThan(-1);
+  return select < title;
+}
+
+it("Tap board draws the Location select above the On tap heading", () => {
+  expect(selectBeforeHeading(tapBoardRecord, "On tap")).toBe(true);
+});
+
+it("Variance draws the Location select above the Variance by brand heading", () => {
+  expect(selectBeforeHeading(createElement(TaproomVarianceView, { model: taproomVariance }), "Variance by brand")).toBe(true);
+});
