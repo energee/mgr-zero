@@ -49,7 +49,7 @@ const packagedFormats = [
   { id: FMT_CASE, name: "case · 24×16 oz" },
 ];
 
-/** More → Catalog: three brands, 8 price groups, 3 channels, 3 water profiles. */
+/** More → Catalog: three brands and 8 price groups. */
 export const catalogBrands: CatalogSnapshot = {
   brands: [
     {
@@ -81,12 +81,6 @@ export const catalogBrands: CatalogSnapshot = {
     },
   ],
   priceGroups,
-  channels: [
-    { id: "ch-wholesale", name: "Wholesale" },
-    { id: "ch-taproom", name: "Taproom" },
-    { id: "ch-dtc", name: "DTC" },
-  ],
-  waterProfileCount: 3,
 };
 
 /** Hazy IPA brand sheet: Core, price group 3, 3 active packages. */

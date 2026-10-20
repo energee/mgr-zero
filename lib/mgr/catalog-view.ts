@@ -1,7 +1,11 @@
 // lib/mgr/catalog-view.ts — view-model for Catalog. list_brands plus
-// list_price_groups (and optional list_sale_channels / water-profile count)
-// paint the inventory Catalog drawing.
+// list_price_groups paint the brand table and the Price groups row;
+// toCatalogScopes builds the Sort and Category picks above the table.
+import type { ListScope } from "@/components/mgr/list-controls";
 import type { EmptyState } from "./empty-state";
+import type { BrandSort } from "./enums";
+import { BRAND_SORTS } from "./enums";
+import { BRAND_SORT_LABEL } from "./labels";
 import { plural } from "./plural";
 
 /** One brand row's facts, each drawn in its own column. */
@@ -25,8 +29,7 @@ export type CatalogViewModel = {
   empty?: EmptyState;
   priceGroups: string;
   priceGroupsHref: string;
-  waterProfiles?: string;
-  waterProfilesHref?: string;
+  waterProfilesHref: string;
 };
 
 /** list_brands row: brand facts plus nested style and SKUs. */
@@ -44,10 +47,6 @@ export type CatalogSnapshot = {
   brands: CatalogBrandRow[];
   /** list_price_groups. */
   priceGroups: { id: string; name: string }[];
-  /** list_sale_channels. Inventory uses the count for "N channels". */
-  channels?: { id: string; name: string }[];
-  /** Inventory-only until list_water_profiles exists. */
-  waterProfileCount?: number;
   backHref?: string;
   /** A search or category is on, so an empty list means no match, not no brands. */
   filtered?: boolean;
@@ -58,12 +57,9 @@ const NOT_SET = "Not set";
 export function toCatalogViewProps({
   brands,
   priceGroups,
-  channels,
-  waterProfileCount,
   backHref,
   filtered,
 }: CatalogSnapshot): CatalogViewModel {
-  const groupCopy = plural(priceGroups.length, "group");
   return {
     backHref,
     empty: brands.length > 0 ? undefined
@@ -78,10 +74,33 @@ export function toCatalogViewProps({
       skus: String(b.skus.length + (b.pours?.length ?? 0)),
       href: `/catalog/brands/${b.id}`,
     })),
-    priceGroups: channels
-      ? `${plural(channels.length, "channel")} · ${groupCopy}`
-      : groupCopy,
+    priceGroups: plural(priceGroups.length, "group"),
     priceGroupsHref: "/pricing",
-    waterProfiles: waterProfileCount == null ? undefined : plural(waterProfileCount, "profile"),
+    waterProfilesHref: "/catalog/water-profiles",
   };
+}
+
+/** The Sort and Category settings, the brewery's category names, and (live)
+ *  the link for one changed setting. The inventory leaves `href` out. */
+export type CatalogScopeInput = {
+  sort: BrandSort;
+  category: string;
+  categories: string[];
+  href?: (patch: { sort?: BrandSort; category?: string }) => string;
+};
+
+/** Sort, then Category once the brewery has a category. "All categories" is
+ *  the empty value, and a category not in the list reads as All. */
+export function toCatalogScopes({ sort, category, categories, href }: CatalogScopeInput): ListScope[] {
+  const sortScope: ListScope = {
+    label: "Sort",
+    value: sort,
+    options: BRAND_SORTS.map((value) => ({ value, label: BRAND_SORT_LABEL[value], href: href?.({ sort: value }) })),
+  };
+  if (!categories.length) return [sortScope];
+  return [sortScope, {
+    label: "Category",
+    value: categories.includes(category) ? category : "",
+    options: ["", ...categories].map((name) => ({ value: name, label: name || "All categories", href: href?.({ category: name }) })),
+  }];
 }
