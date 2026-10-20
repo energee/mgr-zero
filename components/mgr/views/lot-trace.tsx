@@ -35,7 +35,7 @@ export function LotTraceView({
         {E.ttl("Recorded source transfers")}
         {model.sourceTransfers.map(row => <Fragment key={row.key}>{E.fld(row.title, [row.detail, row.trailing].filter(Boolean).join(" · "))}</Fragment>)}
       </>}
-      {tape !== undefined ? tape : E.tape(model.tape.map((row) => [row.label, row.when]))}
+      {tape !== undefined ? tape : E.tape(model.tape.map((row) => [row.label, <span key={row.key} className="whitespace-nowrap">{row.when}</span>]))}
       {E.ttl("Recorded balances by SKU and bin")}
       {balances !== undefined ? balances : model.balances.map((row) => (
         <Fragment key={row.key}>{E.row(row.title, row.detail ?? "", row.trailing ?? "")}</Fragment>

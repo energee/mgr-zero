@@ -234,6 +234,12 @@ describe("Lot trace", () => {
     expect(page).not.toMatch(/\bE\./);
   });
 
+  it("keeps each movement date on one line on a phone (#1013 review)", () => {
+    const model = toLotTraceViewProps(lotTraceHazy, DEMO_TIME_ZONE);
+    const html = htmlOf(createElement(LotTraceView, { model }));
+    for (const row of model.tape) expect(html).toContain(`<span class="whitespace-nowrap">${row.when}</span>`);
+  });
+
   it("lets the live page suppress the inventory tape", () => {
     const html = htmlOf(createElement(LotTraceView, {
       model: toLotTraceViewProps(lotTraceHazy, DEMO_TIME_ZONE),
