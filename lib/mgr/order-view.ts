@@ -124,25 +124,31 @@ const qtyText = (qty: number | null) => (qty === null ? "Not recorded" : String(
 /** qty × cents rounded to the nearest cent, half up, the way the database
  *  rounds a numeric line amount. qty is numeric(12,2), so it is scaled to
  *  whole hundredths first: the product stays an exact integer, where a float
- *  product (1.15 × 50 = 57.4999…) would round the wrong way. */
+ *  product (1.15 × 50 = 57.4999…) would round the wrong way.
+ *  ponytail: exact only while hundredths × cents stays under 2^53 (about
+ *  9×10^15, e.g. 1,000,000 units at $900,000 each); no order comes near it. */
 export function orderLineCents(qty: number, unitCents: number): number {
   const hundredths = Math.round(Number(qty) * 100) * Number(unitCents);
   return Math.floor((hundredths + 50) / 100);
 }
 
 /** The order's money summary: the before-tax order amount for a submitted
- *  wholesale order, an items estimate for a draft, nothing payable for a
- *  transfer. A total needs every charge collection; an undefined deposits
- *  list or line fee means it was not supplied, which is not the same as none. */
+ *  wholesale order, an items estimate for a draft (or a draft cancelled before
+ *  it was ever submitted, since keg charges freeze at submit), nothing payable
+ *  for a transfer. A total needs every charge collection; an undefined
+ *  deposits list or line fee means it was not supplied, which is not the same
+ *  as none. */
 function orderSummary(
   order: OrderSnapshot["order"],
   lines: OrderSnapshot["lines"],
   deposits: OrderSnapshot["deposits"],
+  events: OrderSnapshot["events"],
 ): PriceSummaryModel {
   if (order.kind === "taproom_transfer") return { rows: [], note: "Taproom transfer · not a customer charge. No invoice or balance due." };
   const itemsCents = lines.reduce((sum, l) => sum + orderLineCents(l.qty_ordered, l.unit_price_cents), 0);
   const items = money(itemsCents);
-  if (order.status === "draft") {
+  const neverSubmitted = order.status === "draft" || (order.status === "cancelled" && !events.some((e) => e.event === "submitted"));
+  if (neverSubmitted) {
     return {
       rows: [{ label: "Keg deposits and fees", value: "Not finalized until submission" }],
       total: { label: "Items estimate", value: items },
@@ -211,7 +217,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
       ...(order.kind === "wholesale" ? [{ label: "Customer PO", value: order.po_number ?? "Not specified" }] : []),
       ...(order.note ? [{ label: "Note", value: order.note, wide: true }] : []),
     ],
-    summary: orderSummary(order, lines, deposits),
+    summary: orderSummary(order, lines, deposits, events),
     costLine: costLineFor(order, cogs),
     restockNote: restockNoteFor(order, lines),
     repickNote: order.repick_since && order.status === "confirmed" ? "Changed after pick: count the added or raised lines; the rest is already staged." : undefined,

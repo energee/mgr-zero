@@ -57,7 +57,7 @@ export function OrderView({
   complianceNote,
 }: {
   model: OrderViewModel;
-  /** The state's verbs, primary first; drawn in the header. */
+  /** The state's verbs, primary first; drawn in the header after Put back when beer is staged. */
   actions?: ReactNode;
   /** The bottom row. Omitted: the inventory's inert Cancel order row; null: none. */
   footer?: ReactNode;
@@ -65,8 +65,11 @@ export function OrderView({
   showAddLine?: boolean;
   complianceNote?: string;
 }) {
+  // Staged beer must go back before anything ships, so Put back leads (the
+  // caller passes its fulfillment verbs as secondary then).
   const headerVerbs = (
     <>
+      {model.putBackHref ? E.btn("Put back", "p", model.putBackHref) : null}
       {actions}
       {model.confirmHref ? E.btn("Review and confirm", "p", model.confirmHref) : null}
       {model.editHref ? E.btn("Edit draft", "g", model.editHref) : null}
@@ -83,8 +86,8 @@ export function OrderView({
             {model.repickNote ? E.status("changed after pick", "w") : null}
           </p>
         </div>
-        {/* Primary first in the source: it leads the phone row and ends the desk row. */}
-        <div className="flex flex-wrap gap-2 *:w-auto! [&>*:first-child]:flex-1 md:flex-row-reverse md:pt-5 md:[&>*:first-child]:flex-none">
+        {/* Primary first, in both reading and tab order: it fills the phone row's width and leads the right-aligned desk row. */}
+        <div className="flex flex-wrap gap-2 *:w-auto! [&>*:first-child]:flex-1 md:justify-end md:pt-5 md:[&>*:first-child]:flex-none">
           {headerVerbs}
         </div>
       </header>
@@ -92,7 +95,6 @@ export function OrderView({
       {model.restockNote || model.repickNote || complianceNote ? (
         <div className="flex flex-col gap-2">
           {model.restockNote ? E.note(model.restockNote) : null}
-          {model.putBackHref ? <div>{E.act("Put back", "attention", model.putBackHref)}</div> : null}
           {model.repickNote ? E.note(model.repickNote) : null}
           {complianceNote ? E.note(complianceNote) : null}
         </div>

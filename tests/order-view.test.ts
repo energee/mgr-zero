@@ -210,6 +210,39 @@ describe("Order view loop", () => {
       expect(summary.note).toMatch(/^Ordered quantities; not final invoiced amount\./);
     });
 
+    it("submitted and picked orders carry the same before-tax total", () => {
+      for (const status of ["submitted", "picked"] as const) {
+        const { summary } = toOrderViewProps({ ...orderConfirmedWholesale, order: { ...orderConfirmedWholesale.order, status } });
+        expect(summary.total).toEqual({ label: "Order amount · before tax", value: "$1,172.00" });
+      }
+    });
+
+    it("withholds the total on a shipped or cancelled order without deposits, and a draft stays an estimate", () => {
+      for (const status of ["shipped", "cancelled"] as const) {
+        const { summary } = toOrderViewProps({ ...orderConfirmedWholesale, order: { ...orderConfirmedWholesale.order, status }, deposits: undefined });
+        expect(summary.total).toBeUndefined();
+        expect(summary.note).toBe("Order amount unavailable: complete charge and line data required.");
+      }
+      const draft = toOrderViewProps({ ...orderConfirmedWholesale, order: { ...orderConfirmedWholesale.order, status: "draft" }, deposits: undefined });
+      expect(draft.summary.total).toEqual({ label: "Items estimate", value: "$1,028.00" });
+    });
+
+    it("rounds a fractional fee line per unit: 1.15 × 50¢ is 58¢", () => {
+      const lines = [{ ...orderConfirmedWholesale.lines[1]!, qty_ordered: 1.15, unit_price_cents: 0, one_way_fee_cents: 50 }];
+      const model = toOrderViewProps({ ...orderConfirmedWholesale, lines, deposits: [] });
+      expect(model.summary.rows[2]).toEqual({ label: "One-way keg fees", value: "$0.58" });
+      expect(model.kegCharges[0]?.amount).toBe("$0.58");
+      expect(model.summary.total?.value).toBe("$0.58");
+    });
+
+    it("a draft cancelled before submit stays an items estimate: its charges were never frozen", () => {
+      const cancelledDraft = { ...orderConfirmedWholesale, order: { ...orderConfirmedWholesale.order, status: "cancelled" as const }, deposits: [],
+        events: [{ id: "e1", event: "created", actor: "Ted", payload: {}, created_at: "2026-10-16T13:02:00.000Z" }, { id: "e2", event: "cancelled", actor: "Ted", payload: { reason: "dup" }, created_at: "2026-10-16T13:04:00.000Z" }] };
+      const { summary } = toOrderViewProps(cancelledDraft);
+      expect(summary.total).toEqual({ label: "Items estimate", value: "$1,028.00" });
+      expect(summary.rows).toEqual([{ label: "Keg deposits and fees", value: "Not finalized until submission" }]);
+    });
+
     it("a cancelled order's amount is history, not an amount to collect", () => {
       const cancelled = { ...orderConfirmedWholesale, order: { ...orderConfirmedWholesale.order, status: "cancelled" as const } };
       const { summary } = toOrderViewProps(cancelled);
