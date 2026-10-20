@@ -101,6 +101,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
+          # The action pushes with the Claude app token; GITHUB_TOKEN stays out of .git/config.
+          persist-credentials: false
       - name: Run Claude /simplify
         uses: anthropics/claude-code-action@374f254f5efaf968abfe15d399fd90972e8138b9 # v1
         with:
@@ -111,5 +113,15 @@ jobs:
             If nothing changed, do not commit.
           # Edit and git only, never a repo script: with Edit, any script it may
           # run (package.json, lint config) is code it can rewrite while holding
-          # a push token. The push re-runs ci.yml, which land-pr.sh waits on.
-          claude_args: '--model opus --allowedTools "Skill,Task,Read,Edit,Grep,Glob,Bash(git diff:*),Bash(git status:*),Bash(git add:*),Bash(git commit:*),Bash(git push origin HEAD)"'
+          # a push token. For the same reason it cannot edit .git (hooks, config
+          # run by its own git commit) or .github. The push re-runs ci.yml,
+          # which land-pr.sh waits on.
+          claude_args: '--model opus --allowedTools "Skill,Task,Read,Edit,Grep,Glob,Bash(git diff:*),Bash(git status:*),Bash(git add:*),Bash(git commit:*),Bash(git push origin HEAD)" --disallowedTools "Edit(.git/**),Edit(.github/**)"'
+      # The agent's run succeeds even when its push fails; fail the job instead,
+      # since land-pr.sh reads this job's success as "simplify applied".
+      - name: Simplify edits reached the PR branch
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          [ -z "$(git status --porcelain)" ] || { echo "::error::uncommitted simplify edits"; git status --short; exit 1; }
+          [ "$(git rev-parse HEAD)" = "$(git ls-remote origin "refs/heads/$HEAD_REF" | cut -f1)" ] || { echo "::error::simplify commit was not pushed"; exit 1; }

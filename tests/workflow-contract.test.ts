@@ -275,7 +275,9 @@ describe("production-readiness workflow contract", () => {
   it("runs /simplify before the code review, and land-pr requires both", () => {
     const landPr = readFileSync(resolve(__dirname, "..", "scripts", "land-pr.sh"), "utf8");
     const jobs = parse(review).jobs;
-    expect(jobs.simplify.steps.at(-1).with.prompt).toMatch(/^\/simplify /);
+    const simplify = jobs.simplify.steps.find((step: { name?: string }) => step.name === "Run Claude /simplify");
+    expect(simplify.with.prompt).toMatch(/^\/simplify /);
+    expect(simplify.with.claude_args).toContain('--disallowedTools "Edit(.git/**),Edit(.github/**)"');
     expect(jobs.simplify.permissions.contents).toBe("write");
     expect(jobs["claude-review"].needs).toBe("simplify");
     expect(jobs["claude-review"].steps.at(-1).with.claude_args).toContain("## Code review");
