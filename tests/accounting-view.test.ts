@@ -4,14 +4,19 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AccountingView, QboConnectionView, QboDefaultsView, DisconnectQuickBooksView } from "../components/mgr/views/accounting";
 
+it("dates the token expiry by the brewery's day, not its UTC prefix (#991)", () => {
+  const model = toAccountingViewProps({ connected: true, state: "connected", connectionId: "c1", realmLabel: "Test Company", lastError: null, accessExpiresAt: "2026-09-15T02:00:00Z" }, "America/New_York");
+  expect(model.access).toBe("renews automatically · current token expires Sep 14, 2026");
+});
+
 it("keeps disconnected and missing accounting facts distinct from configured defaults", () => {
-  const model = toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null });
+  const model = toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null }, "America/New_York");
   expect(model.defaults).toBeUndefined();
   expect(model.missingEmails).toBeUndefined();
-  expect(toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null }, 3).missingEmails).toBe(3);
+  expect(toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null }, "America/New_York", 3).missingEmails).toBe(3);
   expect(model.backHref).toBeUndefined();
   expect(model.connected).toBe(false);
-  const recovery = toAccountingViewProps({ connected: false, state: "recovery_required", connectionId: "actual", realmLabel: "Actual company", lastError: "Refresh refused", allowAch: false, allowCard: true });
+  const recovery = toAccountingViewProps({ connected: false, state: "recovery_required", connectionId: "actual", realmLabel: "Actual company", lastError: "Refresh refused", allowAch: false, allowCard: true }, "America/New_York");
   expect(recovery.defaults).toEqual({ allowAch: false, allowCard: true });
   expect(recovery.reconnect).toBe(true);
   expect(recovery.canDisconnect).toBe(true);
@@ -32,7 +37,7 @@ it("offers the disconnect action by default and does not leak fixture paths", ()
   const html = renderToStaticMarkup(createElement(DisconnectQuickBooksView, { status: "available" }));
   expect(html).toContain("Disconnect QuickBooks");
   expect(html).not.toContain("already disconnected");
-  const model = toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null });
+  const model = toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null }, "America/New_York");
   const account = renderToStaticMarkup(createElement(AccountingView, { model, connection: null, defaults: null }));
   expect(account).toContain("Count unavailable");
   expect(account).not.toContain("Save push defaults");
@@ -40,7 +45,7 @@ it("offers the disconnect action by default and does not leak fixture paths", ()
 });
 
 it("reports portal-email presence without claiming delivery or blocking push", () => {
-  const model = { ...toAccountingViewProps({ connected: false, state: "disconnected" as const, realmLabel: null, lastError: null }), missingEmails: 2, customersHref: "/customers?missingEmail=1" };
+  const model = { ...toAccountingViewProps({ connected: false, state: "disconnected" as const, realmLabel: null, lastError: null }, "America/New_York"), missingEmails: 2, customersHref: "/customers?missingEmail=1" };
   const markup = renderToStaticMarkup(createElement(AccountingView, { model }));
   expect(markup).toContain("2 · no portal login email");
   expect(markup).toContain('href="/customers?missingEmail=1"');
@@ -48,7 +53,7 @@ it("reports portal-email presence without claiming delivery or blocking push", (
 });
 
 it("names the connected company, keeps its id as a separate fact, and labels the QuickBooks environment", () => {
-  const model = toAccountingViewProps({ connected: true, state: "connected", connectionId: "c1", realmLabel: "Test Company", realmId: "4620816365342151800", lastError: null }, undefined, "sandbox");
+  const model = toAccountingViewProps({ connected: true, state: "connected", connectionId: "c1", realmLabel: "Test Company", realmId: "4620816365342151800", lastError: null }, "America/New_York", undefined, "sandbox");
   expect(model.company).toBe("Test Company");
   expect(model.status).toBe("connected · sandbox");
   expect(model.companyId).toBe("4620816365342151800");
@@ -57,8 +62,8 @@ it("names the connected company, keeps its id as a separate fact, and labels the
   expect(html).toContain("connected · sandbox");
   expect(html).toContain("4620816365342151800");
   // A label that is only the id (connected before CompanyName was stored) is not repeated as a name.
-  expect(toAccountingViewProps({ connected: true, state: "connected", realmLabel: "4620816365342151800", realmId: "4620816365342151800", lastError: null }, undefined, "production").company).toBe("QuickBooks Online");
-  expect(toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null }, undefined, "production").status).toBe("disconnected");
+  expect(toAccountingViewProps({ connected: true, state: "connected", realmLabel: "4620816365342151800", realmId: "4620816365342151800", lastError: null }, "America/New_York", undefined, "production").company).toBe("QuickBooks Online");
+  expect(toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null }, "America/New_York", undefined, "production").status).toBe("disconnected");
 });
 
 it("reads the QuickBooks environment from the configured API host", () => {

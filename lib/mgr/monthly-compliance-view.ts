@@ -65,7 +65,7 @@ export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot
     title: snapshot.monthLabel,
     timeZone: snapshot.timeZone,
     backHref: snapshot.backHref,
-    filingDate: snapshot.filing?.filed_at?.slice(0, 10),
+    filingDate: snapshot.filing?.filed_at ? formatDate(snapshot.filing.filed_at, snapshot.timeZone) : undefined,
     amendments: snapshot.filing?.basis_amendments?.map(row => ({
       id: row.correction_id,
       oldBasis: row.correction.old_basis ? formatDate(row.correction.old_basis) : "Not set",

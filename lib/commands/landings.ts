@@ -7,6 +7,7 @@
 import { z } from "zod";
 import { canRun, CommandError, completeRows, defineQuery, inChunks, PAGE_SIZE, runCommand, STAFF_ROLES, unwrap } from "./registry";
 import type { TodayItem } from "./today";
+import { formatDate } from "@/lib/date-format";
 import { poNo } from "@/lib/mgr/doc-no";
 import { plural } from "@/lib/mgr/plural";
 import { TODAY_VERB } from "@/lib/mgr/today-view";
@@ -111,11 +112,11 @@ defineQuery({
     const rows: WorkRow[] = [
       ...today.map((t) => ({ kind: KIND[t.reason], id: t.subjectId, label: t.safeLabel, detail: t.detail, href: t.href, verb: TODAY_VERB[t.reason][0], tone: TODAY_VERB[t.reason][1], dueAt: t.dueAt })),
       ...pos.map((p) => ({
-        kind: "POs" as const, id: p.id, label: `${poNo(p.po_no)} · ${p.vendor_name ?? "vendor"}`, detail: p.status.replace("_", " ") + (p.expected_on ? ` · due ${p.expected_on}` : ""),
+        kind: "POs" as const, id: p.id, label: `${poNo(p.po_no)} · ${p.vendor_name ?? "vendor"}`, detail: p.status.replace("_", " ") + (p.expected_on ? ` · due ${formatDate(p.expected_on)}` : ""),
         href: `/purchase-orders/${p.id}`, verb: p.status === "draft" ? "Send" : "Receive", tone: "info" as const, dueAt: p.expected_on,
       })),
       ...routes.map((r) => ({
-        kind: "routes" as const, id: r.id, label: r.name ?? "Route", detail: `${plural(r.deliveries[0]?.count ?? 0, "stop")} · ${r.delivery_date}`,
+        kind: "routes" as const, id: r.id, label: r.name ?? "Route", detail: `${plural(r.deliveries[0]?.count ?? 0, "stop")} · ${formatDate(r.delivery_date)}`,
         href: `/routes/${r.id}`, verb: r.departed_at ? "Return" : "Depart", tone: "info" as const, dueAt: r.delivery_date,
       })),
     ];

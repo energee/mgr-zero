@@ -1,4 +1,5 @@
 // lib/mgr/confirm-order-view.ts — view-model for the Confirm order review.
+import { formatDate } from "@/lib/date-format";
 import { docNo } from "./doc-no";
 
 export type ConfirmOrderLineView = {
@@ -46,7 +47,7 @@ export function toConfirmOrderViewProps({ order, lines, atp, sourceOnHand, locat
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const sourceMap = new Map(sourceOnHand?.map((row) => [row.sku_id, Number(row.qty)]));
   const sourceName = locations.find((l) => l.id === order.from_location_id)?.name ?? "source";
-  const ships = order.requested_ship_date ? ` · ships ${order.requested_ship_date}` : "";
+  const ships = order.requested_ship_date ? ` · ships ${formatDate(order.requested_ship_date)}` : "";
   const judged = lines.map((l): JudgedLine => {
     const sourceQty = sourceOnHand === undefined ? undefined : sourceMap.get(l.sku_id) ?? 0;
     const qtyAtp = atpMap.get(l.sku_id);

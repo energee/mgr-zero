@@ -28,6 +28,11 @@ describe("Order view loop", () => {
     expect(String(model.events.at(-1)?.[0])).toMatch(/lines adjusted/);
   });
 
+  it("prints the requested ship date in the one date format (#991)", () => {
+    const model = toOrderViewProps({ ...orderPickedRestock, order: { ...orderPickedRestock.order, requested_ship_date: "2026-09-14" } });
+    expect(model.requested).toBe("Sep 14, 2026");
+  });
+
   it("lists keg charges: each deposit, and the one-way fee per one-way keg line (frozen at submit)", () => {
     const lines = orderPickedRestock.lines.map((l) => l.id === "l-stout" ? { ...l, one_way_fee_cents: 1000 } : l);
     const deposits = [{ order_line_id: "l-hazy", description: "Lolev kegs deposit", qty_ordered: 4, unit_price_cents: 3000, amount_cents: 12000 }];

@@ -1,4 +1,5 @@
 // lib/mgr/receipt-view.ts — view-model for Receipt (inventory echo).
+import { formatDate } from "@/lib/date-format";
 import { poNo } from "./doc-no";
 import type { RecoveryAttempt } from "@/lib/commands/recovery";
 
@@ -105,11 +106,11 @@ export function toPostedReceiptViewProps(po: PostedReceiptSnapshot, receiptId: s
       return [
         `+${quantity} ${frozen ? count.base_uom : "purchase units"} ${count.material_name ?? `Line ${count.po_line_id}`} · receipt`,
         [frozen ? undefined : "Original units and name were not captured",
-          count.lot_code ? `Lot ${count.lot_code}${count.lot_best_by ? ` · best by ${count.lot_best_by}` : ""}` : count.lot_id ? `Lot reference ${count.lot_id} · original lot metadata not captured` : undefined,
+          count.lot_code ? `Lot ${count.lot_code}${count.lot_best_by ? ` · best by ${formatDate(count.lot_best_by)}` : ""}` : count.lot_id ? `Lot reference ${count.lot_id} · original lot metadata not captured` : undefined,
           variance === 0 ? "as expected" : formatVariance(variance, count.purchase_uom)].filter(Boolean).join(" · "),
       ];
     }),
-    info: `Received ${receipt.received_on}.${receipt.corrected_by_receipt_id ? " This receipt is superseded; its original facts are retained." : " Only counted quantities posted."}${receipt.correction_reason ? ` Correction reason: ${receipt.correction_reason}.` : ""} Still owed reflects effective receipts on this purchase order.`,
+    info: `Received ${formatDate(receipt.received_on)}.${receipt.corrected_by_receipt_id ? " This receipt is superseded; its original facts are retained." : " Only counted quantities posted."}${receipt.correction_reason ? ` Correction reason: ${receipt.correction_reason}.` : ""} Still owed reflects effective receipts on this purchase order.`,
     correction: !receipt.corrected_by_receipt_id && po.status !== "cancelled" ? { href: backHref && correctReceiptHref(backHref, receipt.id) } : undefined,
     revisions: [
       ...(receipt.corrects_receipt_id ? [{ label: "Original receipt", href: backHref && receiptHref(backHref, receipt.corrects_receipt_id) }] : []),
