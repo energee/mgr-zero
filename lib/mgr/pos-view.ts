@@ -129,7 +129,27 @@ export type PosMenuModel = {
   excluded: PosMenuItem[];
   externalItems: { label: string; detail: string; disposition: "queued" | "ignored"; href?: string }[];
   message?: string;
+  /** Set when no Square location is mapped: what is missing and, for an admin, where to fix it. */
+  setup?: PosMenuSetup;
 };
+
+/** The Menu's empty state. `action` is absent for roles that cannot open Point of sale settings. */
+export type PosMenuSetup = { title: string; description: string; action?: { label: string; href?: string } };
+
+/**
+ * The Menu's empty state when no Square location is mapped (#997).
+ * `observed` counts Square locations MGR has seen: none means Square still has
+ * to be connected; some means only the mapping is missing. Point of sale
+ * settings are admin-only, so only an admin gets the link; others are told to ask one.
+ */
+export function toPosMenuSetup(observed: number, admin: boolean): PosMenuSetup {
+  if (observed === 0) return admin
+    ? { title: "No Square locations yet", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" } }
+    : { title: "No Square locations yet", description: "Ask an admin to connect Square and map a Square location to an MGR location." };
+  return admin
+    ? { title: "No Square location mapped", description: "Square locations were found, but none is mapped to an MGR location.", action: { label: "Map Square locations", href: "/settings/pos/locations" } }
+    : { title: "No Square location mapped", description: "Square locations were found, but none is mapped to an MGR location. Ask an admin to map one." };
+}
 
 const price = (cents: number | null) => cents == null ? "No price" : money(cents);
 
@@ -161,6 +181,6 @@ export function toPosMenuModel(snapshot: PosMenuSnapshot, locations: { externalL
       detail: row.disposition === "ignored" ? "Explicitly ignored" : "Not mapped · sales stay queued",
       disposition: row.disposition, href: "/settings/pos/mapping",
     })),
-    message: !selected ? "No mapped Square location is available." : !snapshot ? "Choose an MGR bin and sales channel before publishing." : undefined,
+    message: selected && !snapshot ? "Choose an MGR bin and sales channel before publishing." : undefined,
   };
 }
