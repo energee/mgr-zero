@@ -37,10 +37,11 @@ About twenty placements product-wide; most screens show two or three.
    `SlackIcon`. QuickBooks and Square have no marks in Hugeicons (`Square01Icon`
    is a shape) — those headers stay text rather than fake a brand.
 7. **Empty states** — `E.blank` takes one muted contextual icon per use.
+8. **Command form close** — the close mark is `Cancel01Icon` through `Icon`.
 
 ## Left alone, on purpose
 
-`E.btn` / `E.act` verbs; the irreversible teal button (color already carries
+`E.btn` / `E.act` verbs; the irreversible button (color already carries
 it); `E.tape`; tables; chips; composer; venue frames (they speak the vendor's
 language). Lucide stays inside `components/ui/*` for shadcn chrome.
 
