@@ -11,6 +11,7 @@
 // footer={null} draws no bottom row.
 import type { ComponentProps, ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { FactsGrid } from "@/components/mgr/views/facts-grid";
 import { PriceSummary } from "@/components/mgr/views/price-summary";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -103,14 +104,7 @@ export function OrderView({
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_18rem] md:gap-8">
         <section aria-labelledby="order-details" className="min-w-0">
           <h2 id="order-details" className={H2}>Order details</h2>
-          <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3.5">
-            {model.facts.map((fact) => (
-              <div key={fact.label} className={cn("min-w-0", fact.wide && "col-span-2")}>
-                <dt className="text-xs text-muted-foreground">{fact.label}</dt>
-                <dd className="mt-0.5 text-sm font-medium">{fact.value}</dd>
-              </div>
-            ))}
-          </dl>
+          <FactsGrid facts={model.facts} />
         </section>
         <PriceSummary model={model.summary} />
       </div>

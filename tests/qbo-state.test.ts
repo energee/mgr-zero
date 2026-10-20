@@ -476,8 +476,8 @@ describe("QuickBooks current invoice state", () => {
     expect(list.find((row) => row.id === f.invoice.id)).toMatchObject({ subtotal_cents: 10000, total_cents: 10500 });
     const invoice = detail.invoice;
     const lines = detail.lines;
-    expect(toInvoiceViewProps({ invoice, lines, questions: [] , timeZone: "America/New_York" })).toMatchObject({
-      total: "$105.00", summary: expect.stringContaining("edited in QuickBooks"),
+    expect(toInvoiceViewProps({ invoice, lines, questions: [] , timeZone: "America/New_York" }).summary).toMatchObject({
+      total: { label: "Current invoice total", value: "$105.00" }, rows: expect.arrayContaining([{ label: "Frozen MGR line subtotal", value: "$100.00" }]),
     });
     const customerUser = await makeCustomerUser(f.customer.customerId);
     const portalCtx = {
@@ -495,7 +495,7 @@ describe("QuickBooks current invoice state", () => {
     }).invoice).toMatchObject({ amount: "$105.00", detail: "unpaid", paid: false });
 
     const local = { ...invoice, qbo_total_cents: null, qbo_accountant_drift: false };
-    expect(toInvoiceViewProps({ invoice: local, lines, questions: [] , timeZone: "America/New_York" }).total).toBe("$100.00");
+    expect(toInvoiceViewProps({ invoice: local, lines, questions: [] , timeZone: "America/New_York" }).summary.total?.value).toBe("$100.00");
     const paid = { ...invoice, paid_at: "2026-09-10T12:00:00Z", qbo_balance_cents: 0 };
     expect(toPortalInvoiceViewProps({
       invoice: { ...paid, total_cents: 10000 }, lines: portalDetail.lines,
@@ -744,7 +744,7 @@ describe("QuickBooks current invoice state", () => {
       paid_at: "2026-09-09T15:00:00Z", qbo_remote_state: "voided" as const, qbo_balance_cents: 0,
       qbo_accountant_drift: false, written_off_at: null, customers: { name: "Buyer" },
     };
-    expect(toInvoiceViewProps({ invoice, lines: [], questions: [] , timeZone: "America/New_York" })).toMatchObject({ headerTone: "w", summary: expect.stringContaining("voided") });
+    expect(toInvoiceViewProps({ invoice, lines: [], questions: [] , timeZone: "America/New_York" })).toMatchObject({ state: { label: "Voided", tone: "w" } });
     expect(toPortalInvoiceViewProps({
       invoice: { ...invoice, total_cents: 10000 }, lines: [], brewery: { name: "Brewery", customer_phone: null },
     })).toMatchObject({ paid: false, paidOn: undefined, status: "Voided" });

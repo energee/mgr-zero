@@ -10,8 +10,8 @@ import { useCommandAction } from "@/lib/commands/use-command-form";
 export function MarkAnswered({ questionId }: { questionId: string }) {
   const { busy, error, run } = useCommandAction();
   return (
-    <span className="flex flex-col items-end gap-1">
-      <Button variant="ghost" size="sm" disabled={busy} onClick={() => void run("resolve_invoice_question", { questionId }, undefined, { target: questionId })}>{busy ? "Marking…" : "Mark answered"}</Button>
+    <span className="flex flex-col items-start gap-1">
+      <Button variant="outline" size="sm" disabled={busy} onClick={() => void run("resolve_invoice_question", { questionId }, undefined, { target: questionId })}>{busy ? "Marking…" : "Mark answered"}</Button>
       <CommandFormMessage error={error} />
     </span>
   );

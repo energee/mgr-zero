@@ -1,7 +1,8 @@
 // components/mgr/views/price-summary.tsx — one unboxed money summary for a
 // document page: labeled rows, then an optional prominent total and the
-// sentence saying what the total is (and is not). The Order detail draws it
-// beside its facts; the caller's adapter does the arithmetic and wording.
+// sentence saying what the total is (and is not), then optional settlement
+// rows (an invoice's balance and cash). The Order and Invoice details draw it
+// beside their facts; the caller's adapter does the arithmetic and wording.
 export type PriceSummaryModel = {
   /** Subtotals and charges, already formatted ("$1,028.00", or a status such as "Not finalized until submission"). */
   rows: { label: string; value: string }[];
@@ -9,6 +10,8 @@ export type PriceSummaryModel = {
   total?: { label: string; value: string };
   /** What the figure means: basis, exclusions, or why there is no total. */
   note: string;
+  /** After the total: what is still owed and what was paid ("Outstanding balance", "Cash received"); `strong` is the one to read first. */
+  settlement?: { label: string; value: string; strong?: boolean }[];
 };
 
 export function PriceSummary({ model, id = "price-summary" }: { model: PriceSummaryModel; id?: string }) {
@@ -34,6 +37,16 @@ export function PriceSummary({ model, id = "price-summary" }: { model: PriceSumm
         ) : null}
         <p className="text-xs text-pretty text-muted-foreground">{model.note}</p>
       </div>
+      {model.settlement?.length ? (
+        <dl className="mt-3 flex flex-col gap-2.5 border-t pt-3 text-sm">
+          {model.settlement.map((row) => (
+            <div key={row.label} className="flex items-baseline justify-between gap-4">
+              <dt className={row.strong ? "min-w-0 font-medium" : "min-w-0"}>{row.label}</dt>
+              <dd className={row.strong ? "shrink-0 text-right text-xl font-bold tabular-nums" : "shrink-0 text-right tabular-nums"}>{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
     </section>
   );
 }

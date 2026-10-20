@@ -187,7 +187,7 @@ import { DEMO_TIME_ZONE, settingsDemo } from "@/lib/mgr/fixtures/settings";
 import { teamRoster } from "@/lib/mgr/fixtures/team";
 import { todayBrewer, todayDriver, todayEmpty, todaySales, todayTaproom, todayWarehouse } from "@/lib/mgr/fixtures/today";
 import { workWarehouse } from "@/lib/mgr/fixtures/work";
-import { invoiceFailedAls } from "@/lib/mgr/fixtures/invoice";
+import { invoiceFailedAls, invoiceFailedAlsAccounting } from "@/lib/mgr/fixtures/invoice";
 import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, reverseMovementAdjustment } from "@/lib/mgr/fixtures/inventory";
 import { binCold, locationBinsTaproom, locationTaproom, locationsList } from "@/lib/mgr/fixtures/locations";
 import { newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
@@ -1361,13 +1361,13 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Invoice",
-    to: { "Customer mapping": "Mapping conflict", "Pils · case": "Fix mapping" },
+    to: { "Pils · case": "Fix mapping", Return: "Return and credit" },
     job: "Review one invoice, resolve its mappings and push it",
     reads: "get_qbo_connection · get_invoice · list_invoice_questions",
     writes: "push_invoice_to_qbo · resolve_invoice_question",
-    states: [["permission", "sales or admin required", 1], ["unmapped", "push stays unavailable", 1], ["ready", "every customer and item is mapped"], ["pushed", "QuickBooks owns later accounting edits"], ["buyer question", "the note is read here, and answered off-system", 1]],
-    spec: "The drill-in for one invoice, and where a buyer's question lands: the portal writes it, the sales Today row points here, and marking it answered is what clears that row. Nothing about the invoice changes; the reply happens in a phone call or an email, which is why the verb says answered rather than replied.",
-    body: <InvoiceView model={toInvoiceViewProps(invoiceFailedAls)} staffLink={{ href: null, reason: "This invoice has not been successfully pushed to QuickBooks." }} />,
+    states: [["permission", "sales or admin required", 1], ["unmapped", "push stays unavailable", 1], ["ready", "every customer and item is mapped"], ["pushed", "QuickBooks owns later accounting edits"], ["buyer question", "the note is read here, and answered off-system", 1], ["partly paid", "the summary shows the QuickBooks balance and the cash received"], ["edited in QuickBooks", "Current invoice total beside the Frozen MGR line subtotal; the lines stay as frozen", 1], ["no balance", "an unknown balance reads Unknown, never $0.00", 1], ["credit memo", "a signed Credit memo total, no balance due and no Return"]],
+    spec: "Read as a document: number, state and customer, then Issued and Due beside the one price summary (before the lines on the phone). The summary groups the stored line amounts by line kind; its total is the QuickBooks total when there is one, and the balance comes from QuickBooks only. QuickBooks status is said once, with only the mappings that need action. The drill-in is also where a buyer's question lands: the portal writes it, the sales Today row points here, and marking it answered is what clears that row. Nothing about the invoice changes; the reply happens in a phone call or an email, which is why the verb says answered rather than replied. Return closes the page because it corrects a shipment and is not the next step.",
+    body: <InvoiceView model={toInvoiceViewProps(invoiceFailedAls)} quickbooks={{ detail: invoiceFailedAlsAccounting.detail }} staffLink={{ href: null, reason: "This invoice has not been successfully pushed to QuickBooks." }} />,
   },
   {
     step: 5,
