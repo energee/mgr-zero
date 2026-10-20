@@ -2,6 +2,8 @@
 
 Status: approved 2026-10-14 (user: "use shadcn components" — search is `E.search` (shadcn `Input`), sort and category are shadcn `Tabs` via the shared `TabBar` (`E.tabs`)). Branch `feat/list-filters`, PR to `main`.
 
+Update (#965): Sort and Category are now labeled selects (`ScopePick`, `components/mgr/scope-pick.tsx`) whose options are links, built by `toCatalogScopes` in `lib/mgr/catalog-view.ts`. `ListControls` takes them as `scopes`; its tab `rows` stay for other lists. The URL is still the state.
+
 ## Why
 
 Catalog lists every brand A–Z with no way to narrow or reorder it. No list

@@ -10,6 +10,7 @@ import { CatalogView } from "../components/mgr/views/catalog";
 import { FormatView } from "../components/mgr/views/format";
 import { FormatFixture } from "../components/mgr/fixture-adapters";
 import { FormatsView } from "../components/mgr/views/formats";
+import { ListControls } from "../components/mgr/list-controls";
 import { PackageBomView } from "../components/mgr/views/package-bom";
 import { SkuListView } from "../components/mgr/views/sku-list";
 import { SkuView } from "../components/mgr/views/sku";
@@ -24,7 +25,7 @@ import {
 } from "../lib/mgr/fixtures/catalog";
 import { SKU_HAZY, SKU_PILS, SKU_STOUT } from "../lib/mgr/fixtures/demo";
 import { brandLabel, toBrandViewProps, UNPRICED } from "../lib/mgr/brand-view";
-import { toCatalogViewProps } from "../lib/mgr/catalog-view";
+import { toCatalogScopes, toCatalogViewProps } from "../lib/mgr/catalog-view";
 import { toFormatViewProps } from "../lib/mgr/format-view";
 import { toFormatsViewProps } from "../lib/mgr/formats-view";
 import { toPackageBomViewProps } from "../lib/mgr/package-bom-view";
@@ -48,8 +49,8 @@ describe("Catalog view", () => {
     ]);
     // The name is the link to that brand's page; Catalog draws no Edit brand button.
     expect(model.brands[0]?.href).toBe(`/catalog/brands/${model.brands[0]!.key}`);
-    expect(model.priceGroups).toBe("3 channels · 8 groups");
-    expect(model.waterProfiles).toBe("3 profiles");
+    // Price groups names only the groups: no channel count (#965).
+    expect(model.priceGroups).toBe("8 groups");
     expect(model.backHref).toBeUndefined();
   });
 
@@ -114,16 +115,52 @@ describe("Catalog view", () => {
     expect(html).toContain("Animal #14");
   });
 
-  it("omits water profiles when the snapshot has no count", () => {
-    const model = toCatalogViewProps({
-      brands: catalogBrands.brands,
-      priceGroups: catalogBrands.priceGroups,
-      channels: catalogBrands.channels,
-    });
-    expect(model.waterProfiles).toBeUndefined();
-    const html = htmlOf(createElement(CatalogView, { model }));
-    expect(html).not.toMatch(/Water profiles/);
-    expect(html).toMatch(/Price groups/);
+  // #965: inventory and live draw the same Water profiles row, with no invented count.
+  it("draws Water profiles as source and target profiles, linked only live", () => {
+    const model = toCatalogViewProps(catalogBrands);
+    const inert = htmlOf(createElement(CatalogView, { model }));
+    expect(inert).toMatch(/Water profiles/);
+    expect(inert).toMatch(/Source and target profiles/);
+    expect(inert).not.toMatch(/href="\/catalog\/water-profiles"/);
+    expect(htmlOf(createElement(CatalogView, { model, linkRows: true }))).toMatch(/href="\/catalog\/water-profiles"/);
+  });
+
+  // #965: Sort and Category are labeled ScopePick selects; each option is the
+  // link that changes only that setting, so search and the other one stay.
+  it("builds Sort and Category scopes whose options link with one setting changed", () => {
+    const href = (patch: { sort?: string; category?: string }) => JSON.stringify(patch);
+    const [sort, category] = toCatalogScopes({ sort: "abv", category: "Core", categories: ["Core", "Seasonal"], href });
+    expect(sort).toEqual({ label: "Sort", value: "abv", options: [
+      { value: "name", label: "Name", href: '{"sort":"name"}' },
+      { value: "abv", label: "ABV", href: '{"sort":"abv"}' },
+      { value: "newest", label: "Newest", href: '{"sort":"newest"}' },
+    ] });
+    expect(category).toEqual({ label: "Category", value: "Core", options: [
+      { value: "", label: "All categories", href: '{"category":""}' },
+      { value: "Core", label: "Core", href: '{"category":"Core"}' },
+      { value: "Seasonal", label: "Seasonal", href: '{"category":"Seasonal"}' },
+    ] });
+  });
+
+  it("hides Category with no categories, and shows All categories for an unknown one", () => {
+    expect(toCatalogScopes({ sort: "name", category: "", categories: [] }).map((s) => s.label)).toEqual(["Sort"]);
+    const [, category] = toCatalogScopes({ sort: "name", category: "Gone", categories: ["Core"] });
+    expect(category?.value).toBe("");
+    // The inventory passes no href, so its picks stay inert.
+    expect(category?.options.every((o) => o.href === undefined)).toBe(true);
+  });
+
+  it("draws search, then labeled Sort and Category selects, not tab rows", () => {
+    const html = htmlOf(createElement(ListControls, {
+      search: { label: "Search brands or aliases", value: "", keep: {} },
+      scopes: toCatalogScopes({ sort: "name", category: "", categories: ["Core"] }),
+      rows: [],
+    }));
+    expect(html).toMatch(/role="search"/);
+    expect(html).not.toMatch(/role="tablist"/);
+    expect([...html.matchAll(/<label\b[^>]*>(.*?)<\/label>/g)].map((m) => m[1])).toEqual(["Sort", "Category"]);
+    expect(html).toMatch(/>Name</);
+    expect(html).toMatch(/>All categories</);
   });
 
   // docs/plans/list-filters.md: an empty search is not an empty catalog.
@@ -145,22 +182,20 @@ describe("Catalog view", () => {
     expect(html).toContain(brandOf(SKU_HAZY));
     for (const fact of [">IPA<", ">6.8%<", ">4<"]) expect(html).toContain(fact);
     expect(html).toMatch(/Price groups/);
-    expect(html).toMatch(/3 channels · 8 groups/);
+    expect(html).toMatch(/8 groups/);
+    expect(html).not.toMatch(/channel/);
     expect(html).toMatch(/Water profiles/);
-    expect(html).toMatch(/3 profiles/);
     expect(html).not.toMatch(/→/);
   });
 
-  it("createAction, footer, and linkRows slot for live Catalog", () => {
+  it("createAction and linkRows slot for live Catalog", () => {
     const html = htmlOf(createElement(CatalogView, {
       model: toCatalogViewProps(catalogBrands),
       createAction: "NEW BRAND",
-      footer: "FORMATS SLOT",
       linkRows: true,
     }));
     expect(html).toMatch(/NEW BRAND/);
     expect(html).not.toMatch(/>Add brand</);
-    expect(html).toMatch(/FORMATS SLOT/);
     expect(html).toMatch(/href="\/pricing"/);
     expect(html).toContain(brandOf(SKU_HAZY));
   });
@@ -215,6 +250,9 @@ describe("Catalog view", () => {
     expect(shared).toMatch(/from "@\/components\/mgr\/views\/formats"/);
     expect(shared).toMatch(/<FormatsView\b/);
     expect(src).not.toMatch(/waterProfileCount/);
+    // Live and inventory build the Sort and Category picks with the same adapter.
+    expect(src).toContain("toCatalogScopes(");
+    expect(readFileSync("components/mgr/screens.tsx", "utf8")).toContain("toCatalogScopes(");
     expect(src).toMatch(/backHref: "\/more"/);
     // The page no longer redraws the brand rows or nests packages in them.
     expect(src).not.toMatch(/brands=\{/);

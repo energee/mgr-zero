@@ -26,7 +26,7 @@ export const PAYMENT_TERM_LABEL: Record<PaymentTerm, string> = { due_on_receipt:
 /** A stored payment term as the operator reads it; an unknown value prints as stored. */
 export const paymentTermLabel = (term: string) => PAYMENT_TERM_LABEL[term as PaymentTerm] ?? term;
 
-/** Catalog's sort tabs, in BRAND_SORTS order (lib/mgr/enums.ts). */
+/** Catalog's Sort options, in BRAND_SORTS order (lib/mgr/enums.ts). */
 export const BRAND_SORT_LABEL: Record<BrandSort, string> = { name: "Name", abv: "ABV", newest: "Newest" };
 
 /** A record as staff see it: its name, then its staff-only alias when it has one
