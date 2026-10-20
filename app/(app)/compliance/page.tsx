@@ -4,6 +4,7 @@
 // link, and the lots a trace can start from. Sales and Admin.
 import { ComplianceMonthsView } from "@/components/mgr/views/compliance-months";
 import { getActiveBrewery } from "@/lib/brewery";
+import { formatDate } from "@/lib/date-format";
 import { buildContext } from "@/lib/commands/context";
 import type { Filing, LotRowOut } from "@/lib/commands/compliance";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
@@ -24,6 +25,8 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
     const key = periodKey(f.period_start, f.period_end);
     return key && cadenceOf(key) === cadence ? [[key, f] as const] : [];
   }));
+  // A filing row whose filed_at is unset still reads as filed; only its day is unknown.
+  const filedLabel = (f: Filing) => f.filed_at ? `filed ${formatDate(f.filed_at, brewery.timeZone)}` : "filed";
   const months = [...new Set([...recentPeriods(today, cadence, booksOpenedOn), ...filed.keys()])].sort().reverse();
   return (
     <ComplianceMonthsView
@@ -33,11 +36,11 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
         months: months.map((m) => {
           const f = filed.get(m);
           return f
-            ? { key: m, title: periodLabel(m), detail: f.needs_amendment ? `needs amendment · filed ${f.filed_at?.slice(0, 10)}` : `filed ${f.filed_at?.slice(0, 10)} · ${bblFixed(f.figures.removals.taxable ?? 0)} taxable`, tone: f.needs_amendment ? "w" as const : "ok" as const, href: `/compliance/${m}` }
+            ? { key: m, title: periodLabel(m), detail: f.needs_amendment ? `needs amendment · ${filedLabel(f)}` : `${filedLabel(f)} · ${bblFixed(f.figures.removals.taxable ?? 0)} taxable`, tone: f.needs_amendment ? "w" as const : "ok" as const, href: `/compliance/${m}` }
             : { key: m, title: periodLabel(m), detail: periodOver(m, today) ? "not filed · ready to review" : `in progress · file once the ${cadence} ends`, tone: "w" as const, href: `/compliance/${m}` };
         }),
         registry: { key: "registry", title: "Licenses", detail: "the brewery’s state licenses", href: "/compliance/licenses" },
-        lots: lots.map((l) => ({ key: l.id, title: l.code, detail: `${l.brands?.name ?? ""} · packaged ${l.packaged_on}`, href: `/compliance/lots/${l.id}` })),
+        lots: lots.map((l) => ({ key: l.id, title: l.code, detail: `${l.brands?.name ?? ""} · packaged ${formatDate(l.packaged_on)}`, href: `/compliance/lots/${l.id}` })),
       }}
       linkRows
       cadenceHrefs={Object.fromEntries(CADENCES.map(([c, name]) => [name, `/compliance?cadence=${c}`]))}

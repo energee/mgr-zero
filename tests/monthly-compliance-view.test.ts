@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { MonthlyComplianceView } from "../components/mgr/views/monthly-compliance";
-import { monthlyComplianceAugust } from "../lib/mgr/fixtures/monthly-compliance";
+import { monthlyComplianceAmended, monthlyComplianceAugust } from "../lib/mgr/fixtures/monthly-compliance";
 import { toMonthlyComplianceViewProps } from "../lib/mgr/monthly-compliance-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -16,6 +16,11 @@ describe("Monthly compliance view", () => {
     expect(isValidElement(body)).toBe(true);
     expect(body.type).toBe(MonthlyComplianceView);
     expect(body.props.model).toEqual(toMonthlyComplianceViewProps(monthlyComplianceAugust));
+  });
+
+  it("dates the filing by the brewery's day, not filed_at's UTC prefix (#991)", () => {
+    const model = toMonthlyComplianceViewProps({ ...monthlyComplianceAmended, timeZone: "America/New_York", filing: { ...monthlyComplianceAmended.filing!, filed_at: "2026-09-03T02:00:00Z" } });
+    expect(model.filingDate).toBe("Sep 2, 2026");
   });
 
   it("draws the period in progress: reviewable, File once the period ends replaces Save (#579)", () => {

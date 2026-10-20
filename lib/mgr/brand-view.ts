@@ -2,6 +2,7 @@
 // plus list_price_groups, the brewery's styles, and the brand's rows from
 // get_compliance_registry paint BrandView.
 import { NONE } from "@/components/ui/select";
+import { formatDate } from "@/lib/date-format";
 import type { BrandRecipeCost } from "@/lib/commands/catalog";
 import type { RegistryBrand } from "@/lib/commands/compliance";
 import { nameWithAlias } from "./labels";
@@ -82,7 +83,7 @@ export function brandComplianceRows({ approvals, registrations }: NonNullable<Br
     ...approvals.map((approval) => ({
       key: approval.id,
       title: approval.kind === "cola" ? `COLA TTB ID ${approval.ttb_id}` : `Formula ${approval.ttb_id}`,
-      detail: [approval.approved_on ? `approved ${approval.approved_on}` : "approval date unknown", approval.serial_number && `serial ${approval.serial_number}`].filter(Boolean).join(" · "),
+      detail: [approval.approved_on ? `approved ${formatDate(approval.approved_on)}` : "approval date unknown", approval.serial_number && `serial ${approval.serial_number}`].filter(Boolean).join(" · "),
       verb: "Edit",
     })),
     ...registrations.map((registration) => ({

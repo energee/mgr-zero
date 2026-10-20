@@ -9,6 +9,7 @@
 // brewery's catalog outgrows prefix matching.
 import { z } from "zod";
 import { canRun, defineQuery, unwrap, type Ctx } from "./registry";
+import { formatDate } from "@/lib/date-format";
 import { docNo, poNo, batNo } from "@/lib/mgr/doc-no";
 import { escapeLike } from "@/lib/escape-like";
 
@@ -69,7 +70,7 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
     }
     case "lot": {
       const rows = await unwrap(ctx.db.from("lots").select("id, code, packaged_on, brands(name)").eq("brewery_id", b).ilike("code", prefix).limit(LIMIT)) as Row[];
-      return rows.map((r) => hit(r.id as string, r.code as string, `${(r.brands as { name: string } | null)?.name ?? "lot"} · packaged ${r.packaged_on}`, `/compliance/lots/${r.id}`, (r.code as string).toLowerCase() === q.toLowerCase()));
+      return rows.map((r) => hit(r.id as string, r.code as string, `${(r.brands as { name: string } | null)?.name ?? "lot"} · packaged ${formatDate(r.packaged_on as string)}`, `/compliance/lots/${r.id}`, (r.code as string).toLowerCase() === q.toLowerCase()));
     }
     case "order": {
       if (n === null) return [];
@@ -89,7 +90,7 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
     case "batch": {
       if (n === null) return [];
       const rows = await unwrap(ctx.db.from("batches").select("id, batch_no, planned_on, brands:intended_brand_id(name)").eq("brewery_id", b).eq("batch_no", n)) as Row[];
-      return rows.map((r) => hit(r.id as string, `${batNo(r.batch_no as number)} · ${(r.brands as { name: string } | null)?.name ?? ""}`, `planned ${r.planned_on}`, `/batches/${r.id}`, true));
+      return rows.map((r) => hit(r.id as string, `${batNo(r.batch_no as number)} · ${(r.brands as { name: string } | null)?.name ?? ""}`, `planned ${formatDate(r.planned_on as string)}`, `/batches/${r.id}`, true));
     }
   }
 }

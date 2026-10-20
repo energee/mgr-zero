@@ -56,15 +56,16 @@ it("requires an actual link intent before showing identity consent", () => {
 });
 
 it("keeps real linked identities and unlink errors without fixture paths", () => {
-  const html = renderToStaticMarkup(createElement(ChatLinkedPeopleView, { people: [{ id: "real-link", name: "Actual user", roles: ["brewer"], slackIdentity: "U123", linkedAt: "2026-09-12" }], busy: true, error: "Permission changed" }));
+  const html = renderToStaticMarkup(createElement(ChatLinkedPeopleView, { people: [{ id: "real-link", name: "Actual user", roles: ["brewer"], slackIdentity: "U123", linkedAt: "2026-09-12T02:00:00Z" }], timeZone: "America/New_York", busy: true, error: "Permission changed" }));
   expect(html).toContain("Slack U123");
+  expect(html).toContain("linked Sep 11, 2026");
   expect(html).toContain("Permission changed");
   expect(html).toContain("disabled");
   expect(html).not.toContain('href="/');
 });
 
 it("shows every linked staff role rather than selecting a primary role", () => {
-  const html = renderToStaticMarkup(createElement(ChatLinkedPeopleView, { people: [{ id: "multi", name: "Multi-role staff", roles: ["sales", "brewer"], slackIdentity: "U456", linkedAt: "2026-10-16" }] }));
+  const html = renderToStaticMarkup(createElement(ChatLinkedPeopleView, { people: [{ id: "multi", name: "Multi-role staff", roles: ["sales", "brewer"], slackIdentity: "U456", linkedAt: "2026-10-16" }], timeZone: "America/New_York" }));
   expect(html).toContain("sales, brewer");
   expect(html).toContain("Slack U456");
 });
