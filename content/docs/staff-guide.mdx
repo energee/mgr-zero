@@ -383,7 +383,11 @@ A cost ceiling is dollars per barrel of recipe cost. It sorts the rows and lets 
 
 ## Staff orders [#orders]
 
-Orders show up to 50 records per page, newest first. **More** opens older orders only when another one exists; **Newest** returns to the latest page. Status and customer filters remain applied while paging. Changing a filter starts at its newest orders. The **Customer filter** row names the customer, even when it has no orders; a filter that finds nothing says **No orders for** that customer (or **No shipped orders for** it, with a status chosen).
+Orders show up to 50 records per page, newest first. **More** opens older orders only when another one exists; **Newest** returns to the latest page. Status and customer filters remain applied while paging. Changing a filter starts at its newest orders.
+
+**Status** under the Work tabs picks **All states** or one state: **Draft**, **Submitted**, **Confirmed**, **Picked**, **Shipped**, or **Cancelled**. The choice is kept in the page address, so a link, a refresh, or Back keeps it. Opening Orders from a customer adds a **Customer:** line naming that customer, even when it has no orders; if the customer cannot be loaded, it says **Customer unavailable**. Changing **Status** keeps the customer. **Clear** removes only the customer and keeps the status. A filter that finds nothing says **No orders for** that customer (or **No shipped orders for** it, with a status chosen).
+
+On a wide screen the list is a table with **Order**, **Customer**, **Requested ship date**, and **Status** columns, followed by the next action. On a phone each order shows the same facts, labeled, under its order number. The order number opens the order; an order not yet numbered is titled **Order**. An order without a customer, such as a transfer, says **transfer**. **Requested ship date** is the day the customer asked for, not a deadline or a shipped date; an order without one says **Not scheduled**. **Status** shows the order's state. An order with staged beer also shows **Restock staged**. On a confirmed or picked order, put the beer back before picking again. A cancelled order that had been picked, or a shipped order that left picked beer behind, also shows **Restock staged** beside its status but has no list button; Warehouse and Admin put that beer back from the **Put back** row on Today.
 
 <Screen name="Orders" />
 
@@ -393,7 +397,7 @@ Orders show up to 50 records per page, newest first. **More** opens older orders
 
 An order can become `cancelled` any time before shipping. The Orders screen lists newest first and can filter by any status.
 
-Orders list actions follow your role. Sales sees **Open** for confirmed, picked, and staged-restock orders. Warehouse and Admin retain **Pick**, **Ship**, and **Put back**; Warehouse sees **Open** for drafts and submitted orders that Sales or Admin must finish or confirm.
+Orders list actions follow your role. Sales and Admin see **Finish** on drafts and **Confirm** on submitted orders. Warehouse and Admin see **Pick**, **Ship**, and **Put back**, which opens the restock page. An order with no action for your role, and every shipped or cancelled order, has no button: select its order number to open it.
 
 ### Create an order
 

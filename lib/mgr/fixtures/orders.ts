@@ -16,6 +16,8 @@ const ORDER_088 = "00000000-0000-4000-8000-000000000088";
 const ORDER_234 = "00000000-0000-4000-8000-000000000234";
 const ORDER_237 = "00000000-0000-4000-8000-000000000237";
 const ORDER_248 = "00000000-0000-4000-8000-000000000248";
+const ORDER_238 = "00000000-0000-4000-8000-000000000238";
+const ORDER_TRANSFER = "00000000-0000-4000-8000-000000000240";
 
 const line = (
   id: string,
@@ -160,7 +162,8 @@ export const orderTransferComplete: CompleteTransferSnapshot = {
   locations: LOCATIONS,
 };
 
-/** Work → Orders list: the four next-action rows the inventory draws. */
+/** Work → Orders list: one row per next action, plus a staged restock, a
+ *  transfer without a customer or number, and an undated long customer name. */
 export const ordersWorkList: OrdersListSnapshot = {
   roles: ["sales"],
   orders: [
@@ -195,6 +198,24 @@ export const ordersWorkList: OrdersListSnapshot = {
       requested_ship_date: "2026-09-11",
       needs_restock: false,
       customers: { name: TERESA.name },
+    },
+    {
+      // No customer join and no number yet: the transfer and "Order" fallbacks.
+      id: ORDER_TRANSFER,
+      order_no: null,
+      status: "confirmed",
+      requested_ship_date: null,
+      needs_restock: false,
+      customers: null,
+    },
+    {
+      // A long customer name wraps in full on the phone.
+      id: ORDER_238,
+      order_no: 238,
+      status: "submitted",
+      requested_ship_date: null,
+      needs_restock: false,
+      customers: { name: "North Orchard Neighborhood Market and Gathering Hall" },
     },
   ],
 };

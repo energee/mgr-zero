@@ -7,7 +7,9 @@
 import { formatDate } from "@/lib/date-format";
 import { hasAnyRole } from "@/lib/mgr/roles";
 
-export type OrderStatus = "draft" | "submitted" | "confirmed" | "picked" | "shipped" | "cancelled";
+/** Every lifecycle state in order, so a status filter cannot drift from the type. */
+export const ORDER_STATUSES = ["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
 export type ActionTone = "primary" | "success" | "info" | "attention";
 
 /** verb, tone, and the path under the order that finishes it. */

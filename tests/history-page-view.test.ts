@@ -35,7 +35,7 @@ it("offers More only with a next cursor and keeps filters and timestamp precisio
 it("all four inventory/live views mount the same continuation control", () => {
   const pagination = { moreHref: "/next", firstHref: "/newest" };
   const views = [
-    createElement(OrdersView, { model: { rows: [] }, pagination }),
+    createElement(OrdersView, { model: { rows: [], status: "all", statusOptions: [] }, pagination }),
     createElement(InvoicesView, { rows: [], pagination }),
     createElement(PortalOrdersView, { model: { subtitle: "", rows: [], info: "" }, pagination }),
     createElement(PortalInvoicesView, { model: { subtitle: "", rows: [] }, pagination }),

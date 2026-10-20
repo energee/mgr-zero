@@ -2,18 +2,15 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { E } from "@/components/mgr/e";
-import { LinkTabs, workHrefsFor } from "@/components/mgr/work-tabs";
+import { workHrefsFor } from "@/components/mgr/work-tabs";
 import { OrdersView } from "@/components/mgr/views/orders-list";
 import { useCommandQuery } from "@/components/mgr/query-provider";
 import { QueryFeedback } from "@/components/mgr/query-feedback";
 import type { StaffRole } from "@/lib/commands/registry";
 import { toOrdersListViewProps, type OrdersListSnapshot } from "@/lib/mgr/orders-list-view";
-import { salesRoles, type OrderStatus } from "@/lib/mgr/order-status";
+import { salesRoles } from "@/lib/mgr/order-status";
 import { hasAnyRole } from "@/lib/mgr/roles";
 import { historyPage, type HistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
-
-const STATUSES: OrderStatus[] = ["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"];
 
 export function OrdersClient({ roles, timeZone, status, customerId, customerName, cursor }: { roles: readonly StaffRole[]; timeZone: string; status?: string; customerId?: string; customerName?: string; cursor?: string }) {
   const result = useCommandQuery<HistoryPage<OrdersListSnapshot["orders"][number] & HistoryRow>>("list_orders", { status, customerId, cursor });
@@ -21,27 +18,14 @@ export function OrdersClient({ roles, timeZone, status, customerId, customerName
   // get_customer can fail (a stale or malformed link); say so rather than invent a name.
   const customer = customerId ? customerName ?? page.rows[0]?.customers?.name ?? "Customer unavailable" : undefined;
   const canWrite = hasAnyRole(roles, salesRoles); // create_order's roles
-  const orderHref = (nextStatus?: string) => {
-    const query = new URLSearchParams();
-    if (customerId) query.set("customerId", customerId);
-    if (nextStatus) query.set("status", nextStatus);
-    return `/orders${query.size ? `?${query}` : ""}`;
-  };
   return (
     <OrdersView
-      model={toOrdersListViewProps({ roles, status, customer, orders: page.rows })}
+      model={toOrdersListViewProps({ roles, status, customer, customerId, linked: true, orders: page.rows })}
       createAction={canWrite ? <Button asChild><Link href="/orders/new">New order</Link></Button> : null}
       listStatus={!result.data ? <QueryFeedback timeZone={timeZone} error={result.error} loading="Loading orders" paused={result.isPaused} retry={() => void result.refetch()} /> : undefined}
       feedback={result.data ? <QueryFeedback timeZone={timeZone} error={result.error} fetching={result.isFetching} paused={result.isPaused} updatedAt={result.dataUpdatedAt} retry={() => void result.refetch()} /> : undefined}
       pagination={page.pagination}
-      linkRows
       workHrefs={workHrefsFor(roles)}
-      filters={(
-        <>
-        <LinkTabs items={[["all", orderHref()], ...STATUSES.map((s): [string, string] => [s, orderHref(s)])]} current={status ?? "all"} className="w-full justify-start overflow-x-auto md:w-fit" />
-        {customer && E.row("Customer filter", customer, E.act("Clear", undefined, status ? `/orders?status=${status}` : "/orders"))}
-        </>
-      )}
     />
   );
 }
