@@ -5,7 +5,6 @@ export type BeerNavView = { key: string; title: string; detail: string; href?: s
 
 export type BeerViewModel = {
   navs: BeerNavView[];
-  blank: string;
   stock?: { key: string; title: string; detail: string; qty: string }[];
   stockEmpty?: string;
 };
@@ -24,10 +23,8 @@ export type BeerSnapshot = BeerViewModel | {
   showTaproom?: boolean;
 };
 
-const BLANK = "Each summary opens its dedicated area; this page does not expand indefinitely.";
-
 export function toBeerViewProps(s: BeerSnapshot): BeerViewModel {
-  if ("navs" in s) return { navs: s.navs, blank: s.blank };
+  if ("navs" in s) return { navs: s.navs };
   const o = s.overview;
   const navs: BeerNavView[] = [
     { key: "fg", title: "Finished goods", detail: `${plural(o.fgShortages, "shortage")} · ATP by SKU`, href: "/inventory" },
@@ -43,12 +40,11 @@ export function toBeerViewProps(s: BeerSnapshot): BeerViewModel {
     { key: "materials", title: "Materials", detail: plural(o.materialShortages, "shortage"), href: "/materials" },
     { key: "kegs", title: "Kegs", detail: `${o.kegsOut} out at customers`, href: "/kegs" },
   );
-  return { navs, blank: BLANK };
+  return { navs };
 }
 
 export function taproomBeerView(stock: { skuId: string; locationId: string; sku: string; location: string; qty: number }[]): BeerViewModel {
   return {
-    blank: "",
     navs: [
       { key: "count", title: "Weekly count", detail: "record physical stock and review expected consumption", href: "/taproom" },
       { key: "board", title: "Tap board", detail: "open, swap, and kick kegs", href: "/taproom/board" },
