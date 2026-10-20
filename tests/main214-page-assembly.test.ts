@@ -160,6 +160,16 @@ it.each([
   expect(html).toContain('value="west"');
   expect(html).toContain(empty);
 });
+// #1021 review: a search with text offers a way back to the whole list, keeping the other params.
+it("offers Clear search while a search is on, and keeps the other params", async () => {
+  const html = render(await CustomersPage({ searchParams: Promise.resolve({ q: "buy", missingEmail: "1" }) }));
+  expect(html).toMatch(/href="\?missingEmail=1"[^>]*>Clear search</);
+  expect(render(await CustomersPage({ searchParams: Promise.resolve({}) }))).not.toContain("Clear search");
+});
+// #1021 review: a list with no records and no search has nothing to search.
+it.each([["Recipes", RecipesPage], ["Vendors", VendorsPage], ["Materials", MaterialsPage]] as const)("%s draws no search box while the list is empty and unsearched", async (_, Page) => {
+  expect(render(await Page({ searchParams: Promise.resolve({}) }))).not.toContain('role="search"');
+});
 it("says no contracts match when a vendor search finds none", async () => {
   const html = render(await VendorsPage({ searchParams: Promise.resolve({ q: "west" }) }));
   expect(html).toContain("No contracts match");
