@@ -1211,7 +1211,7 @@ export const SCREENS: Screen[] = [
     reads: "list_customers · get_customer",
     writes: "invite_customer_user [existing] · upsert_customer · upsert_ship_to",
     states: DEFAULT_STATES,
-    body: <CustomersView model={toCustomersViewProps(customersList)} search={<ListControls search={{ label: "Search customers", value: "", keep: {} }} rows={[]} />} />,
+    body: <CustomersView model={toCustomersViewProps(customersList)} search={<ListControls search={{ label: "Search customers", value: "", keep: {} }} />} />,
   },
   {
     step: 5, slice: 1, tab: "More", name: "Customers missing email",
@@ -1220,7 +1220,7 @@ export const SCREENS: Screen[] = [
     writes: "none [Invite and Remove access on Customer detail correct portal access]",
     states: [["permission", "sales or admin required", 1], ["missing", "no current portal login has a nonblank email"], ["empty", "all customers have a portal login email"]],
     spec: "This is a presence check, not deliverability or sending. The filtered list and Accounting count use the same authorized server predicate.",
-    body: <CustomersView model={toCustomersViewProps(customersMissingEmail)} search={<ListControls search={{ label: "Search customers", value: "", keep: {} }} rows={[]} />} />,
+    body: <CustomersView model={toCustomersViewProps(customersMissingEmail)} search={<ListControls search={{ label: "Search customers", value: "", keep: {} }} />} />,
   },
   {
     step: 5,
@@ -1390,7 +1390,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_brand · create_sku · update_sku",
     states: DEFAULT_STATES,
     spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix.",
-    body: <CatalogView model={toCatalogViewProps(catalogBrands)} controls={<ListControls search={{ label: "Search brands or aliases", value: "", keep: {} }} scopes={toCatalogScopes({ sort: "name", category: "", categories: ["Core", "Seasonal"] })} rows={[]} />} formats={toFormatsViewProps({ ...formatsInventory, formats: formatsInventory.formats.filter(format => format.basis === "packaged") })} />,
+    body: <CatalogView model={toCatalogViewProps(catalogBrands)} controls={<ListControls search={{ label: "Search brands or aliases", value: "", keep: {} }} scopes={toCatalogScopes({ sort: "name", category: "", categories: ["Core", "Seasonal"] })} />} formats={toFormatsViewProps({ ...formatsInventory, formats: formatsInventory.formats.filter(format => format.basis === "packaged") })} />,
   },
   {
     step: 5,
@@ -1874,7 +1874,7 @@ export const SCREENS: Screen[] = [
     writes: "none [counts happen in the Cycle count sheet]",
     states: [["expiring", "the earliest best-by date needs attention"], ["empty", "no materials yet: Add material is the only action"]],
     spec: "The Beer landing's Materials row opens this list. Count opens Cycle count for that material; Add material opens the existing material and vendor flow.",
-    body: <MaterialsOnHandView model={toMaterialsOnHandViewProps(materialsOnHandList)} controls={<ListControls search={{ label: "Search materials", value: "", keep: {} }} rows={[]} />} />,
+    body: <MaterialsOnHandView model={toMaterialsOnHandViewProps(materialsOnHandList)} controls={<ListControls search={{ label: "Search materials", value: "", keep: {} }} />} />,
   },
   {
     step: 7,
@@ -1901,7 +1901,7 @@ export const SCREENS: Screen[] = [
     writes: "none [creation and editing happen on Vendor]",
     states: [["permission", "warehouse or brewer required", 1], ["active", "available for purchase orders"], ["contract", "committed quantity summarized"], ["empty", "Add vendor is the only action"]],
     spec: "Materials, vendors and contracts are separate lists so each row has one predictable destination.",
-    body: <VendorsView model={toVendorsViewProps(vendorsList)} controls={<ListControls search={{ label: "Search vendors", value: "", keep: {} }} rows={[]} />} />,
+    body: <VendorsView model={toVendorsViewProps(vendorsList)} controls={<ListControls search={{ label: "Search vendors", value: "", keep: {} }} />} />,
   },
   {
     step: 7,
@@ -1982,7 +1982,7 @@ export const SCREENS: Screen[] = [
     writes: "none [creation and versioning happen on Recipe]",
     states: [["no version yet", "a recipe saved without a version reads no version yet, in the warning style"], ["empty", "no recipes yet: New recipe is the only action"]],
     spec: "The More landing's Recipes row opens this list, and its back returns to More. Each row is titled with the recipe's current version and opens Recipe at it; New recipe opens Recipe with no version yet: the parent fields above the first version's editor, one save.",
-    body: <RecipesView model={toRecipesViewProps(recipesList)} controls={<ListControls search={{ label: "Search recipes", value: "", keep: {} }} rows={[]} />} />,
+    body: <RecipesView model={toRecipesViewProps(recipesList)} controls={<ListControls search={{ label: "Search recipes", value: "", keep: {} }} />} />,
   },
   {
     step: 7,

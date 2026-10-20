@@ -34,7 +34,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
         recipes: recipes.map((r) => ({ id: r.id, name: r.name, brand: brandName(r.brand_id), latest_version: r.latest_version })),
         filtered: Boolean(params.q),
       })}
-      controls={recipes.length || params.q ? <ListControls search={{ label: "Search recipes", value: params.q, keep: {} }} rows={[]} /> : undefined}
+      controls={recipes.length || params.q ? <ListControls search={{ label: "Search recipes", value: params.q, keep: {} }} /> : undefined}
     />
   );
 }

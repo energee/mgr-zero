@@ -9,7 +9,8 @@ import { useRouter } from "next/navigation";
 import { useId } from "react";
 import { E } from "@/components/mgr/e";
 
-/** One choice. Radix Select rejects an empty value, so an All row uses "all".
+/** One choice. An All row may be "" (Catalog; E.pick maps it past Radix's
+ *  empty-value rule) or "all" (keg history).
  *  The screen inventory leaves `href` out, and its pick stays inert. */
 export type ScopeOption = { value: string; label: string; href?: string };
 
