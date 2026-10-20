@@ -248,11 +248,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, brewer
 
-Materials, alphabetical, with kind, units, lot tracking, default vendor, and extract potential
+Materials, alphabetical, with kind, units, lot tracking, default vendor, and extract potential; optionally only those whose name contains q
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `includeInactive` | boolean | no |
+| `q` | string | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -297,9 +298,11 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, brewer
 
-Vendors, alphabetical, with typed and observed lead time and each one's contracts and their drawdown (committed, received, on order, available)
+Vendors, alphabetical, with typed and observed lead time and each one's contracts and their drawdown (committed, received, on order, available); optionally only vendors whose name contains q
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `q` | string | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

@@ -55,6 +55,7 @@ describe("get_today (registered reader)", () => {
 
     const forSales = await today(sales, noon);
     expect(forSales.map((i) => [i.reason, i.subjectId])).toEqual([["submitted_order", submitted]]);
+    expect(forSales[0].detail).toBe("submitted · ships Sep 5, 2026");
     const forWarehouse = await today(warehouse, noon);
     expect(forWarehouse.map((i) => [i.reason, i.subjectId])).toEqual([["pick_due", confirmed]]);
     expect((await today(adminCtx, noon)).map((i) => i.reason).sort()).toEqual(["pick_due", "submitted_order"]);
@@ -171,8 +172,8 @@ describe("get_today (registered reader)", () => {
     const adjusted = await adminCtx.db.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 3 }], p_reason: "raise", p_request_id: crypto.randomUUID() });
     expect(adjusted.error).toBeNull();
     const rows = async () => (await today(warehouse, "2026-09-07T12:00:00Z")).filter((i) => i.reason === "pick_due");
-    expect((await rows()).find((i) => i.subjectId === id)?.detail).toBe("pick due · ships Mon 9/7 · changed after pick");
-    expect((await rows()).find((i) => i.subjectId === plain)?.detail).toBe("pick due · ships Mon 9/7");
+    expect((await rows()).find((i) => i.subjectId === id)?.detail).toBe("pick due · ships Sep 7, 2026 · changed after pick");
+    expect((await rows()).find((i) => i.subjectId === plain)?.detail).toBe("pick due · ships Sep 7, 2026");
     expect((await pick(3)).error).toBeNull();
     expect((await rows()).find((i) => i.subjectId === id)).toBeUndefined();
   });

@@ -13,6 +13,7 @@ import { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/li
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, CommandError, type Ctx, latestOf } from "./registry";
 import { brandNames, isoDate } from "./packaging";
 import { recipeGravity } from "@/lib/recipe-gravity";
+import { escapeLike } from "@/lib/escape-like";
 import { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
 
 // The process spec (recipe-builder spec D2, D6, D7). Stored as given; the RPC
@@ -159,11 +160,12 @@ defineCommand({
 // Each recipe carries its latest version (id and number): schedule_batch names
 // a *version*, so the batch picker needs it without a get_recipe per recipe.
 defineQuery({
-  name: "list_recipes", description: "Recipes, alphabetical, with the brand each one brews and its latest version",
-  input: z.object({}), roles: ["admin", "brewer"],
-  handler: async (ctx) => {
-    const recipes = (await unwrap(ctx.db.from("recipes").select("id, name, brand_id, note, created_at")
-      .eq("brewery_id", ctx.breweryId).order("name"))) ?? [];
+  name: "list_recipes", description: "Recipes, alphabetical, with the brand each one brews and its latest version; optionally only those whose name contains q",
+  input: z.object({ q: z.string().trim().max(100).optional().describe("Only recipes whose name contains this text") }), roles: ["admin", "brewer"],
+  handler: async (ctx, i) => {
+    let query = ctx.db.from("recipes").select("id, name, brand_id, note, created_at").eq("brewery_id", ctx.breweryId);
+    if (i.q) query = query.ilike("name", `%${escapeLike(i.q)}%`);
+    const recipes = (await unwrap(query.order("name"))) ?? [];
     if (recipes.length === 0) return [];
     const versions = (await unwrap(ctx.db.from("recipe_versions").select("id, recipe_id, version")
       .in("recipe_id", recipes.map((r) => r.id as string)).order("version", { ascending: false }))) ?? [];

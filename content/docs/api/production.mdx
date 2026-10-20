@@ -248,9 +248,11 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-Recipes, alphabetical, with the brand each one brews and its latest version
+Recipes, alphabetical, with the brand each one brews and its latest version; optionally only those whose name contains q
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `q` | string | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

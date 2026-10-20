@@ -1213,7 +1213,7 @@ export const SCREENS: Screen[] = [
     reads: "list_customers · get_customer",
     writes: "invite_customer_user [existing] · upsert_customer · upsert_ship_to",
     states: DEFAULT_STATES,
-    body: <CustomersView model={toCustomersViewProps(customersList)} />,
+    body: <CustomersView model={toCustomersViewProps(customersList)} search={<ListControls search={{ label: "Search customers", value: "", keep: {} }} rows={[]} />} />,
   },
   {
     step: 5, slice: 1, tab: "More", name: "Customers missing email",
@@ -1222,7 +1222,7 @@ export const SCREENS: Screen[] = [
     writes: "none [Invite and Remove access on Customer detail correct portal access]",
     states: [["permission", "sales or admin required", 1], ["missing", "no current portal login has a nonblank email"], ["empty", "all customers have a portal login email"]],
     spec: "This is a presence check, not deliverability or sending. The filtered list and Accounting count use the same authorized server predicate.",
-    body: <CustomersView model={toCustomersViewProps(customersMissingEmail)} />,
+    body: <CustomersView model={toCustomersViewProps(customersMissingEmail)} search={<ListControls search={{ label: "Search customers", value: "", keep: {} }} rows={[]} />} />,
   },
   {
     step: 5,
@@ -1877,7 +1877,7 @@ export const SCREENS: Screen[] = [
     writes: "none [counts happen in the Cycle count sheet]",
     states: [["expiring", "the earliest best-by date needs attention"], ["empty", "no materials yet: Add material is the only action"]],
     spec: "The Beer landing's Materials row opens this list. Count opens Cycle count for that material; Add material opens the existing material and vendor flow.",
-    body: <MaterialsOnHandView model={toMaterialsOnHandViewProps(materialsOnHandList)} />,
+    body: <MaterialsOnHandView model={toMaterialsOnHandViewProps(materialsOnHandList)} controls={<ListControls search={{ label: "Search materials", value: "", keep: {} }} rows={[]} />} />,
   },
   {
     step: 7,
@@ -1900,11 +1900,11 @@ export const SCREENS: Screen[] = [
     name: "Vendors",
     to: { Edit: "Vendor" },
     job: "List suppliers and open one supplier's terms",
-    reads: "list_vendors_and_contracts",
+    reads: "list_vendors_and_contracts · list_vendors [while a search is on: the new-contract vendor picker still offers every vendor]",
     writes: "none [creation and editing happen on Vendor]",
     states: [["permission", "warehouse or brewer required", 1], ["active", "available for purchase orders"], ["contract", "committed quantity summarized"], ["empty", "Add vendor is the only action"]],
     spec: "Materials, vendors and contracts are separate lists so each row has one predictable destination.",
-    body: <VendorsView model={toVendorsViewProps(vendorsList)} />,
+    body: <VendorsView model={toVendorsViewProps(vendorsList)} controls={<ListControls search={{ label: "Search vendors", value: "", keep: {} }} rows={[]} />} />,
   },
   {
     step: 7,
@@ -1985,7 +1985,7 @@ export const SCREENS: Screen[] = [
     writes: "none [creation and versioning happen on Recipe]",
     states: [["no version yet", "a recipe saved without a version reads no version yet, in the warning style"], ["empty", "no recipes yet: New recipe is the only action"]],
     spec: "The More landing's Recipes row opens this list, and its back returns to More. Each row is titled with the recipe's current version and opens Recipe at it; New recipe opens Recipe with no version yet: the parent fields above the first version's editor, one save.",
-    body: <RecipesView model={toRecipesViewProps(recipesList)} />,
+    body: <RecipesView model={toRecipesViewProps(recipesList)} controls={<ListControls search={{ label: "Search recipes", value: "", keep: {} }} rows={[]} />} />,
   },
   {
     step: 7,
@@ -2606,6 +2606,34 @@ export const SCREENS: Screen[] = [
     slice: 7,
     tab: "More",
     group: "POS",
+    name: "Menu setup",
+    to: { "Set up Square": "Point of sale" },
+    job: "Say what Menu is missing when Square has no locations yet",
+    reads: "list_pos_locations",
+    writes: "none",
+    states: [["admin", "Set up Square opens Point of sale"], ["warehouse", "no link; asks an admin, because Point of sale settings are admin-only", 1]],
+    spec: "Drawn as an admin. No Square location has been seen, so Square still has to be connected before any location can be mapped. Only an admin can open Point of sale settings, so only an admin gets the button; Warehouse reads a sentence asking an admin instead of a link that would land on No access.",
+    body: <PosMenuView model={{ locations: [], selectedLocationId: "", locationName: "Square location", items: [], excluded: [], externalItems: [], setup: { title: "No Square locations yet", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square" } } }} />,
+  },
+  {
+    step: 7,
+    slice: 7,
+    tab: "More",
+    group: "POS",
+    name: "Menu unmapped",
+    to: { "Map Square locations": "Square locations" },
+    job: "Say what Menu is missing when Square locations exist but none is mapped",
+    reads: "list_pos_locations",
+    writes: "none",
+    states: [["admin", "Map Square locations opens Square locations"], ["warehouse", "no link; asks an admin to map one", 1]],
+    spec: "Drawn as an admin. Square locations were found, so connecting is not the missing step: mapping one to an MGR location is. The copy says so rather than repeating the connect instruction. Warehouse gets no link, for the same admin-only reason as Menu setup.",
+    body: <PosMenuView model={{ locations: [], selectedLocationId: "", locationName: "Square location", items: [], excluded: [], externalItems: [], setup: { title: "No Square location mapped", description: "Square locations were found, but none is mapped to an MGR location.", action: { label: "Map Square locations" } } }} />,
+  },
+  {
+    step: 7,
+    slice: 7,
+    tab: "More",
+    group: "POS",
     surface: "sheet",
     name: "POS item",
     to: { "Save override": "Menu", "Publish item to Square": "POS item" },
@@ -2994,8 +3022,8 @@ export const SCREENS: Screen[] = [
     spec: "Rows are rebuilt from owning MGR queries. App Home remains current during quiet hours and is optional for future providers.",
     body: (<>
       {S.h("Today · 4 waiting")}
-      {S.sa("*ORD-0231 · Review submitted order*\nrequested Thu · sales", "Open")}
-      {S.sa("*ORD-0235 · Pick due*\nships Fri · warehouse", "Open")}
+      {S.sa("*ORD-0231 · Review submitted order*\nsubmitted · ships Sep 3, 2026 · sales", "Open")}
+      {S.sa("*ORD-0235 · Pick due*\nships Sep 4, 2026 · warehouse", "Open")}
       {S.sa("*Route A · next stop*\nassigned to you · 9:30 AM", "Open")}
       {S.sa("*FV2 · reading overdue*\nlast reading 26 h ago · brewer", "Open")}
       {S.acts([["Open Today in MGR", "pri"]])}
@@ -3072,7 +3100,7 @@ export const SCREENS: Screen[] = [
     spec: "Future phase only. This fixture intentionally carries an ATP warning, so Slack cannot confirm it.",
     body: (<>
       {S.ctx("Future phase only")}
-      {S.f([["Order", "ORD-0231 · 3 lines · requested Thu · Submitted"], ["Warning", "Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR."]])}
+      {S.f([["Order", "ORD-0231 · 3 lines · ships Sep 3, 2026 · Submitted"], ["Warning", "Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR."]])}
       {S.dis("Confirm order", "This order needs the full MGR review")}
     </>),
   },

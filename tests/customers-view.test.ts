@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { CustomerView } from "../components/mgr/views/customer";
 import { CustomersView } from "../components/mgr/views/customers";
+import { ListControls } from "../components/mgr/list-controls";
 import { ShipToView } from "../components/mgr/views/ship-to";
 import { customerRidgeline, customersList, shipToMain } from "../lib/mgr/fixtures/customers";
 import { ALS, RIDGELINE } from "../lib/mgr/fixtures/demo";
@@ -31,6 +32,13 @@ describe("Customers list", () => {
     expect(isValidElement(screen("Customers").body)).toBe(true);
     expect(body.type).toBe(CustomersView);
     expect(body.props.model).toEqual(toCustomersViewProps(customersList));
+  });
+
+  // #994: both Customers records draw live's search strip, as Recipes, Vendors and Materials do.
+  it.each(["Customers", "Customers missing email"])("the %s inventory record passes ListControls as its search", (name) => {
+    const body = screen(name).body as { props: { search?: { type: unknown; props: { search: { label: string } } } } };
+    expect(body.props.search?.type).toBe(ListControls);
+    expect(body.props.search?.props.search.label).toBe("Search customers");
   });
 
   it("the inventory list offers Add customer, and each row opens by its arrow, not an Open verb (#996)", () => {
@@ -145,6 +153,13 @@ it("distinguishes a resolved missing-email review from an empty customer book", 
   expect(markup).toContain("Invite");
   expect(markup).toContain("presence");
   expect(markup).not.toContain("No customers yet");
+});
+
+// #994: an empty search is not an empty customer book.
+it("says no customers match, not no customers yet, when a search is on", () => {
+  expect(toCustomersViewProps({ customers: [], filtered: true }).empty).toEqual({ title: "No customers match", description: "Clear the search to see every customer." });
+  expect(toCustomersViewProps({ customers: [], missingPortalEmail: true, filtered: true }).empty?.title).toBe("No customers match");
+  expect(toCustomersViewProps({ customers: [] }).empty?.title).toBe("No customers yet");
 });
 
 it("keeps Accounting Review in the shared filtered customer inventory", () => {

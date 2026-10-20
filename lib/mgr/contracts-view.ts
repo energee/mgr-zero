@@ -14,9 +14,20 @@ export type ContractsViewModel = {
   empty?: EmptyState;
 };
 
-export type ContractsSnapshot = { backHref?: string; rows?: ContractsRowView[] };
+export type ContractsSnapshot = {
+  backHref?: string;
+  rows?: ContractsRowView[];
+  /** A vendor search is on, so an empty list means no match, not no contracts. */
+  filtered?: boolean;
+};
 
 export function toContractsViewProps(s: ContractsSnapshot): ContractsViewModel {
   const rows = s.rows ?? [];
-  return { backHref: s.backHref, rows, empty: rows.length === 0 ? { title: "No contracts yet", description: "A contract records beer promised to a customer before it is brewed." } : undefined };
+  return {
+    backHref: s.backHref,
+    rows,
+    empty: rows.length > 0 ? undefined
+      : s.filtered ? { title: "No contracts match", description: "Clear the search to see every contract." }
+      : { title: "No contracts yet", description: "A contract records beer promised to a customer before it is brewed." },
+  };
 }
