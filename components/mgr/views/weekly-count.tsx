@@ -76,7 +76,7 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
   return <>
     <div className="contents print:hidden">
     {E.ttl("Expected consumption")}
-    {E.note(prior ? <>Captured prior · {priorHref ? <Link href={priorHref}>{formatDate(prior.counted_on)}</Link> : formatDate(prior.counted_on)} · reopen saved count</> : "Captured prior · first count")}
+    {prior && <p className="text-xs text-muted-foreground">Last count {priorHref ? <Link href={priorHref}>{formatDate(prior.counted_on)}</Link> : formatDate(prior.counted_on)}</p>}
     {!aligned ? <CommandFormMessage tone="warning">Expected comparison unavailable because a newer saved count changed its baseline. {state.attempt.kind === "unknown" || state.attempt.kind === "submitting" ? "Recover the frozen submission before starting a fresh recount." : "Start a fresh recount."}</CommandFormMessage>
       : expected ? <p className="text-sm">Expected total {expected}</p> : <p className="text-sm">Expected consumption unavailable · {(projection?.reason ?? "no usable POS observation").replaceAll("_", " ")}</p>}
     {aligned && projection?.starts_at && projection.as_of && <p className="text-xs text-muted-foreground">{formatDateTime(projection.starts_at, timeZone)} through {formatDateTime(projection.as_of, timeZone)}</p>}
@@ -89,11 +89,10 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
     <form onSubmit={event => { event.preventDefault(); onSubmit?.(event); }} className="flex flex-col gap-3" aria-label="Count every stock bucket">
       <div className="contents print:hidden">
       {E.ttl("Count every stock bucket")}
-      {E.note(`Server date ${formatDate(state.draft.countedOn)} · whole remaining packages only · enter zero explicitly. A partly full keg is one.`)}
+      {E.info(`Count whole packages for ${formatDate(state.draft.countedOn)}; a partly full keg counts as one. Enter 0 for none.`)}
       </div>
       {print !== undefined ? print : <WeeklyCountPrintAction />}
       <div className="contents print:hidden">
-      {E.note("Print includes only current positive stock and keeps the captured worksheet row numbers.")}
       {state.draft.lines.some(line => line.lotId !== null) && onlyRoles(roles, ["taproom"]) && E.note("Tracked lots use the full worksheet row numbers shown here. Use Print current stock labels before counting; do not guess a lot.")}
       {state.draft.lines.length === 0 && E.blank("No stock buckets are recorded at this taproom. Saving records an empty observation.")}
       <fieldset disabled={locked} className="contents">

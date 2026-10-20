@@ -242,8 +242,8 @@ describe("Brand view", () => {
     expect(model.skuList).toBe("3 active packages · 1 pour");
     expect(model.styleOptions).toContain("Add “Cold IPA”");
     expect(model.compliance.map((row) => row.title)).toEqual(["COLA TTB ID 25318001000034", "OH registration"]);
-    expect(model.compliance[0]).toMatchObject({ detail: "approved 2026-01-15 · serial 260135", verb: "Edit" });
-    expect(model.compliance[1]).toMatchObject({ detail: "OH-88214 · expires 2026-12-31", verb: "Edit" });
+    expect(model.compliance[0]).toMatchObject({ detail: "approved Jan 15, 2026 · serial 260135", verb: "Edit" });
+    expect(model.compliance[1]).toMatchObject({ detail: "OH-88214 · expires Dec 31, 2026", verb: "Edit" });
   });
 
   it("has no suggestion without a recipe, and Unpriced when on no group", () => {

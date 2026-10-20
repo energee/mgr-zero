@@ -37,8 +37,8 @@ describe("Planning view", () => {
     expect(model.requirements[0]).toMatchObject({ key: "labels", quantity: "2 roll", warning: false });
     expect(model.requirements[0].detail).toContain("need 960");
     expect(model.requirements[0].detail).toContain("includes 480 projected");
-    expect(model.requirements[0].detail).toContain("needed by 2026-10-30");
-    expect(model.requirements[0].detail).toContain("buy by 2026-10-23");
+    expect(model.requirements[0].detail).toContain("needed by Oct 30, 2026");
+    expect(model.requirements[0].detail).toContain("buy by Oct 23, 2026");
   });
 
   it("the live route mounts PlanningView, slots DraftButton, and has no E tree", () => {
@@ -48,4 +48,21 @@ describe("Planning view", () => {
     expect(page).toMatch(/<DraftButton\b/);
     expect(page).not.toMatch(/\bE\./);
   });
+
+  it("leads a gap whose needed-by date is before the brewery's today with overdue (#993)", () => {
+    const row = {
+      material_id: "ends", material_name: "Ends", base_uom: "each", purchase_uom: "case",
+      required: 10, projected: 0, on_hand: 0, on_order: 0, short: 10, purchase_units_short: 1,
+      vendor_id: "vendor", vendor_name: "Can Co", lead_time_days: 7, buy_by: "2026-09-05", out_of_reach: false,
+    };
+    const model = toPlanningViewProps({ today: "2026-10-08", requirements: [
+      { ...row, material_id: "late", needed_by: "2026-10-07" },
+      { ...row, material_id: "today", needed_by: "2026-10-08" },
+      { ...row, material_id: "undated", needed_by: null },
+    ] });
+    expect(model.requirements.map((r) => [r.key, r.detail.startsWith("overdue · "), r.warning])).toEqual([
+      ["late", true, true], ["today", false, false], ["undated", false, false],
+    ]);
+  });
 });
+

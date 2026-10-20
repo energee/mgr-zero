@@ -91,6 +91,5 @@ export function TapBoardView({ state: controlledState, skus, timeZone, navigatio
     {recent.map((event, index) => <div key={index}>{E.row(event.title, event.detail)}</div>)}
     {E.ttl("Recent history")}
     {state.snapshot.history.length === 0 ? E.blank("No closed kegs yet.") : state.snapshot.history.map(tap => <div key={tap.id}>{E.row(`Tap ${tap.tap_number ?? "unnumbered"} · ${tapLabel(tap)}`, `${tap.close_reason} · ${Math.round(Number(tap.closing_fill) * 100)}% left · closed ${formatDateTime(tap.closed_at, timeZone)} by ${actor(tap.closed_by_label)}`)}</div>)}
-    {E.note("With no usable POS numerator, a row shows what is on and since when, with no bar. Guest labels are never matched to POS. Nothing on this board posts to the ledger; the weekly count does that.")}
   </>;
 }

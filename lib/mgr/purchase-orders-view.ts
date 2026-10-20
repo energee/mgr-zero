@@ -6,8 +6,9 @@ export type PurchaseOrdersRowView = {
   key: string;
   title: string;
   detail: string;
-  verb: string;
-  tone: "info" | "attention" | "success" | "primary";
+  /** The next action; a closed order has none and its row is a plain link (#996). */
+  verb?: string;
+  tone?: "info" | "attention";
   warning?: boolean;
   href?: string;
 };
@@ -30,6 +31,15 @@ export type PurchaseOrdersSnapshot = {
   /** Closed orders included, so an empty list means there are none at all. */
   includeClosed?: boolean;
 };
+
+/** A purchase order row's next action, from its status. A received or
+ *  cancelled order has none: its row is a plain link, because "Open" on a
+ *  closed order reads as reopen (#996). */
+export function purchaseOrderNext(status: string): { verb: string; tone: "info" | "attention" } | undefined {
+  if (status === "draft") return { verb: "Mark sent", tone: "info" };
+  if (status === "received" || status === "cancelled") return undefined;
+  return { verb: "Receive", tone: status === "partially_received" ? "attention" : "info" };
+}
 
 export function toPurchaseOrdersViewProps(s: PurchaseOrdersSnapshot): PurchaseOrdersViewModel {
   const rows = s.rows ?? [];

@@ -2,6 +2,7 @@
 // inventory mock and for get_order. Mapping lives here so the page does not
 // compose a second E.* tree.
 import type { ReactNode } from "react";
+import { formatDate } from "@/lib/date-format";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { shipToAddress } from "./ship-to-view";
@@ -163,7 +164,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
     shipTo: order.ship_tos?.label,
     pickup: Boolean(order.pickup),
     customerPo: order.po_number ?? undefined,
-    requested: order.requested_ship_date ?? undefined,
+    requested: order.requested_ship_date ? formatDate(order.requested_ship_date) : undefined,
     note: order.note ?? undefined,
     costLine: costLineFor(order, cogs),
     restockNote: restockNoteFor(order, lines),

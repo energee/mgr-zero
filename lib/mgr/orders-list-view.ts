@@ -1,4 +1,5 @@
 // lib/mgr/orders-list-view.ts — view-model for the Work → Orders list.
+import { formatDate } from "@/lib/date-format";
 import type { EmptyState } from "./empty-state";
 import { docNo } from "./doc-no";
 import { nextAction, type ActionTone, type OrderStatus } from "./order-status";
@@ -40,7 +41,7 @@ export function toOrdersListViewProps({ roles, status, customer, orders }: Order
     empty: orders.length === 0 ? { title, description: "Orders appear here once they are placed." } : undefined,
     rows: orders.map((o) => {
       const { verb, tone, href } = nextAction(o.status, o.needs_restock, o.id, roles);
-      const ships = o.requested_ship_date ? ` · ships ${o.requested_ship_date}` : "";
+      const ships = o.requested_ship_date ? ` · ships ${formatDate(o.requested_ship_date)}` : "";
       const restock = o.needs_restock ? " · restock staged" : "";
       return {
         key: o.id,

@@ -1,5 +1,5 @@
 import type { TapInterval } from "./tap-board-state";
-import { formatDateTime } from "@/lib/date-format";
+import { formatDate, formatDateTime, formatTimeOfDay } from "@/lib/date-format";
 import { bblExact } from "@/lib/volume";
 
 export type TaproomTodayRow = { label: string; detail: string; href: string; verb: string };
@@ -22,7 +22,7 @@ export function taproomTodayRows(location: { id: string; name: string }, open: T
   const partialCoverage = variance !== null && report.periods.some((period) => !period.coverage_complete && period.reason === null);
   return [
     { label: "Tap board", detail: `${location.name} · ${open.length} open${latestTap ? ` · last opened ${formatDateTime(latestTap.opened_at, timeZone)}` : " · no open kegs observed"}`, href: `/taproom/board?location=${location.id}`, verb: "Open" },
-    { label: "Weekly count", detail: `${location.name} · ${latestCount ? `last saved ${latestCount.counted_on} at ${formatDateTime(latestCount.created_at, timeZone)}` : "no saved count observed"}`, href: `/taproom?location=${location.id}`, verb: "Count" },
+    { label: "Weekly count", detail: `${location.name} · ${latestCount ? `last saved ${formatDate(latestCount.counted_on)} at ${formatTimeOfDay(latestCount.created_at, timeZone)}` : "no saved count observed"}`, href: `/taproom?location=${location.id}`, verb: "Count" },
     { label: "Variance · 4 weeks", detail: `${location.name} · ${variance === null ? (report.reason ?? "comparison unavailable").replaceAll("_", " ") : `${bblExact(variance, 4)} expected minus actual${partialCoverage ? " · partial POS coverage" : ""}`} · as of ${formatDateTime(report.as_of, timeZone)}`, href: `/taproom/variance?location=${location.id}&weeks=4`, verb: "Review" },
   ];
 }

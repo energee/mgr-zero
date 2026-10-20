@@ -57,7 +57,7 @@ describe("hint roles", () => {
   });
 
   it("keeps QuickBooks connection, sync and revocation failures assertive", () => {
-    const model = { ...toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: "Reconnect required" }), remoteRevocationUnresolved: true };
+    const model = { ...toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: "Reconnect required" }, "America/New_York"), remoteRevocationUnresolved: true };
     const html = renderToStaticMarkup(createElement(AccountingView, { model, sync: createElement(QboSyncView, { status: {
       latest: { at: "Oct 16", operator: "Operator", completed: false, superseded: true }, latestFailure: { at: "Oct 15", operator: "Operator" }, lastSuccess: null, retryRequestId: null,
     } }) }));
