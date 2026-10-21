@@ -11,6 +11,7 @@ const report = {
   aging: [{ bucket: "0-30", kegs: 96, deposit_cents: 288000 }, { bucket: "90+", kegs: 9, deposit_cents: 27000 }],
   customers: [{ customer_id: "c", name: "Ridgeline Tap Room", over_90: 9, oldest_at: "2026-05-12T16:00:00+00:00" }],
   mismatches: [],
+  activePools: 1,
 };
 
 describe("toKegReportViewProps", () => {
@@ -38,10 +39,14 @@ describe("toKegReportViewProps", () => {
     expect(html).toMatch(/<a[^>]*href="\/kegs\/customers\/m"[^>]*>(?:(?!<\/a>)[\s\S])*Al’s Bar/);
     expect(html).not.toMatch(/Open balance/);
   });
-  it("an empty fleet is the empty state", () => {
-    const m = toKegReportViewProps({ fleet: { out: 0, total: 0, utilization: null }, bySize: [], aging: [], customers: [], mismatches: [] }, "America/New_York");
+  it("no pool at all is the add-a-pool empty state", () => {
+    const m = toKegReportViewProps({ fleet: { out: 0, total: 0, utilization: null }, bySize: [], aging: [], customers: [], mismatches: [], activePools: 0 }, "America/New_York");
     expect(m.headline).toEqual(["—", "0 of 0 kegs out"]);
-    expect(m.empty?.title).toBe("No owned keg pools");
+    expect(m.empty).toEqual({ title: "No keg pools", description: "Add a keg pool on Keg fleet, then record kegs acquired to see utilization." });
+  });
+  it("a pool with no kegs acquired says to record them, not that no pool exists (#988)", () => {
+    const m = toKegReportViewProps({ fleet: { out: 0, total: 0, utilization: null }, bySize: [], aging: [], customers: [], mismatches: [], activePools: 1 }, "America/New_York");
+    expect(m.empty).toEqual({ title: "No kegs recorded yet", description: "Record kegs acquired into a pool on Keg fleet to see utilization." });
   });
   it("a customer with nothing over 90 days still lists with the oldest date", () => {
     const m = toKegReportViewProps({ ...report, customers: [{ customer_id: "c", name: "Al’s", over_90: 0, oldest_at: "2026-09-01T00:00:00+00:00" }] }, "America/New_York");

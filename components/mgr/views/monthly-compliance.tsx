@@ -3,7 +3,7 @@ import { DestinationStateExport } from "./destination-state-export";
 import { FileSnapshotControl } from "./file-snapshot";
 import { E } from "@/components/mgr/e";
 import type { LossReview } from "@/lib/commands/compliance";
-import type { ComplianceFiguresViewModel, MonthlyComplianceViewModel } from "@/lib/mgr/monthly-compliance-view";
+import type { BeforeBooksState, ComplianceFiguresViewModel, MonthlyComplianceViewModel } from "@/lib/mgr/monthly-compliance-view";
 import { formatDateTime } from "@/lib/date-format";
 
 function ComplianceFigures({ model, inProcessDetail, warnings = [] }: { model: ComplianceFiguresViewModel; inProcessDetail: string; warnings?: string[] }) {
@@ -57,5 +57,14 @@ export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen
     {E.row("3 · Confirm filed outside MGR", "", model.filingDate ? E.status("Done", "ok") : "")}
     {E.info("MGR saves the immutable snapshot; it does not transmit the filing. Save stays off until the report balances.")}
     {monthOpen ? E.status("File once the period ends", "w") : fileAction !== undefined ? fileAction : model.filingDate ? E.status(`Snapshot saved ${model.filingDate}`, "ok") : <>{E.edit("Note · optional", "filed on pay.gov")}<FileSnapshotControl /></>}
+  </>;
+}
+
+/** A period that starts before the books opened: no report exists, so the page says why (#987).
+ *  The state's action (Open Settings) is present for an admin only. */
+export function PeriodBeforeBooksView({ title, state, backHref }: { title: string; state: BeforeBooksState; backHref?: string }) {
+  return <>
+    {E.back("Compliance", title, undefined, backHref)}
+    {E.blank(state, undefined, state.action && E.btn(state.action.label, "p", state.action.href))}
   </>;
 }
