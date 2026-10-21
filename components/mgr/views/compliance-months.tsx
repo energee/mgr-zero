@@ -22,6 +22,7 @@ export function ComplianceMonthsView({
     <>
       {E.hd("Compliance")}
       <TabBar names={model.cadences} on={model.cadence} cls="w-full" hrefs={cadenceHrefs} />
+      {model.months.length === 0 && model.empty ? E.blank(model.empty) : null}
       {model.months.map((row) => (
         <Fragment key={row.key}>
           {E.nav(row.title, row.detail, row.tone ?? "", undefined, linkRows ? row.href : undefined)}

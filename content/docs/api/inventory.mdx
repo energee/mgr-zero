@@ -122,7 +122,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Available-to-promise (on-hand minus open allocations) per SKU
+Available-to-promise per SKU: on-hand minus open allocations, across all locations. Pass skuId for one SKU; omit it for every SKU. Use it to answer whether an order can be filled; use get_on_hand for where stock sits by location.
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -206,7 +206,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-On-hand quantity per SKU/location
+Physical on-hand quantity per SKU and location. Pass skuId for one SKU; omit it for every SKU. Use it for where stock sits; use get_atp for what can still be promised, since on-hand ignores open allocations.
 
 | Field | Type | Required |
 | --- | --- | --- |
