@@ -138,17 +138,18 @@ export type PosMenuSetup = { title: string; description: string; action?: { labe
 
 /**
  * The Menu's empty state when no Square location is mapped (#997).
- * `connected` false means Square still has to be connected; true means only
- * the mapping is missing. Point of sale settings are admin-only, so only an
- * admin gets the link; others are told to ask one.
+ * An admin reads the connection (#1039): not connected means connect Square
+ * (locations outlive a disconnect, so `observed` cannot say this); connected
+ * with no `observed` location means none has synced yet; otherwise only the
+ * mapping is missing. Point of sale settings are admin-only, so only an admin
+ * gets a link. A non-admin cannot read the connection (`connected` null, #1083),
+ * so it gets one neutral sentence asking an admin.
  */
-export function toPosMenuSetup(connected: boolean, admin: boolean): PosMenuSetup {
-  if (!connected) return admin
-    ? { title: "No Square locations yet", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" } }
-    : { title: "No Square locations yet", description: "Ask an admin to connect Square and map a Square location to an MGR location." };
-  return admin
-    ? { title: "No Square location mapped", description: "Square locations were found, but none is mapped to an MGR location.", action: { label: "Map Square locations", href: "/settings/pos/locations" } }
-    : { title: "No Square location mapped", description: "Square locations were found, but none is mapped to an MGR location. Ask an admin to map one." };
+export function toPosMenuSetup({ admin, connected, observed }: { admin: boolean; connected: boolean | null; observed: number }): PosMenuSetup {
+  if (!admin) return { title: "No Square location mapped", description: "Ask an admin to check the Square connection and map a location." };
+  if (!connected) return { title: "No Square locations yet", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" } };
+  if (observed === 0) return { title: "No Square locations yet", description: "Square is connected, but no locations are synced yet. Sync the Square catalog, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" } };
+  return { title: "No Square location mapped", description: "Square locations were found, but none is mapped to an MGR location.", action: { label: "Map Square locations", href: "/settings/pos/locations" } };
 }
 
 const price = (cents: number | null) => cents == null ? "No price" : money(cents);

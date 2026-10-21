@@ -34,11 +34,11 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
   ]) : [null, [] as Bin[]];
   const model = toPosMenuModel(snapshot, mapped, location?.externalLocationId ?? "");
   if (!location) {
-    // Locations outlive a disconnect, so an admin reads the connection itself (#1039). Connection
-    // health is admin-only; for others, any observed location is the best sign Square was connected.
+    // Locations outlive a disconnect, so only the connection says whether Square is connected (#1039).
+    // get_pos_integration_health is admin-only; a non-admin cannot read it (#1083) and gets neutral copy.
     const admin = hasAnyRole(brewery.roles, ["admin"]);
-    const connected = admin ? (await runCommand("get_pos_integration_health", {}, ctx) as { connected: boolean }).connected : observed.length > 0;
-    model.setup = toPosMenuSetup(connected, admin);
+    const connected = admin ? (await runCommand("get_pos_integration_health", {}, ctx) as { connected: boolean }).connected : null;
+    model.setup = toPosMenuSetup({ admin, connected, observed: observed.length });
   }
   return <PosMenuControl model={model} bins={bins} channels={channels} />;
 }
