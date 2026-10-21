@@ -79,7 +79,7 @@ type BinOnHandRow = OnHandRow & { bin_id: string };
 type AtpRow = { brewery_id: string; sku_id: string; qty: number };
 
 defineQuery({
-  name: "get_on_hand", description: "On-hand quantity per SKU/location",
+  name: "get_on_hand", description: "Physical on-hand quantity per SKU and location. Pass skuId for one SKU; omit it for every SKU. Use it for where stock sits; use get_atp for what can still be promised, since on-hand ignores open allocations.",
   input: bySku, roles: [...readRoles],
   aiExposed: true,
   handler: async (ctx, i) => {
@@ -132,7 +132,7 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_atp", description: "Available-to-promise (on-hand minus open allocations) per SKU",
+  name: "get_atp", description: "Available-to-promise per SKU: on-hand minus open allocations, across all locations. Pass skuId for one SKU; omit it for every SKU. Use it to answer whether an order can be filled; use get_on_hand for where stock sits by location.",
   input: bySku, roles: [...readRoles],
   aiExposed: true,
   handler: (ctx, i) => completeRows<AtpRow>("Available stock", async (_, after) => {
