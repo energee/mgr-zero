@@ -157,12 +157,12 @@ describe("POS UI truth", () => {
 });
 
 describe("Menu with no mapped Square location (#997)", () => {
-  const unmapped = (observed: number, admin: boolean) => renderToStaticMarkup(createElement(PosMenuView, {
-    model: { locations: [], selectedLocationId: "", locationName: "Square location", items: [], excluded: [], externalItems: [], setup: toPosMenuSetup(observed, admin) },
+  const unmapped = (connected: boolean, admin: boolean) => renderToStaticMarkup(createElement(PosMenuView, {
+    model: { locations: [], selectedLocationId: "", locationName: "Square location", items: [], excluded: [], externalItems: [], setup: toPosMenuSetup(connected, admin) },
   }));
 
-  it("sends an admin to connect Square when no Square location has been seen", () => {
-    const html = unmapped(0, true);
+  it("sends an admin to connect Square when Square is not connected", () => {
+    const html = unmapped(false, true);
     expect(html).toContain("Connect Square, then map a Square location");
     expect(html).toMatch(/href="\/settings\/pos"[^>]*>Set up Square/);
     expect(html).not.toContain("Also in Square");
@@ -171,23 +171,29 @@ describe("Menu with no mapped Square location (#997)", () => {
   });
 
   it("draws the setup action inside the empty state, under its message (#1020 review)", () => {
-    const html = unmapped(0, true);
+    const html = unmapped(false, true);
     expect(html).toMatch(/data-slot="empty-content"[^>]*>(?:(?!<\/div>)[\s\S])*Set up Square/);
   });
 
-  it("sends an admin to map a location when Square locations exist but none is mapped", () => {
-    const html = unmapped(2, true);
+  it("sends an admin to map a location when Square is connected but no location is mapped", () => {
+    const html = unmapped(true, true);
     expect(html).not.toContain("Connect Square");
     expect(html).toContain("none is mapped to an MGR location");
     expect(html).toMatch(/href="\/settings\/pos\/locations"[^>]*>Map Square locations/);
   });
 
-  it.each([0, 2])("gives a non-admin no settings link, only a sentence to ask an admin (%i observed)", (observed) => {
-    const html = unmapped(observed, false);
+  it.each([false, true])("gives a non-admin no settings link, only a sentence to ask an admin (connected %s)", (connected) => {
+    const html = unmapped(connected, false);
     expect(html).toContain("Ask an admin");
     expect(html).not.toContain("/settings/pos");
     expect(html).not.toContain("Set up Square");
     expect(html).not.toContain("Map Square locations");
+  });
+
+  it("chooses the connect step from the Square connection, not from leftover locations (#1039)", () => {
+    const page = readFileSync("app/(app)/menu/page.tsx", "utf8");
+    expect(page).toContain('runCommand("get_pos_integration_health"');
+    expect(page).not.toMatch(/toPosMenuSetup\(observed\.length/);
   });
 
   it("keeps the live settings path out of the shared view and inert in the inventory frames", () => {
