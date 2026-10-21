@@ -1,5 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { setTimeout as sleep } from "node:timers/promises";
 import { oauthState, sha256 } from "@/lib/hash";
 import { canRun, CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { hasAnyRole } from "@/lib/mgr/roles";
@@ -13,9 +14,11 @@ import {
   confirmPortalInvoicePayment,
   finishQboPush,
   finishQboReceiptBill,
+  leaseQboTokenRefresh,
   markQboAuthorizationFailed,
   readPortalInvoicePayment,
   readVersionedIntegrationTokens,
+  releaseQboTokenRefresh,
   type QboInvoiceObservation,
   type PortalInvoicePaymentClaim,
   type VersionedIntegrationTokens,
@@ -168,6 +171,42 @@ export function validateQboPaymentUrl(value: string, allowedHosts: ReadonlySet<s
   }
 }
 
+/** How long a caller waits on another caller's refresh; a crashed holder's SQL lease lasts 30 seconds. */
+const QBO_REFRESH_WAIT_MS = 35_000;
+const QBO_REFRESH_POLL_MS = 200;
+
+/**
+ * Runs `refresh` (the Intuit call plus its compare-and-swap) while holding the
+ * connection's refresh lease, so one caller at a time sends the refresh token
+ * (#1032). Intuit retires the old refresh token when it issues a new one, so
+ * two parallel refreshes could leave a dead token stored. A caller that finds
+ * the lease held polls until the holder stores newer credentials, then gets
+ * "superseded" and re-reads them instead of refreshing.
+ */
+async function withQboRefreshLease<T>(
+  ctx: Ctx,
+  expected: VersionedIntegrationTokens,
+  refresh: () => Promise<T>,
+): Promise<T | "superseded"> {
+  const lease = randomUUID();
+  const deadline = Date.now() + QBO_REFRESH_WAIT_MS;
+  for (;;) {
+    const state = await leaseQboTokenRefresh(ctx, expected, lease);
+    if (state === "superseded") return state;
+    if (state === "leased") break;
+    if (Date.now() >= deadline) throw new Error("QuickBooks is unavailable");
+    await sleep(QBO_REFRESH_POLL_MS);
+  }
+  try {
+    return await refresh();
+  } finally {
+    // Logging and dropping a failed release is safe: the lease expires by itself
+    // after 30 seconds, and throwing here would hide the refresh outcome.
+    await releaseQboTokenRefresh(ctx, expected.connectionId, lease)
+      .catch((error: unknown) => console.error("qbo_refresh_lease_release_failed", qboPaymentFailureCause(error)));
+  }
+}
+
 export type PortalInvoicePaymentResult =
   | { kind: "redirect"; url: string }
   | { kind: "unavailable"; reason: "not_configured" | "provider_unavailable" | "link_unavailable" | "context_changed" | "rate_limited" };
@@ -182,13 +221,17 @@ async function refreshPortalInvoicePayment(
     await markQboAuthorizationFailed(ctx, claim, invoiceId);
     return null;
   }
-  const next = await client.refresh(claim.refreshToken).catch(async (error) => {
-    if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, claim, invoiceId);
-    else console.error("qbo_payment_refresh_failed", qboPaymentFailureCause(error));
-    // A failed provider refresh keeps the buyer on Payment unavailable.
-    return null;
+  const stored = await withQboRefreshLease(ctx, claim, async () => {
+    const next = await client.refresh(claim.refreshToken).catch(async (error) => {
+      if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, claim, invoiceId);
+      else console.error("qbo_payment_refresh_failed", qboPaymentFailureCause(error));
+      // A failed provider refresh keeps the buyer on Payment unavailable.
+      return null;
+    });
+    return next !== null && await compareAndSwapPortalInvoicePaymentTokens(ctx, invoiceId, claim, next);
   });
-  if (!next || !await compareAndSwapPortalInvoicePaymentTokens(ctx, invoiceId, claim, next)) return null;
+  if (stored === false) return null;
+  // Stored here, or "superseded" by another caller's stored refresh: read the current claim.
   return readPortalInvoicePayment(ctx, invoiceId);
 }
 
@@ -249,15 +292,18 @@ export async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, ex
     await markQboAuthorizationFailed(ctx, current);
     throw new Error("QuickBooks is unavailable");
   }
-  const next = await client.refresh(current.refreshToken).catch(async (error) => {
-    if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, current);
-    throw new Error(sanitizeQboError(error));
+  // A "superseded" lease means another caller stored newer tokens; the read below returns them.
+  await withQboRefreshLease(ctx, current, async () => {
+    const next = await client.refresh(current.refreshToken).catch(async (error) => {
+      if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, current);
+      throw new Error(sanitizeQboError(error));
+    });
+    try {
+      await compareAndSwapQboTokens(ctx, current, next);
+    } catch (error) {
+      if (!(error instanceof CommandError) || error.status !== 409) throw new Error(sanitizeQboError(error));
+    }
   });
-  try {
-    await compareAndSwapQboTokens(ctx, current, next);
-  } catch (error) {
-    if (!(error instanceof CommandError) || error.status !== 409) throw new Error(sanitizeQboError(error));
-  }
   const stored = await readVersionedIntegrationTokens(ctx, "qbo")
     .catch((error) => { throw new Error(sanitizeQboError(error)); });
   if (stored.connectionId !== current.connectionId || stored.credentialVersion <= current.credentialVersion) {

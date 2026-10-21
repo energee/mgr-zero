@@ -565,6 +565,29 @@ export async function compareAndSwapQboTokens(ctx: Ctx, expected: VersionedInteg
   if (data !== true) throw new CommandError("QuickBooks connection changed; retry with the current connection", 409, "conflict");
 }
 
+/**
+ * Asks for the connection's refresh lease (#1032) at the version the caller read.
+ * "leased": refresh now. "held": another caller is refreshing; ask again shortly.
+ * "superseded": newer credentials are stored; re-read them instead of refreshing.
+ */
+export async function leaseQboTokenRefresh(ctx: Ctx, expected: VersionedIntegrationTokens, lease: string) {
+  const { data, error } = await createAdminClient().rpc("lease_qbo_token_refresh", {
+    p_brewery: ctx.breweryId, p_connection: expected.connectionId,
+    p_expected_version: expected.credentialVersion, p_lease: lease,
+  });
+  if (error || (data !== "leased" && data !== "held" && data !== "superseded")) {
+    throw new Error("QuickBooks refresh lease is unavailable");
+  }
+  return data;
+}
+
+export async function releaseQboTokenRefresh(ctx: Ctx, connectionId: string, lease: string) {
+  const { error } = await createAdminClient().rpc("release_qbo_token_refresh", {
+    p_brewery: ctx.breweryId, p_connection: connectionId, p_lease: lease,
+  });
+  if (error) throw new Error("QuickBooks refresh lease could not be released");
+}
+
 export async function getQboHealth(ctx: Ctx) {
   requireIntegrationRole(ctx);
   const { data, error } = await ctx.db.from("qbo_connections")
