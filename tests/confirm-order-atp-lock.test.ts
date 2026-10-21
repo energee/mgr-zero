@@ -5,37 +5,11 @@
 // allocations and returns no warning. Confirms of different SKUs still run
 // side by side.
 import { afterEach, describe, expect, it } from "vitest";
-import { Client } from "pg";
-import { DB, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation } from "./helpers";
+import { closePgSessions, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation, staffSession, pgSession } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
-const clients: Client[] = [];
-
-afterEach(async () => {
-  await Promise.allSettled(clients.splice(0).map(async (client) => {
-    await client.query("rollback").catch(() => {});
-    await client.end();
-  }));
-});
-
-async function staffTx(userId: string) {
-  const value = new Client({ connectionString: DB });
-  clients.push(value);
-  await value.connect();
-  await value.query("set statement_timeout='8s'; set lock_timeout='7s'");
-  await value.query("begin");
-  await value.query("select set_config('request.jwt.claim.sub',$1,true)", [userId]);
-  await value.query("set local role authenticated");
-  return value;
-}
-
-async function plain() {
-  const value = new Client({ connectionString: DB });
-  clients.push(value);
-  await value.connect();
-  return value;
-}
+afterEach(closePgSessions);
 
 type Warning = { sku_id: string; atp: number };
 const confirmSql = "select public.confirm_order($1,$2) result";
@@ -70,9 +44,9 @@ async function twoSubmittedOrders(sameSku: boolean) {
 // Resolves once B has either finished or is waiting on a lock.
 async function raceConfirms(sameSku: boolean) {
   const f = await twoSubmittedOrders(sameSku);
-  const first = await staffTx(f.userId);
-  const second = await staffTx(f.userId);
-  const observer = await plain();
+  const first = await staffSession(f.userId);
+  const second = await staffSession(f.userId);
+  const observer = await pgSession();
   const pid = (await second.query("select pg_backend_pid() pid")).rows[0].pid as number;
   const waitOf = async () => (await observer.query("select wait_event_type, wait_event from pg_stat_activity where pid=$1", [pid])).rows[0];
 
