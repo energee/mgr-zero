@@ -8,8 +8,8 @@ draft pours (shipped) **and 4-packs**. Cases that arrive in a menu bin become
 
 - A case is broken into four-packs **when it moves into a menu bin** (transfer
   receive or bin move), not at count time and not implicitly.
-- Creating a brand's Case SKU **auto-creates its Four Pack SKU**. Existing
-  brands are not backfilled.
+- Creating a brand's Case SKU **auto-creates its Four Pack SKU**, and existing
+  Case SKUs are backfilled when the Case format gains its Four Pack contents.
 - MGR → Square stays the direction for products; the Square → MGR catalog pull
   remains only for attributing sales of items MGR did not publish.
 
@@ -42,9 +42,12 @@ Migrations: `20261021140000_case_four_pack.sql` (Tasks 1–3) and
 1. **Child SKUs with the parent.** `public.create_sku` (latest
    `20261012100600_sku_keg_pool_legacy_replay.sql`) also inserts the brand's
    SKU for each `format_components` child (`on conflict do nothing`). Covers the
-   catalog form and CSV import, which both call it.
+   catalog form and CSV import, which both call it. Backfill:
+   `replace_format_components` does the same for every existing SKU of the
+   parent format, so composing Case once gives every Case brand its Four Pack.
    Test: `tests/sku-child-formats.test.ts` — creating Hanno · Case creates
-   Hanno · Four Pack; a second Case create does not duplicate it.
+   Hanno · Four Pack; a second Case create does not duplicate it; composing
+   Case after two Case SKUs exist creates both Four Pack SKUs.
 2. **Compose a typed Case** (per the open decision).
    Test: `tests/format-components.test.ts` — Case 0.09677419 = 6 × 0.01612903
    composes; 5 × is refused.
@@ -88,5 +91,4 @@ Migrations: `20261021140000_case_four_pack.sql` (Tasks 1–3) and
 7 needs 4; 8 and 9 last.
 
 **Out of scope (ask).** Website feed (`get_published_pos_menu`) stays
-pours-only; backfilling Four Pack SKUs for existing brands; selling whole
-cases on Square.
+pours-only; selling whole cases on Square.
