@@ -194,6 +194,27 @@ export async function completeQboOAuthStore(intentId: string, actorId: string, r
   return data;
 }
 
+/** Holds the refresh token Intuit just issued on the exchanging intent, so a reap can revoke it if the callback dies (#1034). */
+export async function holdQboOAuthTokens(intentId: string, actorId: string, realmId: string, refreshToken: string) {
+  const { data, error } = await createAdminClient().rpc("hold_qbo_oauth_tokens", {
+    p_intent: intentId, p_actor: actorId, p_realm_id: realmId, p_refresh_token: refreshToken,
+  });
+  if (error || data !== true) throw new Error("QuickBooks OAuth tokens could not be held");
+}
+
+/** OAuth intents whose held refresh token the retention job should revoke now (#1034); see reap_qbo_oauth_exchanges. */
+export async function reapStaleQboOAuthExchanges() {
+  const { data, error } = await createAdminClient().rpc("reap_qbo_oauth_exchanges");
+  if (error) throw new Error("QuickBooks OAuth reap failed");
+  return data.map((row) => ({ intentId: row.intent_id, realmId: row.realm_id, refreshToken: row.refresh_token, giveUp: row.give_up }));
+}
+
+/** Forgets a held refresh token after the reap's revoke attempt. */
+export async function discardQboOAuthTokens(intentId: string, refreshToken: string) {
+  const { error } = await createAdminClient().rpc("discard_qbo_oauth_tokens", { p_intent: intentId, p_refresh_token: refreshToken });
+  if (error) throw new Error("QuickBooks OAuth token discard failed");
+}
+
 /** True when the intent moved to recovery_required; false when it was no longer 'exchanging'. */
 export async function failQboOAuth(intentId: string, actorId: string) {
   const { data, error } = await createAdminClient().rpc("fail_qbo_oauth", { p_intent: intentId, p_actor: actorId });

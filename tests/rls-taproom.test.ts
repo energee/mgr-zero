@@ -310,6 +310,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     confirm_portal_qbo_payment: [B,f.customer.customerId,f.invoice.id,f.taproom.id,R(),"fixture-realm","fixture-id",1,["com.intuit.quickbooks.accounting"]],
     claim_qbo_oauth: ["fixture-state",f.taproom.id,B,"https://example.test/qbo/callback"], qbo_oauth_already_completed: ["fixture-state",f.taproom.id,B], complete_qbo_invoice_sync: [B,f.taproom.id,R(),R(),"fixture-realm",[]],
     complete_qbo_oauth: [R(),f.taproom.id,"fixture-realm","Fixture","fixture-access","fixture-refresh",now,3600,3600,3600,[]], fail_qbo_oauth: [R(),f.taproom.id],
+    hold_qbo_oauth_tokens: [R(),f.taproom.id,"fixture-realm","fixture-refresh"], reap_qbo_oauth_exchanges: [], discard_qbo_oauth_tokens: [R(),"fixture-refresh"],
     finish_qbo_disconnect: [B,R(),f.taproom.id,R(),true], finish_qbo_push: [B,R(),f.taproom.id,"pushed","fixture-id",null,{},R()],
     finish_qbo_receipt_bill: [B,receipt.id,f.taproom.id,R(),"fixture-bill",null,{},false],
     claim_square_oauth: ["fixture-state",f.taproom.id,B,"https://example.test/square/callback"], fail_square_oauth: [R(),f.taproom.id,"not_required",null],
