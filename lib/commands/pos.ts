@@ -48,6 +48,12 @@ defineCommand({
 });
 
 defineQuery({
+  name: "get_square_connected", description: "Whether the brewery's Square seller is connected, and nothing else about the connection, for the roles that open Menu",
+  input: z.object({}), roles: ["admin", "warehouse"],
+  handler: async (ctx) => ({ connected: (await unwrap(ctx.db.rpc("get_square_connected", { p_brewery: ctx.breweryId }))) as boolean }),
+});
+
+defineQuery({
   name: "list_pos_locations", description: "List every observed Square location and its explicit labeled MGR location mapping",
   input: z.object({}), roles: ["admin", "warehouse"],
   handler: async (ctx) => {

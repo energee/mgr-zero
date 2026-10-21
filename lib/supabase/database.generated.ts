@@ -5029,6 +5029,9 @@ isOneToOne: false
 "get_qbo_sync_status":
 { Args: { "p_brewery": string }; Returns: Json
                            },
+"get_square_connected":
+{ Args: { "p_brewery": string }; Returns: boolean
+                           },
 "get_taproom_count":
 { Args: { "p_brewery": string,"p_count": string }; Returns: Json
                            },
