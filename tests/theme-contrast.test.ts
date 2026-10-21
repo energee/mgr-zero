@@ -41,21 +41,23 @@ for (const mode of [":root", ".dark"]) {
   });
 }
 
-// A hovered row action (E.act) paints its tone tint over the tap row's
-// accent/50 hover wash, over the page surface (#1041). Light mode only: in dark,
-// the ghost Button's dark:hover:bg-muted/50 replaces the tint on hover.
-it("keeps hovered primary and destructive row actions at AA in light mode (#1041)", () => {
+// A hovered row action (E.act) paints its tone over the tap row's accent/50
+// hover wash, over the page surface (#1041). Primary and destructive are a tint
+// under tone-colored text; success, attention and info are a solid fill at /80
+// under their -foreground text. Light mode only: in dark, the ghost Button's
+// dark:hover:bg-muted/50 replaces the tone on hover.
+it("keeps every hovered row-action tone at AA in light mode (#1041)", () => {
   const e = readFileSync(new URL("../components/mgr/e.tsx", import.meta.url), "utf8");
   const tokens = tokensOf(":root");
   const rgb = (hex: string) => hex.match(/[a-f\d]{2}/gi)!.map((v) => parseInt(v, 16));
   const over = (top: string, alpha: number, under: number[]) => rgb(top).map((v, i) => v * alpha + under[i] * (1 - alpha));
   const toHex = (c: number[]) => "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
   expect(e).toMatch(/has-\[\[data-tap\]\]:hover:bg-accent\/50/);
-  for (const role of ["primary", "destructive"]) {
-    const alpha = Number(e.match(new RegExp(`text-${role} hover:bg-${role}/(\\d+)`))![1]) / 100;
+  for (const role of ["primary", "destructive", "success", "attention", "info"]) {
+    const [, percent, text] = e.match(new RegExp(`hover:bg-${role}/(\\d+) hover:text-(${role}(?:-foreground)?)"`))!;
     for (const surface of ["background", "card", "popover"]) {
-      const hovered = over(tokens[role], alpha, over(tokens.accent, 0.5, rgb(tokens[surface])));
-      expect(contrast(tokens[role], toHex(hovered)), `${role} hover on ${surface}`).toBeGreaterThanOrEqual(4.5);
+      const hovered = over(tokens[role], Number(percent) / 100, over(tokens.accent, 0.5, rgb(tokens[surface])));
+      expect(contrast(tokens[text], toHex(hovered)), `${role} hover on ${surface}`).toBeGreaterThanOrEqual(4.5);
     }
   }
 });
