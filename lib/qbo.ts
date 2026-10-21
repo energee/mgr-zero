@@ -76,6 +76,8 @@ export type QboOAuthClaim = {
 };
 export type QboOAuthStore = {
   claim(stateHash: string, actorId: string, selectedBreweryId: string, redirectUri: string): Promise<QboOAuthClaim | null>;
+  /** Records the refresh token Intuit issued on the exchanging intent, so a reap can revoke it if this callback dies. */
+  hold(intentId: string, actorId: string, realmId: string, refreshToken: string): Promise<void>;
   /** realmLabel is the verified QuickBooks CompanyName, or null when QuickBooks returned none. */
   complete(intentId: string, actorId: string, realmId: string, tokens: QboTokens, realmLabel: string | null): Promise<string>;
   /** Marks the intent recovery_required; false when it had already left 'exchanging' (e.g. complete committed). */
@@ -285,6 +287,7 @@ export async function completeQboOAuth(input: {
   let storing = false;
   try {
     tokens = await input.client.exchange(code);
+    await input.store.hold(claim.intentId, input.actorId, realmId, tokens.refreshToken);
     if (tokens.grantedScopes?.some((scope) => !claim.requestedScopes.includes(scope))) {
       throw new Error("QuickBooks token response was invalid");
     }

@@ -11,6 +11,7 @@ import {
   completeQboOAuthStore,
   disconnectQbo,
   failQboOAuth,
+  holdQboOAuthTokens,
   qboRealmInUse,
   qboOAuthAlreadyCompleted,
   getQboHealth,
@@ -156,7 +157,7 @@ describe("QuickBooks durable lifecycle", () => {
     await completeQboOAuth({
       request: new Request(`${config.redirectUri}?code=one-time-code&state=${authorize.searchParams.get("state")}&realmId=${realm}`),
       actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri: config.redirectUri,
-      client: oauthClient, store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
+      client: oauthClient, store: { claim: claimQboOAuth, hold: holdQboOAuthTokens, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
     });
     expect((await admin.from("qbo_connections").select("granted_scopes").eq("brewery_id", brewery.id).single()).data?.granted_scopes)
       .toEqual(requestedScopes);
@@ -186,7 +187,7 @@ describe("QuickBooks durable lifecycle", () => {
     await completeQboOAuth({
       request: new Request(`${config.redirectUri}?code=narrow-code&state=${narrow.searchParams.get("state")}&realmId=${realm}`),
       actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri: config.redirectUri,
-      client: narrowClient, store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
+      client: narrowClient, store: { claim: claimQboOAuth, hold: holdQboOAuthTokens, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
     });
     expect((await admin.from("qbo_connections").select("granted_scopes").eq("brewery_id", brewery.id).single()).data?.granted_scopes)
       .toEqual([QBO_ACCOUNTING_SCOPE]);
@@ -211,7 +212,7 @@ describe("QuickBooks durable lifecycle", () => {
     });
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (url) =>
       String(url).includes("/tokens/bearer") ? tokenResponse() : companyResponse());
-    const store = { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse };
+    const store = { claim: claimQboOAuth, hold: holdQboOAuthTokens, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse };
     const begin = (state: string) => ctx.db.rpc("begin_qbo_oauth", {
       p_brewery: brewery.id, p_redirect_uri: redirectUri, p_state_hash: hash(state),
       p_provider_intent: "connect", p_request_id: crypto.randomUUID(),

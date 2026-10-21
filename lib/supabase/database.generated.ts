@@ -4913,6 +4913,9 @@ isOneToOne: false
 "disable_chat_installation":
 { Args: { "p_brewery": string,"p_installation": string,"p_request_id": string }; Returns: Json
                            },
+"discard_qbo_oauth_tokens":
+{ Args: { "p_intent": string,"p_refresh_token": string }; Returns: undefined
+                           },
 "disconnect_chat_installation":
 { Args: { "p_brewery": string,"p_installation": string,"p_request_id": string }; Returns: Json
                            },
@@ -5054,6 +5057,9 @@ isOneToOne: false
                            },
 "has_staff_role":
 { Args: { "b": string,"p_roles": (Database["public"]['Enums']["staff_role"])[] }; Returns: boolean
+                           },
+"hold_qbo_oauth_tokens":
+{ Args: { "p_actor": string,"p_intent": string,"p_realm_id": string,"p_refresh_token": string }; Returns: boolean
                            },
 "import_csv_row":
 { Args: { "p_brewery": string,"p_request_id": string,"p_row_n": number }; Returns: Json
@@ -5254,6 +5260,11 @@ isOneToOne: false
 "read_portal_quote_tax":
 { Args: { "p_actor": string,"p_brewery": string,"p_customer": string,"p_quote": string }; Returns: {
               "access_token": string,"connection_id": string,"tax_input": Json
+            }[]
+                           },
+"reap_qbo_oauth_exchanges":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "intent_id": string,"realm_id": string,"refresh_token": string
             }[]
                            },
 "reattribute_loss":
