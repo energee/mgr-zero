@@ -46,7 +46,7 @@ export function MeSheetActions({ guide }: { guide: "/docs/staff-guide" | "/docs/
       <Button variant="outline" className="w-full md:w-fit md:self-end" asChild><Link href={guide}>Guide</Link></Button>
       <Button variant="outline" className="w-full md:w-fit md:self-end" asChild><Link href="/password">Change password</Link></Button>
       <form action={logout}>
-        <Button type="submit" variant="destructive" className="w-full bg-destructive! text-destructive-foreground! hover:bg-destructive/90! md:w-fit md:self-end">Sign out</Button>
+        <Button type="submit" variant="destructive" className="w-full md:w-fit md:self-end">Sign out</Button>
       </form>
     </div>
   );
