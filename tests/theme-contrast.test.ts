@@ -111,3 +111,27 @@ it("keeps every hovered row-action tone at AA in light mode (#1041)", () => {
     }
   }
 });
+
+// The shadcn Button and Badge destructive variants paint destructive-foreground
+// on a solid destructive fill, the pair E.btn del uses (#1079). A tint under
+// destructive text failed AA in dark cards and popovers. Hover paints the fill
+// at a declared percent over the surface, so that blend is checked too.
+it("keeps the Button and Badge destructive variants at AA, at rest and on hover (#1079)", () => {
+  const rgb = (hex: string) => hex.match(/[a-f\d]{2}/gi)!.map((v) => parseInt(v, 16));
+  const toHex = (c: number[]) => "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+  const over = (top: string, alpha: number, under: string) => toHex(rgb(top).map((v, i) => v * alpha + rgb(under)[i] * (1 - alpha)));
+  for (const file of ["button", "badge"]) {
+    const source = readFileSync(new URL(`../components/ui/${file}.tsx`, import.meta.url), "utf8");
+    const variant = source.match(/destructive:\s*"([^"]*)"/)![1];
+    expect(variant, `${file} destructive`).toMatch(/^bg-destructive text-destructive-foreground /);
+    expect(variant, `${file} destructive has no dark tint`).not.toMatch(/dark:(hover:)?bg-destructive\//);
+    const percent = Number(variant.match(/hover:bg-destructive\/(\d+)/)![1]);
+    for (const mode of [":root", ".dark"]) {
+      const tokens = tokensOf(mode);
+      for (const surface of ["background", "card", "popover"]) {
+        const hovered = over(tokens.destructive, percent / 100, tokens[surface]);
+        expect(contrast(tokens["destructive-foreground"], hovered), `${file} ${mode} hover on ${surface}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  }
+});
