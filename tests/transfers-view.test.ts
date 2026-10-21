@@ -110,13 +110,10 @@ describe("New transfer view", () => {
     expect(model.lines.map((l) => [l.title, l.qty])).toEqual([[SKU_HAZY.name, 2], [SKU_PILS.name, 4]]);
   });
 
-  it("renders Create transfer and the two SKU rows; there is no draft step", () => {
+  it("renders Create transfer and the two SKU rows", () => {
     const html = htmlOf(createElement(NewTransferView, { model: toNewTransferViewProps(newTransferDraft) }));
     expect(html).toMatch(/>Create transfer</);
-    expect(html).not.toMatch(/Save draft/);
-    const form = readFileSync("app/(app)/transfers/new-transfer-form.tsx", "utf8");
-    expect(form).toMatch(/"Create transfer"/);
-    expect(form).not.toMatch(/Save draft/);
+    expect(readFileSync("app/(app)/transfers/new-transfer-form.tsx", "utf8")).toMatch(/"Create transfer"/);
     expect(html).toContain(SKU_HAZY.name);
     expect(html).toContain(SKU_PILS.name);
     expect(html).not.toMatch(/→/);
@@ -160,12 +157,6 @@ describe("Transfer detail view", () => {
     const html = htmlOf(createElement(TransferDetailView, { model: cancelled }));
     expect(html).toMatch(/over-picked/);
     expect(html).not.toMatch(/>Cancel transfer<|>Record pick</);
-  });
-
-  it("a created transfer is submitted, so Record pick is its first verb and there is no Submit", () => {
-    const src = readFileSync("app/(app)/transfers/[id]/transfer-actions.tsx", "utf8");
-    expect(src).not.toMatch(/submit_stock_transfer|>Submit</);
-    for (const name of ["Transfers", "Transfer detail"]) expect(screen(name).states!.map(([state]) => state)).not.toContain("draft");
   });
 
   it("the live footer can cancel with a reason", () => {

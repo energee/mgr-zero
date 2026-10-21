@@ -1,8 +1,7 @@
 // app/(app)/transfers/[id]/transfer-actions.tsx — the one next verb for a
-// stock transfer by status: Record pick (submitted, which every transfer is
-// on creation; picks default to the ordered qty), Receive (picked; quantities
-// default to picked), and Cancel transfer with a reason until it is received
-// (#578).
+// stock transfer by status: Record pick (submitted; picks default to the
+// ordered qty), Receive (picked; quantities default to picked), and Cancel
+// transfer with a reason until it is received (#578).
 "use client";
 
 import { useState } from "react";

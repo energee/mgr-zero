@@ -21,7 +21,7 @@ describe("stock_transfers schema", () => {
 });
 
 describe("stock transfer lifecycle", () => {
-  it("create_stock_transfer refuses same-location and accepts a sku line across two locations; it starts submitted and can be picked at once", async () => {
+  it("create_stock_transfer refuses same-location and accepts a sku line across two locations; pick advances it", async () => {
     const b = await makeBrewery();
     const ctx = await makeStaffCtx(b.id, "admin");
     const from = await seedLocation(b.id, { name: "WH", uses: ["warehouse"] });
