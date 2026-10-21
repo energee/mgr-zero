@@ -57,6 +57,16 @@ it("ThemeBoot's script runs from the server and stays inert in a browser render"
   expect(renderToStaticMarkup(createElement(ThemeBoot))).toContain('type="text/plain"');
 });
 
+// global-error replaces the root layout, so it brings its own document, the
+// global styles and ThemeBoot, or a root layout failure renders unthemed (#1069).
+it("app/global-error.tsx renders its own themed document", () => {
+  const globalError = readFileSync(new URL("../app/global-error.tsx", import.meta.url), "utf8");
+  expect(globalError).toMatch(/^"use client";/m);
+  expect(globalError).toContain('import "./globals.css";');
+  expect(globalError).toMatch(/<html[^>]*suppressHydrationWarning[\s\S]*<head>\s*<ThemeBoot \/>[\s\S]*<body/);
+  expect(globalError).toContain("<RouteError retry={retry} />");
+});
+
 // A notFound() or a throw before the shell flushes makes Next send its bare
 // error document and render the root layout on the client, where the inline
 // script can't run (#986). ThemeBoot's layout effect applies the same rule.
