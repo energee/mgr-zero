@@ -1,5 +1,6 @@
 // Catalog draws one row per brand in the shared RecordTable: the name links to
-// the brand, with its alias under it. Packaged and poured SKUs live in its SKU list.
+// the brand, with its alias under it, and the COLA column reads its recorded
+// approvals. Packaged and poured SKUs live in its SKU list.
 // Price groups and Water profiles rows follow; inventory and live draw both.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
@@ -33,11 +34,11 @@ export function CatalogView({
       {model.empty
         ? E.blank(model.empty)
         : <RecordTable
-          headers={["Brand", "Style", "ABV", "SKUs"]}
-          align={["l", "l", "r", "r"]}
+          headers={["Brand", "Style", "ABV", "SKUs", "COLA"]}
+          align={["l", "l", "r", "r", "l"]}
           rows={model.brands.map((brand) => ({
             key: brand.key,
-            cells: [brand.name, brand.style, brand.abv, brand.skus],
+            cells: [brand.name, brand.style, brand.abv, brand.skus, brand.cola],
             note: brand.alias,
             href: linkRows ? brand.href : undefined,
           }))}

@@ -49,7 +49,7 @@ const packagedFormats = [
   { id: FMT_CASE, name: "case · 24×16 oz" },
 ];
 
-/** More → Catalog: three brands and 8 price groups. */
+/** More → Catalog: three brands (one, no and two COLAs on file) and 8 price groups. */
 export const catalogBrands: CatalogSnapshot = {
   brands: [
     {
@@ -59,6 +59,8 @@ export const catalogBrands: CatalogSnapshot = {
       styles: { name: "IPA" },
       skus: hazySkus,
       pours: [{ id: FMT_PINT }],
+      // The same COLA brandHazy lists under Compliance.
+      colas: [{ ttb_id: "25318001000034", approved_on: "2026-01-15" }],
     },
     {
       id: BRAND_PILS,
@@ -69,6 +71,7 @@ export const catalogBrands: CatalogSnapshot = {
         { id: SKU_PILS.sku_id },
         { id: SKU_PILS_BOTTLE },
       ],
+      colas: [],
     },
     {
       id: BRAND_STOUT,
@@ -78,6 +81,8 @@ export const catalogBrands: CatalogSnapshot = {
       abv: 7.2,
       styles: { name: "Stout" },
       skus: [{ id: SKU_STOUT.sku_id }],
+      // Two labels on file, one with no recorded approval date.
+      colas: [{ ttb_id: "25318001000101", approved_on: "2025-11-03" }, { ttb_id: "00318001000102", approved_on: null }],
     },
   ],
   priceGroups,

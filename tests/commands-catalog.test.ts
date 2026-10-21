@@ -121,3 +121,19 @@ describe("list_brands filters", () => {
     expect(names(await runCommand("list_brands", { category: "Core" }, ctx))).toEqual(["Amber", "Crisp 100% Lager"]);
   });
 });
+
+// #965: every staff role that reads Catalog reads its brands' recorded COLAs.
+describe("list_brands COLA facts", () => {
+  it("returns only this brewery's COLA approvals to a brewer, never formulas", async () => {
+    const own = await makeStaffCtx((await makeBrewery()).id, ["admin"]);
+    const brewer = await makeStaffCtx(own.breweryId, "brewer");
+    const other = await makeStaffCtx((await makeBrewery()).id, "admin");
+    const brand = await runCommand("upsert_brand", { name: "Labeled", style: "Ale" }, own) as { id: string };
+    const foreign = await runCommand("upsert_brand", { name: "Labeled", style: "Ale" }, other) as { id: string };
+    await runCommand("upsert_brand_approval", { brandId: brand.id, kind: "cola", ttbId: "00123456789012", approvedOn: "2026-10-02" }, own);
+    await runCommand("upsert_brand_approval", { brandId: brand.id, kind: "formula", ttbId: "F-1" }, own);
+    await runCommand("upsert_brand_approval", { brandId: foreign.id, kind: "cola", ttbId: "99999999999999" }, other);
+    const rows = await runCommand("list_brands", {}, brewer) as { id: string; colas: { ttb_id: string; approved_on: string | null }[] }[];
+    expect(rows.map((b) => [b.id, b.colas])).toEqual([[brand.id, [{ ttb_id: "00123456789012", approved_on: "2026-10-02" }]]]);
+  });
+});

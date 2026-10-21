@@ -19,7 +19,7 @@ const shipTo = { id: "ship", label: "Dock", address1: "1 Main", address2: null, 
 async function query(name: string, input?: { basis?: string; missingPortalEmail?: boolean }) {
   state.calls.push(name);
   switch (name) {
-    case "list_brands": state.brandInput = input ?? {}; return [brand];
+    case "list_brands": state.brandInput = input ?? {}; return [{ ...brand, colas: [] }];
     case "list_catalog_categories": return [{ name: "Core" }, { name: "Barrel & Wood" }];
     case "list_skus": return brand.skus.map(sku => ({ ...sku, brand_id: brand.id, formats: { name: "Half keg", bbl_per_unit: ".5" } }));
     case "list_formats": return [{ id: "keg", name: "Half keg", basis: "packaged", bbl_per_unit: ".5", brand_id: null }, { id: "pour", name: "Pint", basis: "poured", ounces: 16, brand_id: null, price_group_id: "group", price_groups: { name: "Core" } }].filter(f => !input?.basis || f.basis === input.basis);
