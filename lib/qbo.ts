@@ -315,6 +315,10 @@ export async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, ex
       if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, current);
       throw new Error(sanitizeQboError(error));
     });
+    // Accepted window (#1073): if the process dies or the token request times
+    // out after Intuit rotated the refresh token but before this CAS commits,
+    // the stored token is retired. The next refresh gets invalid_grant and
+    // marks the connection for recovery, so an Admin reconnects.
     try {
       await compareAndSwapQboTokens(ctx, current, next);
     } catch (error) {
