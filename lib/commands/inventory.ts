@@ -59,8 +59,9 @@ defineCommand({
  * Sets (or releases) the standing taproom allocation for a SKU at a location —
  * inventory reserved against ATP without an order line (e.g. house pours,
  * events). Find-then-write (open row may need update, insert, or release), so
- * it is one plpgsql function per iron rule 5 (00001_baseline.sql,
- * set_standing_allocation). qty 0 releases the open allocation, if any.
+ * it is one plpgsql function per iron rule 5 (set_standing_allocation_impl,
+ * latest in 20261021095000_raise_atp_lock.sql). qty 0 releases the open
+ * allocation, if any.
  */
 defineCommand({
   name: "set_standing_allocation", description: "Set or release a standing taproom allocation (source 'taproom_standing') for a SKU at a location",
@@ -79,7 +80,7 @@ type BinOnHandRow = OnHandRow & { bin_id: string };
 type AtpRow = { brewery_id: string; sku_id: string; qty: number };
 
 defineQuery({
-  name: "get_on_hand", description: "On-hand quantity per SKU/location",
+  name: "get_on_hand", description: "Physical on-hand quantity per SKU and location. Pass skuId for one SKU; omit it for every SKU. Use it for where stock sits; use get_atp for what can still be promised, since on-hand ignores open allocations.",
   input: bySku, roles: [...readRoles],
   aiExposed: true,
   handler: async (ctx, i) => {
@@ -132,7 +133,7 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_atp", description: "Available-to-promise (on-hand minus open allocations) per SKU",
+  name: "get_atp", description: "Available-to-promise per SKU: on-hand minus open allocations, across all locations. Pass skuId for one SKU; omit it for every SKU. Use it to answer whether an order can be filled; use get_on_hand for where stock sits by location.",
   input: bySku, roles: [...readRoles],
   aiExposed: true,
   handler: (ctx, i) => completeRows<AtpRow>("Available stock", async (_, after) => {

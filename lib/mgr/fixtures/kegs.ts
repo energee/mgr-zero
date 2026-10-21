@@ -55,4 +55,5 @@ export const kegReportOwned: KegReport = {
   aging: [{ bucket: "0-30", kegs: 96, deposit_cents: 288000 }, { bucket: "31-60", kegs: 25, deposit_cents: 75000 }, { bucket: "61-90", kegs: 12, deposit_cents: 36000 }, { bucket: "90+", kegs: 9, deposit_cents: 27000 }],
   customers: [{ customer_id: "ridgeline", name: "Ridgeline Tap Room", over_90: 9, oldest_at: "2026-05-12T16:00:00+00:00" }],
   mismatches: [{ customer_id: "als", name: "Al’s Bar", pool_id: "owned", pool_name: "Owned", keg_size: "half_bbl", kegs_out: 2, kegs_on_deposit: 3 }],
+  activePools: 1,
 };

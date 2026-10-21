@@ -102,7 +102,7 @@ import { LocationsView } from "@/components/mgr/views/locations";
 import { MeView } from "@/components/mgr/views/me";
 import { MoreView } from "@/components/mgr/views/more";
 import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
-import { MonthlyComplianceView } from "@/components/mgr/views/monthly-compliance";
+import { MonthlyComplianceView, PeriodBeforeBooksView } from "@/components/mgr/views/monthly-compliance";
 import { NewOrderView } from "@/components/mgr/views/new-order";
 import { EditDraftOrderView } from "@/components/mgr/views/edit-draft-order";
 import { editDraftOrder } from "@/lib/mgr/fixtures/edit-draft-order";
@@ -272,7 +272,7 @@ import { toRecipesViewProps } from "@/lib/mgr/recipes-view";
 import { toRecordMovementViewProps } from "@/lib/mgr/record-movement-view";
 import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
 import { toPlanningViewProps } from "@/lib/mgr/planning-view";
-import { toMonthlyComplianceViewProps } from "@/lib/mgr/monthly-compliance-view";
+import { beforeBooksState, toMonthlyComplianceViewProps } from "@/lib/mgr/monthly-compliance-view";
 import { toReverseMovementViewProps } from "@/lib/mgr/reverse-movement-view";
 import { toReviewOrderViewProps } from "@/lib/mgr/review-order-view";
 import { toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
@@ -2115,8 +2115,8 @@ export const SCREENS: Screen[] = [
     job: "Choose a monthly, quarterly, or annual reporting period and see whether its snapshot was filed",
     reads: "list_compliance_reports · list_lots",
     writes: "none",
-    states: [["not filed", "ready to review", 1], ["in progress", "the current period: reviewable, filed once it ends"], ["filed", "immutable snapshot saved"], ["lots", "every packaged lot opens its trace"]],
-    spec: "This is the shared destination for the registry back link, the period rows, and the lot trace. Monthly, Quarterly, and Annual tabs swap the list: the last three months, four calendar quarters, or two calendar years always show, plus every filed period of that length. A TTB filing is exactly one calendar month, quarter, or year; the API takes other jurisdictions and ranges.",
+    states: [["not filed", "ready to review", 1], ["in progress", "the current period: reviewable, filed once it ends"], ["filed", "immutable snapshot saved"], ["lots", "every packaged lot opens its trace"], ["no period yet", "every recent period starts before the books opened · names that date and the first period MGR can report"]],
+    spec: "This is the shared destination for the registry back link, the period rows, and the lot trace. Monthly, Quarterly, and Annual tabs swap the list: the last three months, four calendar quarters, or two calendar years show, less any that start before the books-opened date, plus every filed period of that length. A tab left with no period says No monthly (quarterly, annual) period yet. A TTB filing is exactly one calendar month, quarter, or year; the API takes other jurisdictions and ranges.",
     body: <ComplianceMonthsView model={complianceMonthsDemo} />,
   },
   {
@@ -2141,6 +2141,16 @@ export const SCREENS: Screen[] = [
     states: [["needs amendment", "original snapshot unchanged · corrected figures and actor/time history"], ["invalidated period", "period starts before corrected books-opened date · consult compliance owner"], ["permission", "sales or admin required", 1]],
     spec: "A recorded admin basis correction flags every filed period it affects. The same shared Monthly compliance view retains the immutable original snapshot and shows the recorded corrected figures separately. No amended report is sent or flag cleared by MGR.",
     body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAmended)} />,
+  },
+  {
+    step: 7, slice: 6, tab: "More", name: "Period before the books opened",
+    to: { "Open Settings": "Settings" },
+    job: "Explain why a period that starts before the books opened has no report",
+    reads: "list_compliance_reports",
+    writes: "none",
+    states: [["before books", "the period starts before the books-opened date · no report, Settings holds the date"], ["sales", "no Open Settings button, which would land on No access · asks an admin to change the date", 1]],
+    spec: "MGR reports only from the books-opened date on, so a period that starts earlier has nothing to generate. The page names that date instead of failing. Drawn as an admin, who gets Open Settings; Settings is admin-only, so Sales is asked to have an admin change the date instead. A filed period stays readable after a basis correction (Filed period needs amendment).",
+    body: <PeriodBeforeBooksView title="October 2026" state={{ ...beforeBooksState("October 2026", "2026-10-15", true), action: { label: "Open Settings" } }} />,
   },
   {
     step: 7,
@@ -2280,7 +2290,7 @@ export const SCREENS: Screen[] = [
     job: "Review unreturned aging and utilization across the keg fleet",
     reads: "get_keg_report [utilization from keg_fleet_totals; aging is FIFO over keg_events, returns retire the oldest shipment first; deposit mismatches join keg_customer_balances, keg_deposit_balances, lost keg events, and keg deposit refund lines]",
     writes: "none",
-    states: [["permission", "warehouse or admin required", 1], ["aging", "unreturned kegs grouped by age, deposits at the pool rate"], ["deposit mismatch", "after a refund, kegs on deposit disagree with kegs out plus kegs lost, per customer, pool and size", 1], ["utilization", "out divided by fleet, per pool and size"], ["empty", "no owned keg pools"]],
+    states: [["permission", "warehouse or admin required", 1], ["aging", "unreturned kegs grouped by age, deposits at the pool rate"], ["deposit mismatch", "after a refund, kegs on deposit disagree with kegs out plus kegs lost, per customer, pool and size", 1], ["utilization", "out divided by fleet, per pool and size"], ["no pools", "no keg pool yet · add one on Keg fleet"], ["no kegs", "a pool exists but no kegs acquired · record them on Keg fleet"]],
     spec: "Aging identifies who needs follow-up; utilization shows whether the fleet is working or sitting. The ledger counts kegs rather than serials, so a return closes the oldest open shipment. A deposit refund and the Returned keg event are separate records, so the report lists every customer, pool and size with a refunded deposit whose deposit count disagrees with kegs out plus kegs lost.",
     body: <KegReportView model={toKegReportViewProps(kegReportOwned, DEMO_TIME_ZONE)} />,
   },
@@ -2606,10 +2616,10 @@ export const SCREENS: Screen[] = [
     name: "Menu setup",
     to: { "Set up Square": "Point of sale" },
     job: "Say what Menu is missing when Square has no locations yet",
-    reads: "list_pos_locations",
+    reads: "list_pos_locations · get_pos_integration_health [admin]",
     writes: "none",
-    states: [["admin", "Set up Square opens Point of sale"], ["warehouse", "no link; asks an admin, because Point of sale settings are admin-only", 1]],
-    spec: "Drawn as an admin. No Square location has been seen, so Square still has to be connected before any location can be mapped. Only an admin can open Point of sale settings, so only an admin gets the button; Warehouse reads a sentence asking an admin instead of a link that would land on No access.",
+    states: [["admin", "Set up Square opens Point of sale"], ["connected, none synced", "Square is connected but no location has synced yet · Set up Square opens Point of sale to sync"], ["warehouse", "no link; asks an admin to check the Square connection and map a location, because Warehouse cannot read the connection or open Point of sale settings (#1083)", 1]],
+    spec: "Drawn as an admin. Square is not connected, never or since a disconnect (seen locations outlive one), so it has to be connected before any location can be mapped. If Square is connected but no location has synced yet, the same button says so instead. Only an admin can read the connection or open Point of sale settings, so only an admin gets the button; Warehouse reads one neutral sentence asking an admin instead of a link that would land on No access.",
     body: <PosMenuView model={{ locations: [], selectedLocationId: "", locationName: "Square location", items: [], excluded: [], externalItems: [], setup: { title: "No Square locations yet", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square" } } }} />,
   },
   {
@@ -2620,10 +2630,10 @@ export const SCREENS: Screen[] = [
     name: "Menu unmapped",
     to: { "Map Square locations": "Square locations" },
     job: "Say what Menu is missing when Square locations exist but none is mapped",
-    reads: "list_pos_locations",
+    reads: "list_pos_locations · get_pos_integration_health [admin]",
     writes: "none",
-    states: [["admin", "Map Square locations opens Square locations"], ["warehouse", "no link; asks an admin to map one", 1]],
-    spec: "Drawn as an admin. Square locations were found, so connecting is not the missing step: mapping one to an MGR location is. The copy says so rather than repeating the connect instruction. Warehouse gets no link, for the same admin-only reason as Menu setup.",
+    states: [["admin", "Map Square locations opens Square locations"], ["warehouse", "no link; the same neutral sentence as Menu setup, since Warehouse cannot read the connection", 1]],
+    spec: "Drawn as an admin. Square is connected and its locations were found, so connecting is not the missing step: mapping one to an MGR location is. The copy says so rather than repeating the connect instruction. Warehouse gets no link and no claim about the connection, for the same reasons as Menu setup.",
     body: <PosMenuView model={{ locations: [], selectedLocationId: "", locationName: "Square location", items: [], excluded: [], externalItems: [], setup: { title: "No Square location mapped", description: "Square locations were found, but none is mapped to an MGR location.", action: { label: "Map Square locations" } } }} />,
   },
   {

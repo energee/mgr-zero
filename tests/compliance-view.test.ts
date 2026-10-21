@@ -10,6 +10,7 @@ import { SCREENS } from "../components/mgr/screens";
 import { BrandApprovalView } from "../components/mgr/views/brand-approval";
 import { ComplianceMonthsView } from "../components/mgr/views/compliance-months";
 import { LicensesView } from "../components/mgr/views/licenses";
+import { noPeriodsYet } from "../lib/mgr/compliance-months-view";
 import { LicenseView } from "../components/mgr/views/license";
 import { MaterialLotTraceView } from "../components/mgr/views/material-lot-trace";
 import { toMaterialLotTraceViewProps } from "../lib/mgr/material-lot-trace-view";
@@ -29,6 +30,17 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
 
 describe("Compliance months", () => {
+  it("says why no period is listed when the first one starts after the books opened (#987)", () => {
+    expect(noPeriodsYet("month", "2026-10-15")).toEqual({
+      title: "No monthly period yet",
+      description: "The books opened on Oct 15, 2026. November 2026 is the first monthly period MGR can report, and it is listed here once it starts.",
+    });
+    const html = renderToStaticMarkup(createElement(ComplianceMonthsView, { model: { ...complianceMonthsDemo, months: [], empty: noPeriodsYet("quarter", "2026-10-15") } }));
+    expect(html).toMatch(/No quarterly period yet/);
+    expect(html).toMatch(/Q1 2027 is the first quarterly period/);
+  });
+
+
   it("the Compliance months inventory record is ComplianceMonthsView", () => {
     const body = screen("Compliance months").body as { type: unknown; props: { model: unknown } };
     expect(isValidElement(screen("Compliance months").body)).toBe(true);

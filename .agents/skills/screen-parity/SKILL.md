@@ -197,8 +197,9 @@ import beside different JSX that fails.
 ## Completion gate
 
 For changed behavior, demonstrate the relevant regression failing before the
-fix and passing afterward. Run the repository's required pure tests, typecheck,
-and lint for UI code; leave database-backed suites to CI's fresh database.
+fix and passing afterward. Run the proof named in "Controls, entry point, and
+conversion" above: the screen-only suite, or the full step 4 proof when the
+change touches schema, RPCs, or commands.
 Full CI unit tests and build must pass for the pushed revision before declaring
 a PR ready. Pending, unavailable, or failed checks are not a pass.
 
