@@ -267,6 +267,7 @@ export class SquareClient {
     return this.token({ code, grant_type: "authorization_code" });
   }
 
+  // Code-flow refresh tokens don't rotate, so concurrent refreshes are safe here (unlike QuickBooks, #1032); this changes if MGR moves to PKCE.
   refresh(refreshToken: string) {
     return this.token({ refresh_token: refreshToken, grant_type: "refresh_token" });
   }

@@ -3,39 +3,14 @@
 // admin. Two connections interleave real transactions: A's write is still
 // open when B's starts, so without a lock both count two admins and commit.
 import { afterEach, describe, expect, it } from "vitest";
-import { Client } from "pg";
+import type { Client } from "pg";
 import type { StaffRole } from "@/lib/commands/registry";
-import { DB, makeBrewery, makeStaffCtx } from "./helpers";
+import { closePgSessions, makeBrewery, makeStaffCtx, pgSession, staffSession } from "./helpers";
 
-const clients: Client[] = [];
-
-afterEach(async () => {
-  await Promise.allSettled(clients.splice(0).map(async (client) => {
-    await client.query("rollback").catch(() => {});
-    await client.end();
-  }));
-});
-
-async function adminTx(userId: string) {
-  const value = new Client({ connectionString: DB });
-  clients.push(value);
-  await value.connect();
-  await value.query("set statement_timeout='8s'; set lock_timeout='7s'");
-  await value.query("begin");
-  await value.query("select set_config('request.jwt.claim.sub',$1,true)", [userId]);
-  await value.query("set local role authenticated");
-  return value;
-}
-
-async function plain() {
-  const c = new Client({ connectionString: DB });
-  clients.push(c);
-  await c.connect();
-  return c;
-}
+afterEach(closePgSessions);
 
 async function admins(breweryId: string) {
-  const c = await plain();
+  const c = await pgSession();
   return Number((await c.query("select count(*) n from public.brewery_users where brewery_id=$1 and 'admin'=any(roles)", [breweryId])).rows[0].n);
 }
 
@@ -49,9 +24,9 @@ async function race(first: Write, second: Write, roles: StaffRole[] = ["admin"])
   const brewery = (await makeBrewery()).id;
   const a = await makeStaffCtx(brewery, roles);
   const b = await makeStaffCtx(brewery, roles);
-  const ca = await adminTx(a.userId);
-  const cb = await adminTx(b.userId);
-  const observer = await plain(); // outside any transaction, so pg_stat_activity is fresh
+  const ca = await staffSession(a.userId);
+  const cb = await staffSession(b.userId);
+  const observer = await pgSession(); // outside any transaction, so pg_stat_activity is fresh
   const pid = (await cb.query("select pg_backend_pid() pid")).rows[0].pid as number;
 
   await first(ca, brewery, b.userId); // A's write succeeds; its transaction stays open
@@ -86,11 +61,11 @@ describe("last admin under concurrency (#458)", { concurrent: false }, () => {
   it("the last admin+sales member cannot remove admin from their roles", async () => {
     const brewery = (await makeBrewery()).id;
     const staff = await makeStaffCtx(brewery, ["admin", "sales"]);
-    const c = await adminTx(staff.userId);
+    const c = await staffSession(staff.userId);
     await expect(demote(c, brewery, staff.userId)).rejects.toThrow(/keep at least one admin/);
     await c.query("rollback");
     expect(await admins(brewery)).toBe(1);
-    const observer = await plain();
+    const observer = await pgSession();
     expect((await observer.query("select roles::text[] roles from public.brewery_users where brewery_id=$1 and user_id=$2", [brewery, staff.userId])).rows)
       .toEqual([{ roles: ["admin", "sales"] }]);
   });
@@ -98,7 +73,7 @@ describe("last admin under concurrency (#458)", { concurrent: false }, () => {
   it("an admin+sales member still cannot revoke their own membership", async () => {
     const brewery = (await makeBrewery()).id;
     const staff = await makeStaffCtx(brewery, ["admin", "sales"]);
-    const c = await adminTx(staff.userId);
+    const c = await staffSession(staff.userId);
     await expect(remove(c, brewery, staff.userId)).rejects.toThrow(/you cannot remove yourself/);
     await c.query("rollback");
     expect(await admins(brewery)).toBe(1);

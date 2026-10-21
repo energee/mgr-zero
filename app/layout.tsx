@@ -1,23 +1,19 @@
 // app/layout.tsx — root document: plan §5 fonts (Instrument Sans body, Familjen
 // Grotesk display, JetBrains Mono data) exposed as CSS variables that
 // app/globals.css maps onto --font-sans/--font-heading/--font-mono, plus
-// viewport-fit=cover so the shells can pad for the safe area. THEME_BOOT is an
-// inline, parser-blocking <head> script that applies the `.dark` class from
+// viewport-fit=cover so the shells can pad for the safe area. ThemeBoot
+// (components/mgr/theme-boot.tsx) applies the `.dark` class from
 // localStorage.theme or the OS preference before first paint. React then
-// hydrates <html> against a class list the script already changed, hence
-// suppressHydrationWarning. components/mgr/theme-toggle.tsx
-// flips the class and writes the preference.
+// hydrates <html> against a class list it already changed, hence
+// suppressHydrationWarning.
 import type { Metadata, Viewport } from "next";
 import { Familjen_Grotesk, Instrument_Sans, JetBrains_Mono } from "next/font/google";
+import { ThemeBoot } from "@/components/mgr/theme-boot";
 import "./globals.css";
 
 const instrumentSans = Instrument_Sans({ variable: "--font-instrument-sans", subsets: ["latin"] });
 const familjenGrotesk = Familjen_Grotesk({ variable: "--font-familjen-grotesk", subsets: ["latin"], preload: false });
 const jetbrainsMono = JetBrains_Mono({ variable: "--font-jetbrains-mono", subsets: ["latin"], preload: false });
-
-// ponytail: static boot script; a theme provider dependency would be more code for the same result
-const THEME_BOOT =
-  "(function(){try{var t=localStorage.theme;if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}})()";
 
 export const metadata: Metadata = {
   title: "MGR",
@@ -34,11 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
     >
       <head>
-        <script
-          type={typeof window === "undefined" ? "text/javascript" : "text/plain"}
-          suppressHydrationWarning
-          dangerouslySetInnerHTML={{ __html: THEME_BOOT }}
-        />
+        <ThemeBoot />
       </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

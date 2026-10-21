@@ -1,5 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { setTimeout as sleep } from "node:timers/promises";
 import { oauthState, sha256 } from "@/lib/hash";
 import { canRun, CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { hasAnyRole } from "@/lib/mgr/roles";
@@ -13,9 +14,11 @@ import {
   confirmPortalInvoicePayment,
   finishQboPush,
   finishQboReceiptBill,
+  leaseQboTokenRefresh,
   markQboAuthorizationFailed,
   readPortalInvoicePayment,
   readVersionedIntegrationTokens,
+  releaseQboTokenRefresh,
   type QboInvoiceObservation,
   type PortalInvoicePaymentClaim,
   type VersionedIntegrationTokens,
@@ -76,6 +79,8 @@ export type QboOAuthClaim = {
 };
 export type QboOAuthStore = {
   claim(stateHash: string, actorId: string, selectedBreweryId: string, redirectUri: string): Promise<QboOAuthClaim | null>;
+  /** Records the refresh token Intuit issued on the exchanging intent, so a reap can revoke it if this callback dies. */
+  hold(intentId: string, actorId: string, realmId: string, refreshToken: string): Promise<void>;
   /** realmLabel is the verified QuickBooks CompanyName, or null when QuickBooks returned none. */
   complete(intentId: string, actorId: string, realmId: string, tokens: QboTokens, realmLabel: string | null): Promise<string>;
   /** Marks the intent recovery_required; false when it had already left 'exchanging' (e.g. complete committed). */
@@ -168,6 +173,52 @@ export function validateQboPaymentUrl(value: string, allowedHosts: ReadonlySet<s
   }
 }
 
+/**
+ * The Intuit token request gives up after 20 seconds. The SQL refresh lease
+ * lasts 45 seconds, leaving 25 seconds for the store and release calls, so a
+ * holder's lease does not run out during its Intuit call (#1032).
+ */
+const QBO_TOKEN_TIMEOUT_MS = 20_000;
+/** How long a caller waits on another caller's refresh: past one 45-second lease, so a crashed holder's lease expires first. */
+const QBO_REFRESH_WAIT_MS = 50_000;
+const QBO_REFRESH_POLL_MS = 200;
+
+/**
+ * Runs `refresh` (the Intuit call plus its compare-and-swap) while holding the
+ * connection's refresh lease, so one caller at a time sends the refresh token
+ * (#1032). Intuit retires the old refresh token when it issues a new one, so
+ * two parallel refreshes could leave a dead token stored. A caller that finds
+ * the lease held polls until the holder stores newer credentials, then gets
+ * "superseded" and re-reads them instead of refreshing. "unavailable" means
+ * the connection left 'connected' (for example the holder hit invalid_grant)
+ * or this actor may not store a refresh, so it must not call Intuit at all.
+ * A portal caller passes the invoice whose payment claim authorizes it.
+ */
+async function withQboRefreshLease<T>(
+  ctx: Ctx,
+  expected: VersionedIntegrationTokens,
+  refresh: () => Promise<T>,
+  invoiceId?: string,
+): Promise<T | "superseded" | "unavailable"> {
+  const lease = randomUUID();
+  const deadline = Date.now() + QBO_REFRESH_WAIT_MS;
+  for (;;) {
+    const state = await leaseQboTokenRefresh(ctx, expected, lease, invoiceId);
+    if (state === "superseded" || state === "unavailable") return state;
+    if (state === "leased") break;
+    if (Date.now() >= deadline) throw new Error("QuickBooks is unavailable");
+    await sleep(QBO_REFRESH_POLL_MS);
+  }
+  try {
+    return await refresh();
+  } finally {
+    // Logging and dropping a failed release is safe: the lease expires by itself
+    // after 45 seconds, and throwing here would hide the refresh outcome.
+    await releaseQboTokenRefresh(ctx, expected.connectionId, lease)
+      .catch((error: unknown) => console.error("qbo_refresh_lease_release_failed", qboPaymentFailureCause(error)));
+  }
+}
+
 export type PortalInvoicePaymentResult =
   | { kind: "redirect"; url: string }
   | { kind: "unavailable"; reason: "not_configured" | "provider_unavailable" | "link_unavailable" | "context_changed" | "rate_limited" };
@@ -182,13 +233,22 @@ async function refreshPortalInvoicePayment(
     await markQboAuthorizationFailed(ctx, claim, invoiceId);
     return null;
   }
-  const next = await client.refresh(claim.refreshToken).catch(async (error) => {
-    if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, claim, invoiceId);
-    else console.error("qbo_payment_refresh_failed", qboPaymentFailureCause(error));
-    // A failed provider refresh keeps the buyer on Payment unavailable.
-    return null;
-  });
-  if (!next || !await compareAndSwapPortalInvoicePaymentTokens(ctx, invoiceId, claim, next)) return null;
+  const stored = await withQboRefreshLease(ctx, claim, async () => {
+    const next = await client.refresh(claim.refreshToken).catch(async (error) => {
+      if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, claim, invoiceId);
+      else console.error("qbo_payment_refresh_failed", qboPaymentFailureCause(error));
+      // A failed provider refresh keeps the buyer on Payment unavailable.
+      return null;
+    });
+    if (next === null) return false;
+    if (await compareAndSwapPortalInvoicePaymentTokens(ctx, invoiceId, claim, next)) return true;
+    // Intuit may have retired the stored refresh token; see refreshQboCredentials.
+    console.error("qbo_payment_refresh_store_failed");
+    await markQboAuthorizationFailed(ctx, claim, invoiceId);
+    return false;
+  }, invoiceId);
+  if (stored === false || stored === "unavailable") return null;
+  // Stored here, or "superseded" by another caller's stored refresh: read the current claim.
   return readPortalInvoicePayment(ctx, invoiceId);
 }
 
@@ -249,15 +309,29 @@ export async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, ex
     await markQboAuthorizationFailed(ctx, current);
     throw new Error("QuickBooks is unavailable");
   }
-  const next = await client.refresh(current.refreshToken).catch(async (error) => {
-    if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, current);
-    throw new Error(sanitizeQboError(error));
+  // A "superseded" lease means another caller stored newer tokens; the read below returns them.
+  const outcome = await withQboRefreshLease(ctx, current, async () => {
+    const next = await client.refresh(current.refreshToken).catch(async (error) => {
+      if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, current);
+      throw new Error(sanitizeQboError(error));
+    });
+    // Accepted window (#1073): if the process dies or the token request times
+    // out after Intuit rotated the refresh token but before this CAS commits,
+    // the stored token is retired. The next refresh gets invalid_grant and
+    // marks the connection for recovery, so an Admin reconnects.
+    try {
+      await compareAndSwapQboTokens(ctx, current, next);
+    } catch (error) {
+      // Intuit has answered, so the stored refresh token may now be retired.
+      // Mark the connection for recovery so no caller refreshes with it. The
+      // mark is a no-op when newer tokens were stored (the CAS committed but
+      // its response was lost, or another caller won) or the connection changed.
+      console.error("qbo_refresh_store_failed", qboPaymentFailureCause(error));
+      await markQboAuthorizationFailed(ctx, current);
+      if (!(error instanceof CommandError) || error.status !== 409) throw new Error(sanitizeQboError(error));
+    }
   });
-  try {
-    await compareAndSwapQboTokens(ctx, current, next);
-  } catch (error) {
-    if (!(error instanceof CommandError) || error.status !== 409) throw new Error(sanitizeQboError(error));
-  }
+  if (outcome === "unavailable") throw new Error("QuickBooks is unavailable");
   const stored = await readVersionedIntegrationTokens(ctx, "qbo")
     .catch((error) => { throw new Error(sanitizeQboError(error)); });
   if (stored.connectionId !== current.connectionId || stored.credentialVersion <= current.credentialVersion) {
@@ -285,6 +359,7 @@ export async function completeQboOAuth(input: {
   let storing = false;
   try {
     tokens = await input.client.exchange(code);
+    await input.store.hold(claim.intentId, input.actorId, realmId, tokens.refreshToken);
     if (tokens.grantedScopes?.some((scope) => !claim.requestedScopes.includes(scope))) {
       throw new Error("QuickBooks token response was invalid");
     }
@@ -313,6 +388,44 @@ export async function completeQboOAuth(input: {
     if (tokens && storing && recorded) await revoke(tokens.refreshToken);
     throw new Error(sanitizeQboError(error));
   }
+}
+
+export type QboOAuthReapStore = {
+  reap(): Promise<{ intentId: string; realmId: string; refreshToken: string; giveUp: boolean }[]>;
+  realmInUse(realmId: string): Promise<boolean>;
+  discard(intentId: string, refreshToken: string): Promise<void>;
+};
+
+/**
+ * Retention-job step (#1034): revokes each refresh token Intuit issued to an
+ * OAuth callback that never stored it, then discards it. Like the callback's
+ * own failure path, it skips the revoke when a stored connection uses the
+ * realm, because Intuit's revoke would disconnect that company. A failed
+ * revoke keeps the token for the next daily run, until the reap marks it
+ * giveUp (seven days); then it is discarded unrevoked. A failed realm lookup
+ * or discard also keeps it. Each row's failure is logged and counted, and
+ * never stops the other rows; qboPaymentFailureCause logs only the error name
+ * for these plain errors, never a token or provider body.
+ */
+export async function reapQboOAuthExchanges(store: QboOAuthReapStore, client: Pick<QboOAuthClient, "revoke">) {
+  let done = 0;
+  let failed = 0;
+  for (const held of await store.reap()) {
+    try {
+      if (!await store.realmInUse(held.realmId)) {
+        await client.revoke(held.refreshToken).catch((error: unknown) => {
+          if (!held.giveUp) throw error;
+          console.error("qbo_oauth_reap_revoke_abandoned", qboPaymentFailureCause(error));
+        });
+      }
+      await store.discard(held.intentId, held.refreshToken);
+      done += 1;
+    } catch (error) {
+      failed += 1;
+      console.error("qbo_oauth_reap_failed", qboPaymentFailureCause(error));
+    }
+  }
+  return { done, failed };
 }
 
 export async function pushInvoiceToQbo(
@@ -916,6 +1029,7 @@ export class QboOAuthClient {
       },
       body,
       redirect: "error",
+      signal: AbortSignal.timeout(QBO_TOKEN_TIMEOUT_MS),
     });
     const receivedAt = new Date().toISOString();
     if (!response.ok) {

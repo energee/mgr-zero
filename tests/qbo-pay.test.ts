@@ -260,26 +260,29 @@ describe("QuickBooks portal payment link", () => {
     await expect(resolvePortalInvoicePayment(
       ctx, invoice.data.id, new QboOAuthClient(config, refreshTransport), new Set(["pay.example.test"]),
     )).resolves.toEqual({ kind: "redirect", url: paymentUrl });
-    // Both requests read one expired generation before either refresh completes.
+    // Both requests read one expired generation; the refresh lease (#1032) lets
+    // only the first send the refresh token, and the second uses its result.
     expect((await admin.from("qbo_connections").update({ access_expires_at: "2026-01-01T00:00:00Z" })
       .eq("id", connection.data.id)).error).toBeNull();
-    let finishRefreshes!: () => void;
-    const bothRefreshing = new Promise<void>((resolve) => { finishRefreshes = resolve; });
+    let finishRefresh!: () => void;
+    const refreshGate = new Promise<void>((resolve) => { finishRefresh = resolve; });
     let refreshes = 0;
     const racingTransport = vi.fn<typeof globalThis.fetch>(async (_url, init) => {
       if (init?.method !== "POST") return Response.json({ Invoice: { Id: "remote-pay-2", InvoiceLink: paymentUrl } });
       const attempt = ++refreshes;
-      if (refreshes === 2) finishRefreshes();
-      await bothRefreshing;
+      await refreshGate;
       return Response.json({ access_token: `race-access-${attempt}`, refresh_token: `race-refresh-${attempt}`, expires_in: 3600 });
     });
-    const raceResults = await Promise.all([1, 2].map(() => resolvePortalInvoicePayment(
+    const racing = [1, 2].map(() => resolvePortalInvoicePayment(
       ctx, invoice.data.id, new QboOAuthClient(config, racingTransport), new Set(["pay.example.test"]),
-    )));
-    expect(raceResults).toEqual(expect.arrayContaining([
+    ));
+    await expect.poll(() => refreshes).toBe(1);
+    finishRefresh();
+    expect(await Promise.all(racing)).toEqual([
       { kind: "redirect", url: paymentUrl },
-      { kind: "unavailable", reason: "provider_unavailable" },
-    ]));
+      { kind: "redirect", url: paymentUrl },
+    ]);
+    expect(refreshes).toBe(1);
     expect(racingTransport).toHaveBeenCalledTimes(3);
     expect((await admin.from("qbo_connections").update({ access_expires_at: "2026-01-01T00:00:00Z" })
       .eq("id", connection.data.id)).error).toBeNull();
