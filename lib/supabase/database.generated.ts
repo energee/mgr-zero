@@ -5084,7 +5084,7 @@ isOneToOne: false
 { Args: { "p_from": string }; Returns: Json
                            },
 "lease_qbo_token_refresh":
-{ Args: { "p_brewery": string,"p_connection": string,"p_expected_version": number,"p_lease": string }; Returns: string
+{ Args: { "p_actor": string,"p_brewery": string,"p_connection": string,"p_customer"?: string,"p_expected_version": number,"p_invoice"?: string,"p_lease": string }; Returns: string
                            },
 "lease_square_publication":
 { Args: { "p_actor": string,"p_brewery": string,"p_publication": string }; Returns: {

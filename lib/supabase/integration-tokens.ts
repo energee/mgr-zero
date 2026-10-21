@@ -569,13 +569,17 @@ export async function compareAndSwapQboTokens(ctx: Ctx, expected: VersionedInteg
  * Asks for the connection's refresh lease (#1032) at the version the caller read.
  * "leased": refresh now. "held": another caller is refreshing; ask again shortly.
  * "superseded": newer credentials are stored; re-read them instead of refreshing.
+ * "unavailable": the connection is no longer connected or this actor may not
+ * store a refresh, so the caller must not send the refresh token to Intuit.
+ * A portal caller passes the invoice whose payment claim authorizes it.
  */
-export async function leaseQboTokenRefresh(ctx: Ctx, expected: VersionedIntegrationTokens, lease: string) {
+export async function leaseQboTokenRefresh(ctx: Ctx, expected: VersionedIntegrationTokens, lease: string, invoiceId?: string) {
   const { data, error } = await createAdminClient().rpc("lease_qbo_token_refresh", {
-    p_brewery: ctx.breweryId, p_connection: expected.connectionId,
+    p_brewery: ctx.breweryId, p_connection: expected.connectionId, p_actor: ctx.userId,
     p_expected_version: expected.credentialVersion, p_lease: lease,
+    p_customer: ctx.customerId ?? undefined, p_invoice: invoiceId,
   });
-  if (error || (data !== "leased" && data !== "held" && data !== "superseded")) {
+  if (error || (data !== "leased" && data !== "held" && data !== "superseded" && data !== "unavailable")) {
     throw new Error("QuickBooks refresh lease is unavailable");
   }
   return data;

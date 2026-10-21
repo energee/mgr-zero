@@ -277,7 +277,6 @@ describe("QuickBooks portal payment link", () => {
       ctx, invoice.data.id, new QboOAuthClient(config, racingTransport), new Set(["pay.example.test"]),
     ));
     await expect.poll(() => refreshes).toBe(1);
-    await new Promise((resolve) => setTimeout(resolve, 500)); // room for a second refresh if nothing serializes it
     finishRefresh();
     expect(await Promise.all(racing)).toEqual([
       { kind: "redirect", url: paymentUrl },

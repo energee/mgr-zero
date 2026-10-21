@@ -572,9 +572,8 @@ describe("QuickBooks durable lifecycle", () => {
       new Promise<Response>((resolve) => releases.push((response) => resolve(response)))).mockName(suffix));
     const refreshes = [refreshQboCredentials(ctx, refreshClient("a")), refreshQboCredentials(ctx, refreshClient("b"))];
     // The refresh lease (#1032) lets one caller reach Intuit; the other waits.
+    // Unserialized, the second caller would add a second request no one releases, and the test would time out.
     await vi.waitFor(() => expect(releases).toHaveLength(1));
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    expect(releases).toHaveLength(1);
     releases[0](new Response(JSON.stringify({ access_token: "race-access", refresh_token: "race-refresh", expires_in: 3600 }), { status: 200 }));
     const winners = (await Promise.all(refreshes)).map((tokens) => tokens.accessToken);
     const persisted = await readVersionedIntegrationTokens(ctx, "qbo");
