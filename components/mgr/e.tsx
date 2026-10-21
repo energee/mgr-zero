@@ -231,9 +231,6 @@ export const E = {
           // A lone verb sits where a group would end: right, on the desk.
           "w-full md:w-fit md:self-end",
           kind === "irr" && "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90",
-          // Solid, not shadcn's tint (whose dark:bg-destructive/20 would otherwise
-          // win): a loss should carry the same weight as the teal commit beside it.
-          kind === "del" && "bg-destructive text-destructive-foreground hover:bg-destructive/90 dark:bg-destructive dark:hover:bg-destructive/90",
         )}
         {...(kind === "irr" ? { "data-variant": "irreversible" } : {})}
       >
