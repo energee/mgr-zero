@@ -15,9 +15,14 @@ const contrast = (x: string, y: string) => {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 };
 
-for (const mode of [":root", ".dark"]) {
+// The hex color tokens declared in one globals.css block (":root" or ".dark").
+const tokensOf = (mode: string) => {
   const block = css.slice(css.indexOf(`${mode} {`)).split("}")[0];
-  const tokens = Object.fromEntries([...block.matchAll(/--([\w-]+):\s*(#[a-f\d]{6})/gi)].map((m) => [m[1], m[2]]));
+  return Object.fromEntries([...block.matchAll(/--([\w-]+):\s*(#[a-f\d]{6})/gi)].map((m) => [m[1], m[2]]));
+};
+
+for (const mode of [":root", ".dark"]) {
+  const tokens = tokensOf(mode);
 
   it(`${mode} semantic text pairs meet AA contrast`, () => {
     for (const role of ["primary", "destructive", "irreversible", "warning", "success", "attention", "info"]) {
@@ -35,6 +40,25 @@ for (const mode of [":root", ".dark"]) {
     }
   });
 }
+
+// A hovered row action (E.act) paints its tone tint over the tap row's
+// accent/50 hover wash, over the page surface (#1041). Light mode only: in dark,
+// the ghost Button's dark:hover:bg-muted/50 replaces the tint on hover.
+it("keeps hovered primary and destructive row actions at AA in light mode (#1041)", () => {
+  const e = readFileSync(new URL("../components/mgr/e.tsx", import.meta.url), "utf8");
+  const tokens = tokensOf(":root");
+  const rgb = (hex: string) => hex.match(/[a-f\d]{2}/gi)!.map((v) => parseInt(v, 16));
+  const over = (top: string, alpha: number, under: number[]) => rgb(top).map((v, i) => v * alpha + under[i] * (1 - alpha));
+  const toHex = (c: number[]) => "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+  expect(e).toMatch(/has-\[\[data-tap\]\]:hover:bg-accent\/50/);
+  for (const role of ["primary", "destructive"]) {
+    const alpha = Number(e.match(new RegExp(`text-${role} hover:bg-${role}/(\\d+)`))![1]) / 100;
+    for (const surface of ["background", "card", "popover"]) {
+      const hovered = over(tokens[role], alpha, over(tokens.accent, 0.5, rgb(tokens[surface])));
+      expect(contrast(tokens[role], toHex(hovered)), `${role} hover on ${surface}`).toBeGreaterThanOrEqual(4.5);
+    }
+  }
+});
 
 it("keeps the pre-paint theme script inert on React client remounts", () => {
   expect(layout).toMatch(/type=\{typeof window === "undefined" \? "text\/javascript" : "text\/plain"\}/);
