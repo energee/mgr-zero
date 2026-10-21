@@ -21,7 +21,8 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 describe("Transfers list", () => {
   it("maps list_stock_transfers onto Pick / Receive and Work chips", () => {
     const model = toTransfersViewProps(transfersList);
-    expect(model.title).toBe("Work");
+    // Each Work kind page is titled by its kind, in the inventory as live (#1037).
+    expect(model.title).toBe("Transfers");
     expect(model.workChipIndex).toBe(2);
     expect(model.workChips).toBe(WORK_CHIPS);
     expect(model.workTabs).toBe(WORK_TABS);
@@ -33,7 +34,7 @@ describe("Transfers list", () => {
 
   it("a received or cancelled transfer has no verb; its row is a link, not an Open verb (#1026)", () => {
     const base = { from_name: "Warehouse", to_name: "Taproom", line_count: 1 };
-    const model = toTransfersViewProps({ title: "Transfers", transfers: [
+    const model = toTransfersViewProps({ transfers: [
       { ...base, id: "rec", transfer_no: 8, status: "received" },
       { ...base, id: "can", transfer_no: 9, status: "cancelled" },
     ] });
@@ -45,7 +46,7 @@ describe("Transfers list", () => {
   });
 
   it("live title Transfers omits inventing rows on empty", () => {
-    const model = toTransfersViewProps({ transfers: [], title: "Transfers" });
+    const model = toTransfersViewProps({ transfers: [] });
     expect(model.title).toBe("Transfers");
     expect(model.empty?.title).toBe("No transfers yet");
   });
@@ -63,7 +64,7 @@ describe("Transfers list", () => {
 
   it("binds live actions and permitted navigation without replacing the tabs", () => {
     const html = htmlOf(createElement(TransfersView, {
-      model: toTransfersViewProps({ ...transfersList, title: "Transfers" }),
+      model: toTransfersViewProps(transfersList),
       createAction: "NEW",
       workHrefs: { all: "/work", transfers: "/transfers" },
       linkRows: true,

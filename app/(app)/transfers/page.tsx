@@ -26,7 +26,6 @@ export default async function TransfersPage() {
   return (
     <TransfersView
       model={toTransfersViewProps({
-        title: "Transfers",
         transfers: transfers.map((t) => ({
           id: t.id,
           transfer_no: t.transfer_no,

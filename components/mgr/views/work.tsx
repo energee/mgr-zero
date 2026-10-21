@@ -37,7 +37,7 @@ export function WorkView({
           This strip filters the list in place, so it is not WorkKindTabs, which
           navigates; both draw the same full-width TabBar (#992). */}
       <div data-work-filter className="flex flex-1 flex-col">
-        <TabBar names={model.workChips} on={model.workChips.indexOf(selected)} cls="w-full overflow-x-auto" to={model.workTabs} onChange={onChip ?? setLocalChip} label="Filter work" panel={list} />
+        <TabBar names={model.workChips} on={model.workChips.indexOf(selected)} cls="w-full overflow-x-auto justify-start scroll-cue" to={model.workTabs} onChange={onChip ?? setLocalChip} label="Filter work" panel={list} />
       </div>
     </>
   );

@@ -6,7 +6,7 @@
 // button. Without an href (the inventory) the name is an inert tap, the way
 // E.act draws one. Other cells may hold any node, including their own links
 // and actions, which sit above the covering link.
-import { Fragment, type ReactNode } from "react";
+import { Fragment, isValidElement, type ReactNode } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@/components/ui/item";
@@ -29,9 +29,20 @@ export type RecordTableRow = {
 };
 
 const alignClass = (a: "l" | "r" | undefined) => (a === "r" ? "text-right" : "text-left");
+/** A date as lib/date-format.ts formatDate prints it: "Sep 12, 2026". */
+const PRINTED_DATE = /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/;
+/** What a cell ends with: the cell itself, or a fragment's last child (an
+ *  Overdue badge, then the date). */
+const lastPart = (cell: ReactNode): ReactNode =>
+  isValidElement<{ children?: ReactNode }>(cell) && cell.type === Fragment ? [cell.props.children].flat().at(-1) : cell;
 /** A table cell: text may wrap anywhere, but a number never breaks inside
- *  its value ("$1,040.0" / "0"), and its digits line up down the column. */
-const cellClass = (a: "l" | "r" | undefined) => cn(alignClass(a), a === "r" ? "whitespace-nowrap tabular-nums" : "whitespace-normal wrap-anywhere");
+ *  its value ("$1,040.0" / "0") and its digits line up down the column. A
+ *  cell ending in a printed date never breaks either ("Sep 12," / "2026", #1037). */
+const cellClass = (a: "l" | "r" | undefined, cell: ReactNode) => {
+  const end = lastPart(cell);
+  const whole = a === "r" || (typeof end === "string" && PRINTED_DATE.test(end));
+  return cn(alignClass(a), whole ? "whitespace-nowrap" : "whitespace-normal wrap-anywhere", a === "r" && "tabular-nums");
+};
 /** The one record link style: identity targets wrap and retain the shared
  *  48px minimum on coarse pointers. Other links in a register cell use it too. */
 export const RECORD_LINK = "inline-flex min-h-6 min-w-0 max-w-full shrink items-center whitespace-normal wrap-anywhere text-left font-medium underline underline-offset-4 pointer-coarse:min-h-12";
@@ -73,7 +84,7 @@ export function RecordTable({ headers, align, rows }: {
                   {row.note && <p className="text-muted-foreground">{row.note}</p>}
                 </TableCell>
                 {row.cells.slice(1).map((cell, index) => (
-                  <TableCell key={index} className={cn(ABOVE_COVER, cellClass(align[index + 1]))}>{cell}</TableCell>
+                  <TableCell key={index} className={cn(ABOVE_COVER, cellClass(align[index + 1], cell))}>{cell}</TableCell>
                 ))}
               </TableRow>
             ))}

@@ -815,6 +815,11 @@ describe("SCREENS", () => {
     expect(signInHtml).toContain("md:max-w-[420px]");
   });
 
+  it("never lets a flex column crush E.tbl below its rows (#1037)", () => {
+    // Screens stack in a flex column; a shrinkable scroll box collapsed Planning's week table to one line.
+    expect(renderToStaticMarkup(E.tbl(["week"], [["Sep 7, 2026"]]))).toMatch(/^<div class="shrink-0"><div data-slot="table-container"/);
+  });
+
   it("places list-create actions on the title row", () => {
     // A New/Add/Create/Schedule on a list is a header action, not a second
     // full-width row between the title and the list. Form commits, in-form
@@ -883,6 +888,10 @@ describe("SCREENS", () => {
     for (const name of ["Work", "Orders", "Transfers", "Batches", "Packaging runs", "Purchase orders", "Routes"]) {
       expect(html(name), name).toContain("tablist");
     }
+    // Each Work kind page is titled by its kind; only the all-kinds page says Work (#1037).
+    const h1 = (name: string) => html(name).match(/<h1[^>]*>([^<]*)<\/h1>/)?.[1];
+    expect(["Work", "Orders", "Transfers", "Batches", "Packaging runs", "Purchase orders", "Routes"].map(h1))
+      .toEqual(["Work", "Orders", "Transfers", "Batches", "Packaging", "Purchase orders", "Routes"]);
     expect(html("Packaging runs")).toContain("data-active:bg-primary");
     // Record movement: seven kinds are a Select on the phone, chips from md up.
     const move = html("Record movement");
@@ -1089,6 +1098,8 @@ describe("Work kind strip (#992)", () => {
     const html = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Orders")!.body));
     const lists = [...html.matchAll(/<div[^>]*role="tablist"[^>]*class="([^"]*)"/g)].map((m) => m[1]);
     expect(lists[0]).toContain("w-full overflow-x-auto");
+    // Scrolls from its first tab and fades at a hidden edge (#1037).
+    expect(lists[0]).toContain("justify-start scroll-cue");
     expect(lists[0]).not.toContain("md:w-fit");
   });
 });

@@ -92,6 +92,7 @@ describe("Today view", () => {
     const model = toTodayViewProps(todayWarehouse);
     expect(model.rows.map((r) => [r.title, r.verb])).toEqual([
       ["3 orders ready", "Pick"],
+      ["ORD-0228 · Al’s Bar", "Pick"],
       ["Staged · ORD-0229", "Put back"],
       ["PO-0142 · Country Malt", "Receive"],
       ["Next delivery · Ridgeline", "Resume"],

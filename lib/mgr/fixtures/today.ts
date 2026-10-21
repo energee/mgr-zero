@@ -8,6 +8,8 @@ export const todayWarehouse: TodayViewModel = {
   date: DATE,
   rows: [
     { key: "pick", title: "3 orders ready", detail: "quantities default to ordered", verb: "Pick", tone: "info", warning: true, icon: "package" },
+    // A ship date before the brewery's today, worded as toTodayViewProps writes it (#993, #1037).
+    { key: "late", title: "ORD-0228 · Al’s Bar", detail: "pick due · ships Sep 2, 2026 · overdue", verb: "Pick", tone: "info", warning: true, icon: "package" },
     { key: "restock", title: "Staged · ORD-0229", detail: "restock 3 Pils cases to Warehouse", verb: "Put back", tone: "attention", warning: true, icon: "package" },
     { key: "po", title: "PO-0142 · Country Malt", detail: "arrives Thu", verb: "Receive", tone: "info", icon: "truck" },
     { key: "route", title: "Next delivery · Ridgeline", detail: "your route · stop 1 of 3", verb: "Resume", tone: "info", icon: "route" },

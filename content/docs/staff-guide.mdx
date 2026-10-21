@@ -147,7 +147,7 @@ Admin opens **Import** from **Settings** or the first-run checklist. See [Import
 
 </Callout>
 
-Transfers, Packaging, and Purchase orders also show the Work tabs beneath their heading. These tabs open the corresponding lists and include only areas your role may open.
+Orders, Transfers, Batches, Packaging, Purchase orders, and Routes each carry their own name as the page heading, with the Work tabs beneath it. These tabs open the corresponding lists and include only areas your role may open. On a phone the tabs may not all fit; the strip fades at the edge that hides more, and you can swipe it sideways.
 
 On the **Work** landing itself, chips filter the rows in place. **all** restores your role's default kinds; **Nothing in motion** means the selected filter has no matching rows.
 
@@ -670,7 +670,7 @@ A pool is one group of kegs you count together: **Owned**, **Leased**, or **Pay 
 
 ### Record a keg event
 
-**Record keg event** posts one line to the keg ledger. Choose the pool, the size, the reason (**Acquired**, **Retired**, **Shipped**, **Returned**, **Lost**, or **Found**), the location and bin the kegs are at (the first bin is preselected), and how many kegs. The **Reason** picker says under it what the chosen reason does to the kegs:
+**Record keg event** posts one line to the keg ledger. Its **Record keg event** button stays at the bottom of the form while the fields scroll. Choose the pool, the size, the reason (**Acquired**, **Retired**, **Shipped**, **Returned**, **Lost**, or **Found**), the location and bin the kegs are at (the first bin is preselected), and how many kegs. The **Reason** picker says under it what the chosen reason does to the kegs:
 
 - **Acquired** and **Retired** add kegs to or remove them from the fleet at that bin. No customer.
 - **Shipped** and **Returned** move empty kegs to or from a customer; the customer is required. Shipped names the bin they left from, Returned the bin they came back into. The fleet total does not change.
@@ -772,7 +772,7 @@ Select a planned batch to record its brew day: choose the **Vessel** it knocked 
 
 Batches brought over from another system appear under **Completed** with their brew date, close date and knockout barrels, but no vessel. Only history closed before the brewery's **Books opened on** date (see [Settings](#settings)) can be recorded this way, so these batches never appear on the Cellar map, on Today, or in a report. They carry their knockout, no loss written off at completion, and their packaging as closed runs and lots with the quantities filled. That packaging put no stock on hand: these lots appear in **Packaging** history and in a lot trace, which names the batch, but never in inventory, on an order, or in a report. They cannot be corrected with **Correct turn**; fix them by importing again.
 
-The **Vessels** table at the bottom of Batches lists each vessel's **Kind**, **Capacity (bbl)**, and **Status**, which says **Active** or **Inactive**. Select a vessel's name, or **New vessel**, to open the same full-page **Vessel detail** as Cellar. It takes a **Name**, a **Type** (*fermenter*, *brite*, *barrel*, *kettle*, or *other*), and a **Capacity (bbl)**. **Save vessel** returns to Cellar. A vessel's contents are never entered directly: they always derive from its open occupancy.
+The **Vessels** table at the bottom of Batches lists each vessel's **Kind** (such as **Fermenter** or **Brite**), **Capacity (bbl)**, and **Status**, which says **Active** or **Inactive**. Select a vessel's name, or **New vessel**, to open the same full-page **Vessel detail** as Cellar. It takes a **Name**, a **Type** (**Fermenter**, **Brite**, **Barrel**, **Kettle**, or **Other**), and a **Capacity (bbl)**. **Save vessel** returns to Cellar. A vessel's contents are never entered directly: they always derive from its open occupancy.
 
 ## Cellar [#cellar]
 

@@ -64,5 +64,11 @@ describe("Planning view", () => {
       ["late", true, true], ["today", false, false], ["undated", false, false],
     ]);
   });
+
+  it("the inventory draws an overdue gap through the adapter, so the marker has a frame (#1037)", () => {
+    const overdue = toPlanningViewProps(planningDemo).requirements.filter((r) => r.detail.startsWith("overdue · "));
+    expect(overdue).toHaveLength(1);
+    expect(overdue[0].warning).toBe(true);
+  });
 });
 

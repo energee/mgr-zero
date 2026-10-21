@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { toTodayViewProps } from "../lib/mgr/today-view";
 import type { TodayItem } from "../lib/commands/today";
+import { todayWarehouse } from "../lib/mgr/fixtures/today";
 
 const item = (subjectId: string, dueAt: string | null, reason: TodayItem["reason"] = "fermentation_reading_overdue"): TodayItem => ({
   reason,
@@ -58,6 +59,16 @@ describe("Today due times", () => {
       ["submitted · ships Oct 8, 2026", false],
       ["submitted · ships Oct 7, 2026 · overdue", true],
     ]);
+  });
+
+  it("the warehouse inventory frame draws the overdue row the adapter writes (#1037)", () => {
+    // The fixture is a drawn view model; this pins its wording to the adapter's.
+    const drawn = todayWarehouse.rows.find((r) => r.detail.endsWith(" · overdue"));
+    expect(drawn).toBeDefined();
+    const [adapted] = toTodayViewProps({ date: todayWarehouse.date, items: [
+      { ...item("1", "2026-09-02T04:00:00Z", "pick_due"), detail: drawn!.detail.replace(" · overdue", "") },
+    ], timeZone, now: new Date("2026-09-03T16:00:00Z") }).rows;
+    expect([drawn!.detail, drawn!.verb, drawn!.warning]).toEqual([adapted.detail, adapted.verb, adapted.warning]);
   });
 
   it("needs the brewery zone to judge a date-only deadline", () => {

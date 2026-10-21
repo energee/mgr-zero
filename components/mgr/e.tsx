@@ -448,25 +448,29 @@ export const E = {
       ))}
     </ItemGroup>
   ),
+  /** A small fixed table. Screens stack in a flex column, so the wrapper must
+   *  not shrink: Table's scroll box would collapse to one clipped line (#1037). */
   tbl: (hd: React.ReactNode[], rows: React.ReactNode[][], align?: ("l" | "r")[]) => (
-    <Table className="min-w-max">
-      <TableHeader>
-        <TableRow>
-          {hd.map((h, i) => (
-            <TableHead key={i} className={align?.[i] === "r" ? "text-right" : "text-left"}>{h}</TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((r, i) => (
-          <TableRow key={i}>
-            {r.map((c, j) => (
-              <TableCell key={j} className={align?.[j] === "r" ? "text-right" : "text-left"}>{c}</TableCell>
+    <div className="shrink-0">
+      <Table className="min-w-max">
+        <TableHeader>
+          <TableRow>
+            {hd.map((h, i) => (
+              <TableHead key={i} className={align?.[i] === "r" ? "text-right" : "text-left"}>{h}</TableHead>
             ))}
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {rows.map((r, i) => (
+            <TableRow key={i}>
+              {r.map((c, j) => (
+                <TableCell key={j} className={align?.[j] === "r" ? "text-right" : "text-left"}>{c}</TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   ),
   /** A blank list. A bare node is the whole message; an {@link EmptyState}
    *  splits it into the fact and the sentence saying what to do next.

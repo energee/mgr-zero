@@ -13,5 +13,5 @@ export function WorkKindTabs({ chips, current, tabs, hrefs }: {
   hrefs?: Record<string, string>;
 }) {
   const names = hrefs ? chips.filter(name => hrefs[name]) : chips;
-  return <TabBar names={names} on={names.indexOf(current)} cls="w-full overflow-x-auto" to={tabs} hrefs={hrefs} />;
+  return <TabBar names={names} on={names.indexOf(current)} cls="w-full overflow-x-auto justify-start scroll-cue" to={tabs} hrefs={hrefs} />;
 }

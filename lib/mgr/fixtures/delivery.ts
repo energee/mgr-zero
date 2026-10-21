@@ -6,7 +6,7 @@ import type { RouteViewModel } from "@/lib/mgr/route-view";
 import type { RoutesSnapshot } from "@/lib/mgr/routes-view";
 
 export const routesDriver: RoutesSnapshot = {
-  title: "Work",
+  title: "Routes",
   subtitle: "driver default",
   rows: [
     { key: "a", title: "Route A · Sep 10, 2026", detail: "departed · 1 of 3 delivered", verb: "Resume", tone: "info" },

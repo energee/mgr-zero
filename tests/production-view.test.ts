@@ -93,6 +93,8 @@ describe("Batches view", () => {
   });
   it("offers Brew only on the planned fixture batches", () => {
     const model = toBatchesViewProps(batchesBrewer);
+    expect(model.title).toBe("Batches");
+    expect(batchesFromQuery([], []).title).toBe("Batches");
     expect(model.planned.map(row => row.brewable)).toEqual([true, true]);
     expect(model.active.map(row => row.brewable)).toEqual([false, false, false]);
     expect(model.workChipIndex).toBe(3);
@@ -100,7 +102,7 @@ describe("Batches view", () => {
 
   it("maps each vessel to its own fields and edit destination", () => {
     const vessels = batchesFromQuery([], [{ id: "v4", name: "FV4", kind: "fermenter", capacity_bbl: 10, active: false }], { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}` }).vessels;
-    expect(vessels).toEqual([{ key: "v4", name: "FV4", kind: "fermenter", capacityBbl: 10, active: false, href: "/cellar/vessels/v4" }]);
+    expect(vessels).toEqual([{ key: "v4", name: "FV4", kind: "Fermenter", capacityBbl: 10, active: false, href: "/cellar/vessels/v4" }]);
   });
 
   it("the Batches inventory record is BatchesView", () => {

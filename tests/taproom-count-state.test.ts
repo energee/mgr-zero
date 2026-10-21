@@ -250,7 +250,8 @@ describe("taproom count controlled state", () => {
 
   it("keeps unavailable expected consumption blank while preserving a proven zero", () => {
     expect(projectionExpectedText({ expected_bbl: null })).toBeNull();
-    expect(projectionExpectedText({ expected_bbl: 0 })).toBe("0 bbl expected");
+    // "Expected total 0 bbl": the label already says expected (#1037).
+    expect(projectionExpectedText({ expected_bbl: 0 })).toBe("0 bbl");
   });
 
   it("groups explicitly entered package depletion by brand and keeps an incomplete draft blank", () => {
