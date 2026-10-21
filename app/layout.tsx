@@ -5,19 +5,19 @@
 // inline, parser-blocking <head> script that applies the `.dark` class from
 // localStorage.theme or the OS preference before first paint. React then
 // hydrates <html> against a class list the script already changed, hence
-// suppressHydrationWarning. components/mgr/theme-toggle.tsx
-// flips the class and writes the preference.
+// suppressHydrationWarning. When Next renders this layout on the client (its
+// bare error document after a notFound() or a throw, #986), the script is
+// inert and ThemeBoot applies the same rule (lib/mgr/theme.ts) on mount.
+// components/mgr/theme-toggle.tsx flips the class and writes the preference.
 import type { Metadata, Viewport } from "next";
 import { Familjen_Grotesk, Instrument_Sans, JetBrains_Mono } from "next/font/google";
+import { ThemeBoot } from "@/components/mgr/theme-toggle";
+import { THEME_BOOT } from "@/lib/mgr/theme";
 import "./globals.css";
 
 const instrumentSans = Instrument_Sans({ variable: "--font-instrument-sans", subsets: ["latin"] });
 const familjenGrotesk = Familjen_Grotesk({ variable: "--font-familjen-grotesk", subsets: ["latin"], preload: false });
 const jetbrainsMono = JetBrains_Mono({ variable: "--font-jetbrains-mono", subsets: ["latin"], preload: false });
-
-// ponytail: static boot script; a theme provider dependency would be more code for the same result
-const THEME_BOOT =
-  "(function(){try{var t=localStorage.theme;if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}})()";
 
 export const metadata: Metadata = {
   title: "MGR",
@@ -40,7 +40,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: THEME_BOOT }}
         />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <ThemeBoot />
+        {children}
+      </body>
     </html>
   );
 }

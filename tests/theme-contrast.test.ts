@@ -41,6 +41,24 @@ it("keeps the pre-paint theme script inert on React client remounts", () => {
   expect(layout).toMatch(/<script[\s\S]*suppressHydrationWarning/);
 });
 
+// A notFound() or a throw before the shell flushes makes Next send its bare
+// error document and render the root layout on the client, where the inert
+// script never runs (#986). ThemeBoot re-applies the same rule on mount.
+it("re-applies the stored or OS theme when the root layout renders on the client (#986)", async () => {
+  expect(layout).toMatch(/<ThemeBoot \/>/);
+  const { applyStoredTheme } = await import("@/lib/mgr/theme");
+  for (const [stored, osDark, dark] of [["dark", false, true], ["light", true, false], [undefined, true, true], [undefined, false, false]] as const) {
+    const classes = new Set<string>();
+    Object.assign(globalThis, {
+      localStorage: { getItem: () => stored ?? null },
+      matchMedia: () => ({ matches: osDark }),
+      document: { documentElement: { classList: { add: (c: string) => classes.add(c) } } },
+    });
+    applyStoredTheme();
+    expect(classes.has("dark"), `stored ${stored}, OS dark ${osDark}`).toBe(dark);
+  }
+});
+
 it("paints selected Location Uses with the AA-checked primary pair, not the hover wash (#493)", () => {
   const e = readFileSync(new URL("../components/mgr/e.tsx", import.meta.url), "utf8");
   expect(e).toContain('export const BRIGHT_ON = "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground";');
