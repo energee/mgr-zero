@@ -36,6 +36,7 @@ describe("taproom complete public RLS read boundary", () => {
       const scope = matrix[table];
       const allowed = positive.filter(row => scope === "tenant" ||
         (scope === "self" && row.user_id === own.taproom.id) ||
+        (scope === "cola" && row.kind === "cola") ||
         (scope === "taproom" && own.taps.some(t => t.id === (table === "locations" ? row.id : row.location_id))));
       if (scope !== "deny") expect(allowed.length, `${table} allowed positive control missing`).toBeGreaterThan(0);
       expect(keys(table, await tenantRows(db, table, own))).toEqual(keys(table, allowed));

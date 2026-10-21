@@ -3,7 +3,7 @@
 // toCatalogScopes builds the Sort and Category picks above the table.
 import type { ListScope } from "@/components/mgr/list-controls";
 import type { Approval } from "@/lib/commands/compliance";
-import { formatDate } from "@/lib/date-format";
+import { approvalDate } from "./brand-view";
 import type { EmptyState } from "./empty-state";
 import type { BrandSort } from "./enums";
 import { BRAND_SORTS } from "./enums";
@@ -59,14 +59,13 @@ export type CatalogSnapshot = {
 
 const NOT_SET = "Not set";
 
-/** Only saved records speak: no COLA is "None", never pending or required; several are
- *  only counted, since none of them is the current one. Brand lists each approval. */
+/** Shows only saved COLAs: "None", one COLA's TTB ID and date, or a count when
+ *  there are several (the brand page lists each). */
 function colaFact(colas: CatalogBrandRow["colas"]): string {
   if (colas.length === 0) return "None";
   if (colas.length > 1) return `${colas.length} on file`;
   const { ttb_id, approved_on } = colas[0]!;
-  const date = approved_on ? `approved ${formatDate(approved_on)}` : "approval date not recorded";
-  return `TTB ID ${ttb_id} · ${date}`;
+  return `TTB ID ${ttb_id} · ${approvalDate(approved_on)}`;
 }
 
 export function toCatalogViewProps({

@@ -8,8 +8,10 @@ import { fixtures, keys, matrix, type Fixture, type Row, type Table } from "./rl
 // Each entry below produces a real SELECT against nonempty own AND foreign fixtures.
 const groups = {
   staff: ["allocations", "batch_additions", "batches", "brew_records", "breweries", "catalog_categories", "fermentation_readings", "format_bom", "inventory_movements", "keg_events", "material_contracts", "material_count_lines", "material_counts", "material_lots", "material_movements", "materials", "packaging_material_actuals", "packaging_material_records", "packaging_run_consumptions", "packaging_run_outputs", "packaging_runs", "price_groups", "purchase_order_lines", "purchase_orders", "receipt_lines", "receipts", "recipe_ingredients", "recipe_versions", "recipe_water_additions", "recipes", "styles", "transfers", "vendors", "vessel_occupancies", "vessels", "volume_adjustment_reclassifications", "volume_adjustments", "water_profiles"],
-  all: ["brand_approvals", "brands", "format_components", "formats", "keg_pools", "skus", "tap_intervals", "taproom_count_lines", "taproom_counts"],
+  all: ["brands", "format_components", "formats", "keg_pools", "skus", "tap_intervals", "taproom_count_lines", "taproom_counts"],
   salesWarehouse: ["customers", "deliveries", "invoice_lines", "invoices", "lots", "order_deposit_lines", "order_events", "order_lines", "orders", "routes", "sale_channels", "ship_tos", "shipments", "stock_transfer_lines", "stock_transfers"],
+  // Every role reads COLA approvals; formula approvals stay Admin and Sales (#965).
+  cola: ["brand_approvals"],
   sales: ["brewery_state_licenses", "channel_prices", "invoice_questions", "price_group_barcodes", "qbo_customer_decisions", "qbo_customer_snapshots", "report_basis_amendments", "report_filings", "reporting_basis_corrections", "state_registrations"],
   warehouse: ["pos_catalog_items", "pos_catalog_ownership", "pos_catalog_variations", "pos_menu_lines", "pos_menus", "pos_sales", "pos_sale_expectations", "pos_sales_coverage"],
   warehouseTaproom: ["pos_item_mappings", "pos_locations"],
@@ -38,6 +40,7 @@ function allowed(test: PolicyCase, rows: Row[], role: StaffRole, own: Fixture) {
     case "staff": return staff ? rows : [];
     case "all": return rows;
     case "salesWarehouse": return ["admin", "sales", "warehouse"].includes(role) ? rows : [];
+    case "cola": return ["admin", "sales"].includes(role) ? rows : rows.filter(row => row.kind === "cola");
     case "sales": case "integrations": return ["admin", "sales"].includes(role) ? rows : [];
     case "warehouse": return ["admin", "warehouse"].includes(role) ? rows : [];
     case "warehouseTaproom": return ["admin", "warehouse", "taproom"].includes(role) ? rows : [];

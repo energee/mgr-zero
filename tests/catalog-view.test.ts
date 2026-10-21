@@ -79,7 +79,7 @@ describe("Catalog view", () => {
     expect(model.brands.map(({ cola }) => cola)).toEqual([
       "None",
       "TTB ID 00123456789012 · approved Oct 2, 2026",
-      "TTB ID 26001001000123 · approval date not recorded",
+      "TTB ID 26001001000123 · approval date unknown",
       "2 on file",
     ]);
   });
