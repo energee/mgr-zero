@@ -190,13 +190,31 @@ describe("Menu with no mapped Square location (#997)", () => {
     expect(html).toMatch(/href="\/settings\/pos\/locations"[^>]*>Map Square locations/);
   });
 
-  it.each([0, 2])("gives a non-admin neutral copy and no settings link, since it cannot read the connection (%i observed)", (observed) => {
-    const html = unmapped({ admin: false, connected: null, observed });
-    expect(html).toContain("Ask an admin to check the Square connection and map a location.");
+  it("tells a non-admin that Square is disconnected, with no settings link (#1083)", () => {
+    const html = unmapped({ admin: false, connected: false, observed: 2 });
+    expect(html).toContain("Square isn’t connected. Ask an admin to reconnect it.");
     expect(html).not.toContain("were found");
     expect(html).not.toContain("/settings/pos");
     expect(html).not.toContain("Set up Square");
+  });
+
+  it("tells a non-admin that a connected Square has unmapped locations (#1083)", () => {
+    const html = unmapped({ admin: false, connected: true, observed: 2 });
+    expect(html).toContain("Square locations were found, but none is mapped to an MGR location. Ask an admin to map one.");
+    expect(html).not.toContain("/settings/pos");
     expect(html).not.toContain("Map Square locations");
+  });
+
+  it("tells a non-admin that a connected Square has synced no location yet (#1083)", () => {
+    const html = unmapped({ admin: false, connected: true, observed: 0 });
+    expect(html).toContain("Square is connected, but no locations are synced yet. Ask an admin to sync and map one.");
+    expect(html).not.toContain("/settings/pos");
+  });
+
+  it("reads the connection through get_square_connected for every role (#1083)", () => {
+    const page = readFileSync("app/(app)/menu/page.tsx", "utf8");
+    expect(page).toContain('runCommand("get_square_connected"');
+    expect(page).not.toContain("get_pos_integration_health");
   });
 
   it("keeps the live settings path out of the shared view and inert in the inventory frames", () => {
