@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
 import { Label } from "@/components/ui/label";
@@ -8,6 +9,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { replenishmentQuantityReady } from "@/lib/replenishment-form";
+import { AtpWarnings, atpWarnings, type AtpWarning } from "@/app/(app)/orders/[id]/atp-warnings";
 
 type Sku = { id: string; name: string };
 
@@ -35,16 +37,38 @@ export function QuantityForm({ locationId, skus, kind, values }: {
   values: Record<string, number>;
 }) {
   const id = useId();
+  const router = useRouter();
   const spec = QUANTITY_KINDS[kind];
   const [skuId, setSkuId] = useState(skus[0]?.id ?? "");
   const [qty, setQty] = useState(String(values[skus[0]?.id] ?? 0));
+  const [warnings, setWarnings] = useState<AtpWarning[]>([]);
+  const build = () => ({ locationId, skuId, [spec.qtyKey]: Number(qty) });
   const form = useCommandForm(spec.command, {
-    build: () => ({ locationId, skuId, [spec.qtyKey]: Number(qty) }),
-    reset: () => { setSkuId(skus[0]?.id ?? ""); setQty(String(values[skus[0]?.id] ?? 0)); },
+    build,
+    reset: () => { setSkuId(skus[0]?.id ?? ""); setQty(String(values[skus[0]?.id] ?? 0)); setWarnings([]); },
   });
-  return <CommandForm open={form.open} onOpenChange={form.setOpen} title={spec.title}
+  // A save that leaves ATP negative keeps the sheet open to show the warning
+  // (#1088). The page remounts this form when its values change, so a save's
+  // refresh waits until the sheet closes. Warnings only show after a save, so
+  // closing over them refreshes; dismissing the unsaved form does not.
+  function close(saved: boolean) {
+    form.setOpen(false);
+    if (saved) router.refresh();
+  }
+  return <CommandForm open={form.open} onOpenChange={open => open ? form.setOpen(true) : close(warnings.length > 0)} title={spec.title}
     trigger={<Button variant="outline" disabled={!skus.length}>{spec.title}</Button>}>
-    <form onSubmit={form.submit} className="flex flex-col gap-4">
+    {warnings.length > 0 ? <div className="flex flex-col gap-4">
+      <AtpWarnings warnings={warnings} skuNames={new Map(skus.map(sku => [sku.id, sku.name]))} saved="Allocation saved." />
+      <CommandFormFooter><Button type="button" onClick={() => close(true)}>Done</Button></CommandFormFooter>
+    </div> : <form onSubmit={event => {
+      event.preventDefault();
+      event.stopPropagation();
+      void form.run(spec.command, build(), data => {
+        const next = atpWarnings(data);
+        if (next.length > 0) setWarnings(next);
+        else close(true);
+      }, { refresh: false });
+    }} className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         <Label htmlFor={`${id}-sku`}>SKU</Label>
         <Select value={skuId} onValueChange={(next) => { setSkuId(next); setQty(String(values[next] ?? 0)); }}>
@@ -62,7 +86,7 @@ export function QuantityForm({ locationId, skus, kind, values }: {
       <p className="text-sm text-muted-foreground">{spec.help}</p>
       <CommandFormMessage error={form.error} />
       <CommandFormFooter><Button type="submit" disabled={form.submitting || !replenishmentQuantityReady(skuId, qty)}>{form.submitting ? "Saving…" : spec.title}</Button></CommandFormFooter>
-    </form>
+    </form>}
   </CommandForm>;
 }
 
