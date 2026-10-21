@@ -1,10 +1,9 @@
 -- #1075: a portal quote submit and a staff wholesale line raise on the same
 -- SKU could deadlock (40P01). portal_submit_quote locks the brewery row
 -- FOR UPDATE, then the quoted skus rows FOR UPDATE. A wholesale
--- adjust_order_lines_impl froze the skus rows FOR UPDATE, then its
--- order_lines, allocations and order_events inserts key-shared the brewery
--- row through their brewery_id foreign keys. Each held what the other waited
--- for.
+-- adjust_order_lines_impl froze the skus rows FOR UPDATE, then its inserts
+-- (at least order_events) key-shared the brewery row through their
+-- brewery_id foreign keys. Each held what the other waited for.
 --
 -- The raise now key-shares the brewery row before its skus freeze, so it
 -- waits for a running submit before holding any skus row. Its lock order

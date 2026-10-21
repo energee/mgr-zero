@@ -72,5 +72,8 @@ describe("portal submit racing a wholesale line raise (#1075)", { concurrent: fa
     await portal.query("commit");
     const raised = (await raise).rows[0].result as { order_id: string };
     expect(raised.order_id).toBe(orderId);
+    await staff.query("commit");
+    const line = await observer.query("select qty_ordered from public.order_lines where order_id=$1", [orderId]);
+    expect(line.rows.map(r => Number(r.qty_ordered))).toEqual([3]);
   });
 });
