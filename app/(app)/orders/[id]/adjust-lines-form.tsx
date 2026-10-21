@@ -1,15 +1,19 @@
 // app/(app)/orders/[id]/adjust-lines-form.tsx — the live half of Adjust lines
 // (/orders/[id]/adjust): holds the edited lines and the required reason for the
 // change, draws them with the
-// shared AdjustLinesView, and sends adjust_order_lines; success returns to the order.
+// shared AdjustLinesView, and sends adjust_order_lines; success returns to the
+// order, unless the change left a SKU's ATP negative: then the page stays to
+// show those warnings (atp-warnings.tsx) until "Back to order" (#1088).
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { docNo } from "@/lib/mgr/doc-no";
+import { AtpWarnings, atpWarnings, type AtpWarning } from "./atp-warnings";
 
 type LineRow = { skuId: string; qty: string };
 export function AdjustLinesForm({ orderId, orderNo, currentLines, skus }: {
@@ -20,6 +24,7 @@ export function AdjustLinesForm({ orderId, orderNo, currentLines, skus }: {
   const router = useRouter();
   const [lines, setLines] = useState<LineRow[]>(() => currentLines.map(l => ({ skuId: l.skuId, qty: String(l.qty) })));
   const [reason, setReason] = useState("");
+  const [warnings, setWarnings] = useState<AtpWarning[]>([]);
   const { busy, error, run } = useCommandAction();
   function updateLine(index: number, patch: Partial<LineRow>) {
     setLines(prev => prev.map((line, i) => i === index ? { ...line, ...patch } : line));
@@ -30,7 +35,11 @@ export function AdjustLinesForm({ orderId, orderNo, currentLines, skus }: {
     // A blank quantity is sent and refused, never dropped: adjust_order_lines
     // replaces every line, so dropping it removed the SKU from the order (#433).
     void run("adjust_order_lines", { orderId, reason, lines: lines.filter(l => l.skuId).map(l => ({ skuId: l.skuId, qty: Number(l.qty) })) },
-      () => router.push(`/orders/${orderId}`));
+      data => {
+        const next = atpWarnings(data);
+        if (next.length > 0) setWarnings(next);
+        else router.push(`/orders/${orderId}`);
+      });
   }}>
     <AdjustLinesView model={{
       backTo: docNo("ORD", orderNo ?? null, "Order"), backHref: `/orders/${orderId}`, title: "Adjust lines", skus,
@@ -43,6 +52,12 @@ export function AdjustLinesForm({ orderId, orderNo, currentLines, skus }: {
       onSku={(index, skuId) => updateLine(index, { skuId })}
       onAdd={() => setLines(prev => [...prev, { skuId: "", qty: "" }])}
       onRemove={index => setLines(prev => prev.filter((_, i) => i !== index))}
-      submitting={busy} messages={<CommandFormMessage error={error} />} />
+      submitting={busy} messages={<>
+        <CommandFormMessage error={error} />
+        {warnings.length > 0 && <>
+          <AtpWarnings warnings={warnings} skuNames={new Map(skus.map(sku => [sku.id, sku.label]))} />
+          <Button type="button" className="w-full md:w-fit md:self-end" onClick={() => router.push(`/orders/${orderId}`)}>Back to order</Button>
+        </>}
+      </>} />
   </form>;
 }

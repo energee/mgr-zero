@@ -1,14 +1,16 @@
-// app/(app)/orders/[id]/atp-warnings.tsx — the soft ATP warnings
-// confirm_order returns ({ sku_id, atp } per line left negative), drawn by the
-// Confirm order review's confirm/confirm-buttons.tsx, the only place an order
-// is confirmed (#713).
+// app/(app)/orders/[id]/atp-warnings.tsx — the soft ATP warnings that
+// confirm_order, adjust_order_lines and set_standing_allocation return
+// ({ sku_id, atp } per SKU left negative). Drawn by the Confirm order review
+// (confirm/confirm-buttons.tsx, the only place an order is confirmed, #713),
+// Adjust lines (adjust-lines-form.tsx) and the standing allocation sheet
+// (replenishment/quantity-form.tsx) (#1088).
 "use client";
 
 import { CommandFormMessage } from "@/components/mgr/command-form";
 
 export type AtpWarning = { sku_id: string; atp: number };
 
-/** Reads the `warnings` array out of a confirm_order result. */
+/** Reads the `warnings` array out of a confirm_order, adjust_order_lines or set_standing_allocation result. */
 export function atpWarnings(data: unknown): AtpWarning[] {
   return (data as { warnings?: AtpWarning[] } | null)?.warnings ?? [];
 }

@@ -42,7 +42,7 @@ The legacy invoice `paid_at` field is a payment-confirmation/state marker, not a
 
 `command` · admin, sales
 
-Replace lines on a confirmed/picked order; re-syncs allocations and returnable-keg deposits; on a picked order, an added or raised line sends it back to confirmed for a re-pick, and staged excess flags a restock
+Replace lines on a confirmed/picked order; re-syncs allocations and returnable-keg deposits; on a picked order, an added or raised line sends it back to confirmed for a re-pick, and staged excess flags a restock; returns ATP soft warnings
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -500,7 +500,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Set or release a standing taproom allocation (source 'taproom_standing') for a SKU at a location
+Set or release a standing taproom allocation (source 'taproom_standing') for a SKU at a location; returns an ATP soft warning
 
 | Field | Type | Required |
 | --- | --- | --- |
