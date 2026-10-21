@@ -34,6 +34,8 @@ describe("Confirm order view loop", () => {
     expect(model.fulfillmentSource).toBe("Warehouse");
     expect(model.lines[1]?.tone).toBe("w");
     expect(model.shortageNote).toMatch(/Pils · 16 oz case/);
+    // Staff read the next verb, not the state machine (#1037).
+    expect(renderToStaticMarkup(createElement(ConfirmOrderView, { model }))).not.toContain("Lifecycle");
   });
 
   it("distinguishes source stock from brewery ATP without inventing another stocked location", () => {

@@ -1,13 +1,29 @@
 // lib/mgr/fixtures/today.ts — get_today-shaped snapshots for Today personas.
 // Views own no sample data.
-import { NOTHING_WAITING, type TodayViewModel } from "@/lib/mgr/today-view";
+import type { TodayItem } from "@/lib/commands/today";
+import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
+import { NOTHING_WAITING, toTodayViewProps, type TodayRowView, type TodayViewModel } from "@/lib/mgr/today-view";
 
 const DATE = "Thu 9/3";
+
+/** A pick due on Sep 2, seen on Thu Sep 3, as get_today returns it
+ *  (20261017190000_today_ship_date_format.sql). The adapter writes its
+ *  "overdue" and attention dot (#993); the inventory row keeps no live href. */
+const OVERDUE_PICK: TodayItem = {
+  reason: "pick_due", subjectType: "order", subjectId: "ord-0228", sourceVersion: "1",
+  safeLabel: "ORD-0228", detail: "pick due · ships Sep 2, 2026", dueAt: "2026-09-02T04:00:00Z",
+  href: "/orders/ord-0228/pick", recipientRoles: ["warehouse"], assignedUserId: null,
+};
+const overduePick: TodayRowView = {
+  ...toTodayViewProps({ date: DATE, items: [OVERDUE_PICK], timeZone: DEMO_TIME_ZONE, now: new Date("2026-09-03T16:00:00Z") }).rows[0],
+  href: undefined,
+};
 
 export const todayWarehouse: TodayViewModel = {
   date: DATE,
   rows: [
     { key: "pick", title: "3 orders ready", detail: "quantities default to ordered", verb: "Pick", tone: "info", warning: true, icon: "package" },
+    overduePick,
     { key: "restock", title: "Staged · ORD-0229", detail: "restock 3 Pils cases to Warehouse", verb: "Put back", tone: "attention", warning: true, icon: "package" },
     { key: "po", title: "PO-0142 · Country Malt", detail: "arrives Thu", verb: "Receive", tone: "info", icon: "truck" },
     { key: "route", title: "Next delivery · Ridgeline", detail: "your route · stop 1 of 3", verb: "Resume", tone: "info", icon: "route" },

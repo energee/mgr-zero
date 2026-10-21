@@ -3,6 +3,7 @@
 import type { EmptyState } from "./empty-state";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
 import { batNo } from "@/lib/mgr/doc-no";
+import { sentenceCase } from "@/lib/mgr/labels";
 import { formatLatestReading, type VesselReading } from "./vessel-detail-view";
 import type { GravityUnit } from "./gravity-unit";
 import { formatDate } from "@/lib/date-format";
@@ -75,7 +76,7 @@ export type BatchListRow = { id: string; batch_no: number | null; planned_on: st
 export type BatchVessel = { id: string; name: string; kind: string; capacity_bbl: number; active: boolean };
 
 export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[], hrefs?: { batch: (id: string) => string; vessel: (id: string) => string; reading?: (id: string) => string }, display: { unit: GravityUnit; timeZone: string } = { unit: "plato", timeZone: "UTC" }): BatchesSnapshot {
-  const snapshot: BatchesSnapshot = { title: "Work", planned: [], active: [], completed: [], cancelled: [], vessels: vessels.map(vessel => ({ key: vessel.id, name: vessel.name, kind: vessel.kind, capacityBbl: Number(vessel.capacity_bbl), active: vessel.active, href: hrefs?.vessel(vessel.id) })) };
+  const snapshot: BatchesSnapshot = { title: "Batches", planned: [], active: [], completed: [], cancelled: [], vessels: vessels.map(vessel => ({ key: vessel.id, name: vessel.name, kind: sentenceCase(vessel.kind), capacityBbl: Number(vessel.capacity_bbl), active: vessel.active, href: hrefs?.vessel(vessel.id) })) };
   for (const batch of batches) {
     const row: BatchesRowView = {
       key: batch.id, batchNo: batNo(batch.batch_no), brand: batch.brand_name, recipe: batch.recipe_name,

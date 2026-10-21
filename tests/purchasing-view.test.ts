@@ -39,7 +39,7 @@ const src = (file: string) => readFileSync(file, "utf8");
 
 describe("Purchase orders", () => {
   it("a closed order with no next action is a row link, not an Open verb (#996)", () => {
-    const model = toPurchaseOrdersViewProps({ title: "Work", subtitle: "every order", rows: [
+    const model = toPurchaseOrdersViewProps({ title: "Purchase orders", subtitle: "every order", rows: [
       { key: "po", title: "PO-0012 · Hop Co", detail: "received", href: "/purchase-orders/po" },
     ] });
     const markup = renderToStaticMarkup(createElement(PurchaseOrdersView, { model, linkRows: true, createAction: null }));

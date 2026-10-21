@@ -236,6 +236,26 @@
   }
 }
 
+/* A sideways-scrolling strip (Work's kind tabs on a phone) fades out at each
+   edge that hides more tabs, so a clipped strip reads as scrollable (#1037).
+   The fade follows the strip's own scroll position. A strip that fits has no
+   scroll range, so its timeline is inactive and it draws no fade. A browser
+   without scroll timelines skips the guard and draws no fade at all; without
+   it, a 0s animation would hold the last frame and mask the left edge.
+   Scroll padding keeps a focused tab clear of the 2rem fade. */
+@utility scroll-cue {
+  scroll-padding-inline: 2rem;
+  @supports (animation-timeline: scroll()) {
+    animation: scroll-cue linear both;
+    animation-timeline: scroll(self inline);
+  }
+}
+@keyframes scroll-cue {
+  0% { mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent); }
+  50% { mask-image: linear-gradient(to right, transparent, #000 2rem, #000 calc(100% - 2rem), transparent); }
+  100% { mask-image: linear-gradient(to left, #000 calc(100% - 2rem), transparent); }
+}
+
 /* Unboxed rows (E.row in components/mgr/e.tsx, #909 §2E). A row that follows
    another row draws a hairline 6px above itself, the middle of the page
    column's 12px gap; a lone row, or the first of a run, draws none. Lists

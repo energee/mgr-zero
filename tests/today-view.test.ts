@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { toTodayViewProps } from "../lib/mgr/today-view";
 import type { TodayItem } from "../lib/commands/today";
+import { todayWarehouse } from "../lib/mgr/fixtures/today";
 
 const item = (subjectId: string, dueAt: string | null, reason: TodayItem["reason"] = "fermentation_reading_overdue"): TodayItem => ({
   reason,
@@ -58,6 +59,13 @@ describe("Today due times", () => {
       ["submitted · ships Oct 8, 2026", false],
       ["submitted · ships Oct 7, 2026 · overdue", true],
     ]);
+  });
+
+  it("the warehouse inventory frame draws an overdue pick row with the attention dot (#1037)", () => {
+    // lib/mgr/fixtures/today.ts builds this row through toTodayViewProps from a get_today item.
+    const row = todayWarehouse.rows.find((r) => r.title === "ORD-0228");
+    expect(row).toMatchObject({ detail: "pick due · ships Sep 2, 2026 · overdue", verb: "Pick", warning: true, icon: "package" });
+    expect(row?.href).toBeUndefined();
   });
 
   it("needs the brewery zone to judge a date-only deadline", () => {

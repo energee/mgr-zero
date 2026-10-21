@@ -1,6 +1,6 @@
 // tests/record-table.test.ts — the shared register contract (#1025): rich
 // cells, wrapping names, index-keyed columns, and an explicit destination.
-import { createElement } from "react";
+import { createElement, Fragment } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, it, vi } from "vitest";
 import { RecordTable } from "../components/mgr/views/record-table";
@@ -47,6 +47,19 @@ it("#1030 never breaks a number inside its value, while text cells still wrap", 
   expect(count).not.toContain("wrap-anywhere");
   expect(status).toContain("wrap-anywhere");
   expect(name).not.toContain("whitespace-nowrap");
+});
+
+it("#1037 keeps a printed date on one line, while other text cells still wrap", () => {
+  const [, due, other] = classesOf(renderToStaticMarkup(createElement(RecordTable, { headers: ["Name", "Due", "Note"], align: ["l", "l", "l"], rows: [{ key: "a", cells: ["Alpha", "Sep 12, 2026", "Sep 12, 2026 was the old date"] }] })), "td");
+  expect(due).toContain("whitespace-nowrap");
+  expect(due).not.toContain("wrap-anywhere");
+  expect(other).toContain("wrap-anywhere");
+});
+
+it("#1037 keeps a badge-led date (Overdue, then the date) on one line too", () => {
+  const cell = createElement(Fragment, null, createElement("span", null, "Overdue"), " ", "Oct 3, 2026");
+  const [, due] = classesOf(renderToStaticMarkup(createElement(RecordTable, { headers: ["Name", "Due"], align: ["l", "l"], rows: [{ key: "a", cells: ["Alpha", cell] }] })), "td");
+  expect(due).toContain("whitespace-nowrap");
 });
 
 it("#1030 aligns each column's header and its cells the same way", () => {

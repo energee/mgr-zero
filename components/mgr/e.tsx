@@ -142,11 +142,13 @@ export const E = {
   },
   /** A detail screen's header: an arrow link to the parent area above the title.
    *  `action` is the same list-create slot `hd` takes; `href` is where the
-   *  arrow goes on a live page (fixtures leave it "#"). */
-  back: (to: React.ReactNode, title: React.ReactNode, action?: React.ReactNode, href = "#") => {
+   *  arrow goes on a live page (fixtures leave it "#"). `screen` names the
+   *  destination screen when the parent's title is not its screen name
+   *  ("Packaging" is the Packaging runs screen), as `link` does. */
+  back: (to: React.ReactNode, title: React.ReactNode, action?: React.ReactNode, href = "#", screen?: string) => {
     const head = (
       <div className="flex flex-col gap-1">
-        <Link href={href} className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{to}</Link>
+        <Link href={href} data-to={screen} className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{to}</Link>
         <h1 className="text-lg font-semibold">{title}</h1>
       </div>
     );
@@ -448,25 +450,29 @@ export const E = {
       ))}
     </ItemGroup>
   ),
+  /** A small fixed table. Screens stack in a flex column, so the wrapper must
+   *  not shrink: Table's scroll box would collapse to one clipped line (#1037). */
   tbl: (hd: React.ReactNode[], rows: React.ReactNode[][], align?: ("l" | "r")[]) => (
-    <Table className="min-w-max">
-      <TableHeader>
-        <TableRow>
-          {hd.map((h, i) => (
-            <TableHead key={i} className={align?.[i] === "r" ? "text-right" : "text-left"}>{h}</TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((r, i) => (
-          <TableRow key={i}>
-            {r.map((c, j) => (
-              <TableCell key={j} className={align?.[j] === "r" ? "text-right" : "text-left"}>{c}</TableCell>
+    <div className="shrink-0">
+      <Table className="min-w-max">
+        <TableHeader>
+          <TableRow>
+            {hd.map((h, i) => (
+              <TableHead key={i} className={align?.[i] === "r" ? "text-right" : "text-left"}>{h}</TableHead>
             ))}
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {rows.map((r, i) => (
+            <TableRow key={i}>
+              {r.map((c, j) => (
+                <TableCell key={j} className={align?.[j] === "r" ? "text-right" : "text-left"}>{c}</TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   ),
   /** A blank list. A bare node is the whole message; an {@link EmptyState}
    *  splits it into the fact and the sentence saying what to do next.

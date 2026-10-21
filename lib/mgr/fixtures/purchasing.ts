@@ -14,7 +14,7 @@ import type { VendorViewModel } from "@/lib/mgr/vendor-view";
 import type { VendorsSnapshot } from "@/lib/mgr/vendors-view";
 
 export const purchaseOrdersWarehouse: PurchaseOrdersSnapshot = {
-  title: "Work",
+  title: "Purchase orders",
   subtitle: "warehouse default",
   rows: [
     { key: "po142", title: "PO-0142 · Country Malt", detail: "sent Sep 7, 2026 · expected Sep 10, 2026", verb: "Receive", tone: "info" },

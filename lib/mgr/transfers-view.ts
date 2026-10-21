@@ -44,13 +44,11 @@ export type TransfersRowSnapshot = {
 
 export type TransfersSnapshot = {
   transfers: TransfersRowSnapshot[];
-  /** Inventory Work list title. Live uses "Transfers". */
-  title?: string;
 };
 
-export function toTransfersViewProps({ transfers, title }: TransfersSnapshot): TransfersViewModel {
+export function toTransfersViewProps({ transfers }: TransfersSnapshot): TransfersViewModel {
   return {
-    title: title ?? "Work",
+    title: "Transfers",
     empty: transfers.length === 0 ? { title: "No transfers yet", description: "A transfer moves stock between two locations." } : undefined,
     workChips: WORK_CHIPS,
     workChipIndex: 2,

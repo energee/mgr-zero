@@ -51,7 +51,7 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
   if (run.closed_at) {
     return (
       <RunClosedView
-        model={{ title, backTo: "Packaging runs", backHref: "/packaging", bblDrawn: run.bbl_drawn, lot, outputs, records: materialHistory.records, timeZone: brewery.timeZone }}
+        model={{ title, backTo: "Packaging", backHref: "/packaging", bblDrawn: run.bbl_drawn, lot, outputs, records: materialHistory.records, timeZone: brewery.timeZone }}
         action={latest && correctionPlan ? <MaterialCorrection key={latest.id} runId={run.id} record={latest} plan={correctionPlan} locations={locations} bins={bins} /> : null}
       />
     );
@@ -59,7 +59,7 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
   return (
     <ClosePackagingRunView
       model={{
-        title, backTo: "Packaging runs", backHref: "/packaging", brand: run.brand_name ?? "—",
+        title, backTo: "Packaging", backHref: "/packaging", brand: run.brand_name ?? "—",
         plannedOn: run.planned_on, cancelled: !!run.cancelled_at, source: run.vessel_name ?? "no source yet", showCloseReview: false,
         plannedOutputs: outputs.map((o) => [o.sku_name ?? o.sku_id.slice(0, 8), Number(o.qty_planned), o.qty_actual === null ? "Not recorded" : Number(o.qty_actual)]),
       }}

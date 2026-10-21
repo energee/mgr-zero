@@ -2,7 +2,7 @@
 // surface shared by the live command adapter and Keg fleet inventory fixture.
 "use client";
 
-import { useState, type FormEventHandler, type ReactNode } from "react";
+import { useId, useState, type FormEventHandler, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { FieldDescription } from "@/components/ui/field";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
@@ -41,7 +41,9 @@ export function KegEventFields({ value, options, onChange }: {
   );
 }
 
-/** The shared dialog/sheet, body, error slot, and action row for every Record keg event. */
+/** The shared dialog/sheet, body, error slot, and action row for every Record
+ *  keg event. The error and the submit ride in CommandForm's pinned footer, so
+ *  both stay on screen while the long form scrolls (#1037). */
 export function KegEventPresentation({ open, onOpenChange, trigger, value, options, onChange, onSubmit, error, submitting, ready }: {
   open: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -54,14 +56,17 @@ export function KegEventPresentation({ open, onOpenChange, trigger, value, optio
   submitting?: boolean;
   ready?: boolean;
 }) {
+  const formId = useId();
   return (
-    <CommandForm open={open} onOpenChange={onOpenChange} title="Record keg event" trigger={trigger}>
-      <form data-preview-action onSubmit={onSubmit} className="flex flex-col gap-4">
-        <KegEventFields value={value} options={options} onChange={onChange} />
+    <CommandForm open={open} onOpenChange={onOpenChange} title="Record keg event" trigger={trigger}
+      footer={<>
         <CommandFormMessage error={error} />
         <CommandFormFooter>
-          <Button type="submit" disabled={submitting || !ready}>{submitting ? "Recording…" : "Record keg event"}</Button>
+          <Button type="submit" form={formId} disabled={submitting || !ready}>{submitting ? "Recording…" : "Record keg event"}</Button>
         </CommandFormFooter>
+      </>}>
+      <form id={formId} data-preview-action onSubmit={onSubmit} className="flex flex-col gap-4">
+        <KegEventFields value={value} options={options} onChange={onChange} />
       </form>
     </CommandForm>
   );

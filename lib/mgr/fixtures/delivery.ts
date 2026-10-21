@@ -6,8 +6,8 @@ import type { RouteViewModel } from "@/lib/mgr/route-view";
 import type { RoutesSnapshot } from "@/lib/mgr/routes-view";
 
 export const routesDriver: RoutesSnapshot = {
-  title: "Work",
-  subtitle: "driver default",
+  title: "Routes",
+  subtitle: "",
   rows: [
     { key: "a", title: "Route A · Sep 10, 2026", detail: "departed · 1 of 3 delivered", verb: "Resume", tone: "info" },
     { key: "b", title: "Route B · Sep 11, 2026", detail: "2 stops · driver not assigned", verb: "Assign", tone: "attention", warning: true },

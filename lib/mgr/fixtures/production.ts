@@ -29,11 +29,11 @@ export const cellarMapBrewer: CellarMapViewModel = {
 };
 
 export const batchesBrewer: BatchesSnapshot = {
-  title: "Work",
+  title: "Batches",
   vessels: [
-    { key: "fv1", name: "FV1", kind: "fermenter", capacityBbl: 15, active: true },
-    { key: "fv3", name: "FV3", kind: "fermenter", capacityBbl: 15, active: true },
-    { key: "fv4", name: "FV4", kind: "fermenter", capacityBbl: 10, active: false },
+    { key: "fv1", name: "FV1", kind: "Fermenter", capacityBbl: 15, active: true },
+    { key: "fv3", name: "FV3", kind: "Fermenter", capacityBbl: 15, active: true },
+    { key: "fv4", name: "FV4", kind: "Fermenter", capacityBbl: 10, active: false },
   ],
   planned: [
     { key: "b0416", batchNo: "B-0416", brand: "Hazy IPA", recipe: "Hazy IPA", plannedOn: "Sep 4, 2026", plannedBbl: 15, vessel: null, brewable: true },
@@ -53,7 +53,7 @@ export const batchesBrewer: BatchesSnapshot = {
 };
 
 export const batchesEmpty: BatchesSnapshot = {
-  title: "Work",
+  title: "Batches",
   planned: [],
   active: [],
   vessels: [],
