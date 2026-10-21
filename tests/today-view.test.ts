@@ -61,14 +61,11 @@ describe("Today due times", () => {
     ]);
   });
 
-  it("the warehouse inventory frame draws the overdue row the adapter writes (#1037)", () => {
-    // The fixture is a drawn view model; this pins its wording to the adapter's.
-    const drawn = todayWarehouse.rows.find((r) => r.detail.endsWith(" · overdue"));
-    expect(drawn).toBeDefined();
-    const [adapted] = toTodayViewProps({ date: todayWarehouse.date, items: [
-      { ...item("1", "2026-09-02T04:00:00Z", "pick_due"), detail: drawn!.detail.replace(" · overdue", "") },
-    ], timeZone, now: new Date("2026-09-03T16:00:00Z") }).rows;
-    expect([drawn!.detail, drawn!.verb, drawn!.warning]).toEqual([adapted.detail, adapted.verb, adapted.warning]);
+  it("the warehouse inventory frame draws an overdue pick row with the attention dot (#1037)", () => {
+    // lib/mgr/fixtures/today.ts builds this row through toTodayViewProps from a get_today item.
+    const row = todayWarehouse.rows.find((r) => r.title === "ORD-0228");
+    expect(row).toMatchObject({ detail: "pick due · ships Sep 2, 2026 · overdue", verb: "Pick", warning: true, icon: "package" });
+    expect(row?.href).toBeUndefined();
   });
 
   it("needs the brewery zone to judge a date-only deadline", () => {

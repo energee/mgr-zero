@@ -23,7 +23,7 @@ export function ClosePackagingRunView({
   planActions?: ReactNode;
 }) {
   const header = <>
-    {E.back(model.backTo ?? "Work", model.title, undefined, model.backHref)}
+    {E.back(model.backTo ?? "Packaging", model.title, undefined, model.backHref, "Packaging runs")}
     {model.brand !== undefined ? E.fld("Brand", model.brand) : null}
     {model.plannedOn !== undefined ? E.fld("Planned", formatDate(model.plannedOn)) : null}
     {model.plannedOutputs ? <>{E.fld("Source", model.source ?? "no source yet")}{E.ttl("Planned outputs")}{E.tbl(["SKU", "planned", "actual"], model.plannedOutputs, ["l", "r", "r"])}</> : null}

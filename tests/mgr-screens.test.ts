@@ -1100,6 +1100,9 @@ describe("Work kind strip (#992)", () => {
     expect(lists[0]).toContain("w-full overflow-x-auto");
     // Scrolls from its first tab and fades at a hidden edge (#1037).
     expect(lists[0]).toContain("justify-start scroll-cue");
+    // The fade only exists where scroll timelines do; elsewhere a 0s animation would mask the strip.
+    const css = readFileSync("app/globals.css", "utf8");
+    expect(css).toMatch(/@utility scroll-cue \{\s*scroll-padding-inline: 2rem;\s*@supports \(animation-timeline: scroll\(\)\) \{\s*animation: scroll-cue/);
     expect(lists[0]).not.toContain("md:w-fit");
   });
 });

@@ -16,7 +16,7 @@ export function RunClosedView({
 }) {
   return (
     <>
-      {E.back(model.backTo ?? "Work", model.title, undefined, model.backHref)}
+      {E.back(model.backTo ?? "Packaging", model.title, undefined, model.backHref, "Packaging runs")}
       {model.bblDrawn !== undefined ? E.fld("Barrels drawn", model.bblDrawn === null ? "Not recorded" : model.bblDrawn) : null}
       {model.lot !== undefined ? <>
         {E.fld("Lot", model.lot?.code ?? "Not recorded")}

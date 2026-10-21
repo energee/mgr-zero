@@ -142,11 +142,13 @@ export const E = {
   },
   /** A detail screen's header: an arrow link to the parent area above the title.
    *  `action` is the same list-create slot `hd` takes; `href` is where the
-   *  arrow goes on a live page (fixtures leave it "#"). */
-  back: (to: React.ReactNode, title: React.ReactNode, action?: React.ReactNode, href = "#") => {
+   *  arrow goes on a live page (fixtures leave it "#"). `screen` names the
+   *  destination screen when the parent's title is not its screen name
+   *  ("Packaging" is the Packaging runs screen), as `link` does. */
+  back: (to: React.ReactNode, title: React.ReactNode, action?: React.ReactNode, href = "#", screen?: string) => {
     const head = (
       <div className="flex flex-col gap-1">
-        <Link href={href} className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{to}</Link>
+        <Link href={href} data-to={screen} className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{to}</Link>
         <h1 className="text-lg font-semibold">{title}</h1>
       </div>
     );

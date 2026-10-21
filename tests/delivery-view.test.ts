@@ -49,7 +49,7 @@ describe("Routes", () => {
   });
 
   it("an assigned route is a row link, not an Open verb; Resume and Assign stay verbs (#1026)", () => {
-    const model = toRoutesViewProps({ title: "Work", subtitle: "routes", rows: [
+    const model = toRoutesViewProps({ title: "Routes", subtitle: "", rows: [
       { key: "r", title: "Route C · 2026-09-12", detail: "2 stops · Dana", href: "/routes/r" },
       { key: "a", title: "Route A · 2026-09-10", detail: "departed", verb: "Resume", tone: "info", href: "/routes/a" },
     ] });
