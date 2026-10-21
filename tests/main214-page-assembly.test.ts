@@ -20,7 +20,7 @@ async function query(name: string, input?: { basis?: string; missingPortalEmail?
   state.calls.push(name);
   switch (name) {
     case "list_brands": state.brandInput = input ?? {}; return [brand];
-    case "list_catalog_categories": return [{ name: "Core" }];
+    case "list_catalog_categories": return [{ name: "Core" }, { name: "Barrel & Wood" }];
     case "list_skus": return brand.skus.map(sku => ({ ...sku, brand_id: brand.id, formats: { name: "Half keg", bbl_per_unit: ".5" } }));
     case "list_formats": return [{ id: "keg", name: "Half keg", basis: "packaged", bbl_per_unit: ".5", brand_id: null }, { id: "pour", name: "Pint", basis: "poured", ounces: 16, brand_id: null, price_group_id: "group", price_groups: { name: "Core" } }].filter(f => !input?.basis || f.basis === input.basis);
     case "list_keg_pools": return [];
@@ -201,4 +201,10 @@ it("routes list: an assigned route not yet departed is a row link; Resume and As
   expect(html).toMatch(/<a[^>]*href="\/routes\/gone"[^>]*>Resume<\/a>/);
   expect(html).toMatch(/<a[^>]*href="\/routes\/nobody"[^>]*>Assign<\/a>/);
   expect(html).not.toMatch(/>Open</);
+});
+it("encodes a Catalog category with a space and an ampersand in its scope link", async () => {
+  const page = await CatalogPage({ searchParams: Promise.resolve({ q: "hazy", sort: "abv" }) });
+  const scopes = page.props.controls.props.scopes as { label: string; options: { value: string; href?: string }[] }[];
+  const category = scopes.find((s) => s.label === "Category")?.options.find((o) => o.value === "Barrel & Wood");
+  expect(category?.href).toBe("/catalog?q=hazy&sort=abv&category=Barrel+%26+Wood");
 });

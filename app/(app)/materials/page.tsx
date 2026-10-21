@@ -59,7 +59,7 @@ export default async function MaterialsPage({ searchParams }: { searchParams: Pr
         })),
         filtered: Boolean(params.q),
       })}
-      controls={materials.length || params.q ? <ListControls search={{ label: "Search materials", value: params.q, keep: {} }} rows={[]} /> : undefined}
+      controls={materials.length || params.q ? <ListControls search={{ label: "Search materials", value: params.q, keep: {} }} /> : undefined}
       createAction={<MaterialForm vendors={vendors} />}
       definitionsHref="/materials?view=definitions"
       rowTrailing={(row) => {

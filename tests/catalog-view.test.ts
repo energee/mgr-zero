@@ -154,7 +154,6 @@ describe("Catalog view", () => {
     const html = htmlOf(createElement(ListControls, {
       search: { label: "Search brands or aliases", value: "", keep: {} },
       scopes: toCatalogScopes({ sort: "name", category: "", categories: ["Core"] }),
-      rows: [],
     }));
     expect(html).toMatch(/role="search"/);
     expect(html).not.toMatch(/role="tablist"/);
