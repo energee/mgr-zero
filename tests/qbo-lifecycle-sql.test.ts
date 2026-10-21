@@ -11,6 +11,7 @@ import {
   completeQboOAuthStore,
   disconnectQbo,
   failQboOAuth,
+  holdQboOAuthTokens,
   qboRealmInUse,
   qboOAuthAlreadyCompleted,
   getQboHealth,
@@ -156,7 +157,7 @@ describe("QuickBooks durable lifecycle", () => {
     await completeQboOAuth({
       request: new Request(`${config.redirectUri}?code=one-time-code&state=${authorize.searchParams.get("state")}&realmId=${realm}`),
       actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri: config.redirectUri,
-      client: oauthClient, store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
+      client: oauthClient, store: { claim: claimQboOAuth, hold: holdQboOAuthTokens, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
     });
     expect((await admin.from("qbo_connections").select("granted_scopes").eq("brewery_id", brewery.id).single()).data?.granted_scopes)
       .toEqual(requestedScopes);
@@ -186,7 +187,7 @@ describe("QuickBooks durable lifecycle", () => {
     await completeQboOAuth({
       request: new Request(`${config.redirectUri}?code=narrow-code&state=${narrow.searchParams.get("state")}&realmId=${realm}`),
       actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri: config.redirectUri,
-      client: narrowClient, store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
+      client: narrowClient, store: { claim: claimQboOAuth, hold: holdQboOAuthTokens, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
     });
     expect((await admin.from("qbo_connections").select("granted_scopes").eq("brewery_id", brewery.id).single()).data?.granted_scopes)
       .toEqual([QBO_ACCOUNTING_SCOPE]);
@@ -211,7 +212,7 @@ describe("QuickBooks durable lifecycle", () => {
     });
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (url) =>
       String(url).includes("/tokens/bearer") ? tokenResponse() : companyResponse());
-    const store = { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse };
+    const store = { claim: claimQboOAuth, hold: holdQboOAuthTokens, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse };
     const begin = (state: string) => ctx.db.rpc("begin_qbo_oauth", {
       p_brewery: brewery.id, p_redirect_uri: redirectUri, p_state_hash: hash(state),
       p_provider_intent: "connect", p_request_id: crypto.randomUUID(),
@@ -553,7 +554,7 @@ describe("QuickBooks durable lifecycle", () => {
       .toMatchObject({ state: change === "disconnect" ? "disconnected" : "connected", last_error: null });
   });
 
-  it("lets a concurrent refresh loser use the winner and rejects a response that arrives after disconnect", async () => {
+  it("makes a concurrent refresh caller wait for and use the holder's result, and rejects a response that arrives after disconnect", async () => {
     const config = {
       clientId: "client-id", clientSecret: "client-secret", redirectUri: "https://mgr.test/qbo",
       apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com",
@@ -571,13 +572,14 @@ describe("QuickBooks durable lifecycle", () => {
     const refreshClient = (suffix: string) => new QboOAuthClient(config, vi.fn<typeof globalThis.fetch>(() =>
       new Promise<Response>((resolve) => releases.push((response) => resolve(response)))).mockName(suffix));
     const refreshes = [refreshQboCredentials(ctx, refreshClient("a")), refreshQboCredentials(ctx, refreshClient("b"))];
-    await vi.waitFor(() => expect(releases).toHaveLength(2));
-    releases[0](new Response(JSON.stringify({ access_token: "race-access-a", refresh_token: "race-refresh-a", expires_in: 3600 }), { status: 200 }));
-    releases[1](new Response(JSON.stringify({ access_token: "race-access-b", refresh_token: "race-refresh-b", expires_in: 3600 }), { status: 200 }));
+    // The refresh lease (#1032) lets one caller reach Intuit; the other waits.
+    // Unserialized, the second caller would add a second request no one releases, and the test would time out.
+    await vi.waitFor(() => expect(releases).toHaveLength(1));
+    releases[0](new Response(JSON.stringify({ access_token: "race-access", refresh_token: "race-refresh", expires_in: 3600 }), { status: 200 }));
     const winners = (await Promise.all(refreshes)).map((tokens) => tokens.accessToken);
     const persisted = await readVersionedIntegrationTokens(ctx, "qbo");
-    expect(winners).toEqual([persisted.accessToken, persisted.accessToken]);
-    expect(persisted.refreshToken).toMatch(/^race-refresh-[ab]$/);
+    expect(winners).toEqual(["race-access", "race-access"]);
+    expect(persisted).toMatchObject({ accessToken: "race-access", refreshToken: "race-refresh" });
 
     let releaseLate!: (response: Response) => void;
     const lateFetch = vi.fn<typeof globalThis.fetch>(() => new Promise<Response>((resolve) => { releaseLate = resolve; }));

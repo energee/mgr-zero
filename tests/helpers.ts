@@ -3,6 +3,7 @@ import type { Database } from "@/lib/supabase/database";
 // tests/helpers.ts — creates tenants/users via admin credentials; returns RLS-bound clients per user.
 import type { StaffRole } from "@/lib/commands/registry";
 import { execFileSync } from "node:child_process";
+import { Client } from "pg";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { publicEnv } from "@/lib/env/public";
 import { readServerEnv } from "@/lib/env/server-parser";
@@ -71,6 +72,38 @@ export function sql(q: string, quiet = false, errorVerbosity: "default" | "sqlst
   const transaction = /^\s*begin\s*;/i.test(q) ? [] : ["--single-transaction"];
   const args = [DB, ...verbosity, "-v", "ON_ERROR_STOP=1", ...transaction, quiet ? "-Atq" : "-At", "-f", "-"];
   return execFileSync("psql", args, { encoding: "utf8", input: q }).trim().split("\n").filter(Boolean);
+}
+
+// Real Postgres connections for race tests: each one is its own session, so
+// one can hold a transaction open while another runs. A test file opens them
+// with pgSession or staffSession and closes them all with closePgSessions in
+// afterEach. The timeouts turn a deadlock or a missed commit into a failure.
+const pgSessions: Client[] = [];
+
+/** A session as the database owner, outside any transaction. */
+export async function pgSession(): Promise<Client> {
+  const client = new Client({ connectionString: DB });
+  pgSessions.push(client);
+  await client.connect();
+  await client.query("set statement_timeout='8s'; set lock_timeout='7s'");
+  return client;
+}
+
+/** A session acting as staff `userId`; with `transaction`, inside an open transaction the claim and role are local to. */
+export async function staffSession(userId: string, transaction = true): Promise<Client> {
+  const client = await pgSession();
+  if (transaction) await client.query("begin");
+  await client.query("select set_config('request.jwt.claim.sub',$1,$2)", [userId, transaction]);
+  await client.query(transaction ? "set local role authenticated" : "set role authenticated");
+  return client;
+}
+
+/** Rolls back whatever each open session left uncommitted, then closes it. */
+export async function closePgSessions(): Promise<void> {
+  await Promise.allSettled(pgSessions.splice(0).map(async (client) => {
+    await client.query("rollback").catch(() => {});
+    await client.end();
+  }));
 }
 
 type PrivilegedFixtureTable = "inventory_movements" | "taproom_counts" | "taproom_count_lines" | "volume_adjustments" | "volume_adjustment_reclassifications" | "qbo_pushes" | "qbo_customer_snapshots" | "qbo_customer_decisions" | "pos_menus" | "pos_menu_lines" | "pos_catalog_items" | "pos_catalog_ownership";
