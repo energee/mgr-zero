@@ -2,8 +2,9 @@
 // (/orders/[id]/adjust): holds the edited lines and the required reason for the
 // change, draws them with the
 // shared AdjustLinesView, and sends adjust_order_lines; success returns to the
-// order, unless the change left a SKU's ATP negative: then the page stays to
-// show those warnings (atp-warnings.tsx) until "Back to order" (#1088).
+// order, unless a SKU on it is still below zero ATP: then the page says the
+// lines saved, shows those warnings (atp-warnings.tsx), and offers only
+// "Back to order" in place of Save lines, so the saved change isn't resent (#1088).
 "use client";
 
 import { useState } from "react";
@@ -54,10 +55,10 @@ export function AdjustLinesForm({ orderId, orderNo, currentLines, skus }: {
       onRemove={index => setLines(prev => prev.filter((_, i) => i !== index))}
       submitting={busy} messages={<>
         <CommandFormMessage error={error} />
-        {warnings.length > 0 && <>
-          <AtpWarnings warnings={warnings} skuNames={new Map(skus.map(sku => [sku.id, sku.label]))} />
-          <Button type="button" className="w-full md:w-fit md:self-end" onClick={() => router.push(`/orders/${orderId}`)}>Back to order</Button>
-        </>}
-      </>} />
+        <AtpWarnings warnings={warnings} skuNames={new Map(skus.map(sku => [sku.id, sku.label]))} saved="Lines saved." />
+      </>}
+      footer={warnings.length > 0
+        ? <Button type="button" className="w-full md:w-fit md:self-end" onClick={() => router.push(`/orders/${orderId}`)}>Back to order</Button>
+        : undefined} />
   </form>;
 }

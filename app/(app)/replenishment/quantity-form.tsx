@@ -48,24 +48,25 @@ export function QuantityForm({ locationId, skus, kind, values }: {
     reset: () => { setSkuId(skus[0]?.id ?? ""); setQty(String(values[skus[0]?.id] ?? 0)); setWarnings([]); },
   });
   // A save that leaves ATP negative keeps the sheet open to show the warning
-  // (#1088). The page remounts this form when its values change, so the
-  // refresh waits until the sheet closes.
-  function setOpen(open: boolean) {
-    form.setOpen(open);
-    if (!open) router.refresh();
+  // (#1088). The page remounts this form when its values change, so a save's
+  // refresh waits until the sheet closes. Warnings only show after a save, so
+  // closing over them refreshes; dismissing the unsaved form does not.
+  function close(saved: boolean) {
+    form.setOpen(false);
+    if (saved) router.refresh();
   }
-  return <CommandForm open={form.open} onOpenChange={setOpen} title={spec.title}
+  return <CommandForm open={form.open} onOpenChange={open => open ? form.setOpen(true) : close(warnings.length > 0)} title={spec.title}
     trigger={<Button variant="outline" disabled={!skus.length}>{spec.title}</Button>}>
     {warnings.length > 0 ? <div className="flex flex-col gap-4">
-      <AtpWarnings warnings={warnings} skuNames={new Map(skus.map(sku => [sku.id, sku.name]))} />
-      <CommandFormFooter><Button type="button" onClick={() => setOpen(false)}>Done</Button></CommandFormFooter>
+      <AtpWarnings warnings={warnings} skuNames={new Map(skus.map(sku => [sku.id, sku.name]))} saved="Allocation saved." />
+      <CommandFormFooter><Button type="button" onClick={() => close(true)}>Done</Button></CommandFormFooter>
     </div> : <form onSubmit={event => {
       event.preventDefault();
       event.stopPropagation();
       void form.run(spec.command, build(), data => {
         const next = atpWarnings(data);
         if (next.length > 0) setWarnings(next);
-        else setOpen(false);
+        else close(true);
       }, { refresh: false });
     }} className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">

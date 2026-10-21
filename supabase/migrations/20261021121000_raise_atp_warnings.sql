@@ -1,7 +1,7 @@
 -- #1088: a line raise and a standing allocation that leave a SKU's
 -- available-to-promise (ATP) below zero still save, and now return the same
 -- soft `warnings` confirm_order_impl does: [{ sku_id, atp }] for each SKU they
--- touched that is below zero. The owner chose warn, not refuse, so overselling
+-- touched that is below zero (a standing-allocation release never warns). The owner chose warn, not refuse, so overselling
 -- stays possible on purpose; shipping remains the hard guard. Both writers
 -- already hold the per-SKU atp: lock (#1070), so the warning is exact.
 --
@@ -132,8 +132,8 @@ begin
   insert into public.order_events (brewery_id, order_id, actor, event, payload)
   values (o.brewery_id, p_order, auth.uid(), 'lines_adjusted',
           jsonb_build_object('before', v_before, 'lines', p_lines, 'reason', p_reason));
-  -- #1088: the same soft warnings confirm returns, for the SKUs now on the
-  -- order that this adjustment left below zero ATP.
+  -- #1088: the same soft warnings confirm returns, for every SKU now on the
+  -- order that is still below zero ATP.
   select coalesce(jsonb_agg(jsonb_build_object('sku_id', a.sku_id, 'atp', a.qty)), '[]') into w
   from public.atp a join public.order_lines ol on ol.sku_id = a.sku_id and ol.order_id = p_order
   where a.brewery_id = o.brewery_id and a.qty < 0;
@@ -163,9 +163,13 @@ begin
     returning id into v_alloc;
     v_status := 'open';
   end if;
-  -- #1088: the same soft warning confirm returns, when this SKU is left below zero ATP.
-  select coalesce(jsonb_agg(jsonb_build_object('sku_id', a.sku_id, 'atp', a.qty)), '[]') into w
-  from public.atp a where a.brewery_id = v_brewery and a.sku_id = p_sku and a.qty < 0;
+  -- #1088: the same soft warning confirm returns, when a set leaves this SKU
+  -- below zero ATP. A release only raises ATP, so it never warns.
+  w := '[]';
+  if p_qty > 0 then
+    select coalesce(jsonb_agg(jsonb_build_object('sku_id', a.sku_id, 'atp', a.qty)), '[]') into w
+    from public.atp a where a.brewery_id = v_brewery and a.sku_id = p_sku and a.qty < 0;
+  end if;
   return jsonb_build_object('allocation_id', v_alloc, 'status', v_status, 'warnings', w);
 end $$;
 

@@ -15,10 +15,12 @@ export function atpWarnings(data: unknown): AtpWarning[] {
   return (data as { warnings?: AtpWarning[] } | null)?.warnings ?? [];
 }
 
-export function AtpWarnings({ warnings, skuNames }: { warnings: AtpWarning[]; skuNames: Map<string, string> }) {
+/** `saved` leads the warnings when the write they follow has already been saved (#1088). */
+export function AtpWarnings({ warnings, skuNames, saved }: { warnings: AtpWarning[]; skuNames: Map<string, string>; saved?: string }) {
   if (warnings.length === 0) return null;
   return (
     <div className="flex flex-col gap-1">
+      {saved && <p role="status" className="text-sm">{saved}</p>}
       {warnings.map((w) => (
         <CommandFormMessage key={w.sku_id} tone="warning">
           ATP negative for {skuNames.get(w.sku_id) ?? w.sku_id}
