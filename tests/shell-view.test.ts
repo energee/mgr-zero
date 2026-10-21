@@ -207,15 +207,17 @@ describe("Beer view", () => {
       ["Taproom", `${plural(1, "SKU")} below par · weekly count`],
       ["Taps", `${plural(11, "keg")} open · Tap board`],
       ["Cellar", `${plural(6, "tank")} with beer`],
-      ["Materials", `${plural(3, "shortage")} · Planning`],
+      ["Materials", "on hand · definitions · cycle count"],
+      ["Shortages", plural(3, "shortage")],
       ["Kegs", "142 out at customers"],
     ]);
   });
 
-  it("sends the material shortage count to Planning, which lists those rows (#989)", () => {
+  it("keeps Materials on hand reachable and sends the shortage count to Planning, which lists those rows (#989)", () => {
     const model = toBeerViewProps({ overview: { fgShortages: 0, taproomBelowPar: 0, openTaps: 0, openOccupancies: 0, materialShortages: 55, kegsOut: 0 } });
-    expect(model.navs.find((r) => r.key === "materials")?.href).toBe("/planning");
-    expect(screen("Beer").to?.Materials).toBe("Planning");
+    expect(model.navs.find((r) => r.key === "materials")?.href).toBe("/materials");
+    expect(model.navs.find((r) => r.key === "shortages")).toMatchObject({ title: "Shortages", detail: "55 shortages", href: "/planning" });
+    expect(screen("Beer").to).toMatchObject({ Materials: "Materials on hand", Shortages: "Planning" });
   });
 
   it("omits Taproom and Taps when showTaproom is false", () => {
