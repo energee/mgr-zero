@@ -85,6 +85,10 @@ describe("compliance period keys", () => {
     expect(startsBeforeBooks("2026-10", null)).toBe(false);
   });
 
+  it("refuses to classify a key that is not a period instead of calling it before the books (#987 review)", () => {
+    expect(() => startsBeforeBooks("2026-13", "2026-10-15")).toThrow();
+  });
+
   it("names the first period of each cadence that starts on or after the books opened (#987)", () => {
     expect(firstPeriodFrom("2026-10-15", "month")).toBe("2026-11");
     expect(firstPeriodFrom("2026-10-01", "month")).toBe("2026-10");

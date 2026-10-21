@@ -12,18 +12,29 @@ const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", nu
 
 describe("Monthly compliance view", () => {
   it("explains a period that starts before the books opened instead of failing (#987)", () => {
-    expect(beforeBooksState("October 2026", "2026-10-15")).toEqual({
+    expect(beforeBooksState("October 2026", "2026-10-15", true)).toEqual({
       title: "Before the books opened",
       description: "October 2026 starts before the books opened on Oct 15, 2026, so MGR has no report for it. The books-opened date is in Settings.",
     });
     const body = SCREENS.find((screen) => screen.name === "Period before the books opened")!.body as { type: unknown };
     expect(body.type).toBe(PeriodBeforeBooksView);
     expect(htmlOf(body as ReactNode)).not.toMatch(/href="\/settings/);
-    const live = htmlOf(createElement(PeriodBeforeBooksView, { title: "October 2026", state: beforeBooksState("October 2026", "2026-10-15"), backHref: "/compliance", settingsHref: "/settings" }));
-    expect(live).toMatch(/href="\/settings"/);
-    expect(live).toMatch(/Oct 15, 2026/);
+    const admin = htmlOf(createElement(PeriodBeforeBooksView, { title: "October 2026", state: beforeBooksState("October 2026", "2026-10-15", true), backHref: "/compliance", settingsHref: "/settings" }));
+    expect(admin).toMatch(/href="\/settings"[^>]*>Open Settings/);
+    expect(admin).toMatch(/Oct 15, 2026/);
   });
 
+  it("gives Sales no Settings button, which would land on No access, only a sentence to ask an admin (#987 review)", () => {
+    const sales = htmlOf(createElement(PeriodBeforeBooksView, { title: "October 2026", state: beforeBooksState("October 2026", "2026-10-15", false), backHref: "/compliance" }));
+    expect(sales).toContain("Ask an admin to change the books-opened date.");
+    expect(sales).not.toContain("Open Settings");
+    expect(sales).not.toContain("/settings");
+  });
+
+  it("the period page passes the Settings link to an admin only (#987 review)", () => {
+    const page = readFileSync("app/(app)/compliance/[period]/page.tsx", "utf8");
+    expect(page).toMatch(/settingsHref=\{admin \? "\/settings" : undefined\}/);
+  });
 
   it("owns the inventory drawing", () => {
     const body = SCREENS.find((screen) => screen.name === "Monthly compliance")!.body as { type: unknown; props: { model: unknown } };
