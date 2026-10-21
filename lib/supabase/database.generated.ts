@@ -5089,6 +5089,9 @@ isOneToOne: false
 "lease_order_emails":
 { Args: { "p_from": string }; Returns: Json
                            },
+"lease_qbo_token_refresh":
+{ Args: { "p_actor": string,"p_brewery": string,"p_connection": string,"p_customer"?: string,"p_expected_version": number,"p_invoice"?: string,"p_lease": string }; Returns: string
+                           },
 "lease_square_publication":
 { Args: { "p_actor": string,"p_brewery": string,"p_publication": string }; Returns: {
               "access_expires_at": string,"access_token": string,"credential_version": number,"merchant_id": string,"refresh_token": string,"request_body": string,"superseded": boolean
@@ -5344,6 +5347,9 @@ isOneToOne: false
                            },
 "release_allocation":
 { Args: { "p_allocation": string,"p_request_id": string }; Returns: Json
+                           },
+"release_qbo_token_refresh":
+{ Args: { "p_brewery": string,"p_connection": string,"p_lease": string }; Returns: undefined
                            },
 "replace_format_bom":
 { Args: { "p_brewery": string,"p_format": string,"p_lines": Json,"p_request_id": string }; Returns: Json
