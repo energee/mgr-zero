@@ -115,6 +115,7 @@ describe("inventory and live Account", () => {
     expect(layout).toMatch(/<MeSheet[\s\S]*<PortalMeView\b/);
     expect(layout).toMatch(/<MeSheetActions guide="\/docs\/portal-guide" \/>/);
     expect(layout).not.toMatch(/signOut="outline"/);
-    expect(readFileSync("components/mgr/me-sheet.tsx", "utf8")).toMatch(/variant="destructive" className="w-full bg-destructive! text-destructive-foreground!/);
+    // The destructive variant is the solid pair itself (#1079), checked in theme-contrast.test.ts.
+    expect(readFileSync("components/mgr/me-sheet.tsx", "utf8")).toMatch(/<Button type="submit" variant="destructive"[^>]*>Sign out<\/Button>/);
   });
 });
