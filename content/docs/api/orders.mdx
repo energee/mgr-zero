@@ -11,8 +11,11 @@ later price change never rewrites an existing order. Mutations return
 
 Confirming creates allocations and returns `{ order_id, warnings }`, where
 `warnings` is `[{ sku_id, atp }]` for any SKU whose available-to-promise went
-negative. These are soft warnings. The confirm still succeeds, because the
-brewery, not the API, decides whether to oversell.
+negative. Adjusting lines returns the same shape, listing each SKU now on the
+order that is below zero. Setting a standing allocation returns
+`{ allocation_id, status, warnings }`, and warns only when the set leaves its
+SKU below zero; a release never warns. These are soft warnings. The write still
+succeeds, because the brewery, not the API, decides whether to oversell.
 
 Shipping is one transaction: inventory movements, allocation fulfilment and
 (unless deferred) the invoice, returning `{ order_id, invoice_id }`.
