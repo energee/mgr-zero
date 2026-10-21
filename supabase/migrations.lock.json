@@ -156,5 +156,5 @@
   "20261019230000_batch_addition_material_lock.sql": "4c0557d130c7edc64d1feb8c9af8ae408cfba8a1f2c26f392e44817225f479bb",
   "20261020230000_brand_approvals_staff_read.sql": "6cb0eb00f0d3f48d7b669ce71fc8c5306a7ad1a72ffa78f33d4485db1ffbe088",
   "20261020233000_stock_transfer_no_draft.sql": "f2a11036073ed6f9b703a037834d356a454e21c3565f914bad14e4902e491b9a",
-  "20261021093000_transfer_pick_ledger_lock.sql": "b70905e07bda8b18b695e5cde6cea8382185e6c7158239fbb01e1ae6aafd36f8"
+  "20261021093000_transfer_pick_ledger_lock.sql": "249a5b53c1fdcbf8ca8ca222cc4f60203f0742607c9320cfab273ad8f542a45f"
 }

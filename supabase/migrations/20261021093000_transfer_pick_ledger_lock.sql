@@ -9,8 +9,9 @@
 -- then reads the committed result.
 --
 -- A pick still reserves nothing: two picks of the same stock both pass, and
--- receipt (which re-checks under the same locks) refuses the second. Cancel
--- (#578) releases that transfer's picks.
+-- receipt (which re-checks under the same locks) refuses the second. That
+-- transfer is still picked: record the pick again with what the bin holds,
+-- or cancel it (#578, final) and create a new transfer.
 --
 -- Body otherwise copied from 20260924110000_transfer_pick_stock.sql (no later
 -- migration redefines it).
