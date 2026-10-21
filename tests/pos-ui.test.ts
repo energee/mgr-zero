@@ -171,6 +171,13 @@ describe("Menu with no mapped Square location (#997)", () => {
     expect(html).not.toContain("No mapped Square location is available.");
   });
 
+  it("titles an admin's disconnected Square as not connected, the same title Warehouse gets (#1087 review)", () => {
+    expect(toPosMenuSetup({ admin: true, connected: false, observed: 2 })).toEqual({
+      title: "Square isn’t connected", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" },
+    });
+    expect(toPosMenuSetup({ admin: false, connected: false, observed: 2 }).title).toBe("Square isn’t connected");
+  });
+
   it("draws the setup action inside the empty state, under its message (#1020 review)", () => {
     const html = unmapped({ admin: true, connected: false, observed: 0 });
     expect(html).toMatch(/data-slot="empty-content"[^>]*>(?:(?!<\/div>)[\s\S])*Set up Square/);
