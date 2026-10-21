@@ -4,13 +4,27 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
-import { MonthlyComplianceView } from "../components/mgr/views/monthly-compliance";
+import { MonthlyComplianceView, PeriodBeforeBooksView } from "../components/mgr/views/monthly-compliance";
 import { monthlyComplianceAmended, monthlyComplianceAugust } from "../lib/mgr/fixtures/monthly-compliance";
-import { toMonthlyComplianceViewProps } from "../lib/mgr/monthly-compliance-view";
+import { beforeBooksState, toMonthlyComplianceViewProps } from "../lib/mgr/monthly-compliance-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 
 describe("Monthly compliance view", () => {
+  it("explains a period that starts before the books opened instead of failing (#987)", () => {
+    expect(beforeBooksState("October 2026", "2026-10-15")).toEqual({
+      title: "Before the books opened",
+      description: "October 2026 starts before the books opened on Oct 15, 2026, so MGR has no report for it. The books-opened date is in Settings.",
+    });
+    const body = SCREENS.find((screen) => screen.name === "Period before the books opened")!.body as { type: unknown };
+    expect(body.type).toBe(PeriodBeforeBooksView);
+    expect(htmlOf(body as ReactNode)).not.toMatch(/href="\/settings/);
+    const live = htmlOf(createElement(PeriodBeforeBooksView, { title: "October 2026", state: beforeBooksState("October 2026", "2026-10-15"), backHref: "/compliance", settingsHref: "/settings" }));
+    expect(live).toMatch(/href="\/settings"/);
+    expect(live).toMatch(/Oct 15, 2026/);
+  });
+
+
   it("owns the inventory drawing", () => {
     const body = SCREENS.find((screen) => screen.name === "Monthly compliance")!.body as { type: unknown; props: { model: unknown } };
     expect(isValidElement(body)).toBe(true);

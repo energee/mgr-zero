@@ -4,6 +4,7 @@ import { money } from "./money";
 import { sentenceCase } from "./labels";
 import { bblExact, bblFixed } from "@/lib/volume";
 import { formatDate } from "@/lib/date-format";
+import type { EmptyState } from "./empty-state";
 
 export type MonthlyComplianceSnapshot = {
   monthLabel: string;
@@ -89,5 +90,13 @@ export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot
         bbl: `${allocation.bbl} bbl`,
       })),
     })),
+  };
+}
+
+/** A period that starts before the books opened has no report; say so instead of failing (#987). */
+export function beforeBooksState(periodLabel: string, booksOpenedOn: string): EmptyState {
+  return {
+    title: "Before the books opened",
+    description: `${periodLabel} starts before the books opened on ${formatDate(booksOpenedOn)}, so MGR has no report for it. The books-opened date is in Settings.`,
   };
 }

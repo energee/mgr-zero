@@ -11,6 +11,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { bblFixed } from "@/lib/volume";
 import { cadenceOf, JURISDICTION, periodKey, periodLabel, periodOver, recentPeriods, type Cadence } from "@/lib/compliance-period";
+import { noPeriodsYet } from "@/lib/mgr/compliance-months-view";
 
 const CADENCES: [Cadence, string][] = [["month", "Monthly"], ["quarter", "Quarterly"], ["year", "Annual"]];
 
@@ -39,6 +40,7 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
             ? { key: m, title: periodLabel(m), detail: f.needs_amendment ? `needs amendment · ${filedLabel(f)}` : `${filedLabel(f)} · ${bblFixed(f.figures.removals.taxable ?? 0)} taxable`, tone: f.needs_amendment ? "w" as const : "ok" as const, href: `/compliance/${m}` }
             : { key: m, title: periodLabel(m), detail: periodOver(m, today) ? "not filed · ready to review" : `in progress · file once the ${cadence} ends`, tone: "w" as const, href: `/compliance/${m}` };
         }),
+        empty: booksOpenedOn ? noPeriodsYet(cadence, booksOpenedOn) : undefined,
         registry: { key: "registry", title: "Licenses", detail: "the brewery’s state licenses", href: "/compliance/licenses" },
         lots: lots.map((l) => ({ key: l.id, title: l.code, detail: `${l.brands?.name ?? ""} · packaged ${formatDate(l.packaged_on)}`, href: `/compliance/lots/${l.id}` })),
       }}

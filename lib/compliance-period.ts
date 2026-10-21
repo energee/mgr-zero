@@ -51,16 +51,28 @@ export function periodLabel(key: string): string {
 
 const RECENT: Record<Cadence, number> = { month: 3, quarter: 4, year: 2 };
 
-/** The recent periods of one cadence ending with the one holding `today` (YYYY-MM-DD), newest first. */
-/** Recent periods, newest first; one that starts before the books opened is left out, since no report can cover it. */
+/** generate_compliance_report refuses a period that starts before the books opened; no report covers it. */
+export const startsBeforeBooks = (key: string, booksOpenedOn: string | null) =>
+  booksOpenedOn !== null && (periodRange(key)?.periodStart ?? "") < booksOpenedOn;
+
+/** The key of the period of `cadence` that is `back` periods before the one holding `day` (YYYY-MM-DD). */
+function periodBack(day: string, cadence: Cadence, back: number): string {
+  const [y, mo] = day.split("-").map(Number);
+  if (cadence === "year") return String(y - back);
+  const step = cadence === "quarter" ? 3 : 1;
+  const d = new Date(Date.UTC(y, mo - 1 - back * step, 1));
+  const [yy, m] = [d.getUTCFullYear(), d.getUTCMonth() + 1];
+  return cadence === "quarter" ? `${yy}-Q${Math.ceil(m / 3)}` : `${yy}-${pad(m)}`;
+}
+
+/** Recent periods ending with the one holding `today` (YYYY-MM-DD), newest first; one that starts before the books opened is left out. */
 export function recentPeriods(today: string, cadence: Cadence, booksOpenedOn: string | null = null): string[] {
-  const [y, mo] = today.split("-").map(Number);
-  const keys = Array.from({ length: RECENT[cadence] }, (_, i) => {
-    if (cadence === "year") return String(y - i);
-    const step = cadence === "quarter" ? 3 : 1;
-    const d = new Date(Date.UTC(y, mo - 1 - i * step, 1));
-    const [yy, m] = [d.getUTCFullYear(), d.getUTCMonth() + 1];
-    return cadence === "quarter" ? `${yy}-Q${Math.ceil(m / 3)}` : `${yy}-${pad(m)}`;
-  });
-  return booksOpenedOn ? keys.filter((key) => periodRange(key)!.periodStart >= booksOpenedOn) : keys;
+  const keys = Array.from({ length: RECENT[cadence] }, (_, i) => periodBack(today, cadence, i));
+  return keys.filter((key) => !startsBeforeBooks(key, booksOpenedOn));
+}
+
+/** The first period of `cadence` that starts on or after the books opened: the one holding that day, or the next. */
+export function firstPeriodFrom(booksOpenedOn: string, cadence: Cadence): string {
+  const holding = periodBack(booksOpenedOn, cadence, 0);
+  return startsBeforeBooks(holding, booksOpenedOn) ? periodBack(booksOpenedOn, cadence, -1) : holding;
 }

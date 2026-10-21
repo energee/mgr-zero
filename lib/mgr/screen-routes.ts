@@ -180,6 +180,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Monthly compliance", file: "app/(app)/compliance/[period]/page.tsx" },
   { name: "Filed period needs amendment", file: "app/(app)/compliance/[period]/page.tsx" },
   { name: "Period in progress", file: "app/(app)/compliance/[period]/page.tsx" },
+  { name: "Period before the books opened", file: "app/(app)/compliance/[period]/page.tsx" },
   { name: "Licenses", file: "app/(app)/compliance/licenses/page.tsx" },
   { name: "Brand approval", file: "app/(app)/catalog/brands/[id]/compliance-forms.tsx" },
   { name: "State registration", file: "app/(app)/catalog/brands/[id]/compliance-forms.tsx" },

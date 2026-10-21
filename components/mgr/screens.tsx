@@ -102,7 +102,7 @@ import { LocationsView } from "@/components/mgr/views/locations";
 import { MeView } from "@/components/mgr/views/me";
 import { MoreView } from "@/components/mgr/views/more";
 import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
-import { MonthlyComplianceView } from "@/components/mgr/views/monthly-compliance";
+import { MonthlyComplianceView, PeriodBeforeBooksView } from "@/components/mgr/views/monthly-compliance";
 import { NewOrderView } from "@/components/mgr/views/new-order";
 import { EditDraftOrderView } from "@/components/mgr/views/edit-draft-order";
 import { editDraftOrder } from "@/lib/mgr/fixtures/edit-draft-order";
@@ -272,7 +272,7 @@ import { toRecipesViewProps } from "@/lib/mgr/recipes-view";
 import { toRecordMovementViewProps } from "@/lib/mgr/record-movement-view";
 import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
 import { toPlanningViewProps } from "@/lib/mgr/planning-view";
-import { toMonthlyComplianceViewProps } from "@/lib/mgr/monthly-compliance-view";
+import { beforeBooksState, toMonthlyComplianceViewProps } from "@/lib/mgr/monthly-compliance-view";
 import { toReverseMovementViewProps } from "@/lib/mgr/reverse-movement-view";
 import { toReviewOrderViewProps } from "@/lib/mgr/review-order-view";
 import { toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
@@ -2141,6 +2141,16 @@ export const SCREENS: Screen[] = [
     states: [["needs amendment", "original snapshot unchanged · corrected figures and actor/time history"], ["invalidated period", "period starts before corrected books-opened date · consult compliance owner"], ["permission", "sales or admin required", 1]],
     spec: "A recorded admin basis correction flags every filed period it affects. The same shared Monthly compliance view retains the immutable original snapshot and shows the recorded corrected figures separately. No amended report is sent or flag cleared by MGR.",
     body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAmended)} />,
+  },
+  {
+    step: 7, slice: 6, tab: "More", name: "Period before the books opened",
+    to: { "Open Settings": "Settings" },
+    job: "Explain why a period that starts before the books opened has no report",
+    reads: "list_compliance_reports",
+    writes: "none",
+    states: [["before books", "the period starts before the books-opened date · no report, Settings holds the date"]],
+    spec: "MGR reports only from the books-opened date on, so a period that starts earlier has nothing to generate. The page names that date and links to Settings instead of failing. A filed period stays readable after a basis correction (Filed period needs amendment).",
+    body: <PeriodBeforeBooksView title="October 2026" state={beforeBooksState("October 2026", "2026-10-15")} />,
   },
   {
     step: 7,

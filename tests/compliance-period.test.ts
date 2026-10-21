@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { getCommandDefinition } from "@/lib/commands/registry";
 import "@/lib/commands/compliance";
-import { periodKey, periodLabel, periodOver, periodRange, recentPeriods } from "@/lib/compliance-period";
+import { firstPeriodFrom, periodKey, periodLabel, periodOver, periodRange, recentPeriods, startsBeforeBooks } from "@/lib/compliance-period";
 
 const file = (periodStart: string, periodEnd: string, jurisdiction = "TTB") =>
   getCommandDefinition("file_compliance_report")!.input.safeParse({ jurisdiction, periodStart, periodEnd });
@@ -76,5 +76,22 @@ describe("compliance period keys", () => {
     expect(recentPeriods("2026-01-15", "quarter", "2025-07-01")).toEqual(["2026-Q1", "2025-Q4", "2025-Q3"]);
     expect(recentPeriods("2026-01-15", "year", "2026-01-01")).toEqual(["2026"]);
     expect(recentPeriods("2026-01-15", "month", null)).toEqual(["2026-01", "2025-12", "2025-11"]);
+  });
+
+  it("a period that starts before the books opened has no report (#987)", () => {
+    expect(startsBeforeBooks("2026-10", "2026-10-15")).toBe(true);
+    expect(startsBeforeBooks("2026-11", "2026-10-15")).toBe(false);
+    expect(startsBeforeBooks("2026-10", "2026-10-01")).toBe(false);
+    expect(startsBeforeBooks("2026-10", null)).toBe(false);
+  });
+
+  it("names the first period of each cadence that starts on or after the books opened (#987)", () => {
+    expect(firstPeriodFrom("2026-10-15", "month")).toBe("2026-11");
+    expect(firstPeriodFrom("2026-10-01", "month")).toBe("2026-10");
+    expect(firstPeriodFrom("2026-12-15", "month")).toBe("2027-01");
+    expect(firstPeriodFrom("2026-10-15", "quarter")).toBe("2027-Q1");
+    expect(firstPeriodFrom("2026-04-01", "quarter")).toBe("2026-Q2");
+    expect(firstPeriodFrom("2026-10-15", "year")).toBe("2027");
+    expect(firstPeriodFrom("2026-01-01", "year")).toBe("2026");
   });
 });
