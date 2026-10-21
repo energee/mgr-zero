@@ -27,6 +27,7 @@ const AUTHENTICATED_RPCS = [
   "get_chat_link_intent(uuid,text)",
   "configure_pos_menu(uuid,text,uuid,uuid,uuid)",
   "get_pos_menu(uuid,text)",
+  "get_square_connected(uuid)",
   "get_pos_menu_item(uuid,text,uuid,uuid)",
   "list_chat_user_links(uuid)",
   "set_brewery_operating_defaults(uuid,integer,uuid,integer)",
