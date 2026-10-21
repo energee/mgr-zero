@@ -4,7 +4,7 @@ import { assert } from "vitest";
 // inside one location is move_stock_bin and writes no document.
 import { describe, it, expect } from "vitest";
 import { admin, insertFixture, makeBrewery, makeStaffCtx, seedCustomer, seedLocation, seedCatalog, sql } from "./helpers";
-import { runCommand } from "@/lib/commands/registry";
+import { getCommandDefinition, runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 describe("stock_transfers schema", () => {
@@ -21,7 +21,7 @@ describe("stock_transfers schema", () => {
 });
 
 describe("stock transfer lifecycle", () => {
-  it("create_stock_transfer refuses same-location and accepts a sku line across two locations; submit and pick advance it", async () => {
+  it("create_stock_transfer refuses same-location and accepts a sku line across two locations; it starts submitted and can be picked at once", async () => {
     const b = await makeBrewery();
     const ctx = await makeStaffCtx(b.id, "admin");
     const from = await seedLocation(b.id, { name: "WH", uses: ["warehouse"] });
@@ -44,7 +44,7 @@ describe("stock transfer lifecycle", () => {
     }, ctx) as { transferId: string };
     expect(row.transferId).toMatch(/^[0-9a-f-]{36}$/i);
     const { data: hdr } = await admin.from("stock_transfers").select("status, transfer_no, note").eq("id", row.transferId).single();
-    expect(hdr).toMatchObject({ status: "draft", transfer_no: 1, note: "weekly" });
+    expect(hdr).toMatchObject({ status: "submitted", transfer_no: 1, note: "weekly" });
     const detail = await runCommand("get_stock_transfer", { transferId: row.transferId }, ctx) as
       { transfer: { from_location: { name: string }; to_location: { name: string } }; lines: { skus: { name: string } }[]; bins: unknown[] };
     expect(detail.transfer.from_location.name).toBe("WH");
@@ -52,7 +52,6 @@ describe("stock transfer lifecycle", () => {
     expect(detail.lines[0].skus.name).toBe("IPA case");
     expect(detail.bins.length).toBe(6);
 
-    await runCommand("submit_stock_transfer", { transferId: row.transferId }, ctx);
     // a pick needs the stock in the source bin (#487)
     await runCommand("record_movement", { skuId, locationId: from.id, binId: fromBins![0].id, qty: 2, type: "opening_balance" }, ctx);
     const { data: line } = await admin.from("stock_transfer_lines").select("id").eq("transfer_id", row.transferId).single();
@@ -61,9 +60,8 @@ describe("stock transfer lifecycle", () => {
     expect(after!.status).toBe("picked");
     const { data: l2 } = await admin.from("stock_transfer_lines").select("qty_picked").eq("id", line!.id).single();
     expect(Number(l2!.qty_picked)).toBe(2);
-    // a warehouse member may do all three; sales may not
-    const sales = await makeStaffCtx(b.id, "sales");
-    await expect(runCommand("submit_stock_transfer", { transferId: row.transferId }, sales)).rejects.toMatchObject({ code: "permission_denied" });
+    // creation is the submit: there is no separate submit command
+    expect(getCommandDefinition("submit_stock_transfer")).toBeUndefined();
   });
 });
 
@@ -79,7 +77,6 @@ describe("cancel_stock_transfer (#578)", () => {
     const { transferId } = await runCommand("create_stock_transfer", {
       fromLocationId: from.id, toLocationId: to.id, lines: [{ skuId, qty: 3, fromBinId: from.binId, toBinId: to.binId }],
     }, adminCtx) as { transferId: string };
-    await runCommand("submit_stock_transfer", { transferId }, adminCtx);
     const { data: line } = await admin.from("stock_transfer_lines").select("id").eq("transfer_id", transferId).single();
     await runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: line!.id, qty: 3 }] }, adminCtx);
 
@@ -135,7 +132,6 @@ describe("receive_stock_transfer", () => {
         note,
         lines: [{ skuId, qty: 3, fromBinId: from.binId, toBinId: to.binId }],
       }, ctx) as { transferId: string };
-      await runCommand("submit_stock_transfer", { transferId }, ctx);
       const line = (await admin.from("stock_transfer_lines").select("id").eq("transfer_id", transferId).single()).data!;
       await runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: line.id, qty: 3 }] }, ctx);
       await runCommand("receive_stock_transfer", { transferId, lines: [{ lineId: line.id, qty: 3 }] }, ctx);
@@ -179,7 +175,6 @@ describe("receive_stock_transfer", () => {
         { kegPoolId: pool!.id, kegSize: "half_bbl", qty: 3, fromBinId: from.binId, toBinId: to.binId },
       ],
     }, ctx) as { transferId: string };
-    await runCommand("submit_stock_transfer", { transferId }, ctx);
     const { data: lines } = await admin.from("stock_transfer_lines").select("id, sku_id").eq("transfer_id", transferId);
     await runCommand("record_stock_transfer_pick", { transferId, picks: lines!.map((l) => ({ lineId: l.id, qty: l.sku_id ? 2 : 3 })) }, ctx);
     // receiving before pick is refused
@@ -230,7 +225,7 @@ describe("move_stock_bin", () => {
   });
 });
 
-it("direct RPCs reject fractional empty kegs at move, draft, pick and receive boundaries", async () => {
+it("direct RPCs reject fractional empty kegs at move, create, pick and receive boundaries", async () => {
   const b = await makeBrewery(), ctx = await makeStaffCtx(b.id, "warehouse");
   const from = await seedLocation(b.id, { name: "WH", uses: ["warehouse"] });
   const to = await seedLocation(b.id, { name: "Other", uses: ["storage"] });
@@ -245,7 +240,6 @@ it("direct RPCs reject fractional empty kegs at move, draft, pick and receive bo
   expect(created.error).toBeNull();
   assert(created.data !== null);
   const transferId = created.data.transfer_id;
-  await runCommand("submit_stock_transfer", { transferId }, ctx);
   const { data: stored } = await admin.from("stock_transfer_lines").select("id").eq("transfer_id", transferId).single();
   await admin.from("keg_events").insert({ brewery_id: b.id, pool_id: pool!.id, keg_size: "half_bbl", location_id: from.id, bin_id: from.binId, qty: 2, reason: "acquired", created_by: ctx.userId });
   expect((await ctx.db.rpc("record_stock_transfer_pick", { p_transfer: transferId, p_picks: [{ line_id: stored!.id, qty: 1.00001 }], p_request_id: crypto.randomUUID() })).error).not.toBeNull();
@@ -389,7 +383,6 @@ describe("source bin stock (#451)", () => {
     ];
     for (const line of lines) {
       const { transferId } = await runCommand("create_stock_transfer", { fromLocationId: s.from.id, toLocationId: s.to.id, lines: [line] }, s.ctx) as { transferId: string };
-      await runCommand("submit_stock_transfer", { transferId }, s.ctx);
       const { data: stored } = await admin.from("stock_transfer_lines").select("id").eq("transfer_id", transferId).single();
       await runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: stored!.id, qty: 2 }] }, s.ctx);
       // after the pick, half the stock leaves the source bin
@@ -417,7 +410,6 @@ it("record_stock_transfer_pick refuses more than the source bin holds", async ()
       { kegPoolId: pool!.id, kegSize: "half_bbl", qty: 4, fromBinId: from.binId, toBinId: to.binId },
     ],
   }, ctx) as { transferId: string };
-  await runCommand("submit_stock_transfer", { transferId }, ctx);
   const { data: lines } = await admin.from("stock_transfer_lines").select("id, sku_id").eq("transfer_id", transferId);
   const skuLine = lines!.find((l) => l.sku_id)!.id, kegLine = lines!.find((l) => !l.sku_id)!.id;
 
@@ -454,7 +446,6 @@ it("a pick that passes the source-bin check is receivable; lines sharing a bin c
     { brewery_id: b.id, material_id: malt!.id, location_id: from.id, bin_id: from.binId, lot_id, qty: 2, type: "opening_balance", created_by: ctx.userId })))).error).toBeNull();
   const line = { materialId: malt!.id, fromBinId: from.binId, toBinId: to.binId };
   const { transferId } = await runCommand("create_stock_transfer", { fromLocationId: from.id, toLocationId: to.id, lines: [{ ...line, qty: 3 }, { ...line, qty: 2 }] }, ctx) as { transferId: string };
-  await runCommand("submit_stock_transfer", { transferId }, ctx);
   const { data: stored } = await admin.from("stock_transfer_lines").select("id, qty").eq("transfer_id", transferId).order("qty", { ascending: false });
   const [three, two] = stored!.map((l) => l.id);
 

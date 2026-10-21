@@ -51,7 +51,7 @@ export function NewTransferView({
       <Button type="button" variant="ghost" size="sm" className="w-fit" onClick={controls.addLine}>Add line</Button>
       </Field>
       {messages}
-      {footer !== undefined ? footer : E.btn("Save draft")}
+      {footer !== undefined ? footer : E.btn("Create transfer")}
     </>
   );
 }

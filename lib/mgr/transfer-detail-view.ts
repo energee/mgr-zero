@@ -44,7 +44,6 @@ export type TransferDetailSnapshot = {
 };
 
 function nextVerb(status: string): string | undefined {
-  if (status === "draft") return "Submit";
   if (status === "submitted") return "Record pick";
   if (status === "picked" || status === "in_transit") return "Receive";
   return undefined;

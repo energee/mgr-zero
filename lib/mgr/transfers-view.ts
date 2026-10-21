@@ -8,7 +8,6 @@ import { WORK_CHIPS, WORK_TABS } from "./work-view";
 // none: their row is a plain link, because "Open" on a closed record reads as
 // reopen (#996, #1026).
 const VERB: Record<string, { label: string; tone: "info" | "success" }> = {
-  draft: { label: "Submit", tone: "info" },
   submitted: { label: "Pick", tone: "info" },
   picked: { label: "Receive", tone: "success" },
   in_transit: { label: "Receive", tone: "success" },

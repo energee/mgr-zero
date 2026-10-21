@@ -84,7 +84,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Draft a stock transfer between two locations: sku, material or keg-pool lines, each with a from-bin and a to-bin
+Create a submitted stock transfer between two locations: sku, material or keg-pool lines, each with a from-bin and a to-bin; record its pick next
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -298,7 +298,7 @@ Stock transfers, newest first, with their lines
 
 | Field | Type | Required |
 | --- | --- | --- |
-| `status` | draft or submitted or picked or in_transit or received or cancelled | no |
+| `status` | submitted or picked or in_transit or received or cancelled | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -392,23 +392,6 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "reverse_inventory_movement", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "movementId": "00000000-0000-0000-0000-000000000000", "note": "string" } }'
-```
-
-## submit_stock_transfer [#submit_stock_transfer]
-
-`command` · admin, warehouse
-
-Submit a draft stock transfer
-
-| Field | Type | Required |
-| --- | --- | --- |
-| `transferId` | uuid | yes |
-
-```bash
-curl -X POST "$MGR_URL/api/command" \
-  -H 'content-type: application/json' \
-  -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "submit_stock_transfer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "transferId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 ## update_bin [#update_bin]
