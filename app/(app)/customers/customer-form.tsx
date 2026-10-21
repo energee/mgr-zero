@@ -87,8 +87,8 @@ export function CustomerForm({
   });
 
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title={isEdit ? "Edit Customer" : "New Customer"} trigger={<Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"}>
-          {isEdit ? "Edit" : "New Customer"}
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title={isEdit ? "Edit customer" : "New customer"} trigger={<Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"}>
+          {isEdit ? "Edit" : "New customer"}
         </Button>}>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">

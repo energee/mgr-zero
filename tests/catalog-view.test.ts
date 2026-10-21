@@ -176,9 +176,9 @@ describe("Catalog view", () => {
     expect(html.indexOf('role="search"')).toBeLessThan(html.indexOf(brandOf(SKU_HAZY)));
   });
 
-  it("renders Add brand, Hazy IPA, Price groups, and Water profiles", () => {
+  it("renders New brand, Hazy IPA, Price groups, and Water profiles", () => {
     const html = htmlOf(createElement(CatalogView, { model: toCatalogViewProps(catalogBrands) }));
-    expect(html).toMatch(/>Add brand</);
+    expect(html).toMatch(/>New brand</);
     expect(html).toContain(brandOf(SKU_HAZY));
     for (const fact of [">IPA<", ">6.8%<", ">4<"]) expect(html).toContain(fact);
     expect(html).toMatch(/Price groups/);
@@ -195,7 +195,7 @@ describe("Catalog view", () => {
       linkRows: true,
     }));
     expect(html).toMatch(/NEW BRAND/);
-    expect(html).not.toMatch(/>Add brand</);
+    expect(html).not.toMatch(/>New brand</);
     expect(html).toMatch(/href="\/pricing"/);
     expect(html).toContain(brandOf(SKU_HAZY));
   });
@@ -231,6 +231,12 @@ describe("Catalog view", () => {
     expect(body.props.model).toEqual(toCatalogViewProps(catalogBrands));
   });
 
+  it("the format create verb reads New format in sentence case, inventory and live alike (#1026)", () => {
+    expect(htmlOf(screen("Catalog").body)).toMatch(/>New format</);
+    expect(resolveTap(screen("Catalog"), "New format")).toBe("Format");
+    expect(readFileSync("app/(app)/catalog/format-form.tsx", "utf8")).not.toMatch(/New Format/);
+  });
+
   it("a brand or format name opens its screen in the explorer", () => {
     const packaged = formatsInventory.formats.filter((format) => format.basis === "packaged");
     for (const row of toFormatsViewProps({ ...formatsInventory, formats: packaged }).rows) expect(resolveTap(screen("Catalog"), row.cells[0]!), row.cells[0]).toBe("Format");
@@ -242,7 +248,7 @@ describe("Catalog view", () => {
     const src = readFileSync("app/(app)/catalog/page.tsx", "utf8");
     expect(src).toMatch(/from "@\/components\/mgr\/views\/catalog"/);
     expect(src).toMatch(/<CatalogView\b/);
-    // Brand is a page, not a dialog: New Brand links to it, as does each row.
+    // Brand is a page, not a dialog: New brand links to it, as does each row.
     expect(src).not.toMatch(/<BrandForm\b/);
     expect(src).toMatch(/"\/catalog\/brands\/new"/);
     expect(src).toContain("formats={toFormatsViewProps(");

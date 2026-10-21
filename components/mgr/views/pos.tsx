@@ -142,7 +142,7 @@ export function PosMappingView({ variations, targets, sales, coverage, busy, err
     {E.ttl("Sales coverage")}
     {coverage.length ? coverage.map((line, index) => <div key={`${line}-${index}`}>{E.row(line, "Completed observation window", E.status("Complete", "ok"), "ok")}</div>) : E.note("No complete Square sales coverage yet. A failed or partial sync is not counted as coverage.")}
     {E.ttl("Recent Square facts")}
-    {sales.length ? sales.map(sale => <div key={sale.id}>{E.row(sale.label, sale.detail, sale.href || sale.openable ? E.act("Open", "primary", sale.href) : sale.amount, sale.status === "mapped" ? "ok" : "w")}</div>) : E.blank("No Square sale facts yet")}
+    {sales.length ? sales.map(sale => <div key={sale.id}>{sale.href || sale.openable ? E.nav(sale.label, sale.detail, sale.status === "mapped" ? "ok" : "w", undefined, sale.href) : E.row(sale.label, sale.detail, sale.amount, sale.status === "mapped" ? "ok" : "w")}</div>) : E.blank("No Square sale facts yet")}
   </>;
 }
 
@@ -184,8 +184,8 @@ export function PosMenuView({ model, bins = [], channels = [], busy, error, noti
       <Button disabled={busy || !binId || !channelId}>{busy ? "Saving…" : "Configure menu"}</Button>
     </form>}
     {model.binName && <>{E.fld("Availability source", `${model.locationName} · ${model.binName}`)}{E.fld("Price source", model.channelName ?? "Not configured")}</>}
-    {model.items.map(item => <div key={`${item.brandId}:${item.formatId}`}>{E.row(item.label, `${item.retail} · ${item.source} · ${item.destinations}`, item.href ? E.act("Open", "primary", item.href) : "", "ok")}</div>)}
-    {model.excluded.map(item => <div key={`${item.brandId}:${item.formatId}`}>{E.row(item.label, item.reason ?? "Unavailable", item.href ? E.act("Open", "primary", item.href) : E.status("Off register", "w"), "w")}</div>)}
+    {model.items.map(item => <div key={`${item.brandId}:${item.formatId}`}>{item.href ? E.nav(item.label, `${item.retail} · ${item.source} · ${item.destinations}`, "ok", undefined, item.href) : E.row(item.label, `${item.retail} · ${item.source} · ${item.destinations}`, "", "ok")}</div>)}
+    {model.excluded.map(item => <div key={`${item.brandId}:${item.formatId}`}>{item.href ? E.nav(item.label, item.reason ?? "Unavailable", "w", undefined, item.href) : E.row(item.label, item.reason ?? "Unavailable", E.status("Off register", "w"), "w")}</div>)}
     {model.binName && <Button disabled={busy || model.items.length + model.excluded.length === 0} onClick={onPublish}>{busy ? "Publishing…" : "Publish changes"}</Button>}
     {notice}
     <CommandFormMessage error={error ?? null} />

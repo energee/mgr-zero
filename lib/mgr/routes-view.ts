@@ -6,8 +6,9 @@ export type RoutesRowView = {
   key: string;
   title: string;
   detail: string;
-  verb: string;
-  tone: "info" | "attention" | "success" | "primary";
+  /** The next action; an assigned route not yet departed has none and its row is a plain link (#1026). */
+  verb?: string;
+  tone?: "info" | "attention";
   warning?: boolean;
   href?: string;
 };
@@ -28,6 +29,15 @@ export type RoutesSnapshot = {
   rows?: RoutesRowView[];
   empty?: EmptyState;
 };
+
+/** A route's next action: Resume once it has departed, Assign while it has no
+ *  driver. An assigned route that has not departed has none, so its row is a
+ *  plain link rather than an "Open" verb (#1026). */
+export function routeNext(route: { departed_at: string | null; driver_user_id: string | null }): { verb: string; tone: "info" | "attention" } | undefined {
+  if (route.departed_at) return { verb: "Resume", tone: "info" };
+  if (!route.driver_user_id) return { verb: "Assign", tone: "attention" };
+  return undefined;
+}
 
 export function toRoutesViewProps(s: RoutesSnapshot): RoutesViewModel {
   const rows = s.rows ?? [];

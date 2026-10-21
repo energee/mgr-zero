@@ -116,7 +116,7 @@ export function CustomerView({
           <section aria-label="Customer activity" className="flex flex-col gap-3">
             <h2 className="font-heading text-xl font-semibold">Customer activity</h2>
             {E.nav("Orders", detail ? "Orders for this customer" : model.orders, "", undefined, detail?.ordersHref)}
-            {E.row("Customer keg balance", detail ? "Kegs out and deposits held" : model.kegBalance, E.act("Open", "primary", detail?.kegHref))}
+            {E.nav("Customer keg balance", detail ? "Kegs out and deposits held" : model.kegBalance, "", undefined, detail?.kegHref)}
           </section>
         </div>
       </div>

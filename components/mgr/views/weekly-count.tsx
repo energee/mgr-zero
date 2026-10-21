@@ -50,7 +50,7 @@ export function WeeklyCountView({ model, draft, correction }: { model: WeeklyCou
         </section>}
         {E.ttl("Recent saved counts")}
         <p className="text-sm text-muted-foreground">Newest 50 at this taproom.</p>
-        {model.history.length === 0 ? E.blank("No saved counts yet") : model.history.map(count => <div key={count.key}>{E.row(`Weekly count · ${count.date}`, count.detail, E.act("Open count", "primary", count.href))}</div>)}
+        {model.history.length === 0 ? E.blank("No saved counts yet") : model.history.map(count => <div key={count.key}>{E.nav(`Weekly count · ${count.date}`, count.detail, "", undefined, count.href)}</div>)}
         {E.note("Admin can correct only the latest saved count when a quantity was counted too low. Warehouse and Taproom read the correction history without the action. The original receipt remains in the audit trail.")}
       </div>
     </>}

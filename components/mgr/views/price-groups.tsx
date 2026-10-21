@@ -25,7 +25,7 @@ export function PriceGroupsView({
 }) {
   return (
     <>
-      {E.back("More", "Price groups", createAction !== undefined ? createAction : E.btn("Create price group"), backHref)}
+      {E.back("More", "Price groups", createAction !== undefined ? createAction : E.btn("New price group"), backHref)}
       {E.info("Price groups down, formats across, one table per sale channel. A beer sits on one group and a customer on one channel; the cell where they meet is the price.")}
       {model.groupCount === 0 ? E.blank("Add a price group, then put each brand on one from Catalog.")
         : model.channels.length === 0 ? E.blank("No sale channels yet")

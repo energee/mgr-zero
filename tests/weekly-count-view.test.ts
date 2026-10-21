@@ -23,7 +23,14 @@ it("keeps correction permission and explicit slot suppression in the shared page
   expect(render("admin")).toContain("Correct count");
   expect(render("warehouse")).not.toContain("Correct count");
   expect(render("admin")).not.toContain("Record count");
-  expect(render("admin")).toContain("Open count");
+  expect(render("admin")).not.toContain("Open count");
+});
+
+it("a saved count in the history is a row link to that count, not an Open count verb (#1026)", () => {
+  const history = [{ ...weeklyCount.history[0]!, href: "/taproom/count/sep1" }];
+  const html = renderToStaticMarkup(createElement(WeeklyCountView, { model: { ...weeklyCount, history }, draft: null }));
+  expect(html).toMatch(/<a[^>]*href="\/taproom\/count\/sep1"[^>]*>(?:(?!<\/a>)[\s\S])*Weekly count · Sep 1, 2026/);
+  expect(html).not.toContain("Open count");
 });
 
 it("the live draft, correction and print bindings delegate to shared controls", () => {

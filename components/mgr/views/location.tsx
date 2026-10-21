@@ -25,7 +25,7 @@ export function LocationView({
         <>
           {E.fld("Uses", model.uses.join(" · "))}
           {E.fld("Timezone", model.timezone)}
-          {E.row("Location bins", model.bins, E.act("Open", "primary", model.binsHref))}
+          {E.nav("Location bins", model.bins, "", undefined, model.binsHref)}
         </>
       ) : (
         <>

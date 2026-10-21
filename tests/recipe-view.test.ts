@@ -153,12 +153,12 @@ describe("toRecipePageModel", () => {
     expect(html).toContain("v3 (current)");
     expect(html).toContain("Older version");
     expect(html).toContain("Less crystal");
-    expect(html).not.toContain("Create recipe version");
+    expect(html).not.toContain("New recipe version");
     expect(html).not.toContain("Editable brand");
     expect(html).not.toMatch(/<input|<select|<form/);
     const currentHtml = renderToStaticMarkup(createElement(RecipeView, { model: current, readOnly: true }));
     expect(currentHtml).toContain('href="/recipes/r1/new"');
-    expect(currentHtml).toContain("Create recipe version");
+    expect(currentHtml).toContain("New recipe version");
   });
   it("says which saved line had no extract potential instead of a prediction", () => {
     const model = toRecipePageModel({ ...snapshot, ingredients: [{ ...snapshot.ingredients[0], extract_snapshot: null }] }, ctx);

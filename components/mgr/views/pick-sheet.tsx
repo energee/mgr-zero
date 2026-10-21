@@ -35,7 +35,9 @@ export function PickSheetView({
             {E.ttl(group.title)}
             {group.rows.map((row) => (
               <Fragment key={row.key}>
-                {E.row(row.title, row.detail, <>{row.changedAfterPick ? E.status("changed after pick", "w") : null}{E.act(row.verb, "primary", linkRows ? row.href : undefined)}</>)}
+                {row.verb
+                  ? E.row(row.title, row.detail, <>{row.changedAfterPick ? E.status("changed after pick", "w") : null}{E.act(row.verb, "primary", linkRows ? row.href : undefined)}</>)
+                  : E.nav(row.title, row.detail, "", undefined, linkRows ? row.href : undefined)}
               </Fragment>
             ))}
             {E.row("Totals", group.totals)}

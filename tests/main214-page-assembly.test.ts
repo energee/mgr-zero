@@ -37,6 +37,11 @@ async function query(name: string, input?: { basis?: string; missingPortalEmail?
     // #994: the searched lists record their input and find nothing, so the no-match copy shows.
     case "list_recipes": case "list_vendors_and_contracts": case "list_materials": state.inputs[name] = input; return [];
     case "list_vendors": case "get_material_on_hand": return [];
+    case "list_routes": return { routes: [
+      { id: "planned", name: "North loop", delivery_date: "2026-09-11", driver_user_id: "driver-1", vehicle: null, note: null, departed_at: null, returned_at: null, stops: [] },
+      { id: "gone", name: "Hill route", delivery_date: "2026-09-10", driver_user_id: "driver-1", vehicle: null, note: null, departed_at: "2026-09-10T14:00:00Z", returned_at: null, stops: [] },
+      { id: "nobody", name: "River run", delivery_date: "2026-09-12", driver_user_id: null, vehicle: null, note: null, departed_at: null, returned_at: null, stops: [] },
+    ], unassigned: [], drivers: [], today: "2026-09-10" };
     default: throw new Error(name);
   }
 }
@@ -47,6 +52,7 @@ import CustomerPage from "@/app/(app)/customers/[id]/page";
 import BinsPage from "@/app/(app)/locations/[id]/bins/page";
 import { SCREENS } from "@/components/mgr/screens";
 import PricingPage from "@/app/(app)/pricing/page";
+import RoutesPage from "@/app/(app)/routes/page";
 import RecipesPage from "@/app/(app)/recipes/page";
 import VendorsPage from "@/app/(app)/vendors/page";
 import MaterialsPage from "@/app/(app)/materials/page";
@@ -85,8 +91,8 @@ it.each(["warehouse", "brewer"])("shared catalog and customers suppress denied c
   expect(customers.type).toBe(CustomersView);
   expect(catalog.props.createAction).toBeNull();
   expect(customers.props.createAction).toBeNull();
-  expect(render(catalog)).not.toMatch(/Add brand|Edit brand|Add SKU|Edit SKU|Add pour|Edit pour|Add format/);
-  expect(render(customers)).not.toContain("Add customer");
+  expect(render(catalog)).not.toMatch(/New brand|Edit brand|Add SKU|Edit SKU|Add pour|Edit pour|Add format/);
+  expect(render(customers)).not.toContain("New customer");
 });
 it("customer view keeps tax edit prefill, default ship-to, filtered Orders, Invite and Remove access", async () => {
   const page = await CustomerPage({ params: Promise.resolve({ id: "buyer" }) });
@@ -122,8 +128,8 @@ it("pricing shared tables draw a group's pour as a column by its name, with a ce
 it("explicit null suppresses new shared view fixture actions", async () => {
   const catalog = await CatalogPage();
   const customers = await CustomersPage();
-  expect(render(createElement(CatalogView, { model: catalog.props.model, createAction: null }))).not.toContain("Add brand");
-  expect(render(createElement(CustomersView, { model: customers.props.model, createAction: null }))).not.toContain("Add customer");
+  expect(render(createElement(CatalogView, { model: catalog.props.model, createAction: null }))).not.toContain("New brand");
+  expect(render(createElement(CustomersView, { model: customers.props.model, createAction: null }))).not.toContain("New customer");
 });
 
 it("converted inventory frames never navigate into the live catalog/customer/location/settings pages", () => {
@@ -188,4 +194,11 @@ it("passes Catalog's URL filters to list_brands", async () => {
   const href = (label: string, value: string) => scopes.find((s) => s.label === label)?.options.find((o) => o.value === value)?.href;
   expect(href("Sort", "abv")).toBe("/catalog?q=hazy&sort=abv&category=Core");
   expect(href("Category", "")).toBe("/catalog?q=hazy");
+});
+it("routes list: an assigned route not yet departed is a row link; Resume and Assign stay verbs (#1026)", async () => {
+  const html = render(await RoutesPage());
+  expect(html).toMatch(/<a[^>]*href="\/routes\/planned"[^>]*>(?:(?!<\/a>)[\s\S])*North loop · Sep 11, 2026/);
+  expect(html).toMatch(/<a[^>]*href="\/routes\/gone"[^>]*>Resume<\/a>/);
+  expect(html).toMatch(/<a[^>]*href="\/routes\/nobody"[^>]*>Assign<\/a>/);
+  expect(html).not.toMatch(/>Open</);
 });

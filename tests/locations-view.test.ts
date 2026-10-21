@@ -145,7 +145,7 @@ describe("Location detail", () => {
     expect(html).not.toMatch(/→/);
   });
 
-  it("readOnly paints the uses as a field and Open on bins, not Save", () => {
+  it("readOnly paints the uses as a field and a bins row link, not an Open verb or Save (#1026)", () => {
     const html = htmlOf(createElement(LocationView, {
       model: toLocationViewProps(locationTaproom),
       readOnly: true,
@@ -154,8 +154,8 @@ describe("Location detail", () => {
     expect(html).toMatch(/EDIT/);
     expect(html).toMatch(/Uses/);
     expect(html).toMatch(/Storage · Taproom · Warehouse/);
-    expect(html).toMatch(/>Open</);
-    expect(html).toMatch(new RegExp(`href="/locations/${LOC_TAPROOM.id}/bins"`));
+    expect(html).not.toMatch(/>Open</);
+    expect(html).toMatch(new RegExp(`<a[^>]*href="/locations/${LOC_TAPROOM.id}/bins"[^>]*>(?:(?!</a>)[\\s\\S])*Location bins`));
     expect(html).not.toMatch(/>Save location</);
     expect(html).not.toMatch(/Location name/);
   });

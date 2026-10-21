@@ -1,5 +1,8 @@
 // tests/keg-report-view.test.ts — get_keg_report → Keg report view-model (issue #278).
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { KegReportView } from "@/components/mgr/views/keg-report";
 import { toKegReportViewProps } from "@/lib/mgr/keg-report-view";
 
 const report = {
@@ -26,6 +29,14 @@ describe("toKegReportViewProps", () => {
       { key: "c-p-half_bbl", href: undefined, title: "Al’s Bar", detail: "Owned ½ bbl · 3 out · 2 on deposit" },
     ]);
     expect(toKegReportViewProps({ ...report, mismatches }, "America/New_York", "/kegs").mismatches[0].href).toBe("/kegs/customers/c");
+  });
+  it("customer and mismatch rows are row links to the balance, not an Open balance verb (#1026)", () => {
+    const mismatches = [{ customer_id: "m", name: "Al’s Bar", pool_id: "p", pool_name: "Owned", keg_size: "half_bbl", kegs_out: 3, kegs_on_deposit: 2 }];
+    const model = toKegReportViewProps({ ...report, mismatches }, "America/New_York", "/kegs");
+    const html = renderToStaticMarkup(createElement(KegReportView, { model }));
+    expect(html).toMatch(/<a[^>]*href="\/kegs\/customers\/c"[^>]*>(?:(?!<\/a>)[\s\S])*Ridgeline Tap Room/);
+    expect(html).toMatch(/<a[^>]*href="\/kegs\/customers\/m"[^>]*>(?:(?!<\/a>)[\s\S])*Al’s Bar/);
+    expect(html).not.toMatch(/Open balance/);
   });
   it("an empty fleet is the empty state", () => {
     const m = toKegReportViewProps({ fleet: { out: 0, total: 0, utilization: null }, bySize: [], aging: [], customers: [], mismatches: [] }, "America/New_York");

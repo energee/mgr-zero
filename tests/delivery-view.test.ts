@@ -16,7 +16,7 @@ import {
 } from "../lib/mgr/fixtures/delivery";
 import { toggleRouteStop } from "../lib/mgr/route-view";
 import { workHrefsFor } from "../components/mgr/work-tabs";
-import { toRoutesViewProps } from "../lib/mgr/routes-view";
+import { routeNext, toRoutesViewProps } from "../lib/mgr/routes-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
@@ -40,6 +40,23 @@ describe("Routes", () => {
     expect(isValidElement(screen("Routes").body)).toBe(true);
     expect(body.type).toBe(RoutesView);
     expect(body.props.model).toEqual(toRoutesViewProps(routesDriver));
+  });
+
+  it("a route names its next action; an assigned route not yet departed has none (#1026)", () => {
+    expect(routeNext({ departed_at: "2026-09-10T14:00:00Z", driver_user_id: "d" })).toEqual({ verb: "Resume", tone: "info" });
+    expect(routeNext({ departed_at: null, driver_user_id: null })).toEqual({ verb: "Assign", tone: "attention" });
+    expect(routeNext({ departed_at: null, driver_user_id: "d" })).toBeUndefined();
+  });
+
+  it("an assigned route is a row link, not an Open verb; Resume and Assign stay verbs (#1026)", () => {
+    const model = toRoutesViewProps({ title: "Work", subtitle: "routes", rows: [
+      { key: "r", title: "Route C · 2026-09-12", detail: "2 stops · Dana", href: "/routes/r" },
+      { key: "a", title: "Route A · 2026-09-10", detail: "departed", verb: "Resume", tone: "info", href: "/routes/a" },
+    ] });
+    const html = htmlOf(createElement(RoutesView, { model, createAction: null }));
+    expect(html).toMatch(/<a[^>]*href="\/routes\/r"[^>]*>(?:(?!<\/a>)[\s\S])*Route C · 2026-09-12/);
+    expect(html).toMatch(/>Resume</);
+    expect(html).not.toMatch(/>Open</);
   });
 
   it("renders New route without leaking live hrefs", () => {

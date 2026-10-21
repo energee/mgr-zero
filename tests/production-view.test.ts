@@ -219,6 +219,13 @@ describe("Brew day view", () => {
 });
 
 describe("Vessel detail view", () => {
+  it("the occupancy row is a link to its batch, not an Open batch verb (#1026)", () => {
+    const html = htmlOf(createElement(VesselDetailView, { model: { ...vesselFv3, occupancy: { title: "Stout · BATCH-0168", detail: "13.5 / 15 bbl", href: "/batches/b1" } } }));
+    expect(html).toMatch(/<a[^>]*href="\/batches\/b1"[^>]*>(?:(?!<\/a>)[\s\S])*Stout · BATCH-0168/);
+    expect(html).not.toMatch(/Open batch/);
+    expect(src("app/(app)/cellar/vessels/[id]/page.tsx")).not.toMatch(/Open batch/);
+  });
+
   it("the Vessel detail inventory record is VesselDetailView", () => {
     const body = screen("Vessel detail").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(VesselDetailView);

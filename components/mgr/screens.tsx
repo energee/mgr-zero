@@ -13,8 +13,8 @@ import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // and kept only for the Slack/QuickBooks/Square venue drawings.
 //
 // Two things this file deliberately does not draw. A create surface is the
-// edit surface with empty values (Create brewery is the pattern), so Add
-// customer, Add location, New PO, Add keg pool and Create price group open the
+// edit surface with empty values (Create brewery is the pattern), so New
+// customer, Add location, New PO, Add keg pool and New price group open the
 // records already here rather than earning frames of their own. And the
 // composer strip is staff shell chrome — screen-frame.tsx passes E.comp() to
 // staff frames — so it is present under every staff frame without any
@@ -1075,7 +1075,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Transfers",
-    to: { Submit: "Transfer detail", Pick: "Transfer detail", Receive: "Transfer detail", Open: "Transfer detail", "New transfer": "New transfer", "TRF-0007": "Transfer detail", "TRF-0006": "Transfer detail" },
+    to: { Submit: "Transfer detail", Pick: "Transfer detail", Receive: "Transfer detail", "New transfer": "New transfer", "TRF-0007": "Transfer detail", "TRF-0006": "Transfer detail" },
     job: "Move stock between two locations without an order or an invoice",
     reads: "list_stock_transfers · list_locations · list_bins · list_skus",
     writes: "create_stock_transfer",
@@ -1089,11 +1089,11 @@ export const SCREENS: Screen[] = [
     tab: "Work",
     surface: "sheet",
     name: "New transfer",
-    to: { "Create transfer": "Transfer detail" },
+    to: { "Save draft": "Transfer detail" },
     job: "Draft a stock transfer: two locations, a bin at each end, SKU lines",
     reads: "list_locations · list_bins · list_skus",
     writes: "create_stock_transfer",
-    states: [["permission", "warehouse or admin required", 1], ["same location", "refused · use a bin move", 1], ["empty lines", "Create stays off until one SKU has a qty"]],
+    states: [["permission", "warehouse or admin required", 1], ["same location", "refused · use a bin move", 1], ["empty lines", "Save draft stays off until one SKU has a qty"]],
     spec: "Opens from Transfers · New transfer. Materials and kegs move through the same command from the API; this sheet draws the SKU case. Bins default to the first bin at each location.",
     body: <NewTransferView model={toNewTransferViewProps(newTransferDraft)} />,
   },
@@ -1115,7 +1115,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Pick sheet",
-    to: { Pick: "Pick", Open: "Order" },
+    to: { Pick: "Pick" },
     job: "Group confirmed demand by ship date",
     reads: "daily_pick_sheet [confirmed orders by requested ship date, one fulfillment source]",
     writes: "none",
@@ -1128,7 +1128,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Beer",
     name: "Weekly count",
-    to: { "Hazy IPA": "SKU detail", Pils: "SKU detail", "Print current stock labels": "Weekly count", "Record count": "Weekly count", "Open count": "Weekly count", "Correct count": "Weekly count" },
+    to: { "Hazy IPA": "SKU detail", Pils: "SKU detail", "Print current stock labels": "Weekly count", "Record count": "Weekly count", "Correct count": "Weekly count" },
     job: "Record every physical stock bucket and compare the draft with expected brand consumption",
     reads: "get_taproom_count_snapshot · get_taproom_print_labels · get_taproom_draft_projection · list_taproom_counts · get_taproom_count · list_locations",
     writes: "record_taproom_count · correct_taproom_count [Admin only; latest uncorrected root; increases only]",
@@ -1227,7 +1227,6 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Customer detail",
-    to: { Open: "Customer keg balance" },
     job: "Edit one customer and reach its ship-tos, prices, orders and keg balance",
     reads: "get_customer · list_customer_users",
     writes: "upsert_customer · invite_customer_user · revoke_customer_user · delete_customer [admin]",
@@ -1385,7 +1384,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Catalog",
-    to: { "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand", "New Format": "Format", "16 oz can": "Format", "four-pack": "Format", "case · 24×16oz": "Format", "½ bbl keg": "Format" },
+    to: { "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand", "New format": "Format", "16 oz can": "Format", "four-pack": "Format", "case · 24×16oz": "Format", "½ bbl keg": "Format" },
     job: "Define brands, their sellable formats and prices without ledger writes",
     reads: "list_brands · list_skus · list_catalog_categories",
     writes: "upsert_brand · create_sku · update_sku",
@@ -1994,7 +1993,7 @@ export const SCREENS: Screen[] = [
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe · list_brands [the parent row's Brand picker] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
     writes: "create_recipe [mutable parent row] · set_recipe_brand [change the parent row's brand after creation] · create_recipe_version [one RPC: immutable version + ingredients + mash and fermentation schedules + water and additions, with assumption and process-spec columns on recipe_versions and per-ingredient extract snapshot on recipe_ingredients]",
-    states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"], ["style", "drawn gated: recipes has no style column and the create command takes none; the brand names the style today", 0], ["no version", "a new recipe draws No version yet and Create recipe version, no numbers"], ["draft", "Create recipe version opens a copy of the current version; an unsaved draft is kept in this tab and restored with Start over"], ["frozen", "a saved version reads out as text; a change is the next version"], ["history", "Versions links select an older saved version; (current) returns to the latest; older versions have no write controls"]],
+    states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"], ["style", "drawn gated: recipes has no style column and the create command takes none; the brand names the style today", 0], ["no version", "a new recipe draws No version yet and New recipe version, no numbers"], ["draft", "New recipe version opens a copy of the current version; an unsaved draft is kept in this tab and restored with Start over"], ["frozen", "a saved version reads out as text; a change is the next version"], ["history", "Versions links select an older saved version; (current) returns to the latest; older versions have no write controls"]],
     spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. The page defaults to the newest version; Versions links beside Saved open an exact version with ?v=N, and (current) returns to the newest. Older versions are read-only; each batch's Brew day keeps the plan it was brewed from. A new parent takes a name, the brand it is meant to brew and a note, with style drawn gated until a migration gives recipes one; New recipe opens this page with no version, and one save writes the parent and its first version. Versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: every quantity is per barrel, the batch names its size on Brew day, and Brew day already records knockout volume as its baseline. The scale chips that once previewed a 15 or 30 bbl bill are gone until a brewery's own batch sizes can feed them. Three note fields become one.",
     body: <RecipeView model={recipeHazyV4} parentForm={<NewRecipeFieldsView brands={recipeBrandOptions} values={{ name: "Hazy IPA", brandId: "hazy", note: "" }} />} />,
   },
@@ -2213,7 +2212,7 @@ export const SCREENS: Screen[] = [
     slice: 7,
     tab: "More",
     name: "POS mapping",
-    to: { "Save mapping": "POS mapping", Open: "POS sale detail", "Sync Square catalog": "POS mapping", "Sync Square sales": "POS mapping", "Taproom · Sep 1 to Sep 8": "POS mapping", "Sale · Hazy IPA · pint": "POS sale detail", "Return · Hazy IPA · pint": "POS sale detail" },
+    to: { "Save mapping": "POS mapping", "Sync Square catalog": "POS mapping", "Sync Square sales": "POS mapping", "Taproom · Sep 1 to Sep 8": "POS mapping", "Sale · Hazy IPA · pint": "POS sale detail", "Return · Hazy IPA · pint": "POS sale detail" },
     job: "Map or ignore Square variations and inspect immutable sales coverage without posting inventory",
     reads: "list_pos_variations · list_skus · list_formats · list_pos_sales",
     writes: "set_pos_item_mapping · sync_square_catalog · sync_square_sales",
@@ -2590,7 +2589,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "POS",
     name: "Menu",
-    to: { Taproom: "Menu", Warehouse: "Menu", Open: "POS item", Map: "POS mapping", "Guest cider · pint": "POS mapping" },
+    to: { Taproom: "Menu", Warehouse: "Menu", Map: "POS mapping", "Guest cider · pint": "POS mapping" },
     job: "One catalog, published to every destination that sells from it",
     reads: "get_pos_menu [derived from brands × formats × configured-bin stock]",
     writes: "configure_pos_menu · set_pos_price_override [nullable, per POS location] · set_pos_website_publication · publish_pos_menu [complete derived location change set]",
@@ -2750,7 +2749,7 @@ export const SCREENS: Screen[] = [
     job: "Price every beer from one grid: groups down, formats across, a table per sale channel",
     reads: "list_sale_channels · list_price_groups · list_formats · list_channel_prices",
     writes: "set_channel_price · clear_channel_price · upsert_price_group · delete_price_group",
-    states: [["permission", "sales or admin required", 1], ["empty cell", "unpriced · an order for a SKU on that group and format is refused on that channel", 1], ["empty", "no price groups yet: Create price group is the only action"], ["in use", "a group a brand sits on, or a cell prices, cannot be removed", 1]],
+    states: [["permission", "sales or admin required", 1], ["empty cell", "unpriced · an order for a SKU on that group and format is refused on that channel", 1], ["empty", "no price groups yet: New price group is the only action"], ["in use", "a group a brand sits on, or a cell prices, cannot be removed", 1]],
     spec: "Reached from Catalog. The brewery's price sheet is one grid: rows are price groups, columns are packaged formats plus pours owned by a group (one column per pour name). A beer sits on one group (Catalog → Brand → Price group) and a customer sits on one channel, so the price of any SKU for any customer is the single cell where the two meet. A group with no pour of that name has no cell. Tapping a cell edits that one price; clearing it makes those SKUs unpriced on that channel. A group's name opens Price group, where its position, cost ceiling, and pours live.",
     body: <PriceGroupsView model={toPriceGroupsViewProps(pricingGrid)} />,
   },

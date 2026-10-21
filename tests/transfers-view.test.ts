@@ -31,6 +31,19 @@ describe("Transfers list", () => {
     ]);
   });
 
+  it("a received or cancelled transfer has no verb; its row is a link, not an Open verb (#1026)", () => {
+    const base = { from_name: "Warehouse", to_name: "Taproom", line_count: 1 };
+    const model = toTransfersViewProps({ title: "Transfers", transfers: [
+      { ...base, id: "rec", transfer_no: 8, status: "received" },
+      { ...base, id: "can", transfer_no: 9, status: "cancelled" },
+    ] });
+    expect(model.rows.map((r) => r.verb)).toEqual([undefined, undefined]);
+    const html = htmlOf(createElement(TransfersView, { model, createAction: null, linkRows: true }));
+    expect(html).toMatch(/<a[^>]*href="\/transfers\/rec"[^>]*>(?:(?!<\/a>)[\s\S])*TRF-0008/);
+    expect(html).toMatch(/<a[^>]*href="\/transfers\/can"[^>]*>(?:(?!<\/a>)[\s\S])*TRF-0009/);
+    expect(html).not.toMatch(/>Open</);
+  });
+
   it("live title Transfers omits inventing rows on empty", () => {
     const model = toTransfersViewProps({ transfers: [], title: "Transfers" });
     expect(model.title).toBe("Transfers");
@@ -96,9 +109,11 @@ describe("New transfer view", () => {
     expect(model.lines.map((l) => [l.title, l.qty])).toEqual([[SKU_HAZY.name, 2], [SKU_PILS.name, 4]]);
   });
 
-  it("renders Create transfer and the two SKU rows", () => {
+  it("renders Save draft and the two SKU rows; no Create verb (#1026)", () => {
     const html = htmlOf(createElement(NewTransferView, { model: toNewTransferViewProps(newTransferDraft) }));
-    expect(html).toMatch(/>Create transfer</);
+    expect(html).toMatch(/>Save draft</);
+    expect(html).not.toMatch(/Create transfer/);
+    expect(readFileSync("app/(app)/transfers/new-transfer-form.tsx", "utf8")).not.toMatch(/Create transfer/);
     expect(html).toContain(SKU_HAZY.name);
     expect(html).toContain(SKU_PILS.name);
     expect(html).not.toMatch(/→/);

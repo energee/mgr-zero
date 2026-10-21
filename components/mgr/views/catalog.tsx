@@ -28,7 +28,7 @@ export function CatalogView({
 }) {
   return (
     <>
-      {E.back("More", "Catalog", createAction !== undefined ? createAction : E.btn("Add brand"), model.backHref)}
+      {E.back("More", "Catalog", createAction !== undefined ? createAction : E.btn("New brand"), model.backHref)}
       {controls}
       {model.empty
         ? E.blank(model.empty)
@@ -44,7 +44,7 @@ export function CatalogView({
         />}
       {E.nav("Price groups", model.priceGroups, "", undefined, linkRows ? model.priceGroupsHref : undefined)}
       {E.nav("Water profiles", "Source and target profiles", "", undefined, linkRows ? model.waterProfilesHref : undefined)}
-      {formats && <FormatsView model={formats} header={E.hd("Formats", "", formatAction !== undefined ? formatAction : E.btn("New Format"))} />}
+      {formats && <FormatsView model={formats} header={E.hd("Formats", "", formatAction !== undefined ? formatAction : E.btn("New format"))} />}
     </>
   );
 }

@@ -38,7 +38,7 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
       title={groupId ? "Edit price group" : "New price group"}
       trigger={groupId
         ? <Button variant="link" size="sm" className="px-0 font-medium">{model.name}</Button>
-        : <Button>Create price group</Button>}
+        : <Button>New price group</Button>}
     >
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <PriceGroupView
