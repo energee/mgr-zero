@@ -169,7 +169,7 @@ defineQuery({
 // kegs on deposit disagree with kegs out plus kegs lost (#577, kegDepositRows).
 const AGE_BUCKETS = [{ id: "0-30", max: 30 }, { id: "31-60", max: 60 }, { id: "61-90", max: 90 }, { id: "90+", max: Infinity }] as const;
 defineQuery({
-  name: "get_keg_report", description: "Keg fleet utilization per pool and size, unreturned kegs by age bucket with deposits at risk, the customers holding kegs over 90 days, and customers whose kegs on deposit disagree with their kegs out",
+  name: "get_keg_report", description: "Keg fleet utilization per pool and size, unreturned kegs by age bucket with deposits at risk, the customers holding kegs over 90 days, customers whose kegs on deposit disagree with their kegs out, and how many pools are in service",
   input: z.object({}), roles: ROLES,
   handler: async (ctx) => {
     const [pools, totals, events, customers, kegs, deposits, refunded] = await Promise.all([
@@ -212,6 +212,7 @@ defineQuery({
     const out = bySize.reduce((n, r) => n + r.out, 0), total = bySize.reduce((n, r) => n + r.total, 0);
     return {
       fleet: { out, total, utilization: total ? out / total : null }, bySize, aging,
+      activePools: (pools ?? []).filter((p) => p.active).length,
       customers: [...byCustomer].map(([customer_id, c]) => ({ customer_id, name: customerName.get(customer_id) ?? "", ...c }))
         .sort((a, b) => b.over_90 - a.over_90 || a.name.localeCompare(b.name)),
       mismatches: kegDepositRows((kegs ?? []) as KegBalanceRow[], (deposits ?? []) as DepositBalanceRow[], {

@@ -4,13 +4,34 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
-import { MonthlyComplianceView } from "../components/mgr/views/monthly-compliance";
+import { MonthlyComplianceView, PeriodBeforeBooksView } from "../components/mgr/views/monthly-compliance";
 import { monthlyComplianceAmended, monthlyComplianceAugust } from "../lib/mgr/fixtures/monthly-compliance";
-import { toMonthlyComplianceViewProps } from "../lib/mgr/monthly-compliance-view";
+import { beforeBooksState, toMonthlyComplianceViewProps } from "../lib/mgr/monthly-compliance-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 
 describe("Monthly compliance view", () => {
+  it("explains a period that starts before the books opened instead of failing (#987)", () => {
+    expect(beforeBooksState("October 2026", "2026-10-15", true)).toEqual({
+      title: "Before the books opened",
+      description: "October 2026 starts before the books opened on Oct 15, 2026, so MGR has no report for it. The books-opened date is in Settings.",
+      action: { label: "Open Settings", href: "/settings" },
+    });
+    const body = SCREENS.find((screen) => screen.name === "Period before the books opened")!.body as { type: unknown };
+    expect(body.type).toBe(PeriodBeforeBooksView);
+    expect(htmlOf(body as ReactNode)).not.toMatch(/href="\/settings/);
+    const admin = htmlOf(createElement(PeriodBeforeBooksView, { title: "October 2026", state: beforeBooksState("October 2026", "2026-10-15", true), backHref: "/compliance" }));
+    expect(admin).toMatch(/href="\/settings"[^>]*>Open Settings/);
+    expect(admin).toMatch(/Oct 15, 2026/);
+  });
+
+  it("gives Sales no Settings button, which would land on No access, only a sentence to ask an admin (#987 review)", () => {
+    const sales = htmlOf(createElement(PeriodBeforeBooksView, { title: "October 2026", state: beforeBooksState("October 2026", "2026-10-15", false), backHref: "/compliance" }));
+    expect(sales).toContain("Ask an admin to change the books-opened date.");
+    expect(sales).not.toContain("Open Settings");
+    expect(sales).not.toContain("/settings");
+  });
+
   it("owns the inventory drawing", () => {
     const body = SCREENS.find((screen) => screen.name === "Monthly compliance")!.body as { type: unknown; props: { model: unknown } };
     expect(isValidElement(body)).toBe(true);

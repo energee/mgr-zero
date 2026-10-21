@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { Client } from "pg";
-import { DB, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedLocation } from "./helpers";
+import type { Client } from "pg";
+import { closePgSessions, insertFixture, makeBrewery, makeStaffCtx, pgSession, seedCatalog, seedLocation, staffSession } from "./helpers";
 import { runCommand, type Ctx } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -8,7 +8,6 @@ let breweryId: string;
 let brewer: Ctx;
 let warehouse: Ctx;
 let location: { id: string; binId: string };
-const clients: Client[] = [];
 
 beforeAll(async () => {
   breweryId = (await makeBrewery()).id;
@@ -17,31 +16,7 @@ beforeAll(async () => {
   location = await seedLocation(breweryId, { name: "Cellar lock warehouse" });
 });
 
-afterEach(async () => {
-  await Promise.allSettled(clients.splice(0).map(async (client) => {
-    await client.query("rollback").catch(() => {});
-    await client.end();
-  }));
-});
-
-async function client(userId: string, transaction: boolean) {
-  const value = new Client({ connectionString: DB });
-  clients.push(value);
-  await value.connect();
-  await value.query("set statement_timeout='8s'; set lock_timeout='7s'");
-  if (transaction) await value.query("begin");
-  await value.query("select set_config('request.jwt.claim.sub',$1,$2)", [userId, transaction]);
-  await value.query(transaction ? "set local role authenticated" : "set role authenticated");
-  return value;
-}
-
-async function ownerClient() {
-  const value = new Client({ connectionString: DB });
-  clients.push(value);
-  await value.connect();
-  await value.query("set statement_timeout='8s'; set lock_timeout='7s'");
-  return value;
-}
+afterEach(closePgSessions);
 
 async function brew(bbl = 10) {
   const catalog = await seedCatalog(breweryId, { product: `Lock ${crypto.randomUUID()}`, bblPerUnit: 0.01 });
@@ -62,14 +37,14 @@ describe("cellar workflow serialization", { concurrent: false }, () => {
   it("locks the observed occupancy through a first reading while completed retries bypass closure", async () => {
     const f = await brew(1);
     const requestId = crypto.randomUUID();
-    const a = await client(brewer.userId, true);
+    const a = await staffSession(brewer.userId);
     const first = (await a.query(
       "select public.record_fermentation_reading($1,null,$2,$3,68,4.2,4.1,'frozen',$4) result",
       [breweryId, f.occupancyId, "2026-09-10T14:15:16.000Z", requestId],
     )).rows[0].result;
     await a.query("reset role");
 
-    const b = await ownerClient();
+    const b = await pgSession();
     const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
     const closing = b.query("update public.vessel_occupancies set ended_at=now() where id=$1", [f.occupancyId]);
     closing.catch(() => {});
@@ -77,7 +52,7 @@ describe("cellar workflow serialization", { concurrent: false }, () => {
     await a.query("commit");
     await closing;
 
-    const retry = await client(brewer.userId, false);
+    const retry = await staffSession(brewer.userId, false);
     const replay = (await retry.query(
       "select public.record_fermentation_reading($1,null,$2,$3,68,4.2,4.1,'frozen',$4) result",
       [breweryId, f.occupancyId, "2026-09-10T14:15:16.000Z", requestId],
@@ -100,8 +75,8 @@ describe("cellar workflow serialization", { concurrent: false }, () => {
     const f = await brew();
     const run = await runCommand("schedule_packaging_run", { brandId: f.brandId, plannedOn: "2026-09-02", occupancyId: f.occupancyId, outputs: [{ skuId: f.skuId, qtyPlanned: 995 }] }, brewer) as { id: string };
     await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-09-02T12:00:00Z" }, brewer);
-    const a = await client(brewer.userId, true);
-    const b = await client(brewer.userId, false);
+    const a = await staffSession(brewer.userId);
+    const b = await staffSession(brewer.userId, false);
     const materialPlan = await runCommand("get_packaging_close_plan", { runId: run.id }, brewer) as { revision: string };
     await a.query("select public.close_packaging_run($1,$2,9.95,$3::jsonb,$4,'2026-09-02',null,$5,$6,$7,'[]'::jsonb,$8)", [
       breweryId, run.id, JSON.stringify([{ sku_id: f.skuId, qty_actual: 995 }]), `LOCK-${crypto.randomUUID()}`, location.id, location.binId, crypto.randomUUID(), materialPlan.revision,
@@ -120,8 +95,8 @@ describe("cellar workflow serialization", { concurrent: false }, () => {
   it("waits for a real transfer and recalculates the committed batch scope", async () => {
     const f = await brew();
     const target = await runCommand("upsert_vessel", { name: `Lock BT ${crypto.randomUUID()}`, kind: "brite", capacityBbl: 100 }, brewer) as { id: string };
-    const a = await client(brewer.userId, true);
-    const b = await client(brewer.userId, false);
+    const a = await staffSession(brewer.userId);
+    const b = await staffSession(brewer.userId, false);
     await a.query("select public.record_cellar_transfer($1,$2,$3,4,0.2,$4)", [breweryId, f.occupancyId, target.id, crypto.randomUUID()]);
     await a.query("reset role");
     const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
@@ -138,8 +113,8 @@ describe("cellar workflow serialization", { concurrent: false }, () => {
     for (const mode of ["schedule", "update"] as const) {
       const f = await brew(1);
       const unattached = mode === "update" ? await runCommand("schedule_packaging_run", { brandId: f.brandId, plannedOn: "2026-09-03", outputs: [] }, brewer) as { id: string } : null;
-      const a = await client(brewer.userId, true);
-      const b = await client(brewer.userId, false);
+      const a = await staffSession(brewer.userId);
+      const b = await staffSession(brewer.userId, false);
       await a.query(completionSql, [breweryId, f.batchId, crypto.randomUUID(), 1]);
       await a.query("reset role");
       const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
@@ -152,15 +127,14 @@ describe("cellar workflow serialization", { concurrent: false }, () => {
       await expect(pending).rejects.toThrow(/occupancy is closed/);
       const { count } = await brewer.db.from("packaging_runs").select("id", { count: "exact", head: true }).eq("occupancy_id", f.occupancyId);
       expect(count).toBe(0);
-      clients.splice(clients.indexOf(a), 1); await a.end();
-      clients.splice(clients.indexOf(b), 1); await b.end();
+      await closePgSessions();
     }
   });
 
   it("waits behind a scheduled run, then refuses completion after that run commits", async () => {
     const f = await brew(1);
-    const a = await client(brewer.userId, true);
-    const b = await client(brewer.userId, false);
+    const a = await staffSession(brewer.userId);
+    const b = await staffSession(brewer.userId, false);
     await a.query("select public.schedule_packaging_run($1,$2,'2026-09-03',$3,'[]'::jsonb,$4)", [breweryId, f.brandId, f.occupancyId, crypto.randomUUID()]);
     await a.query("reset role");
     const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
@@ -174,8 +148,8 @@ describe("cellar workflow serialization", { concurrent: false }, () => {
   it("waits for an inventory-only ledger writer without deadlocking on the cellar gate", async () => {
     const f = await brew(1);
     await runCommand("record_movement", { skuId: f.skuId, locationId: location.id, binId: location.binId, qty: 2, type: "adjustment" }, warehouse);
-    const a = await client(warehouse.userId, true);
-    const b = await client(brewer.userId, false);
+    const a = await staffSession(warehouse.userId);
+    const b = await staffSession(brewer.userId, false);
     await a.query("select public.record_inventory_movement($1,$2,$3,$4,-1,'adjustment',null,null,null,$5,null)", [
       breweryId, f.skuId, location.id, location.binId, crypto.randomUUID(),
     ]);
@@ -191,8 +165,8 @@ describe("cellar workflow serialization", { concurrent: false }, () => {
   it("makes a books-opened clear wait for filing, then refuse without changing its basis", async () => {
     const ctx = await makeStaffCtx((await makeBrewery()).id);
     await runCommand("set_books_opened_on", { booksOpenedOn: "2026-02-01" }, ctx);
-    const a = await client(ctx.userId, true);
-    const b = await client(ctx.userId, false);
+    const a = await staffSession(ctx.userId);
+    const b = await staffSession(ctx.userId, false);
     const filingRequest = crypto.randomUUID();
     const filed = (await a.query(
       "select public.file_compliance_report($1,'TTB','2026-02-01','2026-02-28',null,$2) result",
@@ -225,8 +199,8 @@ describe("cellar workflow serialization", { concurrent: false }, () => {
       created_by: ctx.userId, qty: 10, type: "opening_balance", occurred_on: "2026-01-01",
     });
     await runCommand("set_books_opened_on", { booksOpenedOn: "2026-02-01" }, ctx);
-    const a = await client(ctx.userId, true);
-    const b = await client(ctx.userId, false);
+    const a = await staffSession(ctx.userId);
+    const b = await staffSession(ctx.userId, false);
     await a.query("select public.set_brewery_books_opened_on($1,null,$2)", [ctx.breweryId, crypto.randomUUID()]);
     await a.query("reset role");
     const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
@@ -248,8 +222,8 @@ describe("cellar workflow serialization", { concurrent: false }, () => {
 
   it("rechecks the period after a waiting filing sees the books-opened date move past its start", async () => {
     const ctx = await makeStaffCtx((await makeBrewery()).id);
-    const a = await client(ctx.userId, true);
-    const b = await client(ctx.userId, false);
+    const a = await staffSession(ctx.userId);
+    const b = await staffSession(ctx.userId, false);
     await a.query("select public.set_brewery_books_opened_on($1,'2026-03-01',$2)", [ctx.breweryId, crypto.randomUUID()]);
     await a.query("reset role");
     const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
