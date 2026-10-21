@@ -553,7 +553,7 @@ describe("QuickBooks durable lifecycle", () => {
       .toMatchObject({ state: change === "disconnect" ? "disconnected" : "connected", last_error: null });
   });
 
-  it("lets a concurrent refresh loser use the winner and rejects a response that arrives after disconnect", async () => {
+  it("makes a concurrent refresh caller wait for and use the holder's result, and rejects a response that arrives after disconnect", async () => {
     const config = {
       clientId: "client-id", clientSecret: "client-secret", redirectUri: "https://mgr.test/qbo",
       apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com",
@@ -571,13 +571,14 @@ describe("QuickBooks durable lifecycle", () => {
     const refreshClient = (suffix: string) => new QboOAuthClient(config, vi.fn<typeof globalThis.fetch>(() =>
       new Promise<Response>((resolve) => releases.push((response) => resolve(response)))).mockName(suffix));
     const refreshes = [refreshQboCredentials(ctx, refreshClient("a")), refreshQboCredentials(ctx, refreshClient("b"))];
-    await vi.waitFor(() => expect(releases).toHaveLength(2));
-    releases[0](new Response(JSON.stringify({ access_token: "race-access-a", refresh_token: "race-refresh-a", expires_in: 3600 }), { status: 200 }));
-    releases[1](new Response(JSON.stringify({ access_token: "race-access-b", refresh_token: "race-refresh-b", expires_in: 3600 }), { status: 200 }));
+    // The refresh lease (#1032) lets one caller reach Intuit; the other waits.
+    // Unserialized, the second caller would add a second request no one releases, and the test would time out.
+    await vi.waitFor(() => expect(releases).toHaveLength(1));
+    releases[0](new Response(JSON.stringify({ access_token: "race-access", refresh_token: "race-refresh", expires_in: 3600 }), { status: 200 }));
     const winners = (await Promise.all(refreshes)).map((tokens) => tokens.accessToken);
     const persisted = await readVersionedIntegrationTokens(ctx, "qbo");
-    expect(winners).toEqual([persisted.accessToken, persisted.accessToken]);
-    expect(persisted.refreshToken).toMatch(/^race-refresh-[ab]$/);
+    expect(winners).toEqual(["race-access", "race-access"]);
+    expect(persisted).toMatchObject({ accessToken: "race-access", refreshToken: "race-refresh" });
 
     let releaseLate!: (response: Response) => void;
     const lateFetch = vi.fn<typeof globalThis.fetch>(() => new Promise<Response>((resolve) => { releaseLate = resolve; }));
