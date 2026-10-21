@@ -51,9 +51,10 @@ export function periodLabel(key: string): string {
 
 const RECENT: Record<Cadence, number> = { month: 3, quarter: 4, year: 2 };
 
-/** generate_compliance_report refuses a period that starts before the books opened; no report covers it. */
+/** generate_compliance_report refuses a period that starts before the books opened; no report covers it.
+ *  `key` must be a valid period key (callers check periodRange first); any other key throws. */
 export const startsBeforeBooks = (key: string, booksOpenedOn: string | null) =>
-  booksOpenedOn !== null && (periodRange(key)?.periodStart ?? "") < booksOpenedOn;
+  booksOpenedOn !== null && periodRange(key)!.periodStart < booksOpenedOn;
 
 /** The key of the period of `cadence` that is `back` periods before the one holding `day` (YYYY-MM-DD). */
 function periodBack(day: string, cadence: Cadence, back: number): string {

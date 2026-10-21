@@ -2115,8 +2115,8 @@ export const SCREENS: Screen[] = [
     job: "Choose a monthly, quarterly, or annual reporting period and see whether its snapshot was filed",
     reads: "list_compliance_reports · list_lots",
     writes: "none",
-    states: [["not filed", "ready to review", 1], ["in progress", "the current period: reviewable, filed once it ends"], ["filed", "immutable snapshot saved"], ["lots", "every packaged lot opens its trace"]],
-    spec: "This is the shared destination for the registry back link, the period rows, and the lot trace. Monthly, Quarterly, and Annual tabs swap the list: the last three months, four calendar quarters, or two calendar years always show, plus every filed period of that length. A TTB filing is exactly one calendar month, quarter, or year; the API takes other jurisdictions and ranges.",
+    states: [["not filed", "ready to review", 1], ["in progress", "the current period: reviewable, filed once it ends"], ["filed", "immutable snapshot saved"], ["lots", "every packaged lot opens its trace"], ["no period yet", "every recent period starts before the books opened · names that date and the first period MGR can report"]],
+    spec: "This is the shared destination for the registry back link, the period rows, and the lot trace. Monthly, Quarterly, and Annual tabs swap the list: the last three months, four calendar quarters, or two calendar years show, less any that start before the books-opened date, plus every filed period of that length. A tab left with no period says No monthly (quarterly, annual) period yet. A TTB filing is exactly one calendar month, quarter, or year; the API takes other jurisdictions and ranges.",
     body: <ComplianceMonthsView model={complianceMonthsDemo} />,
   },
   {
@@ -2148,9 +2148,9 @@ export const SCREENS: Screen[] = [
     job: "Explain why a period that starts before the books opened has no report",
     reads: "list_compliance_reports",
     writes: "none",
-    states: [["before books", "the period starts before the books-opened date · no report, Settings holds the date"]],
-    spec: "MGR reports only from the books-opened date on, so a period that starts earlier has nothing to generate. The page names that date and links to Settings instead of failing. A filed period stays readable after a basis correction (Filed period needs amendment).",
-    body: <PeriodBeforeBooksView title="October 2026" state={beforeBooksState("October 2026", "2026-10-15")} />,
+    states: [["before books", "the period starts before the books-opened date · no report, Settings holds the date"], ["sales", "no Open Settings button, which would land on No access · asks an admin to change the date", 1]],
+    spec: "MGR reports only from the books-opened date on, so a period that starts earlier has nothing to generate. The page names that date instead of failing. Drawn as an admin, who gets Open Settings; Settings is admin-only, so Sales is asked to have an admin change the date instead. A filed period stays readable after a basis correction (Filed period needs amendment).",
+    body: <PeriodBeforeBooksView title="October 2026" state={{ ...beforeBooksState("October 2026", "2026-10-15", true), action: { label: "Open Settings" } }} />,
   },
   {
     step: 7,

@@ -3,9 +3,8 @@ import { DestinationStateExport } from "./destination-state-export";
 import { FileSnapshotControl } from "./file-snapshot";
 import { E } from "@/components/mgr/e";
 import type { LossReview } from "@/lib/commands/compliance";
-import type { ComplianceFiguresViewModel, MonthlyComplianceViewModel } from "@/lib/mgr/monthly-compliance-view";
+import type { BeforeBooksState, ComplianceFiguresViewModel, MonthlyComplianceViewModel } from "@/lib/mgr/monthly-compliance-view";
 import { formatDateTime } from "@/lib/date-format";
-import type { EmptyState } from "@/lib/mgr/empty-state";
 
 function ComplianceFigures({ model, inProcessDetail, warnings = [] }: { model: ComplianceFiguresViewModel; inProcessDetail: string; warnings?: string[] }) {
   return <>
@@ -61,10 +60,11 @@ export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen
   </>;
 }
 
-/** A period that starts before the books opened: no report exists, so the page says why and points to Settings (#987). */
-export function PeriodBeforeBooksView({ title, state, backHref, settingsHref }: { title: string; state: EmptyState; backHref?: string; settingsHref?: string }) {
+/** A period that starts before the books opened: no report exists, so the page says why (#987).
+ *  The state's action (Open Settings) is present for an admin only. */
+export function PeriodBeforeBooksView({ title, state, backHref }: { title: string; state: BeforeBooksState; backHref?: string }) {
   return <>
     {E.back("Compliance", title, undefined, backHref)}
-    {E.blank(state, undefined, E.btn("Open Settings", "p", settingsHref))}
+    {E.blank(state, undefined, state.action && E.btn(state.action.label, "p", state.action.href))}
   </>;
 }

@@ -93,10 +93,15 @@ export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot
   };
 }
 
-/** A period that starts before the books opened has no report; say so instead of failing (#987). */
-export function beforeBooksState(periodLabel: string, booksOpenedOn: string): EmptyState {
-  return {
-    title: "Before the books opened",
-    description: `${periodLabel} starts before the books opened on ${formatDate(booksOpenedOn)}, so MGR has no report for it. The books-opened date is in Settings.`,
-  };
+/** The Before the books opened empty state; `action` is absent for roles that cannot open Settings. */
+export type BeforeBooksState = EmptyState & { action?: { label: string; href?: string } };
+
+/** A period that starts before the books opened has no report; say so instead of failing (#987).
+ *  Settings is admin-only, so only an admin gets Open Settings; anyone else is told to ask an admin
+ *  rather than given a link that would land on No access (the #1020 Menu pattern). */
+export function beforeBooksState(periodLabel: string, booksOpenedOn: string, admin: boolean): BeforeBooksState {
+  const why = `${periodLabel} starts before the books opened on ${formatDate(booksOpenedOn)}, so MGR has no report for it.`;
+  return admin
+    ? { title: "Before the books opened", description: `${why} The books-opened date is in Settings.`, action: { label: "Open Settings", href: "/settings" } }
+    : { title: "Before the books opened", description: `${why} Ask an admin to change the books-opened date.` };
 }
