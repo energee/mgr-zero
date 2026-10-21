@@ -128,6 +128,26 @@ the rendered page (step 4), and:
    the dev server; those suites hit the real local database. A screen-only
    change needs only the pure files (see above).
 2. Find the owner of the concept in `.agents/ARCHITECTURE.md` and change it there.
+   Then design the diff `/simplify` would leave alone. Step 5 is a backstop,
+   not the plan. Before the first edit, settle each of these (each one is a
+   fix `/simplify` has had to make here):
+   - **Reuse:** name the helper, component, query, or pattern you build on
+     (Negative 2). (#764 had to switch three callers to `bblFixed` and
+     `isUuid`.)
+   - **Derive, don't store:** compute a value from state you already have
+     instead of adding a field, prop, or flag. (Invoice-history "unpaid" was
+     derived from its status.)
+   - **Trust the guard:** skip a check that an upstream type, guard, or
+     constraint already made. (Optional chaining after a `QueryResponse`
+     guard; a NaN test after a JSON number check.)
+   - **Stable dependencies:** key effects and memos on values, not on arrays
+     or objects rebuilt each render. (A new roles array re-flushed the
+     offline outbox on every refresh.)
+   - **Leave nothing behind:** no unused export or re-export, dead branch, or
+     comment that narrates the session. A test asserts behavior, not its own
+     write or another test's assertion.
+   If `/simplify` still finds something on your PR that this list should
+   have caught, name it in the PR description, so dreaming can add it here.
 3. TDD: new behavior starts with a failing vitest — write it, watch it fail,
    then implement; the commit contains the test. Applies to every harness
    (Claude Code, pi, Codex, or other). Exception: UI rendering — TDD the
