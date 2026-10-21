@@ -191,11 +191,13 @@ export const E = {
   ),
   /** Soft-filled workflow entry. Tone describes the action, independently of row status.
    *  `href` makes it a link on a live page, `onClick` a button that acts in place; fixtures leave both out.
-   *  `disabled` holds an in-place action while its command runs. */
+   *  `disabled` holds an in-place action while its command runs.
+   *  Primary and destructive keep their 10% tint on hover: the tap row's hover wash already
+   *  darkens underneath, and a deeper tint drops the text below AA (#1041). */
   act: (t: React.ReactNode, tone: "primary" | "success" | "attention" | "info" | "destructive" = "primary", href?: string, onClick?: () => void, disabled?: boolean) => (
     <Button variant="ghost" size="sm" type="button" data-row-action data-tap asChild={Boolean(href)} onClick={onClick} disabled={disabled} className={cn(
-      tone === "destructive" && "bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive",
-      tone === "primary" && "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary",
+      tone === "destructive" && "bg-destructive/10 text-destructive hover:bg-destructive/10 hover:text-destructive",
+      tone === "primary" && "bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary",
       tone === "success" && "bg-success text-success-foreground hover:bg-success/80 hover:text-success-foreground",
       tone === "attention" && "bg-attention text-attention-foreground hover:bg-attention/80 hover:text-attention-foreground",
       tone === "info" && "bg-info text-info-foreground hover:bg-info/80 hover:text-info-foreground",
