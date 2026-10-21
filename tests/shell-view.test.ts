@@ -232,7 +232,7 @@ describe("Beer view", () => {
       },
       showTaproom: false,
     });
-    expect(model.navs.map((r) => r.title)).toEqual(["Finished goods", "Cellar", "Materials", "Kegs"]);
+    expect(model.navs.map((r) => r.title)).toEqual(["Finished goods", "Cellar", "Materials", "Shortages", "Kegs"]);
   });
 
   it("the inventory drawing still offers Finished goods and does not leak live hrefs", () => {

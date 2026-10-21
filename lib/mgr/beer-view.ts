@@ -37,8 +37,10 @@ export function toBeerViewProps(s: BeerSnapshot): BeerViewModel {
   }
   navs.push(
     { key: "cellar", title: "Cellar", detail: `${plural(o.openOccupancies, "tank")} with beer`, href: "/cellar" },
+    // On a phone this row is the only way into Materials on hand, so it stays.
+    { key: "materials", title: "Materials", detail: "on hand · definitions · cycle count", href: "/materials" },
     // The count is material_requirements rows short > 0, the rows Planning lists (#989).
-    { key: "materials", title: "Materials", detail: `${plural(o.materialShortages, "shortage")} · Planning`, href: "/planning" },
+    { key: "shortages", title: "Shortages", detail: plural(o.materialShortages, "shortage"), href: "/planning" },
     { key: "kegs", title: "Kegs", detail: `${o.kegsOut} out at customers`, href: "/kegs" },
   );
   return { navs };
