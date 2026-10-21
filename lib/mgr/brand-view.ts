@@ -77,13 +77,18 @@ export type BrandSnapshot = {
   saved?: Pick<BrandSnapshot["brand"], "name" | "alias" | "category" | "price_group_id"> | null;
 };
 
+/** An approval's saved date, "approved Jan 15, 2026", or "approval date unknown" when none was entered. */
+export function approvalDate(approvedOn: string | null): string {
+  return approvedOn ? `approved ${formatDate(approvedOn)}` : "approval date unknown";
+}
+
 /** A COLA is listed by its TTB ID (with its serial when known) and never expires; a formula keeps its TTB number; registrations do expire. */
 export function brandComplianceRows({ approvals, registrations }: NonNullable<BrandSnapshot["compliance"]>): RegistryRowView[] {
   const rows: RegistryRowView[] = [
     ...approvals.map((approval) => ({
       key: approval.id,
       title: approval.kind === "cola" ? `COLA TTB ID ${approval.ttb_id}` : `Formula ${approval.ttb_id}`,
-      detail: [approval.approved_on ? `approved ${formatDate(approval.approved_on)}` : "approval date unknown", approval.serial_number && `serial ${approval.serial_number}`].filter(Boolean).join(" · "),
+      detail: [approvalDate(approval.approved_on), approval.serial_number && `serial ${approval.serial_number}`].filter(Boolean).join(" · "),
       verb: "Edit",
     })),
     ...registrations.map((registration) => ({

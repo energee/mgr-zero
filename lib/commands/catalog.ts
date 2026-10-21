@@ -335,7 +335,7 @@ defineCommand({
 
 defineQuery({
   // Brewers read brands too: recipes, batches and packaging runs all name one.
-  name: "list_brands", description: "Brands with their style, price group, SKUs and the pours that group owns, alphabetical unless sorted by ABV (high to low, unset last) or newest; optionally only those whose name or alias contains q, or in one category",
+  name: "list_brands", description: "Brands with their style, price group, SKUs, the pours that group owns and their recorded COLA approvals (colas: TTB ID and approval date; formulas are left out), alphabetical unless sorted by ABV (high to low, unset last) or newest; optionally only those whose name or alias contains q, or in one category",
   input: z.object({
     q: z.string().trim().max(100).optional(),
     sort: z.enum(BRAND_SORTS).optional(),
@@ -343,7 +343,8 @@ defineQuery({
     category: z.string().trim().optional(),
   }), roles: STAFF_ROLES,
   handler: async (ctx, i) => {
-    let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source, batch_share)").eq("brewery_id", ctx.breweryId);
+    let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source, batch_share), colas:brand_approvals(ttb_id, approved_on)")
+      .eq("brewery_id", ctx.breweryId).eq("colas.kind", "cola");
     if (i.q) {
       // An unanchored imatch is a case-insensitive contains. A PostgREST or() value is double-quoted,
       // so commas and parentheses stay literal, and `"` and `\` (including escapeRegex's) are escaped again.

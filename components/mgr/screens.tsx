@@ -1386,7 +1386,7 @@ export const SCREENS: Screen[] = [
     name: "Catalog",
     to: { "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand", "New format": "Format", "16 oz can": "Format", "four-pack": "Format", "case · 24×16oz": "Format", "½ bbl keg": "Format" },
     job: "Define brands, their sellable formats and prices without ledger writes",
-    reads: "list_brands · list_skus · list_catalog_categories",
+    reads: "list_brands [incl. recorded COLA approvals] · list_skus · list_catalog_categories",
     writes: "upsert_brand · create_sku · update_sku",
     states: DEFAULT_STATES,
     spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix.",

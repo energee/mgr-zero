@@ -28,6 +28,8 @@ const SKU_HAZY_SIXTH = "00000000-0000-4000-8000-0000000000a4";
 const SKU_HAZY_CASE = "00000000-0000-4000-8000-0000000000a5";
 const SKU_PILS_BOTTLE = "00000000-0000-4000-8000-0000000000a6";
 const PG_3 = "00000000-0000-4000-8000-0000000000p3";
+/** Hazy IPA's one COLA, on Catalog and under Brand → Compliance. */
+const HAZY_COLA = { ttb_id: "25318001000034", approved_on: "2026-01-15" };
 
 // Ceilings are $/bbl; the first three band, the rest are chosen by hand.
 const priceGroups = Array.from({ length: 8 }, (_, i) => ({
@@ -49,7 +51,7 @@ const packagedFormats = [
   { id: FMT_CASE, name: "case · 24×16 oz" },
 ];
 
-/** More → Catalog: three brands and 8 price groups. */
+/** More → Catalog: three brands (one, no and two COLAs on file) and 8 price groups. */
 export const catalogBrands: CatalogSnapshot = {
   brands: [
     {
@@ -59,6 +61,7 @@ export const catalogBrands: CatalogSnapshot = {
       styles: { name: "IPA" },
       skus: hazySkus,
       pours: [{ id: FMT_PINT }],
+      colas: [HAZY_COLA],
     },
     {
       id: BRAND_PILS,
@@ -69,6 +72,7 @@ export const catalogBrands: CatalogSnapshot = {
         { id: SKU_PILS.sku_id },
         { id: SKU_PILS_BOTTLE },
       ],
+      colas: [],
     },
     {
       id: BRAND_STOUT,
@@ -78,6 +82,8 @@ export const catalogBrands: CatalogSnapshot = {
       abv: 7.2,
       styles: { name: "Stout" },
       skus: [{ id: SKU_STOUT.sku_id }],
+      // Two labels on file, one with no recorded approval date.
+      colas: [{ ttb_id: "25318001000101", approved_on: "2025-11-03" }, { ttb_id: "00318001000102", approved_on: null }],
     },
   ],
   priceGroups,
@@ -103,7 +109,7 @@ export const brandHazy: BrandSnapshot = {
   // Hazy sits on group 3 by hand; its recipe cost lands in group 2's band.
   cost: { costCentsPerBbl: 4810, uncosted: [] },
   compliance: {
-    approvals: [{ id: "cola", brand_id: BRAND_HAZY, kind: "cola", ttb_id: "25318001000034", serial_number: "260135", approved_on: "2026-01-15", expires_on: null, note: null }],
+    approvals: [{ id: "cola", brand_id: BRAND_HAZY, kind: "cola", ...HAZY_COLA, serial_number: "260135", expires_on: null, note: null }],
     registrations: [{ id: "oh", brand_id: BRAND_HAZY, state: "OH", registration_no: "OH-88214", approved_on: null, expires_on: "2026-12-31" }],
   },
 };

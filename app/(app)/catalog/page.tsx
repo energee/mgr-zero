@@ -8,7 +8,7 @@
 // labeled Sort and Category picks whose options are links (toCatalogScopes).
 import { z } from "zod";
 import { CatalogView } from "@/components/mgr/views/catalog";
-import { toCatalogScopes, toCatalogViewProps } from "@/lib/mgr/catalog-view";
+import { toCatalogScopes, toCatalogViewProps, type CatalogBrandRow } from "@/lib/mgr/catalog-view";
 import { toFormatsViewProps } from "@/lib/mgr/formats-view";
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -22,7 +22,7 @@ import { BRAND_SORTS } from "@/lib/mgr/enums";
 
 type PriceGroup = { id: string; name: string };
 type Sku = { id: string; name: string; format_id: string; active: boolean; upc: string | null };
-type Brand = { id: string; name: string; alias: string | null; abv: number | null; description: string | null; category: string | null; price_group_id: string | null; hops: string | null; styles: { name: string } | null; skus: Sku[]; pours: { id: string }[] };
+type Brand = { id: string; name: string; alias: string | null; abv: number | null; description: string | null; category: string | null; price_group_id: string | null; hops: string | null; styles: { name: string } | null; skus: Sku[]; pours: { id: string }[]; colas: CatalogBrandRow["colas"] };
 type Format = { id: string; name: string; basis: "packaged" | "poured"; package_type: string | null; keg_size: string | null; units_per_case: number | null; bbl_per_unit: string | null };
 
 const catalogParams = z.object({

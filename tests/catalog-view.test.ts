@@ -56,14 +56,31 @@ describe("Catalog view", () => {
 
   it("says Not set for a missing style or ABV, and keeps a real zero ABV and zero SKUs", () => {
     const model = toCatalogViewProps({ priceGroups: [], brands: [
-      { id: "unset", name: "Unset", abv: null, styles: null, skus: [] },
-      { id: "blank", name: "Blank", abv: "", styles: null, skus: [] },
-      { id: "zero", name: "Zero", abv: "0.00", styles: { name: "Non-alcoholic" }, skus: [] },
+      { id: "unset", name: "Unset", abv: null, styles: null, skus: [], colas: [] },
+      { id: "blank", name: "Blank", abv: "", styles: null, skus: [], colas: [] },
+      { id: "zero", name: "Zero", abv: "0.00", styles: { name: "Non-alcoholic" }, skus: [], colas: [] },
     ] });
     expect(model.brands.map(({ style, abv, skus }) => [style, abv, skus])).toEqual([
       ["Not set", "Not set", "0"],
       ["Not set", "Not set", "0"],
       ["Non-alcoholic", "0%", "0"],
+    ]);
+  });
+
+  // #965: only recorded COLA approvals (list_brands already left formulas out) decide the cell.
+  it("says None, one COLA's TTB ID and date, or how many are on file", () => {
+    const brand = { abv: null, styles: null, skus: [] };
+    const model = toCatalogViewProps({ priceGroups: [], brands: [
+      { ...brand, id: "none", name: "None", colas: [] },
+      { ...brand, id: "one", name: "One", colas: [{ ttb_id: "00123456789012", approved_on: "2026-10-02" }] },
+      { ...brand, id: "undated", name: "Undated", colas: [{ ttb_id: "26001001000123", approved_on: null }] },
+      { ...brand, id: "two", name: "Two", colas: [{ ttb_id: "1", approved_on: null }, { ttb_id: "2", approved_on: "2026-01-15" }] },
+    ] });
+    expect(model.brands.map(({ cola }) => cola)).toEqual([
+      "None",
+      "TTB ID 00123456789012 · approved Oct 2, 2026",
+      "TTB ID 26001001000123 · approval date unknown",
+      "2 on file",
     ]);
   });
 
@@ -90,7 +107,7 @@ describe("Catalog view", () => {
     expect(inert).not.toMatch(/href="\/catalog\/brands\//);
     expect(inert.match(/<button\b[^>]*data-tap[^>]*>Hazy IPA<\/button>/g)).toHaveLength(2);
     const html = htmlOf(createElement(CatalogView, { model, linkRows: true }));
-    expect([...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map((m) => m[1])).toEqual(["Brand", "Style", "ABV", "SKUs"]);
+    expect([...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map((m) => m[1])).toEqual(["Brand", "Style", "ABV", "SKUs", "COLA"]);
     // One link per brand in the desktop table, then one in the phone list; the
     // positioned link covers the record without adding another focus target.
     const links = [...html.matchAll(/<a\b([^>]*)>(.*?)<\/a>/g)]
@@ -102,7 +119,7 @@ describe("Catalog view", () => {
     const records = html.split(/data-slot="item"(?=[\s>])/).slice(1).filter((chunk) => /^[^>]*role="listitem"/.test(chunk));
     expect(records).toHaveLength(model.brands.length);
     for (const record of records) {
-      expect([...record.matchAll(/<dt\b[^>]*>(.*?)<\/dt>/g)].map((m) => m[1])).toEqual(["Style", "ABV", "SKUs"]);
+      expect([...record.matchAll(/<dt\b[^>]*>(.*?)<\/dt>/g)].map((m) => m[1])).toEqual(["Style", "ABV", "SKUs", "COLA"]);
     }
   });
 
