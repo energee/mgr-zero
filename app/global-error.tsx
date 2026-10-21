@@ -1,13 +1,12 @@
 // app/global-error.tsx — the error surface for a throw in app/layout.tsx itself,
 // which app/error.tsx can't catch because it renders inside that layout. It
 // replaces the root layout, so it brings its own <html>/<body>, the global
-// styles, and ThemeBoot for the stored or OS theme (#1069). The body is the
-// entry card and RouteError copy that app/error.tsx shows.
+// styles, and ThemeBoot for the stored or OS theme (#1069). The body is
+// app/error.tsx's RootError, so both surfaces show the same card.
 "use client";
 
-import { EntrySurface } from "@/components/mgr/entry-surface";
-import { RouteError } from "@/components/mgr/route-error";
 import { ThemeBoot } from "@/components/mgr/theme-boot";
+import RootError from "./error";
 import "./globals.css";
 
 export default function GlobalError({ retry }: { retry: () => void }) {
@@ -18,7 +17,7 @@ export default function GlobalError({ retry }: { retry: () => void }) {
         <title>MGR</title>
       </head>
       <body className="min-h-full flex flex-col">
-        <EntrySurface><RouteError retry={retry} /></EntrySurface>
+        <RootError retry={retry} />
       </body>
     </html>
   );
