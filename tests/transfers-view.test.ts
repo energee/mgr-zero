@@ -110,11 +110,10 @@ describe("New transfer view", () => {
     expect(model.lines.map((l) => [l.title, l.qty])).toEqual([[SKU_HAZY.name, 2], [SKU_PILS.name, 4]]);
   });
 
-  it("renders Save draft and the two SKU rows; no Create verb (#1026)", () => {
+  it("renders Create transfer and the two SKU rows", () => {
     const html = htmlOf(createElement(NewTransferView, { model: toNewTransferViewProps(newTransferDraft) }));
-    expect(html).toMatch(/>Save draft</);
-    expect(html).not.toMatch(/Create transfer/);
-    expect(readFileSync("app/(app)/transfers/new-transfer-form.tsx", "utf8")).not.toMatch(/Create transfer/);
+    expect(html).toMatch(/>Create transfer</);
+    expect(readFileSync("app/(app)/transfers/new-transfer-form.tsx", "utf8")).toMatch(/"Create transfer"/);
     expect(html).toContain(SKU_HAZY.name);
     expect(html).toContain(SKU_PILS.name);
     expect(html).not.toMatch(/→/);

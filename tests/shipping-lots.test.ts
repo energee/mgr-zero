@@ -112,7 +112,6 @@ it("rejects malformed scale, identity and source allocation input without side e
 it("keeps the selected FG lot on both cross-location transfer legs and manual samples", async () => {
   const destination = await seedLocation(ctx.breweryId, { name: "Lot destination" });
   const transfer = await runCommand("create_stock_transfer", { fromLocationId: loc.id, toLocationId: destination.id, lines: [{ skuId: cat.skuId, qty: 2, fromBinId: bin, toBinId: destination.binId }] }, ctx) as { transferId: string };
-  await runCommand("submit_stock_transfer", transfer, ctx);
   const line = (await admin.from("stock_transfer_lines").select("id").eq("transfer_id", transfer.transferId).single()).data!.id;
   await runCommand("record_stock_transfer_pick", { ...transfer, picks: [{ lineId: line, qty: 2 }] }, ctx);
   await runCommand("receive_stock_transfer", { ...transfer, lines: [{ lineId: line, qty: 2, sources: [{ lotId: lots[0], qty: 2 }] }] }, ctx);
@@ -183,7 +182,6 @@ it("cross-location material receipts preserve selected lot and reject rounded so
   const lot = await ins("material_lots", { brewery_id: ctx.breweryId, material_id: material, lot_code: "MALT-1" });
   await ins("material_movements", { brewery_id: ctx.breweryId, material_id: material, location_id: loc.id, bin_id: bin, lot_id: lot.id, qty: 10, type: "opening_balance", created_by: ctx.userId });
   const tr = await runCommand("create_stock_transfer", { fromLocationId: loc.id, toLocationId: dest.id, lines: [{ materialId: material, qty: 2, fromBinId: bin, toBinId: dest.binId }] }, ctx) as { transferId: string };
-  await runCommand("submit_stock_transfer", tr, ctx);
   const line = (await admin.from("stock_transfer_lines").select("id").eq("transfer_id", tr.transferId).single()).data!.id;
   await runCommand("record_stock_transfer_pick", { ...tr, picks: [{ lineId: line, qty: 2 }] }, ctx);
   await expect(runCommand("receive_stock_transfer", { ...tr, lines: [{ lineId: line, qty: 0.00001, sources: [{ lotId: lot.id, qty: 0.00001 }] }] }, ctx)).rejects.toThrow(/four decimals/);
@@ -232,7 +230,6 @@ it("compares parsed UUID identity for ship lines, return lines and return source
 it("rejects UUID aliases in transfer line and source arrays before completion", async () => {
   const dest = await seedLocation(ctx.breweryId, { name: "Alias transfer destination" });
   const tr = await runCommand("create_stock_transfer", { fromLocationId: loc.id, toLocationId: dest.id, lines: [{ skuId: cat.skuId, qty: 1, fromBinId: bin, toBinId: dest.binId }] }, ctx) as { transferId: string };
-  await runCommand("submit_stock_transfer", tr, ctx);
   const line = (await admin.from("stock_transfer_lines").select("id").eq("transfer_id", tr.transferId).single()).data!.id;
   await runCommand("record_stock_transfer_pick", { ...tr, picks: [{ lineId: line, qty: 1 }] }, ctx);
   for (const lines of [

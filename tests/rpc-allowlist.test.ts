@@ -188,7 +188,6 @@ const AUTHENTICATED_RPCS = [
   "staff_roles(uuid)",
   "has_staff_role(uuid,staff_role[])",
   "submit_order(uuid,uuid,uuid,uuid)",
-  "submit_stock_transfer(uuid,uuid)",
   "cancel_stock_transfer(uuid,text,uuid)",
   "today_live_reasons()",
   "unlink_chat_user(uuid,uuid,uuid)",

@@ -5512,9 +5512,6 @@ isOneToOne: false
 "submit_order":
 { Args: { "p_expected_brewery"?: string,"p_expected_customer"?: string,"p_order": string,"p_request_id": string }; Returns: Json
                            },
-"submit_stock_transfer":
-{ Args: { "p_request_id": string,"p_transfer": string }; Returns: Json
-                           },
 "suppress_chat_delivery":
 { Args: { "p_delivery": string,"p_error_code": string,"p_lease": string,"p_state": string }; Returns: undefined
                            },

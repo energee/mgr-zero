@@ -63,7 +63,6 @@ async function transfer(qty = 1) {
   const { transferId } = await runCommand("create_stock_transfer", {
     fromLocationId: whId, toLocationId: storageId, lines: [{ skuId, qty, fromBinId: whBinId, toBinId: storageBinId }],
   }, adminCtx) as { transferId: string };
-  await runCommand("submit_stock_transfer", { transferId }, adminCtx);
   const { data: line } = await admin.from("stock_transfer_lines").select("id").eq("transfer_id", transferId).single();
   await runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: line!.id, qty }] }, adminCtx);
   return transferId;

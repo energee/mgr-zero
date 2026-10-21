@@ -224,11 +224,11 @@ describe("request context headers", () => {
   it("covers another resource-derived write and keeps raw no-header compatibility", async () => {
     const wrong = await db({ "x-mgr-actor-id": actor.id, "x-mgr-brewery-id": breweryA });
     const refusedId = crypto.randomUUID();
-    expect((await wrong.rpc("submit_stock_transfer", { p_transfer: transferId, p_request_id: refusedId })).error?.code).toBe("42501");
+    expect((await wrong.rpc("cancel_stock_transfer", { p_transfer: transferId, p_reason: "wrong brewery", p_request_id: refusedId })).error?.code).toBe("42501");
     expect(sql(`select count(*) from private.command_requests where actor_id='${actor.id}' and request_id='${refusedId}'`)).toEqual(["0"]);
 
     const unscoped = await db();
-    expect((await unscoped.rpc("submit_stock_transfer", { p_transfer: transferId, p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect((await unscoped.rpc("cancel_stock_transfer", { p_transfer: transferId, p_reason: "no header", p_request_id: crypto.randomUUID() })).error).toBeNull();
   });
 
   it("fails closed for malformed or forged actor scope", async () => {
