@@ -3,18 +3,20 @@
 // It prunes old command records, then reaps QuickBooks connects whose callback died mid-exchange (#1034).
 import { NextResponse } from "next/server";
 import { authorizeJob } from "@/lib/jobs/auth";
-import { qboConfig, QboOAuthClient } from "@/lib/qbo";
+import { isQboConfigured, qboConfig, QboOAuthClient, reapQboOAuthExchanges } from "@/lib/qbo";
 import { pruneCommandRequests } from "@/lib/retention/jobs";
-import { reapQboOAuthExchanges } from "@/lib/supabase/integration-tokens";
+import { discardQboOAuthTokens, qboRealmInUse, reapStaleQboOAuthExchanges } from "@/lib/supabase/integration-tokens";
 
 export async function POST(request: Request) {
   if (!authorizeJob(request, process.env.RETENTION_JOB_SECRET)) return NextResponse.json({ ok: false }, { status: 401 });
   try {
     const pruned = await pruneCommandRequests();
-    // The client is built only when a held token needs revoking. The callback is async so a missing
-    // QuickBooks setup (qboConfig throws) becomes a logged revoke failure, not a failed job.
-    const reapedQboExchanges = await reapQboOAuthExchanges(async (refreshToken) => new QboOAuthClient(qboConfig()).revoke(refreshToken));
-    return NextResponse.json({ ok: true, pruned, reapedQboExchanges });
+    // Without QuickBooks setup nothing can be revoked, so the reap is skipped and discards nothing (qboReap: null).
+    const qboReap = isQboConfigured() ? await reapQboOAuthExchanges(
+      { reap: reapStaleQboOAuthExchanges, realmInUse: qboRealmInUse, discard: discardQboOAuthTokens },
+      new QboOAuthClient(qboConfig()),
+    ) : null;
+    return NextResponse.json({ ok: true, pruned, qboReap });
   } catch (e) {
     console.error(e instanceof Error ? e.message : e);
     return NextResponse.json({ ok: false }, { status: 500 });

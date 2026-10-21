@@ -12,10 +12,13 @@ that QuickBooks/Square sync history or portal quotes still reference. A
 The same call then reaps QuickBooks connects whose callback died after Intuit
 issued tokens (#1034). An exchange older than ten minutes is marked for
 recovery. Its held refresh token is revoked at Intuit, unless a stored
-connection uses that QuickBooks company, and then discarded. The response
-reports the count as `reapedQboExchanges`. A revoke needs the QuickBooks
-variables (`QBO_CLIENT_ID` and the rest); without them the token is discarded
-unrevoked, and the error is logged.
+connection uses that QuickBooks company, and then discarded. While a newer
+connect for the brewery is still in progress the token is left for a later
+run. A failed revoke keeps the token for the
+next daily run; after seven days it is discarded unrevoked. The response
+reports `qboReap: { done, failed }`, where one row's failure never stops the
+others. Without the QuickBooks variables (`QBO_CLIENT_ID` and the rest) the
+reap is skipped and `qboReap` is `null`.
 
 Closing a brewery and exporting its records are admin-run, with a direct
 service-role `DATABASE_URL`:

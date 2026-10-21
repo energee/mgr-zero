@@ -4,14 +4,15 @@
 // connection uses that QuickBooks company.
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { completeQboOAuth, QboOAuthClient } from "@/lib/qbo";
+import { completeQboOAuth, QboOAuthClient, reapQboOAuthExchanges } from "@/lib/qbo";
 import {
   claimQboOAuth,
   completeQboOAuthStore,
+  discardQboOAuthTokens,
   failQboOAuth,
   holdQboOAuthTokens,
   qboRealmInUse,
-  reapQboOAuthExchanges,
+  reapStaleQboOAuthExchanges,
 } from "@/lib/supabase/integration-tokens";
 import { admin, makeBrewery, makeStaffCtx, sql } from "./helpers";
 
@@ -22,6 +23,8 @@ const config = {
   apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com",
 };
 const store = { claim: claimQboOAuth, hold: holdQboOAuthTokens, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse };
+const reapStore = { reap: reapStaleQboOAuthExchanges, realmInUse: qboRealmInUse, discard: discardQboOAuthTokens };
+const reap = (revoke: (token: string) => Promise<void>) => reapQboOAuthExchanges(reapStore, { revoke });
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 const issued = (refresh: string) => new Response(JSON.stringify({
   access_token: `${refresh}-access`, refresh_token: refresh, expires_in: 3600, x_refresh_token_expires_in: 86400,
@@ -55,7 +58,8 @@ async function crashedConnect(realm = `realm-${crypto.randomUUID()}`) {
 
 const intent = (id: string) => sql(`select exchange_state||':'||coalesce(issued_refresh_token,'none')
   from private.qbo_oauth_intents where id='${id}'`)[0];
-const age = (id: string) => sql(`update private.qbo_oauth_intents set consumed_at=now()-interval '11 minutes' where id='${id}'`);
+const age = (id: string, interval = "11 minutes") =>
+  sql(`update private.qbo_oauth_intents set consumed_at=now()-interval '${interval}',created_at=now()-interval '${interval}' where id='${id}'`);
 
 describe("QuickBooks OAuth exchange reap (#1034)", { concurrent: false }, () => {
   it("holds the issued refresh token while exchanging, then revokes and discards it once the exchange is stale", async () => {
@@ -63,12 +67,12 @@ describe("QuickBooks OAuth exchange reap (#1034)", { concurrent: false }, () => 
     expect(intent(stuck.intentId)).toBe(`exchanging:${stuck.refresh}`);
 
     const revoke = vi.fn<(token: string) => Promise<void>>().mockResolvedValue(undefined);
-    await reapQboOAuthExchanges(revoke);
+    await reap(revoke);
     expect(revoke).not.toHaveBeenCalledWith(stuck.refresh); // a fresh exchange may still finish
     expect(intent(stuck.intentId)).toBe(`exchanging:${stuck.refresh}`);
 
     age(stuck.intentId);
-    await reapQboOAuthExchanges(revoke);
+    await reap(revoke);
     expect(revoke).toHaveBeenCalledWith(stuck.refresh);
     expect(intent(stuck.intentId)).toBe("recovery_required:none");
   });
@@ -81,22 +85,70 @@ describe("QuickBooks OAuth exchange reap (#1034)", { concurrent: false }, () => 
     })).error).toBeNull();
     age(stuck.intentId);
     const revoke = vi.fn<(token: string) => Promise<void>>().mockResolvedValue(undefined);
-    await reapQboOAuthExchanges(revoke);
+    await reap(revoke);
     expect(revoke).not.toHaveBeenCalledWith(stuck.refresh);
     expect(intent(stuck.intentId)).toBe("recovery_required:none");
   });
 
-  it("revokes a token left by an exchange that a newer connect attempt already marked for recovery", async () => {
+  it("waits for age and for a newer connect to finish before revoking a token a newer attempt moved to recovery", async () => {
     const stuck = await crashedConnect();
+    const newerState = hash(crypto.randomUUID());
     expect((await stuck.ctx.db.rpc("begin_qbo_oauth", {
-      p_brewery: stuck.brewery.id, p_redirect_uri: config.redirectUri, p_state_hash: hash(crypto.randomUUID()),
+      p_brewery: stuck.brewery.id, p_redirect_uri: config.redirectUri, p_state_hash: newerState,
       p_provider_intent: "connect", p_request_id: crypto.randomUUID(),
     })).error).toBeNull();
     expect(intent(stuck.intentId)).toBe(`recovery_required:${stuck.refresh}`);
     const revoke = vi.fn<(token: string) => Promise<void>>().mockResolvedValue(undefined);
-    await reapQboOAuthExchanges(revoke);
+    await reap(revoke); // under ten minutes old
+    age(stuck.intentId);
+    await reap(revoke); // old enough, but the newer connect is still pending
+    expect(revoke).not.toHaveBeenCalledWith(stuck.refresh);
+    expect(intent(stuck.intentId)).toBe(`recovery_required:${stuck.refresh}`);
+    sql(`update private.qbo_oauth_intents set expires_at=now()-interval '1 second' where state_hash='${newerState}'`);
+    await reap(revoke);
     expect(revoke).toHaveBeenCalledWith(stuck.refresh);
     expect(intent(stuck.intentId)).toBe("recovery_required:none");
+  });
+
+  it("keeps the token when the revoke fails, and discards it unrevoked once the reap gives up after seven days", async () => {
+    const stuck = await crashedConnect();
+    age(stuck.intentId);
+    const down = vi.fn<(token: string) => Promise<void>>().mockRejectedValue(new Error("QuickBooks revoke failed"));
+    // Other tests' rows may share the database, so count only this token's revokes.
+    const attempts = () => down.mock.calls.filter(([token]) => token === stuck.refresh).length;
+    await reap(down);
+    expect(attempts()).toBe(1);
+    expect(intent(stuck.intentId)).toBe(`recovery_required:${stuck.refresh}`);
+    age(stuck.intentId, "8 days");
+    await reap(down);
+    expect(attempts()).toBe(2);
+    expect(intent(stuck.intentId)).toBe("recovery_required:none");
+  });
+
+  it("revokes again after a callback whose own failure path already revoked (a harmless double revoke)", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id, "admin");
+    const state = `state-${crypto.randomUUID()}`;
+    expect((await ctx.db.rpc("begin_qbo_oauth", {
+      p_brewery: brewery.id, p_redirect_uri: config.redirectUri, p_state_hash: hash(state),
+      p_provider_intent: "connect", p_request_id: crypto.randomUUID(),
+    })).error).toBeNull();
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(issued("failed-refresh"))
+      .mockResolvedValueOnce(new Response("denied", { status: 403 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+    await expect(completeQboOAuth({
+      request: new Request(`${config.redirectUri}?code=code&state=${state}&realmId=realm-${crypto.randomUUID()}`),
+      actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri: config.redirectUri,
+      client: new QboOAuthClient(config, fetch), store,
+    })).rejects.toThrow("QuickBooks is unavailable");
+    expect(String(fetch.mock.calls[2][1]?.body)).toContain("failed-refresh"); // the callback revoked it
+    const id = sql(`select id from private.qbo_oauth_intents where state_hash='${hash(state)}'`)[0];
+    age(id);
+    const revoke = vi.fn<(token: string) => Promise<void>>().mockResolvedValue(undefined);
+    await reap(revoke);
+    expect(revoke).toHaveBeenCalledWith("failed-refresh");
+    expect(intent(id)).toBe("recovery_required:none");
   });
 
   it("keeps no copy of the token once the connection is stored", async () => {

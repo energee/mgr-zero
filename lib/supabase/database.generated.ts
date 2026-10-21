@@ -5264,7 +5264,7 @@ isOneToOne: false
                            },
 "reap_qbo_oauth_exchanges":
 { Args: Record<PropertyKey, never>; Returns: {
-              "intent_id": string,"realm_id": string,"refresh_token": string
+              "give_up": boolean,"intent_id": string,"realm_id": string,"refresh_token": string
             }[]
                            },
 "reattribute_loss":

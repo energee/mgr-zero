@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { completeQboOAuth, QboOAuthClient, sanitizeQboError } from "@/lib/qbo";
+import { completeQboOAuth, QboOAuthClient, reapQboOAuthExchanges, sanitizeQboError } from "@/lib/qbo";
 
 const config = {
   clientId: "client-id",
@@ -291,5 +291,78 @@ describe("QuickBooks OAuth lifecycle", () => {
     })).rejects.toThrow("QuickBooks is unavailable");
     expect(deniedComplete).not.toHaveBeenCalled();
     expect(deniedFail).toHaveBeenCalledWith("intent-2", "actor-1");
+  });
+});
+
+describe("QuickBooks OAuth hold and reap (#1034)", () => {
+  it("revokes the issued token and fails the connect cleanly when the hold cannot be recorded", async () => {
+    const fail = vi.fn().mockResolvedValue(true);
+    const complete = vi.fn();
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: "access-secret", refresh_token: "unheld-refresh", expires_in: 3600,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+    await expect(completeQboOAuth({
+      request: new Request(`${config.redirectUri}?code=one-time-code&state=opaque&realmId=realm-1`),
+      actorId: "actor-1", selectedBreweryId: "brewery-1", redirectUri: config.redirectUri,
+      client: new QboOAuthClient(config, fetch),
+      store: {
+        claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: ["com.intuit.quickbooks.accounting"] }),
+        hold: vi.fn().mockRejectedValue(new Error("QuickBooks OAuth tokens could not be held")),
+        complete, fail, realmInUse: realmFree,
+      },
+    })).rejects.toThrow("QuickBooks is unavailable");
+    expect(fetch).toHaveBeenCalledTimes(2); // exchange, then revoke; no CompanyInfo read
+    expect(fetch.mock.calls[1][1]).toMatchObject({ body: JSON.stringify({ token: "unheld-refresh" }) });
+    expect(complete).not.toHaveBeenCalled();
+    expect(fail).toHaveBeenCalledWith("intent-1", "actor-1");
+  });
+
+  const held = (n: number) => ({ intentId: `intent-${n}`, realmId: `realm-${n}`, refreshToken: `refresh-${n}`, giveUp: false });
+
+  it("keeps the token when the realm lookup fails, and counts the row as failed", async () => {
+    const discard = vi.fn().mockResolvedValue(undefined);
+    const revoke = vi.fn().mockResolvedValue(undefined);
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(reapQboOAuthExchanges({
+        reap: async () => [held(1)], realmInUse: vi.fn().mockRejectedValue(new Error("QuickBooks connection lookup failed")), discard,
+      }, { revoke })).resolves.toEqual({ done: 0, failed: 1 });
+      expect(revoke).not.toHaveBeenCalled();
+      expect(discard).not.toHaveBeenCalled();
+      expect(JSON.stringify(error.mock.calls)).not.toContain("refresh-1");
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  it("counts a discard error as failed after the revoke", async () => {
+    const revoke = vi.fn().mockResolvedValue(undefined);
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(reapQboOAuthExchanges({
+        reap: async () => [held(1)], realmInUse: realmFree,
+        discard: vi.fn().mockRejectedValue(new Error("QuickBooks OAuth token discard failed")),
+      }, { revoke })).resolves.toEqual({ done: 0, failed: 1 });
+      expect(revoke).toHaveBeenCalledWith("refresh-1");
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  it("handles every other row when one row fails", async () => {
+    const discard = vi.fn().mockResolvedValue(undefined);
+    const revoke = vi.fn(async (token: string) => { if (token === "refresh-2") throw new Error("QuickBooks revoke failed"); });
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(reapQboOAuthExchanges({
+        reap: async () => [held(1), held(2), held(3)], realmInUse: realmFree, discard,
+      }, { revoke })).resolves.toEqual({ done: 2, failed: 1 });
+      expect(discard.mock.calls.map(([intentId]) => intentId)).toEqual(["intent-1", "intent-3"]);
+      expect(error).toHaveBeenCalledWith("qbo_oauth_reap_failed", { name: "Error" });
+    } finally {
+      error.mockRestore();
+    }
   });
 });

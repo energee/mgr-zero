@@ -7,12 +7,17 @@
 -- The daily retention job reaps what is left: it marks an exchange older than
 -- ten minutes for recovery, revokes each held token unless a stored
 -- connection uses that realm, then discards it.
+--
+-- Ten minutes is safe because no callback can still be running by then: the
+-- route has no maxDuration, so Vercel Fluid's 300-second default bounds it,
+-- and the token request times out after 20 seconds (lib/qbo.ts, #1032).
 
 alter table private.qbo_oauth_intents
   add column issued_realm_id text,
   add column issued_refresh_token text;
 
--- Called by the OAuth callback right after the code exchange.
+-- Called by the OAuth callback right after the code exchange. The realm is
+-- the callback's query parameter, not yet verified by the CompanyInfo read.
 create function public.hold_qbo_oauth_tokens(p_intent uuid, p_actor uuid, p_realm_id text, p_refresh_token text)
 returns boolean
 language sql
@@ -42,11 +47,17 @@ create trigger qbo_oauth_intents_clear_completed_tokens
   for each row when (new.exchange_state = 'completed')
   execute function private.clear_completed_qbo_oauth_tokens();
 
--- Marks exchanges older than ten minutes for recovery (the intent itself
--- expires ten minutes after it begins, so no live callback is still in one),
--- then returns every unstored held token for the caller to revoke.
+-- Marks exchanges older than ten minutes for recovery, then returns the held
+-- tokens to revoke. Every returned intent is at least ten minutes old,
+-- including one a newer connect attempt already moved to recovery_required.
+-- An intent is skipped while a newer intent of the same brewery is still
+-- live (pending and unexpired, or exchanging; stale exchanges were just
+-- marked), or another exchange holds the same realm, because Intuit's revoke
+-- could disconnect the company that attempt is connecting.
+-- give_up is true from seven days on: a revoke that has failed daily for a
+-- week is discarded instead of retried forever.
 create function public.reap_qbo_oauth_exchanges()
-returns table(intent_id uuid, realm_id text, refresh_token text)
+returns table(intent_id uuid, realm_id text, refresh_token text, give_up boolean)
 language plpgsql
 security definer
 set search_path to ''
@@ -54,9 +65,15 @@ as $function$
 begin
   update private.qbo_oauth_intents set exchange_state = 'recovery_required'
     where exchange_state = 'exchanging' and consumed_at < now() - interval '10 minutes';
-  return query select i.id, i.issued_realm_id, i.issued_refresh_token
+  return query select i.id, i.issued_realm_id, i.issued_refresh_token, i.consumed_at < now() - interval '7 days'
     from private.qbo_oauth_intents i
-    where i.exchange_state = 'recovery_required' and i.issued_refresh_token is not null;
+    where i.exchange_state = 'recovery_required' and i.issued_refresh_token is not null
+      and i.consumed_at < now() - interval '10 minutes'
+      and not exists(select 1 from private.qbo_oauth_intents newer
+        where newer.id <> i.id
+          and ((newer.exchange_state = 'pending' and newer.expires_at > now()) or newer.exchange_state = 'exchanging')
+          and ((newer.brewery_id = i.brewery_id and newer.created_at > i.created_at)
+            or newer.issued_realm_id = i.issued_realm_id));
 end $function$;
 
 -- Clears a held token after the revoke attempt; the token match keeps a

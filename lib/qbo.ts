@@ -318,6 +318,44 @@ export async function completeQboOAuth(input: {
   }
 }
 
+export type QboOAuthReapStore = {
+  reap(): Promise<{ intentId: string; realmId: string; refreshToken: string; giveUp: boolean }[]>;
+  realmInUse(realmId: string): Promise<boolean>;
+  discard(intentId: string, refreshToken: string): Promise<void>;
+};
+
+/**
+ * Retention-job step (#1034): revokes each refresh token Intuit issued to an
+ * OAuth callback that never stored it, then discards it. Like the callback's
+ * own failure path, it skips the revoke when a stored connection uses the
+ * realm, because Intuit's revoke would disconnect that company. A failed
+ * revoke keeps the token for the next daily run, until the reap marks it
+ * giveUp (seven days); then it is discarded unrevoked. A failed realm lookup
+ * or discard also keeps it. Each row's failure is logged and counted, and
+ * never stops the other rows; qboPaymentFailureCause logs only the error name
+ * for these plain errors, never a token or provider body.
+ */
+export async function reapQboOAuthExchanges(store: QboOAuthReapStore, client: Pick<QboOAuthClient, "revoke">) {
+  let done = 0;
+  let failed = 0;
+  for (const held of await store.reap()) {
+    try {
+      if (!await store.realmInUse(held.realmId)) {
+        await client.revoke(held.refreshToken).catch((error: unknown) => {
+          if (!held.giveUp) throw error;
+          console.error("qbo_oauth_reap_revoke_abandoned", qboPaymentFailureCause(error));
+        });
+      }
+      await store.discard(held.intentId, held.refreshToken);
+      done += 1;
+    } catch (error) {
+      failed += 1;
+      console.error("qbo_oauth_reap_failed", qboPaymentFailureCause(error));
+    }
+  }
+  return { done, failed };
+}
+
 export async function pushInvoiceToQbo(
   ctx: Ctx,
   invoiceId: string,
