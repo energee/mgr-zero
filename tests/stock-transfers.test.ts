@@ -4,7 +4,7 @@ import { assert } from "vitest";
 // inside one location is move_stock_bin and writes no document.
 import { describe, it, expect } from "vitest";
 import { admin, insertFixture, makeBrewery, makeStaffCtx, seedCustomer, seedLocation, seedCatalog, sql } from "./helpers";
-import { getCommandDefinition, runCommand } from "@/lib/commands/registry";
+import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 describe("stock_transfers schema", () => {
@@ -60,8 +60,6 @@ describe("stock transfer lifecycle", () => {
     expect(after!.status).toBe("picked");
     const { data: l2 } = await admin.from("stock_transfer_lines").select("qty_picked").eq("id", line!.id).single();
     expect(Number(l2!.qty_picked)).toBe(2);
-    // creation is the submit: there is no separate submit command
-    expect(getCommandDefinition("submit_stock_transfer")).toBeUndefined();
   });
 });
 

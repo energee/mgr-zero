@@ -1,5 +1,5 @@
 // app/(app)/transfers/[id]/page.tsx — one stock transfer: header, lines with
-// from/to bins, and the next verb (transfer-actions.tsx): Submit, Record pick,
+// from/to bins, and the next verb (transfer-actions.tsx): Record pick,
 // Receive, or Cancel transfer. Receiving posts the paired ledger rows; the
 // page then shows what moved. A cancelled transfer shows its reason. Same movements as Complete transfer, no invoice.
 import type { BinMoveStock } from "@/lib/commands/inventory";
