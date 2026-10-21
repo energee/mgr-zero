@@ -8,6 +8,7 @@ import {
   completeQboOAuthStore,
   disconnectQbo,
   failQboOAuth,
+  holdQboOAuthTokens,
   qboRealmInUse,
   readVersionedIntegrationTokens,
 } from "@/lib/supabase/integration-tokens";
@@ -312,7 +313,7 @@ describe("QuickBooks durable outbound push", () => {
       request: new Request(`${config.redirectUri}?code=reconnect-code&state=${state}&realmId=${f.realm}`),
       actorId: f.ctx.userId, selectedBreweryId: f.brewery.id, redirectUri: config.redirectUri,
       client: new QboOAuthClient(config, oauthFetch),
-      store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
+      store: { claim: claimQboOAuth, hold: holdQboOAuthTokens, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
     });
     expect(reconnected).toBe(f.connectionId);
     const current = await readVersionedIntegrationTokens(f.ctx, "qbo");

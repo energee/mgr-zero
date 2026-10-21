@@ -4913,6 +4913,9 @@ isOneToOne: false
 "disable_chat_installation":
 { Args: { "p_brewery": string,"p_installation": string,"p_request_id": string }; Returns: Json
                            },
+"discard_qbo_oauth_tokens":
+{ Args: { "p_intent": string,"p_refresh_token": string }; Returns: undefined
+                           },
 "disconnect_chat_installation":
 { Args: { "p_brewery": string,"p_installation": string,"p_request_id": string }; Returns: Json
                            },
@@ -5055,6 +5058,9 @@ isOneToOne: false
 "has_staff_role":
 { Args: { "b": string,"p_roles": (Database["public"]['Enums']["staff_role"])[] }; Returns: boolean
                            },
+"hold_qbo_oauth_tokens":
+{ Args: { "p_actor": string,"p_intent": string,"p_realm_id": string,"p_refresh_token": string }; Returns: boolean
+                           },
 "import_csv_row":
 { Args: { "p_brewery": string,"p_request_id": string,"p_row_n": number }; Returns: Json
                            },
@@ -5082,6 +5088,9 @@ isOneToOne: false
                            },
 "lease_order_emails":
 { Args: { "p_from": string }; Returns: Json
+                           },
+"lease_qbo_token_refresh":
+{ Args: { "p_actor": string,"p_brewery": string,"p_connection": string,"p_customer"?: string,"p_expected_version": number,"p_invoice"?: string,"p_lease": string }; Returns: string
                            },
 "lease_square_publication":
 { Args: { "p_actor": string,"p_brewery": string,"p_publication": string }; Returns: {
@@ -5256,6 +5265,11 @@ isOneToOne: false
               "access_token": string,"connection_id": string,"tax_input": Json
             }[]
                            },
+"reap_qbo_oauth_exchanges":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "give_up": boolean,"intent_id": string,"realm_id": string,"refresh_token": string
+            }[]
+                           },
 "reattribute_loss":
 { Args: { "p_adjustment": string,"p_bbl": number,"p_brewery": string,"p_classification": Database["public"]['Enums']["cellar_removal_class"],"p_destination_state": string,"p_request_id": string }; Returns: Json
                            },
@@ -5333,6 +5347,9 @@ isOneToOne: false
                            },
 "release_allocation":
 { Args: { "p_allocation": string,"p_request_id": string }; Returns: Json
+                           },
+"release_qbo_token_refresh":
+{ Args: { "p_brewery": string,"p_connection": string,"p_lease": string }; Returns: undefined
                            },
 "replace_format_bom":
 { Args: { "p_brewery": string,"p_format": string,"p_lines": Json,"p_request_id": string }; Returns: Json

@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { completeQboOAuth, qboConfig, QboOAuthClient } from "@/lib/qbo";
-import { claimQboOAuth, completeQboOAuthStore, failQboOAuth, qboOAuthAlreadyCompleted, qboRealmInUse } from "@/lib/supabase/integration-tokens";
+import { claimQboOAuth, completeQboOAuthStore, failQboOAuth, holdQboOAuthTokens, qboOAuthAlreadyCompleted, qboRealmInUse } from "@/lib/supabase/integration-tokens";
 import { getActiveBrewery } from "@/lib/brewery";
 
 export async function GET(request: Request) {
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
       await completeQboOAuth({
         request, actorId, selectedBreweryId: activeBrewery.id, redirectUri: config.redirectUri,
         client: new QboOAuthClient(config),
-        store: { claim, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
+        store: { claim, hold: holdQboOAuthTokens, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
       });
     } catch (error) {
       if (!(error instanceof AlreadyConnected)) throw error;
