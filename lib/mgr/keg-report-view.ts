@@ -14,6 +14,8 @@ export type KegReport = {
   aging: { bucket: string; kegs: number; deposit_cents: number }[];
   customers: { customer_id: string; name: string; over_90: number; oldest_at: string | null }[];
   mismatches: { customer_id: string; name: string; pool_id: string; pool_name: string; keg_size: string; kegs_out: number; kegs_on_deposit: number }[];
+  /** Pools in service, with or without kegs: tells "add a pool" from "record kegs" when bySize is empty (#988). */
+  activePools: number;
 };
 
 export type KegReportViewModel = {
@@ -46,6 +48,8 @@ export function toKegReportViewProps(r: KegReport, timeZone: string, backHref?: 
       detail: `${m.pool_name} ${SIZE_LABEL[m.keg_size] ?? m.keg_size} · ${m.kegs_out} out · ${m.kegs_on_deposit} on deposit`,
     })),
     sizes: r.bySize.map((s) => ({ key: `${s.pool_id}-${s.keg_size}`, title: `${s.pool_name} ${SIZE_LABEL[s.keg_size] ?? s.keg_size}`, detail: `${s.out} of ${s.total} out`, trailing: `${pct(s.out, s.total)} utilized` })),
-    empty: r.bySize.length ? undefined : { title: "No owned keg pools", description: "Add a keg pool and record kegs acquired to see utilization." },
+    empty: r.bySize.length ? undefined : r.activePools
+      ? { title: "No kegs recorded yet", description: "Record kegs acquired into a pool on Keg fleet to see utilization." }
+      : { title: "No keg pools", description: "Add a keg pool on Keg fleet, then record kegs acquired to see utilization." },
   };
 }
