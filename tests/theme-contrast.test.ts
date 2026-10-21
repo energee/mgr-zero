@@ -41,6 +41,18 @@ for (const mode of [":root", ".dark"]) {
   });
 }
 
+it("keeps the pre-paint theme script inert on React client remounts", () => {
+  expect(layout).toMatch(/type=\{typeof window === "undefined" \? "text\/javascript" : "text\/plain"\}/);
+  expect(layout).toMatch(/<script[\s\S]*suppressHydrationWarning/);
+});
+
+it("paints selected Location Uses with the AA-checked primary pair, not the hover wash (#493)", () => {
+  const e = readFileSync(new URL("../components/mgr/e.tsx", import.meta.url), "utf8");
+  expect(e).toContain('export const BRIGHT_ON = "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground";');
+  const form = readFileSync(new URL("../app/(app)/locations/location-form.tsx", import.meta.url), "utf8");
+  expect(form).toMatch(/<ToggleGroupItem[^>]*className=\{BRIGHT_ON\}/);
+});
+
 // A hovered row action (E.act) paints its tone over the tap row's accent/50
 // hover wash, over the page surface (#1041). Primary and destructive are a tint
 // under tone-colored text; success, attention and info are a solid fill at /80
@@ -60,16 +72,4 @@ it("keeps every hovered row-action tone at AA in light mode (#1041)", () => {
       expect(contrast(tokens[text], toHex(hovered)), `${role} hover on ${surface}`).toBeGreaterThanOrEqual(4.5);
     }
   }
-});
-
-it("keeps the pre-paint theme script inert on React client remounts", () => {
-  expect(layout).toMatch(/type=\{typeof window === "undefined" \? "text\/javascript" : "text\/plain"\}/);
-  expect(layout).toMatch(/<script[\s\S]*suppressHydrationWarning/);
-});
-
-it("paints selected Location Uses with the AA-checked primary pair, not the hover wash (#493)", () => {
-  const e = readFileSync(new URL("../components/mgr/e.tsx", import.meta.url), "utf8");
-  expect(e).toContain('export const BRIGHT_ON = "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground";');
-  const form = readFileSync(new URL("../app/(app)/locations/location-form.tsx", import.meta.url), "utf8");
-  expect(form).toMatch(/<ToggleGroupItem[^>]*className=\{BRIGHT_ON\}/);
 });
