@@ -10,6 +10,7 @@ type Report = {
   bySize: { pool_id: string; pool_name: string; keg_size: string; out: number; total: number }[];
   aging: { bucket: string; kegs: number; deposit_cents: number }[];
   customers: { customer_id: string; name: string; over_90: number; oldest_at: string | null }[];
+  activePools: number;
 };
 
 let b: { id: string };
@@ -35,10 +36,22 @@ describe("get_keg_report", () => {
   it("utilization is out over fleet and aging is FIFO", async () => {
     const r = (await runCommand("get_keg_report", {}, ctx)) as Report;
     expect(r.fleet).toMatchObject({ out: 3, total: 10 });
+    expect(r.activePools).toBe(1);
     expect(r.fleet.utilization).toBeCloseTo(0.3);
     expect(r.bySize).toEqual([{ pool_id: poolId, pool_name: "Owned", keg_size: "half_bbl", out: 3, total: 10 }]);
     expect(r.aging.map((a) => [a.bucket, a.kegs, a.deposit_cents])).toEqual([["0-30", 2, 6000], ["31-60", 0, 0], ["61-90", 0, 0], ["90+", 1, 3000]]);
     expect(r.customers).toEqual([{ customer_id: customerId, name: "Ridgeline Tap Room", over_90: 1, oldest_at: "2026-05-01T00:00:00+00:00" }]);
+  });
+
+  it("counts an active pool with no kegs acquired, and not a retired one (#988)", async () => {
+    const fresh = await makeBrewery();
+    const freshCtx = await makeStaffCtx(fresh.id, "admin");
+    await runCommand("create_keg_pool", { name: "New kegs", kind: "owned", depositCents: 0 }, freshCtx);
+    const retired = ((await runCommand("create_keg_pool", { name: "Old kegs", kind: "owned", depositCents: 0 }, freshCtx)) as { id: string }).id;
+    await runCommand("update_keg_pool", { poolId: retired, active: false }, freshCtx);
+    const r = (await runCommand("get_keg_report", {}, freshCtx)) as Report;
+    expect(r.bySize).toEqual([]);
+    expect(r.activePools).toBe(1);
   });
 
   it("a brewer cannot read it", async () => {

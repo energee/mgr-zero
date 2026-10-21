@@ -11,6 +11,11 @@ QuickBooks setup uses server-only `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`,
 production must use `https://quickbooks.api.intuit.com`. The redirect must
 exactly match the callback registered with Intuit.
 
+A QuickBooks token refresh interrupted after Intuit answered (crash, deploy, or
+the 20-second token timeout) can leave a retired token stored, so the next
+refresh marks the connection for recovery and an Admin must reconnect; this is
+an accepted risk (#1073).
+
 `MGR_DEDICATED=1` hides the hosted-web **Create brewery** page and makes brewery
 creation refuse (403) for every caller, web or API. The database function is
 service-role only, so signed-in accounts cannot bypass the server through

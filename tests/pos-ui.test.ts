@@ -157,34 +157,43 @@ describe("POS UI truth", () => {
 });
 
 describe("Menu with no mapped Square location (#997)", () => {
-  const unmapped = (observed: number, admin: boolean) => renderToStaticMarkup(createElement(PosMenuView, {
-    model: { locations: [], selectedLocationId: "", locationName: "Square location", items: [], excluded: [], externalItems: [], setup: toPosMenuSetup(observed, admin) },
+  const unmapped = (setup: Parameters<typeof toPosMenuSetup>[0]) => renderToStaticMarkup(createElement(PosMenuView, {
+    model: { locations: [], selectedLocationId: "", locationName: "Square location", items: [], excluded: [], externalItems: [], setup: toPosMenuSetup(setup) },
   }));
 
-  it("sends an admin to connect Square when no Square location has been seen", () => {
-    const html = unmapped(0, true);
+  it.each([0, 2])("sends an admin to connect Square when it is not connected, even with %i leftover locations (#1039)", (observed) => {
+    const html = unmapped({ admin: true, connected: false, observed });
     expect(html).toContain("Connect Square, then map a Square location");
     expect(html).toMatch(/href="\/settings\/pos"[^>]*>Set up Square/);
+    expect(html).not.toContain("none is mapped");
     expect(html).not.toContain("Also in Square");
     expect(html).not.toContain("One catalog");
     expect(html).not.toContain("No mapped Square location is available.");
   });
 
   it("draws the setup action inside the empty state, under its message (#1020 review)", () => {
-    const html = unmapped(0, true);
+    const html = unmapped({ admin: true, connected: false, observed: 0 });
     expect(html).toMatch(/data-slot="empty-content"[^>]*>(?:(?!<\/div>)[\s\S])*Set up Square/);
   });
 
-  it("sends an admin to map a location when Square locations exist but none is mapped", () => {
-    const html = unmapped(2, true);
+  it("tells an admin that a connected Square has synced no locations yet, not that some were found (#1082 review)", () => {
+    const html = unmapped({ admin: true, connected: true, observed: 0 });
+    expect(html).toContain("Square is connected, but no locations are synced yet");
+    expect(html).not.toContain("were found");
+    expect(html).toMatch(/href="\/settings\/pos"[^>]*>Set up Square/);
+  });
+
+  it("sends an admin to map a location when Square is connected and its locations synced", () => {
+    const html = unmapped({ admin: true, connected: true, observed: 2 });
     expect(html).not.toContain("Connect Square");
     expect(html).toContain("none is mapped to an MGR location");
     expect(html).toMatch(/href="\/settings\/pos\/locations"[^>]*>Map Square locations/);
   });
 
-  it.each([0, 2])("gives a non-admin no settings link, only a sentence to ask an admin (%i observed)", (observed) => {
-    const html = unmapped(observed, false);
-    expect(html).toContain("Ask an admin");
+  it.each([0, 2])("gives a non-admin neutral copy and no settings link, since it cannot read the connection (%i observed)", (observed) => {
+    const html = unmapped({ admin: false, connected: null, observed });
+    expect(html).toContain("Ask an admin to check the Square connection and map a location.");
+    expect(html).not.toContain("were found");
     expect(html).not.toContain("/settings/pos");
     expect(html).not.toContain("Set up Square");
     expect(html).not.toContain("Map Square locations");
