@@ -59,8 +59,9 @@ defineCommand({
  * Sets (or releases) the standing taproom allocation for a SKU at a location —
  * inventory reserved against ATP without an order line (e.g. house pours,
  * events). Find-then-write (open row may need update, insert, or release), so
- * it is one plpgsql function per iron rule 5 (00001_baseline.sql,
- * set_standing_allocation). qty 0 releases the open allocation, if any.
+ * it is one plpgsql function per iron rule 5 (set_standing_allocation_impl,
+ * latest in 20261021095000_raise_atp_lock.sql). qty 0 releases the open
+ * allocation, if any.
  */
 defineCommand({
   name: "set_standing_allocation", description: "Set or release a standing taproom allocation (source 'taproom_standing') for a SKU at a location",
