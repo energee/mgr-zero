@@ -1,5 +1,8 @@
 import { readFileSync } from "node:fs";
-import { expect, it } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { afterEach, expect, it, vi } from "vitest";
+import { applyStoredTheme, THEME_BOOT, ThemeBoot } from "@/components/mgr/theme-boot";
 
 const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
 const layout = readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
@@ -36,26 +39,33 @@ for (const mode of [":root", ".dark"]) {
   });
 }
 
-it("keeps the pre-paint theme script inert on React client remounts", () => {
-  expect(layout).toMatch(/type=\{typeof window === "undefined" \? "text\/javascript" : "text\/plain"\}/);
-  expect(layout).toMatch(/<script[\s\S]*suppressHydrationWarning/);
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+// The server sends an executable script; a browser render gets a text/plain
+// data block, which React neither runs nor warns about (#239, #986).
+it("ThemeBoot's script runs from the server and stays inert in a browser render", () => {
+  expect(layout).toMatch(/<head>\s*<ThemeBoot \/>/);
+  expect(renderToStaticMarkup(createElement(ThemeBoot))).toContain('type="text/javascript"');
+  vi.stubGlobal("window", {});
+  expect(renderToStaticMarkup(createElement(ThemeBoot))).toContain('type="text/plain"');
 });
 
 // A notFound() or a throw before the shell flushes makes Next send its bare
-// error document and render the root layout on the client, where the inert
-// script never runs (#986). ThemeBoot re-applies the same rule on mount.
-it("re-applies the stored or OS theme when the root layout renders on the client (#986)", async () => {
-  expect(layout).toMatch(/<ThemeBoot \/>/);
-  const { applyStoredTheme } = await import("@/lib/mgr/theme");
-  for (const [stored, osDark, dark] of [["dark", false, true], ["light", true, false], [undefined, true, true], [undefined, false, false]] as const) {
-    const classes = new Set<string>();
-    Object.assign(globalThis, {
-      localStorage: { getItem: () => stored ?? null },
-      matchMedia: () => ({ matches: osDark }),
-      document: { documentElement: { classList: { add: (c: string) => classes.add(c) } } },
-    });
-    applyStoredTheme();
-    expect(classes.has("dark"), `stored ${stored}, OS dark ${osDark}`).toBe(dark);
+// error document and render the root layout on the client, where the inline
+// script can't run (#986). ThemeBoot's layout effect applies the same rule.
+it("applies the stored or OS theme, as a function and as the inline script (#986)", () => {
+  const runs = { function: applyStoredTheme, script: () => new Function(THEME_BOOT)() as void };
+  for (const [how, run] of Object.entries(runs)) {
+    for (const [stored, osDark, dark] of [["dark", false, true], ["light", true, false], [null, true, true], [null, false, false]] as const) {
+      const classes = new Set<string>();
+      vi.stubGlobal("localStorage", { getItem: () => stored });
+      vi.stubGlobal("matchMedia", () => ({ matches: osDark }));
+      vi.stubGlobal("document", { documentElement: { classList: { add: (c: string) => classes.add(c) } } });
+      run();
+      expect(classes.has("dark"), `${how}: stored ${stored}, OS dark ${osDark}`).toBe(dark);
+    }
   }
 });
 
