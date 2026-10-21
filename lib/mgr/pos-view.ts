@@ -138,12 +138,12 @@ export type PosMenuSetup = { title: string; description: string; action?: { labe
 
 /**
  * The Menu's empty state when no Square location is mapped (#997).
- * `observed` counts Square locations MGR has seen: none means Square still has
- * to be connected; some means only the mapping is missing. Point of sale
- * settings are admin-only, so only an admin gets the link; others are told to ask one.
+ * `connected` false means Square still has to be connected; true means only
+ * the mapping is missing. Point of sale settings are admin-only, so only an
+ * admin gets the link; others are told to ask one.
  */
-export function toPosMenuSetup(observed: number, admin: boolean): PosMenuSetup {
-  if (observed === 0) return admin
+export function toPosMenuSetup(connected: boolean, admin: boolean): PosMenuSetup {
+  if (!connected) return admin
     ? { title: "No Square locations yet", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" } }
     : { title: "No Square locations yet", description: "Ask an admin to connect Square and map a Square location to an MGR location." };
   return admin

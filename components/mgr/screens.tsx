@@ -2606,10 +2606,10 @@ export const SCREENS: Screen[] = [
     name: "Menu setup",
     to: { "Set up Square": "Point of sale" },
     job: "Say what Menu is missing when Square has no locations yet",
-    reads: "list_pos_locations",
+    reads: "list_pos_locations · get_pos_integration_health [admin]",
     writes: "none",
     states: [["admin", "Set up Square opens Point of sale"], ["warehouse", "no link; asks an admin, because Point of sale settings are admin-only", 1]],
-    spec: "Drawn as an admin. No Square location has been seen, so Square still has to be connected before any location can be mapped. Only an admin can open Point of sale settings, so only an admin gets the button; Warehouse reads a sentence asking an admin instead of a link that would land on No access.",
+    spec: "Drawn as an admin. Square is not connected, never or since a disconnect (seen locations outlive one), so it has to be connected before any location can be mapped. Only an admin can open Point of sale settings, so only an admin gets the button; Warehouse reads a sentence asking an admin instead of a link that would land on No access.",
     body: <PosMenuView model={{ locations: [], selectedLocationId: "", locationName: "Square location", items: [], excluded: [], externalItems: [], setup: { title: "No Square locations yet", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square" } } }} />,
   },
   {
@@ -2623,7 +2623,7 @@ export const SCREENS: Screen[] = [
     reads: "list_pos_locations",
     writes: "none",
     states: [["admin", "Map Square locations opens Square locations"], ["warehouse", "no link; asks an admin to map one", 1]],
-    spec: "Drawn as an admin. Square locations were found, so connecting is not the missing step: mapping one to an MGR location is. The copy says so rather than repeating the connect instruction. Warehouse gets no link, for the same admin-only reason as Menu setup.",
+    spec: "Drawn as an admin. Square is connected and its locations were found, so connecting is not the missing step: mapping one to an MGR location is. The copy says so rather than repeating the connect instruction. Warehouse gets no link, for the same admin-only reason as Menu setup.",
     body: <PosMenuView model={{ locations: [], selectedLocationId: "", locationName: "Square location", items: [], excluded: [], externalItems: [], setup: { title: "No Square location mapped", description: "Square locations were found, but none is mapped to an MGR location.", action: { label: "Map Square locations" } } }} />,
   },
   {

@@ -33,6 +33,12 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
     runCommand("list_bins", { locationId: location.mgrLocationId }, ctx) as Promise<Bin[]>,
   ]) : [null, [] as Bin[]];
   const model = toPosMenuModel(snapshot, mapped, location?.externalLocationId ?? "");
-  if (!location) model.setup = toPosMenuSetup(observed.length, hasAnyRole(brewery.roles, ["admin"]));
+  if (!location) {
+    // Locations outlive a disconnect, so an admin reads the connection itself (#1039). Connection
+    // health is admin-only; for others, any observed location is the best sign Square was connected.
+    const admin = hasAnyRole(brewery.roles, ["admin"]);
+    const connected = admin ? (await runCommand("get_pos_integration_health", {}, ctx) as { connected: boolean }).connected : observed.length > 0;
+    model.setup = toPosMenuSetup(connected, admin);
+  }
   return <PosMenuControl model={model} bins={bins} channels={channels} />;
 }
