@@ -17,17 +17,21 @@ import { orderAdjustLines, orderPick, orderShortPick } from "@/lib/mgr/fixtures/
 
 function elements(node: ReactNode): ReactElement<Record<string, unknown> & { children?: ReactNode }>[] {
   if (!isValidElement<Record<string, unknown> & { children?: ReactNode }>(node)) return [];
-  return [node, ...Children.toArray(node.props.children).flatMap(elements)];
+  // E.tbl cells live in its rows prop, not its children.
+  const cells = Array.isArray(node.props.rows) ? (node.props.rows as ReactNode[][]).flat() : [];
+  return [node, ...[...Children.toArray(node.props.children), ...cells].flatMap(elements)];
 }
 
 describe("shared order-entry controls", () => {
   it("binds adjustment row IDs, add/remove, decimal counts and the required reason", () => {
     const qty = vi.fn(), sku = vi.fn(), add = vi.fn(), remove = vi.fn(), reason = vi.fn();
-    const nodes = elements(AdjustLinesView({ model: toAdjustLinesViewProps(orderAdjustLines), onQuantity: qty, onSku: sku, onAdd: add, onRemove: remove, onReason: reason }));
+    // An added line (no SKU yet) carries the picker; saved lines are named rows.
+    const model = toAdjustLinesViewProps(orderAdjustLines);
+    const nodes = elements(AdjustLinesView({ model: { ...model, lines: [model.lines[0], { key: "new", added: true, name: "", detail: "", qty: "" }] }, onQuantity: qty, onSku: sku, onAdd: add, onRemove: remove, onReason: reason }));
     invoke(nodes.find(node => node.props.label === "Line 2 quantity")!, "onChange", "1.5");
     invoke(nodes.find(node => node.props.label === "Line 2 SKU")!, "onChange", "actual-id");
     invoke(nodes.find(node => node.props.children === "Add line")!, "onClick");
-    invoke(nodes.find(node => node.props.children === "Remove")!, "onClick");
+    invoke(nodes.find(node => node.props["aria-label"] === "Remove")!, "onClick");
     invoke(nodes.find(node => node.props["aria-label"] === "Reason")!, "onChange", { target: { value: "cut" } });
     expect(qty).toHaveBeenCalledWith(1, "1.5"); expect(sku).toHaveBeenCalledWith(1, "actual-id");
     expect(add).toHaveBeenCalledOnce(); expect(remove).toHaveBeenCalledWith(0); expect(reason).toHaveBeenCalledWith("cut");

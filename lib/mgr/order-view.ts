@@ -53,7 +53,8 @@ export type OrderViewModel = {
   lines: OrderLineView[];
   /** Keg deposits and one-way keg fees, frozen on the order at submit, each named with its line. */
   kegCharges: { key: string; name: string; detail: string; amount: string }[];
-  events: { key: string; at: string; event: string; detail: string }[];
+  /** `by` names the actor when the page passed actorNames. */
+  events: { key: string; at: string; event: string; by?: string; detail: string }[];
 };
 
 export type OrderSnapshot = {
@@ -101,6 +102,10 @@ export type OrderSnapshot = {
   atp: { sku_id: string; qty: number }[];
   /** get_order_cogs, passed only for roles that may run it. */
   cogs?: OrderCogs;
+  /** Display name by user id: staff @handles (list_team_members) and the
+   *  customer's portal emails (list_customer_users). An actor in neither, such
+   *  as revoked staff, reads "a user not on the team". */
+  actorNames?: Record<string, string>;
 };
 
 const titled = (status: string) => status.charAt(0).toUpperCase() + status.slice(1);
@@ -194,7 +199,7 @@ function costLineFor(order: OrderSnapshot["order"], cogs?: OrderCogs): string | 
 
 /** Map a get_order payload onto OrderView's model. Inventory frames pass a
  *  fixture snapshot through this same function. */
-export function toOrderViewProps({ order, lines, events, atp, locations, backHref, timeZone, cogs, deposits }: OrderSnapshot): OrderViewModel {
+export function toOrderViewProps({ order, lines, events, atp, locations, backHref, timeZone, cogs, deposits, actorNames }: OrderSnapshot): OrderViewModel {
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? "line"]));
   const lineNames = new Map(lines.map((l) => [l.id, l.skus?.name ?? "Line"]));
@@ -252,6 +257,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
       key: e.id,
       at: formatDateTime(e.created_at, timeZone),
       event: titled(e.event.replace(/_/g, " ")),
+      ...(actorNames ? { by: actorNames[e.actor] ?? "a user not on the team" } : {}),
       detail: e.event === "lines_adjusted"
         ? `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${typeof e.payload.reason === "string" ? ` (${e.payload.reason})` : ""}`
         : typeof e.payload.reason === "string" ? e.payload.reason : "",

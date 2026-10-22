@@ -1,7 +1,7 @@
 // lib/mgr/fixtures/orders.ts — get_order-shaped snapshots for inventory
 // frames. Views never own sample data: screens pass toXViewProps(snapshot).
 import { OUNCES_PER_BBL } from "@/lib/volume";
-import { ALS, LOC_TAPROOM, LOC_WAREHOUSE, LOCATIONS, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT, TERESA } from "./demo";
+import { ALS, branded, LOC_TAPROOM, LOC_WAREHOUSE, LOCATIONS, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT, TERESA } from "./demo";
 import type { CompleteTransferSnapshot } from "@/lib/mgr/complete-transfer-view";
 import type { ConfirmOrderSnapshot } from "@/lib/mgr/confirm-order-view";
 import type { NewOrderSnapshot } from "@/lib/mgr/new-order-view";
@@ -133,8 +133,8 @@ export const orderSubmittedRidgeline: ConfirmOrderSnapshot = {
     customers: { name: RIDGELINE.name },
   },
   lines: [
-    { id: "l-hazy", sku_id: SKU_HAZY.sku_id, qty_ordered: 4, skus: { name: SKU_HAZY.name } },
-    { id: "l-pils", sku_id: SKU_PILS.sku_id, qty_ordered: 10, skus: { name: SKU_PILS.name } },
+    { id: "l-hazy", sku_id: SKU_HAZY.sku_id, qty_ordered: 4, skus: branded(SKU_HAZY) },
+    { id: "l-pils", sku_id: SKU_PILS.sku_id, qty_ordered: 10, skus: branded(SKU_PILS) },
   ],
   atp: [
     { sku_id: SKU_HAZY.sku_id, qty: 11 },

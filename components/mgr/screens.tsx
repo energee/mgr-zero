@@ -925,9 +925,10 @@ export const SCREENS: Screen[] = [
     name: "Confirm order",
     job: "Confirm a submitted order in two taps from Today",
     reads: "get_order · get_atp",
-    writes: "confirm_order · cancel_order",
+    writes: "confirm_order · adjust_order_lines [submitted: replaces lines; allocations wait for confirm] · cancel_order",
     states: [["loading", "order-shaped skeleton"], ["stale", "line changed · refresh", 1], ["permission", "sales or admin required", 1], ["cancelled", "staged quantities become restock work · Put back clears it"]],
-    spec: "2 taps from Today: Confirm → Confirm order, only when no blocking review exists. The registration warning is the same one the Order screen shows; it links to the brand’s compliance rows and never blocks.",
+    spec: "2 taps from Today: Confirm → Confirm order, only when no blocking review exists. Lines sit under their brand, each named by its format, with the quantity as a number field: editing one asks for a Reason and swaps the verbs for Save lines and Discard changes. The registration warning is the same one the Order screen shows; it links to the brand’s compliance rows and never blocks.",
+    to: { "16 oz case": "SKU detail" },
     body: <ConfirmOrderView model={toConfirmOrderViewProps(orderSubmittedRidgeline)} fulfillmentOptions={[LOC_WAREHOUSE.name, LOC_TAPROOM.name]} complianceNote={OHIO_STOUT_NOTE} />,
   },
   {
@@ -1003,7 +1004,8 @@ export const SCREENS: Screen[] = [
     reads: "get_order",
     writes: "record_pick · resolve_short_pick",
     states: [["permission", "warehouse or admin required", 1], ["short pick", "a line below ordered opens the Short pick frame", 1], ["partly picked", "reopened after a kept-owed line · counted lines start at what was picked"], ["concurrent", "another picker changed qty"], ["cancelled", "staged · restock now", 1], ["offline", "queue whole pick set once"]],
-    spec: "2 taps from Today: Pick → Done picking (all-as-ordered only). Shortage is not a chip here: entering a count below ordered opens Short pick.",
+    spec: "2 taps from Today: Pick → Done picking (all-as-ordered only). The sheet is just the order: one table row per format (Product · Format · Ordered · Actual), the brand named once on its first row, under the customer and ship date. Shortage is not a chip here: entering a count below ordered opens Short pick.",
+    to: { "16 oz case": "SKU detail" },
     body: <PickView model={toPickViewProps(orderPick)} />,
   },
   {
