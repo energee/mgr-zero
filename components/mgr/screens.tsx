@@ -2712,7 +2712,7 @@ export const SCREENS: Screen[] = [
     reads: "get_gravity_unit",
     writes: "set_brewery_gravity_unit · set_my_gravity_unit",
     states: [["brewery default", "admins only see and set this row", 1], ["personal override", "any staff role sets their own"], ["inherit", "“Use brewery default” clears the override"]],
-    spec: "Gravity is stored in °Plato everywhere and that never changes: this screen changes only what is printed and how a typed value is read back, so an existing reading cannot move. Two controls over one value because the two audiences differ. An admin sets what the brewery reads by default, and any brewer may override it for themselves without asking anyone. A membership with no unit of its own follows the brewery, which is why the personal control offers a third option rather than an empty one. SG input accepts both spellings a brewer uses, 1.050 and 1050.",
+    spec: "Gravity is stored in °Plato everywhere and that never changes: this screen changes only what is printed and how a typed value is read back, so an existing reading cannot move. Two controls over one value because the two audiences differ. An admin sets what the brewery reads by default, and any brewer may override it for themselves without asking anyone. A membership with no unit of its own follows the brewery, which is why the personal control offers a third option rather than an empty one. SG input accepts both spellings a brewer uses, 1.050 and 1050. Gravity is the only unit chosen here, so the page is one Gravity unit section. Preview converts one sample reading from the other unit into the one in effect, so a brewer sees the conversion before relying on it.",
     body: <UnitsView model={toUnitsViewProps(unitsPlato)} />,
   },
   {
