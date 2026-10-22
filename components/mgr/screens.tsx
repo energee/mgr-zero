@@ -458,7 +458,7 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", tab: "Work", name: "Work", job: "Everything currently in motion, ordered by next due action",
     reads: "list_work", writes: "none",
     states: DEFAULT_STATES,
-    spec: "Warehouse default rows shown; the chips are the kinds the role may open (a brewer has no Purchase orders or Deliveries), each labeled with its sidebar name, and an explicit chip choice is remembered. Rows sort by urgency/due time, not newest activity.",
+    spec: "Warehouse default rows shown; the chips are the kinds the role may open (a brewer has no Purchase orders or Deliveries), each kind chip labeled with its sidebar name, and an explicit chip choice is remembered. Rows sort by urgency/due time, not newest activity.",
     body: <WorkView model={toWorkViewProps(workWarehouse)} />,
   },
   {

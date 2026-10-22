@@ -88,7 +88,7 @@ export function Qty({
  *  clickable in the inventory. `to` names the screen a tab opens (data-to)
  *  where each tab is a screen of its own, like the Work chips. `labels` is the
  *  text a tab shows when it differs from its name; the name stays the identity
- *  that `on`, `to`, `hrefs` and onChange use (the Work chips, #1104).
+ *  that `to`, `hrefs` and onChange use (the Work chips, #1104).
  *
  *  Each tab's Radix value is its index, not its name: Radix builds the tab and
  *  panel ids from the value, and a name with a space ("Packaging runs") would

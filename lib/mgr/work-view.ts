@@ -25,15 +25,19 @@ export const WORK_LABELS: Record<string, string> = Object.fromEntries(
   Object.entries(WORK_HREFS).map(([chip, href]) => [chip, chipLabel(chip, href)]),
 );
 
+/** The inventory screen each chip opens (TabBar's `to`, the explorer's
+ *  data-to and persona hiding). Not shown to anyone: WORK_LABELS is the text. */
 export const WORK_TABS: Record<string, string> = {
   all: "Work", orders: "Orders", transfers: "Transfers", batches: "Batches",
   runs: "Packaging runs", POs: "Purchase orders", routes: "Routes",
 };
 
-/** What the Work list says when the chosen chip has no rows. */
+/** What the Work list says when the chosen chip has no rows. It names no kind:
+ *  list_work never returns transfers or packaging runs, and each role sees
+ *  only some kinds, so a list of kinds would promise rows that never come. */
 export const WORK_EMPTY = {
   title: "Nothing in motion",
-  description: "An order, transfer, batch, packaging run, purchase order, or delivery appears here while it waits on its next step.",
+  description: "A row appears here when something needs your next step.",
 } satisfies EmptyState;
 
 export type WorkRowView = {
