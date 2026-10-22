@@ -149,7 +149,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Cellar addition", file: "app/(app)/cellar/cellar-addition-form.tsx" },
   { name: "Fermentation reading", file: "app/(app)/cellar/[occupancyId]/reading/page.tsx" },
   { name: "Batches", file: "app/(app)/batches/page.tsx" },
-  { name: "Schedule batch", file: "app/(app)/batches/page.tsx" },
+  { name: "New batch", file: "app/(app)/batches/page.tsx" },
   { name: "Brew day", file: "app/(app)/batches/[id]/page.tsx" },
   { name: "Brew prep", file: "app/(app)/batches/[id]/page.tsx" },
   { name: "Brew day timeline", file: "app/(app)/batches/[id]/page.tsx" },

@@ -1,7 +1,8 @@
 // lib/order-form-rules.ts — the pure "is this New order form submittable" rule
 // behind app/(app)/orders/order-form.tsx. Mirrors the create_order input schema
 // in lib/commands/orders.ts and the orders check constraint; on an empty
-// brewery it also yields the hint naming what to create first.
+// brewery it also yields the hint naming what to create first, and a "Go to"
+// sentence linking the pages where Sales can add it.
 import { andList, submitReason } from "@/lib/mgr/submit-reason";
 
 export type OrderFormReadinessInput = {
@@ -23,6 +24,11 @@ export type OrderFormReadiness = {
   reason: string | null;
   /** Set only when a select the current kind needs has no options at all. */
   hint: string | null;
+  /**
+   * "Go to Customers or Catalog." as text pieces and page links, in reading
+   * order; empty when nothing missing has a page Sales can add it on.
+   */
+  goTo: (string | { label: string; href: string })[];
 };
 
 /** Only a wholly empty spare row may be omitted from the order. */
@@ -85,13 +91,20 @@ export function orderFormReadiness(i: OrderFormReadinessInput): OrderFormReadine
   const availableSkuIds = i.availableSkuIds;
   if (availableSkuIds !== undefined && i.lines.some(line => isUnavailableSku(line.skuId, availableSkuIds))) needs.push("an available SKU on each line");
 
-  const missing: string[] = [];
-  if (i.kind === "wholesale" && i.catalog.customers === 0) missing.push("a customer");
-  if (i.catalog.locations === 0) missing.push("a location");
-  if (i.catalog.skus === 0) missing.push("a SKU");
-  const hint = missing.length === 0 ? null : `Before creating an order, add ${andList(missing)}.`;
+  // A transfer names no customer, so it never asks for one or links Customers.
+  // Only an admin can add a location (/locations offers Sales no Add), so a
+  // missing location is named but not linked.
+  const missing: { thing: string; link?: { label: string; href: string } }[] = [];
+  if (i.kind === "wholesale" && i.catalog.customers === 0) missing.push({ thing: "a customer", link: { label: "Customers", href: "/customers" } });
+  if (i.catalog.locations === 0) missing.push({ thing: "a location" });
+  if (i.catalog.skus === 0) missing.push({ thing: "a SKU", link: { label: "Catalog", href: "/catalog" } });
+  const hint = missing.length === 0 ? null : `Before creating an order, add ${andList(missing.map(m => m.thing))}.`;
 
-  return { submittable: needs.length === 0, reason: submitReason(needs), hint };
+  // At most two links (Customers, Catalog), so " or " between them reads as a list.
+  const links = missing.flatMap(m => m.link ? [m.link] : []);
+  const goTo = links.length === 0 ? [] : ["Go to ", ...links.flatMap((link, k) => k === 0 ? [link] : [" or ", link]), "."];
+
+  return { submittable: needs.length === 0, reason: submitReason(needs), hint, goTo };
 }
 
 /** Initial destination only; a caller's explicit draft selection stays authoritative. */
