@@ -42,9 +42,10 @@ describe("SCREENS", () => {
     expect(String(SCREENS.find((s) => s.name === "Brew day")!.writes)).toContain("record_brew_day");
   });
 
-  it("sets the brewery's source water once, in Settings", () => {
+  it("links Source water in Settings to the Water profiles catalog", () => {
     const settings = text("Settings");
     expect(settings).toMatch(/Source water/);
+    expect(SCREENS.find((s) => s.name === "Settings")!.to?.["Source water"]).toBe("Water profiles");
   });
 
   it("makes a recipe version executable without restating the batch size", () => {
@@ -566,8 +567,11 @@ describe("SCREENS", () => {
     expect(sku).not.toMatch(/bbl per unit|Units per case|Package BOM|Packaging overrides/);
 
     const format = body("Format");
-    expect(format).toContain('aria-label="Size of one container"');
-    expect(format).toMatch(/data-slot="input-group"[\s\S]*aria-label="Size of one container"[\s\S]*role="tablist"/);
+    // The visible label names the input (no aria-label overriding it), and the unit bar rides in its group.
+    const sizeId = /<label[^>]*for="([^"]+)"[^>]*>Size of one container<\/label>/.exec(format)?.[1];
+    expect(sizeId).toBeTruthy();
+    expect(format).toMatch(new RegExp(`data-slot="input-group"[\\s\\S]*<input[^>]*id="${sizeId}"[\\s\\S]*role="tablist"`));
+    expect(format).not.toContain('aria-label="Size of one container"');
     expect(format).toContain("Container");
     expect(format).toContain("Beer per package");
     expect(format).toContain("Containers per package");
@@ -916,7 +920,7 @@ describe("SCREENS", () => {
     expect(body("Brand")).not.toContain("tax class");
     expect(JSON.stringify(brand.states)).toMatch(/tax class/);
     // Every date field is the calendar picker; no screen falls back to the OS date input.
-    for (const name of ["New order", "Schedule batch", "Schedule packaging run", "Receive PO", "Brew day", "Packaging plan"]) {
+    for (const name of ["New order", "New batch", "Schedule packaging run", "Receive PO", "Brew day", "Packaging plan"]) {
       expect(html(name), name).toContain('data-slot="popover-trigger"');
     }
     for (const s of SCREENS) {
@@ -942,7 +946,7 @@ describe("SCREENS", () => {
     const named = [
       "Today", "Taproom", "Order", "Cellar map", "Tap board", "Swap keg",
       "Weekly count", "Brew day", "Route", "Settings", "Brand", "Vendors",
-      "Planning", "Schedule batch", "Vessel detail", "Kick keg", "Return route",
+      "Planning", "New batch", "Vessel detail", "Kick keg", "Return route",
     ];
     const filled = (html: string) =>
       (html.match(/<button\b[^>]*>/g) ?? []).filter((b) =>

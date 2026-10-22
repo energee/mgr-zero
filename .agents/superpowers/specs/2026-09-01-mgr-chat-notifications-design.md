@@ -403,7 +403,8 @@ The worker:
 - stops retrying permanent auth/destination errors;
 - never logs raw provider errors or tokens;
 - never derives MGR truth from the existing chat message;
-- exposes lease expiry so another invocation can recover a crash.
+- exposes lease expiry so another invocation can recover a crash;
+- stops the batch once its lease has lapsed or has under five seconds left, before working on the next row and again before each send or update. It leaves the remaining rows for lease expiry to return to `retrying`, so a slow batch does not start a send after its lease could have been handed to another worker.
 
 No always-on process is required initially. Scheduler and worker hosts are selected after deployment ownership is established, but their authenticated interfaces and database contracts are fixed by this design.
 
@@ -620,6 +621,7 @@ Never log OAuth codes, access/refresh tokens, client/signing/encryption secrets,
 | Provider/network `5xx` | Bounded exponential backoff with jitter |
 | Permanent provider `4xx` | Terminal redacted failure; no retry loop |
 | Worker crash | Lease expires and another invocation retries |
+| Batch outlives its lease | Batch stops when under 5s of lease is left; the next lease call recovers the remaining rows |
 | Scheduler outage | Outstanding/lookback scan recovers missed work using same due-window key |
 | Item resolves before send | Revalidation suppresses delivery |
 | Item changes after render | Reject stale action; update/refresh/deep-link |

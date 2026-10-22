@@ -18,6 +18,8 @@ describe("resolveTap", () => {
     expect(resolveTap(by("Batches"), "B-0409")).toBe("Brew day");
     expect(resolveTap(by("Batches"), "FV1")).toBe("Vessel detail");
     expect(resolveTap(by("Batches"), "Reading")).toBe("Fermentation reading");
+    expect(resolveTap(by("Batches"), "New batch")).toBe("New batch");
+    expect(resolveTap(by("New batch"), "Schedule batch")).toBe("Batches");
   });
   it("opens the live invitation sheet and import route", () => {
     for (const name of ["Team", "First-run checklist"]) {
