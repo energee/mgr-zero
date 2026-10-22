@@ -73,10 +73,11 @@ export type SquareSalesFact = SquareOrderSnapshot & {
   sourceHash: string;
 };
 
+/** One Square item: a beer's pours ("poured"), or its case stock sold as "<Beer> Four Pack" ("packaged"). `brand` is the item name. */
 export type SquarePublicationSource = {
   brandId: string;
   brand: string;
-  catalogGroup: "poured";
+  catalogGroup: "poured" | "packaged";
   locationId: string;
   ownership: "mgr" | "adopted";
   externalItemId: string | null;
