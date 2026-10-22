@@ -64,11 +64,12 @@ const said = (cell: ReactNode) => cell != null && cell !== false;
 /** The name as a link (live) or a tap (inventory); it covers its whole record.
  *  A live name without a link is plain text, so nothing looks tappable. */
 function name(row: RecordTableRow) {
-  if (row.href === null) return <span className="font-medium wrap-anywhere">{row.cells[0]}</span>;
   const cls = cn(RECORD_LINK, "after:absolute after:inset-0");
-  return row.href
-    ? <Link href={row.href} data-to={row.to} className={cls}>{row.cells[0]}</Link>
-    : <Button variant="link" type="button" data-tap data-to={row.to} className={cn(cls, "h-auto p-0 text-foreground")}>{row.cells[0]}</Button>;
+  return row.href === null
+    ? <span className="font-medium wrap-anywhere">{row.cells[0]}</span>
+    : row.href
+      ? <Link href={row.href} data-to={row.to} className={cls}>{row.cells[0]}</Link>
+      : <Button variant="link" type="button" data-tap data-to={row.to} className={cn(cls, "h-auto p-0 text-foreground")}>{row.cells[0]}</Button>;
 }
 
 export function RecordTable({ headers, align, rows: given, sortable = true }: {
