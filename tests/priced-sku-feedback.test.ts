@@ -45,7 +45,7 @@ it("distinguishes cold loading, offline, failure and genuine empty pricing", () 
 it("keeps cached eligible choices on failed refetch with recovery feedback", () => {
   state.data = [{ id: "sku", name: "Keg", brands: null }]; state.error = new Error("Refresh failed");
   const props = view();
-  expect(props.disabled).toBe(false);
+  expect(props.reason).toBeNull();
   expect(props.model.skus).toHaveLength(1);
   expect(renderToStaticMarkup(props.skuFeedback)).toContain("Showing last-known data");
   expect(renderToStaticMarkup(props.skuFeedback)).toContain("Dec 31, 1969, 4:00 PM");
@@ -58,11 +58,11 @@ it("flags customer-incompatible selections without deleting IDs or quantities an
   state.data = [{ id: "other", name: "Other Keg", brands: null }];
   const props = view();
   expect(props.model.lines[0]).toMatchObject({ skuId: "sku", qty: "3", name: "Fixture Beer Keg", skuError: expect.stringContaining("unavailable") });
-  expect(props.disabled).toBe(true);
+  expect(props.reason).toBe("Still needed: an available SKU on each line.");
   const blocked = { preventDefault: vi.fn(), stopPropagation: vi.fn() }; form().props.onSubmit(blocked);
   expect(state.submit).not.toHaveBeenCalled(); expect(blocked.preventDefault).toHaveBeenCalled(); expect(blocked.stopPropagation).toHaveBeenCalled();
   state.data = [{ id: "sku", name: "Keg", brands: null }];
-  expect(view().disabled).toBe(false);
+  expect(view().reason).toBeNull();
   expect(view().model.lines[0].skuError).toBeUndefined();
   const allowed = { preventDefault: vi.fn() }; form().props.onSubmit(allowed);
   expect(state.submit).toHaveBeenCalledWith(allowed);
@@ -99,7 +99,8 @@ it("asks the existing query for each customer channel and disables it without a 
 });
 it("renders error linkage and genuine empty guidance through the actual shared view", () => {
   state.data = [];
-  const props = view(); state.useState.mockReturnValue([false, vi.fn()]);
+  // The shared view's own state (picker open, touched lines) starts at its real initial value.
+  const props = view(); state.useState.mockImplementation((initial: unknown) => [typeof initial === "function" ? initial() : initial, vi.fn()]);
   const html = renderToStaticMarkup(createElement(NewOrderView, props));
   expect(html).toContain('id="test-error-sku-0"');
   expect(html).toContain('aria-describedby="test-error-sku-0"');
