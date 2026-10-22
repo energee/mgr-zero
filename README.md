@@ -291,4 +291,4 @@ Operator procedures live in `docs/operations/`:
 - [Buyer order-confirmation email](docs/operations/order-email-worker.md) — delivery worker, schedule, failure log categories, retries.
 - [Data retention and closing a brewery](docs/operations/brewery-retention.md) — command-record prune job, brewery export and close.
 - [E2E runners](docs/operations/e2e-runners.md) — `bun run test:e2e` and the mobile command-surface regression.
-- [Documentation agent](docs/operations/documentation-agent.md) — post-merge audit of the staff and portal field manuals.
+- [Documentation agent](docs/operations/documentation-agent.md) — post-merge audit of the staff and portal field manuals, integration of newly added Markdown, and `Docs gap:` issues for what it overlooks.

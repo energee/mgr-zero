@@ -50,7 +50,7 @@ function checkBundle(
     edit(producer);
     const validated = spawnSync("bash", ["-e", "-o", "pipefail", "-c", validation], {
       cwd: producer,
-      env: { ...env, GITHUB_OUTPUT: join(root, "output"), DREAM_SHA: "", DREAM_LOGIN: "Fixture", DREAM_EMAIL: "fixture@example.invalid" },
+      env: { ...env, GITHUB_OUTPUT: join(root, "output"), RUNNER_TEMP: root, DREAM_SHA: "", DREAM_LOGIN: "Fixture", DREAM_EMAIL: "fixture@example.invalid" },
       encoding: "utf8",
     });
     expect(validated.status, validated.stderr).toBe(0);
@@ -323,6 +323,30 @@ describe("dreaming workflow", () => {
     checkBundle((repo) => rmSync(join(repo, "AGENTS.md")), ({ published, publisher }) => {
       expect(published.status, published.stderr?.toString()).toBe(0);
       expect(existsSync(join(publisher, "AGENTS.md"))).toBe(false);
+    });
+  });
+
+  it("integrates new documentation and reports gaps through a deterministic job", () => {
+    const prompt = read(".agents/agents/dreaming.md");
+    const source = read(".github/workflows/dreaming.yml");
+    const jobs = (load(source) as { jobs: Record<string, { permissions: Record<string, string> }> }).jobs;
+
+    expect(source).toContain("--diff-filter=A \"$ACCEPTED_BASE\" \"$MAIN_HEAD\" -- '*.md' '*.mdx' > .git/dream-new-docs.txt");
+    expect(prompt).toContain("## Integrate new and missed documentation");
+    expect(prompt).toContain(".dream-findings.jsonl");
+    expect(jobs.maintain.permissions.issues).toBe("read");
+    expect(jobs.report.permissions.issues).toBe("write");
+    expect(source).toContain('scripts/file-doc-findings.sh "$RUNNER_TEMP/dream-findings.jsonl"');
+  });
+
+  it("keeps findings out of the dream and accepts integrated specs", () => {
+    checkBundle((repo) => {
+      mkdirSync(join(repo, ".agents/superpowers/specs"), { recursive: true });
+      writeFileSync(join(repo, ".agents/superpowers/specs/a.md"), "linked\n");
+      writeFileSync(join(repo, ".dream-findings.jsonl"), '{"title":"x","body":"y"}\n');
+    }, ({ published, publisher, base }) => {
+      expect(published.status, published.stderr?.toString()).toBe(0);
+      expect(git(publisher, "diff", "--name-only", base, "HEAD")).toBe(".agents/superpowers/specs/a.md");
     });
   });
 

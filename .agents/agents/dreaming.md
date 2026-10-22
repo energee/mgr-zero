@@ -16,6 +16,9 @@ consolidation: make the living agent docs match reality, citing evidence.
 - .agents/DRIFT.md
 - AGENTS.md
 - .agents/agents/*.md
+- .agents/superpowers/specs/*.md and .agents/superpowers/plans/*.md, only to
+  integrate documentation (below)
+- .dream-findings.jsonl, for overlooked documentation (below)
 
 `TODO.md` is edited only by `scripts/pr-directives.ts`, which runs before you.
 Leave it alone.
@@ -80,6 +83,34 @@ by hand; capture it here so the next session starts with the guard.
   Negative that would have prevented it, add an unchecked `.agents/DRIFT.md`
   item proposing one; never add a Negative yourself.
 - A single occurrence is not a pattern; leave it.
+
+## Integrate new and missed documentation
+`.git/dream-new-docs.txt` lists the Markdown files added in the window. Read
+each, then make the agent docs read as if they had been written together:
+- Link a new spec, plan, or runbook from the place an agent would look for it:
+  the `AGENTS.md` "Where to look" table for a new area, `.agents/ARCHITECTURE.md`
+  for a new owner, or the spec it extends.
+- Fold its durable decisions into `.agents/MEMORY.md`, citing the file.
+- Where two specs or plans state the same thing, keep it in the newer one and
+  replace the older passage with a link. A plan that a newer one replaces gets a
+  one-line `Superseded by <path>` at its top.
+- Also look past the window: an older document no agent doc links to is missed
+  documentation; integrate it the same way.
+- Never move, rename, or delete a file. Never rewrite a spec's design decision
+  to match the code; that contradiction is drift (below).
+
+Documentation outside your editable files (`docs/`, `README.md`,
+`content/docs/`) belongs to the documentation agent. When it is unlinked,
+duplicated, or contradicts a newer document, report it instead of editing it.
+
+## Overlooked documentation
+Write each gap you cannot fix to `.dream-findings.jsonl`, one JSON object per
+line: `{"title": "...", "body": "..."}`. The workflow files each as a GitHub
+issue (at most five a run, skipping titles already open); you cannot run
+`gh issue` yourself. Title: under 100 characters, naming the file. Body: the
+evidence (paths, PRs) and the suggested fix. Write nothing to this file when
+there is nothing to report. Drift between a read-only artifact and the code
+stays in `.agents/DRIFT.md`, not here.
 
 ## Flag, never fix
 Drift in read-only artifacts — specs, wireframes, code, workflows — is durable
