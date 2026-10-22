@@ -82,7 +82,7 @@ Run every row in order. Take a screenshot at each **Evidence** cell.
 | # | Action | Expected | Evidence |
 | --- | --- | --- | --- |
 | J1 | Sign in, open any staff page, select the Ask MGR handle (or Command-K) | Drawer opens. Header shows **Retry setup** while setup loads, then **New chat** and the model name | Drawer with model name |
-| J2 | If the composer stays disabled, select **Retry setup** once | Setup finishes and the message box enables. Record how many retries it took | Enabled box |
+| J2 | If the composer stays disabled, select **Retry setup** once | Setup finishes and the message box enables. If setup takes over 15 seconds, the drawer shows "Ask MGR could not start. Check your connection, then try again." with **Try again**; selecting it once opens the same conversation, not a new one. Record how many retries it took and whether the timeout appeared | Enabled box, or the timeout error |
 | J3 | Send `What inventory is available?` | Text streams in. It names real SKUs from the test brewery, with an observation time. **Stop response** shows while streaming | Finished answer |
 | J4 | Note the SKU's on-hand, then send `Record an adjustment of +1 <a real SKU> at <a real location>, bin <a real bin>` | MGR asks one focused question if a field is missing. Then a **Composer proposal** card shows the server preview, with **Open as form**, **Dismiss**, and **Commit movement** | Proposal card |
 | J5 | Before committing, check the SKU's on-hand in another tab. Then select **Dismiss** | On-hand is unchanged: a proposal records nothing. Record whether the card closes | On-hand, and the card after Dismiss |

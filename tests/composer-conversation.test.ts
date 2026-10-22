@@ -1,12 +1,13 @@
 // Shared live/explorer conversation surface and its interaction affordances.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ComposerConversationView } from "@/components/mgr/views/composer-conversation";
 import { ComposerStripView, isSendKey } from "@/components/mgr/views/composer-strip";
 import { ComposerUnavailableView } from "@/components/mgr/composer-load-boundary";
 import { OfflineOutboxView } from "@/components/mgr/views/composer";
-import { COMPOSER_SETUP_TIMEOUT_MESSAGE, loadComposerSetup } from "@/lib/composer/setup";
+import { COMPOSER_SETUP_TIMEOUT_MESSAGE, COMPOSER_SETUP_TIMEOUT_MS, loadComposerSetup } from "@/lib/composer/setup";
 
 describe("composer conversation surface", () => {
   it("renders a transcript, activity, recovery and conversation controls", () => {
@@ -105,15 +106,27 @@ it("shows progress while the chat interface itself loads (#1105)", () => {
 
 describe("composer setup load (#1105)", () => {
   type Call = { name: string; requestId?: string; signal: AbortSignal };
-  const fake = (answers: Record<string, unknown>, calls: Call[] = []) =>
-    async (name: string, _input: unknown, requestId: string | undefined, signal: AbortSignal) => {
+  type Run = (name: string, input: unknown, requestId: string | undefined, signal: AbortSignal) => Promise<unknown>;
+  const fake = (answers: Record<string, unknown>, calls: Call[] = []): Run =>
+    async (name, _input, requestId, signal) => {
       calls.push({ name, requestId, signal });
       return answers[name];
     };
+  const hang = (calls: Call[] = []): Run => (name, _input, requestId, signal) => {
+    calls.push({ name, requestId, signal });
+    return new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(signal.reason)));
+  };
+  // AbortSignal.timeout ignores fake timers, so the test owns the timeout signal.
+  const clock = () => {
+    const controller = new AbortController();
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(controller.signal);
+    return { timeout, expire: () => controller.abort(new DOMException("signal timed out", "TimeoutError")) };
+  };
+  afterEach(() => { vi.restoreAllMocks(); });
 
-  it("restores the latest conversation's text turns, bounded by the caller's signal", async () => {
+  it("restores the latest conversation's text turns, bounded by the setup timeout", async () => {
     const calls: Call[] = [];
-    const signal = new AbortController().signal;
+    const { timeout } = clock();
     const setup = await loadComposerSetup(fake({
       list_chat_conversations: [{ id: "latest" }, { id: "older" }],
       get_chat_history: { messages: [
@@ -122,31 +135,53 @@ describe("composer setup load (#1105)", () => {
         { id: "a", role: "assistant", content: null },
         { id: "b", role: "assistant", content: "Hello" },
       ] },
-    }, calls), "create-request", signal);
+    }, calls), { current: undefined }, new AbortController().signal);
     expect(setup.conversationId).toBe("latest");
     expect(setup.messages.map((message) => [message.id, message.role])).toEqual([["u", "user"], ["b", "assistant"]]);
     expect(calls.map((call) => call.name)).toEqual(["list_chat_conversations", "get_chat_history"]);
-    expect(calls.every((call) => call.signal === signal)).toBe(true);
+    expect(timeout).toHaveBeenCalledWith(COMPOSER_SETUP_TIMEOUT_MS);
   });
 
-  it("creates the first conversation with the caller's request id so a retry stays idempotent", async () => {
-    const calls: Call[] = [];
-    const setup = await loadComposerSetup(fake({ list_chat_conversations: [], create_chat_conversation: { id: "new" } }, calls), "create-request", new AbortController().signal);
+  it("a retry after a timed-out create reuses the same request id, so no second conversation results", async () => {
+    const createRequest = { current: undefined as string | undefined };
+    const first: Call[] = [];
+    const { expire } = clock();
+    const answers = { list_chat_conversations: [] };
+    const timedOut = loadComposerSetup(async (name, input, requestId, signal) => name === "create_chat_conversation" ? hang(first)(name, input, requestId, signal) : fake(answers, first)(name, input, requestId, signal), createRequest, new AbortController().signal);
+    await vi.waitFor(() => expect(first.map((call) => call.name)).toContain("create_chat_conversation"));
+    expire();
+    await expect(timedOut).rejects.toThrow(COMPOSER_SETUP_TIMEOUT_MESSAGE);
+    const second: Call[] = [];
+    clock();
+    const setup = await loadComposerSetup(fake({ ...answers, create_chat_conversation: { id: "new" } }, second), createRequest, new AbortController().signal);
     expect(setup).toEqual({ conversationId: "new", messages: [] });
-    expect(calls.find((call) => call.name === "create_chat_conversation")?.requestId).toBe("create-request");
+    const ids = [...first, ...second].filter((call) => call.name === "create_chat_conversation").map((call) => call.requestId);
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(1);
   });
 
-  it("turns a timed-out load into the clear setup failure", async () => {
-    const controller = new AbortController();
-    const hang = (_name: string, _input: unknown, _requestId: string | undefined, signal: AbortSignal) =>
-      new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(signal.reason)));
-    const load = loadComposerSetup(hang, "create-request", controller.signal);
-    controller.abort(new DOMException("signal timed out", "TimeoutError"));
+  it("an abort that command() reports as a malformed response is still the timeout", async () => {
+    const { expire } = clock();
+    const load = loadComposerSetup(async () => { expire(); throw new Error("malformed response (200)"); }, { current: undefined }, new AbortController().signal);
     await expect(load).rejects.toThrow(COMPOSER_SETUP_TIMEOUT_MESSAGE);
+  });
+
+  it("a superseded load stops its requests and does not report a timeout", async () => {
+    clock();
+    const replaced = new AbortController();
+    const calls: Call[] = [];
+    const load = loadComposerSetup(hang(calls), { current: undefined }, replaced.signal);
+    replaced.abort();
+    await expect(load).rejects.toMatchObject({ name: "AbortError" });
+    expect(calls.map((call) => call.name)).toEqual(["list_chat_conversations"]);
   });
 
   it("keeps a server failure's own message", async () => {
     const fail = async () => { throw new Error("Chat is not enabled for this brewery"); };
-    await expect(loadComposerSetup(fail, "create-request", new AbortController().signal)).rejects.toThrow("Chat is not enabled for this brewery");
+    await expect(loadComposerSetup(fail, { current: undefined }, new AbortController().signal)).rejects.toThrow("Chat is not enabled for this brewery");
+  });
+
+  it("the staff guide states the live timeout", () => {
+    expect(readFileSync("content/docs/staff-guide.mdx", "utf8")).toContain(`${COMPOSER_SETUP_TIMEOUT_MS / 1000} seconds`);
   });
 });

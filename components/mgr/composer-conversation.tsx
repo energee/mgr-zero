@@ -9,7 +9,7 @@ import { ComposerProposalView } from "@/components/mgr/views/composer";
 import { ComposerStripView } from "@/components/mgr/views/composer-strip";
 import { command } from "@/lib/commands/client";
 import { composerMessageText, latestComposerProposal } from "@/lib/chat/messages";
-import { COMPOSER_SETUP_ACTIVITY, COMPOSER_SETUP_TIMEOUT_MS, loadComposerSetup } from "@/lib/composer/setup";
+import { COMPOSER_SETUP_ACTIVITY, loadComposerSetup } from "@/lib/composer/setup";
 import { movementFormHref } from "@/lib/composer/state";
 
 export default function ComposerConversation({ open, onOpenChange, focusRequest, outboxCount, onOutbox, children }: {
@@ -35,12 +35,13 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
   const [receipt, setReceipt] = useState<string>();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const focusedRequest = useRef(0);
-  // Identifies the current setup load; a superseded run drops its response.
-  const setupRun = useRef(0);
+  // The current setup load. Starting another (Retry setup, Try again) aborts
+  // it, so a superseded load stops its requests and drops its response.
+  const setupLoad = useRef<AbortController>(undefined);
   // One create_chat_conversation identity for every setup attempt, so a retry
   // after a timeout cannot create a second conversation.
   const setupConversationRequest = useRef<string>(undefined);
-  const run = (name: string, input: unknown, requestId?: string, provenance?: Parameters<typeof command>[5]) => command(breweryId, name, input, requestId, expectedContext, provenance);
+  const run = (name: string, input: unknown, requestId?: string, provenance?: Parameters<typeof command>[5], signal?: AbortSignal) => command(breweryId, name, input, requestId, expectedContext, provenance, signal);
   const transport = useMemo(() => new DefaultChatTransport({
     api: "/api/chat",
     prepareSendMessagesRequest: ({ id, messages }) => ({ body: {
@@ -60,26 +61,22 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
 
   // Restores (or creates) the server-owned conversation for this actor/brewery
   // scope. Named so Try again can re-run the load that failed (#329) rather
-  // than only regenerating the last AI turn; `live` drops a response the scope
-  // outlived. The timeout ends a stalled load in that same failure (#1105).
-  async function loadSetup(live: () => boolean) {
+  // than only regenerating the last AI turn. loadComposerSetup's timeout ends
+  // a stalled load in that same failure (#1105).
+  async function loadSetup(superseded: AbortSignal) {
     try {
-      const setup = await loadComposerSetup(
-        (name, input, requestId, signal) => command(breweryId, name, input, requestId, expectedContext, undefined, signal),
-        setupConversationRequest.current ??= crypto.randomUUID(),
-        AbortSignal.timeout(COMPOSER_SETUP_TIMEOUT_MS),
-      );
-      if (!live()) return;
+      const setup = await loadComposerSetup((name, input, requestId, signal) => run(name, input, requestId, undefined, signal), setupConversationRequest, superseded);
+      if (superseded.aborted) return;
       setInitialMessages(setup.messages); setConversationId(setup.conversationId);
-    } catch (cause) { if (live()) failed(cause, "Composer unavailable", reloadSetup); }
+    } catch (cause) { if (!superseded.aborted) failed(cause, "Composer unavailable", reloadSetup); }
   }
 
-  // A retry outlives the scope it started in, so the reload holds the scope it
-  // was issued for and a later one supersedes it.
+  // Starts a setup load and supersedes the one in flight.
   function reloadSetup() {
-    const issued = ++setupRun.current;
+    setupLoad.current?.abort();
+    const load = setupLoad.current = new AbortController();
     setFailure(undefined);
-    void loadSetup(() => issued === setupRun.current);
+    void loadSetup(load.signal);
   }
 
   function retry() {
@@ -88,9 +85,8 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
   }
 
   useEffect(() => {
-    if (!open || setupRun.current > 0) return;
-    const issued = ++setupRun.current;
-    void loadSetup(() => issued === setupRun.current);
+    if (!open || setupLoad.current) return;
+    reloadSetup();
     // One restore per actor/brewery scope, only when the drawer is needed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, breweryId, expectedContext.actorId]);
