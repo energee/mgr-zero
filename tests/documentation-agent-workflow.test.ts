@@ -143,7 +143,28 @@ describe("documentation agent workflow", () => {
   it("rejects edits outside the allowed guide suite before artifact transfer", () => {
     checkPublication((repo) => writeFileSync(join(repo, "content/docs/screens.mdx"), "forbidden\n"), ({ validated, published }) => {
       expect(validated.status).toBe(1);
-      expect(validated.stdout).toContain("outside the guide suite");
+      expect(validated.stdout).toContain("outside the guides, README.md, and the docs this change added");
+      expect(published).toBeUndefined();
+    });
+  });
+
+  // Outside the guides, only README.md and the docs this change added are writable,
+  // so injected PR text cannot steer the agent into rewriting an existing runbook.
+  it("accepts edits to a doc the change added and rejects edits to any other docs page", () => {
+    const added = (repo: string) => writeFileSync(join(repo, ".docs-agent-new-docs.txt"), "docs/operations/new.md\n");
+    checkPublication((repo) => {
+      added(repo);
+      mkdirSync(join(repo, "docs/operations"), { recursive: true });
+      writeFileSync(join(repo, "docs/operations/new.md"), "integrated\n");
+      writeFileSync(join(repo, "README.md"), "linked\n");
+    }, ({ validated }) => expect(validated.status, validated.stdout).toBe(0));
+    checkPublication((repo) => {
+      added(repo);
+      mkdirSync(join(repo, "docs/operations"), { recursive: true });
+      writeFileSync(join(repo, "docs/operations/release-checklist.md"), "rewritten\n");
+    }, ({ validated, published }) => {
+      expect(validated.status).toBe(1);
+      expect(validated.stdout).toContain("docs/operations/release-checklist.md");
       expect(published).toBeUndefined();
     });
   });

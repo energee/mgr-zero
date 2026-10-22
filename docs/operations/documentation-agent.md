@@ -19,8 +19,10 @@ Markdown files the merged PR added (on a weekly or manual audit, those added in
 the last eight days) are integrated too: customer-visible behavior is folded
 into the guides, and a new `docs/` page is linked from `README.md` and
 deduplicated against existing `docs/` pages. For that the agent may also edit
-`docs/**/*.md` and `README.md`, never move or delete a file, and never touch
-`.agents/` (dreaming integrates agent docs the same way, daily).
+`README.md` and the `docs/` pages the change added, never an existing runbook
+(the validate step enforces this, so injected PR text cannot rewrite one). It
+never moves or deletes a file or touches `.agents/` (dreaming integrates agent
+docs the same way, daily). The docs PR body lists any non-guide file it edits.
 
 Whatever either agent finds but may not fix (an unplaceable document, two
 documents that contradict each other, an unlinked page in the other agent's

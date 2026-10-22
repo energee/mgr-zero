@@ -77,7 +77,7 @@ jobs:
           show_full_output: false
           settings: .github/claude-ci-settings.json
           # Bounded guide maintenance does not need the expensive reasoning tier.
-          claude_args: '--model haiku --allowedTools "Read,Grep,Glob,Edit(content/docs/index.mdx),Write(content/docs/index.mdx),Edit(content/docs/staff-guide.mdx),Write(content/docs/staff-guide.mdx),Edit(content/docs/portal-guide.mdx),Write(content/docs/portal-guide.mdx),Edit(docs/**),Write(docs/**),Edit(README.md),Write(README.md),Write(.docs-agent-findings.jsonl)"'
+          claude_args: '--model haiku --allowedTools "Read,Grep,Glob,Edit(content/docs/index.mdx),Write(content/docs/index.mdx),Edit(content/docs/staff-guide.mdx),Write(content/docs/staff-guide.mdx),Edit(content/docs/portal-guide.mdx),Write(content/docs/portal-guide.mdx),Edit(docs/**/*.md),Write(docs/**/*.md),Edit(README.md),Write(README.md),Write(.docs-agent-findings.jsonl)"'
 
       - name: Validate the generated guide
         id: validate
@@ -85,6 +85,10 @@ jobs:
           # The agent may create a guide, not only edit one; git diff never sees
           # an untracked file, so the run would report no changes and bin the work.
           # The job's own scratch files go first so `git add -A` stays honest.
+          # Outside the guides, the agent may change only README.md and the docs/ pages this
+          # change added, so injected PR text cannot steer it into rewriting an existing runbook.
+          allowed=$(printf '%s\n' content/docs/index.mdx content/docs/staff-guide.mdx content/docs/portal-guide.mdx README.md
+            grep -E '^docs/.+\.md$' .docs-agent-new-docs.txt 2>/dev/null || true)
           rm -f .docs-agent-pr.diff .docs-agent-pr.json .docs-agent-new-docs.txt
           # Overlooked-documentation findings become issues in the report job, never part of the patch.
           if [ -s .docs-agent-findings.jsonl ]; then
@@ -98,9 +102,9 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          unexpected=$(printf '%s\n' "$changed" | grep -Ev '^(content/docs/(index|staff-guide|portal-guide)\.mdx|docs/.+\.md|README\.md)$' || true)
+          unexpected=$(printf '%s\n' "$changed" | grep -vxF "$allowed" || true)
           if [ -n "$unexpected" ]; then
-            echo "Documentation agent changed files outside the guide suite and Markdown docs:"
+            echo "Documentation agent changed files outside the guides, README.md, and the docs this change added:"
             echo "$changed"
             exit 1
           fi
@@ -222,6 +226,11 @@ jobs:
 
           open_pr=$(gh pr list --base main --head documentation/user-guide --state open --json number --jq '.[0].number // empty')
           body="Updates the customer-facing MGR field manual after $doc_source. The documentation agent audited every current user-facing route, not only the triggering change."
+          # Make non-guide edits (README.md, newly added docs/ pages) visible to the reviewer.
+          extra=$(git diff --name-only HEAD^ HEAD | grep -v '^content/docs/' || true)
+          if [ -n "$extra" ]; then
+            body=$(printf '%s\n\n**Also edits, to integrate newly added docs:**\n%s' "$body" "$(printf -- '- `%s`\n' $extra)")
+          fi
           if [ -n "$open_pr" ]; then
             gh pr edit "$open_pr" --title "docs: refresh customer field manual" --body "$body"
           else

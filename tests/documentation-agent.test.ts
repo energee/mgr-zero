@@ -19,7 +19,7 @@ describe("post-merge documentation maintainer", () => {
     expect(prompt).toContain("content/docs/portal-guide.mdx");
     expect(prompt).toContain("every current user-facing route");
     expect(prompt).toContain("Do not limit the review to the merged diff");
-    expect(prompt).toContain("Edit only those three MDX files, plus `docs/**/*.md` and `README.md`");
+    expect(prompt).toContain("Edit only those three MDX files, plus `README.md` and the `docs/` pages listed");
     expect(prompt).toContain("fields, choices, defaults, units, and limits");
     expect(prompt).toContain("success, empty, validation, permission, and failure states");
   });
@@ -57,7 +57,7 @@ describe("post-merge documentation maintainer", () => {
     // The agent may write only the guides, and only vitest specifies their
     // shape: a second copy of those rules in shell would drift (see the
     // workflow's validate step).
-    expect(workflow).toContain("content/docs/(index|staff-guide|portal-guide)");
+    expect(workflow).toContain("content/docs/index.mdx content/docs/staff-guide.mdx content/docs/portal-guide.mdx README.md");
     expect(workflow).toMatch(/Edit\(content\/docs\/[a-z-]+\.mdx\)/);
     expect(workflow).not.toMatch(/grep[^\n]*\$guide/);
     expect(workflow).toContain("documentation/user-guide");

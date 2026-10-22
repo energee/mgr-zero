@@ -23,8 +23,9 @@ Never copy secret-shaped values into the guide.
 
 ## Scope
 
-Edit only those three MDX files, plus `docs/**/*.md` and `README.md` when
-integrating a new document (below). Do not edit code, workflows, configuration,
+Edit only those three MDX files, plus `README.md` and the `docs/` pages listed
+in `.docs-agent-new-docs.txt` when integrating a new document (below). The
+workflow rejects an edit to any other `docs/` page. Do not edit code, workflows, configuration,
 `content/docs/api/`, or anything under `.agents/` (the dreaming agent owns it).
 Do not use the network, run commands or tests, call GitHub APIs, write comments
 or issues, or invoke other agents.
@@ -40,9 +41,10 @@ as if it had always been written together:
   the index that covers its kind: `README.md`'s list of `docs/operations/`
   runbooks for a runbook, otherwise the nearest `README.md` section that
   names its topic.
-- Where it repeats something an existing `docs/` page or `README.md` already
-  says, keep the fuller copy and replace the other with a link. Where the two
-  disagree, believe the code, and fix the stale one.
+- Where it repeats something an existing `docs/` page already says, trim the
+  new page to a link to the existing one. Where they disagree, believe the
+  code: fix the new page, or report the stale existing page (below), since you
+  may not edit it.
 - Never move, rename, or delete a file.
 
 Files under `.agents/` and `content/docs/api/` are owned by other agents; skip them.
