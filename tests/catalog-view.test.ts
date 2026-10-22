@@ -299,7 +299,7 @@ describe("Brand view", () => {
     expect(model.suggestion).toMatchObject({ kind: "group", title: "Suggested group 2" });
     expect(model.description).toBe("Juicy, soft, Citra-forward");
     expect(model.hops).toBe("Citra, Mosaic");
-    expect(model.sells.packages.map((p) => [p.name, p.on])).toEqual([["Case", true], ["Four Pack", false], ["Half", true], ["Sixtel", true]]);
+    expect(model.sells.packages.map((p) => [p.name, p.on])).toEqual([["Case", true], ["Half", true], ["Quarter", false], ["Sixtel", true]]);
     expect(model.sells.contents.map((c) => c.label)).toEqual(["Four Pack · 6 per Case"]);
     expect(model.sells.pours.map((p) => [p.name, p.size, p.prices])).toEqual([["Glass", "16 oz", "Taproom $8.00"]]);
     expect(model.styleOptions).toContain("Add “Cold IPA”");
@@ -381,7 +381,7 @@ describe("Brand view", () => {
     expect(html.match(/role="switch"[^>]*disabled=""|disabled=""[^>]*role="switch"/g)).toHaveLength(4);
     // A format with no SKU yet has nothing to open.
     expect(html).toContain("DETAILS Half");
-    expect(html).not.toContain("DETAILS Four Pack");
+    expect(html).not.toContain("DETAILS Quarter");
     expect(html).not.toMatch(/>Edit SKU</);
   });
 

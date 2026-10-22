@@ -7,6 +7,7 @@ const channels = [{ id: "dtc", name: "DTC" }, { id: "wh", name: "Wholesale" }];
 const formats = [
   { id: "case", name: "Case", components: [{ parent_format_id: "case", child_format_id: "four", qty: 6 }] },
   { id: "four", name: "Four Pack", components: [] },
+  { id: "half", name: "Half", components: [] },
   { id: "sixtel", name: "Sixtel (one-way)", components: [] },
 ];
 const prices = [
@@ -32,15 +33,21 @@ describe("toBrandSellsModel", () => {
     const { packages } = toBrandSellsModel({ brand: brand(), formats, prices, channels });
     expect(packages.map((p) => [p.name, p.on, p.skuId])).toEqual([
       ["Case", true, "s-case"],
-      ["Four Pack", false, undefined],
+      ["Half", false, undefined],
       ["Sixtel (one-way)", false, "s-six"],
     ]);
     expect(packages[0]!.upc).toBe("012345678905");
   });
 
+  it("gives a format inside another format no switch, unless the beer already has a SKU in it", () => {
+    const withFour = brand({ skus: [...brand().skus, { id: "s-four", format_id: "four", active: true, upc: null }] });
+    expect(toBrandSellsModel({ brand: withFour, formats, prices, channels }).packages.map((p) => p.name))
+      .toEqual(["Case", "Four Pack", "Half", "Sixtel (one-way)"]);
+  });
+
   it("prices a row across channels in order, skipping unpriced channels and other groups", () => {
     const { packages } = toBrandSellsModel({ brand: brand(), formats, prices, channels });
-    expect(packages.map((p) => p.prices)).toEqual(["DTC $22.00 · Wholesale $18.00", "DTC $4.50", "Unpriced"]);
+    expect(packages.map((p) => p.prices)).toEqual(["DTC $22.00 · Wholesale $18.00", "Unpriced", "Unpriced"]);
   });
 
   it("lists a composed format's children only while it is switched on", () => {
@@ -67,10 +74,10 @@ describe("toBrandSellsModel", () => {
 
 describe("sellsAsCommand", () => {
   const rows = toBrandSellsModel({ brand: brand(), formats, prices, channels }).packages;
-  const [caseRow, fourRow, sixtelRow] = rows as [typeof rows[number], typeof rows[number], typeof rows[number]];
+  const [caseRow, halfRow, sixtelRow] = rows as [typeof rows[number], typeof rows[number], typeof rows[number]];
 
   it("creates the SKU when the format has none", () => {
-    expect(sellsAsCommand(fourRow, true, "b1")).toEqual({ name: "create_sku", input: { brandId: "b1", formatId: "four" } });
+    expect(sellsAsCommand(halfRow, true, "b1")).toEqual({ name: "create_sku", input: { brandId: "b1", formatId: "half" } });
   });
 
   it("turns an inactive SKU back on", () => {

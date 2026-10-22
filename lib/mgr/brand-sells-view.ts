@@ -55,9 +55,13 @@ export function toBrandSellsModel({ brand, formats, prices, channels }: BrandSel
     .filter(Boolean)
     .join(" · ") || "Unpriced";
   const names = new Map(formats.map((f) => [f.id, f.name]));
-  const packages = formats.map((f): SellsAsRow => {
+  // A format inside another (Four Pack in Case) sells from its parent's stock,
+  // so it gets no switch of its own; a SKU already made in it stays switchable.
+  const children = new Set(formats.flatMap((f) => f.components.map((c) => c.child_format_id)));
+  const packages = formats.flatMap((f): SellsAsRow[] => {
     const sku = brand.skus.find((s) => s.format_id === f.id);
-    return { formatId: f.id, name: f.name, on: sku?.active ?? false, skuId: sku?.id, upc: sku?.upc ?? undefined, prices: pricesOf(f.id) };
+    if (children.has(f.id) && !sku) return [];
+    return [{ formatId: f.id, name: f.name, on: sku?.active ?? false, skuId: sku?.id, upc: sku?.upc ?? undefined, prices: pricesOf(f.id) }];
   });
   const switchedOn = new Set(packages.filter((p) => p.on).map((p) => p.formatId));
   return {

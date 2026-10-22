@@ -24,6 +24,7 @@ const FMT_CASE = "00000000-0000-4000-8000-0000000000f3";
 const FMT_HALF = "00000000-0000-4000-8000-0000000000f4";
 const FMT_PINT = "00000000-0000-4000-8000-0000000000f5";
 const FMT_SIXTH = "00000000-0000-4000-8000-0000000000f6";
+const FMT_QUARTER = "00000000-0000-4000-8000-0000000000f7";
 const SKU_HAZY_SIXTH = "00000000-0000-4000-8000-0000000000a4";
 const SKU_HAZY_CASE = "00000000-0000-4000-8000-0000000000a5";
 const SKU_PILS_BOTTLE = "00000000-0000-4000-8000-0000000000a6";
@@ -91,7 +92,7 @@ export const catalogBrands: CatalogSnapshot = {
   priceGroups,
 };
 
-/** Hazy IPA brand sheet: Core, price group 3, 3 active packages (Half, Sixtel, Case, whose Four Packs list beneath), one Glass pour. */
+/** Hazy IPA brand sheet: Core, price group 3, 3 active packages (Half, Sixtel, Case, whose Four Packs list beneath), Quarter off, one Glass pour. */
 export const brandHazy: BrandSnapshot = {
   categories: ["Core", "Seasonal", "One-off", "Barrel-aged"],
   brand: {
@@ -112,6 +113,7 @@ export const brandHazy: BrandSnapshot = {
       { id: FMT_CASE, name: "Case", components: [{ parent_format_id: FMT_CASE, child_format_id: FMT_FOUR, qty: 6 }] },
       { id: FMT_FOUR, name: "Four Pack", components: [] },
       { id: FMT_HALF, name: "Half", components: [] },
+      { id: FMT_QUARTER, name: "Quarter", components: [] },
       { id: FMT_SIXTH, name: "Sixtel", components: [] },
     ],
     channels: [{ id: CH_WHOLESALE, name: "Wholesale" }, { id: CH_TAPROOM, name: "Taproom" }],
