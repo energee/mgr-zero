@@ -10,7 +10,7 @@ import { E } from "@/components/mgr/e";
 import { LinkTabs } from "@/components/mgr/work-tabs";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
-import type { PriceGroupsRowView, PriceGroupsViewModel } from "@/lib/mgr/price-groups-view";
+import type { PriceGroupsChannelView, PriceGroupsRowView, PriceGroupsViewModel } from "@/lib/mgr/price-groups-view";
 
 export type { PriceGroupsViewModel };
 
@@ -51,7 +51,7 @@ export function PriceGroupsView({
   model,
   createAction,
   renderGroup = (row) => E.link(row.name, "Price group"),
-  renderCell = (row, col, value) => <PriceCellInput label={`${row.name} · ${model.formats[col]} on ${model.channel?.name}`} value={value ?? ""} />,
+  renderCell = (channel, row, col, value) => <PriceCellInput label={`${row.name} · ${model.formats[col]} on ${channel.name}`} value={value ?? ""} />,
   renderAddPour = (row, pour) => addPourTrigger(pour, row.name),
   backHref,
 }: {
@@ -60,7 +60,7 @@ export function PriceGroupsView({
   /** The row's first cell: the group's name, opening the group. */
   renderGroup?: (row: PriceGroupsRowView) => ReactNode;
   /** One price cell on the showing channel; `value` is the dollars text, or null when unpriced. */
-  renderCell?: (row: PriceGroupsRowView, col: number, value: string | null) => ReactNode;
+  renderCell?: (channel: PriceGroupsChannelView, row: PriceGroupsRowView, col: number, value: string | null) => ReactNode;
   /** A pour column's cell on a group that has no pour of that name. */
   renderAddPour?: (row: PriceGroupsRowView, pour: string) => ReactNode;
   backHref?: string;
@@ -81,7 +81,7 @@ export function PriceGroupsView({
               ["Group", ...model.formats],
               channel.rows.map((row) => [
                 renderGroup(row),
-                ...row.cells.map((value, col) => row.formatIds[col] ? renderCell(row, col, value) : renderAddPour(row, model.formats[col]!)),
+                ...row.cells.map((value, col) => row.formatIds[col] ? renderCell(channel, row, col, value) : renderAddPour(row, model.formats[col]!)),
               ]),
               ["l", ...model.formats.map(() => "r" as const)],
             )}

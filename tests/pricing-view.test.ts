@@ -104,14 +104,14 @@ describe("Price groups view", () => {
       model: toPriceGroupsViewProps({ ...pricingGrid, channelId: taproom!.id }),
       createAction: "CREATE",
       renderGroup: (row) => `G:${row.name}`,
-      renderCell: (row, col, value) => createElement("b", null, `${row.name}/${col}/${value ?? "none"}`),
+      renderCell: (channel, row, col, value) => createElement("b", null, `${channel.name}/${row.name}/${col}/${value ?? "none"}`),
     }));
     expect(html).toMatch(/CREATE/);
     expect(html).not.toMatch(/New price group/);
     expect(html).toMatch(/G:2/);
     expect(html).not.toMatch(/data-to="Price group"/);
-    expect(html).toContain("<b>2/3/8.00</b>");
-    expect(html).toContain("<b>3/4/none</b>");
+    expect(html).toContain("<b>Taproom/2/3/8.00</b>");
+    expect(html).toContain("<b>Taproom/3/4/none</b>");
   });
 
   it("draws one blank state: no groups first, then no channels", () => {

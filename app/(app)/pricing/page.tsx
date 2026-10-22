@@ -30,7 +30,6 @@ export default async function PricingPage({ searchParams }: { searchParams?: Pro
   ])) as [PriceGroupsSnapshot["channels"], PriceGroupRow[], PriceGroupsSnapshot["formats"], PriceGroupsSnapshot["cells"], PriceGroupBarcode[]];
   const snapshot = { channels, groups, formats, cells, barcodes };
   const model = toPriceGroupsViewProps({ ...snapshot, channelId, channelHref: (id) => `/pricing?channel=${id}` });
-  const channel = model.channel;
   // One editor model per group, not per group per channel.
   const groupModel = new Map(groups.map((g) => [g.id, toPriceGroupViewProps({ ...snapshot, groupId: g.id })]));
   return (
@@ -39,8 +38,8 @@ export default async function PricingPage({ searchParams }: { searchParams?: Pro
       backHref="/more"
       createAction={<GroupForm model={toPriceGroupViewProps(snapshot)} />}
       renderGroup={(row) => <GroupForm groupId={row.id} model={groupModel.get(row.id)!} />}
-      // PriceGroupsView asks for cells only on a showing channel, and only where the row has a format.
-      renderCell={(row, col, value) => <PriceCellForm key={value ?? "empty"} saleChannelId={channel!.id} priceGroupId={row.id} formatId={row.formatIds[col]!} value={value} groupName={row.name} formatName={model.formats[col]!} channelName={channel!.name} />}
+      // PriceGroupsView asks for a cell only where the row has a format.
+      renderCell={(channel, row, col, value) => <PriceCellForm key={value ?? "empty"} saleChannelId={channel.id} priceGroupId={row.id} formatId={row.formatIds[col]!} value={value} groupName={row.name} formatName={model.formats[col]!} channelName={channel.name} />}
       renderAddPour={(row, pour) => <PourForm priceGroupId={row.id} groupName={row.name} name={pour} trigger={addPourTrigger(pour, row.name)} />}
     />
   );
