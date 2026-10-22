@@ -10,8 +10,8 @@ import { platoToSg, sgToPlato } from "@/lib/recipe-gravity";
 export const GRAVITY_UNITS = ["plato", "sg"] as const;
 export type GravityUnit = (typeof GRAVITY_UNITS)[number];
 
-/** The label a person reads for a unit ("Plato", "Specific gravity"). */
-export const gravityUnitLabel = (unit: GravityUnit) => (unit === "sg" ? "Specific gravity" : "Plato");
+/** The label a person reads for a unit: "Plato (°P)" or "Specific gravity (SG)". */
+export const gravityUnitLabel = (unit: GravityUnit) => (unit === "sg" ? "Specific gravity (SG)" : "Plato (°P)");
 
 /** The short unit name for a field label: "°Plato" or "SG". */
 export const gravityUnitShort = (unit: GravityUnit) => (unit === "sg" ? "SG" : "°Plato");
