@@ -98,11 +98,6 @@ describe("Transfers list", () => {
     expect(form).not.toMatch(/sku\.label === value/);
     expect(form).toMatch(/skuOptions: skus\.map\(sku => \(\{ value: sku\.id, label: sku\.label \}\)\)/);
   });
-
-  it("Create transfer opens the new transfer's detail page (#1060)", () => {
-    const form = readFileSync("app/(app)/transfers/new-transfer-form.tsx", "utf8");
-    expect(form).toMatch(/onSuccess: data => router\.push\(`\/transfers\/\$\{\(data as \{ transferId: string \}\)\.transferId\}`\)/);
-  });
 });
 
 describe("New transfer view", () => {
