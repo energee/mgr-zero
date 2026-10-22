@@ -43,6 +43,9 @@ export function MovementForm({
   channels,
   timeZone,
 }: {
+  /** True when the page URL carries ?recordMovement=1 (Today's shortcut or
+   *  Ask MGR's Open as form): the form starts open, and closing it clears that
+   *  deep link from the URL (#1107). */
   autoOpen?: boolean;
   initial?: Partial<MovementInput>;
   skus: { id: string; label: string; bblPerUnit: number | null }[];
@@ -131,25 +134,24 @@ export function MovementForm({
     setType(next);
   }
 
-  // A deep link (?recordMovement=1 from Today or an Ask MGR handoff) opened
-  // this form, so closing it drops the link and its prefill; otherwise a reload
-  // reopens it (#1107). Only ?page survives. A successful record closes the form
-  // through useCommandForm, not here, so the URL (and the handoff's form key)
-  // stays until the receipt is dismissed.
-  function closeDeepLink() {
+  // When a deep link opened this form, replace the URL so a reload or Back
+  // does not reopen it (#1107). Only ?page survives, which drops the prefill.
+  // A successful record closes the form through useCommandForm, not here, so
+  // the URL (and the handoff's form key) stays until the receipt is dismissed.
+  function clearDeepLinkUrl() {
     if (!autoOpen) return;
-    const page = new URLSearchParams(location.search).get("page");
+    const page = new URLSearchParams(window.location.search).get("page");
     router.replace(page ? `/inventory?${new URLSearchParams({ page })}` : "/inventory", { scroll: false });
   }
 
-  function closeReceipt() {
+  function dismissReceiptAndClearDeepLink() {
     setReceipt(null);
-    closeDeepLink();
+    clearDeepLinkUrl();
   }
 
   return (
     <>
-    <CommandForm open={form.open} onOpenChange={open => { form.setOpen(open); if (!open) closeDeepLink(); }} title="Record movement" trigger={<Button>Record movement</Button>}>
+    <CommandForm open={form.open} onOpenChange={open => { form.setOpen(open); if (!open) clearDeepLinkUrl(); }} title="Record movement" trigger={<Button>Record movement</Button>}>
         <form onSubmit={e => { if (!fields) { e.preventDefault(); return; } void form.submit(e); }} className="flex flex-col gap-4">
           <RecordMovementView
             model={movementModel}
@@ -174,8 +176,8 @@ export function MovementForm({
           />
         </form>
       </CommandForm>
-      <CommandForm open={receipt !== null} onOpenChange={open => { if (!open) closeReceipt(); }} title="Movement recorded">
-        {receiptModel && <MovementRecordedView model={receiptModel} footer={<Button onClick={closeReceipt}>Done</Button>} />}
+      <CommandForm open={receipt !== null} onOpenChange={open => { if (!open) dismissReceiptAndClearDeepLink(); }} title="Movement recorded">
+        {receiptModel && <MovementRecordedView model={receiptModel} footer={<Button onClick={dismissReceiptAndClearDeepLink}>Done</Button>} />}
       </CommandForm>
     </>
   );

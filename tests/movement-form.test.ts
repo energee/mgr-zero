@@ -1,7 +1,7 @@
 // tests/movement-form.test.ts — #1107: the live Record movement form starts
 // with no type picked (a deep-linked type still preselects), and closing a
 // form a deep link opened drops ?recordMovement=1 and its prefill from the URL,
-// while a successful record keeps the URL until its receipt is dismissed.
+// while a successful record leaves the URL for the receipt dialog to clear.
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -31,14 +31,19 @@ const render = (props: Partial<Parameters<typeof MovementForm>[0]> = {}) => {
   forms = [];
   return renderToStaticMarkup(createElement(MovementForm, { ...lists, autoOpen: true, ...props }));
 };
+// The form reads window.location; useCommandForm reads the bare global.
+const at = (search: string) => {
+  const location = { pathname: "/inventory", search };
+  vi.stubGlobal("location", location);
+  vi.stubGlobal("window", Object.assign(new EventTarget(), { location }));
+};
 const submitDisabled = (html: string) => / disabled=""/.test(html.match(/<button[^>]*type="submit"[^>]*>/)?.[0] ?? "");
 
 beforeEach(() => {
   Object.values(router).forEach((fn) => fn.mockClear());
   const values = new Map<string, string>();
-  vi.stubGlobal("window", new EventTarget());
   vi.stubGlobal("sessionStorage", { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) });
-  vi.stubGlobal("location", { pathname: "/inventory", search: "?recordMovement=1&skuId=s1&type=depletion&movementHandoff=h1&page=3" });
+  at("?recordMovement=1&skuId=s1&type=depletion&movementHandoff=h1&page=3");
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -60,7 +65,7 @@ it("closing a deep-linked form replaces the URL with the bare inventory page, ke
   render();
   forms[0].onOpenChange(false);
   expect(router.replace).toHaveBeenCalledWith("/inventory?page=3", { scroll: false });
-  vi.stubGlobal("location", { pathname: "/inventory", search: "?recordMovement=1" });
+  at("?recordMovement=1");
   router.replace.mockClear();
   render();
   forms[0].onOpenChange(false);
@@ -73,7 +78,7 @@ it("closing a form the trigger opened leaves the URL alone", () => {
   expect(router.replace).not.toHaveBeenCalled();
 });
 
-it("a successful record keeps the deep link until its receipt is dismissed", async () => {
+it("a successful record does not replace the URL; closing its receipt dialog does", async () => {
   render({ initial: { ...filled, type: "production_in" } });
   await forms[0].children.props.onSubmit({ preventDefault() {}, stopPropagation() {} });
   await vi.waitFor(() => expect(router.refresh).toHaveBeenCalled());
