@@ -554,7 +554,8 @@ describe("SCREENS", () => {
 
   it("shows format volume in familiar brewery units", () => {
     const formats = body("Formats");
-    expect(formats).toContain(">Volume</th>");
+    // The header's label sits in its sort button, before the arrow.
+    expect(formats).toMatch(/<th\b[^>]*>(?:(?!<\/th>)[\s\S])*>Volume</);
     for (const volume of ["16 oz", "64 oz", "3 gal", "½ bbl"]) expect.soft(formats, volume).toContain(volume);
     expect(formats).not.toContain("bbl / format");
   });

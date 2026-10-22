@@ -42,6 +42,27 @@ describe("E.tbl column alignment", () => {
     expect(cells(html, "td").map(cell => cell.content)).toContain("−$25.00");
   });
 
+  it("draws each header as a sort button without changing its alignment", () => {
+    const html = renderToStaticMarkup(E.tbl(["Item", "Qty"], [["Hazy IPA", "1,234.5"], ["Pils", "0"]], ["l", "r"]));
+    expectAlignment(html, ["l", "r"]);
+    const heads = [...html.matchAll(/<th\b[^>]*>[\s\S]*?<\/th>/g)].map(match => match[0]);
+    for (const head of heads) {
+      expect(head).toContain('aria-sort="none"');
+      expect(head).toMatch(/<button\b/);
+    }
+    expect(cells(html, "td").map(cell => cell.content)).toEqual(["Hazy IPA", "1,234.5", "Pils", "0"]);
+    expect(html).toContain("shrink-0");
+    expect(html).toContain("min-w-max");
+  });
+
+  it("draws plain header text when the table is not sortable", () => {
+    const html = renderToStaticMarkup(E.tbl(["Item", "Qty"], [["Hazy IPA", "1"]], ["l", "r"], { sortable: false }));
+    expectAlignment(html, ["l", "r"]);
+    expect(html).not.toContain("aria-sort");
+    expect(html).not.toMatch(/<button\b/);
+    expect(cells(html, "th").map(cell => cell.content)).toEqual(["Item", "Qty"]);
+  });
+
   it("leaves unspecified columns left when alignment is partial", () => {
     expectAlignment(renderToStaticMarkup(E.tbl(["Qty", "Record", "State"], [["0", "Missing amount", "Unknown"]], ["r"])), ["r", "l", "l"]);
   });

@@ -5,13 +5,18 @@
 // is its one link; it covers each whole record, so no row repeats an Open
 // button. Without an href (the inventory) the name is an inert tap, the way
 // E.act draws one. Other cells may hold any node, including their own links
-// and actions, which sit above the covering link.
+// and actions, which sit above the covering link. Headers sort the rows
+// (components/mgr/sort-head.tsx), and both surfaces draw the sorted order; the
+// last sort is remembered per browser.
+"use client";
+
 import { Fragment, isValidElement, type ReactNode } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@/components/ui/item";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PRINTED_DATE } from "@/lib/mgr/table-sort";
+import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { SortHead, useSortedRows } from "@/components/mgr/sort-head";
+import { cellSortValue, PRINTED_DATE, type SortValue } from "@/lib/mgr/table-sort";
 import { cn } from "@/lib/utils";
 
 export type RecordTableRow = {
@@ -27,7 +32,12 @@ export type RecordTableRow = {
   /** The screen the name opens, when the name is a record rather than a
    *  screen name (data-to; tests/mgr-screens.test.ts resolves every link). */
   to?: string;
+  /** Sort values parallel to cells: sort[i] replaces cells[i]'s own text, for
+   *  a component cell whose text is not in the tree (lib/mgr/table-sort.ts). */
+  sort?: SortValue[];
 };
+
+const recordSortValue = (row: RecordTableRow, i: number): SortValue => (row.sort?.[i] !== undefined ? row.sort[i] : cellSortValue(row.cells[i]));
 
 const alignClass = (a: "l" | "r" | undefined) => (a === "r" ? "text-right" : "text-left");
 /** What a cell ends with: the cell itself, or a fragment's last child (an
@@ -57,13 +67,16 @@ function name(row: RecordTableRow) {
     : <Button variant="link" type="button" data-tap data-to={row.to} className={cn(cls, "h-auto p-0 text-foreground")}>{row.cells[0]}</Button>;
 }
 
-export function RecordTable({ headers, align, rows }: {
+export function RecordTable({ headers, align, rows: given, sortable = true }: {
   headers: ReactNode[];
   /** Per column of the table, header and cells alike: "l" for text, "r" for
    *  numbers. The phone list starts every value at the left. */
   align: ("l" | "r")[];
   rows: RecordTableRow[];
+  /** False keeps the rows in the given order with plain headers. */
+  sortable?: boolean;
 }) {
+  const { rows, columns } = useSortedRows(headers, given, recordSortValue, sortable);
   return (
     <>
       <div className="hidden md:block">
@@ -71,7 +84,7 @@ export function RecordTable({ headers, align, rows }: {
           <TableHeader>
             <TableRow>
               {headers.map((header, index) => (
-                <TableHead key={index} className={cn("whitespace-normal", alignClass(align[index]))}>{header}</TableHead>
+                <SortHead key={index} sort={columns[index]} className={cn("whitespace-normal", alignClass(align[index]))}>{header}</SortHead>
               ))}
             </TableRow>
           </TableHeader>

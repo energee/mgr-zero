@@ -13,6 +13,7 @@ import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon"
 import { Palette, type PaletteGroup } from "@/components/mgr/palette";
 import { Qty, StepQuantity, TabBar } from "@/components/mgr/qty";
 import { SearchPick, type SearchPickOption } from "@/components/mgr/search-pick";
+import { SortTable } from "@/components/mgr/sort-table";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
 import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
 import { ComposerDrawerView } from "@/components/mgr/views/composer-drawer";
@@ -29,7 +30,6 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { StaffRole } from "@/lib/commands/registry";
 import type { EmptyState } from "@/lib/mgr/empty-state";
@@ -449,29 +449,11 @@ export const E = {
       ))}
     </ItemGroup>
   ),
-  /** A small fixed table. Screens stack in a flex column, so the wrapper must
-   *  not shrink: Table's scroll box would collapse to one clipped line (#1037). */
-  tbl: (hd: React.ReactNode[], rows: React.ReactNode[][], align?: ("l" | "r")[]) => (
-    <div className="shrink-0">
-      <Table className="min-w-max">
-        <TableHeader>
-          <TableRow>
-            {hd.map((h, i) => (
-              <TableHead key={i} className={align?.[i] === "r" ? "text-right" : "text-left"}>{h}</TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((r, i) => (
-            <TableRow key={i}>
-              {r.map((c, j) => (
-                <TableCell key={j} className={align?.[j] === "r" ? "text-right" : "text-left"}>{c}</TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+  /** A small fixed table whose headers sort its rows and remember the last
+   *  sort per browser (components/mgr/sort-table.tsx). `{ sortable: false }`
+   *  keeps the given row order, for rows whose position carries meaning. */
+  tbl: (hd: React.ReactNode[], rows: React.ReactNode[][], align?: ("l" | "r")[], opts?: { sortable?: false }) => (
+    <SortTable headers={hd} rows={rows} align={align} sortable={opts?.sortable} />
   ),
   /** A blank list. A bare node is the whole message; an {@link EmptyState}
    *  splits it into the fact and the sentence saying what to do next.
