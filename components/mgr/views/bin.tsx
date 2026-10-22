@@ -1,17 +1,22 @@
 // components/mgr/views/bin.tsx — shared Bin sheet body, and the confirm both
-// surfaces draw before delete_bin.
+// surfaces draw before delete_bin. Remove sits in its own section below Save.
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import type { BinViewModel } from "@/lib/mgr/bin-view";
 import { ConfirmDeleteControl } from "./confirm-delete";
 
 export type { BinViewModel };
 
+/** What delete_bin refuses (supabase/migrations/20260923220000_delete_bin_keeps_pos_menu.sql):
+ *  the last bin, a bin with any recorded movement, and a bin a POS menu uses. */
+const REMOVE_RULE = "A location keeps at least one bin. A bin that has ever held stock, or that a POS menu uses, cannot be removed; rename it instead.";
+
 /** Confirm, then remove one bin (delete_bin). */
 export function RemoveBinControl({ bin, ...rest }: { bin: string; busy?: boolean; error?: string | null; onDelete?: () => Promise<boolean> }) {
   return <ConfirmDeleteControl title={`Remove ${bin}`} triggerLabel="Remove" busyLabel="Removing…" {...rest}
     name={<>Remove the <strong>{bin}</strong> bin?</>}
-    warning="A location keeps at least one bin. A bin with recorded stock, or one a POS menu uses, cannot be removed." />;
+    warning={REMOVE_RULE} />;
 }
 
 export function BinView({
@@ -19,19 +24,23 @@ export function BinView({
   controls = {},
   messages,
   footer,
+  remove,
 }: {
   model: BinViewModel;
   controls?: { name?: (value: string) => void };
   messages?: ReactNode;
   footer?: ReactNode;
+  /** Live: the wired RemoveBinControl, or null for a new bin. */
+  remove?: ReactNode;
 }) {
+  const removal = remove !== undefined ? remove : model.name ? <RemoveBinControl bin={model.name} /> : null;
   return (
     <>
       {E.edit("Bin name", model.name, "text", undefined, { onChange: controls.name, required: Boolean(controls.name) })}
-      {E.info("A location keeps at least one bin. Rename the last one rather than removing it.")}
-      {E.note("Tap lines are not bins. The tap board owns those.")}
+      {E.info(<>Don’t add a bin for each tap. Taps are managed on the <Link href={model.tapBoardHref ?? "#"}>Tap board</Link>.</>)}
       {messages}
-      {footer !== undefined ? footer : <>{model.name ? <RemoveBinControl bin={model.name} /> : null}{E.btn("Save bin")}</>}
+      {footer !== undefined ? footer : E.btn("Save bin")}
+      {removal ? <section aria-label="Remove bin" className="mt-2 border-t pt-4">{E.row("Remove bin", "Only an unused bin, never the last one, can be removed.", removal)}</section> : null}
     </>
   );
 }

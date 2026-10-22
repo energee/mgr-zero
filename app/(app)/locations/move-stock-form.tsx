@@ -1,6 +1,7 @@
 // app/(app)/locations/move-stock-form.tsx — CommandForm for move_stock_bin on
-// Location bins, drawing the shared MoveStockFields. The page decides whether
-// a move is possible (moveStockUnavailable) and the view shows the reason.
+// Location bins, drawing the shared MoveStockFields. The view-model decides
+// whether a move is possible (toLocationBinsViewProps' moveUnavailable, or the
+// empty state when nothing is stored) and the view shows that instead.
 "use client";
 
 import { binStockKey, selectedBinStock } from "@/lib/movement-form";
