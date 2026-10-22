@@ -20,6 +20,6 @@ export default async function PlanningPage() {
   const vendors = new Set(buyable.map((g) => g.vendor_id));
   const canDraft = brewery.roles.includes("admin") || brewery.roles.includes("warehouse");
 
-  return <PlanningView model={toPlanningViewProps({ requirements: gaps, today: breweryDate(brewery.timeZone) })}
+  return <PlanningView model={toPlanningViewProps({ requirements: gaps, today: breweryDate(brewery.timeZone), backHref: "/more" })}
     footer={canDraft ? <DraftButton materialIds={buyable.map((g) => g.material_id)} vendorCount={vendors.size} /> : null} />;
 }

@@ -39,7 +39,7 @@ export default async function KegsPage() {
   return (
     <KegFleetView
       model={toKegFleetViewProps({
-        backHref: "/inventory",
+        backHref: "/beer",
         shortages: fleet.shortages.map(kegShortageText),
         pools: fleet.pools.map((p) => {
           const rows = fleet.rows.filter((r) => r.pool_id === p.id && r.qty !== 0);

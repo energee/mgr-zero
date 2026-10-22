@@ -65,6 +65,22 @@ describe("Planning view", () => {
     ]);
   });
 
+  it("the live back link returns to More; the inventory fixture leaves it inert (#1142)", () => {
+    expect(readFileSync("app/(app)/planning/page.tsx", "utf8")).toContain('backHref: "/more"');
+    expect(toPlanningViewProps({ backHref: "/more" }).backHref).toBe("/more");
+    expect(toPlanningViewProps(planningDemo).backHref).toBeUndefined();
+  });
+
+  it("an empty shortage list says it is shortage-only, never that work is scheduled, and links where demand is set up (#1142)", () => {
+    const { empty } = toPlanningViewProps({ requirements: [] });
+    expect(empty?.title).toBe("No material shortages");
+    expect(empty?.description).toContain("only materials");
+    expect(empty?.description).toContain("does not mean any work is scheduled");
+    expect(empty?.description).not.toMatch(/every committed|is covered/);
+    expect(empty?.links.map((link) => link.href)).toEqual(["/batches", "/packaging", "/materials"]);
+    expect(toPlanningViewProps(planningDemo).empty).toBeUndefined();
+  });
+
   it("the inventory draws an overdue gap through the adapter, so the marker has a frame (#1037)", () => {
     const overdue = toPlanningViewProps(planningDemo).requirements.filter((r) => r.detail.startsWith("overdue · "));
     expect(overdue).toHaveLength(1);

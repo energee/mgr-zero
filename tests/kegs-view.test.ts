@@ -64,6 +64,10 @@ describe("Keg fleet", () => {
   });
 
 
+  it("#1110 the live back link goes to Beer, the parent it names", () => {
+    expect(src("app/(app)/kegs/page.tsx")).toContain('backHref: "/beer"');
+  });
+
   it("the live kegs page mounts KegFleetView and slots PoolForm", () => {
     const page = src("app/(app)/kegs/page.tsx");
     expect(page).toMatch(/<KegFleetView\b/);
