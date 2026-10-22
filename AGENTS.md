@@ -111,6 +111,7 @@ the rendered page (step 4), and:
 | Brewing/TTB domain rules (units, loss, removals) | `.agents/superpowers/specs/brewing-domain.md` |
 | Why v1 (`~/Repos/mgr`) was left behind | `.agents/superpowers/specs/2026-08-31-mgr-v1-review.md` |
 | Product intent, what a slice is | `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md` |
+| Plan for a shipped or in-flight feature (Sells as, Square 4-packs, table sort, QuickBooks Bills, multi-role staff, Lolev orders and history) | `docs/plans/<feature>.md`, one file per feature; the PR body names its plan |
 | UI layout, navigation, input model (chat + forms) | `.agents/superpowers/specs/2026-08-31-mgr-ui-layout-plan.md`; screens: `components/mgr/screens.tsx` is the source of truth, viewed at `/docs/screens` (`bun run dev`); the Slack/QuickBooks/Square venue frames live in `components/mgr/venue.tsx`; the inventory publishes at `/docs/screens` (long, linkable) and `/docs/screens-explore` (filter, pick one, tap through — `lib/mgr/screen-links.ts` says where a label goes), the venue frames at `/docs/integrations`; the customer guides embed frames with `<Screen name="…" />` |
 | Chat notifications (Slack today, provider-neutral design) | `.agents/superpowers/specs/2026-09-01-mgr-chat-notifications-design.md`; plan: `.agents/superpowers/plans/2026-09-01-chat-notifications.md` |
 | What's done | `.agents/PROGRESS.md` (dated log) |
