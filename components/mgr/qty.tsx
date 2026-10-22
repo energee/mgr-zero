@@ -18,10 +18,10 @@ import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
-import { useId, useRef, type ReactNode } from "react";
+import { useId, useRef, type AriaAttributes, type ReactNode } from "react";
 
 /** The same stepper for controlled forms and uncontrolled inventory fields. */
-export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, ...attributes }: Omit<FieldControls, "hideLabel"> & { label: string; value?: string; defaultValue?: string }) {
+export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, ...attributes }: Omit<FieldControls, "hideLabel" | "error"> & { label: string; value?: string; defaultValue?: string }) {
   const input = useRef<HTMLInputElement>(null);
   const step = (direction: -1 | 1) => {
     const field = input.current;
@@ -51,16 +51,24 @@ export function Qty({
   onChange,
   unit,
   label,
+  id,
+  invalid,
+  describedBy,
 }: {
   value: string;
   onChange?: (value: string) => void;
   unit?: ReactNode;
   label: string;
+  id?: string;
+  /** From E.qty's `error` (#1121). */
+  invalid?: AriaAttributes["aria-invalid"];
+  describedBy?: string;
 }) {
-  const id = useId();
+  const generatedId = useId();
+  const inputId = id ?? generatedId;
   return (
     <Field>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <FieldLabel htmlFor={inputId}>{label}</FieldLabel>
       {/* overflow-hidden: a unit addon (chips, or a TabBar) is a flex item with a
           content-based min-width, so on a narrow field it won't shrink — clip to
           the field's own border instead of letting it spill past. A clip, not a
@@ -68,13 +76,15 @@ export function Qty({
       <InputGroup className="overflow-hidden">
         {/* eslint-disable-next-line no-restricted-syntax -- Shared E volume primitive; native spinners are hidden. */}
         <InputGroupInput
-          id={id}
+          id={inputId}
           type="number"
           inputMode="decimal"
           step="any"
           value={onChange ? value : undefined}
           defaultValue={onChange ? undefined : value}
           onChange={(event) => onChange?.(event.target.value)}
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
           className="text-2xl font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
         {/* pr-0 for a unit switcher: a TabsList insets itself (p-[3px]), so the

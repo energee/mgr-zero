@@ -61,7 +61,6 @@ export const batchesEmpty: BatchesSnapshot = {
 };
 
 export const scheduleBatchHazy: ScheduleBatchViewModel = {
-  title: "B-0416 · Hazy",
   recipeId: "hazy-v4",
   recipe: "Hazy IPA v4",
   recipeOptions: [{ id: "hazy-v4", label: "Hazy IPA v4" }, { id: "pils-v3", label: "Pils v3" }, { id: "stout-v2", label: "Stout v2" }],

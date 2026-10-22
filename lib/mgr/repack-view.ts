@@ -7,6 +7,8 @@
 // the Lot picker, which both draw so its Untracked stock help shows (#1125).
 // `lots` are the finished-goods lots the cases come out of (#613); the
 // four-packs keep the picked one.
+import { submitReason } from "@/lib/mgr/submit-reason";
+
 export type RepackOption = { id: string; name: string };
 export type RepackViewModel = {
   parent: string;
@@ -18,7 +20,22 @@ export type RepackViewModel = {
   unavailable?: string;
   parents?: RepackOption[]; locations?: RepackOption[]; bins?: RepackOption[]; lots?: RepackOption[];
   parentSkuId?: string; locationId?: string; binId?: string; lotId?: string;
+  /** Where a format's contents are set (Catalog), for a user who may do it
+   *  (create_composed_format). null when this user may not, so the empty Break
+   *  note names who can; the inventory leaves it out and the link stays inert. */
+  formatsHref?: string | null;
 };
+
+/** What Confirm repack waits for. A parent with no single composition row is
+ *  withheld separately, by `unavailable` (REPACK_UNAVAILABLE). */
+export function repackReason(i: { parentSkuId: string; locationId: string; binId: string; qty: string }): string | null {
+  const missing: string[] = [];
+  if (!i.parentSkuId) missing.push("a SKU to break");
+  if (!i.locationId) missing.push("a location");
+  if (!i.binId) missing.push("a bin");
+  if (!(Number(i.qty) > 0)) missing.push("a quantity above zero");
+  return submitReason(missing);
+}
 
 /**
  * The lot to preselect: the only lot of the parent in the bin, when the bin

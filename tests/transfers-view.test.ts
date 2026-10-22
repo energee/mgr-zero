@@ -119,6 +119,11 @@ describe("New transfer view", () => {
     expect(html).not.toMatch(/→/);
   });
 
+  it("draws no in-sheet title or back link; the dialog names it (#1120)", () => {
+    const html = htmlOf(createElement(NewTransferView, { model: toNewTransferViewProps(newTransferDraft) }));
+    expect(html).not.toMatch(/<h1\b|<a\b/);
+  });
+
   it("the New transfer inventory record is NewTransferView", () => {
     const body = screen("New transfer").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(NewTransferView);
