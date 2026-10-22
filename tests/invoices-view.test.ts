@@ -144,6 +144,7 @@ it("reads a historical not_synced invoice as paid and not in QuickBooks, with no
 it("#1030 starts the Accounting cell at the left edge its header uses", () => {
   const voided = toInvoiceListRow({ ...invoice, qbo_remote_state: "voided" }, ["admin"], false, "UTC");
   const html = renderToStaticMarkup(createElement(InvoicesView, { rows: [voided], backHref: "/more" }));
-  expect(html).toMatch(/<th[^>]*class="[^"]*text-left[^"]*"[^>]*>Accounting<\/th>/);
+  // The label may sit inside the header's sort button; the th carries the alignment.
+  expect(html).toMatch(/<th[^>]*class="[^"]*text-left[^"]*"[^>]*>(?:(?!<\/th>)[\s\S])*>Accounting<(?:(?!<\/th>)[\s\S])*<\/th>/);
   expect(html).not.toContain("items-end");
 });

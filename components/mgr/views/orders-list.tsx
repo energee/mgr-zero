@@ -9,6 +9,7 @@ import { E } from "@/components/mgr/e";
 import { ScopePick } from "@/components/mgr/scope-pick";
 import type { OrdersListRowView, OrdersListViewModel } from "@/lib/mgr/orders-list-view";
 import { sentenceCase } from "@/lib/mgr/labels";
+import { ORDER_STATUSES } from "@/lib/mgr/order-status";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
 import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 import { RecordTable } from "./record-table";
@@ -43,6 +44,8 @@ function Register({ rows }: { rows: OrdersListRowView[] }) {
           statusCell(row),
           row.action && E.act(row.action.verb, row.action.tone, row.action.href),
         ],
+        // Status sorts in lifecycle order (draft first); no ship date sorts last.
+        sort: [row.orderNo, row.customer ?? "transfer", row.shipDate, ORDER_STATUSES.indexOf(row.status)],
       }))}
     />
   );

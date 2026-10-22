@@ -40,7 +40,7 @@ describe("packaging views", () => {
 
   it("labels material identity and planned quantity separately with the requirements vocabulary", () => {
     const html = htmlOf(createElement(SchedulePackagingRunView, { model: schedulePackagingRun }));
-    const headers = [...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map(match => match[1]);
+    const headers = [...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map(match => match[1].replace(/<[^>]*>/g, ""));
     expect(headers).toEqual(["Material", "Planned", "On hand", "Short"]);
     const cells = [...html.matchAll(/<td\b[^>]*>(.*?)<\/td>/g)].map(match => match[1]);
     expect(cells.slice(0, 8)).toEqual(["cans", "2,832 each", "3,100", "0", "ends", "2,832 each", "2,400", "432"]);

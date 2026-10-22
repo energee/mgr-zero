@@ -50,6 +50,16 @@ function GroupTable({ rows }: { rows: BatchesRowView[] }) {
         ...(vesselHead ? [row.readings ? <Occupancies key="vessel" readings={row.readings} /> : row.vessel] : []),
         ...(brew ? [row.brewable && E.act("Brew", "info", row.href)] : []),
       ],
+      // A missing brand or recipe sorts last rather than by its muted words;
+      // readings sort by their vessels. The Brew button has nothing to sort.
+      sort: [
+        row.batchNo,
+        row.brand,
+        row.recipe,
+        row.plannedOn,
+        row.plannedBbl,
+        ...(vesselHead ? [row.readings ? row.readings.map(occupancy => occupancy.vessel).join(", ") || null : row.vessel] : []),
+      ],
     }))}
   />;
 }

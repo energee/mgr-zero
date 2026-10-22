@@ -57,7 +57,8 @@ export type CatalogSnapshot = {
   filtered?: boolean;
 };
 
-const NOT_SET = "Not set";
+/** A brand's missing style or ABV; Catalog sorts it as empty (last). */
+export const NOT_SET = "Not set";
 
 /** Shows only saved COLAs: "None", one COLA's TTB ID and date, or a count when
  *  there are several (the brand page lists each). */

@@ -25,8 +25,8 @@ export function BatchCompletionView({ batches, open, onOpenChange, batchId, prev
   const frozen = phase === "loading" || phase === "submitting" || phase === "unknown" || phase === "saved";
   // Saved pre-upgrade receipts deliberately retain their original shape without tank metadata.
   const acknowledgement = preview && phase !== "saved" && batchCompletionAcknowledgement(preview);
-  return <div data-preview-action><CommandForm open={open} onOpenChange={onOpenChange} title="Complete batch"
-    trigger={<Button size="sm" variant="outline" disabled={none} aria-describedby={none ? "completion-none" : undefined}>Complete batch</Button>}>
+  return <div data-preview-action className="flex flex-col items-start gap-2"><CommandForm open={open} onOpenChange={onOpenChange} title="Complete batch"
+    trigger={<Button variant="outline" disabled={none} aria-describedby={none ? "completion-none" : undefined}>Complete batch</Button>}>
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       {E.pick("Batch", batchId, [{ value: "", label: "Batch to complete" }, ...batches.map(batch => ({ value: batch.id, label: batch.label }))], { onChange: onReview, disabled: frozen })}
       {phase === "loading" && <p className="text-sm text-muted-foreground">Calculating from the cellar ledger...</p>}

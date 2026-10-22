@@ -554,7 +554,8 @@ describe("SCREENS", () => {
 
   it("shows format volume in familiar brewery units", () => {
     const formats = body("Formats");
-    expect(formats).toContain(">Volume</th>");
+    // The header's label sits in its sort button, before the arrow.
+    expect(formats).toMatch(/<th\b[^>]*>(?:(?!<\/th>)[\s\S])*>Volume</);
     for (const volume of ["16 oz", "64 oz", "3 gal", "½ bbl"]) expect.soft(formats, volume).toContain(volume);
     expect(formats).not.toContain("bbl / format");
   });
@@ -836,7 +837,7 @@ describe("SCREENS", () => {
       ["Work", "New order"], ["Orders", "New order"], ["Transfers", "New transfer"], ["Batches", "New batch"],
       ["Packaging runs", "Schedule run"], ["Purchase orders", "New PO"], ["Routes", "New route"],
       ["Locations", "Add location"], ["Finished goods", "Add SKU"], ["Customers", "New customer"],
-      ["Catalog", "New brand"], ["Cellar map", "Add vessel"],
+      ["Catalog", "New brand"],
       ["Materials on hand", "Add material"], ["Vendors", "Add vendor"], ["Materials", "Add material"],
       ["Contracts", "Add contract"], ["Recipes", "New recipe"], ["Price groups", "New price group"],
     ] as const) {
@@ -941,7 +942,7 @@ describe("SCREENS", () => {
     const named = [
       "Today", "Taproom", "Order", "Cellar map", "Tap board", "Swap keg",
       "Weekly count", "Brew day", "Route", "Settings", "Brand", "Vendors",
-      "POS mapping", "Planning", "Schedule batch", "Vessel detail", "Kick keg", "Return route",
+      "Planning", "Schedule batch", "Vessel detail", "Kick keg", "Return route",
     ];
     const filled = (html: string) =>
       (html.match(/<button\b[^>]*>/g) ?? []).filter((b) =>

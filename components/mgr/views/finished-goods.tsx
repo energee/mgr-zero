@@ -54,6 +54,8 @@ export function FinishedGoodsView({
         rows={model.rows.map((row) => ({
           key: row.key,
           cells: [row.name, row.onHand, row.allocated, <Available key="available" row={row} shortfallHref={to(row.shortfallHref)} />],
+          // Available is a component, so it sorts by its figure.
+          sort: [row.name, row.onHand, row.allocated, row.atp],
           href: linkRows ? row.href : undefined,
           to: "SKU detail",
         }))}

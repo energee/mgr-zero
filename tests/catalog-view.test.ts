@@ -107,7 +107,7 @@ describe("Catalog view", () => {
     expect(inert).not.toMatch(/href="\/catalog\/brands\//);
     expect(inert.match(/<button\b[^>]*data-tap[^>]*>Hazy IPA<\/button>/g)).toHaveLength(2);
     const html = htmlOf(createElement(CatalogView, { model, linkRows: true }));
-    expect([...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map((m) => m[1])).toEqual(["Brand", "Style", "ABV", "SKUs", "COLA"]);
+    expect([...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map((m) => m[1].replace(/<[^>]*>/g, ""))).toEqual(["Brand", "Style", "ABV", "SKUs", "COLA"]);
     // One link per brand in the desktop table, then one in the phone list; the
     // positioned link covers the record without adding another focus target.
     const links = [...html.matchAll(/<a\b([^>]*)>(.*?)<\/a>/g)]
@@ -637,6 +637,13 @@ describe("Formats view", () => {
       ["½ bbl keg", "packaged", formatVolume("0.50000000"), "unit"],
       ["Hazy IPA · Pint", "poured", "16 oz", "Hazy IPA"],
     ]);
+  });
+
+  it("sorts Volume by barrels across oz, gal and bbl, and a missing figure as empty", () => {
+    const model = toFormatsViewProps(formatsInventory);
+    expect(model.rows.map((r) => r.sort[2])).toEqual([0.00403226, 0.01612903, 0.09677419, 0.5, 16 / 3968]);
+    const unfinished = toFormatsViewProps({ formats: [{ id: "u", name: "Unfinished", basis: "packaged", package_type: "can", bbl_per_unit: null }] });
+    expect(unfinished.rows[0].sort[2]).toBeNull();
   });
 
   it("renders Add format and the five format names", () => {

@@ -21,7 +21,7 @@ plan adds search and sort the same way, so every later list reuses it.
 |---|---|
 | Where is the state? | The URL (`?q=&sort=&category=`). Links can be shared, Back works, and the server re-renders. There is no client state. |
 | Who filters and sorts? | Postgres, through new optional inputs on the registered query (`.agents/ARCHITECTURE.md` Pre-implementation gates). The page never narrows rows. |
-| TanStack Table? | No. It sorts and filters rows already in the client. Our lists are `E.nav` rows, not a grid, and it would be a new dependency. Revisit if a spreadsheet-style grid is needed. |
+| TanStack Table? | No, for search and filter. Column-header sorting later adopted it (`docs/plans/data-table-sort.md`, 2026-10-22). |
 | Generic filter language? | No. Each list command declares its own few inputs. The shared parts are the URL parser and the control strip. |
 | Search semantics | Case-insensitive *contains* on name and alias (`ilike %q%`), escaped with the existing `escapeLike` (`lib/commands/search.ts:40`), which moves to a shared module. |
 | Scope of this PR | Catalog brands only. Customers and Materials adopt it in their own PRs. |
