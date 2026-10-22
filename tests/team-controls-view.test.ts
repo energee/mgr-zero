@@ -79,6 +79,25 @@ it("keeps buyer invitations fixed and staff invitations inclusive of taproom", (
   expect(buyer).not.toContain("Warehouse");
 });
 
+it("describes each staff role in a full sentence under the role picker (#1153)", () => {
+  const help = (role: string) => renderToStaticMarkup(createElement(InviteView, { buyer: false, role }));
+  expect(help("admin")).toContain("Can use every staff screen and action, including Team and Settings.");
+  expect(help("sales")).toContain("Can manage the catalog, customers, pricing, orders, invoices and compliance reports.");
+  expect(help("warehouse")).toContain("Can pick and ship orders, and receive, count and transfer stock.");
+  expect(help("brewer")).toContain("Can manage recipes, batches, cellar work and packaging runs.");
+  expect(help("taproom")).toContain("Can run taproom taps and counts, and set personal preferences.");
+});
+
+it("explains both invitation paths in a neutral note that names Invitations (#1153)", () => {
+  const html = renderToStaticMarkup(createElement(InviteView, { buyer: false }));
+  const note = html.match(/<div\b[^>]*role="note"[^>]*>[\s\S]*?<\/div>/)?.[0] ?? "";
+  expect(note).toContain("bg-info");
+  expect(note).not.toContain("warning");
+  const text = note.replace(/<[^>]+>/g, "");
+  expect(text).toBe("New accounts get an email to set up their login. Existing accounts get no email: when they next sign in, MGR opens Invitations (also at /invitations), and access starts only once they accept.");
+  expect(html).not.toContain("Keep this page open");
+});
+
 it("locks both membership actions during either pending write and retains errors", () => {
   const html = renderToStaticMarkup(createElement(TeamMemberView, { name: "@actual", email: "actual@example.com", savedRoles: ["brewer"], removing: true, error: "Cannot remove the last admin" }));
   expect(html).toContain("Cannot remove the last admin");

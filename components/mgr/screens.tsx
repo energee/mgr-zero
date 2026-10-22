@@ -686,7 +686,7 @@ export const SCREENS: Screen[] = [
     to: { "Send invite": "Team" },
     job: "Invite one new staff account with one role",
     reads: "none", writes: "invite_staff",
-    states: [["permission", "admin only", 1], ["retry", "unchanged input keeps request identity"], ["existing account", "cannot attach existing accounts", 1]],
+    states: [["permission", "admin only", 1], ["retry", "unchanged input keeps request identity"], ["existing account", "pending invitation; access after they accept in Invitations", 1]],
     body: <InviteView buyer={false} />,
   },
   {
@@ -1249,7 +1249,7 @@ export const SCREENS: Screen[] = [
     job: "Invite one buyer to a customer account",
     reads: "get_customer",
     writes: "invite_customer_user [existing]",
-    states: [["permission", "sales or admin required", 1], ["ready", "email is valid"], ["sent", "recipient receives a sign-in link"], ["existing account", "attachment is unsupported; contact the admin", 1]],
+    states: [["permission", "sales or admin required", 1], ["ready", "email is valid"], ["sent", "recipient receives a sign-in link"], ["existing account", "pending invitation; access after they accept in Invitations", 1]],
     body: <InviteView buyer defaultEmail={PORTAL_BUYER.email} />,
   },
   {

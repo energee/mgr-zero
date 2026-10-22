@@ -9,11 +9,11 @@ import { STAFF_ROLES } from "@/lib/mgr/enums";
 import { sentenceCase } from "@/lib/mgr/labels";
 
 const ROLE_DESCRIPTIONS: Record<StaffRole, string> = {
-  admin: "everything, including team and settings",
-  sales: "orders, customers, price groups",
-  warehouse: "pick, receive, count, transfer",
-  brewer: "batches, cellar, packaging",
-  taproom: "taproom stock and personal preferences",
+  admin: "Can use every staff screen and action, including Team and Settings.",
+  sales: "Can manage the catalog, customers, pricing, orders, invoices and compliance reports.",
+  warehouse: "Can pick and ship orders, and receive, count and transfer stock.",
+  brewer: "Can manage recipes, batches, cellar work and packaging runs.",
+  taproom: "Can run taproom taps and counts, and set personal preferences.",
 };
 const ROLE_OPTIONS = STAFF_ROLES.map(value => ({ value, label: sentenceCase(value) }));
 
@@ -29,7 +29,7 @@ export function InviteView({ buyer, email, defaultEmail = "", role, onEmailChang
   return <form onSubmit={event => { event.preventDefault(); if (!busy) onSubmit?.(event); }} className="flex flex-col gap-4">
     {E.edit("Email", email ?? draftEmail, "email", undefined, { onChange: (nextValue: string) => { setEmail(nextValue); onEmailChange?.(nextValue); }, id, disabled: busy, required: true })}
     {buyer ? E.fld("Role", "Buyer") : <StaffRoleField value={role ?? draftRole} onChange={value => { setRole(value); onRoleChange?.(value); }} disabled={busy} />}
-    {E.note("New accounts receive an email to set up their login. Existing accounts receive a pending invitation: ask them to sign in and accept it in Invitations. Access is granted only after consent. Keep this page open to retry unchanged details after an error.")}
+    {E.info("New accounts get an email to set up their login. Existing accounts get no email: when they next sign in, MGR opens Invitations (also at /invitations), and access starts only once they accept.")}
     <CommandFormMessage error={error} />
     <CommandFormFooter><Button type="submit" disabled={busy}>{busy ? "Sending…" : "Send invite"}</Button></CommandFormFooter>
   </form>;
