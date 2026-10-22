@@ -11,6 +11,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@/components/ui/item";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PRINTED_DATE } from "@/lib/mgr/table-sort";
 import { cn } from "@/lib/utils";
 
 export type RecordTableRow = {
@@ -29,8 +30,6 @@ export type RecordTableRow = {
 };
 
 const alignClass = (a: "l" | "r" | undefined) => (a === "r" ? "text-right" : "text-left");
-/** A date as lib/date-format.ts formatDate prints it: "Sep 12, 2026". */
-const PRINTED_DATE = /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/;
 /** What a cell ends with: the cell itself, or a fragment's last child (an
  *  Overdue badge, then the date). */
 const lastPart = (cell: ReactNode): ReactNode =>
