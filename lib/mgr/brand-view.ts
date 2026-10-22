@@ -1,10 +1,12 @@
 // lib/mgr/brand-view.ts — view-model for Brand detail. list_brands (one row)
-// plus list_price_groups, the brewery's styles, and the brand's rows from
-// get_compliance_registry paint BrandView.
+// plus list_price_groups, the brewery's styles, the brand's rows from
+// get_compliance_registry and the Sells as reads (brand-sells-view.ts) paint
+// BrandView.
 import { NONE } from "@/components/ui/select";
 import { formatDate } from "@/lib/date-format";
 import type { BrandRecipeCost } from "@/lib/commands/catalog";
 import type { RegistryBrand } from "@/lib/commands/compliance";
+import { toBrandSellsModel, type BrandSellsModel, type BrandSellsSnapshot } from "./brand-sells-view";
 import { nameWithAlias } from "./labels";
 import { plural } from "./plural";
 import { suggestPriceGroup, type PriceGroupSuggestion } from "./price-group-suggestion";
@@ -40,8 +42,8 @@ export type BrandViewModel = {
   suggestion: PriceGroupSuggestion | null;
   description: string;
   hops: string;
-  skuList: string;
-  skuListHref: string;
+  /** One switch per packaged format, the packages inside the switched-on ones, and the group's pours. */
+  sells: BrandSellsModel;
   /** The brand's own compliance: its COLA/formula approvals and state registrations; a pending row when no COLA is on file. */
   compliance: RegistryRowView[];
 };
@@ -60,8 +62,8 @@ export type BrandSnapshot = {
     hops: string | null;
     price_group_id: string | null;
     styles: { name: string } | null;
-    skus: { id: string; active: boolean }[];
-    pours?: { id: string }[];
+    skus: BrandSellsSnapshot["brand"]["skus"];
+    pours?: BrandSellsSnapshot["brand"]["pours"];
   };
   /** Brewery styles list; may include an inventory "Add …" option. */
   styles: string[];
@@ -70,6 +72,8 @@ export type BrandSnapshot = {
   priceGroups: PriceGroupRow[];
   /** get_brand_recipe_cost. Absent means no recipe. */
   cost?: Pick<BrandRecipeCost, "costCentsPerBbl" | "uncosted">;
+  /** Sells as: packaged list_formats, list_channel_prices, list_sale_channels. Absent on a new brand, which sells nothing yet. */
+  sells?: Omit<BrandSellsSnapshot, "brand">;
   /** This brand's rows from get_compliance_registry. Absent means none on file. */
   compliance?: Pick<RegistryBrand, "approvals" | "registrations">;
   backHref?: string;
@@ -111,6 +115,7 @@ export function toBrandViewProps({
   cost,
   backHref,
   saved: savedOrNull,
+  sells = { formats: [], prices: [], channels: [] },
 }: BrandSnapshot): BrandViewModel {
   const saved = savedOrNull ?? brand;
   // "Unpriced" is a real choice: a brand on no group cannot be ordered.
@@ -144,8 +149,7 @@ export function toBrandViewProps({
     suggestion: cost ? suggestPriceGroup({ ...cost, groups: priceGroups }) : null,
     description: brand.description ?? "",
     hops: brand.hops ?? "",
-    skuList,
-    skuListHref: `/catalog/brands/${brand.id}/skus`,
+    sells: toBrandSellsModel({ brand: { ...brand, pours: brand.pours ?? [] }, ...sells }),
     compliance: rows,
   };
 }

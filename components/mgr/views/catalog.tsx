@@ -1,6 +1,6 @@
 // Catalog draws one row per brand in the shared RecordTable: the name links to
 // the brand, with its alias under it, and the COLA column reads its recorded
-// approvals. Packaged and poured SKUs live in its SKU list.
+// approvals. What a brand sells (packages and pours) lives under its Sells as.
 // Price groups and Water profiles rows follow; inventory and live draw both.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";

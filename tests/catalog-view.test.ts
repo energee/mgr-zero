@@ -288,7 +288,7 @@ describe("Brand view", () => {
     expect(toBrandViewProps({ ...brandHazy, categories: undefined }).categoryOptions).toEqual([]);
     expect(htmlOf(screen("Brand").body as ReactNode)).toContain("Manage categories");
   });
-  it("maps list_brands onto style, ABV, category, price group, and SKU list", () => {
+  it("maps list_brands onto style, ABV, category, price group, and Sells as", () => {
     const model = toBrandViewProps(brandHazy);
     expect(model.name).toBe(brandOf(SKU_HAZY));
     expect(model.style).toBe(brandOf(SKU_HAZY));
@@ -299,7 +299,9 @@ describe("Brand view", () => {
     expect(model.suggestion).toMatchObject({ kind: "group", title: "Suggested group 2" });
     expect(model.description).toBe("Juicy, soft, Citra-forward");
     expect(model.hops).toBe("Citra, Mosaic");
-    expect(model.skuList).toBe("3 active packages · 1 pour");
+    expect(model.sells.packages.map((p) => [p.name, p.on])).toEqual([["Case", true], ["Four Pack", false], ["Half", true], ["Sixtel", true]]);
+    expect(model.sells.contents.map((c) => c.label)).toEqual(["Four Pack · 6 per Case"]);
+    expect(model.sells.pours.map((p) => [p.name, p.size, p.prices])).toEqual([["Glass", "16 oz", "Taproom $8.00"]]);
     expect(model.styleOptions).toContain("Add “Cold IPA”");
     expect(model.compliance.map((row) => row.title)).toEqual(["COLA TTB ID 25318001000034", "OH registration"]);
     expect(model.compliance[0]).toMatchObject({ detail: "approved Jan 15, 2026 · serial 260135", verb: "Edit" });
@@ -331,11 +333,18 @@ describe("Brand view", () => {
     expect(errors).not.toContain('unique "key" prop');
   });
 
-  it("renders Save brand, Sell sheet, and SKU list", () => {
+  it("renders Save brand, Sell sheet, and Sells as", () => {
     const html = htmlOf(createElement(BrandView, { model: toBrandViewProps(brandHazy) }));
     expect(html).toMatch(/>Save brand</);
     expect(html).toMatch(/Sell sheet/);
-    expect(html).toMatch(/SKU list/);
+    expect(html).toMatch(/>Sells as</);
+    expect(html).not.toMatch(/SKU list/);
+    expect(html.match(/role="switch"/g)).toHaveLength(4);
+    expect(html).toContain('aria-label="Sells as Half"');
+    expect(html).toMatch(/Four Pack · 6 per Case/);
+    expect(html).toMatch(/>Glass</);
+    expect(html).toMatch(/>Edit on price group</);
+    expect(html.match(/>Edit SKU</g)).toHaveLength(3);
     expect(html).toMatch(/3 active packages/);
     expect(html).toMatch(/Compliance/);
     expect(html).toMatch(/COLA TTB ID 25318001000034/);
@@ -350,15 +359,30 @@ describe("Brand view", () => {
     expect(html).not.toMatch(/→/);
   });
 
-  it("footer null hides Save brand; linkRows hrefs SKU list", () => {
+  it("footer null hides Save brand; linkRows links Edit on price group", () => {
     const html = htmlOf(createElement(BrandView, {
       model: toBrandViewProps(brandHazy),
       footer: null,
       linkRows: true,
     }));
     expect(html).not.toMatch(/>Save brand</);
-    expect(html).toMatch(/href="\/catalog\/brands\/[^"]+\/skus"/);
-    expect(html).toMatch(/SKU list/);
+    expect(html).toMatch(/href="\/pricing"/);
+  });
+
+  it("live Sells as: switches follow the model, details come from the slot, and sellsDisabled locks them", () => {
+    const model = toBrandViewProps(brandHazy);
+    const html = htmlOf(createElement(BrandView, {
+      model,
+      onSellsAs: () => {},
+      sellsDetails: (row) => `DETAILS ${row.name}`,
+      sellsDisabled: true,
+    }));
+    expect(html.match(/aria-checked="true"/g)).toHaveLength(3);
+    expect(html.match(/role="switch"[^>]*disabled=""|disabled=""[^>]*role="switch"/g)).toHaveLength(4);
+    // A format with no SKU yet has nothing to open.
+    expect(html).toContain("DETAILS Half");
+    expect(html).not.toContain("DETAILS Four Pack");
+    expect(html).not.toMatch(/>Edit SKU</);
   });
 
   it("titles the page with the saved name and alias, not the typed field", () => {
@@ -392,15 +416,15 @@ describe("Brand view", () => {
     expect(model.badges).toEqual([]);
     const html = htmlOf(createElement(BrandView, { model }));
     expect(html).toMatch(/Save the brand to add SKUs and compliance/);
-    expect(html).not.toMatch(/SKU list|>Compliance</);
+    expect(html).not.toMatch(/>Sells as<|>Compliance</);
   });
 
-  it("lays the form beside SKUs and Compliance, with Save brand inside the form", () => {
+  it("lays the form beside Sells as and Compliance, with Save brand inside the form", () => {
     const html = htmlOf(createElement(BrandView, { model: toBrandViewProps(brandHazy) }));
-    const form = html.slice(html.indexOf('aria-label="Brand details"'), html.indexOf('aria-label="SKUs and compliance"'));
+    const form = html.slice(html.indexOf('aria-label="Brand details"'), html.indexOf('aria-label="Sells as and compliance"'));
     expect(form).toMatch(/Selling/);
     expect(form).toMatch(/>Save brand</);
-    expect(form).not.toMatch(/SKU list/);
+    expect(form).not.toMatch(/>Sells as</);
     expect(html).toMatch(/id="compliance"/);
     expect(html).toMatch(/ABV %/);
   });

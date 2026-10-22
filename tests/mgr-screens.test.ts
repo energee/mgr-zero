@@ -344,7 +344,7 @@ describe("SCREENS", () => {
     const verbs = new Set([
       "Correct receipt", "Add brew turn", "Correct turn 1", "Correct turn 2",
       "Add", "Add stop", "Add to route", "Adjust", "Assign", "Brew", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose who gets it", "Close", "Confirm", "Connect", "Count", "Create",
-      "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open format",
+      "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Edit SKU", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",
       "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
       "Unlink", "Use", "Write off", "Fix registration", "Forgot password?", "Import CSV", "Invite staff", "Invite portal user",
@@ -959,9 +959,10 @@ describe("SCREENS", () => {
     }
   });
 
-  it("treats a pour as a non-stock SKU", () => {
+  it("treats a pour as a serving from the tap, not a SKU", () => {
     const brand = SCREENS.find((s) => s.name === "Brand")!;
-    expect(JSON.stringify(brand.states)).toMatch(/non-stock SKU/);
+    expect(String(brand.spec)).toMatch(/A pour is a serving from the tap, not a SKU/);
+    expect(JSON.stringify(brand.states)).not.toMatch(/non-stock SKU/);
     expect(String(brand.spec)).not.toMatch(/draft pours are SKUs/i);
     expect(String(brand.spec)).not.toMatch(/SCHEMA-GATE:[^\]]*styles table/);
   });
