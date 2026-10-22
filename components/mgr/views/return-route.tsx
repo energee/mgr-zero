@@ -14,7 +14,7 @@ export function ReturnRouteView({
 }) {
   return (
     <>
-      {E.back(model.backTo ?? "Deliveries", model.title, undefined, model.backHref, "Routes")}
+      {E.back("Deliveries", model.title, undefined, model.backHref, "Routes")}
       {E.fld("Driver · vehicle", model.driverVehicle)}
       {E.fld("Departed", model.departed)}
       {model.stops.map((row) => (

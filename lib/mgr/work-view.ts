@@ -14,8 +14,9 @@ export const WORK_CHIPS = Object.keys(WORK_HREFS);
 
 /** What each chip shows: "All", then the sidebar's name for the page the chip
  *  opens, so a tab never names its page differently from the sidebar (#1104).
- *  A chip whose page is not in the sidebar keeps its identity as a label; that
- *  is safe because workHrefsFor drops such a chip from every live page. */
+ *  A chip whose page is not in the sidebar keeps its identity as a label. Live
+ *  pages never show it (workHrefsFor drops such a chip); the inventory draws
+ *  every chip, and work-filter-accessibility.test.ts pins each to a sidebar name. */
 const WORK_NAV = STAFF_NAV.find(item => item.href === "/work")?.children ?? [];
 function chipLabel(chip: string, href: string): string {
   if (chip === "all") return "All";
@@ -25,20 +26,26 @@ export const WORK_LABELS: Record<string, string> = Object.fromEntries(
   Object.entries(WORK_HREFS).map(([chip, href]) => [chip, chipLabel(chip, href)]),
 );
 
-/** The inventory screen each chip opens (TabBar's `to`, the explorer's
- *  data-to and persona hiding). Not shown to anyone: WORK_LABELS is the text. */
+/** Screen names, never shown as text (WORK_LABELS is the text): the inventory
+ *  screen each chip opens (TabBar's `to`, the explorer's data-to and persona hiding). */
 export const WORK_TABS: Record<string, string> = {
   all: "Work", orders: "Orders", transfers: "Transfers", batches: "Batches",
   runs: "Packaging runs", POs: "Purchase orders", routes: "Routes",
 };
 
-/** What the Work list says when the chosen chip has no rows. It names no kind:
- *  list_work never returns transfers or packaging runs, and each role sees
- *  only some kinds, so a list of kinds would promise rows that never come. */
-export const WORK_EMPTY = {
-  title: "Nothing in motion",
-  description: "A row appears here when something needs your next step.",
-} satisfies EmptyState;
+/** list_work never returns stock transfers or packaging runs, so those two
+ *  chips' empty line sends the reader to the page that lists them. */
+const LISTED_ELSEWHERE: Record<string, string> = {
+  transfers: "Stock transfers are listed on the Transfers page, not here.",
+  runs: "Packaging runs are listed on the Packaging page, not here.",
+};
+
+/** What the Work list says when the chosen chip has no rows. Every other chip
+ *  names no kind: each role sees only some kinds, so a list of kinds would
+ *  promise rows that never come. */
+export function workEmpty(chip: string): EmptyState {
+  return { title: "Nothing in motion", description: LISTED_ELSEWHERE[chip] ?? "A row appears here when something needs your next step." };
+}
 
 export type WorkRowView = {
   key: string;

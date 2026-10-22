@@ -4,7 +4,7 @@ import { Fragment, useState, type ReactNode } from "react";
 import { DeliveryTruck01Icon, Package01Icon, Route01Icon, ThermometerIcon } from "@hugeicons/core-free-icons";
 import { E } from "@/components/mgr/e";
 import { TabBar } from "@/components/mgr/qty";
-import { filterWorkRows, WORK_EMPTY, WORK_LABELS, type WorkViewModel } from "@/lib/mgr/work-view";
+import { filterWorkRows, WORK_LABELS, workEmpty, type WorkViewModel } from "@/lib/mgr/work-view";
 
 export type { WorkViewModel };
 
@@ -27,7 +27,7 @@ export function WorkView({
   const wanted = chip ?? localChip;
   const selected = model.workChips.includes(wanted) ? wanted : model.workChips[0];
   const rows = filterWorkRows(model, selected);
-  const list = rows.length === 0 ? E.blank(WORK_EMPTY) : rows.map(row => <Fragment key={row.key}>
+  const list = rows.length === 0 ? E.blank(workEmpty(selected)) : rows.map(row => <Fragment key={row.key}>
     {E.row(row.title, row.detail, E.act(row.verb, row.tone, row.href), row.warning ? "w" : "", row.icon ? ICON[row.icon] : undefined)}
   </Fragment>);
   return (

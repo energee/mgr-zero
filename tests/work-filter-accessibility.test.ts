@@ -10,7 +10,7 @@ import { WorkList } from "../app/(app)/work/work-list";
 import { TabBar } from "../components/mgr/qty";
 import { WorkView } from "../components/mgr/views/work";
 import { workWarehouse } from "../lib/mgr/fixtures/work";
-import { toWorkViewProps, WORK_EMPTY } from "../lib/mgr/work-view";
+import { toWorkViewProps, workEmpty } from "../lib/mgr/work-view";
 import type { WorkRow } from "../lib/commands/landings";
 
 const render = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -75,8 +75,15 @@ describe("Work filter tab accessibility (#727)", () => {
   it("puts the empty state, with its next-step line, inside the shown panel (#1129)", () => {
     const html = render(createElement(WorkView, { model: toWorkViewProps({ rows: [] }) }));
     const { shown } = expectTabsToControlPanels(html);
-    expect(shown).toContain(WORK_EMPTY.title);
-    expect(shown).toContain(WORK_EMPTY.description);
+    expect(shown).toContain("Nothing in motion");
+    expect(shown).toContain(workEmpty("all").description);
+  });
+
+  it("points the Transfers and Packaging chips to their own pages, since list_work never lists them (#1129)", () => {
+    const empty = (chip: string) => expectTabsToControlPanels(render(createElement(WorkView, { model: toWorkViewProps({ rows: [] }), chip }))).shown;
+    expect(empty("transfers")).toContain("Stock transfers are listed on the Transfers page");
+    expect(empty("runs")).toContain("Packaging runs are listed on the Packaging page");
+    expect(empty("orders")).toContain(workEmpty("all").description);
   });
 
   it("falls back to the first chip when the chosen one is not offered", () => {
