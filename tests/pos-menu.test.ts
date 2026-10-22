@@ -197,12 +197,19 @@ describe("derived POS menus", () => {
     expect((await admin.from("pos_catalog_variations").insert([
       { brewery_id: brewery.id, connection_id: connectionId, external_item_id: "FOOD", external_variation_id: "PRETZEL", external_item_name: "Pretzel", external_variation_name: "Each", source_version: 1, available: true },
       { brewery_id: brewery.id, connection_id: connectionId, external_item_id: "GUEST", external_variation_id: "CIDER", external_item_name: "Guest cider", external_variation_name: "Pint", source_version: 1, available: false },
+      { brewery_id: brewery.id, connection_id: connectionId, external_item_id: "MERCH", external_variation_id: "SHIRT", external_item_name: "Shirt", external_variation_name: "Large", source_version: 1, available: true },
+      { brewery_id: brewery.id, connection_id: connectionId, external_item_id: "GUEST", external_variation_id: "LAGER", external_item_name: "Guest lager", external_variation_name: "Pint", source_version: 1, available: true },
     ])).error).toBeNull();
+    const sale = (variation: string, item: string, at: string) => ({ brewery_id: brewery.id, connection_id: connectionId, external_order_id: `O-${variation}`,
+      external_line_id: "1", external_item_id: item, external_variation_id: variation, external_location_id: at, sold_at: new Date().toISOString(), qty: 1 });
+    // Pretzel and Shirt sell here, Guest cider only at another location, Guest lager nowhere.
+    expect((await admin.from("pos_sales").insert([sale("PRETZEL", "FOOD", "L1"), sale("SHIRT", "MERCH", "L1"), sale("CIDER", "GUEST", "L2")])).error).toBeNull();
+    await runCommand("set_pos_item_mapping", { externalItemId: "MERCH", externalVariationId: "SHIRT", disposition: "ignored" }, warehouseCtx, execution());
     const menu = await runCommand("get_pos_menu", { posLocationId: "L1" }, warehouseCtx) as Required<NonNullable<import("@/lib/mgr/pos-view").PosMenuSnapshot>>;
-    expect(menu.externalItems).toEqual(expect.arrayContaining([
-      expect.objectContaining({ itemName: "Pretzel", disposition: "queued", available: true }),
-      expect.objectContaining({ itemName: "Guest cider", disposition: "queued", available: false }),
-    ]));
+    // Only an unmapped variation selling at this location asks for a decision; ignored, unsold, or sold elsewhere stays quiet.
+    expect(menu.externalItems).toEqual([
+      expect.objectContaining({ itemName: "Pretzel", externalItemId: "FOOD", externalVariationId: "PRETZEL", available: true }),
+    ]);
     expect(menu.items.some((item) => /Pretzel|Guest cider/.test(item.brand))).toBe(false);
 
     await expect(runCommand("get_pos_menu", { posLocationId: "L1" }, await makeStaffCtx(brewery.id, "sales")))

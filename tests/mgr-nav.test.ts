@@ -28,7 +28,7 @@ describe("navFor", () => {
     // unit is a personal preference rather than a permission
     // (set_my_gravity_unit admits all four roles).
     expect(warehouse.find((t) => t.label === "Beer")!.children!.map((c) => c.label)).toContain("Taproom");
-    expect(warehouse.find((t) => t.label === "More")!.children!.map((c) => c.label)).toEqual(["Menu", "POS mapping", "Vendors", "Planning", "Chat", "Units"]);
+    expect(warehouse.find((t) => t.label === "More")!.children!.map((c) => c.label)).toEqual(["Menu", "Vendors", "Planning", "Chat", "Units"]);
   });
 });
 
@@ -94,15 +94,13 @@ it("taproom has Beer and own settings without forbidden Work", () => {
 
 describe("canOpen", () => {
   it("reads the role gate of the deepest nav entry covering the path (#444)", () => {
-    // /settings is admin-only; Units and POS mapping under it are not.
+    // /settings is admin-only; Units under it is not.
     expect(canOpen(["admin"], "/settings")).toBe(true);
     for (const role of ["sales", "brewer", "warehouse", "taproom"] as const) {
       expect.soft(canOpen([role], "/settings"), role).toBe(false);
       expect.soft(canOpen([role], "/settings/pos"), role).toBe(false);
       expect.soft(canOpen([role], "/settings/units"), role).toBe(true);
     }
-    expect(canOpen(["warehouse"], "/settings/pos/mapping")).toBe(true);
-    expect(canOpen(["brewer"], "/settings/pos/mapping")).toBe(false);
     expect(canOpen(["warehouse"], "/more")).toBe(true);
   });
 });

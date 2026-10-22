@@ -10,6 +10,21 @@ import { PosMenuControl } from "@/components/mgr/views/pos-controls";
 type ObservedLocation = { externalLocationId: string; name: string | null; mgrLocationId: string | null };
 type Channel = { id: string; name: string };
 type Bin = { id: string; name: string };
+type Sku = { id: string; name: string; active: boolean };
+// formats_poured_group_chk: every pour belongs to a price group.
+type Format = { id: string; name: string; price_groups: { name: string } };
+
+/** What an "Also in Square" row can map to: an active SKU or a pour. */
+async function mapTargets(ctx: Ctx) {
+  const [skus, formats] = await Promise.all([
+    runCommand("list_skus", {}, ctx) as Promise<Sku[]>,
+    runCommand("list_formats", { basis: "poured" }, ctx) as Promise<Format[]>,
+  ]);
+  return [
+    ...skus.filter(row => row.active).map(row => ({ value: `sku:${row.id}`, label: `SKU · ${row.name}` })),
+    ...formats.map(row => ({ value: `format:${row.id}`, label: `Pour · ${row.price_groups.name} · ${row.name}` })),
+  ];
+}
 
 async function readMenu(ctx: Ctx, posLocationId: string) {
   try {
@@ -39,5 +54,6 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
     const { connected } = await runCommand("get_square_connected", {}, ctx) as { connected: boolean };
     model.setup = toPosMenuSetup({ admin: hasAnyRole(brewery.roles, ["admin"]), connected, observed: observed.length });
   }
-  return <PosMenuControl model={model} bins={bins} channels={channels} />;
+  const targets = model.externalItems.length ? await mapTargets(ctx) : [];
+  return <PosMenuControl model={model} bins={bins} channels={channels} targets={targets} />;
 }

@@ -14,7 +14,7 @@ export default async function PosSalePage({ params }: { params: Promise<{ id: st
   const { id } = await params, brewery = await getActiveBrewery(), ctx = await buildContext(brewery.id);
   const data = await orNotFound(runCommand("get_pos_sale", { saleId: id }, ctx)) as SaleDetail;
   const sale = data.sale;
-  return <PosSaleDetailView backHref="/settings/pos/mapping" title={`Square ${sale.factKind} ${sale.externalOrderId}`} sale={{
+  return <PosSaleDetailView backHref="/settings/pos" title={`Square ${sale.factKind} ${sale.externalOrderId}`} sale={{
     id: sale.id, label: `${sale.itemName} · ${sale.variationName}`, detail: `${sale.factStatus} · ${sale.mappingLabel ?? sale.mappingStatus}`,
     amount: sale.grossCents == null ? "No amount" : money(sale.grossCents), status: sale.mappingStatus,
     location: sale.locationName, soldAt: formatDateTime(sale.soldAt, brewery.timeZone), quantity: sale.quantity ?? "Not supplied",
