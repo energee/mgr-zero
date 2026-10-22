@@ -2,6 +2,7 @@ import type { Filing, LossReview, Report, StateTransaction } from "@/lib/command
 import { destinationStateTotals } from "./destination-state-export";
 import { money } from "./money";
 import { sentenceCase } from "./labels";
+import { submitReason } from "./submit-reason";
 import { bblExact, bblFixed } from "@/lib/volume";
 import { formatDate } from "@/lib/date-format";
 import type { EmptyState } from "./empty-state";
@@ -22,6 +23,8 @@ export type MonthlyComplianceViewModel = ComplianceFiguresViewModel & {
   filingDate?: string;
   amendments?: { id: string; oldBasis: string; newBasis: string; actor: string; at: string; reason: string; invalidPeriod: boolean; figures: ComplianceFiguresViewModel }[];
   warnings: string[];
+  /** Why Save filed snapshot is off, printed beside it (#1143); null when the report balances. */
+  fileReason: string | null;
   losses: { source: LossReview; key: string; title: string; detail: string; allocations: { key: string; title: string; detail: string; bbl: string }[] }[];
 };
 
@@ -41,7 +44,7 @@ const REMOVAL_LABEL: Record<string, string> = {
   taxable: "Taxpaid removals", export: "Export", vessel_supplies: "Supplies for vessels", research: "Research",
   transfer_in_bond: "Transferred in bond", destruction: "Destroyed", loss: "Losses", sample: "Samples", festival_removal: "Festival removals",
 };
-const CLASS_LABEL = { keg: "kegs", can: "cans", bottle: "bottles" } as const;
+const CLASS_LABEL = { keg: "Kegs", can: "Cans", bottle: "Bottles" } as const;
 const removalBbl = (key: string, value: number) => key === "loss" ? bblExact(value, 8) : bblFixed(value);
 const label = (value: string) => REMOVAL_LABEL[value] ?? sentenceCase(value);
 
@@ -78,6 +81,8 @@ export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot
       figures: toComplianceFigures(row.new_figures),
     })),
     warnings: snapshot.report.warnings,
+    // The warnings themselves are drawn in step 2, under the figures they explain.
+    fileReason: figures.balances ? null : `${submitReason(["figures that balance"])} Step 2 names what does not.`,
     losses: snapshot.losses.map((loss) => ({
       source: loss,
       key: loss.adjustment_id,

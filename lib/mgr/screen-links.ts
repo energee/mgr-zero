@@ -200,7 +200,7 @@ export const INERT: (string | RegExp)[] = [
   // The QuickBooks sync row's title is a read-out; its Sync button acts in place.
   "Last successful sync",
   "1 \u00b7 Add locations",
-  "1 \u00b7 Review auto-reconciled losses",
+  "1 \u00b7 Review cellar losses",
   "2 \u00b7 Review generated figures",
   "2 \u00b7 Review original filed figures",
   "2-row \u00b7 55 lb bags",

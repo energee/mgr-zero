@@ -44,14 +44,36 @@ describe("Monthly compliance view", () => {
     expect(model.filingDate).toBe("Sep 2, 2026");
   });
 
-  it("draws the period in progress: reviewable, File once the period ends replaces Save (#579)", () => {
+  it("draws the period in progress: reviewable, a when-to-record line replaces Save (#579, #1143)", () => {
     const body = SCREENS.find((screen) => screen.name === "Period in progress")!.body as { type: unknown; props: { monthOpen?: boolean } };
     expect(body.type).toBe(MonthlyComplianceView);
     expect(body.props.monthOpen).toBe(true);
     const html = htmlOf(body as ReactNode);
     expect(html).toMatch(/September 2026/);
-    expect(html).toMatch(/File once the period ends/);
+    expect(html).toMatch(/You can record the filing after September 2026 ends/);
     expect(html).not.toMatch(/Save filed snapshot/);
+  });
+
+  it("says before Save that MGR does not file with TTB, in plain sentence-case copy (#1143)", () => {
+    const html = htmlOf(createElement(MonthlyComplianceView, { model: toMonthlyComplianceViewProps(monthlyComplianceAugust) }));
+    const notice = html.indexOf("MGR does not file with TTB");
+    expect(notice).toBeGreaterThan(-1);
+    expect(notice).toBeLessThan(html.indexOf("Save filed snapshot"));
+    expect(html).not.toMatch(/auto-reconciled|immutable|transmit|\bfacts\b|outward|removal category|allocations change/i);
+    for (const header of ["Class", "Begin", "In", "Out", "End", "State", "Removed (bbl)", "Returned (bbl)", "Adjustments (bbl)", "Net (bbl)", "Sales", "Credits", "Net sales"]) expect(html).toContain(`>${header}</th>`);
+    expect(toMonthlyComplianceViewProps(monthlyComplianceAugust).lines.map((line) => line[0])).toEqual(["Kegs", "Cans", "Bottles"]);
+  });
+
+  it("names why Save is off beside it while the report does not balance (#1143, #1122)", () => {
+    expect(toMonthlyComplianceViewProps(monthlyComplianceAugust).fileReason).toBeNull();
+    const unbalanced = { ...monthlyComplianceAugust, report: { figures: { ...monthlyComplianceAugust.report.figures, balances: false }, warnings: ["keg does not balance"] } };
+    const model = toMonthlyComplianceViewProps(unbalanced);
+    expect(model.fileReason).toBe("Still needed: figures that balance. Step 2 names what does not.");
+    const html = htmlOf(createElement(MonthlyComplianceView, { model }));
+    const save = html.match(/<button[^>]*>Save filed snapshot<\/button>/)?.[0] ?? "";
+    expect(save).toMatch(/\sdisabled=""/);
+    const describedBy = save.match(/aria-describedby="([^"]+)"/)?.[1];
+    expect(html).toMatch(new RegExp(`<p id="${describedBy}"[^>]*>${model.fileReason}</p>`));
   });
 
   it("keeps fixture actions inert and supports null live actions", () => {

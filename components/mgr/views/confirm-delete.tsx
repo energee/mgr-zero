@@ -4,12 +4,14 @@
 // footer. Destructive and irreversible verbs open it first, so their command
 // runs only from the confirm button. Wrappers (customer, format, bin, …)
 // supply the copy. `tone: "irreversible"` draws a one-time commit, not a loss.
+// The trigger is a SubmitButton, so a `reason` holds it closed and is printed beside it.
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { IRREVERSIBLE, IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
+import { SubmitButton } from "@/components/mgr/submit-button";
 
-export function ConfirmDeleteControl({ title, triggerLabel, name, warning, busy = false, disabled = false, error, onDelete, size, tone = "destructive", dismissLabel = "Cancel", busyLabel = "Deleting…" }: {
+export function ConfirmDeleteControl({ title, triggerLabel, name, warning, busy = false, reason, error, onDelete, size, tone = "destructive", dismissLabel = "Cancel", busyLabel = "Deleting…" }: {
   /** Sheet title, confirm label, and the trigger's accessible name, e.g. "Delete customer". */
   title: string;
   /** Shorter visible trigger text for a row verb ("Delete"); `title` then names the row for assistive tech. */
@@ -19,8 +21,8 @@ export function ConfirmDeleteControl({ title, triggerLabel, name, warning, busy 
   /** Muted second line: what blocks or follows the action. */
   warning: string;
   busy?: boolean;
-  /** Holds the trigger closed, e.g. while a report does not balance. */
-  disabled?: boolean;
+  /** Why the trigger is held closed, e.g. while a report does not balance (submitReason, lib/mgr/submit-reason.ts); null or absent when it may open. */
+  reason?: string | null;
   error?: string | null;
   /** Resolves true when the action succeeded and the sheet may close. A caller
    *  may share `error` with its own form; the sheet shows it only after its own
@@ -38,8 +40,8 @@ export function ConfirmDeleteControl({ title, triggerLabel, name, warning, busy 
   const toggle = (next: boolean) => { if (!busy) { setOpen(next); setFailed(false); } };
   const irreversible = tone === "irreversible";
   return <CommandForm open={open} onOpenChange={toggle} title={title}
-    trigger={<Button data-preview-action variant={irreversible ? "default" : "destructive"} size={size} disabled={busy || disabled}
-      aria-label={triggerLabel ? title : undefined} {...(irreversible ? { "data-variant": "irreversible", className: `w-full md:w-fit md:self-end ${IRREVERSIBLE}` } : {})}>{triggerLabel ?? title}</Button>}>
+    trigger={<SubmitButton type="button" data-preview-action variant={irreversible ? "default" : "destructive"} size={size} disabled={busy} reason={reason}
+      aria-label={triggerLabel ? title : undefined} {...(irreversible ? { "data-variant": "irreversible", className: `w-full md:w-fit md:self-end ${IRREVERSIBLE}` } : {})} label={triggerLabel ?? title} />}>
     <form data-preview-action className="flex flex-col gap-4" onSubmit={async event => {
       event.preventDefault();
       event.stopPropagation();

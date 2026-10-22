@@ -36,11 +36,13 @@ describe("ConfirmDeleteControl", () => {
     expect(onDelete).not.toHaveBeenCalled();
   });
 
-  it("draws an irreversible tone and can hold the trigger disabled", () => {
-    const html = renderToStaticMarkup(createElement(ConfirmDeleteControl, { title: "Save filed snapshot", tone: "irreversible", disabled: true, name: "File it?", warning: "Once." }));
+  it("draws an irreversible tone and holds the trigger closed beside the reason it names (#1122)", () => {
+    const html = renderToStaticMarkup(createElement(ConfirmDeleteControl, { title: "Save filed snapshot", tone: "irreversible", reason: "Still needed: figures that balance.", name: "File it?", warning: "Once." }));
     const [trigger] = buttons(html);
     expect(trigger).toContain('data-variant="irreversible"');
     expect(trigger).toMatch(DISABLED);
+    const describedBy = trigger?.match(/aria-describedby="([^"]+)"/)?.[1];
+    expect(html).toMatch(new RegExp(`<p id="${describedBy}"[^>]*>Still needed: figures that balance\\.</p>`));
   });
 });
 
@@ -51,14 +53,16 @@ describe("Save filed snapshot", () => {
     expect(save).toContain('aria-haspopup="dialog"');
     expect(save).toContain('data-variant="irreversible"');
     const live = readFileSync("app/(app)/compliance/[period]/file-button.tsx", "utf8");
-    expect(live).toMatch(/<FileSnapshotControl\b/);
-    expect(live).toMatch(/onDelete=\{\(\) => run\("file_compliance_report"/);
+    expect(live).toMatch(/<FileSnapshotForm\b/);
+    expect(live).toMatch(/onFile=\{\(\) => run\("file_compliance_report"/);
+    expect(live).not.toMatch(/<Input\b|<Label\b/);
   });
 
-  it("says the filing is once and is not transmitted", () => {
+  it("opens while nothing blocks it, and the sheet says MGR does not file with TTB", () => {
     const html = renderToStaticMarkup(createElement(FileSnapshotControl, {}));
     expect(html).toContain('aria-haspopup="dialog"');
     expect(html).not.toMatch(DISABLED);
+    expect(readFileSync("components/mgr/views/file-snapshot.tsx", "utf8")).toMatch(/does not file with TTB/);
   });
 });
 

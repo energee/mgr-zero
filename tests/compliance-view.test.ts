@@ -10,7 +10,7 @@ import { SCREENS } from "../components/mgr/screens";
 import { BrandApprovalView } from "../components/mgr/views/brand-approval";
 import { ComplianceMonthsView } from "../components/mgr/views/compliance-months";
 import { LicensesView } from "../components/mgr/views/licenses";
-import { noPeriodsYet } from "../lib/mgr/compliance-months-view";
+import { noPeriodsYet, periodRow } from "../lib/mgr/compliance-months-view";
 import { LicenseView } from "../components/mgr/views/license";
 import { MaterialLotTraceView } from "../components/mgr/views/material-lot-trace";
 import { toMaterialLotTraceViewProps } from "../lib/mgr/material-lot-trace-view";
@@ -40,6 +40,21 @@ describe("Compliance months", () => {
     expect(html).toMatch(/Q1 2027 is the first quarterly period/);
   });
 
+
+  it("states each period's filing in sentence case, the same words as the inventory rows (#1144)", () => {
+    const filing = { id: "f", jurisdiction: "TTB", period_start: "2026-07-01", period_end: "2026-07-31", filed_at: "2026-08-04T15:00:00Z", filed_by: null, note: null, created_at: "2026-08-04T15:00:00Z",
+      figures: { jurisdiction: "TTB", periodStart: "2026-07-01", periodEnd: "2026-07-31", lines: [], removals: { taxable: 38.75 }, cellarRemovals: {}, byState: {}, packaged: 0, inProcess: 0, balances: true } };
+    const today = "2026-09-15";
+    expect(periodRow("2026-09", undefined, today, DEMO_TIME_ZONE)).toEqual(complianceMonthsDemo.months[0]);
+    expect(periodRow("2026-08", { ...filing, period_start: "2026-08-01", period_end: "2026-08-31", filed_at: "2026-09-02T15:00:00Z", needs_amendment: true }, today, DEMO_TIME_ZONE)).toEqual(complianceMonthsDemo.months[1]);
+    expect(periodRow("2026-07", filing, today, DEMO_TIME_ZONE)).toEqual(complianceMonthsDemo.months[2]);
+    expect(periodRow("2026-07", undefined, today, DEMO_TIME_ZONE).detail).toBe("Not filed · Ready to review");
+    expect(periodRow("2026-Q3", undefined, today, DEMO_TIME_ZONE).detail).toBe("In progress · File after the quarter ends");
+    expect(periodRow("2026-07", { ...filing, filed_at: null }, today, DEMO_TIME_ZONE).detail).toBe("Filed · 38.75 bbl taxable");
+    const page = src("app/(app)/compliance/page.tsx");
+    expect(page).toMatch(/periodRow\(/);
+    expect(page).not.toMatch(/ready to review|file once/i);
+  });
 
   it("the Compliance months inventory record is ComplianceMonthsView", () => {
     const body = screen("Compliance months").body as { type: unknown; props: { model: unknown } };
