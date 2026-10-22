@@ -20,7 +20,7 @@ export default async function VesselPage({ params }: { params: Promise<{ id: str
   const ctx = await buildContext(brewery.id);
   // Brewers read a vessel; adding and editing one is admin work.
   requirePagePermission(ctx, id === "new" ? "upsert_vessel" : "list_vessels", "Vessel detail");
-  if (id === "new") return <VesselForm model={{ title: "New vessel", backHref: "/cellar", name: "", type: "Fermenter", typeOptions: VESSEL_TYPES, capacity: "", currentReading: "No readings yet", history: [] }} />;
+  if (id === "new") return <VesselForm model={{ title: "New vessel", backHref: "/cellar", name: "", type: "Fermenter", typeOptions: VESSEL_TYPES, capacity: "" }} />;
   const [vessels, occupancies, unit] = await Promise.all([
     runPageQuery("list_vessels", { retired: true }, ctx), runPageQuery("list_occupancies", {}, ctx), runPageQuery("get_gravity_unit", {}, ctx),
   ]) as [Vessel[], Occupancy[], { effective: GravityUnit }];

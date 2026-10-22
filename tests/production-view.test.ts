@@ -311,6 +311,24 @@ describe("Vessel detail view", () => {
     expect(src("app/(app)/cellar/vessels/[id]/page.tsx")).not.toMatch(/Open batch/);
   });
 
+  it("a vessel not saved yet shows only its facts: no occupancy or readings (#1116)", () => {
+    const { currentReading: _current, history: _history, ...facts } = vesselFv3;
+    const html = htmlOf(createElement(VesselDetailView, { model: { ...facts, occupancy: undefined, title: "New vessel" } }));
+    for (const gone of ["No open occupancy", "Current reading", "Reading history", "No readings yet"]) expect(html).not.toContain(gone);
+    expect(html).toContain("Vessel facts");
+    // An existing empty vessel still says it is empty and has no readings.
+    const empty = htmlOf(createElement(VesselDetailView, { model: { ...vesselFv3, occupancy: undefined, currentReading: "No readings yet", history: [] } }));
+    for (const shown of ["No open occupancy", "Current reading", "Reading history"]) expect(empty).toContain(shown);
+  });
+
+  it("the back link names the page it opens: Cellar (#1116)", () => {
+    const html = htmlOf(createElement(VesselDetailView, { model: vesselFv3 }));
+    expect(html).toMatch(/<a[^>]*>(?:(?!<\/a>)[\s\S])*Cellar<\/a>/);
+    // "Cellar map" stays only as the inventory screen it opens (data-to), never as copy.
+    expect(html).toContain('data-to="Cellar map"');
+    expect(html.replace(/data-to="[^"]*"/g, "")).not.toContain("Cellar map");
+  });
+
   it("the Vessel detail inventory record is VesselDetailView", () => {
     const body = screen("Vessel detail").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(VesselDetailView);
