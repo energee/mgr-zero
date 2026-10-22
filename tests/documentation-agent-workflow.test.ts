@@ -55,7 +55,7 @@ function publication(root: string, edit: (repo: string) => void, intervene?: (re
   const validation = workflow.jobs.maintain.steps.find((step) => step.name === "Validate the generated guide")!.run!;
   const validated = spawnSync("bash", ["-e", "-o", "pipefail", "-c", validation], {
     cwd: repo,
-    env: { ...env, GITHUB_OUTPUT: output },
+    env: { ...env, GITHUB_OUTPUT: output, RUNNER_TEMP: root },
     encoding: "utf8",
   });
   if (validated.status !== 0 || readFileSync(output, "utf8").includes("changed=false")) {
@@ -143,8 +143,54 @@ describe("documentation agent workflow", () => {
   it("rejects edits outside the allowed guide suite before artifact transfer", () => {
     checkPublication((repo) => writeFileSync(join(repo, "content/docs/screens.mdx"), "forbidden\n"), ({ validated, published }) => {
       expect(validated.status).toBe(1);
-      expect(validated.stdout).toContain("outside the guide suite");
+      expect(validated.stdout).toContain("outside the guides, README.md, and the docs this change added");
       expect(published).toBeUndefined();
+    });
+  });
+
+  // Outside the guides, only README.md and the docs this change added are writable,
+  // so injected PR text cannot steer the agent into rewriting an existing runbook.
+  it("accepts edits to a doc the change added and rejects edits to any other docs page", () => {
+    // The trusted copy in RUNNER_TEMP (the fixture root), written before the model ran.
+    const added = (repo: string) => writeFileSync(join(repo, "..", "new-docs.txt"), "docs/operations/new.md\n");
+    checkPublication((repo) => {
+      added(repo);
+      mkdirSync(join(repo, "docs/operations"), { recursive: true });
+      writeFileSync(join(repo, "docs/operations/new.md"), "integrated\n");
+      writeFileSync(join(repo, "README.md"), "linked\n");
+    }, ({ validated }) => expect(validated.status, validated.stdout).toBe(0));
+    checkPublication((repo) => {
+      added(repo);
+      mkdirSync(join(repo, "docs/operations"), { recursive: true });
+      writeFileSync(join(repo, "docs/operations/release-checklist.md"), "rewritten\n");
+    }, ({ validated, published }) => {
+      expect(validated.status).toBe(1);
+      expect(validated.stdout).toContain("docs/operations/release-checklist.md");
+      expect(published).toBeUndefined();
+    });
+  });
+
+  it("ignores a docs list the model wrote into the working tree", () => {
+    checkPublication((repo) => {
+      writeFileSync(join(repo, ".docs-agent-new-docs.txt"), "docs/operations/release-checklist.md\n");
+      mkdirSync(join(repo, "docs/operations"), { recursive: true });
+      writeFileSync(join(repo, "docs/operations/release-checklist.md"), "rewritten\n");
+    }, ({ validated, published }) => {
+      expect(validated.status).toBe(1);
+      expect(published).toBeUndefined();
+    });
+  });
+
+  it("moves findings out of the patch and flags them for the report job", () => {
+    checkPublication((repo) => {
+      writeFileSync(join(repo, ".docs-agent-findings.jsonl"), '{"title":"x","body":"y"}\n');
+      writeFileSync(join(repo, guides[1]), "agent correction\n");
+    }, ({ root, repo, validated, published }) => {
+      expect(validated.status, validated.stderr).toBe(0);
+      expect(readFileSync(join(root, "output"), "utf8")).toContain("findings=true");
+      expect(existsSync(join(root, "doc-findings.jsonl"))).toBe(true);
+      expect(git(repo, "diff", "HEAD^", "HEAD", "--name-only")).toBe(guides[1]);
+      expect(published?.status, published?.stderr).toBe(0);
     });
   });
 
