@@ -16,7 +16,7 @@ export type LocationBinsViewModel = {
   rows: LocationBinsRowView[];
   /** Nothing is stored in any bin; the view draws it in place of Move stock. */
   empty?: EmptyState;
-  /** Where the empty state's Open Inventory goes; fixtures leave it out. */
+  /** Where the empty state's Record movement goes; fixtures leave it out. */
   inventoryHref?: string;
   /** Why Move stock is not offered here; the view draws it in place of the form. */
   moveUnavailable: string | null;
@@ -40,13 +40,15 @@ export type LocationBinsSnapshot = {
   inventoryHref?: string;
 };
 
-/** One bin's row detail: how many stock rows it holds, or nothing when stock
- *  was not read. The page reads every get_bin_move_stock row for Move stock
- *  anyway, so the count comes from those rows rather than a second query. */
+/** One bin's row detail: how many kinds of stock (get_bin_move_stock rows) it
+ *  holds, or nothing when stock was not read. A kind is not a unit count: 400
+ *  cases of one SKU is one kind. The page reads every get_bin_move_stock row
+ *  for Move stock anyway, so the count comes from those rows rather than a
+ *  second query. */
 function holds(stock: LocationBinsSnapshot["stock"], binId: string): string {
   if (!stock) return "";
   const n = stock.filter((s) => s.bin_id === binId).length;
-  return n ? `${plural(n, "item")} on hand` : "Empty";
+  return n ? `${plural(n, "kind")} of stock` : "Empty";
 }
 
 export function toLocationBinsViewProps({
@@ -62,8 +64,9 @@ export function toLocationBinsViewProps({
     backLabel: backLabel ?? location.name,
     backHref,
     rows: bins.map((b) => ({ key: b.id, title: b.name, detail: holds(stock, b.id) })),
-    empty: stock?.length === 0 ? { title: "Nothing is stored in these bins yet", description: "Move stock here from Inventory." } : undefined,
+    empty: stock?.length === 0 ? { title: "Nothing is stored in these bins yet", description: "Record stock into a bin from Inventory." } : undefined,
     inventoryHref,
-    moveUnavailable: stock?.length && bins.length < 2 ? "Moving stock needs at least two bins at this location. Add a bin first." : null,
+    // Only once some bin holds stock: with none, the empty state shows instead.
+    moveUnavailable: stock !== undefined && stock.length > 0 && bins.length < 2 ? "Moving stock needs at least two bins at this location. Add a bin first." : null,
   };
 }

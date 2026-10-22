@@ -26,11 +26,11 @@ export default async function LocationBinsPage({ params }: { params: Promise<{ i
   if (!location) notFound();
   const bins = (await runCommand("list_bins", { locationId: id }, ctx)) as BinRow[];
   const canWrite = brewery.roles.includes("admin") || brewery.roles.includes("warehouse");
-  const stock = canWrite ? await runCommand("get_bin_move_stock", { locationId: id }, ctx) as BinMoveStock[] : [];
+  const stock = canWrite ? await runCommand("get_bin_move_stock", { locationId: id }, ctx) as BinMoveStock[] : undefined;
   return <LocationBinsView
-    model={toLocationBinsViewProps({ location, bins, stock: canWrite ? stock : undefined, backHref: `/locations/${id}`, inventoryHref: "/inventory" })}
+    model={toLocationBinsViewProps({ location, bins, stock, backHref: `/locations/${id}`, inventoryHref: `/inventory?recordMovement=1&locationId=${id}` })}
     createAction={canWrite ? <BinForm locationId={id} /> : null}
     rowActions={Object.fromEntries(bins.map(b => [b.id, canWrite ? <BinForm locationId={id} bin={b} /> : null]))}
-    footer={canWrite ? <MoveStockForm bins={bins} stock={stock} /> : null}
+    footer={stock ? <MoveStockForm bins={bins} stock={stock} /> : null}
   />;
 }

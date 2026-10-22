@@ -115,12 +115,12 @@ it("bins shared view retains actual stock move inputs and suppresses Warehouse-o
   expect(page.props.footer.props.stock).toEqual([{ bin_id: "bin", skuId: "sku", qty: 4 }]);
   expect(page.props.footer.props.bins[0].id).toBe("bin");
   // #1154: the title names the location and the row says what the bin holds.
-  expect(render(page)).toMatch(/Bins at Cold room[\s\S]*Cold[\s\S]*1 item on hand/);
+  expect(render(page)).toMatch(/Bins at Cold room[\s\S]*Cold[\s\S]*1 kind of stock/);
   state.roles = ["sales"]; state.calls = [];
   const readonly = await BinsPage({ params: Promise.resolve({ id: "location" }) });
   expect(state.calls).not.toContain("get_bin_move_stock");
   // Sales never reads bin stock, so the row claims neither a count nor Empty.
-  expect(render(readonly)).not.toMatch(/Add bin|Edit bin|Move stock|on hand|Empty|Nothing is stored/);
+  expect(render(readonly)).not.toMatch(/Add bin|Edit bin|Move stock|of stock|Empty|Nothing is stored/);
 });
 it("pricing shared tables draw a group's pour as a column by its name, with a cell on that group", async () => {
   const page = await PricingPage();

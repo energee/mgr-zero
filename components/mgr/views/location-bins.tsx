@@ -49,7 +49,7 @@ export function LocationBinsView({
 /** Under the rows: the empty state, why Move stock is unavailable, the live
  *  footer (Move stock), or the inventory's Add bin when no createAction came. */
 function belowRows(model: LocationBinsViewModel, footer: ReactNode, createAction: ReactNode): ReactNode {
-  if (model.empty) return E.blank(model.empty, undefined, E.btn("Open Inventory", "g", model.inventoryHref));
+  if (model.empty) return E.blank(model.empty, undefined, E.btn("Record movement", "g", model.inventoryHref));
   if (model.moveUnavailable) return E.gated("Move stock", model.moveUnavailable);
   if (footer !== undefined) return footer;
   return createAction !== undefined ? null : E.btn("Add bin", "g");

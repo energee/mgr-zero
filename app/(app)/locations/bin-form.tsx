@@ -18,11 +18,11 @@ export function BinForm({ locationId, bin }: { locationId: string; bin?: { id: s
     target: bin?.id,
   });
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title={bin ? `Edit bin ${bin.name}` : "Add bin"}
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title={bin ? `Edit bin · ${bin.name}` : "Add bin"}
       trigger={<Button size="sm" variant={bin ? "outline" : "default"} aria-label={bin ? `Edit ${bin.name}` : undefined}>{bin ? "Edit" : "Add bin"}</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <BinView
-          model={toBinViewProps({ id: bin?.id, name, tapBoardHref: "/taproom/board" })}
+          model={toBinViewProps({ name, tapBoardHref: "/taproom/board" })}
           controls={{ name: setName }}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>

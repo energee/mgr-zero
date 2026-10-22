@@ -43,6 +43,5 @@ export const locationBinsTaproom: LocationBinsSnapshot = {
 
 /** Cold bin sheet. */
 export const binCold: BinSnapshot = {
-  id: BIN_COLD,
   name: "Cold",
 };

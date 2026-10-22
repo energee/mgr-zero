@@ -79,7 +79,6 @@ describe("Keg fleet shared fields", () => {
     expect(event).not.toMatch(/<input\b/);
     expect(src("app/(app)/locations/move-stock-form.tsx")).not.toMatch(/components\/ui\/(select|input|label)"/);
     expect(src("app/(app)/locations/move-stock-form.tsx")).toMatch(/<MoveStockFields\b/);
-    expect(src("app/(app)/locations/[id]/bins/page.tsx")).toMatch(/stock: canWrite \? stock : undefined/);
     expect(src("app/(app)/kegs/page.tsx")).toMatch(/kegEventUnavailable/);
   });
 });

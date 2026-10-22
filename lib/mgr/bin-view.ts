@@ -7,7 +7,6 @@ export type BinViewModel = {
 };
 
 export type BinSnapshot = {
-  id?: string;
   name: string;
   tapBoardHref?: string;
 };

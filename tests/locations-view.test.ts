@@ -195,8 +195,8 @@ describe("Location bins", () => {
     expect(model.backLabel).toBe("Location detail");
     expect(model.backHref).toBeUndefined();
     expect(model.rows.map((r) => [r.title, r.detail])).toEqual([
-      ["Walk-in", "3 items on hand"],
-      ["Cold", "1 item on hand"],
+      ["Walk-in", "3 kinds of stock"],
+      ["Cold", "1 kind of stock"],
       ["Dry", "Empty"],
     ]);
     expect(model.empty).toBeUndefined();
@@ -214,7 +214,7 @@ describe("Location bins", () => {
   it("an empty location gets the empty state, not a locked Move stock (#1154)", () => {
     const model = toLocationBinsViewProps({ location, bins: twoBins, stock: [] });
     expect(model.rows.map((r) => r.detail)).toEqual(["Empty", "Empty"]);
-    expect(model.empty).toEqual({ title: "Nothing is stored in these bins yet", description: "Move stock here from Inventory." });
+    expect(model.empty).toEqual({ title: "Nothing is stored in these bins yet", description: "Record stock into a bin from Inventory." });
     expect(model.moveUnavailable).toBeNull();
   });
 
@@ -229,21 +229,21 @@ describe("Location bins", () => {
     expect(html).toMatch(/Location detail/);
     expect(html).toMatch(new RegExp(`<h1[^>]*>Bins at ${LOC_TAPROOM.name}</h1>`));
     expect(html).toMatch(/Walk-in/);
-    expect(html).toMatch(/3 items on hand/);
-    expect(html).toMatch(/1 item on hand/);
+    expect(html).toMatch(/3 kinds of stock/);
+    expect(html).toMatch(/1 kind of stock/);
     expect(html).toMatch(/Empty/);
     expect(html).toMatch(/>Add bin</);
     expect(html).not.toMatch(/→/);
   });
 
-  it("the empty state links Inventory and replaces Move stock", () => {
+  it("the empty state opens Record movement and replaces Move stock", () => {
     const html = htmlOf(createElement(LocationBinsView, {
-      model: toLocationBinsViewProps({ location, bins: twoBins, stock: [], inventoryHref: "/inventory" }),
+      model: toLocationBinsViewProps({ location, bins: twoBins, stock: [], inventoryHref: "/inventory?recordMovement=1&locationId=l" }),
       footer: "live form",
     }));
     expect(html).toMatch(/Nothing is stored in these bins yet/);
-    expect(html).toMatch(/Move stock here from Inventory\./);
-    expect(html).toMatch(/<a[^>]*href="\/inventory"[^>]*>Open Inventory<\/a>/);
+    expect(html).toMatch(/Record stock into a bin from Inventory\./);
+    expect(html).toMatch(/<a[^>]*href="\/inventory\?recordMovement=1&amp;locationId=l"[^>]*>Record movement<\/a>/);
     expect(html).not.toMatch(/live form/);
     expect(html).not.toMatch(/No stock is on hand/);
   });
@@ -263,7 +263,7 @@ describe("Location bins", () => {
       rowActions: { [locationBinsTaproom.bins[1].id]: "EDIT" },
     }));
     expect(html).toMatch(/Walk-in/);
-    expect(html).toMatch(/1 item on hand/);
+    expect(html).toMatch(/1 kind of stock/);
     expect(html.match(/EDIT/g)).toHaveLength(1);
     expect(html).not.toMatch(/→/);
   });
@@ -280,7 +280,7 @@ describe("Location bins", () => {
     expect(src).toMatch(/<LocationBinsView\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/backHref:/);
-    expect(src).toMatch(/inventoryHref: "\/inventory"/);
+    expect(src).toMatch(/inventoryHref: `\/inventory\?recordMovement=1&locationId=\$\{id\}`/);
     expect(src).toMatch(/rowActions=/);
     expect(src).not.toMatch(/detail: ""/);
   });
@@ -310,14 +310,20 @@ describe("Bin sheet", () => {
   it("Remove sits in its own section after Save, stating the delete_bin rule (#1154)", () => {
     const html = htmlOf(createElement(BinView, { model: toBinViewProps(binCold) }));
     const section = /<section aria-label="Remove bin"[^>]*>([\s\S]*?)<\/section>/.exec(html);
+    expect(section?.[1]).toMatch(/<h2[^>]*>Remove bin<\/h2>/);
+    expect(section?.[1]).not.toMatch(/data-slot="item-title"/);
     expect(section?.[1]).toMatch(/aria-label="Remove Cold"/);
     expect(section?.[1]).toMatch(/Only an unused bin, never the last one, can be removed\./);
     expect(section?.[1]).not.toMatch(/Save bin/);
     expect(html.indexOf(">Save bin<")).toBeLessThan(html.indexOf('aria-label="Remove bin"'));
   });
 
-  it("the Remove confirmation states what delete_bin refuses", () => {
-    expect(RemoveBinControl({ bin: "Cold" }).props.warning).toBe("A location keeps at least one bin. A bin that has ever held stock, or that a POS menu uses, cannot be removed; rename it instead.");
+  it("the Remove confirmation states each rule delete_bin enforces, with its own fix", () => {
+    const warning: string = RemoveBinControl({ bin: "Cold" }).props.warning;
+    expect(warning).toMatch(/keeps at least one bin/);
+    expect(warning).toMatch(/ever recorded stock cannot be removed; rename it instead/);
+    expect(warning).toMatch(/POS menu uses cannot be removed until the menu uses another bin/);
+    expect(warning).not.toMatch(/Only empty bins/);
   });
 
   it("a remove slot replaces the inventory Remove inside the section, and null drops the section", () => {
@@ -342,7 +348,7 @@ describe("Bin sheet", () => {
     expect(src).toMatch(/<BinView\b/);
     expect(src).toMatch(/controls=\{\{ name: setName \}\}/);
     expect(src).not.toMatch(/<Label\b|<Input\b/);
-    expect(src).toMatch(/title=\{bin \? `Edit bin \$\{bin\.name\}` : "Add bin"\}/);
+    expect(src).toMatch(/title=\{bin \? `Edit bin · \$\{bin\.name\}` : "Add bin"\}/);
     expect(src).toMatch(/tapBoardHref: "\/taproom\/board"/);
     expect(src).toMatch(/remove=\{bin \? <RemoveBinControl/);
   });
