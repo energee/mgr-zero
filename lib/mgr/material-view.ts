@@ -3,9 +3,12 @@ export type MaterialViewModel = {
   name: string;
   kind: string;
   kindOptions: string[];
+  /** Base units in one purchase unit, the "Base units per purchase unit"
+   * field: "44" for a 44 lb hop box. Not the base unit itself; that is `unit`. */
   baseUnits: string;
   purchaseUnit: string;
   purchaseUnitOptions: string[];
+  /** The base unit recipes and counts use, the "Base unit" field: "lb". */
   unit: string;
   unitOptions: string[];
   defaultVendorId?: string;

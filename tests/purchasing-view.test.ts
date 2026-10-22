@@ -314,10 +314,14 @@ describe("Materials", () => {
 
   // #1112: each unit field says what it holds, and the help is a brewer's example, not schema talk.
   it("MaterialView names each unit field and explains them in plain words", () => {
+    const pick = vi.spyOn(E, "pick");
+    const edit = vi.spyOn(E, "edit");
     const html = htmlOf(createElement(MaterialView, { model: materialCitra }));
-    expect(html).toMatch(/>Base units per purchase unit</);
-    expect(html).toMatch(/>Purchase unit</);
-    expect(html).toMatch(/>Base unit</);
+    expect(pick).toHaveBeenCalledWith("Base unit", "lb", expect.anything(), expect.anything());
+    expect(pick).toHaveBeenCalledWith("Purchase unit", "each", expect.anything(), expect.anything());
+    expect(edit).toHaveBeenCalledWith("Base units per purchase unit", "44", "number", undefined, expect.anything());
+    pick.mockRestore();
+    edit.mockRestore();
     expect(html).toContain("For hops bought in 44 lb boxes, set Base unit to lb, Purchase unit to each, and Base units per purchase unit to 44.");
     expect(html).not.toMatch(/schema/i);
   });
@@ -414,8 +418,9 @@ describe("Vendors and Materials on hand search", () => {
     expect(toVendorsViewProps({ rows: [] }).empty?.title).toBe("No vendors yet");
     expect(toMaterialsOnHandViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No materials match", description: "Clear the search to see every material." });
     expect(toMaterialsOnHandViewProps({ rows: [] }).empty?.title).toBe("No materials yet");
-    // #1112: the page's only action is Add material, so the empty state starts there.
-    expect(toMaterialsOnHandViewProps({ rows: [] }).empty?.description).toBe("Add a material, then receive a purchase order or count it to put it on hand.");
+    // #1112: the page's only action is Add material, so the empty state starts there. Receiving
+    // is the one step that works for every material: a lot-tracked one with no lot can't be counted in.
+    expect(toMaterialsOnHandViewProps({ rows: [] }).empty?.description).toBe("Add a material, then receive a purchase order to put it on hand.");
     // A vendor search narrows Contracts too, so its empty footer is a no-match, not no contracts.
     expect(toContractsViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No contracts match", description: "Clear the search to see every contract." });
     expect(toContractsViewProps({ rows: [] }).empty?.title).toBe("No contracts yet");
