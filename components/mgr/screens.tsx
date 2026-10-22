@@ -208,7 +208,7 @@ import { channelExport, saleChannelsList, unitsPlato } from "@/lib/mgr/fixtures/
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
 import {
   contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsList, materialsOnHandList,
-  correctReceiptCountryMalt, newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
+  correctReceiptCountryMalt, newPoCountryMalt, newPoIncomplete, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
 import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
@@ -252,6 +252,8 @@ import { ComposerProposalView, OfflineOutboxView } from "@/components/mgr/views/
 import { toMoreViewProps } from "@/lib/mgr/more-view";
 import { MOVEMENT_CORRECTION_GATE, toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
 import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
+import { newPoReason } from "@/lib/mgr/new-po-view";
+import { submitReason } from "@/lib/mgr/submit-reason";
 import { toNewTransferViewProps } from "@/lib/mgr/new-transfer-view";
 import { toOrderViewProps } from "@/lib/mgr/order-view";
 import { toOrdersListViewProps } from "@/lib/mgr/orders-list-view";
@@ -1205,7 +1207,7 @@ export const SCREENS: Screen[] = [
     job: "Repair a retained SKU after changing customers", reads: "list_skus", writes: "create_order",
     states: [["customer changed", "replace or remove the unavailable selection", 1]],
     spec: "Unavailable selections keep their labels and quantities. Replace the SKU or remove the line before saving.",
-    body: <NewOrderView model={{ ...toNewOrderViewProps(newOrderDraft), skus: [], lines: toNewOrderViewProps(newOrderDraft).lines.map(line => ({ ...line, skuError: "This SKU is unavailable for this order. Choose an available SKU or remove this line." })) }} disabled />,
+    body: <NewOrderView model={{ ...toNewOrderViewProps(newOrderDraft), skus: [], lines: toNewOrderViewProps(newOrderDraft).lines.map(line => ({ ...line, skuError: "This SKU is unavailable for this order. Choose an available SKU or remove this line." })) }} reason={submitReason(["an available SKU on each line"])} />,
   },
   {
     step: 5,
@@ -1857,6 +1859,15 @@ export const SCREENS: Screen[] = [
     states: [["permission", "warehouse or admin required", 1], ["new", "vendor and one line required · every line needs a material and a quantity above zero · Remove drops a line"], ["from requirements", "Planning drafts the lines; the shortfall is the quantity"], ["contracted lot", "the vendor named a lot on the contract · it prefills receiving"], ["no lot named", "the ordinary case · receiving captures it off the package"]],
     spec: "Expected lot is what the vendor named when the order was placed, which for a hop contract is often a crop-year lot. It is advisory: it creates no lot record and posts nothing, and it is offered only on a lot-tracked material. Receiving prefills its lot from it, and what the receiver reads off the arriving package is what creates the lot. That is the same principle as counted quantity: the promise is compared and the count is what posts. Rice hulls is not lot-tracked, so it is never asked.",
     body: <NewPoView model={newPoCountryMalt} />,
+  },
+  {
+    step: 7, slice: 2, tab: "Work", name: "New PO incomplete",
+    to: { "Add a vendor": "Vendors", "Add line": "New PO", "Save draft": "Purchase orders" },
+    job: "See what a draft still needs before it can be saved",
+    reads: "list_vendors · list_materials", writes: "create_purchase_order",
+    states: [["no vendors", "the picker says so and links to Vendors", 1], ["bad value", "marked at its field with what to enter instead", 1], ["withheld", "Save draft names what is still missing"]],
+    spec: "The shared form feedback on one page. An empty picker says there is nothing to choose and links to where the record is made. A typed value the command cannot take is marked at its own field, with the correction under it; a blank optional cost is not an error. Save draft stays withheld, and the sentence beside it names every missing piece, so a disabled button is never silent.",
+    body: <NewPoView model={newPoIncomplete} reason={newPoReason({ vendor: newPoIncomplete.vendor, lines: newPoIncomplete.lines })} />,
   },
   {
     step: 7,

@@ -17,10 +17,10 @@ import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
-import { useRef, type ReactNode } from "react";
+import { useRef, type AriaAttributes, type ReactNode } from "react";
 
 /** The same stepper for controlled forms and uncontrolled inventory fields. */
-export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, ...attributes }: Omit<FieldControls, "hideLabel"> & { label: string; value?: string; defaultValue?: string }) {
+export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, ...attributes }: Omit<FieldControls, "hideLabel" | "error"> & { label: string; value?: string; defaultValue?: string }) {
   const input = useRef<HTMLInputElement>(null);
   const step = (direction: -1 | 1) => {
     const field = input.current;
@@ -48,12 +48,17 @@ export function Qty({
   unit,
   label,
   id,
+  invalid,
+  describedBy,
 }: {
   value: string;
   onChange?: (value: string) => void;
   unit?: ReactNode;
   label: string;
   id?: string;
+  /** From E.qty's `error` (#1121). */
+  invalid?: AriaAttributes["aria-invalid"];
+  describedBy?: string;
 }) {
   return (
     // overflow-hidden: a unit addon (chips, or a TabBar) is a flex item with a
@@ -71,6 +76,8 @@ export function Qty({
         defaultValue={onChange ? undefined : value}
         onChange={(event) => onChange?.(event.target.value)}
         aria-label={label}
+        aria-invalid={invalid}
+        aria-describedby={describedBy}
         className="text-2xl font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       />
       {/* pr-0 for a unit switcher: a TabsList insets itself (p-[3px]), so the
