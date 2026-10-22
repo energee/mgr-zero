@@ -52,6 +52,8 @@ import {
 import { workWarehouse } from "../lib/mgr/fixtures/work";
 import { taproomBeerView, toBeerViewProps } from "../lib/mgr/beer-view";
 import { toMoreViewProps } from "../lib/mgr/more-view";
+import { STAFF_NAV } from "../lib/mgr/nav";
+import { searchEmptyMessage } from "../lib/mgr/search-palette-state";
 import { toTodayViewProps } from "../lib/mgr/today-view";
 import { filterWorkRows, toWorkViewProps, workFromQuery } from "../lib/mgr/work-view";
 import { plural } from "../lib/mgr/plural";
@@ -302,6 +304,11 @@ describe("More view", () => {
     expect(model.navs.some((r) => r.title === "Settings")).toBe(true);
   });
 
+  it("draws each More card with its navigation entry's description, as live does", () => {
+    const about = new Map(STAFF_NAV.find((t) => t.label === "More")!.children!.map((c) => [c.label, c.about]));
+    for (const row of moreNavs.filter((r) => about.has(r.title))) expect.soft(row.detail, row.title).toBe(about.get(row.title));
+  });
+
   it("the More inventory record is MoreView", () => {
     const body = screen("More").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(MoreView);
@@ -323,6 +330,12 @@ describe("Search view", () => {
     expect(body.props.model).toEqual(searchPalette);
   });
 
+  it("draws each Pages result with its navigation entry's description, as live does", () => {
+    const about = new Map(STAFF_NAV.flatMap((t) => [t, ...(t.children ?? [])]).map((i) => [i.label, i.about]));
+    const pages = searchPalette.groups.find((g) => g.heading === "Pages")!.items;
+    for (const [label, detail] of pages) expect.soft(detail, label).toBe(about.get(label));
+  });
+
   it("the Entity picker inventory record is SearchView", () => {
     const body = screen("Entity picker").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(SearchView);
@@ -335,8 +348,9 @@ describe("Search view", () => {
     const palette = src("components/mgr/search-palette.tsx");
     expect(palette).toMatch(/<SearchView\b/);
     expect(palette).not.toMatch(/<Command\b|<CommandInput\b|<CommandGroup\b|<CommandItem\b/);
-    expect(palette).toContain("No pages or records found · Try a page name, record name, or document number.");
-    expect(screen("Search").states).toContainEqual(["empty", "No pages or records found · Try a page name, record name, or document number."]);
+    expect(palette).toMatch(/emptyMessage=\{searchEmptyMessage\(/);
+    expect(screen("Search").states).toContainEqual(["first use", searchEmptyMessage("", "idle", true)]);
+    expect(screen("Search").states).toContainEqual(["empty", searchEmptyMessage("zzz", "ready", true)]);
   });
 });
 

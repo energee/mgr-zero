@@ -18,11 +18,23 @@ export function excludeSeen(hits: SearchHit[], recent: SearchHit[] = []) {
   return hits.filter((hit) => !recent.some((item) => item.kind === hit.kind && item.id === hit.id));
 }
 
-
 export function searchDestinations(roles: readonly StaffRole[], term: string) {
   const query = term.trim().toLowerCase();
   if (!query) return [];
   return navFor(shippedNav(STAFF_NAV), roles)
     .flatMap(item => [item, ...(item.children ?? [])])
     .filter(item => item.label.toLowerCase().includes(query));
+}
+
+/**
+ * What the palette says when it lists nothing: a first-use hint before any
+ * term, a no-match note once a search finished empty, and nothing while one
+ * loads, fails or is offline (the palette shows those states itself). Page
+ * wording only when the palette searches pages; an entity picker finds records.
+ */
+export function searchEmptyMessage(term: string, status: string, pages: boolean) {
+  const what = pages ? "a page name, record name, or document number" : "a record name or number";
+  if (!term) return `Type ${what}.`;
+  if (status !== "ready") return "";
+  return `${pages ? "No pages or records found" : "No records found"} · Try ${what}.`;
 }
