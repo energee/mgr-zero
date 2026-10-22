@@ -40,6 +40,8 @@ export type BrewPrepViewModel = {
   vesselId: string;
   vessels: BrewDayVessel[];
   ingredients: BrewIngredient[];
+  /** Stock a line without its exact source can be pulled from (get_brew_day_plan sources). Absent (the inventory), Choose lot is a plain verb; given, it opens an inline pick, or is disabled when none of it is that material. */
+  sources?: BrewMaterialSource[];
   /** The cellar-stage additions this batch still plans, e.g. "Fermentation 1 · Dry hop 6". */
   later: string;
 };
@@ -75,8 +77,14 @@ export type BrewTimelineViewModel = {
   confirmEmpty?: boolean;
 };
 
-/** An amount as the pull fields hold it: whole packs plus the loose remainder. */
+/** The tab a planned batch page opens, as `?tab=` spells it: the one `?tab=` names, else Brew day once Prep pulls are saved, else Prep. */
+export const openBrewTab = (tab: string | undefined, pullsSaved: boolean): "prep" | "brew-day" =>
+  tab === "prep" || tab === "brew-day" ? tab : pullsSaved ? "brew-day" : "prep";
+
+/** An amount as the pull fields hold it: whole packs plus the loose remainder.
+ *  With no pack size (1) PackQuantity draws only the first field, so the whole amount goes there. */
 function packFields(qty: number, packSize: number): Pick<BrewIngredient, "packs" | "loose"> {
+  if (packSize === 1) return { packs: String(qty), loose: "0" };
   const split = splitPacks(qty, packSize);
   return { packs: String(split.packs), loose: String(split.loose) };
 }

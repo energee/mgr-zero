@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { BatchesView } from "../components/mgr/views/batches";
 import { BrewDayView } from "../components/mgr/views/brew-day";
+import { BrewPrepView } from "../components/mgr/views/brew-prep";
 import { BrewTimelineView } from "../components/mgr/views/brew-timeline";
 import { ClosePackagingRunView } from "../components/mgr/views/close-packaging-run";
 import { RecipeView } from "../components/mgr/views/recipe";
@@ -17,7 +18,7 @@ import { RunClosedView } from "../components/mgr/views/run-closed";
 import { ScheduleBatchView } from "../components/mgr/views/schedule-batch";
 import { VesselDetailView } from "../components/mgr/views/vessel-detail";
 import {
-  batchesBrewer, brewDayHazy, brewDayTurnsHazy, brewTimelineMineral, closePackagingRunHazy, recipeHazyV4, recipesList,
+  batchesBrewer, brewDayHazy, brewDayTurnsHazy, brewPrepMineral, brewTimelineMineral, closePackagingRunHazy, recipeHazyV4, recipesList,
   runClosedHazy, scheduleBatchHazy, vesselFv3,
 } from "../lib/mgr/fixtures/production";
 import { toBatchesViewProps, batchesFromQuery, type BatchListRow } from "../lib/mgr/batches-view";
@@ -245,6 +246,40 @@ describe("Brew day view", () => {
     expect(form).toMatch(/<BrewTimelineView\b/);
     expect(page).toMatch(/<RecordBrewDayForm\b/);
     expect(page).toMatch(/<RecordBrewTimelineForm\b/);
+  });
+
+  it("the live batch page sends a planned batch's Prep tab to PrepForm, which binds BrewPrepView to save_batch_pulls", () => {
+    const page = src("app/(app)/batches/[id]/page.tsx");
+    const prep = src("app/(app)/batches/[id]/prep-form.tsx");
+    expect(page).toMatch(/<PrepForm\b/);
+    expect(page).toMatch(/openBrewTab\(tab, plan\.pulls\.length > 0\)/);
+    expect(prep).toMatch(/from "@\/components\/mgr\/views\/brew-prep"/);
+    expect(prep).toMatch(/<BrewPrepView\b/);
+    expect(prep).toMatch(/run\("save_batch_pulls", \{ batchId, \.\.\.brewPullsPayload\(values\) \}/);
+    expect(prep).toMatch(/onPrint=\{\(\) => window\.print\(\)\}/);
+  });
+
+  it("the Brew prep inventory record is BrewPrepView", () => {
+    const body = screen("Brew prep").body as { type: unknown; props: { model: unknown } };
+    expect(body.type).toBe(BrewPrepView);
+    expect(body.props.model).toEqual(brewPrepMineral);
+  });
+
+  it("links both tabs when live passes tab hrefs, and leaves them inert in the inventory", () => {
+    const hrefs = { Prep: "/batches/b1?tab=prep", "Brew day": "/batches/b1?tab=brew-day" };
+    const prep = htmlOf(createElement(BrewPrepView, { model: brewPrepMineral, tabHrefs: hrefs }));
+    const timeline = htmlOf(createElement(BrewTimelineView, { model: brewTimelineMineral, tabHrefs: hrefs }));
+    for (const html of [prep, timeline]) {
+      expect(html).toContain('href="/batches/b1?tab=prep"');
+      expect(html).toContain('href="/batches/b1?tab=brew-day"');
+    }
+    expect(htmlOf(createElement(BrewPrepView, { model: brewPrepMineral }))).not.toContain("?tab=");
+  });
+
+  it("Choose lot opens no inline pick without stock, and is disabled when the given stock holds none of the material", () => {
+    const html = htmlOf(createElement(BrewPrepView, { model: { ...brewPrepMineral, sources: [] } }));
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Choose lot<\/button>/);
+    expect(htmlOf(createElement(BrewPrepView, { model: brewPrepMineral }))).not.toMatch(/<button[^>]*disabled=""[^>]*>Choose lot<\/button>/);
   });
 
   it("the Brew day timeline inventory record is BrewTimelineView with Change plan", () => {

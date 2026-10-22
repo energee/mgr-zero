@@ -63,7 +63,7 @@ A member can hold more than one staff role. You get everything each role allows:
 | **Sales** | Catalog; customers and pricing; create, submit, confirm, adjust, and cancel orders, plus credits; view inventory; invoices; replenishment suggestions and creating the replenishment order; brand approvals and state registrations, the brewery’s licenses, the monthly report and its filed snapshot, and lot trace. |
 | **Warehouse** | View inventory and record movements; keg pools and keg events on **Kegs**; view orders, pick, and ship; build delivery routes, and depart, confirm each stop, and return a route you are the assigned driver of; view replenishment suggestions (write controls are available only to Admin and Sales); schedule, pick a tank for, start, and close packaging runs, and repack; vendors, materials and contracts; purchase orders (draft, mark sent, receive), material counts, and drafting orders from Planning. Catalog, Customers, the Invoices list, and Team open if you type their address, but they are not in Warehouse's navigation. Locations opens the same way; there Warehouse can add, rename, or remove a location's bins, though only Admin can add a location or edit its name and uses. |
 | **Taproom** | Today links the tap board, weekly count, and four-week variance with their last observed facts. Beer shows stock at this brewery’s taproom locations and opens the same taproom tools. More offers your own Units and Chat preferences. You can link or unlink your Slack account, mute personal reminder reasons, and select an existing verified personal delivery destination. Warehouse stock, lot history, Work, Search, business records, shared channels, brewery quiet-hour changes, and direct inventory writes are unavailable. |
-| **Brewer** | Today; linking your Slack account from App Home; Recipes and versions; Batches, vessels, and recording brew day; Cellar transfers and fermentation readings; packaging runs (schedule, pick a tank, start, and close), but not **Repack**, which is Admin and Warehouse only; vendors, materials, contracts and material counts, and reading Planning (drafting the orders is Admin and Warehouse). See [Navigate MGR](#navigation). |
+| **Brewer** | Today; linking your Slack account from App Home; Recipes and versions; Batches, vessels, the Prep pull list, and recording brew day; Cellar transfers and fermentation readings; packaging runs (schedule, pick a tank, start, and close), but not **Repack**, which is Admin and Warehouse only; vendors, materials, contracts and material counts, and reading Planning (drafting the orders is Admin and Warehouse). See [Navigate MGR](#navigation). |
 
 <Callout type="info">
 A permission error is the end of that attempt. Ask an administrator. Hitting submit again will not change your access.
@@ -769,21 +769,25 @@ A recipe version is the process spec a brewer follows: its mash schedule, brewho
 
 Only mash-stage ingredients predict gravity, and only when every one of them has an **Extract potential** on its material (see [Purchasing](#purchasing)); until then no prediction is shown, rather than a misleading 0.0. In its place the page names the first ingredient that blocks it and how to fix it: set the material's **Extract potential** under Materials, then create the next version (a draft picks the new value up at once). Give a mash ingredient that adds no extract, such as rice hulls, a potential of 1.000. Quantities are converted from the material's unit (lb, kg, oz or g) to pounds per barrel; a mash ingredient kept by volume or count, such as a syrup in gallons, has no weight to convert, so no prediction is shown, and the page says which ingredient and unit. As you add ingredients, MGR previews the version's predicted OG, FG and ABV live, using the same calculation the record reads back afterward. Nothing is stored, so a later edit to a material's typed extract potential can never move an old version's prediction; a new version snapshots the value it saw at the moment it was saved. Predicted OG and FG are shown in whatever unit you chose under [Gravity units](#gravity-units).
 
+### Batch totals in packs
+
+**Show totals at (bbl)** sits under **Ingredients** when the version has a mash, boil or whirlpool ingredient. Type a batch size and each of those ingredients shows its batch total. When its material has a pack size, the total also reads in packs, such as *22 bbl → 220 lb = 4 × 50 lb + 20 lb*. The pack size is how many base units one purchase unit holds, set on the material under [Materials](#purchasing) (a 55 lb sack is purchase unit *each*, 55 base units). A material with no pack size, or a total under one pack, shows just the amount. The batch size is for this page only: it isn't saved and doesn't change the recipe. Until you type one, the page says *Enter a batch size to see totals in packs.*
+
+A total that already comes out in whole packs shows **Whole packs**. In a draft, any other total offers **Round to N × size** down and up, such as **Round to 4 × 50 lb** and **Round to 5 × 50 lb**. A total under one pack offers only **Round to 1 × 50 lb**. Choosing one rewrites that ingredient's per-barrel amount so the total at that batch size is exactly that many packs. It's a draft edit like any other: nothing is saved until **Create recipe version**. A saved version shows the totals but offers no rounding.
+
 ## Batches [#batches]
 
-Open an unstarted batch to **Reschedule** its planned date or **Cancel plan** and confirm. Only Admin and Brewer can change batch plans. A cancelled batch stays in the **Cancelled** list and no longer contributes material requirements, planned beer supply, or the buyer schedule. These actions move no stock. Once brew day or other physical work is recorded, cancellation and rescheduling are refused.
+Open an unstarted batch to **Reschedule** its planned date or **Cancel plan** and confirm. Only Admin and Brewer can change batch plans. A cancelled batch stays in the **Cancelled** list and no longer contributes material requirements, planned beer supply, or the buyer schedule. These actions move no stock. Once brew day or other physical work is recorded, cancellation and rescheduling are refused. On a planned batch, both sit at the top of the **Brew day** tab.
 
 <Screen name="Batches" />
 
 <Screen name="Schedule batch" />
 
-<Screen name="Brew day" />
-
 *Admin and Brewer.*
 
-Open **Batches** from the **Work** navigation to see the **Planned**, **Active**, **Completed**, and **Cancelled** groups, newest planned date first within each group. On a wide screen each group is a table; on a phone each batch is a short list of labeled facts. Each batch shows its **Batch** number, **Brand**, **Recipe**, **Planned on** date, and **Planned barrels**. A plan with no brand says **No brand yet**, and one with no recipe says **No recipe**. **Planned barrels** is the plan, not the beer in a tank. Select the batch number to open the batch. A planned batch also offers **Brew**, which opens the same page to record its brew day. Each active batch lists its open tanks under **Vessel and latest reading**, one line per tank, with the latest reading in your [gravity unit](#gravity-units) and when it was taken. A batch split across tanks by a partial transfer lists every tank it is in. A tank with no reading yet says **No readings yet**. **Reading** beside a tank opens that tank's [reading sheet](#cellar) directly, without opening the batch first. An active batch with no open tank shows **No open occupancy** instead and has no reading shortcut. In the other groups, a batch that is in a tank also shows its **Vessel**. Work tabs show only areas your role may open. Select **New batch** for a **Recipe version** and a **Brand**, both optional, plus the **Planned barrels** and **Date** that actually reserve the slot. A batch names nothing further until it is brewed, and identity is not required until packaging.
+Open **Batches** from the **Work** navigation to see the **Planned**, **Active**, **Completed**, and **Cancelled** groups, newest planned date first within each group. On a wide screen each group is a table; on a phone each batch is a short list of labeled facts. Each batch shows its **Batch** number, **Brand**, **Recipe**, **Planned on** date, and **Planned barrels**. A plan with no brand says **No brand yet**, and one with no recipe says **No recipe**. **Planned barrels** is the plan, not the beer in a tank. Select the batch number to open the batch. A planned batch also offers **Brew**, which opens the same page on its [Prep or Brew day tab](#prep). Each active batch lists its open tanks under **Vessel and latest reading**, one line per tank, with the latest reading in your [gravity unit](#gravity-units) and when it was taken. A batch split across tanks by a partial transfer lists every tank it is in. A tank with no reading yet says **No readings yet**. **Reading** beside a tank opens that tank's [reading sheet](#cellar) directly, without opening the batch first. An active batch with no open tank shows **No open occupancy** instead and has no reading shortcut. In the other groups, a batch that is in a tank also shows its **Vessel**. Work tabs show only areas your role may open. Select **New batch** for a **Recipe version** and a **Brand**, both optional, plus the **Planned barrels** and **Date** that actually reserve the slot. A batch names nothing further until it is brewed, and identity is not required until packaging.
 
-Select a planned batch to record its brew day: choose the **Vessel** it knocked out into, the **Knockout barrels**, and the **Brewed on** date, review the **Knockout baseline**, then select **Record brew day**. This stamps the brew date and opens the vessel's occupancy in one step; it is refused if the vessel is already occupied, including a backdated day that falls inside a stretch the vessel was full but has since been emptied. A vessel emptied earlier the same day (in the brewery's time zone) can be brewed into with that day's date: the new occupancy starts when the vessel was emptied, not at midnight. It is also refused when the knockout barrels exceed the vessel's **Capacity (bbl)**; the message names the vessel and what it holds. Confirm each **Material source**, **Stage**, and **Actual quantity** before recording. Mash, boil and whirlpool quantities start from the pinned recipe and planned barrels; they remain editable. Later fermentation, dry-hop and packaging ingredients are not prefilled. Choose the exact lot and bin, and enter stock units for water additions rather than assuming a conversion. Use **Add ingredient** for substitutions or other actual use. If none were used, remove the rows and select **Confirm no ingredients used**. Optional process observations record measured values; blanks stay absent. Recording atomically freezes the plan and actuals, consumes the confirmed quantities, and opens the occupancy. Insufficient stock refuses the whole action. A brewed batch's page shows its current open vessel and total confirmed knockout. **Add brew turn** records another brew of the same batch into that tank, with its own actual ingredients, process and date. The first batch brew date stays unchanged. The remaining recipe plan prefills the next turn; confirm the actual quantities. Another turn is refused after a transfer, started packaging, closure, a dependent filed report, a date before the first turn, or a capacity excess. Normal later additions do not prevent another turn. The frozen record retains its original knockout, sources and process observations even after the occupancy closes or master data changes. Older batches without a frozen record explicitly say it is unavailable. **Correct turn** selects the current revision of that turn, requires a reason and appends a revision, exact material reversals and any knockout measurement delta. It never changes the original record. Corrections are refused after later additions, transfers, started packaging, closure or a dependent filed report.
+Select a planned batch to pull its ingredients on [Prep](#prep) and record it on [Brew day](#brew-day). A brewed batch's page shows its record, turns and corrections ([After the brew](#after-the-brew)).
 
 Batches brought over from another system appear under **Completed** with their brew date, close date and knockout barrels, but no vessel. Only history closed before the brewery's **Books opened on** date (see [Settings](#settings)) can be recorded this way, so these batches never appear on the Cellar map, on Today, or in a report. They carry their knockout, no loss written off at completion, and their packaging as closed runs and lots with the quantities filled. That packaging put no stock on hand: these lots appear in **Packaging** history and in a lot trace, which names the batch, but never in inventory, on an order, or in a report. They cannot be corrected with **Correct turn**; fix them by importing again.
 
@@ -792,6 +796,81 @@ The **Vessels** table at the bottom of Batches lists each vessel's **Kind** (suc
 Only an admin adds, edits, or deletes a vessel. **New vessel**, **Add vessel**, **Save vessel**, and **Delete vessel** appear only for an admin. A brewer opens Vessel detail to see the occupancy and readings, with the name, type, and capacity shown as text.
 
 **Delete vessel** asks you to confirm first. A vessel holding beer cannot be deleted: transfer the beer out or complete its batch first. A vessel that has held beer is retired instead of deleted. A retired vessel leaves the Cellar map and is no longer offered for a transfer or a brew day. MGR refuses any beer into it, with the message *vessel is retired*. Its batch history keeps it, and the **Vessels** table lists it as **Inactive**. Its Vessel detail says it is retired and has no **Delete vessel**. Its name is free again, so a replacement tank can take the same name. A vessel that never held beer is deleted.
+
+### Prep: pull the ingredients [#prep]
+
+<Screen name="Brew prep" />
+
+A planned batch has two tabs: **Prep** and **Brew day**. Prep is the pull list you work through before the brew. Brew day is where you log the brew and record it. The batch opens on **Brew day** once Prep has saved pulls, and on **Prep** until then. Select a tab to switch.
+
+Prep works like the order [pick sheet](#pick-sheet). Lines are grouped under **Mash**, **Boil** and **Whirlpool**, the stages that use them. Each line starts at the recipe plan for the batch's planned barrels. The amount reads as whole packs plus loose pounds, such as `4 × 50 lb + 20 lb`. A pack is the material's purchase unit: how many base units one purchase unit holds, set under [Materials](#purchasing). A material with no pack size is counted in its base unit alone.
+
+Touch only the exceptions. Each line has a packs field and, for a material with a pack size, a loose field beside it. Type what you actually pulled. Packs take decimals, so `4.4` sacks of 50 lb is 220 lb. A partly used bag is just loose pounds: MGR doesn't track open bags. A blank field counts as zero. Under each line's name you see its plan, its lot and its bin, such as *plan 220 lb = 4 × 50 lb + 20 lb · C-2 · Malt room / A2*. An untracked material reads *untracked* in place of a lot.
+
+A line is amber while it's short (pulled less than plan) or has no source chosen.
+
+| Control | What it does |
+| --- | --- |
+| **Short** | Shows on a line pulled below plan. It jumps to that line's packs field so you can enter what you really pulled. |
+| **Choose lot** | Shows on a line with no source. It opens **Source**, this material's stock by lot, location and bin with the amount available, such as *C-2 · Malt room / A2 · 1000 lb available*. Pick the exact lot and bin you're pulling from. It's disabled when the material has no stock anywhere. |
+| **Vessel** | The tank you plan to knock out into. Optional. Brew day's Knockout starts from it. Retired tanks aren't offered. |
+| **Later, in cellar** | Counts the recipe's additions you don't pull for brew day, such as *Fermentation 1 · Dry hop 6*, or says *None*. Add those in [Cellar](#cellar) when the time comes. |
+| **Print pull list** | Prints the page so you can pull on paper. |
+| **Done pulling** | Saves the list and opens the Brew day tab. |
+
+A material held in exactly one bin starts with that source already chosen. A line that already has a source has no **Choose lot** on Prep. To pull it from a different lot or bin, use **Edit** on the Brew day tab.
+
+**Done pulling** saves each line's lot, bin and pulled amount, plus the vessel. It moves no stock and reserves nothing, so you can pull the day before. Saving again replaces the whole list. A line pulled to zero with no source is left off it. **Done pulling** stays disabled while a line is pulled above zero with no source, or while a packs or loose amount isn't a number at zero or above.
+
+To fix a saved pull's amount, change it and select **Done pulling** again. To change a saved lot or bin, use **Edit** on the Brew day tab. Nothing on Prep touches inventory, so there's nothing to reverse.
+
+If saving is refused, the message shows above **Done pulling** and your entries stay. MGR refuses Prep for a batch that's already brewed (*batch 202 was already brewed on 2026-10-22*) or cancelled (*batch is cancelled*); there's nothing left to prepare, so go back to **Batches**. It refuses a retired tank: *vessel FV-3 is retired; choose another tank*. It also refuses a lot on a material that isn't lot-tracked, or no lot on one that is: *choose a lot exactly when the material is lot-tracked*.
+
+### Brew day: log and record the brew [#brew-day]
+
+<Screen name="Brew day timeline" />
+
+Brew day runs in process order: **Mash**, **Lauter**, **Boil**, **Whirlpool**, **Knockout**. On the Brew day tab, above the tabs, you see the batch's **Planned** barrels and date, its **Note**, and **Reschedule** and **Cancel plan**. Each stage heading shows the recipe's target for it, such as *152 °F · 60 min · pH 5.3* for Mash. A stage the recipe sets nothing for shows no target. On a phone one stage is open at a time: the first one with an ingredient you haven't confirmed. Tap another stage's heading to open it. On a wider screen every stage shows.
+
+Each ingredient sits in the stage the recipe gives it, so there's no stage to choose. Lines start from the saved Prep pulls. A line Prep didn't save starts at plan, with its source already chosen when the material sits in only one bin. A short line reads *pulled …* before its plan and is amber until you confirm it.
+
+- **Confirm** marks the ingredient as in the brew. It turns to **Pulled** and the line goes green. Tap **Pulled** to undo it.
+- **Edit** opens the same packs and loose fields as Prep, plus **Source** when the material has stock to pick from. Change the amount or the exact lot and bin there.
+
+Process readings sit in their stage. All are optional, and a blank one stays unrecorded. Minutes are whole numbers.
+
+| Stage | Readings |
+| --- | --- |
+| Mash | **Mash water gallons**, **Mash pH** |
+| Lauter | **Sparge water gallons**, **Pre-boil barrels** |
+| Boil | **Boil minutes** |
+| Whirlpool | **Whirlpool °F**, **Whirlpool minutes**, **Whirlpool rest minutes** |
+| Knockout | **Knockout °F** |
+
+Knockout holds the facts you only know at the end of the brew. **Vessel** is the tank it knocked out into, and starts at the tank chosen on Prep. **Knockout barrels** must be above zero, and starts at the planned barrels. **Brewed on** starts at today. Once all three are set, Knockout shows the loss baseline, such as *Knockout 22 bbl → FV-3*.
+
+When nothing is pulled above zero, **Confirm no ingredients used** appears below the stages. Switch it on to record a brew with no ingredients.
+
+**Record brew day** stays disabled until:
+
+1. every ingredient is confirmed;
+2. every amount is a number at zero or above, and every line pulled above zero has a source;
+3. something is pulled, or **Confirm no ingredients used** is on;
+4. Knockout has a vessel, barrels above zero and a brew date.
+
+**Record brew day** is the step that uses stock. In one step it freezes the plan and actuals, takes the confirmed amounts out of their lots and bins, stamps the brew date and opens the vessel's occupancy. Insufficient stock refuses the whole action. It is refused if the vessel is already occupied, including a backdated day that falls inside a stretch the vessel was full but has since been emptied. A vessel emptied earlier the same day (in the brewery's time zone) can be brewed into with that day's date: the new occupancy starts when the vessel was emptied, not at midnight. It is also refused when the knockout barrels exceed the vessel's **Capacity (bbl)**; the message names the vessel and what it holds.
+
+Confirmations and edits on Brew day aren't saved until you record. Leave the page and they start over from the saved Prep pulls. Changing an amount here doesn't change the Prep list.
+
+Brew day has no **Add ingredient**. Water salts and acids aren't on it, and you can't swap in a different material. Record the brew, then open **Correct turn** (below) on that turn and use its **Add ingredient** to add them.
+
+### After the brew [#after-the-brew]
+
+<Screen name="Brew day" />
+
+A brewed batch's page shows its current open vessel and total confirmed knockout. **Add brew turn** records another brew of the same batch into that tank, with its own actual ingredients, process and date. The first batch brew date stays unchanged. The remaining recipe plan prefills the next turn; confirm the actual quantities. Another turn is refused after a transfer, started packaging, closure, a dependent filed report, a date before the first turn, or a capacity excess. Normal later additions do not prevent another turn. The frozen record retains its original knockout, sources and process observations even after the occupancy closes or master data changes. Older batches without a frozen record explicitly say it is unavailable. **Correct turn** selects the current revision of that turn, requires a reason and appends a revision, exact material reversals and any knockout measurement delta. It never changes the original record. Corrections are refused after later additions, transfers, started packaging, closure or a dependent filed report.
+
+**Add brew turn** and **Correct turn** use the older one-page brew form, with a row per ingredient rather than the timeline. Confirm each **Material source**, **Stage**, and **Actual quantity** before recording. Choose the exact lot and bin, and enter stock units for water additions rather than assuming a conversion. Use **Add ingredient** for substitutions or other actual use, and **Remove ingredient** to drop a line. If none were used, remove the rows and select **Confirm no ingredients used**. Optional process observations record measured values; blanks stay absent. A new turn goes into the same tank, so its **Vessel** is fixed. A correction also fixes **Brewed on** and asks for a **Correction reason**.
 
 ## Cellar [#cellar]
 
@@ -1118,6 +1197,7 @@ Do not hunt for hidden controls for these:
 - editing a purchase order after it is saved, or sending one by email from MGR
 - deleting a customer that has history, a single ship-to, inventory history, orders, invoices, or credit memos
 - recording payments
+- adding an ingredient on a planned batch's **Brew day** tab (record the brew, then use **Correct turn**), or changing a saved or prefilled source on **Prep** (use **Edit** on Brew day)
 - a printed lot trace packet
 - an order-confirmation warning from licenses and registrations, or deleting an approval, registration, or license
 - filing a state or other non-TTB report, or a period other than a calendar month, quarter, or year, from the interface (the API accepts any non-TTB jurisdiction and range)

@@ -1,7 +1,7 @@
 // tests/brew-prep-view.test.ts — the brew prep pull list and the brew-day
 // timeline's pure rules (lib/mgr/brew-prep-view.ts).
 import { describe, expect, it } from "vitest";
-import { anyPulled, brewIngredients, brewPullsPayload, brewTargets, canRecordTimeline, canSavePrep, currentStage, isShort, laterAdditions, pullDetail, pullTone, sourceChoices, startAtPlan, timelineRecordPayload, timelineStages, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
+import { anyPulled, brewIngredients, brewPullsPayload, brewTargets, canRecordTimeline, canSavePrep, currentStage, isShort, laterAdditions, openBrewTab, pullDetail, pullTone, sourceChoices, startAtPlan, timelineRecordPayload, timelineStages, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { BrewMaterialSource, BrewPlan, BrewPull } from "@/lib/mgr/brew-day-view";
 
 const chit: BrewIngredient = startAtPlan({ key: "chit", name: "Chit Malt", materialId: "chit", stage: "mash", plan: 220, unit: "lb", packSize: 50, source: null });
@@ -9,6 +9,11 @@ const hops: BrewIngredient = startAtPlan({ key: "ns", name: "Nelson", materialId
 const oats: BrewIngredient = startAtPlan({ key: "oats", name: "Rolled Oats", materialId: "oats", stage: "mash", plan: 200, unit: "lb", packSize: 50, source: { lot: null, bin: "Dry / D1", materialId: "oats", locationId: "dry", binId: "d1", lotId: null } });
 
 describe("pull lines", () => {
+  it("keeps a material with no pack size whole in the one field the view draws", () => {
+    const gypsum = startAtPlan({ key: "gyp", name: "Gypsum", materialId: "gyp", stage: "mash", plan: 1.1, unit: "lb", packSize: 1, source: null });
+    expect([gypsum.packs, gypsum.loose]).toEqual(["1.1", "0"]);
+  });
+
   it("start at plan in whole packs plus loose base units", () => {
     expect(chit).toMatchObject({ packs: "4", loose: "20" });
     expect(hops).toMatchObject({ packs: "1", loose: "0" });
@@ -197,5 +202,17 @@ describe("brewPullsPayload", () => {
       ],
     });
     expect(brewPullsPayload(prep).vesselId).toBe("fv1");
+  });
+});
+
+describe("openBrewTab", () => {
+  it("opens the tab ?tab= names", () => {
+    expect(openBrewTab("prep", true)).toBe("prep");
+    expect(openBrewTab("brew-day", false)).toBe("brew-day");
+  });
+  it("otherwise opens Brew day once Prep pulls are saved, else Prep", () => {
+    expect(openBrewTab(undefined, true)).toBe("brew-day");
+    expect(openBrewTab(undefined, false)).toBe("prep");
+    expect(openBrewTab("other", false)).toBe("prep");
   });
 });

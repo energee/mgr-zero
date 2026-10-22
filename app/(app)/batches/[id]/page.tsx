@@ -1,6 +1,8 @@
 // app/(app)/batches/[id]/page.tsx — one batch. A planned batch (not brewed,
-// not cancelled) mounts the Brew day timeline (BrewTimelineView): ingredients
-// start from its saved Prep pulls, else plan; vessel and date sit in Knockout.
+// not cancelled) has two tabs, switched by `?tab=` links (openBrewTab picks the
+// default: Brew day once Prep pulls are saved, else Prep). Prep (PrepForm →
+// BrewPrepView) saves the pull list; Brew day (BrewTimelineView) starts each
+// ingredient from its saved pull, else plan; vessel and date sit in Knockout.
 // A recorded batch (history, Correct turn, Add brew turn) and a cancelled one
 // keep BrewDayView; the timeline does not model corrections or turns.
 // get_brew_day is the read; only open vessels not already occupied make
@@ -8,7 +10,7 @@
 // an overlap, so every active vessel is offered here (list_vessels hides
 // retired ones, and the database refuses beer into them).
 import { brewPlanActuals, currentBrewRecords, type BrewPlan, type BrewMaterialSource, type BrewPull, type BrewRecordView } from "@/lib/mgr/brew-day-view";
-import { brewIngredients, brewTargets } from "@/lib/mgr/brew-prep-view";
+import { brewIngredients, brewTargets, laterAdditions, openBrewTab } from "@/lib/mgr/brew-prep-view";
 import { getActiveBrewery } from "@/lib/brewery";
 import { formatDate } from "@/lib/date-format";
 import { buildContext } from "@/lib/commands/context";
@@ -18,6 +20,7 @@ import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { batNo } from "@/lib/mgr/doc-no";
 import { ChangePlan } from "../../plan-actions";
+import { PrepForm } from "./prep-form";
 import { RecordBrewDayForm, RecordBrewTimelineForm } from "./record-brew-day-form";
 
 type Batch = {
@@ -28,8 +31,8 @@ type Occupancy = { id: string; vessel_id: string; initial_bbl: number; started_a
 type Vessel = { id: string; name: string; kind: string; capacity_bbl: number };
 type Plan = { batch: { planned_vessel_id: string | null }; plan: BrewPlan; sources: BrewMaterialSource[]; pulls: BrewPull[] };
 
-export default async function BatchPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function BatchPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
+  const [{ id }, { tab }] = await Promise.all([params, searchParams]);
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [{ batch, occupancy }, vessels, today, plan, history] = (await Promise.all([
@@ -42,11 +45,14 @@ export default async function BatchPage({ params }: { params: Promise<{ id: stri
 
   const recorded = Boolean(batch.brewed_on || occupancy);
   const plannedBbl = Number(batch.planned_bbl), planned = plannedBbl + " bbl · " + formatDate(batch.planned_on);
-  if (!recorded && !batch.cancelled_at) return <RecordBrewTimelineForm batchId={batch.id} planActions={<ChangePlan kind="batch" id={batch.id} plannedOn={batch.planned_on} />} model={{
-    title: batNo(batch.batch_no), backHref: "/batches", planned, note: batch.note ?? undefined,
-    ingredients: brewIngredients(plan.plan, plan.pulls, plan.sources, plannedBbl), sources: plan.sources, targets: brewTargets(plan.plan), process: {},
-    vesselId: plan.batch.planned_vessel_id ?? "", vessels, initialBbl: String(plannedBbl), brewedOn: today,
-  }} />;
+  if (!recorded && !batch.cancelled_at) {
+    const tabHrefs = { Prep: `/batches/${batch.id}?tab=prep`, "Brew day": `/batches/${batch.id}?tab=brew-day` };
+    const shared = { title: batNo(batch.batch_no), backHref: "/batches", ingredients: brewIngredients(plan.plan, plan.pulls, plan.sources, plannedBbl), sources: plan.sources, vesselId: plan.batch.planned_vessel_id ?? "", vessels };
+    if (openBrewTab(tab, plan.pulls.length > 0) === "prep") return <PrepForm batchId={batch.id} tabHrefs={tabHrefs} model={{ ...shared, later: laterAdditions(plan.plan) }} />;
+    return <RecordBrewTimelineForm batchId={batch.id} tabHrefs={tabHrefs} planActions={<ChangePlan kind="batch" id={batch.id} plannedOn={batch.planned_on} />} model={{
+      ...shared, planned, note: batch.note ?? undefined, targets: brewTargets(plan.plan), process: {}, initialBbl: String(plannedBbl), brewedOn: today,
+    }} />;
+  }
   const confirmedBbl = currentBrewRecords(history.records).reduce((sum, record) => sum + record.initial_bbl, 0);
   const model = {
     plan: plan.plan, sources: plan.sources, records: history.records, actuals: brewPlanActuals(plan.plan, Number(batch.planned_bbl), plan.sources), process: {}, confirmEmpty: false,
