@@ -41,5 +41,8 @@ export const SKU_STOUT = {
   unit_price_cents: 0,
 } as const;
 
+/** A demo SKU as get_order returns it: name plus its brand and format. */
+export const branded = (sku: { name: string; brand: string; format: string }) => ({ name: sku.name, brands: { name: sku.brand }, formats: { name: sku.format } });
+
 /** Inventory-only until confirm reads the compliance registry. */
 export const OHIO_STOUT_NOTE = "Stout isn’t registered for Ohio. Add the registration on the Stout brand.";

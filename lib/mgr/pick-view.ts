@@ -9,7 +9,6 @@ export type PickLineView = {
   group?: string;
   /** Format under the brand, or the SKU name when it has no brand and format. */
   name: string;
-  detail: string;
   qty: number;
   /** qty_ordered: record_pick refuses a pick above it (#471), so the field caps here. */
   ordered: number;
@@ -54,7 +53,6 @@ export function toPickViewProps({ order, lines, locations, backHref }: PickSnaps
       return {
         key: l.id,
         ...brandLabel(l.skus),
-        detail: `ordered ${ordered}`,
         qty,
         ordered,
         tone: qty < ordered ? "w" : "ok",

@@ -1,6 +1,6 @@
 // lib/mgr/fixtures/pick-sheet.ts — daily_pick_sheet snapshot for the Pick
 // sheet inventory frame. Views never own sample data.
-import { ALS, RIDGELINE, SKU_HAZY, SKU_PILS, TERESA } from "./demo";
+import { ALS, branded, RIDGELINE, SKU_HAZY, SKU_PILS, TERESA } from "./demo";
 import type { PickSheetSnapshot } from "@/lib/mgr/pick-sheet-view";
 
 export const PICK_SHEET_DATE_CHIPS = ["Wed 9/2", "Thu 9/3", "Fri 9/4"];
@@ -18,7 +18,7 @@ const line = (
   sku_id: sku.sku_id,
   qty_ordered,
   qty_picked: null,
-  skus: { name: sku.name, brands: { name: sku.brand }, formats: { name: sku.format } },
+  skus: branded(sku),
 });
 
 /** Confirmed demand for Thu 2026-09-03: three orders, Hazy 9 + Pils 22. */

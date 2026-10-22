@@ -16,22 +16,18 @@ import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { ConfirmOrderView } from "@/components/mgr/views/confirm-order";
-import { useCommandAction } from "@/lib/commands/use-command-form";
 import { toConfirmOrderViewProps, type ConfirmOrderSnapshot } from "@/lib/mgr/confirm-order-view";
 import { AtpWarnings, atpWarnings, type AtpWarning } from "../atp-warnings";
 import { CancelOrderDialog } from "../cancel-order-dialog";
-
-const ordered = (snapshot: ConfirmOrderSnapshot) => Object.fromEntries(snapshot.lines.map((l) => [l.id, String(Number(l.qty_ordered))]));
+import { SaveLinesActions, useLineQuantities } from "../order-lines-form";
 
 /** page.tsx keys this on the saved quantities, so a save remounts it with fresh state. */
 export function ConfirmOrderForm({ snapshot }: { snapshot: ConfirmOrderSnapshot }) {
   const router = useRouter();
-  const action = useCommandAction();
   const orderId = snapshot.order.id;
-  const [qtys, setQtys] = useState(() => ordered(snapshot));
-  const [reason, setReason] = useState("");
+  const edit = useLineQuantities(orderId, snapshot.lines);
+  const { action, qtys, changed } = edit;
   const [warnings, setWarnings] = useState<AtpWarning[] | null>(null);
-  const changed = snapshot.lines.some((l) => qtys[l.id] !== String(Number(l.qty_ordered)));
   const model = toConfirmOrderViewProps({ ...snapshot, lines: snapshot.lines.map((l) => ({ ...l, qty_ordered: Number(qtys[l.id]) })) });
   let footer: ReactNode;
   if (warnings) footer = (
@@ -42,15 +38,7 @@ export function ConfirmOrderForm({ snapshot }: { snapshot: ConfirmOrderSnapshot 
       </div>
     </div>
   );
-  else if (changed) footer = (
-    <div className="flex flex-col gap-2">
-      <CommandFormMessage error={action.error} />
-      <div className="grid grid-cols-2 gap-2 md:flex md:justify-end">
-        <Button type="submit" disabled={action.busy}>{action.busy ? "Saving…" : "Save lines"}</Button>
-        <Button type="button" variant="outline" disabled={action.busy} onClick={() => { setQtys(ordered(snapshot)); setReason(""); }}>Discard changes</Button>
-      </div>
-    </div>
-  );
+  else if (changed) footer = <div className="flex flex-col gap-2"><SaveLinesActions edit={edit} /></div>;
   else footer = (
     <div className="flex flex-col gap-2">
       <CommandFormMessage error={action.error} />
@@ -66,13 +54,8 @@ export function ConfirmOrderForm({ snapshot }: { snapshot: ConfirmOrderSnapshot 
     </div>
   );
   // The form submits only Save lines; Reason is required while it shows.
-  return <form className="contents" onSubmit={(event) => {
-    event.preventDefault();
-    // A blank quantity is sent and refused, never dropped: adjust_order_lines
-    // replaces every line, so dropping it would remove the SKU (#433).
-    if (changed && !action.busy) void action.run("adjust_order_lines", { orderId, reason, lines: snapshot.lines.map((l) => ({ skuId: l.sku_id, qty: Number(qtys[l.id]) })) });
-  }}>
-    <ConfirmOrderView model={model} quantities={qtys} onQuantity={warnings ? undefined : (key, value) => setQtys((prev) => ({ ...prev, [key]: value }))}
-      reason={reason} onReason={changed && !warnings ? setReason : undefined} footer={footer} />
+  return <form className="contents" onSubmit={edit.onSubmit}>
+    <ConfirmOrderView model={model} quantities={qtys} onQuantity={warnings ? undefined : edit.setQty}
+      reason={edit.reason} onReason={changed && !warnings ? edit.setReason : undefined} footer={footer} />
   </form>;
 }

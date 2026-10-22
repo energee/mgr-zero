@@ -9,10 +9,9 @@ import { runPageQuery, requirePagePermission } from "@/lib/mgr/page-query";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { toSkuOption } from "@/lib/order-form-rules";
 import { AdjustLinesForm } from "../adjust-lines-form";
-import type { BrandedSku } from "@/lib/mgr/brand-lines";
+import type { AdjustLinesSavedLine } from "@/lib/mgr/adjust-lines-view";
 import "@/lib/commands/all";
 
-type OrderLine = { sku_id: string; qty_ordered: number; qty_picked: number | null; skus: BrandedSku };
 type SkuRow = { id: string; name: string; brands: { name: string } | null };
 
 export default async function AdjustLinesPage({ params }: { params: Promise<{ id: string }> }) {
@@ -21,7 +20,7 @@ export default async function AdjustLinesPage({ params }: { params: Promise<{ id
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "adjust_order_lines", "Adjust lines");
   const [{ order, lines }, skuRows] = await Promise.all([
-    orNotFound(runPageQuery("get_order", { orderId: id }, ctx)) as Promise<{ order: { id: string; order_no: number | null; status: string }; lines: OrderLine[] }>,
+    orNotFound(runPageQuery("get_order", { orderId: id }, ctx)) as Promise<{ order: { id: string; order_no: number | null; status: string }; lines: AdjustLinesSavedLine[] }>,
     runPageQuery("list_skus", {}, ctx) as Promise<SkuRow[]>,
   ]);
   if (order.status !== "confirmed" && order.status !== "picked") redirect(`/orders/${order.id}`);

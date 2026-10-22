@@ -38,11 +38,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const [{ order, lines, events, atp, deposits }, locations] = (await Promise.all([
     orNotFound(runCommand("get_order", { orderId: id }, ctx)), runCommand("list_locations", {}, ctx),
   ])) as [{ order: Order; lines: OrderLine[]; events: OrderEvent[]; atp: Atp[]; deposits: OrderSnapshot["deposits"] }, { id: string; name: string }[]];
-  // Cost and margin are for Admin and Sales (#810); only a shipped order has any.
-  const cogs = order.status === "shipped" && canRun(ctx, "get_order_cogs") ? (await runCommand("get_order_cogs", { orderId: id }, ctx)) as OrderCogs : undefined;
   const canSell = canRun(ctx, "confirm_order"), canFulfill = canRun(ctx, "record_pick");
-  // History names its actors. Portal buyers are named only for roles that may list them (Admin, Sales).
-  const [team, buyers]: [TeamMember[], PortalUser[]] = await Promise.all([
+  const [cogs, team, buyers]: [OrderCogs | undefined, TeamMember[], PortalUser[]] = await Promise.all([
+    // Cost and margin are for Admin and Sales (#810); only a shipped order has any.
+    order.status === "shipped" && canRun(ctx, "get_order_cogs") ? runCommand("get_order_cogs", { orderId: id }, ctx) as Promise<OrderCogs> : Promise.resolve(undefined),
+    // History names its actors. Portal buyers are named only for roles that may list them (Admin, Sales).
     runCommand("list_team_members", {}, ctx) as Promise<TeamMember[]>,
     order.customer_id && canRun(ctx, "list_customer_users") ? runCommand("list_customer_users", { customerId: order.customer_id }, ctx) as Promise<PortalUser[]> : Promise.resolve([]),
   ]);

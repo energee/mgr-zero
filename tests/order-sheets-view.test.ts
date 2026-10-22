@@ -37,13 +37,13 @@ it("leaves unspecified return-source quantities blank", () => {
 });
 
 describe("Adjust lines view", () => {
-  it("maps picked-below-ordered as a warning stepper", () => {
+  it("notes a line ordered below what was picked", () => {
     const model = toAdjustLinesViewProps(orderAdjustLines);
     expect(model.backTo).toBe("ORD-0229");
-    expect(model.lines.map((l) => [l.group, l.name, l.qty, l.detail, l.tone])).toEqual([
-      ["Hazy IPA", "½ bbl keg", 4, "", ""],
-      ["Pils", "16 oz case", 7, "picked 10", "w"],
-      ["Stout", "⅙ bbl keg", 2, "", ""],
+    expect(model.lines.map((l) => [l.group, l.name, l.qty, l.detail])).toEqual([
+      ["Hazy IPA", "½ bbl keg", 4, ""],
+      ["Pils", "16 oz case", 7, "picked 10"],
+      ["Stout", "⅙ bbl keg", 2, ""],
     ]);
   });
 

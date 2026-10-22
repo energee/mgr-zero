@@ -2,7 +2,7 @@
 // Adjust / Short pick / Pick / Ship / Shipment done / Return sheets. Identities
 // come from demo.ts; order numbers match fixtures/orders.ts (229, 231).
 import { OUNCES_PER_BBL } from "@/lib/volume";
-import { ALS, LOC_TAPROOM, LOC_WAREHOUSE, LOCATIONS, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT } from "./demo";
+import { ALS, branded, LOC_TAPROOM, LOC_WAREHOUSE, LOCATIONS, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT } from "./demo";
 import type { AdjustLinesSnapshot } from "@/lib/mgr/adjust-lines-view";
 import type { PickSnapshot } from "@/lib/mgr/pick-view";
 import type { ReturnCreditSnapshot } from "@/lib/mgr/return-credit-view";
@@ -51,9 +51,6 @@ const line = (
 });
 
 /** Picked Al’s order mid-adjust: Pils stepper is the new 7, picked 10 warns. */
-/** A demo SKU as get_order returns it: name plus its brand and format. */
-const branded = (sku: { name: string; brand: string; format: string }) => ({ name: sku.name, brands: { name: sku.brand }, formats: { name: sku.format } });
-
 export const orderAdjustLines: AdjustLinesSnapshot = {
   order: { id: ORDER_229, order_no: 229, customers: { name: ALS.name } },
   lines: [

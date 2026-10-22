@@ -15,15 +15,14 @@ import { CommandFormMessage } from "@/components/mgr/command-form";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { docNo } from "@/lib/mgr/doc-no";
-import { adjustLineView } from "@/lib/mgr/adjust-lines-view";
-import { byBrand, type BrandedSku } from "@/lib/mgr/brand-lines";
+import { adjustLineView, type AdjustLinesSavedLine } from "@/lib/mgr/adjust-lines-view";
+import { byBrand } from "@/lib/mgr/brand-lines";
 import { AtpWarnings, atpWarnings, type AtpWarning } from "./atp-warnings";
 
 type LineRow = { skuId: string; qty: string; added?: boolean };
-type SavedLine = { sku_id: string; qty_ordered: number; qty_picked: number | null; skus: BrandedSku };
 export function AdjustLinesForm({ orderId, orderNo, currentLines, skus }: {
   orderId: string; orderNo?: number | null;
-  currentLines: SavedLine[];
+  currentLines: AdjustLinesSavedLine[];
   skus: { id: string; label: string }[];
 }) {
   const router = useRouter();
