@@ -88,7 +88,7 @@ describe("row deletes go through the confirm sheet", () => {
     ["app/(app)/pricing/group-form.tsx", "delete_format", /<RemovePourControl[^]*?onDelete=\{\(\) => form\.run\("delete_format"/],
     ["app/(app)/pricing/group-form.tsx", "delete_price_group", /<DeletePriceGroupControl[^]*?onDelete=\{\(\) => form\.run\("delete_price_group"/],
     ["app/(app)/locations/bin-form.tsx", "delete_bin", /<RemoveBinControl[^]*?onDelete=\{\(\) => form\.run\("delete_bin"/],
-    ["app/(app)/pricing/price-cell-form.tsx", "clear_channel_price", /<ConfirmDeleteControl[^]*?onDelete=\{\(\) => form\.run\("clear_channel_price"/],
+    ["app/(app)/pricing/price-cell-form.tsx", "clear_channel_price", /<ConfirmDeleteControl[^]*?onDelete=\{\(\) => action\.run\("clear_channel_price"/],
   ])("%s runs %s only after confirming", (path, command, binding) => {
     const src = readFileSync(path, "utf8");
     expect(src).toMatch(binding);
@@ -99,7 +99,9 @@ describe("row deletes go through the confirm sheet", () => {
     const source = (path: string) => readFileSync(path, "utf8");
     expect(source("app/(app)/locations/bin-form.tsx")).toMatch(/aria-label=\{bin \? `Edit \$\{bin\.name\}`/);
     expect(source("app/(app)/settings/channels/channel-form.tsx")).toMatch(/aria-label=\{isEdit \? `Edit \$\{channel\.name\}`/);
-    expect(source("app/(app)/pricing/price-cell-form.tsx")).toMatch(/className="sr-only"/);
+    // The inline price field is named group · format on channel; its visible text is only the amount.
+    expect(source("app/(app)/pricing/price-cell-form.tsx")).toMatch(/label=\{`\$\{groupName\} · \$\{formatName\} on \$\{channelName\}`\}/);
+    expect(source("components/mgr/views/price-groups.tsx")).toMatch(/<InputGroupInput aria-label=\{label\}/);
     expect(source("components/mgr/command-form.tsx")).toMatch(/aria-label=\{name \? `Edit \$\{name\}`/);
   });
 });

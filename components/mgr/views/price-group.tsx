@@ -1,6 +1,7 @@
 // components/mgr/views/price-group.tsx — one price-group row. Inventory
 // draws name / position / ceiling edits and the group's UPC per packaged
 // format; live keeps GroupForm as the wrapper and slots a barcode editor in.
+// Each pour row carries Edit pour (rename, resize) beside Remove.
 // Removing a pour and deleting the group confirm first; both surfaces draw the
 // same two controls below, live binding onDelete to the commands.
 import { Fragment, type ReactNode } from "react";
@@ -52,7 +53,7 @@ export function PriceGroupView({ model, controls = {}, back, messages, footer, a
             ? E.info("Add a pour size this group sells by the glass. Every beer on the group uses it.")
             : model.pours.map((pour) => (
               <Fragment key={pour.id}>
-                {E.row(pour.name, `${pour.ounces} oz`, renderPour ? renderPour(pour) : <RemovePourControl pour={pour.name} group={model.name} />)}
+                {E.row(pour.name, `${pour.ounces} oz`, renderPour ? renderPour(pour) : <div className="flex gap-2">{E.btn("Edit pour", "g")}<RemovePourControl pour={pour.name} group={model.name} /></div>)}
               </Fragment>
             ))}
           {addPour}

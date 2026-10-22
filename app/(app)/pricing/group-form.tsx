@@ -3,7 +3,7 @@
 // edit (`groupId` rides in the input). Both draw the same PriceGroupView from
 // the same adapter, so the dialog reads the same whether the row exists yet. Delete calls
 // delete_price_group and shows its refusal ("price group is in use") inline,
-// the way the channel Delete does. An existing group also adds pours
+// the way the channel Delete does. An existing group also adds and edits pours
 // (PourForm) and removes them (delete_format) in the same error slot; both
 // removals confirm first. Each packaged format's UPC edits in its own sheet
 // (BarcodeForm, set_price_group_barcode).
@@ -48,8 +48,11 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
           controls={{ name: edit("name"), position: edit("position"), costCeiling: edit("costCeilingInput") }}
           back={null}
           addPour={groupId ? <PourForm priceGroupId={groupId} groupName={model.name} /> : undefined}
-          renderPour={(pour) => <RemovePourControl pour={pour.name} group={model.name} busy={form.busy} error={form.error}
-            onDelete={() => form.run("delete_format", { formatId: pour.id }, undefined, { target: pour.id })} />}
+          renderPour={groupId ? (pour) => <div className="flex gap-2">
+            <PourForm key={`${pour.id}-${pour.name}-${pour.ounces}`} priceGroupId={groupId} groupName={model.name} pour={{ id: pour.id, name: pour.name, ounces: Number(pour.ounces) }} />
+            <RemovePourControl pour={pour.name} group={model.name} busy={form.busy} error={form.error}
+              onDelete={() => form.run("delete_format", { formatId: pour.id }, undefined, { target: pour.id })} />
+          </div> : undefined}
           renderBarcode={groupId ? (b) => <BarcodeForm key={b.upc} priceGroupId={groupId} groupName={model.name} formatId={b.formatId} format={b.format} upc={b.upc} /> : undefined}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>

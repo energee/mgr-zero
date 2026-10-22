@@ -87,17 +87,14 @@ describe("E.tbl column alignment", () => {
     expect(cells(html, "td").map(cell => cell.content)).toEqual(["2", "committed · saved-record", "4", "blocked: Name already exists"]);
   });
 
-  it("keeps every channel, format and group in the scrollable price matrix", () => {
+  it("keeps every format and group of the showing channel in the scrollable price matrix", () => {
     const model = toPriceGroupsViewProps(pricingGrid);
     const html = renderToStaticMarkup(createElement(PriceGroupsView, { model }));
     expectAlignment(html, ["l", ...model.formats.map(() => "r" as const)]);
-    expect((html.match(/<table\b/g) ?? []).length).toBe(model.channels.length);
-    expect(cells(html, "th").length).toBe(model.channels.length * (model.formats.length + 1));
-    expect(cells(html, "td").length).toBe(model.channels.reduce((total, channel) => total + channel.rows.length * (model.formats.length + 1), 0));
+    expect((html.match(/<table\b/g) ?? []).length).toBe(1);
+    expect(cells(html, "th").length).toBe(model.formats.length + 1);
+    expect(cells(html, "td").length).toBe(model.channel!.rows.length * (model.formats.length + 1));
     expect(html).toContain("overflow-x-auto");
-    for (const channel of model.channels) {
-      expect(html).toContain(channel.name);
-      for (const row of channel.rows) for (const value of row.cells) if (value !== null) expect(html).toContain(value);
-    }
+    for (const row of model.channel!.rows) for (const value of row.cells) if (value !== null) expect(html).toContain(`value="${value}"`);
   });
 });

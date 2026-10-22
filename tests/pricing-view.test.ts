@@ -10,30 +10,41 @@ import { PriceGroupsView } from "../components/mgr/views/price-groups";
 import { priceGroupTwo, pricingGrid } from "../lib/mgr/fixtures/pricing";
 import { money } from "../lib/mgr/money";
 import { toPriceGroupViewProps } from "../lib/mgr/price-group-view";
-import { toPriceGroupsViewProps } from "../lib/mgr/price-groups-view";
+import { cellCommit, toPriceGroupsViewProps } from "../lib/mgr/price-groups-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("Price groups view", () => {
-  it("maps the four list_* snapshots onto Wholesale and Taproom tables", () => {
+  const [wholesale, taproom] = pricingGrid.channels;
+
+  it("tabs every sale channel and tables the first by default", () => {
     const model = toPriceGroupsViewProps(pricingGrid);
-    expect(model.channels.map((c) => c.name)).toEqual(["Wholesale", "Taproom"]);
-    // Every format is a column on every channel, as the live grid draws it:
-    // an unpriced format still needs a cell to tap. null is unpriced.
+    expect(model.tabs).toEqual(["Wholesale", "Taproom"]);
+    expect(model.tab).toBe(0);
+    expect(model.tabHrefs).toBeUndefined();
+    // Every format is a column, as the live grid draws it: an unpriced format
+    // still needs a cell to type in. null is unpriced; a cell is dollars text.
     expect(model.formats).toEqual(["½ bbl keg", "sixtel", "case · 24×16oz", "pint", "crowler"]);
-    const rows = (i: number) => model.channels[i]?.rows.map((r) => [r.name, ...r.cells]);
-    expect(rows(0)).toEqual([
-      ["1", "$132.00", "$53.00", "$46.00", null, null],
-      ["2", money(15000), "$95.00", money(3800), null, null],
-      ["3", "$240.00", "$140.00", null, null, null],
+    expect(model.channel?.name).toBe("Wholesale");
+    expect(model.channel?.rows.map((r) => [r.name, ...r.cells])).toEqual([
+      ["1", "132.00", "53.00", "46.00", null, null],
+      ["2", "150.00", "95.00", "38.00", null, null],
+      ["3", "240.00", "140.00", null, null, null],
     ]);
-    expect(rows(1)).toEqual([
-      ["1", null, null, null, "$7.00", "$14.00"],
-      ["2", null, null, null, "$8.00", "$16.00"],
-      ["3", null, null, null, "$11.00", null],
+    expect(model.channel?.rows[1]?.id).toBe(pricingGrid.groups[1]?.id);
+  });
+
+  it("shows the channel the id names, links each tab, and falls back to the first for an unknown id", () => {
+    const model = toPriceGroupsViewProps({ ...pricingGrid, channelId: taproom!.id, channelHref: (id) => `/pricing?channel=${id}` });
+    expect(model.tab).toBe(1);
+    expect(model.channel?.rows.map((r) => [r.name, ...r.cells])).toEqual([
+      ["1", null, null, null, "7.00", "14.00"],
+      ["2", null, null, null, "8.00", "16.00"],
+      ["3", null, null, null, "11.00", null],
     ]);
-    expect(model.channels[0]?.rows[1]?.id).toBe(pricingGrid.groups[1]?.id);
+    expect(model.tabHrefs).toEqual([["Wholesale", `/pricing?channel=${wholesale!.id}`], ["Taproom", `/pricing?channel=${taproom!.id}`]]);
+    expect(toPriceGroupsViewProps({ ...pricingGrid, channelId: "gone" }).channel?.name).toBe("Wholesale");
   });
 
   it("collapses group-owned pours of the same name into one column", () => {
@@ -41,20 +52,21 @@ describe("Price groups view", () => {
     const pg2 = pricingGrid.groups[1]!.id;
     const model = toPriceGroupsViewProps({
       ...pricingGrid,
+      channelId: taproom!.id,
       formats: [
         { id: "half", name: "½ Keg", basis: "packaged" },
         { id: "p1", name: "14 oz pour", basis: "poured", price_group_id: pg1, ounces: 14 },
         { id: "p2", name: "14 oz pour", basis: "poured", price_group_id: pg2, ounces: 14 },
       ],
       cells: [
-        { sale_channel_id: pricingGrid.channels[1]!.id, price_group_id: pg1, format_id: "p1", unit_price_cents: 700 },
+        { sale_channel_id: taproom!.id, price_group_id: pg1, format_id: "p1", unit_price_cents: 700 },
       ],
     });
     expect(model.formats).toEqual(["½ Keg", "14 oz pour"]);
-    expect(model.channels[1]?.rows[0]?.formatIds).toEqual(["half", "p1"]);
-    expect(model.channels[1]?.rows[0]?.cells[1]).toBe("$7.00");
-    expect(model.channels[1]?.rows[1]?.formatIds).toEqual(["half", "p2"]);
-    expect(model.channels[1]?.rows[2]?.formatIds[1]).toBeNull();
+    expect(model.channel?.rows[0]?.formatIds).toEqual(["half", "p1"]);
+    expect(model.channel?.rows[0]?.cells[1]).toBe("7.00");
+    expect(model.channel?.rows[1]?.formatIds).toEqual(["half", "p2"]);
+    expect(model.channel?.rows[2]?.formatIds[1]).toBeNull();
   });
 
   it("labels a brand's format with its brand", () => {
@@ -62,44 +74,44 @@ describe("Price groups view", () => {
     expect(model.formats).toEqual(["Hazy · sixtel"]);
   });
 
-  it("renders New price group, group links, and the Hazy / Pils cells", () => {
+  it("renders New price group, the channel tabs, group links, and one table of inline dollar fields", () => {
     const html = htmlOf(createElement(PriceGroupsView, { model: toPriceGroupsViewProps(pricingGrid) }));
     expect(html).toMatch(/>New price group</);
-    expect(html).toMatch(/Wholesale/);
-    expect(html).toMatch(/Taproom/);
+    expect(html).toMatch(/role="tablist"/);
+    expect(html).toMatch(/>Wholesale</);
+    expect(html).toMatch(/>Taproom</);
+    expect(html.match(/<table\b/g)).toHaveLength(1);
     expect(html).toMatch(/data-to="Price group"/);
-    expect(html).toContain(money(15000));
-    expect(html).toContain(money(3800));
-    expect(html).toMatch(/not priced/);
-    expect(html).toMatch(/½ bbl keg/);
-    expect(html).toMatch(/case · 24×16oz/);
-    expect(html).not.toMatch(/→/);
+    expect(html).toContain('value="150.00"');
+    expect(html).toContain('aria-label="2 · case · 24×16oz on Wholesale"');
+    expect(html).toMatch(/placeholder="—"/);
+    expect(html).not.toMatch(/not priced/);
+  });
+
+  it("offers to add a missing pour where a group has none of that column's name", () => {
+    const pg1 = pricingGrid.groups[0]!.id;
+    const html = htmlOf(createElement(PriceGroupsView, { model: toPriceGroupsViewProps({
+      ...pricingGrid,
+      formats: [{ id: "p1", name: "Half", basis: "poured", price_group_id: pg1, ounces: 9 }],
+    }) }));
+    expect(html.match(/\+ add/g)).toHaveLength(2);
+    expect(html).toMatch(/Half pour to 2/);
+    expect(html).toMatch(/Half pour to 3/);
   });
 
   it("createAction and the row slots replace the inventory button, links and cells inside the same table", () => {
     const html = htmlOf(createElement(PriceGroupsView, {
-      model: toPriceGroupsViewProps(pricingGrid),
+      model: toPriceGroupsViewProps({ ...pricingGrid, channelId: taproom!.id }),
       createAction: "CREATE",
       renderGroup: (row) => `G:${row.name}`,
-      renderCell: (channel, row, col, label) => createElement("b", null, `${channel.name}/${row.name}/${col}`, label),
+      renderCell: (channel, row, col, value) => createElement("b", null, `${channel.name}/${row.name}/${col}/${value ?? "none"}`),
     }));
     expect(html).toMatch(/CREATE/);
     expect(html).not.toMatch(/New price group/);
     expect(html).toMatch(/G:2/);
     expect(html).not.toMatch(/data-to="Price group"/);
-    expect(html).toContain(`<b>Wholesale/2/0${money(15000)}</b>`);
-    expect(html).toMatch(/Taproom\/3\/4<span class="text-muted-foreground">not priced<\/span>/);
-    expect(html).toMatch(/one table per sale channel/);
-  });
-
-  it("hands renderCell a keyed unpriced label, since the live cell's Button puts it beside a sibling", () => {
-    // The page renders this view on the server; the label crosses into the
-    // client Button's children array, where React warns on an unkeyed element.
-    const labels: ReactNode[] = [];
-    htmlOf(createElement(PriceGroupsView, { model: toPriceGroupsViewProps(pricingGrid), renderCell: (_c, _r, _i, label) => { labels.push(label); return label; } }));
-    const elements = labels.filter(isValidElement);
-    expect(elements.length).toBeGreaterThan(0);
-    expect(elements.every((e) => e.key != null)).toBe(true);
+    expect(html).toContain("<b>Taproom/2/3/8.00</b>");
+    expect(html).toContain("<b>Taproom/3/4/none</b>");
   });
 
   it("draws one blank state: no groups first, then no channels", () => {
@@ -108,29 +120,45 @@ describe("Price groups view", () => {
     expect(none).not.toMatch(/No sale channels/);
     const noChannels = htmlOf(createElement(PriceGroupsView, { model: toPriceGroupsViewProps({ ...pricingGrid, channels: [] }) }));
     expect(noChannels).toMatch(/No sale channels yet/);
+    expect(noChannels).not.toMatch(/role="tablist"/);
   });
 
-  it("explains the grid once, above it, and recesses unpriced cells", () => {
+  it("explains the grid once, above it, in one line", () => {
     const html = htmlOf(createElement(PriceGroupsView, { model: toPriceGroupsViewProps(pricingGrid) }));
     expect(html.match(/data-slot="alert"/g)?.length ?? 0).toBe(1);
-    expect(html).not.toMatch(/empty cell is unpriced/);
-    expect(html).toMatch(/<span class="text-muted-foreground">not priced<\/span>/);
+    expect(html).toMatch(/the cell where they meet is the price/);
+    expect(html).not.toMatch(/one table per sale channel/);
+  });
+
+  it("leaving a cell saves changed dollars, asks before clearing a priced cell, and refuses non-numbers", () => {
+    expect(cellCommit("12.50", "12.50")).toEqual({ kind: "none" });
+    expect(cellCommit("", "  ")).toEqual({ kind: "none" });
+    expect(cellCommit("", "7")).toEqual({ kind: "save", cents: 700 });
+    expect(cellCommit("7.00", "$8.25")).toEqual({ kind: "save", cents: 825 });
+    expect(cellCommit("7.00", "0")).toEqual({ kind: "save", cents: 0 });
+    expect(cellCommit("7.00", "7")).toEqual({ kind: "none" });
+    expect(cellCommit("7.00", "")).toEqual({ kind: "clear" });
+    expect(cellCommit("7.00", "abc")).toEqual({ kind: "invalid" });
+    expect(cellCommit("7.00", "-1")).toEqual({ kind: "invalid" });
   });
 
   it("the live page fills the shared table's slots and reuses the group view for create", () => {
     const src = readFileSync("app/(app)/pricing/page.tsx", "utf8");
-    expect(src).not.toMatch(/E\.tbl|E\.blank/);
+    expect(src).not.toMatch(/E\.tbl|E\.blank|E\.tabs|LinkTabs/);
     expect(src).toMatch(/renderGroup=/);
     expect(src).toMatch(/renderCell=/);
-    expect(src).toMatch(/groupName=\{row\.name\}/);
-    expect(src).toMatch(/channelName=\{channel\.name\}/);
+    expect(src).toMatch(/renderAddPour=\{\(row, pour\) => <PourForm priceGroupId=\{row\.id\} groupName=\{row\.name\} name=\{pour\} trigger=\{addPourTrigger\(pour, row\.name\)\}/);
+    expect(src).toMatch(/channelHref: \(id\) => `\/pricing\?channel=\$\{id\}`/);
+    expect(src).toMatch(/backHref="\/more"/);
     expect(src).toMatch(/createAction=\{<GroupForm model=\{toPriceGroupViewProps\(snapshot\)\}/);
     const form = readFileSync("app/(app)/pricing/group-form.tsx", "utf8");
     expect(form).not.toMatch(/<Input\b/);
     expect(form.match(/<PriceGroupView\b/g)?.length).toBe(1);
+    expect(form).toMatch(/<PourForm key=\{`\$\{pour\.id\}/);
     const cell = readFileSync("app/(app)/pricing/price-cell-form.tsx", "utf8");
-    expect(cell).toMatch(/title=\{`\$\{groupName\} · \$\{formatName\}`\}/);
-    expect(cell).toMatch(/unpriced/);
+    expect(cell).toMatch(/<PriceCellInput\b/);
+    expect(cell).toMatch(/cellCommit\(initial, dollars\)/);
+    expect(cell).toMatch(/<ConfirmDeleteControl title="Clear price"/);
   });
 
   it("the Price groups inventory record is PriceGroupsView", () => {

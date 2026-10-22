@@ -1,52 +1,92 @@
-// components/mgr/views/price-groups.tsx — Price groups grid, one table per
-// sale channel, drawn once for both surfaces. Inventory draws E.link for the
-// group and the cell's label; live hands in GroupForm / PriceCellForm through
-// the renderGroup / renderCell slots and keeps the same table around them.
-import { Fragment, type ReactNode } from "react";
+// components/mgr/views/price-groups.tsx — Price groups grid, drawn once for
+// both surfaces: one tab per sale channel over that channel's table. Every
+// cell is an inline dollars field (PriceCellInput); a pour column on a group
+// without that pour shows the add-pour trigger instead. Inventory draws the
+// fields inert and E.link for the group; live hands in GroupForm,
+// PriceCellForm and PourForm through the renderGroup / renderCell /
+// renderAddPour slots and keeps the same table around them.
+import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { LinkTabs } from "@/components/mgr/work-tabs";
+import { Button } from "@/components/ui/button";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import type { PriceGroupsChannelView, PriceGroupsRowView, PriceGroupsViewModel } from "@/lib/mgr/price-groups-view";
 
 export type { PriceGroupsViewModel };
+
+/** One price cell: "$" and a decimal field, "—" when unpriced. Enter or leaving the cell commits (live only). */
+export function PriceCellInput({ label, value, onChange, onCommit, disabled, error, children }: {
+  /** Names the cell for assistive tech: group · format on channel. */
+  label: string;
+  value: string;
+  onChange?: (value: string) => void;
+  onCommit?: () => void;
+  disabled?: boolean;
+  error?: string | null;
+  /** Beside the field: the live Clear confirm while a priced cell is emptied. */
+  children?: ReactNode;
+}) {
+  return (
+    <form className="flex flex-col items-end gap-1" {...(onCommit ? { onSubmit: (event) => { event.preventDefault(); onCommit(); }, onBlur: onCommit } : {})}>
+      <div className="flex items-center gap-1">
+        <InputGroup className="w-28">
+          <InputGroupAddon>$</InputGroupAddon>
+          <InputGroupInput aria-label={label} inputMode="decimal" placeholder="—" autoComplete="off" disabled={disabled} aria-invalid={Boolean(error)}
+            className="text-right tabular-nums"
+            {...(onChange ? { value, onChange: (event) => onChange(event.target.value) } : { defaultValue: value })} />
+        </InputGroup>
+        {children}
+      </div>
+      {error ? <p role="alert" className="max-w-40 text-right text-xs text-destructive">{error}</p> : null}
+    </form>
+  );
+}
+
+/** A pour column's cell on a group without that pour: opens Add pour with the name filled in. */
+export const addPourTrigger = (pour: string, group: string) => (
+  <Button variant="ghost" size="sm" className="text-muted-foreground">+ add<span className="sr-only"> {pour} pour to {group}</span></Button>
+);
 
 export function PriceGroupsView({
   model,
   createAction,
   renderGroup = (row) => E.link(row.name, "Price group"),
-  renderCell = (_channel, _row, _col, label) => label,
+  renderCell = (channel, row, col, value) => <PriceCellInput label={`${row.name} · ${model.formats[col]} on ${channel.name}`} value={value ?? ""} />,
+  renderAddPour = (row, pour) => addPourTrigger(pour, row.name),
   backHref,
 }: {
   model: PriceGroupsViewModel;
   createAction?: ReactNode;
   /** The row's first cell: the group's name, opening the group. */
   renderGroup?: (row: PriceGroupsRowView) => ReactNode;
-  /** One price cell; `label` is the money string or the muted "not priced". */
-  renderCell?: (channel: PriceGroupsChannelView, row: PriceGroupsRowView, col: number, label: ReactNode) => ReactNode;
+  /** One price cell on the showing channel; `value` is the dollars text, or null when unpriced. */
+  renderCell?: (channel: PriceGroupsChannelView, row: PriceGroupsRowView, col: number, value: string | null) => ReactNode;
+  /** A pour column's cell on a group that has no pour of that name. */
+  renderAddPour?: (row: PriceGroupsRowView, pour: string) => ReactNode;
   backHref?: string;
 }) {
+  const channel = model.channel;
   return (
     <>
       {E.back("More", "Price groups", createAction !== undefined ? createAction : E.btn("New price group"), backHref)}
-      {E.info("Price groups down, formats across, one table per sale channel. A beer sits on one group and a customer on one channel; the cell where they meet is the price.")}
+      {E.info("Price groups down, formats across. A beer sits on one group and a customer on one channel; the cell where they meet is the price.")}
       {model.groupCount === 0 ? E.blank("Add a price group, then put each brand on one from Catalog.")
-        : model.channels.length === 0 ? E.blank("No sale channels yet")
-        : model.channels.map((channel) => (
-        <Fragment key={channel.id}>
-          {E.ttl(channel.name)}
+        : !channel ? E.blank("No sale channels yet")
+        : <>
+          {model.tabHrefs
+            ? <LinkTabs items={model.tabHrefs} current={channel.name} className="w-full overflow-x-auto md:w-fit" />
+            : E.tabs(model.tabs, model.tab, "w-full overflow-x-auto md:w-fit")}
           <div className="min-w-0 overflow-x-auto">
             {E.tbl(
               ["Group", ...model.formats],
               channel.rows.map((row) => [
                 renderGroup(row),
-                ...row.cells.map((cell, col) => row.formatIds[col]
-                  // Keyed: the live cell puts the label beside a sibling in its Button's children.
-                  ? renderCell(channel, row, col, cell ?? <span key="label" className="text-muted-foreground">not priced</span>)
-                  : null),
+                ...row.cells.map((value, col) => row.formatIds[col] ? renderCell(channel, row, col, value) : renderAddPour(row, model.formats[col]!)),
               ]),
               ["l", ...model.formats.map(() => "r" as const)],
             )}
           </div>
-        </Fragment>
-      ))}
+        </>}
     </>
   );
 }

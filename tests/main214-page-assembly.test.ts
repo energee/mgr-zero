@@ -123,7 +123,7 @@ it("pricing shared tables draw a group's pour as a column by its name, with a ce
   expect(page.type).toBe(PriceGroupsView);
   const html = render(page);
   expect(html).toMatch(/>Pint<\/th>/);
-  expect(html.match(/not priced/g)).toHaveLength(2);
+  expect(html.match(/placeholder="—"/g)).toHaveLength(2);
 });
 it("explicit null suppresses new shared view fixture actions", async () => {
   const catalog = await CatalogPage();
