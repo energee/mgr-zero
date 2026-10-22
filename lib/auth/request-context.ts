@@ -82,17 +82,13 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
     if (!requestIdentity) return [];
 
     const db = await getSupabaseClient();
-    const { data, error } = await db
-      .from("brewery_users")
-      .select("brewery_id, roles")
-      .eq("user_id", requestIdentity.userId)
-      .returns<StaffMembershipRow[]>();
+    // staff_brewery already returns only the caller's breweries, so both reads
+    // run at once instead of the second waiting on the first's ids.
+    const [{ data, error }, { data: breweries, error: breweryError }] = await Promise.all([
+      db.from("brewery_users").select("brewery_id, roles").eq("user_id", requestIdentity.userId).returns<StaffMembershipRow[]>(),
+      db.from("staff_brewery").select("id, name, timezone"),
+    ]);
     if (error) throw error;
-
-    const breweryIds = (data ?? []).map((row) => row.brewery_id);
-    const { data: breweries, error: breweryError } = breweryIds.length
-      ? await db.from("staff_brewery").select("id, name, timezone").in("id", breweryIds)
-      : { data: [], error: null };
     if (breweryError) throw breweryError;
     const breweryRows = new Map((breweries ?? []).map((brewery) => [brewery.id, brewery]));
     return (data ?? []).map(({ brewery_id, roles }) => {
@@ -106,17 +102,14 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
     if (!requestIdentity) return [];
 
     const db = await getSupabaseClient();
-    const { data, error } = await db
-      // A customers embed would disappear with the buyer base-table policy.
-      .from("portal_customers")
-      .select("id, brewery_id, name")
-      .returns<CustomerMembershipRow[]>();
+    // A customers embed would disappear with the buyer base-table policy, so
+    // the brewery names are a second read; portal_brewery already returns only
+    // the caller's breweries, so it runs alongside rather than after.
+    const [{ data, error }, { data: breweries, error: breweryError }] = await Promise.all([
+      db.from("portal_customers").select("id, brewery_id, name").returns<CustomerMembershipRow[]>(),
+      db.from("portal_brewery").select("id, name"),
+    ]);
     if (error) throw error;
-
-    const breweryIds = [...new Set((data ?? []).map(({ brewery_id }) => brewery_id))];
-    const { data: breweries, error: breweryError } = breweryIds.length
-      ? await db.from("portal_brewery").select("id, name").in("id", breweryIds)
-      : { data: [], error: null };
     if (breweryError) throw breweryError;
     const breweryNames = new Map((breweries ?? []).map((brewery) => [brewery.id, brewery.name]));
 
