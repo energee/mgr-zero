@@ -6,6 +6,10 @@ import { paymentTermLabel, sentenceCase } from "./labels";
  *  "" outside the US (the form draws it for a US customer only); alias "" is none. */
 export type CustomerEditValues = { name: string; alias: string; type: string; country: string; state: string; saleChannelId: string; licenseNumber: string; paymentTerms: string; taxTreatment: string };
 
+/** The note under Alias on both customer forms: list_customers searches it, the
+ *  list titles "name · alias", and no buyer surface reads it. */
+export const CUSTOMER_ALIAS_HELP = "Another name staff know this customer by. Search finds it, and the customer list shows it beside the name. Customers never see it.";
+
 export type CustomerViewModel = {
   backHref?: string;
   name: string;

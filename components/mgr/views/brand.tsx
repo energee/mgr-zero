@@ -93,8 +93,9 @@ export function BrandView({
         <section aria-label="Brand details" className="flex min-w-0 flex-col gap-4">
           {E.cols(
             <RegistryInput label="Brand name" value={model.name} onChange={controls.name} required />,
-            // Staff-only: an informal name such as a series number. Never on the portal, Square or SKU names.
-            <RegistryInput label="Alias" value={model.alias} onChange={controls.alias} placeholder="Staff only" />,
+            // Staff-only: list_brands and SKU search match it, staff pickers and lists show it. Never on the portal, Square or SKU names.
+            <RegistryInput id="brand-alias" label="Alias" value={model.alias} onChange={controls.alias}
+              description="An informal name staff use, such as a series number. Search finds the beer by it, and staff lists show it beside the name. Buyers never see it." />,
           )}
           {E.cols(
             <RegistryInput label="Style" value={model.style} onChange={controls.style} suggestions={model.styleOptions} />,

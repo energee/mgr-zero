@@ -11,7 +11,9 @@ import { ListControls } from "../components/mgr/list-controls";
 import { ShipToView } from "../components/mgr/views/ship-to";
 import { customerRidgeline, customersList, shipToMain } from "../lib/mgr/fixtures/customers";
 import { ALS, RIDGELINE } from "../lib/mgr/fixtures/demo";
-import { toCustomerViewProps } from "../lib/mgr/customer-view";
+import { CUSTOMER_ALIAS_HELP, toCustomerViewProps } from "../lib/mgr/customer-view";
+import { CUSTOMER_TYPES } from "../lib/mgr/enums";
+import { CUSTOMER_TYPE_OPTIONS } from "../lib/mgr/labels";
 import { toCustomersViewProps } from "../lib/mgr/customers-view";
 import { shipToAddress, shipToFormFields, toShipToViewProps } from "../lib/mgr/ship-to-view";
 
@@ -195,12 +197,35 @@ describe("country and alias", () => {
     expect(usMarkup).toContain(">Country<");
     expect(usMarkup).toContain(">United States<");
     expect(usMarkup).toContain(">State<");
-    expect(usMarkup).toContain('placeholder="Staff only"');
+    // The alias says what it is in a note that stays while typing, not a placeholder (#1131).
+    expect(usMarkup).not.toContain('placeholder="Staff only"');
+    expect(usMarkup).toContain(CUSTOMER_ALIAS_HELP);
     const foreign = toCustomerViewProps(jp);
     expect(foreign.editValues).toMatchObject({ country: "JP", state: "", alias: "Tokyo" });
     const jpMarkup = html(createElement(CustomerView, { model: foreign }));
     expect(jpMarkup).toContain(">Japan<");
     expect(jpMarkup).not.toContain(">State<");
+  });
+
+  it("offers each customer type once, in sentence case, on both customer forms (#1131)", () => {
+    expect(CUSTOMER_TYPE_OPTIONS).toEqual([
+      { value: "distributor", label: "Distributor" }, { value: "retailer", label: "Retailer" },
+      { value: "brewery", label: "Brewery" }, { value: "other", label: "Other" },
+    ]);
+    expect(new Set(CUSTOMER_TYPES).size).toBe(CUSTOMER_TYPES.length);
+    expect(readFileSync("components/mgr/views/customer.tsx", "utf8")).toContain("CUSTOMER_TYPE_OPTIONS");
+    const form = readFileSync("app/(app)/customers/customer-form.tsx", "utf8");
+    expect(form).not.toContain("@/components/ui/select");
+    expect(form).toMatch(/E\.pick\("Type", type, CUSTOMER_TYPE_OPTIONS,/);
+    expect(form).toMatch(/E\.pick\("Sale channel", saleChannelId,/);
+  });
+
+  it("the New customer dialog explains the alias and says where ship-tos are added (#1131)", () => {
+    expect(CUSTOMER_ALIAS_HELP).toMatch(/Customers never see it\./);
+    const form = readFileSync("app/(app)/customers/customer-form.tsx", "utf8");
+    expect(form).not.toContain("Staff only");
+    expect(form).toMatch(/E\.edit\("Alias", alias, "text", undefined, \{[^}]*description: CUSTOMER_ALIAS_HELP/);
+    expect(form).toMatch(/!isEdit && E\.info\("Add ship-to addresses on the customer’s page after you create it\."\)/);
   });
 
   it("the save input sends country and alias, a state only for US, and drops a blank alias", async () => {

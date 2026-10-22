@@ -369,15 +369,18 @@ export const E = {
     <a href={href} data-to={to} className="text-sm text-muted-foreground underline">{t}</a>
   ),
   /** An editable field. type is the native input type; "date" pops the calendar
-   *  (DatePicker). */
-  edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[], controls?: FieldControls) => {
+   *  (DatePicker). `description` is a standing note under the field (what an
+   *  alias is for), linked like `error`: pass `id` too, and it is `${id}-description`. */
+  edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[], controls?: FieldControls & { description?: string }) => {
     // `error` is drawn under the field (fieldError), never passed to the input.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { onChange, hideLabel, contextualLabels, error: _error, ...rest } = controls ?? {};
-    const error = fieldError(controls);
+    const { onChange, hideLabel, contextualLabels, error: _error, description, ...rest } = controls ?? {};
+    const descriptionId = description && controls?.id ? `${controls.id}-description` : undefined;
+    const error = fieldError({ ...controls, "aria-describedby": describedBy(controls?.["aria-describedby"], descriptionId) });
     const attributes = { ...rest, "aria-invalid": error.invalid, "aria-describedby": error.describedBy };
+    const note = description ? <FieldDescription id={descriptionId}>{description}</FieldDescription> : null;
     // DatePicker draws its own Field and takes no invalid flag, so a date's error is its message alone.
-    if (type === "date") return <><DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} aria-describedby={error.describedBy} />{error.message}</>;
+    if (type === "date") return <><DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} aria-describedby={error.describedBy} />{note}{error.message}</>;
     // A whole number (a contract quantity, an overdue threshold) is counted,
     // not typed: the same −/+ stepper Weekly count uses.
     if (type === "number") {
@@ -385,6 +388,7 @@ export const E = {
         <Field data-disabled={attributes.disabled} data-invalid={attributes["aria-invalid"]}>
           {!hideLabel && <FieldLabel htmlFor={attributes.id}>{label}</FieldLabel>}
           {E.stq(Number(value) || 0, label, { ...attributes, value, onChange, contextualLabels, step: controls?.step ?? "any", required: controls?.required ?? false })}
+          {note}
           {error.message}
         </Field>
       );
@@ -399,6 +403,7 @@ export const E = {
         {!hideLabel && <FieldLabel htmlFor={attributes.id}>{label}</FieldLabel>}
         <Input type={type} aria-label={label} {...attributes} {...(onChange ? { value, onChange: (event) => onChange(event.target.value) } : { defaultValue: value })} list={listId} />
         {listId ? <datalist id={listId}>{suggestions!.map((o) => <option key={o} value={o} />)}</datalist> : null}
+        {note}
         {error.message}
       </Field>
     );

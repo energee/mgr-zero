@@ -1,6 +1,8 @@
 // components/mgr/views/price-group.tsx — one price-group row. Inventory
-// draws name / position / ceiling edits and the group's UPC per packaged
-// format; live keeps GroupForm as the wrapper and slots a barcode editor in.
+// draws name / position / ceiling edits (name required; Position and the
+// optional Cost ceiling explain themselves under the field) and the group's
+// UPC per packaged format; live keeps GroupForm as the wrapper and slots a
+// barcode editor in.
 // Each pour row carries Edit pour (rename, resize) beside Remove.
 // Removing a pour and deleting the group confirm first; both surfaces draw the
 // same two controls below, live binding onDelete to the commands.
@@ -38,10 +40,12 @@ export function PriceGroupView({ model, controls = {}, back, messages, footer, a
   return (
     <>
       {back !== undefined ? back : E.back("Price groups", model.name, undefined, model.backHref)}
-      {E.edit("Group name", model.name, "text", undefined, controls.name && { onChange: controls.name })}
-      {E.edit("Position", model.position, "number", undefined, { onChange: controls.position, min: 1, step: 1, required: true })}
-      {E.edit("Cost ceiling ($/bbl)", controls.costCeiling ? model.costCeilingInput : model.costCeiling, "number", undefined, { onChange: controls.costCeiling, min: 0 })}
-      {E.info("Dollars per barrel of recipe cost: a brand whose cost lands between the previous group’s ceiling and this one gets this group suggested on Brand, never moved.")}
+      {E.edit("Group name", model.name, "text", undefined, { id: "price-group-name", onChange: controls.name, required: true })}
+      {/* list_price_groups orders by position, and the grid and the ceiling bands follow it (price-group-suggestion.ts). */}
+      {E.edit("Position", model.position, "number", undefined, { id: "price-group-position", onChange: controls.position, min: 1, step: 1, required: true,
+        description: "This group’s row in the price grid: 1 is the top row. No two groups share a position." })}
+      {E.edit("Cost ceiling ($/bbl) (optional)", controls.costCeiling ? model.costCeilingInput : model.costCeiling, "number", undefined, { id: "price-group-ceiling", onChange: controls.costCeiling, min: 0,
+        description: "Dollars per barrel of recipe cost. A brand whose recipe cost is above the previous group’s ceiling and up to this one sees this group suggested on its page. Saving never moves a brand or changes a price." })}
       {model.previousCeilingLabel && model.previousCeiling
         ? E.fld(model.previousCeilingLabel, model.previousCeiling)
         : null}
