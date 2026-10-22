@@ -16,8 +16,11 @@ jq -e -s 'length > 0 and all(.[]; (.title | type == "string" and length > 0) and
 filed=0
 while IFS= read -r line; do
   title="Docs gap: $(jq -r '.title | gsub("\\s+"; " ") | .[:120]' <<<"$line")"
-  open=$(gh issue list --state open --search "in:title \"$title\"" --json title --jq "map(select(.title == $(jq -Rn --arg t "$title" '$t')))[0].title // empty")
-  if [ -n "$open" ]; then echo "Already open: $title"; continue; fi
+  # An assignment, so a failed search stops the run instead of filing a duplicate.
+  open=$(gh issue list --state open --search "in:title \"$title\"" --json title --jq '.[].title')
+  if grep -qxF "$title" <<<"$open"; then
+    echo "Already open: $title"; continue
+  fi
   if [ "$filed" -ge 5 ]; then echo "Five issues filed this run; skipping: $title"; continue; fi
   body="$(jq -r .body <<<"$line")
 

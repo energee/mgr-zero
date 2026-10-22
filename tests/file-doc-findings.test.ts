@@ -13,16 +13,13 @@ function run(findings: string, openTitles: string[] = []) {
   const root = mkdtempSync(join(tmpdir(), "doc-findings-"));
   try {
     writeFileSync(join(root, "findings.jsonl"), findings);
-    writeFileSync(join(root, "open.json"), JSON.stringify(openTitles.map((title) => ({ title }))));
+    writeFileSync(join(root, "open.txt"), openTitles.map((title) => `${title}\n`).join(""));
+    // `gh issue list` prints the open titles, one per line, as its --jq would.
     // Each `gh issue create` is logged NUL-terminated, since bodies span lines.
-    // `gh issue list` prints the open titles (the script filters them with --jq, so
-    // the stub returns raw JSON and lets jq run for real).
     writeFileSync(
       join(root, "gh"),
       `#!/bin/bash
-if [ "$2" = "list" ]; then
-  for ((i = 1; i <= $#; i++)); do [ "\${!i}" = "--jq" ] && { j=$((i + 1)); jq -r "\${!j}" "${root}/open.json"; exit; }; done
-fi
+if [ "$2" = "list" ]; then cat "${root}/open.txt"; exit; fi
 printf '%s\\0' "$*" >> "${root}/created"
 `,
       { mode: 0o755 },
