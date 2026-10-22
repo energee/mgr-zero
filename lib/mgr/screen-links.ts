@@ -221,7 +221,6 @@ export const INERT: (string | RegExp)[] = [
   "Add stop",
   "Add line",
   "Adjust selected",
-  "August 31, 2027",
   "Avery Stone",
   // Customer detail → Portal users rows: a buyer is named, not opened.
   "jordan@ridgelinetap.com",
@@ -314,8 +313,6 @@ export const INERT: (string | RegExp)[] = [
   "Save location mapping",
   "Save vessel",
   "Send staff invite",
-  "September 3, 2026",
-  "September 4, 2026",
   "Ship-to \u00b7 requested date",
   "Ships from",
   "Skip",
@@ -331,7 +328,8 @@ export const INERT: (string | RegExp)[] = [
   "Unlink",
   "Pay invoice",
   "Email me a link",
-  /^(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4}$/,
+  // A date field's trigger reads its value ("Sep 3, 2026", formatDate) and opens its calendar in place.
+  /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}$/,
   "Reset to format price",
   "Switch",
   "Reload",

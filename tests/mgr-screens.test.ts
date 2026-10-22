@@ -495,7 +495,8 @@ describe("SCREENS", () => {
 
   it("renders the controlled date value used by live shared forms", () => {
     const html = renderToStaticMarkup(createElement(DatePicker, { label: "Date", defaultValue: "", value: "2027-08-31", onChange: () => {} }));
-    expect(html).toContain("August 31, 2027");
+    // The app-wide record date (lib/date-format.ts formatDate), not "August 31, 2027" (#1126).
+    expect(html).toContain("Aug 31, 2027");
   });
 
   it("points a date field at its description, as the other fields do", () => {
