@@ -20,11 +20,13 @@ type Completion = {
 
 let breweryId: string;
 let ctx: Ctx;
+let owner: Ctx;
 let location: { id: string; binId: string };
 
 beforeAll(async () => {
   breweryId = (await makeBrewery()).id;
   ctx = await makeStaffCtx(breweryId, "brewer");
+  owner = await makeStaffCtx(breweryId, "admin");
   location = await seedLocation(breweryId);
 });
 
@@ -32,7 +34,7 @@ async function brew(initialBbl: number, startedAt = "2026-09-01T00:00:00Z") {
   const { brandId } = await seedCatalog(breweryId, { product: `Batch ${crypto.randomUUID()}` });
   const vessel = await runCommand("upsert_vessel", {
     name: `FV ${crypto.randomUUID()}`, kind: "fermenter", capacityBbl: 100,
-  }, ctx) as { id: string };
+  }, owner) as { id: string };
   const batch = await runCommand("schedule_batch", {
     intendedBrandId: brandId, plannedOn: "2026-09-01", plannedBbl: initialBbl,
   }, ctx) as { id: string };
@@ -118,7 +120,7 @@ describe("batch completion reconciliation", () => {
 
   it("names every open tank in the write-off confirmation preview (#808)", async () => {
     const source = await brew(20);
-    const tank = await runCommand("upsert_vessel", { name: `BT ${crypto.randomUUID()}`, kind: "brite", capacityBbl: 100 }, ctx) as { id: string };
+    const tank = await runCommand("upsert_vessel", { name: `BT ${crypto.randomUUID()}`, kind: "brite", capacityBbl: 100 }, owner) as { id: string };
     const moved = await runCommand("record_cellar_transfer", { fromOccupancyId: source.occupancyId, toVesselId: tank.id, volumeBbl: 8, lossBbl: 0 }, ctx) as { to_occupancy: { id: string } };
     const reviewed = await preview(source.batchId);
     expect(n(reviewed.inTankBbl)).toBe(20);
@@ -225,7 +227,7 @@ describe("batch completion reconciliation", () => {
 
   it("cancels same-batch transfers, owns cross-batch boundaries, and includes prior loss and signed physical adjustments", async () => {
     const source = await brew(10);
-    const empty = await runCommand("upsert_vessel", { name: `BT ${crypto.randomUUID()}`, kind: "brite", capacityBbl: 100 }, ctx) as { id: string };
+    const empty = await runCommand("upsert_vessel", { name: `BT ${crypto.randomUUID()}`, kind: "brite", capacityBbl: 100 }, owner) as { id: string };
     const moved = await runCommand("record_cellar_transfer", {
       fromOccupancyId: source.occupancyId, toVesselId: empty.id, volumeBbl: 4, lossBbl: 0.2,
     }, ctx) as { to_occupancy: { id: string } };
@@ -250,7 +252,7 @@ describe("batch completion reconciliation", () => {
   it("does not subtract the completion root from occupancy volume and closes every scoped occupancy at one valid time", async () => {
     const future = "2099-01-02T03:04:05Z";
     const source = await brew(10, future);
-    const empty = await runCommand("upsert_vessel", { name: `Future BT ${crypto.randomUUID()}`, kind: "brite", capacityBbl: 100 }, ctx) as { id: string };
+    const empty = await runCommand("upsert_vessel", { name: `Future BT ${crypto.randomUUID()}`, kind: "brite", capacityBbl: 100 }, owner) as { id: string };
     const moved = await runCommand("record_cellar_transfer", {
       fromOccupancyId: source.occupancyId, toVesselId: empty.id, volumeBbl: 4, lossBbl: 0,
     }, ctx) as { to_occupancy: { id: string } };

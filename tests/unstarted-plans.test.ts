@@ -4,6 +4,7 @@ import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
+let owner: Awaited<ReturnType<typeof makeStaffCtx>>;
 let catalog: Awaited<ReturnType<typeof seedCatalog>>;
 let recipeVersionId: string;
 let malt: string;
@@ -16,6 +17,7 @@ const scheduleRun = async (occupancyId?: string) => await runCommand("schedule_p
 beforeAll(async () => {
   const brewery = await makeBrewery();
   ctx = await makeStaffCtx(brewery.id, "brewer");
+  owner = await makeStaffCtx(brewery.id, "admin");
   catalog = await seedCatalog(brewery.id);
   malt = await seedMaterial(brewery.id, { name: "Plan malt", category: "malt" });
   const recipe = await runCommand("create_recipe", { name: "Plan recipe" }, ctx) as { id: string };
@@ -43,7 +45,7 @@ it("reschedules and cancels a batch with exact replay, retained history and no d
   const volume = await admin.from("product_volume_requirements").select("supply_bbl").eq("brand_id", catalog.brandId).single();
   expect(volume.data?.supply_bbl).toBe(0);
   await expect(runCommand("reschedule_batch", { batchId: batch.id, plannedOn: day }, ctx)).rejects.toThrow(/cancelled/);
-  const vessel = await runCommand("upsert_vessel", { name: "Cancelled batch tank", kind: "fermenter", capacityBbl: 20 }, ctx) as { id: string };
+  const vessel = await runCommand("upsert_vessel", { name: "Cancelled batch tank", kind: "fermenter", capacityBbl: 20 }, owner) as { id: string };
   await expect(runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 10, brewedOn: day }, ctx)).rejects.toThrow(/cancelled/);
   for (const table of ["inventory_movements", "material_movements", "vessel_occupancies"] as const) {
     const result = await admin.from(table).select("id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId);
@@ -53,7 +55,7 @@ it("reschedules and cancels a batch with exact replay, retained history and no d
 
 it("cancelled runs stop demanding beer and no longer block completion, without dropping outputs", async () => {
   const batch = await scheduleBatch();
-  const vessel = await runCommand("upsert_vessel", { name: "Run tank", kind: "fermenter", capacityBbl: 20 }, ctx) as { id: string };
+  const vessel = await runCommand("upsert_vessel", { name: "Run tank", kind: "fermenter", capacityBbl: 20 }, owner) as { id: string };
   const brewed = await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 10, brewedOn: day }, ctx) as { occupancy: { id: string } };
   for (const command of ["cancel_batch", "reschedule_batch"]) await expect(runCommand(command, { batchId: batch.id, plannedOn: day }, ctx)).rejects.toThrow(/physical work/);
   const run = await scheduleRun(brewed.occupancy.id);

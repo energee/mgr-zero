@@ -28,13 +28,14 @@ import { sql } from "./helpers";
 async function fixture() {
   const brewery = await makeBrewery();
   const ctx = await makeStaffCtx(brewery.id, "brewer");
+  const owner = await makeStaffCtx(brewery.id, "admin");
   const catalog = await seedCatalog(brewery.id, { bblPerUnit: 0.001 });
   const destination = await seedLocation(brewery.id);
   const materialId = await seedMaterial(brewery.id, { name: "Actual cans", category: "packaging", uom: "each" });
   const bom = await admin.from("format_bom").insert({ brewery_id: brewery.id, format_id: catalog.formatId, material_id: materialId, qty_per_unit: 1 });
   if (bom.error) throw bom.error;
   await seedMovement(brewery.id, { materialId, locationId: destination.id, binId: destination.binId, qty: 100, type: "receipt", createdBy: ctx.userId });
-  const vessel = await runCommand("upsert_vessel", { name: "Actual tank", kind: "fermenter", capacityBbl: 10 }, ctx) as { id: string };
+  const vessel = await runCommand("upsert_vessel", { name: "Actual tank", kind: "fermenter", capacityBbl: 10 }, owner) as { id: string };
   const batch = await runCommand("schedule_batch", { intendedBrandId: catalog.brandId, plannedBbl: 1, plannedOn: "2026-09-28" }, ctx) as { id: string };
   const brew = await runCommand("record_brew_day", { batchId: batch.id, vesselId: vessel.id, brewedOn: "2026-09-28", initialBbl: 1, actuals: [], confirmEmpty: true }, ctx) as { occupancy: { id: string } };
   const run = await runCommand("schedule_packaging_run", { brandId: catalog.brandId, occupancyId: brew.occupancy.id, plannedOn: "2026-09-28", outputs: [{ skuId: catalog.skuId, qtyPlanned: 100 }] }, ctx) as { id: string };
