@@ -6,7 +6,7 @@ import type { MaterialsViewModel } from "@/lib/mgr/materials-view";
 export type { MaterialsViewModel };
 
 /** The material definitions list (/materials?view=definitions), where Edit
- * changes a material. Stock lives on Materials on hand, the only way in, so
+ * changes a material. This list is reached only from Materials on hand, so
  * the back link returns there. */
 export function MaterialsView({
   model,
