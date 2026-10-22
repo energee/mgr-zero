@@ -22,9 +22,10 @@ export type NavItem = {
   /** Omitted = every role. Admin always sees everything. */
   roles?: readonly StaffRole[];
   /** One sentence-case line of what you do there, without a trailing period,
-   * true for every role that sees the entry. The More landing prints it under
-   * the card, Search under a Pages match, and Settings quotes it through
-   * navAbout; tests/mgr-nav.test.ts requires it on every staff entry. */
+   * accurate for every role that can open the entry.
+   * The More landing prints it under the card, Search under a Pages match,
+   * and Settings quotes it through navAbout; tests/mgr-nav.test.ts requires
+   * it on every staff entry. */
   about?: string;
   /** Not built yet: shown in the design inventory, hidden by shippedNav(). */
   planned?: true;

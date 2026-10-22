@@ -93,8 +93,8 @@ export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHi
     heading: kind === "recent" ? "Recent" : HEADING[kind],
     items: items.map(hit => [hit.label, hit.detail, `${hit.kind}:${hit.id}`]),
   }));
-  // tests/mgr-nav.test.ts requires an `about` on every staff entry, so the
-  // blank fallback only satisfies the optional NavItem type.
+  // NavItem.about is optional in the type, so a page with no line renders an
+  // empty detail; every STAFF_NAV entry has one (tests/mgr-nav.test.ts enforces it).
   if (pages.length) viewGroups.unshift({
     heading: "Pages",
     items: pages.map(page => [page.label, page.about ?? "", `page:${page.href}`]),
