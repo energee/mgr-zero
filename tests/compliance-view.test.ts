@@ -50,7 +50,7 @@ describe("Compliance months", () => {
     expect(periodRow("2026-07", filing, today, DEMO_TIME_ZONE)).toEqual(complianceMonthsDemo.months[2]);
     expect(periodRow("2026-07", undefined, today, DEMO_TIME_ZONE).detail).toBe("Not filed · Ready to review");
     expect(periodRow("2026-Q3", undefined, today, DEMO_TIME_ZONE).detail).toBe("In progress · File after the quarter ends");
-    expect(periodRow("2026-07", { ...filing, filed_at: null }, today, DEMO_TIME_ZONE).detail).toBe("Filed · 38.75 bbl taxable");
+    expect(periodRow("2026-07", { ...filing, filed_at: null }, today, DEMO_TIME_ZONE).detail).toBe("Filed · 38.75 bbl taxpaid");
     const page = src("app/(app)/compliance/page.tsx");
     expect(page).toMatch(/periodRow\(/);
     expect(page).not.toMatch(/ready to review|file once/i);

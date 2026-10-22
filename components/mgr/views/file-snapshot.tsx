@@ -9,13 +9,6 @@ import { CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
 import { ConfirmDeleteControl } from "./confirm-delete";
 
-export function FileSnapshotControl(props: { busy?: boolean; reason?: string | null; error?: string | null; onDelete?: () => Promise<boolean> }) {
-  return <ConfirmDeleteControl title="Save filed snapshot" tone="irreversible" {...props}
-    name="Record these figures as the filed snapshot for this period? A period is filed once, and the snapshot cannot be changed."
-    warning="This does not file with TTB or the state; file there yourself first. Later corrections count in the period they are saved in."
-    dismissLabel="Keep reviewing" busyLabel="Saving…" />;
-}
-
 /** The optional note and Save, withheld while `reason` names what is missing.
  *  Without `onNote` and `onFile` (the inventory frame) nothing is saved. */
 export function FileSnapshotForm({ note = "", onNote, reason, busy, error, onFile }: {
@@ -30,7 +23,10 @@ export function FileSnapshotForm({ note = "", onNote, reason, busy, error, onFil
     {E.edit("Note · optional", note, "text", undefined, { id: "file-note", placeholder: "where and when it was filed", onChange: onNote })}
     {/* A footer row on desktop, so the reason sits beside Save as in every other form. */}
     <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
-      <FileSnapshotControl busy={busy} error={error} reason={reason} onDelete={onFile} />
+      <ConfirmDeleteControl title="Save filed snapshot" tone="irreversible" busy={busy} error={error} reason={reason} onDelete={onFile}
+        name="Record these figures as the filed snapshot for this period? A period is filed once, and the snapshot cannot be changed."
+        warning="This does not file with TTB or the state; file there yourself first. Later corrections count in the period they are saved in."
+        dismissLabel="Keep reviewing" busyLabel="Saving…" />
     </div>
     {/* Stays after the confirm sheet closes: a failed filing must not vanish. */}
     <CommandFormMessage error={error} />

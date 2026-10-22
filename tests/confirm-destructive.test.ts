@@ -7,7 +7,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ConfirmDeleteControl } from "../components/mgr/views/confirm-delete";
-import { FileSnapshotControl } from "../components/mgr/views/file-snapshot";
+import { FileSnapshotForm } from "../components/mgr/views/file-snapshot";
 import { TeamMemberView } from "../components/mgr/views/team-controls";
 import { PriceGroupView } from "../components/mgr/views/price-group";
 import { BinView } from "../components/mgr/views/bin";
@@ -59,10 +59,12 @@ describe("Save filed snapshot", () => {
   });
 
   it("opens while nothing blocks it, and the sheet says MGR does not file with TTB", () => {
-    const html = renderToStaticMarkup(createElement(FileSnapshotControl, {}));
-    expect(html).toContain('aria-haspopup="dialog"');
-    expect(html).not.toMatch(DISABLED);
-    expect(readFileSync("components/mgr/views/file-snapshot.tsx", "utf8")).toMatch(/does not file with TTB/);
+    const html = renderToStaticMarkup(createElement(FileSnapshotForm, { reason: null }));
+    const [save] = buttons(html);
+    expect(save).toContain('aria-haspopup="dialog"');
+    expect(save).not.toMatch(DISABLED);
+    // The closed sheet renders no body, so the copy is read from the warning prop itself.
+    expect(readFileSync("components/mgr/views/file-snapshot.tsx", "utf8")).toMatch(/warning="This does not file with TTB or the state; file there yourself first\./);
   });
 });
 

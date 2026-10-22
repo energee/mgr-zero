@@ -204,7 +204,7 @@ export const INERT: (string | RegExp)[] = [
   "2 \u00b7 Review generated figures",
   "2 \u00b7 Review original filed figures",
   "2-row \u00b7 55 lb bags",
-  "3 \u00b7 Confirm filed outside MGR",
+  "3 \u00b7 Record the filing",
   "Beer in process",
   "Packaged",
   "Taxpaid removals",

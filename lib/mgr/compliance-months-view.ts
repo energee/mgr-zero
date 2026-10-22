@@ -50,5 +50,5 @@ export function periodRow(key: string, filing: Filing | undefined, today: string
   const filed = filing.filed_at ? `Filed ${formatDate(filing.filed_at, timeZone)}` : "Filed";
   return filing.needs_amendment
     ? { key, title, detail: `Needs amendment · ${filed}`, tone: "w" }
-    : { key, title, detail: `${filed} · ${bblFixed(filing.figures.removals.taxable ?? 0)} taxable`, tone: "ok" };
+    : { key, title, detail: `${filed} · ${bblFixed(filing.figures.removals.taxable ?? 0)} taxpaid`, tone: "ok" };
 }

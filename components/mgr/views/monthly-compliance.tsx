@@ -16,11 +16,11 @@ function ComplianceFigures({ model, inProcessDetail, warnings = [] }: { model: C
     {E.row("Beer in process", inProcessDetail, model.inProcess)}
     {E.row("Packaged", "production into finished goods", model.packaged)}
     {model.removals.map((row) => <Fragment key={row.key}>{row.key === "loss" ? E.fld(row.title, row.bbl) : E.row(row.title, "", row.bbl)}</Fragment>)}
-    {model.cellarRemovals.length ? <>{E.info("Cellar removals breakdown is explanatory and is already included once in the filing removal totals above. Do not add it again.")}{model.cellarRemovals.map((row) => <Fragment key={row.key}>{E.fld(`${row.title} · non-additive breakdown`, row.bbl)}</Fragment>)}</> : null}
+    {model.cellarRemovals.length ? <>{E.info("Cellar removals breakdown is explanatory and is already included once in the filing removal totals above. Do not add it again.")}{model.cellarRemovals.map((row) => <Fragment key={row.key}>{E.fld(`${row.title} · already counted above`, row.bbl)}</Fragment>)}</> : null}
     {E.ttl("Destination-state totals")}
     {model.stateExport ? <>
       {E.tbl(["State", "Removed (bbl)", "Returned (bbl)", "Adjustments (bbl)", "Net (bbl)", "Sales", "Credits", "Net sales"], model.stateRows, ["l", "r", "r", "r", "r", "r", "r", "r"], { sortable: false })}
-      {E.info("Beer moves and beer sales count on their own dates. Returns reduce removed volume. Credits reduce beer sales; keg deposits are excluded. The Unassigned row holds removals with no recorded destination. These totals match the exported transactions. State taxes and state filing forms are done outside MGR.")}
+      {E.info("Beer moves and beer sales count on their own dates. Net (bbl) is Removed less Returned, plus signed Adjustments. Net sales is Sales less Credits; keg deposits are excluded. The Unassigned row holds transactions with no recorded destination: shipments, returns, adjustments, invoices, or credits. These totals match the exported transactions. State taxes and state filing forms are done outside MGR.")}
       <DestinationStateExport {...model.stateExport} />
     </> : E.info("This snapshot was saved without the transactions behind its destination-state totals.")}
     {model.byState.map((row) => <Fragment key={row.key}>{E.row(row.title, "gross taxable shipments · before returns", row.bbl)}</Fragment>)}
@@ -30,10 +30,16 @@ function ComplianceFigures({ model, inProcessDetail, warnings = [] }: { model: C
 export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen = false }: {
   model: MonthlyComplianceViewModel;
   lossAction?: (loss: LossReview) => ReactNode;
+  /** The live Save (FileButton). Absent in the inventory, which draws the inert form; null draws none. */
   fileAction?: ReactNode;
   /** The period (month, quarter, or year) has not ended: it can be reviewed, not filed (#429). */
   monthOpen?: boolean;
 }) {
+  // Step 3, one case at a time: still running, already filed, the live Save, or the inventory's.
+  const record = monthOpen ? E.status(`You can record the filing after ${model.title} ends`, "w")
+    : model.filingDate ? E.status(`Snapshot saved ${model.filingDate}`, "ok")
+    : fileAction !== undefined ? fileAction
+    : <FileSnapshotForm reason={model.fileReason} />;
   return <>
     {E.back("Compliance", model.title, undefined, model.backHref)}
     {model.amendments?.length ? <section className="grid gap-3 rounded-xl border p-4">
@@ -56,9 +62,11 @@ export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen
     {model.losses.length ? E.info("A reattribution counts in the period you save it. Earlier filed snapshots stay unchanged.") : null}
     {E.row(model.filingDate ? "2 · Review original filed figures" : "2 · Review generated figures", "", E.status(model.filingDate ? `Filed ${model.filingDate}` : model.balances ? "Current" : "Does not balance", model.filingDate || model.balances ? "ok" : "w"))}
     <ComplianceFigures model={model} warnings={model.warnings} inProcessDetail={model.filingDate ? "tanks at filing, not at period end" : "tanks now, not at period end"} />
-    {E.row("3 · Confirm filed outside MGR", "", model.filingDate ? E.status("Done", "ok") : "")}
-    {E.info("MGR does not file with TTB or the state. File your report there yourself, for example on Pay.gov, then record the filing here. The saved snapshot keeps these figures as filed.")}
-    {monthOpen ? E.status(`You can record the filing after ${model.title} ends`, "w") : fileAction !== undefined ? fileAction : model.filingDate ? E.status(`Snapshot saved ${model.filingDate}`, "ok") : <FileSnapshotForm reason={model.fileReason} />}
+    {E.row("3 · Record the filing", "", model.filingDate ? E.status("Done", "ok") : "")}
+    {E.info(model.filingDate
+      ? "MGR does not file with TTB or the state. This snapshot records the figures as filed."
+      : "MGR does not file with TTB or the state. File your report there yourself, for example on Pay.gov, then record the filing here. The saved snapshot keeps these figures as filed.")}
+    {record}
   </>;
 }
 
