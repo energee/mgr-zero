@@ -21,7 +21,7 @@ export function ConfirmDeleteControl({ title, triggerLabel, name, warning, busy 
   /** Muted second line: what blocks or follows the action. */
   warning: string;
   busy?: boolean;
-  /** Why the trigger is held closed, e.g. while a report does not balance (submitReason, lib/mgr/submit-reason.ts); null or absent when it may open. */
+  /** Why the trigger is held closed, e.g. the blocking report warnings from toMonthlyComplianceViewProps' fileReason; null or absent when it may open. */
   reason?: string | null;
   error?: string | null;
   /** Resolves true when the action succeeded and the sheet may close. A caller

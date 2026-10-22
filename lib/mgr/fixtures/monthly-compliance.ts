@@ -39,8 +39,9 @@ export const monthlyComplianceSeptember: MonthlyComplianceSnapshot = {
   report: { ...monthlyComplianceAugust.report, figures: { ...monthlyComplianceAugust.report.figures, periodStart: "2026-09-01", periodEnd: "2026-09-30" } },
 };
 
-/** August with a keg movement the report cannot place (#1143): the server's
- *  warnings as generate_compliance_report writes them, and Save withheld. */
+/** August that does not balance (#1143), so Save is withheld. Its warnings are
+ *  written as generate_compliance_report writes them: kegs do not balance, an
+ *  unclassified keg_swap movement, and the Unassigned note. */
 export const monthlyComplianceUnbalanced: MonthlyComplianceSnapshot = {
   ...monthlyComplianceAugust,
   report: {

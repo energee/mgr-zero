@@ -37,12 +37,12 @@ describe("ConfirmDeleteControl", () => {
   });
 
   it("draws an irreversible tone and holds the trigger closed beside the reason it names (#1122)", () => {
-    const html = renderToStaticMarkup(createElement(ConfirmDeleteControl, { title: "Save filed snapshot", tone: "irreversible", reason: "Still needed: figures that balance.", name: "File it?", warning: "Once." }));
+    const html = renderToStaticMarkup(createElement(ConfirmDeleteControl, { title: "Save filed snapshot", tone: "irreversible", reason: "Save is off: Kegs do not balance.", name: "File it?", warning: "Once." }));
     const [trigger] = buttons(html);
     expect(trigger).toContain('data-variant="irreversible"');
     expect(trigger).toMatch(DISABLED);
     const describedBy = trigger?.match(/aria-describedby="([^"]+)"/)?.[1];
-    expect(html).toMatch(new RegExp(`<p id="${describedBy}"[^>]*>Still needed: figures that balance\\.</p>`));
+    expect(html).toMatch(new RegExp(`<p id="${describedBy}"[^>]*>Save is off: Kegs do not balance\\.</p>`));
   });
 });
 

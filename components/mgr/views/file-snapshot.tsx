@@ -10,7 +10,7 @@ import { E } from "@/components/mgr/e";
 import { ConfirmDeleteControl } from "./confirm-delete";
 
 /** The optional note and Save, withheld while `reason` names what is missing.
- *  Without `onNote` and `onFile` (the inventory frame) nothing is saved. */
+ *  Without `onFile` (the inventory frame) nothing is saved. */
 export function FileSnapshotForm({ note = "", onNote, reason, busy, error, onFile }: {
   note?: string;
   onNote?: (note: string) => void;

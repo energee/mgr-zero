@@ -50,7 +50,9 @@ const removalBbl = (key: string, value: number) => key === "loss" ? bblExact(val
 const label = (value: string) => REMOVAL_LABEL[value] ?? sentenceCase(value);
 
 /** generate_compliance_report's one warning that does not block filing; its other
- *  warnings are the reasons `balances` is false. */
+ *  warnings are the reasons `balances` is false. This must match the SQL literal
+ *  exactly (supabase/migrations/20261013100000_file_cellar_taproom_removals.sql);
+ *  if the SQL wording changes, the note leaks into the Save-off reason. */
 const UNASSIGNED_WARNING = "Some supporting facts have no recorded destination. Review Unassigned; MGR does not infer a state.";
 
 /** One report warning in staff words (#1143). The SQL writes three shapes; any
@@ -97,7 +99,8 @@ export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot
       figures: toComplianceFigures(row.new_figures),
     })),
     warnings: snapshot.report.warnings.map(plainWarning),
-    // `balances` is false exactly when the report has a blocking warning, so the reason always names one.
+    // The SQL sets `balances` to "no blocking warnings" and appends the Unassigned note after,
+    // so a false `balances` always leaves at least one warning for the reason to name.
     fileReason: figures.balances ? null : `Save is off: ${snapshot.report.warnings.filter((warning) => warning !== UNASSIGNED_WARNING).map(plainWarning).join(" ")}`,
     losses: snapshot.losses.map((loss) => ({
       source: loss,
