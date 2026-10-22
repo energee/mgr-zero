@@ -11,7 +11,7 @@ import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 export type { BatchesViewModel };
 
 /** A brand or recipe the plan does not name, said in muted words instead of a blank. */
-const orMissing = (value: string | null, missing: string) => value ?? <span className="text-muted-foreground">{missing}</span>;
+const orMissing = (value: string | null, missing: string) => value ?? <span key={missing} className="text-muted-foreground">{missing}</span>;
 
 /** Where a brewed batch is: one line per open occupancy with its latest reading
  *  and its own Reading action, or "No open occupancy". */
@@ -48,7 +48,7 @@ function GroupTable({ rows }: { rows: BatchesRowView[] }) {
         row.plannedOn,
         row.plannedBbl,
         ...(vesselHead ? [row.readings ? <Occupancies key="vessel" readings={row.readings} /> : row.vessel] : []),
-        ...(brew ? [row.brewable && E.act("Brew", "info", row.href)] : []),
+        ...(brew ? [row.brewable && <Fragment key="brew">{E.act("Brew", "info", row.href)}</Fragment>] : []),
       ],
       // A missing brand or recipe sorts last rather than by its muted words;
       // readings sort by their vessels. The Brew button has nothing to sort.
