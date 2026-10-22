@@ -293,9 +293,15 @@ const brewProcess = processInput.extend({
   boilMinutes: z.number().int().nonnegative().optional(), mashWaterGal: z.number().positive().optional(),
   spargeWaterGal: z.number().nonnegative().optional(), targetMashPh: z.number().min(4).max(7).optional(),
 });
+// A Prep pull is a brew actual before brew day: no stage, and zero is allowed
+// (nothing pulled yet).
+const brewPull = brewActual.omit({ stage: true }).extend({ qty: z.number().nonnegative().multipleOf(0.0001) });
+function brewPullRow(a: z.infer<typeof brewPull>) {
+  return { material_id: a.materialId, recipe_ingredient_id: a.recipeIngredientId ?? null,
+    location_id: a.locationId, bin_id: a.binId, lot_id: a.lotId ?? null, qty: a.qty };
+}
 function brewActualRows(actuals: z.infer<typeof brewActual>[]) {
-  return actuals.map(a => ({ material_id: a.materialId, recipe_ingredient_id: a.recipeIngredientId ?? null, stage: a.stage,
-    location_id: a.locationId, bin_id: a.binId, lot_id: a.lotId ?? null, qty: a.qty }));
+  return actuals.map(a => ({ ...brewPullRow(a), stage: a.stage }));
 }
 
 defineQuery({
@@ -325,6 +331,17 @@ defineCommand({
     p_brewery: ctx.breweryId, p_batch: i.batchId, p_vessel: i.vesselId,
     p_actuals: i.actuals && brewActualRows(i.actuals), p_process: i.process, p_confirm_empty: i.confirmEmpty,
     p_initial_bbl: i.initialBbl, p_brewed_on: i.brewedOn, p_request_id: execution.requestId,
+  })),
+});
+
+// Prep is a draft: a full replace of the batch's pulls and planned tank, read
+// back by get_brew_day_plan. record_brew_day still does the consuming.
+defineCommand({
+  name: "save_batch_pulls", description: "Prep saves the lots and amounts pulled for a planned batch and its planned tank; moves no stock",
+  input: z.object({ batchId: z.string().uuid(), vesselId: z.string().uuid().nullable(), lines: z.array(brewPull) }),
+  roles: ["admin", "brewer"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("save_batch_pulls", {
+    p_brewery: ctx.breweryId, p_batch: i.batchId, p_vessel: i.vesselId, p_lines: i.lines.map(brewPullRow), p_request_id: execution.requestId,
   })),
 });
 
