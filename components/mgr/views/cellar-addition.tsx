@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { Qty } from "@/components/mgr/qty";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ADDITION_STAGES, additionPreview, type AdditionStage, type CellarAdditionViewModel } from "@/lib/mgr/cellar-addition-view";
 import { occupancyIdentity } from "@/lib/mgr/cellar-transfer-view";
@@ -30,9 +31,13 @@ export function CellarAdditionView({ model, onChange, messages, footer, submitti
       {E.pick("Occupancy", model.occupancyId, [{ value: "", label: "Tank with beer in it" }, ...(model.occupancies.map((o) => ({ value: o.occupancy_id, label: (o.vessel_name ?? "Unnamed vessel") + " · " + (occupancyIdentity(o)) })))], { onChange: onChange ? (nextValue: string) => onChange?.({ occupancyId: nextValue }) : undefined, required: true })}
       {E.pick("Material", model.materialId, [{ value: "", label: "Hop, fruit or adjunct" }, ...(model.materials.map((m) => ({ value: m.id, label: m.name + " · " + m.category })))], { onChange: onChange ? (nextValue: string) => onChange?.({ materialId: nextValue, lotId: "" }) : undefined, required: true })}
       {material?.lot_tracked && E.pick("Lot", model.lotId, [{ value: "", label: "Choose a lot" }, ...lots.map(l => ({ value: l.lot_id, label: `${l.lot_code} · ${l.qty} ${material.base_uom}` }))], { onChange: onChange ? value => onChange({ lotId: value }) : undefined, required: true })}
-      <ToggleGroup type="single" variant="outline" size="sm" className="flex-wrap justify-start" {...sel("stage")} onValueChange={(v) => { if (v) onChange?.({ stage: v as AdditionStage }); }}>
-        {Object.entries(ADDITION_STAGES).map(([id, label]) => <ToggleGroupItem key={id} value={id}>{label}</ToggleGroupItem>)}
-      </ToggleGroup>
+      {/* A visible heading names the chips, as E.picks does for a multi-choice group (#1115). */}
+      <Field>
+        <FieldLabel>Stage</FieldLabel>
+        <ToggleGroup type="single" variant="outline" size="sm" className="flex-wrap justify-start" aria-label="Stage" {...sel("stage")} onValueChange={(v) => { if (v) onChange?.({ stage: v as AdditionStage }); }}>
+          {Object.entries(ADDITION_STAGES).map(([id, label]) => <ToggleGroupItem key={id} value={id}>{label}</ToggleGroupItem>)}
+        </ToggleGroup>
+      </Field>
       <Qty label="Quantity" value={model.qty} unit={material?.base_uom ?? ""} onChange={onChange ? (qty) => onChange({ qty }) : undefined} />
       {preview.valid ? E.info(preview.text) : E.note(preview.reason, preview.error ? "alert" : "note")}
     </fieldset>

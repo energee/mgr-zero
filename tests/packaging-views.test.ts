@@ -122,4 +122,20 @@ describe("packaging views", () => {
     // A planned SKU with no known barrels per unit leaves the remainder unknown, not guessed.
     expect(toSchedulePackagingRunView(data, { brandId: "b1", occupancyId: "o1", plannedOn: "", qty: { s2: "3" } }).leftInSource).toBeUndefined();
   });
+
+  // #1125: copy and labels only; repack has no damage input.
+  it("labels the Repack fields and says plainly that repack records no damage", () => {
+    const html = htmlOf(createElement(RepackView, { model: repackCase, footer: null }));
+    const forId = /<label[^>]*for="([^"]+)"[^>]*>Packages to repack<\/label>/.exec(html)?.[1];
+    expect(forId).toBeTruthy();
+    expect(html).toMatch(new RegExp(`<input[^>]*id="${forId}"`));
+    expect(html).toMatch(/>Package to break down</);
+    expect(html).not.toMatch(/Damaged on break/);
+    expect(html).toContain("Repack doesn’t record damage");
+  });
+
+  it("explains Untracked stock where the live Lot picker offers it", () => {
+    const html = htmlOf(createElement(RepackView, { model: { ...repackCase, lots: [{ id: "l1", name: "L-1 · 12 available" }] }, footer: null }));
+    expect(html).toContain("Untracked stock is stock recorded without a lot.");
+  });
 });

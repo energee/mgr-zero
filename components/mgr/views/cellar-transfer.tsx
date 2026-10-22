@@ -2,6 +2,7 @@
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Qty } from "@/components/mgr/qty";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { occupancyIdentity as identity, transferPreview, type CellarTransferViewModel } from "@/lib/mgr/cellar-transfer-view";
@@ -19,6 +20,7 @@ export function CellarTransferView({ model, onChange, messages, footer, submitti
   const occupied = model.occupancies.find(o => o.vessel_id === target?.id);
   const preview = transferPreview(source?.bbl, model.volume, model.loss);
   const held = transferPreview(source?.bbl, model.volume, "").remainder;
+  const left = `Left in ${source?.vessel_name ?? "source"}`;
   const targetVolume = Number(((occupied?.bbl ?? 0) + preview.moving).toFixed(8));
   return <>
     <fieldset disabled={submitting} className="flex flex-col gap-3">
@@ -27,9 +29,13 @@ export function CellarTransferView({ model, onChange, messages, footer, submitti
       <Qty label="Barrels moving" value={model.volume} unit="bbl" onChange={onChange ? volume => onChange({ volume, loss: "" }) : undefined} />
       {source && target && preview.valid && E.info(`${occupied ? "Blend" : "Transfer"} preview: ${target.name} ${occupied?.bbl ?? 0} + ${preview.moving} = ${targetVolume} / ${target.capacity_bbl} bbl${occupied ? ` · keeps ${identity(occupied) || "its existing batch identity"}` : " · opens a new occupancy"}. ${source.vessel_name ?? "Source"} keeps ${preview.remainder} bbl; ${preview.loss} bbl recorded as loss.`)}
       {source && E.fld(`Remainder in ${source.vessel_name ?? "source"}`, preview.remainder === undefined || !Number.isFinite(preview.remainder) ? "—" : `${preview.remainder} bbl`)}
-      <ToggleGroup type="single" variant="outline" size="sm" className="flex-wrap justify-start" value={onChange ? (preview.loss === 0 ? "hold" : preview.remainder === 0 ? "loss" : "") : undefined} defaultValue={onChange ? undefined : "hold"} onValueChange={value => { if (value) onChange?.({ loss: value === "loss" && held !== undefined && held >= 0 ? String(held) : "" }); }}>
-        <ToggleGroupItem value="hold">Leave in {source?.vessel_name ?? "source"}</ToggleGroupItem><ToggleGroupItem value="loss" disabled={held === undefined || !Number.isFinite(held) || held < 0}>Record as loss</ToggleGroupItem>
-      </ToggleGroup>
+      {/* The heading says what the choice is about: the beer the transfer leaves behind (#1115). */}
+      <Field>
+        <FieldLabel>{left}</FieldLabel>
+        <ToggleGroup type="single" variant="outline" size="sm" className="flex-wrap justify-start" aria-label={left} value={onChange ? (preview.loss === 0 ? "hold" : preview.remainder === 0 ? "loss" : "") : undefined} defaultValue={onChange ? undefined : "hold"} onValueChange={value => { if (value) onChange?.({ loss: value === "loss" && held !== undefined && held >= 0 ? String(held) : "" }); }}>
+          <ToggleGroupItem value="hold">Leave in {source?.vessel_name ?? "source"}</ToggleGroupItem><ToggleGroupItem value="loss" disabled={held === undefined || !Number.isFinite(held) || held < 0}>Record as loss</ToggleGroupItem>
+        </ToggleGroup>
+      </Field>
       {E.edit("Loss (bbl) · optional", model.loss, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ loss: nextValue }) : undefined, min: "0", step: "any" })}
     </fieldset>
     {messages}

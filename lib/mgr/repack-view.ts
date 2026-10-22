@@ -13,7 +13,6 @@ export type RepackViewModel = {
   unit: string;
   tape: [string, string][];
   preview: string;
-  damaged: string;
   unavailable?: string;
   lot?: string;
   parents?: RepackOption[]; locations?: RepackOption[]; bins?: RepackOption[]; lots?: RepackOption[];
@@ -42,9 +41,9 @@ export function toRepackView(input: { parent: string; unit: string; location?: s
   const n = Number(base.qty) || 0;
   const out = `−${n} ${base.unit} · repack`;
   // No parent yet: nothing to derive and nothing to refuse; the pickers say what to do.
-  if (!base.parent) return { ...base, tape: [], preview: "Pick a composed SKU, the bin it sits in, and how many to break", damaged: "not recorded" };
+  if (!base.parent) return { ...base, tape: [], preview: "Pick a composed SKU, the bin it sits in, and how many to break" };
   if (!composition) {
-    return { ...base, tape: [[out, "no composition"]], preview: "Preview: nothing to derive · the parent format has no single component row", damaged: "not recorded", unavailable: REPACK_UNAVAILABLE };
+    return { ...base, tape: [[out, "no composition"]], preview: "Preview: nothing to derive · the parent format has no single component row", unavailable: REPACK_UNAVAILABLE };
   }
   // The child leg's bbl is the parent's total, never recomputed per child unit
   // (screens.tsx spec: independent rounding leaves −0.00000001 on a 24×16oz case).
@@ -53,6 +52,5 @@ export function toRepackView(input: { parent: string; unit: string; location?: s
     ...base,
     tape: [[out, `${bbl} bbl`], [`+${n * composition.quantity} ${composition.childLabel} · repack`, `derived from the ${base.unit} total`]],
     preview: `Preview: conserves ${bbl} bbl · same location and bin · not a TTB removal`,
-    damaged: `0 ${composition.childLabel} · the child count is pinned to composition`,
   };
 }

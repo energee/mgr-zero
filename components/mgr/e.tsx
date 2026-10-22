@@ -264,12 +264,13 @@ export const E = {
   ),
   /** A forward arrow read as "to"; null draws it decorative (aria-hidden). */
   arrow: (label: string | null = "to") => <DirectionIcon label={label} />,
-  /** A typed quantity: the OS keyboard is the keypad. unit renders as a trailing
-   *  addon — plain text ("bbl"), chips, or a segmented unit choice (`E.tabs`
-   *  hugged with "w-fit"). The field's clipping and addon padding live in
-   *  components/mgr/qty.tsx, shared with `volume`. */
-  qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string, controls?: FieldControls) => (
-    <Qty value={value} unit={unit} label={label} id={id} onChange={controls?.onChange} />
+  /** A typed quantity under its visible label: the OS keyboard is the keypad.
+   *  unit renders as a trailing addon — plain text ("bbl"), chips, or a
+   *  segmented unit choice (`E.tabs` hugged with "w-fit"). The label, the
+   *  field's clipping and addon padding live in components/mgr/qty.tsx,
+   *  shared with `volume`. */
+  qty: (value: string, unit?: React.ReactNode, label = "Quantity", controls?: FieldControls) => (
+    <Qty value={value} unit={unit} label={label} onChange={controls?.onChange} />
   ),
   /** A view switcher. E.tabs draws no TabsContent: the body below stands in
    *  for the active panel. A filter that swaps the whole list (Work's kinds, an

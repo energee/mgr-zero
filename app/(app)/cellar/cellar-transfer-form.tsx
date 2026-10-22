@@ -15,7 +15,8 @@ export function CellarTransferForm({ occupancies, vessels }: { occupancies: Tran
     build: () => ({ fromOccupancyId: fields.fromId, toVesselId: fields.toId, volumeBbl: Number(fields.volume), lossBbl: fields.loss ? Number(fields.loss) : undefined }),
     reset: () => setFields({ fromId: "", toId: "", volume: "", loss: "" }),
   });
-  return <CommandForm open={form.open} onOpenChange={form.setOpen} title="Cellar transfer" trigger={E.btn("Transfer", "g")} footer={E.pin(<CellarTransferFooter formId={formId} submitting={form.submitting} disabled={!ready} />)}>
+  // No tank holds beer: nothing to move, so the trigger is off; the map's note says why (#1115).
+  return <CommandForm open={form.open} onOpenChange={form.setOpen} title="Cellar transfer" trigger={E.btn("Transfer", occupancies.length ? "g" : "g disabled")} footer={E.pin(<CellarTransferFooter formId={formId} submitting={form.submitting} disabled={!ready} />)}>
     <form id={formId} onSubmit={event => { if (!ready || form.submitting) { event.preventDefault(); return; } void form.submit(event); }} className="flex flex-col gap-3">
       <CellarTransferView model={{ ...fields, occupancies, vessels }} onChange={patch => setFields(current => ({ ...current, ...patch }))} submitting={form.submitting} footer={null} messages={<CommandFormMessage error={form.error} />} />
     </form>

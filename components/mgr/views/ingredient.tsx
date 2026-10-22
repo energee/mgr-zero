@@ -9,7 +9,6 @@
 "use client";
 import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { Field, FieldLabel } from "@/components/ui/field";
 import { INGREDIENT_STAGES, type IngredientLine } from "@/lib/mgr/recipe-process-view";
 
 export type IngredientFields = IngredientLine;
@@ -29,10 +28,7 @@ export function IngredientView({ fields, materials, onChange, footer }: {
     {E.searchPick("Material", fields.materialId, materials.map((m) => ({ value: m.id, label: m.category ? `${m.name} · ${m.category}` : m.name })), { id: `${id}-material`, placeholder: "Choose a material", ...bind("materialId") })}
     {E.pick("Stage", fields.stage, INGREDIENT_STAGE_OPTIONS, bind("stage"))}
     {E.inline(
-      <Field>
-        <FieldLabel htmlFor={`${id}-qty`}>{qtyLabel}</FieldLabel>
-        {E.qty(fields.perBblQty, unit ? `${unit} / bbl` : "/ bbl", qtyLabel, `${id}-qty`, bind("perBblQty"))}
-      </Field>,
+      E.qty(fields.perBblQty, unit ? `${unit} / bbl` : "/ bbl", qtyLabel, bind("perBblQty")),
       E.edit("Timing min · optional", fields.timingMinutes, "number", undefined, bind("timingMinutes")),
     )}
     {footer !== undefined ? footer : E.btns([["Delete ingredient", "g"], "Save ingredient"])}
