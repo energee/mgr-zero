@@ -92,6 +92,8 @@ describe("post-merge documentation maintainer", () => {
     expect(jobs.maintain.permissions.issues).toBeUndefined();
     expect(jobs.report.permissions.issues).toBe("write");
     expect(source).toContain('scripts/file-doc-findings.sh "$RUNNER_TEMP/doc-findings.jsonl"');
+    // Cross-document integration needs the same tier as dreaming.
+    expect(source).toContain("claude_args: '--model sonnet ");
     // A run whose guide edits fail validation still reports what it found.
     expect(source).toContain("if: always() && needs.maintain.outputs.findings == 'true'");
     expect(source).toContain("if: always() && steps.validate.outputs.findings == 'true'");

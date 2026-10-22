@@ -80,8 +80,9 @@ jobs:
           display_report: false
           show_full_output: false
           settings: .github/claude-ci-settings.json
-          # Bounded guide maintenance does not need the expensive reasoning tier.
-          claude_args: '--model haiku --allowedTools "Read,Grep,Glob,Edit(content/docs/index.mdx),Write(content/docs/index.mdx),Edit(content/docs/staff-guide.mdx),Write(content/docs/staff-guide.mdx),Edit(content/docs/portal-guide.mdx),Write(content/docs/portal-guide.mdx),Edit(docs/**/*.md),Write(docs/**/*.md),Edit(README.md),Write(README.md),Write(.docs-agent-findings.jsonl)"'
+          # Integrating new docs (deduplicating, settling contradictions against the code,
+          # judging what to report) is cross-document synthesis, like dreaming's.
+          claude_args: '--model sonnet --allowedTools "Read,Grep,Glob,Edit(content/docs/index.mdx),Write(content/docs/index.mdx),Edit(content/docs/staff-guide.mdx),Write(content/docs/staff-guide.mdx),Edit(content/docs/portal-guide.mdx),Write(content/docs/portal-guide.mdx),Edit(docs/**/*.md),Write(docs/**/*.md),Edit(README.md),Write(README.md),Write(.docs-agent-findings.jsonl)"'
 
       - name: Validate the generated guide
         id: validate
