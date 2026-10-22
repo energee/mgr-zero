@@ -1,5 +1,6 @@
 import { formatDate, formatDateTime } from "@/lib/date-format";
 import { disconnectStatus } from "@/lib/mgr/integration-disconnect";
+import { connectionStateLabel } from "@/lib/mgr/labels";
 export type QboHealth = { connected: boolean; connectionId?: string; state: "connected" | "disconnected" | "recovery_required"; realmLabel: string | null; realmId?: string; remoteRevocationState?: string; lastError: string | null; accessExpiresAt?: string | null; allowAch?: boolean; allowCard?: boolean; purchaseAccountId?: string | null };
 export type QboEnvironment = "sandbox" | "production";
 export type QboMappingKind = "customer" | "item" | "deposit" | "one_way_fee" | "vendor" | "purchase_account";
@@ -30,7 +31,7 @@ export function toAccountingViewProps(health: QboHealth, timeZone: string, missi
   const name = qboCompanyName(health);
   return {
     connected: health.connected && health.state === "connected", canDisconnect: disconnectStatus(health) === "available",
-    company: name ?? "QuickBooks Online", status: `${health.state.replaceAll("_", " ")}${health.realmId && environment ? ` · ${environment}` : ""}`,
+    company: name ?? "QuickBooks Online", status: `${connectionStateLabel(health.state)}${health.realmId && environment ? ` · ${environment}` : ""}`,
     companyId: health.realmId,
     reconnect: Boolean(health.connectionId), error: health.lastError,
     access: health.accessExpiresAt ? `renews automatically · current token expires ${formatDate(health.accessExpiresAt, timeZone)}` : undefined,

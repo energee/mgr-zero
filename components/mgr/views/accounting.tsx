@@ -5,6 +5,7 @@ import { QuickBooksMark } from "@/components/mgr/brand-icons";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { CommandFormMessage } from "@/components/mgr/command-form";
+import { plural } from "@/lib/mgr/plural";
 import type { AccountingViewModel, QboSyncStatus } from "@/lib/mgr/accounting-view";
 import type { QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
 import type { DisconnectStatus } from "@/lib/mgr/integration-disconnect";
@@ -44,7 +45,7 @@ export function QboSyncView({ busy = false, disabled = false, error, onSync, sta
 export function QboConnectionView({ configured = true, reconnect = false, busy = false, error, onConnect }: { configured?: boolean; reconnect?: boolean; busy?: boolean; error?: string | null; onConnect?: () => void }) {
   return <div className="flex flex-col gap-2">
     <Button type="button" data-variant="irreversible" className="bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" disabled={!configured || busy} onClick={onConnect}>{busy ? "Opening QuickBooks…" : reconnect ? "Reconnect QuickBooks" : "Connect QuickBooks"}</Button>
-    {!configured && <p className="text-sm text-muted-foreground">QuickBooks setup is unavailable until the server connection values are configured.</p>}
+    {!configured && <p className="text-sm text-muted-foreground">QuickBooks isn’t available in MGR yet. Contact MGR support to turn it on.</p>}
     <CommandFormMessage error={error} />
   </div>;
 }
@@ -61,6 +62,13 @@ export function QboDefaultsView({ allowAch, allowCard, busy = false, disabled = 
   </form>;
 }
 
+/** count_customers_missing_portal_email as a sentence; undefined when the caller did not read it. */
+function missingEmailsDetail(count?: number) {
+  if (count === undefined) return "Count unavailable · review portal login emails";
+  if (count === 0) return "All customers have a portal login email";
+  return `${plural(count, "customer has", "customers have")} no portal login email`;
+}
+
 export function AccountingView({ model, connection, defaults, messages, sync }: { model: AccountingViewModel; connection?: ReactNode; defaults?: ReactNode; messages?: ReactNode; sync?: ReactNode }) {
   return <>
     {E.back("Settings", "Accounting", undefined, model.backHref)}
@@ -68,12 +76,15 @@ export function AccountingView({ model, connection, defaults, messages, sync }: 
     {E.row(model.company, model.status, model.canDisconnect ? E.act("Disconnect", "destructive", model.disconnectHref) : "", model.connected ? "ok" : "w", QuickBooksMark)}
     {model.error && E.note(`Last connection error: ${model.error}`, "alert")}
     {!model.connected && (connection !== undefined ? connection : <QboConnectionView reconnect={model.reconnect} />)}
-    {E.row("Online payments", "checked when a customer opens Pay", "fail closed", "ok", QuickBooksMark)}
+    {/* The Pay button reads each invoice's payment link from QuickBooks, so payments need the connection. */}
+    {model.connected
+      ? E.row("Online payments", "Through each invoice’s QuickBooks payment link", "", "ok", QuickBooksMark)
+      : E.row("Online payments", "Connect QuickBooks first", "Not available", "", QuickBooksMark)}
     {model.connected && <>{E.fld("Company", model.company)}{model.companyId && E.fld("Company ID", model.companyId)}{model.access && E.fld("Access", model.access)}{E.nav("Mappings", "Customers, SKUs and returnable-keg deposits", "", undefined, model.mappingsHref)}</>}
     {sync !== undefined ? sync : <QboSyncView status={model.syncStatus} disabled={!model.connected} />}
     {E.ttl("Push defaults")}
-    {defaults !== undefined ? defaults : model.defaults ? <QboDefaultsView {...model.defaults} disabled={!model.connected} /> : E.gated("Push defaults", "Connect QuickBooks to read and save the company's payment options.")}
-    {E.row("Customers missing a portal login email", model.missingEmails === undefined ? "Count unavailable · review portal login emails" : `${model.missingEmails} · no portal login email`, E.act("Review", "primary", model.customersHref), model.missingEmails ? "w" : "")}
+    {defaults !== undefined ? defaults : model.defaults ? <QboDefaultsView {...model.defaults} disabled={!model.connected} /> : E.gated("Bank transfer (ACH) and card", "Connect QuickBooks to read and save the company's payment options.")}
+    {E.row("Customers missing a portal login email", missingEmailsDetail(model.missingEmails), E.act("Review", "primary", model.customersHref), model.missingEmails ? "w" : "")}
     {model.remoteRevocationUnresolved && E.note("Local access is disconnected. QuickBooks could not confirm remote revocation; reconnect to continue.", "alert")}
     {E.info("QuickBooks remains the accounting record. Connecting does not push existing invoices, and MGR never displays credentials.")}
   </>;

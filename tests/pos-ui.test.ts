@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { PointOfSaleView, PosItemView, PosMenuView } from "@/components/mgr/views/pos";
+import { ConnectSquareView, PointOfSaleView, PosItemView, PosMenuView } from "@/components/mgr/views/pos";
 import { SCREENS } from "@/components/mgr/screens";
 import { classifyCommandFailure } from "@/lib/commands/client";
 import { isTerminalPublication, publicationNotice, readPublicationOutcome, reconcileBooleanChange, selectExactCommandAttempt, shouldStartNewCommandAttempt, syncFailureMessage, syncResultMessage, toPosMenuSetup, toPosVariationRow } from "@/lib/mgr/pos-view";
@@ -116,6 +116,16 @@ describe("POS UI truth", () => {
       sales: [{ id: "s", label: "Sale · Hazy", detail: "1 pint", amount: "$7.00", status: "mapped", href: "/settings/pos/sales/s" }] }));
     expect(pos).toMatch(/<a[^>]*href="\/settings\/pos\/sales\/s"[^>]*>(?:(?!<\/a>)[\s\S])*Sale · Hazy/);
     expect(pos).not.toMatch(/>Open</);
+  });
+
+  it("describes Square's own QuickBooks feed as taproom sales, not a second provider (#1151)", () => {
+    const pos = renderToStaticMarkup(createElement(PointOfSaleView, { model: { connected: false, merchant: "", state: "Not connected" }, paths: { connector: "/settings/pos/connector" } }));
+    expect(pos).toMatch(/<a[^>]*href="\/settings\/pos\/connector"[^>]*>(?:(?!<\/a>)[\s\S])*Taproom sales in QuickBooks/);
+    expect(pos).toContain("Square’s own connector, separate from MGR");
+    expect(pos).not.toContain("QuickBooks connector");
+    const connect = renderToStaticMarkup(createElement(ConnectSquareView, { configured: false }));
+    expect(connect).toContain("Contact MGR support");
+    expect(connect).not.toContain("server connection values");
   });
 
   it("keeps live POS route sheets on the inventory body layout", () => {
