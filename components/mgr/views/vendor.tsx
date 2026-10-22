@@ -35,7 +35,7 @@ export function VendorView({
               ))), { onChange: controlled("terms") ? value => controls.terms?.(value) : undefined })}</Fragment>,
         <Fragment key={"lead"}>{E.edit("Lead time (days)", model.leadDays, "number", undefined, { onChange: controlled("leadDays") ? (nextValue: string) => controls.leadDays?.(nextValue) : undefined, min: 0, step: 1, inputMode: "numeric" })}</Fragment>,
       )}
-      {E.info("Planning uses this lead time to calculate when to buy. Received orders show a separate observed average.")}
+      {E.info("When Planning lists a material short and it resolves to this vendor, its buy-by date is the needed-by date less this lead time. Received orders show a separate observed average.")}
       {messages}
       {footer !== undefined ? footer : E.btn("Save vendor")}
     </>
