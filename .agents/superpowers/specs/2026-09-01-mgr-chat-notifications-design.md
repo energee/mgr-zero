@@ -403,7 +403,8 @@ The worker:
 - stops retrying permanent auth/destination errors;
 - never logs raw provider errors or tokens;
 - never derives MGR truth from the existing chat message;
-- exposes lease expiry so another invocation can recover a crash.
+- exposes lease expiry so another invocation can recover a crash;
+- does not send or update a row once its lease has lapsed or has under five seconds left. It leaves the row for lease expiry to return to `retrying`, so a slow batch cannot post a message twice.
 
 No always-on process is required initially. Scheduler and worker hosts are selected after deployment ownership is established, but their authenticated interfaces and database contracts are fixed by this design.
 

@@ -158,13 +158,24 @@ export async function runChatCallbackBatch({ limit = 25, now = new Date(), db = 
   return { processed, failed };
 }
 
+// How much lease must remain before a provider call starts. It covers the
+// pacing wait (at most 1s) plus a slow provider round-trip. Once a lease
+// lapses, the next lease call hands the row to another worker, so a send
+// after that point posts the message twice (#1158).
+const LEASE_SAFETY_MS = 5_000;
+
 // Leases due deliveries, re-checks everything from server state, then sends or
 // updates. Persists only provider ids and redacted codes. Only provider-send
 // failures are classified and retried; a failure to record an outcome is
-// logged and never resends or aborts the rest of the batch.
+// logged and never resends or aborts the rest of the batch. Rows the batch
+// reaches too late in its lease are left untouched and counted as `expired`.
 export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = serviceClient(), transport = slackTransport() }: Deps & { limit?: number } = {}) {
+  // Leases are stamped from `now`, which a caller may pin; advance it by the
+  // wall time this batch has spent, starting before the lease call.
+  const startedAt = Date.now();
   const leased = (await unwrap(db.rpc("lease_chat_deliveries", { p_limit: limit, p_lease_seconds: 60, p_now: now.toISOString() }))) as Lease[];
-  const counts = { sent: 0, updated: 0, suppressed: 0, retried: 0, terminal: 0 };
+  const leaseClock = () => now.getTime() + (Date.now() - startedAt);
+  const counts = { sent: 0, updated: 0, suppressed: 0, retried: 0, terminal: 0, expired: 0 };
   for (const lease of leased) {
     const stop = async (state: "suppressed" | "terminal", code: string) => {
       await unwrap(db.rpc("suppress_chat_delivery", { p_delivery: lease.id, p_lease: lease.lease_expires_at, p_state: state, p_error_code: code }));
@@ -209,6 +220,8 @@ export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = 
           await stop("terminal", check.reason); continue;
         }
       }
+      // Not failed: lease expiry returns the row to `retrying` for the next batch.
+      if (Date.parse(lease.lease_expires_at) - leaseClock() < LEASE_SAFETY_MS) { counts.expired++; continue; }
       const paceKey = `${installationId}:${ctx.destination.external_destination_id}`;
       if (existing) {
         await paced(paceKey, () => transport.update({ installationId, ref: existing, notification, intentId: lease.id, resolved }));
