@@ -13,10 +13,10 @@ first. A missing recipe or version returns `404 not_found`; history has the
 same Admin/Brewer and brewery access restrictions as the current recipe.
 
 The cellar map is the read behind vessel work: what is in each tank, and for how
-long. Fermentation readings are appended per open occupancy and are what an
-overdue reading notification is measured against. A reading must carry at
-least one of `tempF`, `gravityPlato` or `ph`; a note alone is refused with
-`400 invalid_input`.
+long. Fermentation readings are appended to an open occupancy, a brewed batch,
+or both, and are what an overdue reading notification is measured against. A
+reading must carry at least one of `tempF`, `gravityPlato` or `ph`; a note
+alone is refused with `400 invalid_input`.
 
 {/* ops:production */}
 
