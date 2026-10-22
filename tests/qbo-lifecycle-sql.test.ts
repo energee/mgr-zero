@@ -13,7 +13,7 @@ import {
   failQboOAuth,
   holdQboOAuthTokens,
   qboRealmInUse,
-  qboOAuthAlreadyCompleted,
+  qboOAuthExchangeState,
   getQboHealth,
   readVersionedIntegrationTokens,
 } from "@/lib/supabase/integration-tokens";
@@ -289,16 +289,17 @@ describe("QuickBooks durable lifecycle", () => {
     expect((await begin(validState)).error).toBeNull();
     await expect(callback(supersededState)).rejects.toThrow("oauth state invalid");
     expect(fetch).not.toHaveBeenCalled();
-    await expect(qboOAuthAlreadyCompleted(hash(validState), ctx.userId, brewery.id)).resolves.toBe(false);
+    await expect(qboOAuthExchangeState(hash(validState), ctx.userId, brewery.id)).resolves.toBe("pending");
     await expect(callback(validState)).resolves.toEqual(expect.any(String));
     await expect(callback(validState)).rejects.toThrow("oauth state invalid");
     expect(fetch).toHaveBeenCalledTimes(2);
-    // A replayed callback is recognisable as already completed, but only for
-    // the Admin and brewery that completed it; superseded state is not.
-    await expect(qboOAuthAlreadyCompleted(hash(validState), ctx.userId, brewery.id)).resolves.toBe(true);
-    await expect(qboOAuthAlreadyCompleted(hash(validState), otherAdmin.userId, brewery.id)).resolves.toBe(false);
-    await expect(qboOAuthAlreadyCompleted(hash(validState), ctx.userId, legitimateBrewery.id)).resolves.toBe(false);
-    await expect(qboOAuthAlreadyCompleted(hash(supersededState), ctx.userId, brewery.id)).resolves.toBe(false);
+    // A replayed callback can read how the first one ended, but only for the
+    // Admin and brewery that began it; a superseded state reads as such.
+    await expect(qboOAuthExchangeState(hash(validState), ctx.userId, brewery.id)).resolves.toBe("completed");
+    await expect(qboOAuthExchangeState(hash(validState), otherAdmin.userId, brewery.id)).resolves.toBeNull();
+    await expect(qboOAuthExchangeState(hash(validState), ctx.userId, legitimateBrewery.id)).resolves.toBeNull();
+    await expect(qboOAuthExchangeState(hash(supersededState), ctx.userId, brewery.id)).resolves.toBe("recovery_required");
+    await expect(qboOAuthExchangeState(hash(`unknown-${crypto.randomUUID()}`), ctx.userId, brewery.id)).resolves.toBeNull();
 
     const lostState = `lost-${crypto.randomUUID()}`;
     expect((await begin(lostState)).error).toBeNull();
@@ -327,6 +328,9 @@ describe("QuickBooks durable lifecycle", () => {
       client: new QboOAuthClient(config, delayedFetch), store,
     });
     await vi.waitFor(() => expect(delayedFetch).toHaveBeenCalledTimes(1));
+    // #1034: a duplicate callback arriving now finds the first still exchanging.
+    await expect(qboOAuthExchangeState(hash(delayedState), ctx.userId, brewery.id)).resolves.toBe("exchanging");
+    await expect(qboOAuthExchangeState(hash(delayedState), otherAdmin.userId, brewery.id)).resolves.toBeNull();
     const connection = await admin.from("qbo_connections").select("id").eq("brewery_id", brewery.id).single();
     expect(connection.error).toBeNull();
     await expect(disconnectQbo(ctx, connection.data!.id, vi.fn().mockResolvedValue(undefined), crypto.randomUUID()))
