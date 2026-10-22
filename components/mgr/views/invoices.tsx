@@ -10,9 +10,6 @@ import { HistoryNavigation, type HistoryNavigationProps } from "./history-naviga
 import { QboSyncView } from "./accounting";
 import { RecordTable } from "./record-table";
 
-// Every element cell carries a key: this server view hands the cells to the
-// client RecordTable in an array prop, and React warns about any without one (#1137).
-
 /** The current total, with the local subtotal under it when an accountant edited the invoice. */
 const total = (row: InvoiceListRow) => <Fragment key="total">
   {row.total.value}

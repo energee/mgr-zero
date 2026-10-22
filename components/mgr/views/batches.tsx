@@ -10,9 +10,7 @@ import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 
 export type { BatchesViewModel };
 
-/** A brand or recipe the plan does not name, said in muted words instead of a blank.
- *  Element cells are keyed: this server view hands them to the client
- *  RecordTable in an array prop, and React warns about any without a key (#1137). */
+/** A brand or recipe the plan does not name, said in muted words instead of a blank. */
 const orMissing = (value: string | null, missing: string) => value ?? <span key={missing} className="text-muted-foreground">{missing}</span>;
 
 /** Where a brewed batch is: one line per open occupancy with its latest reading

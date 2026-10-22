@@ -17,8 +17,6 @@ import { WorkKindTabs } from "./work-kind-tabs";
 
 export type { OrdersListViewModel };
 
-// Every element cell carries a key: this server view hands the cells to the
-// client RecordTable in an array prop, and React warns about any without one (#1137).
 const muted = (text: string) => <span key={text} className="text-muted-foreground">{text}</span>;
 
 /** Lifecycle status, and staged restock as a second worded badge so color is never the only signal. */
