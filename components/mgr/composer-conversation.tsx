@@ -35,9 +35,10 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
   const [receipt, setReceipt] = useState<string>();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const focusedRequest = useRef(0);
-  // The current setup load. Starting another (Retry setup, Try again) aborts
-  // it, so a superseded load stops its requests and drops its response.
-  const setupLoad = useRef<AbortController>(undefined);
+  // The latest setup load's controller. Starting another (Retry setup, Try
+  // again) aborts it, so a replaced load stops its requests and drops its
+  // response. It is never cleared: once set, setup has started in this mount.
+  const latestSetup = useRef<AbortController>(undefined);
   // One create_chat_conversation identity for every setup attempt, so a retry
   // after a timeout cannot create a second conversation.
   const setupConversationRequest = useRef<string>(undefined);
@@ -63,18 +64,19 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
   // scope. Named so Try again can re-run the load that failed (#329) rather
   // than only regenerating the last AI turn. loadComposerSetup's timeout ends
   // a stalled load in that same failure (#1105).
-  async function loadSetup(superseded: AbortSignal) {
+  // `signal` aborts when a newer load replaces this one.
+  async function loadSetup(signal: AbortSignal) {
     try {
-      const setup = await loadComposerSetup((name, input, requestId, signal) => run(name, input, requestId, undefined, signal), setupConversationRequest, superseded);
-      if (superseded.aborted) return;
+      const setup = await loadComposerSetup((name, input, requestId, requestSignal) => run(name, input, requestId, undefined, requestSignal), setupConversationRequest, signal);
+      if (signal.aborted) return;
       setInitialMessages(setup.messages); setConversationId(setup.conversationId);
-    } catch (cause) { if (!superseded.aborted) failed(cause, "Composer unavailable", reloadSetup); }
+    } catch (cause) { if (!signal.aborted) failed(cause, "Composer unavailable", reloadSetup); }
   }
 
   // Starts a setup load and supersedes the one in flight.
   function reloadSetup() {
-    setupLoad.current?.abort();
-    const load = setupLoad.current = new AbortController();
+    latestSetup.current?.abort();
+    const load = latestSetup.current = new AbortController();
     setFailure(undefined);
     void loadSetup(load.signal);
   }
@@ -85,9 +87,10 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
   }
 
   useEffect(() => {
-    if (!open || setupLoad.current) return;
+    if (!open || latestSetup.current) return;
     reloadSetup();
-    // One restore per actor/brewery scope, only when the drawer is needed.
+    // One restore per mount, only when the drawer is needed. The app layout
+    // keys Composer by actor/brewery/roles, so a new scope remounts it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, breweryId, expectedContext.actorId]);
 

@@ -15,27 +15,28 @@ export const COMPOSER_SETUP_TIMEOUT_MESSAGE = "Ask MGR could not start. Check yo
 
 /** `createRequest` holds the create_chat_conversation request id. The caller
  *  keeps one holder across retries, so a create that committed after a timeout
- *  is not repeated. `superseded` aborts a load that a newer retry replaced. */
-export async function loadComposerSetup(run: SetupRun, createRequest: { current: string | undefined }, superseded: AbortSignal) {
+ *  is not repeated. The caller aborts `signal` when a newer load replaces this one. */
+export async function loadComposerSetup(run: SetupRun, createRequest: { current: string | undefined }, signal: AbortSignal) {
   const timeout = AbortSignal.timeout(COMPOSER_SETUP_TIMEOUT_MS);
-  // A signalled command() skips its failure invalidation (lib/commands/client.ts).
-  // That is safe: only this load reads chat conversations, and a retry re-lists them.
-  const signal = AbortSignal.any([superseded, timeout]);
+  // command() given a signal does not send its data-changed event on failure
+  // (lib/commands/client.ts). That is safe: the event only refreshes the cached
+  // screen reads in lib/commands/query-cache.ts, and no chat data is cached there.
+  const requestSignal = AbortSignal.any([signal, timeout]);
   try {
-    const conversations = await run("list_chat_conversations", {}, undefined, signal) as { id: string }[];
+    const conversations = await run("list_chat_conversations", {}, undefined, requestSignal) as { id: string }[];
     if (!conversations[0]) {
-      const created = await run("create_chat_conversation", { title: "MGR conversation" }, createRequest.current ??= crypto.randomUUID(), signal) as { id: string };
+      const created = await run("create_chat_conversation", { title: "MGR conversation" }, createRequest.current ??= crypto.randomUUID(), requestSignal) as { id: string };
       return { conversationId: created.id, messages: [] as UIMessage[] };
     }
     const conversationId = conversations[0].id;
-    const history = await run("get_chat_history", { conversationId }, undefined, signal) as { messages: StoredMessage[] };
+    const history = await run("get_chat_history", { conversationId }, undefined, requestSignal) as { messages: StoredMessage[] };
     const messages = history.messages.filter((message) => message.role !== "result" && message.content).map((message) => ({
       id: message.id, role: message.role as "user" | "assistant", parts: [{ type: "text", text: message.content! }],
     })) as UIMessage[];
     return { conversationId, messages };
   } catch (cause) {
-    // An abort can surface as a TimeoutError or, mid-body, as a malformed
-    // response; the timeout signal says whether the clock ran out.
+    // A timeout can surface as a TimeoutError or, mid-body, as a malformed
+    // response. So the clock decides: any failure after it ran out is a timeout.
     if (timeout.aborted) throw new Error(COMPOSER_SETUP_TIMEOUT_MESSAGE, { cause });
     throw cause;
   }
