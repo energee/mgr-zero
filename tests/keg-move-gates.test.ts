@@ -56,14 +56,20 @@ describe("Keg fleet shared fields", () => {
   });
 
   it("says which pools each money field applies to, and why an owned pool has no vendor (#1119)", () => {
-    const fields = (kind: KegPoolValue["kind"]) => html(createElement(KegPoolFields, { value: { name: "A", kind, vendorId: "", perFill: "", deposit: "0.00", active: true }, vendors: [], onChange: () => {} }));
+    const fields = (kind: KegPoolValue["kind"], editing = false) => html(createElement(KegPoolFields, { value: { name: "A", kind, vendorId: "", perFill: "", deposit: "0.00", active: true }, vendors: [], editing, onChange: () => {} }));
     const owned = fields("owned");
     expect(owned).toContain("None · the brewery owns these kegs");
     expect(owned).not.toContain("owned pools have no vendor");
-    // A blank per-fill cost stays blank (null), never 0: only pay per fill requires one.
-    for (const kind of ["owned", "leased"] as const) expect(fields(kind)).toContain("Only for a pool charged per fill. Leave blank otherwise.");
+    for (const kind of ["owned", "leased"] as const) expect(fields(kind)).toContain("Only a Pay per fill pool needs this. Leave it blank.");
     expect(fields("pay_per_fill")).toContain("Required: what the vendor charges for each keg filled.");
-    expect(owned).toContain("Charged to the customer for each keg from this pool. 0 means no deposit.");
+    // update_keg_pool keeps a stored cost when the field is cleared, so Edit never says to leave it blank.
+    for (const kind of ["owned", "leased"] as const) {
+      const edit = fields(kind, true);
+      expect(edit).toContain("Only a Pay per fill pool needs this. Once set, it can be changed but not removed.");
+      expect(edit).not.toContain("Leave it blank");
+    }
+    // ensure_order_deposit_lines charges deposits on wholesale orders only.
+    expect(owned).toContain("Charged on wholesale orders for each keg from this pool. 0 means no deposit.");
     expect(owned).toMatch(/id="pool-per-fill"[^>]*aria-describedby="pool-per-fill-help"|aria-describedby="pool-per-fill-help"[^>]*id="pool-per-fill"/);
     expect(owned).toMatch(/id="pool-deposit"[^>]*aria-describedby="pool-deposit-help"|aria-describedby="pool-deposit-help"[^>]*id="pool-deposit"/);
   });

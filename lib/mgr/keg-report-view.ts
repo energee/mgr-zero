@@ -19,6 +19,8 @@ export type KegReport = {
 };
 
 export type KegReportViewModel = {
+  /** Keg fleet's path on the live page. The inventory passes none, so the back
+   *  link, the empty state's action and the customer rows stay inert. */
   backHref?: string;
   headline: [string, string];
   aging: string[][];
@@ -27,8 +29,8 @@ export type KegReportViewModel = {
   sizes: { key: string; title: string; detail: string; trailing: string }[];
   /** Deposit mismatches; `href` as for customers. */
   mismatches: { key: string; href?: string; title: string; detail: string }[];
-  /** `action` opens Keg fleet, where pools are added and kegs recorded; `href` is set by the live page only. */
-  empty?: EmptyState & { action: { label: string; href?: string } };
+  /** `action` labels the button to backHref: Keg fleet, where pools are added and kegs recorded. */
+  empty?: EmptyState & { action: string };
 };
 
 const BUCKET_LABEL: Record<string, string> = { "0-30": "0–30 days", "31-60": "31–60 days", "61-90": "61–90 days", "90+": "Over 90 days" };
@@ -53,7 +55,7 @@ export function toKegReportViewProps(r: KegReport, timeZone: string, backHref?: 
       ...(r.activePools
         ? { title: "No kegs recorded yet", description: "Record kegs acquired into a pool on Keg fleet to see utilization." }
         : { title: "No keg pools", description: "Add a keg pool on Keg fleet, then record kegs acquired to see utilization." }),
-      action: { label: "Open Keg fleet", href: backHref },
+      action: "Open Keg fleet",
     },
   };
 }

@@ -18,11 +18,15 @@ const KIND_OPTIONS = KEG_POOL_KINDS.map((value) => ({ value, label: KIND_LABEL[v
 /** Add/Edit keg pool. `editing` fixes the kind (it cannot change after
  *  creation) and offers In service. Without onChange the fields draw the
  *  value uncontrolled, as the inventory does. Each money field says which
- *  pools it applies to; a blank per-fill cost stays blank, never 0 (#1119). */
+ *  pools it applies to (#1119). */
 export function KegPoolFields({ value, vendors, editing = false, onChange }: {
   value: KegPoolValue; vendors: KegOption[]; editing?: boolean; onChange?: (next: KegPoolValue) => void;
 }) {
   const set = <K extends keyof KegPoolValue>(key: K) => onChange ? (next: KegPoolValue[K]) => onChange({ ...value, [key]: next }) : undefined;
+  // update_keg_pool keeps a stored per-fill cost when the field is cleared, so Edit never says to leave it blank.
+  const perFillHelp = value.kind === "pay_per_fill" ? "Required: what the vendor charges for each keg filled."
+    : editing ? "Only a Pay per fill pool needs this. Once set, it can be changed but not removed."
+    : "Only a Pay per fill pool needs this. Leave it blank.";
   return (
     <>
       {E.edit("Pool name", value.name, "text", undefined, { id: "pool-name", onChange: set("name"), required: true })}
@@ -32,11 +36,11 @@ export function KegPoolFields({ value, vendors, editing = false, onChange }: {
         : E.pick("Vendor", value.vendorId, vendors, { id: "pool-vendor", onChange: set("vendorId"), placeholder: "Select a vendor", required: true })}
       <div className="flex min-w-0 flex-col gap-2">
         {E.edit("Per-fill cost ($)", value.perFill, "number", undefined, { id: "pool-per-fill", min: 0, step: 0.01, onChange: set("perFill"), required: value.kind === "pay_per_fill", "aria-describedby": "pool-per-fill-help" })}
-        <FieldDescription id="pool-per-fill-help">{value.kind === "pay_per_fill" ? "Required: what the vendor charges for each keg filled." : "Only for a pool charged per fill. Leave blank otherwise."}</FieldDescription>
+        <FieldDescription id="pool-per-fill-help">{perFillHelp}</FieldDescription>
       </div>
       <div className="flex min-w-0 flex-col gap-2">
         {E.edit("Deposit per keg ($)", value.deposit, "number", undefined, { id: "pool-deposit", min: 0, step: 0.01, onChange: set("deposit"), "aria-describedby": "pool-deposit-help" })}
-        <FieldDescription id="pool-deposit-help">Charged to the customer for each keg from this pool. 0 means no deposit.</FieldDescription>
+        <FieldDescription id="pool-deposit-help">Charged on wholesale orders for each keg from this pool. 0 means no deposit.</FieldDescription>
       </div>
       {editing && <label className="flex items-center gap-2 text-sm">{E.sw(value.active, "In service", set("active"))}In service</label>}
     </>

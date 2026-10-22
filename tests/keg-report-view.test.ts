@@ -42,15 +42,14 @@ describe("toKegReportViewProps", () => {
   it("no pool at all is the add-a-pool empty state", () => {
     const m = toKegReportViewProps({ fleet: { out: 0, total: 0, utilization: null }, bySize: [], aging: [], customers: [], mismatches: [], activePools: 0 }, "America/New_York");
     expect(m.headline).toEqual(["—", "0 of 0 kegs out"]);
-    expect(m.empty).toEqual({ title: "No keg pools", description: "Add a keg pool on Keg fleet, then record kegs acquired to see utilization.", action: { label: "Open Keg fleet", href: undefined } });
+    expect(m.empty).toEqual({ title: "No keg pools", description: "Add a keg pool on Keg fleet, then record kegs acquired to see utilization.", action: "Open Keg fleet" });
   });
   it("a pool with no kegs acquired says to record them, not that no pool exists (#988)", () => {
     const m = toKegReportViewProps({ fleet: { out: 0, total: 0, utilization: null }, bySize: [], aging: [], customers: [], mismatches: [], activePools: 1 }, "America/New_York");
-    expect(m.empty).toEqual({ title: "No kegs recorded yet", description: "Record kegs acquired into a pool on Keg fleet to see utilization.", action: { label: "Open Keg fleet", href: undefined } });
+    expect(m.empty).toEqual({ title: "No kegs recorded yet", description: "Record kegs acquired into a pool on Keg fleet to see utilization.", action: "Open Keg fleet" });
   });
   it("the empty state's action opens Keg fleet, where pools are added and kegs recorded (#1119)", () => {
     const model = toKegReportViewProps({ fleet: { out: 0, total: 0, utilization: null }, bySize: [], aging: [], customers: [], mismatches: [], activePools: 0 }, "America/New_York", "/kegs");
-    expect(model.empty?.action).toEqual({ label: "Open Keg fleet", href: "/kegs" });
     const html = renderToStaticMarkup(createElement(KegReportView, { model }));
     expect(html).toMatch(/<a[^>]*href="\/kegs"[^>]*>(?:(?!<\/a>)[\s\S])*Open Keg fleet/);
   });

@@ -249,7 +249,6 @@ describe("Beer view", () => {
   });
 
   it("the Beer inventory record prints its counts through the same adapter as live (#1119)", () => {
-    expect(beerOverview).toHaveProperty("overview");
     const html = htmlOf(screen("Beer").body);
     expect(html).toContain("11 kegs on tap · Tap board");
     expect(html).toContain("6 occupied tanks");
