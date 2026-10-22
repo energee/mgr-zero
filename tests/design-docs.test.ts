@@ -30,8 +30,8 @@ describe("design docs", () => {
   });
 
   it("stays out of the documentation agent's reach", () => {
-    // .github/workflows/documentation-agent.yml allowlists three guides and
-    // fails the run on any other path; a generated page must not be editable.
+    // .github/workflows/documentation-agent.yml allowlists three guides (plus
+    // README.md and newly added docs/ pages) and fails the run on any other path; a generated page must not be editable.
     const wf = readFileSync(".github/workflows/documentation-agent.yml", "utf8");
     expect(wf).not.toContain("screens.mdx");
   });

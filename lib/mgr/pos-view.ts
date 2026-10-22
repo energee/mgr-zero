@@ -166,6 +166,8 @@ type PosMenuSnapshotItem = {
 export type PosMenuSnapshot = {
   location?: { name?: string }; bin?: { name?: string }; channel?: { name?: string };
   items?: PosMenuSnapshotItem[]; excluded?: PosMenuSnapshotItem[];
+  /** Case stock in the menu bin offered as its child format (a case is six four-packs). */
+  packaged?: { brandId: string; skuId: string; formatId: string; brand: string; format: string; qty: number; priceCents: number | null; available: boolean }[];
   externalItems?: { externalItemId: string; externalVariationId: string; itemName?: string; variationName?: string }[];
 } | null;
 

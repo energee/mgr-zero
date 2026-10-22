@@ -162,6 +162,26 @@ describe("Square durable catalog publication", () => {
     expect(retired.object).not.toHaveProperty("is_archived");
   });
 
+  it("archives an owned item present nowhere and restores the same item when a variation returns", () => {
+    const source = (present: boolean) => ({ brandId: "brand-1", brand: "Hazy IPA", catalogGroup: "poured" as const,
+      locationId: "L1", ownership: "mgr" as const, externalItemId: "ITEM-1", variations: [{ formatId: "format-1",
+        format: "Pint", priceCents: 700, present, externalVariationId: "VAR-1" }] });
+    const item = (locations: string[], archived?: boolean) => ({ type: "ITEM", id: "ITEM-1", version: 7,
+      present_at_all_locations: false, present_at_location_ids: locations, item_data: { name: "Hazy IPA",
+        ...(archived === undefined ? {} : { is_archived: archived }), variations: [
+          { type: "ITEM_VARIATION", id: "VAR-1", version: 6, present_at_all_locations: false, present_at_location_ids: locations,
+            item_variation_data: { item_id: "ITEM-1", name: "Pint", pricing_type: "FIXED_PRICING",
+              price_money: { amount: 700, currency: "USD" } } }] } });
+
+    expect(prepareSquareCatalogPublication(source(false), item(["L1"])).object).toMatchObject({ id: "ITEM-1",
+      present_at_location_ids: [], item_data: { is_archived: true } });
+    expect(prepareSquareCatalogPublication(source(true), item([], true)).object).toMatchObject({ id: "ITEM-1",
+      present_at_location_ids: ["L1"], item_data: { is_archived: false,
+        variations: [expect.objectContaining({ id: "VAR-1", present_at_location_ids: ["L1"] })] } });
+    expect(prepareSquareCatalogPublication(source(false), item(["L2"])).object)
+      .not.toHaveProperty("item_data.is_archived");
+  });
+
   it("persists the exact body and key before I/O, replays unknown outcomes, and records owned identity", async () => {
     const { brewery, ctx, brandId, formatId } = await publicationFixture();
 

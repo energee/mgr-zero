@@ -63,6 +63,17 @@ describe("Square provider boundary", () => {
     expect(JSON.parse(String(fetch.mock.calls[2][1]?.body))).toMatchObject({ cursor: "next-page" });
   });
 
+  it("keeps an archived item's variations available, since Square search returns archived items", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(new Response(JSON.stringify({
+      objects: [{ type: "ITEM", id: "I1", version: 10, item_data: { name: "Hazy", is_archived: true, variations: [
+        { type: "ITEM_VARIATION", id: "V16", version: 11, item_variation_data: { item_id: "I1", name: "Pint" } },
+      ] } }],
+    }), { status: 200 }));
+    await expect(new SquareClient(config, fetch).listCatalogVariations("access-secret")).resolves.toEqual([
+      { itemId: "I1", itemName: "Hazy", variationId: "V16", variationName: "Pint", version: 11, available: true },
+    ]);
+  });
+
   it("rejects a location from another merchant and revokes the full authorization honestly", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(new Response(JSON.stringify({ locations: [
