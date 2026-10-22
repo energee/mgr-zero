@@ -110,13 +110,14 @@ CREATE OR REPLACE FUNCTION private.pos_menu_snapshot (
     GROUP BY s.brand_id,b.name,cf.id,cf.name,cp.unit_price_cents
   ),
   external_rows AS (
-    SELECT v.external_item_id,v.external_variation_id,v.external_item_name,v.external_variation_name,v.available,
-      CASE WHEN map.ignored THEN 'ignored' WHEN map.connection_id IS NULL THEN 'queued' ELSE 'mapped' END disposition
+    SELECT v.external_item_id,v.external_variation_id,v.external_item_name,v.external_variation_name,v.available
     FROM menu m
     JOIN public.pos_catalog_variations v ON v.connection_id=m.connection_id AND v.brewery_id=m.brewery_id
     LEFT JOIN public.pos_item_mappings map ON map.connection_id=v.connection_id
       AND map.external_item_id=v.external_item_id AND map.external_variation_id=v.external_variation_id
-    WHERE map.connection_id IS NULL OR map.ignored
+    WHERE map.connection_id IS NULL
+      AND EXISTS(SELECT 1 FROM public.pos_sales s WHERE s.connection_id=v.connection_id
+        AND s.external_variation_id=v.external_variation_id AND s.external_location_id=m.external_location_id)
   )
   SELECT jsonb_build_object(
     'publicId',m.public_id,
@@ -141,7 +142,7 @@ CREATE OR REPLACE FUNCTION private.pos_menu_snapshot (
     'externalItems',coalesce((SELECT jsonb_agg(jsonb_build_object(
       'externalItemId',e.external_item_id,'externalVariationId',e.external_variation_id,
       'itemName',e.external_item_name,'variationName',e.external_variation_name,
-      'available',e.available,'disposition',e.disposition)
+      'available',e.available)
       ORDER BY e.external_item_name,e.external_variation_name,e.external_item_id,e.external_variation_id) FROM external_rows e),'[]'::jsonb)
   ) FROM menu m
   JOIN public.locations loc ON loc.id=m.location_id AND loc.brewery_id=m.brewery_id

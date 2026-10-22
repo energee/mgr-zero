@@ -24,7 +24,7 @@ the Case SKU, and the menu exposes it as 4-packs.
 
 ## Tasks
 
-One migration, `20261021140000_square_four_pack_menu.sql`, then
+One migration, `20261022060000_square_four_pack_menu.sql`, then
 `bun run migrations:lock`. Every task starts with its named failing test.
 
 1. **Compose a Case that has its own volume.** Lolev's Case is typed at
