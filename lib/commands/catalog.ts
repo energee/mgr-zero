@@ -234,10 +234,10 @@ defineCommand({
     const result = await ctx.db.rpc("delete_sale_channel", {
       p_brewery: ctx.breweryId, p_id: i.channelId, p_request_id: execution.requestId,
     });
-    // inventory_movements, customers, orders and channel_prices all reference
-    // the channel `on delete restrict`, so a channel in use comes back as a raw
-    // foreign-key violation; say it in product terms rather than letting it
-    // fall through to a generic 500.
+    // inventory_movements, customers, orders and channel_prices reference the
+    // channel `on delete restrict` and pos_menus by a plain foreign key, so a
+    // channel in use comes back as a raw foreign-key violation; say it in
+    // product terms rather than letting it fall through to a generic 500.
     if (result.error?.code === "23503") throw new CommandError("channel is in use");
     return unwrap(Promise.resolve(result));
   },

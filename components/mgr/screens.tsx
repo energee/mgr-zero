@@ -2710,8 +2710,9 @@ export const SCREENS: Screen[] = [
     to: { "Save channel": "Sale channels" },
     job: "Create or edit one sale channel and its default tax treatment",
     reads: "list_sale_channels",
-    writes: "upsert_sale_channel · delete_sale_channel",
-    states: [["permission", "admin required", 1], ["new", "name and tax treatment required"], ["in use", "delete is refused", 1]],
+    writes: "upsert_sale_channel",
+    states: [["permission", "admin required", 1], ["new", "titled Add channel · name and tax treatment required"], ["edit", "titled with the channel being edited"]],
+    spec: "Drawn editing the Export channel. The sheet has no Delete: removal and its in-use rule live on the Sale channels list. The selected tax treatment shows its meaning under the chips where the wording is settled, which today is Export only, so an Export channel and the Export treatment are not confused.",
     body: <ChannelView model={toChannelViewProps(channelExport)} />,
   },
   {

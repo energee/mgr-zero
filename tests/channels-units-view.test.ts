@@ -10,7 +10,7 @@ import { SaleChannelsView } from "../components/mgr/views/sale-channels";
 import { GravityUnitControls, UnitsView } from "../components/mgr/views/units";
 import { channelExport, saleChannelsList, unitsPlato } from "../lib/mgr/fixtures/settings-catalog";
 import { toChannelViewProps } from "../lib/mgr/channel-view";
-import { toSaleChannelsViewProps } from "../lib/mgr/sale-channels-view";
+import { CHANNEL_IN_USE_RULE, toSaleChannelsViewProps } from "../lib/mgr/sale-channels-view";
 import { toUnitsViewProps } from "../lib/mgr/units-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -37,6 +37,26 @@ describe("Sale channels view", () => {
       ],
     });
     expect(model.rows.map((r) => r.detail)).toEqual(["Taxable", "Transfer in bond"]);
+  });
+
+  it("states the in-use rule only for a role that may delete (#1149)", () => {
+    expect(toSaleChannelsViewProps({ ...saleChannelsList, canDelete: true }).deleteNote).toBe(CHANNEL_IN_USE_RULE);
+    expect(toSaleChannelsViewProps(saleChannelsList).deleteNote).toBeUndefined();
+    // An empty list offers no Delete, so it states no rule.
+    expect(toSaleChannelsViewProps({ channels: [], canDelete: true }).deleteNote).toBeUndefined();
+    // Every table that references a channel restricts its delete, the Square menu included.
+    expect(CHANNEL_IN_USE_RULE).toBe("A channel used by any movement, customer, order, price or Square menu cannot be deleted.");
+  });
+
+  it("draws the in-use rule on the list where Delete is offered", () => {
+    const withRule = htmlOf(createElement(SaleChannelsView, { model: toSaleChannelsViewProps({ ...saleChannelsList, canDelete: true }) }));
+    expect(withRule).toContain(CHANNEL_IN_USE_RULE);
+    expect(htmlOf(createElement(SaleChannelsView, { model: toSaleChannelsViewProps(saleChannelsList) }))).not.toContain("cannot be deleted");
+  });
+
+  it("the delete confirm states the same rule", () => {
+    const src = readFileSync("components/mgr/views/delete-channel.tsx", "utf8");
+    expect(src).toContain("warning={CHANNEL_IN_USE_RULE}");
   });
 
   it("names an empty list without inventing rows", () => {
@@ -104,6 +124,7 @@ describe("Sale channels view", () => {
     // Add/Edit/Delete are drawn only for a role the registry lets run them (#478).
     expect(src).toContain('canRun(ctx, "upsert_sale_channel")');
     expect(src).toContain('canRun(ctx, "delete_sale_channel")');
+    expect(src).toContain("toSaleChannelsViewProps({ channels, canDelete, backHref");
   });
 });
 
@@ -111,7 +132,8 @@ describe("Channel view", () => {
   it("the live channel form mounts ChannelView", () => {
     const source = readFileSync("app/(app)/settings/channels/channel-form.tsx", "utf8");
     expect(source).toMatch(/<ChannelView\b/);
-    expect(source).toContain('title="Channel"');
+    // Add and Edit are told apart, and Edit names the saved channel (#1149).
+    expect(source).toContain('title={isEdit ? `Edit channel · ${channel.name}` : "Add channel"}');
     expect(source).not.toMatch(/components\/ui\/(input|label|select)/);
   });
 
@@ -120,6 +142,7 @@ describe("Channel view", () => {
     expect(model.name).toBe("Export");
     expect(model.taxOptions).toEqual(["Taxable", "Export", "Vessel supplies", "Research", "Transfer in bond"]);
     expect(model.taxIndex).toBe(1);
+    expect(model.taxHint).toBe("Export: sold for shipment outside the US, not taxed.");
   });
 
   it("labels vessel_supplies at chips index 2", () => {
@@ -130,11 +153,15 @@ describe("Channel view", () => {
     });
     expect(model.taxIndex).toBe(2);
     expect(model.taxOptions[2]).toBe("Vessel supplies");
+    // Only Export has settled hint copy (#1149); the rest stay unhinted.
+    expect(model.taxHint).toBeUndefined();
   });
 
-  it("renders Channel name, export chips, override info, and Save channel", () => {
+  it("renders Channel name, labelled export chips with their hint, override info, and Save channel", () => {
     const html = htmlOf(createElement(ChannelView, { model: toChannelViewProps(channelExport) }));
     expect(html).toMatch(/Channel name/);
+    expect(html).toMatch(/>Tax treatment</);
+    expect(html).toContain("Export: sold for shipment outside the US, not taxed.");
     expect(html).toMatch(/value="Export"/);
     expect(html).toMatch(/>Taxable</);
     expect(html).toMatch(/>Export</);
@@ -142,7 +169,8 @@ describe("Channel view", () => {
     expect(html).toMatch(/>Research</);
     expect(html).toMatch(/>Transfer in bond</);
     expect(html).toMatch(/Customers may override this/);
-    expect(html).toMatch(/A channel with movements cannot be deleted/);
+    // The sheet has no Delete, so it states no delete rule (#1149).
+    expect(html).not.toMatch(/cannot be deleted/);
     expect(html).toMatch(/>Save channel</);
     expect(html).not.toMatch(/→/);
   });
