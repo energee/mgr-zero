@@ -118,7 +118,7 @@ export function OrderForm({
         kind, customer: customerId, shipTo: shipToId, source: fromLocationId, destination: toLocationId,
         customers: customers.map(customer => ({ id: customer.id, label: customer.name })),
         shipTos, sources: locations.map(location => ({ id: location.id, label: location.name })), skus: skuOptions,
-        requestedShip: requestedShipDate, po: poNumber, pickup, backHref: "/orders",
+        requestedShip: requestedShipDate, po: poNumber, pickup, backHref: "/orders", customersHref: "/customers",
         lines: lines.map(line => ({ ...line,
           name: skuOptions.find(sku => sku.id === line.skuId)?.label ?? skus.find(sku => sku.id === line.skuId)?.label ?? (line.skuId ? "Selected SKU" : ""),
           skuError: skuOptionsReady && isUnavailableSku(line.skuId, availableSkuIds) ? "This SKU is unavailable for this order. Choose an available SKU or remove this line." : undefined,
@@ -134,7 +134,7 @@ export function OrderForm({
           {readiness.hint} {readiness.goTo.map(part => typeof part === "string" ? part : <Link key={part.href} href={part.href} className="underline">{part.label}</Link>)}
         </p>}
         <CommandFormMessage error={form.error} />
-      </>} submitting={form.submitting} disabled={!readiness.submittable} />
+      </>} submitting={form.submitting} reason={readiness.reason} />
     </form>
   );
 }
