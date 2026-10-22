@@ -1,10 +1,13 @@
+// components/mgr/views/route.tsx — shared Route builder (planned route): date,
+// driver, vehicle, name and ordered stops. Save route plan names what it still
+// needs (routeReason); Depart route waits for a saved driver.
 "use client";
 import { useId, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
-import { toggleRouteStop, type RouteViewModel } from "@/lib/mgr/route-view";
+import { routeReason, toggleRouteStop, type RouteViewModel } from "@/lib/mgr/route-view";
 
 export type { RouteViewModel };
 
@@ -20,10 +23,10 @@ export function RouteView({ model, controls, busy = false, error, onSave, onDepa
     for (const key of ["date", "driverId", "vehicle", "name"] as const) if (patch[key] !== undefined) controls?.[key]?.(patch[key]);
     if (patch.selection) controls?.selection?.(patch.selection);
   };
-  const ready = Boolean(value.date) && Object.keys(value.selection).length > 0;
+  const reason = routeReason(value);
   return <>
     {E.back(model.backTo ?? "Routes", model.title, undefined, model.backHref)}
-    <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); if (!busy && ready) onSave?.(); }}>
+    <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); if (!busy && !reason) onSave?.(); }}>
       <fieldset disabled={busy}><DatePicker label="Delivery date" value={value.date ?? ""} onChange={date => change({ date })} /></fieldset>
 
       {E.pick("Driver", value.driverId ?? "", (model.driverOptions ?? []).map(driver => ({ value: driver.id, label: driver.label })), { onChange: driverId => change({ driverId }), disabled: busy, placeholder: "Not assigned", id: id + "-driver" })}
@@ -42,7 +45,7 @@ export function RouteView({ model, controls, busy = false, error, onSave, onDepa
       })}
       <CommandFormMessage error={error} />
       <div className="flex flex-col gap-2 md:flex-row">
-        <Button type="submit" variant={model.saved ? "outline" : "default"} className="w-full md:w-fit" disabled={busy || !ready}>{busy ? "Saving…" : "Save route plan"}</Button>
+        {E.submit("Save route plan", { submitting: busy, reason, variant: model.saved ? "outline" : "default", className: "w-full md:w-fit" })}
         {model.saved && <Button type="button" className="w-full md:w-fit" disabled={busy || !model.savedDriverId} onClick={onDepart}>Depart route</Button>}
       </div>
       {model.saved && !model.savedDriverId && E.note("Assign a driver and save before departing.")}
