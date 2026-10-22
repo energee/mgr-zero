@@ -13,7 +13,7 @@ describe("cellSortValue", () => {
   });
 
   it("reads an empty cell as null", () => {
-    for (const cell of [null, undefined, false, true, ""]) expect(cellSortValue(cell)).toBeNull();
+    for (const cell of [null, undefined, false, true, "", "—", createElement("span", null, "—")]) expect(cellSortValue(cell)).toBeNull();
   });
 
   it("reads a host element or fragment by its text children", () => {

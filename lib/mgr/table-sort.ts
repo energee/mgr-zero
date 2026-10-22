@@ -28,10 +28,12 @@ function text(node: ReactNode): string {
 }
 
 /** A cell's sort value: a number as is, otherwise its text, or null when it
- *  has none (a component cell's caller passes its own sort value). */
+ *  has none (a component cell's caller passes its own sort value). A lone
+ *  "—" is how the screens print no value, so it is empty too. */
 export function cellSortValue(cell: ReactNode): SortValue {
   if (typeof cell === "number") return cell;
-  return text(cell).trim() || null;
+  const value = text(cell).trim();
+  return value && value !== "—" ? value : null;
 }
 
 function figure(value: string): number | undefined {
