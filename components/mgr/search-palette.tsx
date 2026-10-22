@@ -17,7 +17,7 @@ import { useBrewery } from "@/lib/brewery-provider";
 import { command } from "@/lib/commands/client";
 import type { StaffRole } from "@/lib/commands/registry";
 import type { SearchHit, SearchKind } from "@/lib/commands/search";
-import { excludeSeen, restrictToOptions, searchCacheKey, searchDestinations, searchEmptyMessage, searchLoading } from "@/lib/mgr/search-palette-state";
+import { excludeSeen, restrictToOptions, searchCacheKey, searchDestinations, searchEmptyMessage, searchLoading, type SearchStatus } from "@/lib/mgr/search-palette-state";
 
 const HEADING: Record<SearchKind, string> = { sku: "SKUs", order: "Orders", invoice: "Invoices", material_lot: "Ingredient lots", lot: "Lots", customer: "Customers", po: "Purchase orders", batch: "Batches" };
 
@@ -29,8 +29,6 @@ export function SearchCacheProvider({ children }: { children: React.ReactNode })
   const [cache] = useState(() => new Map<string, SearchHit[]>());
   return <SearchCache.Provider value={cache}>{children}</SearchCache.Provider>;
 }
-
-type SearchStatus = "idle" | "loading" | "ready" | "error" | "offline";
 
 export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHits, heading, sub, roles, onNavigate }: { roles?: readonly StaffRole[]; onNavigate?: (href: string) => void; placeholder?: string; kinds?: SearchKind[]; onPick?: (hit: SearchHit) => void; initialHits?: SearchHit[]; heading?: string; sub?: string }) {
   const breweryId = useBrewery();

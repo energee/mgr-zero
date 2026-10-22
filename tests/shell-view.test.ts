@@ -52,7 +52,6 @@ import {
 import { workWarehouse } from "../lib/mgr/fixtures/work";
 import { taproomBeerView, toBeerViewProps } from "../lib/mgr/beer-view";
 import { toMoreViewProps } from "../lib/mgr/more-view";
-import { STAFF_NAV } from "../lib/mgr/nav";
 import { searchEmptyMessage } from "../lib/mgr/search-palette-state";
 import { toTodayViewProps } from "../lib/mgr/today-view";
 import { filterWorkRows, toWorkViewProps, workFromQuery } from "../lib/mgr/work-view";
@@ -304,11 +303,6 @@ describe("More view", () => {
     expect(model.navs.some((r) => r.title === "Settings")).toBe(true);
   });
 
-  it("draws each More card with its navigation entry's description, as live does", () => {
-    const about = new Map(STAFF_NAV.find((t) => t.label === "More")!.children!.map((c) => [c.label, c.about]));
-    for (const row of moreNavs.filter((r) => about.has(r.title))) expect.soft(row.detail, row.title).toBe(about.get(row.title));
-  });
-
   it("the More inventory record is MoreView", () => {
     const body = screen("More").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(MoreView);
@@ -328,12 +322,6 @@ describe("Search view", () => {
     const body = screen("Search").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(SearchView);
     expect(body.props.model).toEqual(searchPalette);
-  });
-
-  it("draws each Pages result with its navigation entry's description, as live does", () => {
-    const about = new Map(STAFF_NAV.flatMap((t) => [t, ...(t.children ?? [])]).map((i) => [i.label, i.about]));
-    const pages = searchPalette.groups.find((g) => g.heading === "Pages")!.items;
-    for (const [label, detail] of pages) expect.soft(detail, label).toBe(about.get(label));
   });
 
   it("the Entity picker inventory record is SearchView", () => {

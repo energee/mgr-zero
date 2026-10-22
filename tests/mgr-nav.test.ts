@@ -2,7 +2,7 @@
 // boundary: role filtering leaves no gaps, and the active tab is the longest
 // href prefix of the current path (so /orders/123 lights Work, / lights Today).
 import { describe, expect, it } from "vitest";
-import { activeChild, activeTab, canOpen, isUnder, shippedNav, navFor, PORTAL_NAV, STAFF_NAV } from "../lib/mgr/nav";
+import { activeChild, activeTab, canOpen, isUnder, navAbout, shippedNav, navFor, PORTAL_NAV, STAFF_NAV } from "../lib/mgr/nav";
 import { STAFF_ROLES } from "../lib/mgr/enums";
 import { workHrefsFor } from "../components/mgr/work-tabs";
 
@@ -137,5 +137,11 @@ describe("about", () => {
     for (const item of STAFF_NAV.flatMap(tab => [tab, ...(tab.children ?? [])])) {
       expect.soft(item.about, item.label).toMatch(/^[A-Z][^.]*[^.\s]$/);
     }
+  });
+
+  it("navAbout quotes an entry's line and refuses a label with none", () => {
+    const chat = STAFF_NAV.find(t => t.label === "More")!.children!.find(c => c.label === "Chat")!;
+    expect(navAbout("Chat")).toBe(chat.about);
+    expect(() => navAbout("Formats")).toThrow(/Formats/);
   });
 });

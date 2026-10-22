@@ -26,15 +26,19 @@ export function searchDestinations(roles: readonly StaffRole[], term: string) {
     .filter(item => item.label.toLowerCase().includes(query));
 }
 
+/** Where the palette's record search stands for the current term. */
+export type SearchStatus = "idle" | "loading" | "ready" | "error" | "offline";
+
 /**
  * What the palette says when it lists nothing: a first-use hint before any
  * term, a no-match note once a search finished empty, and nothing while one
  * loads, fails or is offline (the palette shows those states itself). Page
- * wording only when the palette searches pages; an entity picker finds records.
+ * wording only when the palette searches pages (it was given roles); an entity
+ * picker finds records.
  */
-export function searchEmptyMessage(term: string, status: string, pages: boolean) {
-  const what = pages ? "a page name, record name, or document number" : "a record name or number";
+export function searchEmptyMessage(term: string, status: SearchStatus, searchesPages: boolean) {
+  const what = searchesPages ? "a page name, record name, or document number" : "a record name or number";
   if (!term) return `Type ${what}.`;
   if (status !== "ready") return "";
-  return `${pages ? "No pages or records found" : "No records found"} · Try ${what}.`;
+  return `${searchesPages ? "No pages or records found" : "No records found"} · Try ${what}.`;
 }

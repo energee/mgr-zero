@@ -37,5 +37,5 @@ it("hints before the first term and reports a finished empty search, with page w
   expect(searchEmptyMessage("", "idle", false)).toBe("Type a record name or number.");
   expect(searchEmptyMessage("zzz", "ready", true)).toBe("No pages or records found · Try a page name, record name, or document number.");
   expect(searchEmptyMessage("zzz", "ready", false)).toBe("No records found · Try a record name or number.");
-  for (const status of ["loading", "error", "offline"]) expect(searchEmptyMessage("zzz", status, true)).toBe("");
+  for (const status of ["loading", "error", "offline"] as const) expect(searchEmptyMessage("zzz", status, true)).toBe("");
 });
