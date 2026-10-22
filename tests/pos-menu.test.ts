@@ -111,6 +111,35 @@ describe("derived POS menus", () => {
       .resolves.toEqual(inactive.excluded[0]);
   });
 
+  it("offers a case in the configured bin as six four-packs at the channel's four-pack price", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id, "admin");
+    const taproom = await seedLocation(brewery.id, { name: "Taproom", uses: ["taproom"] });
+    await connectedLocation(brewery.id, "L1", taproom.id);
+    const channel = await channelId(brewery.id, "Taproom");
+    const four = await admin.from("formats").insert({
+      brewery_id: brewery.id, name: "Four Pack", basis: "packaged", package_type: "can", bbl_per_unit: 0.01612903, units_per_case: 4,
+    }).select("id").single();
+    expect(four.error).toBeNull();
+    const fourId = four.data!.id as string;
+    const kase = await seedCatalog(brewery.id, { product: "Hanno", sku: "Hanno case", packageType: "can", bblPerUnit: 0.09677419, format: "Case" });
+    await runCommand("replace_format_components", { formatId: kase.formatId, components: [{ childFormatId: fourId, qty: 6 }] }, ctx);
+    await priceSku(brewery.id, { saleChannelId: channel, brandId: kase.brandId, formatId: fourId, cents: 1400 });
+    await runCommand("configure_pos_menu", { posLocationId: "L1", binId: taproom.binId, saleChannelId: channel }, ctx, execution());
+
+    const empty = await runCommand("get_pos_menu", { posLocationId: "L1" }, ctx) as Required<NonNullable<PosMenuSnapshot>>;
+    expect(empty.packaged).toEqual([expect.objectContaining({ brandId: kase.brandId, formatId: fourId, qty: 0, available: false })]);
+
+    await runCommand("record_movement", {
+      skuId: kase.skuId, locationId: taproom.id, binId: taproom.binId, qty: 2.5, type: "opening_balance",
+    }, ctx, execution());
+    const stocked = await runCommand("get_pos_menu", { posLocationId: "L1" }, ctx) as Required<NonNullable<PosMenuSnapshot>>;
+    expect(stocked.packaged).toEqual([{
+      brandId: kase.brandId, skuId: kase.skuId, formatId: fourId, brand: "Hanno", format: "Four Pack", qty: 15, priceCents: 1400, available: true,
+    }]);
+    expect(stocked.items).toEqual([]);
+  });
+
   it("keeps nullable price overrides independent per Square location and restores fallback when cleared", async () => {
     const brewery = await makeBrewery();
     const adminCtx = await makeStaffCtx(brewery.id, "admin");
