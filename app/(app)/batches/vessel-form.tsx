@@ -21,7 +21,7 @@ export function VesselForm({ vesselId, model }: { vesselId?: string; model: Vess
   }}>
     <VesselDetailView model={{ ...model, name, type: kind, capacity }} onName={setName} onType={setKind} onCapacity={setCapacity}
       disabled={disabled} submitting={action.busy} messages={<CommandFormMessage error={action.error} />}
-      remove={vesselId && <RemoveVesselControl vessel={model.title} busy={action.busy} error={action.error}
+      remove={vesselId && !model.retired && <RemoveVesselControl vessel={model.title} busy={action.busy} error={action.error}
         onDelete={() => action.run("delete_vessel", { vesselId }, () => router.push("/cellar"))} />} />
   </form>;
 }

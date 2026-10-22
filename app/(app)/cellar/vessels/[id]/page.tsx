@@ -11,7 +11,7 @@ import { batNo } from "@/lib/mgr/doc-no";
 import { formatDateTime } from "@/lib/date-format";
 import "@/lib/commands/all";
 
-type Vessel = { id: string; name: string; kind: string; capacity_bbl: number };
+type Vessel = { id: string; name: string; kind: string; capacity_bbl: number; active: boolean };
 type Occupancy = { occupancy_id: string; vessel_id: string; batch_id: string; batch_no: number | null; brand_name: string | null; bbl: number };
 
 export default async function VesselPage({ params }: { params: Promise<{ id: string }> }) {
@@ -29,7 +29,7 @@ export default async function VesselPage({ params }: { params: Promise<{ id: str
   const occupancy = occupancies.find(occupancy => occupancy.vessel_id === id);
   const readings = occupancy ? await runPageQuery("list_fermentation_readings", { occupancyId: occupancy.occupancy_id }, ctx) as VesselReading[] : [];
   const model = {
-    title: vessel.name, backHref: "/cellar", name: vessel.name, type: vessel.kind[0].toUpperCase() + vessel.kind.slice(1), typeOptions: VESSEL_TYPES, capacity: String(vessel.capacity_bbl),
+    title: vessel.name, backHref: "/cellar", name: vessel.name, type: vessel.kind[0].toUpperCase() + vessel.kind.slice(1), typeOptions: VESSEL_TYPES, capacity: String(vessel.capacity_bbl), retired: !vessel.active,
     occupancy: occupancy ? { title: `${occupancy.brand_name ?? "No brand yet"} · ${batNo(occupancy.batch_no)}`, detail: `${occupancy.bbl} / ${vessel.capacity_bbl} bbl`, href: `/batches/${occupancy.batch_id}` } : undefined,
     readingHref: occupancy ? `/cellar/${occupancy.occupancy_id}/reading` : undefined,
     currentReading: readings[0] ? `${formatVesselReading(readings[0], unit.effective)} · ${formatDateTime(readings[0].at, brewery.timeZone)}` : "No readings yet",

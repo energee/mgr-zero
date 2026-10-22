@@ -22,6 +22,7 @@ export function VesselDetailView({ model, onName, onType, onCapacity, messages, 
 }) {
   return <>
     {E.back("Cellar map", model.title, undefined, model.backHref)}
+    {model.retired && E.info("This vessel is retired. It is out of the cellar and takes no new beer; its batch history stays.")}
     {model.occupancy ? E.nav(model.occupancy.title, model.occupancy.detail, model.occupancy.warning ? "w" : "", undefined, model.occupancy.href) : E.blank("No open occupancy")}
     {E.fld("Current reading", model.currentReading)}
     {model.readingHref && E.btn("Reading", "p", model.readingHref)}

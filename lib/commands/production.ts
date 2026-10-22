@@ -256,7 +256,7 @@ defineCommand({
 });
 
 defineQuery({
-  name: "list_vessels", description: "Vessels, alphabetical, with kind and capacity; retired vessels only when retired is true",
+  name: "list_vessels", description: "Vessels, alphabetical, with kind and capacity; includes retired vessels when retired is true",
   input: z.object({ retired: z.boolean().optional() }), roles: ["admin", "brewer"],
   handler: (ctx, i) => {
     const query = ctx.db.from("vessels").select("id, name, kind, capacity_bbl, active").eq("brewery_id", ctx.breweryId);

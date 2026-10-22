@@ -59,6 +59,30 @@ it("cellar derives fills from occupancy and keeps links explicit", () => {
   expect(toCellarMapViewProps([{ ...vessels[0], capacity_bbl: 0 }], occupancies).tiles[0].fill).toBeUndefined();
 });
 
+describe("vessels are admin-managed", () => {
+  it("a brewer reads vessel facts as text, with no Save or Delete", () => {
+    const html = htmlOf(createElement(VesselDetailView, { model: vesselFv3, editable: false, remove: "Delete vessel" }));
+    expect(html).toContain(vesselFv3.name);
+    expect(html).toContain("Capacity (bbl)");
+    expect(html).not.toContain("<input");
+    expect(html).not.toContain("Save vessel");
+    expect(html).not.toContain("Delete vessel");
+  });
+
+  it("a retired vessel says so", () => {
+    expect(htmlOf(createElement(VesselDetailView, { model: { ...vesselFv3, retired: true } }))).toContain("retired");
+    expect(htmlOf(createElement(VesselDetailView, { model: vesselFv3 }))).not.toContain("retired");
+  });
+
+  it("hides Add vessel and New vessel when their href is null", () => {
+    const model = toCellarMapViewProps([{ id: "v1", name: "Tank", capacity_bbl: 10 }], []);
+    expect(htmlOf(createElement(CellarMapView, { model }))).toContain("Add vessel");
+    expect(htmlOf(createElement(CellarMapView, { model: { ...model, addHref: null } }))).not.toContain("Add vessel");
+    expect(htmlOf(createElement(BatchesView, { model: toBatchesViewProps(batchesBrewer) }))).toContain("New vessel");
+    expect(htmlOf(createElement(BatchesView, { model: toBatchesViewProps(batchesBrewer), newVesselHref: null }))).not.toContain("New vessel");
+  });
+});
+
 it("vessel readings preserve optional measurements and do not invent actors", () => {
   const reading = { id: "r1", at: "2026-09-12", temp_f: 68, gravity_plato: null, ph: null, note: null };
   expect(formatVesselReading(reading, "plato")).toBe("68 °F");
