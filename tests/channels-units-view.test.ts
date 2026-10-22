@@ -41,10 +41,10 @@ describe("Sale channels view", () => {
   });
 
   it("states the in-use rule only for a role that may delete (#1149)", () => {
-    expect(toSaleChannelsViewProps({ ...saleChannelsList, canDelete: true }).deleteNote).toBe(CHANNEL_IN_USE_RULE);
-    expect(toSaleChannelsViewProps(saleChannelsList).deleteNote).toBeUndefined();
+    expect(toSaleChannelsViewProps({ ...saleChannelsList, canDelete: true }).inUseRule).toBe(CHANNEL_IN_USE_RULE);
+    expect(toSaleChannelsViewProps(saleChannelsList).inUseRule).toBeUndefined();
     // An empty list offers no Delete, so it states no rule.
-    expect(toSaleChannelsViewProps({ channels: [], canDelete: true }).deleteNote).toBeUndefined();
+    expect(toSaleChannelsViewProps({ channels: [], canDelete: true }).inUseRule).toBeUndefined();
   });
 
   it("the staff guide quotes the in-use rule the screen states", () => {

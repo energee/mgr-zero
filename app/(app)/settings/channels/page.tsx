@@ -7,9 +7,9 @@
 // name is load-bearing (an order carries its own sale_channel_id, which
 // private.ship_order_impl reads), so any channel may be renamed; a channel a
 // movement, customer, order, price cell or Square menu references cannot be
-// deleted. No per-row usage is read, so every row offers Delete and the rule
-// (CHANNEL_IN_USE_RULE) is stated above the list and in the confirm sheet,
-// where a refused delete shows its error.
+// deleted. No per-row usage is read, so every row offers Delete to a role
+// that may run it, and the rule (CHANNEL_IN_USE_RULE) is stated above the
+// list and in the confirm sheet, where a refused delete shows its error.
 import { DeleteChannelControl } from "@/components/mgr/views/delete-channel";
 import { SaleChannelsView } from "@/components/mgr/views/sale-channels";
 import { DeleteCommandButton } from "../../delete-command-button";

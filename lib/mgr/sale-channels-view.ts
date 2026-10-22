@@ -22,13 +22,15 @@ export type SaleChannelsViewModel = {
   backHref?: string;
   rows: SaleChannelsRowView[];
   empty?: EmptyState;
-  /** The in-use rule, drawn above the rows only when they offer Delete. */
-  deleteNote?: string;
+  /** The rule text (CHANNEL_IN_USE_RULE) drawn above the rows, not a
+   *  note on the Delete action. Set only when canDelete is. */
+  inUseRule?: string;
 };
 
 export type SaleChannelsSnapshot = {
   backHref?: string;
-  /** Live: the role may run delete_sale_channel, so each row offers Delete. */
+  /** A role that may run delete_sale_channel. Live sets it from canRun; the
+   *  inventory frame sets it to show the Admin persona. */
   canDelete?: boolean;
   channels: {
     id: string;
@@ -48,7 +50,7 @@ function detail(c: SaleChannelsSnapshot["channels"][number]): string {
 export function toSaleChannelsViewProps({ channels, backHref, canDelete }: SaleChannelsSnapshot): SaleChannelsViewModel {
   return {
     backHref,
-    deleteNote: canDelete && channels.length > 0 ? CHANNEL_IN_USE_RULE : undefined,
+    inUseRule: canDelete && channels.length > 0 ? CHANNEL_IN_USE_RULE : undefined,
     empty: channels.length === 0 ? { title: "No sale channels yet", description: "A channel groups the customers that share a price list." } : undefined,
     rows: channels.map((c) => ({
       key: c.id,
