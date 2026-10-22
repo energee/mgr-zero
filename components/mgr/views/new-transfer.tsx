@@ -1,9 +1,13 @@
-// components/mgr/views/new-transfer.tsx — shared New transfer sheet body.
-import type { ReactNode } from "react";
+// components/mgr/views/new-transfer.tsx — shared New transfer sheet body. An
+// entered line that cannot be sent is marked at its quantity (#1121); an empty
+// SKU list says where SKUs are made (#1123).
+"use client";
+import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import type { NewTransferViewModel } from "@/lib/mgr/new-transfer-view";
+import { orderLineError } from "@/lib/order-form-rules";
 
 export type { NewTransferViewModel };
 
@@ -33,6 +37,7 @@ export function NewTransferView({
   messages?: ReactNode;
   footer?: ReactNode;
 }) {
+  const id = useId();
   return (
     <>
       {E.back("Transfers", "New transfer")}
@@ -43,8 +48,8 @@ export function NewTransferView({
       <Field><FieldLabel>Lines</FieldLabel>
       {model.lines.map((line, index) => (
         <div key={`${line.title}:${index}`} className="flex gap-2">
-          {E.pick(`Line ${index + 1} SKU`, line.sku ?? line.title, model.skuOptions, { onChange: controls.lineSku ? value => controls.lineSku?.(index, value) : undefined, placeholder: "SKU", displayValue: line.title || undefined, hideLabel: true })}
-          {E.edit(`Line ${index + 1} qty`, String(controls.lineQty ? String(line.qty) : line.qty), "number", undefined, { onChange: controls.lineQty ? (nextValue: string) => controls.lineQty?.(index, nextValue) : undefined, min: "0", step: "any", hideLabel: true })}
+          {E.pick(`Line ${index + 1} SKU`, line.sku ?? line.title, model.skuOptions, { onChange: controls.lineSku ? value => controls.lineSku?.(index, value) : undefined, placeholder: "SKU", displayValue: line.title || undefined, hideLabel: true, id: `${id}-sku-${index}`, empty: { text: "No SKUs yet.", label: "Add a SKU", href: model.skusHref, to: "Catalog" } })}
+          {E.edit(`Line ${index + 1} qty`, String(line.qty), "number", undefined, { onChange: controls.lineQty ? (nextValue: string) => controls.lineQty?.(index, nextValue) : undefined, min: "0", step: "any", hideLabel: true, id: `${id}-qty-${index}`, error: orderLineError({ skuId: line.sku ?? line.title, qty: String(line.qty) }, index, model.lines.length) })}
           {model.lines.length > 1 ? <Button type="button" variant="ghost" onClick={() => controls.removeLine?.(index)}>Remove</Button> : null}
         </div>
       ))}

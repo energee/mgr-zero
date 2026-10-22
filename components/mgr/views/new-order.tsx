@@ -1,10 +1,13 @@
+// components/mgr/views/new-order.tsx — shared New order sheet body, and the
+// order line controls (SKU picker, quantity, Pickup) other order views reuse.
+// A started line that cannot be saved is marked at its quantity (#1121).
 "use client";
 
 import { useId, type ReactNode } from "react";
-import { E } from "@/components/mgr/e";
+import { E, type PickEmpty } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { SearchPick } from "@/components/mgr/search-pick";
-import { orderLineErrors } from "@/lib/order-form-rules";
+import { orderLineError } from "@/lib/order-form-rules";
 import { DatePicker } from "@/components/mgr/date-picker";
 import type { NewOrderViewModel, OrderOption } from "@/lib/mgr/new-order-view";
 import { Fragment } from "react";
@@ -21,8 +24,8 @@ export type NewOrderControls = {
   addLine?: () => void; removeLine?: (index: number) => void;
 };
 
-function OrderPick({ label, value, options, onChange }: { label: string; value: string; options: OrderOption[]; onChange?: (value: string) => void }) {
-  return E.pick(label, value, options.map(option => typeof option === "string" ? option : { value: option.id, label: option.label }), { onChange, placeholder: label });
+function OrderPick({ label, value, options, onChange, empty }: { label: string; value: string; options: OrderOption[]; onChange?: (value: string) => void; empty?: PickEmpty }) {
+  return E.pick(label, value, options.map(option => typeof option === "string" ? option : { value: option.id, label: option.label }), { onChange, placeholder: label, empty });
 }
 
 // The adapter supplies options and request feedback. SearchPick keeps pending
@@ -32,8 +35,10 @@ export function OrderSkuPicker({ options, ...props }: { value: string; label: st
   return SearchPick({ ...props, options: options.map(option => ({ value: option.id, label: option.label })), title: "Select SKU", placeholder: "Select SKU", searchPlaceholder: "Search SKUs", noMatchMessage: "No matching SKUs" });
 }
 
-export function OrderQuantity({ value, label, onChange, contextualLabels = false, max, step = "any", required = false, invalid = false }: { value: string | number; label: string; onChange?: (value: string) => void; contextualLabels?: boolean; max?: number; step?: string; required?: boolean; invalid?: boolean }) {
-  return E.edit(label, String(value), "number", undefined, { onChange, min: 0, max, step, required, "aria-invalid": invalid || undefined, contextualLabels, hideLabel: true });
+/** `error` says what is wrong with the quantity under the field (#1121); `invalid` only marks it. */
+export function OrderQuantity({ value, label, onChange, contextualLabels = false, max, step = "any", required = false, invalid = false, error }: { value: string | number; label: string; onChange?: (value: string) => void; contextualLabels?: boolean; max?: number; step?: string; required?: boolean; invalid?: boolean; error?: string }) {
+  const id = useId();
+  return E.edit(label, String(value), "number", undefined, { onChange, min: 0, max, step, required, "aria-invalid": invalid || undefined, contextualLabels, hideLabel: true, id: error ? id : undefined, error });
 }
 
 /** A wholesale order the customer collects; it is never put on a route. Shared by New order and Edit draft. */
@@ -44,7 +49,7 @@ export function PickupSwitch({ on, onChange, disabled = false }: { on: boolean; 
 /** SKU request feedback is shared by the line list and its picker surface. */
 export function NewOrderView({ model, controls = {}, messages, feedback, skuFeedback, skuOptionsReady = true, skuEmptyMessage, footer, submitting = false, disabled = false }: { model: NewOrderViewModel; controls?: NewOrderControls; messages?: ReactNode; feedback?: ReactNode; skuFeedback?: ReactNode; skuOptionsReady?: boolean; skuEmptyMessage?: string; footer?: ReactNode; submitting?: boolean; disabled?: boolean }) {
   const errorPrefix = useId();
-  const lineErrors = orderLineErrors(model.lines.map(line => ({ skuId: line.skuId ?? line.name, qty: String(line.qty) })));
+  const lineErrors = model.lines.map((line, index) => orderLineError({ skuId: line.skuId ?? line.name, qty: String(line.qty) }, index, model.lines.length));
   const skus = model.skus ?? model.lines.map(line => ({ id: line.name, label: line.name }));
   const source = model.sources.find(option => typeof option !== "string" && option.id === model.source);
   const sourceLabel = typeof source === "object" ? source.label : model.source;
@@ -55,7 +60,7 @@ export function NewOrderView({ model, controls = {}, messages, feedback, skuFeed
     {E.cols(
       model.kind === "taproom_transfer"
         ? <OrderPick key="destination" label="To location" value={model.destination ?? ""} options={model.sources} onChange={controls.destination} />
-        : <OrderPick key="customer" label="Customer" value={model.customer} options={model.customers} onChange={controls.customer} />,
+        : <OrderPick key="customer" label="Customer" value={model.customer} options={model.customers} onChange={controls.customer} empty={{ text: "No customers yet.", label: "Add a customer", href: model.customersHref, to: "Customers" }} />,
       model.kind === "taproom_transfer" ? null :
         <Fragment key={"ship-to"}>{E.pick("Ship-to", model.shipTo, [{ value: "", label: (model.customer ? "Select ship-to" : "Select a customer first") }, ...(model.shipTos.map(option => ({ value: typeof option === "string" ? option : option.id, label: (typeof option === "string" ? option : option.label) })))], { onChange: controls.shipTo, disabled: !model.customer })}</Fragment>,
       <OrderPick key="source" label="Source location" value={model.source} options={model.sources} onChange={controls.source} />,
@@ -68,7 +73,7 @@ export function NewOrderView({ model, controls = {}, messages, feedback, skuFeed
       {E.row(
         <OrderSkuPicker label={`Line ${index + 1} SKU`} value={line.skuId ?? line.name} options={skus} selectedLabel={line.name} feedback={skuFeedback} optionsReady={skuOptionsReady} emptyMessage={skuEmptyMessage} errorId={line.skuError ? `${errorPrefix}-sku-${index}` : undefined} onChange={controls.lineSku && (value => controls.lineSku?.(index, value))} />,
         line.atp == null ? "" : `ATP ${line.atp} at ${sourceLabel}`,
-        <OrderQuantity contextualLabels label={`Line ${index + 1} quantity`} value={line.qty} onChange={controls.lineQty && (value => controls.lineQty?.(index, value))} />,
+        <OrderQuantity contextualLabels label={`Line ${index + 1} quantity`} value={line.qty} error={lineErrors[index]} onChange={controls.lineQty && (value => controls.lineQty?.(index, value))} />,
         line.warning ? "w" : "",
       )}
       {line.skuError && <p id={`${errorPrefix}-sku-${index}`} role="alert" className="text-sm text-destructive">{line.skuError}</p>}
@@ -76,9 +81,8 @@ export function NewOrderView({ model, controls = {}, messages, feedback, skuFeed
     </div>)}
     <Button type="button" variant="ghost" className="w-fit" onClick={controls.addLine}>Add line</Button>
     {E.info("Order number is assigned on commit.")}
-    {lineErrors.map(error => <p key={error} role="status" className="text-sm text-muted-foreground">{error}</p>)}
     {messages}
     {E.sp()}
-    {footer !== undefined ? footer : <Button type="submit" className="w-full md:w-fit md:self-end" disabled={submitting || disabled || lineErrors.length > 0}>{submitting ? "Saving…" : "Save draft"}</Button>}
+    {footer !== undefined ? footer : <Button type="submit" className="w-full md:w-fit md:self-end" disabled={submitting || disabled || lineErrors.some(Boolean)}>{submitting ? "Saving…" : "Save draft"}</Button>}
   </>;
 }

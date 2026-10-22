@@ -2,6 +2,7 @@
 // behind app/(app)/orders/order-form.tsx. Mirrors the create_order input schema
 // in lib/commands/orders.ts and the orders check constraint; on an empty
 // brewery it also yields the hint naming what to create first.
+import { andList } from "@/lib/mgr/submit-reason";
 
 export type OrderFormReadinessInput = {
   kind: "wholesale" | "taproom_transfer";
@@ -28,18 +29,22 @@ export const isBlankLine = (l: { skuId: string; qty: string }) => !l.skuId && !l
 /** Every entered row needs a SKU and a finite, positive quantity. */
 export const isCompleteLine = (l: { skuId: string; qty: string }) => Boolean(l.skuId) && Number.isFinite(Number(l.qty)) && Number(l.qty) > 0;
 
-/** Shared feedback for live and inventory order rows; blank spare rows need no correction. */
+/** One row's correction, shown at its quantity field; undefined when the row is blank or complete.
+ *  `count` is how many rows the form has: with more than one, removing the row is an option. */
+export function orderLineError(line: { skuId: string; qty: string }, index: number, count: number): string | undefined {
+  return isBlankLine(line) || isCompleteLine(line)
+    ? undefined : `Line ${index + 1}: select a SKU and enter a quantity greater than zero${count > 1 ? ", or remove the line" : ""}.`;
+}
+
+/** Every row's correction, for readiness checks; shared by order and transfer rows. */
 export function orderLineErrors(lines: { skuId: string; qty: string }[]): string[] {
-  return lines.flatMap((line, index) => isBlankLine(line) || isCompleteLine(line)
-    ? [] : [`Line ${index + 1}: select a SKU and enter a quantity greater than zero${lines.length > 1 ? ", or remove the line" : ""}.`]);
+  return lines.flatMap((line, index) => orderLineError(line, index, lines.length) ?? []);
 }
 
 /** A retained nonblank selection is unavailable when the current options omit it. */
 export function isUnavailableSku(skuId: string, availableSkuIds: string[]): boolean {
   return Boolean(skuId) && !availableSkuIds.includes(skuId);
 }
-
-const conjunction = new Intl.ListFormat("en", { type: "conjunction" });
 
 export function orderFormReadiness(i: OrderFormReadinessInput): OrderFormReadiness {
   const party = i.kind === "wholesale" ? Boolean(i.customerId && i.shipToId) : Boolean(i.toLocationId);
@@ -53,7 +58,7 @@ export function orderFormReadiness(i: OrderFormReadinessInput): OrderFormReadine
   if (i.kind === "wholesale" && i.catalog.customers === 0) missing.push("a customer");
   if (i.catalog.locations === 0) missing.push("a location");
   if (i.catalog.skus === 0) missing.push("a SKU");
-  const hint = missing.length === 0 ? null : `Before creating an order, add ${conjunction.format(missing)}.`;
+  const hint = missing.length === 0 ? null : `Before creating an order, add ${andList(missing)}.`;
 
   return { submittable, hint };
 }

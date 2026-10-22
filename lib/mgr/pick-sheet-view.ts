@@ -53,6 +53,9 @@ export type PickSheetSnapshot = {
   }[];
 };
 
+/** Why Print is withheld: an empty sheet has nothing to print, and says so in its title (#1128). */
+export const pickSheetPrintReason = (model: PickSheetViewModel): string | null => model.empty?.title ?? null;
+
 export function toPickSheetViewProps({ orders }: PickSheetSnapshot): PickSheetViewModel {
   if (orders.length === 0) {
     return { groups: [], empty: { title: "Nothing confirmed to pick", description: "Confirm an order to add its lines to the pick sheet." } };

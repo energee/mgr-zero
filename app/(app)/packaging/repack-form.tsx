@@ -6,7 +6,8 @@
 // the only ratio the RPC accepts as volume-neutral. The Lot picker offers the
 // parent's lots in the chosen bin (get_bin_move_stock, as Record movement
 // does); both legs are written to that lot (#613). A bin holding one lot of
-// the parent and no untracked units starts on that lot.
+// the parent and no untracked units starts on that lot. Confirm repack names
+// what it still needs (repackReason).
 "use client";
 
 import { useEffect, useId, useState } from "react";
@@ -17,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { repackFooter, RepackView } from "@/components/mgr/views/repack";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { soleRepackLot, toRepackView } from "@/lib/mgr/repack-view";
+import { repackReason, soleRepackLot, toRepackView } from "@/lib/mgr/repack-view";
 
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
@@ -58,12 +59,12 @@ export function RepackForm({ locations, bins, parents, autoOpen = false }: { aut
     }),
     parents: parents.map((p) => ({ id: p.id, name: p.label })),
     locations, bins: bins.filter((b) => b.location_id === locationId), lots,
-    parentSkuId, locationId, binId, lotId: chosenLot,
+    parentSkuId, locationId, binId, lotId: chosenLot, formatsHref: "/catalog/formats",
   };
-  const disabled = !locationId || !binId || !child || !(Number(qty) > 0);
+  const reason = repackReason({ parentSkuId, locationId, binId, qty });
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Repack" trigger={<Button size="sm" variant="outline">Repack</Button>}
-      footer={repackFooter(model, { formId, submitting: form.submitting, disabled })}>
+      footer={repackFooter(model, { formId, submitting: form.submitting, reason })}>
       <form id={formId} onSubmit={form.submit} className="flex flex-col gap-3">
         <RepackView model={model} footer={null} submitting={form.submitting} messages={<><CommandFormMessage error={stockError} /><CommandFormMessage error={form.error} /></>}
           onParent={(id) => { setParentSkuId(id); setLotId(""); }} onLocation={(id) => { setLocationId(id); setBinId(""); setLotId(""); }}

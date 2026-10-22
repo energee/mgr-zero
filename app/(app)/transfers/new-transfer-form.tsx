@@ -1,14 +1,19 @@
 // app/(app)/transfers/new-transfer-form.tsx — CommandForm for
 // create_stock_transfer: source and destination locations (bins default to
 // each location's first), SKU lines with quantities. Materials and kegs move
-// through the same command from the API; this form draws the SKU case.
+// through the same command from the API; this form draws the SKU case. A wholly
+// blank spare line is left out; any other line must be complete, or Create
+// transfer stays withheld (newTransferReason) — it is never silently dropped.
 "use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { NewTransferView } from "@/components/mgr/views/new-transfer";
+import { E } from "@/components/mgr/e";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { newTransferReason } from "@/lib/mgr/new-transfer-view";
+import { isBlankLine } from "@/lib/order-form-rules";
 
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
@@ -24,11 +29,11 @@ export function NewTransferForm({ locations, bins, skus }: { locations: Location
   const form = useCommandForm("create_stock_transfer", {
     build: () => ({
       fromLocationId: fromId, toLocationId: toId,
-      lines: lines.filter((l) => l.skuId && Number(l.qty) > 0).map((l) => ({ skuId: l.skuId, qty: Number(l.qty), fromBinId: fromBin, toBinId: toBin })),
+      lines: lines.filter((l) => !isBlankLine(l)).map((l) => ({ skuId: l.skuId, qty: Number(l.qty), fromBinId: fromBin, toBinId: toBin })),
     }),
     reset: () => { setFromId(""); setToId(""); setFromBin(""); setToBin(""); setLines([{ skuId: "", qty: "" }]); },
   });
-  const ready = fromId && toId && fromId !== toId && fromBin && toBin && lines.some((l) => l.skuId && Number(l.qty) > 0);
+  const reason = newTransferReason({ fromId, toId, fromBinId: fromBin, toBinId: toBin, lines });
   const fromBins = bins.filter(bin => bin.location_id === fromId);
   const toBins = bins.filter(bin => bin.location_id === toId);
   const model = {
@@ -41,11 +46,12 @@ export function NewTransferForm({ locations, bins, skus }: { locations: Location
     toBin: toBins.find(bin => bin.id === toBin)?.name ?? "",
     toBinOptions: toBins.map(bin => bin.name),
     skuOptions: skus.map(sku => ({ value: sku.id, label: sku.label })),
+    skusHref: "/catalog",
     lines: lines.map(line => ({ sku: line.skuId, title: skus.find(sku => sku.id === line.skuId)?.label ?? "", qty: line.qty })),
   };
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="New transfer" trigger={<Button size="sm">New transfer</Button>}>
-      <form onSubmit={form.submit} className="flex flex-col gap-4">
+      <form onSubmit={event => { if (reason) { event.preventDefault(); return; } void form.submit(event); }} className="flex flex-col gap-4">
         <NewTransferView
           model={model}
           controls={{
@@ -59,9 +65,7 @@ export function NewTransferForm({ locations, bins, skus }: { locations: Location
             removeLine: index => setLines(previous => previous.filter((_, lineIndex) => lineIndex !== index)),
           }}
           messages={<CommandFormMessage error={form.error} />}
-          footer={<CommandFormFooter>
-          <Button type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Creating…" : "Create transfer"}</Button>
-        </CommandFormFooter>}
+          footer={<CommandFormFooter>{E.submit("Create transfer", { submitting: form.submitting, reason, busy: "Creating…" })}</CommandFormFooter>}
         />
       </form>
     </CommandForm>

@@ -29,7 +29,7 @@ import { toMaterialsOnHandViewProps } from "../lib/mgr/materials-on-hand-view";
 import { purchaseOrderNext, toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
 import { receiptBillPresentation, receiptBillRequest, toPostedReceiptViewProps, type ReceiptSnapshot } from "../lib/mgr/receipt-view";
 import { toVendorsViewProps } from "../lib/mgr/vendors-view";
-import { poLineCounts } from "../lib/mgr/new-po-view";
+import { newPoReason } from "../lib/mgr/new-po-view";
 import { CLOSURE_FORM_ID } from "../lib/mgr/receive-po-view";
 import { beginRecovery, discardRecovery } from "../lib/commands/recovery";
 
@@ -407,15 +407,16 @@ describe("Vendors and Materials on hand search", () => {
 });
 
 describe("New PO lines", () => {
-  // One check decides which rows count: the view flags a row that falls short
-  // and the form saves only when every row counts, so the two cannot disagree.
+  // One check decides which rows count: the form saves only when newPoReason
+  // finds nothing missing, and the view marks the same bad values per field.
   it("a line counts only with a material and a positive quantity", () => {
-    expect(poLineCounts({ materialId: "malt", qty: "4" })).toBe(true);
-    expect(poLineCounts({ materialId: "malt", qty: 0.5 })).toBe(true);
-    expect(poLineCounts({ materialId: "malt", qty: "0" })).toBe(false);
-    expect(poLineCounts({ materialId: "malt", qty: "" })).toBe(false);
-    expect(poLineCounts({ materialId: "", qty: "4" })).toBe(false);
-    expect(poLineCounts({ qty: 4 })).toBe(false);
+    const counts = (line: { materialId?: string; qty: number | string }) => newPoReason({ vendor: "v", lines: [{ ...line, cost: "" }] }) === null;
+    expect(counts({ materialId: "malt", qty: "4" })).toBe(true);
+    expect(counts({ materialId: "malt", qty: 0.5 })).toBe(true);
+    expect(counts({ materialId: "malt", qty: "0" })).toBe(false);
+    expect(counts({ materialId: "malt", qty: "" })).toBe(false);
+    expect(counts({ materialId: "", qty: "4" })).toBe(false);
+    expect(counts({ qty: 4 })).toBe(false);
   });
 
   it("every row is required, removable when there is more than one, and a zero quantity is flagged", () => {
@@ -447,7 +448,7 @@ describe("New PO lines", () => {
 
   it("the live form saves only when every line counts, through the shared check", () => {
     const form = src("app/(app)/purchase-orders/new-po-form.tsx");
-    expect(form).toContain("lines.every(poLineCounts)");
+    expect(form).toContain("newPoReason({ vendor: vendorId, lines })");
     expect(form).toMatch(/remove: index =>/);
     expect(src("components/mgr/views/new-po.tsx")).not.toMatch(/const started\b/);
   });

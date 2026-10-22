@@ -41,8 +41,10 @@ it.each([
   expect(event.preventDefault).toHaveBeenCalledOnce();
   expect(event.stopPropagation).toHaveBeenCalledOnce();
   const html = renderToStaticMarkup(view);
-  expect(html).toContain('Line 2: select a SKU and enter a quantity greater than zero, or remove the line.');
-  expect(html).toMatch(/<p[^>]*role="status"[^>]*>Line 2:/);
+  // The message sits under line 2's quantity, which it marks and describes (#1121).
+  const errorId = html.match(/<div role="alert"[^>]*id="([^"]+)"[^>]*>Line 2: select a SKU and enter a quantity greater than zero, or remove the line\.<\/div>/)?.[1];
+  expect(errorId).toBeTruthy();
+  expect(html).toMatch(new RegExp(`aria-label="Line 2 quantity"[^>]*aria-invalid="true"[^>]*aria-describedby="${errorId}"`));
 });
 
 it("asks to complete the only row without offering nonexistent clearing or Remove actions", () => {
@@ -51,7 +53,7 @@ it("asks to complete the only row without offering nonexistent clearing or Remov
   expect(html).toContain('Line 1: select a SKU and enter a quantity greater than zero.');
   expect(html).not.toContain('clear the line');
   expect(html).not.toContain('remove the line');
-  expect(html).toContain('role="status"');
+  expect(html).toContain('role="alert"');
 });
 
 it("sends every valid line and ignores only wholly blank spare rows", () => {
