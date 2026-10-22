@@ -324,6 +324,7 @@ export type Screen = {
   job: ReactNode;
   reads: ReactNode;
   writes: ReactNode;
+  /** Annotation chips: state, note, and `1` for a blocked or failure state (offline, permission, error), drawn filled. */
   states?: [string, string, (0 | 1)?][];
   spec?: ReactNode;
   /** The program that still owns shipping this screen, when no reads/writes tag
@@ -595,7 +596,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "Staff lands on Today; a customer lands on portal Order. The verified membership decides; the person never chooses a shell. Name is collected here. Expired, wrong-audience and already-a-member are their own landings.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: <EntryView model={toAcceptInviteViewProps("Demo Brewing", "warehouse")} />,
+    body: <EntryView model={toAcceptInviteViewProps("Demo Brewing", ["warehouse"])} />,
   },
   {
     step: 2,
@@ -684,9 +685,9 @@ export const SCREENS: Screen[] = [
   {
     step: 2, slice: 1, tab: "More", surface: "sheet", name: "Invite staff",
     to: { "Send invite": "Team" },
-    job: "Invite one new staff account with one role",
+    job: "Invite one person to the staff with one role",
     reads: "none", writes: "invite_staff",
-    states: [["permission", "admin only", 1], ["retry", "unchanged input keeps request identity"], ["existing account", "pending invitation; access after they accept in Invitations", 1]],
+    states: [["permission", "admin only", 1], ["retry", "unchanged input keeps request identity"], ["existing account", "pending invitation; access after they accept in Invitations"]],
     body: <InviteView buyer={false} />,
   },
   {
@@ -1249,7 +1250,7 @@ export const SCREENS: Screen[] = [
     job: "Invite one buyer to a customer account",
     reads: "get_customer",
     writes: "invite_customer_user [existing]",
-    states: [["permission", "sales or admin required", 1], ["ready", "email is valid"], ["sent", "recipient receives a sign-in link"], ["existing account", "pending invitation; access after they accept in Invitations", 1]],
+    states: [["permission", "sales or admin required", 1], ["ready", "email is valid"], ["sent", "recipient receives a sign-in link"], ["existing account", "pending invitation; access after they accept in Invitations"]],
     body: <InviteView buyer defaultEmail={PORTAL_BUYER.email} />,
   },
   {
