@@ -34,6 +34,7 @@ export function CatalogView({
   formats?: FormatsViewModel;
   formatAction?: ReactNode;
 }) {
+  // Each `links && (...)` below gives undefined (no links: the inventory's inert tap) or, live, the path or null (denied: drawn plain).
   return (
     <>
       {E.back("More", "Catalog", createAction !== undefined ? createAction : E.btn("New brand"), model.backHref)}
