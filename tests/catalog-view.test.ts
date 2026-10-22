@@ -504,12 +504,12 @@ describe("SKU view", () => {
     expect(html).toMatch(/½ bbl keg/);
   });
 
-  it("the live SKU forms mount the shared controlled SkuView", () => {
+  it("the live SKU form mounts the shared controlled SkuView", () => {
     const form = readFileSync("app/(app)/catalog/sku-form.tsx", "utf8");
     expect(form).toMatch(/from "@\/components\/mgr\/views\/sku"/);
-    expect(form.match(/<SkuView\b/g)).toHaveLength(2);
+    expect(form.match(/<SkuView\b/g)).toHaveLength(1);
     expect(form).toMatch(/controls=\{\{/);
-    // Only the live-only Name input is drawn here; Format, Active and UPC are the view's.
+    // Active and UPC are the view's; this file draws no inputs of its own.
     expect(form).not.toMatch(/<Select\b|<Input\b/);
     expect(form).not.toMatch(/aria-label="UPC/);
   });
