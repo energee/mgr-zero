@@ -130,4 +130,4 @@ No model request or field Core Web Vitals improvement is claimed.
 
 ## Follow-up production measurement
 
-A production deployment exists, but no field Web Vitals sample has been collected, so LCP, INP, CLS, FCP, and TTFB remain unmeasured. Establish field baselines in Vercel Speed Insights against LCP < 2.5 s, INP < 200 ms, CLS < 0.1, FCP < 1.8 s, and TTFB < 800 ms. Configure any observability drains through the Vercel Dashboard or REST API rather than application bundle code.
+A production deployment exists, but no field Web Vitals sample has been collected, so LCP, INP, CLS, FCP, and TTFB remain unmeasured. The root layout (`app/layout.tsx`) mounts `<SpeedInsights />` from `@vercel/speed-insights`; it reports nothing until Speed Insights is enabled for the project in the Vercel Dashboard (an ask-first hosted change). Establish field baselines in Vercel Speed Insights against LCP < 2.5 s, INP < 200 ms, CLS < 0.1, FCP < 1.8 s, and TTFB < 800 ms. Configure any observability drains through the Vercel Dashboard or REST API rather than application bundle code.
