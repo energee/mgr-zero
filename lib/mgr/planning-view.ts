@@ -1,5 +1,7 @@
 import { formatDate } from "@/lib/date-format";
+import type { StaffRole } from "@/lib/commands/registry";
 import type { EmptyState } from "./empty-state";
+import { canOpen } from "./nav";
 
 export type MaterialRequirementSnapshot = {
   material_id: string;
@@ -30,10 +32,14 @@ export type PlanningSnapshot = {
   today?: string;
   /** Where the back link goes; the live page passes "/more", the inventory leaves it "#". */
   backHref?: string;
+  /** The viewer's roles, live only: the empty state links only pages they can
+   *  open. The inventory omits them and draws every link row, inert. */
+  roles?: readonly StaffRole[];
 };
 
-/** The empty list's words, plus the pages where the demand it counts is set up. */
-type PlanningEmpty = EmptyState & { links: { key: string; title: string; detail: string; href: string }[] };
+/** The empty list's words, plus the pages where the demand it counts is set up
+ *  (`href` only on the live page). */
+type PlanningEmpty = EmptyState & { links: { title: string; detail: string; href?: string }[] };
 
 export type PlanningViewModel = {
   requirements: { key: string; title: string; detail: string; quantity: string; warning: boolean }[];
@@ -47,15 +53,18 @@ export type PlanningViewModel = {
 
 /** The live page asks only for short materials, so an empty list says nothing
  *  about whether any batch or run is planned (#1142). */
-const NOTHING_SHORT: PlanningEmpty = {
+const NOTHING_SHORT: EmptyState = {
   title: "No material shortages",
-  description: "Planning lists only materials that planned batches, open packaging runs, or uncovered orders need beyond on hand and sent purchase orders. An empty list does not mean any work is scheduled.",
-  links: [
-    { key: "batches", title: "Batches", detail: "plan a batch so its recipe's ingredients count", href: "/batches" },
-    { key: "packaging", title: "Packaging runs", detail: "schedule a run so its formats' materials count", href: "/packaging" },
-    { key: "materials", title: "Materials", detail: "give each material a default vendor so a gap can draft", href: "/materials" },
-  ],
+  description: "Planning lists only materials that planned or brewing batches, open packaging runs, or uncovered orders need beyond on hand and sent purchase orders. An empty list does not mean any work is scheduled.",
 };
+
+/** Where the demand Planning counts is set up, under their nav labels; the
+ *  empty state links to them. */
+const SETUP_LINKS = [
+  { title: "Batches", detail: "plan a batch so its recipe's ingredients count", href: "/batches" },
+  { title: "Packaging", detail: "schedule a run so its formats' materials count", href: "/packaging" },
+  { title: "Materials", detail: "give each material a default vendor so a gap can draft", href: "/materials" },
+];
 
 const fmt = (value: number) => value.toLocaleString("en-US", { maximumFractionDigits: 1 });
 
@@ -77,6 +86,12 @@ export function toPlanningViewProps(snapshot: PlanningSnapshot): PlanningViewMod
       warning: !row.vendor_id || row.out_of_reach || overdue,
     };
   });
+  // Live, drop the links a role's nav hides (Batches is Brewer's). No roles is
+  // the inventory: every row, without hrefs, as fixtures draw links.
+  const { roles } = snapshot;
+  const links = roles
+    ? SETUP_LINKS.filter((link) => canOpen(roles, link.href))
+    : SETUP_LINKS.map((link) => ({ title: link.title, detail: link.detail }));
   return {
     requirements,
     horizon: snapshot.horizon,
@@ -84,6 +99,6 @@ export function toPlanningViewProps(snapshot: PlanningSnapshot): PlanningViewMod
     drafts: snapshot.drafts,
     info: snapshot.info,
     backHref: snapshot.backHref,
-    empty: requirements.length === 0 && !snapshot.horizon ? NOTHING_SHORT : undefined,
+    empty: requirements.length === 0 && !snapshot.horizon ? { ...NOTHING_SHORT, links } : undefined,
   };
 }

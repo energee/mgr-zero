@@ -16,6 +16,7 @@ import { kegShortageText, toKegFleetViewProps, withLocationBin } from "../lib/mg
 import { REASON_EFFECT, REASON_LABEL } from "../lib/mgr/keg-labels";
 import { kegHistoryScope, toKegHistoryViewProps } from "../lib/mgr/keg-history-view";
 import { formatDate } from "../lib/date-format";
+import { activeTab, STAFF_NAV } from "../lib/mgr/nav";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
@@ -64,8 +65,12 @@ describe("Keg fleet", () => {
   });
 
 
-  it("#1110 the live back link goes to Beer, the parent it names", () => {
-    expect(src("app/(app)/kegs/page.tsx")).toContain('backHref: "/beer"');
+  it("#1110 the live back link goes to the nav group that holds Kegs", () => {
+    const parent = activeTab(STAFF_NAV, "/kegs")!;
+    expect(parent.label).toBe("Beer");
+    expect(src("app/(app)/kegs/page.tsx")).toContain(`backHref: "${parent.href}"`);
+    const html = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps({ ...kegFleetMicrostar, backHref: parent.href }) }));
+    expect(html).toMatch(new RegExp(`<a[^>]*href="${parent.href}"[^>]*>.*?Beer</a>`));
   });
 
   it("the live kegs page mounts KegFleetView and slots PoolForm", () => {

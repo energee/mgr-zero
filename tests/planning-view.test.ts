@@ -1,10 +1,15 @@
 import { readFileSync } from "node:fs";
-import { isValidElement } from "react";
+import { createElement, isValidElement, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { PlanningView } from "../components/mgr/views/planning";
 import { planningDemo } from "../lib/mgr/fixtures/planning";
 import { toPlanningViewProps } from "../lib/mgr/planning-view";
+import { activeTab, STAFF_NAV } from "../lib/mgr/nav";
+import type { StaffRole } from "../lib/commands/registry";
+
+const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 
 describe("Planning view", () => {
   it("owns the inventory drawing", () => {
@@ -65,20 +70,55 @@ describe("Planning view", () => {
     ]);
   });
 
-  it("the live back link returns to More; the inventory fixture leaves it inert (#1142)", () => {
-    expect(readFileSync("app/(app)/planning/page.tsx", "utf8")).toContain('backHref: "/more"');
-    expect(toPlanningViewProps({ backHref: "/more" }).backHref).toBe("/more");
+  it("the live back link returns to the nav group that holds Planning; the inventory fixture leaves it inert (#1142)", () => {
+    const parent = activeTab(STAFF_NAV, "/planning")!.href;
+    expect(readFileSync("app/(app)/planning/page.tsx", "utf8")).toContain(`backHref: "${parent}"`);
+    const html = htmlOf(createElement(PlanningView, { model: toPlanningViewProps({ requirements: [], backHref: parent, roles: ["brewer"] }) }));
+    expect(html).toMatch(new RegExp(`<a[^>]*href="${parent}"[^>]*>.*?More</a>`));
     expect(toPlanningViewProps(planningDemo).backHref).toBeUndefined();
   });
 
-  it("an empty shortage list says it is shortage-only, never that work is scheduled, and links where demand is set up (#1142)", () => {
-    const { empty } = toPlanningViewProps({ requirements: [] });
+  it("an empty shortage list says it is shortage-only and links, inside the empty block, to where demand is set up (#1142)", () => {
+    const { empty } = toPlanningViewProps({ requirements: [], roles: ["brewer"] });
     expect(empty?.title).toBe("No material shortages");
-    expect(empty?.description).toContain("only materials");
+    expect(empty?.description).toContain("planned or brewing batches");
     expect(empty?.description).toContain("does not mean any work is scheduled");
     expect(empty?.description).not.toMatch(/every committed|is covered/);
-    expect(empty?.links.map((link) => link.href)).toEqual(["/batches", "/packaging", "/materials"]);
+    expect(empty?.links).toEqual([
+      expect.objectContaining({ title: "Batches", href: "/batches" }),
+      expect.objectContaining({ title: "Packaging", href: "/packaging" }),
+      expect.objectContaining({ title: "Materials", href: "/materials" }),
+    ]);
+    const html = htmlOf(createElement(PlanningView, { model: toPlanningViewProps({ requirements: [], roles: ["brewer"] }) }));
+    expect(html).toContain("No material shortages");
+    expect(html).toMatch(/data-slot="empty-content"[\s\S]*href="\/batches"[\s\S]*href="\/packaging"[\s\S]*href="\/materials"/);
     expect(toPlanningViewProps(planningDemo).empty).toBeUndefined();
+  });
+
+  it("rows that are not short still leave the empty state (#1142)", () => {
+    const covered = {
+      material_id: "malt", material_name: "Malt", base_uom: "lb", purchase_uom: "bag",
+      required: 100, projected: 0, on_hand: 100, on_order: 0, short: 0, purchase_units_short: 0,
+      needed_by: null, vendor_id: "vendor", vendor_name: "Malt Co", lead_time_days: 7, buy_by: null, out_of_reach: false,
+    };
+    const model = toPlanningViewProps({ requirements: [covered] });
+    expect(model.requirements).toEqual([]);
+    expect(model.empty?.title).toBe("No material shortages");
+  });
+
+  it("the empty state links only pages the viewer's roles can open (#1142)", () => {
+    const hrefs = (roles: StaffRole[]) => toPlanningViewProps({ requirements: [], roles }).empty?.links.map((link) => link.href);
+    expect(hrefs(["brewer"])).toEqual(["/batches", "/packaging", "/materials"]);
+    expect(hrefs(["warehouse"])).toEqual(["/packaging", "/materials"]);
+    expect(readFileSync("app/(app)/planning/page.tsx", "utf8")).toContain("roles: brewery.roles");
+  });
+
+  it("the inventory draws every empty-state link row, inert (#1142)", () => {
+    expect(toPlanningViewProps({ requirements: [] }).empty?.links).toEqual([
+      { title: "Batches", detail: expect.any(String) },
+      { title: "Packaging", detail: expect.any(String) },
+      { title: "Materials", detail: expect.any(String) },
+    ]);
   });
 
   it("the inventory draws an overdue gap through the adapter, so the marker has a frame (#1037)", () => {
