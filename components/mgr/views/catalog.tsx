@@ -4,7 +4,7 @@
 // Price groups and Water profiles rows follow; inventory and live draw both.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import type { CatalogViewModel } from "@/lib/mgr/catalog-view";
+import { NOT_SET, type CatalogViewModel } from "@/lib/mgr/catalog-view";
 import { FormatsView, type FormatsViewModel } from "@/components/mgr/views/formats";
 import { RecordTable } from "@/components/mgr/views/record-table";
 
@@ -39,6 +39,8 @@ export function CatalogView({
           rows={model.brands.map((brand) => ({
             key: brand.key,
             cells: [brand.name, brand.style, brand.abv, brand.skus, brand.cola],
+            // A style or ABV that is not set sorts last, not as the words.
+            sort: [brand.name, brand.style === NOT_SET ? null : brand.style, brand.abv === NOT_SET ? null : brand.abv, brand.skus, brand.cola],
             note: brand.alias,
             href: linkRows ? brand.href : undefined,
           }))}

@@ -84,6 +84,9 @@ export function PriceGroupsView({
                 ...row.cells.map((value, col) => row.formatIds[col] ? renderCell(channel, row, col, value) : renderAddPour(row, model.formats[col]!)),
               ]),
               ["l", ...model.formats.map(() => "r" as const)],
+              // Unsorted: the cells are price editors, and the rows are the
+              // price groups in their saved order.
+              { sortable: false },
             )}
           </div>
         </>}

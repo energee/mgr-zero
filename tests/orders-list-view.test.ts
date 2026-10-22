@@ -105,7 +105,9 @@ describe("Orders list view loop", () => {
 
   it("draws a register: headed columns on the desk, the same facts labeled on the phone", () => {
     const html = renderToStaticMarkup(createElement(OrdersView, { model: toOrdersListViewProps({ ...ordersWorkList, roles: ["admin"], linked: true }) }));
-    for (const header of ["Order", "Customer", "Requested ship date", "Status"]) expect(html).toContain(`>${header}</th>`);
+    // A header is its text, whether plain or inside its sort button.
+    const headers = [...html.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)].map(match => match[1].replace(/<[^>]*>/g, ""));
+    expect(headers).toEqual(expect.arrayContaining(["Order", "Customer", "Requested ship date", "Status"]));
     expect(html).toContain(">Not scheduled<");
     expect(html).toContain(">Restock staged<");
     expect(html).toContain('href="/orders/00000000-0000-4000-8000-000000000231"');

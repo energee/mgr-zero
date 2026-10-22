@@ -42,6 +42,27 @@ describe("E.tbl column alignment", () => {
     expect(cells(html, "td").map(cell => cell.content)).toContain("−$25.00");
   });
 
+  it("draws each header as a sort button without changing its alignment", () => {
+    const html = renderToStaticMarkup(E.tbl(["Item", "Qty"], [["Hazy IPA", "1,234.5"], ["Pils", "0"]], ["l", "r"]));
+    expectAlignment(html, ["l", "r"]);
+    const heads = [...html.matchAll(/<th\b[^>]*>[\s\S]*?<\/th>/g)].map(match => match[0]);
+    for (const head of heads) {
+      expect(head).toContain('aria-sort="none"');
+      expect(head).toMatch(/<button\b/);
+    }
+    expect(cells(html, "td").map(cell => cell.content)).toEqual(["Hazy IPA", "1,234.5", "Pils", "0"]);
+    expect(html).toContain("shrink-0");
+    expect(html).toContain("min-w-max");
+  });
+
+  it("draws plain header text when the table is not sortable", () => {
+    const html = renderToStaticMarkup(E.tbl(["Item", "Qty"], [["Hazy IPA", "1"]], ["l", "r"], { sortable: false }));
+    expectAlignment(html, ["l", "r"]);
+    expect(html).not.toContain("aria-sort");
+    expect(html).not.toMatch(/<button\b/);
+    expect(cells(html, "th").map(cell => cell.content)).toEqual(["Item", "Qty"]);
+  });
+
   it("leaves unspecified columns left when alignment is partial", () => {
     expectAlignment(renderToStaticMarkup(E.tbl(["Qty", "Record", "State"], [["0", "Missing amount", "Unknown"]], ["r"])), ["r", "l", "l"]);
   });
@@ -96,5 +117,27 @@ describe("E.tbl column alignment", () => {
     expect(cells(html, "td").length).toBe(model.channel!.rows.length * (model.formats.length + 1));
     expect(html).toContain("overflow-x-auto");
     for (const row of model.channel!.rows) for (const value of row.cells) if (value !== null) expect(html).toContain(`value="${value}"`);
+  });
+});
+
+/** A screen's rendered headers: each one's text and whether it is a sort button. */
+function sortHeads(name: string) {
+  const html = renderToStaticMarkup(createElement("div", null, SCREENS.find(screen => screen.name === name)!.body));
+  return [...html.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)].map(match => ({ text: match[1].replace(/<[^>]*>/g, ""), sorts: /<button\b/.test(match[1]) }));
+}
+
+describe("screen table sorting", () => {
+  it.each([
+    ["Finished goods", "Available"],
+    ["Orders", "Status"],
+    ["Batches", "Vessel and latest reading"],
+  ])("%s sorts its %s column by an explicit value, since the cell is a component", (name, header) => {
+    expect(sortHeads(name).filter(head => head.text === header).map(head => head.sorts)).toContain(true);
+  });
+
+  it.each(["Monthly compliance", "Price groups"])("%s keeps its saved row order: no header sorts", name => {
+    const heads = sortHeads(name);
+    expect(heads.length).toBeGreaterThan(0);
+    expect(heads.filter(head => head.sorts)).toEqual([]);
   });
 });

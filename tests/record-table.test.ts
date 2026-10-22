@@ -76,3 +76,53 @@ it("#1030 starts every phone value at one left edge, numbers included, and never
   for (const cls of values) expect(cls).not.toContain("text-right");
   for (const cls of classesOf(out, "dt")) expect(cls).toContain("whitespace-nowrap");
 });
+
+/** Each header cell's markup, in order. */
+const heads = (out: string) => [...out.matchAll(/<th\b[^>]*>[\s\S]*?<\/th>/g)].map((m) => m[0]);
+
+it("draws a header with text cells as a sort button, unsorted until clicked", () => {
+  const out = heads(html([{ key: "a", cells: ["Alpha", "ok", "1"] }]));
+  expect(out).toHaveLength(3);
+  for (const head of out) {
+    expect(head).toContain('aria-sort="none"');
+    expect(head).toMatch(/<button\b/);
+  }
+});
+
+it("gives a column with nothing to sort (empty or component cells) a plain header", () => {
+  const Comp = () => createElement("span", null, "3 kegs");
+  const out = heads(renderToStaticMarkup(createElement(RecordTable, {
+    headers: ["Name", "Available", "Note"], align: ["l", "r", "l"],
+    rows: [{ key: "a", cells: ["Alpha", createElement(Comp), null] }],
+  })));
+  expect(out[0]).toMatch(/<button\b/);
+  for (const head of out.slice(1)) {
+    expect(head).not.toContain("aria-sort");
+    expect(head).not.toMatch(/<button\b/);
+  }
+});
+
+it("sorts a component column by the row's explicit sort value", () => {
+  const Comp = () => createElement("span", null, "3 kegs");
+  const out = heads(renderToStaticMarkup(createElement(RecordTable, {
+    headers: ["Name", "Available"], align: ["l", "r"],
+    rows: [{ key: "a", cells: ["Alpha", createElement(Comp)], sort: [null, 3] }],
+  })));
+  expect(out[1]).toContain('aria-sort="none"');
+});
+
+it("draws plain headers when the table is not sortable", () => {
+  const out = heads(renderToStaticMarkup(createElement(RecordTable, { headers: ["Name", "Status"], align: ["l", "l"], rows: [{ key: "a", cells: ["Alpha", "ok"] }], sortable: false })));
+  for (const head of out) {
+    expect(head).not.toContain("aria-sort");
+    expect(head).not.toMatch(/<button\b/);
+  }
+});
+
+it("keeps the server's row order before any sort is chosen", () => {
+  const out = html([{ key: "b", cells: ["Bravo", "", "2"] }, { key: "a", cells: ["Alpha", "", "1"] }]);
+  const table = out.slice(0, out.indexOf("</table>"));
+  expect(table.indexOf("Bravo")).toBeLessThan(table.indexOf("Alpha"));
+  const list = out.slice(out.indexOf("</table>"));
+  expect(list.indexOf("Bravo")).toBeLessThan(list.indexOf("Alpha"));
+});

@@ -45,6 +45,9 @@ function Register({ rows }: { rows: InvoiceListRow[] }) {
         row.payment,
         accounting(row),
       ],
+      // Money by its cents and Due by its day, so the local subtotal line, an
+      // Overdue badge, or "Unavailable" never decides the order (null sorts last).
+      sort: [row.document.number, row.customer, row.total.cents, row.balance.cents, row.due.day],
     }))}
   />;
 }
