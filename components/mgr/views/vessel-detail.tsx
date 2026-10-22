@@ -15,7 +15,7 @@ export function RemoveVesselControl({ vessel, ...rest }: { vessel: string; busy?
 }
 
 /** `editable` is false for a brewer: the vessel facts read as text, with no Save or Delete (vessels are admin-managed).
- *  A model with no `history` is New vessel: nothing has happened in it yet, so only the facts are drawn.
+ *  A model with no `readings` is New vessel: nothing has happened in it yet, so only the facts are drawn.
  *  `reason` (vesselReason) says what Save vessel still needs. */
 export function VesselDetailView({ model, onName, onType, onCapacity, messages, submitting = false, reason, editable = true, remove, footer }: {
   model: VesselDetailViewModel; onName?: (value: string) => void; onType?: (value: string) => void; onCapacity?: (value: string) => void;
@@ -27,12 +27,12 @@ export function VesselDetailView({ model, onName, onType, onCapacity, messages, 
   return <>
     {E.back("Cellar", model.title, undefined, model.backHref, "Cellar map")}
     {model.retired && E.info("This vessel is retired. It is out of the cellar and takes no new beer; its batch history stays.")}
-    {model.history && <>
+    {model.readings && <>
       {model.occupancy ? E.nav(model.occupancy.title, model.occupancy.detail, model.occupancy.warning ? "w" : "", undefined, model.occupancy.href) : E.blank("No open occupancy")}
-      {E.fld("Current reading", model.currentReading)}
+      {E.fld("Current reading", model.readings.current)}
       {model.readingHref && E.btn("Reading", "p", model.readingHref)}
       {E.ttl("Reading history")}
-      {model.history.length ? model.history.map(row => <Fragment key={row.key}>{E.row(row.title, row.detail, row.who)}</Fragment>) : E.blank("No readings yet")}
+      {model.readings.history.length ? model.readings.history.map(row => <Fragment key={row.key}>{E.row(row.title, row.detail, row.who)}</Fragment>) : E.blank("No readings yet")}
     </>}
     {E.ttl("Vessel facts")}
     {editable ? <>

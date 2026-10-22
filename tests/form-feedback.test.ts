@@ -152,7 +152,7 @@ describe("per-form reasons", () => {
 
   it("Vessel capacity marks a typed value that is not above zero, never a blank one (#1116)", () => {
     expect(vesselCapacityError("")).toBeUndefined();
-    for (const capacity of ["0", "-2", "abc"]) expect(vesselCapacityError(capacity)).toBe("Capacity must be more than 0.");
+    for (const capacity of ["0", "-2", "abc"]) expect(vesselCapacityError(capacity)).toBe("Enter a capacity above zero.");
     expect(vesselCapacityError("0.5")).toBeUndefined();
   });
 
@@ -292,10 +292,10 @@ describe("line errors in the views", () => {
 
   it("a drawn vessel capacity of 0 is marked at the field; a live one waits for the user to leave it (#1116)", () => {
     const drawn = html(createElement(VesselDetailView, { model: { ...vesselFv3, capacity: "0" } }));
-    const errorId = drawn.match(/id="([^"]+-error)"[^>]*>Capacity must be more than 0\.</)?.[1];
+    const errorId = drawn.match(/id="([^"]+-error)"[^>]*>Enter a capacity above zero\.</)?.[1];
     expect(errorId).toBeTruthy();
     expect(drawn).toMatch(new RegExp(`aria-describedby="${errorId}"`));
-    expect(html(createElement(VesselDetailView, { model: { ...vesselFv3, capacity: "0" }, onCapacity: () => {} }))).not.toContain("Capacity must be more than 0.");
+    expect(html(createElement(VesselDetailView, { model: { ...vesselFv3, capacity: "0" }, onCapacity: () => {} }))).not.toContain("Enter a capacity above zero.");
   });
 
   it("an empty picker names who adds the record when this user cannot", () => {

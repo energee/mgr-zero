@@ -19,7 +19,7 @@ import { ScheduleBatchView } from "../components/mgr/views/schedule-batch";
 import { VesselDetailView } from "../components/mgr/views/vessel-detail";
 import {
   batchesBrewer, brewDayHazy, brewDayTurnsHazy, brewPrepMineral, brewTimelineMineral, closePackagingRunHazy, recipeHazyV4, recipesList,
-  runClosedHazy, scheduleBatchHazy, vesselFv3,
+  runClosedHazy, scheduleBatchHazy, vesselFv3, vesselNew,
 } from "../lib/mgr/fixtures/production";
 import { toBatchesViewProps, batchesFromQuery, type BatchListRow } from "../lib/mgr/batches-view";
 import { brewTurnModel, canRecordBrewDay } from "../lib/mgr/brew-day-view";
@@ -88,7 +88,7 @@ describe("vessels are admin-managed", () => {
 it("vessel readings preserve optional measurements and do not invent actors", () => {
   const reading = { id: "r1", at: "2026-09-12", temp_f: 68, gravity_plato: null, ph: null, note: null };
   expect(formatVesselReading(reading, "plato")).toBe("68 °F");
-  const html = htmlOf(createElement(VesselDetailView, { model: { ...vesselFv3, occupancy: undefined, history: [{ key: "r1", title: reading.at, detail: "68 °F" }] }, submitting: true, messages: "Save failed", footer: null }));
+  const html = htmlOf(createElement(VesselDetailView, { model: { ...vesselFv3, occupancy: undefined, readings: { current: "68 °F", history: [{ key: "r1", title: reading.at, detail: "68 °F" }] } }, submitting: true, messages: "Save failed", footer: null }));
   expect(html).toContain("No open occupancy");
   expect(html).toContain("Save failed");
   expect(html).toContain("disabled");
@@ -312,13 +312,28 @@ describe("Vessel detail view", () => {
   });
 
   it("a vessel not saved yet shows only its facts: no occupancy or readings (#1116)", () => {
-    const { currentReading: _current, history: _history, ...facts } = vesselFv3;
-    const html = htmlOf(createElement(VesselDetailView, { model: { ...facts, occupancy: undefined, title: "New vessel" } }));
+    const html = htmlOf(createElement(VesselDetailView, { model: vesselNew }));
     for (const gone of ["No open occupancy", "Current reading", "Reading history", "No readings yet"]) expect(html).not.toContain(gone);
     expect(html).toContain("Vessel facts");
     // An existing empty vessel still says it is empty and has no readings.
-    const empty = htmlOf(createElement(VesselDetailView, { model: { ...vesselFv3, occupancy: undefined, currentReading: "No readings yet", history: [] } }));
+    const empty = htmlOf(createElement(VesselDetailView, { model: { ...vesselFv3, occupancy: undefined, readings: { current: "No readings yet", history: [] } } }));
     for (const shown of ["No open occupancy", "Current reading", "Reading history"]) expect(empty).toContain(shown);
+  });
+
+  it("the live New vessel page passes no readings, so it draws only the facts (#1116)", () => {
+    const newLine = src("app/(app)/cellar/vessels/[id]/page.tsx").split("\n").find(line => line.includes('id === "new") return'));
+    expect(newLine).toMatch(/<VesselForm\b/);
+    expect(newLine).not.toMatch(/readings|occupancy/);
+  });
+
+  it("the New vessel inventory record draws the not-yet-saved vessel with what Save still needs (#1116)", () => {
+    const record = screen("New vessel");
+    const body = record.body as { type: unknown; props: { model: unknown; reason: unknown } };
+    expect(body.type).toBe(VesselDetailView);
+    expect(body.props.model).toEqual(vesselNew);
+    expect(body.props.reason).toBe("Still needed: a name and a capacity above zero.");
+    expect(screen("Cellar map").to?.["Add vessel"]).toBe("New vessel");
+    expect(screen("Batches").to?.["New vessel"]).toBe("New vessel");
   });
 
   it("the back link names the page it opens: Cellar (#1116)", () => {

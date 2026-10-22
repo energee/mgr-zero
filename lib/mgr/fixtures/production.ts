@@ -155,16 +155,27 @@ export const brewTimelineMineral: BrewTimelineViewModel = {
 export const vesselFv3: VesselDetailViewModel = {
   title: "FV3",
   occupancy: { title: "Stout · BATCH-0168", detail: "13.5 / 15 bbl · 90% full", warning: true },
-  currentReading: "5.2 °P · 68.2 °F · overdue 31 h",
-  history: [
-    { key: "r1", title: "Sep 2, 2026, 7:10 AM", detail: "5.2 °P · 68.2 °F", who: "Dana" },
-    { key: "r2", title: "Sep 1, 2026, 7:04 AM", detail: "6.8 °P · 67.9 °F", who: "Ali" },
-    { key: "r3", title: "Aug 31, 2026, 6:58 AM", detail: "8.6 °P · 67.5 °F", who: "Dana" },
-  ],
+  readings: {
+    current: "5.2 °P · 68.2 °F · overdue 31 h",
+    history: [
+      { key: "r1", title: "Sep 2, 2026, 7:10 AM", detail: "5.2 °P · 68.2 °F", who: "Dana" },
+      { key: "r2", title: "Sep 1, 2026, 7:04 AM", detail: "6.8 °P · 67.9 °F", who: "Ali" },
+      { key: "r3", title: "Aug 31, 2026, 6:58 AM", detail: "8.6 °P · 67.5 °F", who: "Dana" },
+    ],
+  },
   name: "FV3",
   type: "Fermenter",
   typeOptions: ["Fermenter", "Brite", "Barrel", "Kettle", "Other"],
   capacity: "15",
+};
+
+/** New vessel before it is filled in: no name, a capacity of 0, and no readings. */
+export const vesselNew: VesselDetailViewModel = {
+  title: "New vessel",
+  name: "",
+  type: "Fermenter",
+  typeOptions: ["Fermenter", "Brite", "Barrel", "Kettle", "Other"],
+  capacity: "0",
 };
 
 const packagingPlan = {

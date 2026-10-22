@@ -20,10 +20,9 @@ export type VesselDetailViewModel = {
   /** The open occupancy; its row only opens the batch, so it is a row link, not a verb (#1026). */
   occupancy?: { title: string; detail: string; warning?: boolean; href?: string };
   readingHref?: string;
-  /** Absent with `history` on New vessel: a vessel not saved yet has no
-   *  occupancy or readings, so the view draws only its facts (#1116). */
-  currentReading?: string;
-  history?: { key: string; title: string; detail: string; who?: string }[];
+  /** Absent on New vessel: a vessel not saved yet has no occupancy or
+   *  readings, so the view draws only its facts (#1116). */
+  readings?: { current: string; history: { key: string; title: string; detail: string; who?: string }[] };
   name: string;
   type: string;
   typeOptions: string[];
@@ -40,7 +39,7 @@ function hasCapacity(capacity: string): boolean {
 /** A typed capacity the vessel cannot take, shown under the field. A blank
  *  one is not an error: the capacity is then missing (vesselReason). */
 export function vesselCapacityError(capacity: string): string | undefined {
-  return capacity.trim() !== "" && !hasCapacity(capacity) ? "Capacity must be more than 0." : undefined;
+  return capacity.trim() !== "" && !hasCapacity(capacity) ? "Enter a capacity above zero." : undefined;
 }
 
 /** What Save vessel waits for: a name and a capacity above zero. */
