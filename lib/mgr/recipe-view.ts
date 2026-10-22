@@ -3,18 +3,26 @@
 // get_recipe result shape (RecipeSnapshot), the copy of a saved version a new
 // draft starts from (versionToDraft), why a draft cannot be saved yet
 // (draftBlocker), the read page's model of a saved version (toRecipePageModel)
-// and why a prediction is missing (gravityBlockerText, noMashText).
+// and why a prediction is missing (gravityBlockerText, noMashText). A brew-day
+// line also totals in packs at the batch size typed into Show totals at
+// (ingredientPack, batchTotalText), and the draft offers rounding it to whole
+// packs (packRounding).
 import type { ReactNode } from "react";
 import { formatDate } from "@/lib/date-format";
 import { gravityBlockers, type GravityBlocker } from "@/lib/recipe-gravity";
 import { formatGravity, type GravityUnit } from "./gravity-unit";
+import { splitPacks, withPacks } from "./pack-qty";
 import { plural } from "./plural";
+import { fromTicks, toTicks } from "./quantity-input";
 import {
-  fermentationSummary, ingredientDetail, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, processReadout,
+  fermentationSummary, ingredientDetail, isBrewDayStage, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, processReadout,
   type FermentationStage, type IngredientLine, type IngredientStage, type MashStep, type ProcessColumns, type RecipeMaterial, type WaterDraft,
 } from "./recipe-process-view";
-/** `action` (a live Edit) draws in place of `qty` when the page is a draft. */
-export type RecipeIngredientView = { key: string; title: string; detail: string; qty: string; action?: ReactNode };
+/** A brew-day line's per-bbl amount, its material's pack size (base units per pack; 1 = no pack) and base unit. */
+export type RecipePack = { perBbl: number; factor: number; unit: string };
+/** `action` (a live Edit) draws in place of `qty` when the page is a draft. `pack` lets the page total the line
+ *  at a batch size; `onRound` (the live draft only) takes the per-bbl amount a Round choice picked. */
+export type RecipeIngredientView = { key: string; title: string; detail: string; qty: string; action?: ReactNode; pack?: RecipePack; onRound?: (perBbl: number) => void };
 
 /** Input bounds mirroring create_recipe_version, so the browser refuses a
  * decimal minute or a zero volume before the command answers with a raw
@@ -50,6 +58,8 @@ export type RecipeViewModel = {
   priceGroup?: string;
   priceGroupOptions?: string[];
   ingredients?: RecipeIngredientView[];
+  /** Show totals at's starting text. The live pages leave it blank (never saved); the inventory fixture fills it. */
+  totalsAtBbl?: string;
   preBoil?: string;
   boilMin?: string;
   whirlpoolMin?: string;
@@ -156,6 +166,30 @@ export function noMashText(stages: string[]): string | null {
   return stages.length > 0 && !stages.includes("mash") ? "No mash ingredient, so nothing is predicted." : null;
 }
 
+/** The pack a line totals with: brew-day stages only, a positive amount, and a known material; else none. */
+export function ingredientPack(stage: string, perBbl: number, material: Pick<RecipeMaterial, "base_uom" | "purchase_uom_factor"> | undefined): RecipePack | undefined {
+  if (!isBrewDayStage(stage) || !(perBbl > 0) || !material) return undefined;
+  return { perBbl, factor: Number(material.purchase_uom_factor), unit: material.base_uom };
+}
+
+/** The line's batch total at `bbl`, to the 4 decimals material quantities store (as brew day scales it). */
+const batchQty = (p: RecipePack, bbl: number) => fromTicks(toTicks(p.perBbl * bbl));
+
+/** The total the page draws after "22 bbl" and an arrow: "220 lb = 4 × 50 lb + 20 lb", or just "220 lb" with no pack or under one pack. */
+export const batchTotalText = (p: RecipePack, bbl: number): string => withPacks(batchQty(p, bbl), p.factor, p.unit);
+
+/** At `bbl`: whole when the total is already whole packs, else "Round to N × size" down (from one pack up) and up,
+ *  each with the per-bbl amount that gives that many packs, to the 6 decimals per_bbl_qty stores. Null with no pack.
+ *  ponytail: that rounding error grows with `bbl`; from about 100 bbl it can pass half a tick (950.0001 lb for 19 × 50 lb
+ *  at 300 bbl), so the line still offers Round. Exact whole packs at that size need per_bbl_qty to keep more decimals. */
+export function packRounding(p: RecipePack, bbl: number): { whole: boolean; choices: { label: string; perBbl: number }[] } | null {
+  if (p.factor === 1) return null;
+  const split = splitPacks(batchQty(p, bbl), p.factor);
+  if (split.packs > 0 && split.loose === 0) return { whole: true, choices: [] };
+  const counts = split.packs > 0 ? [split.packs, split.packs + 1] : [1];
+  return { whole: false, choices: counts.map((n) => ({ label: `Round to ${n} × ${p.factor} ${p.unit}`, perBbl: Number((n * p.factor / bbl).toFixed(6)) })) };
+}
+
 /** The read page's selected saved version, or the empty state before the first version. */
 export function toRecipePageModel(
   s: RecipeSnapshot,
@@ -184,7 +218,7 @@ export function toRecipePageModel(
     ingredients: ingredients.map((i) => ({
       key: i.id, title: material.name(i.material_id),
       detail: ingredientDetail(i.stage, i.timing_minutes, perBblDisplay(Number(i.per_bbl_qty)), material.unit(i.material_id)),
-      qty: "",
+      qty: "", pack: ingredientPack(i.stage, Number(i.per_bbl_qty), material.get(i.material_id)),
     })),
     ...versionNumbers(v),
     mash: { title: `Mash schedule · ${plural(v.mash_schedule.length, "step")}`, detail: mashRowSummary(v.mash_schedule), rows: v.mash_schedule.map((m) => ({ title: m.name, detail: mashStepDetail(m) })) },

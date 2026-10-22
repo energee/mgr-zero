@@ -51,7 +51,7 @@ export const TAPS: [string | RegExp, string][] = [
   [/^RUN-\d+/, "Close packaging run"],
   ["Reading", "Fermentation reading"],
   ["Outbox", "Offline outbox"],
-  ["Start", "Brew day"],
+  ["Start", "Brew prep"],
   ["Transfer", "Cellar transfer"],
   ["Addition", "Cellar addition"],
   [/^Stop \d+ ·/, "Confirm delivery"],

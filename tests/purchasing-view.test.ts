@@ -171,6 +171,20 @@ it("posted receipt uses counted quantities, captured lot references and current 
   expect(toPostedReceiptViewProps({ ...snapshot, lines: [{ ...snapshot.lines[0], qty_open: 0 }] }, "receipt-id")!.stillOwed).toBe("Nothing owed");
 });
 
+it("posted receipt converts sacks to pounds exactly, without float error", () => {
+  const sack = { material_name: "Pale malt", purchase_uom: "sack", base_uom: "lb", variance: 0 };
+  const snapshot = {
+    id: "po-id", po_no: 7, status: "received", lines: [],
+    receipts: [{ id: "receipt-id", received_on: "2026-09-12", receipt_lines: [
+      { ...sack, po_line_id: "a", qty_counted: 2, purchase_uom_factor: 55 },
+      { ...sack, po_line_id: "b", qty_counted: 4.4, purchase_uom_factor: 50 },
+    ] }],
+  };
+  const tape = toPostedReceiptViewProps(snapshot, "receipt-id")!.tape;
+  expect(tape[0][0]).toBe("+110 lb Pale malt · receipt");
+  expect(tape[1][0]).toBe("+220 lb Pale malt · receipt");
+});
+
 describe("receipt Bill presentation", () => {
   const receipt: ReceiptSnapshot = { id: "latest", received_on: "2026-09-20", receipt_lines: [], corrects_receipt_id: "original" };
   const admin = { canPost: true, connected: true, mappingsReady: true, mappingHref: "/settings/accounting/mappings" };

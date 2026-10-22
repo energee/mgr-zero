@@ -107,14 +107,14 @@ isOneToOne: false
                   ]
                 },"batches": {
                   Row: {
-                    "batch_no": number | null,"brewed_on": string | null,"brewery_id": string,"cancelled_at": string | null,"closed_at": string | null,"completion_adjustment_id": string | null,"created_at": string,"created_by": string,"id": string,"intended_brand_id": string | null,"note": string | null,"planned_bbl": number,"planned_on": string,"recipe_version_id": string | null
+                    "batch_no": number | null,"brewed_on": string | null,"brewery_id": string,"cancelled_at": string | null,"closed_at": string | null,"completion_adjustment_id": string | null,"created_at": string,"created_by": string,"id": string,"intended_brand_id": string | null,"note": string | null,"planned_bbl": number,"planned_on": string,"planned_vessel_id": string | null,"recipe_version_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "batch_no"?: number | null,"brewed_on"?: string | null,"brewery_id": string,"cancelled_at"?: string | null,"closed_at"?: string | null,"completion_adjustment_id"?: string | null,"created_at"?: string,"created_by": string,"id"?: string,"intended_brand_id"?: string | null,"note"?: string | null,"planned_bbl": number,"planned_on": string,"recipe_version_id"?: string | null
+                    "batch_no"?: number | null,"brewed_on"?: string | null,"brewery_id": string,"cancelled_at"?: string | null,"closed_at"?: string | null,"completion_adjustment_id"?: string | null,"created_at"?: string,"created_by": string,"id"?: string,"intended_brand_id"?: string | null,"note"?: string | null,"planned_bbl": number,"planned_on": string,"planned_vessel_id"?: string | null,"recipe_version_id"?: string | null
                   }
                   Update: {
-                    "batch_no"?: number | null,"brewed_on"?: string | null,"brewery_id"?: string,"cancelled_at"?: string | null,"closed_at"?: string | null,"completion_adjustment_id"?: string | null,"created_at"?: string,"created_by"?: string,"id"?: string,"intended_brand_id"?: string | null,"note"?: string | null,"planned_bbl"?: number,"planned_on"?: string,"recipe_version_id"?: string | null
+                    "batch_no"?: number | null,"brewed_on"?: string | null,"brewery_id"?: string,"cancelled_at"?: string | null,"closed_at"?: string | null,"completion_adjustment_id"?: string | null,"created_at"?: string,"created_by"?: string,"id"?: string,"intended_brand_id"?: string | null,"note"?: string | null,"planned_bbl"?: number,"planned_on"?: string,"planned_vessel_id"?: string | null,"recipe_version_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -141,6 +141,18 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "product_volume_requirements"
       referencedColumns: ["brand_id","brewery_id"]
+    },{
+      foreignKeyName: "batches_planned_vessel_id_brewery_id_fkey"
+      columns: ["planned_vessel_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "vessel_contents"
+      referencedColumns: ["vessel_id","brewery_id"]
+    },{
+      foreignKeyName: "batches_planned_vessel_id_brewery_id_fkey"
+      columns: ["planned_vessel_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "vessels"
+      referencedColumns: ["id","brewery_id"]
     },{
       foreignKeyName: "batches_recipe_version_id_brewery_id_fkey"
       columns: ["recipe_version_id","brewery_id"]
@@ -242,6 +254,62 @@ isOneToOne: false
       columns: ["style_id","brewery_id"]
 isOneToOne: false
       referencedRelation: "styles"
+      referencedColumns: ["id","brewery_id"]
+    }
+                  ]
+                },"brew_pulls": {
+                  Row: {
+                    "batch_id": string,"bin_id": string,"brewery_id": string,"id": string,"location_id": string,"lot_id": string | null,"material_id": string,"qty": number,"recipe_ingredient_id": string | null,"updated_at": string,"updated_by": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "batch_id": string,"bin_id": string,"brewery_id": string,"id"?: string,"location_id": string,"lot_id"?: string | null,"material_id": string,"qty": number,"recipe_ingredient_id"?: string | null,"updated_at"?: string,"updated_by"?: string
+                  }
+                  Update: {
+                    "batch_id"?: string,"bin_id"?: string,"brewery_id"?: string,"id"?: string,"location_id"?: string,"lot_id"?: string | null,"material_id"?: string,"qty"?: number,"recipe_ingredient_id"?: string | null,"updated_at"?: string,"updated_by"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "brew_pulls_batch_id_brewery_id_fkey"
+      columns: ["batch_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "batches"
+      referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "brew_pulls_bin_id_location_id_brewery_id_fkey"
+      columns: ["bin_id","location_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "bins"
+      referencedColumns: ["id","location_id","brewery_id"]
+    },{
+      foreignKeyName: "brew_pulls_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "brew_pulls_location_id_brewery_id_fkey"
+      columns: ["location_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "brew_pulls_lot_id_material_id_brewery_id_fkey"
+      columns: ["lot_id","material_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "material_lots"
+      referencedColumns: ["id","material_id","brewery_id"]
+    },{
+      foreignKeyName: "brew_pulls_material_id_brewery_id_fkey"
+      columns: ["material_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "materials"
+      referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "brew_pulls_recipe_ingredient_id_brewery_id_fkey"
+      columns: ["recipe_ingredient_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "recipe_ingredients"
       referencedColumns: ["id","brewery_id"]
     }
                   ]
@@ -5398,6 +5466,9 @@ isOneToOne: false
                            },
 "revoke_staff":
 { Args: { "p_brewery": string,"p_request_id": string,"p_user": string }; Returns: Json
+                           },
+"save_batch_pulls":
+{ Args: { "p_batch": string,"p_brewery": string,"p_lines": Json,"p_request_id": string,"p_vessel": string }; Returns: Json
                            },
 "save_catalog_category":
 { Args: { "p_brewery": string,"p_name": string,"p_previous_name": string,"p_request_id": string }; Returns: Json

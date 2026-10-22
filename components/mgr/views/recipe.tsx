@@ -7,14 +7,16 @@
 // `slots`, the bottom button submits, and `controls.blockedReason` says what the
 // draft still lacks. Without `controls`, New recipe version sits in the
 // title row. parentForm draws the recipe's parent fields (name, style, brand,
-// note) at the top.
+// note) at the top. Show totals at is a page-only batch size, never saved:
+// typed, each brew-day line shows its batch total in packs, and off the read
+// page each line not in whole packs offers "Round to N × size", down and up.
 "use client";
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
-import { RECIPE_NUMBERS, type RecipeNumberKey, type RecipeScheduleView, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { batchTotalText, packRounding, RECIPE_NUMBERS, type RecipeIngredientView, type RecipeNumberKey, type RecipeScheduleView, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 
 export type { RecipeViewModel };
 
@@ -40,10 +42,29 @@ export function RecipeView({
   model: RecipeViewModel;
   parentForm?: ReactNode;
   controls?: RecipeControls;
-  /** A cut version: numbers and notes read out as text, schedules as rows, nothing that looks editable. */
+  /** A cut version: numbers and notes read out as text, schedules as rows, nothing that edits it (Show totals at only sizes the totals). */
   readOnly?: boolean;
   slots?: RecipeSlots;
 }) {
+  const [totalsAt, setTotalsAt] = useState(model.totalsAtBbl ?? "");
+  const bbl = Number(totalsAt);
+  const packed = (model.ingredients ?? []).some((row) => row.pack);
+  // A brew-day line's total at the typed size, then Whole packs or (off the read page) its Round choices.
+  const packFoot = ({ pack, onRound }: RecipeIngredientView) => {
+    if (!pack || !(bbl > 0)) return undefined;
+    const rounding = packRounding(pack, bbl);
+    return (
+      <>
+        <span className="text-sm">{bbl} bbl {E.arrow()} {batchTotalText(pack, bbl)}</span>
+        {rounding?.whole ? <span>{E.status("Whole packs", "ok")}</span> : null}
+        {rounding && !readOnly && rounding.choices.length ? (
+          <div className="flex flex-col gap-2 md:flex-row md:justify-end">
+            {rounding.choices.map((c) => <Fragment key={c.label}>{E.btn(c.label, "g", undefined, onRound ? () => onRound(c.perBbl) : undefined)}</Fragment>)}
+          </div>
+        ) : null}
+      </>
+    );
+  };
   const bind = (key: RecipeNumberKey | "notes") => (controls ? { onChange: (value: string) => controls.set(key, value) } : undefined);
   // A schedule: the live draft's sheet trigger, else its heading, rows and summary on a cut version, else the row that opens its screen.
   const schedule = (s: RecipeScheduleView | undefined, slot: ReactNode) => {
@@ -100,8 +121,14 @@ export function RecipeView({
     <>
       {head}
       {E.ttl("Ingredients")}
+      {packed ? (
+        <>
+          {E.edit("Show totals at (bbl)", totalsAt, "number", undefined, { onChange: setTotalsAt, min: 0 })}
+          {bbl > 0 ? null : E.polite("Enter a batch size to see totals in packs.")}
+        </>
+      ) : null}
       {(model.ingredients ?? []).map((row) => (
-        <Fragment key={row.key}>{E.row(row.title, row.detail, row.action ?? row.qty)}</Fragment>
+        <Fragment key={row.key}>{E.row(row.title, row.detail, row.action ?? row.qty, "", undefined, packFoot(row))}</Fragment>
       ))}
       {slots.addIngredient ?? (readOnly ? null : E.row("+ add ingredient", "material · stage · timing", ""))}
       {E.ttl("Process")}

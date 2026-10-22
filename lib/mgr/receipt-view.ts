@@ -1,6 +1,7 @@
 // lib/mgr/receipt-view.ts — view-model for Receipt (inventory echo).
 import { formatDate } from "@/lib/date-format";
 import { poNo } from "./doc-no";
+import { fromPacks } from "./pack-qty";
 import type { RecoveryAttempt } from "@/lib/commands/recovery";
 
 export type ReceiptBillViewModel = {
@@ -101,7 +102,7 @@ export function toPostedReceiptViewProps(po: PostedReceiptSnapshot, receiptId: s
     bill: receiptBillPresentation(receipt, billContext),
     tape: receipt.receipt_lines.map(count => {
       const frozen = count.purchase_uom_factor != null && count.base_uom != null;
-      const quantity = frozen ? Number(count.qty_counted) * Number(count.purchase_uom_factor) : Number(count.qty_counted);
+      const quantity = frozen ? fromPacks(Number(count.qty_counted), 0, Number(count.purchase_uom_factor)) : Number(count.qty_counted);
       const variance = Number(count.variance);
       return [
         `+${quantity} ${frozen ? count.base_uom : "purchase units"} ${count.material_name ?? `Line ${count.po_line_id}`} · receipt`,

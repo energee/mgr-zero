@@ -46,6 +46,8 @@ import { BatchesView } from "@/components/mgr/views/batches";
 import { BeerView } from "@/components/mgr/views/beer";
 import { BinView } from "@/components/mgr/views/bin";
 import { BrewDayView } from "@/components/mgr/views/brew-day";
+import { BrewPrepView } from "@/components/mgr/views/brew-prep";
+import { BrewTimelineView } from "@/components/mgr/views/brew-timeline";
 import { BrandApprovalView } from "@/components/mgr/views/brand-approval";
 import { BrandView } from "@/components/mgr/views/brand";
 import { CatalogView } from "@/components/mgr/views/catalog";
@@ -71,6 +73,7 @@ import { AccountingView, ConnectQuickBooksView, DisconnectQuickBooksView, QboSyn
 import { accountingExpired, quickBooksMappings } from "@/lib/mgr/fixtures/accounting";
 import { tapBoard, tapBoardSkus, kickKeg, swapKeg } from "@/lib/mgr/fixtures/taproom";
 import { cellarAdditionCitra, cellarTransferPils } from "@/lib/mgr/fixtures/production";
+import { brewTurnModel } from "@/lib/mgr/brew-day-view";
 import { CustomerView } from "@/components/mgr/views/customer";
 import { CustomersView } from "@/components/mgr/views/customers";
 import { DeniedView } from "@/components/mgr/views/denied";
@@ -192,7 +195,7 @@ import { newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubm
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
 import { parsPils } from "@/lib/mgr/fixtures/pars";
 import {
-  batchesBrewer, brewDayHazy, brewDayTurnsHazy, closePackagingRunHazy, FERM_STAGES, MASH_STEPS, recipeBrandOptions, recipeHazyV4, recipesList, WATER_HAZY,
+  batchesBrewer, brewDayTurnsHazy, brewPrepMineral, brewTimelineMineral, closePackagingRunHazy, FERM_STAGES, MASH_STEPS, recipeBrandOptions, recipeHazyV4, recipesList, WATER_HAZY,
   runClosedHazy, scheduleBatchHazy, vesselFv3,
 } from "@/lib/mgr/fixtures/production";
 import { PICK_SHEET_DATE_CHIPS, pickSheet } from "@/lib/mgr/fixtures/pick-sheet";
@@ -1667,7 +1670,7 @@ export const SCREENS: Screen[] = [
     slice: 4,
     tab: "Work",
     name: "Batches",
-    to: { Brew: "Brew day", "New vessel": "Vessel detail" },
+    to: { Brew: "Brew prep", "New vessel": "Vessel detail" },
     job: "See planned and active batches with the next brew or cellar action",
     reads: "list_batches · list_vessels · list_brands · list_recipes · get_gravity_unit",
     writes: "none [scheduling happens on Schedule batch; recording on Brew day or Fermentation reading; existing commands]",
@@ -1692,13 +1695,39 @@ export const SCREENS: Screen[] = [
     slice: 4,
     tab: "Work",
     name: "Brew day",
-    to: { "2-row": "Entity picker", "Citra \u00b7 boil": "Entity picker", "Yeast": "Entity picker", "Brew sheet · Hazy IPA v4": "Mash schedule" },
+    to: { "2-row": "Entity picker", "Citra \u00b7 boil": "Entity picker", "Yeast": "Entity picker", "Brew sheet · Hazy IPA v4": "Mash schedule", "Record brew turn": "Brew day" },
     job: "Consume actual lots and set knockout baseline",
     reads: "get_brew_day · get_brew_day_plan · get_brew_record · list_vessels",
-    writes: "cancel_batch, reschedule_batch, record_brew_day [confirmed actual sources + frozen sheet + knockout occupancy], correct_brew_record [unused revision with linked compensation]",
+    writes: "record_brew_day [another turn: confirmed actual sources + frozen sheet + knockout into the open vessel], correct_brew_record [unused revision with linked compensation]",
     states: [...permitted("brewer or admin required"), ["multiple turns", "Add brew turn and correct each current turn"]],
-    spec: "Add brew turn records another same-batch knockout into its existing open vessel. Each turn owns its frozen actuals and correction chain; the batch keeps its first brew date. Transfers, started packaging, closure, filed reports and capacity bounds prevent another turn. The brew sheet row is a read-out of the version’s process spec, opened frozen; brew day captures actuals, and fermentation reality arrives through Fermentation reading, so there is no mash-actuals form here. Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
-    body: <><BrewDayView model={brewDayHazy} planActions={<PlanActions plannedOn="2026-09-04" />} /><BrewDayView model={brewDayTurnsHazy} /></>,
+    spec: "A brewed batch's page, drawn recorded and then with Add brew turn open; a planned batch opens Brew prep and the Brew day timeline instead, and a cancelled one shows only that it is cancelled. Add brew turn records another same-batch knockout into its existing open vessel. Each turn owns its frozen actuals and correction chain; the batch keeps its first brew date. Transfers, started packaging, closure, filed reports and capacity bounds prevent another turn. The brew sheet row is a read-out of the version’s process spec, opened frozen; brew day captures actuals, and fermentation reality arrives through Fermentation reading, so there is no mash-actuals form here. Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
+    body: <><BrewDayView model={brewDayTurnsHazy} /><BrewDayView model={brewTurnModel(brewDayTurnsHazy)} /></>,
+  },
+  {
+    step: 7,
+    slice: 4,
+    tab: "Work",
+    name: "Brew prep",
+    to: { "Malted Oats": "Material", "Briess Pilsen": "Material", "Chit Malt": "Material", "Rolled Oats": "Material", "Briess White Wheat": "Material", "Brewer’s Crystals": "Material", "Freestyle Nelson Sauvin 2026": "Material", "Choose lot": "Entity picker", "Done pulling": "Brew day timeline" },
+    job: "Pull a batch's brew-day ingredients before the brew, touching only exceptions",
+    reads: "get_brew_day · get_brew_day_plan · list_vessels",
+    writes: "save_batch_pulls [one RPC: replaces the batch's pulls and planned tank; moves no stock], reschedule_batch, cancel_batch",
+    states: [...permitted("brewer or admin required"), ["at plan", "each line starts at plan in whole packs plus loose pounds"], ["short", "a line pulled below plan turns amber and offers Short", 1], ["no source", "Choose lot picks the bin and lot to pull from", 1]],
+    spec: "The Prep tab of a batch, drawn like the order Pick sheet. Lines group under the brew-day stages that consume them: Mash, Boil, Whirlpool. Each line starts at the recipe plan scaled to the batch, shown in whole packs of the material's purchase unit plus loose pounds, so 220 lb of a 50 lb sack reads 4 × 50 lb + 20 lb. A pack count accepts decimals (4.4 sacks). An opened bag is not tracked as inventory: a partial pull is just pounds. Cellar-stage additions are listed as later work, not pulled here. Done pulling saves each line's pulled quantity, source bin and lot, plus the planned vessel, as a draft that moves no stock, then opens the Brew day tab, which starts from those pulls. The tabs sit under the title, then the planned barrels, date and note on one line. A line under one pack shows only its pounds field. On desk each line is one row with its fields at the right; on a phone Print pull list and Done pulling stay at the foot of the screen. Change plan (Reschedule, Cancel plan) is folded at the bottom, outside the pull form. A planned tank retired since Prep starts unchosen. The live batch page mounts this view on a planned batch's Prep tab.",
+    body: <BrewPrepView model={brewPrepMineral} planActions={<PlanActions plannedOn="2026-10-22" />} />,
+  },
+  {
+    step: 7,
+    slice: 4,
+    tab: "Work",
+    name: "Brew day timeline",
+    to: { "Confirm all": "Brew day timeline", "Malted Oats": "Material", "Briess Pilsen": "Material", "Chit Malt": "Material", "Rolled Oats": "Material", "Briess White Wheat": "Material", "Brewer’s Crystals": "Material", "Freestyle Nelson Sauvin 2026": "Material" },
+    job: "Brew in process order, confirming each pulled ingredient and recording knockout once",
+    reads: "get_brew_day · get_brew_day_plan · list_vessels",
+    writes: "record_brew_day [existing command: confirmed actual sources + frozen sheet + knockout occupancy]",
+    states: [...permitted("brewer or admin required"), ["in progress", "the first stage with an unconfirmed ingredient is the open one on a phone"], ["unconfirmed", "Record brew day stays disabled until every ingredient is confirmed", 1], ["knockout", "vessel, barrels and brew date set the loss baseline"]],
+    spec: "The Brew day tab of a batch, redesigned as a timeline: Mash, Lauter, Boil, Whirlpool, Knockout. Each stage heads with its recipe target and holds its own ingredients and process readings. A row confirms as pulled in one tap; Edit opens the same packs and loose pounds field Prep uses. The recipe owns each ingredient's stage, so there is no stage pick. Vessel, knockout barrels and brew date close the timeline in Knockout. On a phone the stages fold so one is open at a time. Record brew day stays the one irreversible verb. A line with no exact source (its material sits in several bins) picks one in Edit. With nothing pulled, Confirm no ingredients used appears and Record needs it. Confirm all confirms every row at once. Each stage heading counts its confirmed ingredients, so a folded stage says what is left. On a phone Edit and Confirm take their own full-width line, and Record brew day stays at the foot of the screen; on desk the readings keep a readable width and Knockout is one row. The planned facts sit under the tabs; Change plan is folded at the bottom, outside the record form. The live batch page mounts this view for a planned batch; a recorded or cancelled batch keeps the Brew day screen (history, corrections, brew turns).",
+    body: <BrewTimelineView model={brewTimelineMineral} planActions={<PlanActions plannedOn="2026-10-22" />} />,
   },
   {
     step: 7,
@@ -1991,7 +2020,8 @@ export const SCREENS: Screen[] = [
     slice: 3,
     tab: "More",
     name: "Recipe",
-    to: { Style: "Recipe", "v4 (current)": "Recipe", v3: "Recipe", v2: "Recipe", v1: "Recipe", "+ add ingredient": "Ingredient", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", Water: "Water" },
+    // The Round choices rewrite the line's per bbl in place, so they stay on Recipe.
+    to: { Style: "Recipe", "v4 (current)": "Recipe", v3: "Recipe", v2: "Recipe", v1: "Recipe", "Round to 19 × 50 lb": "Recipe", "Round to 20 × 50 lb": "Recipe", "Round to 1 × 44 lb": "Recipe", "+ add ingredient": "Ingredient", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", Water: "Water" },
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe · list_brands [the parent row's Brand picker] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
     writes: "create_recipe [mutable parent row] · set_recipe_brand [change the parent row's brand after creation] · create_recipe_version [one RPC: immutable version + ingredients + mash and fermentation schedules + water and additions, with assumption and process-spec columns on recipe_versions and per-ingredient extract snapshot on recipe_ingredients]",

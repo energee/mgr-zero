@@ -16,7 +16,7 @@ export const matrix = {
   sale_channels: "deny", channel_prices: "deny", price_group_barcodes: "deny", inventory_movements: "deny", allocations: "deny",
   taproom_pars: "taproom", tap_intervals: "tenant", taproom_counts: "tenant", taproom_count_lines: "tenant", recipes: "deny", recipe_versions: "deny", recipe_ingredients: "deny", recipe_water_additions: "deny",
   vessels: "deny", batches: "deny", vessel_occupancies: "deny", transfers: "deny", volume_adjustments: "deny", volume_adjustment_reclassifications: "deny",
-  fermentation_readings: "deny", material_movements: "deny", batch_additions: "deny", brew_records: "deny", packaging_runs: "deny",
+  fermentation_readings: "deny", material_movements: "deny", batch_additions: "deny", brew_records: "deny", brew_pulls: "deny", packaging_runs: "deny",
   lots: "deny", packaging_run_outputs: "deny", packaging_run_consumptions: "deny", packaging_material_records: "deny", packaging_material_actuals: "deny", material_contracts: "deny",
   purchase_orders: "deny", purchase_order_lines: "deny", receipts: "deny", receipt_lines: "deny",
   material_counts: "deny", material_count_lines: "deny", orders: "deny", order_lines: "deny", order_deposit_lines: "deny", order_events: "deny",
@@ -110,6 +110,7 @@ export async function fixtures() {
   await put("fermentation_readings", { batch_id: batch.id, occupancy_id: occupancy.id, gravity_plato: 5, created_by: owner.id });
   const consumption = await put("material_movements", { material_id: material.id, location_id: wh.id, bin_id: wh.binId, qty: -1, type: "consumption", created_by: owner.id });
   await put("batch_additions", { batch_id: batch.id, stage: "mash", movement_id: consumption.id });
+  await put("brew_pulls", { batch_id: batch.id, material_id: material.id, location_id: wh.id, bin_id: wh.binId, qty: 1, updated_by: owner.id });
   const run = await put("packaging_runs", { brand_id: cat.brandId, planned_on: day, created_by: owner.id });
   await put("lots", { packaging_run_id: run.id, brand_id: cat.brandId, code: "PRIVATE-LOT", packaged_on: day });
   await put("packaging_run_outputs", { run_id: run.id, sku_id: cat.skuId, qty_planned: 1 });

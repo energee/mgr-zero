@@ -6,6 +6,7 @@ import { ReceivePoView } from "@/components/mgr/views/receive-po";
 import { ReceiptView } from "@/components/mgr/views/receipt";
 import { CLOSURE_FORM_ID, CORRECTION_INFO, receiveMode, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
 import { receiptBillRequest, receiptHref, type ReceiptViewModel } from "@/lib/mgr/receipt-view";
+import { fromPacks } from "@/lib/mgr/pack-qty";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { discardRecovery } from "@/lib/commands/recovery";
 
@@ -63,7 +64,7 @@ export function ReceiveForm({ poId, lines, locations, bins, today, model, correc
       })),
       tape: counted.map(line => {
         const count = Number(counts[line.id]), difference = count - line.qty_open;
-        const quantity = line.material?.purchase_uom_factor != null ? count * Number(line.material.purchase_uom_factor) : count;
+        const quantity = line.material?.purchase_uom_factor != null ? fromPacks(count, 0, Number(line.material.purchase_uom_factor)) : count;
         return [`+${quantity} ${line.material?.base_uom ?? line.material?.purchase_uom ?? "purchase units"} ${line.material?.name ?? `Line ${line.id}`} · preview`,
           [line.material?.lot_tracked ? `lot ${lots[line.id]?.trim() || "required"}` : undefined, difference === 0 ? "as expected" : `${difference > 0 ? "over" : "short"} ${Math.abs(difference)}`].filter(Boolean).join(" · ")];
       }),

@@ -14,7 +14,7 @@ export type MashStep = { name: string; kind: string; tempF: number; minutes: num
 /** Conversion happens between these temperatures; outside them a step is not a rest. */
 export const SACC_RANGE_F = [144, 162] as const;
 
-export const totalMinutes = (steps: readonly MashStep[]): number => steps.reduce((total, step) => total + step.minutes, 0);
+export const totalMinutes = (steps: readonly Pick<MashStep, "minutes">[]): number => steps.reduce((total, step) => total + step.minutes, 0);
 
 /**
  * The conversion rest the prediction reads: the longest step sitting in the
