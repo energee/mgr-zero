@@ -226,18 +226,23 @@ export const E = {
       {foot ? <ItemFooter className="flex-col items-stretch gap-2">{foot}</ItemFooter> : null}
     </Item>
   ),
-  /** Soft-filled workflow entry. Tone describes the action, independently of row status.
+  /** Soft-filled workflow entry (primary and destructive are text-only in dark). Tone describes
+   *  the action, independently of row status.
    *  `href` makes it a link on a live page, `onClick` a button that acts in place; fixtures leave both out.
    *  `disabled` holds an in-place action while its command runs.
    *  Primary and destructive keep their 10% tint on hover: the tap row's hover wash already
-   *  darkens underneath, and a deeper tint drops the text below AA (#1041). */
+   *  darkens underneath, and a deeper tint drops the text below AA (#1041). Dark mode drops
+   *  that tint, at rest and on hover: it pulled the text below AA when hovered on every surface,
+   *  and at rest on popovers (#1065). Success, attention and info restate their hover fill under
+   *  dark:, or the ghost Button's dark:hover:bg-muted/50 replaces it and hovered attention text
+   *  falls below AA on cards. */
   act: (t: React.ReactNode, tone: "primary" | "success" | "attention" | "info" | "destructive" = "primary", href?: string, onClick?: () => void, disabled?: boolean) => (
     <Button variant="ghost" size="sm" type="button" data-row-action data-tap asChild={Boolean(href)} onClick={onClick} disabled={disabled} className={cn(
-      tone === "destructive" && "bg-destructive/10 text-destructive hover:bg-destructive/10 hover:text-destructive",
-      tone === "primary" && "bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary",
-      tone === "success" && "bg-success text-success-foreground hover:bg-success/80 hover:text-success-foreground",
-      tone === "attention" && "bg-attention text-attention-foreground hover:bg-attention/80 hover:text-attention-foreground",
-      tone === "info" && "bg-info text-info-foreground hover:bg-info/80 hover:text-info-foreground",
+      tone === "destructive" && "bg-destructive/10 text-destructive hover:bg-destructive/10 hover:text-destructive dark:bg-transparent dark:hover:bg-transparent",
+      tone === "primary" && "bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary dark:bg-transparent dark:hover:bg-transparent",
+      tone === "success" && "bg-success text-success-foreground hover:bg-success/80 hover:text-success-foreground dark:hover:bg-success/80",
+      tone === "attention" && "bg-attention text-attention-foreground hover:bg-attention/80 hover:text-attention-foreground dark:hover:bg-attention/80",
+      tone === "info" && "bg-info text-info-foreground hover:bg-info/80 hover:text-info-foreground dark:hover:bg-info/80",
     )}>{href ? <Link href={href}>{t}</Link> : t}</Button>
   ),
   /** A status word. Not a button; `href` makes it a jump to where the status is fixed (COLA pending → Compliance). */
