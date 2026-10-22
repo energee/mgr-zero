@@ -2,9 +2,14 @@
 // upsert_brand: controlled fields and Save brand, which stays on the page (a
 // new brand moves to its own page, where SKUs and compliance unlock), and
 // the brand's compliance sheets (compliance-forms.tsx) on their rows.
-// Always writable: page.tsx admits Admin and Sales only.
+// Sells as: each switch sends sellsAsCommand (create_sku, or update_sku's
+// active flag) through reconcileBooleanChange, which shows the flip at once
+// and puts it back if the command fails; a row with a SKU slots SkuEditForm.
+// A role without create_sku gets disabled switches and no SKU sheet.
+// The brand form is always writable: page.tsx admits Admin and Sales only.
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CommandFormMessage } from "@/components/mgr/command-form";
@@ -12,26 +17,44 @@ import { E } from "@/components/mgr/e";
 import { BrandView } from "@/components/mgr/views/brand";
 import { CatalogCategoriesControl } from "@/components/mgr/views/catalog-categories";
 import { useCommandAction, useFields } from "@/lib/commands/use-command-form";
+import { sellsAsCommand, type SellsAsRow } from "@/lib/mgr/brand-sells-view";
 import { toBrandViewProps, UNPRICED, type BrandSnapshot } from "@/lib/mgr/brand-view";
+import { reconcileBooleanChange } from "@/lib/mgr/pos-view";
+import type { KegPoolOption } from "@/lib/mgr/sku-view";
+import { SkuEditForm } from "../../sku-form";
 import { ApprovalForm, RegistrationForm } from "./compliance-forms";
 
-export type BrandRow = BrandSnapshot["brand"];
+/** A list_brands SKU, with the facts SkuEditForm edits. */
+type BrandSku = BrandSnapshot["brand"]["skus"][number] & { name: string; keg_pool_id: string | null; batch_share: number | string | null };
+export type BrandRow = Omit<BrandSnapshot["brand"], "skus"> & { skus: BrandSku[] };
+/** The Sells as reads; a format's package_type tells SkuEditForm whether it takes a keg pool. */
+export type SellsReads = Omit<NonNullable<BrandSnapshot["sells"]>, "formats"> & { formats: (NonNullable<BrandSnapshot["sells"]>["formats"][number] & { package_type: string | null })[] };
 
-export function BrandPage({ brand, styles, categories, priceGroups, compliance, cost }: {
+export function BrandPage({ brand, styles, categories, priceGroups, compliance, cost, sells, pools, canSell }: {
   brand: BrandRow | null; styles: string[]; categories: string[]; priceGroups: BrandSnapshot["priceGroups"]; compliance: BrandSnapshot["compliance"]; cost: BrandSnapshot["cost"];
+  sells?: SellsReads; pools: KegPoolOption[]; canSell: boolean;
 }) {
   const router = useRouter();
   const { busy, error, run } = useCommandAction();
   const categoryAction = useCommandAction();
+  const sellsAction = useCommandAction();
+  // A switch's state until the refreshed SKUs arrive; new SKUs from the server replace every one.
+  const [switched, setSwitched] = useState<Record<string, boolean>>({});
+  const [switchedSkus, setSwitchedSkus] = useState(brand?.skus);
+  if (switchedSkus !== brand?.skus) {
+    setSwitchedSkus(brand?.skus);
+    setSwitched({});
+  }
   const { v: f, set } = useFields({
     name: brand?.name ?? "", alias: brand?.alias ?? "", style: brand?.styles?.name ?? "", abv: brand?.abv == null ? "" : String(brand.abv),
     description: brand?.description ?? "", category: brand?.category ?? "", priceGroupId: brand?.price_group_id ?? "", hops: brand?.hops ?? "",
   });
   // The view speaks in ids (UNPRICED for none); the command omits empty strings.
-  const model = toBrandViewProps({
+  const viewModel = toBrandViewProps({
     brand: { id: brand?.id ?? "", name: f.name, alias: f.alias, abv: f.abv, description: f.description, category: f.category, hops: f.hops, price_group_id: f.priceGroupId, styles: f.style ? { name: f.style } : null, skus: brand?.skus ?? [], pours: brand?.pours ?? [] },
-    styles, categories, priceGroups, compliance, cost, backHref: "/catalog", saved: brand,
+    styles, categories, priceGroups, compliance, cost, sells, backHref: "/catalog", saved: brand,
   });
+  const model = { ...viewModel, sells: { ...viewModel.sells, packages: viewModel.sells.packages.map((row) => ({ ...row, on: switched[row.formatId] ?? row.on })) } };
   // Sheets need a saved brand; BrandView draws no compliance section until there is one.
   const subject = brand ? { id: brand.id, name: brand.name } : null;
   const actions = subject
@@ -40,6 +63,20 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
       ...(compliance?.registrations ?? []).map((registration) => [registration.id, <RegistrationForm key={`${registration.id}-${registration.registration_no}-${registration.expires_on}`} brand={subject} registration={registration} />] as const),
     ]);
   const addCompliance = subject && <div className="flex gap-2 py-2"><ApprovalForm brand={subject} /><RegistrationForm brand={subject} /></div>;
+  function onSellsAs(row: SellsAsRow, on: boolean) {
+    const save = (next: boolean) => {
+      const { name, input } = sellsAsCommand(row, next, brand!.id);
+      return sellsAction.run(name, input);
+    };
+    void reconcileBooleanChange(row.on, on, save, (value) => setSwitched((s) => ({ ...s, [row.formatId]: value })));
+  }
+  // BrandView draws Sells as only for a saved brand, so a row's SKU is in brand.skus.
+  function skuSheet(row: SellsAsRow) {
+    if (!canSell) return null;
+    const sku = brand!.skus.find((s) => s.id === row.skuId)!;
+    const format = sells?.formats.find((f) => f.id === row.formatId);
+    return <SkuEditForm sku={sku} formatName={row.name} packageType={format?.package_type} pools={pools} />;
+  }
   const controls = {
     name: set("name"), alias: set("alias"), style: set("style"), abv: set("abv"), category: set("category"), description: set("description"), hops: set("hops"),
     priceGroup: (id: string) => set("priceGroupId")(id === UNPRICED ? "" : id),
@@ -73,6 +110,10 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
         footer={E.btn(busy ? "Saving…" : "Save brand", busy || !f.name.trim() ? "p disabled" : "p")}
         actions={actions ?? undefined}
         addCompliance={addCompliance}
+        onSellsAs={onSellsAs}
+        sellsDetails={skuSheet}
+        sellsDisabled={!canSell || sellsAction.busy}
+        sellsMessages={<CommandFormMessage error={sellsAction.error} />}
       />
     </form>
   );

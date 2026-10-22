@@ -2,8 +2,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { Children, isValidElement, type ComponentProps, type FormEvent, type ReactElement, type ReactNode } from "react";
 import type * as React from "react";
-import { renderToStaticMarkup } from "react-dom/server";
-import { SkuEditForm, SkuForm } from "@/app/(app)/catalog/sku-form";
+import { SkuEditForm } from "@/app/(app)/catalog/sku-form";
 import { CommandForm } from "@/components/mgr/command-form";
 import { SkuView } from "@/components/mgr/views/sku";
 import { skuHazyHalf } from "@/lib/mgr/fixtures/catalog";
@@ -83,17 +82,9 @@ it.each(["0", "-1", "101", "invalid"])("does not dispatch invalid share %s", val
   expect(state.sent).toEqual([]);
 });
 
-it("renders equivalent saved fixture/live shares through SkuView and leaves creation as one command", () => {
+it("renders equivalent saved fixture/live shares through SkuView", () => {
   const fixtureModel = toSkuViewProps({ ...skuHazyHalf, sku });
   const live = viewOf(edit());
   expect(live.type).toBe(SkuView);
   expect(shareControl(edit()).props.value).toBe(fixtureModel.batchSharePercent);
-  state.values = [];
-  const sheet = assemble(() => SkuForm({ brandId: "brand", formats: [{ id: "format", name: "Case" }] }));
-  expect(sheet.type).toBe(CommandForm);
-  const view = viewOf(sheet);
-  expect(view.props.model.batchSharePercent).toBeUndefined();
-  expect(renderToStaticMarkup(view)).toContain("Edit the SKU after creation");
-  submit(sheet);
-  expect(state.sent).toEqual([{ name: "create_sku", input: { brandId: "brand", formatId: "format", name: undefined, upc: undefined, kegPoolId: null } }]);
 });

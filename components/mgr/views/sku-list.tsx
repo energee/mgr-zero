@@ -1,6 +1,6 @@
-// components/mgr/views/sku-list.tsx — SKU list for one brand. Live slots
-// SkuForm as createAction and SkuEditForm as rowAction; inventory draws Add SKU
-// and an unlabeled Edit.
+// components/mgr/views/sku-list.tsx — SKU list for one brand. Live and the
+// inventory pass createAction null (packages are switched on under Brand's
+// Sells as); live slots SkuEditForm as rowAction, the inventory an unlabeled Edit.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { SkuListViewModel } from "@/lib/mgr/sku-list-view";

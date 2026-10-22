@@ -1,8 +1,7 @@
 // app/(app)/catalog/page.tsx — Catalog (screen record): the brand list, then
 // formats. A brand's name opens Brand (brands/[id]); its packages are one tap
-// further, on Brand's SKU list row (brands/[id]/skus) — Catalog no longer nests
-// them. Packaged and poured SKUs are managed together under each brand. Add format
-// opens format-form.tsx; a format's name links to its components and Package BOM.
+// further, switched on and off under Brand's Sells as — Catalog no longer nests
+// them. Add format opens format-form.tsx; a format's name links to its components and Package BOM.
 // ?q=, ?sort= and ?category= narrow and order the brands in list_brands
 // (docs/plans/list-filters.md); ListControls draws them as a GET form and
 // labeled Sort and Category picks whose options are links (toCatalogScopes).

@@ -24,10 +24,13 @@ const FMT_CASE = "00000000-0000-4000-8000-0000000000f3";
 const FMT_HALF = "00000000-0000-4000-8000-0000000000f4";
 const FMT_PINT = "00000000-0000-4000-8000-0000000000f5";
 const FMT_SIXTH = "00000000-0000-4000-8000-0000000000f6";
+const FMT_QUARTER = "00000000-0000-4000-8000-0000000000f7";
 const SKU_HAZY_SIXTH = "00000000-0000-4000-8000-0000000000a4";
 const SKU_HAZY_CASE = "00000000-0000-4000-8000-0000000000a5";
 const SKU_PILS_BOTTLE = "00000000-0000-4000-8000-0000000000a6";
 const PG_3 = "00000000-0000-4000-8000-0000000000p3";
+const CH_WHOLESALE = "00000000-0000-4000-8000-0000000000c1";
+const CH_TAPROOM = "00000000-0000-4000-8000-0000000000c2";
 /** Hazy IPA's one COLA, on Catalog and under Brand → Compliance. */
 const HAZY_COLA = { ttb_id: "25318001000034", approved_on: "2026-01-15" };
 
@@ -40,9 +43,9 @@ const priceGroups = Array.from({ length: 8 }, (_, i) => ({
 }));
 
 const hazySkus = [
-  { id: SKU_HAZY.sku_id, name: SKU_HAZY.name, format_id: FMT_HALF, active: true },
-  { id: SKU_HAZY_SIXTH, name: `${HAZY} · ⅙ bbl keg`, format_id: FMT_SIXTH, active: true },
-  { id: SKU_HAZY_CASE, name: `${HAZY} · case · 24×16 oz`, format_id: FMT_CASE, active: true },
+  { id: SKU_HAZY.sku_id, name: SKU_HAZY.name, format_id: FMT_HALF, active: true, upc: "00810123450127" },
+  { id: SKU_HAZY_SIXTH, name: `${HAZY} · ⅙ bbl keg`, format_id: FMT_SIXTH, active: true, upc: null },
+  { id: SKU_HAZY_CASE, name: `${HAZY} · case · 24×16 oz`, format_id: FMT_CASE, active: true, upc: null },
 ];
 
 const packagedFormats = [
@@ -89,7 +92,7 @@ export const catalogBrands: CatalogSnapshot = {
   priceGroups,
 };
 
-/** Hazy IPA brand sheet: Core, price group 3, 3 active packages. */
+/** Hazy IPA brand sheet: Core, price group 3, 3 active packages (Half, Sixtel, Case, whose Four Packs list beneath), Quarter off, one Glass pour. */
 export const brandHazy: BrandSnapshot = {
   categories: ["Core", "Seasonal", "One-off", "Barrel-aged"],
   brand: {
@@ -102,7 +105,26 @@ export const brandHazy: BrandSnapshot = {
     price_group_id: PG_3,
     styles: { name: HAZY },
     skus: hazySkus,
-    pours: [{ id: FMT_PINT }],
+    pours: [{ id: FMT_PINT, name: "Glass", ounces: 16 }],
+  },
+  // Packaged list_formats (alphabetical), the two sale channels, and group 3's cells.
+  sells: {
+    formats: [
+      { id: FMT_CASE, name: "Case", components: [{ parent_format_id: FMT_CASE, child_format_id: FMT_FOUR, qty: 6 }] },
+      { id: FMT_FOUR, name: "Four Pack", components: [] },
+      { id: FMT_HALF, name: "Half", components: [] },
+      { id: FMT_QUARTER, name: "Quarter", components: [] },
+      { id: FMT_SIXTH, name: "Sixtel", components: [] },
+    ],
+    channels: [{ id: CH_WHOLESALE, name: "Wholesale" }, { id: CH_TAPROOM, name: "Taproom" }],
+    prices: [
+      { sale_channel_id: CH_WHOLESALE, price_group_id: PG_3, format_id: FMT_CASE, unit_price_cents: 5400 },
+      { sale_channel_id: CH_WHOLESALE, price_group_id: PG_3, format_id: FMT_FOUR, unit_price_cents: 1200 },
+      { sale_channel_id: CH_TAPROOM, price_group_id: PG_3, format_id: FMT_FOUR, unit_price_cents: 1600 },
+      { sale_channel_id: CH_WHOLESALE, price_group_id: PG_3, format_id: FMT_HALF, unit_price_cents: 24000 },
+      { sale_channel_id: CH_WHOLESALE, price_group_id: PG_3, format_id: FMT_SIXTH, unit_price_cents: 14000 },
+      { sale_channel_id: CH_TAPROOM, price_group_id: PG_3, format_id: FMT_PINT, unit_price_cents: 800 },
+    ],
   },
   styles: [HAZY, "IPA", PILS, "Add “Cold IPA”"],
   priceGroups,

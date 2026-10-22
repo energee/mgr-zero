@@ -95,10 +95,10 @@ it("gates catalog mutators and excludes inactive SKUs from New Order picker opti
   // there is no Edit brand button to gate.
   expect(page).toMatch(/canWrite[^\n]*E\.btn\("New brand"/);
   expect(page).not.toMatch(/Edit brand/);
-  // A brand's packages, and both SKU sheets, live on its SKU list page.
-  // main214-page-assembly renders that page per role and proves the gating.
+  // A brand's packages are switched on under Sells as; its SKU list page keeps
+  // the edit sheets. main214-page-assembly renders that page per role and proves the gating.
   const skuList = readFileSync("app/(app)/catalog/brands/[id]/skus/page.tsx", "utf8");
-  expect(skuList).toMatch(/canWrite \? <SkuForm/);
+  expect(skuList).not.toContain("<SkuForm");
   expect(skuList).toContain("rowAction={canWrite ?");
   expect(skuList).toContain("<PourForm");
   expect(page).not.toContain("<PourForm");
