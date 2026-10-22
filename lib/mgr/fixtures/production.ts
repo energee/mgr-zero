@@ -169,13 +169,13 @@ export const vesselFv3: VesselDetailViewModel = {
   capacity: "15",
 };
 
-/** New vessel before it is filled in: no name, a capacity of 0, and no readings. */
+/** New vessel before it is filled in: no name, no capacity, and no readings. */
 export const vesselNew: VesselDetailViewModel = {
   title: "New vessel",
   name: "",
   type: "Fermenter",
   typeOptions: ["Fermenter", "Brite", "Barrel", "Kettle", "Other"],
-  capacity: "0",
+  capacity: "",
 };
 
 const packagingPlan = {

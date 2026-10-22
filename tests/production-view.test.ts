@@ -332,6 +332,8 @@ describe("Vessel detail view", () => {
     expect(body.type).toBe(VesselDetailView);
     expect(body.props.model).toEqual(vesselNew);
     expect(body.props.reason).toBe("Still needed: a name and a capacity above zero.");
+    // Like the live page, the capacity starts blank, so no field error is drawn yet.
+    expect(htmlOf(record.body)).not.toContain("Enter a capacity above zero.");
     expect(screen("Cellar map").to?.["Add vessel"]).toBe("New vessel");
     expect(screen("Batches").to?.["New vessel"]).toBe("New vessel");
   });
@@ -342,6 +344,11 @@ describe("Vessel detail view", () => {
     // "Cellar map" stays only as the inventory screen it opens (data-to), never as copy.
     expect(html).toContain('data-to="Cellar map"');
     expect(html.replace(/data-to="[^"]*"/g, "")).not.toContain("Cellar map");
+  });
+
+  it("a refused New vessel names New vessel, and editing a vessel keeps the incomplete state (#1116)", () => {
+    expect(src("app/(app)/cellar/vessels/[id]/page.tsx")).toContain('requirePagePermission(ctx, id === "new" ? "upsert_vessel" : "list_vessels", id === "new" ? "New vessel" : "Vessel detail")');
+    expect(screen("Vessel detail").states?.map(([state]) => state)).toContain("incomplete");
   });
 
   it("the Vessel detail inventory record is VesselDetailView", () => {

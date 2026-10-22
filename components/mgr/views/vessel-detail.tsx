@@ -23,7 +23,7 @@ export function VesselDetailView({ model, onName, onType, onCapacity, messages, 
 }) {
   const capacityId = useId();
   // A drawn fixture (no onCapacity) shows its capacity error at once; a live one waits until the field is left.
-  const [capacityLeft, setCapacityLeft] = useState(!onCapacity);
+  const [showCapacityError, setShowCapacityError] = useState(!onCapacity);
   return <>
     {E.back("Cellar", model.title, undefined, model.backHref, "Cellar map")}
     {model.retired && E.info("This vessel is retired. It is out of the cellar and takes no new beer; its batch history stays.")}
@@ -40,8 +40,8 @@ export function VesselDetailView({ model, onName, onType, onCapacity, messages, 
         {E.edit("Name", model.name, "text", undefined, { onChange: onName, disabled: submitting, required: true })}
         {E.pick("Type", model.type, (model.typeOptions.map(type => ({ value: type, label: type }))), { onChange: onType, disabled: submitting })}
         {E.edit("Capacity (bbl)", model.capacity, "number", undefined, {
-          onChange: onCapacity, onBlur: () => setCapacityLeft(true), disabled: submitting, required: true, min: "0", step: "any",
-          id: capacityId, error: capacityLeft ? vesselCapacityError(model.capacity) : undefined,
+          onChange: onCapacity, onBlur: () => setShowCapacityError(true), disabled: submitting, required: true, min: "0", step: "any",
+          id: capacityId, error: showCapacityError ? vesselCapacityError(model.capacity) : undefined,
         })}
       </FieldGroup>
       {messages}
