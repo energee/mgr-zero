@@ -53,8 +53,9 @@ export type PickSheetSnapshot = {
   }[];
 };
 
-/** Why Print is withheld: an empty sheet has nothing to print, and says so in its title (#1128). */
-export const pickSheetPrintReason = (model: PickSheetViewModel): string | null => model.empty?.title ?? null;
+/** Why Print is withheld: an empty sheet has nothing to print (#1128). Its own
+ *  words, so the header does not repeat the empty state's title. */
+export const pickSheetPrintReason = (model: PickSheetViewModel): string | null => (model.empty ? "Nothing to print yet." : null);
 
 export function toPickSheetViewProps({ orders }: PickSheetSnapshot): PickSheetViewModel {
   if (orders.length === 0) {

@@ -253,6 +253,7 @@ import { toMoreViewProps } from "@/lib/mgr/more-view";
 import { MOVEMENT_CORRECTION_GATE, toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
 import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
 import { newPoReason } from "@/lib/mgr/new-po-view";
+import { submitReason } from "@/lib/mgr/submit-reason";
 import { toNewTransferViewProps } from "@/lib/mgr/new-transfer-view";
 import { toOrderViewProps } from "@/lib/mgr/order-view";
 import { toOrdersListViewProps } from "@/lib/mgr/orders-list-view";
@@ -1206,7 +1207,7 @@ export const SCREENS: Screen[] = [
     job: "Repair a retained SKU after changing customers", reads: "list_skus", writes: "create_order",
     states: [["customer changed", "replace or remove the unavailable selection", 1]],
     spec: "Unavailable selections keep their labels and quantities. Replace the SKU or remove the line before saving.",
-    body: <NewOrderView model={{ ...toNewOrderViewProps(newOrderDraft), skus: [], lines: toNewOrderViewProps(newOrderDraft).lines.map(line => ({ ...line, skuError: "This SKU is unavailable for this order. Choose an available SKU or remove this line." })) }} disabled />,
+    body: <NewOrderView model={{ ...toNewOrderViewProps(newOrderDraft), skus: [], lines: toNewOrderViewProps(newOrderDraft).lines.map(line => ({ ...line, skuError: "This SKU is unavailable for this order. Choose an available SKU or remove this line." })) }} reason={submitReason(["an available SKU on each line"])} />,
   },
   {
     step: 5,

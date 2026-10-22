@@ -20,7 +20,7 @@ import Link from "next/link";
 import { useRef, type AriaAttributes, type ReactNode } from "react";
 
 /** The same stepper for controlled forms and uncontrolled inventory fields. */
-export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, ...attributes }: Omit<FieldControls, "hideLabel"> & { label: string; value?: string; defaultValue?: string }) {
+export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, ...attributes }: Omit<FieldControls, "hideLabel" | "error"> & { label: string; value?: string; defaultValue?: string }) {
   const input = useRef<HTMLInputElement>(null);
   const step = (direction: -1 | 1) => {
     const field = input.current;

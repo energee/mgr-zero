@@ -20,8 +20,10 @@ export type RepackViewModel = {
   lot?: string;
   parents?: RepackOption[]; locations?: RepackOption[]; bins?: RepackOption[]; lots?: RepackOption[];
   parentSkuId?: string; locationId?: string; binId?: string; lotId?: string;
-  /** Where composed formats are set up, on a live page; the inventory leaves it inert. */
-  formatsHref?: string;
+  /** Where a format's contents are set (Catalog), for a user who may do it
+   *  (create_composed_format). null when this user may not, so the empty Break
+   *  note names who can; the inventory leaves it out and the link stays inert. */
+  formatsHref?: string | null;
 };
 
 /** What Confirm repack waits for. A parent with no single composition row is

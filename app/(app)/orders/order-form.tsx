@@ -134,7 +134,7 @@ export function OrderForm({
           {readiness.hint} Go to <Link href="/customers" className="underline">Customers</Link> or <Link href="/catalog" className="underline">Catalog</Link>.
         </p>}
         <CommandFormMessage error={form.error} />
-      </>} submitting={form.submitting} disabled={!readiness.submittable} />
+      </>} submitting={form.submitting} reason={readiness.reason} />
     </form>
   );
 }

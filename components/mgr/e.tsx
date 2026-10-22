@@ -115,22 +115,25 @@ const fieldGrid = (fields: React.ReactNode[], className: string) => (
 /** What a live adapter passes to make a field its own: an onChange, or none
  *  with `disabled` for a read-out that must not look editable. Fixtures pass
  *  nothing and draw a default value. */
-export type FieldControls = Pick<React.InputHTMLAttributes<HTMLInputElement>, "id" | "name" | "disabled" | "required" | "readOnly" | "min" | "max" | "step" | "minLength" | "maxLength" | "pattern" | "placeholder" | "autoComplete" | "inputMode" | "aria-label" | "aria-invalid" | "aria-describedby" | "form"> & {
+export type FieldControls = Pick<React.InputHTMLAttributes<HTMLInputElement>, "id" | "name" | "disabled" | "required" | "readOnly" | "min" | "max" | "step" | "minLength" | "maxLength" | "pattern" | "placeholder" | "autoComplete" | "inputMode" | "aria-label" | "aria-invalid" | "aria-describedby" | "form" | "onBlur"> & {
   onChange?: (value: string) => void;
   /** Inline row controls already have visible context. */
   hideLabel?: boolean;
   contextualLabels?: boolean;
   /** What is wrong with the value, shown under the field (#1121). The field is
-   *  marked invalid; pass `id` too, so the message (`${id}-error`) is linked. */
+   *  marked invalid; pass `id` too, so the message (`${id}-error`) is linked.
+   *  Pass it once the user has left the field (`onBlur`), not while typing. */
   error?: string;
 };
 
 /** A picker with nothing to offer says so, and where the missing record is
  *  made (#1123). `href` is that page on a live screen; the inventory leaves it
- *  out and the link stays "#". `to` names the inventory screen it opens. */
+ *  out and the link stays "#". `to` names the inventory screen it opens. With
+ *  no `label` there is no link: `text` then names who can add the record. */
 export type PickEmpty = { text: string; href?: string; label?: string; to?: string };
 
-const describedBy = (...ids: (string | undefined)[]) => ids.filter(Boolean).join(" ") || undefined;
+/** One aria-describedby value from several optional ids. */
+export const describedBy = (...ids: (string | undefined)[]) => ids.filter(Boolean).join(" ") || undefined;
 
 /** A field's error wiring: the invalid flag and description for the control,
  *  and the FieldError message under it. */
@@ -336,10 +339,10 @@ export const E = {
     </div>
   ),
   /** A form's submit, withheld while `submitting` or while `reason` (from
-   *  submitReason, lib/mgr/submit-reason.ts) names what is missing; the reason
-   *  is printed beside it and linked by aria-describedby (#1122). `id` names
-   *  the button, and the reason is `${id}-reason`. Other options are passed to
-   *  the Button (variant, className, form). */
+   *  submitReason, lib/mgr/submit-reason.ts: "Still needed: …") names what is
+   *  missing; the reason is printed beside it and linked by aria-describedby
+   *  (#1122). `id` names the button, and the reason is `${id}-reason`. Other
+   *  options are passed to the Button (variant, className, form). */
   submit: (label: React.ReactNode, options: Omit<SubmitButtonProps, "label">) => <SubmitButton label={label} {...options} />,
   tape: (arr: [React.ReactNode, React.ReactNode?][]) => (
     <ol className="ml-1 flex flex-col gap-1 border-l-2 pl-3 font-mono text-xs text-muted-foreground">
@@ -447,7 +450,9 @@ export const E = {
   },
   /** A picked value from a list too long for a Select (materials): the trigger opens a
    *  searchable sheet (phone) or dialog (desk). `placeholder` is the trigger text when
-   *  nothing is picked; `selectedLabel` names a retained value missing from `options`. */
+   *  nothing is picked; `selectedLabel` names a retained value missing from `options`.
+   *  With no options the open list says "No … to choose yet", never "No matching …";
+   *  `empty` adds the note and link under the trigger. */
   searchPick: (label: string, value: string, options: SearchPickOption[], controls?: Pick<FieldControls, "id" | "disabled" | "placeholder" | "hideLabel" | "onChange" | "aria-describedby"> & { selectedLabel?: string; previewAction?: boolean; empty?: PickEmpty }) => {
     const empty = options.length ? undefined : controls?.empty;
     const emptyId = empty && controls?.id ? `${controls.id}-empty` : undefined;
@@ -455,7 +460,7 @@ export const E = {
     <Field data-disabled={controls?.disabled}>
       {!controls?.hideLabel && <FieldLabel htmlFor={controls?.id}>{label}</FieldLabel>}
       <SearchPick label={label} value={value} options={options} onChange={controls?.onChange} id={controls?.id} disabled={controls?.disabled} errorId={describedBy(controls?.["aria-describedby"], emptyId)} selectedLabel={controls?.selectedLabel} previewAction={controls?.previewAction}
-        title={label} placeholder={controls?.placeholder ?? `Select ${label.toLowerCase()}`} searchPlaceholder={`Search ${label.toLowerCase()}`} noMatchMessage={`No matching ${label.toLowerCase()}`} emptyMessage={controls?.empty?.text} />
+        title={label} placeholder={controls?.placeholder ?? `Select ${label.toLowerCase()}`} searchPlaceholder={`Search ${label.toLowerCase()}`} noMatchMessage={`No matching ${label.toLowerCase()}`} emptyMessage={controls?.empty?.text ?? `No ${label.toLowerCase()} to choose yet`} />
       {empty && emptyNote(empty, emptyId)}
     </Field>
     );

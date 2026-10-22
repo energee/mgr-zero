@@ -2,8 +2,9 @@
 // create_stock_transfer: source and destination locations (bins default to
 // each location's first), SKU lines with quantities. Materials and kegs move
 // through the same command from the API; this form draws the SKU case. A wholly
-// blank spare line is left out; any other line must be complete, or Create
-// transfer stays withheld (newTransferReason) — it is never silently dropped.
+// blank spare line is left out (transferPayloadLines); any other line must be
+// complete, or Create transfer stays withheld (newTransferReason) — it is never
+// silently dropped. `skusHref` is Catalog only for a user who may create a SKU.
 "use client";
 
 import { useState } from "react";
@@ -12,14 +13,13 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { NewTransferView } from "@/components/mgr/views/new-transfer";
 import { E } from "@/components/mgr/e";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { newTransferReason } from "@/lib/mgr/new-transfer-view";
-import { isBlankLine } from "@/lib/order-form-rules";
+import { newTransferReason, transferPayloadLines } from "@/lib/mgr/new-transfer-view";
 
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 type Line = { skuId: string; qty: string };
 
-export function NewTransferForm({ locations, bins, skus }: { locations: Location[]; bins: Bin[]; skus: { id: string; label: string }[] }) {
+export function NewTransferForm({ locations, bins, skus, skusHref }: { locations: Location[]; bins: Bin[]; skus: { id: string; label: string }[]; skusHref: string | null }) {
   const [fromId, setFromId] = useState("");
   const [toId, setToId] = useState("");
   const [fromBin, setFromBin] = useState("");
@@ -29,7 +29,7 @@ export function NewTransferForm({ locations, bins, skus }: { locations: Location
   const form = useCommandForm("create_stock_transfer", {
     build: () => ({
       fromLocationId: fromId, toLocationId: toId,
-      lines: lines.filter((l) => !isBlankLine(l)).map((l) => ({ skuId: l.skuId, qty: Number(l.qty), fromBinId: fromBin, toBinId: toBin })),
+      lines: transferPayloadLines(lines, fromBin, toBin),
     }),
     reset: () => { setFromId(""); setToId(""); setFromBin(""); setToBin(""); setLines([{ skuId: "", qty: "" }]); },
   });
@@ -46,7 +46,7 @@ export function NewTransferForm({ locations, bins, skus }: { locations: Location
     toBin: toBins.find(bin => bin.id === toBin)?.name ?? "",
     toBinOptions: toBins.map(bin => bin.name),
     skuOptions: skus.map(sku => ({ value: sku.id, label: sku.label })),
-    skusHref: "/catalog",
+    skusHref,
     lines: lines.map(line => ({ sku: line.skuId, title: skus.find(sku => sku.id === line.skuId)?.label ?? "", qty: line.qty })),
   };
   return (

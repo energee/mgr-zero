@@ -7,7 +7,8 @@
 // parent's lots in the chosen bin (get_bin_move_stock, as Record movement
 // does); both legs are written to that lot (#613). A bin holding one lot of
 // the parent and no untracked units starts on that lot. Confirm repack names
-// what it still needs (repackReason).
+// what it still needs (repackReason). `formatsHref` is Catalog only for a user
+// who may set a format's contents; otherwise null, and the note names who can.
 "use client";
 
 import { useEffect, useId, useState } from "react";
@@ -25,7 +26,7 @@ type Bin = { id: string; location_id: string; name: string };
 /** One list_repack_parents row: a composed SKU and the child it breaks into, or null when composition has no single row. */
 export type RepackParent = { id: string; label: string; unit: string; bblPerUnit: number; child: { skuId: string; unit: string; quantity: number } | null };
 
-export function RepackForm({ locations, bins, parents, autoOpen = false }: { autoOpen?: boolean; locations: Location[]; bins: Bin[]; parents: RepackParent[] }) {
+export function RepackForm({ locations, bins, parents, formatsHref, autoOpen = false }: { autoOpen?: boolean; locations: Location[]; bins: Bin[]; parents: RepackParent[]; formatsHref: string | null }) {
   const formId = useId();
   const breweryId = useBrewery();
   const [locationId, setLocationId] = useState("");
@@ -59,7 +60,7 @@ export function RepackForm({ locations, bins, parents, autoOpen = false }: { aut
     }),
     parents: parents.map((p) => ({ id: p.id, name: p.label })),
     locations, bins: bins.filter((b) => b.location_id === locationId), lots,
-    parentSkuId, locationId, binId, lotId: chosenLot, formatsHref: "/catalog/formats",
+    parentSkuId, locationId, binId, lotId: chosenLot, formatsHref,
   };
   const reason = repackReason({ parentSkuId, locationId, binId, qty });
   return (

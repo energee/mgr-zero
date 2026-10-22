@@ -37,23 +37,25 @@ it.each([
   form.props.onSubmit(event);
   expect(harness.sent).toEqual([]);
   const view = form.props.children;
-  expect(view.props.disabled).toBe(true);
+  expect(view.props.reason).toBeTruthy();
   expect(event.preventDefault).toHaveBeenCalledOnce();
   expect(event.stopPropagation).toHaveBeenCalledOnce();
+  // Save draft names what is still needed at once; the line's own field error
+  // waits until the user leaves its quantity (#1121, #1122; tests/form-feedback.test.ts).
+  expect(view.props.reason).toBe("Still needed: a SKU with a quantity above zero on each line.");
   const html = renderToStaticMarkup(view);
-  // The message sits under line 2's quantity, which it marks and describes (#1121).
-  const errorId = html.match(/<div role="alert"[^>]*id="([^"]+)"[^>]*>Line 2: select a SKU and enter a quantity greater than zero, or remove the line\.<\/div>/)?.[1];
-  expect(errorId).toBeTruthy();
-  expect(html).toMatch(new RegExp(`aria-label="Line 2 quantity"[^>]*aria-invalid="true"[^>]*aria-describedby="${errorId}"`));
+  const reasonId = html.match(/<p id="([^"]+)"[^>]*>Still needed: a SKU with a quantity above zero on each line\.<\/p>/)?.[1];
+  expect(reasonId).toBeTruthy();
+  expect(html).toMatch(new RegExp(`<button[^>]*type="submit"[^>]*disabled=""[^>]*aria-describedby="${reasonId}"`));
 });
 
 it("asks to complete the only row without offering nonexistent clearing or Remove actions", () => {
   const view = render([{ skuId: "sku-1", qty: "" }]).props.children;
   const html = renderToStaticMarkup(view);
-  expect(html).toContain('Line 1: select a SKU and enter a quantity greater than zero.');
+  expect(html).toContain("Still needed: a SKU with a quantity above zero on each line.");
   expect(html).not.toContain('clear the line');
   expect(html).not.toContain('remove the line');
-  expect(html).toContain('role="alert"');
+  expect(html).not.toContain(">Remove<");
 });
 
 it("sends every valid line and ignores only wholly blank spare rows", () => {

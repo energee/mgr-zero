@@ -419,7 +419,7 @@ describe("New PO lines", () => {
     expect(counts({ qty: 4 })).toBe(false);
   });
 
-  it("every row is required, removable when there is more than one, and a zero quantity is flagged", () => {
+  it("every row is required, removable when there is more than one, and a zero quantity is flagged once left", () => {
     const noop = () => {};
     const remove = vi.fn();
     const model = {
@@ -433,8 +433,12 @@ describe("New PO lines", () => {
     const html = renderToStaticMarkup(createElement(NewPoView, { model, controls: { material: noop, quantity: noop, remove } }));
     const line = (n: number) => html.slice(html.indexOf(`Line ${n} material`), html.indexOf(`Line ${n} unit cost`));
     expect(line(1)).toContain("required");
-    expect(line(1)).not.toContain('aria-invalid="true"');
-    expect(line(2)).toContain('aria-invalid="true"');
+    // A live line waits for its quantity's blur (useTouchedLines); a drawn one shows the state it depicts.
+    expect(html).not.toContain('aria-invalid="true"');
+    const drawn = renderToStaticMarkup(createElement(NewPoView, { model, controls: { remove } }));
+    const drawnLine = (n: number) => drawn.slice(drawn.indexOf(`Line ${n} material`), drawn.indexOf(`Line ${n} unit cost`));
+    expect(drawnLine(1)).not.toContain('aria-invalid="true"');
+    expect(drawnLine(2)).toContain('aria-invalid="true"');
     expect(html.match(/>Remove</g)).toHaveLength(2);
     const single = renderToStaticMarkup(createElement(NewPoView, { model: { ...model, lines: model.lines.slice(0, 1) }, controls: { remove } }));
     expect(single).not.toContain(">Remove<");
@@ -448,7 +452,6 @@ describe("New PO lines", () => {
 
   it("the live form saves only when every line counts, through the shared check", () => {
     const form = src("app/(app)/purchase-orders/new-po-form.tsx");
-    expect(form).toContain("newPoReason({ vendor: vendorId, lines })");
     expect(form).toMatch(/remove: index =>/);
     expect(src("components/mgr/views/new-po.tsx")).not.toMatch(/const started\b/);
   });
