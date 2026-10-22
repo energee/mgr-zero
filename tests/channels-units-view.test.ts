@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { ChannelView } from "../components/mgr/views/channel";
+import { DeleteChannelControl } from "../components/mgr/views/delete-channel";
 import { SaleChannelsView } from "../components/mgr/views/sale-channels";
 import { GravityUnitControls, UnitsView } from "../components/mgr/views/units";
 import { channelExport, saleChannelsList, unitsPlato } from "../lib/mgr/fixtures/settings-catalog";
@@ -44,8 +45,10 @@ describe("Sale channels view", () => {
     expect(toSaleChannelsViewProps(saleChannelsList).deleteNote).toBeUndefined();
     // An empty list offers no Delete, so it states no rule.
     expect(toSaleChannelsViewProps({ channels: [], canDelete: true }).deleteNote).toBeUndefined();
-    // Every table that references a channel restricts its delete, the Square menu included.
-    expect(CHANNEL_IN_USE_RULE).toBe("A channel used by any movement, customer, order, price or Square menu cannot be deleted.");
+  });
+
+  it("the staff guide quotes the in-use rule the screen states", () => {
+    expect(readFileSync("content/docs/staff-guide.mdx", "utf8")).toContain(CHANNEL_IN_USE_RULE);
   });
 
   it("draws the in-use rule on the list where Delete is offered", () => {
@@ -55,8 +58,7 @@ describe("Sale channels view", () => {
   });
 
   it("the delete confirm states the same rule", () => {
-    const src = readFileSync("components/mgr/views/delete-channel.tsx", "utf8");
-    expect(src).toContain("warning={CHANNEL_IN_USE_RULE}");
+    expect(DeleteChannelControl({ name: "Export" }).props.warning).toBe(CHANNEL_IN_USE_RULE);
   });
 
   it("names an empty list without inventing rows", () => {
@@ -110,7 +112,8 @@ describe("Sale channels view", () => {
     const body = screen("Sale channels").body as { type: unknown; props: { model: unknown } };
     expect(isValidElement(screen("Sale channels").body)).toBe(true);
     expect(body.type).toBe(SaleChannelsView);
-    expect(body.props.model).toEqual(toSaleChannelsViewProps(saleChannelsList));
+    // Drawn as Admin, the persona its permission state names, so it states the rule.
+    expect(body.props.model).toEqual(toSaleChannelsViewProps({ ...saleChannelsList, canDelete: true }));
   });
 
   it("the live channels page mounts SaleChannelsView with no second E.* tree", () => {
@@ -142,7 +145,7 @@ describe("Channel view", () => {
     expect(model.name).toBe("Export");
     expect(model.taxOptions).toEqual(["Taxable", "Export", "Vessel supplies", "Research", "Transfer in bond"]);
     expect(model.taxIndex).toBe(1);
-    expect(model.taxHint).toBe("Export: sold for shipment outside the US, not taxed.");
+    expect(model.taxHint).toBe("Sold for shipment outside the US, not taxed.");
   });
 
   it("labels vessel_supplies at chips index 2", () => {
@@ -161,7 +164,8 @@ describe("Channel view", () => {
     const html = htmlOf(createElement(ChannelView, { model: toChannelViewProps(channelExport) }));
     expect(html).toMatch(/Channel name/);
     expect(html).toMatch(/>Tax treatment</);
-    expect(html).toContain("Export: sold for shipment outside the US, not taxed.");
+    // The hint changes with the selection, so it sits in a status region.
+    expect(html).toMatch(/<div role="status"><p[^>]*>Sold for shipment outside the US, not taxed\.<\/p><\/div>/);
     expect(html).toMatch(/value="Export"/);
     expect(html).toMatch(/>Taxable</);
     expect(html).toMatch(/>Export</);

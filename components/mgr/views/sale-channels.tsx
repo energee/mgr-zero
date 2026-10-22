@@ -1,7 +1,8 @@
 // components/mgr/views/sale-channels.tsx — Sale channels list. Live passes
 // ChannelForm as createAction, ChannelForm + DeleteChannelControl (delete-channel.tsx) via rowTrailing, and the
 // tax-treatment info string; inventory uses Add channel and unlabeled nav.
-// The model's deleteNote (the in-use rule) draws only when rows offer Delete.
+// The model's deleteNote (the in-use rule) draws only when rows offer Delete,
+// as an info note: it is a standing rule, not a warning about this list.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { SaleChannelsViewModel } from "@/lib/mgr/sale-channels-view";
@@ -31,7 +32,7 @@ export function SaleChannelsView({
     <>
       {E.back(backLabel, "Sale channels", createAction !== undefined ? createAction : E.btn("Add channel"), model.backHref)}
       {info ? E.info(info) : null}
-      {model.deleteNote ? E.note(model.deleteNote) : null}
+      {model.deleteNote ? E.info(model.deleteNote) : null}
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (

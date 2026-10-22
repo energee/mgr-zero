@@ -2697,9 +2697,9 @@ export const SCREENS: Screen[] = [
     job: "Name the channels this brewery sells through and what each one is taxed as",
     reads: "list_sale_channels",
     writes: "upsert_sale_channel · delete_sale_channel",
-    states: [["permission", "admin required", 1], ["in use", "delete refused by on delete restrict · human copy, not a 23503", 1], ["seeded", "four defaults arrive with the brewery"], ["inherit", "a customer with no override takes the channel default"]],
+    states: [["permission", "admin required", 1], ["in use", "rule stated above the list and in the delete confirm · a foreign key refuses the delete, human copy, not a 23503", 1], ["seeded", "four defaults arrive with the brewery"], ["inherit", "a customer with no override takes the channel default"]],
     spec: "The channel carries a name and a default tax treatment and nothing else: removal classification stays on the movement type, which is why #42 rejected giving the channel a removal flag or a required-destination-state flag. Resolution order is customer override → channel default, and the resolved value is frozen onto the movement at write time so editing a customer in March never restates January.",
-    body: <SaleChannelsView model={toSaleChannelsViewProps(saleChannelsList)} />,
+    body: <SaleChannelsView model={toSaleChannelsViewProps({ ...saleChannelsList, canDelete: true })} />,
   },
   {
     step: 8,

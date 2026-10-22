@@ -28,7 +28,7 @@ export function ChannelView({
       {E.edit("Channel name", model.name, "text", undefined, { onChange: controls.name, required: Boolean(controls.name) })}
       {E.ttl("Tax treatment")}
       {E.chips(model.taxOptions, model.taxIndex, false, onTaxTreatment ? { onChange: index => onTaxTreatment(TAX_TREATMENTS[index]), label: "Tax treatment" } : undefined)}
-      {E.polite(model.taxHint)}
+      <div role="status">{E.polite(model.taxHint)}</div>
       {E.info("Customers may override this. Sales without a customer take the channel default.")}
       {messages}
       {footer !== undefined ? footer : E.btn("Save channel")}

@@ -1,5 +1,6 @@
-// lib/mgr/channel-view.ts — view-model for the Channel sheet (inventory).
-// Live create/edit stays channel-form.tsx. Chip labels derive from TAX_TREATMENTS.
+// lib/mgr/channel-view.ts — view-model for the Channel sheet, shared by the
+// inventory frame and the live ChannelForm. Chip labels derive from
+// TAX_TREATMENTS; taxHint holds the selected treatment's settled hint copy.
 import { sentenceCase } from "./labels";
 import { TAX_TREATMENTS, type TaxTreatment } from "./tax-treatments";
 
@@ -10,7 +11,7 @@ export const CHANNEL_TAX_TREATMENTS = TAX_TREATMENTS.map(sentenceCase);
 /** What a treatment means, shown under the chips while it is selected. Only
  *  Export has settled wording (#1149); the others wait for confirmed copy. */
 const TAX_TREATMENT_HINTS: Partial<Record<TaxTreatment, string>> = {
-  export: "Export: sold for shipment outside the US, not taxed.",
+  export: "Sold for shipment outside the US, not taxed.",
 };
 
 export type ChannelViewModel = {

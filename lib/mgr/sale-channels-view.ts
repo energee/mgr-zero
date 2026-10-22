@@ -16,7 +16,7 @@ export type SaleChannelsRowView = {
 /** Why a delete is refused: inventory_movements, customers, orders,
  *  channel_prices and pos_menus all reference the channel, and each foreign
  *  key blocks the delete (delete_sale_channel in lib/commands/catalog.ts). */
-export const CHANNEL_IN_USE_RULE = "A channel used by any movement, customer, order, price or Square menu cannot be deleted.";
+export const CHANNEL_IN_USE_RULE = "A channel used by any movement, customer, order, price cell or Square menu cannot be deleted.";
 
 export type SaleChannelsViewModel = {
   backHref?: string;
