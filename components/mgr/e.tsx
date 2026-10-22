@@ -163,8 +163,8 @@ export const E = {
   /** `id` makes the title an anchor; scroll-m keeps it clear of the sticky header (as screen-index does). */
   /** A group heading inside a list, larger than `ttl`: the beer over its formats on Confirm order and Pick. */
   group: (t: React.ReactNode) => <h2 className="mt-3 text-base font-semibold">{t}</h2>,
-  /** The same beer name in a table's first column (Pick, Adjust lines); a long name and alias wraps on a phone. */
-  brand: (t: React.ReactNode) => <span className="inline-block max-w-28 whitespace-normal text-base font-semibold md:max-w-none">{t}</span>,
+  /** The same beer name in a table's first column (Pick, Adjust lines), at the row's text size so its row is no taller than a format row; a long name and alias wraps on a phone. */
+  brand: (t: React.ReactNode) => <span className="inline-block max-w-28 whitespace-normal font-semibold md:max-w-none">{t}</span>,
   ttl: (t: React.ReactNode, id?: string) => <h2 id={id} className={cn("mt-2 text-sm font-medium text-muted-foreground", id && "scroll-m-20")}>{t}</h2>,
   /** `icon` says which kind of thing a row is — only in lists that mix kinds
    * (Today, search); a homogeneous list gets none (docs/plans/hugeicons.md §3). */
@@ -455,9 +455,10 @@ export const E = {
   ),
   /** A small fixed table whose headers sort its rows and remember the last
    *  sort per browser (components/mgr/sort-table.tsx). `{ sortable: false }`
-   *  keeps the given row order, for rows whose position carries meaning. */
-  tbl: (hd: React.ReactNode[], rows: React.ReactNode[][], align?: ("l" | "r")[], opts?: { sortable?: false }) => (
-    <SortTable headers={hd} rows={rows} align={align} sortable={opts?.sortable} />
+   *  keeps the given row order, for rows whose position carries meaning;
+   *  `{ dense: true }` tightens the rows of a read-only list. */
+  tbl: (hd: React.ReactNode[], rows: React.ReactNode[][], align?: ("l" | "r")[], opts?: { sortable?: false; dense?: true }) => (
+    <SortTable headers={hd} rows={rows} align={align} sortable={opts?.sortable} dense={opts?.dense} />
   ),
   /** A blank list. A bare node is the whole message; an {@link EmptyState}
    *  splits it into the fact and the sentence saying what to do next.

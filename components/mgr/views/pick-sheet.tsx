@@ -43,7 +43,7 @@ export function PickSheetView({
               </Fragment>
             ))}
             {E.ttl("Totals")}
-            {E.tbl(["Product", "Format", "Qty"], group.totals.map((t, i) => [startsGroup(group.totals, i) ? E.brand(t.group) : "", t.name, t.qty]), ["l", "l", "r"], { sortable: false })}
+            {E.tbl(["Product", "Format", "Qty"], group.totals.map((t, i) => [startsGroup(group.totals, i) ? E.brand(t.group) : "", t.name, t.qty]), ["l", "l", "r"], { sortable: false, dense: true })}
           </Fragment>
         ))}
     </>
