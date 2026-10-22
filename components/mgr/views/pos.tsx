@@ -122,21 +122,21 @@ function VariationMappingRow({ row, targets, busy, onSave }: {
   row: PosVariationRow; targets: { value: string; label: string }[]; busy?: boolean;
   onSave?: (row: PosVariationRow, target: string) => void;
 }) {
-  const [target, setTarget] = useState("");
+  const [target, setTarget] = useState(row.target);
   return <form className="flex flex-col gap-3 rounded-lg border p-3" onSubmit={event => { event.preventDefault(); onSave?.(row, target); }}>
     {E.hd(row.label, row.detail)}
     <SelectField id={`pos-variation-${row.externalVariationId}`} label="Mapping" value={target}
       options={[...targets, { value: "ignore", label: "Ignore this variation" }]} onChange={setTarget} />
-    <Button variant="outline" disabled={busy || !target}>{busy ? "Saving…" : "Save mapping"}</Button>
+    <Button variant="outline" disabled={busy || !target || target === row.target}>{busy ? "Saving…" : row.disposition === "queued" ? "Save mapping" : "Change mapping"}</Button>
   </form>;
 }
 
-export function PosSaleDetailView({ title, sale, revisions, backHref }: {
+export function PosSaleDetailView({ title, sale, revisions, backHref, backLabel = "Point of sale" }: {
   title: string; sale: PosSaleRow & { location: string; soldAt: string; quantity: string; expected: string; source: string };
-  revisions: { label: string; detail: string; current: boolean }[]; backHref?: string;
+  revisions: { label: string; detail: string; current: boolean }[]; backHref?: string; backLabel?: string;
 }) {
   return <>
-    {E.back("Point of sale", title, undefined, backHref)}
+    {E.back(backLabel, title, undefined, backHref)}
     {E.row(`${sale.location} · ${sale.soldAt}`, sale.detail, sale.amount, sale.status === "mapped" ? "ok" : "w", SquareMark)}
     {E.fld("Source identity", sale.source)}
     {E.fld("Quantity", sale.quantity)}
@@ -147,11 +147,13 @@ export function PosSaleDetailView({ title, sale, revisions, backHref }: {
   </>;
 }
 
-export function PosMenuView({ model, bins = [], channels = [], targets = [], busy, error, notice, onConfigure, onPublish, onMap, backHref }: {
+export function PosMenuView({ model, bins = [], channels = [], targets = [], busy, savingKey, error, notice, onConfigure, onPublish, onMap, backHref }: {
   model: PosMenuModel; bins?: { id: string; name: string }[]; channels?: { id: string; name: string }[];
   /** Map choices for "Also in Square": `sku:<id>`, `format:<id>`; the row adds `ignore`. */
   targets?: { value: string; label: string }[];
   busy?: boolean; error?: string | null; notice?: ReactNode; backHref?: string;
+  /** `externalItemId:externalVariationId` of the Square row whose mapping is saving. */
+  savingKey?: string;
   onConfigure?: (binId: string, channelId: string) => void; onPublish?: () => void;
   onMap?: (row: PosVariationRow, target: string) => void;
 }) {
@@ -160,6 +162,10 @@ export function PosMenuView({ model, bins = [], channels = [], targets = [], bus
   // With no mapped location there is nothing to configure or list: show the
   // model's setup step instead (#997). Its link, if any, comes from the caller.
   const mapped = Boolean(model.selectedLocationId);
+  const mappingRow = (row: PosVariationRow) => {
+    const key = `${row.externalItemId}:${row.externalVariationId}`;
+    return <VariationMappingRow key={key} row={row} targets={targets} busy={busy && savingKey === key} onSave={onMap} />;
+  };
   return <>
     {E.back("More", model.title ?? "Menu", undefined, backHref)}
     {model.setup && E.blank(model.setup, undefined, model.setup.action && E.btn(model.setup.action.label, "p", model.setup.action.href))}
@@ -179,8 +185,10 @@ export function PosMenuView({ model, bins = [], channels = [], targets = [], bus
     <CommandFormMessage error={error ?? null} />
     {model.externalItems.length > 0 && <>
       {E.ttl("Also in Square")}
-      {E.info("These Square items are selling here but did not come from MGR. Map one to a SKU or pour so its sales count toward the taproom variance, or ignore it.")}
-      {model.externalItems.map(row => <VariationMappingRow key={`${row.externalItemId}:${row.externalVariationId}`} row={row} targets={targets} busy={busy} onSave={onMap} />)}
+      {E.info("These Square items have sold but did not come from MGR. Map one to a SKU or pour so its sales count toward the taproom variance, or ignore it.")}
+      {model.externalItems.filter(row => row.disposition === "queued").map(row => mappingRow(row))}
+      {model.externalItems.some(row => row.disposition !== "queued") && E.ttl("Mapped or ignored")}
+      {model.externalItems.filter(row => row.disposition !== "queued").map(row => mappingRow(row))}
     </>}
   </>;
 }

@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { PointOfSaleView, PosItemView, PosMenuView } from "@/components/mgr/views/pos";
 import { SCREENS } from "@/components/mgr/screens";
 import { classifyCommandFailure } from "@/lib/commands/client";
-import { isTerminalPublication, publicationNotice, readPublicationOutcome, reconcileBooleanChange, selectExactCommandAttempt, shouldStartNewCommandAttempt, syncFailureMessage, syncResultMessage, toPosMenuSetup } from "@/lib/mgr/pos-view";
+import { isTerminalPublication, publicationNotice, readPublicationOutcome, reconcileBooleanChange, selectExactCommandAttempt, shouldStartNewCommandAttempt, syncFailureMessage, syncResultMessage, toPosMenuSetup, toPosVariationRow } from "@/lib/mgr/pos-view";
 import { navFor, shippedNav, STAFF_NAV } from "@/lib/mgr/nav";
 import { SCREEN_ROUTES } from "@/lib/mgr/screen-routes";
 
@@ -123,14 +123,31 @@ describe("POS UI truth", () => {
       .toContain('<div className="flex flex-col gap-2">{children}</div>');
   });
 
-  it("maps a Square item from Menu only while one is selling there, beside the one filled Publish verb", () => {
+  it("turns a selling Square variation into a Menu row that knows its current choice", () => {
+    const row = { externalItemId: "i", externalVariationId: "v", itemName: "Guest cider", variationName: "Pint" };
+    expect(toPosVariationRow({ ...row, disposition: "queued", skuId: null, formatId: null, mappingLabel: null }))
+      .toEqual({ externalItemId: "i", externalVariationId: "v", label: "Guest cider · Pint", detail: "Sold in Square · not from MGR", disposition: "queued", target: "" });
+    expect(toPosVariationRow({ ...row, disposition: "mapped", skuId: null, formatId: "f1", mappingLabel: "Pour · Pint" }))
+      .toMatchObject({ detail: "Pour · Pint", disposition: "mapped", target: "format:f1" });
+    expect(toPosVariationRow({ ...row, disposition: "mapped", skuId: "s1", formatId: null, mappingLabel: "SKU · Cider can" }))
+      .toMatchObject({ target: "sku:s1" });
+    expect(toPosVariationRow({ ...row, itemName: null, variationName: null, disposition: "ignored", skuId: null, formatId: null, mappingLabel: "Ignored" }))
+      .toMatchObject({ label: "v", detail: "Ignored", target: "ignore" });
+  });
+
+  it("asks about queued Square items and lets a mapped or ignored one change, beside the one filled Publish verb", () => {
     const base = { locations: [], selectedLocationId: "taproom", locationName: "Taproom", binName: "Cold", channelName: "Taproom", items: [], excluded: [] };
     const quiet = renderToStaticMarkup(createElement(PosMenuView, { model: { ...base, externalItems: [] } }));
     expect(quiet).not.toContain("Also in Square");
-    const selling = renderToStaticMarkup(createElement(PosMenuView, { model: { ...base, externalItems: [{ externalItemId: "i", externalVariationId: "v", label: "Guest cider · pint", detail: "Selling here · not from MGR" }] },
+    const queued = { externalItemId: "i", externalVariationId: "v", label: "Guest cider · pint", detail: "Sold in Square · not from MGR", disposition: "queued" as const, target: "" };
+    const ignored = { externalItemId: "m", externalVariationId: "s", label: "Shirt · Large", detail: "Ignored", disposition: "ignored" as const, target: "ignore" };
+    const selling = renderToStaticMarkup(createElement(PosMenuView, { model: { ...base, externalItems: [queued, ignored] },
       targets: [{ value: "format:pint", label: "Pour · House · pint" }] }));
-    expect(selling).toMatch(/Also in Square[\s\S]*Guest cider · pint[\s\S]*Save mapping/);
+    expect(selling).toMatch(/Also in Square[\s\S]*Guest cider · pint[\s\S]*Save mapping[\s\S]*Mapped or ignored[\s\S]*Shirt · Large[\s\S]*Change mapping/);
     expect(selling).toMatch(/<button[^>]*data-variant="outline"[^>]*>Save mapping/);
+    // Only the row being saved shows its progress.
+    const saving = renderToStaticMarkup(createElement(PosMenuView, { model: { ...base, externalItems: [queued, ignored] }, busy: true, savingKey: "m:s" }));
+    expect(saving.match(/Saving…/g)).toHaveLength(1);
     expect(navFor(shippedNav(STAFF_NAV), ["warehouse"]).find(item => item.label === "More")?.children?.map(child => child.label)).not.toContain("POS mapping");
   });
 

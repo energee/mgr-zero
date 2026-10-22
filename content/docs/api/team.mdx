@@ -458,9 +458,11 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse
 
-List every observed Square variation with queued, ignored, or explicit labeled packaged/poured mapping state
+List every observed Square variation with queued, ignored, or explicit labeled packaged/poured mapping state; selling keeps only variations MGR did not publish that have an accepted sale
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `selling` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

@@ -171,10 +171,31 @@ defineQuery({
   },
 });
 
+/**
+ * The Square variations Menu asks about: not published by MGR (MGR's own are mapped at publish)
+ * and sold at least once. One existence check per candidate variation.
+ * ponytail: N small queries, one per hand-made Square item; move into SQL if that list grows large.
+ */
+async function sellingNotPublished<T extends { external_variation_id: string }>(ctx: Ctx, rows: T[]) {
+  const owned = await completeRows<{ external_variation_id: string }>("Square data", start =>
+    ctx.db.from("pos_catalog_ownership").select("external_variation_id", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).order("external_variation_id").range(start, start + PAGE_SIZE - 1));
+  const ownedIds = new Set(owned.map((row) => row.external_variation_id));
+  const candidates = rows.filter((row) => !ownedIds.has(row.external_variation_id));
+  const sold = await Promise.all(candidates.map(async (row) => {
+    const sale = await unwrap(ctx.db.from("pos_sales").select("id")
+      .eq("brewery_id", ctx.breweryId).eq("external_variation_id", row.external_variation_id).eq("fact_status", "accepted").eq("fact_kind", "sale").limit(1));
+    return Boolean(sale?.length);
+  }));
+  return candidates.filter((_, index) => sold[index]);
+}
+
 defineQuery({
-  name: "list_pos_variations", description: "List every observed Square variation with queued, ignored, or explicit labeled packaged/poured mapping state",
-  input: z.object({}), roles: ["admin", "warehouse"],
-  handler: async (ctx) => {
+  name: "list_pos_variations", description: "List every observed Square variation with queued, ignored, or explicit labeled packaged/poured mapping state; selling keeps only variations MGR did not publish that have an accepted sale",
+  input: z.object({
+    selling: z.boolean().optional().describe("Keep only variations MGR did not publish (no catalog ownership) that have at least one accepted Square sale"),
+  }), roles: ["admin", "warehouse"],
+  handler: async (ctx, input) => {
     const [data, mappings] = await Promise.all([
       completeRows<{ external_item_id: string; external_variation_id: string; external_item_name: string | null;
         external_variation_name: string | null; available: boolean }>("Square data", start =>
@@ -188,7 +209,8 @@ defineQuery({
       ),
     ]);
     const byVariation = new Map(mappings.map((row) => [`${row.external_item_id}\0${row.external_variation_id}`, row]));
-    return data.map((row) => {
+    const rows = input.selling ? await sellingNotPublished(ctx, data) : data;
+    return rows.map((row) => {
       const mapping = byVariation.get(`${row.external_item_id}\0${row.external_variation_id}`);
       return { externalItemId: row.external_item_id, externalVariationId: row.external_variation_id,
         itemName: row.external_item_name, variationName: row.external_variation_name, available: row.available,

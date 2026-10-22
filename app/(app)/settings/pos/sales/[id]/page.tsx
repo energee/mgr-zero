@@ -3,6 +3,7 @@ import { PosSaleDetailView } from "@/components/mgr/views/pos";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { money } from "@/lib/mgr/money";
+import { canOpen } from "@/lib/mgr/nav";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
@@ -14,7 +15,9 @@ export default async function PosSalePage({ params }: { params: Promise<{ id: st
   const { id } = await params, brewery = await getActiveBrewery(), ctx = await buildContext(brewery.id);
   const data = await orNotFound(runCommand("get_pos_sale", { saleId: id }, ctx)) as SaleDetail;
   const sale = data.sale;
-  return <PosSaleDetailView backHref="/settings/pos" title={`Square ${sale.factKind} ${sale.externalOrderId}`} sale={{
+  // Point of sale is admin-only; Warehouse can read a sale, so its back link goes to Menu (#444).
+  const back = canOpen(brewery.roles, "/settings/pos") ? { href: "/settings/pos", label: "Point of sale" } : { href: "/menu", label: "Menu" };
+  return <PosSaleDetailView backHref={back.href} backLabel={back.label} title={`Square ${sale.factKind} ${sale.externalOrderId}`} sale={{
     id: sale.id, label: `${sale.itemName} · ${sale.variationName}`, detail: `${sale.factStatus} · ${sale.mappingLabel ?? sale.mappingStatus}`,
     amount: sale.grossCents == null ? "No amount" : money(sale.grossCents), status: sale.mappingStatus,
     location: sale.locationName, soldAt: formatDateTime(sale.soldAt, brewery.timeZone), quantity: sale.quantity ?? "Not supplied",

@@ -88,13 +88,35 @@ export type PosLocationRow = {
   mgrLocationId: string;
 };
 
-/** An unmapped Square variation selling at the menu's location: Menu asks to map or ignore it. */
+/**
+ * A Square variation MGR did not publish that has sold: Menu asks to map or ignore it while
+ * queued, and lets a mapped or ignored one change. `target` is the current choice in the
+ * Mapping picker's terms (`sku:<id>`, `format:<id>`, `ignore`, or "" while queued).
+ */
 export type PosVariationRow = {
   externalItemId: string;
   externalVariationId: string;
   label: string;
   detail: string;
+  disposition: "queued" | "mapped" | "ignored";
+  target: string;
 };
+
+/** One `list_pos_variations` row, as Menu's "Also in Square" shows it. */
+export function toPosVariationRow(row: {
+  externalItemId: string; externalVariationId: string; itemName: string | null; variationName: string | null;
+  disposition: PosVariationRow["disposition"]; skuId: string | null; formatId: string | null; mappingLabel: string | null;
+}): PosVariationRow {
+  let target = "";
+  if (row.disposition === "ignored") target = "ignore";
+  else if (row.skuId) target = `sku:${row.skuId}`;
+  else if (row.formatId) target = `format:${row.formatId}`;
+  return {
+    externalItemId: row.externalItemId, externalVariationId: row.externalVariationId,
+    label: [row.itemName, row.variationName].filter(Boolean).join(" · ") || row.externalVariationId,
+    detail: row.mappingLabel ?? "Sold in Square · not from MGR", disposition: row.disposition, target,
+  };
+}
 
 export type PosSaleRow = {
   id: string;
@@ -127,6 +149,7 @@ export type PosMenuModel = {
   channelName?: string;
   items: PosMenuItem[];
   excluded: PosMenuItem[];
+  /** Square items MGR did not publish that have sold; the page fills this from `list_pos_variations({ selling: true })`. */
   externalItems: PosVariationRow[];
   message?: string;
   /** Set when no Square location is mapped: what is missing and, for an admin, where to fix it. */
@@ -168,6 +191,7 @@ export type PosMenuSnapshot = {
   items?: PosMenuSnapshotItem[]; excluded?: PosMenuSnapshotItem[];
   /** Case stock in the menu bin offered as its child format (a case is six four-packs). */
   packaged?: { brandId: string; skuId: string; formatId: string; brand: string; format: string; qty: number; priceCents: number | null; available: boolean }[];
+  /** The API's unmapped variations sold at this location; Menu reads `list_pos_variations({ selling: true })` instead. */
   externalItems?: { externalItemId: string; externalVariationId: string; itemName?: string; variationName?: string }[];
 } | null;
 
@@ -184,11 +208,7 @@ export function toPosMenuModel(snapshot: PosMenuSnapshot, locations: { externalL
     selectedLocationId, locationName: snapshot?.location?.name ?? selected?.name ?? "Square location",
     binName: snapshot?.bin?.name, channelName: snapshot?.channel?.name,
     items: (snapshot?.items ?? []).map(item), excluded: (snapshot?.excluded ?? []).map(item),
-    externalItems: (snapshot?.externalItems ?? []).map(row => ({
-      externalItemId: row.externalItemId, externalVariationId: row.externalVariationId,
-      label: [row.itemName, row.variationName].filter(Boolean).join(" · ") || row.externalVariationId,
-      detail: "Selling here · not from MGR",
-    })),
+    externalItems: [],
     message: selected && !snapshot ? "Choose an MGR bin and sales channel before publishing." : undefined,
   };
 }
