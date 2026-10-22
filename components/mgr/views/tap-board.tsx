@@ -1,61 +1,87 @@
+// components/mgr/views/tap-board.tsx — Tap board and its Tap / Kick / Swap
+// sheet, shared by the inventory and /taproom/board. The sheet's submit is
+// withheld with a reason, and a left guest field is marked, from one rule set
+// (tapSheetNeeds); an empty keg SKU picker says where keg SKUs are made (#1114).
 "use client";
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { E } from "@/components/mgr/e";
+import { E, type PickEmpty } from "@/components/mgr/e";
+import { FieldDescription } from "@/components/ui/field";
+import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { formatDateTime, formatWeekday } from "@/lib/date-format";
 import { bblExact } from "@/lib/volume";
 import { Button } from "@/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { ScopePick, type ScopeOption } from "@/components/mgr/scope-pick";
-import { tapLabel, openTapBoardSheet, editTapBoardSheet, type TapBoardState, type TapBoardSheet, type TapSheetFields, type TapInterval } from "@/lib/mgr/tap-board-state";
+import { tapLabel, tapSheetNeeds, tapSheetReason, openTapBoardSheet, editTapBoardSheet, type TapBoardState, type TapBoardSheet, type TapSheetFields, type TapInterval } from "@/lib/mgr/tap-board-state";
 
 export type TapSku = { id: string; name: string; nominalBbl: number };
 const volume = (value: number) => bblExact(value, 4);
 const actor = (label: string | null) => label ? `@${label}` : "staff";
-const fills = [[.25, "¼"], [.5, "½"], [.6, "60%"], [1, "Full"]] as const;
+// Labels only: the stored fills are fixed by the tap_intervals CHECK constraints.
+const fills = [[.25, "25%"], [.5, "50%"], [.6, "60%"], [1, "Full"]] as const;
 const closingFills = [[0, "Empty"], [.25, "About ¼ left"], [.5, "About ½ left"]] as const;
 
-function FillChips({ values, value, onChange }: { values: readonly (readonly [number, string])[]; value: number; onChange: (value: number) => void }) {
-  return <ToggleGroup type="single" variant="outline" size="sm" className="flex-wrap justify-start" value={String(value)} onValueChange={value => { if (value) onChange(Number(value)); }}>{values.map(([fill, label]) => <ToggleGroupItem key={fill} value={String(fill)}>{label}</ToggleGroupItem>)}</ToggleGroup>;
+const VERBS = { tap: "Tap keg", kick: "Kick keg", swap: "Swap · one record" } as const;
+
+function fillChips<Fill extends number>(label: string, options: readonly (readonly [Fill, string])[], value: Fill, onChange: (fill: Fill) => void) {
+  return E.chips(options.map(([, text]) => text), options.findIndex(([fill]) => fill === value), false, { label, onChange: index => onChange(options[index][0]) });
 }
 
+/** The keg SKU picker with nothing to offer. `skusHref` is Catalog for a user
+ *  who may create a SKU, null for one who may not; the inventory leaves it out. */
+const noKegSkus = (skusHref: string | null | undefined): PickEmpty => skusHref === null
+  ? { text: "No keg SKUs to tap yet. Guest keg is still available. An admin or sales member adds keg SKUs in Catalog." }
+  : { text: "No keg SKUs to tap yet. Guest keg is still available.", label: "Add a keg SKU", href: skusHref, to: "Catalog" };
+
 /** `timeZone` is the brewery's: the server renders this client view first, so both sides must format in one zone (#442). */
-export function TapKegView({ sheet: controlledSheet, skus, timeZone, onEdit, closedFact, onReload }: { sheet: TapBoardSheet; skus: TapSku[]; timeZone: string; onEdit?: (fields: Partial<TapSheetFields>) => void; closedFact?: string | null; onReload?: () => void }) {
+export function TapKegView({ sheet: controlledSheet, skus, skusHref, timeZone, onEdit, closedFact, onReload }: { sheet: TapBoardSheet; skus: TapSku[]; skusHref?: string | null; timeZone: string; onEdit?: (fields: Partial<TapSheetFields>) => void; closedFact?: string | null; onReload?: () => void }) {
+  const id = useId();
   const [internalSheet, setInternalSheet] = useState(controlledSheet);
+  // A guest field's error waits until the user leaves it (#1121).
+  const [left, setLeft] = useState<{ guestLabel?: true; guestNominalBbl?: true }>({});
   const sheet = onEdit ? controlledSheet : internalSheet;
   const locked = sheet.attempt.kind === "submitting" || sheet.attempt.kind === "unknown";
   const edit = (patch: Partial<TapSheetFields>) => { if (!locked) { if (onEdit) onEdit(patch); else setInternalSheet(current => ({ ...current, fields: { ...current.fields, ...patch } })); } };
+  const needs = tapSheetNeeds(sheet);
+  const guestError = (field: "guestLabel" | "guestNominalBbl") => left[field] && needs[field] ? `Enter ${needs[field]}.` : undefined;
+  const label = sheet.attempt.kind === "unknown" ? "Retry unchanged" : VERBS[sheet.kind];
+  const submit = { submitting: sheet.attempt.kind === "submitting", reason: tapSheetReason(sheet) };
   return <>
     {closedFact && E.row("Already swapped", closedFact, <Button type="button" variant="outline" onClick={onReload}>Reload</Button>, "w")}
     <fieldset disabled={locked} className="flex flex-col gap-3">
       {sheet.interval && <>{E.ttl(sheet.kind === "kick" ? `Kick tap ${sheet.interval.tap_number ?? "unnumbered"}` : "Coming off")}{E.fld(sheet.kind === "kick" ? "Coming off" : `Tap ${sheet.interval.tap_number ?? "unnumbered"}`, `${tapLabel(sheet.interval)} · ${volume(sheet.interval.nominal_bbl)} · on since ${formatDateTime(sheet.interval.opened_at, timeZone)} · ${actor(sheet.interval.opened_by_label)}`)}</>}
       {sheet.kind !== "tap" && <>
-        {E.pick("Reason", sheet.fields.reason, (["Kicked empty", "Flavor change", "Quality hold"].map(reason => ({ value: reason, label: reason }))), { onChange: (nextValue: string) => edit({ reason: nextValue }) })}
+        {E.pick("Reason", sheet.fields.reason, (["Kicked empty", "Flavor change", "Quality hold"].map(reason => ({ value: reason, label: reason }))), { id: `${id}-reason`, onChange: (nextValue: string) => edit({ reason: nextValue }) })}
         {E.ttl("Remaining")}
-        <FillChips values={closingFills} value={sheet.fields.closeFill} onChange={value => edit({ closeFill: value as 0 | .25 | .5 })} />
+        {fillChips("Remaining", closingFills, sheet.fields.closeFill, closeFill => edit({ closeFill }))}
       </>}
       {sheet.kind !== "kick" && <>
         {E.ttl("Going on")}
-        {sheet.fields.identity !== "guest" && E.pick("Packaged keg SKU", sheet.fields.identity === "same" ? sheet.interval?.sku_id ?? "" : sheet.fields.skuId, [{ value: "", label: "Choose a keg" }, ...(sheet.fields.identity === "same" && sheet.interval?.sku_id && !skus.some(sku => sku.id === sheet.interval?.sku_id) ? [{ value: sheet.interval.sku_id, label: `${tapLabel(sheet.interval)} · ${volume(sheet.interval.nominal_bbl)}` }] : []), ...(skus.map(sku => ({ value: sku.id, label: sku.name + " · " + (volume(sku.nominalBbl)) })))], { onChange: (nextValue: string) => edit({ identity: "own", skuId: nextValue }), required: true })}
-        {E.pick("Identity", String(sheet.fields.identity), [...(sheet.kind === "swap" ? [{ value: "same", label: "Same own SKU", disabled: !sheet.interval?.sku_id }] : []), { value: "own", label: "Own keg" }, { value: "guest", label: "Guest keg" }], { onChange: (nextValue: string) => edit({ identity: nextValue as TapSheetFields["identity"] }) })}
+        {sheet.fields.identity !== "guest" && E.pick("Packaged keg SKU", sheet.fields.identity === "same" ? sheet.interval?.sku_id ?? "" : sheet.fields.skuId, [...(sheet.fields.identity === "same" && sheet.interval?.sku_id && !skus.some(sku => sku.id === sheet.interval?.sku_id) ? [{ value: sheet.interval.sku_id, label: `${tapLabel(sheet.interval)} · ${volume(sheet.interval.nominal_bbl)}` }] : []), ...(skus.map(sku => ({ value: sku.id, label: sku.name + " · " + (volume(sku.nominalBbl)) })))], { id: `${id}-sku`, placeholder: "Choose a keg", empty: noKegSkus(skusHref), onChange: (nextValue: string) => edit({ identity: "own", skuId: nextValue }), required: true })}
+        {E.pick("Identity", String(sheet.fields.identity), [...(sheet.kind === "swap" ? [{ value: "same", label: "Same own SKU", disabled: !sheet.interval?.sku_id }] : []), { value: "own", label: "Own keg" }, { value: "guest", label: "Guest keg" }], { id: `${id}-identity`, onChange: (nextValue: string) => edit({ identity: nextValue as TapSheetFields["identity"] }) })}
         {sheet.fields.identity === "guest" && <>
-          {E.edit("Guest keg label", sheet.fields.guestLabel, "text", undefined, { onChange: (nextValue: string) => edit({ guestLabel: nextValue }), required: true, maxLength: 200 })}
-          {E.edit("Guest nominal BBL", sheet.fields.guestNominalBbl, "number", undefined, { onChange: (nextValue: string) => edit({ guestNominalBbl: nextValue }), required: true, min: "0", step: "any" })}
+          {E.edit("Guest keg label", sheet.fields.guestLabel, "text", undefined, { id: `${id}-guest-label`, onChange: (nextValue: string) => edit({ guestLabel: nextValue }), onBlur: () => setLeft(current => ({ ...current, guestLabel: true })), error: guestError("guestLabel"), required: true, maxLength: 200 })}
+          {E.edit("Guest nominal BBL", sheet.fields.guestNominalBbl, "number", undefined, { id: `${id}-guest-bbl`, onChange: (nextValue: string) => edit({ guestNominalBbl: nextValue }), onBlur: () => setLeft(current => ({ ...current, guestNominalBbl: true })), error: guestError("guestNominalBbl"), required: true, min: "0", step: "any" })}
         </>}
-        {E.edit("Tap number · optional and may repeat", sheet.fields.tapNumber, "text", undefined, { onChange: (nextValue: string) => edit({ tapNumber: nextValue }), maxLength: 80 })}
-        {E.ttl("Opening fill")}<FillChips values={fills} value={sheet.fields.openingFill} onChange={value => edit({ openingFill: value as .25 | .5 | .6 | 1 })} />
+        <div className="flex min-w-0 flex-col gap-2">
+          {E.edit("Tap number · optional", sheet.fields.tapNumber, "text", undefined, { id: `${id}-tap-number`, onChange: (nextValue: string) => edit({ tapNumber: nextValue }), maxLength: 80, "aria-describedby": `${id}-tap-number-help` })}
+          <FieldDescription id={`${id}-tap-number-help`}>Two kegs can share a number. A keg left blank sorts last.</FieldDescription>
+        </div>
+        {E.ttl("Opening fill")}
+        {fillChips("Opening fill", fills, sheet.fields.openingFill, openingFill => edit({ openingFill }))}
       </>}
     </fieldset>
     {E.info(`Remaining is a rough observation. ${sheet.kind === "swap" ? "The atomic swap" : "This action"} does not change finished-goods inventory.`)}
     {sheet.attempt.kind === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The request and fields are frozen; retry unchanged to recover the original result.</CommandFormMessage>}
     {sheet.attempt.kind === "error" && <CommandFormMessage error={sheet.attempt.message} />}
-    <CommandFormFooter><Button type="submit" variant={sheet.kind === "kick" ? "destructive" : "default"} data-variant={sheet.kind === "swap" ? "irreversible" : undefined} className={sheet.kind === "swap" ? "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" : undefined} disabled={sheet.attempt.kind === "submitting"}>{sheet.attempt.kind === "unknown" ? "Retry unchanged" : sheet.attempt.kind === "submitting" ? "Saving…" : sheet.kind === "tap" ? "Tap keg" : sheet.kind === "kick" ? "Kick keg" : "Swap · one record"}</Button></CommandFormFooter>
+    <CommandFormFooter>{sheet.kind === "swap" ? <IrreversibleSubmit label={label} {...submit} /> : E.submit(label, { ...submit, variant: sheet.kind === "kick" ? "destructive" : "default" })}</CommandFormFooter>
     {sheet.kind === "swap" && E.note("The swap is one record. A half-finished swap is not a state this can reach.")}
   </>;
 }
 
-export type TapBoardNavigation = { backHref?: string; countHref?: string; varianceHref?: string; locations: ScopeOption[]; location: string };
+/** `skusHref` is where keg SKUs are made, for the empty keg SKU picker (noKegSkus). */
+export type TapBoardNavigation = { backHref?: string; countHref?: string; varianceHref?: string; skusHref?: string | null; locations: ScopeOption[]; location: string };
 
 /** `timeZone` is the brewery's: the server renders this client view first, so both sides must format in one zone (#442). */
 export function TapBoardView({ state: controlledState, skus, timeZone, navigation, recentEvents, pollError, onOpen, onClose, onEdit, onSubmit, onReload }: {
@@ -80,7 +106,7 @@ export function TapBoardView({ state: controlledState, skus, timeZone, navigatio
     {navigation.locations.length > 0 && <ScopePick label="Location" value={navigation.location} options={navigation.locations} />}
     <div className="flex items-center justify-between gap-2">{E.ttl("On tap")}<Button type="button" size="sm" disabled={navigation.locations.length === 0} onClick={() => open("tap", null)}>Tap keg</Button></div>
     <CommandForm open={Boolean(sheet)} onOpenChange={next => { if (!next && !locked) { if (onClose) onClose(); else setInternalState(current => ({ ...current, sheet: null })); } }} title={sheet?.kind === "kick" ? "Kick keg" : sheet?.kind === "swap" ? "Swap keg" : "Tap keg"}>
-      {sheet && <form onSubmit={event => { event.preventDefault(); onSubmit?.(event); }} className="flex flex-col gap-3"><TapKegView key={sheet.interval?.id ?? "new-tap"} sheet={sheet} skus={skus} timeZone={timeZone} onEdit={edit} onReload={onReload} closedFact={closed ? `${tapLabel(closed)} was closed ${formatDateTime(closed.closed_at, timeZone)} by ${actor(closed.closed_by_label)}. Review the board before acting.` : null} /></form>}
+      {sheet && <form onSubmit={event => { event.preventDefault(); onSubmit?.(event); }} className="flex flex-col gap-3"><TapKegView key={sheet.interval?.id ?? "new-tap"} sheet={sheet} skus={skus} skusHref={navigation.skusHref} timeZone={timeZone} onEdit={edit} onReload={onReload} closedFact={closed ? `${tapLabel(closed)} was closed ${formatDateTime(closed.closed_at, timeZone)} by ${actor(closed.closed_by_label)}. Review the board before acting.` : null} /></form>}
     </CommandForm>
     <CommandFormMessage tone="warning">{pollError}</CommandFormMessage>
     {navigation.locations.length === 0 ? E.blank("No taproom locations yet. Ask Admin to add one under Locations.") : state.snapshot.open.length === 0 ? E.blank("No kegs are on tap.") : <>

@@ -1,4 +1,4 @@
-import { expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { E } from "../components/mgr/e";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -61,4 +61,45 @@ it("closes the keg the history entry names, as its own interval", () => {
   expect(open).toHaveLength(1);
   expect(open[0].id).not.toBe(closed.id);
   expect(open[0].sku_id).toBe(closed.sku_id);
+});
+
+describe("Tap keg sheet feedback (#1114)", () => {
+  const tap = openTapBoardSheet({ open: [], history: [] }, "tap", null, "actual-location").sheet!;
+  const render = (props: Partial<Parameters<typeof TapKegView>[0]> = {}) => renderToStaticMarkup(createElement(TapKegView, { sheet: tap, skus: tapBoardSkus, timeZone: "America/New_York", ...props }));
+
+  it("withholds Tap keg and names what is missing instead of a native bubble", () => {
+    const html = render();
+    expect(html).toContain("Still needed: a packaged keg SKU.");
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled=""[^>]*aria-describedby="[^"]+-reason"[^>]*>Tap keg<\/button>/);
+    expect(render({ sheet: { ...tap, fields: { ...tap.fields, skuId: tapBoardSkus[0].id } } })).not.toContain("Still needed");
+    expect(renderToStaticMarkup(createElement(TapKegView, { sheet: kickKeg, skus: tapBoardSkus, timeZone: "America/New_York" }))).not.toContain("Still needed");
+  });
+
+  it("offers no selectable placeholder keg, and says where keg SKUs come from when there are none", () => {
+    const pick = vi.spyOn(E, "pick");
+    render({ skus: [] });
+    const call = pick.mock.calls.find(([label]) => label === "Packaged keg SKU")!;
+    pick.mockRestore();
+    expect(call[2]).toEqual([]);
+    expect(call[3]).toMatchObject({ placeholder: "Choose a keg" });
+    expect(render({ skus: [], skusHref: "/catalog" })).toMatch(/No keg SKUs to tap yet\. Guest keg is still available\. <a [^>]*href="\/catalog"[^>]*>Add a keg SKU<\/a>/);
+    expect(render({ skus: [], skusHref: null })).toContain("No keg SKUs to tap yet. Guest keg is still available. An admin or sales member adds keg SKUs in Catalog.");
+    expect(render()).not.toContain("No keg SKUs");
+  });
+
+  it("names both guest needs and marks no guest field before it is left", () => {
+    const html = render({ sheet: { ...tap, fields: { ...tap.fields, identity: "guest" } } });
+    expect(html).toContain("Still needed: a guest keg label and a guest nominal BBL above zero.");
+    expect(html).not.toContain('aria-invalid="true"');
+  });
+
+  it("labels the fill chips on one percent scale and the tap number plainly", () => {
+    const html = render();
+    expect(html).toContain('aria-label="Opening fill"');
+    for (const label of ["25%", "50%", "60%", "Full"]) expect(html).toContain(`>${label}</button>`);
+    for (const fraction of ["¼", "½"]) expect(html).not.toContain(`>${fraction}</button>`);
+    expect(html).toContain("Tap number · optional");
+    expect(html).toContain("Two kegs can share a number.");
+    expect(html).not.toContain("may repeat");
+  });
 });

@@ -1,4 +1,5 @@
 import { canRetireCommandFailure } from "@/lib/commands/failure";
+import { submitReason } from "@/lib/mgr/submit-reason";
 
 export type TapInterval = {
   id: string;
@@ -119,24 +120,40 @@ export function pollErrorAfterTapBoardSave(current: string | null, result: TapBo
   return result.refreshError === null ? current : "Tap action saved. Board refresh failed; reload when the connection returns.";
 }
 
-function keg(fields: TapSheetFields) {
-  if (fields.identity === "own") {
-    if (!fields.skuId) throw new Error("Choose an own packaged keg SKU.");
-    return { skuId: fields.skuId };
-  }
+type TapSheetNeeds = Partial<Record<"reason" | "skuId" | "guestLabel" | "guestNominalBbl", string>>;
+
+/** What the sheet's fields still lack, keyed by field, each phrased as a need
+ *  ("a guest keg label"). The one rule set: the withheld submit names these
+ *  (tapSheetReason), the guest fields mark theirs, and payload() refuses them. */
+export function tapSheetNeeds(sheet: TapBoardSheet): TapSheetNeeds {
+  const fields = sheet.fields, needs: TapSheetNeeds = {};
+  if (sheet.kind !== "tap" && !fields.reason.trim()) needs.reason = "a closing reason";
+  if (sheet.kind === "kick") return needs;
+  if (fields.identity === "own" && !fields.skuId) needs.skuId = "a packaged keg SKU";
   if (fields.identity === "guest") {
-    const label = fields.guestLabel.trim(), nominalBbl = Number(fields.guestNominalBbl);
-    if (!label || !Number.isFinite(nominalBbl) || nominalBbl <= 0) throw new Error("Guest kegs need a label and positive nominal BBL.");
-    return { label, nominalBbl };
+    const nominalBbl = Number(fields.guestNominalBbl);
+    if (!fields.guestLabel.trim()) needs.guestLabel = "a guest keg label";
+    if (!(Number.isFinite(nominalBbl) && nominalBbl > 0)) needs.guestNominalBbl = "a guest nominal BBL above zero";
   }
+  return needs;
+}
+
+/** Why Tap keg, Kick keg or Swap is withheld, or null when the sheet is ready. */
+export const tapSheetReason = (sheet: TapBoardSheet) => submitReason(Object.values(tapSheetNeeds(sheet)));
+
+/** The incoming keg, once tapSheetNeeds is empty: "same" sends none. */
+function keg(fields: TapSheetFields) {
+  if (fields.identity === "own") return { skuId: fields.skuId };
+  if (fields.identity === "guest") return { label: fields.guestLabel.trim(), nominalBbl: Number(fields.guestNominalBbl) };
 }
 
 function payload(sheet: TapBoardSheet): TapCommandPayload {
+  const reason = tapSheetReason(sheet);
+  if (reason) throw new Error(reason);
   const tapNumber = sheet.fields.tapNumber.trim() || undefined;
   if (sheet.kind === "tap") return { locationId: sheet.fields.locationId, keg: keg(sheet.fields)!, tapNumber, openingFill: sheet.fields.openingFill };
   if (!sheet.interval) throw new Error("Choose an open keg.");
   const close = { openIntervalId: sheet.interval.id, closeFill: sheet.fields.closeFill, reason: sheet.fields.reason.trim() };
-  if (!close.reason) throw new Error("Choose a closing reason.");
   if (sheet.kind === "kick") return close;
   if (sheet.fields.identity === "same") {
     if (!sheet.interval.sku_id) throw new Error("Guest replacements need an explicit identity.");
