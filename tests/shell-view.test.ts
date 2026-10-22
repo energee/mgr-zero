@@ -30,6 +30,7 @@ import {
   portalForgotPassword,
   portalSetPassword,
   portalSignIn,
+  portalStaffOnly,
   resetPassword,
   setPassword,
   signIn,
@@ -472,6 +473,7 @@ describe("Entry views", () => {
     ["Portal forgot password", portalForgotPassword],
     ["Portal set password", portalSetPassword],
     ["No membership", noMembership],
+    ["Portal staff only", portalStaffOnly],
     ["Expired reset", expiredReset],
   ] as const)("the %s inventory record is EntryView", (name, fixture) => {
     const body = screen(name).body as { type: unknown; props: { model: unknown } };

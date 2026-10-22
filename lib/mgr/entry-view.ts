@@ -36,6 +36,13 @@ export const noMembershipModel: EntryViewModel = {
   info: "Contact your brewery administrator about access.",
   primary: "Create brewery", extraPrimary: "Sign out",
 };
+/** A staff login on no customer account opened the portal; staff roles never grant it (#1145). */
+export const portalStaffOnlyModel: EntryViewModel = {
+  title: "Portal is for customers", inputs: [],
+  note: "The portal is for customer accounts. You are signed in as staff.",
+  info: "Staff roles do not open a customer's portal. To shop as a buyer, sign in with a login on that customer's account.",
+  primary: "Back to Today", extraPrimary: "Sign out",
+};
 export const expiredResetModel: EntryViewModel = {
   title: "Reset link expired", inputs: [],
   note: "This reset link is no longer valid.", primary: "Request a new link",
