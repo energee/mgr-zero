@@ -6,6 +6,7 @@ import { ComposerConversationView } from "@/components/mgr/views/composer-conver
 import { ComposerStripView, isSendKey } from "@/components/mgr/views/composer-strip";
 import { ComposerUnavailableView } from "@/components/mgr/composer-load-boundary";
 import { OfflineOutboxView } from "@/components/mgr/views/composer";
+import { COMPOSER_SETUP_TIMEOUT_MESSAGE, loadComposerSetup } from "@/lib/composer/setup";
 
 describe("composer conversation surface", () => {
   it("renders a transcript, activity, recovery and conversation controls", () => {
@@ -88,10 +89,64 @@ describe("composer conversation surface", () => {
 });
 
 
-it("explains pending setup and offers setup recovery before a conversation exists", () => {
+it("shows progress while setup is pending and offers setup recovery before a conversation exists (#1105)", () => {
   const html = renderToStaticMarkup(createElement(ComposerConversationView, {
     messages: [], activity: "Opening your conversation…", onSetupRetry: () => undefined,
   }));
   expect(html).toContain("Opening your conversation");
+  expect(html).toContain('data-slot="skeleton"');
   expect(html).toContain("Retry setup");
+});
+
+it("shows progress while the chat interface itself loads (#1105)", () => {
+  const html = renderToStaticMarkup(ComposerUnavailableView({ outboxCount: 0, onOutbox: () => undefined, children: null }));
+  expect(html).toContain('data-slot="skeleton"');
+});
+
+describe("composer setup load (#1105)", () => {
+  type Call = { name: string; requestId?: string; signal: AbortSignal };
+  const fake = (answers: Record<string, unknown>, calls: Call[] = []) =>
+    async (name: string, _input: unknown, requestId: string | undefined, signal: AbortSignal) => {
+      calls.push({ name, requestId, signal });
+      return answers[name];
+    };
+
+  it("restores the latest conversation's text turns, bounded by the caller's signal", async () => {
+    const calls: Call[] = [];
+    const signal = new AbortController().signal;
+    const setup = await loadComposerSetup(fake({
+      list_chat_conversations: [{ id: "latest" }, { id: "older" }],
+      get_chat_history: { messages: [
+        { id: "u", role: "user", content: "Hi" },
+        { id: "r", role: "result", content: "{}" },
+        { id: "a", role: "assistant", content: null },
+        { id: "b", role: "assistant", content: "Hello" },
+      ] },
+    }, calls), "create-request", signal);
+    expect(setup.conversationId).toBe("latest");
+    expect(setup.messages.map((message) => [message.id, message.role])).toEqual([["u", "user"], ["b", "assistant"]]);
+    expect(calls.map((call) => call.name)).toEqual(["list_chat_conversations", "get_chat_history"]);
+    expect(calls.every((call) => call.signal === signal)).toBe(true);
+  });
+
+  it("creates the first conversation with the caller's request id so a retry stays idempotent", async () => {
+    const calls: Call[] = [];
+    const setup = await loadComposerSetup(fake({ list_chat_conversations: [], create_chat_conversation: { id: "new" } }, calls), "create-request", new AbortController().signal);
+    expect(setup).toEqual({ conversationId: "new", messages: [] });
+    expect(calls.find((call) => call.name === "create_chat_conversation")?.requestId).toBe("create-request");
+  });
+
+  it("turns a timed-out load into the clear setup failure", async () => {
+    const controller = new AbortController();
+    const hang = (_name: string, _input: unknown, _requestId: string | undefined, signal: AbortSignal) =>
+      new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(signal.reason)));
+    const load = loadComposerSetup(hang, "create-request", controller.signal);
+    controller.abort(new DOMException("signal timed out", "TimeoutError"));
+    await expect(load).rejects.toThrow(COMPOSER_SETUP_TIMEOUT_MESSAGE);
+  });
+
+  it("keeps a server failure's own message", async () => {
+    const fail = async () => { throw new Error("Chat is not enabled for this brewery"); };
+    await expect(loadComposerSetup(fail, "create-request", new AbortController().signal)).rejects.toThrow("Chat is not enabled for this brewery");
+  });
 });

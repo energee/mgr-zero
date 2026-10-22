@@ -249,6 +249,7 @@ import { toMaterialsViewProps } from "@/lib/mgr/materials-view";
 import { toMaterialsOnHandViewProps } from "@/lib/mgr/materials-on-hand-view";
 import { ComposerConversationView } from "@/components/mgr/views/composer-conversation";
 import { ComposerProposalView, OfflineOutboxView } from "@/components/mgr/views/composer";
+import { COMPOSER_SETUP_ACTIVITY } from "@/lib/composer/setup";
 import { toMoreViewProps } from "@/lib/mgr/more-view";
 import { MOVEMENT_CORRECTION_GATE, toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
 import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
@@ -844,6 +845,20 @@ export const SCREENS: Screen[] = [
         onCommit={() => undefined}
       />
     </>,
+  },
+  {
+    step: 4,
+    slice: 1,
+    tab: "Today",
+    group: "Global",
+    name: "Composer setup",
+    to: { "Retry setup": "Composer setup", Minimize: "Today" },
+    job: "Open the actor's latest conversation, or start the first, before input is enabled",
+    reads: "list_chat_conversations · get_chat_history",
+    writes: "create_chat_conversation [first open only; one request id across retries]",
+    states: [["opening", "progress bar · Retry setup · input disabled"], ["timed out", "after 15 seconds: Ask MGR couldn't start · Try again", 1], ["failed", "the server's message · Try again", 1]],
+    spec: "Setup restores the latest conversation and its history, or creates one. A stalled load ends after 15 seconds in the failure alert, and Try again re-runs setup with the same create request id, so a retry never makes a second conversation.",
+    body: <ComposerConversationView messages={[]} activity={COMPOSER_SETUP_ACTIVITY} onSetupRetry={() => undefined} />,
   },
   {
     step: 4,

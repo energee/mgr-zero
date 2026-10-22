@@ -35,6 +35,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Search", file: "components/mgr/search-palette.tsx" },
   { name: "Entity picker", file: "components/mgr/search-palette.tsx" },
   { name: "Composer proposal", file: "components/mgr/composer.tsx" },
+  { name: "Composer setup", file: "components/mgr/composer.tsx" },
   { name: "Composer question", file: "components/mgr/composer.tsx" },
   { name: "Composer answer", file: "components/mgr/composer.tsx" },
   { name: "Unresolved requests", file: "components/mgr/command-recovery.tsx" },

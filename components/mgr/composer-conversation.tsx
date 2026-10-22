@@ -9,9 +9,8 @@ import { ComposerProposalView } from "@/components/mgr/views/composer";
 import { ComposerStripView } from "@/components/mgr/views/composer-strip";
 import { command } from "@/lib/commands/client";
 import { composerMessageText, latestComposerProposal } from "@/lib/chat/messages";
+import { COMPOSER_SETUP_ACTIVITY, COMPOSER_SETUP_TIMEOUT_MS, loadComposerSetup } from "@/lib/composer/setup";
 import { movementFormHref } from "@/lib/composer/state";
-
-type StoredMessage = { id: string; role: "user" | "assistant" | "result"; content: string | null };
 
 export default function ComposerConversation({ open, onOpenChange, focusRequest, outboxCount, onOutbox, children }: {
   open: boolean;
@@ -38,6 +37,8 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
   const focusedRequest = useRef(0);
   // Identifies the current setup load; a superseded run drops its response.
   const setupRun = useRef(0);
+  // One create_chat_conversation identity for every setup attempt, so a retry
+  // after a timeout cannot create a second conversation.
   const setupConversationRequest = useRef<string>(undefined);
   const run = (name: string, input: unknown, requestId?: string, provenance?: Parameters<typeof command>[5]) => command(breweryId, name, input, requestId, expectedContext, provenance);
   const transport = useMemo(() => new DefaultChatTransport({
@@ -48,31 +49,28 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
   }), [breweryId, expectedContext.actorId]);
   const { messages, setMessages, sendMessage, regenerate, stop, status, error, clearError } = useChat({ id: conversationId, messages: initialMessages, generateId: () => crypto.randomUUID(), transport });
 
-  async function newChat(openDrawer = true, live = () => true) {
+  // New chat: a separate private conversation, opened in the drawer.
+  async function newChat() {
     clearError(); setFailure(undefined); setReceipt(undefined);
     try {
-      const requestId = openDrawer ? crypto.randomUUID() : (setupConversationRequest.current ??= crypto.randomUUID());
-      const conversation = await run("create_chat_conversation", { title: "MGR conversation" }, requestId) as { id: string };
-      if (!live()) return;
-      setInitialMessages([]); setConversationId(conversation.id); setMessages([]); if (openDrawer) onOpenChange(true);
-    } catch (cause) { if (live()) failed(cause, "Composer unavailable", openDrawer ? () => void newChat() : reloadSetup); }
+      const conversation = await run("create_chat_conversation", { title: "MGR conversation" }) as { id: string };
+      setInitialMessages([]); setConversationId(conversation.id); setMessages([]); onOpenChange(true);
+    } catch (cause) { failed(cause, "Composer unavailable", () => void newChat()); }
   }
 
-  // Restores the server-owned conversation for this actor/brewery scope. Named
-  // so Try again can re-run the load that failed (#329) rather than only
-  // regenerating the last AI turn; `live` drops a response the scope outlived.
+  // Restores (or creates) the server-owned conversation for this actor/brewery
+  // scope. Named so Try again can re-run the load that failed (#329) rather
+  // than only regenerating the last AI turn; `live` drops a response the scope
+  // outlived. The timeout ends a stalled load in that same failure (#1105).
   async function loadSetup(live: () => boolean) {
     try {
-      const conversations = await run("list_chat_conversations", {}) as { id: string }[];
+      const setup = await loadComposerSetup(
+        (name, input, requestId, signal) => command(breweryId, name, input, requestId, expectedContext, undefined, signal),
+        setupConversationRequest.current ??= crypto.randomUUID(),
+        AbortSignal.timeout(COMPOSER_SETUP_TIMEOUT_MS),
+      );
       if (!live()) return;
-      if (!conversations[0]) { await newChat(false, live); return; }
-      const id = conversations[0].id;
-      const history = await run("get_chat_history", { conversationId: id }) as { messages: StoredMessage[] };
-      if (!live()) return;
-      const restored = history.messages.filter((message) => message.role !== "result" && message.content).map((message) => ({
-        id: message.id, role: message.role as "user" | "assistant", parts: [{ type: "text", text: message.content! }],
-      })) as UIMessage[];
-      setInitialMessages(restored); setConversationId(id);
+      setInitialMessages(setup.messages); setConversationId(setup.conversationId);
     } catch (cause) { if (live()) failed(cause, "Composer unavailable", reloadSetup); }
   }
 
@@ -125,7 +123,7 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
   }
 
   return <>
-    <ComposerConversationView messages={transcript} onSetupRetry={!conversationId ? reloadSetup : undefined} activity={!conversationId && !failure ? "Opening your conversation… Input becomes available when setup finishes. If this persists, retry setup or ask your administrator to check the connection." : status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={failure?.message ?? error?.message} onRetry={retry} onNewChat={() => void newChat()} />
+    <ComposerConversationView messages={transcript} onSetupRetry={!conversationId ? reloadSetup : undefined} activity={!conversationId && !failure ? COMPOSER_SETUP_ACTIVITY : status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={failure?.message ?? error?.message} onRetry={retry} onNewChat={() => void newChat()} />
     {proposalError && <p role="alert" className="rounded-md border border-destructive/40 bg-card p-3 text-sm">{proposalError}</p>}
     {proposal && !receipt && <ComposerProposalView effects={proposal.effects} warnings={proposal.warnings} openHref={movementFormHref(proposal.input)} onCommit={() => void commitProposal()} committing={committing} />}
     {receipt && <p role="status" className="rounded-md border bg-card p-3 text-sm font-medium">{receipt}</p>}
