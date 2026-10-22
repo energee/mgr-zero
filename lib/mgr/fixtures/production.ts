@@ -105,13 +105,13 @@ export const brewDayTurnsHazy: BrewDayViewModel = {
 
 /** BAT-202 Mineral #6 v1, 22 bbl: its mash, boil and whirlpool ingredients, each starting at plan. */
 const mineralIngredients: BrewIngredient[] = ([
-  { key: "malted-oats", name: "Malted Oats", stage: "mash", plan: 1650, unit: "lb", packSize: 55, source: { lot: "MO-2611", bin: "Malt room / A2" } },
-  { key: "pilsen", name: "Briess Pilsen", stage: "mash", plan: 400, unit: "lb", packSize: 50, source: { lot: "BP-0918", bin: "Malt room / A1" } },
-  { key: "chit", name: "Chit Malt", stage: "mash", plan: 220, unit: "lb", packSize: 50, source: null },
-  { key: "rolled-oats", name: "Rolled Oats", stage: "mash", plan: 200, unit: "lb", packSize: 50, source: { lot: null, bin: "Dry storage / D1" } },
-  { key: "white-wheat", name: "Briess White Wheat", stage: "mash", plan: 200, unit: "lb", packSize: 50, source: { lot: "WW-0822", bin: "Malt room / A3" } },
-  { key: "crystals", name: "Brewer’s Crystals", stage: "boil", plan: 110, unit: "lb", packSize: 55, source: { lot: "BC-0710", bin: "Dry storage / D2" } },
-  { key: "nelson", name: "Freestyle Nelson Sauvin 2026", stage: "whirlpool", plan: 44, unit: "lb", packSize: 44, source: { lot: "NS-26-114", bin: "Hop freezer / F1" } },
+  { key: "malted-oats", name: "Malted Oats", materialId: "malted-oats", stage: "mash", plan: 1650, unit: "lb", packSize: 55, source: { lot: "MO-2611", bin: "Malt room / A2", materialId: "malted-oats", locationId: "malt-room", binId: "a2", lotId: "mo-2611" } },
+  { key: "pilsen", name: "Briess Pilsen", materialId: "pilsen", stage: "mash", plan: 400, unit: "lb", packSize: 50, source: { lot: "BP-0918", bin: "Malt room / A1", materialId: "pilsen", locationId: "malt-room", binId: "a1", lotId: "bp-0918" } },
+  { key: "chit", name: "Chit Malt", materialId: "chit", stage: "mash", plan: 220, unit: "lb", packSize: 50, source: null },
+  { key: "rolled-oats", name: "Rolled Oats", materialId: "rolled-oats", stage: "mash", plan: 200, unit: "lb", packSize: 50, source: { lot: null, bin: "Dry storage / D1", materialId: "rolled-oats", locationId: "dry-storage", binId: "d1", lotId: null } },
+  { key: "white-wheat", name: "Briess White Wheat", materialId: "white-wheat", stage: "mash", plan: 200, unit: "lb", packSize: 50, source: { lot: "WW-0822", bin: "Malt room / A3", materialId: "white-wheat", locationId: "malt-room", binId: "a3", lotId: "ww-0822" } },
+  { key: "crystals", name: "Brewer’s Crystals", materialId: "crystals", stage: "boil", plan: 110, unit: "lb", packSize: 55, source: { lot: "BC-0710", bin: "Dry storage / D2", materialId: "crystals", locationId: "dry-storage", binId: "d2", lotId: "bc-0710" } },
+  { key: "nelson", name: "Freestyle Nelson Sauvin 2026", materialId: "nelson", stage: "whirlpool", plan: 44, unit: "lb", packSize: 44, source: { lot: "NS-26-114", bin: "Hop freezer / F1", materialId: "nelson", locationId: "hop-freezer", binId: "f1", lotId: "ns-26-114" } },
 ] satisfies Omit<BrewIngredient, "packs" | "loose">[]).map(startAtPlan);
 
 const mineralVessels = [1, 2, 3, 4, 5, 6].map(n => ({ id: `fv${n}`, name: `FV${n}`, kind: "fermenter", capacity_bbl: 25.5 }));
@@ -125,9 +125,17 @@ export const brewPrepMineral: BrewPrepViewModel = {
   later: "Fermentation 1 · Dry hop 6",
 };
 
+/** Chit Malt sits in two bins, so Prep could not pick its source alone: Edit offers both. */
+const chitStock = [
+  { material_id: "chit", material_name: "Chit Malt", unit: "lb", location_id: "malt-room", location_name: "Malt room", bin_id: "a4", bin_name: "A4", lot_id: "cm-0907", lot_code: "CM-0907", qty: 150 },
+  { material_id: "chit", material_name: "Chit Malt", unit: "lb", location_id: "malt-room", location_name: "Malt room", bin_id: "a5", bin_name: "A5", lot_id: "cm-1002", lot_code: "CM-1002", qty: 300 },
+];
+
 /** Brew day mid-mash: the first two mash rows confirmed, so Mash is the open stage on a phone. */
 export const brewTimelineMineral: BrewTimelineViewModel = {
   title: brewPrepMineral.title,
+  planned: "22 bbl · Oct 22, 2026",
+  sources: chitStock,
   ingredients: brewPrepMineral.ingredients.map(row => ({ ...row, confirmed: row.key === "malted-oats" || row.key === "pilsen" })),
   targets: { mash: "152 °F · 60 min · pH 5.3", lauter: "pre-boil 25 bbl", boil: "60 min", whirlpool: "180 °F · 20 min", knockout: "66 °F" },
   process: { mashWaterGal: "620", targetMashPh: "5.3" },
@@ -217,11 +225,13 @@ export const recipeHazyV4: RecipeViewModel = {
   recipeNote: "The flagship. Keep it soft and juicy.",
   priceGroup: "3",
   priceGroupOptions: ["Not decided", "1", "2", "3", "4", "5", "6", "7", "8"],
+  // 2-row comes in 50 lb sacks and Citra in 44 lb boxes; the dry hop is a cellar stage, so it has no pack total.
   ingredients: [
-    { key: "malt", title: "2-row", detail: "mash · 44 lb / bbl", qty: "" },
-    { key: "boil", title: "Citra", detail: "boil · 10 min · 0.4 lb / bbl", qty: "" },
+    { key: "malt", title: "2-row", detail: "mash · 44 lb / bbl", qty: "", pack: { perBbl: 44, factor: 50, unit: "lb" } },
+    { key: "boil", title: "Citra", detail: "boil · 10 min · 0.4 lb / bbl", qty: "", pack: { perBbl: 0.4, factor: 44, unit: "lb" } },
     { key: "dh", title: "Citra", detail: "dry hop · day 4 · 1.2 lb / bbl", qty: "" },
   ],
+  totalsAtBbl: "22",
   preBoil: "16.8",
   boilMin: "60",
   whirlpoolMin: "20",

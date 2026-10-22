@@ -1,10 +1,14 @@
-// app/(app)/batches/[id]/page.tsx — one batch: planned facts, and either the
-// occupancy it landed in (brewed) or record-brew-day-form.tsx (planned).
+// app/(app)/batches/[id]/page.tsx — one batch. A planned batch (not brewed,
+// not cancelled) mounts the Brew day timeline (BrewTimelineView): ingredients
+// start from its saved Prep pulls, else plan; vessel and date sit in Knockout.
+// A recorded batch (history, Correct turn, Add brew turn) and a cancelled one
+// keep BrewDayView; the timeline does not model corrections or turns.
 // get_brew_day is the read; only open vessels not already occupied make
 // sense to offer, but record_brew_day itself is the one place that refuses
 // an overlap, so every active vessel is offered here (list_vessels hides
 // retired ones, and the database refuses beer into them).
-import { brewPlanActuals, currentBrewRecords, type BrewPlan, type BrewMaterialSource, type BrewRecordView } from "@/lib/mgr/brew-day-view";
+import { brewPlanActuals, currentBrewRecords, type BrewPlan, type BrewMaterialSource, type BrewPull, type BrewRecordView } from "@/lib/mgr/brew-day-view";
+import { brewIngredients, brewTargets } from "@/lib/mgr/brew-prep-view";
 import { getActiveBrewery } from "@/lib/brewery";
 import { formatDate } from "@/lib/date-format";
 import { buildContext } from "@/lib/commands/context";
@@ -14,7 +18,7 @@ import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { batNo } from "@/lib/mgr/doc-no";
 import { ChangePlan } from "../../plan-actions";
-import { RecordBrewDayForm } from "./record-brew-day-form";
+import { RecordBrewDayForm, RecordBrewTimelineForm } from "./record-brew-day-form";
 
 type Batch = {
   id: string; batch_no: number | null; intended_brand_id: string | null; recipe_version_id: string | null;
@@ -22,6 +26,7 @@ type Batch = {
 };
 type Occupancy = { id: string; vessel_id: string; initial_bbl: number; started_at: string; vessel_name: string };
 type Vessel = { id: string; name: string; kind: string; capacity_bbl: number };
+type Plan = { batch: { planned_vessel_id: string | null }; plan: BrewPlan; sources: BrewMaterialSource[]; pulls: BrewPull[] };
 
 export default async function BatchPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,17 +38,23 @@ export default async function BatchPage({ params }: { params: Promise<{ id: stri
     breweryToday(ctx),
     runCommand("get_brew_day_plan", { batchId: id }, ctx),
     runCommand("get_brew_record", { batchId: id }, ctx),
-  ])) as [{ batch: Batch; occupancy: Occupancy | null }, Vessel[], string, { plan: BrewPlan; sources: BrewMaterialSource[] }, { records: BrewRecordView[] }];
+  ])) as [{ batch: Batch; occupancy: Occupancy | null }, Vessel[], string, Plan, { records: BrewRecordView[] }];
 
   const recorded = Boolean(batch.brewed_on || occupancy);
+  const plannedBbl = Number(batch.planned_bbl), planned = plannedBbl + " bbl · " + formatDate(batch.planned_on);
+  if (!recorded && !batch.cancelled_at) return <RecordBrewTimelineForm batchId={batch.id} planActions={<ChangePlan kind="batch" id={batch.id} plannedOn={batch.planned_on} />} model={{
+    title: batNo(batch.batch_no), backHref: "/batches", planned, note: batch.note ?? undefined,
+    ingredients: brewIngredients(plan.plan, plan.pulls, plan.sources, plannedBbl), sources: plan.sources, targets: brewTargets(plan.plan), process: {},
+    vesselId: plan.batch.planned_vessel_id ?? "", vessels, initialBbl: String(plannedBbl), brewedOn: today,
+  }} />;
   const confirmedBbl = currentBrewRecords(history.records).reduce((sum, record) => sum + record.initial_bbl, 0);
   const model = {
     plan: plan.plan, sources: plan.sources, records: history.records, actuals: brewPlanActuals(plan.plan, Number(batch.planned_bbl), plan.sources), process: {}, confirmEmpty: false,
     title: batNo(batch.batch_no), backHref: "/batches",
-    planned: Number(batch.planned_bbl) + " bbl · " + formatDate(batch.planned_on), note: batch.note ?? undefined,
+    planned, note: batch.note ?? undefined,
     today, plannedBbl: Number(batch.planned_bbl), recorded, cancelled: !!batch.cancelled_at, vesselId: occupancy?.vessel_id ?? "", vesselName: occupancy?.vessel_name, vessels,
     initialBbl: history.records.length ? String(confirmedBbl) : occupancy ? String(Number(occupancy.initial_bbl)) : recorded ? "" : String(Number(batch.planned_bbl)),
     brewedOn: batch.brewed_on ?? (recorded ? "" : today),
   };
-  return <RecordBrewDayForm key={`${batch.id}:${history.records.length}`} batchId={batch.id} model={model} planActions={<ChangePlan kind="batch" id={batch.id} plannedOn={batch.planned_on} />} />;
+  return <RecordBrewDayForm key={`${batch.id}:${history.records.length}`} batchId={batch.id} model={model} />;
 }

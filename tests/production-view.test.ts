@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { BatchesView } from "../components/mgr/views/batches";
 import { BrewDayView } from "../components/mgr/views/brew-day";
+import { BrewTimelineView } from "../components/mgr/views/brew-timeline";
 import { ClosePackagingRunView } from "../components/mgr/views/close-packaging-run";
 import { RecipeView } from "../components/mgr/views/recipe";
 import { RecipesView } from "../components/mgr/views/recipes";
@@ -16,7 +17,7 @@ import { RunClosedView } from "../components/mgr/views/run-closed";
 import { ScheduleBatchView } from "../components/mgr/views/schedule-batch";
 import { VesselDetailView } from "../components/mgr/views/vessel-detail";
 import {
-  batchesBrewer, brewDayHazy, brewDayTurnsHazy, closePackagingRunHazy, recipeHazyV4, recipesList,
+  batchesBrewer, brewDayHazy, brewDayTurnsHazy, brewTimelineMineral, closePackagingRunHazy, recipeHazyV4, recipesList,
   runClosedHazy, scheduleBatchHazy, vesselFv3,
 } from "../lib/mgr/fixtures/production";
 import { toBatchesViewProps, batchesFromQuery, type BatchListRow } from "../lib/mgr/batches-view";
@@ -235,12 +236,35 @@ describe("Brew day view", () => {
     expect(html).toMatch(/FV2/);
   });
 
-  it("the live batch page delegates both states through RecordBrewDayForm to BrewDayView", () => {
+  it("the live batch page sends a planned batch to BrewTimelineView and a recorded or cancelled one to BrewDayView", () => {
     const page = src("app/(app)/batches/[id]/page.tsx");
     const form = src("app/(app)/batches/[id]/record-brew-day-form.tsx");
     expect(form).toMatch(/from "@\/components\/mgr\/views\/brew-day"/);
     expect(form).toMatch(/<BrewDayView\b/);
+    expect(form).toMatch(/from "@\/components\/mgr\/views\/brew-timeline"/);
+    expect(form).toMatch(/<BrewTimelineView\b/);
     expect(page).toMatch(/<RecordBrewDayForm\b/);
+    expect(page).toMatch(/<RecordBrewTimelineForm\b/);
+  });
+
+  it("the Brew day timeline inventory record is BrewTimelineView with Change plan", () => {
+    const body = screen("Brew day timeline").body as { type: unknown; props: { model: unknown; planActions: { type: unknown } } };
+    expect(body.type).toBe(BrewTimelineView);
+    expect(body.props.model).toEqual(brewTimelineMineral);
+    expect(body.props.planActions.type).toBe(PlanActions);
+  });
+
+  it("draws the timeline's planned facts and Change plan above the record form, so their fields never submit it", () => {
+    const html = htmlOf(createElement(BrewTimelineView, { model: brewTimelineMineral, planActions: createElement(PlanActions, { plannedOn: "2026-10-22" }) }));
+    expect(html).toContain("22 bbl · Oct 22, 2026");
+    expect(html.indexOf("Change plan")).toBeGreaterThan(-1);
+    expect(html.indexOf("Change plan")).toBeLessThan(html.indexOf("<form"));
+    expect(html).not.toContain("Confirm no ingredients used");
+  });
+
+  it("offers Confirm no ingredients used on the timeline only when nothing is pulled", () => {
+    const none = { ...brewTimelineMineral, ingredients: brewTimelineMineral.ingredients.map(row => ({ ...row, packs: "0", loose: "0" })) };
+    expect(htmlOf(createElement(BrewTimelineView, { model: none }))).toContain("Confirm no ingredients used");
   });
 });
 

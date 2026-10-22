@@ -2,11 +2,15 @@
 // pull list (drawn like the order Pick sheet), and the Brew day timeline
 // (Mash → Lauter → Boil → Whirlpool → Knockout). Both read the same brew-day
 // ingredients, counted in packs plus loose base units (./pack-qty). Open bags
-// are not inventory: a partial pull is just base units.
-import { BREW_DAY_STAGES } from "./recipe-process-view";
-import type { BrewDayVessel } from "./brew-day-view";
+// are not inventory: a partial pull is just base units. Prep is saved as
+// brew_pulls through save_batch_pulls; nothing here moves stock.
+import { BREW_DAY_STAGES, INGREDIENT_STAGES } from "./recipe-process-view";
+import { brewDayLines, brewSourceKey, isBrewDayStage, observedProcess, plannedQty, soleSource, type BrewDayVessel, type BrewMaterialSource, type BrewPlan, type BrewPull } from "./brew-day-view";
+import { sentenceCase } from "./labels";
+import type { SourceIds } from "./material-source";
 import { fromPacks, packs, splitPacks } from "./pack-qty";
 import { toTicks } from "./quantity-input";
+import { totalMinutes } from "./recipe-schedule";
 
 export type BrewDayStage = (typeof BREW_DAY_STAGES)[number];
 
@@ -14,13 +18,15 @@ export type BrewDayStage = (typeof BREW_DAY_STAGES)[number];
 export type BrewIngredient = {
   key: string;
   name: string;
+  /** The recipe line's material; a source is chosen among this material's stock. */
+  materialId: string;
   stage: BrewDayStage;
   plan: number;
   unit: string;
   /** Base units per pack: materials.purchase_uom_factor. */
   packSize: number;
-  /** The bin it is pulled from; null until a source is chosen. A null lot is an untracked material. */
-  source: { lot: string | null; bin: string } | null;
+  /** The exact source it is pulled from, with its lot code and "location / bin" for display; null until chosen. A null lot is an untracked material. */
+  source: (SourceIds & { lot: string | null; bin: string }) | null;
   /** Pulled packs (decimals allowed) and loose base units, as typed. */
   packs: string;
   loose: string;
@@ -51,7 +57,12 @@ export type TimelineStage = (typeof TIMELINE_STAGES)[number]["stage"];
 export type BrewTimelineViewModel = {
   title: string;
   backHref?: string;
+  /** The batch's planned barrels and date, e.g. "22 bbl · Oct 22, 2026", and its note; each shows only when set. */
+  planned?: string;
+  note?: string;
   ingredients: BrewIngredient[];
+  /** Stock a line without its exact source can be pulled from (get_brew_day_plan sources); with none, Edit offers no source pick. */
+  sources?: BrewMaterialSource[];
   /** The recipe target shown in each stage heading, e.g. "152 °F · 60 min · pH 5.3". */
   targets: Partial<Record<TimelineStage, string>>;
   /** Process readings by the record_brew_day process keys, as typed. */
@@ -60,16 +71,64 @@ export type BrewTimelineViewModel = {
   vessels: BrewDayVessel[];
   initialBbl: string;
   brewedOn: string;
+  /** The brewer confirmed nothing was pulled: record_brew_day refuses an empty record without it. */
+  confirmEmpty?: boolean;
 };
 
+/** An amount as the pull fields hold it: whole packs plus the loose remainder. */
+function packFields(qty: number, packSize: number): Pick<BrewIngredient, "packs" | "loose"> {
+  const split = splitPacks(qty, packSize);
+  return { packs: String(split.packs), loose: String(split.loose) };
+}
+
 /** A pull line starts at plan: whole packs plus the loose remainder. */
-export function startAtPlan(row: Omit<BrewIngredient, "packs" | "loose">): BrewIngredient {
-  const split = splitPacks(row.plan, row.packSize);
-  return { ...row, packs: String(split.packs), loose: String(split.loose) };
+export const startAtPlan = (row: Omit<BrewIngredient, "packs" | "loose">): BrewIngredient => ({ ...row, ...packFields(row.plan, row.packSize) });
+
+/** A stock source or saved pull as a line's source. */
+const lineSource = (s: BrewMaterialSource): BrewIngredient["source"] =>
+  ({ materialId: s.material_id, locationId: s.location_id, binId: s.bin_id, lotId: s.lot_id, lot: s.lot_code, bin: `${s.location_name} / ${s.bin_name}` });
+
+/** Prep's lines for `plannedBbl`: a saved pull's amount and source, else plan with the only matching source (brewPlanActuals' rule). */
+export function brewIngredients(plan: BrewPlan, pulls: BrewPull[], sources: BrewMaterialSource[], plannedBbl: number): BrewIngredient[] {
+  return brewDayLines(plan).map(line => {
+    const row = { key: line.id, name: line.materialName, materialId: line.material_id, stage: line.stage, plan: plannedQty(line, plannedBbl), unit: line.unit, packSize: line.purchaseUomFactor ?? 1 };
+    const pull = pulls.find(saved => saved.recipe_ingredient_id === line.id);
+    if (pull) return { ...row, source: lineSource(pull), ...packFields(pull.qty, row.packSize) };
+    const only = soleSource(sources, line.material_id);
+    return startAtPlan({ ...row, source: only ? lineSource(only) : null });
+  });
+}
+
+/** The cellar-stage lines still planned, counted by stage: "Fermentation 1 · Dry hop 6", or "None". */
+export function laterAdditions(plan: BrewPlan): string {
+  const stages = (plan.ingredients ?? []).map(row => row.stage);
+  const counts = INGREDIENT_STAGES.filter(stage => !isBrewDayStage(stage))
+    .map(stage => ({ stage, count: stages.filter(s => s === stage).length }))
+    .filter(({ count }) => count > 0);
+  return counts.map(({ stage, count }) => `${sentenceCase(stage)} ${count}`).join(" · ") || "None";
 }
 
 /** Base units pulled; a blank field counts as none. */
 export const pulledQty = (row: BrewIngredient) => fromPacks(Number(row.packs) || 0, Number(row.loose) || 0, row.packSize);
+
+/** A typed packs or loose field is a number at or above zero; blank counts as zero. */
+const isPullAmount = (value: string) => Number.isFinite(Number(value)) && Number(value) >= 0;
+
+/** A line's amounts are valid and it has a source unless pulled to zero: brew_pulls and record_brew_day both need an exact source. */
+const pullReady = (row: BrewIngredient) => isPullAmount(row.packs) && isPullAmount(row.loose) && (row.source !== null || pulledQty(row) === 0);
+
+/** Prep saves when every line is pullReady (a short line pulled to nothing needs no source). */
+export const canSavePrep = (model: BrewPrepViewModel) => model.ingredients.every(pullReady);
+
+/** save_batch_pulls input: each sourced line at its pulled amount; a line with no source was pulled to zero and is left out. */
+export function brewPullsPayload(model: BrewPrepViewModel) {
+  return {
+    vesselId: model.vesselId || null,
+    lines: model.ingredients.flatMap(row => row.source
+      ? [{ recipeIngredientId: row.key, materialId: row.source.materialId, locationId: row.source.locationId, binId: row.source.binId, lotId: row.source.lotId, qty: pulledQty(row) }]
+      : []),
+  };
+}
 
 export const isShort = (row: BrewIngredient) => toTicks(pulledQty(row)) < toTicks(row.plan);
 
@@ -83,6 +142,14 @@ export function pullDetail(row: BrewIngredient): string {
   return `plan ${inPacks === plan ? plan : `${plan} = ${inPacks}`} · ${source}`;
 }
 
+/** A line's source picks: this material's stock, labelled "C-2 · Malt room / A2 · 1000 lb available", each with the source it sets. */
+export const sourceChoices = (sources: BrewMaterialSource[], materialId: string) =>
+  sources.filter(s => s.material_id === materialId).map(s => ({
+    value: brewSourceKey(s), label: `${s.lot_code ?? "Untracked"} · ${s.location_name} / ${s.bin_name} · ${s.qty} ${s.unit} available`, source: lineSource(s) }));
+
+/** Something is pulled above zero; until then Record needs the brewer to confirm no ingredients were used. */
+export const anyPulled = (model: BrewTimelineViewModel) => model.ingredients.some(row => pulledQty(row) > 0);
+
 /** Each timeline stage with its own ingredients and process reading keys. */
 export const timelineStages = (model: BrewTimelineViewModel) =>
   TIMELINE_STAGES.map(stage => ({ ...stage, ingredients: model.ingredients.filter(row => row.stage === stage.stage) }));
@@ -95,5 +162,39 @@ export const currentStage = (model: BrewTimelineViewModel): TimelineStage =>
 export const knockoutReady = (model: BrewTimelineViewModel) =>
   model.vessels.some(vessel => vessel.id === model.vesselId) && Number(model.initialBbl) > 0 && Number.isFinite(Number(model.initialBbl)) && Boolean(model.brewedOn);
 
-/** Record brew day is irreversible: every ingredient confirmed and a valid knockout first. */
-export const canRecordTimeline = (model: BrewTimelineViewModel) => model.ingredients.every(row => row.confirmed) && knockoutReady(model);
+/** Record brew day is irreversible: every ingredient confirmed and pullReady, something pulled or confirmEmpty, and a valid knockout.
+ *  Stock on hand is not checked here: append_brew_actuals refuses a short source with a readable error. */
+export const canRecordTimeline = (model: BrewTimelineViewModel) =>
+  model.ingredients.every(row => row.confirmed && pullReady(row))
+  && (anyPulled(model) || Boolean(model.confirmEmpty))
+  && knockoutReady(model);
+
+/** record_brew_day input: each line pulled above zero at its exact source; a pulled line with no source throws. */
+export function timelineRecordPayload(model: BrewTimelineViewModel, batchId: string): [string, Record<string, unknown>] {
+  const actuals = model.ingredients.filter(row => pulledQty(row) > 0).map(row => {
+    if (!row.source) throw new Error("Choose an exact material source");
+    const { materialId, locationId, binId, lotId } = row.source;
+    return { materialId, locationId, binId, lotId, recipeIngredientId: row.key, stage: row.stage, qty: pulledQty(row) };
+  });
+  // brewRecordPayload's key order: a saved attempt is matched by its JSON (lib/commands/recovery.ts).
+  return ["record_brew_day", { initialBbl: Number(model.initialBbl), actuals, process: observedProcess(model.process), confirmEmpty: Boolean(model.confirmEmpty),
+    batchId, vesselId: model.vesselId, brewedOn: model.brewedOn }];
+}
+
+/** Present parts joined " · ", or undefined when none is set. */
+const joinParts = (...parts: (string | null)[]) => parts.filter(Boolean).join(" · ") || undefined;
+/** "152 °F" from a set column; null when the column is blank. */
+const withUnit = (value: number | null | undefined, unit: string) => value == null ? null : `${value} ${unit}`;
+
+/** Each stage's recipe target from the pinned version, e.g. mash "152 °F · 60 min · pH 5.3"; a stage with nothing set is left out. */
+export function brewTargets(plan: BrewPlan): BrewTimelineViewModel["targets"] {
+  const v = plan.version ?? {};
+  const targets: Record<TimelineStage, string | undefined> = {
+    mash: joinParts(withUnit(v.mash_temp_f, "°F"), withUnit(totalMinutes(v.mash_schedule ?? []) || null, "min"), v.target_mash_ph == null ? null : `pH ${v.target_mash_ph}`),
+    lauter: joinParts(v.pre_boil_bbl == null ? null : `pre-boil ${v.pre_boil_bbl} bbl`),
+    boil: joinParts(withUnit(v.boil_minutes, "min")),
+    whirlpool: joinParts(withUnit(v.whirlpool_temp_f, "°F"), withUnit(v.whirlpool_minutes, "min")),
+    knockout: joinParts(withUnit(v.knockout_temp_f, "°F")),
+  };
+  return Object.fromEntries(Object.entries(targets).filter(([, text]) => text !== undefined));
+}

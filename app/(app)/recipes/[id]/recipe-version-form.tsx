@@ -14,6 +14,8 @@
 // shared parent fields sit on top and one save runs create_recipe then
 // create_recipe_version, landing on the recipe. Efficiency and attenuation
 // are typed as percents, as the inventory draws them, and sent as fractions.
+// Each brew-day line carries its pack (ingredientPack), so RecipeView's Round
+// choices rewrite that line's per-bbl amount through the same change().
 "use client";
 
 import { useEffect, useState } from "react";
@@ -27,7 +29,7 @@ import { useCommandContext } from "@/lib/brewery-provider";
 import { gravityBlockers, recipeGravity } from "@/lib/recipe-gravity";
 import { plural } from "@/lib/mgr/plural";
 import { readRecipeDraft, recipeDraftKey, shouldKeepDraft, writeRecipeDraft } from "@/lib/mgr/recipe-draft";
-import { draftBlocker, gravityBlockerText, noMashText, RECIPE_NUMBERS, type RecipeDraft, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
+import { draftBlocker, gravityBlockerText, ingredientPack, noMashText, RECIPE_NUMBERS, type RecipeDraft, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
 import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashRowSummary, materialLookup, optionalNumber as num, removeAt, upsertAt, type RecipeMaterial, type MashStep, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, WaterSheet } from "./schedule-sheets";
 
@@ -155,6 +157,8 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
         ingredients: lines.map((l, i) => ({
           key: `${i}-${l.materialId}`, title: material.name(l.materialId), detail: ingredientDetail(l.stage, l.timingMinutes, l.perBblQty, material.unit(l.materialId)), qty: "",
           action: <IngredientSheet line={l} materials={sheetMaterials} onSave={(f) => change({ lines: upsertAt(draft.lines, i, f) })} onDelete={() => change({ lines: removeAt(draft.lines, i) })} trigger={E.act(<>Edit<span className="sr-only"> {material.name(l.materialId)}</span></>)} />,
+          pack: ingredientPack(l.stage, Number(l.perBblQty), material.get(l.materialId)),
+          onRound: (perBbl: number) => change({ lines: upsertAt(draft.lines, i, { ...l, perBblQty: String(perBbl) }) }),
         })),
         mash: mashRow, fermentation: fermentationRow, water: waterRow,
         predicted: preview ? `Predicted: OG ${formatGravity(preview.ogPlato, unit)} · FG ${formatGravity(preview.fgPlato, unit)} · ABV ${preview.abv.toFixed(1)}%` : gravityWhy ?? undefined,

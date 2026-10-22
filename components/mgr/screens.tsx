@@ -1723,8 +1723,8 @@ export const SCREENS: Screen[] = [
     reads: "get_brew_day · get_brew_day_plan · list_vessels",
     writes: "record_brew_day [SCHEMA-GATE: the brew-day redesign waits on the Prep pull-list record; the live Brew day screen records today]",
     states: [...permitted("brewer or admin required"), ["in progress", "the first stage with an unconfirmed ingredient is the open one on a phone"], ["unconfirmed", "Record brew day stays disabled until every ingredient is confirmed", 1], ["knockout", "vessel, barrels and brew date set the loss baseline"]],
-    spec: "The Brew day tab of a batch, redesigned as a timeline: Mash, Lauter, Boil, Whirlpool, Knockout. Each stage heads with its recipe target and holds its own ingredients and process readings. A row confirms as pulled in one tap; Edit opens the same packs and loose pounds field Prep uses. The recipe owns each ingredient's stage, so there is no stage pick. Vessel, knockout barrels and brew date close the timeline in Knockout. On a phone the stages fold so one is open at a time. Record brew day stays the one irreversible verb. The live batch page keeps the current Brew day screen until the Prep record ships.",
-    body: <BrewTimelineView model={brewTimelineMineral} />,
+    spec: "The Brew day tab of a batch, redesigned as a timeline: Mash, Lauter, Boil, Whirlpool, Knockout. Each stage heads with its recipe target and holds its own ingredients and process readings. A row confirms as pulled in one tap; Edit opens the same packs and loose pounds field Prep uses. The recipe owns each ingredient's stage, so there is no stage pick. Vessel, knockout barrels and brew date close the timeline in Knockout. On a phone the stages fold so one is open at a time. Record brew day stays the one irreversible verb. A line with no exact source (its material sits in several bins) picks one in Edit. With nothing pulled, Confirm no ingredients used appears and Record needs it. The planned facts and Change plan sit above the tabs, outside the record form. The live batch page mounts this view for a planned batch; a recorded or cancelled batch keeps the Brew day screen (history, corrections, brew turns).",
+    body: <BrewTimelineView model={brewTimelineMineral} planActions={<PlanActions plannedOn="2026-10-22" />} />,
   },
   {
     step: 7,
@@ -2017,7 +2017,8 @@ export const SCREENS: Screen[] = [
     slice: 3,
     tab: "More",
     name: "Recipe",
-    to: { Style: "Recipe", "v4 (current)": "Recipe", v3: "Recipe", v2: "Recipe", v1: "Recipe", "+ add ingredient": "Ingredient", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", Water: "Water" },
+    // The Round choices rewrite the line's per bbl in place, so they stay on Recipe.
+    to: { Style: "Recipe", "v4 (current)": "Recipe", v3: "Recipe", v2: "Recipe", v1: "Recipe", "Round to 19 × 50 lb": "Recipe", "Round to 20 × 50 lb": "Recipe", "Round to 1 × 44 lb": "Recipe", "+ add ingredient": "Ingredient", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", Water: "Water" },
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe · list_brands [the parent row's Brand picker] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
     writes: "create_recipe [mutable parent row] · set_recipe_brand [change the parent row's brand after creation] · create_recipe_version [one RPC: immutable version + ingredients + mash and fermentation schedules + water and additions, with assumption and process-spec columns on recipe_versions and per-ingredient extract snapshot on recipe_ingredients]",

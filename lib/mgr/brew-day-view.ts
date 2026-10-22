@@ -10,9 +10,16 @@ export const vesselOptions = (vessels: BrewDayVessel[]) =>
   vessels.map(item => ({ value: item.id, label: `${item.name} · ${item.kind} · ${Number(item.capacity_bbl)} bbl` }));
 
 export type BrewMaterialSource = { material_id: string; material_name: string; unit: string; location_id: string; location_name: string; bin_id: string; bin_name: string; lot_id: string | null; lot_code: string | null; qty: number };
+/** A saved Prep line (brew_pulls): the exact source and the amount pulled for a recipe line; qty is pulled, not on hand. */
+export type BrewPull = BrewMaterialSource & { id: string; recipe_ingredient_id: string | null };
 export type BrewActualDraft = { key: string; source: string; recipeIngredientId?: string; stage: IngredientStage; qty: string };
-export type BrewPlan = { recipe?: string; version?: { version?: number; mash_schedule?: { name: string; temp_f?: number; tempF?: number; minutes: number }[] } | null;
-  ingredients?: { id: string; material_id: string; materialName: string; unit: string; stage: IngredientStage; per_bbl_qty: number }[];
+/** purchaseUomFactor is the material's pack size; plan snapshots frozen before it existed lack it, read as 1. */
+export type BrewPlanIngredient = { id: string; material_id: string; materialName: string; unit: string; stage: IngredientStage; per_bbl_qty: number; purchaseUomFactor?: number };
+/** version is the pinned recipe_versions row (to_jsonb); a snapshot frozen before a process column existed lacks it. */
+export type BrewPlan = { recipe?: string; version?: { version?: number; mash_schedule?: { name: string; temp_f?: number; tempF?: number; minutes: number }[];
+    mash_temp_f?: number | null; target_mash_ph?: number | null; pre_boil_bbl?: number | null; boil_minutes?: number | null;
+    whirlpool_temp_f?: number | null; whirlpool_minutes?: number | null; knockout_temp_f?: number | null } | null;
+  ingredients?: BrewPlanIngredient[];
   waterAdditions?: { materialName: string; qty: number; unit: string; baseUnit: string }[] };
 export type BrewRecordView = { id: string; turn: number; initial_bbl: number; brewed_on: string; created_at: string; correction_reason: string | null; corrects_id: string | null;
   plan_snapshot: BrewPlan; process: Record<string, number>; additions: { id: string; material_name: string; unit: string; confirmed_qty: number; stage: IngredientStage; recipe_ingredient_id: string | null; lot_code: string | null; location_name: string; bin_name: string;
@@ -50,10 +57,26 @@ export function brewSourceKey(source: Pick<BrewMaterialSource, "material_id" | "
   return materialSourceKey({ materialId: source.material_id, locationId: source.location_id, binId: source.bin_id, lotId: source.lot_id });
 }
 
+/** Mash, boil and whirlpool are confirmed on brew day; later stages post from cellar additions. */
+export const isBrewDayStage = (stage: IngredientStage): stage is (typeof BREW_DAY_STAGES)[number] => (BREW_DAY_STAGES as readonly string[]).includes(stage);
+
+/** The plan's lines confirmed on brew day (mash, boil, whirlpool), in plan order. */
+export const brewDayLines = (plan: BrewPlan) =>
+  (plan.ingredients ?? []).filter((row): row is BrewPlanIngredient & { stage: (typeof BREW_DAY_STAGES)[number] } => isBrewDayStage(row.stage));
+
+/** A line's planned amount for `volume` bbl, exact to the tick. */
+export const plannedQty = (row: BrewPlanIngredient, volume: number) => fromTicks(toTicks(row.per_bbl_qty * volume));
+
+/** The one source holding this material; undefined when none or several do, so the brewer chooses. */
+export function soleSource(sources: BrewMaterialSource[], materialId: string): BrewMaterialSource | undefined {
+  const matches = sources.filter(source => source.material_id === materialId);
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
 export function brewPlanActuals(plan: BrewPlan, volume: number, sources: BrewMaterialSource[]): BrewActualDraft[] {
-  return (plan.ingredients ?? []).filter(row => (BREW_DAY_STAGES as readonly string[]).includes(row.stage)).map(row => {
-    const matches = sources.filter(source => source.material_id === row.material_id);
-    return { key: row.id, recipeIngredientId: row.id, stage: row.stage, qty: String(fromTicks(toTicks(row.per_bbl_qty * volume))), source: matches.length === 1 ? brewSourceKey(matches[0]) : "" };
+  return brewDayLines(plan).map(row => {
+    const source = soleSource(sources, row.material_id);
+    return { key: row.id, recipeIngredientId: row.id, stage: row.stage, qty: String(plannedQty(row, volume)), source: source ? brewSourceKey(source) : "" };
   });
 }
 
@@ -82,10 +105,13 @@ export function brewActualPayload(model: BrewDayViewModel) {
   });
 }
 
+/** Typed process readings as numbers; a blank reading was not measured and is left out. */
+export const observedProcess = (process?: Record<string, string>) =>
+  Object.fromEntries(Object.entries(process ?? {}).filter(([, value]) => value !== "").map(([key, value]) => [key, Number(value)]));
+
 /** Submit the selected turn's correction or a new brew turn. Blank observations are omitted. */
 export function brewRecordPayload(values: BrewDayViewModel, batchId: string): [string, Record<string, unknown>] {
-  const process = Object.fromEntries(Object.entries(values.process ?? {}).filter(([, value]) => value !== "").map(([key, value]) => [key, Number(value)]));
-  const facts = { initialBbl: Number(values.initialBbl), actuals: brewActualPayload(values), process, confirmEmpty: Boolean(values.confirmEmpty) };
+  const facts = { initialBbl: Number(values.initialBbl), actuals: brewActualPayload(values), process: observedProcess(values.process), confirmEmpty: Boolean(values.confirmEmpty) };
   return values.correctionRecordId
     ? ["correct_brew_record", { ...facts, recordId: values.correctionRecordId, reason: values.correctionReason }]
     : ["record_brew_day", { ...facts, batchId, vesselId: values.vesselId, brewedOn: values.brewedOn }];

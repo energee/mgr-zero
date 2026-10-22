@@ -28,9 +28,10 @@ export function materialLookup<M extends { id: string; name: string; base_uom: s
   return { name: (id: string) => byId.get(id)?.name ?? id.slice(0, 8), unit: (id: string) => byId.get(id)?.base_uom, get: (id: string) => byId.get(id) };
 }
 /** The material fields the recipe editor reads; both recipe pages project list_materials to this.
- *  Lives here, not in the "use client" editor, because the server pages call it (#440). */
-export type RecipeMaterial = { id: string; name: string; category: string; base_uom: string; extract_potential: number | null };
-export const toRecipeMaterial = ({ id, name, category, base_uom, extract_potential }: RecipeMaterial): RecipeMaterial => ({ id, name, category, base_uom, extract_potential });
+ *  Lives here, not in the "use client" editor, because the server pages call it (#440).
+ *  purchase_uom_factor is base units per purchase pack (1 = no pack); the page totals brew-day lines in packs with it. */
+export type RecipeMaterial = { id: string; name: string; category: string; base_uom: string; extract_potential: number | null; purchase_uom_factor: number };
+export const toRecipeMaterial = ({ id, name, category, base_uom, extract_potential, purchase_uom_factor }: RecipeMaterial): RecipeMaterial => ({ id, name, category, base_uom, extract_potential, purchase_uom_factor });
 export type FermentationStage = { name: string; kind: string; tempF: number; days: number };
 export type WaterAddition = { materialId: string; qty: number; unit: string; stage: string };
 export type WaterDraft = { targetProfileId: string; sourceProfileId: string; mashGal: string; spargeGal: string; targetMashPh: string; additions: WaterAddition[] };
