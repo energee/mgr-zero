@@ -675,11 +675,14 @@ describe("SCREENS", () => {
   it("draws locked-out landings and the composer question", () => {
     // Issue 83: no-membership, expired invite/reset, session expiry with the
     // outbox kept, and the composer question (chips, no Commit).
-    for (const name of ["No membership", "Expired invite", "Expired reset", "Session expired", "Composer question"]) {
+    for (const name of ["No membership", "Portal staff only", "Expired invite", "Expired reset", "Session expired", "Composer question"]) {
       expect(SCREENS.some((s) => s.name === name), name).toBe(true);
     }
     const q = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Composer question")!.body));
     expect(q).not.toMatch(/Commit/);
+    const staffOnly = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Portal staff only")!.body));
+    expect(staffOnly).toMatch(/Back to Today/);
+    expect(staffOnly).not.toMatch(/Create brewery/);
     const accept = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Accept invite")!.body));
     expect(accept).toMatch(/name|Name/i);
     const search = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Search")!.body));

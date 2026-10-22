@@ -1,6 +1,6 @@
 // tests/no-membership-page.test.ts — where /no-membership sends each kind of
 // signed-in account, and that a staff login reaching it from the portal is told
-// why instead of being bounced silently back to Today (#1145).
+// the portal is for customers and offered Today (#1145).
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, it, vi } from "vitest";
 
@@ -29,9 +29,9 @@ it("tells a staff-only login the portal is for customers and links back to Today
 
 it("sends an account with a customer membership home: the portal, or Today for staff too", async () => {
   state.customers = [{ customerId: "customer" }];
-  await expect(NoMembershipPage()).rejects.toThrow("redirect /portal");
+  await expect(NoMembershipPage()).rejects.toThrow(/^redirect \/portal$/);
   state.staff = [{ breweryId: "brewery" }];
-  await expect(NoMembershipPage()).rejects.toThrow("redirect /");
+  await expect(NoMembershipPage()).rejects.toThrow(/^redirect \/$/);
 });
 
 it("keeps No brewery yet for a login on no brewery and no customer", async () => {

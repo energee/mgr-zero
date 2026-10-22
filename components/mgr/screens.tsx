@@ -536,10 +536,10 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 2, slice: 1, group: "Entry", surface: "entry", name: "Portal staff only",
-    job: "A staff login on no customer account opened the portal",
+    job: "A staff login on no customer account opens the portal",
     reads: "none", writes: "none",
     states: [["staff only", "back to Today or sign out"]],
-    spec: "Staff roles never open a customer's portal, so the portal sends this login here instead of a silent bounce to Today. A login that is also on a customer account opens only its own account. No customer picker or preview.",
+    spec: "Staff roles never open a customer's portal, so a portal page sends a staff login on no customer account here. A login that is also on customer accounts opens only those accounts. No customer picker or preview.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: <EntryView model={portalStaffOnly} />,
   },
