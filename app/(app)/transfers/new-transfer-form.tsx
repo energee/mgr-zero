@@ -2,9 +2,11 @@
 // create_stock_transfer: source and destination locations (bins default to
 // each location's first), SKU lines with quantities. Materials and kegs move
 // through the same command from the API; this form draws the SKU case.
+// Create transfer opens the new transfer's detail page.
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { NewTransferView } from "@/components/mgr/views/new-transfer";
@@ -15,6 +17,7 @@ type Bin = { id: string; location_id: string; name: string };
 type Line = { skuId: string; qty: string };
 
 export function NewTransferForm({ locations, bins, skus }: { locations: Location[]; bins: Bin[]; skus: { id: string; label: string }[] }) {
+  const router = useRouter();
   const [fromId, setFromId] = useState("");
   const [toId, setToId] = useState("");
   const [fromBin, setFromBin] = useState("");
@@ -27,6 +30,7 @@ export function NewTransferForm({ locations, bins, skus }: { locations: Location
       lines: lines.filter((l) => l.skuId && Number(l.qty) > 0).map((l) => ({ skuId: l.skuId, qty: Number(l.qty), fromBinId: fromBin, toBinId: toBin })),
     }),
     reset: () => { setFromId(""); setToId(""); setFromBin(""); setToBin(""); setLines([{ skuId: "", qty: "" }]); },
+    onSuccess: data => router.push(`/transfers/${(data as { transferId: string }).transferId}`),
   });
   const ready = fromId && toId && fromId !== toId && fromBin && toBin && lines.some((l) => l.skuId && Number(l.qty) > 0);
   const fromBins = bins.filter(bin => bin.location_id === fromId);
