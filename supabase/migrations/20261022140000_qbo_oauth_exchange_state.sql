@@ -5,10 +5,14 @@
 --
 -- This replaces it with the intent's exchange_state, so the route can tell
 -- 'completed' (report connected) from 'exchanging' (return to Accounting with
--- no flag and let the live connection status show the result). A return type
+-- no flag, so the page shows only its stored connection status). A return type
 -- cannot change under create or replace, hence a new function and a drop.
 -- Read-only; it never exchanges a code or touches a connection, so a replayed
 -- state still grants nothing.
+--
+-- The drop is safe to ship with the route change: pre-release, and between
+-- the hosted db push and the deploy the only effect is that a duplicate
+-- callback reports error=oauth, as it did before #822.
 
 -- security-definer: justified — qbo_oauth_intents is in private and only
 -- service_role calls the OAuth RPCs; this returns one state word about the

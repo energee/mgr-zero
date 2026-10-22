@@ -34,8 +34,8 @@ export async function GET(request: Request) {
       });
     } catch (error) {
       if (!(error instanceof DuplicateCallback)) throw error;
-      // The first callback has not finished: no flag, so Accounting's live
-      // connection status shows whatever it produces.
+      // The first callback is still exchanging: return with no flag, so
+      // Accounting shows only its stored connection status (#1034).
       if (error.firstState === "exchanging") return NextResponse.redirect(destination, 303);
     }
     destination.searchParams.set("connected", "1");

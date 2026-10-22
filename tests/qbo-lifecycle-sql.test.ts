@@ -294,7 +294,8 @@ describe("QuickBooks durable lifecycle", () => {
     await expect(callback(validState)).rejects.toThrow("oauth state invalid");
     expect(fetch).toHaveBeenCalledTimes(2);
     // A replayed callback can read how the first one ended, but only for the
-    // Admin and brewery that began it; a superseded state reads as such.
+    // Admin and brewery that began it; a superseded state reads
+    // 'recovery_required', so the route still reports error=oauth.
     await expect(qboOAuthExchangeState(hash(validState), ctx.userId, brewery.id)).resolves.toBe("completed");
     await expect(qboOAuthExchangeState(hash(validState), otherAdmin.userId, brewery.id)).resolves.toBeNull();
     await expect(qboOAuthExchangeState(hash(validState), ctx.userId, legitimateBrewery.id)).resolves.toBeNull();

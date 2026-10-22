@@ -224,14 +224,14 @@ export async function failQboOAuth(intentId: string, actorId: string) {
 
 /**
  * The exchange_state of this Admin's OAuth intent for this brewery; a duplicate callback reads how the first one went (#1034).
- * Null when no intent matches, though the generated type says string.
+ * Null when no intent matches this state, Admin, and brewery.
  */
-export async function qboOAuthExchangeState(stateHash: string, actorId: string, breweryId: string): Promise<string | null> {
+export async function qboOAuthExchangeState(stateHash: string, actorId: string, breweryId: string) {
   const { data, error } = await createAdminClient().rpc("qbo_oauth_exchange_state", {
     p_state_hash: stateHash, p_actor: actorId, p_brewery: breweryId,
   });
   if (error) throw new Error("QuickBooks OAuth state lookup failed");
-  return data;
+  return data as "pending" | "exchanging" | "completed" | "recovery_required" | null;
 }
 
 /** True when a stored (not disconnected) QuickBooks connection of any brewery uses this realm; the OAuth callback must not revoke then. */
