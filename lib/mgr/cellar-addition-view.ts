@@ -6,7 +6,7 @@ import { occupancyIdentity, type TransferOccupancy } from "./cellar-transfer-vie
 
 export type AdditionMaterial = { id: string; name: string; category: string; base_uom: string; lot_tracked: boolean };
 export type AdditionLot = { lot_id: string; lot_code: string; qty: number; received_on: string | null };
-/** Post-knockout stages only: mash, boil and whirlpool happen on brew day. */
+/** Post-knockout stages only: mash, boil and whirlpool happen on brew day. Values are the visible Stage toggle labels, so they are sentence case. */
 export const ADDITION_STAGES = { dry_hop: "Dry hop", fermentation: "Fermentation", other: "Other" } as const;
 export type AdditionStage = keyof typeof ADDITION_STAGES;
 
