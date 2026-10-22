@@ -15,7 +15,7 @@ export function CellarMapView({ model, transfer, addition, complete }: { model: 
     {model.detail && E.nav(model.detail.title, model.detail.description, "", undefined, model.detail.href)}
     {model.tiles.length ? E.tiles(model.tiles.map(tile => [tile.name, tile.detail, tile.reading, tile.warning ? 1 : 0, tile.fill, tile.href]), "c2") : E.blank("No vessels yet")}
     {complete !== undefined ? complete : E.btn("Complete batch", "g")}
-    {E.btn("Add vessel", "g", model.addHref)}
+    {model.addHref !== null && E.btn("Add vessel", "g", model.addHref)}
     {E.sp()}
   </>;
 }

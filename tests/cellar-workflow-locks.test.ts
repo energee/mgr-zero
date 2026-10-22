@@ -6,12 +6,14 @@ import "@/lib/commands/all";
 
 let breweryId: string;
 let brewer: Ctx;
+let owner: Ctx;
 let warehouse: Ctx;
 let location: { id: string; binId: string };
 
 beforeAll(async () => {
   breweryId = (await makeBrewery()).id;
   brewer = await makeStaffCtx(breweryId, "brewer");
+  owner = await makeStaffCtx(breweryId, "admin");
   warehouse = await makeStaffCtx(breweryId, "warehouse");
   location = await seedLocation(breweryId, { name: "Cellar lock warehouse" });
 });
@@ -20,7 +22,7 @@ afterEach(closePgSessions);
 
 async function brew(bbl = 10) {
   const catalog = await seedCatalog(breweryId, { product: `Lock ${crypto.randomUUID()}`, bblPerUnit: 0.01 });
-  const vessel = await runCommand("upsert_vessel", { name: `Lock FV ${crypto.randomUUID()}`, kind: "fermenter", capacityBbl: 100 }, brewer) as { id: string };
+  const vessel = await runCommand("upsert_vessel", { name: `Lock FV ${crypto.randomUUID()}`, kind: "fermenter", capacityBbl: 100 }, owner) as { id: string };
   const batch = await runCommand("schedule_batch", { intendedBrandId: catalog.brandId, plannedOn: "2026-09-01", plannedBbl: bbl }, brewer) as { id: string };
   const day = await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: bbl, brewedOn: "2026-09-01" }, brewer) as { occupancy: { id: string } };
   return { batchId: batch.id, occupancyId: day.occupancy.id, vesselId: vessel.id, ...catalog };
@@ -94,7 +96,7 @@ describe("cellar workflow serialization", { concurrent: false }, () => {
 
   it("waits for a real transfer and recalculates the committed batch scope", async () => {
     const f = await brew();
-    const target = await runCommand("upsert_vessel", { name: `Lock BT ${crypto.randomUUID()}`, kind: "brite", capacityBbl: 100 }, brewer) as { id: string };
+    const target = await runCommand("upsert_vessel", { name: `Lock BT ${crypto.randomUUID()}`, kind: "brite", capacityBbl: 100 }, owner) as { id: string };
     const a = await staffSession(brewer.userId);
     const b = await staffSession(brewer.userId, false);
     await a.query("select public.record_cellar_transfer($1,$2,$3,4,0.2,$4)", [breweryId, f.occupancyId, target.id, crypto.randomUUID()]);

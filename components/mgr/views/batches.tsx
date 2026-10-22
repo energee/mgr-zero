@@ -79,7 +79,9 @@ function VesselTable({ vessels }: { vessels: BatchVesselView[] }) {
 }
 
 export function BatchesView({ model, createAction, workHrefs, newVesselHref }: {
-  model: BatchesViewModel; createAction?: ReactNode; workHrefs?: Record<string, string>; newVesselHref?: string;
+  model: BatchesViewModel; createAction?: ReactNode; workHrefs?: Record<string, string>;
+  /** null hides New vessel: vessels are admin-managed. */
+  newVesselHref?: string | null;
 }) {
   return <>
     {E.hd(model.title, "", createAction !== undefined ? createAction : E.btn("New batch"))}
@@ -94,7 +96,7 @@ export function BatchesView({ model, createAction, workHrefs, newVesselHref }: {
     </>}
     {model.vessels !== undefined && <>
       {E.ttl("Vessels")}
-      <div className="self-start">{E.btn("New vessel", "p", newVesselHref)}</div>
+      {newVesselHref !== null && <div className="self-start">{E.btn("New vessel", "p", newVesselHref)}</div>}
       {!model.vessels.length ? E.blank("No vessels yet") : <VesselTable vessels={model.vessels} />}
     </>}
   </>;

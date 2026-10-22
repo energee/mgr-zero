@@ -40,8 +40,8 @@ beforeAll(async () => {
   fixtureDate = sql(`select ((now() at time zone timezone)::date - 2)::text from breweries where id='${breweryId}'`, true)[0];
 });
 
-async function exactCompletion(setup = { breweryId, brewerCtx, location, fixtureDate }) {
-  const { breweryId, brewerCtx, location, fixtureDate } = setup;
+async function exactCompletion(setup = { breweryId, adminCtx, brewerCtx, location, fixtureDate }) {
+  const { breweryId, adminCtx, brewerCtx, location, fixtureDate } = setup;
   const { brandId, skuId } = await seedCatalog(breweryId, {
     product: `Loss review ${crypto.randomUUID()}`,
     sku: `Exact case ${crypto.randomUUID()}`,
@@ -49,7 +49,7 @@ async function exactCompletion(setup = { breweryId, brewerCtx, location, fixture
   });
   const vessel = await runCommand("upsert_vessel", {
     name: `FV ${crypto.randomUUID()}`, kind: "fermenter", capacityBbl: 2,
-  }, brewerCtx) as { id: string };
+  }, adminCtx) as { id: string };
   const batch = await runCommand("schedule_batch", {
     intendedBrandId: brandId, plannedOn: fixtureDate, plannedBbl: 1,
   }, brewerCtx) as { id: string };
@@ -96,7 +96,7 @@ describe("completion loss review", () => {
     const { brandId } = await seedCatalog(futureBrewery.id, { product: `Future loss ${crypto.randomUUID()}` });
     const vessel = await runCommand("upsert_vessel", {
       name: `Future FV ${crypto.randomUUID()}`, kind: "fermenter", capacityBbl: 2,
-    }, futureBrewer) as { id: string };
+    }, futureAdmin) as { id: string };
     const batch = await runCommand("schedule_batch", {
       intendedBrandId: brandId, plannedOn: futureStart, plannedBbl: 1,
     }, futureBrewer) as { id: string };
@@ -368,7 +368,7 @@ describe("completion loss review", () => {
     const freshBrewer = await makeStaffCtx(freshBrewery.id, "brewer");
     const freshLocation = await seedLocation(freshBrewery.id);
     const freshDate = sql(`select ((now() at time zone timezone)::date - 2)::text from breweries where id='${freshBrewery.id}'`, true)[0];
-    const taproom = await exactCompletion({ breweryId: freshBrewery.id, brewerCtx: freshBrewer, location: freshLocation, fixtureDate: freshDate });
+    const taproom = await exactCompletion({ breweryId: freshBrewery.id, adminCtx: freshAdmin, brewerCtx: freshBrewer, location: freshLocation, fixtureDate: freshDate });
     const allocation = await runCommand("reattribute_loss", { adjustmentId: taproom.adjustmentId, bbl: "0.01", classification: "taproom" }, freshAdmin) as import("@/lib/commands/compliance").LossAllocation;
     expect(allocation.tax_treatment).toBe("taxable");
     // Move the loss and its correction into last month, which has ended and is unfiled.

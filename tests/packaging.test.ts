@@ -27,6 +27,7 @@ import "@/lib/commands/all";
 let b: { id: string };
 let fixtureDate: string;
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
+let owner: Awaited<ReturnType<typeof makeStaffCtx>>;
 let stout: { brandId: string; skuId: string; formatId: string };
 let pils: { brandId: string; skuId: string };
 
@@ -35,7 +36,7 @@ let pils: { brandId: string; skuId: string };
 // occupancy id — the handle every packaging run points at once it starts.
 async function brewInto(vesselName: string, brand: string | null, bbl: number, on: string) {
   const vessel = (await runCommand("upsert_vessel",
-    { name: vesselName, kind: "fermenter", capacityBbl: 60 }, ctx)) as { id: string };
+    { name: vesselName, kind: "fermenter", capacityBbl: 60 }, owner)) as { id: string };
   const batch = (await runCommand("schedule_batch",
     { plannedOn: on, plannedBbl: bbl, ...(brand ? { intendedBrandId: brand } : {}) }, ctx)) as { id: string };
   const day = (await runCommand("record_brew_day",
@@ -62,6 +63,7 @@ beforeAll(async () => {
   b = await makeBrewery();
   fixtureDate = sql(`select ((now() at time zone timezone)::date - 2)::text from breweries where id='${b.id}'`, true)[0];
   ctx = await makeStaffCtx(b.id, "brewer");
+  owner = await makeStaffCtx(b.id, "admin");
   stout = await seedCatalog(b.id, { product: "Stout", sku: "Stout case", bblPerUnit: 0.0645 });
   pils = await seedCatalog(b.id, { product: "Pils", sku: "Pils case", bblPerUnit: 0.0645 });
 
@@ -265,6 +267,7 @@ describe("what the brewhouse still has to brew", () => {
   it("lists open occupancies and reports demand, supply and the gap per brand", async () => {
     const fresh = await makeBrewery();
     const freshCtx = await makeStaffCtx(fresh.id, "brewer");
+    const freshOwner = await makeStaffCtx(fresh.id, "admin");
     const cat = await seedCatalog(fresh.id, { product: "Amber", sku: "Amber case", bblPerUnit: 0.5 });
 
     // Demand: 100 units × 0.5 bbl = 50 bbl, on an open run planned today.
@@ -286,7 +289,7 @@ describe("what the brewhouse still has to brew", () => {
 
     // In-tank beer counts as supply too, through its batch's brand.
     const vessel = (await runCommand("upsert_vessel",
-      { name: "FV-AMBER", kind: "fermenter", capacityBbl: 60 }, freshCtx)) as { id: string };
+      { name: "FV-AMBER", kind: "fermenter", capacityBbl: 60 }, freshOwner)) as { id: string };
     const batch = (await runCommand("schedule_batch",
       { plannedOn: today, plannedBbl: 25, intendedBrandId: cat.brandId }, freshCtx)) as { id: string };
     await runCommand("record_brew_day",
@@ -656,7 +659,7 @@ describe("closing the run", () => {
     // empty it is refused; a partial one is not.
     const { runId, occupancyId } = await startedRun("FV-KEEPS-RUN", 12, "2026-12-06");
     const brite = (await runCommand("upsert_vessel",
-      { name: "BT-KEEPS-RUN", kind: "brite", capacityBbl: 60 }, ctx)) as { id: string };
+      { name: "BT-KEEPS-RUN", kind: "brite", capacityBbl: 60 }, owner)) as { id: string };
     await expect(runCommand("record_cellar_transfer",
       { fromOccupancyId: occupancyId, toVesselId: brite.id, volumeBbl: 12 }, ctx))
       .rejects.toThrow(/a started packaging run still draws from this tank; close the run before transferring the heel out/);
@@ -997,12 +1000,13 @@ describe("packaging refuses other tenants and other roles", () => {
   beforeAll(async () => {
     other = await makeBrewery();
     otherCtx = await makeStaffCtx(other.id, "brewer");
+    const otherOwner = await makeStaffCtx(other.id, "admin");
     const cat = await seedCatalog(other.id, { product: "Their IPA", sku: "Their IPA case" });
     otherBrandId = cat.brandId;
     otherSkuId = cat.skuId;
 
     const vessel = (await runCommand("upsert_vessel",
-      { name: "Their FV", kind: "fermenter", capacityBbl: 40 }, otherCtx)) as { id: string };
+      { name: "Their FV", kind: "fermenter", capacityBbl: 40 }, otherOwner)) as { id: string };
     const batch = (await runCommand("schedule_batch",
       { intendedBrandId: otherBrandId, plannedOn: "2026-11-02", plannedBbl: 20 }, otherCtx)) as { id: string };
     otherOccupancyId = ((await runCommand("record_brew_day",

@@ -2,7 +2,8 @@ import { formatLatestReading, type VesselReading } from "./vessel-detail-view";
 import type { GravityUnit } from "./gravity-unit";
 
 export type CellarMapViewModel = {
-  backHref?: string; addHref?: string; readingHref?: string | null; readingHint?: string; brewHref?: string;
+  /** addHref null hides Add vessel (vessels are admin-managed). */
+  backHref?: string; addHref?: string | null; readingHref?: string | null; readingHint?: string; brewHref?: string;
   tiles: { name: string; detail: string; reading?: string; warning?: boolean; fill?: number; href?: string }[];
   detail?: { title: string; description: string; href?: string };
 };

@@ -24,4 +24,6 @@ export type VesselDetailViewModel = {
   type: string;
   typeOptions: string[];
   capacity: string;
+  /** Retired by delete_vessel: out of the cellar, history kept, nothing left to delete. */
+  retired?: boolean;
 };

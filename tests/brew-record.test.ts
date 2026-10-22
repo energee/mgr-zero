@@ -6,6 +6,7 @@ import "@/lib/commands/all";
 async function plannedBrew(stock = 200) {
   const brewery = await makeBrewery();
   const brewer = await makeStaffCtx(brewery.id, "brewer");
+  const owner = await makeStaffCtx(brewery.id, "admin");
   const location = await seedLocation(brewery.id);
   const materialId = await seedMaterial(brewery.id, { name: "Pale malt", category: "malt", lotTracked: true });
   const lot = await ins("material_lots", { brewery_id: brewery.id, material_id: materialId, lot_code: "MALT-ORIGINAL", received_on: "2026-09-01" });
@@ -13,11 +14,11 @@ async function plannedBrew(stock = 200) {
   const recipe = await runCommand("create_recipe", { name: "Brew record pale" }, brewer) as { id: string };
   const version = await runCommand("create_recipe_version", { recipeId: recipe.id, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78, mashSchedule: [{ name: "Rest", kind: "infusion", tempF: 152, minutes: 60 }], ingredients: [{ materialId, perBblQty: 60, stage: "mash" }] }, brewer) as { id: string };
   const batch = await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 2, recipeVersionId: version.id }, brewer) as { id: string };
-  const vessel = await runCommand("upsert_vessel", { name: "FV actuals", kind: "fermenter", capacityBbl: 10 }, brewer) as { id: string };
+  const vessel = await runCommand("upsert_vessel", { name: "FV actuals", kind: "fermenter", capacityBbl: 10 }, owner) as { id: string };
   const ingredient = await admin.from("recipe_ingredients").select("id").eq("recipe_version_id", version.id).single().throwOnError();
   const actual = { materialId, recipeIngredientId: ingredient.data!.id, stage: "mash", locationId: location.id, binId: location.binId, lotId: lot.id, qty: 115 };
   const input = { batchId: batch.id, vesselId: vessel.id, initialBbl: 2, brewedOn: "2026-10-01", actuals: [actual], process: { knockoutTempF: 68, preBoilBbl: 2.4 } };
-  return { brewery, brewer, materialId, location, lot, recipe, version, batch, vessel, input };
+  return { brewery, brewer, owner, materialId, location, lot, recipe, version, batch, vessel, input };
 }
 
 describe("brew turn record revisions (#807)", () => {
@@ -116,7 +117,7 @@ describe("actual brew-day record (#622)", () => {
     const f = await plannedBrew();
     const original = await runCommand("record_brew_day", f.input, f.brewer) as { record: { id: string }; occupancy: { id: string } };
     if (dependency === "transfer") {
-      const target = await runCommand("upsert_vessel", { name: "Target", kind: "brite", capacityBbl: 10 }, f.brewer) as { id: string };
+      const target = await runCommand("upsert_vessel", { name: "Target", kind: "brite", capacityBbl: 10 }, f.owner) as { id: string };
       await runCommand("record_cellar_transfer", { fromOccupancyId: original.occupancy.id, toVesselId: target.id, volumeBbl: 1 }, f.brewer);
     } else if (dependency === "packaging") {
       const brand = await ins("brands", { brewery_id: f.brewery.id, name: "Test brand" });

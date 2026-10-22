@@ -11,6 +11,7 @@ import "@/lib/commands/all";
 
 let breweryId: string;
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
+let owner: Awaited<ReturnType<typeof makeStaffCtx>>;
 let loc: Awaited<ReturnType<typeof seedLocation>>;
 let occupancyId: string;
 let citra: string;
@@ -20,8 +21,9 @@ let salt: string;
 beforeAll(async () => {
   breweryId = (await makeBrewery()).id;
   ctx = await makeStaffCtx(breweryId, "brewer");
+  owner = await makeStaffCtx(breweryId, "admin");
   loc = await seedLocation(breweryId);
-  const vessel = (await runCommand("upsert_vessel", { name: "FV1", kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
+  const vessel = (await runCommand("upsert_vessel", { name: "FV1", kind: "fermenter", capacityBbl: 30 }, owner)) as { id: string };
   const batch = (await runCommand("schedule_batch", { plannedOn: "2026-09-01", plannedBbl: 20 }, ctx)) as { id: string };
   const day = (await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 20, brewedOn: "2026-09-01" }, ctx)) as { occupancy: { id: string } };
   occupancyId = day.occupancy.id;
@@ -72,7 +74,7 @@ describe("record_batch_addition", () => {
 // lock, or both pass their checks against the same bin and drive it negative.
 describe("record_batch_addition under a concurrent material writer", () => {
   it("waits for the writer's lock and then refuses what the writer already drained", async () => {
-    const vessel = (await runCommand("upsert_vessel", { name: "FV-race", kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
+    const vessel = (await runCommand("upsert_vessel", { name: "FV-race", kind: "fermenter", capacityBbl: 30 }, owner)) as { id: string };
     const batch = (await runCommand("schedule_batch", { plannedOn: "2026-09-01", plannedBbl: 20 }, ctx)) as { id: string };
     const day = (await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 20, brewedOn: "2026-09-01" }, ctx)) as { occupancy: { id: string } };
     const mosaic = await seedMaterial(breweryId, { name: "Mosaic", category: "other" });

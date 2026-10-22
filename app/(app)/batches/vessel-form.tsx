@@ -2,10 +2,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CommandFormMessage } from "@/components/mgr/command-form";
-import { VesselDetailView } from "@/components/mgr/views/vessel-detail";
+import { RemoveVesselControl, VesselDetailView } from "@/components/mgr/views/vessel-detail";
 import type { VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 
+/** Admin edit of one vessel; `vesselId` is absent for a new vessel, which has nothing to delete. */
 export function VesselForm({ vesselId, model }: { vesselId?: string; model: VesselDetailViewModel }) {
   const router = useRouter();
   const [name, setName] = useState(model.name);
@@ -19,6 +20,8 @@ export function VesselForm({ vesselId, model }: { vesselId?: string; model: Vess
     void action.run("upsert_vessel", { id: vesselId, name, kind: kind.toLowerCase(), capacityBbl: Number(capacity) }, () => router.push("/cellar"));
   }}>
     <VesselDetailView model={{ ...model, name, type: kind, capacity }} onName={setName} onType={setKind} onCapacity={setCapacity}
-      disabled={disabled} submitting={action.busy} messages={<CommandFormMessage error={action.error} />} />
+      disabled={disabled} submitting={action.busy} messages={<CommandFormMessage error={action.error} />}
+      remove={vesselId && !model.retired && <RemoveVesselControl vessel={model.title} busy={action.busy} error={action.error}
+        onDelete={() => action.run("delete_vessel", { vesselId }, () => router.push("/cellar"))} />} />
   </form>;
 }
