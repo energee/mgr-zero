@@ -2,16 +2,21 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, it, vi } from "vitest";
+import { E } from "@/components/mgr/e";
 import { applyStoredTheme, THEME_BOOT, ThemeBoot } from "@/components/mgr/theme-boot";
 
 const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
 const layout = readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
+const rgb = (hex: string) => hex.match(/[a-f\d]{2}/gi)!.map((v) => parseInt(v, 16));
+const toHex = (c: number[]) => "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+// The color `top` painted at `alpha` (0-1) over the color `under`.
+const over = (top: string, alpha: number, under: string) => toHex(rgb(top).map((v, i) => v * alpha + rgb(under)[i] * (1 - alpha)));
 const luminance = (hex: string) => {
-  const rgb = hex.match(/[a-f\d]{2}/gi)!.map((v) => {
-    const c = parseInt(v, 16) / 255;
+  const [r, g, b] = rgb(hex).map((v) => {
+    const c = v / 255;
     return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
   });
-  return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+  return r * 0.2126 + g * 0.7152 + b * 0.0722;
 };
 const contrast = (x: string, y: string) => {
   const [a, b] = [luminance(x), luminance(y)];
@@ -92,32 +97,36 @@ it("paints selected Location Uses with the AA-checked primary pair, not the hove
 });
 
 // A row action (E.act) paints its tone's fill over the page surface at rest,
-// and over the tap row's accent/50 hover wash when hovered (#1041). The fill
-// is read from the tone's classes. In dark mode a tone's dark: class wins; on
-// hover without one, the ghost Button's dark:hover: fill wins. Primary and
-// destructive drop their 10% tint in dark, which failed AA on popovers (#1065).
+// and over the tap row's accent/50 hover wash when hovered (#1041). The test
+// renders each E.act, so the classes are the ones the Button merges (the ghost
+// variant plus the tone). In dark mode a dark: class beats its plain twin.
+// Primary and destructive drop their 10% tint in dark: hovered, it fell below
+// AA on every surface, and at rest on popovers (#1065).
 it("keeps every row-action tone at AA, at rest and hovered, in both modes (#1041, #1065)", () => {
   const e = readFileSync(new URL("../components/mgr/e.tsx", import.meta.url), "utf8");
-  const ghost = readFileSync(new URL("../components/ui/button.tsx", import.meta.url), "utf8").match(/ghost:\s*"([^"]*)"/)![1];
-  const rgb = (hex: string) => hex.match(/[a-f\d]{2}/gi)!.map((v) => parseInt(v, 16));
-  const toHex = (c: number[]) => "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
-  // The bg-<token>[/<percent>] class with exactly this variant prefix, or undefined.
-  const fill = (classes: string, prefix: string) => classes.match(new RegExp(`(?:^| )${prefix}bg-([\\w-]+?)(?:/(\\d+))?(?= |$)`))?.slice(1);
   expect(e).toMatch(/has-\[\[data-tap\]\]:hover:bg-accent\/50/);
   for (const mode of [":root", ".dark"]) {
     const tokens = tokensOf(mode);
     const dark = mode === ".dark";
-    // Paints a fill over an underlying color; bg-transparent paints nothing.
+    // The `<prefix><kind>-<token>[/<percent>]` class naming a theme color or
+    // transparent, with exactly this variant prefix: [token, percent?] or undefined.
+    const color = (classes: string, prefix: string, kind: "bg" | "text") =>
+      [...classes.matchAll(new RegExp(`(?:^| )${prefix}${kind}-([\\w-]+?)(?:/(\\d+))?(?= |$)`, "g"))]
+        .map((m) => m.slice(1))
+        .find(([token]) => token === "transparent" || token in tokens);
+    // No fill class, or bg-transparent, paints nothing over `under`.
     const paint = ([token, percent = "100"]: string[], under: string) =>
-      token === "transparent" ? under : toHex(rgb(tokens[token]).map((v, i) => v * (Number(percent) / 100) + rgb(under)[i] * (1 - Number(percent) / 100)));
-    for (const role of ["primary", "destructive", "success", "attention", "info"]) {
-      const tone = e.match(new RegExp(`tone === "${role}" && "([^"]*)"`))![1];
-      const [, text, hoverText] = tone.match(/(?:^| )text-([\w-]+) .*hover:text-([\w-]+)/)!;
-      const rest = (dark && fill(tone, "dark:")) || fill(tone, "")!;
-      const hover = (dark && (fill(tone, "dark:hover:") ?? fill(ghost, "dark:hover:"))) || fill(tone, "hover:")!;
+      token === "transparent" ? under : over(tokens[token], Number(percent) / 100, under);
+    for (const role of ["primary", "destructive", "success", "attention", "info"] as const) {
+      const classes = renderToStaticMarkup(E.act("Go", role)).match(/class="([^"]*)"/)![1];
+      const pick = (state: "" | "hover:", kind: "bg" | "text") => (dark && color(classes, `dark:${state}`, kind)) || color(classes, state, kind);
+      const rest = pick("", "bg") ?? ["transparent"];
+      const hover = pick("hover:", "bg") ?? rest;
+      const text = pick("", "text")![0];
+      const hoverText = pick("hover:", "text")?.[0] ?? text;
       for (const surface of ["background", "card", "popover"]) {
         const atRest = paint(rest, tokens[surface]);
-        const hovered = paint(hover, toHex(rgb(tokens.accent).map((v, i) => v * 0.5 + rgb(tokens[surface])[i] * 0.5)));
+        const hovered = paint(hover, over(tokens.accent, 0.5, tokens[surface]));
         expect(contrast(tokens[text], atRest), `${mode} ${role} at rest on ${surface}`).toBeGreaterThanOrEqual(4.5);
         expect(contrast(tokens[hoverText], hovered), `${mode} ${role} hovered on ${surface}`).toBeGreaterThanOrEqual(4.5);
       }
@@ -130,9 +139,6 @@ it("keeps every row-action tone at AA, at rest and hovered, in both modes (#1041
 // destructive text failed AA in dark cards and popovers. Hover paints the fill
 // at a declared percent over the surface, so that blend is checked too.
 it("keeps the Button and Badge destructive variants at AA, at rest and on hover (#1079)", () => {
-  const rgb = (hex: string) => hex.match(/[a-f\d]{2}/gi)!.map((v) => parseInt(v, 16));
-  const toHex = (c: number[]) => "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
-  const over = (top: string, alpha: number, under: string) => toHex(rgb(top).map((v, i) => v * alpha + rgb(under)[i] * (1 - alpha)));
   for (const file of ["button", "badge"]) {
     const source = readFileSync(new URL(`../components/ui/${file}.tsx`, import.meta.url), "utf8");
     const variant = source.match(/destructive:\s*"([^"]*)"/)![1];

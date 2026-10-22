@@ -193,14 +193,16 @@ export const E = {
       {foot ? <ItemFooter className="flex-col items-stretch gap-2">{foot}</ItemFooter> : null}
     </Item>
   ),
-  /** Soft-filled workflow entry. Tone describes the action, independently of row status.
+  /** Soft-filled workflow entry (primary and destructive are text-only in dark). Tone describes
+   *  the action, independently of row status.
    *  `href` makes it a link on a live page, `onClick` a button that acts in place; fixtures leave both out.
    *  `disabled` holds an in-place action while its command runs.
    *  Primary and destructive keep their 10% tint on hover: the tap row's hover wash already
    *  darkens underneath, and a deeper tint drops the text below AA (#1041). Dark mode drops
-   *  that tint, at rest and on hover: it pulled the text below AA on cards and popovers (#1065).
-   *  Success, attention and info restate their hover fill under dark:, or the ghost Button's
-   *  dark:hover:bg-muted/50 replaces it and attention text falls below AA. */
+   *  that tint, at rest and on hover: it pulled the text below AA when hovered on every surface,
+   *  and at rest on popovers (#1065). Success, attention and info restate their hover fill under
+   *  dark:, or the ghost Button's dark:hover:bg-muted/50 replaces it and hovered attention text
+   *  falls below AA on cards. */
   act: (t: React.ReactNode, tone: "primary" | "success" | "attention" | "info" | "destructive" = "primary", href?: string, onClick?: () => void, disabled?: boolean) => (
     <Button variant="ghost" size="sm" type="button" data-row-action data-tap asChild={Boolean(href)} onClick={onClick} disabled={disabled} className={cn(
       tone === "destructive" && "bg-destructive/10 text-destructive hover:bg-destructive/10 hover:text-destructive dark:bg-transparent dark:hover:bg-transparent",
