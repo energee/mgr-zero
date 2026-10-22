@@ -72,6 +72,7 @@ export function toPriceGroupViewProps(snapshot: PriceGroupSnapshot): PriceGroupV
   };
 }
 
-/** What Save price group still needs: only a name, since Position and Cost
- *  ceiling are bounded by their own fields and the ceiling may stay blank. */
+/** What Save price group still needs. Only the name needs a reason here:
+ *  Position is enforced by its own required, min 1 input, and Cost ceiling is
+ *  optional, so a blank ceiling is valid. */
 export const priceGroupReason = ({ name }: { name: string }) => submitReason(name.trim() ? [] : ["a group name"]);

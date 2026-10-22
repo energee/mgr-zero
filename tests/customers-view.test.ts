@@ -226,7 +226,8 @@ describe("country and alias", () => {
     const form = readFileSync("app/(app)/customers/customer-form.tsx", "utf8");
     expect(form).not.toContain("Staff only");
     expect(form).toContain("{CUSTOMER_ALIAS_HELP}");
-    expect(form).toContain("Add ship-to addresses on the customer’s page after you create the customer.");
+    // Create only: an existing customer already has a page to add ship-tos on.
+    expect(form).toContain('!isEdit && E.info("Add ship-to addresses on the customer’s page after you create the customer.")');
   });
 
   it("the save input sends country and alias, a state only for US, and drops a blank alias", async () => {
