@@ -73,10 +73,11 @@ export type SquareSalesFact = SquareOrderSnapshot & {
   sourceHash: string;
 };
 
+/** One Square item: a beer's pours ("poured"), or its case stock sold as "<Beer> Four Pack" ("packaged"). `brand` is the item name. */
 export type SquarePublicationSource = {
   brandId: string;
   brand: string;
-  catalogGroup: "poured";
+  catalogGroup: "poured" | "packaged";
   locationId: string;
   ownership: "mgr" | "adopted";
   externalItemId: string | null;
@@ -187,8 +188,18 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
   const parentNeedsName = anyPresent && source.ownership === "mgr" && itemData.name !== source.brand;
   if (parentNeedsLocation || parentNeedsRemoval) setLocationPresence(item, source.locationId, parentNeedsLocation);
   if (parentNeedsName) itemData.name = source.brand;
+  // A beer keeps one Square item for life: an owned item present at no location is archived (Square keeps its
+  // ID and order references; a delete would not), and the same item is restored when a variation returns.
+  // ponytail: only a location-listed item (present_at_all_locations false) is ever archived; an all-locations
+  // item is never "present nowhere" here.
+  const presentNowhere = item.present_at_all_locations === false
+    && !(Array.isArray(item.present_at_location_ids) && item.present_at_location_ids.length > 0);
+  const archive = !anyPresent && source.ownership === "mgr" && presentNowhere;
+  const restore = anyPresent && itemData.is_archived === true;
+  const parentNeedsArchive = (archive && itemData.is_archived !== true) || restore;
+  if (parentNeedsArchive) itemData.is_archived = archive;
   return {
-    object: changed.length === 1 && !String(changed[0].id).startsWith("#")
+    object: changed.length === 1 && !String(changed[0].id).startsWith("#") && !parentNeedsArchive
       && !parentNeedsLocation && !parentNeedsRemoval && !parentNeedsName ? changed[0] : item,
     itemVersion: current.version as number,
     variationVersions: { versions: variationVersions, changed: changedVariationIds },
@@ -317,6 +328,7 @@ export class SquareClient {
     const cursors = new Set<string>();
     let cursor: string | null = null;
     do {
+      // SearchCatalogObjects returns archived items too; only is_deleted marks a variation unavailable.
       const body = { object_types: ["ITEM", "ITEM_VARIATION"], include_deleted_objects: true, ...(cursor ? { cursor } : {}) };
       const data = await this.api("/v2/catalog/search", accessToken, { method: "POST", body: JSON.stringify(body) });
       if (data.objects !== undefined && !Array.isArray(data.objects)) throw unavailable();
