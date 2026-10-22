@@ -32,7 +32,7 @@ it("labels mapped variance from incomplete POS coverage as partial", () => {
   expect(rows[2].detail).toContain("0.25 bbl expected minus actual · partial POS coverage");
 });
 
-it("says how many kegs are on tap, the words Beer uses for the same count (#1119)", () => {
+it("says how many kegs are on tap at the location (#1119)", () => {
   const open = [{ opened_at: "2026-09-08T15:20:00Z" }, { opened_at: "2026-09-08T14:00:00Z" }] as Parameters<typeof taproomTodayRows>[1];
   const [board] = taproomTodayRows(location, open, [], report, "America/New_York");
   expect(board.detail).toMatch(/^Main taproom · 2 kegs on tap · last opened /);

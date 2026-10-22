@@ -29,7 +29,8 @@ export type KegReportViewModel = {
   sizes: { key: string; title: string; detail: string; trailing: string }[];
   /** Deposit mismatches; `href` as for customers. */
   mismatches: { key: string; href?: string; title: string; detail: string }[];
-  /** `action` labels the button to backHref: Keg fleet, where pools are added and kegs recorded. */
+  /** `action` labels the button to backHref: Keg fleet, where pools are added and kegs recorded.
+   *  It is set even without backHref; the inventory's button is then inert. */
   empty?: EmptyState & { action: string };
 };
 
@@ -51,11 +52,8 @@ export function toKegReportViewProps(r: KegReport, timeZone: string, backHref?: 
       detail: `${m.pool_name} ${SIZE_LABEL[m.keg_size] ?? m.keg_size} · ${m.kegs_out} out · ${m.kegs_on_deposit} on deposit`,
     })),
     sizes: r.bySize.map((s) => ({ key: `${s.pool_id}-${s.keg_size}`, title: `${s.pool_name} ${SIZE_LABEL[s.keg_size] ?? s.keg_size}`, detail: `${s.out} of ${s.total} out`, trailing: `${pct(s.out, s.total)} utilized` })),
-    empty: r.bySize.length ? undefined : {
-      ...(r.activePools
-        ? { title: "No kegs recorded yet", description: "Record kegs acquired into a pool on Keg fleet to see utilization." }
-        : { title: "No keg pools", description: "Add a keg pool on Keg fleet, then record kegs acquired to see utilization." }),
-      action: "Open Keg fleet",
-    },
+    empty: r.bySize.length ? undefined : r.activePools
+      ? { title: "No kegs recorded yet", description: "Record kegs acquired into a pool on Keg fleet to see utilization.", action: "Open Keg fleet" }
+      : { title: "No keg pools", description: "Add a keg pool on Keg fleet, then record kegs acquired to see utilization.", action: "Open Keg fleet" },
   };
 }

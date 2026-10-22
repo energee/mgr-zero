@@ -12,7 +12,9 @@ export type BeerViewModel = {
 export type BeerOverview = {
   fgShortages: number;
   taproomBelowPar: number;
+  /** Open tap intervals: kegs on tap now, guest kegs included. */
   openTaps: number;
+  /** Open vessel occupancies: one per tank holding beer. */
   openOccupancies: number;
   materialShortages: number;
   kegsOut: number;
@@ -32,12 +34,10 @@ export function toBeerViewProps(s: BeerSnapshot): BeerViewModel {
   if (s.showTaproom) {
     navs.push(
       { key: "taproom", title: "Taproom", detail: `${plural(o.taproomBelowPar, "SKU")} below par · weekly count`, href: "/taproom" },
-      // openTaps is open tap intervals: kegs on tap now, guest kegs included.
       { key: "taps", title: "Taps", detail: `${plural(o.openTaps, "keg")} on tap · Tap board`, href: "/taproom/board" },
     );
   }
   navs.push(
-    // openOccupancies is open vessel occupancies: one per tank holding beer.
     { key: "cellar", title: "Cellar", detail: plural(o.openOccupancies, "occupied tank"), href: "/cellar" },
     // On a phone this row is the only way into Materials on hand, so it stays.
     { key: "materials", title: "Materials", detail: "on hand · definitions · cycle count", href: "/materials" },
