@@ -5,9 +5,12 @@
 // (components/mgr/theme-boot.tsx) applies the `.dark` class from
 // localStorage.theme or the OS preference before first paint. React then
 // hydrates <html> against a class list it already changed, hence
-// suppressHydrationWarning.
+// suppressHydrationWarning. SpeedInsights reports real users' Core Web Vitals
+// to Vercel (enabled per project in the Vercel dashboard); under `next dev` it
+// only logs them to the console.
 import type { Metadata, Viewport } from "next";
 import { Familjen_Grotesk, Instrument_Sans, JetBrains_Mono } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeBoot } from "@/components/mgr/theme-boot";
 import "./globals.css";
 
@@ -32,7 +35,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <ThemeBoot />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <SpeedInsights />
+      </body>
     </html>
   );
 }
