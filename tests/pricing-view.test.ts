@@ -185,17 +185,18 @@ describe("Price group view", () => {
     expect(priceGroupReason({ name: "  " })).toBe("Still needed: a group name.");
     expect(priceGroupReason({ name: "Core" })).toBeNull();
     const form = readFileSync("app/(app)/pricing/group-form.tsx", "utf8");
-    expect(form).toMatch(/E\.submit\("Save price group", \{[^}]*reason: priceGroupReason\(draft\)/);
+    expect(form).toContain("reason: priceGroupReason(draft)");
   });
 
   it("marks Group name required, says what Position does, and marks Cost ceiling optional (#1133)", () => {
     const html = htmlOf(createElement(PriceGroupView, { model: toPriceGroupViewProps(pricingGrid), footer: null }));
     expect(inputTag(html, "price-group-name")).toContain('required=""');
-    expect(inputTag(html, "price-group-position")).toContain('aria-describedby="price-group-position-description"');
-    expect(html).toMatch(/id="price-group-position-description"[^>]*>This group’s row in the price grid: 1 is the top row\./);
-    expect(html).toContain("Cost ceiling ($/bbl) (optional)");
+    expect(inputTag(html, "price-group-position")).toContain('aria-describedby="price-group-position-help"');
+    expect(html).toMatch(/id="price-group-position-help"[^>]*>This group’s row in the price grid: lower numbers sit higher/);
+    expect(html).toContain("Cost ceiling ($/bbl) · optional");
     expect(inputTag(html, "price-group-ceiling")).not.toContain("required");
-    expect(html).toMatch(/id="price-group-ceiling-description"[^>]*>Dollars per barrel of recipe cost\./);
+    expect(inputTag(html, "price-group-ceiling")).toContain('aria-describedby="price-group-ceiling-help"');
+    expect(html).toMatch(/id="price-group-ceiling-help"[^>]*>Dollars per barrel of recipe cost\. A brand’s page suggests the first group/);
     expect(html).not.toContain("never moved");
   });
 

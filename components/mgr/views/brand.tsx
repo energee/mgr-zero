@@ -17,6 +17,7 @@
 import { Fragment, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
+import { FieldDescription } from "@/components/ui/field";
 import { RegistryInput, RegistrySelect, rowAction } from "@/components/mgr/views/registry-fields";
 import { BRAND_ABV } from "@/lib/mgr/brand-abv";
 import type { SellsAsRow } from "@/lib/mgr/brand-sells-view";
@@ -93,9 +94,11 @@ export function BrandView({
         <section aria-label="Brand details" className="flex min-w-0 flex-col gap-4">
           {E.cols(
             <RegistryInput label="Brand name" value={model.name} onChange={controls.name} required />,
-            // Staff-only: list_brands and SKU search match it, staff pickers and lists show it. Never on the portal, Square or SKU names.
-            <RegistryInput id="brand-alias" label="Alias" value={model.alias} onChange={controls.alias}
-              description="An informal name staff use, such as a series number. Search finds the beer by it, and staff lists show it beside the name. Buyers never see it." />,
+            // Staff-only: list_brands and SKU search match it; Catalog notes it under the name, pickers beside it. Never on the portal, Square or SKU names.
+            <div className="flex min-w-0 flex-col gap-2">
+              {E.edit("Alias", model.alias, "text", undefined, { id: "brand-alias", onChange: controls.alias, "aria-describedby": "brand-alias-help" })}
+              <FieldDescription id="brand-alias-help">An informal name staff use, such as a series number. Search finds the beer by it. Catalog shows it under the name, and staff pickers show it beside the name. Buyers never see it.</FieldDescription>
+            </div>,
           )}
           {E.cols(
             <RegistryInput label="Style" value={model.style} onChange={controls.style} suggestions={model.styleOptions} />,

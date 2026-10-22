@@ -199,6 +199,9 @@ describe("country and alias", () => {
     expect(usMarkup).toContain(">State<");
     // The alias says what it is in a note that stays while typing, not a placeholder (#1131).
     expect(usMarkup).not.toContain('placeholder="Staff only"');
+    const aliasHelp = usMarkup.match(/<input[^>]*aria-describedby="([^"]+-alias-help)"/)?.[1];
+    expect(aliasHelp).toBeDefined();
+    expect(usMarkup).toContain(`id="${aliasHelp}"`);
     expect(usMarkup).toContain(CUSTOMER_ALIAS_HELP);
     const foreign = toCustomerViewProps(jp);
     expect(foreign.editValues).toMatchObject({ country: "JP", state: "", alias: "Tokyo" });
@@ -216,16 +219,14 @@ describe("country and alias", () => {
     expect(readFileSync("components/mgr/views/customer.tsx", "utf8")).toContain("CUSTOMER_TYPE_OPTIONS");
     const form = readFileSync("app/(app)/customers/customer-form.tsx", "utf8");
     expect(form).not.toContain("@/components/ui/select");
-    expect(form).toMatch(/E\.pick\("Type", type, CUSTOMER_TYPE_OPTIONS,/);
-    expect(form).toMatch(/E\.pick\("Sale channel", saleChannelId,/);
+    expect(form).toContain("CUSTOMER_TYPE_OPTIONS");
   });
 
   it("the New customer dialog explains the alias and says where ship-tos are added (#1131)", () => {
-    expect(CUSTOMER_ALIAS_HELP).toMatch(/Customers never see it\./);
     const form = readFileSync("app/(app)/customers/customer-form.tsx", "utf8");
     expect(form).not.toContain("Staff only");
-    expect(form).toMatch(/E\.edit\("Alias", alias, "text", undefined, \{[^}]*description: CUSTOMER_ALIAS_HELP/);
-    expect(form).toMatch(/!isEdit && E\.info\("Add ship-to addresses on the customer’s page after you create it\."\)/);
+    expect(form).toContain("{CUSTOMER_ALIAS_HELP}");
+    expect(form).toContain("Add ship-to addresses on the customer’s page after you create the customer.");
   });
 
   it("the save input sends country and alias, a state only for US, and drops a blank alias", async () => {

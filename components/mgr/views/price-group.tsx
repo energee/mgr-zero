@@ -8,6 +8,7 @@
 // same two controls below, live binding onDelete to the commands.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { FieldDescription } from "@/components/ui/field";
 import type { PriceGroupViewModel } from "@/lib/mgr/price-group-view";
 import { ConfirmDeleteControl } from "./confirm-delete";
 
@@ -41,11 +42,15 @@ export function PriceGroupView({ model, controls = {}, back, messages, footer, a
     <>
       {back !== undefined ? back : E.back("Price groups", model.name, undefined, model.backHref)}
       {E.edit("Group name", model.name, "text", undefined, { id: "price-group-name", onChange: controls.name, required: true })}
-      {/* list_price_groups orders by position, and the grid and the ceiling bands follow it (price-group-suggestion.ts). */}
-      {E.edit("Position", model.position, "number", undefined, { id: "price-group-position", onChange: controls.position, min: 1, step: 1, required: true,
-        description: "This group’s row in the price grid: 1 is the top row. No two groups share a position." })}
-      {E.edit("Cost ceiling ($/bbl) (optional)", controls.costCeiling ? model.costCeilingInput : model.costCeiling, "number", undefined, { id: "price-group-ceiling", onChange: controls.costCeiling, min: 0,
-        description: "Dollars per barrel of recipe cost. A brand whose recipe cost is above the previous group’s ceiling and up to this one sees this group suggested on its page. Saving never moves a brand or changes a price." })}
+      {/* list_price_groups orders by position (gaps kept), and suggestPriceGroup reads ceilings in that order. */}
+      <div className="flex min-w-0 flex-col gap-2">
+        {E.edit("Position", model.position, "number", undefined, { id: "price-group-position", onChange: controls.position, min: 1, step: 1, required: true, "aria-describedby": "price-group-position-help" })}
+        <FieldDescription id="price-group-position-help">This group’s row in the price grid: lower numbers sit higher, and the lowest is the top row. No two groups share a position.</FieldDescription>
+      </div>
+      <div className="flex min-w-0 flex-col gap-2">
+        {E.edit("Cost ceiling ($/bbl) · optional", controls.costCeiling ? model.costCeilingInput : model.costCeiling, "number", undefined, { id: "price-group-ceiling", onChange: controls.costCeiling, min: 0, "aria-describedby": "price-group-ceiling-help" })}
+        <FieldDescription id="price-group-ceiling-help">Dollars per barrel of recipe cost. A brand’s page suggests the first group, from the top row down, whose ceiling is at or above the brand’s recipe cost. Groups with no ceiling are skipped. Saving never moves a brand or changes a price.</FieldDescription>
+      </div>
       {model.previousCeilingLabel && model.previousCeiling
         ? E.fld(model.previousCeilingLabel, model.previousCeiling)
         : null}

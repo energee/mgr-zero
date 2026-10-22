@@ -90,13 +90,3 @@ it("renders the empty option label and keeps the required select value empty", (
   expect(html).toContain('value=""');
   expect(html).toContain('required=""');
 });
-
-it("draws an E.edit description under the field and links it, beside any error (#1131, #1133)", () => {
-  const text = renderToStaticMarkup(E.edit("Alias", "", "text", undefined, { id: "a", onChange: () => {}, description: "Staff only." }));
-  expect(text).toMatch(/<input[^>]*aria-describedby="a-description"/);
-  expect(text).toMatch(/id="a-description"[^>]*>Staff only\.</);
-  const number = renderToStaticMarkup(E.edit("Position", "1", "number", undefined, { id: "p", onChange: () => {}, description: "Row.", error: "Bad." }));
-  expect(number).toMatch(/<input[^>]*aria-describedby="p-description p-error"/);
-  expect(number).toMatch(/id="p-description"[^>]*>Row\.</);
-  expect(renderToStaticMarkup(E.edit("Alias", "", "text"))).not.toContain("description");
-});

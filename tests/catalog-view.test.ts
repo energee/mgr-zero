@@ -132,8 +132,8 @@ describe("Catalog view", () => {
     expect(html).toContain("Animal #14");
     // What the alias is for stays visible while typing (#1131).
     expect(html).not.toContain('placeholder="Staff only"');
-    expect(html).toMatch(/<input[^>]*aria-describedby="brand-alias-description"/);
-    expect(html).toMatch(/id="brand-alias-description"[^>]*>An informal name staff use, such as a series number\./);
+    expect(html).toMatch(/<input[^>]*aria-describedby="brand-alias-help"/);
+    expect(html).toMatch(/id="brand-alias-help"[^>]*>An informal name staff use, such as a series number\./);
   });
 
   // #965: inventory and live draw the same Water profiles row, with no invented count.

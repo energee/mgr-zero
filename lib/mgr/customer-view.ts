@@ -6,9 +6,10 @@ import { paymentTermLabel, sentenceCase } from "./labels";
  *  "" outside the US (the form draws it for a US customer only); alias "" is none. */
 export type CustomerEditValues = { name: string; alias: string; type: string; country: string; state: string; saleChannelId: string; licenseNumber: string; paymentTerms: string; taxTreatment: string };
 
-/** The note under Alias on both customer forms: list_customers searches it, the
- *  list titles "name · alias", and no buyer surface reads it. */
-export const CUSTOMER_ALIAS_HELP = "Another name staff know this customer by. Search finds it, and the customer list shows it beside the name. Customers never see it.";
+/** The note under Alias on both customer forms: list_customers (Search
+ *  customers) matches it, the list titles "name · alias", and no buyer surface
+ *  reads it. Global search matches customer names only. */
+export const CUSTOMER_ALIAS_HELP = "Another name staff know this customer by. Search customers finds the customer by it, and the customer list shows it beside the name. Buyers never see it.";
 
 export type CustomerViewModel = {
   backHref?: string;
@@ -29,12 +30,6 @@ export type CustomerViewModel = {
   kegBalance: string;
   orders: string;
 };
-
-function titleType(type: string): string {
-  if (type === "retailer") return "Retailer";
-  if (type === "distributor") return "Distributor";
-  return type;
-}
 
 export type CustomerSnapshot = {
   customer: {
@@ -69,12 +64,12 @@ export function toCustomerViewProps({
   orders,
   backHref,
 }: CustomerSnapshot): CustomerViewModel {
-  const tax = customer.tax_treatment ? sentenceCase(customer.tax_treatment) : "Inherit from channel";
+  const tax = customer.tax_treatment ? sentenceCase(customer.tax_treatment) : "Inherit sale channel";
   return {
     backHref,
     name: customer.name,
     state: customer.state,
-    type: titleType(customer.type),
+    type: sentenceCase(customer.type),
     license: customer.license_no ?? "",
     terms: customer.payment_terms ? paymentTermLabel(customer.payment_terms) : "",
     channel: customer.sale_channels?.name ?? "",

@@ -1,8 +1,7 @@
 // app/(app)/customers/customer-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the upsert_customer
 // command. Doubles as create (no `customer` prop) and edit (`customer` prop
 // pre-fills fields and the command input carries `id`, per plan decision 8).
-// Sale channel is required — it decides the customer's prices. Ship-tos are
-// not part of upsert_customer: create says they are added on the customer page.
+// Sale channel is required — it decides the customer's prices.
 "use client";
 
 import { useState } from "react";
@@ -10,6 +9,7 @@ import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
+import { FieldDescription } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { PAYMENT_TERMS, type CustomerType, type PaymentTerm } from "@/lib/mgr/enums";
@@ -95,7 +95,10 @@ export function CustomerForm({
             <Label htmlFor="customer-name">Name</Label>
             <Input id="customer-name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
-          {E.edit("Alias", alias, "text", undefined, { id: "customer-alias", onChange: setAlias, description: CUSTOMER_ALIAS_HELP })}
+          <div className="flex flex-col gap-2">
+            {E.edit("Alias", alias, "text", undefined, { id: "customer-alias", onChange: setAlias, "aria-describedby": "customer-alias-help" })}
+            <FieldDescription id="customer-alias-help">{CUSTOMER_ALIAS_HELP}</FieldDescription>
+          </div>
           {E.pick("Type", type, CUSTOMER_TYPE_OPTIONS, { id: "customer-type", onChange: (value) => setType(value as CustomerType) })}
           {E.pick("Country", country, COUNTRY_OPTIONS, { id: "customer-country", onChange: setCountry, required: true })}
           {country === "US" && <div className="flex flex-col gap-2">
@@ -116,7 +119,8 @@ export function CustomerForm({
           </div>
           {E.pick("Payment terms", paymentTerms, PAYMENT_TERMS.map(t => ({ value: t, label: PAYMENT_TERM_LABEL[t] })), { id: "customer-terms", onChange: setPaymentTerms, displayValue: paymentTermLabel(paymentTerms) })}
           {E.pick("Tax treatment", taxTreatment, [{ value: "", label: "Inherit sale channel" }, ...TAX_TREATMENTS.map(t => ({ value: t, label: sentenceCase(t) }))], { id: "customer-tax", onChange: value => setTaxTreatment(value as TaxTreatment | ""), displayValue: taxTreatment ? sentenceCase(taxTreatment) : "Inherit sale channel" })}
-          {!isEdit && E.info("Add ship-to addresses on the customer’s page after you create it.")}
+          {/* upsert_customer takes no ship-to; ship-tos are upsert_ship_to on Customer detail. */}
+          {E.info("Add ship-to addresses on the customer’s page after you create the customer.")}
           <CommandFormMessage error={form.error} />
           <CommandFormFooter>
             <Button type="submit" disabled={form.submitting}>
