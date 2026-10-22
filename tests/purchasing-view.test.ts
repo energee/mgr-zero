@@ -282,6 +282,12 @@ describe("Materials", () => {
     expect((screen("Materials").body as { type: unknown }).type).toBe(MaterialsView);
   });
 
+  // #1111: Materials on hand is the only way into the definitions list, so its back link returns there.
+  it("the definitions list goes back to Materials on hand", () => {
+    expect(htmlOf(createElement(MaterialsView, { model: { rows: [] } }))).toMatch(/Materials on hand<\/a>/);
+    expect(src("app/(app)/materials/page.tsx")).toMatch(/toMaterialsViewProps\(\{\s*backHref: "\/materials",/);
+  });
+
   it("count keeps real bin identities, decimal input, explicit preview and nullable footer", () => {
     const pick = vi.spyOn(E, "pick");
     const html = htmlOf(createElement(CycleCountView, {
@@ -304,6 +310,16 @@ describe("Materials", () => {
     const html = htmlOf(createElement(MaterialView, { model: materialCitra }));
     expect(html).toMatch(/>Save material</);
     expect(html).toMatch(/Default vendor/);
+  });
+
+  // #1112: each unit field says what it holds, and the help is a brewer's example, not schema talk.
+  it("MaterialView names each unit field and explains them in plain words", () => {
+    const html = htmlOf(createElement(MaterialView, { model: materialCitra }));
+    expect(html).toMatch(/>Base units per purchase unit</);
+    expect(html).toMatch(/>Purchase unit</);
+    expect(html).toMatch(/>Base unit</);
+    expect(html).toContain("For hops bought in 44 lb boxes, set Base unit to lb, Purchase unit to each, and Base units per purchase unit to 44.");
+    expect(html).not.toMatch(/schema/i);
   });
 
   // #430: the potential recipe predictions read, asked only where it applies.
@@ -398,6 +414,8 @@ describe("Vendors and Materials on hand search", () => {
     expect(toVendorsViewProps({ rows: [] }).empty?.title).toBe("No vendors yet");
     expect(toMaterialsOnHandViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No materials match", description: "Clear the search to see every material." });
     expect(toMaterialsOnHandViewProps({ rows: [] }).empty?.title).toBe("No materials yet");
+    // #1112: the page's only action is Add material, so the empty state starts there.
+    expect(toMaterialsOnHandViewProps({ rows: [] }).empty?.description).toBe("Add a material, then receive a purchase order or count it to put it on hand.");
     // A vendor search narrows Contracts too, so its empty footer is a no-match, not no contracts.
     expect(toContractsViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No contracts match", description: "Clear the search to see every contract." });
     expect(toContractsViewProps({ rows: [] }).empty?.title).toBe("No contracts yet");
