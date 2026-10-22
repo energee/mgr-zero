@@ -162,7 +162,7 @@ jobs:
             ${{ steps.window.outputs.head }}. Read .agents/agents/dreaming.md and follow it exactly.
             Open watchdog issues (WATCHDOG_ISSUES): ${{ steps.watchdog.outputs.list }}
           # Cross-document synthesis needs stronger reasoning than bounded maintenance.
-          claude_args: '--model sonnet --permission-mode dontAsk --disallowedTools "Bash(git:*)" --allowedTools "Read,Glob,Grep,Edit(.agents/MEMORY.md),Edit(.agents/PROGRESS.md),Edit(.agents/ARCHITECTURE.md),Edit(.agents/DRIFT.md),Edit(.agents/agents/*.md),Edit(.agents/superpowers/specs/*.md),Edit(.agents/superpowers/plans/*.md),Edit(AGENTS.md),Write(.agents/MEMORY.md),Write(.agents/PROGRESS.md),Write(.agents/ARCHITECTURE.md),Write(.agents/DRIFT.md),Write(.agents/agents/*.md),Write(.agents/superpowers/specs/*.md),Write(.agents/superpowers/plans/*.md),Write(AGENTS.md),Write(.dream-findings.jsonl),Bash(gh pr list:*),Bash(gh pr view:*)"'
+          claude_args: '--model sonnet --permission-mode dontAsk --disallowedTools "Bash(git:*)" --allowedTools "Read,Glob,Grep,Edit(.agents/MEMORY.md),Edit(.agents/PROGRESS.md),Edit(.agents/ARCHITECTURE.md),Edit(.agents/DRIFT.md),Edit(.agents/agents/*.md),Edit(AGENTS.md),Write(.agents/MEMORY.md),Write(.agents/PROGRESS.md),Write(.agents/ARCHITECTURE.md),Write(.agents/DRIFT.md),Write(.agents/agents/*.md),Write(AGENTS.md),Write(.dream-findings.jsonl),Bash(gh pr list:*),Bash(gh pr view:*)"'
 
       - name: Validate dream changes
         if: steps.window.outputs.new == 'true'
@@ -189,7 +189,7 @@ jobs:
           fi
           while IFS= read -r path; do
             case "$path" in
-              .agents/MEMORY.md|.agents/PROGRESS.md|.agents/ARCHITECTURE.md|.agents/DRIFT.md|.agents/agents/*.md|.agents/superpowers/specs/*.md|.agents/superpowers/plans/*.md|AGENTS.md|TODO.md) ;;
+              .agents/MEMORY.md|.agents/PROGRESS.md|.agents/ARCHITECTURE.md|.agents/DRIFT.md|.agents/agents/*.md|AGENTS.md|TODO.md) ;;
               *) echo "Dream changed forbidden path: $path"; exit 1 ;;
             esac
           done <<EOF
@@ -213,8 +213,9 @@ jobs:
           if-no-files-found: error
           path: dream.bundle
 
+      # always(): a dream rejected by validation still reports what it found.
       - name: Save dream findings
-        if: steps.validate.outputs.findings == 'true'
+        if: always() && steps.validate.outputs.findings == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dream-findings
@@ -224,7 +225,7 @@ jobs:
   # The model job has no issue access; this deterministic job files what it overlooked.
   report:
     needs: maintain
-    if: needs.maintain.outputs.findings == 'true'
+    if: always() && needs.maintain.outputs.findings == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -238,7 +239,7 @@ jobs:
         with:
           name: dream-findings
           path: ${{ runner.temp }}
-      - name: File overlooked documentation as issues
+      - name: List overlooked documentation in the agent's Docs gaps issue
         env:
           GH_TOKEN: ${{ github.token }}
         run: scripts/file-doc-findings.sh "$RUNNER_TEMP/dream-findings.jsonl" "dreaming agent"
@@ -297,8 +298,8 @@ jobs:
           git diff --no-renames --name-only -z "$TRUSTED_BASE" FETCH_HEAD > "$RUNNER_TEMP/dream-paths"
           while IFS= read -r -d '' path; do
             case "$path" in
-              .agents/agents/*/*|.agents/superpowers/specs/*/*|.agents/superpowers/plans/*/*) echo "Dream bundle changed forbidden path: $path"; exit 1 ;;
-              .agents/MEMORY.md|.agents/PROGRESS.md|.agents/ARCHITECTURE.md|.agents/DRIFT.md|.agents/agents/*.md|.agents/superpowers/specs/*.md|.agents/superpowers/plans/*.md|AGENTS.md|TODO.md) ;;
+              .agents/agents/*/*) echo "Dream bundle changed forbidden path: $path"; exit 1 ;;
+              .agents/MEMORY.md|.agents/PROGRESS.md|.agents/ARCHITECTURE.md|.agents/DRIFT.md|.agents/agents/*.md|AGENTS.md|TODO.md) ;;
               *) echo "Dream bundle changed forbidden path: $path"; exit 1 ;;
             esac
             # Documents may be deleted or regular text blobs, never symlinks,

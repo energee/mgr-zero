@@ -16,8 +16,6 @@ consolidation: make the living agent docs match reality, citing evidence.
 - .agents/DRIFT.md
 - AGENTS.md
 - .agents/agents/*.md
-- .agents/superpowers/specs/*.md and .agents/superpowers/plans/*.md, only to
-  integrate documentation (below)
 - .dream-findings.jsonl, for overlooked documentation (below)
 
 `TODO.md` is edited only by `scripts/pr-directives.ts`, which runs before you.
@@ -86,28 +84,30 @@ by hand; capture it here so the next session starts with the guard.
 
 ## Integrate new and missed documentation
 `.git/dream-new-docs.txt` lists the Markdown files added in the window. Read
-each, then make the agent docs read as if they had been written together:
+each, then make your editable files read as if they and it had been written
+together:
 - Link a new spec, plan, or runbook from the place an agent would look for it:
-  the `AGENTS.md` "Where to look" table for a new area, `.agents/ARCHITECTURE.md`
-  for a new owner, or the spec it extends.
-- Fold its durable decisions into `.agents/MEMORY.md`, citing the file.
-- Where two specs or plans state the same thing, keep it in the newer one and
-  replace the older passage with a link. A plan that a newer one replaces gets a
-  one-line `Superseded by <path>` at its top.
-- Also look past the window: an older document no agent doc links to is missed
-  documentation; integrate it the same way.
-- Never move, rename, or delete a file. Never rewrite a spec's design decision
-  to match the code; that contradiction is drift (below).
+  the `AGENTS.md` "Where to look" table for a new area, or
+  `.agents/ARCHITECTURE.md` for a new owner.
+- Fold a durable decision it records into `.agents/MEMORY.md` in one line,
+  citing the file; MEMORY.md stays a ledger of decisions, not a changelog.
+- Look past the window too: an older spec, plan, or runbook that no agent doc
+  links to is missed documentation. Link it the same way.
+- A file whose first line says it is generated (for example the API operations
+  backlog `bun run docs:api` writes) needs no link and no report.
 
-Documentation outside your editable files (`docs/`, `README.md`,
-`content/docs/`) belongs to the documentation agent. When it is unlinked,
-duplicated, or contradicts a newer document, report it instead of editing it.
+Specs and plans stay read-only (Flag, never fix). Where two of them say the
+same thing, or a newer one supersedes an older one, report it (below) rather
+than editing either. Documentation outside your editable files (`docs/`,
+`README.md`, `content/docs/`) belongs to the documentation agent: report it
+when it is unlinked, duplicated, or contradicts a newer document.
 
 ## Overlooked documentation
 Write each gap you cannot fix to `.dream-findings.jsonl`, one JSON object per
-line: `{"title": "...", "body": "..."}`. The workflow files each as a GitHub
-issue (at most five a run, skipping titles already open); you cannot run
-`gh issue` yourself. Title: under 100 characters, naming the file. Body: the
+line: `{"title": "...", "body": "..."}`. The workflow lists them in one
+"Docs gaps: dreaming agent" issue, replacing the previous run's list, so report
+every gap still open, not only new ones. You cannot run `gh issue` yourself.
+Title: under 100 characters, naming the file. Body: the
 evidence (paths, PRs) and the suggested fix. Write nothing to this file when
 there is nothing to report. Drift between a read-only artifact and the code
 stays in `.agents/DRIFT.md`, not here.

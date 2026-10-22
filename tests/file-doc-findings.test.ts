@@ -1,6 +1,7 @@
-// tests/file-doc-findings.test.ts — the doc agents' findings become issues only
-// through scripts/file-doc-findings.sh: model output, so it is validated,
-// deduplicated against open issues, and capped. `gh` is stubbed on PATH.
+// tests/file-doc-findings.test.ts — the doc agents' findings reach GitHub only
+// through scripts/file-doc-findings.sh: one upserted issue per agent with a fixed
+// title, so model text never reaches an issue title (dreaming's watchdog collector
+// reads titles) and reruns update one issue instead of filing more. `gh` is stubbed.
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,18 +10,17 @@ import { describe, expect, it } from "vitest";
 
 const script = resolve("scripts/file-doc-findings.sh");
 
-function run(findings: string, openTitles: string[] = []) {
+function run(findings: string, openIssue = "") {
   const root = mkdtempSync(join(tmpdir(), "doc-findings-"));
   try {
     writeFileSync(join(root, "findings.jsonl"), findings);
-    writeFileSync(join(root, "open.txt"), openTitles.map((title) => `${title}\n`).join(""));
-    // `gh issue list` prints the open titles, one per line, as its --jq would.
-    // Each `gh issue create` is logged NUL-terminated, since bodies span lines.
+    // `gh issue list` prints the open issue's number (or nothing), as its --jq would.
+    // Each other `gh` call is logged NUL-terminated, since bodies span lines.
     writeFileSync(
       join(root, "gh"),
       `#!/bin/bash
-if [ "$2" = "list" ]; then cat "${root}/open.txt"; exit; fi
-printf '%s\\0' "$*" >> "${root}/created"
+if [ "$2" = "list" ]; then printf '%s' "${openIssue}"; exit; fi
+printf '%s\\0' "$*" >> "${root}/calls"
 `,
       { mode: 0o755 },
     );
@@ -28,55 +28,61 @@ printf '%s\\0' "$*" >> "${root}/created"
       env: { ...process.env, PATH: `${root}:${process.env.PATH}` },
       encoding: "utf8",
     });
-    let created: string[] = [];
+    let calls: string[] = [];
     try {
-      created = readFileSync(join(root, "created"), "utf8").split("\0").filter(Boolean);
+      calls = readFileSync(join(root, "calls"), "utf8").split("\0").filter(Boolean);
     } catch {
-      // No issue was created.
+      // No issue was created or edited.
     }
-    return { result, created };
+    return { result, calls };
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 }
 
-const finding = (title: string) => JSON.stringify({ title, body: `Why ${title} matters.` });
+const finding = (title: string, body = `Why ${title} matters.`) => JSON.stringify({ title, body });
 
 describe("file-doc-findings.sh", () => {
-  it("does nothing for an empty or missing findings file", () => {
-    const { result, created } = run("");
+  it.each([[""], ["\n\n"]])("does nothing when there are no findings: %j", (findings) => {
+    const { result, calls } = run(findings);
     expect(result.status, result.stderr).toBe(0);
-    expect(created).toEqual([]);
+    expect(calls).toEqual([]);
   });
 
-  it("files each finding once with a prefixed title and the documentation label", () => {
-    const { result, created } = run(`${finding("Slack guide not linked")}\n${finding("Retention runbook orphaned")}\n`);
+  it("creates one issue with a fixed title listing every finding", () => {
+    const { result, calls } = run(`${finding("Slack guide not linked")}\n${finding("Retention runbook failing")}\n`);
     expect(result.status, result.stderr).toBe(0);
-    expect(created).toHaveLength(2);
-    expect(created[0]).toContain("issue create --title Docs gap: Slack guide not linked");
-    expect(created[0]).toContain("--label documentation");
-    expect(created[0]).toContain("Filed by the test agent");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("issue create --title Docs gaps: test agent --label documentation --body");
+    expect(calls[0]).toContain("### Slack guide not linked");
+    expect(calls[0]).toContain("### Retention runbook failing");
   });
 
-  it("skips a finding whose title is already an open issue", () => {
-    const { result, created } = run(`${finding("Slack guide not linked")}\n`, ["Docs gap: Slack guide not linked"]);
+  it("replaces the open issue's list instead of filing another", () => {
+    const { result, calls } = run(`${finding("Slack guide not linked")}\n`, "42");
     expect(result.status, result.stderr).toBe(0);
-    expect(created).toEqual([]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatch(/^issue edit 42 --body /);
   });
 
-  it("files at most five issues per run", () => {
-    const lines = Array.from({ length: 8 }, (_, i) => finding(`gap ${i}`)).join("\n");
-    const { result, created } = run(lines);
-    expect(result.status, result.stderr).toBe(0);
-    expect(created).toHaveLength(5);
+  it("lists at most twenty findings", () => {
+    const lines = Array.from({ length: 25 }, (_, i) => finding(`gap ${i}`)).join("\n");
+    const { calls } = run(lines);
+    expect(calls[0]).toContain("### gap 19");
+    expect(calls[0]).not.toContain("### gap 20");
+  });
+
+  it("defuses @-mentions copied from untrusted content", () => {
+    const { calls } = run(finding("Ping", "cc @someone and @org/team"));
+    expect(calls[0]).not.toMatch(/@someone|@org/);
   });
 
   it.each([["not json"], [JSON.stringify({ title: "", body: "x" })], [JSON.stringify({ title: "x" })]])(
     "fails loudly on a malformed finding: %s",
     (line) => {
-      const { result, created } = run(`${line}\n`);
+      const { result, calls } = run(`${line}\n`);
       expect(result.status).not.toBe(0);
-      expect(created).toEqual([]);
+      expect(calls).toEqual([]);
     },
   );
 });
