@@ -103,7 +103,7 @@ describe("per-form reasons", () => {
 
   it("New order names what Save draft still needs", () => {
     const base = { kind: "wholesale" as const, customerId: "c", shipToId: "st", fromLocationId: "l", toLocationId: "", lines: [{ skuId: "s", qty: "2" }], availableSkuIds: ["s"], catalog: { customers: 1, locations: 1, skus: 1 } };
-    expect(orderFormReadiness(base)).toEqual({ submittable: true, reason: null, hint: null });
+    expect(orderFormReadiness(base)).toEqual({ submittable: true, reason: null, hint: null, goTo: [] });
     expect(orderFormReadiness({ ...base, customerId: "", shipToId: "", fromLocationId: "", lines: [{ skuId: "", qty: "" }] }).reason)
       .toBe("Still needed: a customer, a source location, and a SKU with a quantity above zero on each line.");
     expect(orderFormReadiness({ ...base, shipToId: "" }).reason).toBe("Still needed: a ship-to.");

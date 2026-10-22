@@ -17,7 +17,7 @@ import { waterProfiles } from "./catalog";
 
 export const cellarMapBrewer: CellarMapViewModel = {
   readingHref: null,
-  readingHint: "Several tanks hold beer. Open a tank to record its reading.",
+  actionHint: "Several tanks hold beer. Open a tank to record its reading.",
   tiles: [
     { name: "FV1", detail: "Pils · 12.8 / 15 bbl", reading: "1.9 °P · read 4 h", fill: 85 },
     { name: "FV2", detail: "Hazy · 9.0 / 15 bbl", reading: "7.5 °P · read 8 h", fill: 60 },
@@ -61,7 +61,6 @@ export const batchesEmpty: BatchesSnapshot = {
 };
 
 export const scheduleBatchHazy: ScheduleBatchViewModel = {
-  title: "B-0416 · Hazy",
   recipeId: "hazy-v4",
   recipe: "Hazy IPA v4",
   recipeOptions: [{ id: "hazy-v4", label: "Hazy IPA v4" }, { id: "pils-v3", label: "Pils v3" }, { id: "stout-v2", label: "Stout v2" }],

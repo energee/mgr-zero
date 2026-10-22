@@ -1,6 +1,7 @@
 // app/api/chat/jobs/deliver/route.ts — bounded worker wake: processes pending
 // App Home receipts, then leases and delivers due notifications (send/update/
-// retry/suppress). Body may carry {limit} (capped at 100 by the lease RPC).
+// retry/suppress, and stop at rows whose lease is nearly spent, counted as
+// `expired`). Body may carry {limit} (capped at 100 by the lease RPC).
 // Bearer-authenticated internal job (CHAT_JOB_SECRET).
 import { NextResponse } from "next/server";
 import { authorizeJob } from "@/lib/jobs/auth";
