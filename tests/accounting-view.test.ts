@@ -35,6 +35,9 @@ it("preserves unavailable setup, errors, and explicit payment settings", () => {
   expect(defaults).toContain('aria-checked="false"');
   expect(defaults).toContain('aria-checked="true"');
   expect(defaults).toContain("Save push defaults");
+  // Matches OnlinePaymentsRow: turning both off affects new invoices only.
+  expect(defaults).toContain("invoices pushed earlier keep theirs");
+  expect(defaults).not.toContain("cannot pay online at all");
 });
 
 it("offers the disconnect action by default and does not leak fixture paths", () => {
@@ -101,7 +104,7 @@ it("reads connection statuses, online payments and portal logins as sentences (#
   expect(connected).toContain("Through each invoice’s QuickBooks payment link");
   expect(connected).not.toContain("Not available");
   expect(connected).toContain("1 customer has no portal login email");
-  // QboDefaultsView: both options off means customers cannot pay new invoices online.
+  // OnlinePaymentsRow: both options off means customers cannot pay new invoices online.
   const bothOff = render(toAccountingViewProps({ ...health, connected: true, state: "connected", connectionId: "c1", allowAch: false, allowCard: false }, "America/New_York"));
   expect(bothOff).toContain("Bank transfer and card are off for new invoices");
   expect(bothOff).toContain(">Off<");
