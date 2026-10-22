@@ -27,7 +27,9 @@ type Sku = { id: string; name: string; format_id: string; active: boolean; upc: 
 type Brand = { id: string; name: string; alias: string | null; abv: number | null; description: string | null; category: string | null; price_group_id: string | null; hops: string | null; styles: { name: string } | null; skus: Sku[]; pours: { id: string }[]; colas: CatalogBrandRow["colas"] };
 type Format = { id: string; name: string; basis: "packaged" | "poured"; package_type: string | null; keg_size: string | null; units_per_case: number | null; bbl_per_unit: string | null };
 
-/** The reads app/(app)/pricing/page.tsx runs; a role must pass them all or it lands on No access. */
+/** The reads app/(app)/pricing/page.tsx runs; a role must pass them all or it
+ *  lands on No access. Keep in step with that page; tests/main214-page-assembly.test.ts
+ *  fails when the two differ for any staff role. */
 const PRICING_READS = ["list_sale_channels", "list_price_groups", "list_formats", "list_channel_prices", "list_price_group_barcodes"];
 
 const catalogParams = z.object({

@@ -58,6 +58,8 @@ import RecipesPage from "@/app/(app)/recipes/page";
 import VendorsPage from "@/app/(app)/vendors/page";
 import MaterialsPage from "@/app/(app)/materials/page";
 import { CatalogView } from "@/components/mgr/views/catalog";
+import { canRun } from "@/lib/commands/registry";
+import { STAFF_ROLES } from "@/lib/mgr/enums";
 import { SkuListView } from "@/components/mgr/views/sku-list";
 import { CustomersView } from "@/components/mgr/views/customers";
 import { CustomerDetailForm } from "@/app/(app)/customers/customer-detail-form";
@@ -85,8 +87,22 @@ it.each([
   const html = render(await CatalogPage());
   for (const href of linked) expect(html).toContain(`href="${href}"`);
   for (const href of inert) expect(html).not.toContain(`href="${href}`);
+  // The rows still draw for every role; one without its link is plain, not a dead tap.
+  for (const text of [">Hazy<", "Price groups", "Water profiles"]) expect(html).toContain(text);
+  if (role === "warehouse") expect(html).not.toMatch(/\sdata-tap[\s>=]/);
   // Every role that reaches Catalog may open a format.
   expect(html).toContain('href="/catalog/formats/keg"');
+});
+// #1062: the Price groups gate is the reads /pricing runs, so the two cannot drift
+// apart. The real registry answers canRun for each staff role.
+it.each(STAFF_ROLES)("Catalog links Price groups for %s exactly when it may run every /pricing read", async (role) => {
+  state.roles = [role];
+  await PricingPage();
+  const reads = [...new Set(state.calls)];
+  expect(reads).toContain("list_channel_prices");
+  const ctx = { breweryId: "brewery", roles: [role] } as unknown as Parameters<typeof canRun>[0];
+  const html = render(await CatalogPage());
+  expect(html.includes('href="/pricing"')).toBe(reads.every(name => canRun(ctx, name)));
 });
 it("assembles the shared SKU list with the brand's packages and the edit sheet, but no New SKU", async () => {
   const page = await SkuListPage({ params: Promise.resolve({ id: "brand" }) });

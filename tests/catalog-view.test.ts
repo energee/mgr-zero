@@ -218,6 +218,22 @@ describe("Catalog view", () => {
     expect(html).toContain(brandOf(SKU_HAZY));
   });
 
+  // #1062: live, a row the viewer cannot open is plain, not the inventory's dead tap.
+  it("draws a live row without its link as plain text, with no tap or Open", () => {
+    const html = htmlOf(createElement(CatalogView, {
+      model: toCatalogViewProps(catalogBrands),
+      createAction: null,
+      links: { brands: false, priceGroups: false, waterProfiles: false },
+    }));
+    expect(html).toContain(brandOf(SKU_HAZY));
+    expect(html).toMatch(/Price groups/);
+    expect(html).toMatch(/Water profiles/);
+    expect(html).not.toMatch(/\sdata-tap[\s>=]/);
+    expect(html).not.toContain('aria-label="Open"');
+    // Sort headers stay buttons; the brand name is no longer one.
+    expect(html).not.toMatch(new RegExp(`<button\\b[^>]*>${brandOf(SKU_HAZY)}<`));
+  });
+
   it("draws one entry per brand without separate pour rows", () => {
     const model = toCatalogViewProps(catalogBrands);
     const html = htmlOf(createElement(CatalogView, {
