@@ -4,7 +4,7 @@ import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
 
 export function CellarMapView({ model, transfer, addition, complete }: { model: CellarMapViewModel; transfer?: ReactNode; addition?: ReactNode; complete?: ReactNode }) {
   return <>
-    {E.back("Beer", "Cellar", E.btn("Add vessel", "g", model.addHref), model.backHref)}
+    {E.back("Beer", "Cellar", model.addHref === null ? undefined : E.btn("Add vessel", "g", model.addHref), model.backHref)}
     {model.tiles.length ? E.tiles(model.tiles.map(tile => [tile.name, tile.detail, tile.reading, tile.warning ? 1 : 0, tile.fill, tile.href]), "c2") : E.blank("No vessels yet")}
     <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
       {E.btn("Reading", model.readingHref === null ? "p disabled" : "p", model.readingHref ?? undefined)}

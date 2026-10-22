@@ -167,7 +167,7 @@ import { TransfersView } from "@/components/mgr/views/transfers";
 import { UnitsView } from "@/components/mgr/views/units";
 import { VendorView } from "@/components/mgr/views/vendor";
 import { VendorsView } from "@/components/mgr/views/vendors";
-import { VesselDetailView } from "@/components/mgr/views/vessel-detail";
+import { RemoveVesselControl, VesselDetailView } from "@/components/mgr/views/vessel-detail";
 import { CellarMapView } from "@/components/mgr/views/cellar-map";
 import { cellarMapBrewer } from "@/lib/mgr/fixtures/production";
 import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/demo";
@@ -1607,9 +1607,9 @@ export const SCREENS: Screen[] = [
     to: { "FV3 \u00b7 fermenter \u00b7 15 bbl": "Vessel detail" , "Add vessel": "Vessel detail" },
     job: "Occupancy is the subject: fill, gravity and overdue lead every tile",
     reads: "list_occupancies · list_vessels · list_batches · list_fermentation_readings · get_gravity_unit · get_batch_completion_preview",
-    writes: "upsert_vessel [mutable single rows] · complete_batch",
-    states: [["beer in tanks", "named volume requires explicit loss acknowledgement", 1], ["open run", "complete batch refused"], ["negative residual", "reload cellar facts", 1], ["uncertain", "retry unchanged request", 1], ["saved", "batch and all open occupancies closed"]],
-    spec: "Complete batch reviews the server-derived baseline, frozen packaged output, prior attributed volume, threshold, residual and current beer in each open tank. Beer at or above max(0.05 bbl, 0.5% of baseline) requires an explicit acknowledgement naming the barrels and tanks being written off. The same shared completion surface freezes the acknowledgement during submission and uncertain retry, then atomically closes the batch and all of its open occupancies. A threshold-qualified residual becomes one typed nonphysical loss root; the form accepts no amount or cause. Tile fill derives from occupancy vs vessel capacity, never from a status column. Reading is the one primary; Transfer and Brew day are outline. A tile opens Vessel detail.",
+    writes: "upsert_vessel [mutable single rows; admin] · complete_batch",
+    states: [["brewer", "Add vessel hidden; vessels are admin-managed"], ["beer in tanks", "named volume requires explicit loss acknowledgement", 1], ["open run", "complete batch refused"], ["negative residual", "reload cellar facts", 1], ["uncertain", "retry unchanged request", 1], ["saved", "batch and all open occupancies closed"]],
+    spec: "Complete batch reviews the server-derived baseline, frozen packaged output, prior attributed volume, threshold, residual and current beer in each open tank. Beer at or above max(0.05 bbl, 0.5% of baseline) requires an explicit acknowledgement naming the barrels and tanks being written off. The same shared completion surface freezes the acknowledgement during submission and uncertain retry, then atomically closes the batch and all of its open occupancies. A threshold-qualified residual becomes one typed nonphysical loss root; the form accepts no amount or cause. Tile fill derives from occupancy vs vessel capacity, never from a status column. Reading is the one primary; Transfer and Brew day are outline. A tile opens Vessel detail. Retired vessels are not tiles. Add vessel shows only to an admin.",
     body: <CellarMapView model={cellarMapBrewer} complete={<BatchCompletionFixture />} />,
   },
   {
@@ -1620,10 +1620,10 @@ export const SCREENS: Screen[] = [
     to: { "Stout · BATCH-0168": "Brew day" },
     job: "Inspect one vessel's occupancy and readings and edit its physical facts",
     reads: "list_vessels · list_occupancies · list_fermentation_readings · get_gravity_unit",
-    writes: "upsert_vessel [mutable facts only]",
-    states: [["permission", "brewer or admin required", 1], ["occupied", "batch and fill shown"], ["empty", "available for a batch"], ["reading overdue", "last reading flagged", 1]],
-    spec: "Batch occupancy and reading history are records; only the vessel name, type and capacity are editable here.",
-    body: <VesselDetailView model={vesselFv3} />,
+    writes: "upsert_vessel [mutable facts only] · delete_vessel",
+    states: [["permission", "brewer or admin required", 1], ["brewer", "vessel facts read-only; no Save or Delete"], ["occupied", "batch and fill shown"], ["empty", "available for a batch"], ["reading overdue", "last reading flagged", 1], ["holding beer", "delete refused", 1], ["with batch history", "retired, not deleted"]],
+    spec: "Batch occupancy and reading history are records; only the vessel name, type and capacity are editable here, and only by an admin. A brewer sees the facts as text. Delete vessel confirms first. A vessel holding beer is refused. A vessel that has held beer is retired: it leaves the cellar, transfer targets and brew day, while its batch history and the Batches vessel table keep it. A vessel that never held beer is deleted.",
+    body: <VesselDetailView model={vesselFv3} remove={<RemoveVesselControl vessel="FV3" />} />,
   },
   {
     step: 7,

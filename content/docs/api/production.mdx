@@ -123,6 +123,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_recipe_version", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "recipeId": "00000000-0000-0000-0000-000000000000", "mashSchedule": [ { "name": "string", "kind": "infusion", "tempF": 1, "minutes": 1 } ], "brewhouseEfficiency": 1, "yeastAttenuation": 1, "ingredients": [ { "materialId": "00000000-0000-0000-0000-000000000000", "perBblQty": 1, "stage": "mash" } ] } }'
 ```
 
+## delete_vessel [#delete_vessel]
+
+`command` · admin
+
+Delete a vessel that never held beer, or retire one with batch history so that history keeps it; a vessel holding beer is refused. The result's retired flag says which
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `vesselId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "delete_vessel", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "vesselId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 ## get_batch_completion_preview [#get_batch_completion_preview]
 
 `query` · admin, brewer
@@ -265,9 +282,11 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-Vessels, alphabetical, with kind and capacity
+Vessels, alphabetical, with kind and capacity; retired vessels only when retired is true
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `retired` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -459,7 +478,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 ## upsert_vessel [#upsert_vessel]
 
-`command` · admin, brewer
+`command` · admin
 
 Create or rename a vessel: its name, kind and capacity. Contents are never stored here — they are derived from the open occupancy
 
@@ -505,7 +524,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* production-designed */}
 
-25 of the 26 operations in this area are available today; the 1 below are not.
+26 of the 27 operations in this area are available today; the 1 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
