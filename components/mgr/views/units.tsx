@@ -1,6 +1,7 @@
-// components/mgr/views/units.tsx — Settings · Units. Live passes
-// GravityUnitForm as controls; inventory draws the chip groups. Back, info,
-// and the formatGravity example always draw.
+// components/mgr/views/units.tsx — Settings · Units. Gravity is the only
+// unit a brewery chooses, so the page is one "Gravity unit" section. Live
+// passes GravityUnitForm as controls; inventory draws the chip groups. Back,
+// the display-only note, and the conversion preview always draw.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { BREWERY_UNITS, MINE_UNITS, type UnitsViewModel } from "@/lib/mgr/units-view";
@@ -37,9 +38,11 @@ export function UnitsView({
   return (
     <>
       {E.back(backLabel, "Units", undefined, model.backHref)}
-      {E.info("This changes only how gravity is shown and typed.")}
+      {E.group("Gravity unit")}
+      {E.info("Changing this only changes how gravity is shown and typed. Your readings are not changed.")}
       {controls !== undefined ? controls : <GravityUnitControls model={model} />}
-      {E.fld("A 12.5 °P reading shows as", model.example)}
+      {E.ttl("Preview")}
+      <p className="text-sm">{model.preview}</p>
     </>
   );
 }
