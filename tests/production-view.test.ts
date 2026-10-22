@@ -172,13 +172,12 @@ describe("Schedule batch view", () => {
 });
 
 describe("Brew day view", () => {
-  it("keeps plan actions on the first brew but not on an additional turn", () => {
-    const planActions = createElement(PlanActions, { plannedOn: "2026-09-04" });
-    const planned = htmlOf(createElement(BrewDayView, { model: brewDayHazy, planActions }));
-    for (const label of ["Change plan", "Reschedule", "Cancel plan"]) expect(planned).toContain(label);
-    const turn = htmlOf(createElement(BrewDayView, { model: brewTurnModel(brewDayTurnsHazy), planActions }));
-    expect(turn).toContain("Record brew turn");
-    for (const label of ["Change plan", "Reschedule", "Cancel plan"]) expect(turn).not.toContain(label);
+  it("draws Change plan on both planned tabs, ahead of the form that saves or records", () => {
+    const planActions = createElement(PlanActions, { plannedOn: "2026-10-22" });
+    for (const html of [htmlOf(createElement(BrewPrepView, { model: brewPrepMineral, planActions })), htmlOf(createElement(BrewTimelineView, { model: brewTimelineMineral, planActions }))]) {
+      for (const label of ["Change plan", "Reschedule", "Cancel plan"]) expect(html).toContain(label);
+      expect(html.indexOf("Change plan")).toBeLessThan(html.indexOf("<form"));
+    }
   });
   it("draws Cancel plan as a small control beside Reschedule, not a full-width button (#995)", () => {
     const html = htmlOf(createElement(PlanActions, { plannedOn: "2026-09-04" }));
@@ -227,7 +226,7 @@ describe("Brew day view", () => {
   it("the Brew day inventory record is BrewDayView", () => {
     const body = screen("Brew day").body as { props: { children: { type: unknown; props: { model: unknown } }[] } };
     expect(body.props.children.map(view => view.type)).toEqual([BrewDayView, BrewDayView]);
-    expect(body.props.children.map(view => view.props.model)).toEqual([brewDayHazy, brewDayTurnsHazy]);
+    expect(body.props.children.map(view => view.props.model)).toEqual([brewDayTurnsHazy, brewTurnModel(brewDayTurnsHazy)]);
   });
 
   it("renders Record brew day and knockout", () => {
@@ -263,6 +262,7 @@ describe("Brew day view", () => {
     const body = screen("Brew prep").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(BrewPrepView);
     expect(body.props.model).toEqual(brewPrepMineral);
+    expect((body.props as { planActions?: { type: unknown } }).planActions?.type).toBe(PlanActions);
   });
 
   it("links both tabs when live passes tab hrefs, and leaves them inert in the inventory", () => {

@@ -28,7 +28,7 @@ it("shares plan controls across inventory and live views and hides them for canc
   const sourceWrapper = readFileSync("app/(app)/packaging/[id]/run-actions.tsx", "utf8");
   expect(sourceWrapper.match(/<PackagingSourcePicker/g)).toHaveLength(1);
   for (const element of [
-    createElement(BrewDayView, { model: { ...brewDayHazy, cancelled: true }, planActions: createElement(PlanActions, { plannedOn: "2026-09-28" }) }),
+    createElement(BrewDayView, { model: { ...brewDayHazy, cancelled: true } }),
     createElement(ClosePackagingRunView, { model: { title: "Run", plannedOn: "2026-09-28", cancelled: true }, planActions: createElement(PlanActions, { plannedOn: "2026-09-28" }) }),
   ]) {
     const html = renderToStaticMarkup(element);

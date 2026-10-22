@@ -1,7 +1,7 @@
 // tests/brew-prep-view.test.ts — the brew prep pull list and the brew-day
 // timeline's pure rules (lib/mgr/brew-prep-view.ts).
 import { describe, expect, it } from "vitest";
-import { anyPulled, brewIngredients, brewPullsPayload, brewTargets, canRecordTimeline, canSavePrep, currentStage, isShort, laterAdditions, openBrewTab, pullDetail, pullTone, sourceChoices, startAtPlan, timelineRecordPayload, timelineStages, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
+import { anyPulled, brewIngredients, brewPullsPayload, brewTargets, canRecordTimeline, canSavePrep, currentStage, isShort, laterAdditions, openBrewTab, pullDetail, pullTone, sourceChoices, startAtPlan, timelineRecordPayload, timelineStages, timelineTone, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { BrewMaterialSource, BrewPlan, BrewPull } from "@/lib/mgr/brew-day-view";
 
 const chit: BrewIngredient = startAtPlan({ key: "chit", name: "Chit Malt", materialId: "chit", stage: "mash", plan: 220, unit: "lb", packSize: 50, source: null });
@@ -36,9 +36,13 @@ describe("pull lines", () => {
   });
 });
 
+/** Stock behind hops (NS-1 in F1) and oats (untracked in D1), 300 lb each. */
+const onHand = (material: string, location: string, bin: string, lot: string | null): BrewMaterialSource =>
+  ({ material_id: material, material_name: material, unit: "lb", location_id: location, location_name: location, bin_id: bin, bin_name: bin, lot_id: lot, lot_code: lot, qty: 300 });
 const timeline: BrewTimelineViewModel = {
   title: "BAT-1", ingredients: [{ ...chit, confirmed: true }, { ...hops, confirmed: true }], targets: {}, process: {},
   vesselId: "fv1", vessels: [{ id: "fv1", name: "FV1", kind: "fermenter", capacity_bbl: 25.5 }], initialBbl: "22", brewedOn: "2026-10-22",
+  sources: [onHand("ns", "freezer", "f1", "ns-1"), onHand("oats", "dry", "d1", null)],
 };
 /** Every pulled line has its exact source. */
 const sourced: BrewTimelineViewModel = { ...timeline, ingredients: [{ ...oats, confirmed: true }, { ...hops, confirmed: true }] };
@@ -73,6 +77,19 @@ describe("timeline", () => {
     expect(canRecordTimeline(none)).toBe(false);
     expect(canRecordTimeline({ ...none, confirmEmpty: true })).toBe(true);
     expect(canRecordTimeline({ ...sourced, ingredients: [], confirmEmpty: true })).toBe(true);
+  });
+  it("refuses pulls that together exceed what their source holds, or a source no longer in stock", () => {
+    const twice = { ...sourced, ingredients: [{ ...oats, confirmed: true }, { ...oats, key: "oats-2", confirmed: true }] };
+    expect(canRecordTimeline(twice)).toBe(false);
+    expect(canRecordTimeline({ ...sourced, sources: [onHand("ns", "freezer", "f1", "ns-1")] })).toBe(false);
+  });
+  it("turns a confirmed row green only when it has a source within stock", () => {
+    expect(timelineTone({ ...hops, confirmed: true }, timeline.sources)).toBe("ok");
+    expect(timelineTone({ ...chit, confirmed: true }, timeline.sources)).toBe("w");
+    expect(timelineTone({ ...hops, confirmed: true }, [])).toBe("w");
+    expect(timelineTone({ ...chit, packs: "0", loose: "", confirmed: true }, timeline.sources)).toBe("ok");
+    expect(timelineTone(hops, timeline.sources)).toBe("");
+    expect(timelineTone({ ...hops, packs: "0" }, timeline.sources)).toBe("w");
   });
   it("knows whether anything is pulled, which is when the confirm-empty switch hides", () => {
     expect(anyPulled(sourced)).toBe(true);
@@ -147,6 +164,10 @@ describe("brewIngredients", () => {
     const [chit] = brewIngredients(plan, [pull], sources, 22);
     expect(chit).toMatchObject({ plan: 220, packs: "4", loose: "10", source: { lot: "C-2", bin: "Malt room / A2", binId: "a2", lotId: "c-2" } });
   });
+  it("once Prep is saved, starts a line it left off (pulled to zero with no source) at zero", () => {
+    const [, ns] = brewIngredients(plan, [pull], sources, 22);
+    expect(ns).toMatchObject({ plan: 44, packs: "0", loose: "0" });
+  });
 });
 
 describe("sourceChoices", () => {
@@ -162,7 +183,7 @@ describe("sourceChoices", () => {
   it("gives the source a picked choice sets on the line", () => {
     const [, second] = sourceChoices(sources, "chit");
     expect(second.source).toEqual({ lot: "C-2", bin: "Malt room / A2", materialId: "chit", locationId: "malt-room", binId: "a2", lotId: "c-2" });
-    expect(canRecordTimeline({ ...timeline, ingredients: [{ ...chit, source: second.source, confirmed: true }, { ...hops, confirmed: true }] })).toBe(true);
+    expect(canRecordTimeline({ ...timeline, sources: [...timeline.sources!, ...sources], ingredients: [{ ...chit, source: second.source, confirmed: true }, { ...hops, confirmed: true }] })).toBe(true);
   });
 });
 

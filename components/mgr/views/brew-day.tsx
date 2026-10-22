@@ -1,5 +1,5 @@
 "use client";
-import { cloneElement, Fragment, useId, useState, type ReactNode } from "react";
+import { cloneElement, Fragment, useId, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { formatDate } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,7 @@ import { PlanCancelled } from "./plan-actions";
 
 export type { BrewDayViewModel };
 
-export function BrewDayView({ model, busy = false, error, onChange, onRecord, planActions }: {
-  planActions?: ReactNode;
+export function BrewDayView({ model, busy = false, error, onChange, onRecord }: {
   model: BrewDayViewModel; busy?: boolean; error?: string | null;
   onChange?: (patch: Partial<BrewDayViewModel>) => void;
   onRecord?: () => void;
@@ -35,7 +34,6 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, pl
   </>;
   return <>
     {header}
-    {!model.cancelled && !value.recorded && !value.addingTurn && !value.correctionRecordId && planActions}
     {model.cancelled ? <PlanCancelled /> : value.recorded ? <>
       {E.fld("Vessel", model.vesselName || "No open occupancy")}
       {E.fld("Knockout", model.initialBbl ? model.initialBbl + " bbl" : "Unavailable after the occupancy closes")}

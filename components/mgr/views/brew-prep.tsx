@@ -48,10 +48,14 @@ export function SourcePick({ row, choices, onChange, disabled = false }: {
 /** Short and Choose lot act in place: Short moves to the line's packs field to enter what was pulled (Pick's Short
  *  opens the same amount entry); Choose lot opens the line's source pick when `sources` holds stock of its material,
  *  and is disabled when `sources` is given but holds none. Without `sources` (the inventory) it stays a plain verb. */
-export function BrewPrepView({ model, onChange, onPrint, messages, footer, submitting = false, disabled = false, tabHrefs }: {
+export function BrewPrepView({ model, onChange, onPrint, onSave, messages, footer, planActions, submitting = false, disabled = false, tabHrefs }: {
   model: BrewPrepViewModel;
   onChange?: (patch: Partial<BrewPrepViewModel>) => void;
   onPrint?: () => void;
+  /** Done pulling submits the pull form; without it (the inventory) submitting does nothing. */
+  onSave?: () => void;
+  /** Reschedule / cancel, drawn under the title and outside the pull form so its own fields never submit Done pulling. */
+  planActions?: ReactNode;
   messages?: ReactNode;
   footer?: ReactNode;
   submitting?: boolean;
@@ -66,28 +70,31 @@ export function BrewPrepView({ model, onChange, onPrint, messages, footer, submi
   const byStage = (stage: BrewDayStage) => value.ingredients.filter(row => row.stage === stage);
   return <>
     {E.back("Batches", model.title, undefined, model.backHref)}
-    <BrewTabs on={0} hrefs={tabHrefs} />
-    {E.info("Lines start at plan in whole packs plus loose pounds. Touch only exceptions.")}
-    {E.pick("Vessel", value.vesselId, vesselOptions(value.vessels), { onChange: vesselId => change({ vesselId }), placeholder: "Choose vessel" })}
-    {BREW_DAY_STAGES.filter(stage => byStage(stage).length).map(stage => <Fragment key={stage}>
-      {E.ttl(sentenceCase(stage))}
-      {byStage(stage).map(row => {
-        const choices = sourceChoices(value.sources ?? [], row.materialId), packsId = `${id}-${row.key}-packs`;
-        return <div key={row.key}>
-          {E.row(row.name, pullDetail(row), "", pullTone(row), undefined, <div className="flex flex-wrap items-center gap-2">
-            <PackQuantity row={row} id={packsId} onChange={patch => patchLine(row.key, patch)} disabled={submitting} />
-            {isShort(row) && <Button type="button" size="sm" variant="outline" data-preview-action onClick={() => document.getElementById(packsId)?.focus()}>Short</Button>}
-            {choosing === row.key
-              ? <SourcePick row={row} choices={choices} disabled={submitting} onChange={source => patchLine(row.key, { source })} />
-              : !row.source && E.act("Choose lot", "attention", undefined, choices.length ? () => setChoosing(row.key) : undefined, submitting || (value.sources !== undefined && !choices.length))}
-          </div>)}
-        </div>;
-      })}
-    </Fragment>)}
-    {E.fld("Later, in cellar", model.later)}
-    <Button type="button" variant="ghost" className="w-fit" data-preview-action onClick={onPrint}>Print pull list</Button>
-    {messages}
-    {E.sp()}
-    {footer !== undefined ? footer : <Button type="submit" className="w-full md:w-fit md:self-end" disabled={submitting || disabled}>{submitting ? "Saving…" : "Done pulling"}</Button>}
+    {planActions}
+    <form className="contents" onSubmit={event => { event.preventDefault(); if (!submitting && !disabled) onSave?.(); }}>
+      <BrewTabs on={0} hrefs={tabHrefs} />
+      {E.info("Lines start at plan in whole packs plus loose pounds. Touch only exceptions.")}
+      {E.pick("Vessel", value.vesselId, vesselOptions(value.vessels), { onChange: vesselId => change({ vesselId }), placeholder: "Choose vessel" })}
+      {BREW_DAY_STAGES.filter(stage => byStage(stage).length).map(stage => <Fragment key={stage}>
+        {E.ttl(sentenceCase(stage))}
+        {byStage(stage).map(row => {
+          const choices = sourceChoices(value.sources ?? [], row.materialId), packsId = `${id}-${row.key}-packs`;
+          return <div key={row.key}>
+            {E.row(row.name, pullDetail(row), "", pullTone(row), undefined, <div className="flex flex-wrap items-center gap-2">
+              <PackQuantity row={row} id={packsId} onChange={patch => patchLine(row.key, patch)} disabled={submitting} />
+              {isShort(row) && <Button type="button" size="sm" variant="outline" data-preview-action onClick={() => document.getElementById(packsId)?.focus()}>Short</Button>}
+              {choosing === row.key
+                ? <SourcePick row={row} choices={choices} disabled={submitting} onChange={source => patchLine(row.key, { source })} />
+                : !row.source && E.act("Choose lot", "attention", undefined, choices.length ? () => setChoosing(row.key) : undefined, submitting || (value.sources !== undefined && !choices.length))}
+            </div>)}
+          </div>;
+        })}
+      </Fragment>)}
+      {E.fld("Later, in cellar", model.later)}
+      <Button type="button" variant="ghost" className="w-fit" data-preview-action onClick={onPrint}>Print pull list</Button>
+      {messages}
+      {E.sp()}
+      {footer !== undefined ? footer : <Button type="submit" className="w-full md:w-fit md:self-end" disabled={submitting || disabled}>{submitting ? "Saving…" : "Done pulling"}</Button>}
+    </form>
   </>;
 }

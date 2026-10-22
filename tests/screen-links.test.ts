@@ -14,7 +14,7 @@ const names = new Set(SCREENS.map((s) => s.name));
 
 describe("resolveTap", () => {
   it("keeps batch history and exact occupancy reading destinations distinct", () => {
-    expect(resolveTap(by("Batches"), "Brew")).toBe("Brew day");
+    expect(resolveTap(by("Batches"), "Brew")).toBe("Brew prep");
     expect(resolveTap(by("Batches"), "B-0409")).toBe("Brew day");
     expect(resolveTap(by("Batches"), "FV1")).toBe("Vessel detail");
     expect(resolveTap(by("Batches"), "Reading")).toBe("Fermentation reading");

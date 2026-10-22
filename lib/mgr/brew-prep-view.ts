@@ -4,11 +4,11 @@
 // ingredients, counted in packs plus loose base units (./pack-qty). Open bags
 // are not inventory: a partial pull is just base units. Prep is saved as
 // brew_pulls through save_batch_pulls; nothing here moves stock.
-import { BREW_DAY_STAGES, INGREDIENT_STAGES } from "./recipe-process-view";
-import { brewDayLines, brewSourceKey, isBrewDayStage, observedProcess, plannedQty, soleSource, type BrewDayVessel, type BrewMaterialSource, type BrewPlan, type BrewPull } from "./brew-day-view";
+import { BREW_DAY_STAGES, INGREDIENT_STAGES, isBrewDayStage } from "./recipe-process-view";
+import { brewDayLines, brewSourceKey, fitsStock, observedProcess, plannedQty, soleSource, type BrewDayVessel, type BrewMaterialSource, type BrewPlan, type BrewPull } from "./brew-day-view";
 import { sentenceCase } from "./labels";
-import type { SourceIds } from "./material-source";
-import { fromPacks, packs, splitPacks } from "./pack-qty";
+import { materialSourceKey, type SourceIds } from "./material-source";
+import { fromPacks, splitPacks, withPacks } from "./pack-qty";
 import { toTicks } from "./quantity-input";
 import { totalMinutes } from "./recipe-schedule";
 
@@ -47,7 +47,7 @@ export type BrewPrepViewModel = {
 };
 
 /** The timeline's stages in process order; lauter and knockout hold readings only. */
-export const TIMELINE_STAGES = [
+const TIMELINE_STAGES = [
   { stage: "mash", label: "Mash", process: ["mashWaterGal", "targetMashPh"] },
   { stage: "lauter", label: "Lauter", process: ["spargeWaterGal", "preBoilBbl"] },
   { stage: "boil", label: "Boil", process: ["boilMinutes"] },
@@ -65,6 +65,8 @@ export type BrewTimelineViewModel = {
   ingredients: BrewIngredient[];
   /** Stock a line without its exact source can be pulled from (get_brew_day_plan sources); with none, Edit offers no source pick. */
   sources?: BrewMaterialSource[];
+  /** The pinned plan's water additions, listed under Mash; recorded with Correct turn after the brew. */
+  waterAdditions?: BrewPlan["waterAdditions"];
   /** The recipe target shown in each stage heading, e.g. "152 °F · 60 min · pH 5.3". */
   targets: Partial<Record<TimelineStage, string>>;
   /** Process readings by the record_brew_day process keys, as typed. */
@@ -96,14 +98,16 @@ export const startAtPlan = (row: Omit<BrewIngredient, "packs" | "loose">): BrewI
 const lineSource = (s: BrewMaterialSource): BrewIngredient["source"] =>
   ({ materialId: s.material_id, locationId: s.location_id, binId: s.bin_id, lotId: s.lot_id, lot: s.lot_code, bin: `${s.location_name} / ${s.bin_name}` });
 
-/** Prep's lines for `plannedBbl`: a saved pull's amount and source, else plan with the only matching source (brewPlanActuals' rule). */
+/** Prep's lines for `plannedBbl`: a saved pull's amount and source. A line with no pull takes the only matching source
+ *  (brewPlanActuals' rule) and starts at plan, or at zero once Prep is saved: a saved Prep leaves off only lines pulled to zero. */
 export function brewIngredients(plan: BrewPlan, pulls: BrewPull[], sources: BrewMaterialSource[], plannedBbl: number): BrewIngredient[] {
   return brewDayLines(plan).map(line => {
     const row = { key: line.id, name: line.materialName, materialId: line.material_id, stage: line.stage, plan: plannedQty(line, plannedBbl), unit: line.unit, packSize: line.purchaseUomFactor ?? 1 };
     const pull = pulls.find(saved => saved.recipe_ingredient_id === line.id);
     if (pull) return { ...row, source: lineSource(pull), ...packFields(pull.qty, row.packSize) };
     const only = soleSource(sources, line.material_id);
-    return startAtPlan({ ...row, source: only ? lineSource(only) : null });
+    const unpulled = { ...row, source: only ? lineSource(only) : null };
+    return pulls.length ? { ...unpulled, ...packFields(0, row.packSize) } : startAtPlan(unpulled);
   });
 }
 
@@ -145,9 +149,8 @@ export const pullTone = (row: BrewIngredient): "w" | "ok" => !row.source || isSh
 
 /** "plan 220 lb = 4 × 50 lb + 20 lb · lot · bin". */
 export function pullDetail(row: BrewIngredient): string {
-  const plan = `${row.plan} ${row.unit}`, inPacks = packs(row.plan, row.packSize, row.unit);
   const source = row.source ? `${row.source.lot ?? "untracked"} · ${row.source.bin}` : "no source chosen";
-  return `plan ${inPacks === plan ? plan : `${plan} = ${inPacks}`} · ${source}`;
+  return `plan ${withPacks(row.plan, row.packSize, row.unit)} · ${source}`;
 }
 
 /** A line's source picks: this material's stock, labelled "C-2 · Malt room / A2 · 1000 lb available", each with the source it sets. */
@@ -170,10 +173,24 @@ export const currentStage = (model: BrewTimelineViewModel): TimelineStage =>
 export const knockoutReady = (model: BrewTimelineViewModel) =>
   model.vessels.some(vessel => vessel.id === model.vesselId) && Number(model.initialBbl) > 0 && Number.isFinite(Number(model.initialBbl)) && Boolean(model.brewedOn);
 
-/** Record brew day is irreversible: every ingredient confirmed and pullReady, something pulled or confirmEmpty, and a valid knockout.
- *  Stock on hand is not checked here: append_brew_actuals refuses a short source with a readable error. */
+/** The stock each row pulled above zero from a source draws: fitsStock's lines. A row's source is camelCase SourceIds,
+ *  so it keys with materialSourceKey, the same string brewSourceKey gives its stock row. */
+const stockDraws = (rows: BrewIngredient[]) =>
+  rows.flatMap(row => row.source && pulledQty(row) > 0 ? [{ source: materialSourceKey(row.source), qty: pulledQty(row) }] : []);
+
+/** A timeline row's tone: confirmed is green only with a source within stock, else amber; unconfirmed is amber when short,
+ *  unsourced or over stock, else plain. */
+export function timelineTone(row: BrewIngredient, sources: BrewMaterialSource[] = []): "ok" | "w" | "" {
+  const fits = pullReady(row) && fitsStock(stockDraws([row]), sources);
+  if (row.confirmed) return fits ? "ok" : "w";
+  return isShort(row) || !fits ? "w" : "";
+}
+
+/** Record brew day is irreversible: every ingredient confirmed and pullReady, the pulls together within stock (canRecordBrewDay's
+ *  rule), something pulled or confirmEmpty, and a valid knockout. */
 export const canRecordTimeline = (model: BrewTimelineViewModel) =>
   model.ingredients.every(row => row.confirmed && pullReady(row))
+  && fitsStock(stockDraws(model.ingredients), model.sources)
   && (anyPulled(model) || Boolean(model.confirmEmpty))
   && knockoutReady(model);
 

@@ -13,6 +13,7 @@ export const INGREDIENT_STAGES = ["mash", "boil", "whirlpool", "fermentation", "
 export type IngredientStage = (typeof INGREDIENT_STAGES)[number];
 /** Stages whose materials are confirmed on brew day; later stages post from cellar additions. */
 export const BREW_DAY_STAGES = ["mash", "boil", "whirlpool"] as const satisfies readonly IngredientStage[];
+export const isBrewDayStage = (stage: string): stage is (typeof BREW_DAY_STAGES)[number] => (BREW_DAY_STAGES as readonly string[]).includes(stage);
 /** One ingredient line as the editor holds it: strings until the version is built. */
 export type IngredientLine = { materialId: string; perBblQty: string; stage: IngredientStage; timingMinutes: string };
 export const lineReady = (l: IngredientLine) => l.materialId !== "" && Number(l.perBblQty) > 0 && (l.timingMinutes === "" || Number.isInteger(Number(l.timingMinutes)));

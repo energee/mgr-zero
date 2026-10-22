@@ -6,14 +6,17 @@
 // Knockout carries the vessel, barrels and brew date. On a phone the stages
 // fold so one is open at a time; from md up all show. The live batch page
 // mounts it for a planned batch; ./brew-day.tsx still draws recorded and
-// cancelled batches (history, corrections, brew turns).
+// cancelled batches (history, corrections, brew turns). Planned water additions
+// are listed under Mash as a reminder only: the timeline has no Add ingredient,
+// so they are recorded with Correct turn after the brew. A row is green only
+// once confirmed with a source within stock (timelineTone).
 "use client";
 import { Fragment, useId, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
-import { anyPulled, canRecordTimeline, currentStage, isShort, knockoutReady, pullDetail, pulledQty, sourceChoices, timelineStages, type BrewIngredient, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
+import { anyPulled, canRecordTimeline, currentStage, isShort, knockoutReady, pullDetail, pulledQty, sourceChoices, timelineStages, timelineTone, type BrewIngredient, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import { vesselOptions } from "@/lib/mgr/brew-day-view";
 import { packs } from "@/lib/mgr/pack-qty";
 import { processFields } from "./brew-day";
@@ -48,7 +51,7 @@ export function BrewTimelineView({ model, busy = false, error, onChange, onRecor
           <Button type="button" size="sm" variant="ghost" data-preview-action aria-label={`Edit ${row.name}`} aria-expanded={editing === row.key} disabled={busy} onClick={() => setEditing(editing === row.key ? null : row.key)}>Edit</Button>
           <Button type="button" size="sm" variant={row.confirmed ? "secondary" : "outline"} data-preview-action aria-pressed={Boolean(row.confirmed)} aria-label={`${row.name} pulled`} disabled={busy} onClick={() => patchRow(row.key, { confirmed: !row.confirmed })}>{row.confirmed ? "Pulled" : "Confirm"}</Button>
         </div>,
-        row.confirmed ? "ok" : isShort(row) ? "w" : "", undefined,
+        timelineTone(row, value.sources), undefined,
         editing === row.key ? <div className="flex flex-col gap-2">
           <PackQuantity row={row} disabled={busy} onChange={patch => patchRow(row.key, patch)} />
           {choices.length > 0 && <SourcePick row={row} choices={choices} disabled={busy} onChange={source => patchRow(row.key, { source })} />}
@@ -69,13 +72,16 @@ export function BrewTimelineView({ model, busy = false, error, onChange, onRecor
         </summary>
         <div className="mt-2 flex flex-col gap-3">
           {stage.ingredients.map(ingredient)}
+          {stage.stage === "mash" && (value.waterAdditions ?? []).map((row, index) => <Fragment key={index}>{E.fld(row.materialName, `${row.qty} ${row.unit} planned · add with Correct turn after recording`)}</Fragment>)}
           {stage.stage === "knockout" && <>
             {E.pick("Vessel", value.vesselId, vesselOptions(value.vessels), { onChange: vesselId => change({ vesselId }), disabled: busy, required: true, placeholder: "Choose vessel", id: id + "-vessel" })}
             {E.edit("Knockout barrels", value.initialBbl, "number", undefined, { onChange: initialBbl => change({ initialBbl }), id: id + "-bbl", disabled: busy, required: true, min: "0", step: "any" })}
             <fieldset disabled={busy}><DatePicker label="Brewed on" value={value.brewedOn} onChange={brewedOn => change({ brewedOn })} /></fieldset>
           </>}
           {E.cols(...stage.process.map(reading))}
-          {stage.stage === "knockout" && knockoutReady(value) && E.tape([[<>Knockout {value.initialBbl} bbl {E.arrow()} {vessel?.name}</>, "loss baseline"]])}
+          {stage.stage === "knockout" && (knockoutReady(value)
+            ? E.tape([[<>Knockout {value.initialBbl} bbl {E.arrow()} {vessel?.name}</>, "loss baseline"]])
+            : E.fld("Knockout baseline", "Choose a vessel, positive barrels and a brew date"))}
         </div>
       </details>)}
       {!anyPulled(value) && <fieldset disabled={busy}><label className="flex items-center gap-2">{E.sw(Boolean(value.confirmEmpty), "Confirm no ingredients used", confirmEmpty => change({ confirmEmpty }))}Confirm no ingredients used</label></fieldset>}

@@ -34,4 +34,16 @@ describe("fromPacks", () => {
     expect(fromPacks(4.4, 0, 50)).toBe(220);
     expect(fromPacks(0.1, 0.2, 1)).toBe(0.3);
   });
+  it("multiplies by a six-decimal pack size before rounding, as the receipt ledger does", () => {
+    expect(fromPacks(100, 0, 2.204623)).toBe(220.4623);
+    expect(fromPacks(25, 0, 2.204623)).toBe(55.1156);
+  });
+  it("round-trips splitPacks for a six-decimal pack size", () => {
+    expect(splitPacks(220.4623, 2.204623)).toEqual({ packs: 100, loose: 0 });
+    for (const qty of [55.1156, 220.4623, 1000, 0.5]) {
+      const split = splitPacks(qty, 2.204623);
+      expect(fromPacks(split.packs, split.loose, 2.204623)).toBe(qty);
+      expect(split.loose).toBeGreaterThanOrEqual(0);
+    }
+  });
 });

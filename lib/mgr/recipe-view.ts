@@ -11,11 +11,11 @@ import type { ReactNode } from "react";
 import { formatDate } from "@/lib/date-format";
 import { gravityBlockers, type GravityBlocker } from "@/lib/recipe-gravity";
 import { formatGravity, type GravityUnit } from "./gravity-unit";
-import { packs, splitPacks } from "./pack-qty";
+import { splitPacks, withPacks } from "./pack-qty";
 import { plural } from "./plural";
 import { fromTicks, toTicks } from "./quantity-input";
 import {
-  BREW_DAY_STAGES, fermentationSummary, ingredientDetail, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, processReadout,
+  fermentationSummary, ingredientDetail, isBrewDayStage, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, processReadout,
   type FermentationStage, type IngredientLine, type IngredientStage, type MashStep, type ProcessColumns, type RecipeMaterial, type WaterDraft,
 } from "./recipe-process-view";
 /** A brew-day line's per-bbl amount, its material's pack size (base units per pack; 1 = no pack) and base unit. */
@@ -168,7 +168,7 @@ export function noMashText(stages: string[]): string | null {
 
 /** The pack a line totals with: brew-day stages only, a positive amount, and a known material; else none. */
 export function ingredientPack(stage: string, perBbl: number, material: Pick<RecipeMaterial, "base_uom" | "purchase_uom_factor"> | undefined): RecipePack | undefined {
-  if (!(BREW_DAY_STAGES as readonly string[]).includes(stage) || !(perBbl > 0) || !material) return undefined;
+  if (!isBrewDayStage(stage) || !(perBbl > 0) || !material) return undefined;
   return { perBbl, factor: Number(material.purchase_uom_factor), unit: material.base_uom };
 }
 
@@ -176,14 +176,12 @@ export function ingredientPack(stage: string, perBbl: number, material: Pick<Rec
 const batchQty = (p: RecipePack, bbl: number) => fromTicks(toTicks(p.perBbl * bbl));
 
 /** The total the page draws after "22 bbl" and an arrow: "220 lb = 4 × 50 lb + 20 lb", or just "220 lb" with no pack or under one pack. */
-export function batchTotalText(p: RecipePack, bbl: number): string {
-  const qty = batchQty(p, bbl);
-  const base = `${qty} ${p.unit}`;
-  return p.factor === 1 || splitPacks(qty, p.factor).packs === 0 ? base : `${base} = ${packs(qty, p.factor, p.unit)}`;
-}
+export const batchTotalText = (p: RecipePack, bbl: number): string => withPacks(batchQty(p, bbl), p.factor, p.unit);
 
 /** At `bbl`: whole when the total is already whole packs, else "Round to N × size" down (from one pack up) and up,
- *  each with the per-bbl amount that gives that many packs, to the 6 decimals per_bbl_qty stores. Null with no pack. */
+ *  each with the per-bbl amount that gives that many packs, to the 6 decimals per_bbl_qty stores. Null with no pack.
+ *  ponytail: that rounding error grows with `bbl`; from about 100 bbl it can pass half a tick (950.0001 lb for 19 × 50 lb
+ *  at 300 bbl), so the line still offers Round. Exact whole packs at that size need per_bbl_qty to keep more decimals. */
 export function packRounding(p: RecipePack, bbl: number): { whole: boolean; choices: { label: string; perBbl: number }[] } | null {
   if (p.factor === 1) return null;
   const split = splitPacks(batchQty(p, bbl), p.factor);

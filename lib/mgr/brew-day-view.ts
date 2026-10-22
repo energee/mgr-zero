@@ -1,4 +1,4 @@
-import { BREW_DAY_STAGES, type IngredientStage } from "./recipe-process-view";
+import { BREW_DAY_STAGES, isBrewDayStage, type IngredientStage } from "./recipe-process-view";
 import { materialSourceKey, restoreSources } from "./material-source";
 import { fromTicks, toTicks } from "./quantity-input";
 // lib/mgr/brew-day-view.ts — view-model for Brew day.
@@ -57,9 +57,6 @@ export function brewSourceKey(source: Pick<BrewMaterialSource, "material_id" | "
   return materialSourceKey({ materialId: source.material_id, locationId: source.location_id, binId: source.bin_id, lotId: source.lot_id });
 }
 
-/** Mash, boil and whirlpool are confirmed on brew day; later stages post from cellar additions. */
-export const isBrewDayStage = (stage: IngredientStage): stage is (typeof BREW_DAY_STAGES)[number] => (BREW_DAY_STAGES as readonly string[]).includes(stage);
-
 /** The plan's lines confirmed on brew day (mash, boil, whirlpool), in plan order. */
 export const brewDayLines = (plan: BrewPlan) =>
   (plan.ingredients ?? []).filter((row): row is BrewPlanIngredient & { stage: (typeof BREW_DAY_STAGES)[number] } => isBrewDayStage(row.stage));
@@ -85,15 +82,19 @@ export function canRecordBrewDay(model: BrewDayViewModel) {
   if (model.correctionRecordId && !model.correctionReason?.trim()) return false;
   const actuals = model.actuals ?? [];
   if (!actuals.length) return Boolean(model.confirmEmpty);
+  if (actuals.some(row => !Number.isFinite(Number(row.qty)) || Number(row.qty) <= 0)) return false;
+  return fitsStock(actuals.map(row => ({ source: row.source, qty: Number(row.qty) })), model.sources);
+}
+
+/** Lines drawing on one source (by brewSourceKey) together fit what it holds; a line whose source is not in stock does not fit. */
+export function fitsStock(lines: { source: string; qty: number }[], sources: BrewMaterialSource[] = []): boolean {
   const totals = new Map<string, number>();
-  for (const row of actuals) {
-    const source = model.sources?.find(source => brewSourceKey(source) === row.source), qty = Number(row.qty);
-    if (!source || !Number.isFinite(qty) || qty <= 0) return false;
-    const total = (totals.get(row.source) ?? 0) + toTicks(qty);
-    if (total > toTicks(source.qty)) return false;
-    totals.set(row.source, total);
-  }
-  return true;
+  return lines.every(line => {
+    const source = sources.find(candidate => brewSourceKey(candidate) === line.source);
+    const total = (totals.get(line.source) ?? 0) + toTicks(line.qty);
+    totals.set(line.source, total);
+    return source !== undefined && total <= toTicks(source.qty);
+  });
 }
 
 export function brewActualPayload(model: BrewDayViewModel) {
