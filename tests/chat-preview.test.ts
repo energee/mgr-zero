@@ -80,12 +80,30 @@ describe("chat preview web renderer", () => {
     for (const fixture of CHAT_PREVIEW_FIXTURES) {
       const html = renderToStaticMarkup(createElement(ChatPreview, { fixture }));
       expect(html).toContain(fixture.title);
-      expect(html).toContain("Preview data");
+      expect(html).toContain("Sample data");
       expect(html).toMatch(/<section[^>]*aria-labelledby="/);
       for (const action of fixture.actions) expect(html).toContain(action.label);
       for (const item of fixture.items) expect(html).toContain(item.title);
       expect(html).not.toMatch(/xox[baprs]-|slack\.com\/api|fetch\(|https?:\/\//);
     }
+  });
+
+  // #1146: the surface is named once, the DM shows its actions once, the
+  // sample date cannot go stale, and the sample dialog cannot look savable.
+  it("names each surface once and shows each DM action once", () => {
+    const dm = CHAT_PREVIEW_FIXTURES.find(({ id }) => id === "personal-dm")!;
+    const html = renderToStaticMarkup(createElement(ChatPreview, { fixture: dm }));
+    expect(html).toContain("Direct message · Sample data");
+    expect(html.match(/Direct message/g)).toHaveLength(1);
+    for (const label of ["Open pick in MGR", "Snooze", "Mute picks"]) expect(html.split(`>${label}<`)).toHaveLength(2);
+    expect(JSON.stringify(dm)).not.toMatch(/\b\d{1,2}\/\d{1,2}\b/);
+  });
+
+  it("draws the sample preferences dialog without a live Save", () => {
+    const preferences = CHAT_PREVIEW_FIXTURES.find(({ id }) => id === "preferences")!;
+    expect(preferences.actions.every((action) => !action.enabled)).toBe(true);
+    const html = renderToStaticMarkup(createElement(ChatPreview, { fixture: preferences }));
+    expect(html).toMatch(/<button[^>]*aria-disabled="true"[^>]*>Save preferences/);
   });
 
   it("renders gated controls disabled with the same visible reason", () => {

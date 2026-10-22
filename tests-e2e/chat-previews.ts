@@ -1,4 +1,5 @@
 // tests-e2e/chat-previews.ts — isolated local browser smoke for Chat settings previews and Slack venue frames.
+// Runs against `next dev`, where the development-only "All preview states" picker it traverses is shown.
 import assert from "node:assert/strict";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync } from "node:fs";
@@ -93,7 +94,7 @@ async function main() {
     ab("wait", "--url", "**/");
     ab("network", "requests", "--clear");
     ab("open", `${BASE_URL}/settings/chat`);
-    ab("wait", "--text", "Fixture data only. Previews never send Slack messages.");
+    ab("wait", "--text", "Sample data only. These previews show what MGR posts in Slack and never send a message.");
     traversePreviewsByKeyboard();
 
     assert.equal(ab("eval", "document.querySelector('[role=dialog]') === null").result, true, "preview gallery unexpectedly opened a real modal");

@@ -29,6 +29,14 @@ const portableNotificationSchema = z.object({
 }).strict();
 
 export type NotificationReason = z.infer<typeof notificationReasonSchema>;
+
+/** The words a person reads for each reason: Slack message status, Slack's
+ *  preferences dialog, and MGR's own notification preferences. */
+export const NOTIFICATION_REASON_LABEL: Record<NotificationReason, string> = {
+  submitted_order: "Review submitted order", pick_due: "Pick due", restock_due: "Put back staged beer", delivery_next: "Next stop",
+  fermentation_reading_overdue: "Reading overdue", invoice_question: "Buyer asked about an invoice", operations_digest: "Operations",
+};
+
 export type PortableAction = z.infer<typeof portableActionSchema>;
 export type PortableNotification = Omit<z.infer<typeof portableNotificationSchema>, "actions"> & {
   actions: readonly PortableAction[];
@@ -51,7 +59,6 @@ export type ChatPreviewFixture = {
   id: ChatPreviewId;
   surface: "settings" | "app_home" | "direct_message" | "private_channel" | "modal";
   title: string;
-  eyebrow: string;
   status?: { label: string; tone: "neutral" | "healthy" | "attention" };
   fields: readonly { label: string; value: string }[];
   items: readonly PortableNotification[];

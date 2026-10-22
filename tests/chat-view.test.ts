@@ -2,6 +2,9 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
+import { NOTIFICATION_REASON_LABEL } from "../lib/chat/contracts";
+import { personalChatPreferences } from "../lib/mgr/fixtures/chat";
+import { CHAT_PREVIEW_FIXTURES } from "../lib/chat/preview-fixtures";
 import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView } from "../components/mgr/views/chat";
 import { SCREENS } from "../components/mgr/screens";
 
@@ -14,7 +17,7 @@ it("keeps reading cadence restricted to whole hours", () => {
 
 it("preserves personal notification reasons before linking and gates taproom quiet hours", () => {
   const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { preferences: [{ reason: "pick_due", enabled: true }], quietStart: null, quietEnd: null, timezone: "America/New_York", link: null }, canSetQuietHours: false }));
-  expect(html).toContain("pick due");
+  expect(html).toContain("Pick due");
   expect(html).toContain("Link MGR account");
   expect(html).not.toContain("Save my quiet hours");
   expect(html).not.toContain("Unlink my Slack");
@@ -80,4 +83,23 @@ it("keys every element the chat settings page hands ChatSettingsView", () => {
     expect(element, slot).not.toBeNull();
     expect(element![2], `${slot} <${element![1]}>`).toMatch(/\bkey=/);
   }
+});
+
+// #1146: staff read sentence-case reasons, the same words Slack's own
+// preferences dialog uses, and plain instructions without developer terms.
+it("labels each personal reason in plain words with no repeated sublabel", () => {
+  const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: personalChatPreferences }));
+  for (const { reason } of personalChatPreferences.preferences) {
+    expect(html).toContain(`aria-label="${NOTIFICATION_REASON_LABEL[reason]}"`);
+    expect(html).not.toMatch(new RegExp(`[>"]${reason.replaceAll("_", " ")}[<"]`));
+  }
+  expect(html).not.toContain("Personal reminders<");
+  expect(html).not.toContain("App Home");
+});
+
+it("keeps fixture and server-setup jargon and the developer preview picker out of Chat settings", () => {
+  const html = renderToStaticMarkup(createElement(ChatSettingsView, { health: { installation: null, queue: {}, lastCallback: null, lastDelivery: null, destinations: [], linkedCount: 0 }, configured: false, timezone: "America/New_York", readingDueHours: 24, previewFixtures: CHAT_PREVIEW_FIXTURES }));
+  expect(html).toContain("Sample data");
+  expect(html).not.toMatch(/fixture|server setup|All preview states/i);
+  expect(html).not.toContain(">Chat notifications<");
 });

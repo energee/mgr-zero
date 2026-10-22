@@ -9,7 +9,6 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
     id: "settings-disconnected",
     surface: "settings",
     title: "Chat notifications",
-    eyebrow: "Back · Settings · Chat",
     status: { label: "Slack · Not connected", tone: "neutral" },
     fields: [
       { label: "Projection", value: "Bring today’s assigned, due and overdue work into chat. MGR remains the source of truth." },
@@ -22,7 +21,6 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
     id: "settings-active",
     surface: "settings",
     title: "Chat",
-    eyebrow: "Back · Settings",
     status: { label: "Slack · Demo Brewing · Connected · scopes healthy", tone: "healthy" },
     fields: [
       { label: "Operations channel", value: "#mgr-operations · private" },
@@ -37,7 +35,6 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
     id: "link",
     surface: "app_home",
     title: "Your MGR work",
-    eyebrow: "Slack · MGR · App Home",
     fields: [
       { label: "Link", value: "Link your account to see only work your current brewery role permits." },
       { label: "Privacy", value: "No customer contacts, prices or notes are posted here" },
@@ -49,7 +46,6 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
     id: "app-home",
     surface: "app_home",
     title: "Today · 4 waiting",
-    eyebrow: "Slack · MGR · App Home · Refresh",
     fields: [],
     items: [
       notification({ reason: "submitted_order", urgency: "attention", subject: { type: "order", id: "order-0231", safeLabel: "ORD-0231" }, title: "Review submitted order", detail: "submitted · ships Sep 3, 2026 · sales", dueAt: "2026-09-03T09:00:00.000Z", ownerClass: "sales", resolutionKey: "submitted-order:order-0231", actions: [openMgr("Open")] }),
@@ -63,20 +59,19 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
     id: "personal-dm",
     surface: "direct_message",
     title: "ORD-0235",
-    eyebrow: "Slack · MGR · Direct message",
     status: { label: "Pick due · assigned to you", tone: "attention" },
     fields: [
-      { label: "Requested ship date", value: "Fri 9/4" },
+      { label: "Requested ship date", value: "Tomorrow" },
       { label: "What to do", value: "Open the pick flow in MGR" },
     ],
     items: [notification({ reason: "pick_due", urgency: "attention", subject: { type: "order", id: "order-0235", safeLabel: "ORD-0235" }, title: "Pick due", detail: "assigned to you", dueAt: "2026-09-04T09:00:00.000Z", ownerClass: "warehouse", resolutionKey: "pick-due:order-0235", actions: [openMgr("Open pick in MGR"), { id: "snooze", label: "Snooze", enabled: true }, { id: "mute_reason", label: "Mute picks", enabled: true }] })],
-    actions: [openMgr("Open pick in MGR"), { id: "snooze", label: "Snooze", enabled: true }, { id: "mute_reason", label: "Mute picks", enabled: true }],
+    // The message's buttons belong to its one item; repeating them here drew them twice (#1146).
+    actions: [],
   },
   {
     id: "team-digest",
     surface: "private_channel",
     title: "Morning operations · 6 waiting",
-    eyebrow: "Slack · #mgr-operations · MGR",
     fields: [
       { label: "Submitted orders", value: "2 · need sales review" },
       { label: "Picks due", value: "2 · warehouse queue" },
@@ -90,7 +85,6 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
     id: "preferences",
     surface: "modal",
     title: "Notification preferences",
-    eyebrow: "Close",
     fields: [
       { label: "Submitted orders", value: "On" },
       { label: "Picks due", value: "On" },
@@ -99,13 +93,12 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
       { label: "Quiet hours", value: "9:00 PM–6:00 AM" },
     ],
     items: [],
-    actions: [{ id: "edit_preferences", label: "Save preferences", enabled: true }],
+    actions: [{ id: "edit_preferences", label: "Save preferences", enabled: false, disabledReason: "Sample only. Change yours in My notification preferences." }],
   },
   {
     id: "fermentation-gated",
     surface: "modal",
     title: "Record fermentation reading",
-    eyebrow: "Close",
     status: { label: "Future phase only", tone: "attention" },
     fields: [
       { label: "Vessel", value: "FV2 · Hazy IPA" },
@@ -120,7 +113,6 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
     id: "order-confirm-gated",
     surface: "modal",
     title: "Review order",
-    eyebrow: "Close",
     status: { label: "Future phase only", tone: "attention" },
     fields: [
       { label: "Order", value: "ORD-0231 · 3 lines · ships Sep 3, 2026 · Submitted" },
@@ -134,7 +126,6 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
     id: "reauthorization",
     surface: "settings",
     title: "Health",
-    eyebrow: "Back · Chat",
     status: { label: "Slack authorization expired. No messages are being sent.", tone: "attention" },
     fields: [
       { label: "Last callback", value: "Today · 8:42 AM · Succeeded" },

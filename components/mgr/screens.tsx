@@ -2462,7 +2462,7 @@ export const SCREENS: Screen[] = [
     reads: "get_chat_integration_health",
     writes: "begin_chat_installation [admin-only, single-use OAuth intent]",
     states: [["permission", "admin only", 1], ["OAuth cancelled", "remain disconnected · try again", 1]],
-    spec: "This is production Settings UI, not a developer demo. Preview surfaces remain available while disconnected and use non-sensitive fixtures.",
+    spec: "This is production Settings UI, not a developer demo. Preview surfaces remain available while disconnected and are labelled as sample data.",
     body: <ChatSettingsView health={chatDisconnected} timezone="America/New_York" readingDueHours={24} previewFixtures={CHAT_PREVIEW_FIXTURES} />,
   },
   {
@@ -2476,7 +2476,7 @@ export const SCREENS: Screen[] = [
     reads: "get_chat_integration_health · get_notification_preferences · get_brewery_operating_defaults · [presentation: ten provider-free fixtures]",
     writes: "set_notification_destination · set_brewery_quiet_hours · set_brewery_operating_defaults · disable_chat_installation · disconnect_chat_installation",
     states: [["permission", "admin only", 1], ["healthy", "last callback and delivery shown"], ["retrying", "queue count + redacted reason", 1], ["disabled", "no sends; previews still work", 1]],
-    spec: "Preview picker renders the same provider-neutral fixtures consumed by renderer contract tests. It never queries live customer data or sends a message. Reading cadence is MGR-owned and controls both Today and chat.",
+    spec: "Four preview tabs render the same provider-neutral fixtures consumed by renderer contract tests, labelled as sample data. The All preview states picker shows only in development. Previews never query live customer data or send a message. Reading cadence is MGR-owned and controls both Today and chat.",
     body: <ChatSettingsView health={chatConnected} timezone="America/New_York" readingDueHours={24} channels={[{ id: "COPS", name: "mgr-operations" }]} channel="COPS" previewFixtures={CHAT_PREVIEW_FIXTURES} />,
   },
   {
@@ -2489,7 +2489,7 @@ export const SCREENS: Screen[] = [
     reads: "get_notification_preferences",
     writes: "set_notification_preference · set_notification_destination · set_personal_quiet_hours · unlink_chat_user",
     states: [["unlinked", "preferences remain available before linking"], ["linked", "unlink only your Slack identity"], ["permission", "every staff role; Taproom cannot set personal quiet hours", 1], ["error", "keep entered quiet hours and show the command error", 1]],
-    spec: "Personal delivery preferences do not change MGR work, App Home or team digests. Clearing both personal times follows the brewery quiet hours.",
+    spec: "Personal delivery preferences do not change MGR work, App Home or team digests. Each reason uses the label Slack's preferences dialog shows. Clearing both personal times follows the brewery quiet hours.",
     body: <ChatPersonalPreferencesView preferences={personalChatPreferences} />,
   },
   {
