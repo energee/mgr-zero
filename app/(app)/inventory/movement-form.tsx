@@ -1,5 +1,6 @@
 // app/(app)/inventory/movement-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the record_movement command.
 // Picking a location preselects its first bin (list_bins is alphabetical), so the common case is one tap.
+// No movement type is preselected: the user picks one, unless a deep link passed it (#1107).
 "use client";
 
 import { command } from "@/lib/commands/client";
@@ -9,6 +10,7 @@ import { movementFields } from "@/lib/movement-form";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { formatVolume } from "@/lib/volume";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
@@ -30,7 +32,7 @@ type MovementType = (typeof MOVEMENT_TYPES)[number];
 // Mirrors the DB CHECK (removal_shape): sale_removal and depletion each name a
 // channel, and only depletion is staff-facing here (sale_removal comes from
 // shipping). The channels are the brewery's own rows, read by list_sale_channels.
-const requiresChannel = (type: MovementType) => type === "depletion";
+const requiresChannel = (type: MovementType | "") => type === "depletion";
 
 export function MovementForm({
   autoOpen = false,
@@ -51,6 +53,7 @@ export function MovementForm({
   timeZone: string;
 }) {
   const breweryId = useBrewery();
+  const router = useRouter();
   const [receipt, setReceipt] = useState<MovementReceipt | null>(null);
   const [stock, setStock] = useState<BinMoveStock[]>([]);
   const [lotId, setLotId] = useState(initial?.lotId ?? "");
@@ -61,7 +64,7 @@ export function MovementForm({
   const [qty, setQty] = useState(initial?.qty == null ? "" : String(Math.abs(initial.qty)));
   const [direction, setDirection] = useState<"add" | "remove">((initial?.qty ?? 1) < 0 ? "remove" : "add");
   const [destState, setDestState] = useState(initial?.destState ?? "");
-  const [type, setType] = useState<MovementType>((initial?.type as MovementType | undefined) ?? "opening_balance");
+  const [type, setType] = useState<MovementType | "">((initial?.type as MovementType | undefined) ?? "");
   // A hand-entered movement is a taproom event far more often than not, so
   // Taproom is preselected when the brewery still has that seeded channel.
   const defaultChannelId = (channels.find((c) => c.name === "Taproom") ?? channels[0])?.id ?? "";
@@ -71,7 +74,7 @@ export function MovementForm({
     defaultOpen: autoOpen,
     onSuccess: data => setReceipt(data as MovementReceipt),
     build: () => ({ skuId, locationId, binId, lotId: lotId || undefined, ...movementFields(type, qty, direction, destState, saleChannelId), type, note: note || undefined }),
-    reset: () => { setStockError(null); setLotId(""); setStock([]); setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType("opening_balance"); setSaleChannelId(defaultChannelId); setNote(""); setDestState(""); setDirection("add"); },
+    reset: () => { setStockError(null); setLotId(""); setStock([]); setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType(""); setSaleChannelId(defaultChannelId); setNote(""); setDestState(""); setDirection("add"); },
   });
 
   useEffect(() => {
@@ -81,7 +84,7 @@ export function MovementForm({
     return () => { live = false; };
   }, [breweryId, locationId, form.open]);
   let fields: ReturnType<typeof movementFields> | null = null;
-  try { fields = movementFields(type, qty, direction, destState, saleChannelId); } catch { /* Incomplete inputs disable submission. */ }
+  try { if (type) fields = movementFields(type, qty, direction, destState, saleChannelId); } catch { /* Incomplete inputs disable submission. */ }
   const unitVolume = skus.find(s => s.id === skuId)?.bblPerUnit;
   const receiptModel = receipt ? toMovementRecordedViewProps({
     sku: skus.find(s => s.id === receipt.sku_id)?.label ?? receipt.sku_id,
@@ -109,7 +112,7 @@ export function MovementForm({
   const availableLots = stock.filter(item => item.kind === "sku" && item.stock_id === skuId && item.bin_id === binId && item.lot_id);
   const lotOptions = ["Untracked / legacy stock", ...availableLots.map(item => `${item.lot_code} · ${item.qty} available`)];
   const movementModel: RecordMovementViewModel = {
-    kind: sentenceCase(type), kindIndex: MOVEMENT_TYPES.indexOf(type), kindOptions,
+    kind: sentenceCase(type), kindIndex: type ? MOVEMENT_TYPES.indexOf(type) : -1, kindOptions,
     sku: selectedSku?.label ?? "", skuId, skuOptions: skus.map(item => ({ value: item.id, label: item.label })),
     location: selectedLocation?.name ?? "", locationOptions: locations.map(item => item.name),
     bin: selectedBin?.name ?? "", binOptions: bins.filter(item => item.location_id === locationId).map(item => item.name),
@@ -128,9 +131,25 @@ export function MovementForm({
     setType(next);
   }
 
+  // A deep link (?recordMovement=1 from Today or an Ask MGR handoff) opened
+  // this form, so closing it drops the link and its prefill; otherwise a reload
+  // reopens it (#1107). Only ?page survives. A successful record closes the form
+  // through useCommandForm, not here, so the URL (and the handoff's form key)
+  // stays until the receipt is dismissed.
+  function closeDeepLink() {
+    if (!autoOpen) return;
+    const page = new URLSearchParams(location.search).get("page");
+    router.replace(page ? `/inventory?${new URLSearchParams({ page })}` : "/inventory", { scroll: false });
+  }
+
+  function closeReceipt() {
+    setReceipt(null);
+    closeDeepLink();
+  }
+
   return (
     <>
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Record movement" trigger={<Button>Record movement</Button>}>
+    <CommandForm open={form.open} onOpenChange={open => { form.setOpen(open); if (!open) closeDeepLink(); }} title="Record movement" trigger={<Button>Record movement</Button>}>
         <form onSubmit={e => { if (!fields) { e.preventDefault(); return; } void form.submit(e); }} className="flex flex-col gap-4">
           <RecordMovementView
             model={movementModel}
@@ -155,8 +174,8 @@ export function MovementForm({
           />
         </form>
       </CommandForm>
-      <CommandForm open={receipt !== null} onOpenChange={open => { if (!open) setReceipt(null); }} title="Movement recorded">
-        {receiptModel && <MovementRecordedView model={receiptModel} footer={<Button onClick={() => setReceipt(null)}>Done</Button>} />}
+      <CommandForm open={receipt !== null} onOpenChange={open => { if (!open) closeReceipt(); }} title="Movement recorded">
+        {receiptModel && <MovementRecordedView model={receiptModel} footer={<Button onClick={closeReceipt}>Done</Button>} />}
       </CommandForm>
     </>
   );
