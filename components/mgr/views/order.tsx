@@ -8,8 +8,11 @@
 // `footer`: fixtures pass inert E buttons and leave `footer` out (an inert
 // Cancel order row draws); the live page passes its LifecycleButtons and
 // CancelOrderAction (app/(app)/orders/[id]/lifecycle-buttons.tsx), and
-// footer={null} draws no bottom row.
+// footer={null} draws no bottom row. With onQuantity, Ordered is the shared
+// number field and a required Reason with `lineActions` (Save lines) follows
+// the lines: the live page adjusts quantities in place (order-lines-form.tsx).
 import type { ComponentProps, ReactNode } from "react";
+import { OrderQuantity } from "./new-order";
 import { E } from "@/components/mgr/e";
 import { FactsGrid } from "@/components/mgr/views/facts-grid";
 import { PriceSummary } from "@/components/mgr/views/price-summary";
@@ -56,6 +59,11 @@ export function OrderView({
   adjustLines,
   showAddLine,
   complianceNote,
+  quantities,
+  onQuantity,
+  reason,
+  onReason,
+  lineActions,
 }: {
   model: OrderViewModel;
   /** The state's verbs, primary first; drawn in the header after Put back when beer is staged. */
@@ -65,7 +73,18 @@ export function OrderView({
   adjustLines?: boolean;
   showAddLine?: boolean;
   complianceNote?: string;
+  /** Edited Ordered quantities by line key; a line not in it shows its ordered qty. */
+  quantities?: Record<string, string>;
+  onQuantity?: (key: string, value: string) => void;
+  /** Shown, and required, with onReason: adjust_order_lines records it. */
+  reason?: string;
+  onReason?: (value: string) => void;
+  /** Save lines and Discard changes, drawn under Reason. */
+  lineActions?: ReactNode;
 }) {
+  const orderedField = (line: OrderViewModel["lines"][number]) => onQuantity
+    ? <div className="w-32 md:ml-auto"><OrderQuantity label={`${line.name} ordered`} value={quantities?.[line.key] ?? line.ordered} onChange={(value) => onQuantity(line.key, value)} /></div>
+    : line.ordered;
   // Staged beer must go back before anything ships, so Put back leads (the
   // caller passes its fulfillment verbs as secondary then).
   const headerVerbs = (
@@ -132,7 +151,7 @@ export function OrderView({
                     <LineNotes line={line} />
                   </TableCell>
                   {NUMBER_COLUMNS.map(([label, field]) => (
-                    <TableCell key={label} className={cn("text-right tabular-nums", (line[field] === "Not supplied" || line[field] === "Not recorded") && "text-xs text-muted-foreground")}>{line[field]}</TableCell>
+                    <TableCell key={label} className={cn("text-right tabular-nums", (line[field] === "Not supplied" || line[field] === "Not recorded") && "text-xs text-muted-foreground")}>{field === "ordered" ? orderedField(line) : line[field]}</TableCell>
                   ))}
                   <TableCell className={cn("text-right font-semibold tabular-nums", !adjustLines && "pr-0")}>{line.amount}</TableCell>
                   {adjustLines ? <TableCell className="pr-0 text-right">{E.act("Adjust", "attention")}</TableCell> : null}
@@ -150,7 +169,7 @@ export function OrderView({
                 {([["Ordered", line.ordered], ["Brewery ATP", line.atp], ["Picked", line.picked], ["Shipped", line.shipped], ["Unit price", line.unitPrice], ["Line amount", line.amount]] as const).map(([label, value]) => (
                   <div key={label}>
                     <dt className="text-xs text-muted-foreground">{label}</dt>
-                    <dd className="mt-0.5 text-sm font-medium tabular-nums">{value}</dd>
+                    <dd className="mt-0.5 text-sm font-medium tabular-nums">{label === "Ordered" ? orderedField(line) : value}</dd>
                   </div>
                 ))}
               </dl>
@@ -160,6 +179,7 @@ export function OrderView({
         </ul>
         <p className={cn(LEGEND, "mt-2")}>Brewery ATP is not stock at the fulfillment source. Missing ATP is not zero.</p>
         {showAddLine ? <div className="mt-3">{E.btn("Add line", "g")}</div> : null}
+        {onReason ? <div className="mt-3 flex flex-col gap-2">{E.edit("Reason", reason ?? "", "text", undefined, { onChange: onReason, required: true })}{lineActions}</div> : null}
       </section>
 
       {model.kegCharges.length ? (
@@ -194,7 +214,7 @@ export function OrderView({
               {model.events.map((event) => (
                 <li key={event.key} className="grid gap-0.5 text-sm md:grid-cols-[11rem_minmax(0,1fr)] md:gap-4">
                   <span className="text-xs text-muted-foreground md:pt-0.5">{event.at}</span>
-                  <span>{event.event}{event.detail ? <span className="text-muted-foreground"> · {event.detail}</span> : null}</span>
+                  <span>{event.event}{event.by ? ` by ${event.by}` : null}{event.detail ? <span className="text-muted-foreground"> · {event.detail}</span> : null}</span>
                 </li>
               ))}
             </ol>

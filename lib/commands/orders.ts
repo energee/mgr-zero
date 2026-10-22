@@ -69,7 +69,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "adjust_order_lines", description: "Replace lines on a confirmed/picked order; re-syncs allocations and returnable-keg deposits; on a picked order, an added or raised line sends it back to confirmed for a re-pick, and staged excess flags a restock; returns ATP soft warnings",
+  name: "adjust_order_lines", description: "Replace lines on a submitted/confirmed/picked order; a submitted order holds no allocations until confirm, otherwise re-syncs allocations and returnable-keg deposits; on a picked order, an added or raised line sends it back to confirmed for a re-pick, and staged excess flags a restock; returns ATP soft warnings",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1), lines }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("adjust_order_lines", { p_order: i.orderId, p_lines: toLines(i.lines), p_reason: i.reason, p_request_id: execution.requestId })),
@@ -291,7 +291,7 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_order", description: "One order with lines, keg deposits, events, shipment, brewery ATP, and on-hand stock at its fulfillment source",
+  name: "get_order", description: "One order with lines (each SKU with its brand name and staff alias, and format name), keg deposits, events, shipment, brewery ATP, and on-hand stock at its fulfillment source",
   roles: [...readRoles],
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
@@ -299,7 +299,7 @@ defineQuery({
       .eq("brewery_id", ctx.breweryId).eq("id", i.orderId).single());
     if (!order) throw new CommandError("Order not found", 404, "not_found");
     const [lines, events, shipment, deposits] = await Promise.all([
-      completeRows("Order lines", start => ctx.db.from("order_lines").select("*, skus(name)", { count: "exact" })
+      completeRows("Order lines", start => ctx.db.from("order_lines").select("*, skus(name, brands(name, alias), formats(name))", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId).order("sku_id").range(start, start + PAGE_SIZE - 1)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
       unwrap(ctx.db.from("shipments").select().eq("order_id", i.orderId).maybeSingle()),
@@ -340,14 +340,14 @@ defineCommand({
 });
 
 defineQuery({
-  name: "daily_pick_sheet", description: "Confirmed/picked orders grouped by requested ship date with lines",
+  name: "daily_pick_sheet", description: "Confirmed/picked orders grouped by requested ship date with lines (each SKU with its brand name and staff alias, and format name)",
   roles: [...readRoles],
   input: z.object({ date: z.string().date().optional() }),
   // Paged past PostgREST's 1000-row cap (#759); without a date this is every
   // confirmed/picked order. id breaks ship-date ties so pages never overlap.
   handler: (ctx, i) => completeRows("Pick sheet", start => {
     let q = ctx.db.from("orders")
-      .select("*, customers(name), order_lines(*, skus(name))", { count: "exact" })
+      .select("*, customers(name), order_lines(*, skus(name, brands(name, alias), formats(name)))", { count: "exact" })
       .eq("brewery_id", ctx.breweryId).in("status", ["confirmed", "picked"]);
     if (i.date) q = q.eq("requested_ship_date", i.date);
     return q.order("requested_ship_date", { ascending: true }).order("id").range(start, start + PAGE_SIZE - 1);

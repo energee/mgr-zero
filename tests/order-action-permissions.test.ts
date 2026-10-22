@@ -23,7 +23,8 @@ it("offers sales and fulfillment actions only to their registered roles", () => 
       createElement(CancelOrderAction, { orderId: "order", status, canSell })));
   }
   expect(render("warehouse", "submitted")).not.toContain("Confirm");
-  expect(render("warehouse", "picked")).not.toContain("Adjust lines");
+  expect(render("warehouse", "picked")).not.toContain("Add or remove lines");
+  expect(render("sales", "picked")).toContain("Add or remove lines");
   expect(render("warehouse", "picked")).not.toContain("Cancel");
   expect(render("sales", "submitted")).toContain("Cancel");
   expect(render("sales", "picked")).not.toContain("Record pick");
@@ -63,7 +64,7 @@ it("the live page fills OrderView's header and bottom slots from lifecycle-butto
   const src = readFileSync("app/(app)/orders/[id]/page.tsx", "utf8");
   expect(src).toMatch(/actions=\{<LifecycleButtons\b/);
   expect(src).toMatch(/footer=\{<CancelOrderAction\b/);
-  expect(src).toMatch(/<OrderActionScope>\s*<OrderView\b/);
+  expect(src).toMatch(/<OrderActionScope>[\s\S]*?<OrderLinesForm\b/);
 });
 
 // Restock outranks fulfillment: staged beer goes back before anything ships.

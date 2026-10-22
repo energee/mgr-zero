@@ -73,6 +73,21 @@ describe("order lifecycle", () => {
     const { data: o } = await admin.from("orders").select("status").eq("id", id).single();
     expect(o!.status).toBe("cancelled");
   });
+  it("adjust on a submitted order replaces lines without allocating; confirm allocates the new qty", async () => {
+    const id = await createOrder(10);
+    await staffDb.rpc("submit_order", { p_order: id, p_request_id: crypto.randomUUID() });
+    const { error } = await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 6 }], p_reason: "buyer call", p_request_id: crypto.randomUUID() });
+    expect(error).toBeNull();
+    const { data: line } = await admin.from("order_lines").select().eq("order_id", id).single();
+    expect(Number(line!.qty_ordered)).toBe(6);
+    const { data: before } = await admin.from("allocations").select().eq("ref", line!.id);
+    expect(before).toEqual([]);
+    const { data: o } = await admin.from("orders").select("status").eq("id", id).single();
+    expect(o!.status).toBe("submitted");
+    await staffDb.rpc("confirm_order", { p_order: id, p_request_id: crypto.randomUUID() });
+    const { data: alloc } = await admin.from("allocations").select().eq("ref", line!.id).eq("status", "open").single();
+    expect(Number(alloc!.qty)).toBe(6);
+  });
   it("update_draft_order replaces lines, re-snapshots price, and updates order fields", async () => {
     const id = await createOrder(10);
     // Update: reduce qty 10 → 7, change po_number

@@ -1,8 +1,9 @@
-// tests/proxy.test.ts — verifies Supabase refresh cookies preserve no-cache response headers.
+// tests/proxy.test.ts — verifies the proxy refreshes the session with one local claims check and its refresh cookies preserve no-cache response headers.
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createServerClient = vi.hoisted(() => vi.fn());
+const getClaims = vi.hoisted(() => vi.fn());
 const getUser = vi.hoisted(() => vi.fn());
 
 type SsrOptions = {
@@ -20,9 +21,10 @@ import { config, proxy } from "@/proxy";
 
 beforeEach(() => {
   createServerClient.mockReset();
+  getClaims.mockReset();
   getUser.mockReset();
   createServerClient.mockImplementation((_url: string, _key: string, options: SsrOptions) => {
-    getUser.mockImplementation(async () => {
+    getClaims.mockImplementation(async () => {
       options.cookies.setAll(
         [{ name: "sb-session", value: "refreshed", options: { httpOnly: true } }],
         {
@@ -31,9 +33,9 @@ beforeEach(() => {
           Pragma: "no-cache",
         }
       );
-      return { data: { user: null }, error: null };
+      return { data: null, error: null };
     });
-    return { auth: { getUser } };
+    return { auth: { getClaims, getUser } };
   });
 });
 
@@ -71,9 +73,12 @@ describe("Supabase proxy refresh", () => {
     expect(response.cookies.get("sb-session")?.value).toBe("refreshed");
   });
 
-  it("uses exactly one auth refresh lookup", async () => {
+  // getClaims refreshes an expired session like getUser, but verifies the JWT
+  // locally instead of calling Supabase Auth on every navigation.
+  it("refreshes through one local claims check, not a getUser round trip", async () => {
     await proxy(new NextRequest("http://localhost:3000/inventory"));
 
-    expect(getUser).toHaveBeenCalledTimes(1);
+    expect(getClaims).toHaveBeenCalledTimes(1);
+    expect(getUser).not.toHaveBeenCalled();
   });
 });

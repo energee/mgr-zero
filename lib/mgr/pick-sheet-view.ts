@@ -1,10 +1,12 @@
 // lib/mgr/pick-sheet-view.ts — view-model for Work → Pick sheet.
 // Groups daily_pick_sheet rows by requested_ship_date the way the live page
-// does; weekday chips stay a filters slot, not this mapping.
+// does; weekday chips stay a filters slot, not this mapping. Each date totals
+// its lines per SKU, grouped by brand like Pick (brand-lines.ts).
 import type { EmptyState } from "./empty-state";
 import { formatDate } from "@/lib/date-format";
 import { docNo } from "./doc-no";
 import { plural } from "./plural";
+import { brandLabel, byBrand, type BrandedSku } from "./brand-lines";
 
 export type PickSheetRowView = {
   key: string;
@@ -18,11 +20,14 @@ export type PickSheetRowView = {
   changedAfterPick?: boolean;
 };
 
+/** One SKU's ordered quantity across a date's orders. */
+export type PickSheetTotalView = { key: string; group?: string; name: string; qty: number };
+
 export type PickSheetGroupView = {
   key: string;
   title: string;
   rows: PickSheetRowView[];
-  totals: string;
+  totals: PickSheetTotalView[];
 };
 
 export type PickSheetViewModel = {
@@ -43,7 +48,7 @@ export type PickSheetSnapshot = {
       sku_id: string;
       qty_ordered: number;
       qty_picked: number | null;
-      skus: { name: string } | null;
+      skus: BrandedSku;
     }[];
   }[];
 };
@@ -55,11 +60,11 @@ export function toPickSheetViewProps({ orders }: PickSheetSnapshot): PickSheetVi
   const grouped = Map.groupBy(orders, (o) => o.requested_ship_date ?? "Unscheduled");
   return {
     groups: [...grouped].map(([shipDate, group]) => {
-      const totals = new Map<string, number>();
+      const totals = new Map<string, { skus: BrandedSku; qty: number }>();
       const rows = group.map((o) => {
         for (const l of o.order_lines) {
-          const name = l.skus?.name ?? "Line";
-          totals.set(name, (totals.get(name) ?? 0) + Number(l.qty_ordered));
+          const total = totals.get(l.sku_id) ?? { skus: l.skus, qty: 0 };
+          totals.set(l.sku_id, { ...total, qty: total.qty + Number(l.qty_ordered) });
         }
         return {
           key: o.id,
@@ -74,7 +79,7 @@ export function toPickSheetViewProps({ orders }: PickSheetSnapshot): PickSheetVi
         key: shipDate,
         title: shipDate === "Unscheduled" ? shipDate : formatDate(shipDate),
         rows,
-        totals: [...totals].map(([name, qty]) => `${name} ${qty}`).join(" · "),
+        totals: byBrand([...totals].map(([key, t]) => ({ key, ...t }))).map((t) => ({ key: t.key, ...brandLabel(t.skus), qty: t.qty })),
       };
     }),
   };

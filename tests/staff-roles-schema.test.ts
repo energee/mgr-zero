@@ -54,6 +54,14 @@ describe("staff role array clean cutover (#797)", () => {
       order by 1`)).toEqual([]);
   });
 
+  // is_staff_of(col) runs once per row (SECURITY DEFINER blocks inlining); the
+  // `col in (select my_staff_brewery_ids(...))` form runs once per query.
+  it("has no live policy checking staff access row by row with is_staff_of", () => {
+    expect(sql(`select tablename||':'||policyname from pg_policies where schemaname='public'
+      and coalesce(qual,'')||coalesce(with_check,'') ~ 'is_staff_of[[:space:]]*\\('
+      order by 1`)).toEqual([]);
+  });
+
   it("has no public/private scalar membership readers, even in PL/pgSQL bodies", () => {
     const functions = sql(`select json_build_object('signature',p.oid::regprocedure::text,
         'arguments',pg_get_function_arguments(p.oid),'body',p.prosrc)::text

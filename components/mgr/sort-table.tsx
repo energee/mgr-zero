@@ -8,11 +8,13 @@ import type { ReactNode } from "react";
 import { SortHead, useSortedRows } from "@/components/mgr/sort-head";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { cellSortValue } from "@/lib/mgr/table-sort";
+import { cn } from "@/lib/utils";
 
 const alignClass = (align: "l" | "r" | undefined) => (align === "r" ? "text-right" : "text-left");
 const cellValue = (row: ReactNode[], i: number) => cellSortValue(row[i]);
 
-export function SortTable({ headers, rows: given, align, sortable = true }: { headers: ReactNode[]; rows: ReactNode[][]; align?: ("l" | "r")[]; sortable?: boolean }) {
+/** `dense` halves the cells' vertical padding, for a read-only list scanned at a glance (Pick sheet totals). */
+export function SortTable({ headers, rows: given, align, sortable = true, dense = false }: { headers: ReactNode[]; rows: ReactNode[][]; align?: ("l" | "r")[]; sortable?: boolean; dense?: boolean }) {
   const { rows, columns } = useSortedRows(headers, given, cellValue, sortable);
   return (
     <div className="shrink-0">
@@ -29,7 +31,7 @@ export function SortTable({ headers, rows: given, align, sortable = true }: { he
             // Keyed by the row's given position, which a sort does not change.
             <TableRow key={given.indexOf(r)}>
               {r.map((c, j) => (
-                <TableCell key={j} className={alignClass(align?.[j])}>{c}</TableCell>
+                <TableCell key={j} className={cn(alignClass(align?.[j]), dense && "py-1")}>{c}</TableCell>
               ))}
             </TableRow>
           ))}

@@ -8,7 +8,7 @@
 // command action: Submit and Cancel see the same busy and error state.
 // There is no Confirm here: a submitted order confirms only through Review and
 // confirm (/orders/[id]/confirm), so stock and source warnings show before
-// commit (#713). Adjust lines, Record pick and Ship / Complete transfer are
+// commit (#713). Add or remove lines (/adjust), Record pick and Ship / Complete transfer are
 // links to their own pages under /orders/[id]/. Calls commands directly rather
 // than through useCommandForm since these aren't single-field command forms.
 "use client";
@@ -61,7 +61,8 @@ export function LifecycleButtons({
       {canSell && status === "draft" && E.btn("Submit", busy ? "p disabled" : "p", undefined, () => void action.run("submit_order", { orderId }))}
       {canFulfill && status === "picked" && E.btn(transfer ? "Complete transfer" : "Ship", fulfil, `/orders/${orderId}/${transfer ? "complete" : "ship"}`)}
       {canFulfill && open && E.btn("Record pick", status === "confirmed" ? fulfil : "g", `/orders/${orderId}/pick`)}
-      {canSell && open && E.btn("Adjust lines", "g", `/orders/${orderId}/adjust`)}
+      {/* Quantities change in place on the lines (order-lines-form.tsx); this page adds or removes a beer. */}
+      {canSell && open && E.btn("Add or remove lines", "g", `/orders/${orderId}/adjust`)}
       {error ? <div className="basis-full"><CommandFormMessage error={error} /></div> : null}
     </>
   );

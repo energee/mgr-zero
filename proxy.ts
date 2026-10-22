@@ -25,7 +25,10 @@ export async function proxy(req: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  // getClaims refreshes an expired session like getUser, but verifies the JWT
+  // locally against the project's signing keys instead of calling Supabase Auth
+  // on every navigation (it falls back to getUser for a symmetric-key project).
+  await supabase.auth.getClaims();
   return res;
 }
 
