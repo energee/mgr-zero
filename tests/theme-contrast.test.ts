@@ -91,23 +91,36 @@ it("paints selected Location Uses with the AA-checked primary pair, not the hove
   expect(form).toMatch(/<ToggleGroupItem[^>]*className=\{BRIGHT_ON\}/);
 });
 
-// A hovered row action (E.act) paints its tone over the tap row's accent/50
-// hover wash, over the page surface (#1041). Primary and destructive are a tint
-// under tone-colored text; success, attention and info are a solid fill at /80
-// under their -foreground text. Light mode only: in dark, the ghost Button's
-// dark:hover:bg-muted/50 replaces the tone on hover.
-it("keeps every hovered row-action tone at AA in light mode (#1041)", () => {
+// A row action (E.act) paints its tone's fill over the page surface at rest,
+// and over the tap row's accent/50 hover wash when hovered (#1041). The fill
+// is read from the tone's classes. In dark mode a tone's dark: class wins; on
+// hover without one, the ghost Button's dark:hover: fill wins. Primary and
+// destructive drop their 10% tint in dark, which failed AA on popovers (#1065).
+it("keeps every row-action tone at AA, at rest and hovered, in both modes (#1041, #1065)", () => {
   const e = readFileSync(new URL("../components/mgr/e.tsx", import.meta.url), "utf8");
-  const tokens = tokensOf(":root");
+  const ghost = readFileSync(new URL("../components/ui/button.tsx", import.meta.url), "utf8").match(/ghost:\s*"([^"]*)"/)![1];
   const rgb = (hex: string) => hex.match(/[a-f\d]{2}/gi)!.map((v) => parseInt(v, 16));
-  const over = (top: string, alpha: number, under: number[]) => rgb(top).map((v, i) => v * alpha + under[i] * (1 - alpha));
   const toHex = (c: number[]) => "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+  // The bg-<token>[/<percent>] class with exactly this variant prefix, or undefined.
+  const fill = (classes: string, prefix: string) => classes.match(new RegExp(`(?:^| )${prefix}bg-([\\w-]+?)(?:/(\\d+))?(?= |$)`))?.slice(1);
   expect(e).toMatch(/has-\[\[data-tap\]\]:hover:bg-accent\/50/);
-  for (const role of ["primary", "destructive", "success", "attention", "info"]) {
-    const [, percent, text] = e.match(new RegExp(`hover:bg-${role}/(\\d+) hover:text-(${role}(?:-foreground)?)"`))!;
-    for (const surface of ["background", "card", "popover"]) {
-      const hovered = over(tokens[role], Number(percent) / 100, over(tokens.accent, 0.5, rgb(tokens[surface])));
-      expect(contrast(tokens[text], toHex(hovered)), `${role} hover on ${surface}`).toBeGreaterThanOrEqual(4.5);
+  for (const mode of [":root", ".dark"]) {
+    const tokens = tokensOf(mode);
+    const dark = mode === ".dark";
+    // Paints a fill over an underlying color; bg-transparent paints nothing.
+    const paint = ([token, percent = "100"]: string[], under: string) =>
+      token === "transparent" ? under : toHex(rgb(tokens[token]).map((v, i) => v * (Number(percent) / 100) + rgb(under)[i] * (1 - Number(percent) / 100)));
+    for (const role of ["primary", "destructive", "success", "attention", "info"]) {
+      const tone = e.match(new RegExp(`tone === "${role}" && "([^"]*)"`))![1];
+      const [, text, hoverText] = tone.match(/(?:^| )text-([\w-]+) .*hover:text-([\w-]+)/)!;
+      const rest = (dark && fill(tone, "dark:")) || fill(tone, "")!;
+      const hover = (dark && (fill(tone, "dark:hover:") ?? fill(ghost, "dark:hover:"))) || fill(tone, "hover:")!;
+      for (const surface of ["background", "card", "popover"]) {
+        const atRest = paint(rest, tokens[surface]);
+        const hovered = paint(hover, toHex(rgb(tokens.accent).map((v, i) => v * 0.5 + rgb(tokens[surface])[i] * 0.5)));
+        expect(contrast(tokens[text], atRest), `${mode} ${role} at rest on ${surface}`).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(tokens[hoverText], hovered), `${mode} ${role} hovered on ${surface}`).toBeGreaterThanOrEqual(4.5);
+      }
     }
   }
 });
