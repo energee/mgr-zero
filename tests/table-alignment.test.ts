@@ -119,3 +119,25 @@ describe("E.tbl column alignment", () => {
     for (const row of model.channel!.rows) for (const value of row.cells) if (value !== null) expect(html).toContain(`value="${value}"`);
   });
 });
+
+/** A screen's rendered headers: each one's text and whether it is a sort button. */
+function sortHeads(name: string) {
+  const html = renderToStaticMarkup(createElement("div", null, SCREENS.find(screen => screen.name === name)!.body));
+  return [...html.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)].map(match => ({ text: match[1].replace(/<[^>]*>/g, ""), sorts: /<button\b/.test(match[1]) }));
+}
+
+describe("screen table sorting", () => {
+  it.each([
+    ["Finished goods", "Available"],
+    ["Orders", "Status"],
+    ["Batches", "Vessel and latest reading"],
+  ])("%s sorts its %s column by an explicit value, since the cell is a component", (name, header) => {
+    expect(sortHeads(name).filter(head => head.text === header).map(head => head.sorts)).toContain(true);
+  });
+
+  it.each(["Monthly compliance", "Price groups"])("%s keeps its saved row order: no header sorts", name => {
+    const heads = sortHeads(name);
+    expect(heads.length).toBeGreaterThan(0);
+    expect(heads.filter(head => head.sorts)).toEqual([]);
+  });
+});

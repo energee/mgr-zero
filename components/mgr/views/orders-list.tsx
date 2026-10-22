@@ -43,6 +43,8 @@ function Register({ rows }: { rows: OrdersListRowView[] }) {
           statusCell(row),
           row.action && E.act(row.action.verb, row.action.tone, row.action.href),
         ],
+        // The status cell is badges (components); no ship date sorts last.
+        sort: [row.orderNo, row.customer ?? "transfer", row.shipDate, row.status],
       }))}
     />
   );
