@@ -45,6 +45,19 @@ describe("what a tap sheet still needs (#1114)", () => {
   it("refuses to build the payload the withheld button names", () => {
     expect(() => beginTapBoardAttempt({ snapshot, sheet: tap }, nextId)).toThrow("Still needed: a packaged keg SKU.");
   });
+
+  it("starts a new tap on the first keg SKU it is given, so the inventory and the live board open alike", () => {
+    expect(openTapBoardSheet(snapshot, "tap", null, id, nextId).sheet!.fields.skuId).toBe(nextId);
+    expect(tapSheetReason(openTapBoardSheet(snapshot, "tap", null, id, nextId).sheet!)).toBeNull();
+    const guest = { id, location_id: id, sku_id: null, label: "Cider", nominal_bbl: .5, tap_number: null, opening_fill: 1, not_in_inventory: true, opened_at: "2026-09-08T12:00:00Z", opened_by: id, opened_by_label: "dana", brand_id: null, brand_name: null, sku_name: null };
+    expect(openTapBoardSheet({ open: [guest], history: [] }, "swap", guest, id, nextId).sheet!.fields.skuId).toBe("");
+  });
+
+  it("names the failed check when a same-SKU swap has no SKU to reuse", () => {
+    const guest = { id, location_id: id, sku_id: null, label: "Cider", nominal_bbl: .5, tap_number: null, opening_fill: 1, not_in_inventory: true, opened_at: "2026-09-08T12:00:00Z", opened_by: id, opened_by_label: "dana", brand_id: null, brand_name: null, sku_name: null };
+    const state = editTapBoardSheet(openTapBoardSheet({ open: [guest], history: [] }, "swap", guest), { identity: "same" });
+    expect(() => beginTapBoardAttempt(state, nextId)).toThrow("The open keg has no SKU to reuse. Choose Own keg or Guest keg.");
+  });
 });
 
 describe("tap board controlled state", () => {

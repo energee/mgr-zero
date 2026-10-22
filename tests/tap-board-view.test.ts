@@ -82,8 +82,13 @@ describe("Tap keg sheet feedback (#1114)", () => {
     pick.mockRestore();
     expect(call[2]).toEqual([]);
     expect(call[3]).toMatchObject({ placeholder: "Choose a keg" });
-    expect(render({ skus: [], skusHref: "/catalog" })).toMatch(/No keg SKUs to tap yet\. Guest keg is still available\. <a [^>]*href="\/catalog"[^>]*>Add a keg SKU<\/a>/);
-    expect(render({ skus: [], skusHref: null })).toContain("No keg SKUs to tap yet. Guest keg is still available. An admin or sales member adds keg SKUs in Catalog.");
+    const none = "No keg SKUs with a keg volume yet. Guest keg is still available.";
+    expect(render({ skus: [], skusHref: "/catalog" })).toMatch(/No keg SKUs with a keg volume yet\. Guest keg is still available\. <a [^>]*href="\/catalog"[^>]*>Add a keg SKU<\/a>/);
+    const plain = `${none} An admin or sales member adds keg SKUs in Catalog.`;
+    expect(render({ skus: [], skusHref: null })).toContain(plain);
+    // The inventory passes no href: plain text, never a link to "#".
+    expect(render({ skus: [] })).toContain(plain);
+    expect(render({ skus: [] })).not.toContain('href="#"');
     expect(render()).not.toContain("No keg SKUs");
   });
 
@@ -99,7 +104,7 @@ describe("Tap keg sheet feedback (#1114)", () => {
     for (const label of ["25%", "50%", "60%", "Full"]) expect(html).toContain(`>${label}</button>`);
     for (const fraction of ["¼", "½"]) expect(html).not.toContain(`>${fraction}</button>`);
     expect(html).toContain("Tap number · optional");
-    expect(html).toContain("Two kegs can share a number.");
+    expect(html).toContain("Two kegs can share a number. A keg with no number sorts last.");
     expect(html).not.toContain("may repeat");
   });
 });
