@@ -2,7 +2,7 @@
 // shared RecordTable from structured invoice facts; financial detail is never
 // recovered from display text. The document number is each row's one link; a
 // row without an href (the inventory) draws it as an inert tap.
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QuickBooksMark } from "@/components/mgr/brand-icons";
 import type { InvoiceListRow } from "@/lib/mgr/invoices-view";
@@ -10,16 +10,19 @@ import { HistoryNavigation, type HistoryNavigationProps } from "./history-naviga
 import { QboSyncView } from "./accounting";
 import { RecordTable } from "./record-table";
 
+// Every element cell carries a key: this server view hands the cells to the
+// client RecordTable in an array prop, and React warns about any without one (#1137).
+
 /** The current total, with the local subtotal under it when an accountant edited the invoice. */
-const total = (row: InvoiceListRow) => <>
+const total = (row: InvoiceListRow) => <Fragment key="total">
   {row.total.value}
   {row.localSubtotal && <span className="block text-muted-foreground">Local subtotal {row.localSubtotal.value}</span>}
-</>;
+</Fragment>;
 
 /** Accounting exceptions only: an ordinary row has none and says nothing. */
 function accounting(row: InvoiceListRow) {
   if (!row.accounting && !row.needsMapping && !row.quickbooksHref) return null;
-  return <div className="flex min-w-0 flex-col items-start gap-1">
+  return <div key="accounting" className="flex min-w-0 flex-col items-start gap-1">
     {row.needsMapping && E.status("Needs mapping", "w")}
     {row.accounting}
     {/* E.btn ends a group on the right on the desk; the span keeps it on the column's left edge. */}
@@ -41,7 +44,7 @@ function Register({ rows }: { rows: InvoiceListRow[] }) {
         row.customer,
         total(row),
         row.balance.value,
-        row.overdue ? <>{E.status("Overdue", "w")} {row.due.value}</> : row.due.value,
+        row.overdue ? <Fragment key="due">{E.status("Overdue", "w")} {row.due.value}</Fragment> : row.due.value,
         row.payment,
         accounting(row),
       ],
