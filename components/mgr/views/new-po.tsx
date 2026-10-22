@@ -31,6 +31,7 @@ export function NewPoView({ model, controls = {}, messages, footer, submitting =
       {E.pick("Vendor", model.vendor, [{ value: "", label: "Select vendor" }, ...((model.vendors ?? [{ id: model.vendor, name: model.vendor }]).map(vendor => ({ value: vendor.id, label: vendor.name })))], { onChange: controls.vendor, required: true, id: `${id}-vendor`, empty: { text: "No vendors yet.", label: "Add a vendor", href: model.vendorsHref, to: "Vendors" } })}
       <DatePicker label="Expected" value={controls.expected ? model.expected : undefined} defaultValue={model.expected} onChange={controls.expected} />
       {model.lines.map((line, index) => {
+        // Inventory fixtures carry a display cost ("$4.20"); a number input can't hold the "$".
         const cost = controls.cost ? line.cost : line.cost.replace(/^\$/, "");
         const errors = touched.shown(index) ? poLineErrors({ qty: line.qty, cost }) : {};
         const qtyErrorId = lineErrorIds(`${id}-${index}`, errors).qty;
