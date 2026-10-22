@@ -4,8 +4,7 @@ import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
 
 export function CellarMapView({ model, transfer, addition, complete }: { model: CellarMapViewModel; transfer?: ReactNode; addition?: ReactNode; complete?: ReactNode }) {
   return <>
-    {E.back("Beer", "Cellar", E.btn("Add vessel", "g", model.addHref), model.backHref)}
-    {model.tiles.length ? E.tiles(model.tiles.map(tile => [tile.name, tile.detail, tile.reading, tile.warning ? 1 : 0, tile.fill, tile.href]), "c2") : E.blank("No vessels yet")}
+    {E.back("Beer", "Cellar", undefined, model.backHref)}
     <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
       {E.btn("Reading", model.readingHref === null ? "p disabled" : "p", model.readingHref ?? undefined)}
       {transfer !== undefined ? transfer : E.btn("Transfer", "g")}
@@ -14,7 +13,9 @@ export function CellarMapView({ model, transfer, addition, complete }: { model: 
     </div>
     {model.readingHint && E.info(model.readingHint)}
     {model.detail && E.nav(model.detail.title, model.detail.description, "", undefined, model.detail.href)}
+    {model.tiles.length ? E.tiles(model.tiles.map(tile => [tile.name, tile.detail, tile.reading, tile.warning ? 1 : 0, tile.fill, tile.href]), "c2") : E.blank("No vessels yet")}
     {complete !== undefined ? complete : E.btn("Complete batch", "g")}
+    {E.btn("Add vessel", "g", model.addHref)}
     {E.sp()}
   </>;
 }

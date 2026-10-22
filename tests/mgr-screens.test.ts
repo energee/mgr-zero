@@ -836,7 +836,7 @@ describe("SCREENS", () => {
       ["Work", "New order"], ["Orders", "New order"], ["Transfers", "New transfer"], ["Batches", "New batch"],
       ["Packaging runs", "Schedule run"], ["Purchase orders", "New PO"], ["Routes", "New route"],
       ["Locations", "Add location"], ["Finished goods", "Add SKU"], ["Customers", "New customer"],
-      ["Catalog", "New brand"], ["Cellar map", "Add vessel"],
+      ["Catalog", "New brand"],
       ["Materials on hand", "Add material"], ["Vendors", "Add vendor"], ["Materials", "Add material"],
       ["Contracts", "Add contract"], ["Recipes", "New recipe"], ["Price groups", "New price group"],
     ] as const) {

@@ -1,6 +1,5 @@
 "use client";
 import { useId, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { CellarTransferView, CellarTransferFooter } from "@/components/mgr/views/cellar-transfer";
@@ -16,7 +15,7 @@ export function CellarTransferForm({ occupancies, vessels }: { occupancies: Tran
     build: () => ({ fromOccupancyId: fields.fromId, toVesselId: fields.toId, volumeBbl: Number(fields.volume), lossBbl: fields.loss ? Number(fields.loss) : undefined }),
     reset: () => setFields({ fromId: "", toId: "", volume: "", loss: "" }),
   });
-  return <CommandForm open={form.open} onOpenChange={form.setOpen} title="Cellar transfer" trigger={<Button size="sm" variant="outline">Transfer</Button>} footer={E.pin(<CellarTransferFooter formId={formId} submitting={form.submitting} disabled={!ready} />)}>
+  return <CommandForm open={form.open} onOpenChange={form.setOpen} title="Cellar transfer" trigger={E.btn("Transfer", "g")} footer={E.pin(<CellarTransferFooter formId={formId} submitting={form.submitting} disabled={!ready} />)}>
     <form id={formId} onSubmit={event => { if (!ready || form.submitting) { event.preventDefault(); return; } void form.submit(event); }} className="flex flex-col gap-3">
       <CellarTransferView model={{ ...fields, occupancies, vessels }} onChange={patch => setFields(current => ({ ...current, ...patch }))} submitting={form.submitting} footer={null} messages={<CommandFormMessage error={form.error} />} />
     </form>
