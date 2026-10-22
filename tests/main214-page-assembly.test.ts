@@ -8,9 +8,10 @@ const render = (node: Parameters<typeof renderToStaticMarkup>[0]) =>
   renderToStaticMarkup(createElement(BreweryProvider, { id: "brewery", actorId: "actor" }, node));
 const state = vi.hoisted(() => ({ roles: ["admin"], calls: [] as string[], customerInput: {} as Record<string, unknown>, brandInput: {} as Record<string, unknown>, inputs: {} as Record<string, unknown> }));
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", roles: state.roles }) }));
-vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ roles: state.roles }), isUuid: () => true }));
+// The real command registry loads (the pages import @/lib/commands/all), so canRun
+// answers each role the way it does live.
+vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ breweryId: "brewery", roles: state.roles }), isUuid: () => true }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }), notFound() { throw new Error("not found"); } }));
-vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => ({ busy: false, error: "", run() {} }), useCommandForm: () => ({ open: false, setOpen() {}, busy: false, error: "", submit() {} }) }));
 vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query }));
 const brand = { id: "brand", name: "Hazy", abv: 6.8, description: "Juicy", category: "Core", price_group_id: "group", hops: "Citra", styles: { name: "IPA" }, skus: [{ id: "sku", name: "Hazy keg", format_id: "keg", active: false, upc: "123456" }] };
@@ -72,6 +73,20 @@ it("assembles shared Catalog with the brand link and the shared format list", as
   for (const text of ["/catalog/brands/brand", "/catalog/formats/keg"]) expect(html).toContain(text);
   for (const text of ["Edit brand", "Edit SKU", "UPC 123456", "New pour", "Edit pour"]) expect(html).not.toContain(text);
   expect(html).not.toContain("/catalog/formats/pour");
+});
+// #1062: Catalog links a brand, Price groups and Water profiles only for a role
+// that page lets in (upsert_brand, the /pricing reads, list_water_profiles).
+it.each([
+  ["admin", ["/catalog/brands/brand", "/pricing", "/catalog/water-profiles"], []],
+  ["sales", ["/catalog/brands/brand", "/pricing"], ["/catalog/water-profiles"]],
+  ["warehouse", [], ["/catalog/brands/", "/pricing", "/catalog/water-profiles"]],
+])("Catalog links for %s only the pages that role may open", async (role, linked, inert) => {
+  state.roles = [role];
+  const html = render(await CatalogPage());
+  for (const href of linked) expect(html).toContain(`href="${href}"`);
+  for (const href of inert) expect(html).not.toContain(`href="${href}`);
+  // Every role that reaches Catalog may open a format.
+  expect(html).toContain('href="/catalog/formats/keg"');
 });
 it("assembles the shared SKU list with the brand's packages and the edit sheet, but no New SKU", async () => {
   const page = await SkuListPage({ params: Promise.resolve({ id: "brand" }) });

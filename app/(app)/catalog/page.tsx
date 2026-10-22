@@ -2,6 +2,8 @@
 // formats. A brand's name opens Brand (brands/[id]); its packages are one tap
 // further, switched on and off under Brand's Sells as — Catalog no longer nests
 // them. Add format opens format-form.tsx; a format's name links to its components and Package BOM.
+// A brand, Price groups and Water profiles link only for a role whose page lets
+// it in (canRun on the reads or write that page requires), never to No access.
 // ?q=, ?sort= and ?category= narrow and order the brands in list_brands
 // (docs/plans/list-filters.md); ListControls draws them as a GET form and
 // labeled Sort and Category picks whose options are links (toCatalogScopes).
@@ -13,6 +15,7 @@ import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
+import { canRun } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { FormatForm } from "./format-form";
 import { ListControls } from "@/components/mgr/list-controls";
@@ -23,6 +26,9 @@ type PriceGroup = { id: string; name: string };
 type Sku = { id: string; name: string; format_id: string; active: boolean; upc: string | null };
 type Brand = { id: string; name: string; alias: string | null; abv: number | null; description: string | null; category: string | null; price_group_id: string | null; hops: string | null; styles: { name: string } | null; skus: Sku[]; pours: { id: string }[]; colas: CatalogBrandRow["colas"] };
 type Format = { id: string; name: string; basis: "packaged" | "poured"; package_type: string | null; keg_size: string | null; units_per_case: number | null; bbl_per_unit: string | null };
+
+/** The reads app/(app)/pricing/page.tsx runs; a role must pass them all or it lands on No access. */
+const PRICING_READS = ["list_sale_channels", "list_price_groups", "list_formats", "list_channel_prices", "list_price_group_barcodes"];
 
 const catalogParams = z.object({
   q: z.string().trim().max(100).catch(""),
@@ -49,7 +55,11 @@ export default async function CatalogPage({ searchParams }: { searchParams?: Pro
       model={toCatalogViewProps({ brands, priceGroups: groups, backHref: "/more", filtered: Boolean(params.q || params.category) })}
       controls={controls}
       createAction={canWrite ? E.btn("New brand", "p", "/catalog/brands/new") : null}
-      linkRows
+      links={{
+        brands: canRun(ctx, "upsert_brand"), // the brand page requires it
+        priceGroups: PRICING_READS.every(name => canRun(ctx, name)),
+        waterProfiles: canRun(ctx, "list_water_profiles"),
+      }}
       formats={toFormatsViewProps({ formats, formatHref: format => `/catalog/formats/${format.id}` })}
       formatAction={canWrite ? <FormatForm componentOptions={formats.filter(format => format.bbl_per_unit !== null)} /> : null}
     />
