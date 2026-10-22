@@ -130,7 +130,10 @@ export function TabBar({
   return (
     <Tabs value={hrefs || onChange ? value : undefined} defaultValue={hrefs || onChange ? undefined : value} onValueChange={onChange && ((v) => onChange(names[Number(v)]))} className={panel === undefined ? "min-w-0" : "min-w-0 flex-1 gap-3"}>
       <TabsList variant="solid" className={cls} aria-label={label}>
-        {names.map((n, i) => <TabsTrigger key={n} value={String(i)} data-to={to?.[n]} asChild={Boolean(hrefs?.[n])}>{hrefs?.[n] ? <Link href={hrefs[n]}>{labels?.[n] ?? n}</Link> : labels?.[n] ?? n}</TabsTrigger>)}
+        {names.map((n, i) => {
+          const text = labels?.[n] ?? n;
+          return <TabsTrigger key={n} value={String(i)} data-to={to?.[n]} asChild={Boolean(hrefs?.[n])}>{hrefs?.[n] ? <Link href={hrefs[n]}>{text}</Link> : text}</TabsTrigger>;
+        })}
       </TabsList>
       {panel === undefined ? null : names.map((n, i) => <TabsContent key={n} value={String(i)} tabIndex={-1} className="flex flex-col gap-3">{panel}</TabsContent>)}
     </Tabs>

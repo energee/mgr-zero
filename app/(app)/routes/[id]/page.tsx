@@ -41,7 +41,6 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
       <ReturnRouteView
         model={{
           title,
-          backTo: "Deliveries",
           backHref: "/routes",
           driverVehicle,
           departed,
@@ -61,7 +60,6 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
     <DriverRouteView
       model={{
         title,
-        backTo: "Deliveries",
         backHref: "/routes",
         driverVehicle,
         departed,
