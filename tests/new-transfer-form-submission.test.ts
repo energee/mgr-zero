@@ -11,7 +11,7 @@ vi.mock("@/lib/commands/use-command-form", () => ({ useCommandForm: (_name: stri
 import { NewTransferForm } from "@/app/(app)/transfers/new-transfer-form";
 
 it("Create transfer opens the new transfer's detail page (#1060)", () => {
-  NewTransferForm({ locations: [], bins: [], skus: [] });
+  NewTransferForm({ locations: [], bins: [], skus: [], skusHref: null });
   harness.opts?.onSuccess?.({ transferId: "t-1" });
   expect(harness.push).toHaveBeenCalledWith("/transfers/t-1");
 });

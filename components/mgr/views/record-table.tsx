@@ -1,5 +1,5 @@
 // components/mgr/views/record-table.tsx — comparable records (Catalog's brands,
-// Formats, Finished goods, Batches, Invoices) drawn once for both surfaces: a
+// Formats, Finished goods, Batches, Orders, Invoices) drawn once for both surfaces: a
 // table from md up, and on the phone a list of records separated by rules,
 // each fact labeled by its column header. The first cell names the record and
 // is its one link; it covers each whole record, so no row repeats an Open
@@ -23,7 +23,10 @@ export type RecordTableRow = {
   key: string;
   /** cells[0] is the record's name; the rest line up under headers[1..].
    *  A null, undefined or false cell has nothing to say: its table cell is
-   *  empty and the phone list leaves the labeled pair out. */
+   *  empty and the phone list leaves the labeled pair out.
+   *  A server caller hands these (and its headers) across in an array prop,
+   *  so every element cell needs its own key (#1137); wrap a keyless helper
+   *  like E.act in `<Fragment key>`. */
   cells: ReactNode[];
   /** A secondary line under the name, such as a brand's staff-only alias. */
   note?: ReactNode;
