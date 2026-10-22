@@ -262,7 +262,7 @@ describe("Square packaged (Four Pack) publication", () => {
     await expect(publishSquareMenu(f.ctx, { posLocationId: "L1" }, crypto.randomUUID(), new SquareClient(config, fetch)))
       .resolves.toMatchObject({ published: true });
     expect(bodies.find((body) => body.object.id === itemId)?.object).toMatchObject({ present_at_location_ids: [],
-      item_data: { variations: [expect.objectContaining({ present_at_location_ids: [] })] } });
+      item_data: { is_archived: true, variations: [expect.objectContaining({ present_at_location_ids: [] })] } });
     expect(sql(`select (i.retired_at is not null)::text||':'||(o.retired_at is not null)::text||':'||m.sku_id
       from public.pos_catalog_items i join public.pos_catalog_ownership o using (connection_id,brand_id,catalog_group)
       join public.pos_item_mappings m on m.connection_id=o.connection_id and m.external_variation_id=o.external_variation_id
@@ -286,6 +286,22 @@ describe("Square packaged (Four Pack) publication", () => {
     const [itemId, variationId] = before!.split(":");
     expect(bodies.some((body) => body.object.id.startsWith(`#mgr-item-${f.first.brandId}-packaged`))).toBe(false);
     expect(bodies.find((body) => body.object.id === itemId)?.object).toMatchObject({ present_at_location_ids: ["L1"],
-      item_data: { variations: [expect.objectContaining({ id: variationId, present_at_location_ids: ["L1"] })] } });
+      item_data: { is_archived: false, variations: [expect.objectContaining({ id: variationId, present_at_location_ids: ["L1"] })] } });
+  });
+
+  it("archives a poured beer's Square item when its last keg leaves the menu bin", async () => {
+    const f = await fixture();
+    const { bodies, fetch } = createCatalogFetch();
+    const publish = () => publishSquareMenu(f.ctx, { posLocationId: "L1" }, crypto.randomUUID(), new SquareClient(config, fetch));
+    await publish();
+    const itemId = sql(`select external_item_id from public.pos_catalog_items
+      where brewery_id='${f.brewery.id}' and catalog_group='poured'`)[0]!;
+    const keg = sql(`select id from public.skus where brewery_id='${f.brewery.id}' and brand_id='${f.first.brandId}'`)[0]!;
+    await runCommand("record_movement", { skuId: keg, locationId: f.location.id, binId: f.location.binId,
+      qty: -1, type: "adjustment" }, f.ctx, execution());
+    bodies.length = 0;
+    await expect(publish()).resolves.toMatchObject({ published: true });
+    expect(bodies.find((body) => body.object.id === itemId)?.object).toMatchObject({ present_at_location_ids: [],
+      item_data: { is_archived: true } });
   });
 });

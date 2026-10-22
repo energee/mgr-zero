@@ -52,6 +52,16 @@ One migration, `20261021140000_square_four_pack_menu.sql`, then
    it with no expected keg draw (§16.14).
    Test: `tests/pos-sales-sync.test.ts` — a Four Pack sale maps without manual
    mapping and adds no keg expectation.
+4b. **Archive, never delete (owner, 2026-10-22).** A beer keeps one Square
+   item and one sale entry for life. When a publish leaves an owned item
+   present at no location, MGR also sets `item_data.is_archived = true`; when
+   a variation becomes present again it sets `is_archived = false` on the same
+   item. Square keeps an archived item's ID and order references; a delete
+   does not. Catalog sync must keep an archived owned item available (not
+   "missing"). The guide tells staff to archive in Square, never delete.
+   Test: `tests/pos-publication-spec-fixes.test.ts` — runs out → upsert has
+   `is_archived: true`; returns → same item id with `is_archived: false`;
+   poured and packaged alike.
 5. **Menu screen.** `/menu` shows four-pack rows beside pours (screen-parity
    skill; `components/mgr/screens.tsx` fixture). Proof: screen tests + browse.
 6. **Docs.** Staff guide Menu and Catalog (Package contents); command
