@@ -16,6 +16,7 @@ consolidation: make the living agent docs match reality, citing evidence.
 - .agents/DRIFT.md
 - AGENTS.md
 - .agents/agents/*.md
+- .dream-findings.jsonl, for overlooked documentation (below)
 
 `TODO.md` is edited only by `scripts/pr-directives.ts`, which runs before you.
 Leave it alone.
@@ -80,6 +81,36 @@ by hand; capture it here so the next session starts with the guard.
   Negative that would have prevented it, add an unchecked `.agents/DRIFT.md`
   item proposing one; never add a Negative yourself.
 - A single occurrence is not a pattern; leave it.
+
+## Integrate new and missed documentation
+`.git/dream-new-docs.txt` lists the Markdown files added in the window. Read
+each, then make your editable files read as if they and it had been written
+together:
+- Link a new spec, plan, or runbook from the place an agent would look for it:
+  the `AGENTS.md` "Where to look" table for a new area, or
+  `.agents/ARCHITECTURE.md` for a new owner.
+- Fold a durable decision it records into `.agents/MEMORY.md` in one line,
+  citing the file; MEMORY.md stays a ledger of decisions, not a changelog.
+- Look past the window too: an older spec, plan, or runbook that no agent doc
+  links to is missed documentation. Link it the same way.
+- A file whose first line says it is generated (for example the API operations
+  backlog `bun run docs:api` writes) needs no link and no report.
+
+Specs and plans stay read-only (Flag, never fix). Where two of them say the
+same thing, or a newer one supersedes an older one, report it (below) rather
+than editing either. Documentation outside your editable files (`docs/`,
+`README.md`, `content/docs/`) belongs to the documentation agent: report it
+when it is unlinked, duplicated, or contradicts a newer document.
+
+## Overlooked documentation
+Write each gap you cannot fix to `.dream-findings.jsonl`, one JSON object per
+line: `{"title": "...", "body": "..."}`. The workflow lists them in one
+"Docs gaps: dreaming agent" issue, replacing the previous run's list, so report
+every gap still open, not only new ones. You cannot run `gh issue` yourself.
+Title: under 100 characters, naming the file. Body: the
+evidence (paths, PRs) and the suggested fix. Write nothing to this file when
+there is nothing to report. Drift between a read-only artifact and the code
+stays in `.agents/DRIFT.md`, not here.
 
 ## Flag, never fix
 Drift in read-only artifacts — specs, wireframes, code, workflows — is durable
