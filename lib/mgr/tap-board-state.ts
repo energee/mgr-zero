@@ -128,7 +128,9 @@ type TapSheetNeeds = Partial<Record<"reason" | "skuId" | "guestLabel" | "guestNo
 
 /** What the sheet's fields still lack, keyed by field, each phrased as a need
  *  ("a guest keg label"). The one rule set: the withheld submit names these
- *  (tapSheetReason), the guest fields mark theirs, and payload() refuses them. */
+ *  (tapSheetReason), the guest fields mark theirs, and payload() refuses them.
+ *  One case is not a need: a "same" swap whose open keg has no SKU to reuse.
+ *  The picker disables that option, and payload() refuses it if it arrives. */
 export function tapSheetNeeds(sheet: TapBoardSheet): TapSheetNeeds {
   const fields = sheet.fields, needs: TapSheetNeeds = {};
   if (sheet.kind !== "tap" && !fields.reason.trim()) needs.reason = "a closing reason";
@@ -156,6 +158,7 @@ function payload(sheet: TapBoardSheet): TapCommandPayload {
   const reason = tapSheetReason(sheet);
   if (reason) throw new Error(reason);
   const tapNumber = sheet.fields.tapNumber.trim() || undefined;
+  // A tap sheet's identity is "own" or "guest", so incomingKeg returns a keg.
   if (sheet.kind === "tap") return { locationId: sheet.fields.locationId, keg: incomingKeg(sheet.fields)!, tapNumber, openingFill: sheet.fields.openingFill };
   if (!sheet.interval) throw new Error("Choose an open keg.");
   const close = { openIntervalId: sheet.interval.id, closeFill: sheet.fields.closeFill, reason: sheet.fields.reason.trim() };
