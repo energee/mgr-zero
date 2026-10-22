@@ -458,7 +458,7 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", tab: "Work", name: "Work", job: "Everything currently in motion, ordered by next due action",
     reads: "list_work", writes: "none",
     states: DEFAULT_STATES,
-    spec: "Warehouse default rows shown; the chips are the kinds the role may open (a brewer has no POs or routes) and an explicit chip choice is remembered. Rows sort by urgency/due time, not newest activity.",
+    spec: "Warehouse default rows shown; the chips are the kinds the role may open (a brewer has no Purchase orders or Deliveries), each labeled with its sidebar name, and an explicit chip choice is remembered. Rows sort by urgency/due time, not newest activity.",
     body: <WorkView model={toWorkViewProps(workWarehouse)} />,
   },
   {
@@ -1791,8 +1791,8 @@ export const SCREENS: Screen[] = [
     job: "See what is planned, what is due and what closed, and schedule the next run",
     reads: "list_packaging_runs · list_brands · list_occupancies · list_skus · list_locations · list_bins",
     writes: "none [scheduling and closing happen on their own surfaces]",
-    states: [["short", "a planned run whose materials fall short says so on the row and its next action is Resolve, not Start"], ["due today", "the same row also appears in Today for the brewer"], ["closed", "recent runs stay for a few weeks with lot, output and yield; after that they are history under Search and Lot trace"], ["empty", "no runs planned: the button is the only thing on the page"]],
-    spec: "The Work list with the Runs tab active, which is the packaging list: Work is where everything in motion lives, so runs get no rail entry of their own. Upcoming sorts by planned date and every row names its next action. Recent breaks Work's in-motion rule on purpose, because a brewer plans the next run against the last one's yield; it is kept short and the full history stays in Search. Schedule run opens the sheet; a row opens the run, where closing happens.",
+    states: [["short", "a planned run whose materials fall short says so on the row and its next action is Resolve, not Start"], ["due today", "the same row also appears in Today for the brewer"], ["closed", "recent runs stay for a few weeks with lot, output and yield; after that they are history under Search and Lot trace"], ["empty", "no runs planned: the empty state points at Schedule run"]],
+    spec: "The Work list with the Packaging tab active, which is the packaging list: Work is where everything in motion lives, so runs get no rail entry of their own. Upcoming sorts by planned date and every row names its next action. Recent breaks Work's in-motion rule on purpose, because a brewer plans the next run against the last one's yield; it is kept short and the full history stays in Search. Schedule run opens the sheet; a row opens the run, where closing happens.",
     body: <PackagingRunsView model={toPackagingRunsViewProps(packagingRuns, DEMO_TIME_ZONE)} />,
   },
   {
@@ -1842,7 +1842,7 @@ export const SCREENS: Screen[] = [
     reads: "list_purchase_orders",
     writes: "none [creation and receiving happen on their own surfaces]",
     states: [["draft", "Send is the next action"], ["partial", "Receive stays available for the remainder"], ["empty", "no open purchase orders: New PO is the only action"]],
-    spec: "The Work list with the POs tab active. Each row names the next action; New PO opens the existing vendor purchase draft, and Receive PO returns here.",
+    spec: "The Work list with the Purchase orders tab active. Each row names the next action; New PO opens the existing vendor purchase draft, and Receive PO returns here.",
     body: <PurchaseOrdersView model={toPurchaseOrdersViewProps(purchaseOrdersWarehouse)} />,
   },
   {

@@ -135,7 +135,7 @@ Scroll within the page to reach lower fields and actions. The header, collapsed 
 Related records appear as simple separated rows. The row's named action or arrow says what it will open or do; a switch or quantity control changes only that row.
 
 - **Beer** opens a landing that counts each area (finished-goods shortages, open taps, tanks with beer, material shortages, kegs out) and holds **Inventory**, **Taproom**, **Taps**, **Cellar**, **Materials**, **Shortages**, and **Kegs** as allowed by role. **Materials** opens materials on hand, their definitions, and cycle counts. **Shortages** counts the materials that planned work is short of and opens **Planning**, which lists them.
-- **Work** opens everything in motion: Today's rows plus the open purchase orders and delivery routes your role may open, sorted by due date, with chips (**all**, **orders**, **transfers**, **batches**, **runs**, **POs**, **routes**) that filter it. The chip you pick is remembered on that device. It holds **Orders**, **Pick**, **Replenishment**, **Transfers**, **Batches**, **Packaging**, **POs**, and **Deliveries**.
+- **Work** opens everything in motion: Today's rows plus the open purchase orders and delivery routes your role may open, sorted by due date, with chips (**All**, **Orders**, **Transfers**, **Batches**, **Packaging**, **Purchase orders**, **Deliveries**) that filter it. Each chip uses the same name as its sidebar entry. The chip you pick is remembered on that device. Select **New order** (Admin and Sales) to open the New order form. Work holds **Orders**, **Pick**, **Replenishment**, **Transfers**, **Batches**, **Packaging**, **Purchase orders**, and **Deliveries**.
 - **More** opens the list of your setup and desk pages: **Invoices**, **Catalog**, **Menu**, **Customers**, **Price groups**, **Recipes**, **Vendors**, **Compliance**, **Planning**, **Settings**, **Sale channels**, **Locations**, and **Units**. Taproom's More list is **Chat** and **Units**. Settings is Admin's; for every other role, the back link on **Units** returns to **More**.
 
 Taproom does not have Work. Its Beer section opens the live Taproom count, Taps board, and brand variance pages, and an empty Today links to those same jobs. Links your role cannot use are simply not shown. Menu appears under More for Admin and Warehouse, while a tab with nothing you can open does not appear.
@@ -147,9 +147,9 @@ Admin opens **Import** from **Settings** or the first-run checklist. See [Import
 
 </Callout>
 
-Orders, Transfers, Batches, Packaging, Purchase orders, and Routes each carry their own name as the page heading, with the Work tabs beneath it. These tabs open the corresponding lists and include only areas your role may open. On a phone the tabs may not all fit; the strip fades at the edge that hides more, and you can swipe it sideways.
+Orders, Transfers, Batches, Packaging, Purchase orders, and Deliveries each carry their sidebar name as the page heading, with the Work tabs beneath it. The tabs use the same names. These tabs open the corresponding lists and include only areas your role may open. On a phone the tabs may not all fit; the strip fades at the edge that hides more, and you can swipe it sideways.
 
-On the **Work** landing itself, chips filter the rows in place. **all** restores your role's default kinds; **Nothing in motion** means the selected filter has no matching rows.
+On the **Work** landing itself, chips filter the rows in place. **All** restores your role's default kinds. **Nothing in motion** means the selected filter has no matching rows; a row appears once something is waiting on its next step.
 
 **Sort a table** by selecting a column heading. The first selection sorts it from lowest or earliest to highest or latest, the second reverses it, and the third returns the table to its usual order. An arrow beside the heading shows the direction. Dates and amounts sort by value, and empty cells always sort last. Order status sorts in lifecycle order, from Draft to Cancelled. Each table remembers its last sort on this browser and device. On a phone a table becomes a list with no headings, so it keeps any sort chosen at a wider width in the same browser. Orders and Invoices sort only the page of records shown, not their whole history. Monthly compliance and price-group tables keep their fixed order and have no sortable headings.
 
@@ -923,7 +923,7 @@ Open an unstarted run to **Reschedule** its planned date or **Cancel plan** and 
 
 *Admin, Brewer, and Warehouse.*
 
-Open **Packaging** from the **Work** navigation to see every run by planned date, newest first. A run still in progress names its next action on the row. A closed or cancelled run has none, so its row only opens it; a closed run is dated by the day it closed. Select **Schedule run** for a **Planned date**, a **Brand**, and an optional **Source tank**. A run is identified by the brand it packages from the moment it is planned; the tank can be picked later. Choosing the brand lists each of its SKUs under **Planned outputs** with a quantity; enter how many of each to package, and leave the rest at zero. Each planned SKU whose format has a volume shows the barrels it takes. With a tank chosen, the sheet shows its batch and volume, and what would be left in it once every planned SKU has a known volume. **Save run plan** stays disabled until the date, the brand, and at least one quantity are filled. **Materials** previews the planned BOM requirements, current on-hand quantities and shortages. Shortages do not prevent saving a plan; closing requires enough stock for confirmed actual use and loss.
+Open **Packaging** from the **Work** navigation to see every run by planned date, newest first. A run still in progress names its next action on the row. A closed or cancelled run has none, so its row only opens it; a closed run is dated by the day it closed. With no runs at all, the page says **No runs planned** and points you to **Schedule run**. Select **Schedule run** for a **Planned date**, a **Brand**, and an optional **Source tank**. A run is identified by the brand it packages from the moment it is planned; the tank can be picked later. Choosing the brand lists each of its SKUs under **Planned outputs** with a quantity; enter how many of each to package, and leave the rest at zero. Each planned SKU whose format has a volume shows the barrels it takes. With a tank chosen, the sheet shows its batch and volume, and what would be left in it once every planned SKU has a known volume. **Save run plan** stays disabled until the date, the brand, and at least one quantity are filled. **Materials** previews the planned BOM requirements, current on-hand quantities and shortages. Shortages do not prevent saving a plan; closing requires enough stock for confirmed actual use and loss.
 
 The scheduling material preview separates **Material**, **Planned**, **On hand**, and **Short**. Planned amounts include each material's base unit. A dash means unavailable, while zero means a known zero. Plan and close requirements also show **On order**; incoming stock is not on-hand stock.
 
@@ -943,7 +943,7 @@ Before **Discard saved request → Confirm discard**, check the closed run's lot
 
 <Screen name="Purchase orders" />
 
-Purchasing is four pages. **Vendors** and **Materials** hold the definitions, **POs** (Work tab) is where an order lives from draft to received, and **Planning** shows what committed work is short of and drafts the orders to cover it.
+Purchasing is four pages. **Vendors** and **Materials** hold the definitions, **Purchase orders** (Work tab) is where an order lives from draft to received, and **Planning** shows what committed work is short of and drafts the orders to cover it.
 
 ### Vendors and contracts
 
@@ -1007,7 +1007,7 @@ Correcting a posted receipt does not edit its Bill or create a vendor credit. Th
 
 For orders, MGR projects only the open order quantity not covered by finished goods, open packaging runs, or projected batch units of the same SKU. Standing allocations hold stock ahead of orders but never project on their own. For example, 100 packages on hand, 50 standing and 80 ordered projects 30, while no stock, 50 standing and 10 ordered projects only 10. Needed-by is the earliest requested ship date among that SKU's open order allocations, or today if none has one. Receiving finished goods or scheduling enough run output removes the order projection; an order and the batch expected to supply it are not added twice.
 
-**Draft N purchase orders** (Admin and Warehouse) writes one draft per vendor for every buyable row, quantities rounded up to whole purchase units, priced from the contract for what its available commitment covers and left blank beyond that. The label says how many before you commit, and the page then opens the POs list so you can review and mark them sent.
+**Draft N purchase orders** (Admin and Warehouse) writes one draft per vendor for every buyable row, quantities rounded up to whole purchase units, priced from the contract for what its available commitment covers and left blank beyond that. The label says how many before you commit, and the page then opens the Purchase orders list so you can review and mark them sent.
 
 ## Team [#team]
 

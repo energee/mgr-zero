@@ -62,6 +62,15 @@ describe("packaging views", () => {
     expect(page).not.toMatch(/\bE\./);
   });
 
+  it("an empty list says how to plan a run, and a list with runs has no empty state (#1129)", () => {
+    const model = toPackagingRunsViewProps([], DEMO_TIME_ZONE);
+    expect(model.empty).toEqual({ title: "No runs planned", description: expect.stringContaining("Schedule run") });
+    const html = htmlOf(createElement(PackagingRunsView, { model, actions: null }));
+    expect(html).toContain("No runs planned");
+    expect(html).toContain(model.empty?.description);
+    expect(toPackagingRunsViewProps(packagingRuns, DEMO_TIME_ZONE).empty).toBeUndefined();
+  });
+
   it("prints an upcoming run's planned day in the one date format (#991)", () => {
     const [upcoming] = toPackagingRunsViewProps([{
       id: "u", run_no: 8, planned_on: "2026-09-05", started_at: null, closed_at: null, cancelled_at: null,

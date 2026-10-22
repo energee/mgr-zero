@@ -1,10 +1,40 @@
-// lib/mgr/work-view.ts — view-model for the Work landing (list_work).
+// lib/mgr/work-view.ts — view-model for the Work landing (list_work), and the
+// Work chips every Work page draws: their identities, pages, and labels.
 import type { WorkKind, WorkRow } from "@/lib/commands/landings";
-export const WORK_CHIPS = ["all", "orders", "transfers", "batches", "runs", "POs", "routes"];
+import type { EmptyState } from "@/lib/mgr/empty-state";
+import { STAFF_NAV } from "@/lib/mgr/nav";
+
+/** The page each Work chip opens. A key is the chip's identity: "all" or a
+ *  WorkKind, the value filters, hrefs and the remembered mgr-work-filter use. */
+export const WORK_HREFS: Record<"all" | WorkKind, string> = {
+  all: "/work", orders: "/orders", transfers: "/transfers", batches: "/batches",
+  runs: "/packaging", POs: "/purchase-orders", routes: "/routes",
+};
+export const WORK_CHIPS = Object.keys(WORK_HREFS);
+
+/** What each chip shows: "All", then the sidebar's name for the page the chip
+ *  opens, so a tab never names its page differently from the sidebar (#1104).
+ *  A chip whose page is not in the sidebar keeps its identity as a label; that
+ *  is safe because workHrefsFor drops such a chip from every live page. */
+const WORK_NAV = STAFF_NAV.find(item => item.href === "/work")?.children ?? [];
+function chipLabel(chip: string, href: string): string {
+  if (chip === "all") return "All";
+  return WORK_NAV.find(item => item.href === href)?.label ?? chip;
+}
+export const WORK_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(WORK_HREFS).map(([chip, href]) => [chip, chipLabel(chip, href)]),
+);
+
 export const WORK_TABS: Record<string, string> = {
   all: "Work", orders: "Orders", transfers: "Transfers", batches: "Batches",
   runs: "Packaging runs", POs: "Purchase orders", routes: "Routes",
 };
+
+/** What the Work list says when the chosen chip has no rows. */
+export const WORK_EMPTY = {
+  title: "Nothing in motion",
+  description: "An order, transfer, batch, packaging run, purchase order, or delivery appears here while it waits on its next step.",
+} satisfies EmptyState;
 
 export type WorkRowView = {
   key: string;

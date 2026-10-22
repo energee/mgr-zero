@@ -5,15 +5,12 @@ import Link from "next/link";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
 import type { StaffRole } from "@/lib/commands/registry";
+import { WORK_HREFS } from "@/lib/mgr/work-view";
 
-/** The Work chips and where each one goes. */
-export const WORK_CHIPS: [label: string, href: string][] = [
-  ["all", "/work"], ["orders", "/orders"], ["transfers", "/transfers"], ["batches", "/batches"], ["runs", "/packaging"], ["POs", "/purchase-orders"], ["routes", "/routes"],
-];
-
+/** Each Work chip the role may open, keyed by chip identity, with its page. */
 export function workHrefsFor(roles: readonly StaffRole[]) {
   const work = navFor(STAFF_NAV, roles).find(item => item.href === "/work");
-  return Object.fromEntries(WORK_CHIPS.filter(([, href]) => href === work?.href || work?.children?.some(item => item.href === href)));
+  return Object.fromEntries(Object.entries(WORK_HREFS).filter(([, href]) => href === work?.href || work?.children?.some(item => item.href === href)));
 }
 
 export function LinkTabs({ items, current, className = "w-full" }: { items: [label: string, href: string][]; current: string; className?: string }) {

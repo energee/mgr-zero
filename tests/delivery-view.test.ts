@@ -59,6 +59,11 @@ describe("Routes", () => {
     expect(html).not.toMatch(/>Open</);
   });
 
+  it("headed Deliveries, the sidebar's name, in the inventory and the live page (#1104)", () => {
+    expect(htmlOf(createElement(RoutesView, { model: toRoutesViewProps(routesDriver) }))).toMatch(/<h1[^>]*>Deliveries</);
+    expect(src("app/(app)/routes/page.tsx")).toContain('toRoutesViewProps({ title: "Deliveries"');
+  });
+
   it("renders New route without leaking live hrefs", () => {
     const html = htmlOf(createElement(RoutesView, { model: toRoutesViewProps(routesDriver) }));
     expect(html).toMatch(/>New route</);

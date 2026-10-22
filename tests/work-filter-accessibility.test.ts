@@ -1,6 +1,7 @@
 // tests/work-filter-accessibility.test.ts — #727: every Work filter tab's
 // aria-controls names a mounted, labelled tabpanel, in both the inventory
 // record and the live WorkList adapter (one shared WorkView). Ported from #743.
+// Tabs show the sidebar names (#1104); the empty panel says what fills it (#1129).
 // The explorer's guard on the filter tablist is asserted in shell-view.test.ts.
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -9,7 +10,7 @@ import { WorkList } from "../app/(app)/work/work-list";
 import { TabBar } from "../components/mgr/qty";
 import { WorkView } from "../components/mgr/views/work";
 import { workWarehouse } from "../lib/mgr/fixtures/work";
-import { toWorkViewProps } from "../lib/mgr/work-view";
+import { toWorkViewProps, WORK_EMPTY } from "../lib/mgr/work-view";
 import type { WorkRow } from "../lib/commands/landings";
 
 const render = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -42,8 +43,14 @@ describe("Work filter tab accessibility (#727)", () => {
   it("associates every inventory tab with its result panel", () => {
     const html = render(createElement(WorkView, { model: toWorkViewProps(workWarehouse) }));
     const { selected, shown } = expectTabsToControlPanels(html);
-    expect(selected).toBe("all");
+    expect(selected).toBe("All");
     expect(shown).toContain("ORD-0231 · Ridgeline");
+  });
+
+  it("labels each tab with the sidebar's name for its page, not its kind identity (#1104)", () => {
+    const html = render(createElement(WorkView, { model: toWorkViewProps(workWarehouse) }));
+    const tabs = [...html.matchAll(/<button\b[^>]*role="tab"[^>]*>(.*?)<\/button>/g)].map(([, text]) => text);
+    expect(tabs).toEqual(["All", "Orders", "Transfers", "Batches", "Packaging", "Purchase orders", "Deliveries"]);
   });
 
   it("keeps the live WorkList on the same panel-backed WorkView", () => {
@@ -60,20 +67,22 @@ describe("Work filter tab accessibility (#727)", () => {
   it("shows the chosen chip's panel with only that kind's rows", () => {
     const html = render(createElement(WorkView, { model: toWorkViewProps(workWarehouse), chip: "routes" }));
     const { selected, shown } = expectTabsToControlPanels(html);
-    expect(selected).toBe("routes");
+    expect(selected).toBe("Deliveries");
     expect(shown).toContain("Route A");
     expect(shown).not.toContain("ORD-0231");
   });
 
-  it("puts the empty state inside the shown panel", () => {
+  it("puts the empty state, with its next-step line, inside the shown panel (#1129)", () => {
     const html = render(createElement(WorkView, { model: toWorkViewProps({ rows: [] }) }));
-    expect(expectTabsToControlPanels(html).shown).toContain("Nothing in motion");
+    const { shown } = expectTabsToControlPanels(html);
+    expect(shown).toContain(WORK_EMPTY.title);
+    expect(shown).toContain(WORK_EMPTY.description);
   });
 
   it("falls back to the first chip when the chosen one is not offered", () => {
     const html = render(createElement(WorkView, { model: toWorkViewProps(workWarehouse), chip: "bogus" }));
     const { selected, shown } = expectTabsToControlPanels(html);
-    expect(selected).toBe("all");
+    expect(selected).toBe("All");
     expect(shown).toContain("ORD-0231 · Ridgeline");
   });
 

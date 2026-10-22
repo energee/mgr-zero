@@ -890,10 +890,10 @@ describe("SCREENS", () => {
     for (const name of ["Work", "Orders", "Transfers", "Batches", "Packaging runs", "Purchase orders", "Routes"]) {
       expect(html(name), name).toContain("tablist");
     }
-    // Each Work kind page is titled by its kind; only the all-kinds page says Work (#1037).
+    // Each Work kind page is titled by its sidebar name; only the all-kinds page says Work (#1037, #1104).
     const h1 = (name: string) => html(name).match(/<h1[^>]*>([^<]*)<\/h1>/)?.[1];
     expect(["Work", "Orders", "Transfers", "Batches", "Packaging runs", "Purchase orders", "Routes"].map(h1))
-      .toEqual(["Work", "Orders", "Transfers", "Batches", "Packaging", "Purchase orders", "Routes"]);
+      .toEqual(["Work", "Orders", "Transfers", "Batches", "Packaging", "Purchase orders", "Deliveries"]);
     expect(html("Packaging runs")).toContain("data-active:bg-primary");
     // Record movement: seven kinds are a Select on the phone, chips from md up.
     const move = html("Record movement");
