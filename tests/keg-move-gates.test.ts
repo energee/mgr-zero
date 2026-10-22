@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { KegFleetView, KegEventFields, KegPoolFields } from "@/components/mgr/views/keg-fleet";
 import { kegFleetMicrostar } from "@/lib/mgr/fixtures/kegs";
-import { kegEventUnavailable, needsKegCustomer, toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
+import { kegEventUnavailable, needsKegCustomer, toKegFleetViewProps, type KegPoolValue } from "@/lib/mgr/keg-fleet-view";
 import { moveStockUnavailable } from "@/lib/movement-form";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 
@@ -53,6 +53,19 @@ describe("Keg fleet shared fields", () => {
     expect(out).toContain("Move stock");
     expect(out).toContain("Add a bin first.");
     expect(out).not.toContain("live form");
+  });
+
+  it("says which pools each money field applies to, and why an owned pool has no vendor (#1119)", () => {
+    const fields = (kind: KegPoolValue["kind"]) => html(createElement(KegPoolFields, { value: { name: "A", kind, vendorId: "", perFill: "", deposit: "0.00", active: true }, vendors: [], onChange: () => {} }));
+    const owned = fields("owned");
+    expect(owned).toContain("None · the brewery owns these kegs");
+    expect(owned).not.toContain("owned pools have no vendor");
+    // A blank per-fill cost stays blank (null), never 0: only pay per fill requires one.
+    for (const kind of ["owned", "leased"] as const) expect(fields(kind)).toContain("Only for a pool charged per fill. Leave blank otherwise.");
+    expect(fields("pay_per_fill")).toContain("Required: what the vendor charges for each keg filled.");
+    expect(owned).toContain("Charged to the customer for each keg from this pool. 0 means no deposit.");
+    expect(owned).toMatch(/id="pool-per-fill"[^>]*aria-describedby="pool-per-fill-help"|aria-describedby="pool-per-fill-help"[^>]*id="pool-per-fill"/);
+    expect(owned).toMatch(/id="pool-deposit"[^>]*aria-describedby="pool-deposit-help"|aria-describedby="pool-deposit-help"[^>]*id="pool-deposit"/);
   });
 
   it("pool and event fields are E controls, with an In service switch", () => {
