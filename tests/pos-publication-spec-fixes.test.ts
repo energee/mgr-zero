@@ -268,4 +268,24 @@ describe("Square packaged (Four Pack) publication", () => {
       join public.pos_item_mappings m on m.connection_id=o.connection_id and m.external_variation_id=o.external_variation_id
       where i.brewery_id='${f.brewery.id}' and i.catalog_group='packaged'`)).toEqual([`true:true:${f.caseSkuId}`]);
   });
+
+  it("brings the same Square item and variation back when cases return, so sales stay one product", async () => {
+    const f = await caseFixture();
+    const { bodies, fetch } = createCatalogFetch();
+    const publish = () => publishSquareMenu(f.ctx, { posLocationId: "L1" }, crypto.randomUUID(), new SquareClient(config, fetch));
+    const ids = () => sql(`select o.external_item_id||':'||o.external_variation_id||':'||(o.retired_at is null)::text
+      from public.pos_catalog_ownership o where o.brewery_id='${f.brewery.id}' and o.catalog_group='packaged'`);
+    await publish();
+    const [before] = ids();
+    await f.move(-2, "adjustment");
+    await publish();
+    await f.move(1, "adjustment");
+    bodies.length = 0;
+    await expect(publish()).resolves.toMatchObject({ published: true });
+    expect(ids()).toEqual([before]);
+    const [itemId, variationId] = before!.split(":");
+    expect(bodies.some((body) => body.object.id.startsWith(`#mgr-item-${f.first.brandId}-packaged`))).toBe(false);
+    expect(bodies.find((body) => body.object.id === itemId)?.object).toMatchObject({ present_at_location_ids: ["L1"],
+      item_data: { variations: [expect.objectContaining({ id: variationId, present_at_location_ids: ["L1"] })] } });
+  });
 });
