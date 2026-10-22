@@ -6,8 +6,8 @@
 // compliance sheets). Sells as is one switch per packaged format (on means the
 // brand sells it: an active SKU), then the packages inside the switched-on
 // ones and the price group's pours, each with its prices; pours and prices
-// are edited on the price group, which the section links to. The header badges carry the state a reader scrolls for: COLA
-// pending (a jump link to Compliance), price group or Unpriced, category, SKU
+// are edited on the price group, which the section links to. The header
+// badges carry the state a reader scrolls for: COLA pending (a jump link to Compliance), price group or Unpriced, category, SKU
 // count. Until its first save, a new brand's right column is one note.
 // Style is typed against the brewery's own styles as suggestions: an
 // unmatched entry is the Add path. The recipe cost suggests a price group

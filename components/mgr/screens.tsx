@@ -1427,7 +1427,7 @@ export const SCREENS: Screen[] = [
     to: { "Save SKU": "Brand" },
     job: "Edit a packaged SKU opened from its brand's Sells as",
     reads: "list_formats · list_keg_pools",
-    writes: "create_sku · update_sku · upsert_format",
+    writes: "update_sku",
     states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["in use", "format cannot change; create another SKU", 1], ["keg pool", "keg formats only · None charges no deposit"], ["no pool", "warning on SKU list · no deposit", 1], ["batch share", "optional percentage on an existing SKU · brand total at most 100%"]],
     spec: "A SKU is one brand in one packaged format, and holds stock. The Brand page's Sells as switch creates it, turns it off and back on; Edit SKU there opens this sheet. A pour is not a SKU: it is added on its price group. It owns active state, optional UPC, and provider mappings. Edit SKU also sets its default batch package share as a percentage; blank projects nothing, and all shares of one brand total at most 100%. Create first, then edit to set the share. A keg SKU selects a Keg pool or None; the pool kind derives container source. Out-of-service pools cannot be newly linked; existing links survive retirement. Price lives on the grid cell (sale channel × price group × format), never as a SKU exception. Group-shared barcodes are a follow-on table; until then a SKU may carry its own UPC. Name, volume and packaging derive from the Format. A different physical package is a different Format. Corrections affect future calculations and open plans; recorded movement volumes and closed packaging yield stay frozen.",
     body: <SkuView model={toSkuViewProps(skuHazyHalf)} />,
