@@ -1,9 +1,13 @@
 // components/mgr/demo-screens.tsx — personal screens redrawn for the explorer's
 // chosen persona (lib/mgr/demo-personas.ts): Me, Slack preferences, and Permission denied for the screen the
-// persona was just refused. Demo only: the inventory keeps its fixture
+// persona was just refused, and the vessel screens a non-admin reads without
+// Add, New, Save or Delete vessel. Demo only: the inventory keeps its fixture
 // drawings (Maria, "Invoices"); nothing under app/ imports this.
 import { cloneElement, type ReactElement, type ComponentProps } from "react";
 import { OrdersView } from "@/components/mgr/views/orders-list";
+import { BatchesView } from "@/components/mgr/views/batches";
+import { CellarMapView } from "@/components/mgr/views/cellar-map";
+import { VesselDetailView } from "@/components/mgr/views/vessel-detail";
 import { ordersWorkList } from "@/lib/mgr/fixtures/orders";
 import { toOrdersListViewProps } from "@/lib/mgr/orders-list-view";
 import { E } from "@/components/mgr/e";
@@ -30,6 +34,21 @@ export function asPersona(screen: Screen, persona: Persona, refused?: string): S
     // createAction: undefined keeps OrdersView's default New order button; null hides it.
     const body = screen.body as ReactElement<ComponentProps<typeof OrdersView>>;
     return { ...screen, body: cloneElement(body, { model, createAction: canWrite ? undefined : null }) };
+  }
+  // Vessels are admin-managed: null hides Add vessel and New vessel; a brewer reads the facts.
+  if (!hasAnyRole(persona.roles, ["admin"])) {
+    if (screen.name === "Cellar map") {
+      const body = screen.body as ReactElement<ComponentProps<typeof CellarMapView>>;
+      return { ...screen, body: cloneElement(body, { model: { ...body.props.model, addHref: null } }) };
+    }
+    if (screen.name === "Batches") {
+      const body = screen.body as ReactElement<ComponentProps<typeof BatchesView>>;
+      return { ...screen, body: cloneElement(body, { newVesselHref: null }) };
+    }
+    if (screen.name === "Vessel detail") {
+      const body = screen.body as ReactElement<ComponentProps<typeof VesselDetailView>>;
+      return { ...screen, body: cloneElement(body, { editable: false }) };
+    }
   }
   if (screen.name === "My notification preferences") {
     return { ...screen, body: <ChatPersonalPreferencesView preferences={personalChatPreferences} canSetQuietHours={!onlyRoles(persona.roles, ["taproom"])} back={hasAnyRole(persona.roles, ["admin"]) ? "Chat" : "More"} /> };

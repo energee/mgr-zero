@@ -530,7 +530,9 @@ sort int`. idx `(recipe_version_id)`, `(material_id)`. Revoke update/delete.
 
 ### `vessels`
 `name, kind vessel_kind, capacity_bbl numeric > 0, active bool`. **No status column**
-(decision). unique `(brewery_id, name)`.
+(decision). `active = false` is a retired vessel: `delete_vessel` retires one with
+occupancy history instead of deleting it, and no new occupancy may open in it. Name is
+unique `(brewery_id, name) where active`, so a retired name is free again.
 
 ### `batches`
 `batch_no bigint` (trigger), `intended_brand_id → brands` nullable, `recipe_version_id →

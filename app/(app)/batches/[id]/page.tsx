@@ -2,7 +2,8 @@
 // occupancy it landed in (brewed) or record-brew-day-form.tsx (planned).
 // get_brew_day is the read; only open vessels not already occupied make
 // sense to offer, but record_brew_day itself is the one place that refuses
-// an overlap, so every vessel is offered here.
+// an overlap, so every active vessel is offered here (list_vessels hides
+// retired ones, and the database refuses beer into them).
 import { brewPlanActuals, currentBrewRecords, type BrewPlan, type BrewMaterialSource, type BrewRecordView } from "@/lib/mgr/brew-day-view";
 import { getActiveBrewery } from "@/lib/brewery";
 import { formatDate } from "@/lib/date-format";
