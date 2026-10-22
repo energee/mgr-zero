@@ -5,7 +5,7 @@ import { formatDate } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
-import { brewCorrectionModel, brewTurnModel, currentBrewRecords, brewSourceKey, canRecordBrewDay, type BrewActualDraft, type BrewDayViewModel, type BrewPlan } from "@/lib/mgr/brew-day-view";
+import { brewCorrectionModel, brewTurnModel, currentBrewRecords, brewSourceKey, canRecordBrewDay, vesselOptions, type BrewActualDraft, type BrewDayViewModel, type BrewPlan } from "@/lib/mgr/brew-day-view";
 
 import { INGREDIENT_STAGES, perBblDisplay, type IngredientStage } from "@/lib/mgr/recipe-process-view";
 
@@ -55,7 +55,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, pl
       {E.info("Already brewed. Cellar transfers and fermentation readings continue from the current occupancy, when one is open.")}
     </> : <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); if (!busy && ready) onRecord?.(); }}>
 
-      {E.pick("Vessel", value.vesselId, value.vessels.map(item => ({ value: item.id, label: `${item.name} · ${item.kind} · ${Number(item.capacity_bbl)} bbl` })), { onChange: vesselId => change({ vesselId }), disabled: busy || Boolean(value.correctionRecordId) || Boolean(value.addingTurn), required: true, placeholder: "Choose vessel", id: id + "-vessel" })}
+      {E.pick("Vessel", value.vesselId, vesselOptions(value.vessels), { onChange: vesselId => change({ vesselId }), disabled: busy || Boolean(value.correctionRecordId) || Boolean(value.addingTurn), required: true, placeholder: "Choose vessel", id: id + "-vessel" })}
       {E.edit("Knockout barrels", value.initialBbl, "number", undefined, { onChange: (nextValue: string) => change({ initialBbl: nextValue }), id: id + "-bbl", disabled: busy, required: true, min: "0", step: "any" })}
       <fieldset disabled={busy || Boolean(value.correctionRecordId)}><DatePicker label="Brewed on" value={value.brewedOn} onChange={brewedOn => change({ brewedOn })} /></fieldset>
       {E.fld("Knockout baseline", ready ? <>{value.initialBbl} bbl {E.arrow()} {vessel?.name}</> : "Choose a vessel, positive barrels and a brew date")}

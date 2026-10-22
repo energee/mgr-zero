@@ -5,6 +5,10 @@ import { fromTicks, toTicks } from "./quantity-input";
 export type BrewDayLotView = { key: string; title: string; detail: string };
 export type BrewDayVessel = { id: string; name: string; kind: string; capacity_bbl: number };
 
+/** Vessel pick options: "FV3 · fermenter · 25.5 bbl". */
+export const vesselOptions = (vessels: BrewDayVessel[]) =>
+  vessels.map(item => ({ value: item.id, label: `${item.name} · ${item.kind} · ${Number(item.capacity_bbl)} bbl` }));
+
 export type BrewMaterialSource = { material_id: string; material_name: string; unit: string; location_id: string; location_name: string; bin_id: string; bin_name: string; lot_id: string | null; lot_code: string | null; qty: number };
 export type BrewActualDraft = { key: string; source: string; recipeIngredientId?: string; stage: IngredientStage; qty: string };
 export type BrewPlan = { recipe?: string; version?: { version?: number; mash_schedule?: { name: string; temp_f?: number; tempF?: number; minutes: number }[] } | null;

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { canRecordTimeline, currentStage, isShort, knockoutReady, pullDetail, pulledQty, timelineStages, type BrewIngredient, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
+import { vesselOptions } from "@/lib/mgr/brew-day-view";
 import { packs } from "@/lib/mgr/pack-qty";
 import { processFields } from "./brew-day";
 import { BrewTabs, PackQuantity } from "./brew-prep";
@@ -55,7 +56,7 @@ export function BrewTimelineView({ model, busy = false, error, onChange, onRecor
       <div className="mt-2 flex flex-col gap-3">
         {stage.ingredients.map(ingredient)}
         {stage.stage === "knockout" && <>
-          {E.pick("Vessel", value.vesselId, value.vessels.map(item => ({ value: item.id, label: `${item.name} · ${item.kind} · ${Number(item.capacity_bbl)} bbl` })), { onChange: vesselId => change({ vesselId }), disabled: busy, required: true, placeholder: "Choose vessel", id: id + "-vessel" })}
+          {E.pick("Vessel", value.vesselId, vesselOptions(value.vessels), { onChange: vesselId => change({ vesselId }), disabled: busy, required: true, placeholder: "Choose vessel", id: id + "-vessel" })}
           {E.edit("Knockout barrels", value.initialBbl, "number", undefined, { onChange: initialBbl => change({ initialBbl }), id: id + "-bbl", disabled: busy, required: true, min: "0", step: "any" })}
           <fieldset disabled={busy}><DatePicker label="Brewed on" value={value.brewedOn} onChange={brewedOn => change({ brewedOn })} /></fieldset>
         </>}

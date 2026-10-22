@@ -15,7 +15,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `get_recipe_outcomes` | query | Recipe |
-| `record_brew_day_pull` | command | Brew prep |
+| `save_batch_pulls` | command | Brew prep |
 ## Today & notifications: 2 to build, 26 built
 
 | Operation | Kind | Needed by |

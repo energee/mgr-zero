@@ -73,6 +73,9 @@ export const pulledQty = (row: BrewIngredient) => fromPacks(Number(row.packs) ||
 
 export const isShort = (row: BrewIngredient) => toTicks(pulledQty(row)) < toTicks(row.plan);
 
+/** A pull line is amber until it has a source and reaches plan. */
+export const pullTone = (row: BrewIngredient): "w" | "ok" => !row.source || isShort(row) ? "w" : "ok";
+
 /** "plan 220 lb = 4 × 50 lb + 20 lb · lot · bin". */
 export function pullDetail(row: BrewIngredient): string {
   const plan = `${row.plan} ${row.unit}`, inPacks = packs(row.plan, row.packSize, row.unit);
@@ -88,6 +91,7 @@ export const timelineStages = (model: BrewTimelineViewModel) =>
 export const currentStage = (model: BrewTimelineViewModel): TimelineStage =>
   timelineStages(model).find(stage => stage.ingredients.some(row => !row.confirmed))?.stage ?? "knockout";
 
+/** Knockout has a listed vessel, positive barrels and a brew date: what record_brew_day requires, and when the loss-baseline tape shows. */
 export const knockoutReady = (model: BrewTimelineViewModel) =>
   model.vessels.some(vessel => vessel.id === model.vesselId) && Number(model.initialBbl) > 0 && Number.isFinite(Number(model.initialBbl)) && Boolean(model.brewedOn);
 

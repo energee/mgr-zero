@@ -14,9 +14,8 @@ export function splitPacks(qty: number, factor: number): { packs: number; loose:
 
 /** "4 × 50 lb + 20 lb"; an amount under one pack, or a factor of 1, stays in base units. */
 export function packs(qty: number, factor: number, unit: string): string {
-  if (factor === 1) return `${qty} ${unit}`;
   const split = splitPacks(qty, factor);
-  if (split.packs === 0) return `${qty} ${unit}`;
+  if (factor === 1 || split.packs === 0) return `${qty} ${unit}`;
   const whole = `${split.packs} × ${factor} ${unit}`;
   return split.loose ? `${whole} + ${split.loose} ${unit}` : whole;
 }

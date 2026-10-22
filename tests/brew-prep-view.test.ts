@@ -1,7 +1,7 @@
 // tests/brew-prep-view.test.ts — the brew prep pull list and the brew-day
 // timeline's pure rules (lib/mgr/brew-prep-view.ts).
 import { describe, expect, it } from "vitest";
-import { canRecordTimeline, currentStage, isShort, pullDetail, startAtPlan, timelineStages, type BrewIngredient, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
+import { canRecordTimeline, currentStage, isShort, pullDetail, pullTone, startAtPlan, timelineStages, type BrewIngredient, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 
 const chit: BrewIngredient = startAtPlan({ key: "chit", name: "Chit Malt", stage: "mash", plan: 220, unit: "lb", packSize: 50, source: null });
 const hops: BrewIngredient = startAtPlan({ key: "ns", name: "Nelson", stage: "whirlpool", plan: 44, unit: "lb", packSize: 44, source: { lot: "NS-1", bin: "Freezer / F1" } });
@@ -22,6 +22,11 @@ describe("pull lines", () => {
     expect(isShort({ ...chit, packs: "4", loose: "19.9" })).toBe(true);
     expect(isShort({ ...chit, packs: "4.4", loose: "" })).toBe(false);
     expect(isShort({ ...chit, packs: "", loose: "" })).toBe(true);
+  });
+  it("need attention when short or still without a source", () => {
+    expect(pullTone(hops)).toBe("ok");
+    expect(pullTone(chit)).toBe("w");
+    expect(pullTone({ ...hops, packs: "0" })).toBe("w");
   });
 });
 

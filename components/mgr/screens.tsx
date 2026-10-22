@@ -1708,7 +1708,7 @@ export const SCREENS: Screen[] = [
     to: { "Malted Oats": "Material", "Briess Pilsen": "Material", "Chit Malt": "Material", "Rolled Oats": "Material", "Briess White Wheat": "Material", "Brewer’s Crystals": "Material", "Freestyle Nelson Sauvin 2026": "Material", "Choose lot": "Entity picker", "Done pulling": "Brew day timeline" },
     job: "Pull a batch's brew-day ingredients before the brew, touching only exceptions",
     reads: "get_brew_day · get_brew_day_plan · list_vessels",
-    writes: "record_brew_day_pull [SCHEMA-GATE: no table records a pull list or the vessel chosen before brew day]",
+    writes: "save_batch_pulls [SCHEMA-GATE: no table records a pull list or the vessel chosen before brew day]",
     states: [...permitted("brewer or admin required"), ["at plan", "each line starts at plan in whole packs plus loose pounds"], ["short", "a line pulled below plan turns amber and offers Short", 1], ["no source", "Choose lot picks the bin and lot to pull from", 1]],
     spec: "The Prep tab of a batch, drawn like the order Pick sheet. Lines group under the brew-day stages that consume them: Mash, Boil, Whirlpool. Each line starts at the recipe plan scaled to the batch, shown in whole packs of the material's purchase unit plus loose pounds, so 220 lb of a 50 lb sack reads 4 × 50 lb + 20 lb. A pack count accepts decimals (4.4 sacks). An opened bag is not tracked as inventory: a partial pull is just pounds. Cellar-stage additions are listed as later work, not pulled here. Persisting the pull needs a new pull-list record per batch line (pulled quantity, source bin and lot, who and when) plus the chosen vessel; until that migration exists the screen is inventory only.",
     body: <BrewPrepView model={brewPrepMineral} />,

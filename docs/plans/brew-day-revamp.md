@@ -77,9 +77,9 @@ create table public.brew_pulls (
 create index brew_pulls_batch on public.brew_pulls (batch_id);
 alter table public.brew_pulls enable row level security;
 -- Staff read policy in the once-per-query auth.uid() shape the other staff tables use;
--- writes only through save_brew_pulls (security definer).
+-- writes only through save_batch_pulls (security definer).
 
--- save_brew_pulls(p_brewery, p_batch, p_vessel, p_lines jsonb):
+-- save_batch_pulls(p_brewery, p_batch, p_vessel, p_lines jsonb):
 --   refuses a brewed or cancelled batch and a retired vessel;
 --   checks each line's lot the way record_brew_day does (a lot exactly when lot-tracked, same material and brewery);
 --   replaces the batch's rows and sets planned_vessel_id in one transaction.
@@ -103,11 +103,11 @@ Each task writes its named test first and watches it fail. Rendering is checked 
 3. **Receiving uses the pack math.** Replace the inline factor multiply in `po-actions.tsx:66` and `receipt-view.ts:104` with `packsToQty`.
    - Test: existing `tests/purchasing-view.test.ts` stays green; add one case for a 55 lb factor.
    - Depends on 1.
-4. **Migration and RPCs.** The SQL above, `save_brew_pulls`, extended `get_brew_day_plan`.
+4. **Migration and RPCs.** The SQL above, `save_batch_pulls`, extended `get_brew_day_plan`.
    - Test: `tests/brew-pulls.test.ts` (database). Save replaces rows; brewed or cancelled batch refused; retired vessel refused; a lot on an untracked material, or none on a tracked one, refused; another brewery's batch refused; plan returns pulls and factors.
    - Types: regenerate `lib/supabase/database.generated.ts`.
    - Depends on nothing.
-5. **Command.** `save_brew_pulls` in `lib/commands/production.ts` (roles admin, brewer), input `{ batchId, vesselId, lines: { recipeIngredientId?, materialId, locationId, binId, lotId?, qty }[] }`; `bun run docs:api`.
+5. **Command.** `save_batch_pulls` in `lib/commands/production.ts` (roles admin, brewer), input `{ batchId, vesselId, lines: { recipeIngredientId?, materialId, locationId, binId, lotId?, qty }[] }`; `bun run docs:api`.
    - Test: `tests/brew-pulls.test.ts` command case; `tests/api-docs.test.ts`.
    - Depends on 4.
 6. **Prep view-model.** `lib/mgr/brew-prep-view.ts`: `toBrewPrepModel(plan, pulls, sources, plannedBbl)` groups brew-day lines by stage, starts each at its saved pull or the plan, splits it into packs + loose, marks short and unsourced lines.
@@ -117,7 +117,7 @@ Each task writes its named test first and watches it fail. Rendering is checked 
 7. **Brew day timeline view-model.** In `lib/mgr/brew-day-view.ts`: `brewTimeline(model)` returns the five stages with their actuals, their regrouped process fields and a confirmed flag per actual; `canRecordBrewDay` also requires every actual confirmed; `brewPlanActuals` prefers saved pulls over plan.
    - Test: `tests/brew-day-actuals-view.test.ts`.
    - Depends on 1; 6 for the pull shape.
-8. **Live Prep tab.** `app/(app)/batches/[id]/page.tsx` reads pulls; a new `prep-form.tsx` binds the shared Prep view to `save_brew_pulls`. Tabs via `E.tabs`. **Print pull list** uses the pick sheet's print pattern.
+8. **Live Prep tab.** `app/(app)/batches/[id]/page.tsx` reads pulls; a new `prep-form.tsx` binds the shared Prep view to `save_batch_pulls`. Tabs via `E.tabs`. **Print pull list** uses the pick sheet's print pattern.
    - Test: view-model tests from 6; render checked by eye.
    - Depends on 2, 5, 6.
 9. **Live Brew day timeline.** `record-brew-day-form.tsx` mounts the timeline view; vessel and date move to Knockout; the Stage picker goes.

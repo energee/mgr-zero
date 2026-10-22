@@ -7,7 +7,8 @@
 import { Fragment, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { isShort, pullDetail, type BrewDayStage, type BrewIngredient, type BrewPrepViewModel } from "@/lib/mgr/brew-prep-view";
+import { isShort, pullDetail, pullTone, type BrewDayStage, type BrewIngredient, type BrewPrepViewModel } from "@/lib/mgr/brew-prep-view";
+import { vesselOptions } from "@/lib/mgr/brew-day-view";
 import { BREW_DAY_STAGES } from "@/lib/mgr/recipe-process-view";
 import { sentenceCase } from "@/lib/mgr/labels";
 
@@ -52,11 +53,11 @@ export function BrewPrepView({ model, onChange, onShort, onChooseLot, onPrint, m
     {E.back("Batches", model.title, undefined, model.backHref)}
     <BrewTabs on={0} />
     {E.info("Lines start at plan in whole packs plus loose pounds. Touch only exceptions.")}
-    {E.pick("Vessel", value.vesselId, value.vessels.map(item => ({ value: item.id, label: `${item.name} · ${item.kind} · ${Number(item.capacity_bbl)} bbl` })), { onChange: vesselId => change({ vesselId }), placeholder: "Choose vessel" })}
+    {E.pick("Vessel", value.vesselId, vesselOptions(value.vessels), { onChange: vesselId => change({ vesselId }), placeholder: "Choose vessel" })}
     {BREW_DAY_STAGES.filter(stage => byStage(stage).length).map(stage => <Fragment key={stage}>
       {E.ttl(sentenceCase(stage))}
       {byStage(stage).map(row => <div key={row.key}>
-        {E.row(row.name, pullDetail(row), "", isShort(row) ? "w" : "ok", undefined, <div className="flex flex-wrap items-center gap-2">
+        {E.row(row.name, pullDetail(row), "", pullTone(row), undefined, <div className="flex flex-wrap items-center gap-2">
           <PackQuantity row={row} onChange={patch => patchLine(row.key, patch)} disabled={submitting} />
           {isShort(row) && <Button type="button" size="sm" variant="outline" data-preview-action onClick={() => onShort?.(row.key)}>Short</Button>}
           {!row.source && E.act("Choose lot", "attention", undefined, onChooseLot && (() => onChooseLot(row.key)))}
