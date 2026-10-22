@@ -30,7 +30,7 @@ describe("Pick sheet view loop", () => {
       "/orders/00000000-0000-4000-8000-000000000232",
       "/orders/00000000-0000-4000-8000-000000000234",
     ]);
-    expect(model.groups[0]?.totals).toBe("Hazy IPA · ½ bbl keg 9 · Pils · 16 oz case 22");
+    expect(model.groups[0]?.totals.map((t) => [t.group, t.name, t.qty])).toEqual([["Hazy IPA", "½ bbl keg", 9], ["Pils", "16 oz case", 22]]);
   });
 
   it("marks a row whose order was changed after pick (#811)", () => {
@@ -76,7 +76,9 @@ describe("Pick sheet view loop", () => {
     expect(markup).toMatch(/Teresa’s · ORD-0234/);
     expect(markup).toMatch(/3 lines/);
     expect(markup).toMatch(/>Totals</);
-    expect(markup).toMatch(/Hazy IPA · ½ bbl keg 9 · Pils · 16 oz case 22/);
+    // Totals is the same table as Pick: one row per format, the beer named on its first row.
+    expect(markup.match(/<th[^>]*>[\s\S]*?<\/th>/g)?.map((h) => h.replace(/<[^>]+>/g, ""))).toEqual(["Product", "Format", "Qty"]);
+    expect(markup).toMatch(/>Hazy IPA<[\s\S]*>½ bbl keg<[\s\S]*>9<[\s\S]*>Pils<[\s\S]*>16 oz case<[\s\S]*>22</);
     expect(markup).toContain(">Pick<");
     expect(markup).toMatch(/Thu 9\/3/);
   });

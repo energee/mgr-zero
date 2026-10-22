@@ -1,9 +1,16 @@
-// lib/mgr/adjust-lines-view.ts — view-model for the Adjust lines page.
+// lib/mgr/adjust-lines-view.ts — view-model for the Adjust lines page: the
+// Pick-style table, saved lines named by brand and format (brand-lines.ts).
+import { brandLabel, byBrand, type BrandedSku } from "./brand-lines";
 import { docNo } from "./doc-no";
 
 export type AdjustLinesLineView = {
   key: string;
   skuId?: string;
+  /** A line added on this page: it carries the SKU picker until it is saved. */
+  added?: boolean;
+  /** Brand heading; saved lines arrive grouped by it. */
+  group?: string;
+  /** Format under the brand, or the SKU name when it has no brand and format. */
   name: string;
   detail: string;
   qty: number | string;
@@ -26,27 +33,23 @@ export type AdjustLinesSnapshot = {
     sku_id: string;
     qty_ordered: number;
     qty_picked: number | null;
-    skus: { name: string } | null;
+    skus: BrandedSku;
   }[];
 };
 
-/** Map a get_order payload onto AdjustLinesView. qty_ordered is the edit value. */
+/** A saved line's row: brand and format, and a warning when ordered drops below picked. */
+export function adjustLineView(l: { sku_id: string; skus: BrandedSku; qty_picked: number | null }, key: string, qty: number | string): AdjustLinesLineView {
+  const picked = l.qty_picked === null ? null : Number(l.qty_picked);
+  const belowPicked = picked !== null && qty !== "" && Number(qty) < picked;
+  return { key, skuId: l.sku_id, ...brandLabel(l.skus), qty, detail: belowPicked ? `picked ${picked}` : "", tone: belowPicked ? "w" : "" };
+}
+
+/** Map a get_order payload onto AdjustLinesView, lines grouped by brand. qty_ordered is the edit value. */
 export function toAdjustLinesViewProps({ order, lines, backHref }: AdjustLinesSnapshot): AdjustLinesViewModel {
   return {
     backTo: docNo("ORD", order.order_no, "Order"),
     backHref,
     title: "Adjust lines",
-    lines: lines.map((l) => {
-      const ordered = Number(l.qty_ordered);
-      const picked = l.qty_picked === null ? null : Number(l.qty_picked);
-      return {
-        key: l.id,
-        skuId: l.sku_id,
-        name: l.skus?.name ?? "Line",
-        detail: picked !== null && ordered < picked ? `picked ${picked}` : "",
-        qty: ordered,
-        tone: picked !== null && ordered < picked ? "w" : "",
-      };
-    }),
+    lines: byBrand(lines).map((l) => adjustLineView(l, l.id, Number(l.qty_ordered))),
   };
 }

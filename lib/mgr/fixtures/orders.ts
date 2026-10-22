@@ -133,8 +133,8 @@ export const orderSubmittedRidgeline: ConfirmOrderSnapshot = {
     customers: { name: RIDGELINE.name },
   },
   lines: [
-    { id: "l-hazy", sku_id: SKU_HAZY.sku_id, qty_ordered: 4, skus: { name: SKU_HAZY.name } },
-    { id: "l-pils", sku_id: SKU_PILS.sku_id, qty_ordered: 10, skus: { name: SKU_PILS.name } },
+    { id: "l-hazy", sku_id: SKU_HAZY.sku_id, qty_ordered: 4, skus: { name: SKU_HAZY.name, brands: { name: SKU_HAZY.brand }, formats: { name: SKU_HAZY.format } } },
+    { id: "l-pils", sku_id: SKU_PILS.sku_id, qty_ordered: 10, skus: { name: SKU_PILS.name, brands: { name: SKU_PILS.brand }, formats: { name: SKU_PILS.format } } },
   ],
   atp: [
     { sku_id: SKU_HAZY.sku_id, qty: 11 },

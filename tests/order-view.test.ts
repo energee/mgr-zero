@@ -13,6 +13,30 @@ import { orderLineCents, toOrderViewProps, type OrderSnapshot } from "../lib/mgr
 const PAGE = "app/(app)/orders/[id]/page.tsx";
 
 describe("Order view loop", () => {
+  it("draws Ordered as the shared number field, plus Reason, when lines can be adjusted in place", () => {
+    const model = toOrderViewProps(orderConfirmedWholesale);
+    const read = renderToStaticMarkup(createElement(OrderView, { model }));
+    expect(read).not.toMatch(/aria-label="Decrease"/);
+    const key = model.lines[0].key;
+    const edit = renderToStaticMarkup(createElement(OrderView, { model, quantities: { [key]: "7" }, onQuantity: () => {}, reason: "", onReason: () => {}, lineActions: "SAVE" }));
+    // Desktop table and phone list each draw one field per line.
+    expect(edit.match(/aria-label="Decrease"/g)).toHaveLength(model.lines.length * 2);
+    expect(edit).toMatch(/value="7"/);
+    expect(edit).toMatch(/Reason/);
+    expect(edit).toContain("SAVE");
+  });
+
+  it("names who made each history entry: staff by @handle, a portal buyer by email", () => {
+    const events = [
+      { id: "e1", event: "submitted", actor: "buyer-id", payload: {}, created_at: "2026-10-16T13:02:00.000Z" },
+      { id: "e2", event: "lines_adjusted", actor: "staff-id", payload: { before: {}, lines: [], reason: "call" }, created_at: "2026-10-16T13:04:00.000Z" },
+      { id: "e3", event: "confirmed", actor: "gone-id", payload: {}, created_at: "2026-10-16T13:05:00.000Z" },
+    ];
+    const model = toOrderViewProps({ ...orderPickedRestock, events, actorNames: { "buyer-id": "buyer@bar.com", "staff-id": "@ted" } });
+    expect(model.events.map((e) => e.by)).toEqual(["buyer@bar.com", "@ted", "a user not on the team"]);
+    expect(renderToStaticMarkup(createElement(OrderView, { model }))).toContain("Lines adjusted by @ted");
+  });
+
   it("maps the shared fixture through the adapter", () => {
     const model = toOrderViewProps(orderPickedRestock);
     expect(model.title).toBe("ORD-0229");
@@ -139,12 +163,17 @@ describe("Order view loop", () => {
   });
 
   it("the live Order page mounts OrderView via the adapter, with no second E.* tree", () => {
+    // page.tsx adapts get_order; order-lines-form.tsx mounts the drawing with in-place quantities.
     const src = readFileSync(PAGE, "utf8");
-    expect(src).toMatch(/from "@\/components\/mgr\/views\/order"/);
+    const form = readFileSync("app/(app)/orders/[id]/order-lines-form.tsx", "utf8");
     expect(src).toMatch(/from "@\/lib\/mgr\/order-view"/);
-    expect(src).toMatch(/<OrderView\b/);
-    expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
-    expect(src).not.toMatch(/\bE\.(back|row|ttl|fld|act|tape|btn)\b/);
+    expect(src).toMatch(/<OrderLinesForm\b/);
+    expect(form).toMatch(/from "@\/components\/mgr\/views\/order"/);
+    expect(form).toMatch(/<OrderView\b/);
+    for (const file of [src, form]) {
+      expect(file).not.toMatch(/from "@\/components\/mgr\/e"/);
+      expect(file).not.toMatch(/\bE\.(back|row|ttl|fld|act|tape|btn)\b/);
+    }
   });
 
   describe("Price summary (#976)", () => {

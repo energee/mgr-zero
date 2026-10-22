@@ -1,11 +1,18 @@
 // lib/mgr/confirm-order-view.ts — view-model for the Confirm order review.
 import { formatDate } from "@/lib/date-format";
+import { brandLabel, byBrand, type BrandedSku } from "./brand-lines";
 import { docNo } from "./doc-no";
 
 export type ConfirmOrderLineView = {
   key: string;
+  /** Brand heading; lines arrive grouped by it (brand-lines.ts). */
+  group?: string;
+  /** Format under the brand, or the SKU name when it has no brand and format. */
   name: string;
-  trailing: string;
+  /** qty_ordered; Confirm order edits it in place. */
+  qty: number;
+  /** Stock at the source and brewery ATP for this line. */
+  detail: string;
   tone?: "" | "w" | "ok";
 };
 
@@ -30,7 +37,7 @@ export type ConfirmOrderSnapshot = {
     from_location_id: string;
     customers: { name: string } | null;
   };
-  lines: { id: string; sku_id: string; qty_ordered: number; skus: { name: string } | null }[];
+  lines: { id: string; sku_id: string; qty_ordered: number; skus: BrandedSku }[];
   atp: { sku_id: string; qty: number }[];
   sourceOnHand?: { sku_id: string; qty: number }[];
   locations: { id: string; name: string }[];
@@ -42,13 +49,14 @@ export type ConfirmOrderSnapshot = {
  * oversells when `atp - qty_ordered < 0` (#415). A SKU missing from `atp`
  * stays unjudged rather than read as 0. A line short at the source is named
  * once, under the source shortage; the per-line `w` tone marks every short line.
+ * Lines come grouped by brand, each named by its format (brand-lines.ts).
  */
 export function toConfirmOrderViewProps({ order, lines, atp, sourceOnHand, locations, backHref }: ConfirmOrderSnapshot): ConfirmOrderViewModel {
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const sourceMap = new Map(sourceOnHand?.map((row) => [row.sku_id, Number(row.qty)]));
   const sourceName = locations.find((l) => l.id === order.from_location_id)?.name ?? "source";
   const ships = order.requested_ship_date ? ` · ships ${formatDate(order.requested_ship_date)}` : "";
-  const judged = lines.map((l): JudgedLine => {
+  const judged = byBrand(lines).map((l): JudgedLine => {
     const sourceQty = sourceOnHand === undefined ? undefined : sourceMap.get(l.sku_id) ?? 0;
     const qtyAtp = atpMap.get(l.sku_id);
     return { l, sourceQty, qtyAtp, short: sourceQty !== undefined && sourceQty < l.qty_ordered, oversold: qtyAtp !== undefined && qtyAtp - l.qty_ordered < 0 };
@@ -61,8 +69,9 @@ export function toConfirmOrderViewProps({ order, lines, atp, sourceOnHand, locat
     fulfillmentSource: sourceName,
     lines: judged.map(({ l, sourceQty, qtyAtp, short, oversold }) => ({
       key: l.id,
-      name: l.skus?.name ?? "Line",
-      trailing: `${l.qty_ordered}${sourceQty === undefined ? "" : ` · ${sourceQty} at ${sourceName}`}${qtyAtp === undefined ? "" : ` · ${sourceQty === undefined ? "ATP" : "brewery ATP"} ${qtyAtp}`}${oversold ? ` · leaves ${formatSigned(qtyAtp! - l.qty_ordered)}` : ""}`,
+      ...brandLabel(l.skus),
+      qty: Number(l.qty_ordered),
+      detail: [sourceQty === undefined ? "" : `${sourceQty} at ${sourceName}`, qtyAtp === undefined ? "" : `${sourceQty === undefined ? "ATP" : "brewery ATP"} ${qtyAtp}`, oversold ? `leaves ${formatSigned(qtyAtp! - l.qty_ordered)}` : ""].filter(Boolean).join(" · "),
       tone: short || oversold ? "w" : "",
     })),
     shortageNote: shortageNote(judged, sourceName),

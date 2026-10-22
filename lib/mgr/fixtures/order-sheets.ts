@@ -51,22 +51,25 @@ const line = (
 });
 
 /** Picked Al’s order mid-adjust: Pils stepper is the new 7, picked 10 warns. */
+/** A demo SKU as get_order returns it: name plus its brand and format. */
+const branded = (sku: { name: string; brand: string; format: string }) => ({ name: sku.name, brands: { name: sku.brand }, formats: { name: sku.format } });
+
 export const orderAdjustLines: AdjustLinesSnapshot = {
   order: { id: ORDER_229, order_no: 229, customers: { name: ALS.name } },
   lines: [
-    line("l-hazy", SKU_HAZY, 4, 4),
-    line("l-pils", SKU_PILS, 7, 10),
-    line("l-stout", SKU_STOUT, 2, 2),
+    { ...line("l-hazy", SKU_HAZY, 4, 4), skus: branded(SKU_HAZY) },
+    { ...line("l-pils", SKU_PILS, 7, 10), skus: branded(SKU_PILS) },
+    { ...line("l-stout", SKU_STOUT, 2, 2), skus: branded(SKU_STOUT) },
   ],
 };
 
-/** Warehouse pick of Ridgeline: counts start at ordered. */
+/** Warehouse pick of Ridgeline: counts start at ordered, lines under their brand. */
 export const orderPick: PickSnapshot = {
-  order: { id: ORDER_231, order_no: 231, from_location_id: LOC_WAREHOUSE.id },
+  order: { id: ORDER_231, order_no: 231, from_location_id: LOC_WAREHOUSE.id, requested_ship_date: "2026-09-10", customers: { name: RIDGELINE.name } },
   lines: [
-    line("l-hazy", SKU_HAZY, 4, null),
-    line("l-pils", SKU_PILS, 10, null),
-    line("l-stout", SKU_STOUT, 2, null),
+    { ...line("l-hazy", SKU_HAZY, 4, null), skus: branded(SKU_HAZY) },
+    { ...line("l-pils", SKU_PILS, 10, null), skus: branded(SKU_PILS) },
+    { ...line("l-stout", SKU_STOUT, 2, null), skus: branded(SKU_STOUT) },
   ],
   locations: LOCATIONS,
 };

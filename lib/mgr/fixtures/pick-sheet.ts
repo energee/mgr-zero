@@ -11,14 +11,14 @@ const ORDER_234 = "00000000-0000-4000-8000-000000000234";
 
 const line = (
   id: string,
-  sku: { sku_id: string; name: string },
+  sku: { sku_id: string; name: string; brand: string; format: string },
   qty_ordered: number,
 ) => ({
   id,
   sku_id: sku.sku_id,
   qty_ordered,
   qty_picked: null,
-  skus: { name: sku.name },
+  skus: { name: sku.name, brands: { name: sku.brand }, formats: { name: sku.format } },
 });
 
 /** Confirmed demand for Thu 2026-09-03: three orders, Hazy 9 + Pils 22. */

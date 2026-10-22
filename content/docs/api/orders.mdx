@@ -45,7 +45,7 @@ The legacy invoice `paid_at` field is a payment-confirmation/state marker, not a
 
 `command` · admin, sales
 
-Replace lines on a confirmed/picked order; re-syncs allocations and returnable-keg deposits; on a picked order, an added or raised line sends it back to confirmed for a re-pick, and staged excess flags a restock; returns ATP soft warnings
+Replace lines on a submitted/confirmed/picked order; a submitted order holds no allocations until confirm, otherwise re-syncs allocations and returnable-keg deposits; on a picked order, an added or raised line sends it back to confirmed for a re-pick, and staged excess flags a restock; returns ATP soft warnings
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -162,7 +162,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Confirmed/picked orders grouped by requested ship date with lines
+Confirmed/picked orders grouped by requested ship date with lines (each SKU with its brand name and staff alias, and format name)
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -214,7 +214,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-One order with lines, keg deposits, events, shipment, brewery ATP, and on-hand stock at its fulfillment source
+One order with lines (each SKU with its brand name and staff alias, and format name), keg deposits, events, shipment, brewery ATP, and on-hand stock at its fulfillment source
 
 | Field | Type | Required |
 | --- | --- | --- |

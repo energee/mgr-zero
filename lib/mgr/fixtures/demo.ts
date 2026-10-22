@@ -20,18 +20,24 @@ export const TERESA = { name: "Teresa’s" } as const;
 export const SKU_HAZY = {
   sku_id: "00000000-0000-4000-8000-0000000000a1",
   name: "Hazy IPA · ½ bbl keg",
+  brand: "Hazy IPA",
+  format: "½ bbl keg",
   unit_price_cents: 15000,
 } as const;
 
 export const SKU_PILS = {
   sku_id: "00000000-0000-4000-8000-0000000000a2",
   name: "Pils · 16 oz case",
+  brand: "Pils",
+  format: "16 oz case",
   unit_price_cents: 3800,
 } as const;
 
 export const SKU_STOUT = {
   sku_id: "00000000-0000-4000-8000-0000000000a3",
   name: "Stout · ⅙ bbl keg",
+  brand: "Stout",
+  format: "⅙ bbl keg",
   unit_price_cents: 0,
 } as const;
 

@@ -16,26 +16,27 @@ vi.mock("@/components/mgr/command-form", async (original) => {
   const real = await original<typeof import("@/components/mgr/command-form")>();
   return { ...real, CommandForm: (props: typeof form & { trigger: unknown }) => { form = props; return createElement("div", { "data-dialog": true }, props.trigger as never, props.children as never); } };
 });
-import { ConfirmButtons } from "@/app/(app)/orders/[id]/confirm/confirm-buttons";
+import { ConfirmOrderForm } from "@/app/(app)/orders/[id]/confirm/confirm-buttons";
+import { orderSubmittedRidgeline } from "@/lib/mgr/fixtures/orders";
 import { BatchCompletionForm } from "@/app/(app)/cellar/batch-completion-form";
 
 beforeEach(() => { action.busy = false; action.error = null; action.setError.mockClear(); });
 
 it("renders the cancel error inside the dialog, not only behind it", () => {
   action.error = "Order already shipped";
-  const html = renderToStaticMarkup(createElement(ConfirmButtons, { orderId: "o", lines: [] }));
+  const html = renderToStaticMarkup(createElement(ConfirmOrderForm, { snapshot: orderSubmittedRidgeline }));
   const dialog = html.slice(html.indexOf("data-dialog"));
   expect(dialog).toContain("Order already shipped");
 });
 
 it("labels the cancel submit while it runs", () => {
   action.busy = true;
-  const html = renderToStaticMarkup(createElement(ConfirmButtons, { orderId: "o", lines: [] }));
+  const html = renderToStaticMarkup(createElement(ConfirmOrderForm, { snapshot: orderSubmittedRidgeline }));
   expect(html).toContain("Cancelling…");
 });
 
 it("clears the error when the dialog closes, and a stale confirm error when it opens", () => {
-  renderToStaticMarkup(createElement(ConfirmButtons, { orderId: "o", lines: [] }));
+  renderToStaticMarkup(createElement(ConfirmOrderForm, { snapshot: orderSubmittedRidgeline }));
   form.onOpenChange(false);
   expect(action.setError).toHaveBeenCalledWith(null);
   action.setError.mockClear();

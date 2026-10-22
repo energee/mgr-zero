@@ -38,6 +38,28 @@ describe("Confirm order view loop", () => {
     expect(renderToStaticMarkup(createElement(ConfirmOrderView, { model }))).not.toContain("Lifecycle");
   });
 
+  it("groups lines under their brand, each named by its format, in name order", () => {
+    const [hazy, pils] = orderSubmittedRidgeline.lines;
+    const model = toConfirmOrderViewProps({
+      ...orderSubmittedRidgeline,
+      lines: [
+        { ...pils, skus: { name: "Pils · Case", brands: { name: "Pils" }, formats: { name: "Case" } } },
+        { ...hazy, skus: { name: "Hazy · Half", brands: { name: "Hazy" }, formats: { name: "Half" } } },
+        { ...hazy, id: "l-hazy-case", sku_id: "hazy-case", skus: { name: "Hazy · Case", brands: { name: "Hazy" }, formats: { name: "Case" } } },
+      ],
+    });
+    expect(model.lines.map((l) => [l.group, l.name])).toEqual([["Hazy", "Case"], ["Hazy", "Half"], ["Pils", "Case"]]);
+    expect(renderToStaticMarkup(createElement(ConfirmOrderView, { model }))).toMatch(/>Hazy<\/h2>[\s\S]*>Case<[\s\S]*>Half<[\s\S]*>Pils<\/h2>[\s\S]*>Case</);
+  });
+
+  it("draws each line's quantity as the shared number field when it can be edited", () => {
+    const model = toConfirmOrderViewProps(orderSubmittedRidgeline);
+    const markup = renderToStaticMarkup(createElement(ConfirmOrderView, { model, quantities: { "l-hazy": "3" }, onQuantity: () => {} }));
+    expect(markup.match(/aria-label="Decrease"/g)).toHaveLength(2);
+    expect(markup).toMatch(/value="3"/);
+    expect(markup).toMatch(/value="10"/);
+  });
+
   it("distinguishes source stock from brewery ATP without inventing another stocked location", () => {
     const model = toConfirmOrderViewProps({
       ...orderSubmittedRidgeline,
@@ -45,7 +67,8 @@ describe("Confirm order view loop", () => {
       atp: [{ sku_id: orderSubmittedRidgeline.lines[0].sku_id, qty: 5 }],
       sourceOnHand: [{ sku_id: orderSubmittedRidgeline.lines[0].sku_id, qty: 0 }],
     });
-    expect(model.lines[0].trailing).toBe("4 · 0 at Warehouse · brewery ATP 5");
+    expect(model.lines[0].qty).toBe(4);
+    expect(model.lines[0].detail).toBe("0 at Warehouse · brewery ATP 5");
     expect(model.lines[0].tone).toBe("w");
     expect(model.shortageNote).toMatch(/Replenish Warehouse.*Warehouse cannot pick/i);
     expect(model.shortageNote).not.toMatch(/another location/i);
@@ -59,7 +82,7 @@ describe("Confirm order view loop", () => {
       atp: [{ sku_id: sku.sku_id, qty: 3 }],
       sourceOnHand: [{ sku_id: sku.sku_id, qty: 3 }],
     });
-    expect(model.lines[0].trailing).toMatch(/3 at Warehouse/);
+    expect(model.lines[0].detail).toMatch(/3 at Warehouse/);
     expect(model.shortageNote).toMatch(/Short at Warehouse: .*Replenish Warehouse.*Warehouse cannot pick/i);
     expect(model.shortageNote).not.toMatch(/another location/i);
   });
@@ -75,7 +98,7 @@ describe("Confirm order view loop", () => {
       sourceOnHand: [{ sku_id: sku.sku_id, qty: 10 }],
     });
     expect(model.lines[0].tone).toBe("w");
-    expect(model.lines[0].trailing).toMatch(/brewery ATP 5 · leaves −5$/);
+    expect(model.lines[0].detail).toMatch(/brewery ATP 5 · leaves −5$/);
     expect(model.shortageNote).toMatch(/^Confirming oversells ATP for .*; that stays your call\.$/);
   });
 
@@ -117,7 +140,8 @@ describe("Confirm order view loop", () => {
   });
 
   it("the live page mounts ConfirmOrderView with no second E.* tree", () => {
-    const src = noSecondTree("app/(app)/orders/[id]/confirm/page.tsx");
+    noSecondTree("app/(app)/orders/[id]/confirm/page.tsx");
+    const src = noSecondTree("app/(app)/orders/[id]/confirm/confirm-buttons.tsx");
     expect(src).toMatch(/from "@\/components\/mgr\/views\/confirm-order"/);
     expect(src).toMatch(/<ConfirmOrderView\b/);
   });
