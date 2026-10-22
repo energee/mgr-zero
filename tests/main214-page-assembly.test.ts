@@ -73,11 +73,12 @@ it("assembles shared Catalog with the brand link and the shared format list", as
   for (const text of ["Edit brand", "Edit SKU", "UPC 123456", "New pour", "Edit pour"]) expect(html).not.toContain(text);
   expect(html).not.toContain("/catalog/formats/pour");
 });
-it("assembles the shared SKU list with the brand's packages and both SKU sheets", async () => {
+it("assembles the shared SKU list with the brand's packages and the edit sheet, but no New SKU", async () => {
   const page = await SkuListPage({ params: Promise.resolve({ id: "brand" }) });
   expect(page.type).toBe(SkuListView);
   const html = render(page);
-  for (const text of ["Hazy · SKUs", "Half keg", "inactive", "New SKU", "Edit SKU"]) expect(html).toContain(text);
+  for (const text of ["Hazy · SKUs", "Half keg", "inactive", "Edit SKU"]) expect(html).toContain(text);
+  expect(html).not.toMatch(/New SKU|Add SKU/);
   state.roles = ["warehouse"];
   const readonly = render(await SkuListPage({ params: Promise.resolve({ id: "brand" }) }));
   expect(readonly).not.toMatch(/New SKU|Edit SKU|Add SKU/);

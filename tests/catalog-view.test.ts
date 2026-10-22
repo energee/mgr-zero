@@ -559,6 +559,13 @@ describe("SKU list view", () => {
     expect(barcodeOf(barcodes, null, cased.format_id)).toBeUndefined();
   });
 
+  it("an empty brand points at Sells as on the Brand page", () => {
+    expect(toSkuListViewProps({ ...skuListHazy, skus: [], pours: [] }).empty).toEqual({
+      title: "No SKUs yet",
+      description: "Switch a package on under Sells as on the Brand page.",
+    });
+  });
+
   it("renders Add SKU, Edit, and the three packages", () => {
     const html = htmlOf(createElement(SkuListView, { model: toSkuListViewProps(skuListHazy) }));
     expect(html).toMatch(/>Add SKU</);
@@ -593,14 +600,17 @@ describe("SKU list view", () => {
     const page = readFileSync("app/(app)/catalog/brands/[id]/skus/page.tsx", "utf8");
     expect(page).toMatch(/from "@\/components\/mgr\/views\/sku-list"/);
     expect(page).toMatch(/<SkuListView\b/);
-    expect(page).toMatch(/createAction=\{canWrite \? <SkuForm/);
+    // Packages are switched on under Sells as; this page only edits them.
+    expect(page).toMatch(/createAction=\{null\}/);
+    expect(page).not.toMatch(/<SkuForm\b/);
     expect(page).toMatch(/<SkuEditForm\b/);
-    expect(page).toMatch(/backHref: `\/catalog\/brands\/\$\{id\}`/);
+    expect(page).toMatch(/backHref: `\/catalog\/brands\/\$\{id\}#sells-as`/);
   });
 
   it("the SKU list inventory record is SkuListView", () => {
-    const body = screen("SKU list").body as { type: unknown; props: { model: unknown } };
+    const body = screen("SKU list").body as { type: unknown; props: { model: unknown; createAction: unknown } };
     expect(body.type).toBe(SkuListView);
+    expect(body.props.createAction).toBeNull();
     expect(body.props.model).toEqual(toSkuListViewProps(skuListHazy));
   });
 });
