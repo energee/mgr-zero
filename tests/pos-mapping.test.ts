@@ -191,4 +191,34 @@ describe("Square explicit mapping", () => {
     expect(JSON.stringify(await runCommand("get_pos_integration_health", {}, adminCtx)))
       .not.toMatch(/"accessToken"|"refreshToken"|access-secret|refresh-secret/i);
   });
+
+  it("lists only the Square items MGR did not publish that have an accepted sale, with their current decision", async () => {
+    const brewery = await makeBrewery();
+    const warehouseCtx = await makeStaffCtx(brewery.id, "warehouse");
+    const connectionId = await connected(brewery.id);
+    const keg = await seedCatalog(brewery.id, { product: "Hazy", sku: "Hazy half", packageType: "keg", bblPerUnit: 0.5, format: "Half" });
+    const pint = await seedPour(brewery.id, { brandId: keg.brandId, name: "Pint", ounces: 16 });
+    const variation = (item: string, id: string, name: string) => ({ brewery_id: brewery.id, connection_id: connectionId,
+      external_item_id: item, external_variation_id: id, external_item_name: name, external_variation_name: "Each", source_version: 1 });
+    expect((await admin.from("pos_catalog_variations").insert([variation("GUEST", "CIDER", "Guest cider"), variation("MERCH", "SHIRT", "Shirt"),
+      variation("FOOD", "PRETZEL", "Pretzel"), variation("FOOD", "NACHOS", "Nachos"), variation("HAZY", "HAZY-PINT", "Hazy")])).error).toBeNull();
+    // Hazy is MGR's own published item: its ownership row says so.
+    sql(`insert into public.pos_catalog_items(brewery_id,connection_id,brand_id,catalog_group,external_item_id,ownership)
+      values('${brewery.id}','${connectionId}','${keg.brandId}','poured','HAZY','mgr')`);
+    sql(`insert into public.pos_catalog_ownership(brewery_id,connection_id,brand_id,catalog_group,format_id,external_item_id,external_variation_id)
+      values('${brewery.id}','${connectionId}','${keg.brandId}','poured','${pint}','HAZY','HAZY-PINT')`);
+    const sale = (item: string, id: string, extra: Record<string, unknown> = { qty: 1, fact_status: "accepted" }) => ({ brewery_id: brewery.id, connection_id: connectionId,
+      external_order_id: `O-${id}`, external_line_id: "1", external_item_id: item, external_variation_id: id, external_location_id: "L9",
+      sold_at: new Date().toISOString(), ...extra });
+    // Cider, Shirt and Hazy sold; Nachos has only a removed fact; Pretzel never sold. L9 has no menu.
+    expect((await admin.from("pos_sales").insert([sale("GUEST", "CIDER"), sale("MERCH", "SHIRT"), sale("HAZY", "HAZY-PINT"),
+      sale("FOOD", "NACHOS", { qty: null, fact_status: "removed" })])).error).toBeNull();
+    await runCommand("set_pos_item_mapping", { externalItemId: "MERCH", externalVariationId: "SHIRT", disposition: "ignored" }, warehouseCtx,
+      { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() });
+
+    const rows = await runCommand("list_pos_variations", { selling: true }, warehouseCtx) as Array<Record<string, unknown>>;
+    expect(rows.map(row => [row.externalVariationId, row.disposition])).toEqual([["CIDER", "queued"], ["SHIRT", "ignored"]]);
+    // Without the flag every observed variation still lists, for API callers such as adoption.
+    expect((await runCommand("list_pos_variations", {}, warehouseCtx) as unknown[]).length).toBe(5);
+  });
 });

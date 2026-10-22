@@ -112,12 +112,14 @@ export function PosMenuControl({ model, bins, channels, targets }: {
   targets: { value: string; label: string }[];
 }) {
   const command = useCommandAction(), publication = useExactCommand();
+  const [savingKey, setSavingKey] = useState<string>();
   const outcome = readPublicationOutcome(publication.result);
   const terminal = isTerminalPublication(outcome?.status);
   const publish = (newAttempt = false, retryConflict = false) => publication.run("publish_pos_menu", { posLocationId: model.selectedLocationId, ...(retryConflict ? { retryConflict: true } : {}) }, newAttempt, model.selectedLocationId);
-  return <PosMenuView model={model} bins={bins} channels={channels} targets={targets} busy={command.busy || publication.busy} error={command.error ?? publication.error} backHref="/more"
+  return <PosMenuView model={model} bins={bins} channels={channels} targets={targets} busy={command.busy || publication.busy} savingKey={savingKey} error={command.error ?? publication.error} backHref="/more"
     onMap={(row, target) => {
       const [kind, id] = target.split(":", 2);
+      setSavingKey(`${row.externalItemId}:${row.externalVariationId}`);
       void command.run("set_pos_item_mapping", {
         externalItemId: row.externalItemId, externalVariationId: row.externalVariationId,
         disposition: kind === "ignore" ? "ignored" : "mapped",
