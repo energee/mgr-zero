@@ -21,11 +21,12 @@ describe("water profiles view", () => {
     expect(IONS[0]).toEqual(["calcium_ppm", "Calcium", "calciumPpm"]);
     expect(IONS[5]).toEqual(["bicarbonate_ppm", "Bicarbonate", "bicarbonatePpm"]);
   });
-  // #1152: a profile has no source/target kind; a recipe version picks sourceProfileId and targetProfileId.
-  it("no profiles is the empty state, which says a recipe version picks the source and the target", () => {
+  // #1152: a profile is not marked as a source or a target; a recipe version can pick each
+  // (sourceProfileId and targetProfileId are both optional).
+  it("no profiles is the empty state, which says a recipe version can pick the source and the target", () => {
     expect(toWaterProfilesViewProps({ profiles: [] }).empty).toEqual({
       title: "No water profiles yet",
-      description: "Add your source water or a target for a style. A recipe version picks its source and its target from this list.",
+      description: "Add your source water or a target for a style. A recipe version can pick its source and its target from this list.",
     });
   });
   it("names the water profile the same way on the list, the sheet and the live form", () => {
@@ -37,10 +38,13 @@ describe("water profiles view", () => {
     for (const verb of ["Add water profile", "Edit water profile", "Save water profile"]) expect(live).toContain(`"${verb}"`);
     expect(`${list}${sheet}${live}`).not.toMatch(/"(Add|Save) profile"|>(Add|Save) profile</);
   });
-  it("labels each ion with its unit and says all six are required ppm, never negative", () => {
+  it("labels each ion with its unit and ties every ion input to the required, nonnegative ppm help", () => {
     const sheet = renderToStaticMarkup(createElement(WaterProfileView, { fields: toWaterProfileFields(hazy) }));
     for (const [, label] of IONS) expect(sheet).toContain(`${label} (ppm)`);
-    expect(sheet).toContain("All six ions are required, in parts per million (ppm, the same as mg/L). None can be negative.");
+    const help = sheet.match(/<p[^>]*id="([^"]+)"[^>]*>All six ions are required\. Enter each in ppm \(the same as mg\/L\)\. None can be negative\.<\/p>/);
+    expect(help).not.toBeNull();
+    const described = [...sheet.matchAll(/<input[^>]*aria-describedby="([^"]+)"/g)].map((m) => m[1]);
+    expect(described).toEqual(IONS.map(() => help![1]));
   });
   it("sends Brewer back to Recipes, since Brewer cannot open Catalog", () => {
     expect(waterProfilesBack(["brewer"])).toEqual({ label: "Recipes", href: "/recipes" });

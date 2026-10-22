@@ -42,7 +42,7 @@ describe("SCREENS", () => {
     expect(String(SCREENS.find((s) => s.name === "Brew day")!.writes)).toContain("record_brew_day");
   });
 
-  it("sets the brewery's source water once, in Settings", () => {
+  it("links Source water in Settings to the Water profiles catalog", () => {
     const settings = text("Settings");
     expect(settings).toMatch(/Source water/);
   });
