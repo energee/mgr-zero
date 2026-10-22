@@ -1,6 +1,6 @@
 # Brew day revamp: Prep pull list, process timeline, pack quantities
 
-Status: Phase 1 plan, awaiting approval. Branch `feat/brew-day-revamp`, PR to `main`.
+Status: approved by the owner 2026-10-22; Phase 2 in progress (tasks 1 and 2 done). Branch `feat/brew-day-revamp`, PR #1103 to `main`.
 Clickable prototype: https://claude.ai/artifact/Mnw4PUb8xVkFeRhW4SKs2o (private; shared by the owner).
 Line numbers are from `origin/main` 802636c0.
 
