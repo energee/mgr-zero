@@ -100,7 +100,6 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Square locations", file: "app/(app)/settings/pos/locations/page.tsx" },
   { name: "Square → QuickBooks connector", file: "app/(app)/settings/pos/connector/page.tsx" },
   { name: "Disconnect Square", file: "app/(app)/settings/pos/disconnect/page.tsx" },
-  { name: "POS mapping", file: "app/(app)/settings/pos/mapping/page.tsx" },
   { name: "POS sale detail", file: "app/(app)/settings/pos/sales/[id]/page.tsx" },
   { name: "Menu", file: "app/(app)/menu/page.tsx" },
   { name: "Menu setup", file: "app/(app)/menu/page.tsx" },

@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { PosItemView, PosMappingView, PosMenuView } from "@/components/mgr/views/pos";
+import { PointOfSaleView, PosItemView, PosMenuView } from "@/components/mgr/views/pos";
 import { SCREENS } from "@/components/mgr/screens";
 import { classifyCommandFailure } from "@/lib/commands/client";
 import { isTerminalPublication, publicationNotice, readPublicationOutcome, reconcileBooleanChange, selectExactCommandAttempt, shouldStartNewCommandAttempt, syncFailureMessage, syncResultMessage, toPosMenuSetup } from "@/lib/mgr/pos-view";
@@ -100,11 +100,10 @@ describe("POS UI truth", () => {
   it("renders the inventory sync and sale-opening action contract", () => {
     const html = (name: string) => renderToStaticMarkup(createElement("div", null, SCREENS.find(screen => screen.name === name)!.body));
     expect(html("Point of sale")).toMatch(/Sync Square catalog[\s\S]*Sync Square sales/);
-    expect(html("POS mapping")).toMatch(/Sync Square catalog[\s\S]*Sync Square sales/);
     // A recent sale opens by its row arrow, not an Open verb (#1026).
-    const saleRow = html("POS mapping").split('data-slot="item"').find(item => item.includes("Sale · Hazy IPA · pint"));
+    const saleRow = html("Point of sale").split('data-slot="item"').find(item => item.includes("Sale · Hazy IPA · pint"));
     expect(saleRow).toContain('aria-label="Open"');
-    expect(html("POS mapping")).not.toMatch(/>Open</);
+    expect(html("Point of sale")).not.toMatch(/>Open</);
   });
 
   it("a live menu item and a live sale are row links to their detail (#1026)", () => {
@@ -113,10 +112,10 @@ describe("POS UI truth", () => {
     const menu = renderToStaticMarkup(createElement(PosMenuView, { model }));
     expect(menu).toMatch(/<a[^>]*href="\/menu\/item\/pint"[^>]*>(?:(?!<\/a>)[\s\S])*Hazy · Pint/);
     expect(menu).not.toMatch(/>Open</);
-    const mapping = renderToStaticMarkup(createElement(PosMappingView, { variations: [], targets: [], coverage: [],
+    const pos = renderToStaticMarkup(createElement(PointOfSaleView, { model: { connected: true, merchant: "Demo", state: "connected" },
       sales: [{ id: "s", label: "Sale · Hazy", detail: "1 pint", amount: "$7.00", status: "mapped", href: "/settings/pos/sales/s" }] }));
-    expect(mapping).toMatch(/<a[^>]*href="\/settings\/pos\/sales\/s"[^>]*>(?:(?!<\/a>)[\s\S])*Sale · Hazy/);
-    expect(mapping).not.toMatch(/>Open</);
+    expect(pos).toMatch(/<a[^>]*href="\/settings\/pos\/sales\/s"[^>]*>(?:(?!<\/a>)[\s\S])*Sale · Hazy/);
+    expect(pos).not.toMatch(/>Open</);
   });
 
   it("keeps live POS route sheets on the inventory body layout", () => {
@@ -124,16 +123,22 @@ describe("POS UI truth", () => {
       .toContain('<div className="flex flex-col gap-2">{children}</div>');
   });
 
-  it("gives Warehouse a direct route to POS mapping and retained sales", () => {
-    expect(navFor(shippedNav(STAFF_NAV), ["warehouse"]).find(item => item.label === "More")?.children)
-      .toEqual(expect.arrayContaining([expect.objectContaining({ label: "POS mapping", href: "/settings/pos/mapping" })]));
+  it("maps a Square item from Menu only while one is selling there, beside the one filled Publish verb", () => {
+    const base = { locations: [], selectedLocationId: "taproom", locationName: "Taproom", binName: "Cold", channelName: "Taproom", items: [], excluded: [] };
+    const quiet = renderToStaticMarkup(createElement(PosMenuView, { model: { ...base, externalItems: [] } }));
+    expect(quiet).not.toContain("Also in Square");
+    const selling = renderToStaticMarkup(createElement(PosMenuView, { model: { ...base, externalItems: [{ externalItemId: "i", externalVariationId: "v", label: "Guest cider · pint", detail: "Selling here · not from MGR" }] },
+      targets: [{ value: "format:pint", label: "Pour · House · pint" }] }));
+    expect(selling).toMatch(/Also in Square[\s\S]*Guest cider · pint[\s\S]*Save mapping/);
+    expect(selling).toMatch(/<button[^>]*data-variant="outline"[^>]*>Save mapping/);
+    expect(navFor(shippedNav(STAFF_NAV), ["warehouse"]).find(item => item.label === "More")?.children?.map(child => child.label)).not.toContain("POS mapping");
   });
 
   it("mounts one shared view from every POS inventory record", () => {
     const source = readFileSync("components/mgr/screens.tsx", "utf8");
     for (const view of [
       "PointOfSaleView", "ConnectSquareView", "SquareLocationsView", "SquareConnectorView",
-      "DisconnectSquareView", "PosMappingView", "PosSaleDetailView", "PosMenuView", "PosItemView",
+      "DisconnectSquareView", "PosSaleDetailView", "PosMenuView", "PosItemView",
     ]) expect(source, view).toContain(`<${view}`);
   });
 
@@ -141,14 +146,13 @@ describe("POS UI truth", () => {
     const routes = new Map(SCREEN_ROUTES.map((route) => [route.name, route.file]));
     expect(Object.fromEntries([...routes].filter(([name]) => [
       "Point of sale", "Connect Square", "Square locations", "Square → QuickBooks connector",
-      "Disconnect Square", "POS mapping", "POS sale detail", "Menu", "POS item",
+      "Disconnect Square", "POS sale detail", "Menu", "POS item",
     ].includes(name)))).toEqual({
       "Point of sale": "app/(app)/settings/pos/page.tsx",
       "Connect Square": "app/(app)/settings/pos/connect/page.tsx",
       "Square locations": "app/(app)/settings/pos/locations/page.tsx",
       "Square → QuickBooks connector": "app/(app)/settings/pos/connector/page.tsx",
       "Disconnect Square": "app/(app)/settings/pos/disconnect/page.tsx",
-      "POS mapping": "app/(app)/settings/pos/mapping/page.tsx",
       "POS sale detail": "app/(app)/settings/pos/sales/[id]/page.tsx",
       Menu: "app/(app)/menu/page.tsx",
       "POS item": "app/(app)/menu/item/[formatId]/page.tsx",

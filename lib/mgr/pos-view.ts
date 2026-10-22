@@ -88,12 +88,12 @@ export type PosLocationRow = {
   mgrLocationId: string;
 };
 
+/** An unmapped Square variation selling at the menu's location: Menu asks to map or ignore it. */
 export type PosVariationRow = {
   externalItemId: string;
   externalVariationId: string;
   label: string;
   detail: string;
-  disposition: "queued" | "ignored" | "mapped";
 };
 
 export type PosSaleRow = {
@@ -127,7 +127,7 @@ export type PosMenuModel = {
   channelName?: string;
   items: PosMenuItem[];
   excluded: PosMenuItem[];
-  externalItems: { label: string; detail: string; disposition: "queued" | "ignored"; href?: string }[];
+  externalItems: PosVariationRow[];
   message?: string;
   /** Set when no Square location is mapped: what is missing and, for an admin, where to fix it. */
   setup?: PosMenuSetup;
@@ -166,7 +166,7 @@ type PosMenuSnapshotItem = {
 export type PosMenuSnapshot = {
   location?: { name?: string }; bin?: { name?: string }; channel?: { name?: string };
   items?: PosMenuSnapshotItem[]; excluded?: PosMenuSnapshotItem[];
-  externalItems?: { itemName?: string; variationName?: string; disposition: "queued" | "ignored" }[];
+  externalItems?: { externalItemId: string; externalVariationId: string; itemName?: string; variationName?: string }[];
 } | null;
 
 export function toPosMenuModel(snapshot: PosMenuSnapshot, locations: { externalLocationId: string; name: string }[], selectedLocationId: string): PosMenuModel {
@@ -183,9 +183,9 @@ export function toPosMenuModel(snapshot: PosMenuSnapshot, locations: { externalL
     binName: snapshot?.bin?.name, channelName: snapshot?.channel?.name,
     items: (snapshot?.items ?? []).map(item), excluded: (snapshot?.excluded ?? []).map(item),
     externalItems: (snapshot?.externalItems ?? []).map(row => ({
-      label: [row.itemName, row.variationName].filter(Boolean).join(" · "),
-      detail: row.disposition === "ignored" ? "Explicitly ignored" : "Not mapped · sales stay queued",
-      disposition: row.disposition, href: "/settings/pos/mapping",
+      externalItemId: row.externalItemId, externalVariationId: row.externalVariationId,
+      label: [row.itemName, row.variationName].filter(Boolean).join(" · ") || row.externalVariationId,
+      detail: "Selling here · not from MGR",
     })),
     message: selected && !snapshot ? "Choose an MGR bin and sales channel before publishing." : undefined,
   };

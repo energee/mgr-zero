@@ -941,7 +941,7 @@ describe("SCREENS", () => {
     const named = [
       "Today", "Taproom", "Order", "Cellar map", "Tap board", "Swap keg",
       "Weekly count", "Brew day", "Route", "Settings", "Brand", "Vendors",
-      "POS mapping", "Planning", "Schedule batch", "Vessel detail", "Kick keg", "Return route",
+      "Planning", "Schedule batch", "Vessel detail", "Kick keg", "Return route",
     ];
     const filled = (html: string) =>
       (html.match(/<button\b[^>]*>/g) ?? []).filter((b) =>

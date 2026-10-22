@@ -238,7 +238,7 @@ defineCommand({
 });
 
 defineQuery({
-  name: "get_pos_menu", description: "Read one complete Square-location menu derived from its configured bin, active keg stock, poured formats, and channel prices",
+  name: "get_pos_menu", description: "Read one complete Square-location menu derived from its configured bin, active keg stock, poured formats, and channel prices; externalItems lists only the unmapped Square variations that have sold at this location",
   input: z.object({ posLocationId }), roles: [...menuRoles],
   handler: (ctx, input) => unwrap(ctx.db.rpc("get_pos_menu", {
     p_brewery: ctx.breweryId, p_external_location: input.posLocationId,
