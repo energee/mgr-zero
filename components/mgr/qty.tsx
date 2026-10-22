@@ -6,7 +6,7 @@
 // It is its own module only to break an import cycle: e.tsx imports VolumeField
 // for `E.volume`, so VolumeField cannot import `E` back, and the composition
 // cannot simply live in e.tsx either — SCREENS is a module-level const, built at
-// import time, where VolumeField's React.useId() could never run. Screen authors
+// import time, where Qty's useId() could never run. Screen authors
 // never import this directly; they use E.qty, E.tabs and E.volume.
 "use client";
 import type { FieldControls } from "@/components/mgr/e";
@@ -40,11 +40,12 @@ export function StepQuantity({ label, value, defaultValue, onChange, contextualL
 }
 
 /** A typed quantity under its visible label: the OS keyboard is the keypad, so
- *  nothing here draws one. Every caller is a field standing alone in a sheet,
- *  so the label is always shown; its generated id ties it to the input, and the
- *  input's aria-label repeats the same text (#1115). Defaults live in `E.qty`/`E.tabs`, the vocabulary
- *  screen authors call; every caller here passes label, on and cls, so
- *  repeating those defaults would only give them a second place to drift. */
+ *  nothing here draws one. The label's generated id ties it to the input, so
+ *  the visible text is the input's accessible name (#1115). No caller sits
+ *  under a column header, so the label is always shown; add a hideLabel if
+ *  one ever does. Defaults live in `E.qty`/`E.tabs`, the vocabulary screen
+ *  authors call; every caller here passes label, on and cls, so repeating
+ *  those defaults would only give them a second place to drift. */
 export function Qty({
   value,
   onChange,
@@ -74,7 +75,6 @@ export function Qty({
           value={onChange ? value : undefined}
           defaultValue={onChange ? undefined : value}
           onChange={(event) => onChange?.(event.target.value)}
-          aria-label={label}
           className="text-2xl font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
         {/* pr-0 for a unit switcher: a TabsList insets itself (p-[3px]), so the

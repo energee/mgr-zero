@@ -10,9 +10,9 @@ export function CellarMapView({ model, transfer, addition, complete }: { model: 
   return <>
     {E.back("Beer", "Cellar", undefined, model.backHref)}
     <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
-      {E.btn("Reading", model.readingHref === null ? "p disabled" : "p", model.readingHref ?? undefined)}
-      {transfer !== undefined ? transfer : E.btn("Transfer", "g")}
-      {addition !== undefined ? addition : E.btn("Addition", "g")}
+      {E.btn("Reading", model.actionsOff || model.readingHref === null ? "p disabled" : "p", model.readingHref ?? undefined)}
+      {transfer !== undefined ? transfer : E.btn("Transfer", model.actionsOff ? "g disabled" : "g")}
+      {addition !== undefined ? addition : E.btn("Addition", model.actionsOff ? "g disabled" : "g")}
     </div>
     {model.actionHint && E.info(model.actionHint)}
     {E.link("Start a brew day in Batches", "Batches", model.brewHref)}

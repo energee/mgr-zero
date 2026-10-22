@@ -134,8 +134,11 @@ describe("packaging views", () => {
     expect(html).toContain("Repack doesn’t record damage");
   });
 
-  it("explains Untracked stock where the live Lot picker offers it", () => {
-    const html = htmlOf(createElement(RepackView, { model: { ...repackCase, lots: [{ id: "l1", name: "L-1 · 12 available" }] }, footer: null }));
-    expect(html).toContain("Untracked stock is stock recorded without a lot.");
+  it("explains Untracked stock where the Lot picker offers it, tied to the picker", () => {
+    // The inventory fixture carries the lot list, so the frame shows the picker and its help.
+    const html = htmlOf(createElement(RepackView, { model: repackCase, footer: null }));
+    const id = /<p[^>]*id="([^"]+)"[^>]*>Untracked stock is stock recorded without a lot\./.exec(html)?.[1];
+    expect(id).toBeTruthy();
+    expect(html).toMatch(new RegExp(`<button[^>]*aria-label="Lot"[^>]*aria-describedby="${id}"|<button[^>]*aria-describedby="${id}"[^>]*aria-label="Lot"`));
   });
 });

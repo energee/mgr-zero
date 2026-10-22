@@ -5,7 +5,7 @@
 // leg is never typed: it is derived (lib/mgr/repack-view.ts). Repack has no
 // damage input, and the sheet says so rather than drawing an empty field (#1125).
 "use client";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { FieldDescription } from "@/components/ui/field";
 import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
@@ -28,6 +28,7 @@ export function RepackView({ model, footer, messages, onParent, onLocation, onBi
   onParent?: (id: string) => void; onLocation?: (id: string) => void; onBin?: (id: string) => void; onLot?: (id: string) => void; onQuantity?: (value: string) => void;
   submitting?: boolean; disabled?: boolean;
 }) {
+  const untrackedHelp = useId();
   return <>
     <fieldset disabled={submitting} className="flex flex-col gap-3">
       {model.parents ? pick("Package to break down", model.parentSkuId, model.parents, onParent) : E.fld("Package to break down", model.parent)}
@@ -35,13 +36,11 @@ export function RepackView({ model, footer, messages, onParent, onLocation, onBi
         ? <div className="grid grid-cols-2 gap-2">{pick("Location", model.locationId, model.locations, onLocation)}{pick("Bin", model.binId, model.bins ?? [], onBin, !model.locationId)}</div>
         : E.fld("Location · bin", model.location)}
       {/* The lot the cases come out of; empty is lot-less stock, which the RPC refuses when the bin holds lotted cases. */}
-      {model.lots
-        ? E.pick("Lot", model.lotId ?? "", [{ value: "", label: "Untracked stock" }, ...model.lots.map((o) => ({ value: o.id, label: o.name }))], { onChange: onLot, disabled: !model.binId, "aria-label": "Lot", "aria-describedby": "repack-untracked", description: <FieldDescription id="repack-untracked">Untracked stock is stock recorded without a lot. If this bin holds lotted packages, pick their lot.</FieldDescription> })
-        : E.fld("Lot", model.lot ?? "")}
+      {E.pick("Lot", model.lotId ?? "", [{ value: "", label: "Untracked stock" }, ...(model.lots ?? []).map((o) => ({ value: o.id, label: o.name }))], { onChange: onLot, disabled: !model.binId, "aria-label": "Lot", "aria-describedby": untrackedHelp, description: <FieldDescription id={untrackedHelp}>Untracked stock is stock recorded without a lot. If this bin holds lotted packages, pick their lot.</FieldDescription> })}
       <Qty label="Packages to repack" value={model.qty} unit={model.unit} onChange={onQuantity} />
       {E.tape(model.tape)}
       {E.info(model.preview)}
-      {E.polite("Repack doesn’t record damage. The count it adds comes from the package’s composition.")}
+      <FieldDescription>Repack doesn’t record damage. The count it adds comes from the package’s composition.</FieldDescription>
     </fieldset>
     {messages}
     {footer !== undefined ? footer : repackFooter(model, { submitting, disabled })}

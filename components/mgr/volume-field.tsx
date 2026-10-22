@@ -1,9 +1,6 @@
-// components/mgr/volume-field.tsx — an atomic format's volume, behind E.volume:
-// a quantity whose unit addon is the per-instance unit choice. Qty draws the
-// visible label and ties it to the input. It builds the field from
-// components/mgr/qty.tsx — the same Qty and TabBar behind E.qty and E.tabs —
-// rather than taking the control as a prop, because screens.tsx renders on the
-// server and a function cannot cross that boundary.
+// components/mgr/volume-field.tsx — an atomic format's volume, behind E.volume
+// and the Format sheet: a Qty (components/mgr/qty.tsx) whose unit addon is a
+// TabBar of volume units, with the value and unit callbacks named apart.
 "use client";
 
 import { Qty, TabBar } from "@/components/mgr/qty";

@@ -269,7 +269,7 @@ export const E = {
    *  segmented unit choice (`E.tabs` hugged with "w-fit"). The label, the
    *  field's clipping and addon padding live in components/mgr/qty.tsx,
    *  shared with `volume`. */
-  qty: (value: string, unit?: React.ReactNode, label = "Quantity", controls?: FieldControls) => (
+  qty: (value: string, unit?: React.ReactNode, label = "Quantity", controls?: Pick<FieldControls, "onChange">) => (
     <Qty value={value} unit={unit} label={label} onChange={controls?.onChange} />
   ),
   /** A view switcher. E.tabs draws no TabsContent: the body below stands in
