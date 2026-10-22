@@ -115,6 +115,8 @@ export function MovementForm({
   const availableLots = stock.filter(item => item.kind === "sku" && item.stock_id === skuId && item.bin_id === binId && item.lot_id);
   const lotOptions = ["Untracked / legacy stock", ...availableLots.map(item => `${item.lot_code} · ${item.qty} available`)];
   const movementModel: RecordMovementViewModel = {
+    // kindIndex -1 means no kind is chosen yet. The view draws from the empty
+    // `kind`, which shows the Select kind placeholder and no pressed toggle.
     kind: sentenceCase(type), kindIndex: type ? MOVEMENT_TYPES.indexOf(type) : -1, kindOptions,
     sku: selectedSku?.label ?? "", skuId, skuOptions: skus.map(item => ({ value: item.id, label: item.label })),
     location: selectedLocation?.name ?? "", locationOptions: locations.map(item => item.name),
@@ -135,9 +137,12 @@ export function MovementForm({
   }
 
   // When a deep link opened this form, replace the URL so a reload or Back
-  // does not reopen it (#1107). Only ?page survives, which drops the prefill.
-  // A successful record closes the form through useCommandForm, not here, so
-  // the URL (and the handoff's form key) stays until the receipt is dismissed.
+  // does not reopen it (#1107). The new URL keeps only ?page, so the prefill
+  // values (skuId, type, qty and the rest) leave the URL too.
+  // A successful record closes the form through useCommandForm, not here.
+  // The URL stays until the receipt is dismissed, because page.tsx keys this
+  // form on ?movementHandoff: dropping it early would remount the form and
+  // lose the receipt.
   function clearDeepLinkUrl() {
     if (!autoOpen) return;
     const page = new URLSearchParams(window.location.search).get("page");

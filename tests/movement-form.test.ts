@@ -32,7 +32,7 @@ const render = (props: Partial<Parameters<typeof MovementForm>[0]> = {}) => {
   return renderToStaticMarkup(createElement(MovementForm, { ...lists, autoOpen: true, ...props }));
 };
 // The form reads window.location; useCommandForm reads the bare global.
-const at = (search: string) => {
+const setUrl = (search: string) => {
   const location = { pathname: "/inventory", search };
   vi.stubGlobal("location", location);
   vi.stubGlobal("window", Object.assign(new EventTarget(), { location }));
@@ -43,7 +43,7 @@ beforeEach(() => {
   Object.values(router).forEach((fn) => fn.mockClear());
   const values = new Map<string, string>();
   vi.stubGlobal("sessionStorage", { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) });
-  at("?recordMovement=1&skuId=s1&type=depletion&movementHandoff=h1&page=3");
+  setUrl("?recordMovement=1&skuId=s1&type=depletion&movementHandoff=h1&page=3");
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -65,7 +65,7 @@ it("closing a deep-linked form replaces the URL with the bare inventory page, ke
   render();
   forms[0].onOpenChange(false);
   expect(router.replace).toHaveBeenCalledWith("/inventory?page=3", { scroll: false });
-  at("?recordMovement=1");
+  setUrl("?recordMovement=1");
   router.replace.mockClear();
   render();
   forms[0].onOpenChange(false);
