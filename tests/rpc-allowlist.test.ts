@@ -102,6 +102,7 @@ const AUTHENTICATED_RPCS = [
   "create_sku(uuid,uuid,uuid,text,text,uuid,uuid)",
   "create_stock_transfer(uuid,uuid,uuid,date,text,jsonb,uuid)",
   "delete_bin(uuid,uuid,uuid)",
+  "delete_vessel(uuid,uuid,uuid)",
   "delete_catalog_category(uuid,text,uuid)",
   "delete_customer(uuid,uuid,uuid)",
   "delete_format(uuid,uuid,uuid)",

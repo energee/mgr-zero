@@ -239,18 +239,29 @@ defineCommand({
     kind: z.enum(VESSEL_KINDS),
     capacityBbl: bbl,
   }),
-  roles: ["admin", "brewer"],
+  roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_vessel", {
     p_brewery: ctx.breweryId, p_vessel: i.id ?? null, p_name: i.name, p_kind: i.kind,
     p_capacity_bbl: i.capacityBbl, p_request_id: execution.requestId,
   })),
 });
 
+defineCommand({
+  name: "delete_vessel", description: "Delete a vessel that never held beer, or retire one with batch history so that history keeps it; a vessel holding beer is refused. The result's retired flag says which",
+  input: z.object({ vesselId: z.string().uuid() }),
+  roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_vessel", {
+    p_brewery: ctx.breweryId, p_vessel: i.vesselId, p_request_id: execution.requestId,
+  })),
+});
+
 defineQuery({
-  name: "list_vessels", description: "Vessels, alphabetical, with kind and capacity",
-  input: z.object({}), roles: ["admin", "brewer"],
-  handler: (ctx) => unwrap(ctx.db.from("vessels").select("id, name, kind, capacity_bbl, active")
-    .eq("brewery_id", ctx.breweryId).order("name")),
+  name: "list_vessels", description: "Vessels, alphabetical, with kind and capacity; retired vessels only when retired is true",
+  input: z.object({ retired: z.boolean().optional() }), roles: ["admin", "brewer"],
+  handler: (ctx, i) => {
+    const query = ctx.db.from("vessels").select("id, name, kind, capacity_bbl, active").eq("brewery_id", ctx.breweryId);
+    return unwrap((i.retired ? query : query.eq("active", true)).order("name"));
+  },
 });
 
 // Scheduling is intent: both the brand and the recipe version are optional, and
