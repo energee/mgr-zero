@@ -75,7 +75,7 @@ export function SourcePick({ row, choices, onChange, disabled = false }: {
 /** Short and Choose lot act in place: Short moves to the line's first amount field to enter what was pulled (Pick's Short
  *  opens the same amount entry); Choose lot opens the line's source pick when `sources` holds stock of its material,
  *  and is disabled when `sources` is given but holds none. Without `sources` (the inventory) it stays a plain verb. */
-export function BrewPrepView({ model, onChange, onPrint, onSave, messages, footer, planActions, submitting = false, disabled = false, tabHrefs }: {
+export function BrewPrepView({ model, onChange, onPrint, onSave, messages, planActions, submitting = false, disabled = false, tabHrefs }: {
   model: BrewPrepViewModel;
   onChange?: (patch: Partial<BrewPrepViewModel>) => void;
   onPrint?: () => void;
@@ -84,7 +84,6 @@ export function BrewPrepView({ model, onChange, onPrint, onSave, messages, foote
   /** Reschedule / cancel, folded at the foot (ChangePlanFold), outside the pull form. */
   planActions?: ReactNode;
   messages?: ReactNode;
-  footer?: ReactNode;
   submitting?: boolean;
   /** A validation gate (canSavePrep) disables Done pulling without claiming an in-flight command, as PickView's does. */
   disabled?: boolean;
@@ -120,10 +119,10 @@ export function BrewPrepView({ model, onChange, onPrint, onSave, messages, foote
       </div>
       {E.fld("Later, in cellar", model.later)}
       {messages}
-      {footer !== undefined ? footer : <BrewFooter>
+      <BrewFooter>
         <Button type="button" variant="outline" data-preview-action onClick={onPrint}>Print pull list</Button>
         <Button type="submit" disabled={submitting || disabled}>{submitting ? "Saving…" : "Done pulling"}</Button>
-      </BrewFooter>}
+      </BrewFooter>
     </form>
     <ChangePlanFold>{planActions}</ChangePlanFold>
   </>;

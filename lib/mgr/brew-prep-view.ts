@@ -176,7 +176,8 @@ export const timelineStages = (model: BrewTimelineViewModel) =>
 export const stageProgress = (rows: BrewIngredient[]) =>
   rows.length ? `${rows.filter(row => row.confirmed).length} of ${rows.length} confirmed` : undefined;
 
-/** Confirm all: every ingredient confirmed at the amount and source it shows; timelineTone still flags any that can't record. */
+/** The timeline's Confirm all: every ingredient in every stage confirmed at the amount and source it shows (pass the whole
+ *  ingredient list, not one stage's); timelineTone still flags any that can't record. */
 export const confirmAll = (rows: BrewIngredient[]) => rows.map(row => ({ ...row, confirmed: true }));
 
 /** The stage a phone opens: the first one still holding an unconfirmed ingredient. */
@@ -194,7 +195,7 @@ const stockDraws = (rows: BrewIngredient[]) =>
 
 /** A timeline row's tone: confirmed is green only with a source within stock, else amber; unconfirmed is amber when short,
  *  unsourced or over stock, else plain. */
-export function timelineTone(row: BrewIngredient, sources: BrewMaterialSource[] = []): "ok" | "w" | "" {
+export function timelineTone(row: BrewIngredient, sources?: BrewMaterialSource[]): "ok" | "w" | "" {
   const fits = pullReady(row) && fitsStock(stockDraws([row]), sources);
   if (row.confirmed) return fits ? "ok" : "w";
   return isShort(row) || !fits ? "w" : "";

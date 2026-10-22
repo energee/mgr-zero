@@ -65,12 +65,6 @@ export function BrewTimelineView({ model, busy = false, error, onChange, onRecor
         </div> : undefined)}
     </div>;
   };
-  const knockoutFields = (process: readonly string[]) => E.cols(
-    E.pick("Vessel", value.vesselId, vesselOptions(value.vessels), { onChange: vesselId => change({ vesselId }), disabled: busy, required: true, placeholder: "Choose vessel", id: id + "-vessel" }),
-    E.edit("Knockout barrels", value.initialBbl, "number", undefined, { onChange: initialBbl => change({ initialBbl }), id: id + "-bbl", disabled: busy, required: true, min: "0", step: "any" }),
-    <fieldset disabled={busy}><DatePicker label="Brewed on" value={value.brewedOn} onChange={brewedOn => change({ brewedOn })} /></fieldset>,
-    ...process.map(reading),
-  );
   return <>
     {E.back("Batches", model.title, undefined, model.backHref)}
     <BrewTabs on={1} hrefs={tabHrefs} />
@@ -88,12 +82,17 @@ export function BrewTimelineView({ model, busy = false, error, onChange, onRecor
         <div className="mt-2 flex flex-col gap-3">
           {stage.ingredients.map(ingredient)}
           {stage.stage === "mash" && (value.waterAdditions ?? []).map((row, index) => <Fragment key={index}>{E.fld(row.materialName, `${row.qty} ${row.unit} planned · add with Correct turn after recording`)}</Fragment>)}
-          {stage.stage === "knockout"
-            ? knockoutFields(stage.process)
-            : stage.process.length > 0 && <div className="md:max-w-2xl">{E.cols(...stage.process.map(reading))}</div>}
-          {stage.stage === "knockout" && (knockoutReady(value)
-            ? E.tape([[<>Knockout {value.initialBbl} bbl {E.arrow()} {vessel?.name}</>, "loss baseline"]])
-            : E.fld("Knockout baseline", "Choose a vessel, positive barrels and a brew date"))}
+          {stage.stage === "knockout" ? <>
+            {E.cols(
+              E.pick("Vessel", value.vesselId, vesselOptions(value.vessels), { onChange: vesselId => change({ vesselId }), disabled: busy, required: true, placeholder: "Choose vessel", id: id + "-vessel" }),
+              E.edit("Knockout barrels", value.initialBbl, "number", undefined, { onChange: initialBbl => change({ initialBbl }), id: id + "-bbl", disabled: busy, required: true, min: "0", step: "any" }),
+              <fieldset disabled={busy}><DatePicker label="Brewed on" value={value.brewedOn} onChange={brewedOn => change({ brewedOn })} /></fieldset>,
+              ...stage.process.map(reading),
+            )}
+            {knockoutReady(value)
+              ? E.tape([[<>Knockout {value.initialBbl} bbl {E.arrow()} {vessel?.name}</>, "loss baseline"]])
+              : E.fld("Knockout baseline", "Choose a vessel, positive barrels and a brew date")}
+          </> : stage.process.length > 0 && <div className="md:max-w-2xl">{E.cols(...stage.process.map(reading))}</div>}
         </div>
       </details>)}
       {!anyPulled(value) && <fieldset disabled={busy}><label className="flex items-center gap-2">{E.sw(Boolean(value.confirmEmpty), "Confirm no ingredients used", confirmEmpty => change({ confirmEmpty }))}Confirm no ingredients used</label></fieldset>}

@@ -47,7 +47,7 @@ export default async function BatchPage({ params, searchParams }: { params: Prom
   const plannedBbl = Number(batch.planned_bbl), planned = plannedBbl + " bbl · " + formatDate(batch.planned_on);
   if (!recorded && !batch.cancelled_at) {
     // A planned tank retired since Prep is not in list_vessels: start with none chosen rather than a hidden id save_batch_pulls refuses.
-    const plannedVessel = vessels.some(vessel => vessel.id === plan.batch.planned_vessel_id) ? plan.batch.planned_vessel_id! : "";
+    const plannedVessel = vessels.find(vessel => vessel.id === plan.batch.planned_vessel_id)?.id ?? "";
     const tabHrefs = { Prep: `/batches/${batch.id}?tab=prep`, "Brew day": `/batches/${batch.id}?tab=brew-day` };
     const shared = { title: batNo(batch.batch_no), backHref: "/batches", ingredients: brewIngredients(plan.plan, plan.pulls, plan.sources, plannedBbl), sources: plan.sources, vesselId: plannedVessel, vessels, planned, note: batch.note ?? undefined };
     const planActions = <ChangePlan kind="batch" id={batch.id} plannedOn={batch.planned_on} />;
