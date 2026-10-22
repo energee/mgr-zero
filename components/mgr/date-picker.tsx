@@ -40,8 +40,7 @@ export function DatePicker({ label, defaultValue = "", value, onChange, disabled
     setOpen(false);
   };
   // A <label for> does not name a button, so the trigger points back at both the
-  // label and itself: "Best by, Sep 5, 2026". data-preview-action: the trigger
-  // opens its calendar in place, so the screen explorer never routes it.
+  // label and itself: "Best by, Sep 5, 2026".
   const labelId = React.useId();
   const triggerId = React.useId();
 
@@ -58,6 +57,7 @@ export function DatePicker({ label, defaultValue = "", value, onChange, disabled
             aria-describedby={describedBy}
             variant="outline"
             className="w-full min-w-0 shrink justify-start text-left font-normal"
+            // The trigger opens its calendar in place, so the screen explorer never routes it.
             data-preview-action
           >
             <Icon icon={Calendar03Icon} data-icon="inline-start" />
