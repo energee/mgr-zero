@@ -302,10 +302,11 @@ export const E = {
   ),
   /** A forward arrow read as "to"; null draws it decorative (aria-hidden). */
   arrow: (label: string | null = "to") => <DirectionIcon label={label} />,
-  /** A typed quantity: the OS keyboard is the keypad. unit renders as a trailing
-   *  addon — plain text ("bbl"), chips, or a segmented unit choice (`E.tabs`
-   *  hugged with "w-fit"). The field's clipping and addon padding live in
-   *  components/mgr/qty.tsx, shared with `volume`. */
+  /** A typed quantity under its visible label: the OS keyboard is the keypad.
+   *  unit renders as a trailing addon — plain text ("bbl"), chips, or a
+   *  segmented unit choice (`E.tabs` hugged with "w-fit"). The label, the
+   *  field's clipping and addon padding live in components/mgr/qty.tsx,
+   *  shared with `volume`. */
   qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string, controls?: FieldControls) => {
     const error = fieldError({ ...controls, id });
     return <>

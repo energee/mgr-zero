@@ -3,10 +3,11 @@
 // base unit, and the consumption preview. Inventory passes a fixture with no
 // onChange; live wraps it in cellar-addition-form.tsx.
 "use client";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { Qty } from "@/components/mgr/qty";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ADDITION_STAGES, additionPreview, type AdditionStage, type CellarAdditionViewModel } from "@/lib/mgr/cellar-addition-view";
 import { occupancyIdentity } from "@/lib/mgr/cellar-transfer-view";
@@ -23,6 +24,7 @@ export function CellarAdditionView({ model, onChange, messages, footer, submitti
   const material = model.materials.find((m) => m.id === model.materialId);
   const lots = model.lotsByMaterial[model.materialId] ?? [];
   const preview = additionPreview(model);
+  const stageId = useId();
   // Inventory (no onChange) draws the fixture uncontrolled; live is controlled.
   const sel = (name: "occupancyId" | "materialId" | "lotId" | "stage") => onChange ? { value: model[name] } : { defaultValue: model[name] };
   return <>
@@ -30,11 +32,16 @@ export function CellarAdditionView({ model, onChange, messages, footer, submitti
       {E.pick("Occupancy", model.occupancyId, [{ value: "", label: "Tank with beer in it" }, ...(model.occupancies.map((o) => ({ value: o.occupancy_id, label: (o.vessel_name ?? "Unnamed vessel") + " · " + (occupancyIdentity(o)) })))], { onChange: onChange ? (nextValue: string) => onChange?.({ occupancyId: nextValue }) : undefined, required: true })}
       {E.pick("Material", model.materialId, [{ value: "", label: "Hop, fruit or adjunct" }, ...(model.materials.map((m) => ({ value: m.id, label: m.name + " · " + m.category })))], { onChange: onChange ? (nextValue: string) => onChange?.({ materialId: nextValue, lotId: "" }) : undefined, required: true })}
       {material?.lot_tracked && E.pick("Lot", model.lotId, [{ value: "", label: "Choose a lot" }, ...lots.map(l => ({ value: l.lot_id, label: `${l.lot_code} · ${l.qty} ${material.base_uom}` }))], { onChange: onChange ? value => onChange({ lotId: value }) : undefined, required: true })}
-      <ToggleGroup type="single" variant="outline" size="sm" className="flex-wrap justify-start" {...sel("stage")} onValueChange={(v) => { if (v) onChange?.({ stage: v as AdditionStage }); }}>
-        {Object.entries(ADDITION_STAGES).map(([id, label]) => <ToggleGroupItem key={id} value={id}>{label}</ToggleGroupItem>)}
-      </ToggleGroup>
+      {/* The visible heading is the chip group's name (#1115). */}
+      <Field>
+        <FieldLabel id={stageId}>Stage</FieldLabel>
+        <ToggleGroup type="single" variant="outline" size="sm" className="flex-wrap justify-start" aria-labelledby={stageId} {...sel("stage")} onValueChange={(v) => { if (v) onChange?.({ stage: v as AdditionStage }); }}>
+          {Object.entries(ADDITION_STAGES).map(([id, label]) => <ToggleGroupItem key={id} value={id}>{label}</ToggleGroupItem>)}
+        </ToggleGroup>
+      </Field>
       <Qty label="Quantity" value={model.qty} unit={material?.base_uom ?? ""} onChange={onChange ? (qty) => onChange({ qty }) : undefined} />
-      {preview.valid ? E.info(preview.text) : E.note(preview.reason, preview.error ? "alert" : "note")}
+      {/* What is still needed is guidance, not a warning; only a real error (more than the lot holds) is amber (#1115). */}
+      {preview.valid ? E.info(preview.text) : preview.error ? E.note(preview.reason, "alert") : E.info(preview.reason)}
     </fieldset>
     {messages}
     {footer !== undefined ? footer : E.pin(<CellarAdditionFooter submitting={submitting} />)}

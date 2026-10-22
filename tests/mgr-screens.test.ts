@@ -566,8 +566,11 @@ describe("SCREENS", () => {
     expect(sku).not.toMatch(/bbl per unit|Units per case|Package BOM|Packaging overrides/);
 
     const format = body("Format");
-    expect(format).toContain('aria-label="Size of one container"');
-    expect(format).toMatch(/data-slot="input-group"[\s\S]*aria-label="Size of one container"[\s\S]*role="tablist"/);
+    // The visible label names the input (no aria-label overriding it), and the unit bar rides in its group.
+    const sizeId = /<label[^>]*for="([^"]+)"[^>]*>Size of one container<\/label>/.exec(format)?.[1];
+    expect(sizeId).toBeTruthy();
+    expect(format).toMatch(new RegExp(`data-slot="input-group"[\\s\\S]*<input[^>]*id="${sizeId}"[\\s\\S]*role="tablist"`));
+    expect(format).not.toContain('aria-label="Size of one container"');
     expect(format).toContain("Container");
     expect(format).toContain("Beer per package");
     expect(format).toContain("Containers per package");
