@@ -2,6 +2,7 @@
 // behind app/(app)/orders/order-form.tsx. Mirrors the create_order input schema
 // in lib/commands/orders.ts and the orders check constraint; on an empty
 // brewery it also yields the hint naming what to create first.
+import { andList, submitReason } from "@/lib/mgr/submit-reason";
 
 export type OrderFormReadinessInput = {
   kind: "wholesale" | "taproom_transfer";
@@ -18,6 +19,8 @@ export type OrderFormReadinessInput = {
 
 export type OrderFormReadiness = {
   submittable: boolean;
+  /** What Save draft still needs (submitReason), or null when submittable. */
+  reason: string | null;
   /** Set only when a select the current kind needs has no options at all. */
   hint: string | null;
 };
@@ -28,10 +31,42 @@ export const isBlankLine = (l: { skuId: string; qty: string }) => !l.skuId && !l
 /** Every entered row needs a SKU and a finite, positive quantity. */
 export const isCompleteLine = (l: { skuId: string; qty: string }) => Boolean(l.skuId) && Number.isFinite(Number(l.qty)) && Number(l.qty) > 0;
 
-/** Shared feedback for live and inventory order rows; blank spare rows need no correction. */
+/** A line's corrections, one per field that is wrong, so each marks its own
+ *  control. `sku` and `qty` are its SKU picker's and quantity's messages. */
+export type LineErrors = { sku?: string; qty?: string };
+
+/** One row's corrections; empty when the row is blank or complete. `count` is
+ *  how many rows the form has: with more than one, removing the row is an option. */
+export function orderLineError(line: { skuId: string; qty: string }, index: number, count: number): LineErrors {
+  if (isBlankLine(line)) return {};
+  const remove = count > 1 ? ", or remove the line" : "";
+  const qty = Number(line.qty);
+  return {
+    ...(line.skuId ? {} : { sku: `Line ${index + 1}: select a SKU${remove}.` }),
+    ...(Number.isFinite(qty) && qty > 0 ? {} : { qty: `Line ${index + 1}: enter a quantity greater than zero${remove}.` }),
+  };
+}
+
+/** Every row's corrections as one list, for readiness checks; shared by order and transfer rows. */
 export function orderLineErrors(lines: { skuId: string; qty: string }[]): string[] {
-  return lines.flatMap((line, index) => isBlankLine(line) || isCompleteLine(line)
-    ? [] : [`Line ${index + 1}: select a SKU and enter a quantity greater than zero${lines.length > 1 ? ", or remove the line" : ""}.`]);
+  return lines.flatMap((line, index) => Object.values(orderLineError(line, index, lines.length)));
+}
+
+/** Edit draft's corrections per line: a saved draft's SKU must still be
+ *  offered and appear once, and its quantity must be at least 0.01 (a cent
+ *  of a unit, the column's scale). */
+export function draftLineErrors(lines: { skuId: string; qty: string }[], skuIds: string[]): LineErrors[] {
+  return lines.map((line, index) => {
+    const n = index + 1;
+    const qty = Number(line.qty);
+    let sku: string | undefined;
+    if (!skuIds.includes(line.skuId)) sku = `Line ${n}: choose an available SKU.`;
+    else if (lines.findIndex((other) => other.skuId === line.skuId) !== index) sku = `Line ${n}: this SKU is already on another line. Combine its quantities or remove this line.`;
+    return {
+      ...(sku ? { sku } : {}),
+      ...(Number.isFinite(qty) && qty >= 0.01 ? {} : { qty: `Line ${n}: enter a quantity of at least 0.01.` }),
+    };
+  });
 }
 
 /** A retained nonblank selection is unavailable when the current options omit it. */
@@ -39,23 +74,24 @@ export function isUnavailableSku(skuId: string, availableSkuIds: string[]): bool
   return Boolean(skuId) && !availableSkuIds.includes(skuId);
 }
 
-const conjunction = new Intl.ListFormat("en", { type: "conjunction" });
-
 export function orderFormReadiness(i: OrderFormReadinessInput): OrderFormReadiness {
-  const party = i.kind === "wholesale" ? Boolean(i.customerId && i.shipToId) : Boolean(i.toLocationId);
-  const hasLine = i.lines.some(isCompleteLine);
-  const lineErrors = orderLineErrors(i.lines);
+  const needs: string[] = [];
+  if (i.kind === "wholesale") {
+    if (!i.customerId) needs.push("a customer");
+    else if (!i.shipToId) needs.push("a ship-to");
+  } else if (!i.toLocationId) needs.push("a To location");
+  if (!i.fromLocationId) needs.push("a source location");
+  if (!i.lines.some(isCompleteLine) || orderLineErrors(i.lines).length > 0) needs.push("a SKU with a quantity above zero on each line");
   const availableSkuIds = i.availableSkuIds;
-  const hasUnavailableSku = availableSkuIds !== undefined && i.lines.some(line => isUnavailableSku(line.skuId, availableSkuIds));
-  const submittable = party && Boolean(i.fromLocationId) && hasLine && lineErrors.length === 0 && !hasUnavailableSku;
+  if (availableSkuIds !== undefined && i.lines.some(line => isUnavailableSku(line.skuId, availableSkuIds))) needs.push("an available SKU on each line");
 
   const missing: string[] = [];
   if (i.kind === "wholesale" && i.catalog.customers === 0) missing.push("a customer");
   if (i.catalog.locations === 0) missing.push("a location");
   if (i.catalog.skus === 0) missing.push("a SKU");
-  const hint = missing.length === 0 ? null : `Before creating an order, add ${conjunction.format(missing)}.`;
+  const hint = missing.length === 0 ? null : `Before creating an order, add ${andList(missing)}.`;
 
-  return { submittable, hint };
+  return { submittable: needs.length === 0, reason: submitReason(needs), hint };
 }
 
 /** Initial destination only; a caller's explicit draft selection stays authoritative. */

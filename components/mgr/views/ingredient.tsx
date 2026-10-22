@@ -5,7 +5,9 @@
 // (recipes/[id]/schedule-sheets.tsx) edits a draft version. Material and
 // stage are picked by id and enum value; the labels are display. Material is
 // a searchable picker (E.searchPick), since a brewery's material list outgrows
-// a Select; an option reads "name · category" when the category is known.
+// a Select; an option reads "name · category" when the category is known. With
+// no materials it links to Materials, which recipe editors (Admin, Brewer) may
+// add to (#1123).
 "use client";
 import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
@@ -26,7 +28,7 @@ export function IngredientView({ fields, materials, onChange, footer }: {
   const unit = materials.find((m) => m.id === fields.materialId)?.unit;
   const qtyLabel = unit ? `Quantity per bbl (${unit})` : "Quantity per bbl";
   return <>
-    {E.searchPick("Material", fields.materialId, materials.map((m) => ({ value: m.id, label: m.category ? `${m.name} · ${m.category}` : m.name })), { id: `${id}-material`, placeholder: "Choose a material", ...bind("materialId") })}
+    {E.searchPick("Material", fields.materialId, materials.map((m) => ({ value: m.id, label: m.category ? `${m.name} · ${m.category}` : m.name })), { id: `${id}-material`, placeholder: "Choose a material", empty: { text: "No materials yet.", label: "Add a material", href: "/materials", to: "Materials" }, ...bind("materialId") })}
     {E.pick("Stage", fields.stage, INGREDIENT_STAGE_OPTIONS, bind("stage"))}
     {E.inline(
       <Field>
