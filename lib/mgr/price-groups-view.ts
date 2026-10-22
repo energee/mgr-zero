@@ -1,9 +1,11 @@
 // lib/mgr/price-groups-view.ts — view-model for the Price groups grid.
 // list_sale_channels × list_price_groups × list_formats, filled from
-// list_channel_prices. Packaged formats are one column each. Pours owned by a
-// price group share a column by name; a group with no pour of that name has
-// no cell. A cell is the money string, or null when unpriced.
-import { money } from "./money";
+// list_channel_prices. One channel shows at a time, chosen by tab. Packaged
+// formats are one column each. Pours owned by a price group share a column by
+// name; a group with no pour of that name has a null formatId there (the grid
+// offers to add it). A cell is the dollars-input text ("12.50"), or null when
+// unpriced.
+import { dollarsInput, toCents } from "./money";
 
 export type PriceGroupsRowView = { id: string; name: string; cells: (string | null)[]; formatIds: (string | null)[] };
 
@@ -18,7 +20,14 @@ export type PriceGroupsViewModel = {
   formats: string[];
   /** How many groups exist, so a grid with no channels can still say which is missing. */
   groupCount: number;
-  channels: PriceGroupsChannelView[];
+  /** Sale channel names, one tab each. */
+  tabs: string[];
+  /** Index of the channel showing. */
+  tab: number;
+  /** Live: each tab's link. Inventory leaves it out and draws inert tabs. */
+  tabHrefs?: [label: string, href: string][];
+  /** The showing channel's table; null when there are no channels. */
+  channel: PriceGroupsChannelView | null;
 };
 
 /** One row of list_price_groups: the grid row and its $/bbl ceiling. */
@@ -29,6 +38,10 @@ export const byPosition = (a: { position: number }, b: { position: number }) => 
 
 export type PriceGroupsSnapshot = {
   backHref?: string;
+  /** The channel to show; an unknown or missing id shows the first. */
+  channelId?: string;
+  /** Live: the link for a channel's tab. */
+  channelHref?: (channelId: string) => string;
   channels: { id: string; name: string }[];
   groups: PriceGroupRow[];
   formats: {
@@ -72,14 +85,19 @@ function pricingColumns(formats: PriceGroupsSnapshot["formats"]) {
   ];
 }
 
-/** Map the four list_* pricing queries onto PriceGroupsView tables. */
-export function toPriceGroupsViewProps({ channels, groups, formats, cells }: PriceGroupsSnapshot): PriceGroupsViewModel {
+/** Map the four list_* pricing queries onto PriceGroupsView: tabs, and the showing channel's table. */
+export function toPriceGroupsViewProps({ channels, groups, formats, cells, channelId, channelHref }: PriceGroupsSnapshot): PriceGroupsViewModel {
   const byKey = new Map(cells.map((c) => [cellKey(c.sale_channel_id, c.price_group_id, c.format_id), c.unit_price_cents]));
   const columns = pricingColumns(formats);
+  const tab = Math.max(0, channels.findIndex((c) => c.id === channelId));
+  const channel = channels[tab];
   return {
     formats: columns.map((c) => c.label),
     groupCount: groups.length,
-    channels: channels.map((channel) => ({
+    tabs: channels.map((c) => c.name),
+    tab,
+    ...(channelHref ? { tabHrefs: channels.map((c): [string, string] => [c.name, channelHref(c.id)]) } : {}),
+    channel: channel ? {
       id: channel.id,
       name: channel.name,
       rows: groups.map((group) => {
@@ -91,10 +109,23 @@ export function toPriceGroupsViewProps({ channels, groups, formats, cells }: Pri
           cells: formatIds.map((formatId) => {
             if (!formatId) return null;
             const cents = byKey.get(cellKey(channel.id, group.id, formatId));
-            return cents === undefined ? null : money(cents);
+            return cents === undefined ? null : dollarsInput(cents);
           }),
         };
       }),
-    })),
+    } : null,
   };
+}
+
+/** What leaving an inline price cell does: nothing, ask to clear, save cents, or refuse the text. */
+export type CellCommit = { kind: "none" } | { kind: "clear" } | { kind: "save"; cents: number } | { kind: "invalid" };
+
+/** `initial` is the saved dollars text ("" when unpriced); emptying a priced cell asks before clearing. */
+export function cellCommit(initial: string, dollars: string): CellCommit {
+  const text = dollars.trim().replace(/^\$/, "");
+  if (text === "") return initial === "" ? { kind: "none" } : { kind: "clear" };
+  const cents = toCents(text);
+  if (cents === undefined || !Number.isFinite(cents) || cents < 0) return { kind: "invalid" };
+  // "7" over a saved "7.00" is the same price: nothing to save.
+  return cents === toCents(initial) ? { kind: "none" } : { kind: "save", cents };
 }

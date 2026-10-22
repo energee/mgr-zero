@@ -400,9 +400,10 @@ describe("SCREENS", () => {
     expect(venue).toContain("9/3/26");
     expect(venue).not.toContain("9/11/26");
     const grid = SCREENS.find((s) => s.name === "Price groups")!;
-    const gridText = renderToStaticMarkup(createElement("div", null, grid.body)).replace(/<[^>]*>/g, " ");
-    expect(gridText).toContain("$150.00");
-    expect(gridText).not.toContain("$185.00");
+    // Grid cells are dollar fields: the price is the input's value.
+    const gridHtml = renderToStaticMarkup(createElement("div", null, grid.body));
+    expect(gridHtml).toContain('value="150.00"');
+    expect(gridHtml).not.toContain('value="185.00"');
     const history = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Invoice history")!.body));
     expect(history.match(/INV-1042/g)).toHaveLength(1);
     expect(history).not.toContain("INV-0198");

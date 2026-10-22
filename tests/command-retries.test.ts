@@ -105,7 +105,8 @@ it("runs a sheet's secondary action (Remove, Delete, Clear) through the form's o
 it("clears every sheet error on close: secondary actions share the form's slot, bespoke state resets (#447)", async () => {
   const { readFileSync } = await import("node:fs");
   const src = (p: string) => readFileSync(new URL(`../app/(app)/${p}`, import.meta.url), "utf8");
-  for (const p of ["locations/bin-form.tsx", "pricing/group-form.tsx", "pricing/price-cell-form.tsx", "settings/team/member-form.tsx"]) {
+  // pricing/price-cell-form.tsx is an inline field, not a sheet: it has no close to clear on.
+  for (const p of ["locations/bin-form.tsx", "pricing/group-form.tsx", "settings/team/member-form.tsx"]) {
     expect(src(p), p).not.toContain("useCommandAction(");
     expect(src(p), p).toContain("form.run(");
   }
