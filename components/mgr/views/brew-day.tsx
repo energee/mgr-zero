@@ -9,7 +9,8 @@ import { brewCorrectionModel, brewTurnModel, currentBrewRecords, brewSourceKey, 
 
 import { INGREDIENT_STAGES, perBblDisplay, type IngredientStage } from "@/lib/mgr/recipe-process-view";
 
-const processFields = [["preBoilBbl", "Pre-boil barrels"], ["boilMinutes", "Boil minutes"], ["whirlpoolMinutes", "Whirlpool minutes"], ["whirlpoolTempF", "Whirlpool °F"], ["whirlpoolRestMinutes", "Whirlpool rest minutes"], ["knockoutTempF", "Knockout °F"], ["mashWaterGal", "Mash water gallons"], ["spargeWaterGal", "Sparge water gallons"], ["targetMashPh", "Mash pH"]] as const;
+/** record_brew_day process keys and their labels; the Brew day timeline (./brew-timeline) regroups them by stage. */
+export const processFields = [["preBoilBbl", "Pre-boil barrels"], ["boilMinutes", "Boil minutes"], ["whirlpoolMinutes", "Whirlpool minutes"], ["whirlpoolTempF", "Whirlpool °F"], ["whirlpoolRestMinutes", "Whirlpool rest minutes"], ["knockoutTempF", "Knockout °F"], ["mashWaterGal", "Mash water gallons"], ["spargeWaterGal", "Sparge water gallons"], ["targetMashPh", "Mash pH"]] as const;
 
 import { PlanCancelled } from "./plan-actions";
 

@@ -2,6 +2,7 @@
 // snapshots. Views own no sample data.
 import type { BatchesSnapshot } from "@/lib/mgr/batches-view";
 import type { BrewDayViewModel } from "@/lib/mgr/brew-day-view";
+import { startAtPlan, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
 import type { RecipeViewModel } from "@/lib/mgr/recipe-view";
 import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
@@ -100,6 +101,40 @@ export const brewDayTurnsHazy: BrewDayViewModel = {
     id: `hazy-turn-${turn}`, turn, initial_bbl: 7.3, brewed_on: `2026-09-0${turn + 3}`, created_at: `2026-09-0${turn + 3}`,
     corrects_id: null, correction_reason: null, plan_snapshot: brewDayHazy.plan!, process: { knockoutTempF: 68 }, additions: [],
   })),
+};
+
+/** BAT-202 Mineral #6 v1, 22 bbl: its mash, boil and whirlpool ingredients, each starting at plan. */
+const mineralIngredients: BrewIngredient[] = ([
+  { key: "malted-oats", name: "Malted Oats", stage: "mash", plan: 1650, unit: "lb", packSize: 55, source: { lot: "MO-2611", bin: "Malt room / A2" } },
+  { key: "pilsen", name: "Briess Pilsen", stage: "mash", plan: 400, unit: "lb", packSize: 50, source: { lot: "BP-0918", bin: "Malt room / A1" } },
+  { key: "chit", name: "Chit Malt", stage: "mash", plan: 220, unit: "lb", packSize: 50, source: null },
+  { key: "rolled-oats", name: "Rolled Oats", stage: "mash", plan: 200, unit: "lb", packSize: 50, source: { lot: null, bin: "Dry storage / D1" } },
+  { key: "white-wheat", name: "Briess White Wheat", stage: "mash", plan: 200, unit: "lb", packSize: 50, source: { lot: "WW-0822", bin: "Malt room / A3" } },
+  { key: "crystals", name: "Brewer’s Crystals", stage: "boil", plan: 110, unit: "lb", packSize: 55, source: { lot: "BC-0710", bin: "Dry storage / D2" } },
+  { key: "nelson", name: "Freestyle Nelson Sauvin 2026", stage: "whirlpool", plan: 44, unit: "lb", packSize: 44, source: { lot: "NS-26-114", bin: "Hop freezer / F1" } },
+] satisfies Omit<BrewIngredient, "packs" | "loose">[]).map(startAtPlan);
+
+const mineralVessels = [1, 2, 3, 4, 5, 6].map(n => ({ id: `fv${n}`, name: `FV${n}`, kind: "fermenter", capacity_bbl: 25.5 }));
+
+/** Prep mid-pull: Briess Pilsen came up 7.5 sacks, so it reads short. */
+export const brewPrepMineral: BrewPrepViewModel = {
+  title: "BAT-202 · Mineral #6 v1 · 22 bbl",
+  vesselId: "fv3",
+  vessels: mineralVessels,
+  ingredients: mineralIngredients.map(row => row.key === "pilsen" ? { ...row, packs: "7.5", loose: "0" } : row),
+  later: "Fermentation 1 · Dry hop 6",
+};
+
+/** Brew day mid-mash: the first two mash rows confirmed, so Mash is the open stage on a phone. */
+export const brewTimelineMineral: BrewTimelineViewModel = {
+  title: brewPrepMineral.title,
+  ingredients: brewPrepMineral.ingredients.map(row => ({ ...row, confirmed: row.key === "malted-oats" || row.key === "pilsen" })),
+  targets: { mash: "152 °F · 60 min · pH 5.3", lauter: "pre-boil 25 bbl", boil: "60 min", whirlpool: "180 °F · 20 min", knockout: "66 °F" },
+  process: { mashWaterGal: "620", targetMashPh: "5.3" },
+  vesselId: "fv3",
+  vessels: mineralVessels,
+  initialBbl: "22",
+  brewedOn: "2026-10-22",
 };
 
 export const vesselFv3: VesselDetailViewModel = {
