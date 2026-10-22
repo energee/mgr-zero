@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { ChannelView } from "../components/mgr/views/channel";
 import { SaleChannelsView } from "../components/mgr/views/sale-channels";
-import { UnitsView } from "../components/mgr/views/units";
+import { GravityUnitControls, UnitsView } from "../components/mgr/views/units";
 import { channelExport, saleChannelsList, unitsPlato } from "../lib/mgr/fixtures/settings-catalog";
 import { toChannelViewProps } from "../lib/mgr/channel-view";
 import { toSaleChannelsViewProps } from "../lib/mgr/sale-channels-view";
@@ -164,8 +164,9 @@ describe("Units view", () => {
     expect(model.mineIndex).toBe(0);
   });
 
-  it("previews the conversion into the unit in effect (#1155)", () => {
-    expect(toUnitsViewProps(unitsPlato).preview).toBe("A reading of 1.050 SG shows as 12.5 °P.");
+  it("previews a reading typed in the other unit, converted into the unit in effect (#1155)", () => {
+    // 1.050 SG is 12.39 °P, so Plato shows 12.4 — computed, not the 12.5 sample echoed.
+    expect(toUnitsViewProps(unitsPlato).preview).toBe("A reading of 1.050 SG shows as 12.4 °P.");
     expect(toUnitsViewProps({ brewery: "plato", mine: "sg", effective: "sg" }).preview)
       .toBe("A reading of 12.5 °P shows as 1.050 SG.");
   });
@@ -177,7 +178,7 @@ describe("Units view", () => {
     expect(html).toContain("Use brewery default · Plato (°P)");
   });
 
-  it("uses effective for the chips when mine overrides brewery", () => {
+  it("places the chips on brewery and mine when mine overrides brewery", () => {
     const model = toUnitsViewProps({ brewery: "plato", mine: "sg", effective: "sg" });
     expect(model.breweryIndex).toBe(0);
     expect(model.mineIndex).toBe(2);
@@ -193,11 +194,11 @@ describe("Units view", () => {
     expect(html).toMatch(/Your preference/);
     expect(html).toMatch(/>Plato \(°P\)</);
     expect(html).toMatch(/>Specific gravity \(SG\)</);
-    expect(html).toContain("A reading of 1.050 SG shows as 12.5 °P.");
+    expect(html).toContain("A reading of 1.050 SG shows as 12.4 °P.");
     expect(html).not.toMatch(/→/);
   });
 
-  it("a controls slot replaces the chip groups and keeps the note and preview", () => {
+  it("a controls slot replaces the chip groups and the preview, and keeps the note", () => {
     const html = htmlOf(createElement(UnitsView, {
       model: toUnitsViewProps(unitsPlato),
       controls: "CONTROLS",
@@ -206,7 +207,14 @@ describe("Units view", () => {
     expect(html).not.toMatch(/Use brewery default/);
     expect(html).not.toMatch(/Brewery default/);
     expect(html).toContain("Changing this only changes how gravity is shown and typed. Your readings are not changed.");
-    expect(html).toContain("A reading of 1.050 SG shows as 12.5 °P.");
+    expect(html).not.toMatch(/A reading of/);
+  });
+
+  it("the preview follows the controls' model, so a tapped chip and the preview agree (#1155 review)", () => {
+    const html = htmlOf(createElement(GravityUnitControls, {
+      model: toUnitsViewProps({ brewery: "plato", mine: "sg", effective: "sg" }),
+    }));
+    expect(html).toContain("A reading of 12.5 °P shows as 1.050 SG.");
   });
 
   it("the Units inventory record is UnitsView", () => {

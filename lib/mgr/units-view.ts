@@ -1,6 +1,7 @@
 // lib/mgr/units-view.ts — view-model for Settings · Units.
-// Maps get_gravity_unit onto UnitsView; the preview converts one sample
-// reading with formatGravity, from the other unit into the one in effect.
+// Maps get_gravity_unit onto UnitsView; the preview takes a typical reading
+// typed in the other unit and shows it as formatGravity would in the unit in effect.
+import { sgToPlato } from "@/lib/recipe-gravity";
 import { formatGravity, GRAVITY_UNITS, gravityUnitLabel, type GravityUnit } from "./gravity-unit";
 
 export type UnitsViewModel = {
@@ -9,7 +10,7 @@ export type UnitsViewModel = {
   breweryIndex: number;
   mineOptions: string[];
   mineIndex: number;
-  /** "A reading of 12.5 °P shows as 1.050 SG." — always a conversion. */
+  /** "A reading of 12.5 °P shows as 1.050 SG." — the other unit into the one in effect. */
   preview: string;
 };
 
@@ -27,10 +28,11 @@ export const BREWERY_UNITS: readonly GravityUnit[] = GRAVITY_UNITS;
 /** Position 0 is "Use brewery default", the null personal override. */
 export const MINE_UNITS: readonly (GravityUnit | null)[] = [null, ...GRAVITY_UNITS];
 
-const SAMPLE_PLATO = 12.5;
-/** The sample reading in one unit, with its symbol: formatGravity leaves SG bare. */
-function sampleReading(unit: GravityUnit): string {
-  return unit === "sg" ? `${formatGravity(SAMPLE_PLATO, unit)} SG` : formatGravity(SAMPLE_PLATO, unit);
+/** A typical wort as typed in each unit, held as the °Plato it is stored as. */
+const SAMPLE_PLATO: Record<GravityUnit, number> = { plato: 12.5, sg: sgToPlato(1.05) };
+/** A stored Plato figure in one unit, with its symbol: formatGravity leaves SG bare. */
+function reading(plato: number, unit: GravityUnit): string {
+  return unit === "sg" ? `${formatGravity(plato, unit)} SG` : formatGravity(plato, unit);
 }
 
 /** Map a get_gravity_unit payload onto UnitsView. */
@@ -42,6 +44,6 @@ export function toUnitsViewProps({ brewery, mine, effective, backHref }: UnitsSn
     breweryIndex: BREWERY_UNITS.indexOf(brewery),
     mineOptions: [`Use brewery default · ${gravityUnitLabel(brewery)}`, ...breweryOptions],
     mineIndex: MINE_UNITS.indexOf(mine),
-    preview: `A reading of ${sampleReading(otherUnit)} shows as ${sampleReading(effective)}.`,
+    preview: `A reading of ${reading(SAMPLE_PLATO[otherUnit], otherUnit)} shows as ${reading(SAMPLE_PLATO[otherUnit], effective)}.`,
   };
 }
