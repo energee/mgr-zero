@@ -30,7 +30,9 @@ export function BinView({
   controls?: { name?: (value: string) => void };
   messages?: ReactNode;
   footer?: ReactNode;
-  /** Live: the wired RemoveBinControl, or null for a new bin. */
+  /** Live: the wired RemoveBinControl, or null for a new bin (no section).
+   *  Left out (the inventory fixtures), a named bin draws an unwired
+   *  RemoveBinControl, as `footer` left out draws a plain Save bin. */
   remove?: ReactNode;
 }) {
   const removal = remove !== undefined ? remove : model.name ? <RemoveBinControl bin={model.name} /> : null;
