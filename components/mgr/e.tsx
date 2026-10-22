@@ -14,6 +14,7 @@ import { Palette, type PaletteGroup } from "@/components/mgr/palette";
 import { Qty, StepQuantity, TabBar } from "@/components/mgr/qty";
 import { SearchPick, type SearchPickOption } from "@/components/mgr/search-pick";
 import { SortTable } from "@/components/mgr/sort-table";
+import { SubmitButton, type SubmitButtonProps } from "@/components/mgr/submit-button";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
 import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
 import { ComposerDrawerView } from "@/components/mgr/views/composer-drawer";
@@ -23,7 +24,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Progress } from "@/components/ui/progress";
@@ -114,12 +115,44 @@ const fieldGrid = (fields: React.ReactNode[], className: string) => (
 /** What a live adapter passes to make a field its own: an onChange, or none
  *  with `disabled` for a read-out that must not look editable. Fixtures pass
  *  nothing and draw a default value. */
-export type FieldControls = Pick<React.InputHTMLAttributes<HTMLInputElement>, "id" | "name" | "disabled" | "required" | "readOnly" | "min" | "max" | "step" | "minLength" | "maxLength" | "pattern" | "placeholder" | "autoComplete" | "inputMode" | "aria-label" | "aria-invalid" | "aria-describedby" | "form"> & {
+export type FieldControls = Pick<React.InputHTMLAttributes<HTMLInputElement>, "id" | "name" | "disabled" | "required" | "readOnly" | "min" | "max" | "step" | "minLength" | "maxLength" | "pattern" | "placeholder" | "autoComplete" | "inputMode" | "aria-label" | "aria-invalid" | "aria-describedby" | "form" | "onBlur"> & {
   onChange?: (value: string) => void;
   /** Inline row controls already have visible context. */
   hideLabel?: boolean;
   contextualLabels?: boolean;
+  /** What is wrong with the value, shown under the field (#1121). The field is
+   *  marked invalid; pass `id` too, so the message (`${id}-error`) is linked.
+   *  Pass it once the user has left the field (`onBlur`), not while typing. */
+  error?: string;
 };
+
+/** A picker with nothing to offer says so, and where the missing record is
+ *  made (#1123). `href` is that page on a live screen; the inventory leaves it
+ *  out and the link stays "#". `to` names the inventory screen it opens. With
+ *  no `label` there is no link: `text` then names who can add the record. */
+export type PickEmpty = { text: string; href?: string; label?: string; to?: string };
+
+/** One aria-describedby value from several optional ids. */
+export const describedBy = (...ids: (string | undefined)[]) => ids.filter(Boolean).join(" ") || undefined;
+
+/** A field's error wiring: the invalid flag and description for the control,
+ *  and the FieldError message under it. */
+function fieldError(controls?: Pick<FieldControls, "id" | "error" | "aria-invalid" | "aria-describedby">) {
+  const errorId = controls?.error && controls.id ? `${controls.id}-error` : undefined;
+  return {
+    invalid: controls?.error ? true : controls?.["aria-invalid"],
+    describedBy: describedBy(controls?.["aria-describedby"], errorId),
+    message: controls?.error ? <FieldError id={errorId}>{controls.error}</FieldError> : null,
+  };
+}
+
+/** The empty note under a picker, outside the control, so a disabled or
+ *  unopenable picker still explains itself. */
+const emptyNote = (empty: PickEmpty, id?: string) => (
+  <FieldDescription id={id}>
+    {empty.text}{empty.label ? <> <Link href={empty.href ?? "#"} data-to={empty.to}>{empty.label}</Link></> : null}
+  </FieldDescription>
+);
 
 export const E = {
   palette: (placeholder: string, groups: PaletteGroup[]) => <Palette placeholder={placeholder} groups={groups} />,
@@ -160,7 +193,7 @@ export const E = {
       </div>
     );
   },
-  /** A group heading inside a list, larger than `ttl`: the beer over its formats on Confirm order, the ship date on Pick sheet. */
+  /** A group heading, larger than `ttl`: the beer over its formats on Confirm order, the ship date on Pick sheet, the one Gravity unit section on Units. Both render h2, so the `ttl`s after it sit beside it in the outline. */
   group: (t: React.ReactNode) => <h2 className="mt-3 text-base font-semibold">{t}</h2>,
   /** The same beer name in a table's first column (Pick, Adjust lines), at the row's text size so its row is no taller than a format row; a long name and alias wraps on a phone. */
   brand: (t: React.ReactNode) => <span className="inline-block max-w-28 whitespace-normal font-semibold md:max-w-none">{t}</span>,
@@ -268,9 +301,13 @@ export const E = {
    *  addon — plain text ("bbl"), chips, or a segmented unit choice (`E.tabs`
    *  hugged with "w-fit"). The field's clipping and addon padding live in
    *  components/mgr/qty.tsx, shared with `volume`. */
-  qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string, controls?: FieldControls) => (
-    <Qty value={value} unit={unit} label={label} id={id} onChange={controls?.onChange} />
-  ),
+  qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string, controls?: FieldControls) => {
+    const error = fieldError({ ...controls, id });
+    return <>
+      <Qty value={value} unit={unit} label={label} id={id} onChange={controls?.onChange} invalid={error.invalid} describedBy={error.describedBy} />
+      {error.message}
+    </>;
+  },
   /** A view switcher. E.tabs draws no TabsContent: the body below stands in
    *  for the active panel. A filter that swaps the whole list (Work's kinds, an
    *  order's states) is a tab bar too. A live in-place filter (WorkView) calls
@@ -301,6 +338,12 @@ export const E = {
       {t}
     </div>
   ),
+  /** A form's submit, withheld while `submitting` or while `reason` (from
+   *  submitReason, lib/mgr/submit-reason.ts: "Still needed: …") names what is
+   *  missing; the reason is printed beside it and linked by aria-describedby
+   *  (#1122). `id` names the button, and the reason is `${id}-reason`. Other
+   *  options are passed to the Button (variant, className, form). */
+  submit: (label: React.ReactNode, options: Omit<SubmitButtonProps, "label">) => <SubmitButton label={label} {...options} />,
   tape: (arr: [React.ReactNode, React.ReactNode?][]) => (
     <ol className="ml-1 flex flex-col gap-1 border-l-2 pl-3 font-mono text-xs text-muted-foreground">
       {arr.map(([a, b], i) => (
@@ -328,8 +371,13 @@ export const E = {
   /** An editable field. type is the native input type; "date" pops the calendar
    *  (DatePicker). */
   edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[], controls?: FieldControls) => {
-    const { onChange, hideLabel, contextualLabels, ...attributes } = controls ?? {};
-    if (type === "date") return <DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} aria-describedby={controls?.["aria-describedby"]} />;
+    // `error` is drawn under the field (fieldError), never passed to the input.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { onChange, hideLabel, contextualLabels, error: _error, ...rest } = controls ?? {};
+    const error = fieldError(controls);
+    const attributes = { ...rest, "aria-invalid": error.invalid, "aria-describedby": error.describedBy };
+    // DatePicker draws its own Field and takes no invalid flag, so a date's error is its message alone.
+    if (type === "date") return <><DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} aria-describedby={error.describedBy} />{error.message}</>;
     // A whole number (a contract quantity, an overdue threshold) is counted,
     // not typed: the same −/+ stepper Weekly count uses.
     if (type === "number") {
@@ -337,6 +385,7 @@ export const E = {
         <Field data-disabled={attributes.disabled} data-invalid={attributes["aria-invalid"]}>
           {!hideLabel && <FieldLabel htmlFor={attributes.id}>{label}</FieldLabel>}
           {E.stq(Number(value) || 0, label, { ...attributes, value, onChange, contextualLabels, step: controls?.step ?? "any", required: controls?.required ?? false })}
+          {error.message}
         </Field>
       );
     }
@@ -350,6 +399,7 @@ export const E = {
         {!hideLabel && <FieldLabel htmlFor={attributes.id}>{label}</FieldLabel>}
         <Input type={type} aria-label={label} {...attributes} {...(onChange ? { value, onChange: (event) => onChange(event.target.value) } : { defaultValue: value })} list={listId} />
         {listId ? <datalist id={listId}>{suggestions!.map((o) => <option key={o} value={o} />)}</datalist> : null}
+        {error.message}
       </Field>
     );
   },
@@ -379,27 +429,42 @@ export const E = {
     </Field>
   ),
   /** A picked value: a Select for short fixed lists; long lists (SKU, customer) keep opening Entity picker.
-   *  The trigger shows the matching option's label (so server markup names the choice) unless `displayValue` overrides it. */
-  pick: (label: string, value: string, options: (string | { value: string; label: string; disabled?: boolean })[], controls?: FieldControls & { forward?: boolean; displayValue?: ReactNode; description?: ReactNode }) => (
-    <Field data-disabled={controls?.disabled}>
+   *  The trigger shows the matching option's label (so server markup names the choice) unless `displayValue` overrides it.
+   *  `empty` is shown when nothing but a "" placeholder is offered. */
+  pick: (label: string, value: string, options: (string | { value: string; label: string; disabled?: boolean })[], controls?: FieldControls & { forward?: boolean; displayValue?: ReactNode; description?: ReactNode; empty?: PickEmpty }) => {
+    const empty = controls?.empty && !options.some((o) => (typeof o === "string" ? o : o.value) !== "") ? controls.empty : undefined;
+    const emptyId = empty && controls?.id ? `${controls.id}-empty` : undefined;
+    const error = fieldError(controls);
+    return (
+    <Field data-disabled={controls?.disabled} data-invalid={error.invalid}>
       {!controls?.hideLabel && <FieldLabel htmlFor={controls?.id}>{label}</FieldLabel>}
       <Select {...(controls?.onChange ? { value, onValueChange: (next) => controls.onChange?.(next === "__empty_field__" ? "" : next) } : { defaultValue: value })} disabled={controls?.disabled} required={controls?.required} name={controls?.name} form={controls?.form}>
-        <SelectTrigger id={controls?.id} aria-label={controls?.["aria-label"] ?? label} aria-describedby={controls?.["aria-describedby"]} className={controls?.forward ? "[&_svg:last-child]:hidden" : undefined}><SelectValue placeholder={options.find((o): o is { value: string; label: string } => typeof o !== "string" && o.value === "")?.label ?? controls?.placeholder}>{controls?.displayValue ?? options.map((o) => typeof o === "string" ? { value: o, label: o } : o).find((o) => o.value === value)?.label}</SelectValue>{controls?.forward ? <DirectionIcon label="Open" /> : null}</SelectTrigger>
+        <SelectTrigger id={controls?.id} aria-label={controls?.["aria-label"] ?? label} aria-describedby={describedBy(error.describedBy, emptyId)} aria-invalid={error.invalid} className={controls?.forward ? "[&_svg:last-child]:hidden" : undefined}><SelectValue placeholder={options.find((o): o is { value: string; label: string } => typeof o !== "string" && o.value === "")?.label ?? controls?.placeholder}>{controls?.displayValue ?? options.map((o) => typeof o === "string" ? { value: o, label: o } : o).find((o) => o.value === value)?.label}</SelectValue>{controls?.forward ? <DirectionIcon label="Open" /> : null}</SelectTrigger>
         <SelectContent><SelectGroup>{options.map((o) => typeof o === "string" ? <SelectItem key={o} value={o || "__empty_field__"}>{o}</SelectItem> : <SelectItem key={o.value} value={o.value || "__empty_field__"} disabled={o.disabled}>{o.label}</SelectItem>)}</SelectGroup></SelectContent>
       </Select>
       {controls?.description}
+      {empty && emptyNote(empty, emptyId)}
+      {error.message}
     </Field>
-  ),
+    );
+  },
   /** A picked value from a list too long for a Select (materials): the trigger opens a
    *  searchable sheet (phone) or dialog (desk). `placeholder` is the trigger text when
-   *  nothing is picked; `selectedLabel` names a retained value missing from `options`. */
-  searchPick: (label: string, value: string, options: SearchPickOption[], controls?: Pick<FieldControls, "id" | "disabled" | "placeholder" | "hideLabel" | "onChange" | "aria-describedby"> & { selectedLabel?: string; previewAction?: boolean }) => (
+   *  nothing is picked; `selectedLabel` names a retained value missing from `options`.
+   *  With no options the open list says "No … to choose yet", never "No matching …";
+   *  `empty` adds the note and link under the trigger. */
+  searchPick: (label: string, value: string, options: SearchPickOption[], controls?: Pick<FieldControls, "id" | "disabled" | "placeholder" | "hideLabel" | "onChange" | "aria-describedby"> & { selectedLabel?: string; previewAction?: boolean; empty?: PickEmpty }) => {
+    const empty = options.length ? undefined : controls?.empty;
+    const emptyId = empty && controls?.id ? `${controls.id}-empty` : undefined;
+    return (
     <Field data-disabled={controls?.disabled}>
       {!controls?.hideLabel && <FieldLabel htmlFor={controls?.id}>{label}</FieldLabel>}
-      <SearchPick label={label} value={value} options={options} onChange={controls?.onChange} id={controls?.id} disabled={controls?.disabled} errorId={controls?.["aria-describedby"]} selectedLabel={controls?.selectedLabel} previewAction={controls?.previewAction}
-        title={label} placeholder={controls?.placeholder ?? `Select ${label.toLowerCase()}`} searchPlaceholder={`Search ${label.toLowerCase()}`} noMatchMessage={`No matching ${label.toLowerCase()}`} />
+      <SearchPick label={label} value={value} options={options} onChange={controls?.onChange} id={controls?.id} disabled={controls?.disabled} errorId={describedBy(controls?.["aria-describedby"], emptyId)} selectedLabel={controls?.selectedLabel} previewAction={controls?.previewAction}
+        title={label} placeholder={controls?.placeholder ?? `Select ${label.toLowerCase()}`} searchPlaceholder={`Search ${label.toLowerCase()}`} noMatchMessage={`No matching ${label.toLowerCase()}`} emptyMessage={controls?.empty?.text ?? `No ${label.toLowerCase()} to choose yet`} />
+      {empty && emptyNote(empty, emptyId)}
     </Field>
-  ),
+    );
+  },
   // The amber box and the quiet box differed only by tint; the glyph is the
   // second channel, so the difference survives a dim screen or a colorblind eye.
   note: (t: React.ReactNode, role: "note" | "alert" = "note") => (

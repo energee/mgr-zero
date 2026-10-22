@@ -33,6 +33,15 @@ export const newPoCountryMalt: NewPoViewModel = {
   ],
 };
 
+/** New PO on a brewery with no vendors yet and one line typed wrong: the
+ *  empty picker, field errors and withheld Save draft (#1121–#1123). */
+export const newPoIncomplete: NewPoViewModel = {
+  vendor: "",
+  vendors: [],
+  expected: "",
+  lines: [{ key: "malt", materialId: "malt", title: "2-row · 55 lb bags", detail: "lot-tracked", qty: "-4", cost: "-3", lot: "" }],
+};
+
 export const receivePoCountryMalt: ReceivePoViewModel = {
   state: "sent", closure: "cancel", closureReason: "Vendor cannot fulfil this order", locationId: "warehouse", binId: "shelf", receivedOn: "2026-09-10",
   locations: [{ id: "warehouse", name: "Warehouse" }], bins: [{ id: "shelf", name: "Shelf" }],
