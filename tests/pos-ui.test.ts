@@ -124,7 +124,8 @@ describe("POS UI truth", () => {
     expect(pos).toContain("Square’s own connector, separate from MGR");
     expect(pos).not.toContain("QuickBooks connector");
     const connect = renderToStaticMarkup(createElement(ConnectSquareView, { configured: false }));
-    expect(connect).toContain("Contact MGR support");
+    expect(connect).toContain("Square isn’t turned on in MGR yet.");
+    expect(connect).not.toContain("support");
     expect(connect).not.toContain("server connection values");
   });
 
@@ -172,13 +173,13 @@ describe("POS UI truth", () => {
   it("maps every live POS route to its inventory screen", () => {
     const routes = new Map(SCREEN_ROUTES.map((route) => [route.name, route.file]));
     expect(Object.fromEntries([...routes].filter(([name]) => [
-      "Point of sale", "Connect Square", "Square locations", "Square → QuickBooks connector",
+      "Point of sale", "Connect Square", "Square locations", "Taproom sales in QuickBooks",
       "Disconnect Square", "POS sale detail", "Menu", "POS item",
     ].includes(name)))).toEqual({
       "Point of sale": "app/(app)/settings/pos/page.tsx",
       "Connect Square": "app/(app)/settings/pos/connect/page.tsx",
       "Square locations": "app/(app)/settings/pos/locations/page.tsx",
-      "Square → QuickBooks connector": "app/(app)/settings/pos/connector/page.tsx",
+      "Taproom sales in QuickBooks": "app/(app)/settings/pos/connector/page.tsx",
       "Disconnect Square": "app/(app)/settings/pos/disconnect/page.tsx",
       "POS sale detail": "app/(app)/settings/pos/sales/[id]/page.tsx",
       Menu: "app/(app)/menu/page.tsx",

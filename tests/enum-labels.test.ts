@@ -1,5 +1,6 @@
 // Issue #333: enum values must reach operators as human labels, never as the
 // raw lowercase/snake_case database value.
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { connectionStateLabel, sentenceCase, importKindLabel } from "@/lib/mgr/labels";
 import { MOVEMENT_KIND_OPTIONS } from "@/lib/mgr/record-movement-view";
@@ -59,5 +60,14 @@ describe("connection states (#1151)", () => {
     expect(["connected", "disconnected", "recovery_required"].map(connectionStateLabel)).toEqual([
       "Connected", "Not connected", "Reconnect required",
     ]);
+  });
+
+  it("is the label every page that prints a connection state uses", () => {
+    // Point of sale and Invoices build their status in the page, not in a tested adapter.
+    for (const file of ["lib/mgr/accounting-view.ts", "app/(app)/settings/pos/page.tsx", "app/(app)/invoices/page.tsx"]) {
+      const source = readFileSync(file, "utf8");
+      expect(source, file).toContain("connectionStateLabel(health.state)");
+      expect(source, file).not.toMatch(/state\.replace(All)?\(/);
+    }
   });
 });

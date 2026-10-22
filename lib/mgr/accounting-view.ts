@@ -9,7 +9,10 @@ export type QboMappingSection = {
   rows: { id: string; label: string; kind: QboMappingKind; currentId?: string | null; detail?: string }[];
 };
 export type AccountingViewModel = {
-  connected: boolean; canDisconnect: boolean; company: string; status: string; reconnect: boolean; error?: string | null; access?: string;
+  connected: boolean; canDisconnect: boolean; company: string; status: string;
+  /** Health carries a connectionId, so MGR has connected this brewery before: the button reads Reconnect QuickBooks. */
+  reconnect: boolean;
+  error?: string | null; access?: string;
   /** QuickBooks realm id, shown as its own fact. */
   companyId?: string;
   syncStatus?: QboSyncStatus;

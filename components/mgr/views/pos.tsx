@@ -61,7 +61,7 @@ export function ConnectSquareView({ configured = true, busy = false, error, onCo
     {E.info("MGR publishes owned catalog items to Square and reads completed sales as expected consumption.")}
     {E.note("Connecting does not publish a menu, import old sales, or change inventory.")}
     <Button disabled={!configured || busy} onClick={onConnect}>{busy ? "Opening Square…" : "Connect Square"}</Button>
-    {!configured && <p className="text-sm text-muted-foreground">Square isn’t available in MGR yet. Contact MGR support to turn it on.</p>}
+    {!configured && <p className="text-sm text-muted-foreground">Square isn’t turned on in MGR yet.</p>}
     <CommandFormMessage error={error ?? null} />
   </>;
 }

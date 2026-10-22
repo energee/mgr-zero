@@ -45,7 +45,7 @@ export function QboSyncView({ busy = false, disabled = false, error, onSync, sta
 export function QboConnectionView({ configured = true, reconnect = false, busy = false, error, onConnect }: { configured?: boolean; reconnect?: boolean; busy?: boolean; error?: string | null; onConnect?: () => void }) {
   return <div className="flex flex-col gap-2">
     <Button type="button" data-variant="irreversible" className="bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" disabled={!configured || busy} onClick={onConnect}>{busy ? "Opening QuickBooks…" : reconnect ? "Reconnect QuickBooks" : "Connect QuickBooks"}</Button>
-    {!configured && <p className="text-sm text-muted-foreground">QuickBooks isn’t available in MGR yet. Contact MGR support to turn it on.</p>}
+    {!configured && <p className="text-sm text-muted-foreground">QuickBooks isn’t turned on in MGR yet.</p>}
     <CommandFormMessage error={error} />
   </div>;
 }
@@ -62,6 +62,15 @@ export function QboDefaultsView({ allowAch, allowCard, busy = false, disabled = 
   </form>;
 }
 
+/** The portal's Pay button opens each invoice's QuickBooks payment link, so online
+ *  payment needs the connection; new invoices get a link only for the push defaults
+ *  that are on. Invoices pushed earlier keep the options they were pushed with. */
+function OnlinePaymentsRow({ model }: { model: AccountingViewModel }) {
+  if (!model.connected) return E.row("Online payments", "Needs a QuickBooks connection", "Not available", "", QuickBooksMark);
+  if (model.defaults && !model.defaults.allowAch && !model.defaults.allowCard) return E.row("Online payments", "Bank transfer and card are off for new invoices", "Off", "", QuickBooksMark);
+  return E.row("Online payments", "Through each invoice’s QuickBooks payment link", "", "ok", QuickBooksMark);
+}
+
 /** count_customers_missing_portal_email as a sentence; undefined when the caller did not read it. */
 function missingEmailsDetail(count?: number) {
   if (count === undefined) return "Count unavailable · review portal login emails";
@@ -76,10 +85,7 @@ export function AccountingView({ model, connection, defaults, messages, sync }: 
     {E.row(model.company, model.status, model.canDisconnect ? E.act("Disconnect", "destructive", model.disconnectHref) : "", model.connected ? "ok" : "w", QuickBooksMark)}
     {model.error && E.note(`Last connection error: ${model.error}`, "alert")}
     {!model.connected && (connection !== undefined ? connection : <QboConnectionView reconnect={model.reconnect} />)}
-    {/* The Pay button reads each invoice's payment link from QuickBooks, so payments need the connection. */}
-    {model.connected
-      ? E.row("Online payments", "Through each invoice’s QuickBooks payment link", "", "ok", QuickBooksMark)
-      : E.row("Online payments", "Connect QuickBooks first", "Not available", "", QuickBooksMark)}
+    <OnlinePaymentsRow model={model} />
     {model.connected && <>{E.fld("Company", model.company)}{model.companyId && E.fld("Company ID", model.companyId)}{model.access && E.fld("Access", model.access)}{E.nav("Mappings", "Customers, SKUs and returnable-keg deposits", "", undefined, model.mappingsHref)}</>}
     {sync !== undefined ? sync : <QboSyncView status={model.syncStatus} disabled={!model.connected} />}
     {E.ttl("Push defaults")}

@@ -27,9 +27,10 @@ it("preserves unavailable setup, errors, and explicit payment settings", () => {
   expect(connect).toContain("disabled");
   expect(connect).toContain("Authorization failed");
   expect(connect).toContain('data-variant="irreversible"');
-  // The admin cannot set server values; the copy names who can turn QuickBooks on (#1151).
-  expect(connect).toContain("Contact MGR support");
+  // The admin cannot set server values, and MGR has no support channel to promise (#1151).
+  expect(connect).toContain("QuickBooks isn’t turned on in MGR yet.");
   expect(connect).not.toContain("server connection values");
+  expect(connect).not.toContain("support");
   const defaults = renderToStaticMarkup(createElement(QboDefaultsView, { allowAch: false, allowCard: true, disabled: true }));
   expect(defaults).toContain('aria-checked="false"');
   expect(defaults).toContain('aria-checked="true"');
@@ -87,8 +88,12 @@ it("reads connection statuses, online payments and portal logins as sentences (#
   const disconnected = render(toAccountingViewProps(health, "America/New_York", 0));
   expect(disconnected).toContain("Not connected");
   expect(disconnected).not.toContain("fail closed");
-  expect(disconnected).toContain("Connect QuickBooks first");
+  // True whether QuickBooks was never connected, needs reconnecting, or is not turned on.
+  expect(disconnected).toContain("Needs a QuickBooks connection");
   expect(disconnected).toContain("Not available");
+  const recovery = render(toAccountingViewProps({ ...health, state: "recovery_required", connectionId: "c1" }, "America/New_York"));
+  expect(recovery).toContain("Needs a QuickBooks connection");
+  expect(recovery).not.toContain("Connect QuickBooks first");
   expect(disconnected).toContain("All customers have a portal login email");
   // The section heading names Push defaults; the locked card under it does not repeat it.
   expect(disconnected.match(/Push defaults/g)).toHaveLength(1);
@@ -96,4 +101,11 @@ it("reads connection statuses, online payments and portal logins as sentences (#
   expect(connected).toContain("Through each invoice’s QuickBooks payment link");
   expect(connected).not.toContain("Not available");
   expect(connected).toContain("1 customer has no portal login email");
+  // QboDefaultsView: both options off means customers cannot pay new invoices online.
+  const bothOff = render(toAccountingViewProps({ ...health, connected: true, state: "connected", connectionId: "c1", allowAch: false, allowCard: false }, "America/New_York"));
+  expect(bothOff).toContain("Bank transfer and card are off for new invoices");
+  expect(bothOff).toContain(">Off<");
+  expect(bothOff).not.toContain("Through each invoice’s QuickBooks payment link");
+  const achOnly = render(toAccountingViewProps({ ...health, connected: true, state: "connected", connectionId: "c1", allowAch: true, allowCard: false }, "America/New_York"));
+  expect(achOnly).toContain("Through each invoice’s QuickBooks payment link");
 });
