@@ -66,21 +66,16 @@ describe("orderFormReadiness", () => {
     expect(orderFormReadiness({ ...empty, kind: "taproom_transfer", catalog: { customers: 0, locations: 1, skus: 1 } }).hint).toBeNull();
   });
 
-  it("the hint links only the pages where each missing thing is added (#1127)", () => {
+  it("the hint's Go to sentence links only the pages where Sales can add what is missing (#1127)", () => {
     const empty = { kind: "wholesale" as const, customerId: "", shipToId: "", fromLocationId: "", toLocationId: "", lines: [{ skuId: "", qty: "" }] };
-    const nothing = { customers: 0, locations: 0, skus: 0 };
-    expect(orderFormReadiness({ ...empty, catalog: nothing }).links).toEqual([
-      { label: "Customers", href: "/customers" },
-      { label: "Locations", href: "/locations" },
-      { label: "Catalog", href: "/catalog" },
-    ]);
+    const customers = { label: "Customers", href: "/customers" };
+    const catalog = { label: "Catalog", href: "/catalog" };
+    expect(orderFormReadiness({ ...empty, catalog: { customers: 0, locations: 0, skus: 0 } }).goTo).toEqual(["Go to ", customers, " or ", catalog, "."]);
     // A transfer never needs a customer, so it never links Customers.
-    expect(orderFormReadiness({ ...empty, kind: "taproom_transfer", catalog: nothing }).links).toEqual([
-      { label: "Locations", href: "/locations" },
-      { label: "Catalog", href: "/catalog" },
-    ]);
-    expect(orderFormReadiness({ ...empty, catalog: { customers: 1, locations: 1, skus: 0 } }).links).toEqual([{ label: "Catalog", href: "/catalog" }]);
-    expect(orderFormReadiness({ ...empty, catalog: { customers: 1, locations: 1, skus: 1 } }).links).toEqual([]);
+    expect(orderFormReadiness({ ...empty, kind: "taproom_transfer", catalog: { customers: 0, locations: 0, skus: 0 } }).goTo).toEqual(["Go to ", catalog, "."]);
+    // Only an admin can add a location (the Locations page offers Sales no Add), so a missing location is named in the hint but not linked.
+    expect(orderFormReadiness({ ...empty, catalog: { customers: 1, locations: 0, skus: 1 } }).goTo).toEqual([]);
+    expect(orderFormReadiness({ ...empty, catalog: { customers: 1, locations: 1, skus: 1 } }).goTo).toEqual([]);
   });
 });
 

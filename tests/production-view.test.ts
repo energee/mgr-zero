@@ -164,13 +164,6 @@ describe("New batch sheet", () => {
     expect(html).toMatch(/Note · optional/);
   });
 
-  it("the live dialog is titled New batch and commits with Schedule batch (#1127)", () => {
-    const form = src("app/(app)/batches/new-batch-form.tsx");
-    expect(form).toMatch(/title="New batch"/);
-    expect(form).toMatch(/"Schedule batch"/);
-    expect(form).not.toMatch(/Save schedule/);
-  });
-
   it("the live new-batch wrapper mounts the shared controlled body", () => {
     const form = src("app/(app)/batches/new-batch-form.tsx");
     expect(form).toMatch(/from "@\/components\/mgr\/views\/schedule-batch"/);

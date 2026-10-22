@@ -1,8 +1,8 @@
 // lib/order-form-rules.ts — the pure "is this New order form submittable" rule
 // behind app/(app)/orders/order-form.tsx. Mirrors the create_order input schema
 // in lib/commands/orders.ts and the orders check constraint; on an empty
-// brewery it also yields the hint naming what to create first, and the pages
-// where each missing thing is added.
+// brewery it also yields the hint naming what to create first, and a "Go to"
+// sentence linking the pages where Sales can add it.
 
 export type OrderFormReadinessInput = {
   kind: "wholesale" | "taproom_transfer";
@@ -21,8 +21,11 @@ export type OrderFormReadiness = {
   submittable: boolean;
   /** Set only when a select the current kind needs has no options at all. */
   hint: string | null;
-  /** The page that adds each thing the hint names, in the hint's order; empty when there is no hint. */
-  links: { label: string; href: string }[];
+  /**
+   * "Go to Customers or Catalog." as text pieces and page links, in reading
+   * order; empty when nothing missing has a page Sales can add it on.
+   */
+  goTo: (string | { label: string; href: string })[];
 };
 
 /** Only a wholly empty spare row may be omitted from the order. */
@@ -53,13 +56,19 @@ export function orderFormReadiness(i: OrderFormReadinessInput): OrderFormReadine
   const submittable = party && Boolean(i.fromLocationId) && hasLine && lineErrors.length === 0 && !hasUnavailableSku;
 
   // A transfer names no customer, so it never asks for one or links Customers.
-  const missing: { thing: string; label: string; href: string }[] = [];
-  if (i.kind === "wholesale" && i.catalog.customers === 0) missing.push({ thing: "a customer", label: "Customers", href: "/customers" });
-  if (i.catalog.locations === 0) missing.push({ thing: "a location", label: "Locations", href: "/locations" });
-  if (i.catalog.skus === 0) missing.push({ thing: "a SKU", label: "Catalog", href: "/catalog" });
+  // Only an admin can add a location (/locations offers Sales no Add), so a
+  // missing location is named but not linked.
+  const missing: { thing: string; link?: { label: string; href: string } }[] = [];
+  if (i.kind === "wholesale" && i.catalog.customers === 0) missing.push({ thing: "a customer", link: { label: "Customers", href: "/customers" } });
+  if (i.catalog.locations === 0) missing.push({ thing: "a location" });
+  if (i.catalog.skus === 0) missing.push({ thing: "a SKU", link: { label: "Catalog", href: "/catalog" } });
   const hint = missing.length === 0 ? null : `Before creating an order, add ${conjunction.format(missing.map(m => m.thing))}.`;
 
-  return { submittable, hint, links: missing.map(({ label, href }) => ({ label, href })) };
+  // At most two links (Customers, Catalog), so " or " between them reads as a list.
+  const links = missing.flatMap(m => m.link ? [m.link] : []);
+  const goTo = links.length === 0 ? [] : ["Go to ", ...links.flatMap((link, k) => k === 0 ? [link] : [" or ", link]), "."];
+
+  return { submittable, hint, goTo };
 }
 
 /** Initial destination only; a caller's explicit draft selection stays authoritative. */

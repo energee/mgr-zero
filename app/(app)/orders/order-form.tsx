@@ -24,8 +24,6 @@ export type SkuRow = { id: string; name: string; active: boolean; brands: { name
 
 type LineRow = { skuId: string; qty: string };
 
-const or = new Intl.ListFormat("en", { type: "disjunction" });
-
 export function OrderForm({
   customers,
   locations,
@@ -133,11 +131,7 @@ export function OrderForm({
         addLine, removeLine,
       }} messages={<>
         {readiness.hint && <p id="order-form-hint" className="text-sm text-muted-foreground">
-          {readiness.hint} Go to {or.formatToParts(readiness.links.map(link => link.label)).map((part, index) => {
-            // An "element" part is one link's label; "literal" parts are the commas and "or".
-            const link = readiness.links.find(l => l.label === part.value);
-            return part.type === "element" && link ? <Link key={index} href={link.href} className="underline">{link.label}</Link> : part.value;
-          })}.
+          {readiness.hint} {readiness.goTo.map(part => typeof part === "string" ? part : <Link key={part.href} href={part.href} className="underline">{part.label}</Link>)}
         </p>}
         <CommandFormMessage error={form.error} />
       </>} submitting={form.submitting} disabled={!readiness.submittable} />
