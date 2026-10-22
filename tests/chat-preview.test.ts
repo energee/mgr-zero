@@ -5,7 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ChatPreview, ChatPreviewPicker } from "@/lib/chat/preview-web";
-import { assertPortableNotification } from "@/lib/chat/contracts";
+import { assertPortableNotification, NOTIFICATION_REASON_LABEL } from "@/lib/chat/contracts";
 import { CHAT_PREVIEW_FIXTURES } from "@/lib/chat/preview-fixtures";
 import { SCREENS } from "@/components/mgr/screens";
 
@@ -29,11 +29,35 @@ describe("chat preview fixtures", () => {
     expect(new Set(CHAT_PREVIEW_FIXTURES.map((fixture) => fixture.id)).size).toBe(CHAT_PREVIEW_FIXTURES.length);
   });
 
-  it("App Home and Personal queue fixtures show the formatDate ship-date wording (#991)", () => {
+  // #991 keeps the fixture and its venue frame in one wording; #1146 makes
+  // sample ship dates relative, so a preview never reads as overdue work.
+  it("App Home and Personal queue fixtures share one relative ship-date wording", () => {
     const appHome = CHAT_PREVIEW_FIXTURES.find((fixture) => fixture.id === "app-home")!;
     const submitted = appHome.items.find((item) => item.reason === "submitted_order")!;
-    expect(submitted.detail).toMatch(/^submitted · ships Sep 3, 2026/);
-    expect(JSON.stringify(SCREENS.find((screen) => screen.name === "Personal queue")!.body)).toContain("submitted · ships Sep 3, 2026");
+    expect(submitted.detail).toBe("submitted · ships today · sales");
+    expect(JSON.stringify(SCREENS.find((screen) => screen.name === "Personal queue")!.body)).toContain(submitted.detail);
+  });
+
+  it("shows no calendar date that a sample could outlive", () => {
+    const calendarDate = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}\b|\b\d{1,2}\/\d{1,2}\b|\b\d{4}-\d{2}-\d{2}\b/;
+    for (const fixture of CHAT_PREVIEW_FIXTURES) {
+      // dueAt is never drawn, so only the rendered preview is checked.
+      expect(renderToStaticMarkup(createElement(ChatPreview, { fixture })), fixture.id).not.toMatch(calendarDate);
+    }
+    for (const name of ["Personal queue", "Order confirmation form"]) {
+      expect(JSON.stringify(SCREENS.find((screen) => screen.name === name)!.body), name).not.toMatch(calendarDate);
+    }
+  });
+
+  it("names the sample preferences reasons as Slack's preferences dialog does", () => {
+    const preferences = CHAT_PREVIEW_FIXTURES.find(({ id }) => id === "preferences")!;
+    const reasons = preferences.fields.map(({ label }) => label).filter((label) => label !== "Quiet hours");
+    expect(reasons.length).toBeGreaterThan(0);
+    const venue = JSON.stringify(SCREENS.find((screen) => screen.name === "Notification preferences")!.body);
+    for (const label of reasons) {
+      expect(Object.values(NOTIFICATION_REASON_LABEL)).toContain(label);
+      expect(venue).toContain(label);
+    }
   });
 
   it("validates every portable item and excludes sensitive keys and values", () => {
@@ -88,15 +112,14 @@ describe("chat preview web renderer", () => {
     }
   });
 
-  // #1146: the surface is named once, the DM shows its actions once, the
-  // sample date cannot go stale, and the sample dialog cannot look savable.
+  // #1146: the surface is named once, the DM shows its actions once, and
+  // the sample dialog cannot look savable.
   it("names each surface once and shows each DM action once", () => {
     const dm = CHAT_PREVIEW_FIXTURES.find(({ id }) => id === "personal-dm")!;
     const html = renderToStaticMarkup(createElement(ChatPreview, { fixture: dm }));
     expect(html).toContain("Direct message · Sample data");
     expect(html.match(/Direct message/g)).toHaveLength(1);
     for (const label of ["Open pick in MGR", "Snooze", "Mute picks"]) expect(html.split(`>${label}<`)).toHaveLength(2);
-    expect(JSON.stringify(dm)).not.toMatch(/\b\d{1,2}\/\d{1,2}\b/);
   });
 
   it("draws the sample preferences dialog without a live Save", () => {

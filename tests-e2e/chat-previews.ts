@@ -73,7 +73,7 @@ function traversePreviewsByKeyboard() {
     const fixture = CHAT_PREVIEW_FIXTURES[index];
     assert.equal(ab("eval", `document.querySelector('input[value=${JSON.stringify(fixture.id)}]')?.checked`).result, true, `${fixture.title} was not selected by keyboard`);
     assert.equal(ab("eval", "document.activeElement?.matches(':focus-visible')").result, true, `${fixture.title} lost visible keyboard focus`);
-    assert.equal(ab("eval", `document.querySelector('section[aria-labelledby="chat-preview-${fixture.id}"] h3')?.textContent`).result, fixture.title);
+    assert.equal(ab("eval", "document.querySelector('[data-chat-preview] section[aria-labelledby] h3')?.textContent").result, fixture.title);
     if (index < CHAT_PREVIEW_FIXTURES.length - 1) ab("press", "ArrowRight");
   }
 }
@@ -94,7 +94,7 @@ async function main() {
     ab("wait", "--url", "**/");
     ab("network", "requests", "--clear");
     ab("open", `${BASE_URL}/settings/chat`);
-    ab("wait", "--text", "Sample data only. These previews show what MGR posts in Slack and never send a message.");
+    ab("wait", "--text", "Sample data only. A preview never sends a Slack message.");
     traversePreviewsByKeyboard();
 
     assert.equal(ab("eval", "document.querySelector('[role=dialog]') === null").result, true, "preview gallery unexpectedly opened a real modal");

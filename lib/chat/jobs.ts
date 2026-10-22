@@ -14,7 +14,7 @@ import { sha256 } from "@/lib/hash";
 import { isUuid } from "@/lib/commands/context";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { paced } from "@/lib/chat/pacing";
-import { assertPortableNotification, type NotificationReason, type PortableNotification, type Occurrence } from "./contracts";
+import { assertPortableNotification, NOTIFICATION_REASON_LABEL, type NotificationReason, type PortableNotification, type Occurrence } from "./contracts";
 import type { ChatProviderTransport, ProviderMessageRef } from "./provider";
 import { issueChatLinkProof } from "./linking";
 import { chatStatePool, chatLifecycleClient } from "./state";
@@ -78,10 +78,6 @@ export type DeliveryContext = {
 type Lease = { id: string; occurrence_id: string; destination_id: string; installation_id: string; provider: string; lease_expires_at: string; attempt_count: number };
 type Deps = { db?: SupabaseClient<Database>; transport?: ChatProviderTransport; now?: Date };
 
-const TITLE: Record<NotificationReason, string> = {
-  submitted_order: "Review submitted order", pick_due: "Pick due", restock_due: "Put back staged beer", delivery_next: "Next stop",
-  fermentation_reading_overdue: "Reading overdue", invoice_question: "Buyer asked about an invoice", operations_digest: "Operations digest",
-};
 const OWNER: Record<NotificationReason, PortableNotification["ownerClass"]> = {
   submitted_order: "sales", pick_due: "warehouse", restock_due: "warehouse", delivery_next: "driver", fermentation_reading_overdue: "brewer", invoice_question: "sales", operations_digest: "team",
 };
@@ -94,7 +90,7 @@ export function toNotification(o: Occurrence): PortableNotification {
   const n: PortableNotification = {
     reason: o.reason, urgency: o.urgency,
     subject: { type: o.subject_type, id: o.subject_id, safeLabel: o.payload.safe_label },
-    title: TITLE[o.reason], detail: o.payload.detail, dueAt: o.due_at, ownerClass: OWNER[o.reason], resolutionKey: o.semantic_key,
+    title: NOTIFICATION_REASON_LABEL[o.reason], detail: o.payload.detail, dueAt: o.due_at, ownerClass: OWNER[o.reason], resolutionKey: o.semantic_key,
     actions: [{ id: "open_mgr", label: "Open in MGR", url: o.payload.href, enabled: true }],
   };
   assertPortableNotification(n);

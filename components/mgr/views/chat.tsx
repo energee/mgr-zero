@@ -12,13 +12,15 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChatPreview, ChatPreviewPicker } from "@/lib/chat/preview-web";
 import { NOTIFICATION_REASON_LABEL, type ChatPreviewFixture, type ChatPreviewId } from "@/lib/chat/contracts";
 
+const PREVIEW_TABS: [ChatPreviewId, string][] = [["app-home", "App Home"], ["personal-dm", "Personal DM"], ["team-digest", "Team digest"], ["preferences", "Preferences"]];
+
 export function ChatPreviewGallery({ fixtures }: { fixtures: readonly ChatPreviewFixture[] }) {
   const [selected, setSelected] = useState<ChatPreviewId>("app-home");
   const fixture = fixtures.find(item => item.id === selected);
   return <section data-chat-preview className="flex min-w-0 flex-col gap-4" aria-label="Preview surfaces">
-    {E.note("Sample data only. These previews show what MGR posts in Slack and never send a message.")}
+    {E.note("Sample data only. A preview never sends a Slack message.")}
     <Tabs value={selected} onValueChange={value => setSelected(value as ChatPreviewId)}>
-      <TabsList variant="solid" className="w-full">{[["app-home", "App Home"], ["personal-dm", "Personal DM"], ["team-digest", "Team digest"], ["preferences", "Preferences"]].map(([id, label]) => <TabsTrigger key={id} value={id}>{label}</TabsTrigger>)}</TabsList>
+      <TabsList variant="solid" className="w-full">{PREVIEW_TABS.map(([id, label]) => <TabsTrigger key={id} value={id}>{label}</TabsTrigger>)}</TabsList>
     </Tabs>
     {/* Every fixture state, for checking renderer changes while developing; staff see only the four tabs (#1146). */}
     {process.env.NODE_ENV === "development" && <details><summary>All preview states</summary><ChatPreviewPicker selected={selected} onSelect={setSelected} /></details>}
@@ -26,6 +28,9 @@ export function ChatPreviewGallery({ fixtures }: { fixtures: readonly ChatPrevie
   </section>;
 }
 
+/** Admin Chat settings, shared by the app and the screen inventory. The
+ *  `fields`, `connection` and `delivery` slots draw the built-in view when
+ *  left undefined and draw nothing when given `null`. */
 export function ChatSettingsView({ health, timezone, readingDueHours, configured = true, fields, connection, delivery, previewFixtures = [], oauthError = false, installed = false, backHref, healthHref, peopleHref, disconnectHref, preferencesHref, channels = null, channel = "" }: {
   health: ChatHealth; timezone: string; readingDueHours: number; configured?: boolean; fields?: ReactNode; connection?: ReactNode; delivery?: ReactNode; previewFixtures?: readonly ChatPreviewFixture[]; oauthError?: boolean; installed?: boolean;
   backHref?: string; healthHref?: string; peopleHref?: string; disconnectHref?: string; preferencesHref?: string; channels?: { id: string; name: string }[] | null; channel?: string;
@@ -55,8 +60,8 @@ export function ChatSettingsView({ health, timezone, readingDueHours, configured
   </>;
 }
 
-export function ChatPersonalPreferencesView({ preferences, canSetQuietHours = true, back = "Chat", backHref, busy = false, error, onPreference, onDestination, onUnlink, onSaveQuiet }: {
-  preferences: ChatPreferences; canSetQuietHours?: boolean; back?: string; backHref?: string; busy?: boolean; error?: string | null;
+export function ChatPersonalPreferencesView({ preferences, configured = true, canSetQuietHours = true, back = "Chat", backHref, busy = false, error, onPreference, onDestination, onUnlink, onSaveQuiet }: {
+  preferences: ChatPreferences; configured?: boolean; canSetQuietHours?: boolean; back?: string; backHref?: string; busy?: boolean; error?: string | null;
   onPreference?: (reason: ChatPreferences["preferences"][number]["reason"], enabled: boolean) => void;
   onDestination?: (reason: ChatPreferences["preferences"][number]["reason"], destinationId: string) => void;
   onUnlink?: () => void; onSaveQuiet?: (start: string, end: string, timezone: string) => void;
@@ -65,9 +70,10 @@ export function ChatPersonalPreferencesView({ preferences, canSetQuietHours = tr
   const [start, setStart] = useState(preferences.quietStart?.slice(0, 5) ?? "");
   const [end, setEnd] = useState(preferences.quietEnd?.slice(0, 5) ?? "");
   const [timezone, setTimezone] = useState(preferences.timezone);
+  const howToLink = configured ? E.info("To link your Slack, open the MGR app in Slack, go to its Home tab and choose Link MGR account. Then follow that link back here.") : E.note("Slack isn’t available for your brewery yet.");
   return <>
     {E.back(back, "My notification preferences", undefined, backHref)}
-    {preferences.link ? E.row(`Slack user ${preferences.link.external_user_id}`, "Linked to your MGR account", <Button variant="outline" disabled={busy} onClick={onUnlink}>Unlink my Slack</Button>) : E.info("To link your Slack, open the MGR app in Slack, go to its Home tab and choose Link MGR account. Then follow that link back here.")}
+    {preferences.link ? E.row(`Slack user ${preferences.link.external_user_id}`, "Linked to your MGR account", <Button variant="outline" disabled={busy} onClick={onUnlink}>Unlink my Slack</Button>) : howToLink}
     {E.note("These switches change only your personal Slack reminders. Your MGR work and assignments stay the same.")}
     {preferences.preferences.map(({ reason, enabled, personalDestinationId }) => {
       const label = NOTIFICATION_REASON_LABEL[reason];
@@ -196,7 +202,7 @@ export function ChatLinkConsentView({ intent, backHref, busy = false, error, onL
       {E.info(`Slack user ${intent.slackIdentity} in ${intent.workspace} will be linked to ${intent.mgrIdentity} in ${intent.brewery}.`)}
       {E.note("This enables personal reminders and App Home. It does not change your MGR permissions.")}
       <Button data-variant="irreversible" className="bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" disabled={busy} onClick={onLink}>Link accounts</Button>
-    </> : E.info("This link is missing, expired, already used, or belongs to another brewery. Select the right brewery, then open the MGR app’s Home tab in Slack and choose Link MGR account for a fresh link.", "alert")}
+    </> : E.info("This link is missing, expired, already used, or belongs to another brewery. Select the right brewery, then open the MGR app in Slack, go to its Home tab and choose Link MGR account for a fresh link.", "alert")}
     <CommandFormMessage error={error} />
     {E.btn("Back", "g", backHref)}
   </>;

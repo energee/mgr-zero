@@ -97,6 +97,16 @@ it("labels each personal reason in plain words with no repeated sublabel", () =>
   expect(html).not.toContain("App Home");
 });
 
+it("does not send staff to link Slack while Slack is unavailable", () => {
+  const unlinked = { ...personalChatPreferences, link: null };
+  const available = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: unlinked }));
+  expect(available).toContain("Link MGR account");
+  const unavailable = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: unlinked, configured: false }));
+  expect(unavailable).not.toContain("Link MGR account");
+  expect(unavailable).toContain("Slack isn’t available for your brewery yet.");
+  expect(unavailable).toContain("aria-label=\"Pick due\"");
+});
+
 it("keeps fixture and server-setup jargon and the developer preview picker out of Chat settings", () => {
   const html = renderToStaticMarkup(createElement(ChatSettingsView, { health: { installation: null, queue: {}, lastCallback: null, lastDelivery: null, destinations: [], linkedCount: 0 }, configured: false, timezone: "America/New_York", readingDueHours: 24, previewFixtures: CHAT_PREVIEW_FIXTURES }));
   expect(html).toContain("Sample data");

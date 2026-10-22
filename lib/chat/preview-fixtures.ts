@@ -1,5 +1,5 @@
 // Provides committed, non-sensitive fixtures for provider-neutral chat previews.
-import type { ChatPreviewFixture, PortableAction, PortableNotification } from "./contracts";
+import { NOTIFICATION_REASON_LABEL, type ChatPreviewFixture, type PortableAction, type PortableNotification } from "./contracts";
 
 const openMgr = (label: string): PortableAction => ({ id: "open_mgr", label, enabled: true });
 const notification = (value: PortableNotification): PortableNotification => value;
@@ -26,7 +26,7 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
       { label: "Operations channel", value: "#mgr-operations · private" },
       { label: "Quiet hours", value: "9:00 PM–6:00 AM · brewery time" },
       { label: "Reading overdue after", value: "24 hours · Today + chat" },
-      { label: "Preview · App Home", value: "4 current work reasons · fixture data" },
+      { label: "Preview · App Home", value: "4 current work reasons · sample data" },
     ],
     items: [],
     actions: [openMgr("Open preview"), { id: "edit_preferences", label: "Disable", enabled: true }],
@@ -48,8 +48,8 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
     title: "Today · 4 waiting",
     fields: [],
     items: [
-      notification({ reason: "submitted_order", urgency: "attention", subject: { type: "order", id: "order-0231", safeLabel: "ORD-0231" }, title: "Review submitted order", detail: "submitted · ships Sep 3, 2026 · sales", dueAt: "2026-09-03T09:00:00.000Z", ownerClass: "sales", resolutionKey: "submitted-order:order-0231", actions: [openMgr("Open")] }),
-      notification({ reason: "pick_due", urgency: "normal", subject: { type: "order", id: "order-0235", safeLabel: "ORD-0235" }, title: "Pick due", detail: "ships Sep 4, 2026 · warehouse", dueAt: "2026-09-04T09:00:00.000Z", ownerClass: "warehouse", resolutionKey: "pick-due:order-0235", actions: [openMgr("Open")] }),
+      notification({ reason: "submitted_order", urgency: "attention", subject: { type: "order", id: "order-0231", safeLabel: "ORD-0231" }, title: "Review submitted order", detail: "submitted · ships today · sales", dueAt: "2026-09-03T09:00:00.000Z", ownerClass: "sales", resolutionKey: "submitted-order:order-0231", actions: [openMgr("Open")] }),
+      notification({ reason: "pick_due", urgency: "normal", subject: { type: "order", id: "order-0235", safeLabel: "ORD-0235" }, title: "Pick due", detail: "ships tomorrow · warehouse", dueAt: "2026-09-04T09:00:00.000Z", ownerClass: "warehouse", resolutionKey: "pick-due:order-0235", actions: [openMgr("Open")] }),
       notification({ reason: "delivery_next", urgency: "normal", subject: { type: "delivery", id: "route-a-next", safeLabel: "Route A · next stop" }, title: "Next stop", detail: "assigned to you · 9:30 AM", dueAt: "2026-09-04T09:30:00.000Z", ownerClass: "driver", resolutionKey: "delivery-next:route-a-next", actions: [openMgr("Open")] }),
       notification({ reason: "fermentation_reading_overdue", urgency: "attention", subject: { type: "occupancy", id: "fv2", safeLabel: "FV2 · reading overdue" }, title: "Reading overdue", detail: "last reading 26 h ago · brewer", dueAt: "2026-09-03T07:00:00.000Z", ownerClass: "brewer", resolutionKey: "fermentation-reading-overdue:fv2", actions: [openMgr("Open")] }),
     ],
@@ -86,10 +86,10 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
     surface: "modal",
     title: "Notification preferences",
     fields: [
-      { label: "Submitted orders", value: "On" },
-      { label: "Picks due", value: "On" },
-      { label: "Assigned deliveries", value: "On" },
-      { label: "Fermentation readings", value: "On" },
+      { label: NOTIFICATION_REASON_LABEL.submitted_order, value: "On" },
+      { label: NOTIFICATION_REASON_LABEL.pick_due, value: "On" },
+      { label: NOTIFICATION_REASON_LABEL.delivery_next, value: "On" },
+      { label: NOTIFICATION_REASON_LABEL.fermentation_reading_overdue, value: "On" },
       { label: "Quiet hours", value: "9:00 PM–6:00 AM" },
     ],
     items: [],
@@ -115,7 +115,7 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
     title: "Review order",
     status: { label: "Future phase only", tone: "attention" },
     fields: [
-      { label: "Order", value: "ORD-0231 · 3 lines · ships Sep 3, 2026 · Submitted" },
+      { label: "Order", value: "ORD-0231 · 3 lines · ships today · Submitted" },
       { label: "Warning", value: "Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR." },
     ],
     items: [],
