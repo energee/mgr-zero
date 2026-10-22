@@ -119,6 +119,7 @@ const mineralVessels = [1, 2, 3, 4, 5, 6].map(n => ({ id: `fv${n}`, name: `FV${n
 /** Prep mid-pull: Briess Pilsen came up 7.5 sacks, so it reads short. */
 export const brewPrepMineral: BrewPrepViewModel = {
   title: "BAT-202 · Mineral #6 v1 · 22 bbl",
+  planned: "22 bbl · Oct 22, 2026",
   vesselId: "fv3",
   vessels: mineralVessels,
   ingredients: mineralIngredients.map(row => row.key === "pilsen" ? { ...row, packs: "7.5", loose: "0" } : row),
@@ -131,11 +132,17 @@ const chitStock = [
   { material_id: "chit", material_name: "Chit Malt", unit: "lb", location_id: "malt-room", location_name: "Malt room", bin_id: "a5", bin_name: "A5", lot_id: "cm-1002", lot_code: "CM-1002", qty: 300 },
 ];
 
+/** The stock behind each sourced line, so a confirmed row reads green (timelineTone checks it against stock). */
+const lineStock = mineralIngredients.flatMap(row => row.source ? [{
+  material_id: row.materialId, material_name: row.name, unit: row.unit, location_id: row.source.locationId, location_name: row.source.bin.split(" / ")[0],
+  bin_id: row.source.binId, bin_name: row.source.bin.split(" / ")[1], lot_id: row.source.lotId, lot_code: row.source.lot, qty: 2000,
+}] : []);
+
 /** Brew day mid-mash: the first two mash rows confirmed, so Mash is the open stage on a phone. */
 export const brewTimelineMineral: BrewTimelineViewModel = {
   title: brewPrepMineral.title,
-  planned: "22 bbl · Oct 22, 2026",
-  sources: chitStock,
+  planned: brewPrepMineral.planned,
+  sources: [...lineStock, ...chitStock],
   ingredients: brewPrepMineral.ingredients.map(row => ({ ...row, confirmed: row.key === "malted-oats" || row.key === "pilsen" })),
   targets: { mash: "152 °F · 60 min · pH 5.3", lauter: "pre-boil 25 bbl", boil: "60 min", whirlpool: "180 °F · 20 min", knockout: "66 °F" },
   process: { mashWaterGal: "620", targetMashPh: "5.3" },

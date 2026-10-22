@@ -49,11 +49,11 @@ export default async function BatchPage({ params, searchParams }: { params: Prom
     // A planned tank retired since Prep is not in list_vessels: start with none chosen rather than a hidden id save_batch_pulls refuses.
     const plannedVessel = vessels.some(vessel => vessel.id === plan.batch.planned_vessel_id) ? plan.batch.planned_vessel_id! : "";
     const tabHrefs = { Prep: `/batches/${batch.id}?tab=prep`, "Brew day": `/batches/${batch.id}?tab=brew-day` };
-    const shared = { title: batNo(batch.batch_no), backHref: "/batches", ingredients: brewIngredients(plan.plan, plan.pulls, plan.sources, plannedBbl), sources: plan.sources, vesselId: plannedVessel, vessels };
+    const shared = { title: batNo(batch.batch_no), backHref: "/batches", ingredients: brewIngredients(plan.plan, plan.pulls, plan.sources, plannedBbl), sources: plan.sources, vesselId: plannedVessel, vessels, planned, note: batch.note ?? undefined };
     const planActions = <ChangePlan kind="batch" id={batch.id} plannedOn={batch.planned_on} />;
     if (openBrewTab(tab, plan.pulls.length > 0) === "prep") return <PrepForm batchId={batch.id} tabHrefs={tabHrefs} planActions={planActions} model={{ ...shared, later: laterAdditions(plan.plan) }} />;
     return <RecordBrewTimelineForm batchId={batch.id} tabHrefs={tabHrefs} planActions={planActions} model={{
-      ...shared, planned, note: batch.note ?? undefined, targets: brewTargets(plan.plan), waterAdditions: plan.plan.waterAdditions, process: {}, initialBbl: String(plannedBbl), brewedOn: today,
+      ...shared, targets: brewTargets(plan.plan), waterAdditions: plan.plan.waterAdditions, process: {}, initialBbl: String(plannedBbl), brewedOn: today,
     }} />;
   }
   const confirmedBbl = currentBrewRecords(history.records).reduce((sum, record) => sum + record.initial_bbl, 0);

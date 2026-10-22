@@ -804,22 +804,22 @@ Only an admin adds, edits, or deletes a vessel. **New vessel**, **Add vessel**, 
 
 A planned batch has two tabs: **Prep** and **Brew day**. Prep is the pull list you work through before the brew. Brew day is where you log the brew and record it. The batch opens on **Brew day** once Prep has saved pulls, and on **Prep** until then. Select a tab to switch.
 
-Under the batch title, Prep shows **Reschedule** and **Cancel plan**, the same controls as on the Brew day tab.
+Both tabs sit under the batch title, followed by one **Planned** line: the planned barrels, date and note. **Reschedule or cancel** at the bottom of either tab opens **Reschedule** and **Cancel plan**.
 
 Prep works like the order [pick sheet](#pick-sheet). Lines are grouped under **Mash**, **Boil** and **Whirlpool**, the stages that use them. Each line starts at the recipe plan for the batch's planned barrels. The amount reads as whole packs plus loose pounds, such as `4 × 50 lb + 20 lb`. A pack is the material's purchase unit: how many base units one purchase unit holds, set under [Materials](#purchasing). A material with no pack size is counted in its base unit alone.
 
-Touch only the exceptions. Each line has a packs field and, for a material with a pack size, a loose field beside it. Type what you actually pulled. Packs take decimals, so `4.4` sacks of 50 lb is 220 lb. A partly used bag is just loose pounds: MGR doesn't track open bags. A blank field counts as zero. Under each line's name you see its plan, its lot and its bin, such as *plan 220 lb = 4 × 50 lb + 20 lb · C-2 · Malt room / A2*. An untracked material reads *untracked* in place of a lot.
+Touch only the exceptions. Each line has a packs field and, for a material with a pack size, a loose field beside it. A line planned at less than one pack shows only its loose field. Type what you actually pulled. Packs take decimals, so `4.4` sacks of 50 lb is 220 lb. A partly used bag is just loose pounds: MGR doesn't track open bags. A blank field counts as zero. Under each line's name you see its plan, its lot and its bin, such as *plan 220 lb = 4 × 50 lb + 20 lb · C-2 · Malt room / A2*. An untracked material reads *untracked* in place of a lot.
 
 A line is amber while it's short (pulled less than plan) or has no source chosen.
 
 | Control | What it does |
 | --- | --- |
-| **Short** | Shows on a line pulled below plan. It jumps to that line's packs field so you can enter what you really pulled. |
+| **Short** | Shows on a line pulled below plan. It jumps to that line's first amount field so you can enter what you really pulled. |
 | **Choose lot** | Shows on a line with no source. It opens **Source**, this material's stock by lot, location and bin with the amount available, such as *C-2 · Malt room / A2 · 1000 lb available*. Pick the exact lot and bin you're pulling from. It's disabled when the material has no stock anywhere. |
 | **Vessel** | The tank you plan to knock out into. Optional. Brew day's Knockout starts from it. Retired tanks aren't offered, and a tank retired after you saved Prep shows as not chosen. |
 | **Later, in cellar** | Counts the recipe's additions you don't pull for brew day, such as *Fermentation 1 · Dry hop 6*, or says *None*. Add those in [Cellar](#cellar) when the time comes. |
 | **Print pull list** | Prints the page so you can pull on paper. |
-| **Done pulling** | Saves the list and opens the Brew day tab. |
+| **Done pulling** | Saves the list and opens the Brew day tab. On a phone it stays at the bottom of the screen, beside **Print pull list**. |
 
 A material held in exactly one bin starts with that source already chosen. A line that already has a source has no **Choose lot** on Prep. To pull it from a different lot or bin, use **Edit** on the Brew day tab.
 
@@ -833,10 +833,11 @@ If saving is refused, the message shows above **Done pulling** and your entries 
 
 <Screen name="Brew day timeline" />
 
-Brew day runs in process order: **Mash**, **Lauter**, **Boil**, **Whirlpool**, **Knockout**. On the Brew day tab, above the tabs, you see the batch's **Planned** barrels and date, its **Note**, and **Reschedule** and **Cancel plan**. Each stage heading shows the recipe's target for it, such as *152 °F · 60 min · pH 5.3* for Mash. A stage the recipe sets nothing for shows no target. On a phone one stage is open at a time: the first one with an ingredient you haven't confirmed. Tap another stage's heading to open it. On a wider screen every stage shows.
+Brew day runs in process order: **Mash**, **Lauter**, **Boil**, **Whirlpool**, **Knockout**. Each stage heading shows how many of its ingredients you've confirmed, such as *2 of 4 confirmed*, and the recipe's target for it, such as *152 °F · 60 min · pH 5.3* for Mash. A stage the recipe sets nothing for shows no target. On a phone one stage is open at a time: the first one with an ingredient you haven't confirmed. Tap another stage's heading to open it. On a wider screen every stage shows.
 
 Each ingredient sits in the stage the recipe gives it, so there's no stage to choose. Lines start from the saved Prep pulls. A line Prep left off starts at zero. Before Prep is saved, every line starts at plan. Either way, its source is already chosen when the material sits in only one bin. A short line reads *pulled …* before its plan and is amber until you confirm it.
 
+- **Confirm all**, at the top, confirms every line at the amount and source it shows. Use it when the pull went to plan, then **Edit** any exception.
 - **Confirm** marks the ingredient as in the brew. It turns to **Pulled** and the line goes green. A confirmed line stays amber while it's pulled above zero with no source, or pulls more than its lot and bin hold. Tap **Pulled** to undo it.
 - **Edit** opens the same packs and loose fields as Prep, plus **Source** when the material has stock to pick from. Change the amount or the exact lot and bin there.
 
@@ -861,6 +862,8 @@ When nothing is pulled above zero, **Confirm no ingredients used** appears below
 3. the lines pulled from each lot and bin together fit what it holds;
 4. something is pulled, or **Confirm no ingredients used** is on;
 5. Knockout has a vessel, barrels above zero and a brew date.
+
+On a phone, **Edit** and **Confirm** sit on their own line under each ingredient, and **Record brew day** stays at the bottom of the screen.
 
 **Record brew day** is the step that uses stock. In one step it freezes the plan and actuals, takes the confirmed amounts out of their lots and bins, stamps the brew date and opens the vessel's occupancy. Insufficient stock refuses the whole action. It is refused if the vessel is already occupied, including a backdated day that falls inside a stretch the vessel was full but has since been emptied. A vessel emptied earlier the same day (in the brewery's time zone) can be brewed into with that day's date: the new occupancy starts when the vessel was emptied, not at midnight. It is also refused when the knockout barrels exceed the vessel's **Capacity (bbl)**; the message names the vessel and what it holds.
 

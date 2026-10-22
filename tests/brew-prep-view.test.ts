@@ -1,7 +1,7 @@
 // tests/brew-prep-view.test.ts — the brew prep pull list and the brew-day
 // timeline's pure rules (lib/mgr/brew-prep-view.ts).
 import { describe, expect, it } from "vitest";
-import { anyPulled, brewIngredients, brewPullsPayload, brewTargets, canRecordTimeline, canSavePrep, currentStage, isShort, laterAdditions, openBrewTab, pullDetail, pullTone, sourceChoices, startAtPlan, timelineRecordPayload, timelineStages, timelineTone, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
+import { anyPulled, brewIngredients, confirmAll, brewPullsPayload, brewTargets, canRecordTimeline, canSavePrep, currentStage, isShort, laterAdditions, openBrewTab, pullDetail, pullTone, sourceChoices, showsPacks, stageProgress, startAtPlan, timelineRecordPayload, timelineStages, timelineTone, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { BrewMaterialSource, BrewPlan, BrewPull } from "@/lib/mgr/brew-day-view";
 
 const chit: BrewIngredient = startAtPlan({ key: "chit", name: "Chit Malt", materialId: "chit", stage: "mash", plan: 220, unit: "lb", packSize: 50, source: null });
@@ -28,6 +28,12 @@ describe("pull lines", () => {
     expect(isShort({ ...chit, packs: "4", loose: "19.9" })).toBe(true);
     expect(isShort({ ...chit, packs: "4.4", loose: "" })).toBe(false);
     expect(isShort({ ...chit, packs: "", loose: "" })).toBe(true);
+  });
+  it("show a packs field only when the plan reaches one pack or packs are already entered", () => {
+    expect(showsPacks(chit)).toBe(true);
+    expect(showsPacks(startAtPlan({ ...chit, plan: 22 }))).toBe(false);
+    expect(showsPacks({ ...startAtPlan({ ...chit, plan: 22 }), packs: "1" })).toBe(true);
+    expect(showsPacks(startAtPlan({ ...chit, plan: 1.1, packSize: 1 }))).toBe(false);
   });
   it("need attention when short or still without a source", () => {
     expect(pullTone(hops)).toBe("ok");
@@ -90,6 +96,15 @@ describe("timeline", () => {
     expect(timelineTone({ ...chit, packs: "0", loose: "", confirmed: true }, timeline.sources)).toBe("ok");
     expect(timelineTone(hops, timeline.sources)).toBe("");
     expect(timelineTone({ ...hops, packs: "0" }, timeline.sources)).toBe("w");
+  });
+  it("counts a stage's confirmed ingredients, and says nothing for a stage without any", () => {
+    expect(stageProgress([{ ...chit, confirmed: true }, oats])).toBe("1 of 2 confirmed");
+    expect(stageProgress([])).toBeUndefined();
+  });
+  it("confirms every ingredient at its current amount", () => {
+    const rows = confirmAll([oats, { ...hops, packs: "0", loose: "30" }]);
+    expect(rows.map(row => row.confirmed)).toEqual([true, true]);
+    expect(rows[1]).toMatchObject({ packs: "0", loose: "30" });
   });
   it("knows whether anything is pulled, which is when the confirm-empty switch hides", () => {
     expect(anyPulled(sourced)).toBe(true);

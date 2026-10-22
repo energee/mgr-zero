@@ -172,11 +172,12 @@ describe("Schedule batch view", () => {
 });
 
 describe("Brew day view", () => {
-  it("draws Change plan on both planned tabs, ahead of the form that saves or records", () => {
+  it("folds Change plan at the foot of both planned tabs, after the form that saves or records", () => {
     const planActions = createElement(PlanActions, { plannedOn: "2026-10-22" });
     for (const html of [htmlOf(createElement(BrewPrepView, { model: brewPrepMineral, planActions })), htmlOf(createElement(BrewTimelineView, { model: brewTimelineMineral, planActions }))]) {
-      for (const label of ["Change plan", "Reschedule", "Cancel plan"]) expect(html).toContain(label);
-      expect(html.indexOf("Change plan")).toBeLessThan(html.indexOf("<form"));
+      for (const label of ["Reschedule or cancel", "Change plan", "Reschedule", "Cancel plan"]) expect(html).toContain(label);
+      expect(html.indexOf("<details class=\"rounded border p-3\"><summary")).toBeGreaterThan(html.lastIndexOf("</form>"));
+      expect(html.indexOf("Planned")).toBeLessThan(html.indexOf("<form"));
     }
   });
   it("draws Cancel plan as a small control beside Reschedule, not a full-width button (#995)", () => {
@@ -289,11 +290,10 @@ describe("Brew day view", () => {
     expect(body.props.planActions.type).toBe(PlanActions);
   });
 
-  it("draws the timeline's planned facts and Change plan above the record form, so their fields never submit it", () => {
+  it("draws the timeline's planned facts above the record form and Change plan after it, so their fields never submit it", () => {
     const html = htmlOf(createElement(BrewTimelineView, { model: brewTimelineMineral, planActions: createElement(PlanActions, { plannedOn: "2026-10-22" }) }));
-    expect(html).toContain("22 bbl · Oct 22, 2026");
-    expect(html.indexOf("Change plan")).toBeGreaterThan(-1);
-    expect(html.indexOf("Change plan")).toBeLessThan(html.indexOf("<form"));
+    expect(html.indexOf("22 bbl · Oct 22, 2026")).toBeLessThan(html.indexOf("<form"));
+    expect(html.indexOf("Change plan")).toBeGreaterThan(html.lastIndexOf("</form>"));
     expect(html).not.toContain("Confirm no ingredients used");
   });
 

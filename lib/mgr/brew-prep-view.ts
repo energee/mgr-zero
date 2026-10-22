@@ -37,6 +37,9 @@ export type BrewIngredient = {
 export type BrewPrepViewModel = {
   title: string;
   backHref?: string;
+  /** The batch's planned barrels and date, e.g. "22 bbl · Oct 22, 2026", and its note; shown on one line when set. */
+  planned?: string;
+  note?: string;
   vesselId: string;
   vessels: BrewDayVessel[];
   ingredients: BrewIngredient[];
@@ -147,6 +150,10 @@ export const isShort = (row: BrewIngredient) => toTicks(pulledQty(row)) < toTick
 /** A pull line is amber until it has a source and reaches plan. */
 export const pullTone = (row: BrewIngredient): "w" | "ok" => !row.source || isShort(row) ? "w" : "ok";
 
+/** A packs field is worth drawing when the material has a pack size and the plan reaches one pack, or packs are
+ *  already entered; under one pack the line is just loose base units, so a packs stepper stuck at 0 is noise. */
+export const showsPacks = (row: BrewIngredient) => row.packSize !== 1 && (toTicks(row.plan) >= toTicks(row.packSize) || Number(row.packs) > 0);
+
 /** "plan 220 lb = 4 × 50 lb + 20 lb · lot · bin". */
 export function pullDetail(row: BrewIngredient): string {
   const source = row.source ? `${row.source.lot ?? "untracked"} · ${row.source.bin}` : "no source chosen";
@@ -164,6 +171,13 @@ export const anyPulled = (model: BrewTimelineViewModel) => model.ingredients.som
 /** Each timeline stage with its own ingredients and process reading keys. */
 export const timelineStages = (model: BrewTimelineViewModel) =>
   TIMELINE_STAGES.map(stage => ({ ...stage, ingredients: model.ingredients.filter(row => row.stage === stage.stage) }));
+
+/** A folded stage's progress, "1 of 2 confirmed"; undefined for a stage with no ingredients. */
+export const stageProgress = (rows: BrewIngredient[]) =>
+  rows.length ? `${rows.filter(row => row.confirmed).length} of ${rows.length} confirmed` : undefined;
+
+/** Confirm all: every ingredient confirmed at the amount and source it shows; timelineTone still flags any that can't record. */
+export const confirmAll = (rows: BrewIngredient[]) => rows.map(row => ({ ...row, confirmed: true }));
 
 /** The stage a phone opens: the first one still holding an unconfirmed ingredient. */
 export const currentStage = (model: BrewTimelineViewModel): TimelineStage =>
