@@ -29,8 +29,6 @@ export function NewBatchForm({ brands, recipeVersions }: { brands: Brand[]; reci
   });
   const ready = plannedOn && Number(plannedBbl) > 0;
   const model = {
-    backHref: "/batches",
-    title: "New batch",
     recipeId: recipeVersionId,
     recipe: recipeVersions.find(({ id }) => id === recipeVersionId)?.label ?? "Not decided",
     recipeOptions: recipeVersions,
@@ -50,7 +48,7 @@ export function NewBatchForm({ brands, recipeVersions }: { brands: Brand[]; reci
     note: setNote,
   };
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Schedule batch" trigger={<Button size="sm">New batch</Button>}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="New batch" trigger={<Button size="sm">New batch</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <ScheduleBatchView
           model={model}
@@ -59,7 +57,7 @@ export function NewBatchForm({ brands, recipeVersions }: { brands: Brand[]; reci
           footer={
             <CommandFormFooter>
               <Button type="submit" disabled={form.submitting || !ready}>
-                {form.submitting ? "Saving…" : "Save schedule"}
+                {form.submitting ? "Scheduling…" : "Schedule batch"}
               </Button>
             </CommandFormFooter>
           }

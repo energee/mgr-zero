@@ -1,7 +1,5 @@
-// lib/mgr/schedule-batch-view.ts — view-model for Schedule batch.
+// lib/mgr/schedule-batch-view.ts — view-model for the New batch sheet.
 export type ScheduleBatchViewModel = {
-  backHref?: string;
-  title: string;
   recipeId?: string;
   recipe: string;
   recipeOptions: { id: string; label: string }[];

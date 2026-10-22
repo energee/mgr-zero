@@ -75,7 +75,7 @@ export function NewOrderView({ model, controls = {}, messages, feedback, skuFeed
       {model.lines.length > 1 && <Button type="button" variant="ghost" size="sm" onClick={() => controls.removeLine?.(index)}>Remove</Button>}
     </div>)}
     <Button type="button" variant="ghost" className="w-fit" onClick={controls.addLine}>Add line</Button>
-    {E.info("Order number is assigned on commit.")}
+    {E.info("Order number is assigned when you save the draft.")}
     {lineErrors.map(error => <p key={error} role="status" className="text-sm text-muted-foreground">{error}</p>)}
     {messages}
     {E.sp()}

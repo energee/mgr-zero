@@ -148,18 +148,27 @@ describe("Batches view", () => {
   });
 });
 
-describe("Schedule batch view", () => {
-  it("the Schedule batch inventory record is ScheduleBatchView", () => {
-    const body = screen("Schedule batch").body as { type: unknown; props: { model: unknown } };
+describe("New batch sheet", () => {
+  it("the New batch inventory record is a sheet drawing ScheduleBatchView", () => {
+    const record = screen("New batch");
+    expect(record.surface).toBe("sheet");
+    const body = record.body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(ScheduleBatchView);
     expect(body.props.model).toEqual(scheduleBatchHazy);
   });
 
-  it("renders Save schedule without leaking live hrefs", () => {
+  it("renders Schedule batch with no in-sheet title or back link (#1120, #1127)", () => {
     const html = htmlOf(createElement(ScheduleBatchView, { model: scheduleBatchHazy }));
-    expect(html).toMatch(/>Save schedule</);
-    expect(html).not.toMatch(/href="\/batches"/);
+    expect(html).toMatch(/>Schedule batch</);
+    expect(html).not.toMatch(/<h1\b|<a\b/);
     expect(html).toMatch(/Note · optional/);
+  });
+
+  it("the live dialog is titled New batch and commits with Schedule batch (#1127)", () => {
+    const form = src("app/(app)/batches/new-batch-form.tsx");
+    expect(form).toMatch(/title="New batch"/);
+    expect(form).toMatch(/"Schedule batch"/);
+    expect(form).not.toMatch(/Save schedule/);
   });
 
   it("the live new-batch wrapper mounts the shared controlled body", () => {

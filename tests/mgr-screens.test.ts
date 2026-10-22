@@ -916,7 +916,7 @@ describe("SCREENS", () => {
     expect(body("Brand")).not.toContain("tax class");
     expect(JSON.stringify(brand.states)).toMatch(/tax class/);
     // Every date field is the calendar picker; no screen falls back to the OS date input.
-    for (const name of ["New order", "Schedule batch", "Schedule packaging run", "Receive PO", "Brew day", "Packaging plan"]) {
+    for (const name of ["New order", "New batch", "Schedule packaging run", "Receive PO", "Brew day", "Packaging plan"]) {
       expect(html(name), name).toContain('data-slot="popover-trigger"');
     }
     for (const s of SCREENS) {
@@ -942,7 +942,7 @@ describe("SCREENS", () => {
     const named = [
       "Today", "Taproom", "Order", "Cellar map", "Tap board", "Swap keg",
       "Weekly count", "Brew day", "Route", "Settings", "Brand", "Vendors",
-      "Planning", "Schedule batch", "Vessel detail", "Kick keg", "Return route",
+      "Planning", "New batch", "Vessel detail", "Kick keg", "Return route",
     ];
     const filled = (html: string) =>
       (html.match(/<button\b[^>]*>/g) ?? []).filter((b) =>

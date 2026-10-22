@@ -1,7 +1,8 @@
 // lib/order-form-rules.ts — the pure "is this New order form submittable" rule
 // behind app/(app)/orders/order-form.tsx. Mirrors the create_order input schema
 // in lib/commands/orders.ts and the orders check constraint; on an empty
-// brewery it also yields the hint naming what to create first.
+// brewery it also yields the hint naming what to create first, and the pages
+// where each missing thing is added.
 
 export type OrderFormReadinessInput = {
   kind: "wholesale" | "taproom_transfer";
@@ -20,6 +21,8 @@ export type OrderFormReadiness = {
   submittable: boolean;
   /** Set only when a select the current kind needs has no options at all. */
   hint: string | null;
+  /** The page that adds each thing the hint names, in the hint's order; empty when there is no hint. */
+  links: { label: string; href: string }[];
 };
 
 /** Only a wholly empty spare row may be omitted from the order. */
@@ -49,13 +52,14 @@ export function orderFormReadiness(i: OrderFormReadinessInput): OrderFormReadine
   const hasUnavailableSku = availableSkuIds !== undefined && i.lines.some(line => isUnavailableSku(line.skuId, availableSkuIds));
   const submittable = party && Boolean(i.fromLocationId) && hasLine && lineErrors.length === 0 && !hasUnavailableSku;
 
-  const missing: string[] = [];
-  if (i.kind === "wholesale" && i.catalog.customers === 0) missing.push("a customer");
-  if (i.catalog.locations === 0) missing.push("a location");
-  if (i.catalog.skus === 0) missing.push("a SKU");
-  const hint = missing.length === 0 ? null : `Before creating an order, add ${conjunction.format(missing)}.`;
+  // A transfer names no customer, so it never asks for one or links Customers.
+  const missing: { thing: string; label: string; href: string }[] = [];
+  if (i.kind === "wholesale" && i.catalog.customers === 0) missing.push({ thing: "a customer", label: "Customers", href: "/customers" });
+  if (i.catalog.locations === 0) missing.push({ thing: "a location", label: "Locations", href: "/locations" });
+  if (i.catalog.skus === 0) missing.push({ thing: "a SKU", label: "Catalog", href: "/catalog" });
+  const hint = missing.length === 0 ? null : `Before creating an order, add ${conjunction.format(missing.map(m => m.thing))}.`;
 
-  return { submittable, hint };
+  return { submittable, hint, links: missing.map(({ label, href }) => ({ label, href })) };
 }
 
 /** Initial destination only; a caller's explicit draft selection stays authoritative. */

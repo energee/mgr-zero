@@ -1,4 +1,6 @@
-// components/mgr/views/new-transfer.tsx — shared New transfer sheet body.
+// components/mgr/views/new-transfer.tsx — shared New transfer sheet body. It
+// draws no title: the sheet it opens in (CommandForm live, ScreenSheet in the
+// inventory) already names it (#1120).
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
@@ -35,7 +37,6 @@ export function NewTransferView({
 }) {
   return (
     <>
-      {E.back("Transfers", "New transfer")}
       <Pick label="From" value={model.from} options={model.fromOptions} onChange={controls.from} />
       <Pick label="From bin" value={model.fromBin} options={model.fromBinOptions} onChange={controls.fromBin} disabled={!model.from} />
       <Pick label="To" value={model.to} options={model.toOptions} onChange={controls.to} />
