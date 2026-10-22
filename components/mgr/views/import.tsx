@@ -5,7 +5,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Attachment, AttachmentContent, AttachmentDescription, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
-import { IMPORT_FIELDS, IMPORT_KINDS, IMPORT_ROW_CAP, readyImportRows, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
+import { IMPORT_FIELDS, IMPORT_KINDS, IMPORT_ROW_CAP_LABEL, readyImportRows, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 import { importKindLabel } from "@/lib/mgr/labels";
 import { ConfirmDiscard } from "@/components/mgr/views/command-recovery";
 
@@ -17,10 +17,8 @@ export type ImportViewModel = {
   previewRows?: number[];
 };
 
-const ROW_CAP = IMPORT_ROW_CAP.toLocaleString("en-US");
-
 /** How the upload step's column list marks a field; state is required only for a US row. */
-function columnNeed(field: { required?: boolean; usOnly?: boolean }): string {
+function columnRequirementLabel(field: { required?: boolean; usOnly?: boolean }): string {
   if (field.required) return "required";
   if (field.usOnly) return "required for a US address";
   return "optional";
@@ -55,11 +53,11 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
     </FieldSet>
     {model.error && <p role="alert" className="text-destructive">{model.error}</p>}
     {step === 0 && <>
-      <p>Save your spreadsheet as a CSV file with one record per row, up to {ROW_CAP} rows. Name the first row’s columns as listed below and MGR matches them for you; you can match other names in the next step.</p>
+      <p>Save your spreadsheet as a CSV file with one record per row, up to {IMPORT_ROW_CAP_LABEL} rows. Name the first row’s columns exactly as listed below, with the same capitals, and MGR matches them for you. You can match columns with other names in the next step.</p>
       {E.ttl(`${importKindLabel(kind)} columns`)}
-      <ul className="space-y-1 text-sm">{fields.map(field => <li key={field.name}><code>{field.name}</code> · {columnNeed(field)}</li>)}</ul>
+      <ul className="space-y-1 text-sm">{fields.map(field => <li key={field.name}><code>{field.name}</code> · {columnRequirementLabel(field)}{field.lookup && " · name or ID"}</li>)}</ul>
       <Field><FieldLabel>CSV file</FieldLabel><Attachment state={model.headers ? "done" : "idle"} className="w-full">
-        <AttachmentContent><AttachmentTitle>{model.fileName ?? "Choose a CSV file"}</AttachmentTitle><AttachmentDescription>{model.headers ? `${model.csvRowCount} rows ready to map` : `.csv · up to ${ROW_CAP} rows`}</AttachmentDescription></AttachmentContent>
+        <AttachmentContent><AttachmentTitle>{model.fileName ?? "Choose a CSV file"}</AttachmentTitle><AttachmentDescription>{model.headers ? `${model.csvRowCount} rows ready to map` : `.csv · up to ${IMPORT_ROW_CAP_LABEL} rows`}</AttachmentDescription></AttachmentContent>
         <AttachmentTrigger asChild aria-label="Choose CSV file"><label className="cursor-pointer"><input type="file" accept=".csv,text/csv" className="sr-only" onChange={event => onFile?.(event.target.files?.[0])} /></label></AttachmentTrigger>
       </Attachment></Field>
       {model.headers && <Button onClick={() => onStep?.(1)}>Map {model.csvRowCount} rows</Button>}

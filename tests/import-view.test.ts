@@ -80,6 +80,9 @@ it("names its steps, labels the kind choice and lists the chosen kind's columns 
   expect(html).toMatch(/<code>name<\/code> · required/);
   expect(html).toMatch(/<code>state<\/code> · required for a US address/);
   expect(html).toMatch(/<code>alias<\/code> · optional/);
+  expect(html).toMatch(/<code>saleChannelId<\/code> · required · name or ID/);
+  expect(html).toContain("up to 5,000 rows");
+  for (const later of [1, 2]) expect(renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, kind: "customers", step: later } }))).not.toContain("Customers columns");
   const balances = upload("opening_balances");
   for (const field of IMPORT_FIELDS.opening_balances) expect(balances).toContain(`<code>${field.name}</code>`);
   expect(balances).not.toContain("<code>saleChannelId</code>");
