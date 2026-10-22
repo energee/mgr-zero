@@ -4,7 +4,7 @@ import { E } from "@/components/mgr/e";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Attachment, AttachmentContent, AttachmentDescription, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { IMPORT_FIELDS, IMPORT_KINDS, IMPORT_ROW_CAP, readyImportRows, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 import { importKindLabel } from "@/lib/mgr/labels";
 import { ConfirmDiscard } from "@/components/mgr/views/command-recovery";
@@ -16,6 +16,15 @@ export type ImportViewModel = {
   /** Preview row number of each sent row; outcome row n renders as previewRows[n - 1]. */
   previewRows?: number[];
 };
+
+const ROW_CAP = IMPORT_ROW_CAP.toLocaleString("en-US");
+
+/** How the upload step's column list marks a field; state is required only for a US row. */
+function columnNeed(field: { required?: boolean; usOnly?: boolean }): string {
+  if (field.required) return "required";
+  if (field.usOnly) return "required for a US address";
+  return "optional";
+}
 
 /**
  * onDiscard drops an unresolved batch's saved request (after a confirming step) so a new batch can start.
@@ -37,17 +46,20 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
   const fields = IMPORT_FIELDS[kind], ready = readyImportRows(rows, validation).length;
   return <>
     {E.back("Settings", "Import", undefined, model.backHref)}
-    {E.stp(["upload", "map", "preview", "commit"], step)}
-    <fieldset disabled={step !== 0 || busy} className="min-w-0">
+    {E.stp(["Upload", "Map", "Preview", "Commit"], step)}
+    <FieldSet disabled={step !== 0 || busy} className="min-w-0 gap-0">
+      <FieldLegend variant="label">What are you importing?</FieldLegend>
       <ToggleGroup type="single" value={kind} onValueChange={value => { if (value) onKind?.(value as ImportKind); }} variant="outline" size="sm" className="flex-wrap justify-start">
         {IMPORT_KINDS.map(value => <ToggleGroupItem key={value} value={value}>{importKindLabel(value)}</ToggleGroupItem>)}
       </ToggleGroup>
-    </fieldset>
+    </FieldSet>
     {model.error && <p role="alert" className="text-destructive">{model.error}</p>}
     {step === 0 && <>
-      <p>Upload a CSV with a header row, up to {IMPORT_ROW_CAP} records. Quoted commas and newlines are supported.</p>
+      <p>Save your spreadsheet as a CSV file with one record per row, up to {ROW_CAP} rows. Name the first row’s columns as listed below and MGR matches them for you; you can match other names in the next step.</p>
+      {E.ttl(`${importKindLabel(kind)} columns`)}
+      <ul className="space-y-1 text-sm">{fields.map(field => <li key={field.name}><code>{field.name}</code> · {columnNeed(field)}</li>)}</ul>
       <Field><FieldLabel>CSV file</FieldLabel><Attachment state={model.headers ? "done" : "idle"} className="w-full">
-        <AttachmentContent><AttachmentTitle>{model.fileName ?? "Choose a CSV file"}</AttachmentTitle><AttachmentDescription>{model.headers ? `${model.csvRowCount} rows ready to map` : ".csv · up to 5,000 rows"}</AttachmentDescription></AttachmentContent>
+        <AttachmentContent><AttachmentTitle>{model.fileName ?? "Choose a CSV file"}</AttachmentTitle><AttachmentDescription>{model.headers ? `${model.csvRowCount} rows ready to map` : `.csv · up to ${ROW_CAP} rows`}</AttachmentDescription></AttachmentContent>
         <AttachmentTrigger asChild aria-label="Choose CSV file"><label className="cursor-pointer"><input type="file" accept=".csv,text/csv" className="sr-only" onChange={event => onFile?.(event.target.files?.[0])} /></label></AttachmentTrigger>
       </Attachment></Field>
       {model.headers && <Button onClick={() => onStep?.(1)}>Map {model.csvRowCount} rows</Button>}

@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import { E } from "../components/mgr/e";
 import { ImportView } from "../components/mgr/views/import";
+import { IMPORT_FIELDS } from "../lib/import-csv";
 import { importPreview } from "../lib/mgr/fixtures/import";
 
 it("keeps missing mappings and preview cells empty rather than undefined", () => {
@@ -66,4 +67,20 @@ it("offers Import another file only once results are recovered, never past an un
   expect(html).toContain("Correct blocked rows in a new batch");
   expect(renderToStaticMarkup(createElement(ImportView, { model: { ...recovered, result: null, error: "Some rows may have committed" }, onNextFile: vi.fn() }))).not.toContain("Import another file");
   expect(renderToStaticMarkup(createElement(ImportView, { model: { ...recovered, busy: true }, onNextFile: vi.fn() }))).not.toContain("Import another file");
+});
+
+it("names its steps, labels the kind choice and lists the chosen kind's columns before upload (#1150)", () => {
+  const upload = (kind: typeof importPreview.kind) => renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, kind, step: 0, rows: [], validation: [] } }));
+  const html = upload("customers");
+  for (const step of ["Upload", "Map", "Preview", "Commit"]) expect(html).toContain(`>${step}</span>`);
+  expect(html).toMatch(/<legend[^>]*>What are you importing\?<\/legend>/);
+  expect(html).not.toContain("Quoted commas");
+  expect(html).toContain("Customers columns");
+  for (const field of IMPORT_FIELDS.customers) expect(html).toContain(`<code>${field.name}</code>`);
+  expect(html).toMatch(/<code>name<\/code> · required/);
+  expect(html).toMatch(/<code>state<\/code> · required for a US address/);
+  expect(html).toMatch(/<code>alias<\/code> · optional/);
+  const balances = upload("opening_balances");
+  for (const field of IMPORT_FIELDS.opening_balances) expect(balances).toContain(`<code>${field.name}</code>`);
+  expect(balances).not.toContain("<code>saleChannelId</code>");
 });
