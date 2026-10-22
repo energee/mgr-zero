@@ -495,8 +495,15 @@ describe("SCREENS", () => {
 
   it("renders the controlled date value used by live shared forms", () => {
     const html = renderToStaticMarkup(createElement(DatePicker, { label: "Date", defaultValue: "", value: "2027-08-31", onChange: () => {} }));
-    // The app-wide record date (lib/date-format.ts formatDate), not "August 31, 2027" (#1126).
+    // The app-wide record date (lib/date-format.ts formatDate).
     expect(html).toContain("Aug 31, 2027");
+  });
+
+  it("shows a date typed with a year below 1000 instead of failing the form", () => {
+    // The native date input reports each year digit as typed: 0002, 0020, 0202, 2026.
+    const html = renderToStaticMarkup(createElement(DatePicker, { label: "Date", value: "0002-10-22", name: "date", onChange: () => {} }));
+    expect(html).toContain("Oct 22, 2");
+    expect(html).toContain('value="0002-10-22"');
   });
 
   it("points a date field at its description, as the other fields do", () => {

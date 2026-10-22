@@ -239,7 +239,6 @@ export const INERT: (string | RegExp)[] = [
   /^Remove source \d+$/,
   "Review current material plan",
   "Correct material actuals",
-  "Pick a date",
   "Remove source",
   "Add ingredient",
   "Remove ingredient",
@@ -328,8 +327,6 @@ export const INERT: (string | RegExp)[] = [
   "Unlink",
   "Pay invoice",
   "Email me a link",
-  // A date field's trigger reads its value ("Sep 3, 2026", formatDate) and opens its calendar in place.
-  /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}, \d{4}$/,
   "Reset to format price",
   "Switch",
   "Reload",

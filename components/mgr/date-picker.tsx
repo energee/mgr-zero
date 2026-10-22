@@ -18,9 +18,10 @@ function parseISODate(value: string) {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
+/** yyyy-mm-dd. The year is padded too: a native date input reports each year digit as typed (0002). */
 function formatISODate(date: Date) {
-  const part = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${part(date.getMonth() + 1)}-${part(date.getDate())}`;
+  const part = (value: number, width = 2) => String(value).padStart(width, "0");
+  return `${part(date.getFullYear(), 4)}-${part(date.getMonth() + 1)}-${part(date.getDate())}`;
 }
 
 /** `aria-describedby` names the help text the caller composes beside the field. */
@@ -39,7 +40,8 @@ export function DatePicker({ label, defaultValue = "", value, onChange, disabled
     setOpen(false);
   };
   // A <label for> does not name a button, so the trigger points back at both the
-  // label and itself: "Best by, Sep 5, 2026".
+  // label and itself: "Best by, Sep 5, 2026". data-preview-action: the trigger
+  // opens its calendar in place, so the screen explorer never routes it.
   const labelId = React.useId();
   const triggerId = React.useId();
 
@@ -56,6 +58,7 @@ export function DatePicker({ label, defaultValue = "", value, onChange, disabled
             aria-describedby={describedBy}
             variant="outline"
             className="w-full min-w-0 shrink justify-start text-left font-normal"
+            data-preview-action
           >
             <Icon icon={Calendar03Icon} data-icon="inline-start" />
             {isoDate ? formatDate(isoDate) : "Pick a date"}
