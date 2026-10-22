@@ -73,6 +73,7 @@ function traversePreviewsByKeyboard() {
     const fixture = CHAT_PREVIEW_FIXTURES[index];
     assert.equal(ab("eval", `document.querySelector('input[value=${JSON.stringify(fixture.id)}]')?.checked`).result, true, `${fixture.title} was not selected by keyboard`);
     assert.equal(ab("eval", "document.activeElement?.matches(':focus-visible')").result, true, `${fixture.title} lost visible keyboard focus`);
+    // The gallery draws one preview at a time, so the first rendered section is the selected fixture.
     assert.equal(ab("eval", "document.querySelector('[data-chat-preview] section[aria-labelledby] h3')?.textContent").result, fixture.title);
     if (index < CHAT_PREVIEW_FIXTURES.length - 1) ab("press", "ArrowRight");
   }

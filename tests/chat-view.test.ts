@@ -91,7 +91,9 @@ it("labels each personal reason in plain words with no repeated sublabel", () =>
   const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: personalChatPreferences }));
   for (const { reason } of personalChatPreferences.preferences) {
     expect(html).toContain(`aria-label="${NOTIFICATION_REASON_LABEL[reason]}"`);
-    expect(html).not.toMatch(new RegExp(`[>"]${reason.replaceAll("_", " ")}[<"]`));
+    // The raw reason id with spaces ("pick due") must never be drawn as a label.
+    const rawReasonText = reason.replaceAll("_", " ");
+    expect(html).not.toMatch(new RegExp(`[>"]${rawReasonText}[<"]`));
   }
   expect(html).not.toContain("Personal reminders<");
   expect(html).not.toContain("App Home");
@@ -107,7 +109,9 @@ it("does not send staff to link Slack while Slack is unavailable", () => {
   expect(unavailable).toContain("aria-label=\"Pick due\"");
 });
 
-it("keeps fixture and server-setup jargon and the developer preview picker out of Chat settings", () => {
+// The "All preview states" picker renders only when NODE_ENV is "development";
+// vitest runs with NODE_ENV "test", so this checks what staff see.
+it("omits fixture wording and the dev-only state picker from Chat settings", () => {
   const html = renderToStaticMarkup(createElement(ChatSettingsView, { health: { installation: null, queue: {}, lastCallback: null, lastDelivery: null, destinations: [], linkedCount: 0 }, configured: false, timezone: "America/New_York", readingDueHours: 24, previewFixtures: CHAT_PREVIEW_FIXTURES }));
   expect(html).toContain("Sample data");
   expect(html).not.toMatch(/fixture|server setup|All preview states/i);

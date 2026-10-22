@@ -22,7 +22,7 @@ export function ChatPreviewGallery({ fixtures }: { fixtures: readonly ChatPrevie
     <Tabs value={selected} onValueChange={value => setSelected(value as ChatPreviewId)}>
       <TabsList variant="solid" className="w-full">{PREVIEW_TABS.map(([id, label]) => <TabsTrigger key={id} value={id}>{label}</TabsTrigger>)}</TabsList>
     </Tabs>
-    {/* Every fixture state, for checking renderer changes while developing; staff see only the four tabs (#1146). */}
+    {/* Every fixture state, for checking renderer changes while developing; staff see only the four tabs. */}
     {process.env.NODE_ENV === "development" && <details><summary>All preview states</summary><ChatPreviewPicker selected={selected} onSelect={setSelected} /></details>}
     {fixture && <ChatPreview fixture={fixture} />}
   </section>;

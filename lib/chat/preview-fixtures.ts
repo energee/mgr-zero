@@ -65,7 +65,7 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
       { label: "What to do", value: "Open the pick flow in MGR" },
     ],
     items: [notification({ reason: "pick_due", urgency: "attention", subject: { type: "order", id: "order-0235", safeLabel: "ORD-0235" }, title: "Pick due", detail: "assigned to you", dueAt: "2026-09-04T09:00:00.000Z", ownerClass: "warehouse", resolutionKey: "pick-due:order-0235", actions: [openMgr("Open pick in MGR"), { id: "snooze", label: "Snooze", enabled: true }, { id: "mute_reason", label: "Mute picks", enabled: true }] })],
-    // The message's buttons belong to its one item; repeating them here drew them twice (#1146).
+    // The message's buttons belong to its one item; repeating them here drew them twice.
     actions: [],
   },
   {

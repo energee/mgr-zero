@@ -7,7 +7,11 @@ import { describe, expect, it } from "vitest";
 import { ChatPreview, ChatPreviewPicker } from "@/lib/chat/preview-web";
 import { assertPortableNotification, NOTIFICATION_REASON_LABEL } from "@/lib/chat/contracts";
 import { CHAT_PREVIEW_FIXTURES } from "@/lib/chat/preview-fixtures";
+import { renderSlackPreferences } from "@/lib/chat/slack-renderer";
 import { SCREENS } from "@/components/mgr/screens";
+
+/** How many times `text` appears in `html`. */
+const countOf = (html: string, text: string) => html.split(text).length - 1;
 
 const forbiddenKeys = new Set([
   "email", "phone", "price", "balance", "licenseNumber", "signature",
@@ -29,8 +33,10 @@ describe("chat preview fixtures", () => {
     expect(new Set(CHAT_PREVIEW_FIXTURES.map((fixture) => fixture.id)).size).toBe(CHAT_PREVIEW_FIXTURES.length);
   });
 
-  // #991 keeps the fixture and its venue frame in one wording; #1146 makes
-  // sample ship dates relative, so a preview never reads as overdue work.
+  // The fixture and its venue frame share one wording (#991). Samples say
+  // "today"/"tomorrow" where Slack's Today rows print "Mon D, YYYY": a fixed
+  // date reads as overdue once it passes, and the screen frames are built
+  // statically, so a date computed at build time would go stale the same way.
   it("App Home and Personal queue fixtures share one relative ship-date wording", () => {
     const appHome = CHAT_PREVIEW_FIXTURES.find((fixture) => fixture.id === "app-home")!;
     const submitted = appHome.items.find((item) => item.reason === "submitted_order")!;
@@ -54,9 +60,11 @@ describe("chat preview fixtures", () => {
     const reasons = preferences.fields.map(({ label }) => label).filter((label) => label !== "Quiet hours");
     expect(reasons.length).toBeGreaterThan(0);
     const venue = JSON.stringify(SCREENS.find((screen) => screen.name === "Notification preferences")!.body);
+    const slackDialog = JSON.stringify(renderSlackPreferences("intent-1"));
     for (const label of reasons) {
       expect(Object.values(NOTIFICATION_REASON_LABEL)).toContain(label);
       expect(venue).toContain(label);
+      expect(slackDialog).toContain(`"text":"${label}"`);
     }
   });
 
@@ -112,14 +120,13 @@ describe("chat preview web renderer", () => {
     }
   });
 
-  // #1146: the surface is named once, the DM shows its actions once, and
-  // the sample dialog cannot look savable.
-  it("names each surface once and shows each DM action once", () => {
+  // The DM header names its surface once, and its buttons are drawn once.
+  it("shows the personal DM surface label and each action once", () => {
     const dm = CHAT_PREVIEW_FIXTURES.find(({ id }) => id === "personal-dm")!;
     const html = renderToStaticMarkup(createElement(ChatPreview, { fixture: dm }));
     expect(html).toContain("Direct message · Sample data");
-    expect(html.match(/Direct message/g)).toHaveLength(1);
-    for (const label of ["Open pick in MGR", "Snooze", "Mute picks"]) expect(html.split(`>${label}<`)).toHaveLength(2);
+    expect(countOf(html, "Direct message")).toBe(1);
+    for (const label of ["Open pick in MGR", "Snooze", "Mute picks"]) expect(countOf(html, `>${label}<`), label).toBe(1);
   });
 
   it("draws the sample preferences dialog without a live Save", () => {
