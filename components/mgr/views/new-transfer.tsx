@@ -1,4 +1,6 @@
-// components/mgr/views/new-transfer.tsx — shared New transfer sheet body. An
+// components/mgr/views/new-transfer.tsx — shared New transfer sheet body. It
+// draws no title: the sheet it opens in (CommandForm live, ScreenSheet in the
+// inventory) already names it (#1120). An
 // entered line that cannot be sent marks its SKU or its quantity, with the
 // message under the line, once the user leaves the quantity (#1121). An empty
 // SKU list says where SKUs are made, or who makes them, and a chosen location
@@ -53,7 +55,6 @@ export function NewTransferView({
     : { text: "No SKUs yet.", label: "Add a SKU", href: model.skusHref, to: "Catalog" };
   return (
     <>
-      {E.back("Transfers", "New transfer")}
       <Pick label="From" value={model.from} options={model.fromOptions} onChange={controls.from} />
       <Pick label="From bin" value={model.fromBin} options={model.fromBinOptions} onChange={controls.fromBin} disabled={!model.from} empty={model.from ? NO_BINS : undefined} />
       <Pick label="To" value={model.to} options={model.toOptions} onChange={controls.to} />

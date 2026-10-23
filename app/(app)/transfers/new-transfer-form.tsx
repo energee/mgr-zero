@@ -5,9 +5,11 @@
 // blank spare line is left out (transferPayloadLines); any other line must be
 // complete, or Create transfer stays withheld (newTransferReason) — it is never
 // silently dropped. `skusHref` is Catalog only for a user who may create a SKU.
+// Create transfer opens the new transfer's detail page.
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { NewTransferView } from "@/components/mgr/views/new-transfer";
@@ -20,6 +22,7 @@ type Bin = { id: string; location_id: string; name: string };
 type Line = { skuId: string; qty: string };
 
 export function NewTransferForm({ locations, bins, skus, skusHref }: { locations: Location[]; bins: Bin[]; skus: { id: string; label: string }[]; skusHref: string | null }) {
+  const router = useRouter();
   const [fromId, setFromId] = useState("");
   const [toId, setToId] = useState("");
   const [fromBin, setFromBin] = useState("");
@@ -32,6 +35,7 @@ export function NewTransferForm({ locations, bins, skus, skusHref }: { locations
       lines: transferPayloadLines(lines, fromBin, toBin),
     }),
     reset: () => { setFromId(""); setToId(""); setFromBin(""); setToBin(""); setLines([{ skuId: "", qty: "" }]); },
+    onSuccess: data => router.push(`/transfers/${(data as { transferId: string }).transferId}`),
   });
   const reason = newTransferReason({ fromId, toId, fromBinId: fromBin, toBinId: toBin, lines });
   const fromBins = bins.filter(bin => bin.location_id === fromId);

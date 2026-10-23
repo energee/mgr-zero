@@ -10,21 +10,27 @@ import type { ChatHealth, ChatLinkIntent, ChatLinkedPerson, ChatPreferences } fr
 import { SlackMark } from "@/components/mgr/brand-icons";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChatPreview, ChatPreviewPicker } from "@/lib/chat/preview-web";
-import type { ChatPreviewFixture, ChatPreviewId } from "@/lib/chat/contracts";
+import { NOTIFICATION_REASON_LABEL, type ChatPreviewFixture, type ChatPreviewId } from "@/lib/chat/contracts";
+
+const PREVIEW_TABS: [ChatPreviewId, string][] = [["app-home", "App Home"], ["personal-dm", "Personal DM"], ["team-digest", "Team digest"], ["preferences", "Preferences"]];
 
 export function ChatPreviewGallery({ fixtures }: { fixtures: readonly ChatPreviewFixture[] }) {
   const [selected, setSelected] = useState<ChatPreviewId>("app-home");
   const fixture = fixtures.find(item => item.id === selected);
   return <section data-chat-preview className="flex min-w-0 flex-col gap-4" aria-label="Preview surfaces">
-    {E.note("Fixture data only. Previews never send Slack messages.")}
+    {E.note("Sample data only. A preview never sends a Slack message.")}
     <Tabs value={selected} onValueChange={value => setSelected(value as ChatPreviewId)}>
-      <TabsList variant="solid" className="w-full">{[["app-home", "App Home"], ["personal-dm", "Personal DM"], ["team-digest", "Team digest"], ["preferences", "Preferences"]].map(([id, label]) => <TabsTrigger key={id} value={id}>{label}</TabsTrigger>)}</TabsList>
+      <TabsList variant="solid" className="w-full">{PREVIEW_TABS.map(([id, label]) => <TabsTrigger key={id} value={id}>{label}</TabsTrigger>)}</TabsList>
     </Tabs>
-    <details><summary>All preview states</summary><ChatPreviewPicker selected={selected} onSelect={setSelected} /></details>
+    {/* Every fixture state, for checking renderer changes while developing; staff see only the four tabs. */}
+    {process.env.NODE_ENV === "development" && <details><summary>All preview states</summary><ChatPreviewPicker selected={selected} onSelect={setSelected} /></details>}
     {fixture && <ChatPreview fixture={fixture} />}
   </section>;
 }
 
+/** Admin Chat settings, shared by the app and the screen inventory. The
+ *  `fields`, `connection` and `delivery` slots draw the built-in view when
+ *  left undefined and draw nothing when given `null`. */
 export function ChatSettingsView({ health, timezone, readingDueHours, configured = true, fields, connection, delivery, previewFixtures = [], oauthError = false, installed = false, backHref, healthHref, peopleHref, disconnectHref, preferencesHref, channels = null, channel = "" }: {
   health: ChatHealth; timezone: string; readingDueHours: number; configured?: boolean; fields?: ReactNode; connection?: ReactNode; delivery?: ReactNode; previewFixtures?: readonly ChatPreviewFixture[]; oauthError?: boolean; installed?: boolean;
   backHref?: string; healthHref?: string; peopleHref?: string; disconnectHref?: string; preferencesHref?: string; channels?: { id: string; name: string }[] | null; channel?: string;
@@ -33,7 +39,7 @@ export function ChatSettingsView({ health, timezone, readingDueHours, configured
   const connected = installation && !["disconnected", "pending"].includes(installation.state);
   return <>
     {E.back("Settings", "Chat", undefined, backHref)}
-    {!connected && <>{E.ttl("Chat notifications")}{E.info("Bring today’s assigned, due and overdue work into chat. Slack shows the work; MGR stays the record.")}</>}
+    {!connected && E.info("Bring today’s assigned, due and overdue work into chat. Slack shows the work; MGR stays the record.")}
     {oauthError && E.note("Slack connection was cancelled or could not finish. Try again; your existing settings remain available.", "alert")}
     {installed && E.info("Slack authorization completed. Choose a private operations channel below.")}
     {E.row(connected ? `Slack · ${installation.workspace}` : "Slack", connected ? installation.state.replaceAll("_", " ") : "Not connected", connected ? E.act("Disconnect", "destructive", disconnectHref) : "", connected && installation.state === "active" ? "ok" : "w", SlackMark)}
@@ -54,8 +60,8 @@ export function ChatSettingsView({ health, timezone, readingDueHours, configured
   </>;
 }
 
-export function ChatPersonalPreferencesView({ preferences, canSetQuietHours = true, back = "Chat", backHref, busy = false, error, onPreference, onDestination, onUnlink, onSaveQuiet }: {
-  preferences: ChatPreferences; canSetQuietHours?: boolean; back?: string; backHref?: string; busy?: boolean; error?: string | null;
+export function ChatPersonalPreferencesView({ preferences, configured = true, canSetQuietHours = true, back = "Chat", backHref, busy = false, error, onPreference, onDestination, onUnlink, onSaveQuiet }: {
+  preferences: ChatPreferences; configured?: boolean; canSetQuietHours?: boolean; back?: string; backHref?: string; busy?: boolean; error?: string | null;
   onPreference?: (reason: ChatPreferences["preferences"][number]["reason"], enabled: boolean) => void;
   onDestination?: (reason: ChatPreferences["preferences"][number]["reason"], destinationId: string) => void;
   onUnlink?: () => void; onSaveQuiet?: (start: string, end: string, timezone: string) => void;
@@ -64,16 +70,20 @@ export function ChatPersonalPreferencesView({ preferences, canSetQuietHours = tr
   const [start, setStart] = useState(preferences.quietStart?.slice(0, 5) ?? "");
   const [end, setEnd] = useState(preferences.quietEnd?.slice(0, 5) ?? "");
   const [timezone, setTimezone] = useState(preferences.timezone);
+  const howToLink = configured ? E.info("To link your Slack, open the MGR app in Slack, go to its Home tab and choose Link MGR account. Then follow that link back here.") : E.note("Slack isn’t available for your brewery yet.");
   return <>
     {E.back(back, "My notification preferences", undefined, backHref)}
-    {preferences.link ? E.row(`Slack user ${preferences.link.external_user_id}`, "Linked to your MGR account", <Button variant="outline" disabled={busy} onClick={onUnlink}>Unlink my Slack</Button>) : E.info("To link your Slack, open MGR’s App Home in Slack and choose Link MGR account. Return here using that fresh link.")}
-    {E.note("These preferences change your personal reminders. MGR work, assignments and App Home stay the same.")}
-    {preferences.preferences.map(preference => <div key={preference.reason}>
-      {E.row(preference.reason.replaceAll("_", " "), "Personal reminders", <Switch aria-label={preference.reason.replaceAll("_", " ")} checked={onPreference ? preference.enabled : undefined} defaultChecked={onPreference ? undefined : preference.enabled} disabled={busy} onCheckedChange={enabled => onPreference?.(preference.reason, enabled)} />)}
-      {Boolean(preferences.destinations?.length) && <label className="flex items-center justify-between gap-3 py-3 text-sm">{preference.reason.replaceAll("_", " ")} destination
-        {E.pick(`${preference.reason.replaceAll("_", " ")} destination`, preference.personalDestinationId ?? "", [{ value: "", label: "Default delivery", disabled: true }, ...(preferences.destinations!.map(destination => ({ value: destination.id, label: destination.external_destination_id })))], { onChange: onDestination ? (nextValue: string) => onDestination?.(preference.reason, nextValue) : undefined, disabled: busy, hideLabel: true })}
+    {preferences.link ? E.row(`Slack user ${preferences.link.external_user_id}`, "Linked to your MGR account", <Button variant="outline" disabled={busy} onClick={onUnlink}>Unlink my Slack</Button>) : howToLink}
+    {E.note("These switches change only your personal Slack reminders. Your MGR work and assignments stay the same.")}
+    {preferences.preferences.map(({ reason, enabled, personalDestinationId }) => {
+      const label = NOTIFICATION_REASON_LABEL[reason];
+      return <div key={reason}>
+      {E.row(label, "", <Switch aria-label={label} checked={onPreference ? enabled : undefined} defaultChecked={onPreference ? undefined : enabled} disabled={busy} onCheckedChange={next => onPreference?.(reason, next)} />)}
+      {Boolean(preferences.destinations?.length) && <label className="flex items-center justify-between gap-3 py-3 text-sm">{label} destination
+        {E.pick(`${label} destination`, personalDestinationId ?? "", [{ value: "", label: "Default delivery", disabled: true }, ...(preferences.destinations!.map(destination => ({ value: destination.id, label: destination.external_destination_id })))], { onChange: onDestination ? (nextValue: string) => onDestination?.(reason, nextValue) : undefined, disabled: busy, hideLabel: true })}
       </label>}
-    </div>)}
+      </div>;
+    })}
     {canSetQuietHours && <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && Boolean(start) === Boolean(end)) onSaveQuiet?.(start, end, timezone); }}>
       {E.edit("My quiet hours start", start, "time", undefined, { onChange: (nextValue: string) => setStart(nextValue), id: `${id}-start`, disabled: busy })}
       {E.edit("My quiet hours end", end, "time", undefined, { onChange: (nextValue: string) => setEnd(nextValue), id: `${id}-end`, disabled: busy })}
@@ -138,7 +148,7 @@ export function ChatDeliveryView({ enabled, canDisable = enabled, busy = false, 
 
 export function ChatConnectionView({ configured = true, reauthorize = false, busy = false, error, onConnect }: { configured?: boolean; reauthorize?: boolean; busy?: boolean; error?: string | null; onConnect?: () => void }) {
   return <div className="flex flex-col gap-3">
-    {!configured && E.note("Slack connection setup is unavailable. Your administrator must finish the server setup. Fixture previews remain available.")}
+    {!configured && E.note("Slack isn’t available for your brewery yet. Ask MGR support to turn it on, then connect here.")}
     <Button disabled={!configured || busy} onClick={onConnect}>{busy ? "Opening Slack…" : reauthorize ? "Reauthorize Slack" : "Connect Slack"}</Button>
     <CommandFormMessage error={error} />
   </div>;
@@ -192,7 +202,7 @@ export function ChatLinkConsentView({ intent, backHref, busy = false, error, onL
       {E.info(`Slack user ${intent.slackIdentity} in ${intent.workspace} will be linked to ${intent.mgrIdentity} in ${intent.brewery}.`)}
       {E.note("This enables personal reminders and App Home. It does not change your MGR permissions.")}
       <Button data-variant="irreversible" className="bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" disabled={busy} onClick={onLink}>Link accounts</Button>
-    </> : E.info("This link is missing, expired, already used, or belongs to another brewery. Select the right brewery, then open MGR’s App Home in Slack and choose Link MGR account for a fresh link.", "alert")}
+    </> : E.info("This link is missing, expired, already used, or belongs to another brewery. Select the right brewery, then open the MGR app in Slack, go to its Home tab and choose Link MGR account for a fresh link.", "alert")}
     <CommandFormMessage error={error} />
     {E.btn("Back", "g", backHref)}
   </>;

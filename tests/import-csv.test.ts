@@ -15,6 +15,9 @@ it("skips blank lines, admits a bare quote inside a value, and drops Excel's sep
 it("rejects malformed CSV, ambiguous headers and mismatched widths", () => {
   for (const value of ['a\n"open', 'a\n"closed"oops', 'a,a\n1,2', 'a,b\n1']) expect(() => parseCsv(value)).toThrow();
 });
+it("names the row cap the way the upload step writes it (#1150)", () => {
+  expect(() => parseCsv(`a\n${"1\n".repeat(5001)}`)).toThrow("At most 5,000 rows per batch");
+});
 it("maps explicit fields and rejects blank, fractional cents and nondecimal numbers", () => {
   expect(mapCsvRows([["IPA", "2"]], { product: 0 })).toEqual([{ product: "IPA" }]);
   const ids = { skuId: crypto.randomUUID(), locationId: crypto.randomUUID(), binId: crypto.randomUUID() };
