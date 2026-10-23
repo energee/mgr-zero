@@ -38,6 +38,24 @@ export function InviteView({ buyer, email, defaultEmail = "", role, onEmailChang
   </form>;
 }
 
+/** Resend and Cancel for one pending invitation on Team. The live adapter (InvitationActions)
+ *  passes the commands and their shared busy/error; the inventory frame leaves them inert.
+ *  Cancel confirms first in the shared sheet. */
+export function PendingInvitationActionsView({ email, onResend, onCancel, busy = false, error }: {
+  email: string; onResend?: () => void; onCancel?: () => Promise<boolean>; busy?: boolean; error?: string | null;
+}) {
+  return <div className="flex flex-col items-end gap-2">
+    <div className="flex gap-2">
+      <Button type="button" variant="outline" size="sm" disabled={busy} onClick={onResend}>Resend</Button>
+      <ConfirmDeleteControl title="Cancel invitation" triggerLabel="Cancel" size="sm" busy={busy} error={error} onDelete={onCancel}
+        busyLabel="Cancelling…" dismissLabel="Keep invitation"
+        name={<>Cancel the invitation for <strong>{email}</strong>?</>}
+        warning="They can no longer accept it. Send a new invitation to give them access later." />
+    </div>
+    <CommandFormMessage error={error} />
+  </div>;
+}
+
 export function TeamMemberView({ name, email, avatar, savedRoles, roles, onRolesChange, onSubmit, onRemove, saving = false, removing = false, error }: {
   name: string; email: string; avatar?: string; savedRoles: StaffRole[]; roles?: StaffRole[]; onRolesChange?: (value: StaffRole[]) => void;
   onSubmit?: FormEventHandler<HTMLFormElement>; onRemove?: () => Promise<boolean>; saving?: boolean; removing?: boolean; error?: string | null;

@@ -201,7 +201,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     set_brewery_operating_defaults: [B,24,R(),21], set_brewery_books_opened_on: [B,"2026-10-01",R()], set_one_way_keg_fee: [B,1000,R()], set_brewery_ai_model: [B,"openai/gpt-5.4",R()], begin_csv_import: [B,"opening_balances",importRows,R()], import_csv_row: [B,importRequest,0],
     correct_reporting_basis: [B,"2026-09-01",null,"Correct basis",R()],
     claim_invite_request: [B,`${name}@test.local`,"staff","warehouse",null,R()], complete_invite_membership: [inviteRequest], record_invite_failure: [failureRequest],
-    revoke_account_invitation: [B,consentInvite,R()],
+    revoke_account_invitation: [B,consentInvite,R()], resend_account_invitation: [B,consentInvite,R()],
     record_keg_event: [B,f.pool.id,"half_bbl",1,"acquired",W,BIN,null,null,R()], update_keg_pool: [B,f.pool.id,name,null,null,0,true,R()], create_keg_pool: [B,name,"owned",null,null,0,R()],
     begin_chat_installation: [B,"slack","https://example.test/chat/callback","state",R()], begin_chat_reauthorization: [B,I,"https://example.test/chat/callback","state",R()],
     begin_qbo_oauth: [B,"https://example.test/qbo/callback","state","connect",R(),["com.intuit.quickbooks.accounting"]], begin_qbo_invoice_sync: [B,R()], get_qbo_sync_status: [B],
@@ -263,6 +263,8 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   readNames.push("invoice_push_facts");
   // list_compliance_reports reads which recent periods hold report activity (#1209).
   readNames.push("list_compliance_active_months");
+  // Team's pending invitations (#1204) return no rows to a caller without Admin.
+  readNames.push("list_pending_invitations");
   // Existing-account consent is authenticated own-identity work, covered by existing-account-invites.test.ts.
   const ownNames = ["accept_account_invitation","set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_personal_notification_destination","create_chat_conversation","append_chat_message"];
   const existing = [...readFileSync(new URL("./rls-command-boundary.test.ts", import.meta.url), "utf8").matchAll(/rpc: "(\w+)"/g)].map(m => m[1]);
@@ -277,6 +279,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   readSignatures.push("order_packaging_shortfall_rows()");
   readSignatures.push("invoice_push_facts(uuid,uuid[])");
   readSignatures.push("list_compliance_active_months(uuid,date,date)");
+  readSignatures.push("list_pending_invitations(uuid)");
   const ownSignatures = ["accept_account_invitation(uuid,uuid)","set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_personal_notification_destination(uuid,text,uuid,uuid)","create_chat_conversation(uuid,text,uuid)","append_chat_message(uuid,uuid,text,text,uuid)"];
   expect(catalog.filter(c => readNames.includes(c.name)).map(c => c.signature).sort()).toEqual(readSignatures.sort());
   expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures].sort());
