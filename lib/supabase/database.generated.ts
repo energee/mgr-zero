@@ -5444,6 +5444,9 @@ isOneToOne: false
 "record_invite_failure":
 { Args: { "p_request_id": string }; Returns: undefined
                            },
+"record_invoice_payment":
+{ Args: { "p_amount_cents": number,"p_brewery": string,"p_invoice": string,"p_method": string,"p_received_on": string,"p_reference": string,"p_request_id": string }; Returns: Json
+                           },
 "record_keg_event":
 { Args: { "p_bin": string,"p_brewery": string,"p_customer": string,"p_keg_size": Database["public"]['Enums']["keg_size"],"p_location": string,"p_note": string,"p_pool": string,"p_qty": number,"p_reason": Database["public"]['Enums']["keg_event_reason"],"p_request_id": string }; Returns: Json
                            },
@@ -5773,6 +5776,9 @@ isOneToOne: false
                            },
 "upsert_water_profile":
 { Args: { "p_bicarbonate": number,"p_brewery": string,"p_calcium": number,"p_chloride": number,"p_magnesium": number,"p_name": string,"p_profile": string,"p_request_id": string,"p_sodium": number,"p_sulfate": number }; Returns: Json
+                           },
+"void_invoice_payment":
+{ Args: { "p_brewery": string,"p_payment": string,"p_reason": string,"p_request_id": string }; Returns: Json
                            },
 "write_off_invoice":
 { Args: { "p_brewery": string,"p_invoice": string,"p_reason": string,"p_request_id": string }; Returns: Json

@@ -68,6 +68,8 @@ const AUTHENTICATED_RPCS = [
   "set_qbo_one_way_fee_mapping(uuid,text,uuid)",
   "set_qbo_push_defaults(uuid,boolean,boolean,uuid)",
   "write_off_invoice(uuid,uuid,text,uuid)",
+  "record_invoice_payment(uuid,uuid,integer,date,text,text,uuid)",
+  "void_invoice_payment(uuid,uuid,text,uuid)",
   "start_qbo_push(uuid,uuid,text,uuid)",
   "set_qbo_vendor_mapping(uuid,uuid,text,uuid)",
   "set_qbo_purchase_account(uuid,text,uuid)",
