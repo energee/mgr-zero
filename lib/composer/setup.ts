@@ -1,10 +1,12 @@
 // lib/composer/setup.ts — opens the Ask MGR drawer's conversation: restores the
-// person's latest one with its history, or creates the first. A timeout bounds
-// the whole load, so a stalled request ends in the drawer's failure state with
-// Try again instead of an endless opening message (#1105).
+// person's latest one with its newest text turns, or creates the first. A
+// timeout bounds the whole load, so a stalled request ends in the drawer's
+// failure state with Try again instead of an endless opening message (#1105).
 import type { UIMessage } from "ai";
+import { MAX_HISTORY_MESSAGES } from "@/lib/chat/model-messages";
 
-type StoredMessage = { id: string; role: "user" | "assistant" | "result"; content: string | null };
+/** A text turn from get_chat_history with recentTurns: it never returns result rows. */
+type StoredMessage = { id: string; role: "user" | "assistant"; content: string };
 type SetupRun = (name: string, input: unknown, requestId: string | undefined, signal: AbortSignal) => Promise<unknown>;
 
 /** What the drawer says while setup runs, beside its pulsing bar. */
@@ -29,9 +31,10 @@ export async function loadComposerSetup(run: SetupRun, createRequest: { current:
       return { conversationId: created.id, messages: [] as UIMessage[] };
     }
     const conversationId = conversations[0].id;
-    const history = await run("get_chat_history", { conversationId }, undefined, requestSignal) as { messages: StoredMessage[] };
-    const messages = history.messages.filter((message) => message.role !== "result" && message.content).map((message) => ({
-      id: message.id, role: message.role as "user" | "assistant", parts: [{ type: "text", text: message.content! }],
+    // Only the newest text turns, the same window the model sees, so the load does not grow with the conversation (#1169).
+    const history = await run("get_chat_history", { conversationId, recentTurns: MAX_HISTORY_MESSAGES }, undefined, requestSignal) as { messages: StoredMessage[] };
+    const messages = history.messages.map((message) => ({
+      id: message.id, role: message.role, parts: [{ type: "text", text: message.content }],
     })) as UIMessage[];
     return { conversationId, messages };
   } catch (cause) {

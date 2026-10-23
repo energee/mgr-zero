@@ -18,7 +18,7 @@ export default async function WorkPage() {
     <WorkList
       rows={rows} defaults={defaultWorkKinds(brewery.roles)}
       chips={Object.keys(workHrefsFor(brewery.roles))}
-      createAction={canCreate ? E.btn("New order", "g", "/orders") : null}
+      createAction={canCreate ? E.btn("New order", "g", "/orders/new") : null}
     />
   );
 }

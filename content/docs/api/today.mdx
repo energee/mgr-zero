@@ -163,11 +163,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer, taproom
 
-Read one composer conversation and its messages for the current author and brewery
+Read one composer conversation and its messages for the current author and brewery; recentTurns returns only that many newest text turns, oldest first
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `conversationId` | uuid | yes |
+| `recentTurns` | integer | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
