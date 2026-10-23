@@ -477,7 +477,7 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", tab: "More", name: "More", job: "Setup and desk review, never standing work",
     reads: "none [role navigation manifest]", writes: "none",
     states: DEFAULT_STATES,
-    spec: "Role-filtered; hidden entries leave no gaps. Standing work remains in Today, Beer or Work.",
+    spec: "Role-filtered; hidden entries leave no gaps. Entries sit under Sales, Production, Setup and Integrations headings, and an area with none of the role's entries has no heading. The rail's More group uses the same headings. Standing work remains in Today, Beer or Work.",
     body: <MoreView model={toMoreViewProps(moreNavs)} />,
   },
   {

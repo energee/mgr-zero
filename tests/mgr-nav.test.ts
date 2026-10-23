@@ -2,7 +2,7 @@
 // boundary: role filtering leaves no gaps, and the active tab is the longest
 // href prefix of the current path (so /orders/123 lights Work, / lights Today).
 import { describe, expect, it } from "vitest";
-import { activeChild, activeTab, canOpen, isUnder, navAbout, navTitle, shippedNav, navFor, PORTAL_NAV, STAFF_NAV } from "../lib/mgr/nav";
+import { activeChild, activeTab, canOpen, isUnder, navAbout, navGroups, navTitle, shippedNav, navFor, PORTAL_NAV, STAFF_NAV, type NavItem } from "../lib/mgr/nav";
 import { STAFF_ROLES } from "../lib/mgr/enums";
 import { workHrefsFor } from "../components/mgr/work-tabs";
 
@@ -159,5 +159,34 @@ describe("about", () => {
     const chat = STAFF_NAV.find(t => t.label === "More")!.children!.find(c => c.label === "Chat")!;
     expect(navAbout("Chat")).toBe(chat.about);
     expect(() => navAbout("Formats")).toThrow(/Formats/);
+  });
+});
+
+describe("navGroups (#1159)", () => {
+  const moreFor = (roles: Parameters<typeof navFor>[1]) => navFor(shippedNav(STAFF_NAV), roles).find(t => t.label === "More")!.children!;
+  const drawn = (items: readonly NavItem[]) => navGroups(items).map(g => [g.group, g.items.map(i => i.label)]);
+
+  it("files every More entry under one area", () => {
+    for (const c of STAFF_NAV.find(t => t.label === "More")!.children!) expect.soft(c.group, c.label).toBeDefined();
+  });
+
+  it("draws admin's More under Sales, Production, Setup and Integrations", () => {
+    expect(drawn(moreFor(["admin"]))).toEqual([
+      ["Sales", ["Invoices", "Catalog", "Customers", "Price groups", "Compliance"]],
+      ["Production", ["Recipes", "Vendors", "Planning"]],
+      ["Setup", ["Import", "Settings", "Sale channels", "Locations", "Units"]],
+      ["Integrations", ["Menu", "Chat"]],
+    ]);
+  });
+
+  it("drops an area the role has no entry under", () => {
+    expect(drawn(moreFor(["taproom"]))).toEqual([["Setup", ["Units"]], ["Integrations", ["Chat"]]]);
+    expect(drawn(moreFor(["brewer"]))).toEqual([["Production", ["Recipes", "Vendors", "Planning"]], ["Setup", ["Units"]], ["Integrations", ["Chat"]]]);
+    expect(drawn(moreFor(["warehouse"]))).toEqual([["Production", ["Vendors", "Planning"]], ["Setup", ["Units"]], ["Integrations", ["Menu", "Chat"]]]);
+  });
+
+  it("keeps a tab's ungrouped children together under no heading", () => {
+    const beer = STAFF_NAV.find(t => t.label === "Beer")!;
+    expect(navGroups(beer.children!)).toEqual([{ group: undefined, items: beer.children }]);
   });
 });
