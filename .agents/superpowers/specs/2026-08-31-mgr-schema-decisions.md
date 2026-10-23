@@ -210,3 +210,33 @@ provider callback as an MGR actor or make ordinary commands depend on provider
 transport state. Disconnect stops local delivery first; credential deletion may
 retry later, and serialization prevents that cleanup from deleting a newer
 reauthorized credential.
+
+## Invoice payments recorded in MGR (2026-10-22, #1045)
+
+Owner decision; plan: `docs/plans/invoice-local-payments.md`. It reverses the
+design doc's open choice 5 ("Payments have no table").
+
+**Why a table now.** QuickBooks was the only source of paid state. An invoice
+QuickBooks never received had a null balance, so it could never read Paid and
+never read Overdue. A brewery without QuickBooks saw no overdue invoice at all.
+
+**Only an invoice QuickBooks never received.** A null QuickBooks balance is
+never read as zero, as paid, or as an inferred amount owed. So the ledger owns
+only an invoice with no QuickBooks identity, no unresolved push, no push to an
+earlier company, and no `paid_at` set elsewhere. Every other invoice keeps
+QuickBooks' balance, known or not.
+
+**A void is a reversal row.** The baseline's ledger convention corrects an
+entry with a new row, never an edit. `invoice_payment_voids` is that row, shaped
+like `inventory_movements.compensates_id`: unique per payment, with a reason.
+Both tables refuse update and delete by trigger.
+
+**`paid_at` is stored, not derived.** Every reader of paid state already reads
+`invoices.paid_at`. Writing it from the two RPCs makes those readers say Paid
+with no change. It cannot drift: invoice lines are frozen at issue, both RPCs
+hold the invoice row lock, and a payment is refused once `paid_at` is set.
+
+**A push with local payments is refused, not reconciled.** `start_qbo_push`
+refuses an invoice with an unvoided payment. `record_invoice_payment` refuses
+one with a pending push. Both lock the invoice row first, so an invoice never
+reaches QuickBooks with a payment already on it.

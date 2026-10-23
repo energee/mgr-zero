@@ -328,7 +328,10 @@ null dates use current customer terms because issue-time terms were not stored.
 `qbo_invoice_id text`, `qbo_sync_status default 'pending'`, `qbo_sync_error text`,
 `qbo_idempotency_key uuid not null default gen_random_uuid() unique`,
 `qbo_tax_cents int`, `qbo_total_cents int`, `qbo_balance_cents int`, `paid_at timestamptz`
-(all five QBO fields written only by the sync job; tax is QBO's — decision). unique
+(all five QBO fields written only by the sync job; tax is QBO's — decision). For an
+invoice whose balance MGR's ledger owns, `paid_at` is also written by
+`record_invoice_payment` (paid in full) and `void_invoice_payment` (back below the
+total); see `invoice_payments` below (#1045). unique
 `(brewery_id, invoice_no)`. idx `(customer_id, issued_on desc)`, `(brewery_id,
 qbo_sync_status) where qbo_sync_status <> 'pushed'`. RLS: `staff_all`; `P-customer` select.
 `qbo_idempotency_key` is the stable external request identity, not durable intent storage.
@@ -344,8 +347,32 @@ not null <> 0, unit_price_cents int not null, amount_cents int generated always 
   ⇒ `keg_pool_id and keg_size not null`; refunds have `qty < 0`.
 - idx `(invoice_id)`, `(keg_pool_id) where keg_pool_id is not null`.
 
+### `invoice_payments` — ledger (#1045, 2026-10-22)
+Payments received outside QuickBooks, for an invoice QuickBooks never received.
+`invoice_id → invoices, amount_cents int not null > 0, received_on date not null,
+method text not null check (in 'cash','check','ach','other')` (mirrored by
+`PAYMENT_METHODS`; no enum type), `reference text` (null, or 1–200 non-blank
+characters), `recorded_by → auth.users not null, recorded_at timestamptz`.
+idx `(brewery_id, invoice_id)`. Written only by `record_invoice_payment` (Admin, Sales).
+Plan: `docs/plans/invoice-local-payments.md`.
+
+### `invoice_payment_voids` — ledger (#1045, 2026-10-22)
+One row per voided payment: `payment_id → invoice_payments, reason text not null`
+(1–500 non-blank characters), `voided_by → auth.users not null, voided_at timestamptz`.
+unique `(brewery_id, payment_id)`: a payment is voided at most once. Written only by
+`void_invoice_payment` (Admin, Sales). A payment is voided when a void row names it;
+the payment row is never changed, as `inventory_movements.compensates_id` points at
+the row it reverses.
+
+Both tables: append-only. The `immutable_history` trigger
+(`private.preserve_invoice_payment_history`, a copy of
+`preserve_reporting_basis_history`) refuses every update and delete. Grants:
+`authenticated` select only; `service_role` none. RLS: `staff_read` select for
+Admin, Sales and Warehouse, the roles of `get_invoice` and `list_invoices`.
+
 ### Views
-- `invoice_totals` — `subtotal_cents = sum(amount_cents)` per invoice, plus the QBO columns.
+- `invoice_totals` — `subtotal_cents = sum(amount_cents)` per invoice, plus the QBO columns,
+  plus `local_paid_cents` (unvoided `invoice_payments`; `collected_cents` stays QBO cash only).
 - `keg_deposit_balances` — per `(customer_id, keg_pool_id, keg_size)`: sum of deposit
   lines − refunds, in cents and in kegs.
 
@@ -766,8 +793,10 @@ shipment's order.
    identity, and are reachable only through the RLS-checking server token boundary.
    Future sync modules use that boundary and never receive a service-client eslint
    allowlist.
-5. **Payments** have no table; `invoices.paid_at / qbo_balance_cents` from QBO is enough
-   while QBO is the book of record.
+5. ~~**Payments** have no table; `invoices.paid_at / qbo_balance_cents` from QBO is enough
+   while QBO is the book of record.~~ **Reversed 2026-10-22** (#1045, owner decision):
+   an invoice QuickBooks never received takes payments in `invoice_payments`, corrected
+   by `invoice_payment_voids` (§5); see `docs/plans/invoice-local-payments.md`.
 6. ~~**Materials have no locations**; one store per brewery. `material_movements` gains a
    `location_id` later if multi-site materials appear.~~ **Reversed 2026-09-06:** materials
    are per location and bin; see `2026-09-06-mgr-locations-bins-transfers-design.md`.
