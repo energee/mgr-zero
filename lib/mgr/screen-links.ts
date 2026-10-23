@@ -168,7 +168,6 @@ export const TAPS: [string | RegExp, string][] = [
   ["Pay", "Pay invoice"],
   ["You \u00b7 buyer", "Portal Me"],
   [/^Weekly count · /, "Weekly count"],
-  [/^Square\W*QuickBooks connector$/, "Square \u2192 QuickBooks connector"],
   ["Connect Slack", "Chat settings"],
   ["Preview surfaces", "Chat settings"],
   ["Health", "Reauthorization"],

@@ -244,7 +244,7 @@ describe("SCREENS", () => {
   it("draws connection recovery and confirmation surfaces", () => {
     const expected = new Map<string, Screen["surface"]>([
       ["Connect QuickBooks", undefined], ["Mapping conflict", "sheet"], ["Disconnect QuickBooks", "sheet"],
-      ["Connect Square", undefined], ["Square locations", "sheet"], ["Square → QuickBooks connector", "sheet"], ["Disconnect Square", "sheet"],
+      ["Connect Square", undefined], ["Square locations", "sheet"], ["Taproom sales in QuickBooks", "sheet"], ["Disconnect Square", "sheet"],
       ["Linked people", undefined], ["Link your Slack", "entry"], ["Disconnect Slack", "sheet"],
     ]);
     for (const [name, surface] of expected) {
