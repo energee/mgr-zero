@@ -1427,7 +1427,7 @@ export const SCREENS: Screen[] = [
     reads: "get_invoice · get_qbo_connection",
     writes: "record_invoice_payment",
     states: [["permission", "admin or sales required", 1], ["above balance", "an amount over the balance due is refused", 1], ["future", "a received day after the brewery's today is refused", 1], ["prepayment", "a received day before the issue date is accepted"], ["paid in full", "the invoice reads Paid"], ["connected", "the invoice is no longer sent to QuickBooks", 1]],
-    spec: "Amount, received day and method are required; a reference such as a check number is optional. The amount is capped at the balance due, so there is no credit balance, and the received day at the brewery's today. Paid in full marks the invoice paid on the received day. A payment is never edited; Void corrects it.",
+    spec: "Amount, received day and method are required; a reference such as a check number is optional. The amount is capped at the balance due, so there is no credit balance, and the received day at the brewery's today. Paid in full marks the invoice paid on the latest received day of its payments. A payment is never edited; Void corrects it.",
     // INV-1039 partly paid in MGR: the rest of its balance, received on the inventory's today.
     body: <RecordPaymentView value={{ amount: dollarsInput(LOCAL_BALANCE_CENTS), receivedOn: "2026-10-04", method: "check", reference: "1190" }} maxCents={LOCAL_BALANCE_CENTS} maxDate="2026-10-04" quickbooksConnected />,
   },

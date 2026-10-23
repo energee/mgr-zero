@@ -70,7 +70,7 @@ create trigger immutable_history before update or delete on public.invoice_payme
 -- list_invoices reads it beside subtotal_cents in the same request.
 -- collected_cents stays QuickBooks cash only; local_paid_cents is the ledger's
 -- unvoided sum. A reader wanting all cash collected adds both for a
--- ledger-owned invoice (docs/plans/invoice-local-payments.md, Design 6).
+-- ledger-owned invoice.
 create or replace view public.invoice_totals with (security_invoker = true) as
 select i.id as invoice_id,
   i.brewery_id,
@@ -111,20 +111,20 @@ begin
   if not found then raise exception 'invoice not found'; end if;
   if v_inv.kind <> 'invoice' then raise exception 'only an invoice takes a payment'; end if;
   if v_inv.qbo_invoice_id is not null then raise exception 'this invoice is in QuickBooks; record its payment there'; end if;
-  if v_inv.written_off_at is not null then raise exception 'a written-off invoice takes no payment'; end if;  -- Q6
-  -- Covers a historical invoice (Q7) and one marked paid before a company change (Q4).
+  if v_inv.written_off_at is not null then raise exception 'a written-off invoice takes no payment'; end if;
+  -- Covers a historical invoice and one marked paid before a company change.
   if v_inv.paid_at is not null then raise exception 'this invoice is already paid'; end if;
-  -- Any connection: a push frozen by a company or connection change also refuses (Q3).
+  -- Any connection: a push frozen by a company or connection change also refuses.
   if exists (select 1 from public.qbo_pushes where invoice_id = p_invoice and brewery_id = p_brewery and status = 'pending')
-    then raise exception 'a QuickBooks push of this invoice is unresolved; retry it first'; end if;  -- Q3
-  -- Only an invoice whose identity a company change purged reaches this (Q4).
+    then raise exception 'a QuickBooks push of this invoice is unresolved; retry it first'; end if;
+  -- Only an invoice whose identity a company change purged reaches this.
   if exists (select 1 from public.qbo_pushes where invoice_id = p_invoice and brewery_id = p_brewery and status = 'pushed')
-    then raise exception 'this invoice was in a previous QuickBooks company; push it to the current one'; end if;  -- Q4
+    then raise exception 'this invoice was in a previous QuickBooks company; push it to the current one'; end if;
   if p_amount_cents is null or p_amount_cents <= 0 then raise exception 'a payment must be more than $0.00'; end if;
   if p_received_on is null or p_method is null then raise exception 'a payment needs a received date and a method'; end if;
   if length(v_reference) > 200 then raise exception 'a payment reference is at most 200 characters'; end if;
   select timezone into v_tz from public.breweries where id = p_brewery;
-  -- A date before issued_on is allowed: a prepayment (Q10).
+  -- A date before issued_on is allowed: a prepayment.
   if p_received_on > (now() at time zone v_tz)::date then
     raise exception 'a payment cannot be received in the future'; end if;
 
@@ -133,8 +133,8 @@ begin
   -- The unvoided sum before this payment.
   select coalesce(sum(local_paid_cents), 0) into v_paid_before from public.invoice_totals
     where invoice_id = p_invoice and brewery_id = p_brewery;
-  -- Also refuses every payment on a $0.00 invoice: nothing is due (Design 4).
-  if p_amount_cents > v_total - v_paid_before then  -- Q1
+  -- Also refuses every payment on a $0.00 invoice: nothing is due.
+  if p_amount_cents > v_total - v_paid_before then
     raise exception 'a payment cannot be more than the balance due'; end if;
 
   insert into public.invoice_payments (brewery_id, invoice_id, amount_cents, received_on, method, reference, recorded_by)
@@ -176,8 +176,9 @@ begin
 
   select * into v_payment from public.invoice_payments where id = p_payment and brewery_id = p_brewery;
   if not found then raise exception 'payment not found'; end if;
-  -- The invoice row lock serializes two voids of one payment, and a void with a
-  -- payment or a push (the lock order of record_invoice_payment and start_qbo_push).
+  -- The invoice row lock serializes two voids of the same payment.
+  -- It also orders a void against record_invoice_payment and start_qbo_push,
+  -- which lock the same row.
   select * into v_inv from public.invoices where id = v_payment.invoice_id and brewery_id = p_brewery for update;
   if exists (select 1 from public.invoice_payment_voids where payment_id = p_payment and brewery_id = p_brewery)
     then raise exception 'this payment is already voided'; end if;
@@ -200,7 +201,7 @@ revoke all on function public.void_invoice_payment(uuid, uuid, text, uuid) from 
 grant execute on function public.void_invoice_payment(uuid, uuid, text, uuid) to authenticated;
 
 -- The QuickBooks push facts that decide who owns an invoice's balance
--- (invoiceLedgerOwnsBalance): a pending push (Q3) and a successful one (Q4).
+-- (invoiceLedgerOwnsBalance): a pending push and a successful one.
 -- qbo_pushes is readable by Admin and Sales only (integration_operator_read),
 -- but list_invoices and get_invoice also serve Warehouse, which would otherwise
 -- see no push and read an unknown balance as owed. This returns only the two
@@ -257,7 +258,7 @@ begin
   if v_inv.qbo_sync_status = 'not_synced' then raise exception 'historical invoices are not sent to QuickBooks'; end if;
   if exists (select 1 from public.invoice_payments p where p.invoice_id=p_invoice and p.brewery_id=p_brewery
       and not exists (select 1 from public.invoice_payment_voids v where v.payment_id=p.id and v.brewery_id=p.brewery_id))
-    then raise exception 'payments for this invoice are recorded in MGR, so it is not sent to QuickBooks'; end if;  -- Q8: voided payments do not block
+    then raise exception 'payments for this invoice are recorded in MGR, so it is not sent to QuickBooks'; end if;  -- voided payments do not block
   -- Any other replay (its push not finished): the first result, once the refusals above pass.
   if v_replay is not null then
     return v_replay;

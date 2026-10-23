@@ -13,7 +13,7 @@ import { useCommandForm } from "@/lib/commands/use-command-form";
 import { toCents } from "@/lib/mgr/money";
 import { invoicePaymentReady, type InvoicePaymentValue } from "@/lib/mgr/invoice-view";
 
-/** `today` is breweryDate(timeZone), from the server page; `balanceCents` caps the amount (Q1). */
+/** `today` is breweryDate(timeZone), from the server page; `balanceCents` caps the amount. */
 export function RecordPaymentForm({ invoiceId, balanceCents, today, quickbooksConnected }: {
   invoiceId: string; balanceCents: number; today: string; quickbooksConnected: boolean;
 }) {

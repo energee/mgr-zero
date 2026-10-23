@@ -31,7 +31,7 @@ const NUMBER_COLUMNS = [["Quantity", "qty"], ["Unit price", "unitPrice"]] as con
 const METHOD_OPTIONS = [{ value: "", label: "Select a method" }, ...PAYMENT_METHODS.map((value) => ({ value, label: PAYMENT_METHOD_LABEL[value] }))];
 
 /** The Record payment sheet's body, fields like KegPoolFields: amount capped at
- *  the balance (Q1), received day capped at the brewery's today (Q10), method,
+ *  the balance, received day capped at the brewery's today, method,
  *  reference. Without onChange the fields draw the value uncontrolled, as the
  *  inventory does. At a QuickBooks-connected brewery it warns that payments stop
  *  the push. Then the live form's submit footer, or the inert Record payment
@@ -45,6 +45,7 @@ export function RecordPaymentView({ value, maxCents, maxDate, quickbooksConnecte
       {quickbooksConnected ? E.note("This invoice will not be sent to QuickBooks while it has payments recorded in MGR.") : null}
       {E.edit("Amount ($)", value.amount, "number", undefined, { id: "payment-amount", min: 0, max: maxCents / 100, step: 0.01, onChange: set("amount"), required: true })}
       {E.edit("Received on", value.receivedOn, "date", undefined, { max: maxDate, onChange: set("receivedOn"), required: true })}
+      {/* E.pick hands back a plain string; METHOD_OPTIONS holds only "" and PaymentMethod values, so the cast is safe (as in KegPoolFields). */}
       {E.pick("Method", value.method, METHOD_OPTIONS, { id: "payment-method", onChange: set("method") as ((v: string) => void) | undefined, required: true })}
       {E.edit("Reference · optional", value.reference, "text", undefined, { id: "payment-reference", maxLength: 200, onChange: set("reference") })}
       {footer !== undefined ? footer : E.btn("Record payment")}

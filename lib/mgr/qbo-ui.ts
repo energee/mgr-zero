@@ -55,7 +55,7 @@ export function qboInvoicePresentation(input: {
   if (input.writtenOff) return { detail: "written off in MGR", actions: [] };
   // A historical order (record_historical_order) is never sent to QuickBooks.
   if (input.syncStatus === "not_synced") return { detail: "not in QuickBooks (before the books opened)", actions: [] };
-  // Only unvoided payments count, so voiding them all brings the push back (Q8).
+  // Only unvoided payments count, so voiding them all brings the push back.
   if (input.localPaidCents > 0) return { detail: "Payments recorded in MGR · not sent to QuickBooks", actions: [] };
   if (!hasAnyRole(input.roles, ["admin", "sales"])) {
     return { detail: input.syncStatus === "pushed" ? "QuickBooks status available to Sales" : "not pushed", actions: [] };

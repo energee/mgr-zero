@@ -169,7 +169,7 @@ function invoiceState(snapshot: InvoiceSnapshot, totalCents: number): InvoiceVie
   if (state === "voided") return { label: "Voided", tone: "w" };
   if (state === "deleted") return { label: "Deleted in QuickBooks", tone: "w" };
   if (invoiceIsSettledWithoutPayment(invoice)) return { label: "Settled", tone: "ok" };
-  // All lines priced at zero: settled, never overdue, and takes no payment (Design 4).
+  // All lines priced at zero: settled, never overdue, and takes no payment.
   if (invoiceLedgerOwnsBalance(toLedgerFacts(snapshot)) && totalCents <= 0) return { label: "No payment due", tone: "ok" };
   // The two sources never both hold money: MGR refuses a payment on a QuickBooks
   // invoice, and start_qbo_push refuses an invoice with payments.
@@ -244,8 +244,8 @@ const paymentView = (p: InvoicePaymentRecord): InvoicePaymentView => ({
 /** The Record payment form's value: dollars and a YYYY-MM-DD day, as typed. */
 export type InvoicePaymentValue = { amount: string; receivedOn: string; method: PaymentMethod | ""; reference: string };
 
-/** Ready to submit: more than $0.00 and at most the balance (Q1), a method, and
- *  a received day no later than today; a day before issue is a prepayment (Q10).
+/** Ready to submit: more than $0.00 and at most the balance, a method, and
+ *  a received day no later than today; a day before issue is a prepayment.
  *  record_invoice_payment checks the same again. */
 export function invoicePaymentReady(value: InvoicePaymentValue, balanceCents: number, today: string): boolean {
   const cents = toCents(value.amount);

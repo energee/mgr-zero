@@ -343,7 +343,7 @@ defineCommand({
 // RPCs hold every rule: only an invoice QuickBooks never received, no more
 // than the balance, no future received date in the brewery's zone.
 defineCommand({
-  name: "record_invoice_payment", description: "Record a payment received outside QuickBooks on an invoice QuickBooks never received; paid in full marks the invoice paid on the received day; returns the remaining balance",
+  name: "record_invoice_payment", description: "Record a payment received outside QuickBooks on an invoice QuickBooks never received; paid in full marks the invoice paid on the latest received day of its payments; returns the remaining balance",
   roles: [...salesRoles],
   input: z.object({
     invoiceId: z.string().uuid(), amountCents: z.number().int().positive(), receivedOn: isoDate,
@@ -438,7 +438,7 @@ defineQuery({
   roles: [...readRoles],
   input: z.object({ invoiceId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    const [invoice, invLines, pushes, payments] = await Promise.all([
+    const [invoice, invLines, pushes, paymentRows] = await Promise.all([
       unwrap(ctx.db.from("invoices").select("*, customers(id,name,qbo_customer_id,qbo_realm_id)").eq("id", i.invoiceId).eq("brewery_id", ctx.breweryId).single()),
       completeRows("Invoice lines", start => ctx.db.from("invoice_lines").select("*, skus(name,qbo_item_id,qbo_realm_id)", { count: "exact" })
         .eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).order("kind").order("id").range(start, start + PAGE_SIZE - 1)),
@@ -452,10 +452,10 @@ defineQuery({
     ]);
     if (!invoice) throw new Error("Invoice not found");
     const staffLinks = await invoiceStaffLinks(ctx, [invoice]);
-    const ledger = payments.map(({ invoice_payment_voids: voids, ...payment }) => ({ ...payment, void: voids as unknown as { reason: string } | null }));
+    const payments = paymentRows.map(({ invoice_payment_voids: voids, ...payment }) => ({ ...payment, void: voids as unknown as { reason: string } | null }));
     const push = pushes.get(invoice.id);
-    return { invoice, lines: invLines, payments: ledger,
-      localPaidCents: ledger.reduce((sum, payment) => payment.void ? sum : sum + payment.amount_cents, 0),
+    return { invoice, lines: invLines, payments,
+      localPaidCents: payments.reduce((sum, payment) => payment.void ? sum : sum + payment.amount_cents, 0),
       hasPendingPush: push?.has_pending_push ?? false, wasPushedToQbo: push?.was_pushed ?? false,
       quickbooksLink: staffLinks.get(invoice.id) ?? null };
   },

@@ -17,7 +17,7 @@ export const invoiceList = [
   { ...invoice, id: "deleted", invoice_no: 1035, customers: { name: "Teresa’s" }, qbo_remote_state: "deleted" as const },
   { ...invoice, id: "settled", invoice_no: 1034, qbo_balance_cents: 0 },
   { ...invoice, id: "settled-with-cash", invoice_no: 1031, paid_at: "2026-09-30T12:00:00Z", qbo_balance_cents: 0, qbo_cash_collected_cents: 48000 },
-  // A first push whose result is unknown: no QuickBooks identity yet, and the pending push keeps the balance unknown (Q3).
+  // A first push whose result is unknown: no QuickBooks identity yet, and the pending push keeps the balance unknown.
   { ...invoice, id: "unknown-push", invoice_no: 1030, qbo_invoice_id: null, was_pushed_to_qbo: false, qbo_sync_status: "pending" as const, has_pending_qbo_push: true, qbo_balance_cents: null },
   { ...invoice, id: "partial", invoice_no: 1033, customers: null, due_on: "2026-10-20", qbo_balance_cents: 50000, qbo_cash_collected_cents: 48000 },
   { ...invoice, id: "written-off", invoice_no: 1032, customers: { name: "Teresa’s" }, qbo_remote_state: "deleted" as const, written_off_at: "2026-09-30T15:00:00Z" },
