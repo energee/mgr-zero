@@ -12,6 +12,9 @@ import { toPutBackViewProps } from "@/lib/mgr/put-back-view";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { PutBackButton } from "./put-back-button";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/orders") };
 
 type Line = { id: string; qty_ordered: number; qty_picked: number | null; qty_shipped: number | null; skus: { name: string } | null };
 type Order = { id: string; order_no: number | null; status: string; needs_restock: boolean };

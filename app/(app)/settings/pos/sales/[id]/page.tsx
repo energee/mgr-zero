@@ -3,10 +3,12 @@ import { PosSaleDetailView } from "@/components/mgr/views/pos";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { money } from "@/lib/mgr/money";
-import { canOpen } from "@/lib/mgr/nav";
+import { canOpen, navTitle } from "@/lib/mgr/nav";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
+
+export const metadata = { title: navTitle("/settings/pos/sales") };
 
 type Sale = { id: string; factKind: "sale" | "return"; externalOrderId: string; externalLineId: string; itemName: string; variationName: string; factStatus: string; mappingLabel: string | null; mappingStatus: "mapped" | "queued" | "ignored" | "unsupported" | "removed"; grossCents: number | null; locationName: string; soldAt: string; quantity: string | null; expectedBbl: number | null; servingOunces: number | null; sourceOrderId: string | null; sourceLineId: string | null; sourceVersion: string; current: boolean };
 type SaleDetail = { sale: Sale; revisions: Sale[] };
