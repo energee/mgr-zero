@@ -6,10 +6,10 @@ import { createElement, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
-import { InvoiceView } from "../components/mgr/views/invoice";
-import { creditMemoAls, invoiceEditedInQbo, invoiceFailedAls, invoicePartlyPaid } from "../lib/mgr/fixtures/invoice";
+import { InvoiceView, RecordPaymentView } from "../components/mgr/views/invoice";
+import { creditMemoAls, invoiceEditedInQbo, invoiceFailedAls, invoiceLocalPartlyPaid, invoicePartlyPaid } from "../lib/mgr/fixtures/invoice";
 import { ALS } from "../lib/mgr/fixtures/demo";
-import { invoiceMappingRows, toInvoiceViewProps } from "../lib/mgr/invoice-view";
+import { invoiceMappingRows, invoicePaymentReady, toInvoiceViewProps } from "../lib/mgr/invoice-view";
 import { invoiceIsCreditable } from "../lib/mgr/invoice-state";
 
 const htmlOf = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(createElement("div", null, node));
@@ -95,7 +95,8 @@ describe("Invoice view", () => {
       { label: "Outstanding balance", value: "$315.00", strong: true },
       { label: "Cash received in QuickBooks", value: "$300.00" },
     ]);
-    expect(toInvoiceViewProps(invoiceFailedAls).summary.settlement).toEqual([{ label: "Outstanding balance", value: "Unknown", strong: true }]);
+    // A pending push leaves the balance with QuickBooks, which has not supplied one (#1045 Q3).
+    expect(toInvoiceViewProps({ ...invoiceFailedAls, hasPendingPush: true }).summary.settlement).toEqual([{ label: "Outstanding balance", value: "Unknown", strong: true }]);
     // Zero balance with no cash is settled, not paid.
     const settled = toInvoiceViewProps({ ...invoicePartlyPaid, invoice: { ...invoicePartlyPaid.invoice, qbo_balance_cents: 0, qbo_cash_collected_cents: 0 } });
     expect(settled.state).toEqual({ label: "Settled", tone: "ok" });
@@ -155,6 +156,10 @@ describe("Invoice view", () => {
       invoice: invoiceFailedAls.invoice,
       lines: invoiceFailedAls.lines,
       questions: invoiceFailedAls.questions,
+      payments: [],
+      hasPendingPush: false,
+      wasPushedToQbo: false,
+      localPaidCents: 0,
     });
     expect(model.mappings).toBeUndefined();
     const html = htmlOf(createElement(InvoiceView, { model }));
@@ -248,4 +253,141 @@ it("renders a verified staff destination through the shared invoice view", () =>
   const html = htmlOf(createElement(InvoiceView, { model: toInvoiceViewProps(invoiceFailedAls), quickbooks: { detail: "Pushed" }, staffLink: { href: "https://app.qbo.intuit.com/app/invoice?txnId=34&companyId=4620000000000000", reason: null } }));
   expect(html).toContain('href="https://app.qbo.intuit.com/app/invoice?txnId=34&amp;companyId=4620000000000000"');
   expect(html).not.toContain("verified provider link is unavailable");
+});
+
+describe("Invoice payments recorded in MGR (#1045)", () => {
+  it("shows a local partly paid invoice's outstanding balance and paid amount, and no mapping rows", () => {
+    const model = toInvoiceViewProps(invoiceLocalPartlyPaid);
+    expect(model.state).toEqual({ label: "Partially paid", tone: "" });
+    expect(model.summary.settlement).toEqual([
+      { label: "Outstanding balance", value: "$315.00", strong: true },
+      { label: "Paid in MGR", value: "$300.00" },
+    ]);
+    // The snapshot carries mapping rows; an unvoided payment blocks the push they serve.
+    expect(invoiceLocalPartlyPaid.mappings).not.toHaveLength(0);
+    expect(model.mappings).toBeUndefined();
+    expect(model.paymentBalanceCents).toBe(31500);
+  });
+  it("lists each payment newest first, and a voided one with its reason", () => {
+    expect(toInvoiceViewProps(invoiceLocalPartlyPaid).payments).toEqual([
+      { key: "pay-check", id: "pay-check", amount: "$300.00", receivedOn: "Sep 20, 2026", method: "Check", reference: "1182" },
+      { key: "pay-cash", id: "pay-cash", amount: "$100.00", receivedOn: "Sep 12, 2026", method: "Cash", voidReason: "Counted twice" },
+    ]);
+  });
+  it("owns the balance of a never-pushed invoice: the line total is outstanding", () => {
+    const model = toInvoiceViewProps(invoiceFailedAls);
+    expect(model.state).toEqual({ label: "Unpaid", tone: "" });
+    expect(model.summary.settlement).toEqual([{ label: "Outstanding balance", value: "$615.00", strong: true }]);
+    expect(model.mappings).toEqual(invoiceFailedAls.mappings);
+    expect(model.payments).toEqual([]);
+    expect(model.paymentBalanceCents).toBe(61500);
+  });
+  it.each([
+    ["a pending push (Q3)", { hasPendingPush: true }],
+    ["a push to a previous QuickBooks company (Q4)", { wasPushedToQbo: true }],
+  ])("keeps an Unknown balance and takes no payment for %s", (_, patch) => {
+    const model = toInvoiceViewProps({ ...invoiceFailedAls, ...patch });
+    expect(model.summary.settlement).toEqual([{ label: "Outstanding balance", value: "Unknown", strong: true }]);
+    expect(model.paymentBalanceCents).toBeNull();
+  });
+  it("reads Paid with a $0.00 balance once payments reach the total", () => {
+    const model = toInvoiceViewProps({
+      ...invoiceLocalPartlyPaid,
+      invoice: { ...invoiceLocalPartlyPaid.invoice, paid_at: "2026-09-20T04:00:00Z" },
+      localPaidCents: 61500,
+    });
+    expect(model.state).toEqual({ label: "Paid", tone: "ok" });
+    expect(model.summary.settlement).toEqual([
+      { label: "Outstanding balance", value: "$0.00", strong: true },
+      { label: "Paid in MGR", value: "$615.00" },
+    ]);
+    expect(model.paymentBalanceCents).toBeNull();
+  });
+  it("reads No payment due for a ledger-owned $0.00 invoice, which takes no payment (Design 4)", () => {
+    const free = { ...invoiceFailedAls, lines: invoiceFailedAls.lines.map((l) => ({ ...l, unit_price_cents: 0, amount_cents: 0 })) };
+    const model = toInvoiceViewProps(free);
+    expect(model.state).toEqual({ label: "No payment due", tone: "ok" });
+    expect(model.paymentBalanceCents).toBeNull();
+  });
+  it.each([
+    ["written off (Q6)", { invoice: { ...invoiceFailedAls.invoice, written_off_at: "2026-09-20T12:00:00Z" } }],
+    ["paid outside the ledger, as a historical import (Q7)", { invoice: { ...invoiceFailedAls.invoice, paid_at: "2025-08-14T12:00:00Z" } }],
+    ["a QuickBooks invoice", { invoice: { ...invoiceFailedAls.invoice, qbo_invoice_id: "qbo-1039" } }],
+  ])("takes no payment when %s", (_, patch) => {
+    expect(toInvoiceViewProps({ ...invoiceFailedAls, ...patch }).paymentBalanceCents).toBeNull();
+  });
+  it("takes no payment on a credit memo", () => {
+    expect(toInvoiceViewProps(creditMemoAls).paymentBalanceCents).toBeNull();
+  });
+});
+
+describe("Invoice view: the Payments section (#1045)", () => {
+  const model = toInvoiceViewProps(invoiceLocalPartlyPaid);
+  const voidButtons = (html: string) => html.match(/>Void</g) ?? [];
+  it("lists each payment, and a voided one with its reason", () => {
+    const html = htmlOf(createElement(InvoiceView, { model }));
+    expect(html).toContain('id="invoice-payments"');
+    for (const text of ["$300.00", "Sep 20, 2026", "Check", "1182", "$100.00", "Cash", "Voided", "Counted twice"]) expect(html).toContain(text);
+  });
+  it("draws the inert Record payment and one Void, on the unvoided payment, when the slots are omitted", () => {
+    const html = htmlOf(createElement(InvoiceView, { model }));
+    expect(html).toContain("Record payment");
+    expect(voidButtons(html)).toHaveLength(1);
+  });
+  it("draws neither when the slots are null", () => {
+    const html = htmlOf(createElement(InvoiceView, { model, recordPayment: null, paymentAction: null }));
+    expect(html).not.toContain("Record payment");
+    expect(voidButtons(html)).toHaveLength(0);
+  });
+  it("passes each unvoided payment to a paymentAction function", () => {
+    const html = htmlOf(createElement(InvoiceView, { model, paymentAction: (p) => createElement("span", null, `void-${p.id}`) }));
+    expect(html).toContain("void-pay-check");
+    expect(html).not.toContain("void-pay-cash");
+  });
+  it("draws no default Record payment on an invoice that takes no payment", () => {
+    const html = htmlOf(createElement(InvoiceView, { model: toInvoiceViewProps(invoiceEditedInQbo) }));
+    expect(html).not.toContain("Record payment");
+    expect(html).not.toContain('id="invoice-payments"');
+  });
+});
+
+describe("RecordPaymentView (#1045)", () => {
+  const value = { amount: "", receivedOn: "2026-10-23", method: "" as const, reference: "" };
+  const fields = (quickbooksConnected: boolean) =>
+    htmlOf(createElement(RecordPaymentView, { value, maxCents: 31500, maxDate: "2026-10-23", quickbooksConnected }));
+  it("caps the amount at the balance (Q1) and the received date at today (Q10)", () => {
+    const html = fields(false);
+    expect(html).toContain('max="315"');
+    expect(html).toContain('max="2026-10-23"');
+    for (const text of ["Amount ($)", "Received on", "Method", "Reference · optional"]) expect(html).toContain(text);
+  });
+  it("says the invoice will not be sent to QuickBooks only when QuickBooks is connected", () => {
+    const sentence = "This invoice will not be sent to QuickBooks while it has payments recorded in MGR.";
+    expect(fields(true)).toContain(sentence);
+    expect(fields(false)).not.toContain(sentence);
+  });
+});
+
+describe("invoicePaymentReady", () => {
+  const ready = { amount: "100.00", receivedOn: "2026-10-01", method: "check" as const, reference: "" };
+  const today = "2026-10-23";
+  it("accepts an amount up to the balance with a date and a method", () => {
+    expect(invoicePaymentReady(ready, 31500, today)).toBe(true);
+    expect(invoicePaymentReady({ ...ready, amount: "315.00" }, 31500, today)).toBe(true);
+    expect(invoicePaymentReady({ ...ready, receivedOn: today }, 31500, today)).toBe(true);
+  });
+  it("accepts a date before the invoice was issued: a prepayment (Q10)", () => {
+    expect(invoicePaymentReady({ ...ready, receivedOn: "2026-08-01" }, 31500, today)).toBe(true);
+  });
+  it.each([
+    ["zero", { amount: "0" }],
+    ["no amount", { amount: "" }],
+    ["a non-number", { amount: "abc" }],
+    ["above the balance (Q1)", { amount: "315.01" }],
+    ["a date after today", { receivedOn: "2026-10-24" }],
+    ["no date", { receivedOn: "" }],
+    ["no method", { method: "" as const }],
+  ])("refuses %s", (_, patch) => {
+    expect(invoicePaymentReady({ ...ready, ...patch }, 31500, today)).toBe(false);
+  });
 });

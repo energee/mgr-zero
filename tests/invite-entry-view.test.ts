@@ -26,6 +26,10 @@ it("shows fixed text for a ?error= code, never the query string itself (#472)", 
   expect(toSetPasswordViewProps("a@example.com", "Call 555-0100 to verify your account").error).toBe("Your password was not saved. Try again.");
 });
 
+it("heads the password page Change password, like the Me link that opens it (#1108)", () => {
+  expect(toSetPasswordViewProps("a@example.com").title).toBe("Change password");
+});
+
 it("binds verified invitation display data and keeps password validation", () => {
   const model = toAcceptInviteViewProps("Actual brewery", ["customer"]);
   const html = renderToStaticMarkup(createElement(EntryView, { model, defaults: { name: "Actual buyer" } }));

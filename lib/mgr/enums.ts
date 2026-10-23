@@ -33,6 +33,11 @@ export const FERMENTATION_STAGE_KINDS = ["primary", "secondary", "diacetyl rest"
 export const WATER_ADDITION_STAGES = ["mash", "sparge", "kettle"] as const;
 export const WATER_ADDITION_UNITS = ["g", "mL", "oz"] as const;
 
+// Location uses (location_kind enum; the location Uses picker). A place may
+// have several; guards test membership.
+export const LOCATION_USES = ["warehouse", "taproom", "storage"] as const;
+export type LocationUse = (typeof LOCATION_USES)[number];
+
 // Customer types (customer_type enum; lib/commands/customers.ts, the customer forms).
 export const CUSTOMER_TYPES = ["distributor", "retailer", "brewery", "other"] as const;
 export type CustomerType = (typeof CUSTOMER_TYPES)[number];
@@ -43,6 +48,11 @@ export type CustomerType = (typeof CUSTOMER_TYPES)[number];
 // Labels: PAYMENT_TERM_LABEL in lib/mgr/labels.ts.
 export const PAYMENT_TERMS = ["due_on_receipt", "net15", "net30"] as const;
 export type PaymentTerm = (typeof PAYMENT_TERMS)[number];
+
+// How an invoice payment recorded in MGR was received; mirrors the
+// invoice_payments.method check (#1045). Labels: PAYMENT_METHOD_LABEL in lib/mgr/labels.ts.
+export const PAYMENT_METHODS = ["cash", "check", "ach", "other"] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 // US state codes (USPS), plus DC and the inhabited territories, for every
 // state field: customers, ship-tos, licenses, label registrations, CSV import

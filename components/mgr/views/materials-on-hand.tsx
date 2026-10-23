@@ -1,5 +1,7 @@
-// components/mgr/views/materials-on-hand.tsx — Materials on hand. Live slots
-// CountForm / MaterialForm on each row; inventory draws Count.
+// components/mgr/views/materials-on-hand.tsx — Materials on hand. Each row
+// offers Edit (the material's definition) beside Count (stock at one bin).
+// The live page passes MaterialForm and CountForm as rowEdit and rowCount;
+// without them (the screen inventory) the row draws plain Edit and Count buttons.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { MaterialsOnHandRowView, MaterialsOnHandViewModel } from "@/lib/mgr/materials-on-hand-view";
@@ -11,21 +13,20 @@ export function MaterialsOnHandView({
   header,
   controls,
   createAction,
-  rowTrailing,
-  definitionsHref,
+  rowEdit,
+  rowCount,
 }: {
   model: MaterialsOnHandViewModel;
   header?: ReactNode;
   /** The search strip (components/mgr/list-controls.tsx). */
   controls?: ReactNode;
   createAction?: ReactNode;
-  rowTrailing?: (row: MaterialsOnHandRowView) => ReactNode;
-  definitionsHref?: string;
+  rowEdit?: (row: MaterialsOnHandRowView) => ReactNode;
+  rowCount?: (row: MaterialsOnHandRowView) => ReactNode;
 }) {
   return (
     <>
       {header ?? E.back("Beer", "Materials on hand", createAction !== undefined ? createAction : E.btn("Add material"), model.backHref)}
-      {E.nav("Material definitions", "", "", undefined, definitionsHref)}
       {controls}
       {model.empty
         ? E.blank(model.empty)
@@ -34,8 +35,11 @@ export function MaterialsOnHandView({
             {E.row(
               row.title,
               row.detail,
-              rowTrailing ? rowTrailing(row) : E.act(row.verb, row.tone),
-              row.disabled ? "dis" : row.warning ? "w" : "",
+              <>
+                {rowEdit ? rowEdit(row) : E.act("Edit")}
+                {rowCount ? rowCount(row) : E.act("Count", "info")}
+              </>,
+              row.warning ? "w" : "",
             )}
           </Fragment>
         ))}

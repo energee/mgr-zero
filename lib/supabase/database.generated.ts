@@ -1001,6 +1001,64 @@ isOneToOne: false
       referencedColumns: ["id","brewery_id"]
     }
                   ]
+                },"invoice_payment_voids": {
+                  Row: {
+                    "brewery_id": string,"id": string,"payment_id": string,"reason": string,"voided_at": string,"voided_by": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "brewery_id": string,"id"?: string,"payment_id": string,"reason": string,"voided_at"?: string,"voided_by": string
+                  }
+                  Update: {
+                    "brewery_id"?: string,"id"?: string,"payment_id"?: string,"reason"?: string,"voided_at"?: string,"voided_by"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "invoice_payment_voids_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "invoice_payment_voids_payment_id_brewery_id_fkey"
+      columns: ["payment_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "invoice_payments"
+      referencedColumns: ["id","brewery_id"]
+    }
+                  ]
+                },"invoice_payments": {
+                  Row: {
+                    "amount_cents": number,"brewery_id": string,"id": string,"invoice_id": string,"method": string,"received_on": string,"recorded_at": string,"recorded_by": string,"reference": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount_cents": number,"brewery_id": string,"id"?: string,"invoice_id": string,"method": string,"received_on": string,"recorded_at"?: string,"recorded_by": string,"reference"?: string | null
+                  }
+                  Update: {
+                    "amount_cents"?: number,"brewery_id"?: string,"id"?: string,"invoice_id"?: string,"method"?: string,"received_on"?: string,"recorded_at"?: string,"recorded_by"?: string,"reference"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "invoice_payments_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "invoice_payments_invoice_id_brewery_id_fkey"
+      columns: ["invoice_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "invoice_totals"
+      referencedColumns: ["invoice_id","brewery_id"]
+    },{
+      foreignKeyName: "invoice_payments_invoice_id_brewery_id_fkey"
+      columns: ["invoice_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "invoices"
+      referencedColumns: ["id","brewery_id"]
+    }
+                  ]
                 },"invoice_questions": {
                   Row: {
                     "answered_at": string | null,"answered_by": string | null,"body": string,"brewery_id": string,"created_at": string,"created_by": string,"customer_id": string,"id": string,"invoice_id": string
@@ -3816,7 +3874,7 @@ isOneToOne: false
                   ]
                 },"invoice_totals": {
                   Row: {
-                    "brewery_id": string | null,"collected_cents": number | null,"customer_id": string | null,"invoice_id": string | null,"kind": Database["public"]['Enums']["invoice_kind"] | null,"paid_at": string | null,"qbo_balance_cents": number | null,"qbo_sync_status": Database["public"]['Enums']["qbo_sync_status"] | null,"qbo_tax_cents": number | null,"qbo_total_cents": number | null,"subtotal_cents": number | null
+                    "brewery_id": string | null,"collected_cents": number | null,"customer_id": string | null,"invoice_id": string | null,"kind": Database["public"]['Enums']["invoice_kind"] | null,"local_paid_cents": number | null,"paid_at": string | null,"qbo_balance_cents": number | null,"qbo_sync_status": Database["public"]['Enums']["qbo_sync_status"] | null,"qbo_tax_cents": number | null,"qbo_total_cents": number | null,"subtotal_cents": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -5050,7 +5108,7 @@ isOneToOne: false
 { Args: { "p_delivery": string,"p_now"?: string }; Returns: Json
                            },
 "get_chat_history":
-{ Args: { "p_brewery": string,"p_conversation": string }; Returns: Json
+{ Args: { "p_brewery": string,"p_conversation": string,"p_recent_turns"?: number }; Returns: Json
                            },
 "get_chat_home_items":
 { Args: { "p_external_user_id": string,"p_installation": string }; Returns: Json
@@ -5137,6 +5195,11 @@ isOneToOne: false
                            },
 "import_csv_row":
 { Args: { "p_brewery": string,"p_request_id": string,"p_row_n": number }; Returns: Json
+                           },
+"invoice_push_facts":
+{ Args: { "p_brewery": string,"p_invoices": (string)[] }; Returns: {
+              "has_pending_push": boolean,"invoice_id": string,"was_pushed": boolean
+            }[]
                            },
 "is_staff_of":
 { Args: { "b": string }; Returns: boolean
@@ -5385,6 +5448,9 @@ isOneToOne: false
                            },
 "record_invite_failure":
 { Args: { "p_request_id": string }; Returns: undefined
+                           },
+"record_invoice_payment":
+{ Args: { "p_amount_cents": number,"p_brewery": string,"p_invoice": string,"p_method": string,"p_received_on": string,"p_reference": string,"p_request_id": string }; Returns: Json
                            },
 "record_keg_event":
 { Args: { "p_bin": string,"p_brewery": string,"p_customer": string,"p_keg_size": Database["public"]['Enums']["keg_size"],"p_location": string,"p_note": string,"p_pool": string,"p_qty": number,"p_reason": Database["public"]['Enums']["keg_event_reason"],"p_request_id": string }; Returns: Json
@@ -5715,6 +5781,9 @@ isOneToOne: false
                            },
 "upsert_water_profile":
 { Args: { "p_bicarbonate": number,"p_brewery": string,"p_calcium": number,"p_chloride": number,"p_magnesium": number,"p_name": string,"p_profile": string,"p_request_id": string,"p_sodium": number,"p_sulfate": number }; Returns: Json
+                           },
+"void_invoice_payment":
+{ Args: { "p_brewery": string,"p_payment": string,"p_reason": string,"p_request_id": string }; Returns: Json
                            },
 "write_off_invoice":
 { Args: { "p_brewery": string,"p_invoice": string,"p_reason": string,"p_request_id": string }; Returns: Json

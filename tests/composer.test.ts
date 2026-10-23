@@ -13,7 +13,8 @@ import { ComposerStripView } from "@/components/mgr/views/composer-strip";
 import { chatModelFromSettings, gatewayLanguageModels, modelMatches, modelProvider } from "@/lib/chat/models";
 import { canRun } from "@/lib/commands/registry";
 import "@/lib/commands/all";
-import { movementFormHref, movementFormInstanceKey } from "@/lib/composer/state";
+import { composerProposal, movementFormHref, movementFormInstanceKey } from "@/lib/composer/state";
+import { isUuid } from "@/lib/commands/context";
 import { isComposerShortcut } from "@/components/mgr/composer";
 
 const ids = {
@@ -133,6 +134,24 @@ describe("AI composer", () => {
     expect(Object.fromEntries(url.searchParams)).toMatchObject({ recordMovement: "1", ...ids, qty: "-0.5", type: "depletion", note: "Festival tent", movementHandoff: handoffId });
     expect(movementFormInstanceKey()).toBe("manual");
     expect(readFileSync("app/(app)/inventory/page.tsx", "utf8")).toContain("key={movementFormInstanceKey(handoffId)}");
+  });
+
+  // /inventory keys MovementForm on ?movementHandoff. Without a per-proposal
+  // id, Open as form on /inventory soft-navigates into the mounted "manual"
+  // form, which reads its open state and prefill only on mount (#1166).
+  it("keys Open as form by the proposal's preview token so the form remounts (#1166)", () => {
+    const token = (n: number) => `9999999${n}-9999-4999-8999-999999999999`;
+    // The key page.tsx gives the form for the link Open as form builds; the
+    // page drops a non-UUID ?movementHandoff (chat-messages.test.ts pins that
+    // a proposal cannot carry one).
+    const formKey = (previewToken: string) => {
+      const proposal = composerProposal.parse({ name: "record_movement", input: { ...ids, qty: -1, type: "loss" }, previewToken, effects: [], warnings: [] });
+      const handoffId = new URL(movementFormHref(proposal.input, proposal.previewToken), "https://mgr.test").searchParams.get("movementHandoff") ?? undefined;
+      return movementFormInstanceKey(isUuid(handoffId) ? handoffId : undefined);
+    };
+    expect(formKey(token(1))).toBe(`composer:${token(1)}`);
+    expect(formKey(token(2))).not.toBe(formKey(token(1)));
+    expect(readFileSync("components/mgr/composer-conversation.tsx", "utf8")).toContain("movementFormHref(proposal.input, proposal.previewToken)");
   });
 
   it("keeps chat and history staff-only", () => {

@@ -276,7 +276,7 @@ describe("SCREENS", () => {
   it("draws the missing More and Settings destinations", () => {
     const expected = new Map<string, Screen["surface"]>([
       ["Customer detail", undefined], ["Ship-to form", "sheet"], ["Compliance months", undefined],
-      ["Locations", undefined], ["Location detail", undefined], ["Materials", undefined],
+      ["Locations", undefined], ["Location detail", undefined],
       ["Material", "sheet"], ["Vendor", "sheet"], ["Contracts", undefined],
       ["Contract", "sheet"], ["SKU list", undefined], ["Team member", "sheet"],
     ]);
@@ -854,7 +854,7 @@ describe("SCREENS", () => {
       ["Packaging runs", "Schedule run"], ["Purchase orders", "New PO"], ["Routes", "New route"],
       ["Locations", "Add location"], ["Finished goods", "Add SKU in Catalog"], ["Customers", "New customer"],
       ["Catalog", "New brand"],
-      ["Materials on hand", "Add material"], ["Vendors", "Add vendor"], ["Materials", "Add material"],
+      ["Materials on hand", "Add material"], ["Vendors", "Add vendor"],
       ["Contracts", "Add contract"], ["Recipes", "New recipe"], ["Price groups", "New price group"],
     ] as const) {
       const html = body(name);
@@ -1123,5 +1123,27 @@ describe("Work kind strip (#992)", () => {
     const css = readFileSync("app/globals.css", "utf8");
     expect(css).toMatch(/@utility scroll-cue \{\s*scroll-padding-inline: 2rem;\s*@supports \(animation-timeline: scroll\(\)\) \{\s*animation: scroll-cue/);
     expect(lists[0]).not.toContain("md:w-fit");
+  });
+});
+
+describe("Invoice payments recorded in MGR (#1045)", () => {
+  const by = (name: string) => SCREENS.find((s) => s.name === name);
+  it("Invoice writes both payment commands and opens their sheets", () => {
+    const invoice = by("Invoice")!;
+    expect(String(invoice.writes)).toContain("record_invoice_payment · void_invoice_payment");
+    expect(invoice.to).toMatchObject({ "Record payment": "Record payment", Void: "Void payment" });
+    expect(invoice.states?.map(([label]) => label)).toEqual(expect.arrayContaining(["paid in MGR", "payments block push", "no payment due"]));
+  });
+  it("draws Record payment and Void payment as sheets over the shared fields", () => {
+    for (const [name, verb] of [["Record payment", "Record payment"], ["Void payment", "Confirm void"]]) {
+      expect(by(name)?.surface, name).toBe("sheet");
+      expect(text(name), name).toContain(verb);
+    }
+    expect(text("Record payment")).toContain("This invoice will not be sent to QuickBooks while it has payments recorded in MGR.");
+    expect(text("Void payment")).toContain("The $300.00 payment stays on the invoice");
+  });
+  it("says the balance and paid state also come from MGR's ledger", () => {
+    expect(String(by("Invoice")!.spec)).toContain("the balance comes from QuickBooks, or from MGR's payment ledger for an invoice QuickBooks never received");
+    expect(String(by("Payment")?.spec)).not.toContain("there is deliberately no Mark paid button anywhere in MGR");
   });
 });

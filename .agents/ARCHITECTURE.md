@@ -190,7 +190,12 @@ a gap to close, not a convention to trust.
    Customer, order, invoice, price and compliance reads admit only the staff
    roles of the commands that read them, via
    `brewery_id in (select my_staff_brewery_ids(array[...]))`; a brewer gets none
-   of them (#770). Other tables keep `is_staff_of`. `tests/rls-taproom.test.ts`
+   of them (#770). Every other staff policy uses the same form. No policy calls
+   a SECURITY DEFINER helper such as `is_staff_of` or `taproom_can` per row:
+   the helper cannot be inlined, so it runs once per other brewery's row
+   (#1102, #1198). Taproom access is the `taproom` role in that array, plus
+   the taproom-location filter on `locations`, `bins` and `taproom_pars`.
+   `tests/staff-roles-schema.test.ts` enforces it. `tests/rls-taproom.test.ts`
    checks sales, warehouse and brewer against each table's command role list.
    Security-definer stock helpers (`on_hand_rows`, `keg_bin_on_hand_rows`) join the
    caller's `brewery_users` rows once instead of calling a helper per ledger row (#756).

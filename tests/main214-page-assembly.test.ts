@@ -39,9 +39,10 @@ async function query(name: string, input?: { basis?: string; missingPortalEmail?
     case "list_recipes": case "list_vendors_and_contracts": case "list_materials": state.inputs[name] = input; return [];
     case "list_vendors": case "get_material_on_hand": return [];
     case "list_routes": return { routes: [
-      { id: "planned", name: "North loop", delivery_date: "2026-09-11", driver_user_id: "driver-1", vehicle: null, note: null, departed_at: null, returned_at: null, stops: [] },
-      { id: "gone", name: "Hill route", delivery_date: "2026-09-10", driver_user_id: "driver-1", vehicle: null, note: null, departed_at: "2026-09-10T14:00:00Z", returned_at: null, stops: [] },
-      { id: "nobody", name: "River run", delivery_date: "2026-09-12", driver_user_id: null, vehicle: null, note: null, departed_at: null, returned_at: null, stops: [] },
+      { id: "planned", name: "North loop", delivery_date: "2026-09-11", driver_user_id: "driver-1", driver_email: "sam@example.test", vehicle: null, note: null, departed_at: null, returned_at: null, stops: [] },
+      { id: "gone", name: "Hill route", delivery_date: "2026-09-10", driver_user_id: "driver-1", driver_email: "sam@example.test", vehicle: null, note: null, departed_at: "2026-09-10T14:00:00Z", returned_at: null, stops: [] },
+      { id: "nobody", name: "River run", delivery_date: "2026-09-12", driver_user_id: null, driver_email: null, vehicle: null, note: null, departed_at: null, returned_at: null, stops: [] },
+      { id: "former", name: "Lake loop", delivery_date: "2026-09-13", driver_user_id: "driver-2", driver_email: null, vehicle: null, note: null, departed_at: null, returned_at: null, stops: [] },
     ], unassigned: [], drivers: [], today: "2026-09-10" };
     default: throw new Error(name);
   }
@@ -236,6 +237,12 @@ it("routes list: an assigned route not yet departed is a row link; Resume and As
   expect(html).toMatch(/<a[^>]*href="\/routes\/gone"[^>]*>Resume<\/a>/);
   expect(html).toMatch(/<a[^>]*href="\/routes\/nobody"[^>]*>Assign<\/a>/);
   expect(html).not.toMatch(/>Open</);
+});
+it("routes list: a planned route names its driver by roster email, or says the driver left the team (#1124)", async () => {
+  const html = render(await RoutesPage());
+  expect(html).toContain("0 stops · sam@example.test");
+  expect(html).toContain("0 stops · driver not on the team");
+  expect(html).not.toMatch(/driver driver-/);
 });
 it("encodes a Catalog category with a space and an ampersand in its scope link", async () => {
   const page = await CatalogPage({ searchParams: Promise.resolve({ q: "hazy", sort: "abv" }) });
