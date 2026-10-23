@@ -326,10 +326,13 @@ describe("record_invoice_payment and void_invoice_payment commands", () => {
   it("refuses a warehouse member in the registry, before the RPC", async () => {
     const f = await localInvoice();
     const warehouse = await makeStaffCtx(f.breweryId, "warehouse");
+    // Only the registry's gate says "requires [roles]"; the RPC's assert_staff gives a bare "permission denied".
+    const refusedByRegistry = (name: string) =>
+      ({ status: 403, code: "permission_denied", message: expect.stringContaining(`${name} requires [`) });
     await expect(runCommand("record_invoice_payment", { invoiceId: f.invoiceId, ...payment }, warehouse))
-      .rejects.toMatchObject({ status: 403, code: "permission_denied" });
+      .rejects.toMatchObject(refusedByRegistry("record_invoice_payment"));
     await expect(runCommand("void_invoice_payment", { paymentId: crypto.randomUUID(), reason: "Entered twice" }, warehouse))
-      .rejects.toMatchObject({ status: 403, code: "permission_denied" });
+      .rejects.toMatchObject(refusedByRegistry("void_invoice_payment"));
   });
 
   it("trims the reference, refuses a received date that is not a date, and voids with a reason", async () => {
