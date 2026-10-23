@@ -29,7 +29,7 @@ function accounting(row: InvoiceListRow) {
 
 function Register({ rows }: { rows: InvoiceListRow[] }) {
   return <RecordTable
-    headers={["Document", "Customer", "Total", "QuickBooks balance", "Due", "Payment", "Accounting"]}
+    headers={["Document", "Customer", "Total", "Balance", "Due", "Payment", "Accounting"]}
     align={["l", "l", "r", "r", "l", "l", "l"]}
     rows={rows.map(row => ({
       key: row.id,
