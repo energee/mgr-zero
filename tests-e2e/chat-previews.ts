@@ -1,4 +1,5 @@
 // tests-e2e/chat-previews.ts — isolated local browser smoke for Chat settings previews and Slack venue frames.
+// Runs against `next dev`, where the development-only "All preview states" picker it traverses is shown.
 import assert from "node:assert/strict";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync } from "node:fs";
@@ -72,7 +73,8 @@ function traversePreviewsByKeyboard() {
     const fixture = CHAT_PREVIEW_FIXTURES[index];
     assert.equal(ab("eval", `document.querySelector('input[value=${JSON.stringify(fixture.id)}]')?.checked`).result, true, `${fixture.title} was not selected by keyboard`);
     assert.equal(ab("eval", "document.activeElement?.matches(':focus-visible')").result, true, `${fixture.title} lost visible keyboard focus`);
-    assert.equal(ab("eval", `document.querySelector('section[aria-labelledby="chat-preview-${fixture.id}"] h3')?.textContent`).result, fixture.title);
+    // The gallery draws one preview at a time, so the first rendered section is the selected fixture.
+    assert.equal(ab("eval", "document.querySelector('[data-chat-preview] section[aria-labelledby] h3')?.textContent").result, fixture.title);
     if (index < CHAT_PREVIEW_FIXTURES.length - 1) ab("press", "ArrowRight");
   }
 }
@@ -93,7 +95,7 @@ async function main() {
     ab("wait", "--url", "**/");
     ab("network", "requests", "--clear");
     ab("open", `${BASE_URL}/settings/chat`);
-    ab("wait", "--text", "Fixture data only. Previews never send Slack messages.");
+    ab("wait", "--text", "Sample data only. A preview never sends a Slack message.");
     traversePreviewsByKeyboard();
 
     assert.equal(ab("eval", "document.querySelector('[role=dialog]') === null").result, true, "preview gallery unexpectedly opened a real modal");

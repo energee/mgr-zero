@@ -3,10 +3,13 @@
 // names what the form still needs; the reason is printed beside the button and
 // tied to it with aria-describedby, because a disabled button cannot be focused
 // and a hover tooltip never reaches touch or keyboard users. Screen authors call
-// E.submit; IrreversibleSubmit draws it with the irreversible fill, and Pick
-// sheet's Print uses it as a plain button (`type="button"`). Its own
-// "use client" module because it needs useId and e.tsx is imported by
-// server-rendered pages.
+// E.submit; IrreversibleSubmit draws it with the irreversible fill.
+// Pick sheet's Print and ConfirmDeleteControl's sheet trigger use it as a
+// plain button (`type="button"`).
+// The trigger's Radix props and ref reach Button through `...button`, so keep
+// that spread.
+// This file is its own "use client" module because SubmitButton needs useId
+// and e.tsx is imported by server-rendered pages.
 "use client";
 
 import { useId, type ComponentProps, type ReactNode } from "react";
@@ -16,7 +19,7 @@ export type SubmitButtonProps = Omit<ComponentProps<typeof Button>, "type" | "ch
   label: ReactNode;
   /** "button" for an action that is not a form submit (Print); defaults to "submit". */
   type?: "submit" | "button";
-  /** What the form still needs, from submitReason (lib/mgr/submit-reason.ts); null or absent when ready. */
+  /** Why the button is withheld, usually submitReason (lib/mgr/submit-reason.ts); null or absent when ready. */
   reason?: string | null;
   submitting?: boolean;
   /** The label while submitting. */
