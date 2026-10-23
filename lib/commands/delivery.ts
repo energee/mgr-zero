@@ -63,7 +63,8 @@ defineQuery({
         .eq("brewery_id", ctx.breweryId).is("deliveries", null).eq("orders.pickup", false).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<ShipmentRow[]>,
       completeRows("Unrouted transfers", (start) => ctx.db.from("stock_transfers").select(`id, ${TRANSFER_LABEL}, deliveries(id)`, { count: "exact" })
         .eq("brewery_id", ctx.breweryId).in("status", ["picked", "in_transit"]).is("deliveries", null).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<TransferRow[]>,
-      // The roster names each driver by email (#1124); it lists only current members.
+      // The roster names each driver by email (#1124). Emails live in auth.users, which this client
+      // cannot read, so they come from the list_team_members RPC; it lists only current members.
       runCommand("list_team_members", {}, ctx) as Promise<TeamMember[]>,
       breweryToday(ctx),
     ]);

@@ -24,8 +24,7 @@ export function driverLabel(route: Pick<Route, "driver_user_id" | "driver_email"
  *  as unassigned; its label says why they can't drive, since save_route refuses them. */
 export function driverOptions(drivers: Driver[], route: Pick<Route, "driver_user_id" | "driver_email"> | null): { id: string; label: string }[] {
   const options = drivers.map((driver) => ({ id: driver.user_id, label: driver.email + " · " + staffRolesLabel(driver.roles) }));
-  const savedId = route?.driver_user_id;
-  if (!savedId || drivers.some((driver) => driver.user_id === savedId)) return options;
+  if (!route?.driver_user_id || drivers.some((driver) => driver.user_id === route.driver_user_id)) return options;
   const label = route.driver_email ? route.driver_email + " · can no longer drive" : driverLabel(route);
-  return [...options, { id: savedId, label }];
+  return [...options, { id: route.driver_user_id, label }];
 }
