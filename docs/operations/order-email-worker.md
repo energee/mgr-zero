@@ -15,6 +15,8 @@ calls it every 5 minutes (Vercel Hobby cron is daily at most). It needs the
 repository variable `MGR_URL` and the secret `ORDER_EMAIL_JOB_SECRET`, equal to
 the Vercel value. Jobs skip until `MGR_URL` is set; after that a failed call
 fails the run.
+Measured capacity, lease and burst drain times are in
+[worker capacity, 2026-10-23](worker-capacity-local-2026-10-23.md).
 Domain and provider credentials require user approval (#311).
 Tests mock the provider and send no real mail.
 
