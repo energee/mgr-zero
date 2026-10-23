@@ -178,7 +178,7 @@ import { beerOverview } from "@/lib/mgr/fixtures/beer";
 import { brandHazy, catalogBrands, formatCan, formatsInventory, packageBomCase, skuHazyHalf, skuListHazy, waterProfiles } from "@/lib/mgr/fixtures/catalog";
 import { customerRidgeline, customersList, customersMissingEmail, shipToMain } from "@/lib/mgr/fixtures/customers";
 import { deniedInvoices } from "@/lib/mgr/fixtures/denied";
-import { expiredInvite, expiredReset, noMembership, portalForgotPassword, portalSetPassword, portalSignIn, resetPassword, setPassword, signIn } from "@/lib/mgr/fixtures/entry";
+import { expiredInvite, expiredReset, noMembership, portalForgotPassword, portalSetPassword, portalSignIn, portalStaffOnly, resetPassword, setPassword, signIn } from "@/lib/mgr/fixtures/entry";
 import { firstRunDemo } from "@/lib/mgr/fixtures/first-run";
 import { meMaria } from "@/lib/mgr/fixtures/me";
 import { moreNavs } from "@/lib/mgr/fixtures/more";
@@ -537,6 +537,15 @@ export const SCREENS: Screen[] = [
     spec: "After sign-in with no brewery and no customer account. The queue is empty because nothing was writable.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: <EntryView model={noMembership} />,
+  },
+  {
+    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Portal staff only",
+    job: "A staff login on no customer account opens the portal",
+    reads: "none", writes: "none",
+    states: [["staff only", "back to Today or sign out"]],
+    spec: "Staff roles never open a customer's portal, so a portal page sends a staff login on no customer account here. A login that is also on customer accounts opens only those accounts. No customer picker or preview.",
+    hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
+    body: <EntryView model={portalStaffOnly} />,
   },
   {
     step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired invite",
