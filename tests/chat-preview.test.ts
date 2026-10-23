@@ -68,6 +68,18 @@ describe("chat preview fixtures", () => {
     }
   });
 
+  // #1208: each reason is named for the event that happened. The delivered
+  // message title reads the same map, so every sample title uses it too.
+  it("names every reason as a plain event, and every sample title matches it", () => {
+    expect(NOTIFICATION_REASON_LABEL).toEqual({
+      submitted_order: "Order submitted", pick_due: "Pick due", restock_due: "Restock due", delivery_next: "Next delivery stop",
+      fermentation_reading_overdue: "Fermentation reading overdue", invoice_question: "Invoice question", operations_digest: "Operations digest",
+    });
+    for (const fixture of CHAT_PREVIEW_FIXTURES) {
+      for (const item of fixture.items) expect(item.title, fixture.id).toBe(NOTIFICATION_REASON_LABEL[item.reason]);
+    }
+  });
+
   it("validates every portable item and excludes sensitive keys and values", () => {
     for (const fixture of CHAT_PREVIEW_FIXTURES) {
       for (const item of fixture.items) {

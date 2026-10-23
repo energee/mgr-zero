@@ -5,6 +5,7 @@ import { formatDate } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
+import { formatWindow, parseClock } from "@/lib/time-window";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import type { ChatHealth, ChatLinkIntent, ChatLinkedPerson, ChatPreferences } from "@/lib/commands/chat";
 import { SlackMark } from "@/components/mgr/brand-icons";
@@ -60,8 +61,8 @@ export function ChatSettingsView({ health, timezone, readingDueHours, configured
   </>;
 }
 
-export function ChatPersonalPreferencesView({ preferences, configured = true, canSetQuietHours = true, back = "Chat", backHref, busy = false, error, onPreference, onDestination, onUnlink, onSaveQuiet }: {
-  preferences: ChatPreferences; configured?: boolean; canSetQuietHours?: boolean; back?: string; backHref?: string; busy?: boolean; error?: string | null;
+export function ChatPersonalPreferencesView({ preferences, canSetQuietHours = true, back = "Chat", backHref, busy = false, error, onPreference, onDestination, onUnlink, onSaveQuiet }: {
+  preferences: ChatPreferences; canSetQuietHours?: boolean; back?: string; backHref?: string; busy?: boolean; error?: string | null;
   onPreference?: (reason: ChatPreferences["preferences"][number]["reason"], enabled: boolean) => void;
   onDestination?: (reason: ChatPreferences["preferences"][number]["reason"], destinationId: string) => void;
   onUnlink?: () => void; onSaveQuiet?: (start: string, end: string, timezone: string) => void;
@@ -70,7 +71,8 @@ export function ChatPersonalPreferencesView({ preferences, configured = true, ca
   const [start, setStart] = useState(preferences.quietStart?.slice(0, 5) ?? "");
   const [end, setEnd] = useState(preferences.quietEnd?.slice(0, 5) ?? "");
   const [timezone, setTimezone] = useState(preferences.timezone);
-  const howToLink = configured ? E.info("To link your Slack, open the MGR app in Slack, go to its Home tab and choose Link MGR account. Then follow that link back here.") : E.note("Slack isn’t available for your brewery yet.");
+  const howToLink = preferences.installationActive ? E.info("To link your Slack, open the MGR app in Slack, go to its Home tab and choose Link MGR account. Then follow that link back here.") : E.note("Slack isn’t connected for your brewery yet.");
+  const breweryQuiet = preferences.breweryQuietHours;
   return <>
     {E.back(back, "My notification preferences", undefined, backHref)}
     {preferences.link ? E.row(`Slack user ${preferences.link.external_user_id}`, "Linked to your MGR account", <Button variant="outline" disabled={busy} onClick={onUnlink}>Unlink my Slack</Button>) : howToLink}
@@ -84,6 +86,7 @@ export function ChatPersonalPreferencesView({ preferences, configured = true, ca
       </label>}
       </div>;
     })}
+    {E.fld("Brewery quiet hours", breweryQuiet ? `${formatWindow(parseClock(breweryQuiet.start), parseClock(breweryQuiet.end))} · ${breweryQuiet.timezone}` : "Off")}
     {canSetQuietHours && <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && Boolean(start) === Boolean(end)) onSaveQuiet?.(start, end, timezone); }}>
       {E.edit("My quiet hours start", start, "time", undefined, { onChange: (nextValue: string) => setStart(nextValue), id: `${id}-start`, disabled: busy })}
       {E.edit("My quiet hours end", end, "time", undefined, { onChange: (nextValue: string) => setEnd(nextValue), id: `${id}-end`, disabled: busy })}
