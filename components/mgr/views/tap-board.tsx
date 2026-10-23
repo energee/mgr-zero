@@ -13,14 +13,13 @@ import { bblExact } from "@/lib/volume";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { ScopePick, type ScopeOption } from "@/components/mgr/scope-pick";
-import { tapLabel, tapSheetNeeds, tapSheetReason, openTapBoardSheet, editTapBoardSheet, type TapBoardState, type TapBoardSheet, type TapSheetFields, type TapInterval } from "@/lib/mgr/tap-board-state";
+import { tapLabel, fillLabel, OPENING_FILLS, CLOSING_FILLS, tapSheetNeeds, tapSheetReason, openTapBoardSheet, editTapBoardSheet, type TapBoardState, type TapBoardSheet, type TapSheetFields, type TapInterval } from "@/lib/mgr/tap-board-state";
 
 export type TapSku = { id: string; name: string; nominalBbl: number };
 const volume = (value: number) => bblExact(value, 4);
 const actor = (label: string | null) => label ? `@${label}` : "staff";
-// Labels only: the stored fills are fixed by the tap_intervals CHECK constraints.
-const fills = [[.25, "25%"], [.5, "50%"], [.6, "60%"], [1, "Full"]] as const;
-const closingFills = [[0, "Empty"], [.25, "About ¼ left"], [.5, "About ½ left"]] as const;
+// "opened full" / "opened 60%": the Opening fill chip's own word (#1192).
+const opened = (tap: TapInterval) => `opened ${fillLabel(OPENING_FILLS, tap.opening_fill).toLowerCase()}`;
 
 const VERBS = { tap: "Tap keg", kick: "Kick keg", swap: "Swap · one record" } as const;
 
@@ -61,7 +60,7 @@ export function TapKegView({ sheet: controlledSheet, skus, skusHref, timeZone, o
       {sheet.kind !== "tap" && <>
         {E.pick("Reason", sheet.fields.reason, (["Kicked empty", "Flavor change", "Quality hold"].map(reason => ({ value: reason, label: reason }))), { id: `${idPrefix}-close-reason`, onChange: (nextValue: string) => edit({ reason: nextValue }) })}
         {E.ttl("Remaining")}
-        {fillChips("Remaining", closingFills, sheet.fields.closeFill, closeFill => edit({ closeFill }))}
+        {fillChips("Remaining", CLOSING_FILLS, sheet.fields.closeFill, closeFill => edit({ closeFill }))}
       </>}
       {sheet.kind !== "kick" && <>
         {E.ttl("Going on")}
@@ -76,7 +75,7 @@ export function TapKegView({ sheet: controlledSheet, skus, skusHref, timeZone, o
           <FieldDescription id={`${idPrefix}-tap-number-help`}>Two kegs can share a number. A keg with no number sorts last.</FieldDescription>
         </div>
         {E.ttl("Opening fill")}
-        {fillChips("Opening fill", fills, sheet.fields.openingFill, openingFill => edit({ openingFill }))}
+        {fillChips("Opening fill", OPENING_FILLS, sheet.fields.openingFill, openingFill => edit({ openingFill }))}
       </>}
     </fieldset>
     {E.info(`Remaining is a rough observation. ${sheet.kind === "swap" ? "The atomic swap" : "This action"} does not change finished-goods inventory.`)}
@@ -117,12 +116,12 @@ export function TapBoardView({ state: controlledState, skus, timeZone, navigatio
     </CommandForm>
     <CommandFormMessage tone="warning">{pollError}</CommandFormMessage>
     {navigation.locations.length === 0 ? E.blank("No taproom locations yet. Ask Admin to add one under Locations.") : state.snapshot.open.length === 0 ? E.blank("No kegs are on tap.") : <>
-      {E.tiles(state.snapshot.open.filter(tap => tap.sku_id).map(tap => [tap.tap_number ?? "unnumbered", tapLabel(tap), <>{volume(tap.nominal_bbl)} · on <time dateTime={tap.opened_at} title={formatDateTime(tap.opened_at, timeZone)}>{formatWeekday(tap.opened_at, timeZone)}</time> · {actor(tap.opened_by_label)} · opened {Math.round(Number(tap.opening_fill) * 100)}%{tap.not_in_inventory ? " · not in taproom stock · excluded from variance" : ""}</>, tap.not_in_inventory ? 1 : 0, undefined, undefined, actions(tap)]))}
-      {state.snapshot.open.filter(tap => !tap.sku_id).map(tap => <div key={tap.id}>{E.row(`${tap.tap_number ?? "unnumbered"} · ${tapLabel(tap)} · keg`, `nominal ${volume(tap.nominal_bbl)} · on ${formatDateTime(tap.opened_at, timeZone)} by ${actor(tap.opened_by_label)} · opened ${Math.round(Number(tap.opening_fill) * 100)}%${tap.not_in_inventory ? " · not in taproom stock · excluded from variance" : ""} · no guest yield`, actions(tap), "w")}</div>)}
+      {E.tiles(state.snapshot.open.filter(tap => tap.sku_id).map(tap => [tap.tap_number ?? "unnumbered", tapLabel(tap), <>{volume(tap.nominal_bbl)} · on <time dateTime={tap.opened_at} title={formatDateTime(tap.opened_at, timeZone)}>{formatWeekday(tap.opened_at, timeZone)}</time> · {actor(tap.opened_by_label)} · {opened(tap)}{tap.not_in_inventory ? " · not in taproom stock · excluded from variance" : ""}</>, tap.not_in_inventory ? 1 : 0, undefined, undefined, actions(tap)]))}
+      {state.snapshot.open.filter(tap => !tap.sku_id).map(tap => <div key={tap.id}>{E.row(`${tap.tap_number ?? "unnumbered"} · ${tapLabel(tap)} · keg`, `nominal ${volume(tap.nominal_bbl)} · on ${formatDateTime(tap.opened_at, timeZone)} by ${actor(tap.opened_by_label)} · ${opened(tap)}${tap.not_in_inventory ? " · not in taproom stock · excluded from variance" : ""} · no guest yield`, actions(tap), "w")}</div>)}
     </>}
     {E.info("Unnumbered kegs sort last.")}
     {recent.map((event, index) => <div key={index}>{E.row(event.title, event.detail)}</div>)}
     {E.ttl("Recent history")}
-    {state.snapshot.history.length === 0 ? E.blank("No closed kegs yet.") : state.snapshot.history.map(tap => <div key={tap.id}>{E.row(`Tap ${tap.tap_number ?? "unnumbered"} · ${tapLabel(tap)}`, `${tap.close_reason} · ${Math.round(Number(tap.closing_fill) * 100)}% left · closed ${formatDateTime(tap.closed_at, timeZone)} by ${actor(tap.closed_by_label)}`)}</div>)}
+    {state.snapshot.history.length === 0 ? E.blank("No closed kegs yet.") : state.snapshot.history.map(tap => <div key={tap.id}>{E.row(`Tap ${tap.tap_number ?? "unnumbered"} · ${tapLabel(tap)}`, `${tap.close_reason} · ${fillLabel(CLOSING_FILLS, tap.closing_fill)} · closed ${formatDateTime(tap.closed_at, timeZone)} by ${actor(tap.closed_by_label)}`)}</div>)}
   </>;
 }
