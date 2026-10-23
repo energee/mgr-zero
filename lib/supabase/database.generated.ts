@@ -3725,14 +3725,14 @@ isOneToOne: false
                   ]
                 },"water_profiles": {
                   Row: {
-                    "bicarbonate_ppm": number,"brewery_id": string,"calcium_ppm": number,"chloride_ppm": number,"created_at": string,"id": string,"magnesium_ppm": number,"name": string,"sodium_ppm": number,"sulfate_ppm": number
+                    "alkalinity_ppm": number | null,"bicarbonate_ppm": number,"brewery_id": string,"calcium_ppm": number,"chloride_ppm": number,"created_at": string,"id": string,"magnesium_ppm": number,"name": string,"note": string | null,"sodium_ppm": number,"sulfate_ppm": number,"water_ph": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "bicarbonate_ppm": number,"brewery_id": string,"calcium_ppm": number,"chloride_ppm": number,"created_at"?: string,"id"?: string,"magnesium_ppm": number,"name": string,"sodium_ppm": number,"sulfate_ppm": number
+                    "alkalinity_ppm"?: number | null,"bicarbonate_ppm": number,"brewery_id": string,"calcium_ppm": number,"chloride_ppm": number,"created_at"?: string,"id"?: string,"magnesium_ppm": number,"name": string,"note"?: string | null,"sodium_ppm": number,"sulfate_ppm": number,"water_ph"?: number | null
                   }
                   Update: {
-                    "bicarbonate_ppm"?: number,"brewery_id"?: string,"calcium_ppm"?: number,"chloride_ppm"?: number,"created_at"?: string,"id"?: string,"magnesium_ppm"?: number,"name"?: string,"sodium_ppm"?: number,"sulfate_ppm"?: number
+                    "alkalinity_ppm"?: number | null,"bicarbonate_ppm"?: number,"brewery_id"?: string,"calcium_ppm"?: number,"chloride_ppm"?: number,"created_at"?: string,"id"?: string,"magnesium_ppm"?: number,"name"?: string,"note"?: string | null,"sodium_ppm"?: number,"sulfate_ppm"?: number,"water_ph"?: number | null
                   }
                   Relationships: [
                     {
@@ -5263,6 +5263,11 @@ isOneToOne: false
 "list_open_taps":
 { Args: { "p_brewery": string,"p_location": string }; Returns: Json
                            },
+"list_pending_invitations":
+{ Args: { "p_brewery": string }; Returns: {
+              "created_at": string,"email": string,"id": string,"role": Database["public"]['Enums']["staff_role"]
+            }[]
+                           },
 "list_sale_channels":
 { Args: { "p_brewery": string }; Returns: Json
                            },
@@ -5511,6 +5516,9 @@ isOneToOne: false
                            },
 "reschedule_packaging_run":
 { Args: { "p_brewery": string,"p_planned_on": string,"p_request_id": string,"p_run": string }; Returns: Json
+                           },
+"resend_account_invitation":
+{ Args: { "p_brewery": string,"p_invite": string,"p_request_id": string }; Returns: Json
                            },
 "resolve_chat_actor":
 { Args: { "p_external_installation_id": string,"p_external_user_id": string,"p_provider": string }; Returns: Json
@@ -5789,7 +5797,7 @@ isOneToOne: false
 { Args: { "p_brewery": string,"p_capacity_bbl": number,"p_kind": Database["public"]['Enums']["vessel_kind"],"p_name": string,"p_request_id": string,"p_vessel": string }; Returns: Json
                            },
 "upsert_water_profile":
-{ Args: { "p_bicarbonate": number,"p_brewery": string,"p_calcium": number,"p_chloride": number,"p_magnesium": number,"p_name": string,"p_profile": string,"p_request_id": string,"p_sodium": number,"p_sulfate": number }; Returns: Json
+{ Args: { "p_alkalinity": number,"p_bicarbonate": number,"p_brewery": string,"p_calcium": number,"p_chloride": number,"p_magnesium": number,"p_name": string,"p_note": string,"p_ph": number,"p_profile": string,"p_request_id": string,"p_sodium": number,"p_sulfate": number }; Returns: Json
                            },
 "void_invoice_payment":
 { Args: { "p_brewery": string,"p_payment": string,"p_reason": string,"p_request_id": string }; Returns: Json

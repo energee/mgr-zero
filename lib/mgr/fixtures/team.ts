@@ -1,4 +1,4 @@
-// lib/mgr/fixtures/team.ts — Team roster snapshot.
+// lib/mgr/fixtures/team.ts — Team roster and pending invitations snapshot.
 import type { TeamViewModel } from "@/lib/mgr/team-view";
 
 export const teamRoster: TeamViewModel = {
@@ -7,5 +7,8 @@ export const teamRoster: TeamViewModel = {
     { key: "dave", title: "Dave Chen", detail: "@dave · Brewer", src: "/mock/dave.jpg" },
     { key: "ted", title: "Ted", detail: "@ted · Sales", src: "/mock/ted.jpg" },
     { key: "sam", title: "Sam Ortiz", detail: "@sam · Warehouse", src: "/mock/sam.jpg" },
+  ],
+  invitations: [
+    { key: "invite-jo", email: "jo@demobrewing.com", detail: "Taproom · Sent Oct 21, 2026" },
   ],
 };

@@ -229,7 +229,7 @@ export const packageBomCase: PackageBomSnapshot = {
 };
 
 export const waterProfiles: WaterProfile[] = [
-  { id: "denver", name: "Municipal · Denver", calcium_ppm: 42, magnesium_ppm: 8, sodium_ppm: 22, sulfate_ppm: 65, chloride_ppm: 30, bicarbonate_ppm: 110 },
-  { id: "burton", name: "Burton", calcium_ppm: 275, magnesium_ppm: 40, sodium_ppm: 25, sulfate_ppm: 610, chloride_ppm: 35, bicarbonate_ppm: 270 },
-  { id: "hazy", name: "Hazy target", calcium_ppm: 110, magnesium_ppm: 10, sodium_ppm: 15, sulfate_ppm: 90, chloride_ppm: 180, bicarbonate_ppm: 40 },
+  { id: "denver", name: "Municipal · Denver", calcium_ppm: 42, magnesium_ppm: 8, sodium_ppm: 22, sulfate_ppm: 65, chloride_ppm: 30, bicarbonate_ppm: 110, alkalinity_ppm: 90, water_ph: 7.8, note: "City water report, spring 2026" },
+  { id: "burton", name: "Burton", calcium_ppm: 275, magnesium_ppm: 40, sodium_ppm: 25, sulfate_ppm: 610, chloride_ppm: 35, bicarbonate_ppm: 270, alkalinity_ppm: 221, water_ph: 7.4, note: null },
+  { id: "hazy", name: "Hazy target", calcium_ppm: 110, magnesium_ppm: 10, sodium_ppm: 15, sulfate_ppm: 90, chloride_ppm: 180, bicarbonate_ppm: 40, alkalinity_ppm: null, water_ph: null, note: "Soft, chloride-forward target for hazy IPAs" },
 ];

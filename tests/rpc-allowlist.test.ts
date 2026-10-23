@@ -44,6 +44,8 @@ const AUTHENTICATED_RPCS = [
   "accept_account_invitation(uuid,uuid)",
   "list_my_invitations()",
   "revoke_account_invitation(uuid,uuid,uuid)",
+  "list_pending_invitations(uuid)",
+  "resend_account_invitation(uuid,uuid,uuid)",
   "claim_invite_request(uuid,text,text,staff_role,uuid,uuid)",
   "complete_invite_membership(uuid)",
   "record_invite_failure(uuid)",
@@ -231,7 +233,7 @@ const AUTHENTICATED_RPCS = [
   "upsert_state_registration(uuid,uuid,text,text,date,date,uuid,text[])",
   "upsert_vendor(uuid,uuid,text,text,text,integer,text,boolean,uuid)",
   "upsert_vessel(uuid,uuid,text,vessel_kind,numeric,uuid)",
-  "upsert_water_profile(uuid,uuid,text,numeric,numeric,numeric,numeric,numeric,numeric,uuid)",
+  "upsert_water_profile(uuid,uuid,text,numeric,numeric,numeric,numeric,numeric,numeric,numeric,numeric,text,uuid)",
 ];
 
 describe("authenticated RPC allowlist", () => {
