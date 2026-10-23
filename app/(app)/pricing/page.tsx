@@ -2,8 +2,9 @@
 // one sale channel at a time (?channel=<id>, the first by default), price
 // groups down and formats across. Reads list_sale_channels, list_price_groups,
 // list_formats, list_channel_prices (the whole grid in one read) and
-// list_price_group_barcodes. PriceGroupsView draws the tabs and table; this
-// page fills its slots: every cell edits in place through set_channel_price /
+// list_price_group_barcodes; Catalog's Price groups link checks the same reads
+// (PRICING_READS in app/(app)/catalog/page.tsx). PriceGroupsView draws the
+// tabs and table; this page fills its slots: every cell edits in place through set_channel_price /
 // clear_channel_price (PriceCellForm, keyed on its value so a save or clear
 // remounts it), a pour column on a group without that pour opens PourForm
 // with the name filled in, and each group name opens GroupForm, which also

@@ -44,5 +44,5 @@ export default async function CellarPage() {
   const readings = cellarReadings(batches, unit.effective, brewery.timeZone);
   const model = toCellarMapViewProps(vessels, occupancies, readings, Object.fromEntries(vessels.map(vessel => [vessel.id, `/cellar/vessels/${vessel.id}`])), occupancyId => `/cellar/${occupancyId}/reading`);
   model.backHref = "/beer"; model.addHref = canRun(ctx, "upsert_vessel") ? "/cellar/vessels/new" : null; model.brewHref = "/batches";
-  return <CellarMapView model={model} transfer={<CellarTransferForm occupancies={occupancies} vessels={vessels} />} addition={<CellarAdditionForm occupancies={occupancies} materials={additionMaterials} lotsByMaterial={lotsByMaterial} />} complete={<BatchCompletionForm batches={completionCandidates} />} />;
+  return <CellarMapView model={model} transfer={<CellarTransferForm occupancies={occupancies} vessels={vessels} disabled={model.actionsOff} />} addition={<CellarAdditionForm occupancies={occupancies} materials={additionMaterials} lotsByMaterial={lotsByMaterial} disabled={model.actionsOff} />} complete={<BatchCompletionForm batches={completionCandidates} />} />;
 }

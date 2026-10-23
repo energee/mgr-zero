@@ -71,7 +71,7 @@ export const todayDriver: TodayViewModel = {
 export const todayTaproom: TodayViewModel = {
   date: DATE,
   rows: [
-    { key: "board", title: "Tap board", detail: "11 open · last opened Thu 11:20am", verb: "Open", tone: "info", icon: "beer" },
+    { key: "board", title: "Tap board", detail: "11 kegs on tap · last opened Thu 11:20am", verb: "Open", tone: "info", icon: "beer" },
     { key: "count", title: "Weekly count", detail: "last saved Sep 7 at 9:14pm", verb: "Count", tone: "info", icon: "task" },
     { key: "var", title: "Variance · 4 weeks", detail: "+0.6 bbl expected minus actual · as of now", verb: "Review", tone: "info", icon: "task" },
   ],

@@ -2,8 +2,11 @@ import { formatLatestReading, type VesselReading } from "./vessel-detail-view";
 import type { GravityUnit } from "./gravity-unit";
 
 export type CellarMapViewModel = {
-  /** addHref null hides Add vessel (vessels are admin-managed). */
-  backHref?: string; addHref?: string | null; readingHref?: string | null; readingHint?: string; brewHref?: string;
+  /** addHref null hides Add vessel (vessels are admin-managed). actionsOff: no
+   *  tank holds beer, so Reading, Transfer and Addition are all off; the page
+   *  hands the same flag to the live Transfer and Addition forms. actionHint
+   *  says why an action is off. */
+  backHref?: string; addHref?: string | null; readingHref?: string | null; actionsOff?: boolean; actionHint?: string; brewHref?: string;
   tiles: { name: string; detail: string; reading?: string; warning?: boolean; fill?: number; href?: string }[];
   detail?: { title: string; description: string; href?: string };
 };
@@ -14,11 +17,14 @@ export function toCellarMapViewProps(vessels: { id: string; name: string; capaci
   // records the reading against the wrong one, so the tile opens the tank
   // instead. The caller supplies the path — this never invents one. A disabled
   // Reading carries a hint saying why, so it is never a silent dead end (#715).
+  // With no beer in any tank, Transfer and Addition are off too (actionsOff),
+  // so the one hint names all three (#1115).
   const only = occupancies.length === 1 ? occupancies[0] : undefined;
-  let readingHint: string | undefined;
-  if (readingHref && occupancies.length === 0) readingHint = "No tank holds beer, so there is nothing to read.";
-  if (readingHref && occupancies.length > 1) readingHint = "Several tanks hold beer. Open a tank to record its reading.";
-  return { readingHref: readingHref && (only ? readingHref(only.occupancy_id) : null), readingHint, tiles: vessels.map(vessel => {
+  const actionsOff = occupancies.length === 0;
+  let actionHint: string | undefined;
+  if (actionsOff) actionHint = "No tank holds beer, so there is nothing to read, transfer or add to.";
+  else if (readingHref && occupancies.length > 1) actionHint = "Several tanks hold beer. Open a tank to record its reading.";
+  return { readingHref: readingHref && (only ? readingHref(only.occupancy_id) : null), actionsOff, actionHint, tiles: vessels.map(vessel => {
     const occupancy = occupancies.find(item => item.vessel_id === vessel.id);
     const quantity = occupancy ? Number(occupancy.bbl) : 0;
     const capacity = Number(vessel.capacity_bbl);

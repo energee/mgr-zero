@@ -4,7 +4,7 @@
 // RecordTable whose order number is the one link to the order. Live passes
 // OrderForm as createAction and the adapter's hrefs; the inventory's stay inert.
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { ScopePick } from "@/components/mgr/scope-pick";
 import type { OrdersListRowView, OrdersListViewModel } from "@/lib/mgr/orders-list-view";
@@ -17,11 +17,11 @@ import { WorkKindTabs } from "./work-kind-tabs";
 
 export type { OrdersListViewModel };
 
-const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
+const muted = (text: string) => <span key={text} className="text-muted-foreground">{text}</span>;
 
 /** Lifecycle status, and staged restock as a second worded badge so color is never the only signal. */
 const statusCell = (row: OrdersListRowView) => (
-  <span className="inline-flex flex-wrap gap-1.5">
+  <span key="status" className="inline-flex flex-wrap gap-1.5">
     {E.status(sentenceCase(row.status))}
     {row.restock && E.status("Restock staged", "w")}
   </span>
@@ -39,10 +39,10 @@ function Register({ rows }: { rows: OrdersListRowView[] }) {
         to: "Order",
         cells: [
           row.orderNo,
-          row.customer ? <span className="font-medium">{row.customer}</span> : muted("transfer"),
+          row.customer ? <span key="customer" className="font-medium">{row.customer}</span> : muted("transfer"),
           row.shipDate ?? muted("Not scheduled"),
           statusCell(row),
-          row.action && E.act(row.action.verb, row.action.tone, row.action.href),
+          row.action && <Fragment key="action">{E.act(row.action.verb, row.action.tone, row.action.href)}</Fragment>,
         ],
         // Status sorts in lifecycle order (draft first); no ship date sorts last.
         sort: [row.orderNo, row.customer ?? "transfer", row.shipDate, ORDER_STATUSES.indexOf(row.status)],

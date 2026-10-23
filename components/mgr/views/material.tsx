@@ -50,11 +50,11 @@ export function MaterialView({ model, controls = {}, messages, footer }: {
       {E.edit("Material name", model.name, "text", undefined, { onChange: controls.name, required: Boolean(controls.name) })}
       {pick("Kind", model.kind, kindOptions, controls.kind)}
       {E.inline(
-        <Fragment key={"factor"}>{E.edit("Base units", model.baseUnits, "number", undefined, { onChange: controls.baseUnits, min: 0, step: "any", inputMode: "decimal" })}</Fragment>,
+        pick("Base unit", model.unit, unitOptions, controls.unit),
         pick("Purchase unit", model.purchaseUnit, purchaseUnitOptions, controls.purchaseUnit),
-        pick("Unit", model.unit, unitOptions, controls.unit),
       )}
-      {E.info("A 44 lb box is purchase unit each with 44 base units, not a “box” unit: the schema has one unit vocabulary and packaging is the factor.")}
+      {E.edit("Base units per purchase unit", model.baseUnits, "number", undefined, { onChange: controls.baseUnits, min: 0, step: "any", inputMode: "decimal" })}
+      {E.info("Base unit is what recipes and counts use. Purchase unit is how you order it. For hops bought in 44 lb boxes, set Base unit to lb, Purchase unit to each, and Base units per purchase unit to 44.")}
       {EXTRACT_KINDS.has(model.kind.toLowerCase())
         ? E.edit("Extract potential · optional", model.extractPotential ?? "", "number", undefined, { onChange: controls.extractPotential, min: 1, max: 1.05, step: 0.001, inputMode: "decimal" })
         : null}
