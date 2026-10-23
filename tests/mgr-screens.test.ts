@@ -42,9 +42,10 @@ describe("SCREENS", () => {
     expect(String(SCREENS.find((s) => s.name === "Brew day")!.writes)).toContain("record_brew_day");
   });
 
-  it("sets the brewery's source water once, in Settings", () => {
+  it("links Source water in Settings to the Water profiles catalog", () => {
     const settings = text("Settings");
     expect(settings).toMatch(/Source water/);
+    expect(SCREENS.find((s) => s.name === "Settings")!.to?.["Source water"]).toBe("Water profiles");
   });
 
   it("makes a recipe version executable without restating the batch size", () => {
@@ -243,7 +244,7 @@ describe("SCREENS", () => {
   it("draws connection recovery and confirmation surfaces", () => {
     const expected = new Map<string, Screen["surface"]>([
       ["Connect QuickBooks", undefined], ["Mapping conflict", "sheet"], ["Disconnect QuickBooks", "sheet"],
-      ["Connect Square", undefined], ["Square locations", "sheet"], ["Square → QuickBooks connector", "sheet"], ["Disconnect Square", "sheet"],
+      ["Connect Square", undefined], ["Square locations", "sheet"], ["Taproom sales in QuickBooks", "sheet"], ["Disconnect Square", "sheet"],
       ["Linked people", undefined], ["Link your Slack", "entry"], ["Disconnect Slack", "sheet"],
     ]);
     for (const [name, surface] of expected) {
@@ -495,7 +496,15 @@ describe("SCREENS", () => {
 
   it("renders the controlled date value used by live shared forms", () => {
     const html = renderToStaticMarkup(createElement(DatePicker, { label: "Date", defaultValue: "", value: "2027-08-31", onChange: () => {} }));
-    expect(html).toContain("August 31, 2027");
+    // The app-wide record date (lib/date-format.ts formatDate).
+    expect(html).toContain("Aug 31, 2027");
+  });
+
+  it("shows a date typed with a year below 1000 instead of failing the form", () => {
+    // The native date input reports each year digit as typed: 0002, 0020, 0202, 2026.
+    const html = renderToStaticMarkup(createElement(DatePicker, { label: "Date", value: "0002-10-22", name: "date", onChange: () => {} }));
+    expect(html).toContain("Oct 22, 2");
+    expect(html).toContain('value="0002-10-22"');
   });
 
   it("points a date field at its description, as the other fields do", () => {
@@ -678,11 +687,14 @@ describe("SCREENS", () => {
   it("draws locked-out landings and the composer question", () => {
     // Issue 83: no-membership, expired invite/reset, session expiry with the
     // outbox kept, and the composer question (chips, no Commit).
-    for (const name of ["No membership", "Expired invite", "Expired reset", "Session expired", "Composer question"]) {
+    for (const name of ["No membership", "Portal staff only", "Expired invite", "Expired reset", "Session expired", "Composer question"]) {
       expect(SCREENS.some((s) => s.name === name), name).toBe(true);
     }
     const q = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Composer question")!.body));
     expect(q).not.toMatch(/Commit/);
+    const staffOnly = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Portal staff only")!.body));
+    expect(staffOnly).toMatch(/Back to Today/);
+    expect(staffOnly).not.toMatch(/Create brewery/);
     const accept = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Accept invite")!.body));
     expect(accept).toMatch(/name|Name/i);
     const search = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Search")!.body));
