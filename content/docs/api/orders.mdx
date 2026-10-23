@@ -41,6 +41,8 @@ The legacy invoice `paid_at` field is a payment-confirmation/state marker, not a
 
 An invoice QuickBooks never received takes payments recorded in MGR (`record_invoice_payment`), and MGR's ledger owns its balance. For such an invoice, `paid_at` is the brewery-local start of the day its last payment was received. `list_invoices` carries the unvoided sum as `local_paid_cents`. `get_invoice` carries each payment, voided ones with their reasons, as `payments`, and the unvoided sum as `localPaidCents`.
 
+An Admin can write off such an invoice with `write_off_invoice` before it is fully paid, for its remaining balance. Its payments stay, and it takes no new payment.
+
 {/* ops:orders */}
 
 ## adjust_order_lines [#adjust_order_lines]
