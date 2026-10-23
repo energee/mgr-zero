@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@/components/ui/item";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { SortHead, useSortedRows } from "@/components/mgr/sort-head";
-import { cellSortValue, PRINTED_DATE, type SortValue } from "@/lib/mgr/table-sort";
+import { cellSortValue, PRINTED_DATE, unwrapLazy, type SortValue } from "@/lib/mgr/table-sort";
 import { cn } from "@/lib/utils";
 
 export type RecordTableRow = {
@@ -46,9 +46,11 @@ const recordSortValue = (row: RecordTableRow, i: number): SortValue => (row.sort
 
 const alignClass = (a: "l" | "r" | undefined) => (a === "r" ? "text-right" : "text-left");
 /** What a cell ends with: the cell itself, or a fragment's last child (an
- *  Overdue badge, then the date). */
-const lastPart = (cell: ReactNode): ReactNode =>
-  isValidElement<{ children?: ReactNode }>(cell) && cell.type === Fragment ? [cell.props.children].flat().at(-1) : cell;
+ *  Overdue badge, then the date). Read through SSR's lazy wrapper (#1232). */
+const lastPart = (given: ReactNode): ReactNode => {
+  const cell = unwrapLazy(given);
+  return isValidElement<{ children?: ReactNode }>(cell) && cell.type === Fragment ? [cell.props.children].flat().at(-1) : cell;
+};
 /** A table cell: text may wrap anywhere, but a number never breaks inside
  *  its value ("$1,040.0" / "0") and its digits line up down the column. A
  *  cell ending in a printed date never breaks either ("Sep 12," / "2026", #1037). */
