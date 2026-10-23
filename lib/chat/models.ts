@@ -4,7 +4,9 @@ export const DEFAULT_CHAT_MODEL = "anthropic/claude-sonnet-4.5";
 /** Gateway model ids are `provider/model`; the same shape the database check enforces. */
 export const MODEL_ID = /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/i;
 
-export type GatewayModelOption = { id: string; name: string; pricing?: { input: string; output: string } | null };
+/** A model Settings offers: its id and display name. Gateway also returns
+ *  pricing, which Settings does not show (#1147), so it is not passed on. */
+export type GatewayModelOption = { id: string; name: string };
 type GatewayModel = GatewayModelOption & { modelType?: string | null };
 
 export function chatModelFromSettings(settings: unknown, fallback = DEFAULT_CHAT_MODEL) {
@@ -28,7 +30,7 @@ export const modelMatches = (model: GatewayModelOption, query: string) => {
 export function gatewayLanguageModels(models: GatewayModel[]): GatewayModelOption[] {
   return models
     .filter((model) => model.modelType == null || model.modelType === "language")
-    .map(({ id, name, pricing }) => ({ id, name, ...(pricing ? { pricing } : {}) }))
+    .map(({ id, name }) => ({ id, name }))
     .sort((a, b) => modelProvider(a.id).localeCompare(modelProvider(b.id)) || a.name.localeCompare(b.name));
 }
 

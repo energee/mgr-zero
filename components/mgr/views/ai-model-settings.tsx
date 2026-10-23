@@ -7,11 +7,6 @@ import { InputGroupAddon } from "@/components/ui/input-group";
 import { AiModelIcon } from "@/components/mgr/ai-model-icon";
 import { modelMatches, modelProvider, type GatewayModelOption } from "@/lib/chat/models";
 
-const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 4 });
-const priceLabel = (model?: GatewayModelOption) => model?.pricing
-  ? `Input ${usd.format(Number(model.pricing.input) * 1_000_000)} · Output ${usd.format(Number(model.pricing.output) * 1_000_000)} / 1M tokens`
-  : null;
-
 /** The Ask MGR section of Settings: its own form, named by its legend, saved only by Save AI model (Enter submits it). */
 export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = false, error }: {
   value: string;
@@ -24,7 +19,6 @@ export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = 
   const known = models.find((model) => model.id === value);
   const selected = known ?? { id: value, name: value };
   const options = known ? models : [selected, ...models];
-  const selectedPrice = priceLabel(selected);
   const { open, anchor, props: search } = useComboboxSearch(selected.name);
   return <form onSubmit={(event) => { event.preventDefault(); onSubmit?.(); }}>
     <FieldSet className="min-w-0">
@@ -49,13 +43,10 @@ export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = 
             </div>
             <ComboboxContent anchor={anchor}>
               <ComboboxEmpty>No model found.</ComboboxEmpty>
-              <ComboboxList>{(model: GatewayModelOption) => {
-                const price = priceLabel(model);
-                return <ComboboxItem key={model.id} value={model}><AiModelIcon modelId={model.id} /><span className="grid gap-0.5"><span>{model.name}</span><span className="text-xs text-muted-foreground"><span className="capitalize">{modelProvider(model.id)}</span>{price && <> · {price}</>}</span></span></ComboboxItem>;
-              }}</ComboboxList>
+              <ComboboxList>{(model: GatewayModelOption) => <ComboboxItem key={model.id} value={model}><AiModelIcon modelId={model.id} /><span className="grid gap-0.5"><span>{model.name}</span><span className="text-xs capitalize text-muted-foreground">{modelProvider(model.id)}</span></span></ComboboxItem>}</ComboboxList>
             </ComboboxContent>
           </Combobox>
-          <FieldDescription><span className="capitalize">{modelProvider(selected.id)}</span>. {selectedPrice && <>{selectedPrice}. </>}Used by Ask MGR for everyone at this brewery. <a href="https://vercel.com/ai-gateway/models" target="_blank" rel="noreferrer">View models and promotions.</a></FieldDescription>
+          <FieldDescription><span className="capitalize">{modelProvider(selected.id)}</span>. Used by Ask MGR for everyone at this brewery.</FieldDescription>
           {models.length === 0 && <FieldDescription>The Gateway model catalog is unavailable. The saved model remains active.</FieldDescription>}
           <FieldError>{error}</FieldError>
         </Field>
