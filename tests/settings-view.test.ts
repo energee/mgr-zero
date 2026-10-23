@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { booksOpenedChange, oneWayKegFeeChange, toBrewerySettingsValues, breweryOperatingDefaultsCommand } from "@/lib/mgr/settings-view";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
 import { SettingsView } from "@/components/mgr/views/settings";
+import { PortalFulfillmentView } from "@/components/mgr/views/portal-fulfillment";
 import { settingsDemo } from "@/lib/mgr/fixtures/settings";
 import { SettingsForm } from "@/app/(app)/settings/settings-form";
 import { getCommandDefinition } from "@/lib/commands/registry";
@@ -120,5 +121,44 @@ describe("Settings sections (#1025)", () => {
       expect(helpId, field).toBeDefined();
       expect(new RegExp(`id="${helpId}"[^>]*>([^<]*)<`).exec(brewery)?.[1], field).toMatch(help);
     }
+  });
+});
+
+describe("Wholesale fulfillment with no warehouse (#1147)", () => {
+  const view = (props: { locations?: { id: string; name: string }[]; currentId?: string | null; locationsHref?: string } = {}) =>
+    renderToStaticMarkup(createElement(PortalFulfillmentView, { locations: [], currentId: null, ...props }));
+  const text = (html: string) => html.replace(/<[^>]*>/g, "").replaceAll("&#x27;", "'");
+  const save = (html: string) => /<button([^>]*)>Save warehouse<\/button>/.exec(html)?.[1] ?? "";
+
+  it("names the Uses field and links Edit locations under the disabled picker", () => {
+    const html = view({ locationsHref: "/locations" });
+    expect(text(html)).toContain("No location has Warehouse in its Uses. Add Warehouse to a location's Uses, then choose it here.");
+    const link = /<a([^>]*)>Edit locations<\/a>/.exec(html)?.[1];
+    expect(link).toContain('href="/locations"');
+    expect(link).toContain('data-to="Locations"');
+    expect(/<button[^>]*id="portal-warehouse"[^>]*>/.exec(html)?.[0]).toMatch(/aria-describedby="portal-warehouse-empty"/);
+  });
+
+  it("withholds Save warehouse and says why", () => {
+    const html = view();
+    expect(text(html)).toContain("Still needed: a warehouse.");
+    const reasonId = /<p id="([^"]+)"[^>]*>Still needed: a warehouse\.<\/p>/.exec(html)?.[1];
+    expect(save(html)).toContain(' disabled=""');
+    expect(save(html)).toContain(`aria-describedby="${reasonId}"`);
+    const chosen = view({ locations: settingsDemo.warehouseOptions, currentId: settingsDemo.warehouseId });
+    expect(chosen).not.toContain("Still needed");
+    expect(save(chosen)).not.toContain(' disabled=""');
+  });
+
+  it("withholds Save warehouse when the saved location no longer has the Warehouse use", () => {
+    const html = view({ currentId: settingsDemo.warehouseId });
+    expect(text(html)).toContain("Still needed: a warehouse.");
+    expect(save(html)).toContain(' disabled=""');
+  });
+
+  it("leaves Settings one Locations row: People and places", () => {
+    const html = renderToStaticMarkup(createElement(SettingsView, { model: { ...settingsDemo, warehouseId: null, warehouseOptions: [] } }));
+    expect(html.match(/>Locations</g)).toHaveLength(1);
+    expect(html).toContain("Edit locations");
   });
 });

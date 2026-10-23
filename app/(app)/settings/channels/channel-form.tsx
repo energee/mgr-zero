@@ -1,7 +1,7 @@
 // app/(app)/settings/channels/channel-form.tsx — CommandForm (bottom sheet on
 // phone, dialog on desk) over upsert_sale_channel. Doubles as create (no
-// `channel` prop) and edit (`channel` pre-fills name + treatment and the input
-// carries `id`).
+// `channel` prop, titled Add channel) and edit (`channel` pre-fills name +
+// treatment, the title names the saved channel, and the input carries `id`).
 "use client";
 
 import { useState } from "react";
@@ -10,8 +10,6 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { ChannelView } from "@/components/mgr/views/channel";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { toChannelViewProps } from "@/lib/mgr/channel-view";
-import { sentenceCase } from "@/lib/mgr/labels";
-import { TAX_TREATMENTS } from "@/lib/mgr/tax-treatments";
 
 export type SaleChannelEditData = { id: string; name: string; taxTreatment: string };
 
@@ -29,7 +27,7 @@ export function ChannelForm({ channel }: { channel?: SaleChannelEditData }) {
     <CommandForm
       open={form.open}
       onOpenChange={form.setOpen}
-      title="Channel"
+      title={isEdit ? `Edit channel · ${channel.name}` : "Add channel"}
       trigger={
         <Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"} aria-label={isEdit ? `Edit ${channel.name}` : undefined}>
           {isEdit ? "Edit" : "Add channel"}
@@ -41,7 +39,7 @@ export function ChannelForm({ channel }: { channel?: SaleChannelEditData }) {
           model={toChannelViewProps({ id: channel?.id ?? "", name, tax_treatment: taxTreatment })}
           controls={{
             name: setName,
-            taxTreatment: (label) => setTaxTreatment(TAX_TREATMENTS.find((value) => sentenceCase(value) === label) ?? "taxable"),
+            taxTreatment: setTaxTreatment,
           }}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>

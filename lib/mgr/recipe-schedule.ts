@@ -17,7 +17,7 @@ export const SACC_RANGE_F = [144, 162] as const;
 export const totalMinutes = (steps: readonly Pick<MashStep, "minutes">[]): number => steps.reduce((total, step) => total + step.minutes, 0);
 
 /**
- * The conversion rest the prediction reads: the longest step sitting in the
+ * The conversion rest recorded as mash_temp_f: the longest step sitting in the
  * saccharification range. Longest rather than first, because a step mash rests
  * twice in range and the alpha rest is the one that sets fermentability.
  */

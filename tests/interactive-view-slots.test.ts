@@ -66,7 +66,7 @@ it("a live schedule row names its arrows and its Edit after the row, and mash ro
   expect(html).toContain('Edit<span class="sr-only"> Saccharification</span>');
   expect(html).not.toContain('aria-label="Move Mash-in up"');
   expect(html).not.toContain('aria-label="Move Mash-out down"');
-  expect(html).toContain("infusion · 152 °F · 60 min");
+  expect(html).toContain("Infusion · 152 °F · 60 min");
   expect(html).not.toContain("mash-out · 168");
 });
 

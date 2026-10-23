@@ -1,7 +1,7 @@
-// lib/mgr/fixtures/entry.ts — Sign in, reset, set-password, no-membership.
+// lib/mgr/fixtures/entry.ts — Sign in, reset, set-password, no-membership, portal staff only.
 import type { EntryViewModel } from "@/lib/mgr/entry-view";
 import { toSetPasswordViewProps } from "@/lib/mgr/entry-view";
-export { expiredInviteModel as expiredInvite, resetPasswordModel as resetPassword, portalForgotPasswordModel as portalForgotPassword, noMembershipModel as noMembership, expiredResetModel as expiredReset } from "@/lib/mgr/entry-view";
+export { expiredInviteModel as expiredInvite, resetPasswordModel as resetPassword, portalForgotPasswordModel as portalForgotPassword, noMembershipModel as noMembership, portalStaffOnlyModel as portalStaffOnly, expiredResetModel as expiredReset } from "@/lib/mgr/entry-view";
 
 export const signIn: EntryViewModel = {
   title: "Sign in",

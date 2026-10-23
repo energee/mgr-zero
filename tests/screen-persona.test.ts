@@ -22,7 +22,7 @@ describe("persona", () => {
     const screen = asPersona(by("My notification preferences"), { id: "taproom", roles: ["taproom"], name: "Taproom staff", handle: "@taproom" });
     const html = renderToStaticMarkup(createElement("div", null, screen.body));
     expect(html).not.toContain("Save my quiet hours");
-    expect(html).toContain("pick due");
+    expect(html).toContain("Pick due");
     expect(html).toContain("More");
   });
   it.each([

@@ -5,6 +5,7 @@
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
+import { navAbout } from "@/lib/mgr/nav";
 import type { SettingsViewModel } from "@/lib/mgr/settings-view";
 import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
@@ -52,13 +53,13 @@ export function SettingsView({
           {E.nav("Team", model.team, "", undefined, hrefs.team)}
           {E.nav("Locations", model.locations, "", undefined, hrefs.locations)}
           {E.nav("Source water", "Manage source and target water profiles", "", undefined, hrefs.water)}
-          {E.nav("Import", "Upload, map and commit CSV rows", "", undefined, hrefs.import)}
+          {E.nav("Import", navAbout("Import"), "", undefined, hrefs.import)}
         </section>
         <section aria-labelledby="settings-connections" className="flex min-w-0 flex-col gap-2">
           <h2 id="settings-connections" className="mb-2 font-heading text-xl font-semibold">Connections</h2>
           {E.nav("Accounting", "QuickBooks connection, mappings and payment defaults", "", QuickBooksMark, hrefs.accounting)}
           {E.nav("Point of sale", "Square connection, location mappings, sync and menu", "", SquareMark, hrefs.pos)}
-          {E.nav("Chat", "Slack notifications and preferences", "", SlackMark, hrefs.chat)}
+          {E.nav("Chat", navAbout("Chat"), "", SlackMark, hrefs.chat)}
         </section>
       </div>
       <div className="mt-2 grid gap-6 border-t pt-6 @min-[48rem]:grid-cols-2">

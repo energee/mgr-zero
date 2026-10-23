@@ -2,8 +2,8 @@
 // the brewery's water profiles from list_water_profiles (a recipe version can
 // pick any one as its source or its target). Each row has Edit →
 // water-profile-form.tsx; Add water profile opens the same sheet empty.
-// Brewer and Admin. Admin arrives from Catalog or Settings, Brewer from a
-// recipe's Water sheet, so the back arrow follows the role (waterProfilesBack).
+// Brewer and Admin. Admin arrives from Catalog or Settings, both arrive from
+// Recipes or a recipe's Water sheet, and the back arrow follows the role (waterProfilesBack).
 import { WaterProfilesView } from "@/components/mgr/views/water-profiles";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";

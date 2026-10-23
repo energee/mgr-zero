@@ -41,12 +41,12 @@ function Item({ item }: { item: PortableNotification }) {
   );
 }
 
-/** One fixture drawn as the surface a person would see, labelled as preview data. */
+/** One fixture drawn as the surface a person would see, labelled as sample data. */
 export function ChatPreview({ fixture }: { fixture: ChatPreviewFixture }) {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-3 rounded border p-4">
-      <p className="text-xs text-muted-foreground">{SURFACE_LABEL[fixture.surface]} · {fixture.eyebrow} · Preview data</p>
+      <p className="text-xs text-muted-foreground">{SURFACE_LABEL[fixture.surface]} · Sample data</p>
       <h3 id={headingId} className="text-lg font-semibold">{fixture.title}</h3>
       {fixture.status ? <p className={"text-sm " + TONE_CLASS[fixture.status.tone]}>{fixture.status.label}</p> : null}
       {fixture.fields.length > 0 ? (
