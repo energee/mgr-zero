@@ -5161,6 +5161,9 @@ isOneToOne: false
 "get_square_connected":
 { Args: { "p_brewery": string }; Returns: boolean
                            },
+"get_staff_chat_installation":
+{ Args: { "p_brewery": string }; Returns: Json
+                           },
 "get_taproom_count":
 { Args: { "p_brewery": string,"p_count": string }; Returns: Json
                            },

@@ -26,6 +26,7 @@ const AUTHENTICATED_RPCS = [
   "pos_order_versions()",
   "get_chat_integration_health(uuid)",
   "get_chat_link_intent(uuid,text)",
+  "get_staff_chat_installation(uuid)",
   "configure_pos_menu(uuid,text,uuid,uuid,uuid)",
   "get_pos_menu(uuid,text)",
   "get_square_connected(uuid)",

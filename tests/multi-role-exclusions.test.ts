@@ -48,7 +48,7 @@ vi.mock("@/lib/mgr/page-query", async importOriginal => ({
       case "list_open_taps": return [];
       case "get_taproom_variance": return { as_of: "2026-10-16T12:00:00Z", reason: null, rows: [], periods: [] };
       case "list_locations": return [{ id: "tap", name: "Taproom", uses: ["taproom"] }];
-      case "get_notification_preferences": return { preferences: [], quietStart: null, quietEnd: null, timezone: "America/New_York", link: null };
+      case "get_notification_preferences": return { preferences: [], quietStart: null, quietEnd: null, timezone: "America/New_York", link: null, installationActive: false, breweryQuietHours: null };
       case "get_taproom_count_snapshot": return { revision: "revision" };
       case "get_taproom_print_labels": return [{ bin_id: "bin", sku_id: "sku", lot_id: "lot", lot_code: "LOT-797" }];
       case "get_taproom_draft_projection": return null;

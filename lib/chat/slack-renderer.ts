@@ -20,8 +20,8 @@ const intentButton = (action: PortableAction, intentId: string): Block => ({
 });
 const actions = (elements: Block[]): Block[] => (elements.length ? [{ type: "actions", elements: elements.slice(0, 25) }] : []);
 
-// A subject's safeLabel sometimes already carries its reason ("FV2 · reading
-// overdue"), so appending the title would read "… · Reading overdue" twice.
+// A subject's safeLabel can already carry its reason ("FV2 · fermentation
+// reading overdue"), so appending the title would say it twice.
 // Used by every surface that composes label and title on one line: App Home
 // rows and the message fallback text Slack shows in the notification list.
 // endsWith, not includes: a label whose own words happen to contain the reason
