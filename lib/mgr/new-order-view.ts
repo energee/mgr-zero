@@ -18,6 +18,8 @@ export type NewOrderViewModel = {
   kind?: "wholesale" | "taproom_transfer";
   destination?: string;
   backHref?: string;
+  /** Where customers are made, on a live page; the inventory leaves it inert. */
+  customersHref?: string;
 };
 
 export type NewOrderSnapshot = {

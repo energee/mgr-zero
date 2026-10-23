@@ -19,7 +19,7 @@ import { ScheduleBatchView } from "../components/mgr/views/schedule-batch";
 import { VesselDetailView } from "../components/mgr/views/vessel-detail";
 import {
   batchesBrewer, brewDayHazy, brewDayTurnsHazy, brewPrepMineral, brewTimelineMineral, closePackagingRunHazy, recipeHazyV4, recipesList,
-  runClosedHazy, scheduleBatchHazy, vesselFv3,
+  runClosedHazy, scheduleBatchHazy, vesselFv3, cellarTransferPils, cellarAdditionCitra,
 } from "../lib/mgr/fixtures/production";
 import { toBatchesViewProps, batchesFromQuery, type BatchListRow } from "../lib/mgr/batches-view";
 import { brewTurnModel, canRecordBrewDay } from "../lib/mgr/brew-day-view";
@@ -28,6 +28,8 @@ import { toRecipesViewProps } from "../lib/mgr/recipes-view";
 import { formatVesselReading } from "../lib/mgr/vessel-detail-view";
 import { cellarReadings, toCellarMapViewProps } from "../lib/mgr/cellar-map-view";
 import { CellarMapView } from "../components/mgr/views/cellar-map";
+import { CellarTransferView } from "../components/mgr/views/cellar-transfer";
+import { CellarAdditionView } from "../components/mgr/views/cellar-addition";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 
@@ -148,17 +150,19 @@ describe("Batches view", () => {
   });
 });
 
-describe("Schedule batch view", () => {
-  it("the Schedule batch inventory record is ScheduleBatchView", () => {
-    const body = screen("Schedule batch").body as { type: unknown; props: { model: unknown } };
+describe("New batch sheet", () => {
+  it("the New batch inventory record is a sheet drawing ScheduleBatchView", () => {
+    const record = screen("New batch");
+    expect(record.surface).toBe("sheet");
+    const body = record.body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(ScheduleBatchView);
     expect(body.props.model).toEqual(scheduleBatchHazy);
   });
 
-  it("renders Save schedule without leaking live hrefs", () => {
+  it("renders Schedule batch with no in-sheet title or back link (#1120, #1127)", () => {
     const html = htmlOf(createElement(ScheduleBatchView, { model: scheduleBatchHazy }));
-    expect(html).toMatch(/>Save schedule</);
-    expect(html).not.toMatch(/href="\/batches"/);
+    expect(html).toMatch(/>Schedule batch</);
+    expect(html).not.toMatch(/<h1\b|<a\b/);
     expect(html).toMatch(/Note · optional/);
   });
 
@@ -214,7 +218,7 @@ describe("Brew day view", () => {
     const html = htmlOf(createElement(BrewDayView, { model: brewDayHazy, busy: true, error: "Vessel occupied" }));
     expect(html).toContain("Vessel occupied");
     expect(html).toContain('value="14.6"');
-    expect(html).toContain("September 4, 2026");
+    expect(html).toContain("Sep 4, 2026");
     expect(html).toContain("disabled");
     expect(html).toContain("Confirm actual ingredients");
     expect(html).not.toContain('href="/');
@@ -420,9 +424,10 @@ it("explains a disabled cellar Reading instead of leaving a dead end (#715)", ()
   const one = [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2 }];
   const two = [...one, { vessel_id: "v2", occupancy_id: "o2", brand_name: null, bbl: 3 }];
   const reading = (occupancyId: string) => `/cellar/${occupancyId}/reading`;
-  expect(toCellarMapViewProps(vessels, one, {}, {}, reading).readingHint).toBeUndefined();
-  expect(toCellarMapViewProps(vessels, two, {}, {}, reading).readingHint).toBe("Several tanks hold beer. Open a tank to record its reading.");
-  expect(toCellarMapViewProps(vessels, [], {}, {}, reading).readingHint).toBe("No tank holds beer, so there is nothing to read.");
+  expect(toCellarMapViewProps(vessels, one, {}, {}, reading).actionHint).toBeUndefined();
+  expect(toCellarMapViewProps(vessels, two, {}, {}, reading).actionHint).toBe("Several tanks hold beer. Open a tank to record its reading.");
+  // #1115: Transfer and Addition are off for the same reason, so the one note names all three.
+  expect(toCellarMapViewProps(vessels, [], {}, {}, reading).actionHint).toBe("No tank holds beer, so there is nothing to read, transfer or add to.");
   const html = htmlOf(createElement(CellarMapView, { model: toCellarMapViewProps(vessels, two, {}, { v1: "/cellar/vessels/v1" }, reading) }));
   expect(html).toContain("Open a tank to record its reading.");
   expect(html).not.toContain("/reading");
@@ -453,5 +458,64 @@ describe("cellar readings (#700)", () => {
     expect(page).not.toContain("list_fermentation_readings");
     // #759: and only the open batches, so the row cap is never spent on finished ones.
     expect(page).toContain('runCommand("list_batches", { readings: true, open: true }, ctx)');
+  });
+});
+
+// #1115: a field standing alone in a cellar sheet names itself on screen, not only to a screen reader.
+const labelled = (html: string, text: string) => {
+  const forId = new RegExp(`<label[^>]*for="([^"]+)"[^>]*>${text}</label>`).exec(html)?.[1];
+  return Boolean(forId) && new RegExp(`<input[^>]*id="${forId}"`).test(html);
+};
+
+// A single-choice chip group (Radix renders role="radiogroup") is named by its visible heading.
+const headed = (html: string, text: string) => {
+  const id = new RegExp(`<label[^>]*id="([^"]+)"[^>]*>${text}</label>`).exec(html)?.[1];
+  return Boolean(id) && new RegExp(`role="radiogroup"[^>]*aria-labelledby="${id}"|aria-labelledby="${id}"[^>]*role="radiogroup"`).test(html);
+};
+// A picker's help line is tied to it: the trigger's aria-describedby is the line's id.
+const described = (html: string, text: string) => {
+  const id = new RegExp(`<p[^>]*id="([^"]+)"[^>]*>${text}</p>`).exec(html)?.[1];
+  return Boolean(id) && html.includes(`aria-describedby="${id}"`);
+};
+
+describe("cellar sheets label every field (#1115)", () => {
+  it("transfer shows Barrels moving, explains From and To, and heads the remainder choice", () => {
+    const html = htmlOf(createElement(CellarTransferView, { model: cellarTransferPils, footer: null }));
+    expect(labelled(html, "Barrels moving")).toBe(true);
+    expect(headed(html, "What happens to the remainder")).toBe(true);
+    expect(described(html, "The tank the beer leaves.")).toBe(true);
+    expect(described(html, "The tank the beer goes into. One that already holds beer is a blend.")).toBe(true);
+  });
+
+  it("addition shows Quantity and Title Case stage chips under a Stage heading", () => {
+    const html = htmlOf(createElement(CellarAdditionView, { model: cellarAdditionCitra, footer: null }));
+    expect(labelled(html, "Quantity")).toBe(true);
+    expect(headed(html, "Stage")).toBe(true);
+    for (const chip of ["Dry hop", "Fermentation", "Other"]) expect(html).toMatch(new RegExp(`>${chip}</button>`));
+  });
+
+  it("addition says what is still needed as guidance, not as an amber warning", () => {
+    const html = htmlOf(createElement(CellarAdditionView, { model: { ...cellarAdditionCitra, occupancyId: "" }, footer: null }));
+    expect(html).toMatch(/bg-info[\s\S]*Choose a tank/);
+    expect(html).not.toContain("bg-warning");
+    // Over what the lot holds is a real error, so it stays amber.
+    expect(htmlOf(createElement(CellarAdditionView, { model: { ...cellarAdditionCitra, qty: "41" }, footer: null }))).toMatch(/bg-warning[\s\S]*Only 40 lb of L-0790 on hand/);
+  });
+
+  it("with no beer in any tank, all three actions are off under one note, even without a reading path", () => {
+    const vessels = [{ id: "v1", name: "FV1", capacity_bbl: 10 }];
+    const empty = toCellarMapViewProps(vessels, []);
+    expect(empty.actionsOff).toBe(true);
+    expect(empty.actionHint).toBe("No tank holds beer, so there is nothing to read, transfer or add to.");
+    expect(toCellarMapViewProps(vessels, [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2 }]).actionsOff).toBe(false);
+    const html = htmlOf(createElement(CellarMapView, { model: empty }));
+    for (const verb of ["Reading", "Transfer", "Addition"]) expect(html).toMatch(new RegExp(`<button[^>]*disabled=""[^>]*>${verb}</button>`));
+    expect(html).toContain("nothing to read, transfer or add to");
+  });
+
+  it("draws Brew day as a link to Batches, not as a peer action button", () => {
+    const html = htmlOf(createElement(CellarMapView, { model: { tiles: [], brewHref: "/batches" } }));
+    expect(html).toMatch(/<a[^>]*href="\/batches"[^>]*>Start a brew day in Batches<\/a>/);
+    expect(html).not.toMatch(/data-slot="button"[^>]*href="\/batches"/);
   });
 });

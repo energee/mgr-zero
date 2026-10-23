@@ -3,8 +3,12 @@
 // leg from the parent's composition through toRepackView, so nobody types both
 // halves and the two legs cannot disagree on volume. Like the cycle-count
 // model, the option lists and selected ids ride on the model when the sheet is
-// live; the fixture leaves them off and the view draws plain fields. `lot` is
-// the finished-goods lot the cases come out of (#613); the four-packs keep it.
+// live; the fixture leaves them off and the view draws plain fields, except
+// the Lot picker, which both draw so its Untracked stock help shows (#1125).
+// `lots` are the finished-goods lots the cases come out of (#613); the
+// four-packs keep the picked one.
+import { submitReason } from "@/lib/mgr/submit-reason";
+
 export type RepackOption = { id: string; name: string };
 export type RepackViewModel = {
   parent: string;
@@ -13,12 +17,25 @@ export type RepackViewModel = {
   unit: string;
   tape: [string, string][];
   preview: string;
-  damaged: string;
   unavailable?: string;
-  lot?: string;
   parents?: RepackOption[]; locations?: RepackOption[]; bins?: RepackOption[]; lots?: RepackOption[];
   parentSkuId?: string; locationId?: string; binId?: string; lotId?: string;
+  /** Where a format's contents are set (Catalog), for a user who may do it
+   *  (create_composed_format). null when this user may not, so the empty Break
+   *  note names who can; the inventory leaves it out and the link stays inert. */
+  formatsHref?: string | null;
 };
+
+/** What Confirm repack waits for. A parent with no single composition row is
+ *  withheld separately, by `unavailable` (REPACK_UNAVAILABLE). */
+export function repackReason(i: { parentSkuId: string; locationId: string; binId: string; qty: string }): string | null {
+  const missing: string[] = [];
+  if (!i.parentSkuId) missing.push("a SKU to break");
+  if (!i.locationId) missing.push("a location");
+  if (!i.binId) missing.push("a bin");
+  if (!(Number(i.qty) > 0)) missing.push("a quantity above zero");
+  return submitReason(missing);
+}
 
 /**
  * The lot to preselect: the only lot of the parent in the bin, when the bin
@@ -42,9 +59,9 @@ export function toRepackView(input: { parent: string; unit: string; location?: s
   const n = Number(base.qty) || 0;
   const out = `−${n} ${base.unit} · repack`;
   // No parent yet: nothing to derive and nothing to refuse; the pickers say what to do.
-  if (!base.parent) return { ...base, tape: [], preview: "Pick a composed SKU, the bin it sits in, and how many to break", damaged: "not recorded" };
+  if (!base.parent) return { ...base, tape: [], preview: "Pick a composed SKU, the bin it sits in, and how many to break" };
   if (!composition) {
-    return { ...base, tape: [[out, "no composition"]], preview: "Preview: nothing to derive · the parent format has no single component row", damaged: "not recorded", unavailable: REPACK_UNAVAILABLE };
+    return { ...base, tape: [[out, "no composition"]], preview: "Preview: nothing to derive · the parent format has no single component row", unavailable: REPACK_UNAVAILABLE };
   }
   // The child leg's bbl is the parent's total, never recomputed per child unit
   // (screens.tsx spec: independent rounding leaves −0.00000001 on a 24×16oz case).
@@ -53,6 +70,5 @@ export function toRepackView(input: { parent: string; unit: string; location?: s
     ...base,
     tape: [[out, `${bbl} bbl`], [`+${n * composition.quantity} ${composition.childLabel} · repack`, `derived from the ${base.unit} total`]],
     preview: `Preview: conserves ${bbl} bbl · same location and bin · not a TTB removal`,
-    damaged: `0 ${composition.childLabel} · the child count is pinned to composition`,
   };
 }
