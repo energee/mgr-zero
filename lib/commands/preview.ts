@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, previewCommand, STAFF_ROLES, unwrap } from "./registry";
 import { movementInput } from "./movement-input";
+import { MAX_HISTORY_MESSAGES } from "@/lib/chat/model-messages";
 
 const conversationId = z.string().uuid();
 
@@ -36,9 +37,9 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_chat_history", description: "Read one composer conversation and its messages for the current author and brewery",
-  input: z.object({ conversationId }), roles: STAFF_ROLES,
+  name: "get_chat_history", description: "Read one composer conversation and its messages for the current author and brewery; recentTurns returns only that many newest text turns, oldest first",
+  input: z.object({ conversationId, recentTurns: z.number().int().min(1).max(MAX_HISTORY_MESSAGES).optional() }), roles: STAFF_ROLES,
   handler: (ctx, input) => unwrap(ctx.db.rpc("get_chat_history", {
-    p_brewery: ctx.breweryId, p_conversation: input.conversationId,
+    p_brewery: ctx.breweryId, p_conversation: input.conversationId, p_recent_turns: input.recentTurns,
   })),
 });
