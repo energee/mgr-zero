@@ -24,8 +24,9 @@ function formatISODate(date: Date) {
   return `${part(date.getFullYear(), 4)}-${part(date.getMonth() + 1)}-${part(date.getDate())}`;
 }
 
-/** `aria-describedby` names the help text the caller composes beside the field. */
-export function DatePicker({ label, defaultValue = "", value, onChange, disabled, required, name, "aria-describedby": describedBy }: { label: string; defaultValue?: string; value?: string; onChange?: (value: string) => void; disabled?: boolean; required?: boolean; name?: string; "aria-describedby"?: string }) {
+/** `aria-describedby` names the help text the caller composes beside the field.
+ *  `max` (yyyy-mm-dd) disables the calendar's later days and caps the form input. */
+export function DatePicker({ label, defaultValue = "", value, onChange, disabled, required, name, max, "aria-describedby": describedBy }: { label: string; defaultValue?: string; value?: string; onChange?: (value: string) => void; disabled?: boolean; required?: boolean; name?: string; max?: string; "aria-describedby"?: string }) {
   const [internalDate, setInternalDate] = React.useState<Date | undefined>(() => parseISODate(defaultValue));
   const controlled = value !== undefined;
   const date = controlled ? parseISODate(value) : internalDate;
@@ -39,6 +40,7 @@ export function DatePicker({ label, defaultValue = "", value, onChange, disabled
     onChange?.(next ? formatISODate(next) : "");
     setOpen(false);
   };
+  const maxDate = max ? parseISODate(max) : undefined;
   // A <label for> does not name a button, so the trigger points back at both the
   // label and itself: "Best by, Sep 5, 2026".
   const labelId = React.useId();
@@ -65,10 +67,10 @@ export function DatePicker({ label, defaultValue = "", value, onChange, disabled
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
-          <Calendar mode="single" selected={date} onSelect={selectDate} defaultMonth={date} />
+          <Calendar mode="single" selected={date} onSelect={selectDate} defaultMonth={date} disabled={maxDate && { after: maxDate }} />
         </PopoverContent>
       </Popover>
-      {(required || name) && <input type="date" aria-label={label} className="sr-only" tabIndex={-1} name={name} required={required} disabled={disabled} value={isoDate} onChange={event => selectDate(parseISODate(event.target.value))} />}
+      {(required || name) && <input type="date" aria-label={label} className="sr-only" tabIndex={-1} name={name} required={required} disabled={disabled} max={max} value={isoDate} onChange={event => selectDate(parseISODate(event.target.value))} />}
     </Field>
   );
 }

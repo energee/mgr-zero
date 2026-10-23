@@ -6,7 +6,7 @@ import { createElement, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
-import { InvoiceView } from "../components/mgr/views/invoice";
+import { InvoicePaymentFields, InvoiceView } from "../components/mgr/views/invoice";
 import { creditMemoAls, invoiceEditedInQbo, invoiceFailedAls, invoiceLocalPartlyPaid, invoicePartlyPaid } from "../lib/mgr/fixtures/invoice";
 import { ALS } from "../lib/mgr/fixtures/demo";
 import { invoiceMappingRows, invoicePaymentReady, toInvoiceViewProps } from "../lib/mgr/invoice-view";
@@ -318,6 +318,53 @@ describe("Invoice payments recorded in MGR (#1045)", () => {
   });
   it("takes no payment on a credit memo", () => {
     expect(toInvoiceViewProps(creditMemoAls).takesPayment).toBe(false);
+  });
+});
+
+describe("Invoice view: the Payments section (#1045)", () => {
+  const model = toInvoiceViewProps(invoiceLocalPartlyPaid);
+  const voidButtons = (html: string) => html.match(/>Void</g) ?? [];
+  it("lists each payment, and a voided one with its reason", () => {
+    const html = htmlOf(createElement(InvoiceView, { model }));
+    expect(html).toContain('id="invoice-payments"');
+    for (const text of ["$300.00", "Sep 20, 2026", "Check", "1182", "$100.00", "Cash", "Voided", "Counted twice"]) expect(html).toContain(text);
+  });
+  it("draws the inert Record payment and one Void, on the unvoided payment, when the slots are omitted", () => {
+    const html = htmlOf(createElement(InvoiceView, { model }));
+    expect(html).toContain("Record payment");
+    expect(voidButtons(html)).toHaveLength(1);
+  });
+  it("draws neither when the slots are null", () => {
+    const html = htmlOf(createElement(InvoiceView, { model, recordPayment: null, paymentAction: null }));
+    expect(html).not.toContain("Record payment");
+    expect(voidButtons(html)).toHaveLength(0);
+  });
+  it("passes each unvoided payment to a paymentAction function", () => {
+    const html = htmlOf(createElement(InvoiceView, { model, paymentAction: (p) => createElement("span", null, `void-${p.id}`) }));
+    expect(html).toContain("void-pay-check");
+    expect(html).not.toContain("void-pay-cash");
+  });
+  it("draws no default Record payment on an invoice that takes no payment", () => {
+    const html = htmlOf(createElement(InvoiceView, { model: toInvoiceViewProps(invoiceEditedInQbo) }));
+    expect(html).not.toContain("Record payment");
+    expect(html).not.toContain('id="invoice-payments"');
+  });
+});
+
+describe("InvoicePaymentFields (#1045)", () => {
+  const value = { amount: "", receivedOn: "2026-10-23", method: "" as const, reference: "" };
+  const fields = (quickbooksConnected: boolean) =>
+    htmlOf(createElement(InvoicePaymentFields, { value, maxCents: 31500, maxDate: "2026-10-23", quickbooksConnected }));
+  it("caps the amount at the balance (Q1) and the received date at today (Q10)", () => {
+    const html = fields(false);
+    expect(html).toContain('max="315"');
+    expect(html).toContain('max="2026-10-23"');
+    for (const text of ["Amount ($)", "Received on", "Method", "Reference · optional"]) expect(html).toContain(text);
+  });
+  it("says the invoice will not be sent to QuickBooks only when QuickBooks is connected", () => {
+    const sentence = "This invoice will not be sent to QuickBooks while it has payments recorded in MGR.";
+    expect(fields(true)).toContain(sentence);
+    expect(fields(false)).not.toContain(sentence);
   });
 });
 

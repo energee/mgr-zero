@@ -1,8 +1,10 @@
 // components/mgr/views/invoice.tsx — the Invoice screen drawing, read as a
 // document (#977): number, state and customer, then Issued/Due beside the
 // price summary (stacked on the phone, summary before the lines), a line
-// table on the desk and labeled line records on the phone, QuickBooks and
-// accounting, buyer questions, and Return in a closing section. Inventory and
+// table on the desk and labeled line records on the phone, the payments
+// recorded in MGR (#1045), QuickBooks and accounting, buyer questions, and
+// Return in a closing section. InvoicePaymentFields is the Record payment
+// form's body, shared by the inventory sheet and the live form. Inventory and
 // the live page both pass toInvoiceViewProps(get_invoice-shaped data); the
 // live page supplies authorized actions through the slots (an explicit null
 // suppresses a slot; omitted draws the inert fixture control).
@@ -14,9 +16,10 @@ import { PriceSummary } from "@/components/mgr/views/price-summary";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { QboStaffInvoiceLinkView } from "./accounting";
-import { sentenceCase } from "@/lib/mgr/labels";
+import { PAYMENT_METHODS } from "@/lib/mgr/enums";
+import { PAYMENT_METHOD_LABEL, sentenceCase } from "@/lib/mgr/labels";
 import type { QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
-import type { InvoiceQuestionView, InvoiceViewModel } from "@/lib/mgr/invoice-view";
+import type { InvoicePaymentValue, InvoicePaymentView, InvoiceQuestionView, InvoiceViewModel } from "@/lib/mgr/invoice-view";
 import { cn } from "@/lib/utils";
 
 export type { InvoiceViewModel };
@@ -24,6 +27,26 @@ export type { InvoiceViewModel };
 const H2 = "text-base font-semibold";
 const LEGEND = "text-xs text-muted-foreground";
 const NUMBER_COLUMNS = [["Quantity", "qty"], ["Unit price", "unitPrice"]] as const;
+const METHOD_OPTIONS = [{ value: "", label: "Select a method" }, ...PAYMENT_METHODS.map((value) => ({ value, label: PAYMENT_METHOD_LABEL[value] }))];
+
+/** Record payment's fields, like KegPoolFields: amount capped at the balance
+ *  (Q1), received day capped at the brewery's today (Q10), method, reference.
+ *  Without onChange the fields draw the value uncontrolled, as the inventory
+ *  does. At a QuickBooks-connected brewery it warns that payments stop the push. */
+export function InvoicePaymentFields({ value, maxCents, maxDate, quickbooksConnected, onChange }: {
+  value: InvoicePaymentValue; maxCents: number; maxDate: string; quickbooksConnected: boolean; onChange?: (next: InvoicePaymentValue) => void;
+}) {
+  const set = <K extends keyof InvoicePaymentValue>(key: K) => onChange ? (next: InvoicePaymentValue[K]) => onChange({ ...value, [key]: next }) : undefined;
+  return (
+    <>
+      {quickbooksConnected ? E.note("This invoice will not be sent to QuickBooks while it has payments recorded in MGR.") : null}
+      {E.edit("Amount ($)", value.amount, "number", undefined, { id: "payment-amount", min: 0, max: maxCents / 100, step: 0.01, onChange: set("amount"), required: true })}
+      {E.edit("Received on", value.receivedOn, "date", undefined, { max: maxDate, onChange: set("receivedOn"), required: true })}
+      {E.pick("Method", value.method, METHOD_OPTIONS, { id: "payment-method", onChange: set("method") as ((v: string) => void) | undefined, required: true })}
+      {E.edit("Reference · optional", value.reference, "text", undefined, { id: "payment-reference", maxLength: 200, onChange: set("reference") })}
+    </>
+  );
+}
 
 /** The Return button: a link to the return form on the live page, inert in the inventory. */
 export const InvoiceReturnButton = ({ href }: { href?: string }) => (
@@ -36,6 +59,8 @@ export function InvoiceView({
   model,
   correction,
   questionAction,
+  recordPayment,
+  paymentAction,
   mappings = model.mappings,
   pushDisabled = true,
   qbo,
@@ -48,6 +73,10 @@ export function InvoiceView({
   /** The closing Correct a shipment control. Omitted: the inert Return button; null: no section. */
   correction?: ReactNode;
   questionAction?: ReactNode | ((question: InvoiceQuestionView) => ReactNode);
+  /** The Payments section's Record payment control. Omitted: the inert button when model.takesPayment; null: none. */
+  recordPayment?: ReactNode;
+  /** The control on each unvoided payment. Omitted: the inert Void button; null: none. */
+  paymentAction?: ReactNode | ((payment: InvoicePaymentView) => ReactNode);
   mappings?: InvoiceViewModel["mappings"];
   pushDisabled?: boolean;
   /** Replaces the whole QuickBooks region; null draws none. */
@@ -63,6 +92,12 @@ export function InvoiceView({
   const unanswered = (q: InvoiceQuestionView) => {
     if (typeof questionAction === "function") return questionAction(q);
     return questionAction !== undefined ? questionAction : <Button variant="outline" size="sm" type="button">Mark answered</Button>;
+  };
+  const record = recordPayment !== undefined ? recordPayment
+    : model.takesPayment ? <Button variant="outline" size="sm" type="button">Record payment</Button> : null;
+  const paymentControl = (p: InvoicePaymentView) => {
+    if (typeof paymentAction === "function") return paymentAction(p);
+    return paymentAction !== undefined ? paymentAction : <Button variant="outline" size="sm" type="button">Void</Button>;
   };
   const actions = accountingActions !== undefined ? accountingActions
     : mappingRows?.length ? E.btn("Push invoice to QuickBooks Online", pushDisabled ? "irr disabled" : "irr") : null;
@@ -130,6 +165,31 @@ export function InvoiceView({
           ))}
         </ul>
       </section>
+
+      {model.payments.length || record ? (
+        <section aria-labelledby="invoice-payments" className="border-t pt-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="invoice-payments" className={H2}>Payments</h2>
+            {record}
+          </div>
+          {model.payments.length ? (
+            <ul className="mt-1 divide-y">
+              {model.payments.map((p) => (
+                <li key={p.key}>
+                  {E.row(
+                    p.amount,
+                    <>
+                      {[`Received ${p.receivedOn}`, p.method, p.reference].filter(Boolean).join(" · ")}
+                      {p.voidReason ? <span className="block">Voided: {p.voidReason}</span> : null}
+                    </>,
+                    p.voidReason ? E.status("Voided") : paymentControl(p),
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
 
       {hasAccounting ? (
         <section aria-labelledby="invoice-accounting" className="flex flex-col gap-3 border-t pt-5">
