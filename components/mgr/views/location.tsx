@@ -2,36 +2,43 @@
 // location fields it shares with the live Add/Edit location dialog
 // (LocationForm) and the first-run Add location step. Inventory paints the
 // fields + Save. Live is read-only flds with LocationForm in the header.
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { FieldDescription } from "@/components/ui/field";
-import { LOCATION_USES, type LocationUse } from "@/lib/mgr/enums";
+import type { LocationUse } from "@/lib/mgr/enums";
 import { LOCATION_USE_OPTIONS } from "@/lib/mgr/labels";
 import type { LocationViewModel } from "@/lib/mgr/location-view";
 
 export type { LocationViewModel };
 
-const USES_HINT_ID = "location-uses-hint";
+// Each sentence names a real gate: list_locations({ use }) on the tap board,
+// weekly count, variance, Today and Replenishment; taproom staff RLS on stock;
+// the From warehouse and Portal fulfillment warehouse pickers.
+const USES_HINT = "Choose one or more. One place can be all three. The tap board, weekly count, variance and Replenishment list only locations with Taproom. Taproom staff see stock only at those locations. From warehouse on Replenishment and the Portal fulfillment warehouse list only locations with Warehouse.";
+// create_location seeds these three bins; Location bins (admin, warehouse) edits them.
+const BINS_NOTE = "Bins are the rooms and racks inside a location where stock sits. Every new location starts with Cold, Dry and Walk-in. To add, rename or remove bins, open Location bins on the location page.";
 
-/** Location name and Uses, plus what a bin is. Uses is a multi-select: every
- *  taproom or warehouse guard asks whether that use is among them. Fixtures
- *  pass no controls and draw the values unwired. */
+/** Location name and Uses, plus what a bin is. Uses takes several answers:
+ *  every taproom or warehouse guard asks whether that use is among them.
+ *  Fixtures pass no controls and draw the values unwired. */
 export function LocationFields({ name, uses, controls = {} }: {
   name: string;
   uses: LocationUse[];
   controls?: { name?: (value: string) => void; uses?: (value: LocationUse[]) => void };
 }) {
+  const nameId = useId();
+  const hintId = useId();
   const setUses = controls.uses;
   return (
     <>
-      {E.edit("Location name", name, "text", undefined, { onChange: controls.name, required: Boolean(controls.name) })}
+      {E.edit("Location name", name, "text", undefined, { id: nameId, onChange: controls.name, required: Boolean(controls.name) })}
       {E.picks("Uses", uses, LOCATION_USE_OPTIONS, {
-        // Kept in enum order, whatever order the toggles were pressed in.
-        onChange: setUses ? (next) => setUses(LOCATION_USES.filter((use) => next.includes(use))) : undefined,
-        "aria-describedby": USES_HINT_ID,
-        description: <FieldDescription id={USES_HINT_ID}>Choose every use that applies; one place can be all three. Taproom tools list every location that includes Taproom. Warehouse pickers list every location that includes Warehouse.</FieldDescription>,
+        // The options are LOCATION_USES, so every picked value is a LocationUse.
+        onChange: setUses ? (next) => setUses(next as LocationUse[]) : undefined,
+        "aria-describedby": hintId,
+        description: <FieldDescription id={hintId}>{USES_HINT}</FieldDescription>,
       })}
-      {E.info("Bins are the rooms and racks inside this location where stock sits. A new location starts with Cold, Dry and Walk-in. Add or rename bins under Location bins.")}
+      {E.info(BINS_NOTE)}
     </>
   );
 }
@@ -56,6 +63,7 @@ export function LocationView({
           {E.fld("Uses", model.usesLabel)}
           {E.fld("Timezone", model.timezone)}
           {E.nav("Location bins", model.bins, "", undefined, model.binsHref)}
+          {E.info(BINS_NOTE)}
         </>
       ) : (
         <>

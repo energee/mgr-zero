@@ -20,6 +20,9 @@ import { toLocationsViewProps } from "../lib/mgr/locations-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
+// The on-screen copy, spelled out so a wording change is a test change (#1148).
+const USES_HINT = "Choose one or more. One place can be all three. The tap board, weekly count, variance and Replenishment list only locations with Taproom. Taproom staff see stock only at those locations. From warehouse on Replenishment and the Portal fulfillment warehouse list only locations with Warehouse.";
+const BINS_NOTE = "Bins are the rooms and racks inside a location where stock sits. Every new location starts with Cold, Dry and Walk-in. To add, rename or remove bins, open Location bins on the location page.";
 
 describe("Locations list", () => {
   it("maps list_locations through every use, with optional units / taps / bins copy", () => {
@@ -153,25 +156,42 @@ describe("Location detail", () => {
     expect(html).not.toMatch(/Location name/);
   });
 
-  it("Uses says it takes several answers, each guard asking whether a use is among them (#1148)", () => {
+  it("Uses says it takes several answers and names the screens each use gates (#1148)", () => {
     const html = htmlOf(createElement(LocationFields, { name: "Taproom", uses: ["taproom", "storage"] }));
     const group = /<div[^>]*data-slot="toggle-group"[^>]*>/.exec(html)?.[0] ?? "";
     expect(group).toMatch(/aria-label="Uses"/);
-    expect(group).toMatch(/aria-describedby="location-uses-hint"/);
-    expect(html).toMatch(/id="location-uses-hint"[^>]*>Choose every use that applies; one place can be all three\. Taproom tools list every location that includes Taproom\. Warehouse pickers list every location that includes Warehouse\.</);
+    const hintId = /aria-describedby="([^"]+)"/.exec(group)?.[1];
+    expect(hintId).toBeTruthy();
+    expect(html).toContain(`id="${hintId}"`);
+    expect(html).toContain(">" + USES_HINT + "<");
     // Selected uses fill with the AA-checked primary pair, not the hover wash (#493).
     expect(html).toMatch(/<button[^>]*data-state="on"[^>]*data-\[state=on\]:bg-primary[^>]*>Taproom</);
     expect(html).toMatch(/<button[^>]*data-state="off"[^>]*>Warehouse</);
   });
 
+  it("the Location name label focuses its input (#1148)", () => {
+    const html = htmlOf(createElement(LocationFields, { name: "Taproom", uses: ["taproom"] }));
+    const labelFor = /<label[^>]*for="([^"]+)"[^>]*>Location name</.exec(html)?.[1];
+    expect(labelFor).toBeTruthy();
+    expect(html).toMatch(new RegExp(`<input[^>]*id="${labelFor}"`));
+  });
+
   it("the location fields say what a bin is and where bins are kept (#1148)", () => {
     const html = htmlOf(createElement(LocationFields, { name: "", uses: ["warehouse"] }));
-    expect(html).toMatch(/Bins are the rooms and racks inside this location where stock sits\. A new location starts with Cold, Dry and Walk-in\. Add or rename bins under Location bins\./);
+    expect(html).toContain(BINS_NOTE);
+  });
+
+  it("the read-only detail explains bins beside the Location bins link (#1148)", () => {
+    const html = htmlOf(createElement(LocationView, { model: toLocationViewProps(locationTaproom), readOnly: true }));
+    expect(html).toContain(BINS_NOTE);
   });
 
   it("the inventory drawing paints the same location fields the live dialog mounts", () => {
     const html = htmlOf(createElement(LocationView, { model: toLocationViewProps(locationTaproom) }));
-    expect(html).toContain(htmlOf(createElement(LocationFields, { name: LOC_TAPROOM.name, uses: ["storage", "taproom", "warehouse"] })).slice(5, -6));
+    const fields = renderToStaticMarkup(createElement(LocationFields, { name: LOC_TAPROOM.name, uses: ["storage", "taproom", "warehouse"] }));
+    // useId differs between the two renders; compare with the ids removed.
+    const withoutIds = (markup: string) => markup.replace(/(id|for|aria-describedby)="[^"]*"/g, "");
+    expect(withoutIds(html)).toContain(withoutIds(fields));
   });
 
   it("the live Add/Edit location dialog mounts the shared LocationFields (#1148)", () => {
@@ -183,8 +203,13 @@ describe("Location detail", () => {
 
   it("the inventory first-run step draws the same multi-select fields, not single-choice chips (#1148)", () => {
     const html = htmlOf(createElement(FirstRunView, { model: { brewery: "Demo Brewing", steps: "5 steps" } }));
-    expect(html).toMatch(/id="location-uses-hint"/);
+    expect(html).toContain(USES_HINT);
     expect(html).toMatch(/<div[^>]*data-slot="toggle-group"[^>]*aria-label="Uses"/);
+  });
+
+  it("the live first-run step names every use and that one place can be several (#1148)", () => {
+    const src = readFileSync("app/(app)/first-run.tsx", "utf8");
+    expect(src).toContain('E.row("1 · Add locations", "warehouse, taproom, storage, or several at once"');
   });
 
   it("a footer slot replaces Save location", () => {

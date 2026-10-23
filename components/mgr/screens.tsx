@@ -529,8 +529,8 @@ export const SCREENS: Screen[] = [
     job: "Edit one location and open its physical bins",
     reads: "list_locations",
     writes: "update_location",
-    states: [["permission", "admin only", 1], ["warehouse", "fulfillment source"], ["taproom", "POS and taps may map here"], ["several at once", "one building pours, stores and ships"], ["in use", "use changes preserve history"]],
-    spec: "Location facts stay separate from bins, which are their own list. A place is put to as many uses as it is actually put to: one building pours, stores and ships. Every guard asks whether a use is among them, never what the place mainly is.",
+    states: [["permission", "admin only", 1], ["warehouse", "fulfillment source"], ["taproom", "POS and taps may map here"], ["several at once", "one building pours, stores and ships"], ["in use", "use changes preserve history"], ["timezone", "brewery zone by name · set in Settings → Timezone"]],
+    spec: "Location facts stay separate from bins, which are their own list. A place is put to as many uses as it is actually put to: one building pours, stores and ships. Every guard asks whether a use is among them, never what the place mainly is. Uses takes several answers, and the line under it names the screens each use gates. A note says what a bin is and where bins are edited.",
     body: <LocationView model={toLocationViewProps(locationTaproom)} />,
   },
   {

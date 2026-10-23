@@ -27,6 +27,5 @@ export default async function LocationPage({ params }: { params: Promise<{ id: s
     model={toLocationViewProps({ location, bins, timezone: brewery.timeZone, backHref: "/locations" })}
     headerAction={brewery.roles.includes("admin") ? <LocationForm location={location} /> : null}
     readOnly
-    footer={null}
   />;
 }

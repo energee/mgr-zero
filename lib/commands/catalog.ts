@@ -2,7 +2,7 @@ import { z } from "zod";
 import { BRAND_ABV } from "@/lib/mgr/brand-abv";
 import { cents, completeRows, defineCommand, defineQuery, latestOf, PAGE_SIZE, unwrap, CommandError, STAFF_ROLES } from "./registry";
 import { escapeRegex } from "@/lib/escape-regex";
-import { BRAND_SORTS, LOCATION_USES } from "@/lib/mgr/enums";
+import { BRAND_SORTS } from "@/lib/mgr/enums";
 
 /** A UPC/EAN/GTIN barcode: 8, 12, 13 or 14 digits. "" clears it. */
 const upc = z.string().trim().regex(/^(\d{8}|\d{12,14})?$/, "a UPC of 8, 12, 13 or 14 digits");
@@ -142,7 +142,7 @@ defineQuery({
 
 defineCommand({
   name: "create_location", description: "Create a location and say what it is used for — one place may be warehouse, taproom and storage at once; it starts with the Walk-in, Cold and Dry bins",
-  input: z.object({ name: z.string().min(1), uses: z.array(z.enum(LOCATION_USES)).min(1) }),
+  input: z.object({ name: z.string().min(1), uses: z.array(z.enum(["warehouse", "taproom", "storage"])).min(1) }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_location", {
     p_brewery: ctx.breweryId, p_name: i.name, p_uses: i.uses, p_request_id: execution.requestId,
@@ -151,7 +151,7 @@ defineCommand({
 
 defineCommand({
   name: "update_location", description: "Rename a location or change what it is used for (any of warehouse, taproom, storage); movement history is untouched",
-  input: z.object({ locationId: z.string().uuid(), name: z.string().trim().min(1), uses: z.array(z.enum(LOCATION_USES)).min(1) }),
+  input: z.object({ locationId: z.string().uuid(), name: z.string().trim().min(1), uses: z.array(z.enum(["warehouse", "taproom", "storage"])).min(1) }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_location", {
     p_brewery: ctx.breweryId, p_id: i.locationId, p_name: i.name, p_uses: i.uses, p_request_id: execution.requestId,

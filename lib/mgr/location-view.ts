@@ -1,6 +1,6 @@
 // lib/mgr/location-view.ts — view-model for Location detail (list_locations + list_bins).
 import type { LocationUse } from "./enums";
-import { sentenceCase, timezoneLabel } from "./labels";
+import { locationUsesLabel, timezoneLabel } from "./labels";
 
 export type LocationViewModel = {
   backHref?: string;
@@ -32,7 +32,7 @@ export function toLocationViewProps({
     backHref,
     name: location.name,
     uses: location.uses,
-    usesLabel: location.uses.map(sentenceCase).join(" · "),
+    usesLabel: locationUsesLabel(location.uses),
     timezone: `Brewery default · ${timezoneLabel(timezone)}`,
     bins: bins.map((b) => b.name).join(" · ") || "none",
     binsHref: `/locations/${location.id}/bins`,

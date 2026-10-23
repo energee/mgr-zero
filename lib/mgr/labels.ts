@@ -54,5 +54,8 @@ export const CUSTOMER_TYPE_OPTIONS = CUSTOMER_TYPES.map((value) => ({ value, lab
 /** The location Uses picker's options; the stored value is the location_kind enum. */
 export const LOCATION_USE_OPTIONS = LOCATION_USES.map((value) => ({ value, label: sentenceCase(value) }));
 
+/** A location's uses as staff read them: ["storage", "taproom"] → "Storage · Taproom". */
+export const locationUsesLabel = (uses: readonly string[]) => uses.map(sentenceCase).join(" · ");
+
 /** An IANA zone as read: "America/New_York" → "America / New York". */
 export const timezoneLabel = (timezone: string) => timezone.replaceAll("_", " ").replaceAll("/", " / ");
