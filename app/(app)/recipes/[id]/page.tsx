@@ -13,6 +13,9 @@ import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { orNotFound } from "@/lib/mgr/not-found";
 import type { RecipeMaterial } from "@/lib/mgr/recipe-process-view";
 import { toRecipePageModel, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/recipes") };
 
 export default async function RecipePage({ params, searchParams }: {
   params: Promise<{ id: string }>;

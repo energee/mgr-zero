@@ -10,6 +10,9 @@ import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { notFound } from "next/navigation";
 import { readingIdentity } from "@/components/mgr/views/fermentation-reading";
 import { ReadingForm } from "./reading-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/cellar") };
 
 type Occupancy = { occupancy_id: string; vessel_id: string; vessel_name: string | null; batch_no: number | null; brand_name: string | null; bbl: number };
 type Reading = { temp_f: number | null; gravity_plato: number | null; ph: number | null };

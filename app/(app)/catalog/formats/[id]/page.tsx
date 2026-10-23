@@ -14,6 +14,9 @@ import { PourForm } from "../../pour-form";
 import { FormatRowsForm } from "./rows-form";
 import { DeleteCommandButton } from "../../../delete-command-button";
 import { DeleteFormatControl } from "@/components/mgr/views/delete-format";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/catalog/formats") };
 
 type Detail = {
   format: { price_group_id: string | null; price_groups: { name: string } | null; ounces: number | null; id: string; name: string; basis: "packaged" | "poured"; bbl_per_unit: string | null; package_type: string | null; keg_size: string | null; units_per_case: number | null };

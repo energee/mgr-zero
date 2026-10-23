@@ -13,6 +13,9 @@ import { notFound } from "next/navigation";
 import { MoveStockForm } from "../../move-stock-form";
 import type { BinMoveStock } from "@/lib/commands/inventory";
 import { BinForm } from "../../bin-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/locations") };
 
 type LocationRow = { id: string; name: string };
 type BinRow = { id: string; name: string };
