@@ -1,10 +1,11 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedLocation, seedMovement, DB, sql } from "./helpers";
+import { afterEach, expect, it } from "vitest";
+import { admin, closePgSessions, makeBrewery, makeStaffCtx, pgSession, seedLocation, seedMovement, DB, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
+afterEach(closePgSessions);
 type Plan = { revision: string; lines: { material_id: string; qty_expected: number; qty_counted: number; adjustments: { lot_id: string | null; lot_code: string | null; qty_expected: number; qty_counted: number; delta: number }[] }[] };
 async function fixture() {
   const b = await makeBrewery();
@@ -78,7 +79,18 @@ it("records equal counts without movements and rejects empty, duplicate, and inv
   await expect(runCommand("get_material_count_preview", { ...f.input, lines: [{ materialId: f.material.id, qty: 0.00001 }] }, f.ctx)).rejects.toThrow("four decimal");
 });
 
-it.each(["material", "lot", "new lot", "ledger"] as const)("fails promptly and recovers when a concurrent %s writer holds its lock", async kind => {
+// #1234: autovacuum's SHARE UPDATE EXCLUSIVE lasts a moment; the count
+// retries its whole lock set instead of refusing at the first conflict.
+it("previews once a brief autovacuum-mode lock on the material ledger is released", async () => {
+  const f = await fixture();
+  const holder = await pgSession();
+  await holder.query("begin; lock table public.material_movements in share update exclusive mode");
+  const released = new Promise(resolve => setTimeout(resolve, 300)).then(() => holder.query("commit"));
+  expect((await runCommand("get_material_count_preview", f.input, f.ctx) as Plan).lines).toHaveLength(1);
+  await released;
+});
+
+it.each(["material", "lot", "new lot", "ledger"] as const)("refuses as busy, then recovers, when a concurrent %s writer holds its lock through every retry", async kind => {
   const f = await fixture();
   const plan = await runCommand("get_material_count_preview", f.input, f.ctx) as Plan;
   const writer = spawn("psql", [DB, "-X", "-Atq", "-v", "ON_ERROR_STOP=1"], { stdio: ["pipe", "pipe", "pipe"] });
@@ -101,7 +113,7 @@ it.each(["material", "lot", "new lot", "ledger"] as const)("fails promptly and r
     await locked;
     await expect(runCommand("get_material_count_preview", f.input, f.ctx)).rejects.toThrow("busy");
     await expect(runCommand("record_material_count", { ...f.input, revision: plan.revision }, f.ctx)).rejects.toThrow("busy");
-    // The material writer can finish its UPDATE after the count's NOWAIT refusal.
+    // The material writer can finish its UPDATE after the count's busy refusal.
     if (kind === "material") writer.stdin.write(`update public.materials set name = 'Edited hops' where id = '${f.material.id}';\n`);
   } finally { writer.stdin.end("commit;\n"); await ended; }
   const refreshed = await runCommand("get_material_count_preview", f.input, f.ctx) as Plan;
