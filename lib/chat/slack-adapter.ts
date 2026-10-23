@@ -5,7 +5,7 @@ import { Chat } from "chat";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { consumeSlackInteraction, SLACK_ACTION_IDS, withActiveChatInstallation, type SlackInteraction } from "./jobs";
 import { renderSlackPreferences } from "./slack-renderer";
-import { createSlackAdapter, type SlackAdapter } from "@chat-adapter/slack";
+import { createSlackAdapter, type SlackAdapter, type SlackAdapterConfig } from "@chat-adapter/slack";
 import { chatState } from "./state";
 import type { SlackOAuthPort } from "./oauth";
 import { checkSlackConversation, type SlackClientLike, type SlackConversationInfo } from "./slack-transport";
@@ -19,18 +19,34 @@ function required(name: string): string {
 let adapter: SlackAdapter | undefined;
 let instance: Chat<{ slack: SlackAdapter }> | undefined;
 
-function configuredSlackAdapter(): SlackAdapter {
+// Web API options for the shared adapter, whose calls run inside a chat
+// delivery lease (#1247). The worker starts a call only with 5 s of its 60 s
+// lease left (LEASE_SAFETY_MS, lib/chat/jobs.ts), and pacing may spend 1 s of
+// that. A 3 s timeout ends every call about 1 s before the lease can lapse, so
+// no other worker re-leases a row mid-send and posts it twice. The worker owns
+// retries: it reschedules a failed row with backoff, or at Slack's Retry-After
+// for a 429 (classifySlackError). So the client must not retry or wait out a
+// 429 inside the call; the library defaults do both, for up to 30 minutes.
+const LEASED_CALL_OPTIONS: SlackAdapterConfig["webClientOptions"] = {
+  timeout: 3_000, retryConfig: { retries: 0 }, rejectRateLimitedCalls: true,
+};
+
+function configuredSlackAdapter(webClientOptions?: SlackAdapterConfig["webClientOptions"]): SlackAdapter {
   return createSlackAdapter({
     mode: "webhook",
     clientId: required("SLACK_CLIENT_ID"),
     clientSecret: required("SLACK_CLIENT_SECRET"),
     signingSecret: required("SLACK_SIGNING_SECRET"),
     encryptionKey: required("CHAT_SDK_ENCRYPTION_KEY"),
+    webClientOptions,
   });
 }
 
+// One adapter serves the delivery and App Home workers, and also the webhook's
+// views.open and the settings channel calls. Those request-time callers
+// already treat any failure as "try again", so the bounded options suit them too.
 export function slackAdapter(): SlackAdapter {
-  return adapter ??= configuredSlackAdapter();
+  return adapter ??= configuredSlackAdapter(LEASED_CALL_OPTIONS);
 }
 
 export function chat(): Chat<{ slack: SlackAdapter }> {
@@ -114,6 +130,7 @@ async function outgoingInstallation(id: string) {
 
 // Stage on a callback-local SDK adapter. Its write hook cannot reach the shared
 // state; the installed SDK still owns exchange validation and token fields.
+// It keeps the library's Web API defaults: no lease bounds the OAuth exchange.
 export function slackOAuthPort(): SlackOAuthPort {
   const slack = slackAdapter();
   return {
