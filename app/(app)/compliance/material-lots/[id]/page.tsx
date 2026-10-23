@@ -6,6 +6,9 @@ import { runPageQuery } from "@/lib/mgr/page-query";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { toMaterialLotTraceViewProps, type MaterialLotTraceSnapshot } from "@/lib/mgr/material-lot-trace-view";
 import "@/lib/commands/all";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/compliance/material-lots") };
 
 export default async function MaterialLotTracePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

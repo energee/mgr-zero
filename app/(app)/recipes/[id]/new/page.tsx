@@ -12,6 +12,9 @@ import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { versionToDraft, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
 import { RecipeEditor } from "../recipe-version-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/recipes") };
 
 export default async function NewVersionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

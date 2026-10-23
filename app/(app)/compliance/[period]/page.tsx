@@ -17,6 +17,9 @@ import { notFound } from "next/navigation";
 import { FileButton } from "./file-button";
 import { LossReviewForm } from "./loss-review-form";
 import { JURISDICTION, periodLabel, periodOver, periodRange, startsBeforeBooks } from "@/lib/compliance-period";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/compliance") };
 
 export default async function PeriodPage({ params }: { params: Promise<{ period: string }> }) {
   const { period } = await params;

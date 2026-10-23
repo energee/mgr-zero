@@ -25,6 +25,9 @@ import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { CancelOrderAction, LifecycleButtons, OrderActionScope } from "./lifecycle-buttons";
 import { OrderLinesForm } from "./order-lines-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/orders") };
 
 type Order = { id: string; order_no: number | null; customer_id: string | null; kind: "wholesale" | "taproom_transfer"; status: OrderStatus; po_number: string | null; requested_ship_date: string | null; note: string | null; needs_restock: boolean; pickup: boolean; repick_since: string | null; from_location_id?: string; customers: { name: string } | null; ship_tos: { label: string; country: string; city: string | null; state: string | null } | null };
 type OrderLine = { id: string; sku_id: string; qty_ordered: number; qty_picked: number | null; qty_shipped: number | null; unit_price_cents: number; one_way_fee_cents: number | null; short_reason: string | null; skus: { name: string } | null };

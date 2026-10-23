@@ -477,7 +477,7 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", tab: "More", name: "More", job: "Setup and desk review, never standing work",
     reads: "none [role navigation manifest]", writes: "none",
     states: DEFAULT_STATES,
-    spec: "Role-filtered; hidden entries leave no gaps. Standing work remains in Today, Beer or Work.",
+    spec: "Role-filtered; hidden entries leave no gaps. Entries sit under Sales, Production, Setup and Integrations headings, and an area with none of the role's entries has no heading. The rail's More group uses the same headings. Standing work remains in Today, Beer or Work.",
     body: <MoreView model={toMoreViewProps(moreNavs)} />,
   },
   {
@@ -767,12 +767,12 @@ export const SCREENS: Screen[] = [
     name: "Import",
     // The kind chips carry record names ("Customers", "Ship-tos"); authored
     // here so a tap selects the kind instead of resolving to those screens.
-    to: { "Import 2 ready rows": "Import", "Back to mapping": "Import", Customers: "Import", "Ship-tos": "Import", "Products / SKUs": "Import", "Channel prices": "Import", "Opening balances": "Import" },
-    job: "Upload, map, preview and independently commit valid rows",
+    to: { "Import 2 rows": "Import", "Back to matching columns": "Import", Customers: "Import", "Ship-tos": "Import", "Products / SKUs": "Import", "Channel prices": "Import", "Opening balances": "Import" },
+    job: "Upload, match columns, review and import valid rows, each on its own",
     reads: "list_skus · list_locations · list_bins · list_customers · list_formats · list_price_groups · list_sale_channels",
     writes: "import_csv",
-    states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Commit disabled · fix mapping", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "same requestId returns original committed and blocked results"], ["permission", "Import requires admin", 1], ["upload", "kind chosen · its columns listed as required, optional, or required for a US address · reference columns take a name or ID"]],
-    spec: "Before upload, the screen lists the chosen kind's columns from the import field contract and marks each one required, optional, or required for a US address. One logical row is atomic; siblings commit independently. Reference ID cells accept a UUID or trimmed, case-insensitive exact name; missing or ambiguous names block the row. Bin names are scoped to the location, and pour formats to the price group. Product imports use packaged formats. Preview is editable on phone and desk. All-invalid batches cannot commit. Same-batch retry preserves raw cells and returns original results; correction starts only blocked rows with a new identity. Reloading the same tab restores an unresolved batch; Discard saved request drops it after a confirming step and sends nothing.",
+    states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Import disabled · fix column matches", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "same requestId returns original committed and blocked results"], ["permission", "Import requires admin", 1], ["upload", "kind chosen · its columns listed as required, optional, or required for a US address · reference columns take a name or ID · Download template saves a header-only CSV of those columns"]],
+    spec: "The steps are Upload, Match columns, Review and Import. Before upload, the screen lists the chosen kind's columns from the import field contract and marks each one required, optional, or required for a US address. Download template saves a CSV whose only row is those column names, built in the browser from the same list. One logical row is atomic; siblings commit independently. Reference ID cells accept a UUID or trimmed, case-insensitive exact name; missing or ambiguous names block the row. Bin names are scoped to the location, and pour formats to the price group. Product imports use packaged formats. Review is editable on phone and desk. All-invalid batches cannot be imported. Same-batch retry preserves raw cells and returns original results; correction starts only blocked rows with a new identity. Reloading the same tab restores an unresolved batch; Discard saved request drops it after a confirming step and sends nothing.",
     body: <ImportView model={importPreview} />,
   },
   {

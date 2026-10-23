@@ -15,6 +15,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { PourForm } from "../../../pour-form";
 import { SkuEditForm } from "../../../sku-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/catalog/brands") };
 
 type Sku = { id: string; name: string; format_id: string; active: boolean; upc: string | null; keg_pool_id: string | null; batch_share: number | string | null };
 type Brand = { id: string; name: string; price_group_id: string | null; price_groups: { name: string } | null; skus: Sku[]; pours: { id: string; name: string; ounces: number }[] };

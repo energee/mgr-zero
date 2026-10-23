@@ -25,6 +25,9 @@ import { invoiceIsCreditable } from "@/lib/mgr/invoice-state";
 import { breweryDate } from "@/lib/date-format";
 import { RecordPaymentForm, VoidPaymentForm } from "./payment-form";
 import { QboInvoiceActions } from "@/app/(app)/settings/accounting/qbo-controls";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/invoices") };
 
 type Invoice = { id: string; shipment_id: string | null; invoice_no: number | null; kind: "invoice" | "credit_memo"; issued_on: string; due_on: string | null; paid_at: string | null; qbo_invoice_id: string | null; qbo_sync_status: "pending" | "pushed" | "push_failed" | "not_synced"; qbo_sync_error: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_total_cents: number | null; qbo_tax_cents: number | null; qbo_balance_cents: number | null; qbo_cash_collected_cents: number; qbo_accountant_drift: boolean; written_off_at: string | null; customers: { id: string; name: string; qbo_customer_id: string | null; qbo_realm_id: string | null } | null };
 type InvoiceLine = { id: string; kind: string; sku_id: string | null; qty: number; unit_price_cents: number; amount_cents: number; description: string; skus: { name: string; qbo_item_id: string | null; qbo_realm_id: string | null } | null };

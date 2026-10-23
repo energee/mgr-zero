@@ -7,6 +7,9 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import { canReverseMovement, toInventoryDetailViewProps, type InventoryMovement } from "@/lib/mgr/inventory-detail-view";
 import "@/lib/commands/all";
 import { ReversalForm } from "../reversal-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/inventory") };
 
 export default async function InventoryDetailPage({ params, searchParams }: {
   params: Promise<{ id: string }>; searchParams: Promise<{ page?: string; movement?: string }>;
