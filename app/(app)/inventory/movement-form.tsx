@@ -1,17 +1,21 @@
 // app/(app)/inventory/movement-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the record_movement command.
 // Picking a location preselects its first bin (list_bins is alphabetical), so the common case is one tap.
 // No movement type is preselected: the user picks one, unless a deep link passed it (#1107).
+// Record movement names what it still needs (movementReason), a wrong quantity
+// or state is marked on its field, and an empty SKU picker links Catalog only
+// when `skusHref` is set (#1113).
 "use client";
 
 import { command } from "@/lib/commands/client";
 import { useBrewery } from "@/lib/brewery-provider";
 import type { BinMoveStock } from "@/lib/commands/inventory";
-import { movementFields } from "@/lib/movement-form";
+import { movementFieldErrors, movementFields, movementReason, requiresChannel, requiresDestState } from "@/lib/movement-form";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { formatVolume } from "@/lib/volume";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { E } from "@/components/mgr/e";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
 import { RecordMovementView, type RecordMovementViewModel } from "@/components/mgr/views/record-movement";
@@ -29,11 +33,6 @@ const MOVEMENT_TYPES = [
 type MovementReceipt = { id: string; created_at: string; sku_id: string; location_id: string; bin_id: string; qty: number; bbl: number; type: string; dest_state: string | null; sale_channel_id: string | null; lot_id: string | null; ref: string | null; note: string | null };
 type MovementType = (typeof MOVEMENT_TYPES)[number];
 
-// Mirrors the DB CHECK (removal_shape): sale_removal and depletion each name a
-// channel, and only depletion is staff-facing here (sale_removal comes from
-// shipping). The channels are the brewery's own rows, read by list_sale_channels.
-const requiresChannel = (type: MovementType | "") => type === "depletion";
-
 export function MovementForm({
   autoOpen = false,
   initial,
@@ -42,6 +41,7 @@ export function MovementForm({
   bins,
   channels,
   timeZone,
+  skusHref,
 }: {
   /** True when the page URL carries ?recordMovement=1 (Today's shortcut or
    *  Ask MGR's Open as form): the form starts open, and closing it clears that
@@ -54,6 +54,8 @@ export function MovementForm({
   channels: { id: string; name: string }[];
   /** breweries.timezone: the receipt prints the movement time in it (#442). */
   timeZone: string;
+  /** Catalog, for a user who may create a SKU (create_sku); null otherwise. */
+  skusHref: string | null;
 }) {
   const breweryId = useBrewery();
   const router = useRouter();
@@ -86,8 +88,8 @@ export function MovementForm({
     command(breweryId, "get_bin_move_stock", { locationId }).then(data => { if (live) { setStock(data as BinMoveStock[]); setStockError(null); } }).catch(err => { if (live) setStockError(String(err)); });
     return () => { live = false; };
   }, [breweryId, locationId, form.open]);
-  let fields: ReturnType<typeof movementFields> | null = null;
-  try { if (type) fields = movementFields(type, qty, direction, destState, saleChannelId); } catch { /* Incomplete inputs disable submission. */ }
+  const reason = movementReason({ type, skuId, locationId, binId, saleChannelId, qty, destState });
+  const fields = reason ? null : movementFields(type, qty, direction, destState, saleChannelId);
   const unitVolume = skus.find(s => s.id === skuId)?.bblPerUnit;
   const receiptModel = receipt ? toMovementRecordedViewProps({
     sku: skus.find(s => s.id === receipt.sku_id)?.label ?? receipt.sku_id,
@@ -118,13 +120,14 @@ export function MovementForm({
     // kindIndex -1 means no kind is chosen yet. The view draws from the empty
     // `kind`, which shows the Select kind placeholder and no pressed toggle.
     kind: sentenceCase(type), kindIndex: type ? MOVEMENT_TYPES.indexOf(type) : -1, kindOptions,
-    sku: selectedSku?.label ?? "", skuId, skuOptions: skus.map(item => ({ value: item.id, label: item.label })),
+    sku: selectedSku?.label ?? "", skuId, skuOptions: skus.map(item => ({ value: item.id, label: item.label })), skusHref,
     location: selectedLocation?.name ?? "", locationOptions: locations.map(item => item.name),
     bin: selectedBin?.name ?? "", binOptions: bins.filter(item => item.location_id === locationId).map(item => item.name),
+    // The channels are the brewery's own rows, read by list_sale_channels.
     channel: selectedChannel?.name ?? "", channelOptions: requiresChannel(type) ? channels.map(item => item.name) : [],
-    destState, destStateOptions: [], destStateInput: type === "sample" || type === "festival_removal",
-    qty,
-    preview: fields && skuId ? `Preview: ${fields.qty > 0 ? "+" : ""}${fields.qty} SKU units${unitVolume != null ? ` · ${formatVolume(fields.qty * unitVolume)}` : ""} · ${sentenceCase(type)}${fields.destState ? ` · ${fields.destState}` : ""}. Volume is calculated when recorded.` : "Complete the required fields to preview this movement.",
+    destState, destStateOptions: [], destStateInput: requiresDestState(type),
+    qty, errors: movementFieldErrors(type, qty, destState),
+    preview: fields ? `Preview: ${fields.qty > 0 ? "+" : ""}${fields.qty} SKU units${unitVolume != null ? ` · ${formatVolume(fields.qty * unitVolume)}` : ""} · ${sentenceCase(type)}${fields.destState ? ` · ${fields.destState}` : ""}. Volume is calculated when recorded.` : undefined,
     direction: type === "adjustment" ? direction === "add" ? "Add stock" : "Remove stock" : undefined,
     directionOptions: type === "adjustment" ? ["Add stock", "Remove stock"] : undefined,
     lot: lotId ? availableLots.map(item => ({ id: item.lot_id, label: `${item.lot_code} · ${item.qty} available` })).find(item => item.id === lotId)?.label ?? lotId : "Untracked / legacy stock",
@@ -174,9 +177,7 @@ export function MovementForm({
             }}
             messages={<><CommandFormMessage error={stockError} /><CommandFormMessage error={form.error} /></>}
             footer={<CommandFormFooter>
-            <Button type="submit" disabled={form.submitting || !fields || (requiresChannel(type) && !saleChannelId) || !skuId || !locationId || !binId}>
-              {form.submitting ? "Recording…" : "Record movement"}
-            </Button>
+            {E.submit("Record movement", { submitting: form.submitting, busy: "Recording…", reason })}
           </CommandFormFooter>}
           />
         </form>

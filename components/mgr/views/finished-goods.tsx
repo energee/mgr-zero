@@ -1,8 +1,8 @@
 // components/mgr/views/finished-goods.tsx — Finished goods register, drawn by
 // the shared RecordTable. The SKU name is each row's one link (SKU detail); a
-// negative Available adds a Shortfall link under the figure. Live slots
-// MovementForm as createAction, Add SKU after the header, and the movements
-// ledger as footer.
+// negative Available adds a Shortfall link under the figure. The header holds
+// the page actions: live slots MovementForm as createAction beside Add SKU in
+// Catalog (#1113), and the movements ledger as footer.
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
@@ -26,14 +26,16 @@ function Available({ row, shortfallHref }: { row: FinishedGoodsRowView; shortfal
 export function FinishedGoodsView({
   model,
   createAction,
-  afterHeader,
+  addSkuHref,
   footer,
   linkRows,
 }: {
   model: FinishedGoodsViewModel;
+  /** Live: Record movement, for a user who may record one. */
   createAction?: ReactNode;
-  /** Live: Add SKU. Inventory already puts Add SKU in the header. */
-  afterHeader?: ReactNode;
+  /** Where Add SKU in Catalog goes; null hides it for a user who may not
+   *  create a SKU. The inventory leaves it out and the button stays inert. */
+  addSkuHref?: string | null;
   /** Live: movements ledger. Inventory omits this. */
   footer?: ReactNode;
   /** Live: the name and Shortfall go to their pages. Inventory leaves the name
@@ -45,9 +47,8 @@ export function FinishedGoodsView({
   const to = (href: string) => (linkRows ? href : "#");
   return (
     <>
-      {E.back("Beer", "Finished goods", createAction !== undefined ? createAction : E.btn("Add SKU"), model.backHref)}
+      {E.back("Beer", "Finished goods", <div className="flex flex-col gap-2 md:flex-row">{createAction}{addSkuHref !== null && E.btn("Add SKU in Catalog", "g", addSkuHref)}</div>, model.backHref)}
       {model.valueLine !== undefined ? E.fld("Inventory value", model.valueLine) : null}
-      {afterHeader}
       {model.empty ? E.blank(model.empty) : <RecordTable
         headers={["SKU", "On hand", "Allocated", "Available"]}
         align={["l", "r", "r", "r"]}

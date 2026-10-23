@@ -59,9 +59,9 @@ describe("Finished goods view", () => {
     expect(model.rows).toEqual([]);
   });
 
-  it("the inventory drawing offers Add SKU and a worded Shortfall, with no Review and no live hrefs (#942)", () => {
+  it("the inventory drawing offers Add SKU in Catalog and a worded Shortfall, with no Review and no live hrefs (#942, #1113)", () => {
     const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList) }));
-    expect(html).toMatch(/>Add SKU</);
+    expect(html).toMatch(/>Add SKU in Catalog</);
     expect(html).toMatch(/>Shortfall</);
     expect(html).not.toMatch(/>Review</);
     expect(html).toContain(SKU_HAZY.name);
@@ -82,17 +82,22 @@ describe("Finished goods view", () => {
     expect(html).not.toMatch(/>Review</);
   });
 
-  it("createAction, afterHeader, and footer slot for live Finished goods", () => {
+  it("live Finished goods puts Record movement and Add SKU in Catalog together in the header, above the table (#1113)", () => {
     const html = htmlOf(createElement(FinishedGoodsView, {
       model: toFinishedGoodsViewProps(finishedGoodsList),
       createAction: "MOVE",
-      afterHeader: "ADD SKU",
+      addSkuHref: "/catalog",
       footer: "LEDGER",
     }));
-    expect(html).toMatch(/MOVE/);
-    expect(html).not.toMatch(/>Add SKU</);
-    expect(html).toMatch(/ADD SKU/);
+    expect(html).toMatch(/<h1[^>]*>Finished goods<\/h1><\/div><div[^>]*>MOVE<a[^>]*href="\/catalog"[^>]*>Add SKU in Catalog<\/a><\/div>/);
+    expect(html.indexOf("Add SKU in Catalog")).toBeLessThan(html.indexOf("<table"));
     expect(html).toMatch(/LEDGER/);
+  });
+
+  it("a user who may not create a SKU gets no Add SKU in Catalog (#1113)", () => {
+    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList), createAction: "MOVE", addSkuHref: null }));
+    expect(html).toMatch(/MOVE/);
+    expect(html).not.toMatch(/Add SKU/);
   });
 
   it("the Finished goods inventory record is FinishedGoodsView", () => {
@@ -158,6 +163,32 @@ describe("Record movement view", () => {
     expect(html).toMatch(/>Record movement</);
     expect(html).toContain(formatVolume("0.50000000"));
     expect(html).not.toMatch(/→/);
+  });
+
+  it("a drawn quantity and destination state error mark their own field, each linked to its message (#1113)", () => {
+    const model = { ...toRecordMovementViewProps(recordMovementFestival), destStateInput: true, destState: "P", qty: "-3", errors: { qty: "QTY WRONG", destState: "STATE WRONG" } };
+    const html = htmlOf(createElement(RecordMovementView, { model }));
+    for (const message of ["QTY WRONG", "STATE WRONG"]) {
+      const id = html.match(new RegExp(`id="([^"]+-error)"[^>]*>${message}<`))?.[1];
+      expect(id, message).toBeTruthy();
+      expect(html).toMatch(new RegExp(`aria-invalid="true"[^>]*aria-describedby="${id}"|aria-describedby="${id}"[^>]*aria-invalid="true"`));
+    }
+  });
+
+  it("a live form keeps the quantity error back until the field is left (#1113)", () => {
+    const model = { ...toRecordMovementViewProps(recordMovementFestival), qty: "-3", errors: { qty: "QTY WRONG" } };
+    const html = htmlOf(createElement(RecordMovementView, { model, controls: { qty: () => {} } }));
+    expect(html).not.toContain("QTY WRONG");
+  });
+
+  it("an empty SKU picker says so and links Catalog, or names who adds SKUs (#1113)", () => {
+    const empty = { ...toRecordMovementViewProps(recordMovementFestival), sku: "", skuOptions: [] };
+    const drawn = htmlOf(createElement(RecordMovementView, { model: empty }));
+    expect(drawn).toMatch(/No SKUs yet\. <a (?=[^>]*data-to="Catalog")(?=[^>]*href="#")[^>]*>Add a SKU</);
+    expect(htmlOf(createElement(RecordMovementView, { model: { ...empty, skusHref: "/catalog" } }))).toMatch(/href="\/catalog"[^>]*>Add a SKU</);
+    const readOnly = htmlOf(createElement(RecordMovementView, { model: { ...empty, skusHref: null } }));
+    expect(readOnly).toContain("No SKUs yet. An admin or sales member adds them in Catalog.");
+    expect(readOnly).not.toContain("Add a SKU");
   });
 
   it("the Record movement inventory record mounts RecordMovementView with a sibling pin", () => {

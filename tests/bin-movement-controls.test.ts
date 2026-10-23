@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { stockLine } from "@/lib/commands/stock-line";
-import { movementFields, binStockKey, selectedBinStock } from "@/lib/movement-form";
+import { movementFieldErrors, movementFields, movementReason, binStockKey, selectedBinStock } from "@/lib/movement-form";
 
 it("stock lines identify exactly one stock kind and whole empty kegs", () => {
   const id = crypto.randomUUID();
@@ -18,6 +18,25 @@ it("positive movement entry derives direction, requires sample state, and discar
   expect(movementFields("depletion", "2", "add", "PA", "channel").saleChannelId).toBe("channel");
   for (const qty of ["", "0", "-2", "Infinity"]) expect(() => movementFields("loss", qty, "add", "", "")).toThrow();
   for (const state of ["", "P", "12"]) expect(() => movementFields("festival_removal", "1", "add", state, "")).toThrow();
+});
+
+it("Record movement marks a non-positive quantity and a bad destination state on their own fields; decimals stay allowed (#1113)", () => {
+  const qty = "Enter a quantity greater than zero. The kind decides whether stock is added or removed.";
+  for (const value of ["-3", "0", "", "abc", "Infinity"]) expect(movementFieldErrors("loss", value, "")).toEqual({ qty });
+  expect(movementFieldErrors("loss", "2.5", "")).toEqual({});
+  expect(movementFieldErrors("loss", "1", "P")).toEqual({});
+  for (const state of ["", "P", "12"]) expect(movementFieldErrors("festival_removal", "1", state)).toEqual({ destState: "Enter a two-letter state, such as PA." });
+  expect(movementFieldErrors("sample", "1", "pa")).toEqual({});
+  expect(() => movementFields("loss", "-3", "add", "", "")).toThrow(qty);
+});
+
+it("Record movement names everything it still needs, channel and state only for the kinds that carry them (#1113)", () => {
+  const ready = { type: "depletion", skuId: "s", locationId: "l", binId: "b", saleChannelId: "c", qty: "2.5", destState: "" };
+  expect(movementReason(ready)).toBeNull();
+  expect(movementReason({ ...ready, type: "", skuId: "", locationId: "", binId: "", qty: "-3" })).toBe("Still needed: a kind, a SKU, a location, a bin, and a quantity above zero.");
+  expect(movementReason({ ...ready, saleChannelId: "" })).toBe("Still needed: a channel.");
+  expect(movementReason({ ...ready, type: "loss", saleChannelId: "" })).toBeNull();
+  expect(movementReason({ ...ready, type: "sample", destState: "P" })).toBe("Still needed: a two-letter destination state.");
 });
 
 
