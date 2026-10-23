@@ -46,6 +46,9 @@ export default defineConfig({
       },
     ],
     testTimeout: 20000,
+    // Lock-wait tests poll pg_stat_activity until a second backend is parked;
+    // under CI shard load that can take past expect.poll's 1 s default (#1245).
+    expect: { poll: { timeout: 10000 } },
     fileParallelism: false,
     // Mode "test" layers .env.test.local (written by scripts/test-db.sh: the
     // throwaway stack on 5435x) over .env.local (the app stack next dev uses).
