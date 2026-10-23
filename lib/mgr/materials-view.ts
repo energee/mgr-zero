@@ -1,5 +1,13 @@
-// lib/mgr/materials-view.ts — view-model for the Materials definition list.
+// lib/mgr/materials-view.ts — view-model for the Materials definition list,
+// and the note every empty Material picker shows.
+import type { PickEmpty } from "@/components/mgr/e";
 import type { EmptyState } from "./empty-state";
+
+/** The note under an empty Material picker (New PO, New contract, recipe
+ *  ingredient). Every role that opens those forms may add a material, so it
+ *  always links Materials; with no `href` (the screen inventory) the link is inert. */
+export const noMaterialsPick = (href?: string): PickEmpty => ({ text: "No materials yet.", label: "Add a material", href, to: "Materials" });
+
 export type MaterialsRowView = {
   key: string;
   title: string;

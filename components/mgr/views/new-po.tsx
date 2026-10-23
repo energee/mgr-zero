@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { LineErrorMessages, lineErrorIds, OrderQuantity } from "./new-order";
 import { poLineErrors, type NewPoViewModel } from "@/lib/mgr/new-po-view";
+import { noMaterialsPick } from "@/lib/mgr/materials-view";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 
 export type { NewPoViewModel };
@@ -37,7 +38,7 @@ export function NewPoView({ model, controls = {}, messages, footer, submitting =
         const qtyErrorId = lineErrorIds(`${id}-${index}`, errors).qty;
         return <Fragment key={line.key}>
         {E.line(
-          E.pick(`Line ${index + 1} material`, controls.material ? line.materialId ?? "" : line.materialId ?? line.key, [{ value: "", label: "Select material" }, ...((model.materials ?? [{ id: line.key, name: line.title, purchase_uom: "", lot_tracked: line.lot !== undefined }]).map(material => ({ value: material.id, label: material.name + (material.purchase_uom ? ` · ${material.purchase_uom}` : "") })))], { onChange: controls.material ? (nextValue: string) => controls.material?.(index, nextValue) : undefined, required: true, hideLabel: true, id: `${id}-material-${index}`, empty: { text: "No materials yet.", label: "Add a material", href: model.materialsHref, to: "Materials" } }),
+          E.pick(`Line ${index + 1} material`, controls.material ? line.materialId ?? "" : line.materialId ?? line.key, [{ value: "", label: "Select material" }, ...((model.materials ?? [{ id: line.key, name: line.title, purchase_uom: "", lot_tracked: line.lot !== undefined }]).map(material => ({ value: material.id, label: material.name + (material.purchase_uom ? ` · ${material.purchase_uom}` : "") })))], { onChange: controls.material ? (nextValue: string) => controls.material?.(index, nextValue) : undefined, required: true, hideLabel: true, id: `${id}-material-${index}`, empty: noMaterialsPick(model.materialsHref) }),
           line.detail,
           <OrderQuantity label={`Line ${index + 1} quantity`} required invalid={Boolean(errors.qty)} errorId={qtyErrorId} onBlur={() => touched.touch(index)} value={line.qty} onChange={controls.quantity && (value => controls.quantity?.(index, value))} />,
           "", <>
