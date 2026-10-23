@@ -3,8 +3,9 @@
 // price summary (stacked on the phone, summary before the lines), a line
 // table on the desk and labeled line records on the phone, the payments
 // recorded in MGR (#1045), QuickBooks and accounting, buyer questions, and
-// Return in a closing section. InvoicePaymentFields is the Record payment
-// form's body, shared by the inventory sheet and the live form. Inventory and
+// Return in a closing section. RecordPaymentView (over InvoicePaymentFields)
+// and VoidPaymentView are the payment sheets' bodies, shared by the inventory
+// sheets and the live forms in payment-form.tsx. Inventory and
 // the live page both pass toInvoiceViewProps(get_invoice-shaped data); the
 // live page supplies authorized actions through the slots (an explicit null
 // suppresses a slot; omitted draws the inert fixture control).
@@ -44,6 +45,31 @@ export function InvoicePaymentFields({ value, maxCents, maxDate, quickbooksConne
       {E.edit("Received on", value.receivedOn, "date", undefined, { max: maxDate, onChange: set("receivedOn"), required: true })}
       {E.pick("Method", value.method, METHOD_OPTIONS, { id: "payment-method", onChange: set("method") as ((v: string) => void) | undefined, required: true })}
       {E.edit("Reference · optional", value.reference, "text", undefined, { id: "payment-reference", maxLength: 200, onChange: set("reference") })}
+    </>
+  );
+}
+
+/** The Record payment sheet's body: InvoicePaymentFields, then the live
+ *  form's submit footer, or the inert Record payment button when omitted. */
+export function RecordPaymentView({ footer, ...fields }: Parameters<typeof InvoicePaymentFields>[0] & { footer?: ReactNode }) {
+  return (
+    <>
+      <InvoicePaymentFields {...fields} />
+      {footer !== undefined ? footer : E.btn("Record payment")}
+    </>
+  );
+}
+
+/** The Void payment sheet's body: voiding keeps the payment row and needs a
+ *  reason (the only correction, #1045). Footer omitted: the inert Confirm void. */
+export function VoidPaymentView({ paymentId, amount, reason = "", onReasonChange, footer }: {
+  paymentId: string; amount: string; reason?: string; onReasonChange?: (next: string) => void; footer?: ReactNode;
+}) {
+  return (
+    <>
+      <p className="text-sm text-muted-foreground">The {amount} payment stays on the invoice, marked voided with this reason. An invoice that drops below its total is no longer paid.</p>
+      {E.edit("Reason", reason, "text", undefined, { id: `void-reason-${paymentId}`, required: true, maxLength: 500, onChange: onReasonChange })}
+      {footer !== undefined ? footer : E.btn("Confirm void", "del")}
     </>
   );
 }

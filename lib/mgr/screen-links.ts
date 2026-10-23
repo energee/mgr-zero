@@ -265,9 +265,6 @@ export const INERT: (string | RegExp)[] = [
   "Last message from Slack",
   "Lost \u00b7 Al\u2019s Bar",
   "Mark answered",
-  // Invoice's Record payment has no inventory sheet yet; #1045 plan task 12
-  // records the sheet, maps it in Invoice's `to`, and removes this line.
-  "Record payment",
   "Morgan Reed",
   "Open in QuickBooks",
   "Owned \u00bd bbl",
