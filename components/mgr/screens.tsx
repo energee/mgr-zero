@@ -827,6 +827,7 @@ export const SCREENS: Screen[] = [
     step: 3,
     slice: 1,
     tab: "Beer",
+    surface: "sheet",
     name: "Movement recorded",
     job: "Echo the immutable row and name the correction",
     reads: "list_movements",
