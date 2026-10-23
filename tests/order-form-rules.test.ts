@@ -65,6 +65,18 @@ describe("orderFormReadiness", () => {
     // A transfer does not need a customer.
     expect(orderFormReadiness({ ...empty, kind: "taproom_transfer", catalog: { customers: 0, locations: 1, skus: 1 } }).hint).toBeNull();
   });
+
+  it("the hint's Go to sentence links only the pages where Sales can add what is missing (#1127)", () => {
+    const empty = { kind: "wholesale" as const, customerId: "", shipToId: "", fromLocationId: "", toLocationId: "", lines: [{ skuId: "", qty: "" }] };
+    const customers = { label: "Customers", href: "/customers" };
+    const catalog = { label: "Catalog", href: "/catalog" };
+    expect(orderFormReadiness({ ...empty, catalog: { customers: 0, locations: 0, skus: 0 } }).goTo).toEqual(["Go to ", customers, " or ", catalog, "."]);
+    // A transfer never needs a customer, so it never links Customers.
+    expect(orderFormReadiness({ ...empty, kind: "taproom_transfer", catalog: { customers: 0, locations: 0, skus: 0 } }).goTo).toEqual(["Go to ", catalog, "."]);
+    // Only an admin can add a location (the Locations page offers Sales no Add), so a missing location is named in the hint but not linked.
+    expect(orderFormReadiness({ ...empty, catalog: { customers: 1, locations: 0, skus: 1 } }).goTo).toEqual([]);
+    expect(orderFormReadiness({ ...empty, catalog: { customers: 1, locations: 1, skus: 1 } }).goTo).toEqual([]);
+  });
 });
 
 it("new-order destination prefers the default and falls back only when none is designated", async () => {

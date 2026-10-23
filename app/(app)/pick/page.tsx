@@ -1,12 +1,12 @@
 // app/(app)/pick/page.tsx — Pick sheet (screen record): confirmed and picked
 // orders from daily_pick_sheet grouped by requested ship date, each row
 // opening that order. Print via print-button.tsx (the @media print rule in
-// app/globals.css hides the shell chrome).
+// app/globals.css hides the shell chrome), withheld while the sheet is empty.
 import { PickSheetView } from "@/components/mgr/views/pick-sheet";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { toPickSheetViewProps } from "@/lib/mgr/pick-sheet-view";
+import { pickSheetPrintReason, toPickSheetViewProps } from "@/lib/mgr/pick-sheet-view";
 import "@/lib/commands/all";
 import { PrintButton } from "./print-button";
 
@@ -18,10 +18,11 @@ export default async function PickSheetPage({ searchParams }: { searchParams: Pr
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const orders = (await runCommand("daily_pick_sheet", date ? { date } : {}, ctx)) as Order[];
+  const model = toPickSheetViewProps({ orders });
   return (
     <PickSheetView
-      model={toPickSheetViewProps({ orders })}
-      printAction={<PrintButton />}
+      model={model}
+      printAction={<PrintButton reason={pickSheetPrintReason(model)} />}
       filters={null}
       linkRows
       backHref="/work"

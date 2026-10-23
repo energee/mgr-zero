@@ -32,7 +32,7 @@ export function DatePicker({ label, defaultValue = "", value, onChange, disabled
   // A calendar day, so formatDate reads it without a time zone, like every record date.
   const isoDate = date ? formatISODate(date) : "";
   // Picking a day closes the calendar; left open, it covers the form's own
-  // submit button (Save schedule) until Escape (#493).
+  // submit button (Schedule batch) until Escape (#493).
   const [open, setOpen] = React.useState(false);
   const selectDate = (next: Date | undefined) => {
     if (!controlled) setInternalDate(next);
