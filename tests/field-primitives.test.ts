@@ -29,7 +29,6 @@ const appDebt = [
   "app/(app)/work/deliveries/[id]/delivered-form.tsx",
   "app/(app)/pricing/group-form.tsx",
   "app/(app)/replenishment/replenish-form.tsx",
-  "app/(app)/replenishment/quantity-form.tsx",
   "app/(app)/locations/location-form.tsx",
   "app/(app)/orders/[id]/lifecycle-buttons.tsx",
   "app/(app)/orders/[id]/confirm/confirm-buttons.tsx",

@@ -3,6 +3,7 @@
 import { Component, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ComposerActivity } from "@/components/mgr/views/composer-conversation";
 import { ComposerStripView } from "@/components/mgr/views/composer-strip";
 
 export class ComposerLoadBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
@@ -30,7 +31,7 @@ export function ComposerUnavailableView({ failed = false, outboxCount, onOutbox,
         {failed ? <Alert><AlertDescription>
           <p>Ask MGR could not load. Reconnect, then reload this page. Your offline outbox is still available.</p>
           <Button type="button" size="sm" variant="outline" onClick={() => window.location.reload()}>Reload page</Button>
-        </AlertDescription></Alert> : <p role="status" className="text-sm text-muted-foreground">Opening your conversation… Your offline outbox is available while Ask MGR loads.</p>}
+        </AlertDescription></Alert> : <div role="status"><ComposerActivity>Opening your conversation… Your offline outbox is available while Ask MGR loads.</ComposerActivity></div>}
       </div>
     </section>
     {children}

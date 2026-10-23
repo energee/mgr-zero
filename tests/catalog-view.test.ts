@@ -106,7 +106,7 @@ describe("Catalog view", () => {
     const inert = htmlOf(createElement(CatalogView, { model }));
     expect(inert).not.toMatch(/href="\/catalog\/brands\//);
     expect(inert.match(/<button\b[^>]*data-tap[^>]*>Hazy IPA<\/button>/g)).toHaveLength(2);
-    const html = htmlOf(createElement(CatalogView, { model, linkRows: true }));
+    const html = htmlOf(createElement(CatalogView, { model, links: { brands: true, priceGroups: true, waterProfiles: true } }));
     expect([...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map((m) => m[1].replace(/<[^>]*>/g, ""))).toEqual(["Brand", "Style", "ABV", "SKUs", "COLA"]);
     // One link per brand in the desktop table, then one in the phone list; the
     // positioned link covers the record without adding another focus target.
@@ -139,7 +139,7 @@ describe("Catalog view", () => {
     expect(inert).toMatch(/Water profiles/);
     expect(inert).toMatch(/Source and target profiles/);
     expect(inert).not.toMatch(/href="\/catalog\/water-profiles"/);
-    expect(htmlOf(createElement(CatalogView, { model, linkRows: true }))).toMatch(/href="\/catalog\/water-profiles"/);
+    expect(htmlOf(createElement(CatalogView, { model, links: { brands: true, priceGroups: true, waterProfiles: true } }))).toMatch(/href="\/catalog\/water-profiles"/);
   });
 
   // #965: Sort and Category are labeled ScopePick selects; each option is the
@@ -204,23 +204,41 @@ describe("Catalog view", () => {
     expect(html).not.toMatch(/→/);
   });
 
-  it("createAction and linkRows slot for live Catalog", () => {
+  // #1062: each row links on its own gate, so a role may open Price groups without the brands.
+  it("createAction and per-link gates slot for live Catalog", () => {
     const html = htmlOf(createElement(CatalogView, {
       model: toCatalogViewProps(catalogBrands),
       createAction: "NEW BRAND",
-      linkRows: true,
+      links: { brands: false, priceGroups: true, waterProfiles: false },
     }));
     expect(html).toMatch(/NEW BRAND/);
     expect(html).not.toMatch(/>New brand</);
     expect(html).toMatch(/href="\/pricing"/);
+    expect(html).not.toMatch(/href="\/catalog\/(brands|water-profiles)/);
     expect(html).toContain(brandOf(SKU_HAZY));
+  });
+
+  // #1062: live, a row the viewer cannot open is plain, not the inventory's dead tap.
+  it("draws a live row without its link as plain text, with no tap or Open", () => {
+    const html = htmlOf(createElement(CatalogView, {
+      model: toCatalogViewProps(catalogBrands),
+      createAction: null,
+      links: { brands: false, priceGroups: false, waterProfiles: false },
+    }));
+    expect(html).toContain(brandOf(SKU_HAZY));
+    expect(html).toMatch(/Price groups/);
+    expect(html).toMatch(/Water profiles/);
+    expect(html).not.toMatch(/\sdata-tap[\s>=]/);
+    expect(html).not.toContain('aria-label="Open"');
+    // Sort headers stay buttons; the brand name is no longer one.
+    expect(html).not.toMatch(new RegExp(`<button\\b[^>]*>${brandOf(SKU_HAZY)}<`));
   });
 
   it("draws one entry per brand without separate pour rows", () => {
     const model = toCatalogViewProps(catalogBrands);
     const html = htmlOf(createElement(CatalogView, {
       model,
-      linkRows: true,
+      links: { brands: true, priceGroups: false, waterProfiles: false },
     }));
     // The shared view still owns the rows: the slot cannot replace them.
     expect(html).toContain(brandOf(SKU_HAZY));
