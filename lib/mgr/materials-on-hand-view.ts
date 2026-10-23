@@ -27,6 +27,6 @@ export function toMaterialsOnHandViewProps(s: MaterialsOnHandSnapshot): Material
   const rows = s.rows ?? [];
   const empty = rows.length > 0 ? undefined
     : s.filtered ? { title: "No materials match", description: "Clear the search to see every material." }
-    : { title: "No materials yet", description: "Receive a purchase order to put materials on hand." };
+    : { title: "No materials yet", description: "Add a material, then receive a purchase order to put it on hand." };
   return { backHref: s.backHref, rows, empty };
 }

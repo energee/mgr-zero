@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
+import { E } from "@/components/mgr/e";
+import { CommandForm } from "@/components/mgr/command-form";
 import { InviteView } from "@/components/mgr/views/team-controls";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 
@@ -22,12 +23,12 @@ export function InviteForm({ customerId }: { customerId?: string }) {
       const pending = (data as { state?: string } | null)?.state === "pending_consent";
       setEmail(""); setRole("warehouse"); setOpen(false);
       setSent(pending
-        ? "Invitation pending. Ask the recipient to sign in and open Invitations to accept with their existing account."
+        ? "Invitation pending. They see it in Invitations the next time they sign in."
         : "Invite sent. The recipient can set their name and password from the email.");
     });
   }
   return <>
-    {sent && <CommandFormMessage tone="warning">{sent}</CommandFormMessage>}
+    <div role="status">{E.polite(sent)}</div>
     <CommandForm open={open} onOpenChange={next => { if (!action.busy) { setOpen(next); if (next) setSent(null); if (!next) action.setError(null); } }} title={title} trigger={<Button variant="outline">{title}</Button>}>
       <InviteView buyer={Boolean(customerId)} email={email} role={role} onEmailChange={setEmail} onRoleChange={setRole} onSubmit={submit} busy={action.busy} error={action.error} />
     </CommandForm>
