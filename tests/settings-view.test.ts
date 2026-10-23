@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { booksOpenedChange, oneWayKegFeeChange, toBrewerySettingsValues, breweryOperatingDefaultsCommand } from "@/lib/mgr/settings-view";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
 import { SettingsView } from "@/components/mgr/views/settings";
+import { PortalFulfillmentView } from "@/components/mgr/views/portal-fulfillment";
 import { settingsDemo } from "@/lib/mgr/fixtures/settings";
 import { SettingsForm } from "@/app/(app)/settings/settings-form";
 import { getCommandDefinition } from "@/lib/commands/registry";
@@ -120,5 +121,37 @@ describe("Settings sections (#1025)", () => {
       expect(helpId, field).toBeDefined();
       expect(new RegExp(`id="${helpId}"[^>]*>([^<]*)<`).exec(brewery)?.[1], field).toMatch(help);
     }
+  });
+});
+
+describe("Wholesale fulfillment with no warehouse (#1147)", () => {
+  const empty = (locationsHref?: string | null) => renderToStaticMarkup(createElement(PortalFulfillmentView, { locations: [], currentId: null, locationsHref }));
+  const text = (html: string) => html.replace(/<[^>]*>/g, "");
+
+  it("says a location appears only when its Uses include Warehouse, and links Edit locations", () => {
+    const html = empty("/locations");
+    expect(text(html)).toContain("No location has the Warehouse use yet.");
+    const link = /<a([^>]*)>Edit locations<\/a>/.exec(html)?.[1];
+    expect(link).toContain('href="/locations"');
+    expect(link).toContain('data-to="Locations"');
+    expect(text(html)).not.toContain("Add a warehouse before enabling portal orders.");
+  });
+
+  it("names the admin instead of linking when the viewer may not edit locations", () => {
+    const html = empty(null);
+    expect(html).not.toContain("Edit locations");
+    expect(text(html)).toContain("An admin adds the Warehouse use to a location in Locations.");
+  });
+
+  it("says why Save warehouse is withheld", () => {
+    expect(text(empty("/locations"))).toContain("Still needed: a warehouse.");
+    const chosen = renderToStaticMarkup(createElement(PortalFulfillmentView, { locations: settingsDemo.warehouseOptions, currentId: settingsDemo.warehouseId }));
+    expect(chosen).not.toContain("Still needed");
+  });
+
+  it("leaves Settings one Locations row: People and places", () => {
+    const html = renderToStaticMarkup(createElement(SettingsView, { model: { ...settingsDemo, warehouseId: null, warehouseOptions: [] } }));
+    expect(html.match(/>Locations</g)).toHaveLength(1);
+    expect(html).toContain("Edit locations");
   });
 });

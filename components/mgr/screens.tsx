@@ -495,6 +495,14 @@ export const SCREENS: Screen[] = [
     body: <SettingsView model={settingsDemo} />,
   },
   {
+    step: 8, slice: "all", tab: "More", name: "Settings no warehouse", job: "Say why the portal has no fulfillment warehouse to choose",
+    to: { "Source water": "Water profiles" },
+    reads: "get_brewery · list_locations", writes: "none",
+    states: [["no warehouse", "picker disabled · note names the Warehouse use · Edit locations opens Locations"]],
+    spec: "Wholesale fulfillment offers only locations whose Uses include Warehouse. With none, the disabled picker says so beneath it and Edit locations opens Locations, where an admin adds that use. Save warehouse says it still needs a warehouse.",
+    body: <SettingsView model={{ ...settingsDemo, warehouseId: null, warehouseOptions: [] }} />,
+  },
+  {
     step: 8,
     slice: "all",
     tab: "More",

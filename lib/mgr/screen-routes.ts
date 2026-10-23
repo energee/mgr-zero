@@ -48,6 +48,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Disconnect Slack", file: "app/(app)/settings/chat/disconnect/page.tsx" },
   { name: "Reauthorization", file: "app/(app)/settings/chat/health/page.tsx" },
   { name: "Settings", file: "app/(app)/settings/page.tsx" },
+  { name: "Settings no warehouse", file: "app/(app)/settings/page.tsx" },
   { name: "Team", file: "app/(app)/settings/team/page.tsx" },
   { name: "Permission denied", file: "app/(app)/denied/page.tsx" },
   { name: "No membership", file: "app/(auth)/no-membership/page.tsx" },
