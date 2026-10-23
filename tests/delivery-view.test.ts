@@ -59,6 +59,19 @@ describe("Routes", () => {
     expect(html).not.toMatch(/>Open</);
   });
 
+  it("headed Deliveries, the sidebar's name, in the inventory and the live page (#1104)", () => {
+    expect(htmlOf(createElement(RoutesView, { model: toRoutesViewProps(routesDriver) }))).toMatch(/<h1[^>]*>Deliveries</);
+    expect(src("app/(app)/routes/page.tsx")).toContain('toRoutesViewProps({ title: "Deliveries"');
+  });
+
+  it("names the live Work tab links by the sidebar and keeps their pages (#1104)", () => {
+    const html = htmlOf(createElement(RoutesView, { model: toRoutesViewProps(routesDriver), workHrefs: workHrefsFor(["warehouse"]) }));
+    const links = [...html.matchAll(/<a\b[^>]*role="tab"[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/g)].map(([, href, text]) => [text, href]);
+    expect(links).toEqual([
+      ["All", "/work"], ["Orders", "/orders"], ["Transfers", "/transfers"], ["Packaging", "/packaging"], ["Purchase orders", "/purchase-orders"], ["Deliveries", "/routes"],
+    ]);
+  });
+
   it("renders New route without leaking live hrefs", () => {
     const html = htmlOf(createElement(RoutesView, { model: toRoutesViewProps(routesDriver) }));
     expect(html).toMatch(/>New route</);
@@ -96,6 +109,16 @@ describe("Route", () => {
     const empty = htmlOf(createElement(RouteView, { model: { ...routeAPlan, saved: false, selection: {} } }));
     expect(empty).not.toContain("Depart route");
     expect(empty).toMatch(/<button[^>]*disabled[^>]*>Save route plan/);
+  });
+  it("returns to Deliveries, the Routes screen's sidebar name, from every page under it (#1104)", () => {
+    for (const node of [
+      createElement(RouteView, { model: routeAPlan }),
+      createElement(DriverRouteView, { model: driverRouteA }),
+      createElement(ReturnRouteView, { model: returnRouteA }),
+    ]) expect(htmlOf(node)).toMatch(/<a\b[^>]*data-to="Routes"[^>]*>.*?Deliveries<\/a>/);
+    for (const file of ["app/(app)/routes/[id]/page.tsx", "app/(app)/routes/route-form.tsx"]) {
+      expect(src(file)).not.toContain('backTo: "Routes"');
+    }
   });
   it("keeps Work route links within the staff navigation permissions", () => {
     expect(workHrefsFor(["brewer"])).toEqual({ all: "/work", batches: "/batches", runs: "/packaging" });

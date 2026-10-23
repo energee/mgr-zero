@@ -3,7 +3,7 @@ import { E } from "../components/mgr/e";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TapBoardView, TapKegView } from "../components/mgr/views/tap-board";
-import { openTapBoardSheet } from "../lib/mgr/tap-board-state";
+import { openTapBoardSheet, fillLabel, OPENING_FILLS, CLOSING_FILLS } from "../lib/mgr/tap-board-state";
 import { tapBoard, tapBoardSkus, kickKeg, swapKeg } from "../lib/mgr/fixtures/taproom";
 import { SCREENS } from "../components/mgr/screens";
 import { isInertOn } from "../lib/mgr/screen-links";
@@ -106,5 +106,32 @@ describe("Tap keg sheet feedback (#1114)", () => {
     expect(html).toContain("Tap number · optional");
     expect(html).toContain("Two kegs can share a number. A keg with no number sorts last.");
     expect(html).not.toContain("may repeat");
+  });
+});
+
+describe("Fill words match the chips (#1192)", () => {
+  const board = (state = tapBoard) => renderToStaticMarkup(createElement(TapBoardView, { state, skus: tapBoardSkus, timeZone: "America/New_York", navigation: { locations: [{ value: "taproom", label: "Taproom" }], location: "taproom" } }));
+
+  it("names a stored fill with its chip label", () => {
+    expect(fillLabel(OPENING_FILLS, 1)).toBe("Full");
+    expect(fillLabel(OPENING_FILLS, .6)).toBe("60%");
+    expect(fillLabel(CLOSING_FILLS, 0)).toBe("Empty");
+    expect(fillLabel(CLOSING_FILLS, .5)).toBe("About 50% left");
+  });
+
+  it("labels the closing fill chips in percent, like the opening fill", () => {
+    const html = renderToStaticMarkup(createElement(TapKegView, { sheet: swapKeg, skus: tapBoardSkus, timeZone: "America/New_York" }));
+    for (const label of ["Empty", "About 25% left", "About 50% left"]) expect(html).toContain(`>${label}</button>`);
+    expect(html).not.toMatch(/[¼½] left/);
+  });
+
+  it("prints full for a full opening fill and the chip label for a closing fill", () => {
+    const html = board();
+    expect(html).toContain("opened full");
+    expect(html).toContain("opened 60%");
+    expect(html).not.toContain("opened 100%");
+    expect(html).toContain("Kicked empty · Empty · closed");
+    const [closed] = tapBoard.snapshot.history;
+    expect(board({ ...tapBoard, snapshot: { ...tapBoard.snapshot, history: [{ ...closed, closing_fill: .5, close_reason: "Off flavor" }] } })).toContain("Off flavor · About 50% left · closed");
   });
 });

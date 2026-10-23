@@ -1,6 +1,7 @@
-// components/mgr/views/location-bins.tsx — Location bins list. Live passes
-// BinForm as createAction, a bins slot, and the Move stock form (drawing
-// MoveStockFields) as footer; inventory uses Add bin and nav.
+// components/mgr/views/location-bins.tsx — Location bins list. Both paths draw
+// the adapter's rows; live passes BinForm as createAction and as each row's
+// action, and the Move stock form (drawing MoveStockFields) as footer;
+// inventory uses Add bin and nav rows. Nothing stored draws the empty state.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { LocationBinsViewModel, MoveStockOptions, MoveStockValue } from "@/lib/mgr/location-bins-view";
@@ -26,25 +27,30 @@ export function LocationBinsView({
   model,
   createAction,
   footer,
-  bins,
+  rowActions,
 }: {
   model: LocationBinsViewModel;
   createAction?: ReactNode;
   footer?: ReactNode;
-  /** Live: one row per bin with BinForm in action. */
-  bins?: { key: string; title: string; detail: string; action?: ReactNode }[];
+  /** Live: each bin's action (BinForm's Edit) by row key; the inventory taps the row instead. */
+  rowActions?: Record<string, ReactNode>;
 }) {
   return (
     <>
-      {E.back(model.backLabel, "Bins", createAction, model.backHref)}
-      {bins
-        ? bins.map((row) => (
-          <Fragment key={row.key}>{E.row(row.title, row.detail, row.action)}</Fragment>
-        ))
-        : model.rows.map((row) => (
-          <Fragment key={row.key}>{E.nav(row.title, row.detail)}</Fragment>
-        ))}
-      {model.moveUnavailable ? E.gated("Move stock", model.moveUnavailable) : footer !== undefined ? footer : (createAction !== undefined ? null : E.btn("Add bin", "g"))}
+      {E.back(model.backLabel, model.title, createAction, model.backHref)}
+      {model.rows.map((row) => (
+        <Fragment key={row.key}>{rowActions ? E.row(row.title, row.detail, rowActions[row.key]) : E.nav(row.title, row.detail)}</Fragment>
+      ))}
+      {belowRows(model, footer, createAction)}
     </>
   );
+}
+
+/** Under the rows: the empty state, why Move stock is unavailable, the live
+ *  footer (Move stock), or the inventory's Add bin when no createAction came. */
+function belowRows(model: LocationBinsViewModel, footer: ReactNode, createAction: ReactNode): ReactNode {
+  if (model.empty) return E.blank(model.empty, undefined, E.btn("Record movement", "g", model.inventoryHref));
+  if (model.moveUnavailable) return E.gated("Move stock", model.moveUnavailable);
+  if (footer !== undefined) return footer;
+  return createAction !== undefined ? null : E.btn("Add bin", "g");
 }

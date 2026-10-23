@@ -78,7 +78,7 @@ export function FermentationReadingView({
             <p id="fr-gravity-error" role="alert" className="text-sm text-destructive">
               {unit === "sg"
                 ? "Enter a gravity like 1.050 or 1050, or leave it blank."
-                : "Enter a gravity in °Plato like 12.5, or leave it blank."}
+                : "Enter a gravity in °P like 12.5, or leave it blank."}
             </p>
           ) : prior?.gravity ? <p className="text-xs text-muted-foreground">Prior {prior.gravity}</p> : null}
         </div>

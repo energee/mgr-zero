@@ -1,5 +1,6 @@
 import { formatDate } from "@/lib/date-format";
 import { runNo } from "@/lib/mgr/doc-no";
+import type { EmptyState } from "@/lib/mgr/empty-state";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
 
 export type PackagingRunSnapshot = {
@@ -33,6 +34,8 @@ export type PackagingRunRowView = {
 export type PackagingRunsViewModel = {
   upcoming: PackagingRunRowView[];
   recent: PackagingRunRowView[];
+  /** Set only when there are no runs at all. */
+  empty?: EmptyState;
   workChips: string[];
   workTabs: Record<string, string>;
 };
@@ -65,6 +68,7 @@ export function toPackagingRunsViewProps(runs: PackagingRunSnapshot[], timeZone:
   return {
     upcoming: runs.filter((run) => !finished(run)).map((run) => row(run, timeZone, hrefFor?.(run.id))),
     recent: runs.filter(finished).map((run) => row(run, timeZone, hrefFor?.(run.id))),
+    empty: runs.length === 0 ? { title: "No runs planned", description: "Select Schedule run to plan one: a date, a brand, and how many of each SKU." } : undefined,
     workChips: WORK_CHIPS,
     workTabs: WORK_TABS,
   };

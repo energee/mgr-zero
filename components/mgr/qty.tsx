@@ -101,7 +101,9 @@ export function Qty({
  *  entered in. Uncontrolled, like chips — a controlled value with no
  *  onValueChange makes every trigger inert, and these bars are meant to be
  *  clickable in the inventory. `to` names the screen a tab opens (data-to)
- *  where each tab is a screen of its own, like the Work chips.
+ *  where each tab is a screen of its own, like the Work chips. `labels` is the
+ *  text a tab shows when it differs from its name; the name stays the identity
+ *  that `to`, `hrefs` and onChange use (the Work chips, #1104).
  *
  *  Each tab's Radix value is its index, not its name: Radix builds the tab and
  *  panel ids from the value, and a name with a space ("Packaging runs") would
@@ -127,6 +129,7 @@ export function TabBar({
   to,
   onChange,
   hrefs,
+  labels,
   label,
   panel,
 }: {
@@ -136,12 +139,16 @@ export function TabBar({
   to?: Record<string, string>;
   onChange?: (value: string) => void;
   hrefs?: Record<string, string>;
+  labels?: Record<string, string>;
 } & ({ label?: never; panel?: never } | { label: string; panel: ReactNode; onChange: (value: string) => void })) {
   const value = String(on);
   return (
     <Tabs value={hrefs || onChange ? value : undefined} defaultValue={hrefs || onChange ? undefined : value} onValueChange={onChange && ((v) => onChange(names[Number(v)]))} className={panel === undefined ? "min-w-0" : "min-w-0 flex-1 gap-3"}>
       <TabsList variant="solid" className={cls} aria-label={label}>
-        {names.map((n, i) => <TabsTrigger key={n} value={String(i)} data-to={to?.[n]} asChild={Boolean(hrefs?.[n])}>{hrefs?.[n] ? <Link href={hrefs[n]}>{n}</Link> : n}</TabsTrigger>)}
+        {names.map((n, i) => {
+          const text = labels?.[n] ?? n;
+          return <TabsTrigger key={n} value={String(i)} data-to={to?.[n]} asChild={Boolean(hrefs?.[n])}>{hrefs?.[n] ? <Link href={hrefs[n]}>{text}</Link> : text}</TabsTrigger>;
+        })}
       </TabsList>
       {panel === undefined ? null : names.map((n, i) => <TabsContent key={n} value={String(i)} tabIndex={-1} className="flex flex-col gap-3">{panel}</TabsContent>)}
     </Tabs>

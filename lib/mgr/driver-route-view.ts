@@ -12,7 +12,6 @@ export type DriverStopView = {
 
 export type DriverRouteViewModel = {
   backHref?: string;
-  backTo?: string;
   title: string;
   driverVehicle: string;
   departed: string;

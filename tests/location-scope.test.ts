@@ -49,6 +49,11 @@ it("Tap board draws the Location select above the On tap heading", () => {
   expect(selectBeforeHeading(tapBoardRecord, "On tap")).toBe(true);
 });
 
-it("Variance draws the Location select above the Variance by brand heading", () => {
-  expect(selectBeforeHeading(createElement(TaproomVarianceView, { model: taproomVariance }), "Variance by brand")).toBe(true);
+it("Variance draws the Location select under its page title, with no heading between it and the brand table (#1118)", () => {
+  const html = renderToStaticMarkup(createElement(TaproomVarianceView, { model: taproomVariance }));
+  const title = html.indexOf(">Variance by brand</h1>"), select = html.search(/<label[^>]*>Location<\/label>/), table = html.indexOf("<table");
+  expect(title).toBeGreaterThan(-1);
+  expect(select).toBeGreaterThan(title);
+  expect(table).toBeGreaterThan(select);
+  expect(html.slice(select, table)).not.toMatch(/<h[1-6]/);
 });
