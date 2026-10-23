@@ -38,3 +38,6 @@ installations and finish credential cleanup first, replace the key, then
 reauthorize each workspace; old encrypted installation tokens cannot be read
 with a new key. The scheduled chat-state cleanup endpoint is
 `POST /api/chat/jobs/cleanup`, authenticated with `CHAT_JOB_SECRET`.
+
+Measured delivery and scan capacity against the 60 s delivery lease are in
+[worker capacity, 2026-10-23](worker-capacity-local-2026-10-23.md).
