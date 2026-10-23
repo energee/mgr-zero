@@ -8,6 +8,9 @@ import { connectionStateLabel } from "@/lib/mgr/labels";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { SquareSyncControls } from "@/components/mgr/views/pos-controls";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/settings/pos") };
 
 type Health = DisconnectHealth & { connected: boolean; merchantLabel: string | null; lastError: string | null; salesSyncedThrough?: string | null };
 type Location = { mgrLocationId: string | null };

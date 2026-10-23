@@ -8,6 +8,9 @@ import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { QboSyncButton } from "@/app/(app)/settings/accounting/qbo-controls";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/invoices") };
 
 export default async function InvoicesPage({ searchParams }: { searchParams: Promise<{ cursor?: string | string[] }> }) {
   const [params, brewery] = await Promise.all([searchParams, getActiveBrewery()]);

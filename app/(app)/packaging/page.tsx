@@ -19,6 +19,9 @@ import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
 import type { ScheduleRunData } from "@/lib/mgr/schedule-packaging-run-view";
 import { ScheduleRunForm } from "./schedule-run-form";
 import { RepackForm, type RepackParent } from "./repack-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/packaging") };
 
 type Run = {
   id: string; run_no: number; brand_id: string; occupancy_id: string | null; planned_on: string;

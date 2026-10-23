@@ -14,6 +14,9 @@ import { MaterialForm, type Material } from "./material-form";
 import { CountForm } from "./count-form";
 import { ListControls } from "@/components/mgr/list-controls";
 import { listParams } from "@/lib/mgr/list-params";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/materials") };
 
 type OnHand = { material_id: string; location_id: string; bin_id: string; qty: number };
 type Vendor = { id: string; name: string };

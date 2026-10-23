@@ -96,6 +96,8 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Pick sheet", file: "app/(app)/pick/page.tsx" },
   { name: "Pars and allocation", file: "app/(app)/replenishment/page.tsx" },
   { name: "Invoice", file: "app/(app)/invoices/[id]/page.tsx" },
+  { name: "Record payment", file: "app/(app)/invoices/[id]/payment-form.tsx" },
+  { name: "Void payment", file: "app/(app)/invoices/[id]/payment-form.tsx" },
   { name: "Invoices", file: "app/(app)/invoices/page.tsx" },
   { name: "Accounting", file: "app/(app)/settings/accounting/page.tsx" },
   { name: "Point of sale", file: "app/(app)/settings/pos/page.tsx" },

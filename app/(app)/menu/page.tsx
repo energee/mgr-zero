@@ -6,6 +6,9 @@ import { toPosMenuModel, toPosMenuSetup, toPosVariationRow, type PosMenuSnapshot
 import { hasAnyRole } from "@/lib/mgr/roles";
 import "@/lib/commands/all";
 import { PosMenuControl } from "@/components/mgr/views/pos-controls";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/menu") };
 
 type ObservedLocation = { externalLocationId: string; name: string | null; mgrLocationId: string | null };
 type Channel = { id: string; name: string };

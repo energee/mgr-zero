@@ -9,6 +9,9 @@ import { CHAT_PREVIEW_FIXTURES } from "@/lib/chat/preview-fixtures";
 import { ChatSettingsView } from "@/components/mgr/views/chat";
 import "@/lib/commands/all";
 import { ChatConnectionAction, ChatSettingsControls, ChatDelivery } from "./chat-settings-client";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/settings/chat") };
 
 export default async function ChatSettingsPage({ searchParams }: { searchParams: Promise<{ error?: string; installed?: string }> }) {
   const brewery = await getActiveBrewery();

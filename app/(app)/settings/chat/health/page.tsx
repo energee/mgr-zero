@@ -6,6 +6,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { ChatHealth } from "@/lib/commands/chat";
 import "@/lib/commands/all";
 import { ChatConnectionAction, ChatDisable } from "../chat-settings-client";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/settings/chat/health") };
 
 export default async function ChatHealthPage() {
   const { ctx } = await requireAdminContext("Chat health");

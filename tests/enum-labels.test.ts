@@ -2,7 +2,7 @@
 // raw lowercase/snake_case database value.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { connectionStateLabel, sentenceCase, importKindLabel } from "@/lib/mgr/labels";
+import { connectionStateLabel, sentenceCase, importKindLabel, staffRolesLabel } from "@/lib/mgr/labels";
 import { toLocationsViewProps } from "@/lib/mgr/locations-view";
 import { TAX_TREATMENTS } from "@/lib/mgr/tax-treatments";
 import { IMPORT_KINDS } from "@/lib/import-csv";
@@ -16,6 +16,12 @@ describe("sentenceCase", () => {
 
   it("still produces the movement type labels from #255/#269", () => {
     expect(sentenceCase("festival_removal")).toBe("Festival removal");
+  });
+});
+
+describe("staff roles", () => {
+  it("lists a member's roles in STAFF_ROLES order, sentence-cased (Team and the Driver picker, #1124)", () => {
+    expect(staffRolesLabel(["warehouse", "admin"])).toBe("Admin, Warehouse");
   });
 });
 

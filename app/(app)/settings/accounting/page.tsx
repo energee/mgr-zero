@@ -6,6 +6,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { isQboConfigured, qboConfig } from "@/lib/qbo";
 import "@/lib/commands/all";
 import { QboConnectionAction, QboDefaultsForm, QboSyncButton } from "./qbo-controls";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/settings/accounting") };
 
 export default async function AccountingPage({ searchParams }: { searchParams: Promise<{ connected?: string; error?: string }> }) {
   const { brewery, ctx } = await requireAdminContext("Accounting");

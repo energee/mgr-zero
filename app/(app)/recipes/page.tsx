@@ -12,6 +12,9 @@ import { toRecipesViewProps } from "@/lib/mgr/recipes-view";
 import "@/lib/commands/all";
 import { ListControls } from "@/components/mgr/list-controls";
 import { listParams } from "@/lib/mgr/list-params";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/recipes") };
 
 type Recipe = { id: string; name: string; brand_id: string | null; note: string | null; latest_version: number | null };
 type Brand = { id: string; name: string };

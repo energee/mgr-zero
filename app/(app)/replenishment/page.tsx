@@ -8,6 +8,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { ReplenishForm } from "./replenish-form";
 import { QuantityForm, ReleaseAllocationForm } from "./quantity-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/replenishment") };
 
 type LocationRow = { id: string; name: string; uses: ("warehouse" | "taproom" | "storage")[] };
 type Shortfall = { skuId: string; skuName: string; onHand: number; allocated: number; atp: number; reservations: { id: string; source: string; ref: string; qty: number; orderId?: string; orderNo?: number }[] };

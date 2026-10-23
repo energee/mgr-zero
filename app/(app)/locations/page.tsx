@@ -10,6 +10,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { LocationForm } from "./location-form";
 import { canRun } from "@/lib/commands/registry";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/locations") };
 
 type LocationRow = { id: string; name: string; uses: ("warehouse" | "taproom" | "storage")[] };
 

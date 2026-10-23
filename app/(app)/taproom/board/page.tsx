@@ -6,6 +6,9 @@ import { requirePagePermission, runPageQuery as runCommand } from "@/lib/mgr/pag
 import type { TapBoardSnapshot, TapHistory, TapInterval } from "@/lib/mgr/tap-board-state";
 import "@/lib/commands/all";
 import { TapBoard, type TapSku } from "./tap-board";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/taproom/board") };
 
 type Location = { id: string; name: string; uses: string[] };
 type Sku = { id: string; name: string; format_volume: { bbl_per_unit: number | null } | null };

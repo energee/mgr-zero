@@ -17,6 +17,9 @@ import { CellarTransferForm } from "./cellar-transfer-form";
 import { CellarAdditionForm } from "./cellar-addition-form";
 import type { AdditionLot, AdditionMaterial } from "@/lib/mgr/cellar-addition-view";
 import { BatchCompletionForm } from "./batch-completion-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/cellar") };
 
 type Occupancy = {
   occupancy_id: string; vessel_id: string; vessel_name: string | null; batch_id: string; batch_no: number | null;

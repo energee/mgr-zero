@@ -16,11 +16,13 @@ import { DeleteCommandButton } from "../../delete-command-button";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { canRun } from "@/lib/commands/registry";
-import { canOpen } from "@/lib/mgr/nav";
+import { canOpen, navTitle } from "@/lib/mgr/nav";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toSaleChannelsViewProps } from "@/lib/mgr/sale-channels-view";
 import "@/lib/commands/all";
 import { ChannelForm } from "./channel-form";
+
+export const metadata = { title: navTitle("/settings/channels") };
 
 type SaleChannel = { id: string; name: string; tax_treatment: string };
 

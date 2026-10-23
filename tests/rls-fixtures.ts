@@ -20,7 +20,7 @@ export const matrix = {
   lots: "deny", packaging_run_outputs: "deny", packaging_run_consumptions: "deny", packaging_material_records: "deny", packaging_material_actuals: "deny", material_contracts: "deny",
   purchase_orders: "deny", purchase_order_lines: "deny", receipts: "deny", receipt_lines: "deny",
   material_counts: "deny", material_count_lines: "deny", orders: "deny", order_lines: "deny", order_deposit_lines: "deny", order_events: "deny",
-  shipments: "deny", invoices: "deny", invoice_questions: "deny", invoice_lines: "deny", keg_events: "deny",
+  shipments: "deny", invoices: "deny", invoice_questions: "deny", invoice_lines: "deny", invoice_payments: "deny", invoice_payment_voids: "deny", keg_events: "deny",
   stock_transfers: "deny", stock_transfer_lines: "deny", qbo_connections: "deny", qbo_pushes: "deny", qbo_customer_snapshots: "deny", qbo_customer_decisions: "deny", pos_connections: "deny",
   pos_locations: "tenant", pos_item_mappings: "tenant", pos_catalog_variations: "deny", pos_catalog_items: "deny", pos_catalog_ownership: "deny", pos_menus: "deny", pos_menu_lines: "deny", pos_sales: "deny", pos_sale_expectations: "deny", pos_sales_coverage: "deny", brand_approvals: "cola",
   state_registrations: "deny", brewery_state_licenses: "deny", report_filings: "deny", routes: "deny",
@@ -52,6 +52,7 @@ const serviceOnly = new Set<Table>(["brewery_counters", "volume_adjustment_recla
 const privilegedRead: Partial<Record<Table, true>> = {
   qbo_customer_snapshots: true, qbo_customer_decisions: true,
   reporting_basis_corrections: true, report_basis_amendments: true,
+  invoice_payments: true, invoice_payment_voids: true,
 };
 export const day = "2026-09-08";
 export const now = "2026-09-08T12:00:00Z";
@@ -133,6 +134,11 @@ export async function fixtures() {
   const invoice = await put("invoices", { customer_id: customer.customerId, kind: "invoice" });
   await put("invoice_questions", { invoice_id: invoice.id, customer_id: customer.customerId, body: "Private question", created_by: owner.id });
   await put("invoice_lines", { invoice_id: invoice.id, sku_id: cat.skuId, description: "IPA", qty: 1, unit_price_cents: 1200 });
+  // Authenticated has no insert grant on the payment ledger, so its rows go in with privileged SQL.
+  sql(`with payment as (insert into public.invoice_payments(brewery_id,invoice_id,amount_cents,received_on,method,recorded_by)
+      values ('${brewery.id}','${invoice.id}',500,'${day}','check','${owner.id}') returning id)
+    insert into public.invoice_payment_voids(brewery_id,payment_id,reason,voided_by)
+    select '${brewery.id}',id,'Authorization fixture','${owner.id}' from payment`, true);
   const transfer = await put("stock_transfers", { from_location_id: wh.id, to_location_id: taps[0].id, created_by: owner.id });
   await put("stock_transfer_lines", { transfer_id: transfer.id, sku_id: cat.skuId, qty: 1, from_bin_id: wh.binId, to_bin_id: taps[0].binId });
   const qboConnection = await put("qbo_connections", { realm_id: `realm-${brewery.id}` });

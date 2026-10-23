@@ -13,6 +13,9 @@ import { workHrefsFor } from "@/components/mgr/work-tabs";
 import { routeNext, toRoutesViewProps } from "@/lib/mgr/routes-view";
 import "@/lib/commands/all";
 import { driverLabel, type RouteList } from "./labels";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/routes") };
 
 export default async function RoutesPage() {
   const brewery = await getActiveBrewery();
@@ -21,7 +24,7 @@ export default async function RoutesPage() {
   return <RoutesView model={toRoutesViewProps({ title: "Deliveries", subtitle: "", rows: [
     ...routes.map(route => ({
       key: route.id, title: (route.name ?? "Route") + " · " + formatDate(route.delivery_date),
-      detail: route.departed_at ? "departed · " + route.stops.filter(stop => stop.delivered_at).length + " of " + route.stops.length + " delivered" : route.stops.length + (route.stops.length === 1 ? " stop · " : " stops · ") + driverLabel(route.driver_user_id),
+      detail: route.departed_at ? "departed · " + route.stops.filter(stop => stop.delivered_at).length + " of " + route.stops.length + " delivered" : route.stops.length + (route.stops.length === 1 ? " stop · " : " stops · ") + driverLabel(route),
       ...routeNext(route),
       href: "/routes/" + route.id, warning: !route.driver_user_id,
     })),

@@ -18,6 +18,9 @@ import { VendorForm, type Vendor } from "./vendor-form";
 import { ContractForm, type Contract } from "./contract-form";
 import { ListControls } from "@/components/mgr/list-controls";
 import { listParams } from "@/lib/mgr/list-params";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/vendors") };
 
 type Observed = { sent_via: string; n: number; avg_lead_days: number; avg_late_days: number | null };
 type VendorRow = Vendor & {
