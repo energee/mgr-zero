@@ -1,7 +1,11 @@
 // Invoice payments recorded in MGR (#1045, docs/plans/invoice-local-payments.md):
-// the append-only payment and void ledgers and the invoice_totals sum they feed.
-import { describe, expect, it } from "vitest";
-import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, sql } from "./helpers";
+// the append-only payment and void ledgers and the invoice_totals sum they feed,
+// the record and void RPCs, and start_qbo_push's refusal of an invoice with payments.
+import { Client } from "pg";
+import { describe, expect, it, vi } from "vitest";
+import { runCommand } from "@/lib/commands/registry";
+import "@/lib/commands/all";
+import { admin, DB, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, sql } from "./helpers";
 
 /** A $100.00 invoice QuickBooks never received, with a Sales member to act on it. */
 async function localInvoice(invoice: Record<string, unknown> = {}, unitPriceCents = 5000) {
@@ -226,5 +230,91 @@ describe("record_invoice_payment and void_invoice_payment", () => {
     expect((await record(f, { p_brewery: other.breweryId }, other.sales)).error?.message).toMatch(/invoice not found/);
     expect((await voidRpc(f, paymentId, { p_brewery: other.breweryId }, other.sales)).error?.message).toMatch(/payment not found/);
     expect(sql(`select count(*) from public.invoice_payment_voids where payment_id='${paymentId}'`, true)).toEqual(["0"]);
+  });
+});
+
+/** Connects a QuickBooks company and maps the invoice's customer and SKU, so start_qbo_push passes every other check. */
+async function connectBooks(f: Fixture) {
+  await admin.from("qbo_connections").insert({ brewery_id: f.breweryId, realm_id: `realm-${crypto.randomUUID()}`, realm_label: "Fixture books", state: "connected" })
+    .throwOnError();
+  const { customer_id } = (await admin.from("invoices").select("customer_id").eq("id", f.invoiceId).single().throwOnError()).data!;
+  const { sku_id } = (await admin.from("invoice_lines").select("sku_id").eq("invoice_id", f.invoiceId).single().throwOnError()).data!;
+  expect((await f.sales.db.rpc("set_qbo_customer_mapping", {
+    p_brewery: f.breweryId, p_customer: customer_id, p_qbo_customer_id: "customer-42", p_request_id: crypto.randomUUID(),
+  })).error).toBeNull();
+  expect((await f.sales.db.rpc("set_qbo_item_mapping", {
+    p_brewery: f.breweryId, p_sku: sku_id!, p_qbo_item_id: "item-24", p_request_id: crypto.randomUUID(),
+  })).error).toBeNull();
+}
+
+const startPush = (f: Fixture) => f.sales.db.rpc("start_qbo_push", {
+  p_brewery: f.breweryId, p_invoice: f.invoiceId, p_new_attempt_reason: null as never, p_request_id: crypto.randomUUID(),
+});
+
+/** A pg session acting as `userId` through RLS, as PostgREST would; it can hold a transaction open. */
+async function sessionAs(userId: string) {
+  const client = new Client({ connectionString: DB });
+  await client.connect();
+  await client.query("set role authenticated");
+  await client.query("select set_config('request.jwt.claim.sub',$1,false)", [userId]);
+  const pid = (await client.query<{ pid: number }>("select pg_backend_pid() pid")).rows[0].pid;
+  return { client, pid };
+}
+
+const refused = /payments for this invoice are recorded in MGR, so it is not sent to QuickBooks/;
+
+describe("start_qbo_push and local payments", () => {
+  it("refuses an invoice with an unvoided payment, through the RPC and the push_invoice_to_qbo command", async () => {
+    const f = await localInvoice();
+    await connectBooks(f);
+    expect((await record(f)).error).toBeNull();
+    expect((await startPush(f)).error?.message).toMatch(refused);
+    vi.stubEnv("QBO_CLIENT_ID", "client-id");
+    vi.stubEnv("QBO_CLIENT_SECRET", "client-secret");
+    vi.stubEnv("QBO_REDIRECT_URI", "https://mgr.test/api/integrations/qbo/oauth");
+    vi.stubEnv("QBO_API_BASE", "https://sandbox-quickbooks.api.intuit.com");
+    try {
+      await expect(runCommand("push_invoice_to_qbo", { invoiceId: f.invoiceId }, f.sales)).rejects.toThrow(refused);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    expect(sql(`select count(*) from public.qbo_pushes where invoice_id='${f.invoiceId}'`, true)).toEqual(["0"]);
+  });
+
+  it("starts the push once every payment is voided (Q8)", async () => {
+    const f = await localInvoice();
+    await connectBooks(f);
+    const ids = [];
+    for (const amount of [2500, 4000]) ids.push(((await record(f, { p_amount_cents: amount })).data as { paymentId: string }).paymentId);
+    expect((await voidRpc(f, ids[0])).error).toBeNull();
+    expect((await startPush(f)).error?.message).toMatch(refused);
+    expect((await voidRpc(f, ids[1])).error).toBeNull();
+    const push = await startPush(f);
+    expect(push.error).toBeNull();
+    expect(push.data).toMatchObject({ status: "pending" });
+  });
+
+  it("makes a push wait on a payment's row lock, then refuses it", async () => {
+    const f = await localInvoice();
+    await connectBooks(f);
+    const payer = await sessionAs(f.staffId);
+    const pusher = await sessionAs(f.staffId);
+    let pushing: Promise<unknown> | undefined;
+    try {
+      await payer.client.query("begin");
+      await payer.client.query("select public.record_invoice_payment($1,$2,4000,'2026-10-20','check',null,$3)",
+        [f.breweryId, f.invoiceId, crypto.randomUUID()]);
+      pushing = pusher.client.query("select public.start_qbo_push($1,$2,null,$3)", [f.breweryId, f.invoiceId, crypto.randomUUID()]);
+      const settled = pushing.then(() => "started", (e: Error) => e.message);
+      // As the owner: the authenticated role cannot see another backend's wait state.
+      await expect.poll(() => sql(`select wait_event_type from pg_stat_activity where pid=${pusher.pid}`, true)[0], { timeout: 3000 })
+        .toBe("Lock");
+      await payer.client.query("commit");
+      expect(await settled).toMatch(refused);
+    } finally {
+      await payer.client.query("rollback").catch(() => undefined);
+      if (pushing) await Promise.allSettled([pushing]);
+      await Promise.all([payer.client.end(), pusher.client.end()]);
+    }
   });
 });
