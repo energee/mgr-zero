@@ -3,7 +3,10 @@
 // Mark answered (resolve_invoice_question, mark-answered.tsx), and for an
 // invoice still owed or paid (invoiceIsCreditable) Return in the closing
 // Correct a shipment section: a credit memo against a subset of lines
-// (credit-memo-form.tsx).
+// (credit-memo-form.tsx). Payments recorded in MGR (#1045, payment-form.tsx):
+// Record payment when the model says the invoice takes one and the viewer may
+// run record_invoice_payment, and Void on each unvoided payment for a viewer
+// who may run void_invoice_payment; otherwise both slots are null.
 // QuickBooks mapping, exact retry, corrected re-push and local write-off use
 // the same registered commands as the API. An unknown id renders not-found.
 import { InvoiceReturnButton, InvoiceView } from "@/components/mgr/views/invoice";
@@ -16,7 +19,9 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import { invoiceMappingRows, toInvoiceViewProps, type InvoicePaymentRecord } from "@/lib/mgr/invoice-view";
 import { MarkAnswered } from "./mark-answered";
 import { qboInvoicePresentation, type QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
-import { invoiceIsCreditable } from "@/lib/mgr/invoice-state";
+import { invoiceBalanceCents, invoiceCurrentTotalCents, invoiceIsCreditable } from "@/lib/mgr/invoice-state";
+import { breweryDate } from "@/lib/date-format";
+import { RecordPaymentForm, VoidPaymentForm } from "./payment-form";
 import { QboInvoiceActions } from "@/app/(app)/settings/accounting/qbo-controls";
 
 type Invoice = { id: string; shipment_id: string | null; invoice_no: number | null; kind: "invoice" | "credit_memo"; issued_on: string; due_on: string | null; paid_at: string | null; qbo_invoice_id: string | null; qbo_sync_status: "pending" | "pushed" | "push_failed" | "not_synced"; qbo_sync_error: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_total_cents: number | null; qbo_tax_cents: number | null; qbo_balance_cents: number | null; qbo_cash_collected_cents: number; qbo_accountant_drift: boolean; written_off_at: string | null; customers: { id: string; name: string; qbo_customer_id: string | null; qbo_realm_id: string | null } | null };
@@ -43,9 +48,17 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const mappings = !credit && realm && (brewery.roles.includes("admin") || brewery.roles.includes("sales"))
     ? invoiceMappingRows(invoice.customers, lines, realm, health?.depositItemId, `/invoices/${invoice.id}/mapping`, brewery.roles.includes("admin") ? "/settings/accounting/mappings" : undefined, health?.oneWayFeeItemId) : undefined;
   const model = toInvoiceViewProps({ invoice, lines, questions, mappings, payments, hasPendingPush, wasPushedToQbo, localPaidCents, backHref: "/invoices", timeZone: brewery.timeZone });
+  // takesPayment means the ledger owns the balance, so this is the total minus unvoided payments.
+  const balanceCents = invoiceBalanceCents({ ...invoice, has_pending_qbo_push: hasPendingPush, was_pushed_to_qbo: wasPushedToQbo, local_paid_cents: localPaidCents },
+    invoiceCurrentTotalCents(invoice, lines.reduce((sum, line) => sum + line.amount_cents, 0))) ?? 0;
+  const recordPayment = model.takesPayment && canRun(ctx, "record_invoice_payment")
+    ? <RecordPaymentForm invoiceId={invoice.id} balanceCents={balanceCents} today={breweryDate(brewery.timeZone)} quickbooksConnected={Boolean(health?.connected)} />
+    : null;
   return (
     <InvoiceView
       model={model}
+      recordPayment={recordPayment}
+      paymentAction={canRun(ctx, "void_invoice_payment") ? (p) => <VoidPaymentForm paymentId={p.id} amount={p.amount} /> : null}
       staffLink={quickbooksLink}
       correction={memo}
       questionAction={(q) => <MarkAnswered questionId={q.id} />}
