@@ -16,14 +16,17 @@ it("positive movement entry derives direction, requires sample state, and discar
   expect(movementFields("adjustment", "2", "remove", "PA", "channel").qty).toBe(-2);
   expect(movementFields("return_in", "2", "remove", "PA", "channel")).toEqual({ qty: 2, destState: undefined, saleChannelId: undefined });
   expect(movementFields("depletion", "2", "add", "PA", "channel").saleChannelId).toBe("channel");
-  for (const qty of ["", "0", "-2", "Infinity"]) expect(() => movementFields("loss", qty, "add", "", "")).toThrow();
+  for (const qty of ["", "0", "-2", "Infinity", "1.555"]) expect(() => movementFields("loss", qty, "add", "", "")).toThrow();
   for (const state of ["", "P", "12"]) expect(() => movementFields("festival_removal", "1", "add", state, "")).toThrow();
 });
 
-it("Record movement marks a non-positive quantity and a bad destination state on their own fields; decimals stay allowed (#1113)", () => {
-  const qty = "Enter a quantity greater than zero. The kind decides whether stock is added or removed.";
-  for (const value of ["-3", "0", "", "abc", "Infinity"]) expect(movementFieldErrors("loss", value, "")).toEqual({ qty });
-  expect(movementFieldErrors("loss", "2.5", "")).toEqual({});
+it("Record movement marks a quantity the database refuses and a bad destination state on their own fields; two decimals stay allowed (#1113)", () => {
+  const qty = "Enter a quantity above zero, with at most two decimal places. The kind, or Direction for an adjustment, decides whether stock is added or removed.";
+  // record_inventory_movement refuses p_qty <> round(p_qty, 2), so a third decimal is marked here, not by the server.
+  for (const value of ["-3", "0", "", "abc", "Infinity", "2.555", "0.004"]) expect(movementFieldErrors("loss", value, "")).toEqual({ qty });
+  // The command's schema caps the quantity (numeric(12,2)).
+  expect(movementFieldErrors("loss", "10000000000", "")).toEqual({ qty: "Enter a quantity of at most 9,999,999,999.99." });
+  for (const value of ["2.5", "0.01", "1.1", "9999999999.99"]) expect(movementFieldErrors("loss", value, "")).toEqual({});
   expect(movementFieldErrors("loss", "1", "P")).toEqual({});
   for (const state of ["", "P", "12"]) expect(movementFieldErrors("festival_removal", "1", state)).toEqual({ destState: "Enter a two-letter state, such as PA." });
   expect(movementFieldErrors("sample", "1", "pa")).toEqual({});
@@ -33,7 +36,9 @@ it("Record movement marks a non-positive quantity and a bad destination state on
 it("Record movement names everything it still needs, channel and state only for the kinds that carry them (#1113)", () => {
   const ready = { type: "depletion", skuId: "s", locationId: "l", binId: "b", saleChannelId: "c", qty: "2.5", destState: "" };
   expect(movementReason(ready)).toBeNull();
-  expect(movementReason({ ...ready, type: "", skuId: "", locationId: "", binId: "", qty: "-3" })).toBe("Still needed: a kind, a SKU, a location, a bin, and a quantity above zero.");
+  expect(movementReason({ ...ready, type: "", skuId: "", locationId: "", binId: "", qty: "-3" })).toBe("Still needed: a kind, a SKU, a location, a bin, and a quantity above zero with at most two decimals.");
+  expect(movementReason({ ...ready, qty: "2.555" })).toBe("Still needed: a quantity above zero with at most two decimals.");
+  expect(movementReason({ ...ready, qty: "10000000000" })).toBe("Still needed: a smaller quantity.");
   expect(movementReason({ ...ready, saleChannelId: "" })).toBe("Still needed: a channel.");
   expect(movementReason({ ...ready, type: "loss", saleChannelId: "" })).toBeNull();
   expect(movementReason({ ...ready, type: "sample", destState: "P" })).toBe("Still needed: a two-letter destination state.");

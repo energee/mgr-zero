@@ -17,7 +17,8 @@ export type RecordMovementControls = Partial<Record<
   (value: string) => void
 >>;
 
-/** The fields' slots in useTouchedLines, which New order keys by line. */
+/** Field slots in useTouchedLines. This form has no lines, so each slot is one
+ *  field, not a line number. */
 const QTY = 0;
 const DEST_STATE = 1;
 
@@ -53,7 +54,7 @@ export function RecordMovementView({
       {model.directionOptions ? <Pick label="Direction" value={model.direction ?? ""} options={model.directionOptions} onChange={controls.direction} /> : null}
       {model.lotOptions ? <Pick label="Lot" value={model.lot ?? ""} options={model.lotOptions} onChange={controls.lot} /> : null}
       {E.edit("Quantity", model.qty, "number", undefined, { id: `${id}-qty`, onChange: controls.qty, onBlur: () => touched.touch(QTY), error: qtyError, required: Boolean(controls.qty), min: "0.01", step: "0.01" })}
-      {model.note !== undefined ? E.edit("Note", model.note, "text", undefined, { onChange: controls.note ? controls.note ? (nextValue: string) => controls.note!(nextValue) : undefined : undefined }) : null}
+      {model.note !== undefined ? E.edit("Note", model.note, "text", undefined, { onChange: controls.note }) : null}
       {model.preview ? E.info(model.preview) : null}
       {messages}
       {footer !== undefined ? footer : E.pin(<>{E.btn("Record movement", "irr")}</>)}

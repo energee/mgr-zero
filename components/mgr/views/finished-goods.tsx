@@ -31,7 +31,8 @@ export function FinishedGoodsView({
   linkRows,
 }: {
   model: FinishedGoodsViewModel;
-  /** Live: Record movement, for a user who may record one. */
+  /** Live: Record movement, or null for a user who may not record one. The
+   *  inventory leaves it out and draws an inert Record movement. */
   createAction?: ReactNode;
   /** Where Add SKU in Catalog goes; null hides it for a user who may not
    *  create a SKU. The inventory leaves it out and the button stays inert. */
@@ -45,9 +46,14 @@ export function FinishedGoodsView({
   linkRows?: boolean;
 }) {
   const to = (href: string) => (linkRows ? href : "#");
+  const record = createAction !== undefined ? createAction : E.btn("Record movement");
+  // A reader who may do neither gets a bare title, not an empty action row.
+  const actions = record || addSkuHref !== null
+    ? <div className="flex flex-col gap-2 md:flex-row">{record}{addSkuHref !== null && E.btn("Add SKU in Catalog", "g", addSkuHref)}</div>
+    : undefined;
   return (
     <>
-      {E.back("Beer", "Finished goods", <div className="flex flex-col gap-2 md:flex-row">{createAction}{addSkuHref !== null && E.btn("Add SKU in Catalog", "g", addSkuHref)}</div>, model.backHref)}
+      {E.back("Beer", "Finished goods", actions, model.backHref)}
       {model.valueLine !== undefined ? E.fld("Inventory value", model.valueLine) : null}
       {model.empty ? E.blank(model.empty) : <RecordTable
         headers={["SKU", "On hand", "Allocated", "Available"]}

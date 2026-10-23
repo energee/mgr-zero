@@ -61,10 +61,14 @@ it("starts with no movement type picked and keeps Record movement disabled until
 
 it("names every missing field beside the withheld button, and previews once nothing is (#1113)", () => {
   const empty = render({ autoOpen: true });
-  expect(empty).toMatch(/<p id="([^"]+-reason)"[^>]*>Still needed: a kind, a SKU, a location, a bin, and a quantity above zero\.<\/p><button[^>]*type="submit"[^>]*aria-describedby="\1"/);
+  expect(empty).toMatch(/<p id="([^"]+-reason)"[^>]*>Still needed: a kind, a SKU, a location, a bin, and a quantity above zero with at most two decimals\.<\/p><button[^>]*type="submit"[^>]*aria-describedby="\1"/);
   const ready = render({ initial: { ...filled, type: "production_in" } });
   expect(ready).not.toContain("Still needed");
   expect(ready).toContain("Preview: +2 SKU units");
+});
+
+it("Record movement carries the irreversible fill, as its inventory frame draws it: a movement is append-only (#1113)", () => {
+  expect(render({ initial: { ...filled, type: "production_in" } })).toMatch(/<button[^>]*type="submit"[^>]*data-variant="irreversible"[^>]*>Record movement<\/button>|<button[^>]*data-variant="irreversible"[^>]*type="submit"[^>]*>Record movement<\/button>/);
 });
 
 it("an empty SKU picker links Catalog for a user who may create a SKU, and otherwise names who can (#1113)", () => {

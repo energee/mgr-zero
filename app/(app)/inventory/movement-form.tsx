@@ -15,7 +15,7 @@ import { formatVolume } from "@/lib/volume";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { E } from "@/components/mgr/e";
+import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
 import { RecordMovementView, type RecordMovementViewModel } from "@/components/mgr/views/record-movement";
@@ -177,7 +177,7 @@ export function MovementForm({
             }}
             messages={<><CommandFormMessage error={stockError} /><CommandFormMessage error={form.error} /></>}
             footer={<CommandFormFooter>
-            {E.submit("Record movement", { submitting: form.submitting, busy: "Recording…", reason })}
+            <IrreversibleSubmit label="Record movement" busy="Recording…" submitting={form.submitting} reason={reason} />
           </CommandFormFooter>}
           />
         </form>

@@ -59,8 +59,11 @@ describe("Finished goods view", () => {
     expect(model.rows).toEqual([]);
   });
 
-  it("the inventory drawing offers Add SKU in Catalog and a worded Shortfall, with no Review and no live hrefs (#942, #1113)", () => {
+  it("the inventory drawing offers Record movement, Add SKU in Catalog and a worded Shortfall, with no Review and no live hrefs (#942, #1113)", () => {
     const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList) }));
+    // Inert in the frame: the explorer resolves "Record movement" by screen name.
+    expect(html).toMatch(/<button[^>]*>Record movement<\/button>/);
+    expect(html.indexOf(">Record movement<")).toBeLessThan(html.indexOf(">Add SKU in Catalog<"));
     expect(html).toMatch(/>Add SKU in Catalog</);
     expect(html).toMatch(/>Shortfall</);
     expect(html).not.toMatch(/>Review</);
@@ -89,7 +92,11 @@ describe("Finished goods view", () => {
       addSkuHref: "/catalog",
       footer: "LEDGER",
     }));
-    expect(html).toMatch(/<h1[^>]*>Finished goods<\/h1><\/div><div[^>]*>MOVE<a[^>]*href="\/catalog"[^>]*>Add SKU in Catalog<\/a><\/div>/);
+    const title = html.indexOf(">Finished goods</h1>");
+    const move = html.indexOf("MOVE");
+    expect(title).toBeGreaterThan(-1);
+    expect(move).toBeGreaterThan(title);
+    expect(html.slice(move)).toMatch(/^MOVE.*?<a[^>]*href="\/catalog"[^>]*>Add SKU in Catalog<\/a>/);
     expect(html.indexOf("Add SKU in Catalog")).toBeLessThan(html.indexOf("<table"));
     expect(html).toMatch(/LEDGER/);
   });
@@ -98,6 +105,19 @@ describe("Finished goods view", () => {
     const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList), createAction: "MOVE", addSkuHref: null }));
     expect(html).toMatch(/MOVE/);
     expect(html).not.toMatch(/Add SKU/);
+  });
+
+  it("a reader who may neither record a movement nor create a SKU gets a bare title, with no empty action row (#1113)", () => {
+    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList), createAction: null, addSkuHref: null }));
+    expect(html).toMatch(/<div><div class="flex flex-col gap-1"><a[^>]*>.*?Beer<\/a><h1[^>]*>Finished goods<\/h1><\/div>/);
+    expect(html).not.toMatch(/Record movement|Add SKU/);
+  });
+
+  it("the live page gates Add SKU in Catalog and the empty SKU picker's link on create_sku, one href for both (#1113)", () => {
+    const src = readFileSync("app/(app)/inventory/page.tsx", "utf8");
+    expect(src).toMatch(/const skusHref = canRun\(ctx, "create_sku"\) \? "\/catalog" : null;/);
+    expect(src).toMatch(/<MovementForm\b[^\n]*skusHref=\{skusHref\}/);
+    expect(src).toMatch(/addSkuHref=\{skusHref\}/);
   });
 
   it("the Finished goods inventory record is FinishedGoodsView", () => {
