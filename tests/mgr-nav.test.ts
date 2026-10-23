@@ -2,7 +2,7 @@
 // boundary: role filtering leaves no gaps, and the active tab is the longest
 // href prefix of the current path (so /orders/123 lights Work, / lights Today).
 import { describe, expect, it } from "vitest";
-import { activeChild, activeTab, canOpen, isUnder, shippedNav, navFor, PORTAL_NAV, STAFF_NAV } from "../lib/mgr/nav";
+import { activeChild, activeTab, canOpen, isUnder, navAbout, shippedNav, navFor, PORTAL_NAV, STAFF_NAV } from "../lib/mgr/nav";
 import { STAFF_ROLES } from "../lib/mgr/enums";
 import { workHrefsFor } from "../components/mgr/work-tabs";
 
@@ -85,7 +85,7 @@ it("taproom has Beer and own settings without forbidden Work", () => {
   const nav = navFor(shippedNav(STAFF_NAV), ["taproom"]);
   expect(nav.map(t => t.label)).toEqual(["Today", "Beer", "More"]);
   expect(nav.find(t => t.label === "More")!.children!.map(t => t.label)).toEqual(["Chat", "Units"]);
-  expect(nav.find(t => t.label === "Beer")!.children).toEqual([
+  expect(nav.find(t => t.label === "Beer")!.children).toMatchObject([
     { label: "Taproom", href: "/taproom", roles: ["warehouse", "taproom"] },
     { label: "Taps", href: "/taproom/board", roles: ["warehouse", "taproom"] },
     { label: "Variance by brand", href: "/taproom/variance", roles: ["warehouse", "taproom"] },
@@ -127,5 +127,21 @@ describe("multi-role navigation", () => {
     expect(workHrefsFor(roles)).toEqual({ all: "/work", orders: "/orders", batches: "/batches", runs: "/packaging" });
     expect(navFor(STAFF_NAV, roles).some(item => item.href.startsWith("/portal"))).toBe(false);
     expect(PORTAL_NAV.map(item => item.href)).toEqual(["/portal", "/portal/orders", "/portal/invoices", "/portal/account"]);
+  });
+});
+
+describe("about", () => {
+  // Search's Pages results and the More cards both print `about`, so every
+  // staff entry a role can reach carries one short sentence-case line (#1106, #1134).
+  it("describes every staff tab and child in sentence case", () => {
+    for (const item of STAFF_NAV.flatMap(tab => [tab, ...(tab.children ?? [])])) {
+      expect.soft(item.about, item.label).toMatch(/^[A-Z][^.]*[^.\s]$/);
+    }
+  });
+
+  it("navAbout quotes an entry's line and refuses a label with none", () => {
+    const chat = STAFF_NAV.find(t => t.label === "More")!.children!.find(c => c.label === "Chat")!;
+    expect(navAbout("Chat")).toBe(chat.about);
+    expect(() => navAbout("Formats")).toThrow(/Formats/);
   });
 });

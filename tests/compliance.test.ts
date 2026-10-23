@@ -618,7 +618,7 @@ describe("cellar transfer loss (#428)", () => {
   });
 
   // #485: the loss is one volume_adjustments row, so the report reads it once and
-  // Review auto-reconciled losses can reattribute it like a completion loss.
+  // Review cellar losses can reattribute it like a completion loss.
   it("writes the loss as a reattributable cellar loss the report counts once", async () => {
     const brewery = await makeBrewery();
     const brewer = await makeStaffCtx(brewery.id, "brewer");
