@@ -14,6 +14,7 @@ import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, re
 import { assembleFinishedGoods, skuLabel, toFinishedGoodsViewProps } from "../lib/mgr/finished-goods-view";
 import { toMovementRecordedViewProps } from "../lib/mgr/movement-recorded-view";
 import { toRecordMovementViewProps } from "../lib/mgr/record-movement-view";
+import { MOVEMENT_KIND_LABELS } from "../lib/movement-form";
 import { toReverseMovementViewProps } from "../lib/mgr/reverse-movement-view";
 import { formatVolume } from "../lib/volume";
 
@@ -165,14 +166,18 @@ describe("Finished goods view", () => {
 });
 
 describe("Record movement view", () => {
-  it("maps festival removal onto chips index 4 and the Hazy preview", () => {
+  it("maps festival removal onto its kind and the Hazy preview", () => {
     const model = toRecordMovementViewProps(recordMovementFestival);
     expect(model.kind).toBe("Festival removal");
-    expect(model.kindIndex).toBe(4);
     expect(model.sku).toBe(SKU_HAZY.name);
     expect(model.bin).toBe("Cold");
     expect(model.channel).toBe("Taproom");
     expect(model.preview).toBe(`Preview: −1 SKU unit · ${formatVolume("0.50000000")} · Festival removal · PA · amounts are entered positive`);
+  });
+
+  it("lists the live form's kinds in the staff guide's order (#1168)", () => {
+    expect(MOVEMENT_KIND_LABELS).toEqual(["Opening balance", "Production in", "Adjustment", "Depletion", "Destruction", "Loss", "Sample", "Festival removal", "Return in"]);
+    expect(toRecordMovementViewProps(recordMovementFestival).kindOptions).toEqual(MOVEMENT_KIND_LABELS);
   });
 
   it("renders Kind, SKU, Destination state, and Record movement", () => {
@@ -224,7 +229,8 @@ describe("Record movement view", () => {
 describe("Movement recorded view", () => {
   it("maps the festival echo onto the tape and gated correction", () => {
     const model = toMovementRecordedViewProps(movementRecordedFestival);
-    expect(model.title).toBe("Hazy IPA · ½ bbl");
+    expect(model.sku).toBe("Hazy IPA · ½ bbl");
+    expect(model).not.toHaveProperty("backHref");
     expect(model.tapeLabel).toBe("−1 keg · Festival removal · PA");
     expect(model.tapeDetail).toBe(`${formatVolume("0.50000000")} · just now`);
     expect(model.correctionGate).toMatch(/latest eligible saved weekly count/i);
@@ -239,8 +245,16 @@ describe("Movement recorded view", () => {
     expect(html).not.toMatch(/→/);
   });
 
-  it("the Movement recorded inventory record is MovementRecordedView", () => {
-    const body = screen("Movement recorded").body as { type: unknown; props: { model: unknown } };
+  it("draws no in-sheet title or back link, and names the SKU in a row (#1167)", () => {
+    const html = htmlOf(createElement(MovementRecordedView, { model: toMovementRecordedViewProps(movementRecordedFestival) }));
+    expect(html).not.toMatch(/<h1\b|<a\b/);
+    expect(html).toMatch(/<dt[^>]*>SKU<\/dt><dd[^>]*>Hazy IPA · ½ bbl<\/dd>/);
+  });
+
+  it("the Movement recorded inventory record is a sheet drawing MovementRecordedView", () => {
+    const record = screen("Movement recorded");
+    expect(record.surface).toBe("sheet");
+    const body = record.body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(MovementRecordedView);
     expect(body.props.model).toEqual(toMovementRecordedViewProps(movementRecordedFestival));
   });

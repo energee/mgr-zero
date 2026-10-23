@@ -9,7 +9,7 @@
 import { command } from "@/lib/commands/client";
 import { useBrewery } from "@/lib/brewery-provider";
 import type { BinMoveStock } from "@/lib/commands/inventory";
-import { movementFieldErrors, movementFields, movementReason, requiresChannel, requiresDestState } from "@/lib/movement-form";
+import { MOVEMENT_KIND_LABELS, MOVEMENT_TYPES, movementFieldErrors, movementFields, movementReason, requiresChannel, requiresDestState, type MovementType } from "@/lib/movement-form";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { formatVolume } from "@/lib/volume";
 import { useEffect, useState } from "react";
@@ -24,14 +24,7 @@ import { formatDateTime } from "@/lib/date-format";
 import { toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
 import type { MovementInput } from "@/lib/commands/movement-input";
 
-// Staff-facing movement types; sale_removal/taproom_transfer are produced by
-// order flows (plan 1B), not entered manually here.
-const MOVEMENT_TYPES = [
-  "opening_balance", "production_in", "adjustment", "depletion",
-  "destruction", "loss", "sample", "festival_removal", "return_in",
-] as const;
 type MovementReceipt = { id: string; created_at: string; sku_id: string; location_id: string; bin_id: string; qty: number; bbl: number; type: string; dest_state: string | null; sale_channel_id: string | null; lot_id: string | null; ref: string | null; note: string | null };
-type MovementType = (typeof MOVEMENT_TYPES)[number];
 
 export function MovementForm({
   autoOpen = false,
@@ -99,7 +92,6 @@ export function MovementForm({
     destState: receipt.dest_state ?? undefined,
     bbl: String(receipt.bbl),
     when: formatDateTime(receipt.created_at, timeZone),
-    backHref: "/inventory",
     details: [
       { label: "Location", value: `${locations.find(l => l.id === receipt.location_id)?.name ?? receipt.location_id} / ${bins.find(b => b.id === receipt.bin_id)?.name ?? receipt.bin_id}` },
       ...(receipt.sale_channel_id ? [{ label: "Channel", value: channels.find(c => c.id === receipt.sale_channel_id)?.name ?? receipt.sale_channel_id }] : []),
@@ -109,7 +101,6 @@ export function MovementForm({
       ...(receipt.ref ? [{ label: "Source reference", value: receipt.ref }] : []),
     ],
   }) : null;
-  const kindOptions: string[] = MOVEMENT_TYPES.map(sentenceCase);
   const selectedSku = skus.find(item => item.id === skuId);
   const selectedLocation = locations.find(item => item.id === locationId);
   const selectedBin = bins.find(item => item.id === binId);
@@ -117,9 +108,9 @@ export function MovementForm({
   const availableLots = stock.filter(item => item.kind === "sku" && item.stock_id === skuId && item.bin_id === binId && item.lot_id);
   const lotOptions = ["Untracked / legacy stock", ...availableLots.map(item => `${item.lot_code} · ${item.qty} available`)];
   const movementModel: RecordMovementViewModel = {
-    // kindIndex -1 means no kind is chosen yet. The view draws from the empty
-    // `kind`, which shows the Select kind placeholder and no pressed toggle.
-    kind: sentenceCase(type), kindIndex: type ? MOVEMENT_TYPES.indexOf(type) : -1, kindOptions,
+    // An empty `kind` (none chosen yet) shows the Select kind placeholder and
+    // no pressed toggle.
+    kind: sentenceCase(type), kindOptions: MOVEMENT_KIND_LABELS,
     sku: selectedSku?.label ?? "", skuId, skuOptions: skus.map(item => ({ value: item.id, label: item.label })), skusHref,
     location: selectedLocation?.name ?? "", locationOptions: locations.map(item => item.name),
     bin: selectedBin?.name ?? "", binOptions: bins.filter(item => item.location_id === locationId).map(item => item.name),
@@ -164,7 +155,7 @@ export function MovementForm({
           <RecordMovementView
             model={movementModel}
             controls={{
-              kind: value => { const next = MOVEMENT_TYPES[kindOptions.indexOf(value)]; if (next) onTypeChange(next); },
+              kind: value => { const next = MOVEMENT_TYPES[MOVEMENT_KIND_LABELS.indexOf(value)]; if (next) onTypeChange(next); },
               sku: value => { setSkuId(value); setLotId(""); },
               location: value => { const id = locations.find(item => item.name === value)?.id ?? ""; setLocationId(id); setLotId(""); setBinId(bins.find(item => item.location_id === id)?.id ?? ""); },
               bin: value => { setBinId(bins.find(item => item.location_id === locationId && item.name === value)?.id ?? ""); setLotId(""); },

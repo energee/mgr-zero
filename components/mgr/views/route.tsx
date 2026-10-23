@@ -25,7 +25,7 @@ export function RouteView({ model, controls, busy = false, error, onSave, onDepa
   };
   const reason = routeReason(value);
   return <>
-    {E.back(model.backTo ?? "Routes", model.title, undefined, model.backHref)}
+    {E.back("Deliveries", model.title, undefined, model.backHref, "Routes")}
     <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); if (!busy && !reason) onSave?.(); }}>
       <fieldset disabled={busy}><DatePicker label="Delivery date" value={value.date ?? ""} onChange={date => change({ date })} /></fieldset>
 
