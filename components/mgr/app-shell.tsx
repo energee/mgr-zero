@@ -1,7 +1,7 @@
 // components/mgr/app-shell.tsx — the one navigation shell for staff and
 // portal (plan §3, §6), built on shadcn's Sidebar. At md and up the sidebar
 // is the left rail (every tab a menu item with its icon, children indented
-// under it as sub-items, ⌘B
+// under it as sub-items, More's under their area headings, ⌘B
 // collapses it to a 48px icon rail — each tab keeps its glyph and names
 // itself in a tooltip, and the sub-items fold away (#305)); below md the sidebar is hidden and a bottom tab bar with
 // 48px targets and safe-area padding takes over. Breakpoints are viewport
@@ -9,6 +9,7 @@
 // iframe. (pointer: coarse) sizing comes from app/globals.css.
 "use client";
 
+import { Fragment } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MgrIcon } from "@/components/mgr-icon";
@@ -19,7 +20,7 @@ import {
   SidebarProvider, SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { activeChild, activeTab, isUnder, PORTAL_NAV, type NavItem } from "@/lib/mgr/nav";
+import { activeChild, activeTab, isUnder, navGroups, PORTAL_NAV, type NavItem } from "@/lib/mgr/nav";
 import { cn } from "@/lib/utils";
 
 export type AppShellProps = {
@@ -68,12 +69,17 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
                     </SidebarMenuButton>
                     {!leaf && (
                       <SidebarMenuSub>
-                        {tab.children!.map((c) => (
-                          <SidebarMenuSubItem key={c.href}>
-                            <SidebarMenuSubButton asChild isActive={c === child}>
-                              <Link href={c.href} aria-current={c === child ? "page" : undefined}>{c.label}</Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
+                        {navGroups(tab.children!).map(({ group, items: kids }) => (
+                          <Fragment key={group ?? ""}>
+                            {group && <li className="px-2 pt-2 text-xs font-medium text-sidebar-foreground/70">{group}</li>}
+                            {kids.map((c) => (
+                              <SidebarMenuSubItem key={c.href}>
+                                <SidebarMenuSubButton asChild isActive={c === child}>
+                                  <Link href={c.href} aria-current={c === child ? "page" : undefined}>{c.label}</Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            ))}
+                          </Fragment>
                         ))}
                       </SidebarMenuSub>
                     )}

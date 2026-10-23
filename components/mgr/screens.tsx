@@ -477,7 +477,7 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", tab: "More", name: "More", job: "Setup and desk review, never standing work",
     reads: "none [role navigation manifest]", writes: "none",
     states: DEFAULT_STATES,
-    spec: "Role-filtered; hidden entries leave no gaps. Standing work remains in Today, Beer or Work.",
+    spec: "Role-filtered; hidden entries leave no gaps. Entries sit under Sales, Production, Setup and Integrations headings, and an area with none of the role's entries has no heading. The rail's More group uses the same headings. Standing work remains in Today, Beer or Work.",
     body: <MoreView model={toMoreViewProps(moreNavs)} />,
   },
   {
@@ -2232,7 +2232,7 @@ export const SCREENS: Screen[] = [
     job: "Choose a monthly, quarterly, or annual reporting period and see whether its snapshot was filed",
     reads: "list_compliance_reports · list_lots",
     writes: "none",
-    states: [["not filed", "Not filed · Ready to review", 1], ["in progress", "the current period: reviewable · In progress · File after the month ends"], ["filed", "the snapshot saved in MGR · Filed <date> · <bbl> taxpaid"], ["lots", "every packaged lot opens its trace"], ["no period yet", "every recent period starts before the books opened · names that date and the first period MGR can report"]],
+    states: [["not filed", "Not filed · Ready to review", 1], ["no activity", "an ended, unfiled period with no movement, cellar removal or invoice · Not filed · No activity", 1], ["in progress", "the current period: reviewable · In progress · File after the month ends"], ["filed", "the snapshot saved in MGR · Filed <date> · <bbl> taxpaid"], ["lots", "every packaged lot opens its trace"], ["no period yet", "every recent period starts before the books opened · names that date and the first period MGR can report"]],
     spec: "This is the shared destination for the Licenses back link, the period rows, and the lot trace. Monthly, Quarterly, and Annual tabs swap the list: the last three months, four calendar quarters, or two calendar years show, less any that start before the books-opened date, plus every filed period of that length. A tab left with no period says No monthly (quarterly, annual) period yet. A TTB filing is exactly one calendar month, quarter, or year; the API takes other jurisdictions and ranges.",
     body: <ComplianceMonthsView model={complianceMonthsDemo} />,
   },

@@ -45,15 +45,21 @@ describe("Compliance months", () => {
     const filing = { id: "f", jurisdiction: "TTB", period_start: "2026-07-01", period_end: "2026-07-31", filed_at: "2026-08-04T15:00:00Z", filed_by: null, note: null, created_at: "2026-08-04T15:00:00Z",
       figures: { jurisdiction: "TTB", periodStart: "2026-07-01", periodEnd: "2026-07-31", lines: [], removals: { taxable: 38.75 }, cellarRemovals: {}, byState: {}, packaged: 0, inProcess: 0, balances: true } };
     const today = "2026-09-15";
-    expect(periodRow("2026-09", undefined, today, DEMO_TIME_ZONE)).toEqual(complianceMonthsDemo.months[0]);
-    expect(periodRow("2026-08", { ...filing, period_start: "2026-08-01", period_end: "2026-08-31", filed_at: "2026-09-02T15:00:00Z", needs_amendment: true }, today, DEMO_TIME_ZONE)).toEqual(complianceMonthsDemo.months[1]);
-    expect(periodRow("2026-07", filing, today, DEMO_TIME_ZONE)).toEqual(complianceMonthsDemo.months[2]);
-    expect(periodRow("2026-07", undefined, today, DEMO_TIME_ZONE).detail).toBe("Not filed · Ready to review");
-    expect(periodRow("2026-Q3", undefined, today, DEMO_TIME_ZONE).detail).toBe("In progress · File after the quarter ends");
-    expect(periodRow("2026-07", { ...filing, filed_at: null }, today, DEMO_TIME_ZONE).detail).toBe("Filed · 38.75 bbl taxpaid");
+    expect(periodRow("2026-09", undefined, today, DEMO_TIME_ZONE, true)).toEqual(complianceMonthsDemo.months[0]);
+    expect(periodRow("2026-08", { ...filing, period_start: "2026-08-01", period_end: "2026-08-31", filed_at: "2026-09-02T15:00:00Z", needs_amendment: true }, today, DEMO_TIME_ZONE, true)).toEqual(complianceMonthsDemo.months[1]);
+    expect(periodRow("2026-07", filing, today, DEMO_TIME_ZONE, true)).toEqual(complianceMonthsDemo.months[2]);
+    expect(periodRow("2026-07", undefined, today, DEMO_TIME_ZONE, true).detail).toBe("Not filed · Ready to review");
+    expect(periodRow("2026-Q3", undefined, today, DEMO_TIME_ZONE, true).detail).toBe("In progress · File after the quarter ends");
+    expect(periodRow("2026-07", { ...filing, filed_at: null }, today, DEMO_TIME_ZONE, true).detail).toBe("Filed · 38.75 bbl taxpaid");
     const page = src("app/(app)/compliance/page.tsx");
     expect(page).toMatch(/periodRow\(/);
-    expect(page).not.toMatch(/ready to review|file once/i);
+    expect(page).not.toMatch(/ready to review|no activity|file once/i);
+  });
+
+  it("an ended, unfiled period with no report activity reads No activity; activity changes no other row (#1209)", () => {
+    const today = "2026-09-15";
+    expect(periodRow("2026-07", undefined, today, DEMO_TIME_ZONE, false)).toEqual({ key: "2026-07", title: "July 2026", detail: "Not filed · No activity", tone: "w" });
+    expect(periodRow("2026-09", undefined, today, DEMO_TIME_ZONE, false)).toEqual(complianceMonthsDemo.months[0]);
   });
 
   it("the Compliance months inventory record is ComplianceMonthsView", () => {
