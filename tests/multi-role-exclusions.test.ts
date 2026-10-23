@@ -59,7 +59,7 @@ vi.mock("@/lib/mgr/page-query", async importOriginal => ({
       };
       case "get_invoice": return {
         invoice: { id: "invoice", kind: "invoice", invoice_no: 797, issued_on: "2026-10-16", due_on: null, paid_at: null, qbo_sync_status: "pending", qbo_remote_state: "live", customers: null },
-        lines: [], hasPendingPush: false, quickbooksLink: null,
+        lines: [], payments: [], hasPendingPush: false, wasPushedToQbo: false, localPaidCents: 0, quickbooksLink: null,
       };
       case "list_invoice_questions": return [];
       case "get_qbo_connection": return { connected: false, state: "disconnected", realmLabel: null };
@@ -213,10 +213,10 @@ describe("role-only exclusions", () => {
     const connection = { connected: true, connectionId: "connection", realmId: "realm" };
     const push = { connection_id: "connection", realm_id: "realm", qbo_entity_id: "34" };
     for (const excluded of ["warehouse", "brewer", "taproom"] as const) {
-      expect(qboInvoicePresentation({ kind: "invoice", roles: [excluded], connected: true, syncStatus: "pending" }).actions).toEqual([]);
+      expect(qboInvoicePresentation({ kind: "invoice", roles: [excluded], connected: true, syncStatus: "pending", localPaidCents: 0 }).actions).toEqual([]);
       expect(qboStaffInvoiceLink(invoice, [excluded], connection, push)).toBeNull();
       for (const allowed of ["sales", "admin"] as const) {
-        expect(qboInvoicePresentation({ kind: "invoice", roles: [excluded, allowed], connected: true, syncStatus: "pending" }).actions).toEqual(["push"]);
+        expect(qboInvoicePresentation({ kind: "invoice", roles: [excluded, allowed], connected: true, syncStatus: "pending", localPaidCents: 0 }).actions).toEqual(["push"]);
         expect(qboStaffInvoiceLink(invoice, [excluded, allowed], connection, push)?.href).toContain("txnId=34");
       }
     }

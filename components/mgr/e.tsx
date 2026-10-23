@@ -375,7 +375,7 @@ export const E = {
     <a href={href} data-to={to} className="text-sm text-muted-foreground underline">{t}</a>
   ),
   /** An editable field. type is the native input type; "date" pops the calendar
-   *  (DatePicker). */
+   *  (DatePicker), which honors `max` as the last day it offers. */
   edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[], controls?: FieldControls) => {
     // `error` is drawn under the field (fieldError), never passed to the input.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -383,7 +383,7 @@ export const E = {
     const error = fieldError(controls);
     const attributes = { ...rest, "aria-invalid": error.invalid, "aria-describedby": error.describedBy };
     // DatePicker draws its own Field and takes no invalid flag, so a date's error is its message alone.
-    if (type === "date") return <><DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} aria-describedby={error.describedBy} />{error.message}</>;
+    if (type === "date") return <><DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} max={controls?.max === undefined ? undefined : String(controls.max)} aria-describedby={error.describedBy} />{error.message}</>;
     // A whole number (a contract quantity, an overdue threshold) is counted,
     // not typed: the same −/+ stepper Weekly count uses.
     if (type === "number") {

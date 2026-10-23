@@ -32,6 +32,7 @@ import { E } from "@/components/mgr/e";
 import { QboMappingView, QboMappingsView } from "@/components/mgr/views/qbo-mapping";
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { invoiceList, invoicesSync } from "@/lib/mgr/fixtures/invoices";
+import { dollarsInput } from "@/lib/mgr/money";
 import { InviteView, TeamMemberView } from "@/components/mgr/views/team-controls";
 import { CreateBreweryView } from "@/components/mgr/views/create-brewery";
 import { ImportView } from "@/components/mgr/views/import";
@@ -88,7 +89,7 @@ import { DeleteFormatControl } from "@/components/mgr/views/delete-format";
 import { FormatsView } from "@/components/mgr/views/formats";
 import { WaterProfilesView } from "@/components/mgr/views/water-profiles";
 import { WaterProfileView } from "@/components/mgr/views/water-profile";
-import { InvoiceView } from "@/components/mgr/views/invoice";
+import { InvoiceView, RecordPaymentView, VoidPaymentView } from "@/components/mgr/views/invoice";
 import { KegBalanceView } from "@/components/mgr/views/keg-balance";
 import { KegFleetView } from "@/components/mgr/views/keg-fleet";
 import { KegReportView } from "@/components/mgr/views/keg-report";
@@ -188,7 +189,7 @@ import { DEMO_TIME_ZONE, settingsDemo } from "@/lib/mgr/fixtures/settings";
 import { teamRoster } from "@/lib/mgr/fixtures/team";
 import { todayBrewer, todayDriver, todayEmpty, todaySales, todayTaproom, todayWarehouse } from "@/lib/mgr/fixtures/today";
 import { workWarehouse } from "@/lib/mgr/fixtures/work";
-import { invoiceFailedAls, invoiceFailedAlsAccounting } from "@/lib/mgr/fixtures/invoice";
+import { invoiceFailedAls, invoiceFailedAlsAccounting, invoiceLocalPartlyPaid } from "@/lib/mgr/fixtures/invoice";
 import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, reverseMovementAdjustment } from "@/lib/mgr/fixtures/inventory";
 import { binCold, locationBinsTaproom, locationTaproom, locationsList } from "@/lib/mgr/fixtures/locations";
 import { newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
@@ -397,6 +398,11 @@ const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here y
 const permitted = (who: string): NonNullable<Screen["states"]> => [["permission", who, 1], ...DEFAULT_STATES.filter(([st]) => st !== "permission")];
 /** Settings and its no-warehouse variant draw the same page, so they read and write the same. */
 const SETTINGS_IO = { reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_operating_defaults · set_books_opened_on · correct_reporting_basis · set_brewery_ai_model · update_location · set_portal_fulfillment_source" };
+
+/** INV-1039 partly paid in MGR: Record payment's cap and the $300.00 check Void payment voids. */
+const LOCAL_PARTLY_PAID = toInvoiceViewProps(invoiceLocalPartlyPaid);
+const LOCAL_CHECK = LOCAL_PARTLY_PAID.payments[0];
+const LOCAL_BALANCE_CENTS = LOCAL_PARTLY_PAID.paymentBalanceCents!;
 
 export const SCREENS: Screen[] = [
   // step 1 — foundations and both authenticated shells
@@ -1393,8 +1399,8 @@ export const SCREENS: Screen[] = [
     job: "The AR list: what is due, what QuickBooks changed underneath it, and the drill-in for one invoice",
     reads: "list_invoices · get_qbo_connection · get_qbo_sync_status",
     writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping · push_invoice_to_qbo · sync_qbo_payments · write_off_invoice [existing commands] · Open in QuickBooks [verified company-bound invoice destination] · email delivery status [SCHEMA-GATE: post-v1 scope; the invoice query returns no delivery state]",
-    states: [["overdue", "outstanding invoice due before brewery-local today", 1], ["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping, push or sync; Sync QuickBooks is hidden, Admin sees Connect, Sales sees Admin must connect", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "payment status is confirmed by QuickBooks Online sync · no settlement date or user verb"], ["needs mapping", "a failed push Admin or Sales can fix; the drill-in resolves each mapping", 1]],
-    spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the manual sync reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; collected revenue is a read-side rule, remote state live and balance zero, expressed once in the reporting view; no CHECK refuses a historical payment-confirmation marker, because paid-then-voided is a real history the row must be able to hold. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. An outstanding invoice is overdue only when its due date is before brewery-local today, not on the due day itself. Credit memos, invoices whose QuickBooks balance is unknown (never pushed, pending or failed), and settled, paid, written-off, voided or deleted invoices are never marked overdue. Inventory pins its clock. Rows also carry the due date, push failure and credit-memo status; payments come back through manual sync and are read-only. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
+    states: [["overdue", "outstanding invoice due before brewery-local today", 1], ["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping, push or sync; Sync QuickBooks is hidden, Admin sees Connect, Sales sees Admin must connect", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "payment status is confirmed by QuickBooks Online sync, or paid in full by payments recorded in MGR"], ["needs mapping", "a failed push Admin or Sales can fix; the drill-in resolves each mapping", 1]],
+    spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the manual sync reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; collected revenue is a read-side rule, remote state live and balance zero, expressed once in the reporting view; no CHECK refuses a historical payment-confirmation marker, because paid-then-voided is a real history the row must be able to hold. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. An outstanding invoice is overdue only when its due date is before brewery-local today, not on the due day itself. Credit memos, invoices whose balance is unknown (push result unknown, pushed to a previous company, or not yet synced), and settled, paid, written-off, voided or deleted invoices are never marked overdue. Inventory pins its clock. Rows also carry the due date, push failure and credit-memo status; payments come back through manual sync and are read-only, except on an invoice QuickBooks never received, which takes Record payment. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
     body: <InvoicesView rows={invoiceList} connection={{ connected: true, detail: "Connected · company 9341", canConnect: true }} sync={<QboSyncView status={invoicesSync} />} />,
   },
   {
@@ -1402,13 +1408,42 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Invoice",
-    to: { "Pils · case": "Fix mapping", Return: "Return and credit" },
-    job: "Review one invoice, resolve its mappings and push it",
+    to: { "Pils · case": "Fix mapping", Return: "Return and credit", "Record payment": "Record payment", Void: "Void payment" },
+    job: "Review one invoice, resolve its mappings and push it, or record its payments in MGR",
     reads: "get_qbo_connection · get_invoice · list_invoice_questions",
-    writes: "push_invoice_to_qbo · resolve_invoice_question",
-    states: [["permission", "sales or admin required", 1], ["unmapped", "push stays unavailable", 1], ["ready", "every customer and item is mapped"], ["pushed", "QuickBooks owns later accounting edits"], ["buyer question", "the note is read here, and answered off-system", 1], ["partly paid", "the summary shows the QuickBooks balance and the cash received"], ["edited in QuickBooks", "Current invoice total beside the Frozen MGR line subtotal; the lines stay as frozen", 1], ["no balance", "an unknown balance reads Unknown, never $0.00", 1], ["credit memo", "a signed Credit memo total, no balance due and no Return"]],
-    spec: "Read as a document: number, state and customer, then Issued and Due beside the one price summary (before the lines on the phone). The summary groups the stored line amounts by line kind; its total is the QuickBooks total when there is one, and the balance comes from QuickBooks only. QuickBooks status is said once, with only the mappings that need action. The drill-in is also where a buyer's question lands: the portal writes it, the sales Today row points here, and marking it answered is what clears that row. Nothing about the invoice changes; the reply happens in a phone call or an email, which is why the verb says answered rather than replied. Return closes the page because it corrects a shipment and is not the next step.",
+    writes: "push_invoice_to_qbo · resolve_invoice_question · record_invoice_payment · void_invoice_payment",
+    states: [["permission", "sales or admin required", 1], ["unmapped", "push stays unavailable", 1], ["ready", "every customer and item is mapped"], ["pushed", "QuickBooks owns later accounting edits"], ["buyer question", "the note is read here, and answered off-system", 1], ["partly paid", "the summary shows the balance and the cash received, from QuickBooks or from payments recorded in MGR"], ["paid in MGR", "payments recorded in MGR reach the total; paid on the day the last one was received"], ["payments block push", "an unvoided payment in MGR: no Push and no mapping rows", 1], ["no payment due", "a $0.00 invoice QuickBooks never received takes no payment and is never overdue"], ["edited in QuickBooks", "Current invoice total beside the Frozen MGR line subtotal; the lines stay as frozen", 1], ["no balance", "an unknown balance reads Unknown, never $0.00", 1], ["credit memo", "a signed Credit memo total, no balance due and no Return"]],
+    spec: "Read as a document: number, state and customer, then Issued and Due beside the one price summary (before the lines on the phone). The summary groups the stored line amounts by line kind; its total is the QuickBooks total when there is one, and the balance comes from QuickBooks, or from MGR's payment ledger for an invoice QuickBooks never received. Payments lists what was recorded in MGR, voided ones with their reasons; Record payment appears only where that ledger owns the balance, and Void is the only correction. QuickBooks status is said once, with only the mappings that need action. The drill-in is also where a buyer's question lands: the portal writes it, the sales Today row points here, and marking it answered is what clears that row. Nothing about the invoice changes; the reply happens in a phone call or an email, which is why the verb says answered rather than replied. Return closes the page because it corrects a shipment and is not the next step.",
     body: <InvoiceView model={toInvoiceViewProps(invoiceFailedAls)} quickbooks={{ detail: invoiceFailedAlsAccounting.detail }} staffLink={{ href: null, reason: "This invoice has not been successfully pushed to QuickBooks." }} />,
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Record payment",
+    to: { "Record payment": "Invoice" },
+    job: "Record one payment received outside QuickBooks, on an invoice QuickBooks never received",
+    reads: "get_invoice · get_qbo_connection",
+    writes: "record_invoice_payment",
+    states: [["permission", "admin or sales required", 1], ["above balance", "an amount over the balance due is refused", 1], ["future", "a received day after the brewery's today is refused", 1], ["prepayment", "a received day before the issue date is accepted"], ["paid in full", "the invoice reads Paid"], ["connected", "the invoice is no longer sent to QuickBooks", 1]],
+    spec: "Amount, received day and method are required; a reference such as a check number is optional. The amount is capped at the balance due, so there is no credit balance, and the received day at the brewery's today. Paid in full marks the invoice paid on the latest received day of its payments. A payment is never edited; Void corrects it.",
+    // INV-1039 partly paid in MGR: the rest of its balance, received on the inventory's today.
+    body: <RecordPaymentView value={{ amount: dollarsInput(LOCAL_BALANCE_CENTS), receivedOn: "2026-10-04", method: "check", reference: "1190" }} maxCents={LOCAL_BALANCE_CENTS} maxDate="2026-10-04" quickbooksConnected />,
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Void payment",
+    to: { "Confirm void": "Invoice" },
+    job: "Void one payment recorded in MGR, with a reason",
+    reads: "get_invoice",
+    writes: "void_invoice_payment",
+    states: [["permission", "admin or sales required", 1], ["already voided", "a payment is voided once", 1], ["below total", "a paid invoice is no longer paid"]],
+    spec: "Voiding is the only correction: the payment stays on the invoice, marked voided with its reason, and no longer counts toward the balance. An invoice whose payments are all voided can be pushed to QuickBooks again.",
+    body: <VoidPaymentView paymentId={LOCAL_CHECK.id} amount={LOCAL_CHECK.amount} />,
   },
   {
     step: 5,
@@ -2937,11 +2972,11 @@ export const SCREENS: Screen[] = [
   {
     step: 5, slice: 1, group: "QuickBooks Online", venue: { name: "QuickBooks Online", title: "Payment", actions: "Edit" },
     name: "Payment",
-    job: "The accountant records payment here; MGR never offers a Mark paid verb",
+    job: "The accountant records payment here for an invoice in QuickBooks",
     reads: "sync_qbo_payments [manual sync; records guarded payment-confirmation status]",
     writes: "none [no MGR user action]",
     states: [["paid", "the invoice's payment status is confirmed on the next sync"], ["fee deducted", "the deposit is smaller than the payment", 1], ["partial", "balance drops; the AR row stays due", 1], ["sync lagging", "MGR AR shows the last synced balance", 1]],
-    spec: "This frame justifies an absence: there is deliberately no Mark paid button anywhere in MGR. Payment status and the QuickBooks balance update only when staff run the manual sync; no settlement date is supplied, which is why the AR list stops showing an invoice as due without anyone marking it paid. It also carries a number MGR does not model: QuickBooks Payments deducts a processing fee before deposit, so the bank deposit never equals the invoice. MGR reconciles against the QuickBooks balance, not the deposit, and must not read the gap as a short payment.",
+    spec: "An invoice in QuickBooks is paid here; MGR offers Record payment only for an invoice QuickBooks never received. Payment status and the QuickBooks balance update only when staff run the manual sync; no settlement date is supplied, which is why the AR list stops showing an invoice as due without anyone marking it paid. It also carries a number MGR does not model: QuickBooks Payments deducts a processing fee before deposit, so the bank deposit never equals the invoice. MGR reconciles against the QuickBooks balance, not the deposit, and must not read the gap as a short payment.",
     body: (<>
       {X.stat("Paid")}
       {X.amt("Amount paid", INV.major, INV.cents)}

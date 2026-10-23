@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { QboOAuthClient, syncQboInvoices } from "@/lib/qbo";
 import { beginQboInvoiceSync, completeQboInvoiceSync } from "@/lib/supabase/integration-tokens";
 import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
-import { invoiceCurrentState } from "@/lib/mgr/invoice-state";
+import { invoiceBalanceCents, invoiceCurrentState, invoiceLedgerOwnsBalance } from "@/lib/mgr/invoice-state";
 import { qboInvoicePresentation } from "@/lib/mgr/qbo-ui";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { toPortalInvoiceViewProps } from "@/lib/mgr/portal-invoice-view";
@@ -134,7 +134,7 @@ describe("QuickBooks current invoice state", () => {
     const read = await new QboOAuthClient(config, transport).readInvoice("realm", "credit", "access", new Map(), "CreditMemo");
     if (!read.ok) throw new Error("unexpected provider failure");
     expect(read.balanceCents).toBeNull();
-    expect(qboInvoicePresentation({ kind: "credit_memo", roles: ["sales"], connected: true, syncStatus: "pushed",
+    expect(qboInvoicePresentation({ kind: "credit_memo", roles: ["sales"], connected: true, syncStatus: "pushed", localPaidCents: 0,
       remoteState: "live", totalCents: read.totalCents, balanceCents: read.balanceCents, cashCollectedCents: read.cashCollectedCents }))
       .toEqual({ detail: "pushed to QuickBooks", actions: [] });
   });
@@ -475,8 +475,7 @@ describe("QuickBooks current invoice state", () => {
     const { rows: list } = await runCommand("list_invoices", {}, f.ctx) as { rows: { id: string; subtotal_cents: number; total_cents: number }[] };
     expect(list.find((row) => row.id === f.invoice.id)).toMatchObject({ subtotal_cents: 10000, total_cents: 10500 });
     const invoice = detail.invoice;
-    const lines = detail.lines;
-    expect(toInvoiceViewProps({ invoice, lines, questions: [] , timeZone: "America/New_York" }).summary).toMatchObject({
+    expect(toInvoiceViewProps({ ...detail, questions: [], timeZone: "America/New_York" }).summary).toMatchObject({
       total: { label: "Current invoice total", value: "$105.00" }, rows: expect.arrayContaining([{ label: "Frozen MGR line subtotal", value: "$100.00" }]),
     });
     const customerUser = await makeCustomerUser(f.customer.customerId);
@@ -495,7 +494,7 @@ describe("QuickBooks current invoice state", () => {
     }).invoice).toMatchObject({ amount: "$105.00", detail: "unpaid", paid: false });
 
     const local = { ...invoice, qbo_total_cents: null, qbo_accountant_drift: false };
-    expect(toInvoiceViewProps({ invoice: local, lines, questions: [] , timeZone: "America/New_York" }).summary.total?.value).toBe("$100.00");
+    expect(toInvoiceViewProps({ ...detail, invoice: local, questions: [], timeZone: "America/New_York" }).summary.total?.value).toBe("$100.00");
     const paid = { ...invoice, paid_at: "2026-09-10T12:00:00Z", qbo_balance_cents: 0 };
     expect(toPortalInvoiceViewProps({
       invoice: { ...paid, total_cents: 10000 }, lines: portalDetail.lines,
@@ -744,7 +743,10 @@ describe("QuickBooks current invoice state", () => {
       paid_at: "2026-09-09T15:00:00Z", qbo_remote_state: "voided" as const, qbo_balance_cents: 0,
       qbo_accountant_drift: false, written_off_at: null, customers: { name: "Buyer" },
     };
-    expect(toInvoiceViewProps({ invoice, lines: [], questions: [] , timeZone: "America/New_York" })).toMatchObject({ state: { label: "Voided", tone: "w" } });
+    expect(toInvoiceViewProps({
+      invoice: { ...invoice, qbo_invoice_id: "qbo-1" }, lines: [], questions: [], timeZone: "America/New_York",
+      payments: [], hasPendingPush: false, wasPushedToQbo: true, localPaidCents: 0,
+    })).toMatchObject({ state: { label: "Voided", tone: "w" } });
     expect(toPortalInvoiceViewProps({
       invoice: { ...invoice, total_cents: 10000 }, lines: [], brewery: { name: "Brewery", customer_phone: null },
     })).toMatchObject({ paid: false, paidOn: undefined, status: "Voided" });
@@ -763,5 +765,47 @@ describe("QuickBooks current invoice state", () => {
     }
     expect(toPortalInvoicesViewProps({ customerName: "Buyer", invoices: [{ ...invoice, invoice_lines: [{ amount_cents: 10000 }] }] }).rows[0])
       .toMatchObject({ detail: "voided", unpaid: false });
+  });
+});
+
+// #1045 Design 2: MGR's payment ledger owns the balance of an invoice QuickBooks never received.
+describe("who owns an invoice balance", () => {
+  const neverPushed = {
+    kind: "invoice" as const, qbo_invoice_id: null, paid_at: null, qbo_balance_cents: null,
+    has_pending_qbo_push: false, was_pushed_to_qbo: false, local_paid_cents: 0,
+  };
+
+  it.each([
+    // Also a rejected push, a never-pushed invoice a company change purged, and
+    // one whose payments are all voided: each has exactly these facts.
+    ["a never-pushed unpaid invoice", neverPushed],
+    ["an invoice the ledger paid in full", { ...neverPushed, paid_at: "2026-10-20T04:00:00Z", local_paid_cents: 5000 }],
+  ])("the ledger owns %s", (_name, invoice) => {
+    expect(invoiceLedgerOwnsBalance(invoice)).toBe(true);
+  });
+
+  it.each([
+    ["an invoice with a pending push (Q3)", { ...neverPushed, has_pending_qbo_push: true }],
+    ["an invoice pushed and then purged by a company change (Q4)", { ...neverPushed, was_pushed_to_qbo: true }],
+    ["an invoice with a QuickBooks identity", { ...neverPushed, qbo_invoice_id: "qbo-1042" }],
+    ["a credit memo", { ...neverPushed, kind: "credit_memo" as const }],
+    ["an invoice paid outside the ledger, such as a historical import (Q7)", { ...neverPushed, paid_at: "2026-09-01T04:00:00Z" }],
+  ])("QuickBooks owns %s", (_name, invoice) => {
+    expect(invoiceLedgerOwnsBalance(invoice)).toBe(false);
+  });
+
+  it("subtracts payments from the total when the ledger owns the balance", () => {
+    expect(invoiceBalanceCents({ ...neverPushed, local_paid_cents: 3000 }, 10000)).toBe(7000);
+  });
+
+  it("gives a ledger-owned $0.00 invoice a zero balance, never a negative one (Design 4)", () => {
+    expect(invoiceBalanceCents(neverPushed, 0)).toBe(0);
+    expect(invoiceBalanceCents(neverPushed, -500)).toBe(0);
+  });
+
+  it("never turns a null QuickBooks balance into zero", () => {
+    expect(invoiceBalanceCents({ ...neverPushed, has_pending_qbo_push: true }, 10000)).toBeNull();
+    expect(invoiceBalanceCents({ ...neverPushed, was_pushed_to_qbo: true, qbo_balance_cents: undefined }, 10000)).toBeNull();
+    expect(invoiceBalanceCents({ ...neverPushed, qbo_invoice_id: "qbo-1042", qbo_balance_cents: 2500 }, 10000)).toBe(2500);
   });
 });

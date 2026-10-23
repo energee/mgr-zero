@@ -8,7 +8,7 @@ import type { Ctx } from "./registry";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { ORDER_STATUSES, salesRoles, warehouseRoles } from "@/lib/mgr/order-status";
 import { hasAnyRole } from "@/lib/mgr/roles";
-import { REFUSAL_REASONS } from "@/lib/mgr/enums";
+import { PAYMENT_METHODS, REFUSAL_REASONS } from "@/lib/mgr/enums";
 import { isoDate } from "./packaging";
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
 
@@ -339,6 +339,31 @@ defineCommand({
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("resolve_invoice_question", { p_brewery: ctx.breweryId, p_question: i.questionId, p_request_id: execution.requestId })),
 });
 
+// Payments recorded in MGR (#1045, docs/plans/invoice-local-payments.md). The
+// RPCs hold every rule: only an invoice QuickBooks never received, no more
+// than the balance, no future received date in the brewery's zone.
+defineCommand({
+  name: "record_invoice_payment", description: "Record a payment received outside QuickBooks on an invoice QuickBooks never received; paid in full marks the invoice paid on the latest received day of its payments; returns the remaining balance",
+  roles: [...salesRoles],
+  input: z.object({
+    invoiceId: z.string().uuid(), amountCents: z.number().int().positive(), receivedOn: isoDate,
+    method: z.enum(PAYMENT_METHODS), reference: z.string().trim().max(200).optional(),
+  }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_invoice_payment", {
+    p_brewery: ctx.breweryId, p_invoice: i.invoiceId, p_amount_cents: i.amountCents, p_received_on: i.receivedOn,
+    p_method: i.method, p_reference: i.reference ?? null, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "void_invoice_payment", description: "Void a payment recorded in MGR with a reason, the only correction; the payment row is kept, and an invoice that drops below its total is no longer paid; returns the balance",
+  roles: [...salesRoles], requiresConfirmation: true,
+  input: z.object({ paymentId: z.string().uuid(), reason: z.string().trim().min(1).max(500) }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("void_invoice_payment", {
+    p_brewery: ctx.breweryId, p_payment: i.paymentId, p_reason: i.reason, p_request_id: execution.requestId,
+  })),
+});
+
 defineQuery({
   name: "daily_pick_sheet", description: "Confirmed/picked orders grouped by requested ship date with lines (each SKU with its brand name and staff alias, and format name)",
   roles: [...readRoles],
@@ -369,8 +394,21 @@ async function invoiceStaffLinks(ctx: Ctx, invoices: (QboInvoiceIdentity & { id:
     pushByEntity.get(`${invoice.id}:${invoice.qbo_invoice_id}`))]));
 }
 
+type InvoicePushFacts = { has_pending_push: boolean; was_pushed: boolean };
+
+/** Each invoice's pending and successful QuickBooks pushes, by invoice id; an
+ *  invoice with neither is absent. Read through invoice_push_facts, because
+ *  qbo_pushes is readable by Admin and Sales only and Warehouse also reads
+ *  invoices: without the facts, a pending or earlier-pushed invoice would look
+ *  ledger-owned to Warehouse (invoiceLedgerOwnsBalance, #1045). */
+async function invoicePushFacts(ctx: Ctx, invoiceIds: string[]) {
+  const rows = await unwrap(ctx.db.rpc("invoice_push_facts", { p_brewery: ctx.breweryId, p_invoices: invoiceIds }));
+  // A set-returning RPC answers [] for no rows; data is null only beside an error, which unwrap threw.
+  return new Map<string, InvoicePushFacts>(rows!.map(({ invoice_id, ...facts }) => [invoice_id, facts]));
+}
+
 defineQuery({
-  name: "list_invoices", description: "Invoices and credit memos with current total plus frozen local subtotal, newest first",
+  name: "list_invoices", description: "Invoices and credit memos with current total plus frozen local subtotal and the sum of payments recorded in MGR, newest first",
   roles: [...readRoles],
   input: z.object({ customerId: z.string().uuid().optional(), ...historyInput }),
   handler: async (ctx, i) => {
@@ -380,34 +418,46 @@ defineQuery({
     const invoices = page.rows;
     const ids = invoices.map(inv => inv.id);
     const staffLinksPromise = invoiceStaffLinks(ctx, invoices);
-    const [totals, pendingPushes] = ids.length ? await Promise.all([
-      unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents").in("invoice_id", ids)) as PromiseLike<{ invoice_id: string; subtotal_cents: number }[]>,
-      unwrap(ctx.db.from("qbo_pushes").select("invoice_id").in("invoice_id", ids).eq("status", "pending")) as PromiseLike<{ invoice_id: string }[]>,
-    ]) : [[], []];
+    const [totals, pushes] = ids.length ? await Promise.all([
+      unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents, local_paid_cents").in("invoice_id", ids)) as PromiseLike<{ invoice_id: string; subtotal_cents: number; local_paid_cents: number }[]>,
+      invoicePushFacts(ctx, ids),
+    ]) : [[], new Map<string, InvoicePushFacts>()];
     const staffLinks = await staffLinksPromise;
-    const subtotalById = new Map(totals.map(t => [t.invoice_id, t.subtotal_cents]));
-    const pending = new Set(pendingPushes.map(push => push.invoice_id));
+    const totalsById = new Map(totals.map(t => [t.invoice_id, t]));
     return { ...page, rows: invoices.map(inv => {
-      const subtotal_cents = subtotalById.get(inv.id) ?? 0;
-      return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents), has_pending_qbo_push: pending.has(inv.id), quickbooks_link: staffLinks.get(inv.id) ?? null };
+      const { subtotal_cents = 0, local_paid_cents = 0 } = totalsById.get(inv.id) ?? {};
+      const push = pushes.get(inv.id);
+      return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents), local_paid_cents,
+        has_pending_qbo_push: push?.has_pending_push ?? false, was_pushed_to_qbo: push?.was_pushed ?? false, quickbooks_link: staffLinks.get(inv.id) ?? null };
     }) };
   },
 });
 
 defineQuery({
-  name: "get_invoice", description: "One invoice with its lines",
+  name: "get_invoice", description: "One invoice with its lines and the payments recorded in MGR",
   roles: [...readRoles],
   input: z.object({ invoiceId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    const [invoice, invLines, pendingPush] = await Promise.all([
+    const [invoice, invLines, pushes, paymentRows] = await Promise.all([
       unwrap(ctx.db.from("invoices").select("*, customers(id,name,qbo_customer_id,qbo_realm_id)").eq("id", i.invoiceId).eq("brewery_id", ctx.breweryId).single()),
       completeRows("Invoice lines", start => ctx.db.from("invoice_lines").select("*, skus(name,qbo_item_id,qbo_realm_id)", { count: "exact" })
         .eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).order("kind").order("id").range(start, start + PAGE_SIZE - 1)),
-      unwrap(ctx.db.from("qbo_pushes").select("id").eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).eq("status", "pending").maybeSingle()),
+      invoicePushFacts(ctx, [i.invoiceId]),
+      // A void is its own row. PostgREST embeds it as one object or null, since
+      // (brewery_id, payment_id) is unique; the generated types still say an array.
+      completeRows("Invoice payments", start => ctx.db.from("invoice_payments")
+        .select("id, amount_cents, received_on, method, reference, invoice_payment_voids(reason)", { count: "exact" })
+        .eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId)
+        .order("received_on", { ascending: false }).order("id").range(start, start + PAGE_SIZE - 1)),
     ]);
     if (!invoice) throw new Error("Invoice not found");
     const staffLinks = await invoiceStaffLinks(ctx, [invoice]);
-    return { invoice, lines: invLines, hasPendingPush: Boolean(pendingPush), quickbooksLink: staffLinks.get(invoice.id) ?? null };
+    const payments = paymentRows.map(({ invoice_payment_voids: voids, ...payment }) => ({ ...payment, void: voids as unknown as { reason: string } | null }));
+    const push = pushes.get(invoice.id);
+    return { invoice, lines: invLines, payments,
+      localPaidCents: payments.reduce((sum, payment) => payment.void ? sum : sum + payment.amount_cents, 0),
+      hasPendingPush: push?.has_pending_push ?? false, wasPushedToQbo: push?.was_pushed ?? false,
+      quickbooksLink: staffLinks.get(invoice.id) ?? null };
   },
 });
 
