@@ -1,13 +1,15 @@
 // app/(app)/replenishment/quantity-form.tsx — Set taproom par and Set standing
 // allocation (one sheet, two commands), plus Release allocation. The sheet
-// always opens: with no SKUs its picker says where to add one, and the save
-// names what it still needs (replenishmentQuantityReason).
+// always opens: with no SKUs its picker says where to add one (noSkus; only
+// Admin and Sales open it, the create_sku roles, so the Catalog link always
+// shows), and the save names what it still needs (replenishmentQuantityReason).
 "use client";
 
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
+import { noSkus } from "@/components/mgr/views/new-transfer";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { replenishmentQuantityReason } from "@/lib/replenishment-form";
@@ -71,7 +73,7 @@ export function QuantityForm({ locationId, skus, kind, values }: {
         else close(true);
       }, { refresh: false });
     }} className="flex flex-col gap-4">
-      {E.pick("SKU", skuId, skus.map((sku) => ({ value: sku.id, label: sku.name })), { id: `${id}-sku`, placeholder: "Select SKU", onChange: (next) => { setSkuId(next); setQty(String(values[next] ?? 0)); }, empty: { text: "No SKUs yet.", label: "Add a SKU", href: "/catalog" } })}
+      {E.pick("SKU", skuId, skus.map((sku) => ({ value: sku.id, label: sku.name })), { id: `${id}-sku`, placeholder: "Select SKU", onChange: (next) => { setSkuId(next); setQty(String(values[next] ?? 0)); }, empty: noSkus("/catalog") })}
       {E.edit(spec.qtyLabel, qty, "number", undefined, { id: `${id}-qty`, min: 0, step: "any", onChange: setQty, required: true })}
       <p className="text-sm text-muted-foreground">{spec.help}</p>
       <CommandFormMessage error={form.error} />
