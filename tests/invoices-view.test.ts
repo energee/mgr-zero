@@ -149,16 +149,29 @@ it("#1030 starts the Accounting cell at the left edge its header uses", () => {
   expect(html).not.toContain("items-end");
 });
 
-it("#1135 shows Sync QuickBooks only while QuickBooks is connected, and writes the email note for staff", () => {
+it("#1135 shows the sync only while QuickBooks is connected, and writes the email note for staff", () => {
+  const draw = (connected: boolean, canConnect = true) => renderToStaticMarkup(createElement(InvoicesView, {
+    rows: [], connection: { connected, detail: "QuickBooks status", canConnect, connectHref: "/settings/accounting/connect" },
+    sync: createElement("span", null, "live sync"),
+  }));
+  expect(draw(true)).toContain("live sync");
+  expect(draw(true)).not.toContain("Payment status may be stale until QuickBooks is reconnected");
+  const admin = draw(false);
+  expect(admin).not.toContain("live sync");
+  expect(admin).toContain('href="/settings/accounting/connect"');
+  expect(admin).toContain("Payment status may be stale until QuickBooks is reconnected and synced.");
+  expect(admin).toContain("MGR can’t tell whether QuickBooks emailed an invoice.");
+  expect(admin).not.toContain("invoice query");
+  const sales = draw(false, false);
+  expect(sales).not.toContain("live sync");
+  expect(sales).toContain("Admin must connect");
+  expect(sales).not.toContain('href="/settings/accounting/connect"');
+});
+
+it("#1135 falls back to the shared sync view only while connected", () => {
   const draw = (connected: boolean) => renderToStaticMarkup(createElement(InvoicesView, {
-    rows: [], connection: { connected, detail: connected ? "Connected · Ridge company" : "Not connected", canConnect: true, connectHref: "/settings/accounting/connect" },
+    rows: [], connection: { connected, detail: "QuickBooks status", canConnect: true, connectHref: "/settings/accounting/connect" },
   }));
   expect(draw(true)).toContain("Sync QuickBooks");
-  const disconnected = draw(false);
-  expect(disconnected).not.toContain("Sync QuickBooks");
-  expect(disconnected).not.toContain("Last successful sync");
-  expect(disconnected).toContain("Not connected");
-  expect(disconnected).toContain("Connect");
-  expect(disconnected).toContain("MGR can’t tell whether QuickBooks emailed an invoice.");
-  expect(disconnected).not.toContain("invoice query");
+  expect(draw(false)).not.toContain("Sync QuickBooks");
 });
