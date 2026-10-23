@@ -6,6 +6,9 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import type { PickSnapshot } from "@/lib/mgr/pick-view";
 import { PickForm } from "../pick-form";
 import "@/lib/commands/all";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/orders") };
 
 export default async function PickPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

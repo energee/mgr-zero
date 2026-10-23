@@ -77,7 +77,7 @@ function ImportSession({ lookups }: { lookups: ImportLookups }) {
     setBatch(null); setResult(null); setCsv(null); setFileName(null); setMapping({}); setError(null); send.setError(null); setStep(0);
     router.refresh();
   }
-  return <ImportView model={{ kind, step, fileName, headers: csv?.headers, csvRowCount: csv?.rows.length, mapping, rows, validation, lookups, result, error: error ?? (send.error && `${send.error}. Some rows may have committed. Retry this same batch to recover their results.`), busy: send.busy, batchId: batch?.requestId, previewRows: batch?.previewRows, backHref: "/settings" }}
+  return <ImportView model={{ kind, step, fileName, headers: csv?.headers, csvRowCount: csv?.rows.length, mapping, rows, validation, lookups, result, error: error ?? (send.error && `${send.error}. Some rows may have been imported. Retry this same batch to get their results.`), busy: send.busy, batchId: batch?.requestId, previewRows: batch?.previewRows, backHref: "/settings" }}
     onKind={value => { setKind(value); setCsv(null); setFileName(null); }}
     onStep={setStep} onMapping={(field, column) => setMapping({ ...mapping, [field]: column })}
     onFile={async file => {

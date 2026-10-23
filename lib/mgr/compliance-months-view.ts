@@ -37,15 +37,17 @@ export function noPeriodsYet(cadence: Cadence, booksOpenedOn: string): EmptyStat
 }
 
 /** One period row: filed (with its day and taxpaid barrels), needs amendment,
- *  not filed, or still in progress, in sentence case (#1144). The live page adds
+ *  not filed, or still in progress, in sentence case (#1144). An ended, unfiled
+ *  period reads No activity when `active` is false: the report reads no row
+ *  dated in it (list_compliance_reports activePeriods, #1209). It is still
+ *  Not filed, because an empty period is filed too. The live page adds
  *  the href; inventory rows stay inert. A filing whose filed_at is unset still
  *  reads as filed; only its day is unknown. */
-export function periodRow(key: string, filing: Filing | undefined, today: string, timeZone: string): ComplianceNavView {
+export function periodRow(key: string, filing: Filing | undefined, today: string, timeZone: string, active: boolean): ComplianceNavView {
   const title = periodLabel(key);
   if (!filing) {
-    return periodOver(key, today)
-      ? { key, title, detail: "Not filed · Ready to review", tone: "w" }
-      : { key, title, detail: `In progress · File after the ${cadenceOf(key)} ends`, tone: "w" };
+    if (!periodOver(key, today)) return { key, title, detail: `In progress · File after the ${cadenceOf(key)} ends`, tone: "w" };
+    return { key, title, detail: `Not filed · ${active ? "Ready to review" : "No activity"}`, tone: "w" };
   }
   const filed = filing.filed_at ? `Filed ${formatDate(filing.filed_at, timeZone)}` : "Filed";
   return filing.needs_amendment

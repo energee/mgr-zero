@@ -1,5 +1,6 @@
 // components/mgr/views/more.tsx — More landing. The model supplies role-filtered
-// live navs with hrefs; inventory draws the designed list unlabeled.
+// live navs with hrefs, grouped under their area headings; inventory draws the
+// designed list unlinked.
 import { Fragment } from "react";
 import { E } from "@/components/mgr/e";
 import { QuickBooksMark } from "@/components/mgr/brand-icons";
@@ -17,9 +18,14 @@ export function MoreView({
   return (
     <>
       {E.hd("More")}
-      {model.navs.map((row) => (
-        <Fragment key={row.key}>
-          {E.nav(row.title, row.detail ?? "", "", row.mark === "qbo" ? QuickBooksMark : undefined, linkRows ? row.href : undefined)}
+      {model.groups.map(({ group, items }) => (
+        <Fragment key={group ?? ""}>
+          {group && E.ttl(group)}
+          {items.map((row) => (
+            <Fragment key={row.key}>
+              {E.nav(row.title, row.detail ?? "", "", row.mark === "qbo" ? QuickBooksMark : undefined, linkRows ? row.href : undefined)}
+            </Fragment>
+          ))}
         </Fragment>
       ))}
     </>

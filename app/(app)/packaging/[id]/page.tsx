@@ -18,6 +18,9 @@ import { runNo } from "@/lib/mgr/doc-no";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
 import { MaterialCorrection } from "./material-correction";
 import { PickTankForm, StartRunButton, CloseRunForm } from "./run-actions";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/packaging") };
 
 type Run = {
   id: string; run_no: number; brand_id: string; occupancy_id: string | null; planned_on: string;

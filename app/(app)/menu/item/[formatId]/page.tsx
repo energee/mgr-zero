@@ -7,6 +7,9 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { PosItemControl, PosRouteSheet } from "@/components/mgr/views/pos-controls";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/menu/item") };
 
 type ObservedLocation = { externalLocationId: string; mgrLocationId: string | null };
 type MenuItem = { brandId: string; formatId: string; brand: string; format: string; sources: { name: string; qty: number }[]; ounces: number | null; priceCents: number | null; priceOverrideCents: number | null; websitePublished: boolean; available: boolean };

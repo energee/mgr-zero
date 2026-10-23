@@ -9,6 +9,9 @@ import { ShipmentDoneView } from "@/components/mgr/views/shipment-done";
 import { toShipmentDoneViewProps } from "@/lib/mgr/shipment-done-view";
 import type { KegShortage } from "@/lib/mgr/keg-fleet-view";
 import "@/lib/commands/all";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/orders") };
 
 export default async function ShipPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
