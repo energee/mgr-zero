@@ -2,6 +2,8 @@
 // with no type picked (a deep-linked type still preselects), and closing a
 // form a deep link opened drops ?recordMovement=1 and its prefill from the URL,
 // while a successful record leaves the URL for the receipt dialog to clear.
+// #1113: the withheld Record movement says what it still needs, and an empty
+// SKU picker links Catalog only for a user who may create a SKU.
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -25,6 +27,7 @@ const lists = {
   bins: [{ id: "b1", location_id: "l1", name: "Cold" }],
   channels: [{ id: "c1", name: "Taproom" }],
   timeZone: "America/New_York",
+  skusHref: "/catalog",
 };
 const filled = { skuId: "s1", locationId: "l1", binId: "b1", qty: 2 };
 const render = (props: Partial<Parameters<typeof MovementForm>[0]> = {}) => {
@@ -52,7 +55,27 @@ it("starts with no movement type picked and keeps Record movement disabled until
   expect(html).not.toContain('data-state="on"');
   expect(html).toContain("Select kind");
   expect(submitDisabled(html)).toBe(true);
-  expect(html).toContain("Complete the required fields to preview this movement.");
+  expect(html).toContain("Still needed: a kind.");
+  expect(html).not.toContain("Preview:");
+});
+
+it("names every missing field beside the withheld button, and previews once nothing is (#1113)", () => {
+  const empty = render({ autoOpen: true });
+  expect(empty).toMatch(/<p id="([^"]+-reason)"[^>]*>Still needed: a kind, a SKU, a location, a bin, and a quantity above zero with at most two decimals\.<\/p><button[^>]*type="submit"[^>]*aria-describedby="\1"/);
+  const ready = render({ initial: { ...filled, type: "production_in" } });
+  expect(ready).not.toContain("Still needed");
+  expect(ready).toContain("Preview: +2 SKU units");
+});
+
+it("Record movement carries the irreversible fill, as its inventory frame draws it: a movement is append-only (#1113)", () => {
+  expect(render({ initial: { ...filled, type: "production_in" } })).toMatch(/<button[^>]*type="submit"[^>]*data-variant="irreversible"[^>]*>Record movement<\/button>|<button[^>]*data-variant="irreversible"[^>]*type="submit"[^>]*>Record movement<\/button>/);
+});
+
+it("an empty SKU picker links Catalog for a user who may create a SKU, and otherwise names who can (#1113)", () => {
+  expect(render({ skus: [] })).toMatch(/No SKUs yet\. <a[^>]*href="\/catalog"[^>]*>Add a SKU</);
+  const html = render({ skus: [], skusHref: null });
+  expect(html).toContain("No SKUs yet. An admin or sales member adds them in Catalog.");
+  expect(html).not.toContain('href="/catalog"');
 });
 
 it("preselects the type a deep link passes (the Ask MGR handoff)", () => {
