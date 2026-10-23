@@ -17,7 +17,7 @@ import { waterProfiles } from "./catalog";
 
 export const cellarMapBrewer: CellarMapViewModel = {
   readingHref: null,
-  readingHint: "Several tanks hold beer. Open a tank to record its reading.",
+  actionHint: "Several tanks hold beer. Open a tank to record its reading.",
   tiles: [
     { name: "FV1", detail: "Pils · 12.8 / 15 bbl", reading: "1.9 °P · read 4 h", fill: 85 },
     { name: "FV2", detail: "Hazy · 9.0 / 15 bbl", reading: "7.5 °P · read 8 h", fill: 60 },
@@ -61,7 +61,6 @@ export const batchesEmpty: BatchesSnapshot = {
 };
 
 export const scheduleBatchHazy: ScheduleBatchViewModel = {
-  title: "B-0416 · Hazy",
   recipeId: "hazy-v4",
   recipe: "Hazy IPA v4",
   recipeOptions: [{ id: "hazy-v4", label: "Hazy IPA v4" }, { id: "pils-v3", label: "Pils v3" }, { id: "stout-v2", label: "Stout v2" }],
@@ -155,16 +154,27 @@ export const brewTimelineMineral: BrewTimelineViewModel = {
 export const vesselFv3: VesselDetailViewModel = {
   title: "FV3",
   occupancy: { title: "Stout · BATCH-0168", detail: "13.5 / 15 bbl · 90% full", warning: true },
-  currentReading: "5.2 °P · 68.2 °F · overdue 31 h",
-  history: [
-    { key: "r1", title: "Sep 2, 2026, 7:10 AM", detail: "5.2 °P · 68.2 °F", who: "Dana" },
-    { key: "r2", title: "Sep 1, 2026, 7:04 AM", detail: "6.8 °P · 67.9 °F", who: "Ali" },
-    { key: "r3", title: "Aug 31, 2026, 6:58 AM", detail: "8.6 °P · 67.5 °F", who: "Dana" },
-  ],
+  readings: {
+    current: "5.2 °P · 68.2 °F · overdue 31 h",
+    history: [
+      { key: "r1", title: "Sep 2, 2026, 7:10 AM", detail: "5.2 °P · 68.2 °F", who: "Dana" },
+      { key: "r2", title: "Sep 1, 2026, 7:04 AM", detail: "6.8 °P · 67.9 °F", who: "Ali" },
+      { key: "r3", title: "Aug 31, 2026, 6:58 AM", detail: "8.6 °P · 67.5 °F", who: "Dana" },
+    ],
+  },
   name: "FV3",
   type: "Fermenter",
   typeOptions: ["Fermenter", "Brite", "Barrel", "Kettle", "Other"],
   capacity: "15",
+};
+
+/** New vessel before it is filled in: no name, no capacity, and no readings. */
+export const vesselNew: VesselDetailViewModel = {
+  title: "New vessel",
+  name: "",
+  type: "Fermenter",
+  typeOptions: ["Fermenter", "Brite", "Barrel", "Kettle", "Other"],
+  capacity: "",
 };
 
 const packagingPlan = {

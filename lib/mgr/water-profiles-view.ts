@@ -1,6 +1,8 @@
 // lib/mgr/water-profiles-view.ts — view-models for Water profiles (the list)
 // and Water profile (the sheet): a name and six ions in ppm, as
-// list_water_profiles returns them and upsert_water_profile takes them.
+// list_water_profiles returns them and upsert_water_profile takes them. A
+// profile is not marked as a source or a target: a recipe version can pick its
+// source and its target from this one list.
 import type { EmptyState } from "./empty-state";
 import { IONS as CHEMISTRY_IONS, ION_LABELS, type Ions } from "@/lib/water-chemistry";
 import { hasAnyRole } from "./roles";
@@ -34,7 +36,7 @@ export function toWaterProfilesViewProps(s: { profiles: WaterProfile[]; back?: {
     backLabel: s.back?.label,
     backHref: s.back?.href,
     rows: s.profiles.map((p) => ({ key: p.id, title: p.name, detail: ionLine(p) })),
-    empty: s.profiles.length ? undefined : { title: "No water profiles yet", description: "Add profile records your source water or a target." },
+    empty: s.profiles.length ? undefined : { title: "No water profiles yet", description: "Add your source water or a target for a style. A recipe version can pick its source and its target from this list." },
   };
 }
 

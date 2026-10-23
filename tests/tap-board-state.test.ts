@@ -10,12 +10,55 @@ import {
   replaceTapBoardSnapshot,
   submitAndRefreshTapBoard,
   TAP_BOARD_POLL_MS,
+  tapSheetNeeds,
+  tapSheetReason,
   type TapBoardSnapshot,
 } from "@/lib/mgr/tap-board-state";
 
 const id = "11111111-1111-4111-8111-111111111111";
 const nextId = "22222222-2222-4222-8222-222222222222";
 const snapshot: TapBoardSnapshot = { open: [], history: [] };
+
+describe("what a tap sheet still needs (#1114)", () => {
+  const tap = openTapBoardSheet(snapshot, "tap", null, id).sheet!;
+  const fields = (patch: Partial<typeof tap.fields>) => ({ ...tap, fields: { ...tap.fields, ...patch } });
+
+  it("names the packaged keg SKU an own keg is missing", () => {
+    expect(tapSheetNeeds(tap)).toEqual({ skuId: "a packaged keg SKU" });
+    expect(tapSheetReason(tap)).toBe("Still needed: a packaged keg SKU.");
+    expect(tapSheetReason(fields({ skuId: id }))).toBeNull();
+  });
+
+  it("names each guest field on its own, and refuses a size that is not above zero", () => {
+    expect(tapSheetReason(fields({ identity: "guest" }))).toBe("Still needed: a guest keg label and a guest nominal BBL above zero.");
+    expect(tapSheetNeeds(fields({ identity: "guest", guestLabel: "  ", guestNominalBbl: "-1" }))).toEqual({ guestLabel: "a guest keg label", guestNominalBbl: "a guest nominal BBL above zero" });
+    expect(tapSheetReason(fields({ identity: "guest", guestLabel: "Dry cider", guestNominalBbl: "0.25" }))).toBeNull();
+  });
+
+  it("asks a kick for its closing reason and nothing about the incoming keg", () => {
+    const open = { id, location_id: id, sku_id: id, label: null, nominal_bbl: .5, tap_number: "3", opening_fill: 1, not_in_inventory: false, opened_at: "2026-09-08T12:00:00Z", opened_by: id, opened_by_label: "dana", brand_id: null, brand_name: null, sku_name: "Porter" };
+    const kick = openTapBoardSheet({ open: [open], history: [] }, "kick", open).sheet!;
+    expect(tapSheetReason(kick)).toBeNull();
+    expect(tapSheetReason({ ...kick, fields: { ...kick.fields, reason: "", skuId: "" } })).toBe("Still needed: a closing reason.");
+  });
+
+  it("refuses to build the payload the withheld button names", () => {
+    expect(() => beginTapBoardAttempt({ snapshot, sheet: tap }, nextId)).toThrow("Still needed: a packaged keg SKU.");
+  });
+
+  it("starts a new tap on the first keg SKU it is given, so the inventory and the live board open alike", () => {
+    expect(openTapBoardSheet(snapshot, "tap", null, id, nextId).sheet!.fields.skuId).toBe(nextId);
+    expect(tapSheetReason(openTapBoardSheet(snapshot, "tap", null, id, nextId).sheet!)).toBeNull();
+    const guest = { id, location_id: id, sku_id: null, label: "Cider", nominal_bbl: .5, tap_number: null, opening_fill: 1, not_in_inventory: true, opened_at: "2026-09-08T12:00:00Z", opened_by: id, opened_by_label: "dana", brand_id: null, brand_name: null, sku_name: null };
+    expect(openTapBoardSheet({ open: [guest], history: [] }, "swap", guest, id, nextId).sheet!.fields.skuId).toBe("");
+  });
+
+  it("names the failed check when a same-SKU swap has no SKU to reuse", () => {
+    const guest = { id, location_id: id, sku_id: null, label: "Cider", nominal_bbl: .5, tap_number: null, opening_fill: 1, not_in_inventory: true, opened_at: "2026-09-08T12:00:00Z", opened_by: id, opened_by_label: "dana", brand_id: null, brand_name: null, sku_name: null };
+    const state = editTapBoardSheet(openTapBoardSheet({ open: [guest], history: [] }, "swap", guest), { identity: "same" });
+    expect(() => beginTapBoardAttempt(state, nextId)).toThrow("The open keg has no SKU to reuse. Choose Own keg or Guest keg.");
+  });
+});
 
 describe("tap board controlled state", () => {
   it("polls the board every thirty seconds", () => expect(TAP_BOARD_POLL_MS).toBe(30_000));
@@ -50,7 +93,7 @@ describe("tap board controlled state", () => {
     const guest = { id, location_id: id, sku_id: null, label: "Cider", nominal_bbl: .5, tap_number: "7", opening_fill: 1, not_in_inventory: true, opened_at: "2026-09-08T12:00:00Z", opened_by: id, opened_by_label: "dana", brand_id: null, brand_name: null, sku_name: null };
     const state = openTapBoardSheet({ open: [guest], history: [] }, "swap", guest);
     expect(state.sheet?.fields.identity).toBe("guest");
-    expect(() => beginTapBoardAttempt(state, nextId)).toThrow(/label and positive nominal/i);
+    expect(() => beginTapBoardAttempt(state, nextId)).toThrow("Still needed: a guest keg label and a guest nominal BBL above zero.");
   });
 
   it("freezes an uncertain payload and request through polls and every retry failure", () => {
@@ -71,7 +114,7 @@ describe("tap board controlled state", () => {
   it("retires only a definitive first client refusal", () => {
     let state = openTapBoardSheet(snapshot, "tap", null);
     state = editTapBoardSheet(state, { identity: "guest", guestLabel: "Dry cider", guestNominalBbl: "0" });
-    expect(() => beginTapBoardAttempt(state, id)).toThrow(/positive nominal/i);
+    expect(() => beginTapBoardAttempt(state, id)).toThrow("Still needed: a guest nominal BBL above zero.");
     state = editTapBoardSheet(state, { guestNominalBbl: "0.25" });
     state = beginTapBoardAttempt(state, id);
     state = failTapBoardAttempt(state, 400, "invalid", false);

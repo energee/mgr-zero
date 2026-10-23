@@ -40,7 +40,7 @@ export default async function MaterialsPage({ searchParams }: { searchParams: Pr
   const total = (id: string) => (onHandBy.get(id) ?? []).reduce((a, o) => a + Number(o.qty), 0);
 
   if (params.view === "definitions") return <MaterialsView model={toMaterialsViewProps({
-    backHref: "/vendors",
+    backHref: "/materials",
     rows: materials.map(material => ({ key: material.id, title: material.name, detail: `${material.category} · ${material.base_uom} · ${total(material.id).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${material.base_uom} on hand${material.active ? "" : " · inactive"}`, verb: "Edit" })),
   })} createAction={<MaterialForm vendors={vendors} />}
     rowAction={row => <MaterialForm material={materials.find(material => material.id === row.key)!} vendors={vendors} />} />;
