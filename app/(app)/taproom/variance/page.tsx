@@ -21,6 +21,6 @@ export default async function TaproomVariancePage({ searchParams }: { searchPara
     report, weeks, timeZone: brewery.timeZone, backHref: "/beer", location: location.id,
     countHref: `/taproom?location=${location.id}`, boardHref: `/taproom/board?location=${location.id}`,
     locations: locations.map(item => ({ value: item.id, label: item.name, href: `/taproom/variance?location=${item.id}&weeks=${weeks}` })),
-    weekHrefs: [[ "4 weeks", `/taproom/variance?location=${location.id}&weeks=4` ], [ "12 weeks", `/taproom/variance?location=${location.id}&weeks=12` ]],
+    weekHrefs: { "4 weeks": `/taproom/variance?location=${location.id}&weeks=4`, "12 weeks": `/taproom/variance?location=${location.id}&weeks=12` },
   }} />;
 }

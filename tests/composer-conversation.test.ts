@@ -8,6 +8,7 @@ import { ComposerStripView, isSendKey } from "@/components/mgr/views/composer-st
 import { ComposerUnavailableView } from "@/components/mgr/composer-load-boundary";
 import { OfflineOutboxView } from "@/components/mgr/views/composer";
 import { COMPOSER_SETUP_TIMEOUT_MESSAGE, COMPOSER_SETUP_TIMEOUT_MS, loadComposerSetup } from "@/lib/composer/setup";
+import { MAX_HISTORY_MESSAGES } from "@/lib/chat/model-messages";
 
 describe("composer conversation surface", () => {
   it("renders a transcript, activity, recovery and conversation controls", () => {
@@ -105,11 +106,11 @@ it("shows progress while the chat interface itself loads (#1105)", () => {
 });
 
 describe("composer setup load (#1105)", () => {
-  type Call = { name: string; requestId?: string; signal: AbortSignal };
+  type Call = { name: string; input?: unknown; requestId?: string; signal: AbortSignal };
   type Run = (name: string, input: unknown, requestId: string | undefined, signal: AbortSignal) => Promise<unknown>;
   const fake = (answers: Record<string, unknown>, calls: Call[] = []): Run =>
-    async (name, _input, requestId, signal) => {
-      calls.push({ name, requestId, signal });
+    async (name, input, requestId, signal) => {
+      calls.push({ name, input, requestId, signal });
       return answers[name];
     };
   const hang = (calls: Call[] = []): Run => (name, _input, requestId, signal) => {
@@ -124,21 +125,22 @@ describe("composer setup load (#1105)", () => {
   };
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it("restores the latest conversation's text turns, bounded by the setup timeout", async () => {
+  it("restores the latest conversation's newest text turns, bounded by the setup timeout", async () => {
     const calls: Call[] = [];
     const { timeout } = clock();
     const setup = await loadComposerSetup(fake({
       list_chat_conversations: [{ id: "latest" }, { id: "older" }],
       get_chat_history: { messages: [
         { id: "u", role: "user", content: "Hi" },
-        { id: "r", role: "result", content: "{}" },
-        { id: "a", role: "assistant", content: null },
         { id: "b", role: "assistant", content: "Hello" },
       ] },
     }, calls), { current: undefined }, new AbortController().signal);
     expect(setup.conversationId).toBe("latest");
     expect(setup.messages.map((message) => [message.id, message.role])).toEqual([["u", "user"], ["b", "assistant"]]);
-    expect(calls.map((call) => call.name)).toEqual(["list_chat_conversations", "get_chat_history"]);
+    expect(calls.map((call) => [call.name, call.input])).toEqual([
+      ["list_chat_conversations", {}],
+      ["get_chat_history", { conversationId: "latest", recentTurns: MAX_HISTORY_MESSAGES }],
+    ]);
     expect(timeout).toHaveBeenCalledWith(COMPOSER_SETUP_TIMEOUT_MS);
   });
 
