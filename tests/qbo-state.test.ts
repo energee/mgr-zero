@@ -776,13 +776,9 @@ describe("who owns an invoice balance", () => {
   };
 
   it.each([
+    // Also a rejected push, a never-pushed invoice a company change purged, and
+    // one whose payments are all voided: each has exactly these facts.
     ["a never-pushed unpaid invoice", neverPushed],
-    // A rejected push (push_failed) created no QuickBooks document: no identity, no pushed row.
-    ["an unpaid invoice whose push was rejected", { ...neverPushed }],
-    // A company change nulled the identity and balance of an invoice that was never pushed.
-    ["a purged never-pushed unpaid invoice", { ...neverPushed, qbo_balance_cents: null }],
-    // Voided payments leave the unvoided sum at zero.
-    ["an invoice whose payments are all voided", { ...neverPushed, local_paid_cents: 0 }],
     ["an invoice the ledger paid in full", { ...neverPushed, paid_at: "2026-10-20T04:00:00Z", local_paid_cents: 5000 }],
   ])("the ledger owns %s", (_name, invoice) => {
     expect(invoiceLedgerOwnsBalance(invoice)).toBe(true);

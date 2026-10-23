@@ -1,8 +1,9 @@
 # Record an invoice payment in MGR without QuickBooks (#1045)
 
-Status: plan, awaiting owner approval. No implementation code until it is
-approved and the open questions below are answered. Implementation branch:
-`feat/1045-local-payments`, PR to `main`.
+Status: approved 2026-10-23 (owner comment on #1045), all recommended defaults
+Q1–Q10 and the Design 2 reading; implemented on `feat/1045-local-payments`
+(PR #1162, to `main`). The Q9 follow-up is #1228. "Deviations" at the end lists
+where the implementation differs from the tasks below.
 
 ## Goal
 
@@ -160,14 +161,19 @@ change.
 | Q6 | **Written-off invoices.** May one take a local payment? | Refuse. | `invoiceCurrentState` already puts written-off before paid. Write-off means nothing is collected. | 2, 6, 8, 13 |
 | Q7 | **Historical invoices** (`not_synced`, recorded paid before the books opened). They have no `qbo_invoice_id`, so the literal rule admits them. | Refuse. `record_historical_order` already set `paid_at`. They keep reading **Paid**. | A second payment record for an import would double-count. | 2, 6, 8, 13 |
 | Q8 | **Voided payments and push.** Is an invoice whose payments are all voided pushable? | Yes. Only an unvoided payment blocks a push. Its register row has no **Payments recorded in MGR** caption. | A voided payment did not happen. | 3, 7, 9, 13 |
-| Q9 | **Clearing Overdue.** How does an uncollectable, mistaken or fully credited local invoice stop reading **Overdue**? `write_off_invoice` accepts only an invoice QuickBooks voided or deleted, and MGR has no void for a local invoice. | Out of scope here. Open a follow-up issue that lets `write_off_invoice` accept a ledger-owned invoice. | The decision names payments only. **Cost of the default:** until the follow-up lands, such an invoice reads **Overdue** with no way to clear it except recording a payment. | In scope: a `write_off_invoice` copy in task 2, plus 6, 7, 13 |
+| Q9 | **Clearing Overdue.** How does an uncollectable, mistaken or fully credited local invoice stop reading **Overdue**? `write_off_invoice` accepts only an invoice QuickBooks voided or deleted, and MGR has no void for a local invoice. | Out of scope here. Open a follow-up issue that lets `write_off_invoice` accept a ledger-owned invoice (filed as #1228). | The decision names payments only. **Cost of the default:** until the follow-up lands, such an invoice reads **Overdue** with no way to clear it except recording a payment. | In scope: a `write_off_invoice` copy in task 2, plus 6, 7, 13 |
 | Q10 | **Received before issue.** May a payment's received date be before the invoice's issue date (a prepayment taken at order time)? A date after today in the brewery's zone is always refused. | Allow it. | A buyer can pay at order time, before the shipment issues the invoice. **Cost of the default:** `paid_at` can then be earlier than the issue date. | 2, 8, 10 |
 
-## Schema — `supabase/migrations/20261023080000_invoice_payments.sql`
+## Schema — `supabase/migrations/20261023130000_invoice_payments.sql`
 
-The name sorts after the latest file on `origin/main`,
-`20261022140000_qbo_oauth_exchange_state.sql`. If `main` moves first,
+The name sorts after the latest file on `origin/main` (`398b83ad`),
+`20261023120000_taproom_read_policies_once_per_query.sql`. It was written as
+`20261023080000` and renamed when `main` moved first. If `main` moves again,
 rename to a later timestamp before `bun run migrations:lock`.
+
+The SQL below is the approved draft. The migration differs in three places
+(see "Deviations"): `paid_at` takes the latest received day, a new
+`invoice_push_facts` function serves the reads, and comments.
 
 ```sql
 -- Invoice payments recorded in MGR (#1045, docs/plans/invoice-local-payments.md).
@@ -571,7 +577,7 @@ Each task starts by writing its named failing test and watching it fail
 `mgr_test` stack (`scripts/test-db.sh`).
 
 1. **Migration: both tables, immutable triggers, RLS, view column.**
-   - Files: `supabase/migrations/20261023080000_invoice_payments.sql`,
+   - Files: `supabase/migrations/20261023130000_invoice_payments.sql`,
      `supabase/migrations.lock.json` (`bun run migrations:lock`),
      `lib/supabase/database.generated.ts` (`bun run types:database`),
      `tests/rls-fixtures.ts`, `tests/rls-taproom.test.ts`,
@@ -950,3 +956,22 @@ tasks 2, 6, 7 and 13 as the Q9 row says.
 - Online pay for local invoices: the portal pay link stays QuickBooks-only.
 - An AR total or aging report: the register is the AR list.
 - Showing who recorded a payment: the actor is stored, not displayed.
+
+## Deviations (final gate, 2026-10-23)
+
+- **Migration name.** `20261023080000` became `20261023130000`, after
+  `main` gained `20261023100000` and `20261023120000`.
+- **Push facts for Warehouse.** `qbo_pushes` is readable by Admin and Sales
+  only, so `list_invoices` and `get_invoice` read `has_pending_qbo_push` and
+  `was_pushed_to_qbo` through a new `public.invoice_push_facts(p_brewery,
+  p_invoices)` (security definer, Admin, Sales and Warehouse), not a direct
+  `qbo_pushes` select. Without it a Warehouse reader saw a pending or
+  previous-company invoice as ledger-owned, with an inferred balance.
+- **`paid_at`.** Paid in full stamps the latest received day among the
+  unvoided payments, not the day of the payment that completed the total, so
+  a backdated payment cannot date it early. The docs already said "the day its
+  last payment was received".
+- **`paymentBalanceCents` replaces `takesPayment`.** `InvoiceViewModel` carries
+  the most a payment may be, or `null` when the invoice takes no payment. The
+  page passes it to the form instead of recomputing the balance.
+- **`InvoicePaymentFields` merged into `RecordPaymentView`**, its only caller.

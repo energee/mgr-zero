@@ -6,7 +6,7 @@ import { createElement, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
-import { InvoicePaymentFields, InvoiceView } from "../components/mgr/views/invoice";
+import { InvoiceView, RecordPaymentView } from "../components/mgr/views/invoice";
 import { creditMemoAls, invoiceEditedInQbo, invoiceFailedAls, invoiceLocalPartlyPaid, invoicePartlyPaid } from "../lib/mgr/fixtures/invoice";
 import { ALS } from "../lib/mgr/fixtures/demo";
 import { invoiceMappingRows, invoicePaymentReady, toInvoiceViewProps } from "../lib/mgr/invoice-view";
@@ -266,7 +266,7 @@ describe("Invoice payments recorded in MGR (#1045)", () => {
     // The snapshot carries mapping rows; an unvoided payment blocks the push they serve.
     expect(invoiceLocalPartlyPaid.mappings).not.toHaveLength(0);
     expect(model.mappings).toBeUndefined();
-    expect(model.takesPayment).toBe(true);
+    expect(model.paymentBalanceCents).toBe(31500);
   });
   it("lists each payment newest first, and a voided one with its reason", () => {
     expect(toInvoiceViewProps(invoiceLocalPartlyPaid).payments).toEqual([
@@ -280,7 +280,7 @@ describe("Invoice payments recorded in MGR (#1045)", () => {
     expect(model.summary.settlement).toEqual([{ label: "Outstanding balance", value: "$615.00", strong: true }]);
     expect(model.mappings).toEqual(invoiceFailedAls.mappings);
     expect(model.payments).toEqual([]);
-    expect(model.takesPayment).toBe(true);
+    expect(model.paymentBalanceCents).toBe(61500);
   });
   it.each([
     ["a pending push (Q3)", { hasPendingPush: true }],
@@ -288,7 +288,7 @@ describe("Invoice payments recorded in MGR (#1045)", () => {
   ])("keeps an Unknown balance and takes no payment for %s", (_, patch) => {
     const model = toInvoiceViewProps({ ...invoiceFailedAls, ...patch });
     expect(model.summary.settlement).toEqual([{ label: "Outstanding balance", value: "Unknown", strong: true }]);
-    expect(model.takesPayment).toBe(false);
+    expect(model.paymentBalanceCents).toBeNull();
   });
   it("reads Paid with a $0.00 balance once payments reach the total", () => {
     const model = toInvoiceViewProps({
@@ -301,23 +301,23 @@ describe("Invoice payments recorded in MGR (#1045)", () => {
       { label: "Outstanding balance", value: "$0.00", strong: true },
       { label: "Paid in MGR", value: "$615.00" },
     ]);
-    expect(model.takesPayment).toBe(false);
+    expect(model.paymentBalanceCents).toBeNull();
   });
   it("reads No payment due for a ledger-owned $0.00 invoice, which takes no payment (Design 4)", () => {
     const free = { ...invoiceFailedAls, lines: invoiceFailedAls.lines.map((l) => ({ ...l, unit_price_cents: 0, amount_cents: 0 })) };
     const model = toInvoiceViewProps(free);
     expect(model.state).toEqual({ label: "No payment due", tone: "ok" });
-    expect(model.takesPayment).toBe(false);
+    expect(model.paymentBalanceCents).toBeNull();
   });
   it.each([
     ["written off (Q6)", { invoice: { ...invoiceFailedAls.invoice, written_off_at: "2026-09-20T12:00:00Z" } }],
     ["paid outside the ledger, as a historical import (Q7)", { invoice: { ...invoiceFailedAls.invoice, paid_at: "2025-08-14T12:00:00Z" } }],
     ["a QuickBooks invoice", { invoice: { ...invoiceFailedAls.invoice, qbo_invoice_id: "qbo-1039" } }],
   ])("takes no payment when %s", (_, patch) => {
-    expect(toInvoiceViewProps({ ...invoiceFailedAls, ...patch }).takesPayment).toBe(false);
+    expect(toInvoiceViewProps({ ...invoiceFailedAls, ...patch }).paymentBalanceCents).toBeNull();
   });
   it("takes no payment on a credit memo", () => {
-    expect(toInvoiceViewProps(creditMemoAls).takesPayment).toBe(false);
+    expect(toInvoiceViewProps(creditMemoAls).paymentBalanceCents).toBeNull();
   });
 });
 
@@ -351,10 +351,10 @@ describe("Invoice view: the Payments section (#1045)", () => {
   });
 });
 
-describe("InvoicePaymentFields (#1045)", () => {
+describe("RecordPaymentView (#1045)", () => {
   const value = { amount: "", receivedOn: "2026-10-23", method: "" as const, reference: "" };
   const fields = (quickbooksConnected: boolean) =>
-    htmlOf(createElement(InvoicePaymentFields, { value, maxCents: 31500, maxDate: "2026-10-23", quickbooksConnected }));
+    htmlOf(createElement(RecordPaymentView, { value, maxCents: 31500, maxDate: "2026-10-23", quickbooksConnected }));
   it("caps the amount at the balance (Q1) and the received date at today (Q10)", () => {
     const html = fields(false);
     expect(html).toContain('max="315"');

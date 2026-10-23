@@ -70,8 +70,10 @@ export type InvoiceViewModel = {
   mappings?: InvoiceMappingView[];
   /** Payments recorded in MGR, newest received first, voided ones included. */
   payments: InvoicePaymentView[];
-  /** record_invoice_payment would accept a payment: the same refusals, said here, not in the page. */
-  takesPayment: boolean;
+  /** The most a payment may be (the balance) when record_invoice_payment would
+   *  accept one, or null when the invoice takes no payment: the same refusals,
+   *  said here, not in the page. */
+  paymentBalanceCents: number | null;
 };
 
 export type InvoiceSnapshot = {
@@ -153,8 +155,8 @@ const KIND_GROUPS: [label: string, kinds: string[]][] = [
 ];
 const kindGroup = (kind: string) => KIND_GROUPS.find(([, kinds]) => kinds.includes(kind))?.[0] ?? "Adjustments";
 
-/** The facts invoice-state.ts reads to decide who owns the balance, in its names. */
-const ledgerFacts = ({ invoice, hasPendingPush, wasPushedToQbo, localPaidCents }: InvoiceSnapshot) => ({
+/** Renames the snapshot's push and payment facts to the names invoice-state.ts reads. */
+const toLedgerFacts = ({ invoice, hasPendingPush, wasPushedToQbo, localPaidCents }: InvoiceSnapshot) => ({
   ...invoice, has_pending_qbo_push: hasPendingPush, was_pushed_to_qbo: wasPushedToQbo, local_paid_cents: localPaidCents,
 });
 
@@ -168,7 +170,9 @@ function invoiceState(snapshot: InvoiceSnapshot, totalCents: number): InvoiceVie
   if (state === "deleted") return { label: "Deleted in QuickBooks", tone: "w" };
   if (invoiceIsSettledWithoutPayment(invoice)) return { label: "Settled", tone: "ok" };
   // All lines priced at zero: settled, never overdue, and takes no payment (Design 4).
-  if (invoiceLedgerOwnsBalance(ledgerFacts(snapshot)) && totalCents <= 0) return { label: "No payment due", tone: "ok" };
+  if (invoiceLedgerOwnsBalance(toLedgerFacts(snapshot)) && totalCents <= 0) return { label: "No payment due", tone: "ok" };
+  // The two sources never both hold money: MGR refuses a payment on a QuickBooks
+  // invoice, and start_qbo_push refuses an invoice with payments.
   const partlyPaid = snapshot.localPaidCents > 0
     || ((invoice.qbo_cash_collected_cents ?? 0) > 0 && (invoice.qbo_balance_cents ?? 0) > 0);
   return { label: partlyPaid ? "Partially paid" : "Unpaid", tone: "" };
@@ -200,9 +204,9 @@ function invoiceSummary(snapshot: InvoiceSnapshot, localCents: number, totalCent
   else if (invoice.qbo_tax_cents != null && invoice.qbo_tax_cents > 0) rows.push({ label: "Tax (QuickBooks)", value: money(invoice.qbo_tax_cents) });
   const state = invoiceCurrentState(invoice);
   const cash = invoice.qbo_cash_collected_cents ?? 0;
-  const balance = invoiceBalanceCents(ledgerFacts(snapshot), totalCents);
-  const owedOrKnown = state === "unpaid" || (state === "paid" && balance != null);
-  const settlement = owedOrKnown ? [
+  const balance = invoiceBalanceCents(toLedgerFacts(snapshot), totalCents);
+  const showSettlement = state === "unpaid" || (state === "paid" && balance != null);
+  const settlement = showSettlement ? [
     { label: "Outstanding balance", value: balance == null ? "Unknown" : money(balance), strong: true },
     ...(cash > 0 ? [{ label: "Cash received in QuickBooks", value: money(cash) }] : []),
     ...(snapshot.localPaidCents > 0 ? [{ label: "Paid in MGR", value: money(snapshot.localPaidCents) }] : []),
@@ -217,12 +221,14 @@ function invoiceSummary(snapshot: InvoiceSnapshot, localCents: number, totalCent
   };
 }
 
-/** record_invoice_payment's refusals, mirrored: only a ledger-owned
- *  invoice (no QuickBooks identity, pending push or earlier push) that is not
- *  written off, not paid, and still has money due. */
-function invoiceTakesPayment(snapshot: InvoiceSnapshot, totalCents: number) {
-  return invoiceLedgerOwnsBalance(ledgerFacts(snapshot)) && !snapshot.invoice.written_off_at && snapshot.invoice.paid_at == null
+/** record_invoice_payment's refusals, mirrored: only a ledger-owned invoice
+ *  (no QuickBooks identity, pending push or earlier push) that is not written
+ *  off, not paid, and still has money due takes a payment, of at most its
+ *  balance. Otherwise null. */
+function invoicePaymentBalanceCents(snapshot: InvoiceSnapshot, totalCents: number): number | null {
+  const takes = invoiceLedgerOwnsBalance(toLedgerFacts(snapshot)) && !snapshot.invoice.written_off_at && snapshot.invoice.paid_at == null
     && totalCents > snapshot.localPaidCents;
+  return takes ? totalCents - snapshot.localPaidCents : null;
 }
 
 const paymentView = (p: InvoicePaymentRecord): InvoicePaymentView => ({
@@ -284,6 +290,6 @@ export function toInvoiceViewProps(snapshot: InvoiceSnapshot): InvoiceViewModel 
     // An unvoided payment blocks the push the mapping rows serve, as in qboInvoicePresentation.
     mappings: snapshot.localPaidCents > 0 ? undefined : mappings,
     payments: snapshot.payments.map(paymentView),
-    takesPayment: invoiceTakesPayment(snapshot, totalCents),
+    paymentBalanceCents: invoicePaymentBalanceCents(snapshot, totalCents),
   };
 }

@@ -56,6 +56,9 @@ function paymentFact(inv: InvoiceListRecord, state: InvoiceCurrentState): string
   return "Balance due";
 }
 
+/** The first match wins, so the order is the rule: the document's own state,
+ *  then payments recorded in MGR (no QuickBooks detail, so every role sees
+ *  them), then the QuickBooks detail only Admin and Sales may read. */
 function accountingFact(inv: InvoiceListRecord, state: InvoiceCurrentState, roles: readonly StaffRole[], connected: boolean, hasPendingPush: boolean, qboDetail: string): string | null {
   if (state === "written_off") return "Written off in MGR";
   if (inv.qbo_sync_status === "not_synced") return "Not in QuickBooks (before the books opened)";

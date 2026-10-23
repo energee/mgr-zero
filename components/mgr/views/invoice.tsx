@@ -3,8 +3,8 @@
 // price summary (stacked on the phone, summary before the lines), a line
 // table on the desk and labeled line records on the phone, the payments
 // recorded in MGR (#1045), QuickBooks and accounting, buyer questions, and
-// Return in a closing section. RecordPaymentView (over InvoicePaymentFields)
-// and VoidPaymentView are the payment sheets' bodies, shared by the inventory
+// Return in a closing section. RecordPaymentView and VoidPaymentView are the
+// payment sheets' bodies, shared by the inventory
 // sheets and the live forms in payment-form.tsx. Inventory and
 // the live page both pass toInvoiceViewProps(get_invoice-shaped data); the
 // live page supplies authorized actions through the slots (an explicit null
@@ -30,12 +30,14 @@ const LEGEND = "text-xs text-muted-foreground";
 const NUMBER_COLUMNS = [["Quantity", "qty"], ["Unit price", "unitPrice"]] as const;
 const METHOD_OPTIONS = [{ value: "", label: "Select a method" }, ...PAYMENT_METHODS.map((value) => ({ value, label: PAYMENT_METHOD_LABEL[value] }))];
 
-/** Record payment's fields, like KegPoolFields: amount capped at the balance
- *  (Q1), received day capped at the brewery's today (Q10), method, reference.
- *  Without onChange the fields draw the value uncontrolled, as the inventory
- *  does. At a QuickBooks-connected brewery it warns that payments stop the push. */
-export function InvoicePaymentFields({ value, maxCents, maxDate, quickbooksConnected, onChange }: {
-  value: InvoicePaymentValue; maxCents: number; maxDate: string; quickbooksConnected: boolean; onChange?: (next: InvoicePaymentValue) => void;
+/** The Record payment sheet's body, fields like KegPoolFields: amount capped at
+ *  the balance (Q1), received day capped at the brewery's today (Q10), method,
+ *  reference. Without onChange the fields draw the value uncontrolled, as the
+ *  inventory does. At a QuickBooks-connected brewery it warns that payments stop
+ *  the push. Then the live form's submit footer, or the inert Record payment
+ *  button when omitted. */
+export function RecordPaymentView({ value, maxCents, maxDate, quickbooksConnected, onChange, footer }: {
+  value: InvoicePaymentValue; maxCents: number; maxDate: string; quickbooksConnected: boolean; onChange?: (next: InvoicePaymentValue) => void; footer?: ReactNode;
 }) {
   const set = <K extends keyof InvoicePaymentValue>(key: K) => onChange ? (next: InvoicePaymentValue[K]) => onChange({ ...value, [key]: next }) : undefined;
   return (
@@ -45,16 +47,6 @@ export function InvoicePaymentFields({ value, maxCents, maxDate, quickbooksConne
       {E.edit("Received on", value.receivedOn, "date", undefined, { max: maxDate, onChange: set("receivedOn"), required: true })}
       {E.pick("Method", value.method, METHOD_OPTIONS, { id: "payment-method", onChange: set("method") as ((v: string) => void) | undefined, required: true })}
       {E.edit("Reference · optional", value.reference, "text", undefined, { id: "payment-reference", maxLength: 200, onChange: set("reference") })}
-    </>
-  );
-}
-
-/** The Record payment sheet's body: InvoicePaymentFields, then the live
- *  form's submit footer, or the inert Record payment button when omitted. */
-export function RecordPaymentView({ footer, ...fields }: Parameters<typeof InvoicePaymentFields>[0] & { footer?: ReactNode }) {
-  return (
-    <>
-      <InvoicePaymentFields {...fields} />
       {footer !== undefined ? footer : E.btn("Record payment")}
     </>
   );
@@ -99,7 +91,7 @@ export function InvoiceView({
   /** The closing Correct a shipment control. Omitted: the inert Return button; null: no section. */
   correction?: ReactNode;
   questionAction?: ReactNode | ((question: InvoiceQuestionView) => ReactNode);
-  /** The Payments section's Record payment control. Omitted: the inert button when model.takesPayment; null: none. */
+  /** The Payments section's Record payment control. Omitted: the inert button when the model takes a payment (paymentBalanceCents set); null: none. */
   recordPayment?: ReactNode;
   /** The control on each unvoided payment. Omitted: the inert Void button; null: none. */
   paymentAction?: ReactNode | ((payment: InvoicePaymentView) => ReactNode);
@@ -120,7 +112,7 @@ export function InvoiceView({
     return questionAction !== undefined ? questionAction : <Button variant="outline" size="sm" type="button">Mark answered</Button>;
   };
   const record = recordPayment !== undefined ? recordPayment
-    : model.takesPayment ? <Button variant="outline" size="sm" type="button">Record payment</Button> : null;
+    : model.paymentBalanceCents != null ? <Button variant="outline" size="sm" type="button">Record payment</Button> : null;
   const paymentControl = (p: InvoicePaymentView) => {
     if (typeof paymentAction === "function") return paymentAction(p);
     return paymentAction !== undefined ? paymentAction : <Button variant="outline" size="sm" type="button">Void</Button>;

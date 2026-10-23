@@ -32,6 +32,7 @@ import { E } from "@/components/mgr/e";
 import { QboMappingView, QboMappingsView } from "@/components/mgr/views/qbo-mapping";
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { invoiceList, invoicesSync } from "@/lib/mgr/fixtures/invoices";
+import { dollarsInput } from "@/lib/mgr/money";
 import { InviteView, TeamMemberView } from "@/components/mgr/views/team-controls";
 import { CreateBreweryView } from "@/components/mgr/views/create-brewery";
 import { ImportView } from "@/components/mgr/views/import";
@@ -400,8 +401,10 @@ const permitted = (who: string): NonNullable<Screen["states"]> => [["permission"
 /** Settings and its no-warehouse variant draw the same page, so they read and write the same. */
 const SETTINGS_IO = { reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_operating_defaults · set_books_opened_on · correct_reporting_basis · set_brewery_ai_model · update_location · set_portal_fulfillment_source" };
 
-/** The $300.00 check on INV-1039, recorded in MGR: the payment Void payment voids. */
-const LOCAL_CHECK = toInvoiceViewProps(invoiceLocalPartlyPaid).payments[0];
+/** INV-1039 partly paid in MGR: Record payment's cap and the $300.00 check Void payment voids. */
+const LOCAL_PARTLY_PAID = toInvoiceViewProps(invoiceLocalPartlyPaid);
+const LOCAL_CHECK = LOCAL_PARTLY_PAID.payments[0];
+const LOCAL_BALANCE_CENTS = LOCAL_PARTLY_PAID.paymentBalanceCents!;
 
 export const SCREENS: Screen[] = [
   // step 1 — foundations and both authenticated shells
@@ -1425,8 +1428,8 @@ export const SCREENS: Screen[] = [
     writes: "record_invoice_payment",
     states: [["permission", "admin or sales required", 1], ["above balance", "an amount over the balance due is refused", 1], ["future", "a received day after the brewery's today is refused", 1], ["prepayment", "a received day before the issue date is accepted"], ["paid in full", "the invoice reads Paid"], ["connected", "the invoice is no longer sent to QuickBooks", 1]],
     spec: "Amount, received day and method are required; a reference such as a check number is optional. The amount is capped at the balance due, so there is no credit balance, and the received day at the brewery's today. Paid in full marks the invoice paid on the received day. A payment is never edited; Void corrects it.",
-    // INV-1039 partly paid in MGR: $615.00 less the $300.00 check leaves $315.00.
-    body: <RecordPaymentView value={{ amount: "315.00", receivedOn: "2026-10-04", method: "check", reference: "1190" }} maxCents={31500} maxDate="2026-10-04" quickbooksConnected />,
+    // INV-1039 partly paid in MGR: the rest of its balance, received on the inventory's today.
+    body: <RecordPaymentView value={{ amount: dollarsInput(LOCAL_BALANCE_CENTS), receivedOn: "2026-10-04", method: "check", reference: "1190" }} maxCents={LOCAL_BALANCE_CENTS} maxDate="2026-10-04" quickbooksConnected />,
   },
   {
     step: 5,

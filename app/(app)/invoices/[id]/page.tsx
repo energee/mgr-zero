@@ -19,7 +19,7 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import { invoiceMappingRows, toInvoiceViewProps, type InvoicePaymentRecord } from "@/lib/mgr/invoice-view";
 import { MarkAnswered } from "./mark-answered";
 import { qboInvoicePresentation, type QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
-import { invoiceBalanceCents, invoiceCurrentTotalCents, invoiceIsCreditable } from "@/lib/mgr/invoice-state";
+import { invoiceIsCreditable } from "@/lib/mgr/invoice-state";
 import { breweryDate } from "@/lib/date-format";
 import { RecordPaymentForm, VoidPaymentForm } from "./payment-form";
 import { QboInvoiceActions } from "@/app/(app)/settings/accounting/qbo-controls";
@@ -48,11 +48,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const mappings = !credit && realm && (brewery.roles.includes("admin") || brewery.roles.includes("sales"))
     ? invoiceMappingRows(invoice.customers, lines, realm, health?.depositItemId, `/invoices/${invoice.id}/mapping`, brewery.roles.includes("admin") ? "/settings/accounting/mappings" : undefined, health?.oneWayFeeItemId) : undefined;
   const model = toInvoiceViewProps({ invoice, lines, questions, mappings, payments, hasPendingPush, wasPushedToQbo, localPaidCents, backHref: "/invoices", timeZone: brewery.timeZone });
-  // takesPayment means the ledger owns the balance, so this is the total minus unvoided payments.
-  const balanceCents = invoiceBalanceCents({ ...invoice, has_pending_qbo_push: hasPendingPush, was_pushed_to_qbo: wasPushedToQbo, local_paid_cents: localPaidCents },
-    invoiceCurrentTotalCents(invoice, lines.reduce((sum, line) => sum + line.amount_cents, 0))) ?? 0;
-  const recordPayment = model.takesPayment && canRun(ctx, "record_invoice_payment")
-    ? <RecordPaymentForm invoiceId={invoice.id} balanceCents={balanceCents} today={breweryDate(brewery.timeZone)} quickbooksConnected={Boolean(health?.connected)} />
+  const recordPayment = model.paymentBalanceCents != null && canRun(ctx, "record_invoice_payment")
+    ? <RecordPaymentForm invoiceId={invoice.id} balanceCents={model.paymentBalanceCents} today={breweryDate(brewery.timeZone)} quickbooksConnected={Boolean(health?.connected)} />
     : null;
   return (
     <InvoiceView
