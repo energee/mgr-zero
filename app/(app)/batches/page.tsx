@@ -9,6 +9,9 @@ import { toBatchesViewProps, batchesFromQuery, type BatchListRow, type BatchVess
 import { workHrefsFor } from "@/components/mgr/work-tabs";
 import "@/lib/commands/all";
 import { NewBatchForm } from "./new-batch-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/batches") };
 
 type Brand = { id: string; name: string };
 type Recipe = { id: string; name: string; latest_version_id: string | null; latest_version: number | null };

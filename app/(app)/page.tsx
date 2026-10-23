@@ -18,6 +18,9 @@ import { taproomTodayRows } from "@/lib/mgr/taproom-today";
 import type { TapInterval } from "@/lib/mgr/tap-board-state";
 import { formatDayHeader } from "@/lib/date-format";
 import { onlyRoles } from "@/lib/mgr/roles";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/") };
 
 export default async function TodayPage() {
   const brewery = await getActiveBrewery();

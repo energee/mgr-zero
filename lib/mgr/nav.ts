@@ -1,7 +1,8 @@
 // lib/mgr/nav.ts — the navigation manifests both shells consume (plan §3):
 // the four staff tabs with their desktop-rail children, the portal's tabs,
 // and the pure helpers AppShell needs — role filtering (a hidden entry
-// leaves no gap), shipped filtering, and active tab/child resolution. Planned
+// leaves no gap), shipped filtering, and active tab/child resolution — plus
+// navTitle, which names each staff page's browser tab. Planned
 // subareas (Taproom, Batches, Menu, …) are listed with `planned: true` and an
 // anchor on the parent route they will one day belong to, so the docs and the
 // screen inventory (components/mgr/screen-frame.tsx) still know the groups;
@@ -128,6 +129,9 @@ export function shippedNav(items: readonly NavItem[]): NavItem[] {
     .filter((i) => !i.children || i.children.length > 0);
 }
 
+/** Every STAFF_NAV entry, groups and their children alike. */
+const STAFF_ENTRIES = STAFF_NAV.flatMap((i) => [i, ...(i.children ?? [])]);
+
 /**
  * The `about` line of the STAFF_NAV entry labelled `label`, so a surface that
  * describes the same page (a Settings row, an inventory fixture) quotes it
@@ -135,7 +139,7 @@ export function shippedNav(items: readonly NavItem[]): NavItem[] {
  * renamed entry fails loudly rather than drawing a blank description.
  */
 export function navAbout(label: string): string {
-  const about = STAFF_NAV.flatMap((i) => [i, ...(i.children ?? [])]).find((i) => i.label === label)?.about;
+  const about = STAFF_ENTRIES.find((i) => i.label === label)?.about;
   if (!about) throw new Error(`STAFF_NAV has no about line for ${label}`);
   return about;
 }
@@ -153,6 +157,9 @@ function longestMatch<T>(pathname: string, candidates: readonly (readonly [T, st
   return best?.item;
 }
 
+/** The deepest STAFF_NAV entry whose href covers `path`, if any. */
+const coveringEntry = (path: string) => longestMatch(path, STAFF_ENTRIES.map((i) => [i, i.href] as const));
+
 /**
  * Whether `role` may open `path`, by the gate of the deepest STAFF_NAV entry
  * whose href covers it: /settings/units follows Units (every role), while
@@ -161,8 +168,23 @@ function longestMatch<T>(pathname: string, candidates: readonly (readonly [T, st
  * they never point a role at a page that sends it to No access (#444).
  */
 export function canOpen(roles: readonly StaffRole[], path: string): boolean {
-  const best = longestMatch(path, STAFF_NAV.flatMap((i) => [i, ...(i.children ?? [])]).map((i) => [i, i.href] as const));
+  const best = coveringEntry(path);
   return !best || allowed(best, roles);
+}
+
+/**
+ * The browser-tab title of the staff page at `path` (#1109): the label of the
+ * deepest STAFF_NAV entry covering it, so /routes reads "Deliveries" and
+ * /settings/team, which has no entry, follows Settings. Each static page
+ * exports `metadata = { title: navTitle("<its route>") }`, the root layout's
+ * template appends " · MGR", and tests/page-titles.test.ts checks every page
+ * passes its own route. Throws for a path no entry covers, so a moved page
+ * fails the build instead of quietly reading plain "MGR".
+ */
+export function navTitle(path: string): string {
+  const entry = coveringEntry(path);
+  if (!entry) throw new Error(`No STAFF_NAV entry covers ${path}`);
+  return entry.label;
 }
 
 /** The tab whose href (or a child's) is the longest prefix of the path. */

@@ -8,6 +8,9 @@ import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { taproomBeerView, toBeerViewProps } from "@/lib/mgr/beer-view";
 import "@/lib/commands/all";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/beer") };
 
 type Overview = { fgShortages: number; taproomBelowPar: number; openTaps: number; openOccupancies: number; materialShortages: number; kegsOut: number };
 

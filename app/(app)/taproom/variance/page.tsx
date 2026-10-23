@@ -4,6 +4,9 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { requirePagePermission, runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/taproom/variance") };
 
 type Location = { id: string; name: string; uses: string[] };
 

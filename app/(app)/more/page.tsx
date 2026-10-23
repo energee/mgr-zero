@@ -4,8 +4,10 @@
 // appears; the phone More tab lands here instead of on the first child.
 import { MoreView } from "@/components/mgr/views/more";
 import { getActiveBrewery } from "@/lib/brewery";
-import { navFor, shippedNav, STAFF_NAV } from "@/lib/mgr/nav";
+import { navFor, shippedNav, STAFF_NAV, navTitle } from "@/lib/mgr/nav";
 import { toMoreViewProps } from "@/lib/mgr/more-view";
+
+export const metadata = { title: navTitle("/more") };
 
 export default async function MorePage() {
   const brewery = await getActiveBrewery();

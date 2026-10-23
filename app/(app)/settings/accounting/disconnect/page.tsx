@@ -5,6 +5,9 @@ import { disconnectStatus, type DisconnectHealth } from "@/lib/mgr/integration-d
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { QboDisconnectAction } from "../qbo-controls";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/settings/accounting/disconnect") };
 
 export default async function DisconnectQuickBooksPage() {
   const { ctx } = await requireAdminContext("Disconnect QuickBooks");

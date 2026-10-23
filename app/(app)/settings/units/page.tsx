@@ -10,10 +10,12 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toUnitsViewProps } from "@/lib/mgr/units-view";
-import { canOpen } from "@/lib/mgr/nav";
+import { canOpen, navTitle } from "@/lib/mgr/nav";
 import "@/lib/commands/all";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { GravityUnitForm } from "./gravity-unit-form";
+
+export const metadata = { title: navTitle("/settings/units") };
 
 type Effective = { brewery: GravityUnit; mine: GravityUnit | null; effective: GravityUnit };
 

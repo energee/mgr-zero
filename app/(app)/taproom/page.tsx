@@ -10,6 +10,9 @@ import type { TaproomLineMovementType } from "@/lib/supabase/rpc-results";
 import "@/lib/commands/all";
 import { TaproomCountCorrection, TaproomCountForm, TaproomPrintWorksheet, type DraftProjection, type PrintLabel } from "./count-form";
 import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/taproom") };
 
 type Location = { id: string; name: string; uses: string[] };
 type CountHeader = { id: string; root_id: string; effective_id: string; location_id: string; counted_on: string; observed_at: string; counted_by: string; created_at: string; prior_count_id: string | null; corrected_at: string | null; corrected_by: string | null; correction_reason: string | null; observations: number; movements: number; depleted_units: number; destroyed_units: number };

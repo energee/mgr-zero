@@ -11,6 +11,9 @@ import { sentenceCase } from "@/lib/mgr/labels";
 import "@/lib/commands/all";
 import { InviteForm } from "./invite-form";
 import { MemberForm } from "./member-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/settings/team") };
 
 export default async function TeamPage() {
   const [brewery, identity] = await Promise.all([getActiveBrewery(), getRequestIdentity()]);

@@ -13,6 +13,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { purchaseOrderNext, toPurchaseOrdersViewProps } from "@/lib/mgr/purchase-orders-view";
 import "@/lib/commands/all";
 import { poNo } from "@/lib/mgr/doc-no";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/purchase-orders") };
 
 
 type Po = { id: string; po_no: number; status: string; expected_on: string | null; ordered_on: string | null; vendor_name: string | null; lines_open: number };
