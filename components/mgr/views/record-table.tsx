@@ -4,7 +4,8 @@
 // each fact labeled by its column header. The first cell names the record and
 // is its one link; it covers each whole record, so no row repeats an Open
 // button. Without an href (the inventory) the name is an inert tap, the way
-// E.act draws one. Other cells may hold any node, including their own links
+// E.act draws one; an href of null (a live page withholding the link) draws
+// it as plain text. Other cells may hold any node, including their own links
 // and actions, which sit above the covering link. Headers sort the rows
 // (components/mgr/sort-head.tsx), and both surfaces draw the sorted order; the
 // last sort is remembered per browser.
@@ -30,8 +31,9 @@ export type RecordTableRow = {
   cells: ReactNode[];
   /** A secondary line under the name, such as a brand's staff-only alias. */
   note?: ReactNode;
-  /** Where the name links on a live page; the inventory leaves it out. */
-  href?: string;
+  /** Where the name links on a live page; the inventory leaves it out (an
+   *  inert tap). null: the live viewer may not open it, so the name is plain text. */
+  href?: string | null;
   /** The screen the name opens, when the name is a record rather than a
    *  screen name (data-to; tests/mgr-screens.test.ts resolves every link). */
   to?: string;
@@ -62,12 +64,15 @@ export const RECORD_LINK = "inline-flex min-h-6 min-w-0 max-w-full shrink items-
 const ABOVE_COVER = "[&_a]:relative [&_a]:z-10 [&_button]:relative [&_button]:z-10";
 const said = (cell: ReactNode) => cell != null && cell !== false;
 
-/** The name as a link (live) or a tap (inventory); it covers its whole record. */
+/** The name as a link (live) or a tap (inventory); it covers its whole record.
+ *  A live name without a link is plain text, so nothing looks tappable. */
 function name(row: RecordTableRow) {
   const cls = cn(RECORD_LINK, "after:absolute after:inset-0");
-  return row.href
-    ? <Link href={row.href} data-to={row.to} className={cls}>{row.cells[0]}</Link>
-    : <Button variant="link" type="button" data-tap data-to={row.to} className={cn(cls, "h-auto p-0 text-foreground")}>{row.cells[0]}</Button>;
+  return row.href === null
+    ? <span className="font-medium wrap-anywhere">{row.cells[0]}</span>
+    : row.href
+      ? <Link href={row.href} data-to={row.to} className={cls}>{row.cells[0]}</Link>
+      : <Button variant="link" type="button" data-tap data-to={row.to} className={cn(cls, "h-auto p-0 text-foreground")}>{row.cells[0]}</Button>;
 }
 
 export function RecordTable({ headers, align, rows: given, sortable = true }: {
