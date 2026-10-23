@@ -6,7 +6,8 @@ import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
-import { ionReadout, suggestAdditions, type SaltMaterial, type WaterAdditionFields, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import { sentenceCase } from "@/lib/mgr/labels";
+import { ionReadout, suggestAdditions, waterAdditionDetail, type SaltMaterial, type WaterAdditionFields, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { listRow, type ListRowProps } from "./mash-schedule";
 
 export type NamedOption = { id: string; name: string };
@@ -16,7 +17,7 @@ export function WaterView({ title = "Water", water, profiles, materials, header,
   /** Replaces the whole header row: undefined keeps the default E.back, null draws none
    *  (the live sheet passes null because the sheet already says Water). */
   header?: ReactNode;
-  /** Live: the Water profiles page, opened in a new tab so the unsaved version draft survives. Brewer has no Catalog, so this row is Brewer's way in; inventory leaves it unlinked. */
+  /** Live: the Water profiles page, opened in a new tab so the unsaved version draft survives. Brewer has no Catalog, so this row and the one on Recipes are Brewer's way in; inventory leaves it unlinked. */
   profilesHref?: string;
   /** The adapter's call: materials carry a salt identity (the fixture always; live once the schema has the field). Never inferred from a name. */
   chemistryKnown?: boolean;
@@ -37,15 +38,15 @@ export function WaterView({ title = "Water", water, profiles, materials, header,
     {E.pick("Target profile", water.targetProfileId, [{ value: "", label: "No target" }, ...(profiles.map((p) => ({ value: p.id, label: p.name })))], { onChange: onChange ? (nextValue: string) => onChange?.({ targetProfileId: nextValue }) : undefined })}
     {/* A new tab: this sheet edits an unsaved version draft, and leaving the page would drop it. */}
     {profilesHref
-      ? <Link href={profilesHref} target="_blank" rel="noopener" className="block">{E.nav("Water profiles", "add or edit a source or target")}</Link>
-      : E.nav("Water profiles", "add or edit a source or target")}
+      ? <Link href={profilesHref} target="_blank" rel="noopener" className="block">{E.nav("Water profiles", "Add or edit a source or target")}</Link>
+      : E.nav("Water profiles", "Add or edit a source or target")}
     {E.cols(
       E.edit("Mash water gal", water.mashGal, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ mashGal: nextValue }) : undefined, min: "0", step: "any" }),
       E.edit("Sparge water gal", water.spargeGal, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ spargeGal: nextValue }) : undefined, min: "0", step: "any" }),
     )}
     {E.edit("Target mash pH", water.targetMashPh, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ targetMashPh: nextValue }) : undefined, min: "4", max: "7", step: "0.01" })}
     {E.ttl("Salts and acids")}
-    {water.additions.map((a, i) => <Fragment key={`${i}-${a.materialId}`}>{listRow(name(materials, a.materialId), `${a.qty} ${a.unit} · ${a.stage}`, i, water.additions.length, verbs)}</Fragment>)}
+    {water.additions.map((a, i) => <Fragment key={`${i}-${a.materialId}`}>{listRow(name(materials, a.materialId), waterAdditionDetail(a), i, water.additions.length, verbs)}</Fragment>)}
     {E.row("Add addition", "material · amount · stage", E.act("Add", "primary", undefined, onAdd))}
     {chemistry === "gated"
       ? E.gated("Suggest additions", "salt suggestions are not part of this release")
@@ -66,7 +67,7 @@ export function WaterAdditionView({ fields, materials, onChange, footer }: { fie
       E.edit("Amount", fields.qty, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ qty: nextValue }) : undefined, required: true, min: "0", step: "any" }),
       E.pick("Unit", fields.unit, (WATER_ADDITION_UNITS.map(u => ({ value: u, label: u }))), { onChange: onChange ? (nextValue: string) => onChange?.({ unit: nextValue }) : undefined }),
     )}
-    {E.pick("Stage", fields.stage, (WATER_ADDITION_STAGES.map(s => ({ value: s, label: s }))), { onChange: onChange ? (nextValue: string) => onChange?.({ stage: nextValue }) : undefined })}
+    {E.pick("Stage", fields.stage, WATER_ADDITION_STAGES.map(s => ({ value: s, label: sentenceCase(s) })), { onChange: onChange ? (nextValue: string) => onChange?.({ stage: nextValue }) : undefined })}
     {footer !== undefined ? footer : E.btns([["Delete addition", "g"], "Save addition"])}
   </>;
 }

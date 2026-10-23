@@ -59,7 +59,7 @@ describe("SCREENS", () => {
     expect(recipe).toContain("Process");
     expect(recipe).toContain("Mash schedule · 3 steps");
     expect(recipe).toContain("Fermentation schedule · 4 stages");
-    expect(recipe).toMatch(/Water\s+target /);
+    expect(recipe).toMatch(/Water\s+Target /);
     // Spec D4: one place holds the mash temperature, and it is the schedule.
     expect(recipe).not.toMatch(/Mash temp/);
     // Spec D3: quantities are per barrel; the batch names its size on Brew day.
@@ -75,7 +75,7 @@ describe("SCREENS", () => {
     const drawn = text("Recipe");
     // The water row is titled Water, as on the live draft; the Water frame names the source.
     expect(drawn).not.toContain("Water · Municipal Denver");
-    expect(drawn).toContain("target Hazy target · 3 additions");
+    expect(drawn).toContain("Target Hazy target · 3 additions");
     expect(recipe.to?.Water).toBe("Water");
     expect(text("Water")).toContain("Municipal · Denver");
     expect(drawn).toContain("Total 85 min · 152 °F saccharification rest");
@@ -115,7 +115,8 @@ describe("SCREENS", () => {
     expect(mash).toContain("Saccharification");
     expect(mash).toContain("152 °F");
     expect(mash).toContain("Total 85 min");
-    expect(mash).toMatch(/recorded mash temperature; the gravity prediction does not use it/);
+    expect(mash).toContain("The 152 °F rest is recorded as the mash temperature.");
+    expect(mash).not.toMatch(/gravity prediction/);
     expect(mash).toContain("Add step");
   });
 

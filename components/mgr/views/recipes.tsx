@@ -1,7 +1,8 @@
 // components/mgr/views/recipes.tsx — Recipes list, one header for inventory
-// and live: a back to More and New recipe. Each row opens its recipe. Live
-// passes the back, create and row hrefs in the model; inventory leaves them
-// for the explorer to resolve.
+// and live: a back to More and New recipe. Each row opens its recipe, and a
+// Water profiles row follows the list. Live passes the back, create, row and
+// Water profiles hrefs in the model; inventory leaves them for the explorer
+// to resolve.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { RecipesViewModel } from "@/lib/mgr/recipes-view";
@@ -24,6 +25,7 @@ export function RecipesView({ model, controls }: {
             {E.nav(row.title, row.detail, row.warning ? "w" : "", undefined, row.href)}
           </Fragment>
         ))}
+      {E.nav("Water profiles", "Source and target profiles", "", undefined, model.waterProfilesHref)}
     </>
   );
 }

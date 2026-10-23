@@ -11,13 +11,15 @@
 "use client";
 import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { sentenceCase } from "@/lib/mgr/labels";
 import { INGREDIENT_STAGES, type IngredientLine } from "@/lib/mgr/recipe-process-view";
 
 export type IngredientFields = IngredientLine;
 /** `unit` is the material's base unit as the command returns it; absent until a material is picked.
  *  `category` (hop, malt…) is shown beside the name when present. */
 export type IngredientMaterial = { id: string; name: string; unit?: string; category?: string };
-export const INGREDIENT_STAGE_OPTIONS = INGREDIENT_STAGES.map((s) => ({ value: s, label: s.replace("_", " ") }));
+/** The Stage pick's options, here and on Brew day: the stored value, shown in sentence case ("dry_hop" reads "Dry hop"). */
+export const INGREDIENT_STAGE_OPTIONS = INGREDIENT_STAGES.map((s) => ({ value: s, label: sentenceCase(s) }));
 
 export function IngredientView({ fields, materials, onChange, footer }: {
   fields: IngredientFields; materials: IngredientMaterial[]; onChange?: (patch: Partial<IngredientFields>) => void; footer?: ReactNode;

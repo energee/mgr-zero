@@ -6,7 +6,7 @@
 // controlled, the schedule and ingredient rows open their sheets through
 // `slots`, the bottom button submits, and `controls.blockedReason` says what the
 // draft still lacks. Without `controls`, New recipe version sits in the
-// title row. parentForm draws the recipe's parent fields (name, style, brand,
+// title row. parentForm draws the recipe's parent fields (name, brand and
 // note) at the top. Show totals at is a page-only batch size, never saved:
 // typed, each brew-day line shows its batch total in packs, and off the read
 // page each line not in whole packs offers "Round to N × size", down and up.
@@ -130,7 +130,7 @@ export function RecipeView({
       {(model.ingredients ?? []).map((row) => (
         <Fragment key={row.key}>{E.row(row.title, row.detail, row.action ?? row.qty, "", undefined, packFoot(row))}</Fragment>
       ))}
-      {slots.addIngredient ?? (readOnly ? null : E.row("+ add ingredient", "material · stage · timing", ""))}
+      {slots.addIngredient ?? (readOnly ? null : E.row("Add ingredient", "Material, stage and timing", ""))}
       {E.ttl("Process")}
       {numbers}
       {schedule(model.mash, slots.mash)}

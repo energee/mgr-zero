@@ -191,7 +191,6 @@ export const INERT: (string | RegExp)[] = [
   "Record 7 sales + 1 refund as expected",
   "Main ship-to",
   "Dock ship-to",
-  "+ add ingredient",
   // The Recipe frame's note is a read-out row; the parent form above it edits the note.
   "Recipe note",
   // The QuickBooks sync row's title is a read-out; its Sync button acts in place.

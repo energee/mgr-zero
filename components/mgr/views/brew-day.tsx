@@ -7,7 +7,8 @@ import { CommandFormMessage } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { brewCorrectionModel, brewTurnModel, currentBrewRecords, brewSourceKey, canRecordBrewDay, vesselOptions, type BrewActualDraft, type BrewDayViewModel, type BrewPlan } from "@/lib/mgr/brew-day-view";
 
-import { INGREDIENT_STAGES, perBblDisplay, type IngredientStage } from "@/lib/mgr/recipe-process-view";
+import { perBblDisplay, type IngredientStage } from "@/lib/mgr/recipe-process-view";
+import { INGREDIENT_STAGE_OPTIONS } from "./ingredient";
 
 /** record_brew_day process keys and their labels; the Brew day timeline (./brew-timeline) regroups them by stage. */
 export const processFields = [["preBoilBbl", "Pre-boil barrels"], ["boilMinutes", "Boil minutes"], ["whirlpoolMinutes", "Whirlpool minutes"], ["whirlpoolTempF", "Whirlpool °F"], ["whirlpoolRestMinutes", "Whirlpool rest minutes"], ["knockoutTempF", "Knockout °F"], ["mashWaterGal", "Mash water gallons"], ["spargeWaterGal", "Sparge water gallons"], ["targetMashPh", "Mash pH"]] as const;
@@ -63,7 +64,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord }: 
       {E.note("Mash, boil and whirlpool quantities start from the plan. Confirm each exact source and amount. Later fermentation, dry-hop and packaging additions stay planned. For water additions, enter actual use in the material's stock unit.")}
       {(value.actuals ?? []).map((row, index) => <fieldset key={row.key} disabled={busy} className="flex flex-col gap-2 rounded border p-3">
         {E.pick(`Material source ${index + 1}`, row.source, (value.sources ?? []).map(source => ({ value: brewSourceKey(source), label: `${source.material_name} · ${source.lot_code ?? "Untracked"} · ${source.location_name} / ${source.bin_name} · ${source.qty} ${source.unit} available` })), { required: true, forward: true, placeholder: "Choose exact source", onChange: source => patchActual(row.key, { source }) })}
-        {E.pick("Stage", row.stage, [...INGREDIENT_STAGES], { onChange: stage => patchActual(row.key, { stage: stage as IngredientStage }) })}
+        {E.pick("Stage", row.stage, INGREDIENT_STAGE_OPTIONS, { onChange: stage => patchActual(row.key, { stage: stage as IngredientStage }) })}
         {E.edit("Actual quantity", row.qty, "number", undefined, { min: "0", step: "0.0001", required: true, onChange: qty => patchActual(row.key, { qty }) })}
         {E.btn("Remove ingredient", busy ? "g disabled" : "g", undefined, () => change({ actuals: value.actuals!.filter(item => item.key !== row.key) }))}
       </fieldset>)}

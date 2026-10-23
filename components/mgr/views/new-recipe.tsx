@@ -30,7 +30,7 @@ export function NewRecipeFieldsView({ brands, values, onChange, busy = false }: 
       {E.edit("Name", v.name, "text", undefined, { onChange: (nextValue: string) => set({ name: nextValue }), id: `${id}-name`, disabled: busy, required: true })}
       {E.pick("Brand · optional", v.brandId || NONE, [{ value: NONE, label: "Not decided" }, ...(brands.map((b) => ({ value: b.id, label: brandLabel(b) })))], { onChange: (x) => set({ brandId: x === NONE ? "" : x }), disabled: busy })}
       {E.edit("Note · optional", v.note, "text", undefined, { onChange: (nextValue: string) => set({ note: nextValue }), id: `${id}-note`, disabled: busy })}
-      {E.info("The brand is intent only; identity is required at packaging.")}
+      {E.info("Pick the brand this recipe brews, or leave it undecided. New batches start with this brand, and packaging always asks for one.")}
     </>
   );
 }
