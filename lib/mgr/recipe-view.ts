@@ -8,6 +8,7 @@
 // (ingredientPack, batchTotalText), and the draft offers rounding it to whole
 // packs (packRounding).
 import type { ReactNode } from "react";
+import type { EmptyState } from "./empty-state";
 import { formatDate } from "@/lib/date-format";
 import { gravityBlockers, type GravityBlocker } from "@/lib/recipe-gravity";
 import { formatGravity, type GravityUnit } from "./gravity-unit";
@@ -15,7 +16,7 @@ import { splitPacks, withPacks } from "./pack-qty";
 import { plural } from "./plural";
 import { fromTicks, toTicks } from "./quantity-input";
 import {
-  fermentationSummary, ingredientDetail, isBrewDayStage, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, processReadout,
+  fermentationSummary, ingredientDetail, isBrewDayStage, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, processReadout, waterAdditionDetail,
   type FermentationStage, type IngredientLine, type IngredientStage, type MashStep, type ProcessColumns, type RecipeMaterial, type WaterDraft,
 } from "./recipe-process-view";
 /** A brew-day line's per-bbl amount, its material's pack size (base units per pack; 1 = no pack) and base unit. */
@@ -47,7 +48,7 @@ export type RecipeViewModel = {
   /** Where New recipe version goes on a cut version; the draft editor submits instead. */
   createHref?: string;
   /** A recipe with no version yet: drawn instead of the editor, so no number is invented. */
-  empty?: string;
+  empty?: EmptyState;
   title: string;
   /** When the shown version was saved, as a date in the brewery's zone. */
   saved?: string;
@@ -190,6 +191,12 @@ export function packRounding(p: RecipePack, bbl: number): { whole: boolean; choi
   return { whole: false, choices: counts.map((n) => ({ label: `Round to ${n} × ${p.factor} ${p.unit}`, perBbl: Number((n * p.factor / bbl).toFixed(6)) })) };
 }
 
+/** What a version holds (create_recipe_version's input) and the one next step, New recipe version in the title row. */
+const NO_VERSION: EmptyState = {
+  title: "No version yet",
+  description: "A version records this recipe's ingredients, mash and fermentation schedules, water and process targets, and never changes once saved. Select New recipe version to write the first one.",
+};
+
 /** The read page's selected saved version, or the empty state before the first version. */
 export function toRecipePageModel(
   s: RecipeSnapshot,
@@ -199,7 +206,7 @@ export function toRecipePageModel(
   const material = materialLookup(ctx.materials);
   const profileName = (pid: string | null) => (pid && ctx.profiles.find((p) => p.id === pid)?.name) || null;
   const base = { title: recipe.name, backHref: "/recipes", createHref: `/recipes/${recipe.id}/new`, recipeNote: recipe.note ?? undefined };
-  if (!v) return { ...base, empty: "No version yet: create the first one" };
+  if (!v) return { ...base, empty: NO_VERSION };
 
   // The water rows leave out the process scalars processReadout also returns; the numbers grid shows those.
   const waterFacts = processReadout(v, profileName).filter(([k]) => !/^(Pre-boil|Whirlpool|Knockout)/.test(k));
@@ -229,7 +236,7 @@ export function toRecipePageModel(
     },
     water: {
       title: "Water", detail: "",
-      rows: [...waterFacts.map(([k, val]) => ({ title: k, detail: val })), ...waterAdditions.map((a) => ({ title: material.name(a.material_id), detail: `${a.qty} ${a.unit} · ${a.stage}` }))],
+      rows: [...waterFacts.map(([k, val]) => ({ title: k, detail: val })), ...waterAdditions.map((a) => ({ title: material.name(a.material_id), detail: waterAdditionDetail(a) }))],
     },
     notes: v.note ?? "",
     predicted,

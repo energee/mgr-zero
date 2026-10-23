@@ -3,6 +3,8 @@
 // water additions on a draft version (recipe-builder spec D2: repetition earns
 // a surface), pure list helpers, the summary lines the schedule screens print,
 // and the labelled read-out of a cut version's process scalars and water.
+import { sentenceCase } from "./labels";
+import { plural } from "./plural";
 import { isNumber, isPositive } from "./quantity-input";
 import { saccharificationRest, totalMinutes, type MashStep } from "./recipe-schedule";
 import { gramsOf, IONS, ION_LABELS, suggestSalts, waterChemistry, type Ions, type Salt } from "@/lib/water-chemistry";
@@ -20,9 +22,9 @@ export const lineReady = (l: IngredientLine) => l.materialId !== "" && Number(l.
 /** A per-bbl quantity to three significant digits: 40.909091 reads "40.9", 0.011364 reads "0.0114".
  *  Two fixed fraction digits would round small hop rates by 10-12%, so callers format with this before ingredientDetail. */
 export const perBblDisplay = (n: number): string => n.toLocaleString("en-US", { maximumSignificantDigits: 3 });
-/** "dry hop · 4 min · 1.2 lb / bbl": the row detail for a line, drawn the same on the draft and on a cut version. */
+/** "Dry hop · 4 min · 1.2 lb / bbl": the row detail for a line, drawn the same on the draft and on a cut version. */
 export const ingredientDetail = (stage: string, timingMinutes: number | string | null, perBbl: number | string, unit?: string) =>
-  `${stage.replace("_", " ")}${timingMinutes !== null && timingMinutes !== "" ? ` · ${timingMinutes} min` : ""} · ${perBbl}${unit ? ` ${unit}` : ""} / bbl`;
+  `${sentenceCase(stage)}${timingMinutes !== null && timingMinutes !== "" ? ` · ${timingMinutes} min` : ""} · ${perBbl}${unit ? ` ${unit}` : ""} / bbl`;
 /** Name and base unit by material id, for rows that name a material the command returned. */
 export function materialLookup<M extends { id: string; name: string; base_uom: string }>(materials: readonly M[]) {
   const byId = new Map(materials.map((m) => [m.id, m]));
@@ -56,9 +58,10 @@ export const upsertAt = <T>(list: readonly T[], index: number | undefined, item:
 
 export const removeAt = <T>(list: readonly T[], index: number): T[] => list.filter((_, i) => i !== index);
 
+/** The Mash schedule sheet's footer: the total, then which rest (if any) is recorded as the version's mash temperature. */
 export function mashSummary(steps: readonly MashStep[]): string {
   const rest = saccharificationRest(steps);
-  return `Total ${totalMinutes(steps)} min · ${rest ? `the ${rest.tempF} °F rest is the recorded mash temperature; the gravity prediction does not use it.` : "no rest between 144 and 162 °F, so no mash temperature is recorded."}`;
+  return `Total ${totalMinutes(steps)} min. ${rest ? `The ${rest.tempF} °F rest is recorded as the mash temperature.` : "No rest falls between 144 and 162 °F, so no mash temperature is recorded."}`;
 }
 
 /** The one-line mash summary a recipe row shows: "Total 60 min · 152 °F saccharification rest". */
@@ -67,9 +70,16 @@ export function mashRowSummary(steps: readonly MashStep[]): string {
   return `Total ${totalMinutes(steps)} min · ${rest ? `${rest.tempF} °F saccharification rest` : "no saccharification rest"}`;
 }
 
-/** A mash step's row detail; the kind is dropped when it only repeats the step name ("Rest", kind "rest"). */
+/** A water addition row's detail, "4 g · Mash": on the Water sheet and on a cut version's read-out. */
+export const waterAdditionDetail = (a: { qty: number; unit: string; stage: string }) => `${a.qty} ${a.unit} · ${sentenceCase(a.stage)}`;
+
+/** The Water row detail, "Target Hazy target · 3 additions" or "No target · 0 additions": on the recipe draft and on the Water sheet's trigger. */
+export const waterRowSummary = (targetName: string | undefined, additions: number) =>
+  `${targetName ? `Target ${targetName}` : "No target"} · ${plural(additions, "addition")}`;
+
+/** A mash step's row detail, "Infusion · 152 °F · 60 min"; the kind is dropped when it only repeats the step name ("Rest", kind "rest"). */
 export function mashStepDetail(step: MashStep): string {
-  const kind = step.kind.toLowerCase() === step.name.trim().toLowerCase() ? "" : `${step.kind} · `;
+  const kind = step.kind.toLowerCase() === step.name.trim().toLowerCase() ? "" : `${sentenceCase(step.kind)} · `;
   return `${kind}${step.tempF} °F · ${step.minutes} min`;
 }
 

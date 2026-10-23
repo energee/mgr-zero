@@ -10,7 +10,12 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 import { SCREENS } from "../components/mgr/screens";
 import { NewRecipeFieldsView } from "../components/mgr/views/new-recipe";
-import { IngredientView } from "../components/mgr/views/ingredient";
+import { INGREDIENT_STAGE_OPTIONS, IngredientView } from "../components/mgr/views/ingredient";
+import { MashStepView } from "../components/mgr/views/mash-schedule";
+import { FermentationStageView } from "../components/mgr/views/fermentation-schedule";
+import { WaterAdditionView, WaterView } from "../components/mgr/views/water";
+import { BrewDayView } from "../components/mgr/views/brew-day";
+import { EMPTY_WATER, INGREDIENT_STAGES } from "../lib/mgr/recipe-process-view";
 import { RecipeView } from "../components/mgr/views/recipe";
 import { recipeHazyV4 } from "../lib/mgr/fixtures/production";
 import { SCREEN_ROUTES } from "../lib/mgr/screen-routes";
@@ -61,11 +66,11 @@ describe("Recipe creation", () => {
     // A cut version is read out as text, its schedules as rows under their headings.
     const cut = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy v1", preBoil: "16.8", mash: { title: "Mash schedule · 1 step", detail: "60 min", rows: [{ title: "Sacch", detail: "152 °F · 60 min" }] } } }));
     expect(cut).toMatch(/Sacch/);
-    expect(cut).not.toMatch(/<form\b|\+ add ingredient|Open/);
+    expect(cut).not.toMatch(/<form\b|Add ingredient|Open/);
     // No scale chips: they previewed a batch size nothing supplies.
     expect(fixture).not.toMatch(/15 bbl|30 bbl/);
     // No version yet: no number is invented.
-    const none = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy", empty: "No version yet: create the first one", createHref: "/recipes/x/new" } }));
+    const none = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model: { title: "Hazy", empty: { title: "No version yet" }, createHref: "/recipes/x/new" } }));
     expect(none).toMatch(/No version yet/);
     expect(none).not.toMatch(/Pre-boil volume/);
     expect(none).toMatch(/href="\/recipes\/x\/new"/);
@@ -101,8 +106,8 @@ describe("Recipe creation", () => {
   });
 
   describe("the read-out and the draft blocker (plan task 8)", () => {
-    const versioned = { title: "Hazy v1", createHref: "/recipes/x/new", preBoil: "16.8", efficiency: "72.5", notes: "", ingredients: [{ key: "m", title: "2-row", detail: "mash · 40.9 lb / bbl", qty: "" }] };
-    const empty = { title: "Hazy", createHref: "/recipes/x/new", empty: "No version yet: create the first one" };
+    const versioned = { title: "Hazy v1", createHref: "/recipes/x/new", preBoil: "16.8", efficiency: "72.5", notes: "", ingredients: [{ key: "m", title: "2-row", detail: "Mash · 40.9 lb / bbl", qty: "" }] };
+    const empty = { title: "Hazy", createHref: "/recipes/x/new", empty: { title: "No version yet" } };
     const draw = (props: Parameters<typeof RecipeView>[0]) => renderToStaticMarkup(createElement(RecipeView, props));
     const draft = (blockedReason?: string) => draw({ model: { title: "Hazy v2", notes: "" }, controls: { set: () => {}, onSubmit: () => {}, blockedReason } });
 
@@ -176,7 +181,7 @@ describe("Recipe creation", () => {
     expect(form).toMatch(/<NewRecipeFieldsView\b/);
     expect(form).not.toMatch(/<CommandForm\b|grid-cols-2|<Label\b|id="rv-/);
     expect(src("components/mgr/views/recipe.tsx")).not.toMatch(/detail\?:/);
-    // "+ add ingredient" is the add action: it opens the ingredient editor itself, not a list with a second header.
+    // "Add ingredient" is the add action: it opens the ingredient editor itself, not a list with a second header.
     const sheets = src("app/(app)/recipes/[id]/schedule-sheets.tsx");
     expect(sheets).toMatch(/title=\{line \? "Edit ingredient" : "Add ingredient"\}/);
     expect(sheets).not.toMatch(/sheetTitle="Ingredients"/);
@@ -198,5 +203,62 @@ describe("Recipe creation", () => {
     expect(form).toMatch(/"create_recipe"/);
     expect(form).toMatch(/router\.push\(`\/recipes\/\$\{/);
     expect(src("components/mgr/views/new-recipe.tsx")).not.toMatch(/use-command-form|fixtures|<CommandForm\b/);
+  });
+});
+
+describe("recipe form copy (#1139)", () => {
+  const html = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(node);
+
+  it("the brand note says what to do, in brewer words", () => {
+    const fields = html(createElement(NewRecipeFieldsView, { brands: [] }));
+    expect(fields).toContain("Pick the brand this recipe brews, or leave it undecided. Packaging always asks for the brand.");
+    // Schedule batch starts at Not decided whatever recipe is picked, so the note promises no pre-fill.
+    expect(fields).not.toMatch(/intent only|identity is required|New batches start/);
+  });
+
+  it("the add-ingredient row reads like every other create action", () => {
+    const draft = html(createElement(RecipeView, { model: { title: "Hazy v2", notes: "" } }));
+    expect(draft).toContain("Add ingredient");
+    expect(draft).toContain("Material, stage and timing");
+    expect(draft).not.toMatch(/\+ add ingredient|material · stage · timing/);
+  });
+
+  it("stage and type picks show sentence case and keep the stored value", () => {
+    expect(INGREDIENT_STAGE_OPTIONS.map((o) => o.value)).toEqual([...INGREDIENT_STAGES]);
+    expect(INGREDIENT_STAGE_OPTIONS.map((o) => o.label)).toEqual(["Mash", "Boil", "Whirlpool", "Fermentation", "Dry hop", "Packaging", "Other"]);
+    expect(html(createElement(IngredientView, { fields: { materialId: "", stage: "dry_hop", perBblQty: "", timingMinutes: "" }, materials: [] }))).toMatch(/>Dry hop</);
+    expect(html(createElement(MashStepView, { fields: { name: "Mash-out", kind: "direct heat", tempF: "168", minutes: "10" } }))).toMatch(/>Direct heat</);
+    expect(html(createElement(FermentationStageView, { fields: { name: "Rest", kind: "diacetyl rest", tempF: "72", days: "2" } }))).toMatch(/>Diacetyl rest</);
+    expect(html(createElement(WaterAdditionView, { fields: { materialId: "", qty: "", unit: "g", stage: "sparge" }, materials: [] }))).toMatch(/>Sparge</);
+  });
+
+  it("the add-addition row reads like the add-ingredient row", () => {
+    const water = html(createElement(WaterView, { water: EMPTY_WATER, profiles: [], materials: [] }));
+    expect(water).toContain("Material, amount and stage");
+    expect(water).not.toContain("material · amount · stage");
+  });
+
+  it("brew day's Stage pick reuses the recipe's stage options", () => {
+    const brew = html(createElement(BrewDayView, { model: {
+      title: "Batch", vesselId: "v", vessels: [{ id: "v", name: "FV", kind: "fermenter", capacity_bbl: 10 }], initialBbl: "2", brewedOn: "2026-10-01",
+      sources: [], actuals: [{ key: "1", source: "", stage: "dry_hop", qty: "" }], process: {},
+    } }));
+    expect(brew).toMatch(/>Dry hop</);
+    expect(brew).not.toMatch(/>dry_hop</);
+  });
+
+  it("brew day's plan and recorded rows name the stage as the pick does", () => {
+    const ingredient = { id: "i", material_id: "citra", materialName: "Citra", unit: "lb", stage: "dry_hop" as const, per_bbl_qty: 1.2 };
+    const planned = html(createElement(BrewDayView, { model: {
+      title: "Batch", vesselId: "v", vessels: [], initialBbl: "2", brewedOn: "2026-10-01", plan: { ingredients: [ingredient] },
+    } }));
+    expect(planned).toContain("1.2 lb per bbl · Dry hop");
+    const recorded = html(createElement(BrewDayView, { model: {
+      title: "Batch", vesselId: "", vessels: [], initialBbl: "2", brewedOn: "2026-10-01", recorded: true,
+      records: [{ id: "r", turn: 1, initial_bbl: 2, brewed_on: "2026-10-01", created_at: "2026-10-01", correction_reason: null, corrects_id: null, plan_snapshot: {}, process: {},
+        additions: [{ id: "a", material_name: "Citra", unit: "lb", confirmed_qty: 2, stage: "dry_hop", recipe_ingredient_id: null, lot_code: null, location_name: "Cellar", bin_name: "Cold", source: { material_id: "citra", location_id: "c", bin_id: "b", lot_id: null } }] }],
+    } }));
+    expect(recorded).toContain("2 lb · Dry hop · Untracked");
+    expect(planned + recorded).not.toContain("dry_hop");
   });
 });
