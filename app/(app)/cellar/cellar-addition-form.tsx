@@ -1,6 +1,7 @@
 // app/(app)/cellar/cellar-addition-form.tsx — CommandForm for
 // record_batch_addition around the shared CellarAdditionView: a dry hop,
-// fruit or adjunct posted against an open occupancy with its lot.
+// fruit or adjunct posted against an open occupancy with its lot. `disabled`
+// is the map's actionsOff: no tank holds beer, and the map's note says why (#1115).
 "use client";
 import { useId, useState } from "react";
 import { E } from "@/components/mgr/e";
@@ -12,7 +13,7 @@ import { useCommandForm } from "@/lib/commands/use-command-form";
 
 const EMPTY = { occupancyId: "", materialId: "", lotId: "", stage: "dry_hop" as AdditionStage, qty: "" };
 
-export function CellarAdditionForm({ occupancies, materials, lotsByMaterial }: { occupancies: TransferOccupancy[]; materials: AdditionMaterial[]; lotsByMaterial: Record<string, AdditionLot[]> }) {
+export function CellarAdditionForm({ occupancies, materials, lotsByMaterial, disabled }: { occupancies: TransferOccupancy[]; materials: AdditionMaterial[]; lotsByMaterial: Record<string, AdditionLot[]>; disabled?: boolean }) {
   const formId = useId();
   const [fields, setFields] = useState(EMPTY);
   const model = { ...fields, occupancies, materials, lotsByMaterial };
@@ -21,7 +22,7 @@ export function CellarAdditionForm({ occupancies, materials, lotsByMaterial }: {
     build: () => ({ occupancyId: fields.occupancyId, materialId: fields.materialId, stage: fields.stage, qty: Number(fields.qty), lotId: fields.lotId || undefined }),
     reset: () => setFields(EMPTY),
   });
-  return <CommandForm open={form.open} onOpenChange={form.setOpen} title="Cellar addition" trigger={E.btn("Addition", "g")} footer={E.pin(<CellarAdditionFooter formId={formId} submitting={form.submitting} disabled={!ready} />)}>
+  return <CommandForm open={form.open} onOpenChange={form.setOpen} title="Cellar addition" trigger={E.btn("Addition", disabled ? "g disabled" : "g")} footer={E.pin(<CellarAdditionFooter formId={formId} submitting={form.submitting} disabled={!ready} />)}>
     <form id={formId} onSubmit={(event) => { if (!ready || form.submitting) { event.preventDefault(); return; } void form.submit(event); }} className="flex flex-col gap-3">
       <CellarAdditionView model={model} onChange={(patch) => setFields((current) => ({ ...current, ...patch }))} submitting={form.submitting} footer={null} messages={<CommandFormMessage error={form.error} />} />
     </form>

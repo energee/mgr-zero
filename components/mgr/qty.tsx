@@ -1,26 +1,27 @@
 // components/mgr/qty.tsx — a typed quantity and the segmented bar that rides in
 // its unit addon. Both are shared by `E.qty`/`E.tabs` (components/mgr/e.tsx) and
-// by VolumeField (components/mgr/volume-field.tsx), which draws the same field
-// with a generated id.
+// by VolumeField (components/mgr/volume-field.tsx). The quantity draws its own
+// visible label, tied to the input by a generated id (#1115).
 //
 // It is its own module only to break an import cycle: e.tsx imports VolumeField
 // for `E.volume`, so VolumeField cannot import `E` back, and the composition
 // cannot simply live in e.tsx either — SCREENS is a module-level const, built at
-// import time, where VolumeField's React.useId() could never run. Screen authors
+// import time, where Qty's useId() could never run. Screen authors
 // never import this directly; they use E.qty, E.tabs and E.volume.
 "use client";
 import type { FieldControls } from "@/components/mgr/e";
 import { stepQuantity } from "@/lib/mgr/quantity-input";
 import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
-import { useRef, type ReactNode } from "react";
+import { useId, useRef, type AriaAttributes, type ReactNode } from "react";
 
 /** The same stepper for controlled forms and uncontrolled inventory fields. */
-export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, ...attributes }: Omit<FieldControls, "hideLabel"> & { label: string; value?: string; defaultValue?: string }) {
+export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, ...attributes }: Omit<FieldControls, "hideLabel" | "error"> & { label: string; value?: string; defaultValue?: string }) {
   const input = useRef<HTMLInputElement>(null);
   const step = (direction: -1 | 1) => {
     const field = input.current;
@@ -38,47 +39,61 @@ export function StepQuantity({ label, value, defaultValue, onChange, contextualL
   </ButtonGroup>;
 }
 
-/** A typed quantity: the OS keyboard is the keypad, so nothing here draws one.
- *  Defaults live in `E.qty`/`E.tabs`, the vocabulary screen authors call; every
- *  caller here passes label, on and cls, so repeating those defaults would only
- *  give them a second place to drift. */
+/** A typed quantity under its visible label: the OS keyboard is the keypad, so
+ *  nothing here draws one. The label's generated id ties it to the input, so
+ *  the visible text is the input's accessible name (#1115). No caller sits
+ *  under a column header, so the label is always shown; add a hideLabel if
+ *  one ever does. Defaults live in `E.qty`/`E.tabs`, the vocabulary screen
+ *  authors call; every caller here passes label, on and cls, so repeating
+ *  those defaults would only give them a second place to drift. */
 export function Qty({
   value,
   onChange,
   unit,
   label,
   id,
+  invalid,
+  describedBy,
 }: {
   value: string;
   onChange?: (value: string) => void;
   unit?: ReactNode;
   label: string;
   id?: string;
+  /** From E.qty's `error` (#1121). */
+  invalid?: AriaAttributes["aria-invalid"];
+  describedBy?: string;
 }) {
+  const generatedId = useId();
+  const inputId = id ?? generatedId;
   return (
-    // overflow-hidden: a unit addon (chips, or a TabBar) is a flex item with a
-    // content-based min-width, so on a narrow field it won't shrink — clip to
-    // the field's own border instead of letting it spill past. A clip, not a
-    // scroll: a unit set that outgrows the field puts an option out of reach.
-    <InputGroup className="overflow-hidden">
-      {/* eslint-disable-next-line no-restricted-syntax -- Shared E volume primitive; native spinners are hidden. */}
-      <InputGroupInput
-        id={id}
-        type="number"
-        inputMode="decimal"
-        step="any"
-        value={onChange ? value : undefined}
-        defaultValue={onChange ? undefined : value}
-        onChange={(event) => onChange?.(event.target.value)}
-        aria-label={label}
-        className="text-2xl font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-      />
-      {/* pr-0 for a unit switcher: a TabsList insets itself (p-[3px]), so the
-          addon's default inline-end pr-2 would only double up as dead space past
-          the last unit. A plain-text unit ("bbl", "SG · prior 1.021") has no
-          inset of its own and keeps the padding. */}
-      {unit ? <InputGroupAddon align="inline-end" className="has-[>[data-slot=tabs]]:pr-0">{unit}</InputGroupAddon> : null}
-    </InputGroup>
+    <Field>
+      <FieldLabel htmlFor={inputId}>{label}</FieldLabel>
+      {/* overflow-hidden: a unit addon (chips, or a TabBar) is a flex item with a
+          content-based min-width, so on a narrow field it won't shrink — clip to
+          the field's own border instead of letting it spill past. A clip, not a
+          scroll: a unit set that outgrows the field puts an option out of reach. */}
+      <InputGroup className="overflow-hidden">
+        {/* eslint-disable-next-line no-restricted-syntax -- Shared E volume primitive; native spinners are hidden. */}
+        <InputGroupInput
+          id={inputId}
+          type="number"
+          inputMode="decimal"
+          step="any"
+          value={onChange ? value : undefined}
+          defaultValue={onChange ? undefined : value}
+          onChange={(event) => onChange?.(event.target.value)}
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
+          className="text-2xl font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        />
+        {/* pr-0 for a unit switcher: a TabsList insets itself (p-[3px]), so the
+            addon's default inline-end pr-2 would only double up as dead space past
+            the last unit. A plain-text unit ("bbl", "SG · prior 1.021") has no
+            inset of its own and keeps the padding. */}
+        {unit ? <InputGroupAddon align="inline-end" className="has-[>[data-slot=tabs]]:pr-0">{unit}</InputGroupAddon> : null}
+      </InputGroup>
+    </Field>
   );
 }
 
@@ -106,7 +121,7 @@ export function Qty({
  *  Without `panel` the body below is drawn outside the bar and aria-controls
  *  points at nothing: tolerable for a drawing or a bar of links. As a unit
  *  switcher it also announces "tab 1 of 3" with no group name, since the input's
- *  only name is its aria-label; the real app's unit choice wants a radiogroup. */
+ *  only name is its label; the real app's unit choice wants a radiogroup. */
 export function TabBar({
   names,
   on,

@@ -57,7 +57,7 @@ export function labeledTaproomStock(
 
 defineQuery({
   name: "get_beer_overview",
-  description: "Counts behind the Beer landing: finished-goods shortages, taproom SKUs below par, open taps, tanks with beer, material shortages and kegs out at customers",
+  description: "Counts behind the Beer landing: finished-goods shortages, taproom SKUs below par, kegs on tap, occupied tanks, material shortages and kegs out at customers",
   input: z.object({}), roles: STAFF_ROLES,
   handler: async (ctx) => {
     const b = ctx.breweryId;

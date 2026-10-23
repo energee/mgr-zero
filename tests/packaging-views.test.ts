@@ -131,4 +131,23 @@ describe("packaging views", () => {
     // A planned SKU with no known barrels per unit leaves the remainder unknown, not guessed.
     expect(toSchedulePackagingRunView(data, { brandId: "b1", occupancyId: "o1", plannedOn: "", qty: { s2: "3" } }).leftInSource).toBeUndefined();
   });
+
+  // #1125: copy and labels only; repack has no damage input.
+  it("labels the Repack fields and says plainly that repack records no damage", () => {
+    const html = htmlOf(createElement(RepackView, { model: repackCase, footer: null }));
+    const forId = /<label[^>]*for="([^"]+)"[^>]*>Packages to repack<\/label>/.exec(html)?.[1];
+    expect(forId).toBeTruthy();
+    expect(html).toMatch(new RegExp(`<input[^>]*id="${forId}"`));
+    expect(html).toMatch(/>Package to break down</);
+    expect(html).not.toMatch(/Damaged on break/);
+    expect(html).toContain("Repack doesn’t record damage");
+  });
+
+  it("explains Untracked stock where the Lot picker offers it, tied to the picker", () => {
+    // The inventory fixture carries the lot list, so the frame shows the picker and its help.
+    const html = htmlOf(createElement(RepackView, { model: repackCase, footer: null }));
+    const id = /<p[^>]*id="([^"]+)"[^>]*>Untracked stock is stock recorded without a lot\./.exec(html)?.[1];
+    expect(id).toBeTruthy();
+    expect(html).toMatch(new RegExp(`<button[^>]*aria-label="Lot"[^>]*aria-describedby="${id}"|<button[^>]*aria-describedby="${id}"[^>]*aria-label="Lot"`));
+  });
 });
