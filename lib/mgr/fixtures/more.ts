@@ -1,19 +1,22 @@
-// lib/mgr/fixtures/more.ts — More landing navs for the inventory drawing.
+// lib/mgr/fixtures/more.ts — More landing navs for the inventory drawing. A
+// card that is also a More entry in lib/mgr/nav.ts quotes that entry's
+// `about` line through navAbout, as the live page prints it.
 import type { MoreNavView } from "@/lib/mgr/more-view";
+import { navAbout } from "@/lib/mgr/nav";
 
 export const moreNavs: MoreNavView[] = [
-  { key: "invoices", title: "Invoices", detail: "QuickBooks Online mapping and push", mark: "qbo" },
-  { key: "catalog", title: "Catalog", detail: "brands and SKUs" },
-  { key: "prices", title: "Price groups", detail: "rows of the price grid" },
-  { key: "customers", title: "Customers", detail: "accounts and ship-tos" },
-  { key: "recipes", title: "Recipes", detail: "formulas and versions" },
-  { key: "compliance", title: "Compliance months", detail: "reports and filing status" },
-  { key: "vendors", title: "Vendors", detail: "who you buy from" },
-  { key: "channels", title: "Sale channels", detail: "tax treatment" },
-  { key: "formats", title: "Formats", detail: "package composition" },
-  { key: "planning", title: "Planning" },
-  { key: "settings", title: "Settings", detail: "brewery and integrations" },
-  { key: "locations", title: "Locations", detail: "warehouses, taprooms and bins" },
-  { key: "bins", title: "Bins", detail: "physical subdivisions by location" },
-  { key: "chat", title: "Chat", detail: "Slack and notifications" },
+  { key: "invoices", title: "Invoices", detail: navAbout("Invoices"), mark: "qbo" },
+  { key: "catalog", title: "Catalog", detail: navAbout("Catalog") },
+  { key: "prices", title: "Price groups", detail: navAbout("Price groups") },
+  { key: "customers", title: "Customers", detail: navAbout("Customers") },
+  { key: "recipes", title: "Recipes", detail: navAbout("Recipes") },
+  { key: "compliance", title: "Compliance", detail: navAbout("Compliance") },
+  { key: "vendors", title: "Vendors", detail: navAbout("Vendors") },
+  { key: "channels", title: "Sale channels", detail: navAbout("Sale channels") },
+  { key: "formats", title: "Formats", detail: "Define package formats and their volumes" },
+  { key: "planning", title: "Planning", detail: navAbout("Planning") },
+  { key: "settings", title: "Settings", detail: navAbout("Settings") },
+  { key: "locations", title: "Locations", detail: navAbout("Locations") },
+  { key: "bins", title: "Bins", detail: "Subdivide a location into bins" },
+  { key: "chat", title: "Chat", detail: navAbout("Chat") },
 ];

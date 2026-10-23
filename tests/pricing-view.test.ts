@@ -9,7 +9,7 @@ import { PriceGroupView } from "../components/mgr/views/price-group";
 import { PriceGroupsView } from "../components/mgr/views/price-groups";
 import { priceGroupTwo, pricingGrid } from "../lib/mgr/fixtures/pricing";
 import { money } from "../lib/mgr/money";
-import { toPriceGroupViewProps } from "../lib/mgr/price-group-view";
+import { priceGroupReason, toPriceGroupViewProps } from "../lib/mgr/price-group-view";
 import { cellCommit, toPriceGroupsViewProps } from "../lib/mgr/price-groups-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -178,6 +178,28 @@ describe("Price groups view", () => {
 });
 
 describe("Price group view", () => {
+  const inputTag = (html: string, id: string) => html.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))?.[0] ?? "";
+
+  it("Save price group names a missing group name instead of submitting (#1133)", () => {
+    expect(priceGroupReason({ name: "" })).toBe("Still needed: a group name.");
+    expect(priceGroupReason({ name: "  " })).toBe("Still needed: a group name.");
+    expect(priceGroupReason({ name: "Core" })).toBeNull();
+    const form = readFileSync("app/(app)/pricing/group-form.tsx", "utf8");
+    expect(form).toContain("reason: priceGroupReason(draft)");
+  });
+
+  it("marks Group name required, says what Position does, and marks Cost ceiling optional (#1133)", () => {
+    const html = htmlOf(createElement(PriceGroupView, { model: toPriceGroupViewProps(pricingGrid), footer: null }));
+    expect(inputTag(html, "price-group-name")).toContain('required=""');
+    expect(inputTag(html, "price-group-position")).toContain('aria-describedby="price-group-position-help"');
+    expect(html).toMatch(/id="price-group-position-help"[^>]*>This group’s row in the price grid: lower numbers sit higher/);
+    expect(html).toContain("Cost ceiling ($/bbl) · optional");
+    expect(inputTag(html, "price-group-ceiling")).not.toContain("required");
+    expect(inputTag(html, "price-group-ceiling")).toContain('aria-describedby="price-group-ceiling-help"');
+    expect(html).toMatch(/id="price-group-ceiling-help"[^>]*>Dollars per barrel of recipe cost\. A brand’s page suggests the first group/);
+    expect(html).not.toContain("never moved");
+  });
+
   it("maps group 2's ceiling, previous none, and the Hazy featured cell", () => {
     const model = toPriceGroupViewProps(priceGroupTwo);
     expect(model.name).toBe("2");

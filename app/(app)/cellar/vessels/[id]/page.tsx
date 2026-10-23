@@ -19,8 +19,8 @@ export default async function VesselPage({ params }: { params: Promise<{ id: str
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   // Brewers read a vessel; adding and editing one is admin work.
-  requirePagePermission(ctx, id === "new" ? "upsert_vessel" : "list_vessels", "Vessel detail");
-  if (id === "new") return <VesselForm model={{ title: "New vessel", backHref: "/cellar", name: "", type: "Fermenter", typeOptions: VESSEL_TYPES, capacity: "", currentReading: "No readings yet", history: [] }} />;
+  requirePagePermission(ctx, id === "new" ? "upsert_vessel" : "list_vessels", id === "new" ? "New vessel" : "Vessel detail");
+  if (id === "new") return <VesselForm model={{ title: "New vessel", backHref: "/cellar", name: "", type: "Fermenter", typeOptions: VESSEL_TYPES, capacity: "" }} />;
   const [vessels, occupancies, unit] = await Promise.all([
     runPageQuery("list_vessels", { retired: true }, ctx), runPageQuery("list_occupancies", {}, ctx), runPageQuery("get_gravity_unit", {}, ctx),
   ]) as [Vessel[], Occupancy[], { effective: GravityUnit }];
@@ -32,8 +32,10 @@ export default async function VesselPage({ params }: { params: Promise<{ id: str
     title: vessel.name, backHref: "/cellar", name: vessel.name, type: vessel.kind[0].toUpperCase() + vessel.kind.slice(1), typeOptions: VESSEL_TYPES, capacity: String(vessel.capacity_bbl), retired: !vessel.active,
     occupancy: occupancy ? { title: `${occupancy.brand_name ?? "No brand yet"} · ${batNo(occupancy.batch_no)}`, detail: `${occupancy.bbl} / ${vessel.capacity_bbl} bbl`, href: `/batches/${occupancy.batch_id}` } : undefined,
     readingHref: occupancy ? `/cellar/${occupancy.occupancy_id}/reading` : undefined,
-    currentReading: readings[0] ? `${formatVesselReading(readings[0], unit.effective)} · ${formatDateTime(readings[0].at, brewery.timeZone)}` : "No readings yet",
-    history: readings.map(reading => ({ key: reading.id, title: formatDateTime(reading.at, brewery.timeZone), detail: formatVesselReading(reading, unit.effective) })),
+    readings: {
+      current: readings[0] ? `${formatVesselReading(readings[0], unit.effective)} · ${formatDateTime(readings[0].at, brewery.timeZone)}` : "No readings yet",
+      history: readings.map(reading => ({ key: reading.id, title: formatDateTime(reading.at, brewery.timeZone), detail: formatVesselReading(reading, unit.effective) })),
+    },
   };
   return canRun(ctx, "upsert_vessel") ? <VesselForm key={id} vesselId={id} model={model} /> : <VesselDetailView model={model} editable={false} />;
 }
