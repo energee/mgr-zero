@@ -13,7 +13,7 @@ import { FermentationScheduleView, FermentationStageView } from "@/components/mg
 import { IngredientView, type IngredientMaterial } from "@/components/mgr/views/ingredient";
 import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
 import { WaterAdditionView, WaterView } from "@/components/mgr/views/water";
-import { additionReady, lineReady, mashStepReady, moveItem, removeAt, stageReady, toAdditionFields, toMashStepFields, toStageFields, upsertAt, type FermentationStage, type IngredientLine, type MashStep, type SaltMaterial, type WaterAddition, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import { additionReady, lineReady, mashStepReady, moveItem, removeAt, stageReady, toAdditionFields, toMashStepFields, toStageFields, upsertAt, waterRowSummary, type FermentationStage, type IngredientLine, type MashStep, type SaltMaterial, type WaterAddition, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 
 type Editing = { index?: number } | null;
 type ListProps<T> = { items: T[]; onEdit: (index: number) => void; onMove: (index: number, by: -1 | 1) => void; add: ReactNode; onAdd: () => void };
@@ -69,7 +69,7 @@ export function FermentationScheduleSheet({ stages, onChange, trigger }: { stage
 
 export function WaterSheet({ water, profiles, materials, onChange, trigger }: { water: WaterDraft; profiles: WaterProfileIons[]; materials: SaltMaterial[]; onChange: (water: WaterDraft) => void; trigger?: ReactNode }) {
   const target = profiles.find((p) => p.id === water.targetProfileId)?.name;
-  return <ListSheet<WaterAddition, ReturnType<typeof toAdditionFields>> sheetTitle="Water" trigger={trigger ?? `Water · ${target ? `target ${target}` : "no target"} · ${water.additions.length} additions`} addLabel="Add addition" saveLabel="Save addition"
+  return <ListSheet<WaterAddition, ReturnType<typeof toAdditionFields>> sheetTitle="Water" trigger={trigger ?? `Water · ${waterRowSummary(target, water.additions.length)}`} addLabel="Add addition" saveLabel="Save addition"
     items={water.additions} onChange={(additions) => onChange({ ...water, additions })} toFields={toAdditionFields} ready={additionReady}
     toItem={(f) => ({ materialId: f.materialId, qty: Number(f.qty), unit: f.unit, stage: f.stage })}
     list={(p) => <WaterView water={{ ...water, additions: p.items }} profiles={profiles} materials={materials} profilesHref="/catalog/water-profiles" chemistryKnown={false /* until materials carry a salt identity (PR B) */} header={null} onChange={(patch) => onChange({ ...water, ...patch })} onEdit={p.onEdit} onMove={p.onMove} onAdd={p.onAdd} />}
@@ -78,7 +78,7 @@ export function WaterSheet({ water, profiles, materials, onChange, trigger }: { 
 
 const emptyLine = (): IngredientLine => ({ materialId: "", perBblQty: "", stage: "mash", timingMinutes: "" });
 
-/** One ingredient, edited in place: "+ add ingredient" opens a blank editor, Edit on a row opens it filled. No list of its own; the recipe page is the list. */
+/** One ingredient, edited in place: "Add ingredient" opens a blank editor, Edit on a row opens it filled. No list of its own; the recipe page is the list. */
 export function IngredientSheet({ line, materials, onSave, onDelete, trigger }: { line?: IngredientLine; materials: IngredientMaterial[]; onSave: (line: IngredientLine) => void; onDelete?: () => void; trigger: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [f, setF] = useState<IngredientLine>(line ?? emptyLine());

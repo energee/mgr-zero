@@ -174,6 +174,21 @@ describe("sale channel commands", () => {
       .rejects.toMatchObject({ message: "channel is in use" });
   });
 
+  // CHANNEL_IN_USE_RULE names the Square menu; pos_menus holds a plain foreign key.
+  it("delete_sale_channel refuses a channel a Square menu references", async () => {
+    const menuChannel = (await runCommand("upsert_sale_channel", { name: "Menu only", taxTreatment: "taxable" }, ctx)) as { id: string };
+    const loc = (await runCommand("create_location", { name: "Menu taproom", uses: ["taproom"] }, ctx)) as { id: string };
+    const bins = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as { id: string }[];
+    const connection = await admin.from("pos_connections").insert({ brewery_id: breweryId,
+      merchant_id: `channel-menu-${crypto.randomUUID()}`, state: "connected" }).select("id").single();
+    expect(connection.error).toBeNull();
+    expect((await admin.from("pos_locations").insert({ brewery_id: breweryId, connection_id: connection.data!.id,
+      external_location_id: "CHANNEL-MENU", location_id: loc.id })).error).toBeNull();
+    await runCommand("configure_pos_menu", { posLocationId: "CHANNEL-MENU", binId: bins[0].id, saleChannelId: menuChannel.id }, ctx);
+    await expect(runCommand("delete_sale_channel", { channelId: menuChannel.id }, ctx))
+      .rejects.toMatchObject({ message: "channel is in use" });
+  });
+
   it("a channel of another brewery is not editable or deletable", async () => {
     const otherCtx = await makeStaffCtx((await makeBrewery()).id, "admin");
     const mine = (await runCommand("upsert_sale_channel", { name: "Tenant", taxTreatment: "taxable" }, ctx)) as { id: string };

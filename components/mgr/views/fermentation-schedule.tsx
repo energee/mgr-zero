@@ -5,6 +5,7 @@
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { FERMENTATION_STAGE_KINDS } from "@/lib/mgr/enums";
+import { sentenceCase } from "@/lib/mgr/labels";
 import { fermentationSummary, type FermentationStage, type FermentationStageFields } from "@/lib/mgr/recipe-process-view";
 import { listRow, type ListRowProps } from "./mash-schedule";
 
@@ -22,7 +23,7 @@ export function FermentationScheduleView({ title = "Fermentation schedule", stag
 export function FermentationStageView({ fields, onChange, footer }: { fields: FermentationStageFields; onChange?: (patch: Partial<FermentationStageFields>) => void; footer?: ReactNode }) {
   return <>
     {E.edit("Stage name", fields.name, "text", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ name: nextValue }) : undefined, required: true })}
-    {E.pick("Stage", fields.kind, (FERMENTATION_STAGE_KINDS.map(k => ({ value: k, label: k }))), { onChange: onChange ? (nextValue: string) => onChange?.({ kind: nextValue }) : undefined })}
+    {E.pick("Stage", fields.kind, FERMENTATION_STAGE_KINDS.map(k => ({ value: k, label: sentenceCase(k) })), { onChange: onChange ? (nextValue: string) => onChange?.({ kind: nextValue }) : undefined })}
     {E.cols(
       E.edit("Temp °F", fields.tempF, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ tempF: nextValue }) : undefined, required: true, step: "any" }),
       E.edit("Duration days", fields.days, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ days: nextValue }) : undefined, required: true, min: "0", step: "any" }),

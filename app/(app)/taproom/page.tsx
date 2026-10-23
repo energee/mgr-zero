@@ -5,6 +5,7 @@ import { buildContext } from "@/lib/commands/context";
 import { requirePagePermission, runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { TaproomCountSnapshot } from "@/lib/mgr/taproom-count-state";
 import { plural } from "@/lib/mgr/plural";
+import { varianceReason } from "@/lib/mgr/taproom-variance-view";
 import type { TaproomLineMovementType } from "@/lib/supabase/rpc-results";
 import "@/lib/commands/all";
 import { TaproomCountCorrection, TaproomCountForm, TaproomPrintWorksheet, type DraftProjection, type PrintLabel } from "./count-form";
@@ -46,7 +47,7 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
     locations: locations.map(item => ({ value: item.id, label: item.name, href: `/taproom?location=${item.id}` })), location: location.id, roles, lotLabels, timeZone: brewery.timeZone,
     receipt: shownReceipt ? {
       date: formatDate(shownReceipt.counted_on), canCorrect: shownReceipt.correction_eligible,
-      recorded: `Recorded by ${shownReceipt.counted_by === ctx.userId ? "you" : "staff"} at ${formatDateTime(shownReceipt.created_at, brewery.timeZone)}${shownReceipt.prior_count_id ? "" : " · first count"}`,
+      recorded: `Recorded by ${shownReceipt.counted_by === ctx.userId ? "you" : "staff"} at ${formatDateTime(shownReceipt.created_at, brewery.timeZone)}${shownReceipt.prior_count_id ? "" : `. ${varianceReason("missing_baseline")}.`}`,
       priorHref: shownReceipt.prior_count_id ? `/taproom?location=${location.id}&count=${shownReceipt.prior_count_id}` : undefined,
       correction: shownReceipt.corrected_at ? `Corrected by ${shownReceipt.corrected_by === ctx.userId ? "you" : "Admin"} at ${formatDateTime(shownReceipt.corrected_at, brewery.timeZone)} · ${shownReceipt.correction_reason}` : undefined,
       lines: shownReceipt.lines.map((line, index) => {

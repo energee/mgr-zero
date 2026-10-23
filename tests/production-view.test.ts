@@ -25,6 +25,7 @@ import { toBatchesViewProps, batchesFromQuery, type BatchListRow } from "../lib/
 import { brewTurnModel, canRecordBrewDay } from "../lib/mgr/brew-day-view";
 import { PlanActions } from "../components/mgr/views/plan-actions";
 import { toRecipesViewProps } from "../lib/mgr/recipes-view";
+import { resolveTap } from "../lib/mgr/screen-links";
 import { formatVesselReading } from "../lib/mgr/vessel-detail-view";
 import { cellarReadings, toCellarMapViewProps } from "../lib/mgr/cellar-map-view";
 import { CellarMapView } from "../components/mgr/views/cellar-map";
@@ -406,12 +407,29 @@ describe("Recipes view", () => {
         { id: "r2", name: "Stout", brand: "Stout", latest_version: null },
       ],
     });
-    expect(model.rows[0]).toEqual({ key: "r1", title: "Hazy IPA v1", detail: "no brand yet", href: "/recipes/r1" });
-    expect(model.rows[1]).toMatchObject({ title: "Stout", detail: "no version yet", warning: true, href: "/recipes/r2" });
-    const html = htmlOf(createElement(RecipesView, { model }));
+    expect(model.rows[0]).toEqual({ key: "r1", title: "Hazy IPA v1", detail: "No brand yet", href: "/recipes/r1" });
+    expect(model.rows[1]).toMatchObject({ title: "Stout", detail: "No version yet", warning: true, href: "/recipes/r2" });
+    const html = htmlOf(createElement(RecipesView, { model, linkRows: true }));
     expect(html).toContain('href="/recipes/r1"');
     expect(html).toContain('href="/recipes/r2"');
     expect(html).not.toContain(">Open<");
+  });
+
+  it("links Water profiles, where a version's source and target come from (#1140)", () => {
+    const live = htmlOf(createElement(RecipesView, { model: toRecipesViewProps({ recipes: [], waterProfilesHref: "/catalog/water-profiles" }) }));
+    expect(live).toMatch(/<a[^>]*href="\/catalog\/water-profiles"[^>]*>[^]*?Water profiles/);
+    // The inventory frame leaves the row for the explorer, which walks it to the Water profiles record.
+    expect(htmlOf(screen("Recipes").body)).toContain("Water profiles");
+    expect(resolveTap(screen("Recipes"), "Water profiles")).toBe("Water profiles");
+    // The renamed create row still opens the Ingredient record, not the global inert list.
+    expect(resolveTap(screen("Recipe"), "Add ingredient")).toBe("Ingredient");
+  });
+
+  it("draws the inventory list through the live adapter, a recipe with no version included", () => {
+    const { rows } = toRecipesViewProps(recipesList);
+    expect(rows.map((r) => r.detail)).toEqual(["Hazy IPA", "Pils", "No version yet"]);
+    expect(rows[2]).toMatchObject({ title: "Farmhouse saison", warning: true });
+    expect(htmlOf(screen("Recipes").body)).not.toMatch(/15 bbl · updated/);
   });
 
 

@@ -34,14 +34,16 @@ describe("AI composer", () => {
     expect(chatModelFromSettings(null, "anthropic/claude-sonnet-4.5")).toBe("anthropic/claude-sonnet-4.5");
   });
 
-  it("offers every language model returned by Gateway", () => {
-    expect(gatewayLanguageModels([
+  it("offers every language model returned by Gateway, by id and name only", () => {
+    // Gateway also returns pricing; Settings does not show it (#1147), so it is not passed on.
+    const catalog = [
       { id: "openai/gpt-5.4", name: "GPT-5.4", modelType: "language", pricing: { input: "0.0000025", output: "0.000015" } },
       { id: "google/veo", name: "Veo", modelType: "video" },
       { id: "anthropic/claude", name: "Claude", modelType: null },
-    ])).toEqual([
+    ];
+    expect(gatewayLanguageModels(catalog)).toEqual([
       { id: "anthropic/claude", name: "Claude" },
-      { id: "openai/gpt-5.4", name: "GPT-5.4", pricing: { input: "0.0000025", output: "0.000015" } },
+      { id: "openai/gpt-5.4", name: "GPT-5.4" },
     ]);
   });
 
@@ -63,15 +65,16 @@ describe("AI composer", () => {
   it("renders model selection as a shared Settings control", () => {
     const html = renderToStaticMarkup(createElement(AiModelSettingsView, {
       value: "openai/gpt-5.4",
-      models: [{ id: "openai/gpt-5.4", name: "GPT-5.4", pricing: { input: "0.0000025", output: "0.000015" } }],
+      models: [{ id: "openai/gpt-5.4", name: "GPT-5.4" }],
     }));
     const text = html.replace(/<[^>]*>/g, "");
     expect(html).toContain("AI model");
     expect(html).toMatch(/data-slot="input-group-control"[^>]*value="GPT-5\.4"/);
     expect(text).not.toContain("openai/gpt-5.4");
-    expect(text).toContain("Input $2.50 · Output $15.00 / 1M tokens");
+    // Token prices and the Vercel catalog link are vendor detail, not brewery settings (#1147).
+    expect(text).not.toMatch(/tokens|\$/);
     expect(text).toContain("openai");
-    expect(html).toContain('href="https://vercel.com/ai-gateway/models"');
+    expect(html).not.toContain("vercel.com");
     expect(html).toContain("<title>OpenAI</title>");
     expect(html).toContain('placeholder="Search models…"');
     expect(readFileSync("components/mgr/views/ai-model-settings.tsx", "utf8")).not.toMatch(/<select\b/);

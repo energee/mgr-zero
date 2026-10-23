@@ -376,10 +376,10 @@ describe("HTTP API reference", () => {
       expect(named.has(spelled), `${spelled} is spelled-out CRUD; use ${use}`).toBe(false);
       expect(named.has(use), `${use} is what replaces it`).toBe(true);
     }
-    // delete_sale_channel stays: both channel frames draw the refusal ("A
-    // channel with movements cannot be deleted"), so the verb is a capability
-    // the screen describes, not CRUD boilerplate. Retiring it behind a flag is
-    // a design change, not a rename.
+    // delete_sale_channel stays: the Sale channels list states its refusal
+    // (CHANNEL_IN_USE_RULE) where Delete is offered, so the verb is a
+    // capability the screen describes, not CRUD boilerplate. Retiring it
+    // behind a flag is a design change, not a rename.
     expect(named.has("delete_sale_channel")).toBe(true);
   });
 
