@@ -33,6 +33,7 @@ const AUTHENTICATED_RPCS = [
   "set_brewery_operating_defaults(uuid,integer,uuid,integer)",
   "set_brewery_books_opened_on(uuid,date,uuid)",
   "correct_reporting_basis(uuid,date,date,text,uuid)",
+  "list_compliance_active_months(uuid,date,date)",
   "set_one_way_keg_fee(uuid,integer,uuid)",
   "set_brewery_ai_model(uuid,text,uuid)",
 
