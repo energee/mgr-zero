@@ -5318,8 +5318,8 @@ isOneToOne: false
 "prune_command_requests":
 { Args: Record<PropertyKey, never>; Returns: number
                            },
-"qbo_oauth_already_completed":
-{ Args: { "p_actor": string,"p_brewery": string,"p_state_hash": string }; Returns: boolean
+"qbo_oauth_exchange_state":
+{ Args: { "p_actor": string,"p_brewery": string,"p_state_hash": string }; Returns: string
                            },
 "raise_invoice_question":
 { Args: { "p_body": string,"p_brewery": string,"p_invoice": string,"p_request_id": string }; Returns: Json
