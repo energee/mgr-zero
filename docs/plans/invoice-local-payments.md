@@ -163,11 +163,11 @@ change.
 | Q9 | **Clearing Overdue.** How does an uncollectable, mistaken or fully credited local invoice stop reading **Overdue**? `write_off_invoice` accepts only an invoice QuickBooks voided or deleted, and MGR has no void for a local invoice. | Out of scope here. Open a follow-up issue that lets `write_off_invoice` accept a ledger-owned invoice. | The decision names payments only. **Cost of the default:** until the follow-up lands, such an invoice reads **Overdue** with no way to clear it except recording a payment. | In scope: a `write_off_invoice` copy in task 2, plus 6, 7, 13 |
 | Q10 | **Received before issue.** May a payment's received date be before the invoice's issue date (a prepayment taken at order time)? A date after today in the brewery's zone is always refused. | Allow it. | A buyer can pay at order time, before the shipment issues the invoice. **Cost of the default:** `paid_at` can then be earlier than the issue date. | 2, 8, 10 |
 
-## Schema — `supabase/migrations/20261022130000_invoice_payments.sql`
+## Schema — `supabase/migrations/20261023080000_invoice_payments.sql`
 
 The name sorts after the latest file on `origin/main`,
-`20261022120000_brew_pulls.sql`. If `main` moves first, rename to a later
-timestamp before `bun run migrations:lock`.
+`20261022140000_qbo_oauth_exchange_state.sql`. If `main` moves first,
+rename to a later timestamp before `bun run migrations:lock`.
 
 ```sql
 -- Invoice payments recorded in MGR (#1045, docs/plans/invoice-local-payments.md).
@@ -571,7 +571,7 @@ Each task starts by writing its named failing test and watching it fail
 `mgr_test` stack (`scripts/test-db.sh`).
 
 1. **Migration: both tables, immutable triggers, RLS, view column.**
-   - Files: `supabase/migrations/20261022130000_invoice_payments.sql`,
+   - Files: `supabase/migrations/20261023080000_invoice_payments.sql`,
      `supabase/migrations.lock.json` (`bun run migrations:lock`),
      `lib/supabase/database.generated.ts` (`bun run types:database`),
      `tests/rls-fixtures.ts`, `tests/rls-taproom.test.ts`,
