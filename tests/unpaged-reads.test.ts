@@ -29,13 +29,13 @@ function unpagedReads(src: string): string[] {
 
 // Unpaged reads per file when the guard landed. Only ever lower these.
 const ALLOWED: Record<string, number> = {
-  "catalog.ts": 7,
+  "catalog.ts": 6,
   "chat.ts": 2,
   "compliance.ts": 5,
   "customers.ts": 1,
-  "delivery.ts": 4,
+  "delivery.ts": 3,
   "inventory.ts": 6,
-  "orders.ts": 12,
+  "orders.ts": 9,
   "packaging.ts": 8,
   "portal.ts": 6,
   "production.ts": 14,

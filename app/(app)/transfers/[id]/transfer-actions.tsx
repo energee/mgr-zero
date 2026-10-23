@@ -1,7 +1,7 @@
 // app/(app)/transfers/[id]/transfer-actions.tsx — the one next verb for a
-// stock transfer by status: Submit (draft), Record pick (submitted; picks
-// default to the ordered qty), Receive (picked; quantities default to picked),
-// and Cancel transfer with a reason until it is received (#578).
+// stock transfer by status: Record pick (submitted; picks default to the
+// ordered qty), Receive (picked; quantities default to picked), and Cancel
+// transfer with a reason until it is received (#578).
 "use client";
 
 import { useState } from "react";
@@ -23,7 +23,6 @@ export function TransferActions({ transferId, status, lines, stock }: { stock: B
   const irreversible = "w-full bg-irreversible text-irreversible-foreground hover:bg-irreversible/90 md:w-fit";
   return (
     <div className="flex flex-col gap-2">
-      {status === "draft" && <Button className="w-full md:w-fit" disabled={busy} onClick={() => run("submit_stock_transfer", { transferId })}>Submit</Button>}
       {status === "submitted" && <Button className="w-full md:w-fit" disabled={busy} onClick={() => run("record_stock_transfer_pick", { transferId, picks: lines.map((l) => ({ lineId: l.id, qty: l.qty })) })}>Record pick</Button>}
       {(status === "picked" || status === "in_transit") && <>{lines.filter(l => l.skuId || l.materialId).map(l => <div key={l.id} className="flex flex-col gap-2 border-b pb-3"><p>Choose sources totaling {l.qtyPicked ?? l.qty} units</p>{sources(l).map(s => <div key={key(l.id, s.lot_id)}>{E.edit(`${s.name} · ${s.lot_code ?? "Untracked / legacy stock"} · ${s.qty} available`, quantities[key(l.id,s.lot_id)] ?? "", "number", undefined, { min: 0, step: l.skuId ? 0.01 : 0.0001, onChange: qty => setQuantities(prev => ({ ...prev, [key(l.id,s.lot_id)]: qty })) })}</div>)}</div>)}</>}
       {(status === "picked" || status === "in_transit") && (

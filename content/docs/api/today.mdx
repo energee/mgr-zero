@@ -148,7 +148,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer, taproom
 
-Counts behind the Beer landing: finished-goods shortages, taproom SKUs below par, open taps, tanks with beer, material shortages and kegs out at customers
+Counts behind the Beer landing: finished-goods shortages, taproom SKUs below par, kegs on tap, occupied tanks, material shortages and kegs out at customers
 
 Takes no input.
 
@@ -163,11 +163,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer, taproom
 
-Read one composer conversation and its messages for the current author and brewery
+Read one composer conversation and its messages for the current author and brewery; recentTurns returns only that many newest text turns, oldest first
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `conversationId` | uuid | yes |
+| `recentTurns` | integer | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -229,7 +230,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer, taproom
 
-Read your own reason preferences, personal quiet hours and Slack link
+Read your own reason preferences, personal quiet hours and Slack link, plus whether the brewery's Slack is active and its quiet hours
 
 Takes no input.
 

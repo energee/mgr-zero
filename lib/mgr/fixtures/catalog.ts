@@ -24,10 +24,15 @@ const FMT_CASE = "00000000-0000-4000-8000-0000000000f3";
 const FMT_HALF = "00000000-0000-4000-8000-0000000000f4";
 const FMT_PINT = "00000000-0000-4000-8000-0000000000f5";
 const FMT_SIXTH = "00000000-0000-4000-8000-0000000000f6";
+const FMT_QUARTER = "00000000-0000-4000-8000-0000000000f7";
 const SKU_HAZY_SIXTH = "00000000-0000-4000-8000-0000000000a4";
 const SKU_HAZY_CASE = "00000000-0000-4000-8000-0000000000a5";
 const SKU_PILS_BOTTLE = "00000000-0000-4000-8000-0000000000a6";
 const PG_3 = "00000000-0000-4000-8000-0000000000p3";
+const CH_WHOLESALE = "00000000-0000-4000-8000-0000000000c1";
+const CH_TAPROOM = "00000000-0000-4000-8000-0000000000c2";
+/** Hazy IPA's one COLA, on Catalog and under Brand → Compliance. */
+const HAZY_COLA = { ttb_id: "25318001000034", approved_on: "2026-01-15" };
 
 // Ceilings are $/bbl; the first three band, the rest are chosen by hand.
 const priceGroups = Array.from({ length: 8 }, (_, i) => ({
@@ -38,9 +43,9 @@ const priceGroups = Array.from({ length: 8 }, (_, i) => ({
 }));
 
 const hazySkus = [
-  { id: SKU_HAZY.sku_id, name: SKU_HAZY.name, format_id: FMT_HALF, active: true },
-  { id: SKU_HAZY_SIXTH, name: `${HAZY} · ⅙ bbl keg`, format_id: FMT_SIXTH, active: true },
-  { id: SKU_HAZY_CASE, name: `${HAZY} · case · 24×16 oz`, format_id: FMT_CASE, active: true },
+  { id: SKU_HAZY.sku_id, name: SKU_HAZY.name, format_id: FMT_HALF, active: true, upc: "00810123450127" },
+  { id: SKU_HAZY_SIXTH, name: `${HAZY} · ⅙ bbl keg`, format_id: FMT_SIXTH, active: true, upc: null },
+  { id: SKU_HAZY_CASE, name: `${HAZY} · case · 24×16 oz`, format_id: FMT_CASE, active: true, upc: null },
 ];
 
 const packagedFormats = [
@@ -49,7 +54,7 @@ const packagedFormats = [
   { id: FMT_CASE, name: "case · 24×16 oz" },
 ];
 
-/** More → Catalog: three brands, 8 price groups, 3 channels, 3 water profiles. */
+/** More → Catalog: three brands (one, no and two COLAs on file) and 8 price groups. */
 export const catalogBrands: CatalogSnapshot = {
   brands: [
     {
@@ -59,6 +64,7 @@ export const catalogBrands: CatalogSnapshot = {
       styles: { name: "IPA" },
       skus: hazySkus,
       pours: [{ id: FMT_PINT }],
+      colas: [HAZY_COLA],
     },
     {
       id: BRAND_PILS,
@@ -69,6 +75,7 @@ export const catalogBrands: CatalogSnapshot = {
         { id: SKU_PILS.sku_id },
         { id: SKU_PILS_BOTTLE },
       ],
+      colas: [],
     },
     {
       id: BRAND_STOUT,
@@ -78,18 +85,14 @@ export const catalogBrands: CatalogSnapshot = {
       abv: 7.2,
       styles: { name: "Stout" },
       skus: [{ id: SKU_STOUT.sku_id }],
+      // Two labels on file, one with no recorded approval date.
+      colas: [{ ttb_id: "25318001000101", approved_on: "2025-11-03" }, { ttb_id: "00318001000102", approved_on: null }],
     },
   ],
   priceGroups,
-  channels: [
-    { id: "ch-wholesale", name: "Wholesale" },
-    { id: "ch-taproom", name: "Taproom" },
-    { id: "ch-dtc", name: "DTC" },
-  ],
-  waterProfileCount: 3,
 };
 
-/** Hazy IPA brand sheet: Core, price group 3, 3 active packages. */
+/** Hazy IPA brand sheet: Core, price group 3, 3 active packages (Half, Sixtel, Case, whose Four Packs list beneath), Quarter off, one Glass pour. */
 export const brandHazy: BrandSnapshot = {
   categories: ["Core", "Seasonal", "One-off", "Barrel-aged"],
   brand: {
@@ -102,14 +105,33 @@ export const brandHazy: BrandSnapshot = {
     price_group_id: PG_3,
     styles: { name: HAZY },
     skus: hazySkus,
-    pours: [{ id: FMT_PINT }],
+    pours: [{ id: FMT_PINT, name: "Glass", ounces: 16 }],
+  },
+  // Packaged list_formats (alphabetical), the two sale channels, and group 3's cells.
+  sells: {
+    formats: [
+      { id: FMT_CASE, name: "Case", components: [{ parent_format_id: FMT_CASE, child_format_id: FMT_FOUR, qty: 6 }] },
+      { id: FMT_FOUR, name: "Four Pack", components: [] },
+      { id: FMT_HALF, name: "Half", components: [] },
+      { id: FMT_QUARTER, name: "Quarter", components: [] },
+      { id: FMT_SIXTH, name: "Sixtel", components: [] },
+    ],
+    channels: [{ id: CH_WHOLESALE, name: "Wholesale" }, { id: CH_TAPROOM, name: "Taproom" }],
+    prices: [
+      { sale_channel_id: CH_WHOLESALE, price_group_id: PG_3, format_id: FMT_CASE, unit_price_cents: 5400 },
+      { sale_channel_id: CH_WHOLESALE, price_group_id: PG_3, format_id: FMT_FOUR, unit_price_cents: 1200 },
+      { sale_channel_id: CH_TAPROOM, price_group_id: PG_3, format_id: FMT_FOUR, unit_price_cents: 1600 },
+      { sale_channel_id: CH_WHOLESALE, price_group_id: PG_3, format_id: FMT_HALF, unit_price_cents: 24000 },
+      { sale_channel_id: CH_WHOLESALE, price_group_id: PG_3, format_id: FMT_SIXTH, unit_price_cents: 14000 },
+      { sale_channel_id: CH_TAPROOM, price_group_id: PG_3, format_id: FMT_PINT, unit_price_cents: 800 },
+    ],
   },
   styles: [HAZY, "IPA", PILS, "Add “Cold IPA”"],
   priceGroups,
   // Hazy sits on group 3 by hand; its recipe cost lands in group 2's band.
   cost: { costCentsPerBbl: 4810, uncosted: [] },
   compliance: {
-    approvals: [{ id: "cola", brand_id: BRAND_HAZY, kind: "cola", ttb_id: "25318001000034", serial_number: "260135", approved_on: "2026-01-15", expires_on: null, note: null }],
+    approvals: [{ id: "cola", brand_id: BRAND_HAZY, kind: "cola", ...HAZY_COLA, serial_number: "260135", expires_on: null, note: null }],
     registrations: [{ id: "oh", brand_id: BRAND_HAZY, state: "OH", registration_no: "OH-88214", approved_on: null, expires_on: "2026-12-31" }],
   },
 };
@@ -207,7 +229,7 @@ export const packageBomCase: PackageBomSnapshot = {
 };
 
 export const waterProfiles: WaterProfile[] = [
-  { id: "denver", name: "Municipal · Denver", calcium_ppm: 42, magnesium_ppm: 8, sodium_ppm: 22, sulfate_ppm: 65, chloride_ppm: 30, bicarbonate_ppm: 110 },
-  { id: "burton", name: "Burton", calcium_ppm: 275, magnesium_ppm: 40, sodium_ppm: 25, sulfate_ppm: 610, chloride_ppm: 35, bicarbonate_ppm: 270 },
-  { id: "hazy", name: "Hazy target", calcium_ppm: 110, magnesium_ppm: 10, sodium_ppm: 15, sulfate_ppm: 90, chloride_ppm: 180, bicarbonate_ppm: 40 },
+  { id: "denver", name: "Municipal · Denver", calcium_ppm: 42, magnesium_ppm: 8, sodium_ppm: 22, sulfate_ppm: 65, chloride_ppm: 30, bicarbonate_ppm: 110, alkalinity_ppm: 90, water_ph: 7.8, note: "City water report, spring 2026" },
+  { id: "burton", name: "Burton", calcium_ppm: 275, magnesium_ppm: 40, sodium_ppm: 25, sulfate_ppm: 610, chloride_ppm: 35, bicarbonate_ppm: 270, alkalinity_ppm: 221, water_ph: 7.4, note: null },
+  { id: "hazy", name: "Hazy target", calcium_ppm: 110, magnesium_ppm: 10, sodium_ppm: 15, sulfate_ppm: 90, chloride_ppm: 180, bicarbonate_ppm: 40, alkalinity_ppm: null, water_ph: null, note: "Soft, chloride-forward target for hazy IPAs" },
 ];

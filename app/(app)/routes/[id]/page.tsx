@@ -6,6 +6,7 @@ import { E } from "@/components/mgr/e";
 import { DriverRouteView } from "@/components/mgr/views/driver-route";
 import { ReturnRouteView } from "@/components/mgr/views/return-route";
 import { getActiveBrewery } from "@/lib/brewery";
+import { formatDate } from "@/lib/date-format";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
@@ -14,6 +15,9 @@ import { formatTime } from "@/lib/time-window";
 import { driverLabel, type RouteList } from "../labels";
 import { RouteForm } from "../route-form";
 import { ReturnRoute } from "../route-run";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/routes") };
 
 export default async function RoutePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,7 +26,7 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
   const list = (await runCommand("list_routes", { id }, ctx)) as RouteList;
   const route = list.routes[0];
   if (!route) notFound();
-  const title = `${route.name ?? "Route"} · ${route.delivery_date}`;
+  const title = `${route.name ?? "Route"} · ${formatDate(route.delivery_date)}`;
   if (!route.departed_at) {
     const candidates = [
       ...route.stops.map((s) => ({ id: (s.shipment_id ?? s.stock_transfer_id)!, label: s.label, kind: s.shipment_id ? "shipment" as const : "transfer" as const })),
@@ -32,7 +36,7 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
   }
   const openStops = route.stops.filter((s) => !s.delivered_at);
   const next = openStops[0];
-  const driverVehicle = [driverLabel(route.driver_user_id), route.vehicle].filter(Boolean).join(" · ");
+  const driverVehicle = [driverLabel(route), route.vehicle].filter(Boolean).join(" · ");
   const departed = formatTime(route.departed_at, brewery.timeZone);
   const action = route.returned_at ? E.status(`Returned ${formatTime(route.returned_at, brewery.timeZone)}`, "ok") : <ReturnRoute routeId={route.id} open={openStops.length} />;
   if (openStops.length === 0) {
@@ -40,7 +44,6 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
       <ReturnRouteView
         model={{
           title,
-          backTo: "Deliveries",
           backHref: "/routes",
           driverVehicle,
           departed,
@@ -60,7 +63,6 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
     <DriverRouteView
       model={{
         title,
-        backTo: "Deliveries",
         backHref: "/routes",
         driverVehicle,
         departed,

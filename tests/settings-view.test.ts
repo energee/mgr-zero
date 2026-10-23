@@ -7,6 +7,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { booksOpenedChange, oneWayKegFeeChange, toBrewerySettingsValues, breweryOperatingDefaultsCommand } from "@/lib/mgr/settings-view";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
+import { SettingsView } from "@/components/mgr/views/settings";
+import { PortalFulfillmentView } from "@/components/mgr/views/portal-fulfillment";
 import { settingsDemo } from "@/lib/mgr/fixtures/settings";
 import { SettingsForm } from "@/app/(app)/settings/settings-form";
 import { getCommandDefinition } from "@/lib/commands/registry";
@@ -91,5 +93,72 @@ describe("oneWayKegFeeChange", () => {
   it("sends the new fee in cents, and a cleared field as no fee", () => {
     expect(oneWayKegFeeChange(1000, "12.50")).toEqual({ feeCents: 1250 });
     expect(oneWayKegFeeChange(1000, "")).toEqual({ feeCents: 0 });
+  });
+});
+
+describe("Settings sections (#1025)", () => {
+  const html = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo }));
+  const forms = html.split("<form").slice(1).map((chunk) => chunk.slice(0, chunk.indexOf("</form>")));
+
+  it("draws three independent forms, each saved only by its own button", () => {
+    for (const [legend, save, field] of [["Brewery details", "Save brewery", "Brewery name"], ["Ask MGR", "Save AI model", "AI model"], ["Wholesale fulfillment", "Save warehouse", "Portal fulfillment warehouse"]]) {
+      const own = forms.filter((form) => form.includes(legend));
+      expect(own, legend).toHaveLength(1);
+      expect(own[0].match(/type="submit"/g), legend).toHaveLength(1);
+      expect(own[0], legend).toContain(save);
+      expect(own[0], legend).toContain(field);
+      expect(forms.filter((form) => form.includes(save)), save).toHaveLength(1);
+    }
+  });
+
+  it("explains missing versus zero on the one-way fee and the reading hours", () => {
+    const brewery = forms.find((form) => form.includes("Brewery details"))!;
+    for (const [field, help] of [["oneWayKegFee", /blank.*no fee|no fee.*blank/i], ["hours", /required.*1 to 168|1 to 168.*cannot be blank/i]] as const) {
+      const id = new RegExp(`id="([^"]*-${field})"`).exec(brewery)?.[1];
+      expect(id, field).toBeDefined();
+      const described = new RegExp(`id="${id}"[^>]*aria-describedby="([^"]+)"|aria-describedby="([^"]+)"[^>]*id="${id}"`).exec(brewery);
+      const helpId = described?.[1] ?? described?.[2];
+      expect(helpId, field).toBeDefined();
+      expect(new RegExp(`id="${helpId}"[^>]*>([^<]*)<`).exec(brewery)?.[1], field).toMatch(help);
+    }
+  });
+});
+
+describe("Wholesale fulfillment with no warehouse (#1147)", () => {
+  const view = (props: { locations?: { id: string; name: string }[]; currentId?: string | null; locationsHref?: string } = {}) =>
+    renderToStaticMarkup(createElement(PortalFulfillmentView, { locations: [], currentId: null, ...props }));
+  const text = (html: string) => html.replace(/<[^>]*>/g, "").replaceAll("&#x27;", "'");
+  const save = (html: string) => /<button([^>]*)>Save warehouse<\/button>/.exec(html)?.[1] ?? "";
+
+  it("names the Uses field and links Edit locations under the disabled picker", () => {
+    const html = view({ locationsHref: "/locations" });
+    expect(text(html)).toContain("No location has Warehouse in its Uses. Add Warehouse to a location's Uses, then choose it here.");
+    const link = /<a([^>]*)>Edit locations<\/a>/.exec(html)?.[1];
+    expect(link).toContain('href="/locations"');
+    expect(link).toContain('data-to="Locations"');
+    expect(/<button[^>]*id="portal-warehouse"[^>]*>/.exec(html)?.[0]).toMatch(/aria-describedby="portal-warehouse-empty"/);
+  });
+
+  it("withholds Save warehouse and says why", () => {
+    const html = view();
+    expect(text(html)).toContain("Still needed: a warehouse.");
+    const reasonId = /<p id="([^"]+)"[^>]*>Still needed: a warehouse\.<\/p>/.exec(html)?.[1];
+    expect(save(html)).toContain(' disabled=""');
+    expect(save(html)).toContain(`aria-describedby="${reasonId}"`);
+    const chosen = view({ locations: settingsDemo.warehouseOptions, currentId: settingsDemo.warehouseId });
+    expect(chosen).not.toContain("Still needed");
+    expect(save(chosen)).not.toContain(' disabled=""');
+  });
+
+  it("withholds Save warehouse when the saved location no longer has the Warehouse use", () => {
+    const html = view({ currentId: settingsDemo.warehouseId });
+    expect(text(html)).toContain("Still needed: a warehouse.");
+    expect(save(html)).toContain(' disabled=""');
+  });
+
+  it("leaves Settings one Locations row: People and places", () => {
+    const html = renderToStaticMarkup(createElement(SettingsView, { model: { ...settingsDemo, warehouseId: null, warehouseOptions: [] } }));
+    expect(html.match(/>Locations</g)).toHaveLength(1);
+    expect(html).toContain("Edit locations");
   });
 });

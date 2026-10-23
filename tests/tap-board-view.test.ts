@@ -1,9 +1,9 @@
-import { expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { E } from "../components/mgr/e";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TapBoardView, TapKegView } from "../components/mgr/views/tap-board";
-import { openTapBoardSheet } from "../lib/mgr/tap-board-state";
+import { openTapBoardSheet, fillLabel, OPENING_FILLS, CLOSING_FILLS } from "../lib/mgr/tap-board-state";
 import { tapBoard, tapBoardSkus, kickKeg, swapKeg } from "../lib/mgr/fixtures/taproom";
 import { SCREENS } from "../components/mgr/screens";
 import { isInertOn } from "../lib/mgr/screen-links";
@@ -20,7 +20,7 @@ it("shares guest requirements and coarse fill controls without inventing own SKU
 });
 
 it("retains both keg actions without nesting buttons or inventing yield bars", () => {
-  const html = renderToStaticMarkup(createElement(TapBoardView, { state: tapBoard, skus: tapBoardSkus, timeZone: "America/New_York", navigation: { locations: [["Taproom"]], location: "Taproom" } }));
+  const html = renderToStaticMarkup(createElement(TapBoardView, { state: tapBoard, skus: tapBoardSkus, timeZone: "America/New_York", navigation: { locations: [{ value: "taproom", label: "Taproom" }], location: "taproom" } }));
   expect(html.match(/>Swap<\/button>/g)).toHaveLength(tapBoard.snapshot.open.length);
   expect(html.match(/>Kick<\/button>/g)).toHaveLength(tapBoard.snapshot.open.length);
   expect(html).not.toMatch(/<button[^>]*>(?:(?!<\/button>)[\s\S])*<button/);
@@ -61,4 +61,77 @@ it("closes the keg the history entry names, as its own interval", () => {
   expect(open).toHaveLength(1);
   expect(open[0].id).not.toBe(closed.id);
   expect(open[0].sku_id).toBe(closed.sku_id);
+});
+
+describe("Tap keg sheet feedback (#1114)", () => {
+  const tap = openTapBoardSheet({ open: [], history: [] }, "tap", null, "actual-location").sheet!;
+  const render = (props: Partial<Parameters<typeof TapKegView>[0]> = {}) => renderToStaticMarkup(createElement(TapKegView, { sheet: tap, skus: tapBoardSkus, timeZone: "America/New_York", ...props }));
+
+  it("withholds Tap keg and names what is missing instead of a native bubble", () => {
+    const html = render();
+    expect(html).toContain("Still needed: a packaged keg SKU.");
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled=""[^>]*aria-describedby="[^"]+-reason"[^>]*>Tap keg<\/button>/);
+    expect(render({ sheet: { ...tap, fields: { ...tap.fields, skuId: tapBoardSkus[0].id } } })).not.toContain("Still needed");
+    expect(renderToStaticMarkup(createElement(TapKegView, { sheet: kickKeg, skus: tapBoardSkus, timeZone: "America/New_York" }))).not.toContain("Still needed");
+  });
+
+  it("offers no selectable placeholder keg, and says where keg SKUs come from when there are none", () => {
+    const pick = vi.spyOn(E, "pick");
+    render({ skus: [] });
+    const call = pick.mock.calls.find(([label]) => label === "Packaged keg SKU")!;
+    pick.mockRestore();
+    expect(call[2]).toEqual([]);
+    expect(call[3]).toMatchObject({ placeholder: "Choose a keg" });
+    const none = "No keg SKUs with a keg volume yet. Guest keg is still available.";
+    expect(render({ skus: [], skusHref: "/catalog" })).toMatch(/No keg SKUs with a keg volume yet\. Guest keg is still available\. <a [^>]*href="\/catalog"[^>]*>Add a keg SKU<\/a>/);
+    const plain = `${none} An admin or sales member adds keg SKUs in Catalog.`;
+    expect(render({ skus: [], skusHref: null })).toContain(plain);
+    // The inventory passes no href: plain text, never a link to "#".
+    expect(render({ skus: [] })).toContain(plain);
+    expect(render({ skus: [] })).not.toContain('href="#"');
+    expect(render()).not.toContain("No keg SKUs");
+  });
+
+  it("names both guest needs and marks no guest field before it is left", () => {
+    const html = render({ sheet: { ...tap, fields: { ...tap.fields, identity: "guest" } } });
+    expect(html).toContain("Still needed: a guest keg label and a guest nominal BBL above zero.");
+    expect(html).not.toContain('aria-invalid="true"');
+  });
+
+  it("labels the fill chips on one percent scale and the tap number plainly", () => {
+    const html = render();
+    expect(html).toContain('aria-label="Opening fill"');
+    for (const label of ["25%", "50%", "60%", "Full"]) expect(html).toContain(`>${label}</button>`);
+    for (const fraction of ["¼", "½"]) expect(html).not.toContain(`>${fraction}</button>`);
+    expect(html).toContain("Tap number · optional");
+    expect(html).toContain("Two kegs can share a number. A keg with no number sorts last.");
+    expect(html).not.toContain("may repeat");
+  });
+});
+
+describe("Fill words match the chips (#1192)", () => {
+  const board = (state = tapBoard) => renderToStaticMarkup(createElement(TapBoardView, { state, skus: tapBoardSkus, timeZone: "America/New_York", navigation: { locations: [{ value: "taproom", label: "Taproom" }], location: "taproom" } }));
+
+  it("names a stored fill with its chip label", () => {
+    expect(fillLabel(OPENING_FILLS, 1)).toBe("Full");
+    expect(fillLabel(OPENING_FILLS, .6)).toBe("60%");
+    expect(fillLabel(CLOSING_FILLS, 0)).toBe("Empty");
+    expect(fillLabel(CLOSING_FILLS, .5)).toBe("About 50% left");
+  });
+
+  it("labels the closing fill chips in percent, like the opening fill", () => {
+    const html = renderToStaticMarkup(createElement(TapKegView, { sheet: swapKeg, skus: tapBoardSkus, timeZone: "America/New_York" }));
+    for (const label of ["Empty", "About 25% left", "About 50% left"]) expect(html).toContain(`>${label}</button>`);
+    expect(html).not.toMatch(/[¼½] left/);
+  });
+
+  it("prints full for a full opening fill and the chip label for a closing fill", () => {
+    const html = board();
+    expect(html).toContain("opened full");
+    expect(html).toContain("opened 60%");
+    expect(html).not.toContain("opened 100%");
+    expect(html).toContain("Kicked empty · Empty · closed");
+    const [closed] = tapBoard.snapshot.history;
+    expect(board({ ...tapBoard, snapshot: { ...tapBoard.snapshot, history: [{ ...closed, closing_fill: .5, close_reason: "Off flavor" }] } })).toContain("Off flavor · About 50% left · closed");
+  });
 });

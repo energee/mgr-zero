@@ -194,6 +194,27 @@ export async function completeQboOAuthStore(intentId: string, actorId: string, r
   return data;
 }
 
+/** Holds the refresh token Intuit just issued on the exchanging intent, so a reap can revoke it if the callback dies (#1034). */
+export async function holdQboOAuthTokens(intentId: string, actorId: string, realmId: string, refreshToken: string) {
+  const { data, error } = await createAdminClient().rpc("hold_qbo_oauth_tokens", {
+    p_intent: intentId, p_actor: actorId, p_realm_id: realmId, p_refresh_token: refreshToken,
+  });
+  if (error || data !== true) throw new Error("QuickBooks OAuth tokens could not be held");
+}
+
+/** OAuth intents whose held refresh token the retention job should revoke now (#1034); see reap_qbo_oauth_exchanges. */
+export async function reapStaleQboOAuthExchanges() {
+  const { data, error } = await createAdminClient().rpc("reap_qbo_oauth_exchanges");
+  if (error) throw new Error("QuickBooks OAuth reap failed");
+  return data.map((row) => ({ intentId: row.intent_id, realmId: row.realm_id, refreshToken: row.refresh_token, giveUp: row.give_up }));
+}
+
+/** Forgets a held refresh token after the reap's revoke attempt. */
+export async function discardQboOAuthTokens(intentId: string, refreshToken: string) {
+  const { error } = await createAdminClient().rpc("discard_qbo_oauth_tokens", { p_intent: intentId, p_refresh_token: refreshToken });
+  if (error) throw new Error("QuickBooks OAuth token discard failed");
+}
+
 /** True when the intent moved to recovery_required; false when it was no longer 'exchanging'. */
 export async function failQboOAuth(intentId: string, actorId: string) {
   const { data, error } = await createAdminClient().rpc("fail_qbo_oauth", { p_intent: intentId, p_actor: actorId });
@@ -201,13 +222,16 @@ export async function failQboOAuth(intentId: string, actorId: string) {
   return data === true;
 }
 
-/** True when this Admin already completed this OAuth state for this brewery: a duplicate callback, not a failure. */
-export async function qboOAuthAlreadyCompleted(stateHash: string, actorId: string, breweryId: string) {
-  const { data, error } = await createAdminClient().rpc("qbo_oauth_already_completed", {
+/**
+ * The exchange_state of this Admin's OAuth intent for this brewery; a duplicate callback reads how the first one went (#1034).
+ * Null when no intent matches this state, Admin, and brewery.
+ */
+export async function qboOAuthExchangeState(stateHash: string, actorId: string, breweryId: string) {
+  const { data, error } = await createAdminClient().rpc("qbo_oauth_exchange_state", {
     p_state_hash: stateHash, p_actor: actorId, p_brewery: breweryId,
   });
   if (error) throw new Error("QuickBooks OAuth state lookup failed");
-  return data === true;
+  return data as "pending" | "exchanging" | "completed" | "recovery_required" | null;
 }
 
 /** True when a stored (not disconnected) QuickBooks connection of any brewery uses this realm; the OAuth callback must not revoke then. */
@@ -563,6 +587,33 @@ export async function compareAndSwapQboTokens(ctx: Ctx, expected: VersionedInteg
   });
   if (error) throw new Error("QuickBooks token refresh storage failed");
   if (data !== true) throw new CommandError("QuickBooks connection changed; retry with the current connection", 409, "conflict");
+}
+
+/**
+ * Asks for the connection's refresh lease (#1032) at the version the caller read.
+ * "leased": refresh now. "held": another caller is refreshing; ask again shortly.
+ * "superseded": newer credentials are stored; re-read them instead of refreshing.
+ * "unavailable": the connection is no longer connected or this actor may not
+ * store a refresh, so the caller must not send the refresh token to Intuit.
+ * A portal caller passes the invoice whose payment claim authorizes it.
+ */
+export async function leaseQboTokenRefresh(ctx: Ctx, expected: VersionedIntegrationTokens, lease: string, invoiceId?: string) {
+  const { data, error } = await createAdminClient().rpc("lease_qbo_token_refresh", {
+    p_brewery: ctx.breweryId, p_connection: expected.connectionId, p_actor: ctx.userId,
+    p_expected_version: expected.credentialVersion, p_lease: lease,
+    p_customer: ctx.customerId ?? undefined, p_invoice: invoiceId,
+  });
+  if (error || (data !== "leased" && data !== "held" && data !== "superseded" && data !== "unavailable")) {
+    throw new Error("QuickBooks refresh lease is unavailable");
+  }
+  return data;
+}
+
+export async function releaseQboTokenRefresh(ctx: Ctx, connectionId: string, lease: string) {
+  const { error } = await createAdminClient().rpc("release_qbo_token_refresh", {
+    p_brewery: ctx.breweryId, p_connection: connectionId, p_lease: lease,
+  });
+  if (error) throw new Error("QuickBooks refresh lease could not be released");
 }
 
 export async function getQboHealth(ctx: Ctx) {

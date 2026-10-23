@@ -76,10 +76,12 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Palette roles: violet = primary, rose = destructive/error, orange = review,
+/* Palette roles (light): violet = primary, rose = destructive/error, orange = review,
    yellow = warning, green = healthy, cyan = information/irreversible commit.
    accent1-6 are the palette ramp, defined per theme below (light inks are
-   darkened for contrast on the light ground; dark keeps the Monokai hues).
+   darkened for contrast on the light ground). Dark is the Aardvark Blue terminal
+   scheme (iTerm2-Color-Schemes): blue = primary, red = destructive, magenta =
+   review (the scheme has no orange); the rest keep their light roles.
    Keep status labels and alert icons: color is never the only signal. */
 :root {
   --background: #FAFAF7;
@@ -138,55 +140,61 @@
   --irreversible-foreground: #FFFFFF;
 }
 
+/* Aardvark Blue: ground #102040, text #dddddd, muted #bebebe (ANSI 7), black
+   #191919 for ink on bright fills, and the scheme's bright ANSI hues, except
+   --destructive, lifted from red #f05b50 to #ff7a70 to pass AA as text on
+   card and popover. Card, popover, muted, accent, border and the tint
+   surfaces are navy steps derived from the ground, since the scheme defines
+   only one. */
 .dark {
-  --background: #1B1C18;
-  --foreground: #EDEDE6;
-  --card: #22231F;
-  --card-foreground: #EDEDE6;
-  --popover: #262721;
-  --popover-foreground: #EDEDE6;
-  --primary: #ab9df2;
-  --primary-foreground: #1A1030;
-  --secondary: #2A2B26;
-  --secondary-foreground: #EDEDE6;
-  --muted: #2A2B26;
-  --muted-foreground: #A0A196;
-  --accent: #32332D;
-  --accent-foreground: #EDEDE6;
-  --destructive: #ff6188;
-  --destructive-foreground: #1E1F1A;
-  --border: #33342E;
-  --input: #33342E;
-  --ring: #ab9df2;
-  --sidebar: #161713;
-  --sidebar-foreground: #CACAC2;
-  --sidebar-primary: #ab9df2;
-  --sidebar-primary-foreground: #1A1030;
-  --sidebar-accent: #262721;
-  --sidebar-accent-foreground: #EDEDE6;
-  --sidebar-border: #2C2D28;
-  --sidebar-ring: #ab9df2;
-  --chart-1: #ab9df2;
-  --chart-2: #78dce8;
-  --chart-3: #fc9867;
-  --chart-4: #a9dc76;
-  --chart-5: #ffd866;
-  --success: #252E20;
-  --success-foreground: #a9dc76;
-  --attention: #33271F;
-  --attention-foreground: #fc9867;
-  --info: #203033;
-  --info-foreground: #78dce8;
-  --warning: #26231A;
-  --warning-foreground: #ffd866;
-  --accent1: #ff6188;
-  --accent2: #fc9867;
-  --accent3: #ffd866;
-  --accent4: #a9dc76;
-  --accent5: #78dce8;
-  --accent6: #ab9df2;
-  --irreversible: #78dce8;
-  --irreversible-foreground: #1E1F1A;
+  --background: #102040;
+  --foreground: #dddddd;
+  --card: #152a50;
+  --card-foreground: #dddddd;
+  --popover: #1a3058;
+  --popover-foreground: #dddddd;
+  --primary: #60a4ec;
+  --primary-foreground: #102040;
+  --secondary: #1c3360;
+  --secondary-foreground: #dddddd;
+  --muted: #1c3360;
+  --muted-foreground: #bebebe;
+  --accent: #233c6e;
+  --accent-foreground: #dddddd;
+  --destructive: #ff7a70;
+  --destructive-foreground: #191919;
+  --border: #2a4478;
+  --input: #2a4478;
+  --ring: #60a4ec;
+  --sidebar: #0c1a35;
+  --sidebar-foreground: #bebebe;
+  --sidebar-primary: #60a4ec;
+  --sidebar-primary-foreground: #102040;
+  --sidebar-accent: #1a3058;
+  --sidebar-accent-foreground: #dddddd;
+  --sidebar-border: #213a68;
+  --sidebar-ring: #60a4ec;
+  --chart-1: #60a4ec;
+  --chart-2: #60b6cb;
+  --chart-3: #e26be2;
+  --chart-4: #95dc55;
+  --chart-5: #ffe763;
+  --success: #183a2c;
+  --success-foreground: #95dc55;
+  --attention: #2e2350;
+  --attention-foreground: #e26be2;
+  --info: #14385a;
+  --info-foreground: #60b6cb;
+  --warning: #2f3326;
+  --warning-foreground: #ffe763;
+  --accent1: #f05b50;
+  --accent2: #e26be2;
+  --accent3: #ffe763;
+  --accent4: #95dc55;
+  --accent5: #60b6cb;
+  --accent6: #60a4ec;
+  --irreversible: #60b6cb;
+  --irreversible-foreground: #191919;
 }
 
 @layer base {
@@ -226,6 +234,26 @@
   [data-slot="button"][data-variant="destructive"] {
     min-height: 56px;
   }
+}
+
+/* A sideways-scrolling strip (Work's kind tabs on a phone) fades out at each
+   edge that hides more tabs, so a clipped strip reads as scrollable (#1037).
+   The fade follows the strip's own scroll position. A strip that fits has no
+   scroll range, so its timeline is inactive and it draws no fade. A browser
+   without scroll timelines skips the guard and draws no fade at all; without
+   it, a 0s animation would hold the last frame and mask the left edge.
+   Scroll padding keeps a focused tab clear of the 2rem fade. */
+@utility scroll-cue {
+  scroll-padding-inline: 2rem;
+  @supports (animation-timeline: scroll()) {
+    animation: scroll-cue linear both;
+    animation-timeline: scroll(self inline);
+  }
+}
+@keyframes scroll-cue {
+  0% { mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent); }
+  50% { mask-image: linear-gradient(to right, transparent, #000 2rem, #000 calc(100% - 2rem), transparent); }
+  100% { mask-image: linear-gradient(to left, #000 calc(100% - 2rem), transparent); }
 }
 
 /* Unboxed rows (E.row in components/mgr/e.tsx, #909 §2E). A row that follows

@@ -5,6 +5,7 @@
 import { useState, type ReactNode } from "react";
 import { PlanCancelled } from "./plan-actions";
 import { E } from "@/components/mgr/e";
+import { formatDate } from "@/lib/date-format";
 import { PackagingMaterialActuals } from "./packaging-materials";
 import { Button } from "@/components/ui/button";
 import { emptyPackagingActual, patchActual, removeActual, type PackagingActualDraft } from "@/lib/mgr/packaging-actuals";
@@ -22,9 +23,9 @@ export function ClosePackagingRunView({
   planActions?: ReactNode;
 }) {
   const header = <>
-    {E.back(model.backTo ?? "Work", model.title, undefined, model.backHref)}
+    {E.back(model.backTo ?? "Packaging", model.title, undefined, model.backHref, "Packaging runs")}
     {model.brand !== undefined ? E.fld("Brand", model.brand) : null}
-    {model.plannedOn !== undefined ? E.fld("Planned", model.plannedOn) : null}
+    {model.plannedOn !== undefined ? E.fld("Planned", formatDate(model.plannedOn)) : null}
     {model.plannedOutputs ? <>{E.fld("Source", model.source ?? "no source yet")}{E.ttl("Planned outputs")}{E.tbl(["SKU", "planned", "actual"], model.plannedOutputs, ["l", "r", "r"])}</> : null}
   </>;
   return (

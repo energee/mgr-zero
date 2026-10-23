@@ -1,14 +1,19 @@
 // app/(app)/transfers/page.tsx — Work › Transfers: stock transfers between
 // two locations (list_stock_transfers), newest first, each opening its own
-// page; New transfer is new-transfer-form.tsx → create_stock_transfer.
+// page; New transfer is new-transfer-form.tsx → create_stock_transfer. Its
+// empty SKU picker links Catalog only for a user who may create a SKU.
 import { TransfersView } from "@/components/mgr/views/transfers";
 import { workHrefsFor } from "@/components/mgr/work-tabs";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
+import { canRun } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toTransfersViewProps } from "@/lib/mgr/transfers-view";
 import "@/lib/commands/all";
 import { NewTransferForm } from "./new-transfer-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/transfers") };
 
 type Transfer = { id: string; transfer_no: number | null; status: string; from_location_id: string; to_location_id: string; stock_transfer_lines: { id: string }[] };
 type Location = { id: string; name: string; uses: string[] };
@@ -26,7 +31,6 @@ export default async function TransfersPage() {
   return (
     <TransfersView
       model={toTransfersViewProps({
-        title: "Transfers",
         transfers: transfers.map((t) => ({
           id: t.id,
           transfer_no: t.transfer_no,
@@ -36,7 +40,7 @@ export default async function TransfersPage() {
           line_count: t.stock_transfer_lines.length,
         })),
       })}
-      createAction={<NewTransferForm locations={locations} bins={bins} skus={skus.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }))} />}
+      createAction={<NewTransferForm locations={locations} bins={bins} skus={skus.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }))} skusHref={canRun(ctx, "create_sku") ? "/catalog" : null} />}
       workHrefs={workHrefsFor(brewery.roles)}
       linkRows
     />

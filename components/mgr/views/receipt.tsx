@@ -18,7 +18,7 @@ export function ReceiptView({ model, onPostBill, busy = false, error }: {
   const corrected = bill?.action === "corrected";
   return (
     <>
-      {E.back(model.backTo ?? "Work", model.title, undefined, model.backHref)}
+      {E.back(model.backTo ?? "Purchase orders", model.title, undefined, model.backHref)}
       {E.fld("Status", model.status)}
       {E.fld("Still owed", model.stillOwed)}
       {E.tape(model.tape)}

@@ -9,12 +9,12 @@ import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
+import { FieldDescription } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { CUSTOMER_TYPES, PAYMENT_TERMS, type CustomerType, type PaymentTerm } from "@/lib/mgr/enums";
-import type { CustomerEditValues } from "@/lib/mgr/customer-view";
-import { COUNTRY_OPTIONS, PAYMENT_TERM_LABEL, paymentTermLabel, sentenceCase } from "@/lib/mgr/labels";
+import { PAYMENT_TERMS, type CustomerType, type PaymentTerm } from "@/lib/mgr/enums";
+import { CUSTOMER_ALIAS_HELP, type CustomerEditValues } from "@/lib/mgr/customer-view";
+import { COUNTRY_OPTIONS, CUSTOMER_TYPE_OPTIONS, PAYMENT_TERM_LABEL, paymentTermLabel, sentenceCase } from "@/lib/mgr/labels";
 import { TAX_TREATMENTS, type TaxTreatment } from "@/lib/mgr/tax-treatments";
 
 export type { TaxTreatment };
@@ -87,32 +87,19 @@ export function CustomerForm({
   });
 
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title={isEdit ? "Edit Customer" : "New Customer"} trigger={<Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"}>
-          {isEdit ? "Edit" : "New Customer"}
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title={isEdit ? "Edit customer" : "New customer"} trigger={<Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"}>
+          {isEdit ? "Edit" : "New customer"}
         </Button>}>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="customer-name">Name</Label>
             <Input id="customer-name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
-          {E.edit("Alias", alias, "text", undefined, { id: "customer-alias", onChange: setAlias, placeholder: "Staff only" })}
           <div className="flex flex-col gap-2">
-            <Label htmlFor="customer-type">Type</Label>
-            <Select value={type} onValueChange={(v) => setType(v as CustomerType)}>
-              <SelectTrigger id="customer-type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {CUSTOMER_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            {E.edit("Alias", alias, "text", undefined, { id: "customer-alias", onChange: setAlias, "aria-describedby": "customer-alias-help" })}
+            <FieldDescription id="customer-alias-help">{CUSTOMER_ALIAS_HELP}</FieldDescription>
           </div>
+          {E.pick("Type", type, CUSTOMER_TYPE_OPTIONS, { id: "customer-type", onChange: (value) => setType(value as CustomerType) })}
           {E.pick("Country", country, COUNTRY_OPTIONS, { id: "customer-country", onChange: setCountry, required: true })}
           {country === "US" && <div className="flex flex-col gap-2">
             <Label htmlFor="customer-state">State</Label>
@@ -125,19 +112,15 @@ export function CustomerForm({
               required
             />
           </div>}
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="customer-sale-channel">Sale channel</Label>
-            <Select value={saleChannelId} onValueChange={setSaleChannelId} required>
-              <SelectTrigger id="customer-sale-channel"><SelectValue /></SelectTrigger>
-              <SelectContent>{channels.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
+          {E.pick("Sale channel", saleChannelId, channels.map((c) => ({ value: c.id, label: c.name })), { id: "customer-sale-channel", onChange: setSaleChannelId, required: true })}
           <div className="flex flex-col gap-2">
             <Label htmlFor="customer-license">License number</Label>
             <Input id="customer-license" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} />
           </div>
           {E.pick("Payment terms", paymentTerms, PAYMENT_TERMS.map(t => ({ value: t, label: PAYMENT_TERM_LABEL[t] })), { id: "customer-terms", onChange: setPaymentTerms, displayValue: paymentTermLabel(paymentTerms) })}
           {E.pick("Tax treatment", taxTreatment, [{ value: "", label: "Inherit sale channel" }, ...TAX_TREATMENTS.map(t => ({ value: t, label: sentenceCase(t) }))], { id: "customer-tax", onChange: value => setTaxTreatment(value as TaxTreatment | ""), displayValue: taxTreatment ? sentenceCase(taxTreatment) : "Inherit sale channel" })}
+          {/* upsert_customer takes no ship-to; ship-tos are upsert_ship_to on Customer detail. Create only: edit already has that page. */}
+          {!isEdit && E.info("Add ship-to addresses on the customer’s page after you create the customer.")}
           <CommandFormMessage error={form.error} />
           <CommandFormFooter>
             <Button type="submit" disabled={form.submitting}>

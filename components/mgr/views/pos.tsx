@@ -25,9 +25,10 @@ export function PosSyncActions({ catalogBusy = false, salesBusy = false, catalog
   </div>;
 }
 
-export function PointOfSaleView({ model, syncAction, paths }: {
+export function PointOfSaleView({ model, sales = [], coverage = [], syncAction, paths }: {
   model: { connected: boolean; canDisconnect?: boolean; merchant: string; state: string; locations?: string; lastSync?: string; error?: string | null; oauthFailed?: boolean };
-  syncAction?: ReactNode; paths?: { back?: string; connect?: string; disconnect?: string; locations?: string; mapping?: string; menu?: string; connector?: string };
+  sales?: PosSaleRow[]; coverage?: string[];
+  syncAction?: ReactNode; paths?: { back?: string; connect?: string; disconnect?: string; locations?: string; menu?: string; connector?: string };
 }) {
   return <>
     {E.back("Settings", "Point of sale", undefined, paths?.back)}
@@ -39,12 +40,16 @@ export function PointOfSaleView({ model, syncAction, paths }: {
     {model.error && E.note(`Last connection error: ${model.error}`, "alert")}
     {model.connected && <>
       {E.nav("Square locations", model.locations, "", undefined, paths?.locations)}
-      {E.nav("POS mapping", "Map or ignore every Square variation; review sales and coverage", "", undefined, paths?.mapping)}
       {E.fld("Last complete sales sync", model.lastSync)}
       {E.nav("Menu", "One catalog · per-location stock and price", "", undefined, paths?.menu)}
       {syncAction}
+      {E.ttl("Sales coverage")}
+      {coverage.length ? coverage.map((line, index) => <div key={`${line}-${index}`}>{E.row(line, "Completed observation window", E.status("Complete", "ok"), "ok")}</div>) : E.note("No complete Square sales coverage yet. A failed or partial sync is not counted as coverage.")}
+      {E.ttl("Recent Square facts")}
+      {sales.length ? sales.map(sale => <div key={sale.id}>{sale.href || sale.openable ? E.nav(sale.label, sale.detail, sale.status === "mapped" ? "ok" : "w", undefined, sale.href) : E.row(sale.label, sale.detail, sale.amount, sale.status === "mapped" ? "ok" : "w")}</div>) : E.blank("No Square sale facts yet")}
     </>}
-    {E.nav(<>Square {E.arrow()} QuickBooks connector</>, "Review the separate taproom revenue feed", "w", SquareMark, paths?.connector)}
+    {/* Square's own QuickBooks connector is a Square seller setting, so its note lives with Square, not under Accounting. */}
+    {E.nav("Taproom sales in QuickBooks", "Square’s own connector, separate from MGR", "w", SquareMark, paths?.connector)}
   </>;
 }
 
@@ -56,7 +61,7 @@ export function ConnectSquareView({ configured = true, busy = false, error, onCo
     {E.info("MGR publishes owned catalog items to Square and reads completed sales as expected consumption.")}
     {E.note("Connecting does not publish a menu, import old sales, or change inventory.")}
     <Button disabled={!configured || busy} onClick={onConnect}>{busy ? "Opening Square…" : "Connect Square"}</Button>
-    {!configured && <p className="text-sm text-muted-foreground">Square setup is unavailable until the server connection values are configured.</p>}
+    {!configured && <p className="text-sm text-muted-foreground">Square isn’t turned on in MGR yet.</p>}
     <CommandFormMessage error={error ?? null} />
   </>;
 }
@@ -118,41 +123,21 @@ function VariationMappingRow({ row, targets, busy, onSave }: {
   row: PosVariationRow; targets: { value: string; label: string }[]; busy?: boolean;
   onSave?: (row: PosVariationRow, target: string) => void;
 }) {
-  const [target, setTarget] = useState(row.disposition === "ignored" ? "ignore" : "");
+  const [target, setTarget] = useState(row.target);
   return <form className="flex flex-col gap-3 rounded-lg border p-3" onSubmit={event => { event.preventDefault(); onSave?.(row, target); }}>
-    {E.hd(row.label, row.disposition)}
-    <p className="text-sm text-muted-foreground">{row.detail}</p>
+    {E.hd(row.label, row.detail)}
     <SelectField id={`pos-variation-${row.externalVariationId}`} label="Mapping" value={target}
       options={[...targets, { value: "ignore", label: "Ignore this variation" }]} onChange={setTarget} />
-    <Button disabled={busy || !target}>{busy ? "Saving…" : row.disposition === "mapped" ? "Fix mapping" : "Save mapping"}</Button>
+    <Button variant="outline" disabled={busy || !target || target === row.target}>{busy ? "Saving…" : row.disposition === "queued" ? "Save mapping" : "Change mapping"}</Button>
   </form>;
 }
 
-export function PosMappingView({ variations, targets, sales, coverage, busy, error, syncAction, onSave, backHref, backLabel = "Point of sale" }: {
-  variations: PosVariationRow[]; targets: { value: string; label: string }[]; sales: PosSaleRow[];
-  coverage: string[]; busy?: boolean; error?: string | null; syncAction?: ReactNode; backHref?: string; backLabel?: string;
-  onSave?: (row: PosVariationRow, target: string) => void;
-}) {
-  return <>
-    {E.back(backLabel, "POS mapping", syncAction, backHref)}
-    {E.info("Map a Square variation to one packaged SKU or poured format, or explicitly ignore it. Sales remain source facts and never post inventory.")}
-    {E.ttl("Variation queue")}
-    {variations.length ? variations.map(row => <VariationMappingRow key={`${row.externalItemId}:${row.externalVariationId}`} row={row} targets={targets} busy={busy} onSave={onSave} />) : E.blank("No Square variations yet")}
-    <CommandFormMessage error={error ?? null} />
-    {E.ttl("Sales coverage")}
-    {coverage.length ? coverage.map((line, index) => <div key={`${line}-${index}`}>{E.row(line, "Completed observation window", E.status("Complete", "ok"), "ok")}</div>) : E.note("No complete Square sales coverage yet. A failed or partial sync is not counted as coverage.")}
-    {E.ttl("Recent Square facts")}
-    {sales.length ? sales.map(sale => <div key={sale.id}>{E.row(sale.label, sale.detail, sale.href || sale.openable ? E.act("Open", "primary", sale.href) : sale.amount, sale.status === "mapped" ? "ok" : "w")}</div>) : E.blank("No Square sale facts yet")}
-    {E.note("The physical count posts depletion. Square sales and returns supply the expected amount used for variance.")}
-  </>;
-}
-
-export function PosSaleDetailView({ title, sale, revisions, backHref }: {
+export function PosSaleDetailView({ title, sale, revisions, backHref, backLabel = "Point of sale" }: {
   title: string; sale: PosSaleRow & { location: string; soldAt: string; quantity: string; expected: string; source: string };
-  revisions: { label: string; detail: string; current: boolean }[]; backHref?: string;
+  revisions: { label: string; detail: string; current: boolean }[]; backHref?: string; backLabel?: string;
 }) {
   return <>
-    {E.back("POS mapping", title, undefined, backHref)}
+    {E.back(backLabel, title, undefined, backHref)}
     {E.row(`${sale.location} · ${sale.soldAt}`, sale.detail, sale.amount, sale.status === "mapped" ? "ok" : "w", SquareMark)}
     {E.fld("Source identity", sale.source)}
     {E.fld("Quantity", sale.quantity)}
@@ -163,17 +148,29 @@ export function PosSaleDetailView({ title, sale, revisions, backHref }: {
   </>;
 }
 
-export function PosMenuView({ model, bins = [], channels = [], busy, error, notice, onConfigure, onPublish, backHref }: {
+export function PosMenuView({ model, bins = [], channels = [], targets = [], busy, savingKey, error, notice, onConfigure, onPublish, onMap, backHref }: {
   model: PosMenuModel; bins?: { id: string; name: string }[]; channels?: { id: string; name: string }[];
+  /** Map choices for "Also in Square": `sku:<id>`, `format:<id>`; the row adds `ignore`. */
+  targets?: { value: string; label: string }[];
   busy?: boolean; error?: string | null; notice?: ReactNode; backHref?: string;
+  /** `externalItemId:externalVariationId` of the Square row whose mapping is saving. */
+  savingKey?: string;
   onConfigure?: (binId: string, channelId: string) => void; onPublish?: () => void;
+  onMap?: (row: PosVariationRow, target: string) => void;
 }) {
   const [binId, setBinId] = useState(""), [channelId, setChannelId] = useState("");
   const configure = (event: FormEvent) => { event.preventDefault(); onConfigure?.(binId, channelId); };
+  // With no mapped location there is nothing to configure or list: show the
+  // model's setup step instead (#997). Its link, if any, comes from the caller.
+  const mapped = Boolean(model.selectedLocationId);
+  const mappingRow = (row: PosVariationRow) => {
+    const key = `${row.externalItemId}:${row.externalVariationId}`;
+    return <VariationMappingRow key={key} row={row} targets={targets} busy={busy && savingKey === key} onSave={onMap} />;
+  };
   return <>
     {E.back("More", model.title ?? "Menu", undefined, backHref)}
-    <div role="tablist" aria-label="Square location" className="flex flex-wrap gap-2">{model.locations.map(location => <Button role="tab" aria-selected={location.id === model.selectedLocationId} key={location.id} variant={location.id === model.selectedLocationId ? "default" : "outline"} size="sm" asChild={Boolean(location.href)}>{location.href ? <a href={location.href}>{location.label}</a> : location.label}</Button>)}</div>
-    {E.info("One catalog, scoped to this location. Price and availability come from the selected channel and exact MGR bin.")}
+    {model.setup && E.blank(model.setup, undefined, model.setup.action && E.btn(model.setup.action.label, "p", model.setup.action.href))}
+    {mapped && <div role="tablist" aria-label="Square location" className="flex flex-wrap gap-2">{model.locations.map(location => <Button role="tab" aria-selected={location.id === model.selectedLocationId} key={location.id} variant={location.id === model.selectedLocationId ? "default" : "outline"} size="sm" asChild={Boolean(location.href)}>{location.href ? <a href={location.href}>{location.label}</a> : location.label}</Button>)}</div>}
     {model.message && E.note(model.message)}
     {model.selectedLocationId && !model.binName && <form className="flex flex-col gap-3 rounded-lg border p-3" onSubmit={configure}>
       {E.ttl(`Configure ${model.locationName}`)}
@@ -182,14 +179,18 @@ export function PosMenuView({ model, bins = [], channels = [], busy, error, noti
       <Button disabled={busy || !binId || !channelId}>{busy ? "Saving…" : "Configure menu"}</Button>
     </form>}
     {model.binName && <>{E.fld("Availability source", `${model.locationName} · ${model.binName}`)}{E.fld("Price source", model.channelName ?? "Not configured")}</>}
-    {model.items.map(item => <div key={`${item.brandId}:${item.formatId}`}>{E.row(item.label, `${item.retail} · ${item.source} · ${item.destinations}`, item.href ? E.act("Open", "primary", item.href) : "", "ok")}</div>)}
-    {model.excluded.map(item => <div key={`${item.brandId}:${item.formatId}`}>{E.row(item.label, item.reason ?? "Unavailable", item.href ? E.act("Open", "primary", item.href) : E.status("Off register", "w"), "w")}</div>)}
+    {model.items.map(item => <div key={`${item.brandId}:${item.formatId}`}>{item.href ? E.nav(item.label, `${item.retail} · ${item.source} · ${item.destinations}`, "ok", undefined, item.href) : E.row(item.label, `${item.retail} · ${item.source} · ${item.destinations}`, "", "ok")}</div>)}
+    {model.excluded.map(item => <div key={`${item.brandId}:${item.formatId}`}>{item.href ? E.nav(item.label, item.reason ?? "Unavailable", "w", undefined, item.href) : E.row(item.label, item.reason ?? "Unavailable", E.status("Off register", "w"), "w")}</div>)}
     {model.binName && <Button disabled={busy || model.items.length + model.excluded.length === 0} onClick={onPublish}>{busy ? "Publishing…" : "Publish changes"}</Button>}
     {notice}
     <CommandFormMessage error={error ?? null} />
-    {E.ttl("Also in Square")}
-    {E.info("These destination-native rows are never renamed, priced, or retired by MGR. Map or ignore them so their sales have an explicit disposition.")}
-    {model.externalItems.map(item => <div key={item.label}>{E.row(item.label, item.detail, item.href ? E.act(item.disposition === "ignored" ? "Review" : "Map", "primary", item.href) : E.status(item.disposition), item.disposition === "queued" ? "w" : "")}</div>)}
+    {model.externalItems.length > 0 && <>
+      {E.ttl("Also in Square")}
+      {E.info("These Square items have sold but did not come from MGR. Map one to a SKU or pour so its sales count toward the taproom variance, or ignore it.")}
+      {model.externalItems.filter(row => row.disposition === "queued").map(row => mappingRow(row))}
+      {model.externalItems.some(row => row.disposition !== "queued") && E.ttl("Mapped or ignored")}
+      {model.externalItems.filter(row => row.disposition !== "queued").map(row => mappingRow(row))}
+    </>}
   </>;
 }
 

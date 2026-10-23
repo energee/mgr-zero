@@ -11,13 +11,13 @@ export function KegReportView({ model }: { model: KegReportViewModel }) {
   return (
     <>
       {E.back("Keg fleet", "Keg report", undefined, model.backHref)}
-      {model.empty ? E.blank(model.empty) : (
+      {model.empty ? E.blank(model.empty, undefined, E.btn(model.empty.action, "p", model.backHref)) : (
         <>
           {E.num(model.headline[0], model.headline[1])}
           {E.tbl(["Age", "Kegs", "Deposits"], model.aging, ["l", "r", "r"])}
-          {model.customers.map((c) => <div key={c.key}>{E.row(c.title, c.detail, E.act("Open balance", "primary", c.href), c.overdue ? "w" : "")}</div>)}
+          {model.customers.map((c) => <div key={c.key}>{E.nav(c.title, c.detail, c.overdue ? "w" : "", undefined, c.href)}</div>)}
           {model.mismatches.length > 0 && E.ttl("Deposit mismatches")}
-          {model.mismatches.map((m) => <div key={m.key}>{E.row(m.title, m.detail, E.act("Open balance", "primary", m.href), "w")}</div>)}
+          {model.mismatches.map((m) => <div key={m.key}>{E.nav(m.title, m.detail, "w", undefined, m.href)}</div>)}
           {model.sizes.map((s) => <div key={s.key}>{E.row(s.title, s.detail, s.trailing)}</div>)}
         </>
       )}

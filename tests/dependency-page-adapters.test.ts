@@ -1,6 +1,8 @@
 import { expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 const state = vi.hoisted(() => ({ roles: ["warehouse"], calls: [] as [string, unknown][], gates: [] as [string, string | undefined][], source: null as { id: string; name: string } | null, locations: null as { id: string; name: string; uses: string[] }[] | null, reservations: null as { id: string; source: string; ref: string; qty: number; orderId?: string; orderNo?: number }[] | null }));
+// The Orders Status pick navigates with the app router; outside Next it needs a stand-in.
+vi.mock("next/navigation", async (original) => ({ ...await original<typeof import("next/navigation")>(), useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", roles: state.roles, timeZone: "America/Los_Angeles" }) }));
 vi.mock("@/lib/portal", () => {
   const customer = { breweryId: "brewery", customerId: "buyer", customerName: "Buyer" };
@@ -40,6 +42,7 @@ import { NewOrderClient } from "@/app/(app)/orders/new/new-order-client";
 import NewOrderPage from "@/app/(app)/orders/new/page";
 import ReplenishmentPage from "@/app/(app)/replenishment/page";
 import ShopPage from "@/app/(portal)/portal/page";
+import { ScopePick } from "@/components/mgr/scope-pick";
 
 it("does not fetch customer options when Orders has no customer filter", async () => {
   state.calls = [];
@@ -55,8 +58,8 @@ it("preserves customer filtering, default destinations, active SKUs and Warehous
   expect(readonly.props.createAction).toBeNull();
   expect(state.calls).toContainEqual(["list_orders", { customerId: "buyer", status: "draft", cursor: undefined }]);
   expect(state.calls).toContainEqual(["get_customer", { customerId: "buyer" }]);
-  expect(renderToStaticMarkup(readonly.props.filters)).toContain("customerId=buyer");
-  expect(renderToStaticMarkup(readonly.props.filters)).toContain("Buyer");
+  expect(readonly.props.model.statusOptions.every((o: { href: string }) => o.href.includes("customerId=buyer"))).toBe(true);
+  expect(readonly.props.model.customer.name).toBe("Buyer");
   state.roles = ["sales"];
   // New order is its own route now; the list only links to it, and the route
   // itself carries the create_order gate and the picker options.
@@ -114,6 +117,14 @@ it("renders the selected shortfall with actual package volume and competing orde
   const controls = page.props.children[4].props.children;
   expect(controls[0]).toBe(false);
   expect(controls[1].props.canCreate).toBe(false);
+});
+
+it("#973 scopes Replenishment by a labeled Location select that keeps the SKU", async () => {
+  state.roles = ["warehouse"];
+  const page = await ReplenishmentPage({ searchParams: Promise.resolve({ sku: "active" }) });
+  const scope = page.props.children[3];
+  expect(scope.type).toBe(ScopePick);
+  expect(scope.props).toEqual({ label: "Location", value: "tap", options: [{ value: "tap", label: "Taproom", href: "/replenishment?location=tap&sku=active" }] });
 });
 
 it.each(["warehouse", "admin", "sales"])("renders the actual Orders page with the permitted create control for %s", async role => {

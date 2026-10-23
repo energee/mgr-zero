@@ -6,12 +6,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { ChannelView } from "../components/mgr/views/channel";
+import { DeleteChannelControl } from "../components/mgr/views/delete-channel";
 import { SaleChannelsView } from "../components/mgr/views/sale-channels";
-import { UnitsView } from "../components/mgr/views/units";
+import { GravityUnitControls, UnitsView } from "../components/mgr/views/units";
 import { channelExport, saleChannelsList, unitsPlato } from "../lib/mgr/fixtures/settings-catalog";
-import { formatGravity } from "../lib/mgr/gravity-unit";
 import { toChannelViewProps } from "../lib/mgr/channel-view";
-import { toSaleChannelsViewProps } from "../lib/mgr/sale-channels-view";
+import { CHANNEL_IN_USE_RULE, toSaleChannelsViewProps } from "../lib/mgr/sale-channels-view";
 import { toUnitsViewProps } from "../lib/mgr/units-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -33,11 +33,53 @@ describe("Sale channels view", () => {
   it("live-shaped rows omit movement counts and label snake_case treatments", () => {
     const model = toSaleChannelsViewProps({
       channels: [
-        { id: "c1", name: "Taproom", tax_treatment: "taxable" },
-        { id: "c2", name: "Bond", tax_treatment: "transfer_in_bond" },
+        { id: "c1", name: "Taproom", tax_treatment: "taxable", in_use: true, system_code: "taproom" },
+        { id: "c2", name: "Bond", tax_treatment: "transfer_in_bond", in_use: false, system_code: null },
       ],
     });
     expect(model.rows.map((r) => r.detail)).toEqual(["Taxable", "Transfer in bond"]);
+  });
+
+  // #1207: Delete shows only where delete_sale_channel would succeed.
+  const mixed = {
+    channels: [
+      { id: "c1", name: "Taproom", tax_treatment: "taxable", in_use: false, system_code: "taproom" },
+      { id: "c2", name: "Wholesale", tax_treatment: "taxable", in_use: true, system_code: null },
+      { id: "c3", name: "Festival", tax_treatment: "taxable", in_use: false, system_code: null },
+    ],
+  };
+
+  it("offers Delete only on an unused channel that is not the system Taproom (#1207)", () => {
+    expect(toSaleChannelsViewProps({ ...mixed, canDelete: true }).rows.map((r) => [r.title, r.deletable]))
+      .toEqual([["Taproom", false], ["Wholesale", false], ["Festival", true]]);
+    expect(toSaleChannelsViewProps(mixed).rows.map((r) => r.deletable)).toEqual([false, false, false]);
+  });
+
+  it("states the rule only where a role that may delete sees a row without Delete (#1149, #1207)", () => {
+    expect(toSaleChannelsViewProps({ ...mixed, canDelete: true }).inUseRule).toBe(CHANNEL_IN_USE_RULE);
+    expect(toSaleChannelsViewProps(mixed).inUseRule).toBeUndefined();
+    // Every row offers Delete, so there is nothing to explain.
+    expect(toSaleChannelsViewProps({ channels: [mixed.channels[2]!], canDelete: true }).inUseRule).toBeUndefined();
+    // An empty list offers no Delete, so it states no rule.
+    expect(toSaleChannelsViewProps({ channels: [], canDelete: true }).inUseRule).toBeUndefined();
+  });
+
+  it("the rule names the system Taproom channel the RPC refuses (#1207)", () => {
+    expect(CHANNEL_IN_USE_RULE).toMatch(/system Taproom channel/);
+  });
+
+  it("the staff guide quotes the in-use rule the screen states", () => {
+    expect(readFileSync("content/docs/staff-guide.mdx", "utf8")).toContain(CHANNEL_IN_USE_RULE);
+  });
+
+  it("draws the in-use rule on the list where Delete is offered", () => {
+    const withRule = htmlOf(createElement(SaleChannelsView, { model: toSaleChannelsViewProps({ ...saleChannelsList, canDelete: true }) }));
+    expect(withRule).toContain(CHANNEL_IN_USE_RULE);
+    expect(htmlOf(createElement(SaleChannelsView, { model: toSaleChannelsViewProps(saleChannelsList) }))).not.toContain("cannot be deleted");
+  });
+
+  it("the delete confirm states the same rule", () => {
+    expect(DeleteChannelControl({ name: "Export" }).props.warning).toBe(CHANNEL_IN_USE_RULE);
   });
 
   it("names an empty list without inventing rows", () => {
@@ -70,7 +112,7 @@ describe("Sale channels view", () => {
       model,
       createAction: "ADD",
       info: "LIVE INFO",
-      rowTrailing: (id) => `T-${id}`,
+      rowTrailing: (row) => `T-${row.key}`,
     }));
     expect(html).toMatch(/ADD/);
     expect(html).not.toMatch(/>Add channel</);
@@ -91,7 +133,8 @@ describe("Sale channels view", () => {
     const body = screen("Sale channels").body as { type: unknown; props: { model: unknown } };
     expect(isValidElement(screen("Sale channels").body)).toBe(true);
     expect(body.type).toBe(SaleChannelsView);
-    expect(body.props.model).toEqual(toSaleChannelsViewProps(saleChannelsList));
+    // Drawn as Admin, the persona its permission state names, so it states the rule.
+    expect(body.props.model).toEqual(toSaleChannelsViewProps({ ...saleChannelsList, canDelete: true }));
   });
 
   it("the live channels page mounts SaleChannelsView with no second E.* tree", () => {
@@ -105,6 +148,9 @@ describe("Sale channels view", () => {
     // Add/Edit/Delete are drawn only for a role the registry lets run them (#478).
     expect(src).toContain('canRun(ctx, "upsert_sale_channel")');
     expect(src).toContain('canRun(ctx, "delete_sale_channel")');
+    expect(src).toContain("toSaleChannelsViewProps({ channels, canDelete, backHref");
+    // Delete is drawn only on a row the model marks deletable (#1207).
+    expect(src).toMatch(/row\.deletable && <DeleteCommandButton\b/);
   });
 });
 
@@ -112,7 +158,8 @@ describe("Channel view", () => {
   it("the live channel form mounts ChannelView", () => {
     const source = readFileSync("app/(app)/settings/channels/channel-form.tsx", "utf8");
     expect(source).toMatch(/<ChannelView\b/);
-    expect(source).toContain('title="Channel"');
+    // Add and Edit are told apart, and Edit names the saved channel (#1149).
+    expect(source).toContain('title={isEdit ? `Edit channel · ${channel.name}` : "Add channel"}');
     expect(source).not.toMatch(/components\/ui\/(input|label|select)/);
   });
 
@@ -121,6 +168,7 @@ describe("Channel view", () => {
     expect(model.name).toBe("Export");
     expect(model.taxOptions).toEqual(["Taxable", "Export", "Vessel supplies", "Research", "Transfer in bond"]);
     expect(model.taxIndex).toBe(1);
+    expect(model.taxHint).toBe("Sold for shipment outside the US, not taxed.");
   });
 
   it("labels vessel_supplies at chips index 2", () => {
@@ -131,11 +179,22 @@ describe("Channel view", () => {
     });
     expect(model.taxIndex).toBe(2);
     expect(model.taxOptions[2]).toBe("Vessel supplies");
+    expect(model.taxHint).toBe("Supplies for ships or aircraft in foreign trade, not taxed.");
   });
 
-  it("renders Channel name, export chips, override info, and Save channel", () => {
+  it("hints Research and Transfer in bond with their TTB meaning, and leaves Taxable plain (#1207)", () => {
+    const hint = (tax_treatment: string) => toChannelViewProps({ id: "c", name: "C", tax_treatment }).taxHint;
+    expect(hint("research")).toBe("Used for lab analysis, research or testing, not taxed.");
+    expect(hint("transfer_in_bond")).toBe("Sent to another brewery in bond; that brewery pays the tax.");
+    expect(hint("taxable")).toBeUndefined();
+  });
+
+  it("renders Channel name, labelled export chips with their hint, override info, and Save channel", () => {
     const html = htmlOf(createElement(ChannelView, { model: toChannelViewProps(channelExport) }));
     expect(html).toMatch(/Channel name/);
+    expect(html).toMatch(/>Tax treatment</);
+    // The hint changes with the selection, so it sits in a status region.
+    expect(html).toMatch(/<div role="status"><p[^>]*>Sold for shipment outside the US, not taxed\.<\/p><\/div>/);
     expect(html).toMatch(/value="Export"/);
     expect(html).toMatch(/>Taxable</);
     expect(html).toMatch(/>Export</);
@@ -143,7 +202,8 @@ describe("Channel view", () => {
     expect(html).toMatch(/>Research</);
     expect(html).toMatch(/>Transfer in bond</);
     expect(html).toMatch(/Customers may override this/);
-    expect(html).toMatch(/A channel with movements cannot be deleted/);
+    // The sheet has no Delete, so it states no delete rule (#1149).
+    expect(html).not.toMatch(/cannot be deleted/);
     expect(html).toMatch(/>Save channel</);
     expect(html).not.toMatch(/→/);
   });
@@ -156,45 +216,50 @@ describe("Channel view", () => {
 });
 
 describe("Units view", () => {
-  it("maps get_gravity_unit Plato default onto chip indices and formatGravity", () => {
+  it("maps get_gravity_unit Plato default onto chip indices with one label per unit (#1155)", () => {
     const model = toUnitsViewProps(unitsPlato);
     expect(model.backHref).toBeUndefined();
-    expect(model.breweryOptions).toEqual(["Plato", "Specific gravity"]);
+    expect(model.breweryOptions).toEqual(["Plato (°P)", "Specific gravity (SG)"]);
     expect(model.breweryIndex).toBe(0);
-    expect(model.mineOptions).toEqual(["Use brewery default (Plato)", "Plato", "Specific gravity"]);
+    expect(model.mineOptions).toEqual(["Use brewery default · Plato (°P)", "Plato (°P)", "Specific gravity (SG)"]);
     expect(model.mineIndex).toBe(0);
-    expect(model.example).toBe(formatGravity(12.5, "plato"));
+  });
+
+  it("previews a reading typed in the other unit, converted into the unit in effect (#1155)", () => {
+    // 1.050 SG is 12.39 °P, so Plato shows 12.4 — computed, not the 12.5 sample echoed.
+    expect(toUnitsViewProps(unitsPlato).preview).toBe("A reading of 1.050 SG shows as 12.4 °P.");
+    expect(toUnitsViewProps({ brewery: "plato", mine: "sg", effective: "sg" }).preview)
+      .toBe("A reading of 12.5 °P shows as 1.050 SG.");
   });
 
   it("explains who each gravity choice affects, in inventory and live alike (#671 review)", () => {
     const html = htmlOf(createElement(UnitsView, { model: toUnitsViewProps(unitsPlato) }));
     expect(html).toContain("What everyone here sees unless they choose otherwise below.");
     expect(html).toContain("Yours alone; it changes nothing for anyone else.");
-    expect(html).toContain("Use brewery default (Plato)");
+    expect(html).toContain("Use brewery default · Plato (°P)");
   });
 
-  it("uses effective for the example when mine overrides brewery", () => {
+  it("places the chips on brewery and mine when mine overrides brewery", () => {
     const model = toUnitsViewProps({ brewery: "plato", mine: "sg", effective: "sg" });
     expect(model.breweryIndex).toBe(0);
     expect(model.mineIndex).toBe(2);
-    expect(model.example).toBe(formatGravity(12.5, "sg"));
   });
 
-  it("renders back, stored-in-Plato info, chip groups, and the example", () => {
+  it("renders back, the gravity section, the display-only note, chip groups, and the preview", () => {
     const html = htmlOf(createElement(UnitsView, { model: toUnitsViewProps(unitsPlato) }));
     expect(html).toMatch(/Units/);
-    expect(html).toMatch(/Gravity is always stored in °Plato/);
+    expect(html).toMatch(/>Gravity unit</);
+    expect(html).toContain("Changing this only changes how gravity is shown and typed. Your readings are not changed.");
+    expect(html).not.toMatch(/stored/i);
     expect(html).toMatch(/Brewery default/);
     expect(html).toMatch(/Your preference/);
-    expect(html).toMatch(/Use brewery default/);
-    expect(html).toMatch(/>Plato</);
-    expect(html).toMatch(/Specific gravity/);
-    expect(html).toMatch(/A 12.5 °P reading shows as/);
-    expect(html).toContain(formatGravity(12.5, "plato"));
+    expect(html).toMatch(/>Plato \(°P\)</);
+    expect(html).toMatch(/>Specific gravity \(SG\)</);
+    expect(html).toContain("A reading of 1.050 SG shows as 12.4 °P.");
     expect(html).not.toMatch(/→/);
   });
 
-  it("a controls slot replaces the chip groups and keeps the example", () => {
+  it("a controls slot replaces the chip groups and the preview, and keeps the note", () => {
     const html = htmlOf(createElement(UnitsView, {
       model: toUnitsViewProps(unitsPlato),
       controls: "CONTROLS",
@@ -202,9 +267,15 @@ describe("Units view", () => {
     expect(html).toMatch(/CONTROLS/);
     expect(html).not.toMatch(/Use brewery default/);
     expect(html).not.toMatch(/Brewery default/);
-    expect(html).toMatch(/Gravity is always stored in °Plato/);
-    expect(html).toMatch(/A 12.5 °P reading shows as/);
-    expect(html).toContain(formatGravity(12.5, "plato"));
+    expect(html).toContain("Changing this only changes how gravity is shown and typed. Your readings are not changed.");
+    expect(html).not.toMatch(/A reading of/);
+  });
+
+  it("the preview follows the controls' model, so a tapped chip and the preview agree (#1155 review)", () => {
+    const html = htmlOf(createElement(GravityUnitControls, {
+      model: toUnitsViewProps({ brewery: "plato", mine: "sg", effective: "sg" }),
+    }));
+    expect(html).toContain("A reading of 12.5 °P shows as 1.050 SG.");
   });
 
   it("the Units inventory record is UnitsView", () => {

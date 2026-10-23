@@ -42,9 +42,10 @@ describe("SCREENS", () => {
     expect(String(SCREENS.find((s) => s.name === "Brew day")!.writes)).toContain("record_brew_day");
   });
 
-  it("sets the brewery's source water once, in Settings", () => {
+  it("links Source water in Settings to the Water profiles catalog", () => {
     const settings = text("Settings");
     expect(settings).toMatch(/Source water/);
+    expect(SCREENS.find((s) => s.name === "Settings")!.to?.["Source water"]).toBe("Water profiles");
   });
 
   it("makes a recipe version executable without restating the batch size", () => {
@@ -58,7 +59,7 @@ describe("SCREENS", () => {
     expect(recipe).toContain("Process");
     expect(recipe).toContain("Mash schedule · 3 steps");
     expect(recipe).toContain("Fermentation schedule · 4 stages");
-    expect(recipe).toMatch(/Water\s+target /);
+    expect(recipe).toMatch(/Water\s+Target /);
     // Spec D4: one place holds the mash temperature, and it is the schedule.
     expect(recipe).not.toMatch(/Mash temp/);
     // Spec D3: quantities are per barrel; the batch names its size on Brew day.
@@ -74,7 +75,7 @@ describe("SCREENS", () => {
     const drawn = text("Recipe");
     // The water row is titled Water, as on the live draft; the Water frame names the source.
     expect(drawn).not.toContain("Water · Municipal Denver");
-    expect(drawn).toContain("target Hazy target · 3 additions");
+    expect(drawn).toContain("Target Hazy target · 3 additions");
     expect(recipe.to?.Water).toBe("Water");
     expect(text("Water")).toContain("Municipal · Denver");
     expect(drawn).toContain("Total 85 min · 152 °F saccharification rest");
@@ -114,7 +115,8 @@ describe("SCREENS", () => {
     expect(mash).toContain("Saccharification");
     expect(mash).toContain("152 °F");
     expect(mash).toContain("Total 85 min");
-    expect(mash).toMatch(/recorded mash temperature; the gravity prediction does not use it/);
+    expect(mash).toContain("The 152 °F rest is recorded as the mash temperature.");
+    expect(mash).not.toMatch(/gravity prediction/);
     expect(mash).toContain("Add step");
   });
 
@@ -243,7 +245,7 @@ describe("SCREENS", () => {
   it("draws connection recovery and confirmation surfaces", () => {
     const expected = new Map<string, Screen["surface"]>([
       ["Connect QuickBooks", undefined], ["Mapping conflict", "sheet"], ["Disconnect QuickBooks", "sheet"],
-      ["Connect Square", undefined], ["Square locations", "sheet"], ["Square → QuickBooks connector", "sheet"], ["Disconnect Square", "sheet"],
+      ["Connect Square", undefined], ["Square locations", "sheet"], ["Taproom sales in QuickBooks", "sheet"], ["Disconnect Square", "sheet"],
       ["Linked people", undefined], ["Link your Slack", "entry"], ["Disconnect Slack", "sheet"],
     ]);
     for (const [name, surface] of expected) {
@@ -274,7 +276,7 @@ describe("SCREENS", () => {
   it("draws the missing More and Settings destinations", () => {
     const expected = new Map<string, Screen["surface"]>([
       ["Customer detail", undefined], ["Ship-to form", "sheet"], ["Compliance months", undefined],
-      ["Locations", undefined], ["Location detail", undefined], ["Materials", undefined],
+      ["Locations", undefined], ["Location detail", undefined],
       ["Material", "sheet"], ["Vendor", "sheet"], ["Contracts", undefined],
       ["Contract", "sheet"], ["SKU list", undefined], ["Team member", "sheet"],
     ]);
@@ -343,8 +345,8 @@ describe("SCREENS", () => {
   it("keeps row actions to verbs", () => {
     const verbs = new Set([
       "Correct receipt", "Add brew turn", "Correct turn 1", "Correct turn 2",
-      "Add", "Add stop", "Add to route", "Adjust", "Assign", "Brew", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose who gets it", "Close", "Confirm", "Connect", "Count", "Create",
-      "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open balance", "Open batch", "Open count", "Open format",
+      "Add", "Add stop", "Add to route", "Adjust", "Assign", "Brew", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose lot", "Choose who gets it", "Close", "Confirm", "Confirm all", "Connect", "Count", "Create",
+      "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Edit SKU", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",
       "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
       "Unlink", "Use", "Write off", "Fix registration", "Forgot password?", "Import CSV", "Invite staff", "Invite portal user",
@@ -400,9 +402,10 @@ describe("SCREENS", () => {
     expect(venue).toContain("9/3/26");
     expect(venue).not.toContain("9/11/26");
     const grid = SCREENS.find((s) => s.name === "Price groups")!;
-    const gridText = renderToStaticMarkup(createElement("div", null, grid.body)).replace(/<[^>]*>/g, " ");
-    expect(gridText).toContain("$150.00");
-    expect(gridText).not.toContain("$185.00");
+    // Grid cells are dollar fields: the price is the input's value.
+    const gridHtml = renderToStaticMarkup(createElement("div", null, grid.body));
+    expect(gridHtml).toContain('value="150.00"');
+    expect(gridHtml).not.toContain('value="185.00"');
     const history = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Invoice history")!.body));
     expect(history.match(/INV-1042/g)).toHaveLength(1);
     expect(history).not.toContain("INV-0198");
@@ -462,7 +465,10 @@ describe("SCREENS", () => {
     const formats = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Formats")!.body));
     expect(menu.match(/<h[12][^>]*>[^<]*(?:POS )?menu/gi)).toHaveLength(1);
     expect(pos.match(/<h[12][^>]*>Point of sale/gi)).toHaveLength(1);
-    expect(menu + formats).toContain("min-w-max");
+    // RecordTable lets long names wrap instead of widening past the column, and
+    // the phone gets a labeled list rather than a scrolling table (#1025).
+    expect(formats).not.toContain("min-w-max");
+    expect(formats).toContain('role="listitem"');
     const slack = SCREENS.find((s) => s.name === "Notification preferences")!;
     expect(renderToStaticMarkup(VenueFrame({ venue: slack.venue!, children: slack.body }))).toContain('class="slk modal"');
   });
@@ -491,7 +497,15 @@ describe("SCREENS", () => {
 
   it("renders the controlled date value used by live shared forms", () => {
     const html = renderToStaticMarkup(createElement(DatePicker, { label: "Date", defaultValue: "", value: "2027-08-31", onChange: () => {} }));
-    expect(html).toContain("August 31, 2027");
+    // The app-wide record date (lib/date-format.ts formatDate).
+    expect(html).toContain("Aug 31, 2027");
+  });
+
+  it("shows a date typed with a year below 1000 instead of failing the form", () => {
+    // The native date input reports each year digit as typed: 0002, 0020, 0202, 2026.
+    const html = renderToStaticMarkup(createElement(DatePicker, { label: "Date", value: "0002-10-22", name: "date", onChange: () => {} }));
+    expect(html).toContain("Oct 22, 2");
+    expect(html).toContain('value="0002-10-22"');
   });
 
   it("points a date field at its description, as the other fields do", () => {
@@ -550,7 +564,8 @@ describe("SCREENS", () => {
 
   it("shows format volume in familiar brewery units", () => {
     const formats = body("Formats");
-    expect(formats).toContain(">Volume</th>");
+    // The header's label sits in its sort button, before the arrow.
+    expect(formats).toMatch(/<th\b[^>]*>(?:(?!<\/th>)[\s\S])*>Volume</);
     for (const volume of ["16 oz", "64 oz", "3 gal", "½ bbl"]) expect.soft(formats, volume).toContain(volume);
     expect(formats).not.toContain("bbl / format");
   });
@@ -561,8 +576,11 @@ describe("SCREENS", () => {
     expect(sku).not.toMatch(/bbl per unit|Units per case|Package BOM|Packaging overrides/);
 
     const format = body("Format");
-    expect(format).toContain('aria-label="Size of one container"');
-    expect(format).toMatch(/data-slot="input-group"[\s\S]*aria-label="Size of one container"[\s\S]*role="tablist"/);
+    // The visible label names the input (no aria-label overriding it), and the unit bar rides in its group.
+    const sizeId = /<label[^>]*for="([^"]+)"[^>]*>Size of one container<\/label>/.exec(format)?.[1];
+    expect(sizeId).toBeTruthy();
+    expect(format).toMatch(new RegExp(`data-slot="input-group"[\\s\\S]*<input[^>]*id="${sizeId}"[\\s\\S]*role="tablist"`));
+    expect(format).not.toContain('aria-label="Size of one container"');
     expect(format).toContain("Container");
     expect(format).toContain("Beer per package");
     expect(format).toContain("Containers per package");
@@ -627,6 +645,17 @@ describe("SCREENS", () => {
     expect(SCREENS.find((x) => x.name === "Repack")!.writes).not.toMatch(/SCHEMA-GATE/);
   });
 
+  it("gives every Work create form the shared E.pin footer (#1226)", () => {
+    // One placement: primary on the right on the desk, full width on a phone.
+    // The live pages mount these same views, so the record is the proof.
+    const pinned = (name: string) => body(name).match(/<div data-pin="true"[^>]*>([\s\S]*?)<\/div>/)?.[1] ?? "";
+    for (const [name, verb] of [["New PO", "Save draft"], ["New order", "Save draft"], ["Route", "Save route plan"]]) {
+      expect(pinned(name), `${name}: commit inside the pin`).toMatch(new RegExp(`<button[^>]*>${verb}</button>`));
+    }
+    // Depart is the planned route's one primary, so it is last: rightmost on the desk.
+    expect(pinned("Route")).toMatch(/Save route plan<\/button>[\s\S]*Depart route<\/button>$/);
+  });
+
   it("puts the commit on the row, not a second copy at the top", () => {
     // Issue 97: Today-family top buttons duplicated the row verb; Order had
     // Adjust line plus trailing adjust; Confirm order said Next: confirm twice.
@@ -643,8 +672,9 @@ describe("SCREENS", () => {
     expect(html("Driver")).toMatch(/Resume/);
     expect(html("Order")).not.toMatch(/Adjust line/);
     expect(html("Order")).toMatch(/>Add line</);
-    expect(html("Order").match(/data-row-action[^>]*>Adjust</g)).toHaveLength(3);
-    expect(html("Confirm order")).toMatch(/Submitted · ships 2026-09-10/);
+    // Each line's Adjust draws in the desk table and again in the phone list.
+    expect(html("Order").match(/data-row-action[^>]*>Adjust</g)).toHaveLength(6);
+    expect(html("Confirm order")).toMatch(/Submitted · ships Sep 10, 2026/);
     expect(html("Confirm order")).not.toMatch(/Next: confirm/);
     expect(html("Confirm order")).toMatch(/>Confirm order</);
     const empty = html("Today empty");
@@ -669,11 +699,14 @@ describe("SCREENS", () => {
   it("draws locked-out landings and the composer question", () => {
     // Issue 83: no-membership, expired invite/reset, session expiry with the
     // outbox kept, and the composer question (chips, no Commit).
-    for (const name of ["No membership", "Expired invite", "Expired reset", "Session expired", "Composer question"]) {
+    for (const name of ["No membership", "Portal staff only", "Expired invite", "Expired reset", "Session expired", "Composer question"]) {
       expect(SCREENS.some((s) => s.name === name), name).toBe(true);
     }
     const q = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Composer question")!.body));
     expect(q).not.toMatch(/Commit/);
+    const staffOnly = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Portal staff only")!.body));
+    expect(staffOnly).toMatch(/Back to Today/);
+    expect(staffOnly).not.toMatch(/Create brewery/);
     const accept = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Accept invite")!.body));
     expect(accept).toMatch(/name|Name/i);
     const search = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Search")!.body));
@@ -811,6 +844,11 @@ describe("SCREENS", () => {
     expect(signInHtml).toContain("md:max-w-[420px]");
   });
 
+  it("never lets a flex column crush E.tbl below its rows (#1037)", () => {
+    // Screens stack in a flex column; a shrinkable scroll box collapsed Planning's week table to one line.
+    expect(renderToStaticMarkup(E.tbl(["week"], [["Sep 7, 2026"]]))).toMatch(/^<div class="shrink-0"><div data-slot="table-container"/);
+  });
+
   it("places list-create actions on the title row", () => {
     // A New/Add/Create/Schedule on a list is a header action, not a second
     // full-width row between the title and the list. Form commits, in-form
@@ -819,16 +857,16 @@ describe("SCREENS", () => {
     expect(hd).toContain("md:flex-row");
     expect(hd).toContain("md:justify-between");
     expect(hd).toContain("New order");
-    const back = renderToStaticMarkup(E.back("More", "Customers", E.btn("Add customer")));
+    const back = renderToStaticMarkup(E.back("More", "Customers", E.btn("New customer")));
     expect(back).toContain("md:flex-row");
-    expect(back).toContain("Add customer");
+    expect(back).toContain("New customer");
     for (const [name, action] of [
       ["Work", "New order"], ["Orders", "New order"], ["Transfers", "New transfer"], ["Batches", "New batch"],
       ["Packaging runs", "Schedule run"], ["Purchase orders", "New PO"], ["Routes", "New route"],
-      ["Locations", "Add location"], ["Finished goods", "Add SKU"], ["Customers", "Add customer"],
-      ["Catalog", "Add brand"], ["SKU list", "Add SKU"], ["Cellar map", "Add vessel"],
-      ["Materials on hand", "Add material"], ["Vendors", "Add vendor"], ["Materials", "Add material"],
-      ["Contracts", "Add contract"], ["Recipes", "New recipe"], ["Price groups", "Create price group"],
+      ["Locations", "Add location"], ["Finished goods", "Add SKU in Catalog"], ["Customers", "New customer"],
+      ["Catalog", "New brand"],
+      ["Materials on hand", "Add material"], ["Vendors", "Add vendor"],
+      ["Contracts", "Add contract"], ["Recipes", "New recipe"], ["Price groups", "New price group"],
     ] as const) {
       const html = body(name);
       expect(html, name).toMatch(new RegExp(`md:flex-row[^>]*>[\\s\\S]*${action}`));
@@ -872,12 +910,17 @@ describe("SCREENS", () => {
     // one-option chip group, a link and a role editor.
     const html = (name: string) =>
       renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
-    for (const name of ["Chat settings", "Menu", "Tap board", "Variance by brand"]) {
+    // Tap board's taproom choice is a Location select since #973 (tests/location-scope.test.ts).
+    for (const name of ["Chat settings", "Menu", "Variance by brand"]) {
       expect(html(name), name).toContain("tablist");
     }
     for (const name of ["Work", "Orders", "Transfers", "Batches", "Packaging runs", "Purchase orders", "Routes"]) {
       expect(html(name), name).toContain("tablist");
     }
+    // Each Work kind page is titled by its sidebar name; only the all-kinds page says Work (#1037, #1104).
+    const h1 = (name: string) => html(name).match(/<h1[^>]*>([^<]*)<\/h1>/)?.[1];
+    expect(["Work", "Orders", "Transfers", "Batches", "Packaging runs", "Purchase orders", "Routes"].map(h1))
+      .toEqual(["Work", "Orders", "Transfers", "Batches", "Packaging", "Purchase orders", "Deliveries"]);
     expect(html("Packaging runs")).toContain("data-active:bg-primary");
     // Record movement: seven kinds are a Select on the phone, chips from md up.
     const move = html("Record movement");
@@ -900,7 +943,7 @@ describe("SCREENS", () => {
     expect(body("Brand")).not.toContain("tax class");
     expect(JSON.stringify(brand.states)).toMatch(/tax class/);
     // Every date field is the calendar picker; no screen falls back to the OS date input.
-    for (const name of ["New order", "Schedule batch", "Schedule packaging run", "Receive PO", "Brew day", "Packaging plan"]) {
+    for (const name of ["New order", "New batch", "Schedule packaging run", "Receive PO", "Brew day", "Packaging plan"]) {
       expect(html(name), name).toContain('data-slot="popover-trigger"');
     }
     for (const s of SCREENS) {
@@ -926,7 +969,7 @@ describe("SCREENS", () => {
     const named = [
       "Today", "Taproom", "Order", "Cellar map", "Tap board", "Swap keg",
       "Weekly count", "Brew day", "Route", "Settings", "Brand", "Vendors",
-      "POS mapping", "Planning", "Schedule batch", "Vessel detail", "Kick keg", "Return route",
+      "Planning", "New batch", "Vessel detail", "Kick keg", "Return route",
     ];
     const filled = (html: string) =>
       (html.match(/<button\b[^>]*>/g) ?? []).filter((b) =>
@@ -944,9 +987,10 @@ describe("SCREENS", () => {
     }
   });
 
-  it("treats a pour as a non-stock SKU", () => {
+  it("treats a pour as a serving from the tap, not a SKU", () => {
     const brand = SCREENS.find((s) => s.name === "Brand")!;
-    expect(JSON.stringify(brand.states)).toMatch(/non-stock SKU/);
+    expect(String(brand.spec)).toMatch(/A pour is a serving from the tap, not a SKU/);
+    expect(JSON.stringify(brand.states)).not.toMatch(/non-stock SKU/);
     expect(String(brand.spec)).not.toMatch(/draft pours are SKUs/i);
     expect(String(brand.spec)).not.toMatch(/SCHEMA-GATE:[^\]]*styles table/);
   });
@@ -1037,5 +1081,80 @@ describe("vessel tile fill (#909)", () => {
 
   it("draws no bar for a tile without a fill", () => {
     expect(tile()).not.toContain("progressbar");
+  });
+});
+
+describe("Confirm order shortage message (#990)", () => {
+  it("names every short line in one message instead of one note per line", async () => {
+    const { toConfirmOrderViewProps } = await import("../lib/mgr/confirm-order-view");
+    const { ConfirmOrderView } = await import("../components/mgr/views/confirm-order");
+    const { orderSubmittedRidgeline: base } = await import("../lib/mgr/fixtures/orders");
+    const [hazy, pils] = base.lines;
+    const extra = { id: "l-extra", sku_id: "sku-extra", qty_ordered: 2, skus: { name: "Extra stout · case" } };
+    const model = toConfirmOrderViewProps({
+      ...base,
+      lines: [{ ...hazy, qty_ordered: 9 }, pils, extra],
+      atp: [...base.atp, { sku_id: "sku-extra", qty: 1 }],
+      sourceOnHand: [...base.sourceOnHand!, { sku_id: "sku-extra", qty: 5 }],
+    });
+    // The per-line marker stays on every short line.
+    expect(model.lines.map((l) => l.tone)).toEqual(["w", "w", "w"]);
+    expect(model.shortageNote).toBe(
+      `Short at Warehouse: ${hazy.skus!.name}, ${pils.skus!.name}. Replenish Warehouse before picking, or confirm knowing Warehouse cannot pick the full quantity. ` +
+      "Confirming oversells ATP for Extra stout · case; that stays your call.",
+    );
+    const html = renderToStaticMarkup(createElement(ConfirmOrderView, { model }));
+    expect(html.match(/Replenish Warehouse/g)).toHaveLength(1);
+    expect(html.match(/Confirming oversells/g)).toHaveLength(1);
+  });
+
+  it("shows no shortage message when every line is covered", async () => {
+    const { toConfirmOrderViewProps } = await import("../lib/mgr/confirm-order-view");
+    const { orderSubmittedRidgeline: base } = await import("../lib/mgr/fixtures/orders");
+    expect(toConfirmOrderViewProps({ ...base, lines: [base.lines[0]] }).shortageNote).toBeNull();
+  });
+});
+
+describe("Work kind strip (#992)", () => {
+  const WORK_VIEWS = ["orders-list", "transfers", "batches", "packaging-runs", "purchase-orders", "routes"];
+  it("every Work page draws the kind strip through WorkKindTabs, not its own TabBar", () => {
+    for (const view of WORK_VIEWS) {
+      const source = readFileSync(`components/mgr/views/${view}.tsx`, "utf8");
+      expect(source, view).toMatch(/<WorkKindTabs\b/);
+      expect(source, view).not.toMatch(/E\.tabs\(WORK_CHIPS|<TabBar[^>]*workTabs/);
+    }
+  });
+  it("Orders draws the kind strip full width with the state filter on its own row", () => {
+    const html = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Orders")!.body));
+    const lists = [...html.matchAll(/<div[^>]*role="tablist"[^>]*class="([^"]*)"/g)].map((m) => m[1]);
+    expect(lists[0]).toContain("w-full overflow-x-auto");
+    // Scrolls from its first tab and fades at a hidden edge (#1037).
+    expect(lists[0]).toContain("justify-start scroll-cue");
+    // The fade only exists where scroll timelines do; elsewhere a 0s animation would mask the strip.
+    const css = readFileSync("app/globals.css", "utf8");
+    expect(css).toMatch(/@utility scroll-cue \{\s*scroll-padding-inline: 2rem;\s*@supports \(animation-timeline: scroll\(\)\) \{\s*animation: scroll-cue/);
+    expect(lists[0]).not.toContain("md:w-fit");
+  });
+});
+
+describe("Invoice payments recorded in MGR (#1045)", () => {
+  const by = (name: string) => SCREENS.find((s) => s.name === name);
+  it("Invoice writes both payment commands and opens their sheets", () => {
+    const invoice = by("Invoice")!;
+    expect(String(invoice.writes)).toContain("record_invoice_payment · void_invoice_payment");
+    expect(invoice.to).toMatchObject({ "Record payment": "Record payment", Void: "Void payment" });
+    expect(invoice.states?.map(([label]) => label)).toEqual(expect.arrayContaining(["paid in MGR", "payments block push", "no payment due"]));
+  });
+  it("draws Record payment and Void payment as sheets over the shared fields", () => {
+    for (const [name, verb] of [["Record payment", "Record payment"], ["Void payment", "Confirm void"]]) {
+      expect(by(name)?.surface, name).toBe("sheet");
+      expect(text(name), name).toContain(verb);
+    }
+    expect(text("Record payment")).toContain("This invoice will not be sent to QuickBooks while it has payments recorded in MGR.");
+    expect(text("Void payment")).toContain("The $300.00 payment stays on the invoice");
+  });
+  it("says the balance and paid state also come from MGR's ledger", () => {
+    expect(String(by("Invoice")!.spec)).toContain("the balance comes from QuickBooks, or from MGR's payment ledger for an invoice QuickBooks never received");
+    expect(String(by("Payment")?.spec)).not.toContain("there is deliberately no Mark paid button anywhere in MGR");
   });
 });

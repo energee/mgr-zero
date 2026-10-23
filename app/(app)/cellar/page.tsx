@@ -11,11 +11,15 @@ import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
+import { canRun } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { CellarTransferForm } from "./cellar-transfer-form";
 import { CellarAdditionForm } from "./cellar-addition-form";
 import type { AdditionLot, AdditionMaterial } from "@/lib/mgr/cellar-addition-view";
 import { BatchCompletionForm } from "./batch-completion-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/cellar") };
 
 type Occupancy = {
   occupancy_id: string; vessel_id: string; vessel_name: string | null; batch_id: string; batch_no: number | null;
@@ -42,6 +46,6 @@ export default async function CellarPage() {
 
   const readings = cellarReadings(batches, unit.effective, brewery.timeZone);
   const model = toCellarMapViewProps(vessels, occupancies, readings, Object.fromEntries(vessels.map(vessel => [vessel.id, `/cellar/vessels/${vessel.id}`])), occupancyId => `/cellar/${occupancyId}/reading`);
-  model.backHref = "/beer"; model.addHref = "/cellar/vessels/new"; model.brewHref = "/batches";
-  return <CellarMapView model={model} transfer={<CellarTransferForm occupancies={occupancies} vessels={vessels} />} addition={<CellarAdditionForm occupancies={occupancies} materials={additionMaterials} lotsByMaterial={lotsByMaterial} />} complete={<BatchCompletionForm batches={completionCandidates} />} />;
+  model.backHref = "/beer"; model.addHref = canRun(ctx, "upsert_vessel") ? "/cellar/vessels/new" : null; model.brewHref = "/batches";
+  return <CellarMapView model={model} transfer={<CellarTransferForm occupancies={occupancies} vessels={vessels} disabled={model.actionsOff} />} addition={<CellarAdditionForm occupancies={occupancies} materials={additionMaterials} lotsByMaterial={lotsByMaterial} disabled={model.actionsOff} />} complete={<BatchCompletionForm batches={completionCandidates} />} />;
 }

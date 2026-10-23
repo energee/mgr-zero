@@ -54,5 +54,7 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const page = source.getPage((await params).slug);
   if (!page) notFound();
-  return { title: `${page.data.title} · MGR`, description: page.data.description };
+  // The root layout's title template (app/layout.tsx) appends the brand
+  // suffix, so return the bare title.
+  return { title: page.data.title, description: page.data.description };
 }

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { BRAND_ABV } from "@/lib/mgr/brand-abv";
 import { cents, completeRows, defineCommand, defineQuery, latestOf, PAGE_SIZE, unwrap, CommandError, STAFF_ROLES } from "./registry";
-import { escapeLike } from "@/lib/escape-like";
+import { escapeRegex } from "@/lib/escape-regex";
 import { BRAND_SORTS } from "@/lib/mgr/enums";
 
 /** A UPC/EAN/GTIN barcode: 8, 12, 13 or 14 digits. "" clears it. */
@@ -206,15 +206,16 @@ defineCommand({
 // through, each with the tax treatment frozen onto the movements it classifies.
 // Editing the list is admin work; anyone who records or reads a movement needs
 // to see it. No channel name is load-bearing: an order carries its own channel,
-// so shipping never looks one up by name and every row renames and deletes
-// alike (whatever references a channel holds it by on delete restrict).
+// so shipping never looks one up by name and every row renames alike. A
+// channel anything references is held by a foreign key, and the system
+// Taproom channel is never deleted (#1207).
 const TAX_TREATMENTS = ["taxable", "export", "vessel_supplies", "research", "transfer_in_bond"] as const;
 
 defineQuery({
-  name: "list_sale_channels", description: "Sale channels with their tax treatment, alphabetical",
+  name: "list_sale_channels", description: "Sale channels with their tax treatment, alphabetical; in_use says a record references the channel, and system_code 'taproom' marks the system Taproom channel",
   input: z.object({}), roles: ["admin", "sales", "warehouse"],
   aiExposed: true,
-  handler: (ctx) => unwrap(ctx.db.from("sale_channels").select("id, name, tax_treatment").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: (ctx) => unwrap(ctx.db.rpc("list_sale_channels", { p_brewery: ctx.breweryId })),
 });
 
 defineCommand({
@@ -227,17 +228,18 @@ defineCommand({
 });
 
 defineCommand({
-  name: "delete_sale_channel", description: "Remove a sale channel nothing references",
+  name: "delete_sale_channel", description: "Remove a sale channel nothing references; the system Taproom channel is never removed",
   input: z.object({ channelId: z.string().uuid() }),
   roles: ["admin"],
   handler: async (ctx, i, execution) => {
     const result = await ctx.db.rpc("delete_sale_channel", {
       p_brewery: ctx.breweryId, p_id: i.channelId, p_request_id: execution.requestId,
     });
-    // inventory_movements, customers, orders and channel_prices all reference
-    // the channel `on delete restrict`, so a channel in use comes back as a raw
-    // foreign-key violation; say it in product terms rather than letting it
-    // fall through to a generic 500.
+    // inventory_movements, customers, orders and channel_prices reference the
+    // channel `on delete restrict` and pos_menus by a plain foreign key, so a
+    // channel in use comes back as a raw foreign-key violation; say it in
+    // product terms rather than letting it fall through to a generic 500. The
+    // RPC refuses the system Taproom channel itself, in its own words.
     if (result.error?.code === "23503") throw new CommandError("channel is in use");
     return unwrap(Promise.resolve(result));
   },
@@ -335,7 +337,7 @@ defineCommand({
 
 defineQuery({
   // Brewers read brands too: recipes, batches and packaging runs all name one.
-  name: "list_brands", description: "Brands with their style, price group, SKUs and the pours that group owns, alphabetical unless sorted by ABV (high to low, unset last) or newest; optionally only those whose name or alias contains q, or in one category",
+  name: "list_brands", description: "Brands with their style, price group, SKUs, the pours that group owns and their recorded COLA approvals (colas: TTB ID and approval date; formulas are left out), alphabetical unless sorted by ABV (high to low, unset last) or newest; optionally only those whose name or alias contains q, or in one category",
   input: z.object({
     q: z.string().trim().max(100).optional(),
     sort: z.enum(BRAND_SORTS).optional(),
@@ -343,11 +345,13 @@ defineQuery({
     category: z.string().trim().optional(),
   }), roles: STAFF_ROLES,
   handler: async (ctx, i) => {
-    let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source, batch_share)").eq("brewery_id", ctx.breweryId);
+    let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source, batch_share), colas:brand_approvals(ttb_id, approved_on)")
+      .eq("brewery_id", ctx.breweryId).eq("colas.kind", "cola");
     if (i.q) {
-      // A PostgREST or() value is double-quoted, so `"` and `\` (including escapeLike's) are escaped again.
-      const pattern = `"%${escapeLike(i.q).replace(/["\\]/g, (c) => `\\${c}`)}%"`;
-      brands = brands.or(`name.ilike.${pattern},alias.ilike.${pattern}`);
+      // An unanchored imatch is a case-insensitive contains. A PostgREST or() value is double-quoted,
+      // so commas and parentheses stay literal, and `"` and `\` (including escapeRegex's) are escaped again.
+      const pattern = `"${escapeRegex(i.q).replace(/["\\]/g, (c) => `\\${c}`)}"`;
+      brands = brands.or(`name.imatch.${pattern},alias.imatch.${pattern}`);
     }
     if (i.category) brands = brands.eq("category", i.category);
     if (i.sort === "abv") brands = brands.order("abv", { ascending: false, nullsFirst: false });

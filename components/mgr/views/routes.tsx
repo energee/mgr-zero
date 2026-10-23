@@ -1,20 +1,19 @@
 // Shared Routes list; callers supply query rows and explicit destinations.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { TabBar } from "@/components/mgr/qty";
 import type { RoutesViewModel } from "@/lib/mgr/routes-view";
+import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 
 export type { RoutesViewModel };
 
 export function RoutesView({ model, createAction, workHrefs }: {
   model: RoutesViewModel; createAction?: ReactNode; workHrefs?: Record<string, string>;
 }) {
-  const names = workHrefs ? model.workChips.filter(name => workHrefs[name]) : model.workChips;
   return <>
     {E.hd(model.title, model.subtitle, createAction !== undefined ? createAction : E.btn("New route"))}
-    <TabBar names={names} on={names.indexOf(model.workChips[model.workChipIndex])} cls="w-full overflow-x-auto" to={model.workTabs} hrefs={workHrefs} />
+    <WorkKindTabs chips={model.workChips} current={model.workChips[model.workChipIndex]} tabs={model.workTabs} hrefs={workHrefs} />
     {model.empty ? E.blank(model.empty) : model.rows.map(row => <Fragment key={row.key}>
-      {E.row(row.title, row.detail, E.act(row.verb, row.tone, row.href), row.warning ? "w" : "")}
+      {row.verb ? E.row(row.title, row.detail, E.act(row.verb, row.tone, row.href), row.warning ? "w" : "") : E.nav(row.title, row.detail, row.warning ? "w" : "", undefined, row.href)}
     </Fragment>)}
   </>;
 }

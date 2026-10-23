@@ -1,5 +1,7 @@
-// One brand’s sellable SKUs: stocked packages and non-stock pours. Each row
+// One brand’s sellable SKUs: stocked packages and the price group's pours. Each row
 // names its barcode, its own UPC or its price group’s (list_price_group_barcodes).
+// Kept for old links: packages are switched on under the Brand page's Sells as,
+// so there is no New SKU here, and the back link lands on that section.
 // Existing serving identities remain the boundary for poured POS activity.
 import type { KegPoolOption } from "@/lib/mgr/sku-view";
 import type { PriceGroupBarcode } from "@/lib/mgr/price-groups-view";
@@ -12,7 +14,10 @@ import { canRun } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { PourForm } from "../../../pour-form";
-import { SkuForm, SkuEditForm, type FormatOption } from "../../../sku-form";
+import { SkuEditForm } from "../../../sku-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/catalog/brands") };
 
 type Sku = { id: string; name: string; format_id: string; active: boolean; upc: string | null; keg_pool_id: string | null; batch_share: number | string | null };
 type Brand = { id: string; name: string; price_group_id: string | null; price_groups: { name: string } | null; skus: Sku[]; pours: { id: string; name: string; ounces: number }[] };
@@ -25,8 +30,7 @@ export default async function SkuListPage({ params }: { params: Promise<{ id: st
   const canWrite = brewery.roles.includes("admin") || brewery.roles.includes("sales");
   const [brands, formats, pools, barcodes] = await Promise.all([
     runCommand("list_brands", {}, ctx) as Promise<Brand[]>,
-    // A SKU is always a packaged format, so one filtered read serves both the
-    // rows' format names and the New SKU picker.
+    // A SKU is always a packaged format, so the filtered read names every row's format.
     runCommand("list_formats", { basis: "packaged" }, ctx) as Promise<Format[]>,
     canWrite ? runCommand("list_keg_pools", {}, ctx) as Promise<KegPoolOption[]> : Promise.resolve([]),
     // Only this brand's group's codes, under list_price_group_barcodes' own role
@@ -36,11 +40,10 @@ export default async function SkuListPage({ params }: { params: Promise<{ id: st
   const brand = brands.find((b) => b.id === id) ?? notFound();
   const formatById = new Map(formats.map((f) => [f.id, f]));
   const skus = brand.skus.map((sku) => ({ ...sku, formats: formatById.get(sku.format_id) ?? null }));
-  const options: FormatOption[] = formats.map((f) => ({ id: f.id, name: f.name, package_type: f.package_type }));
   return (
     <SkuListView
-      model={toSkuListViewProps({ brand, skus, pours: brand.pours, barcodes, backHref: `/catalog/brands/${id}` })}
-      createAction={canWrite ? <SkuForm brandId={id} formats={options} pools={pools} /> : null}
+      model={toSkuListViewProps({ brand, skus, pours: brand.pours, barcodes, backHref: `/catalog/brands/${id}#sells-as` })}
+      createAction={null}
       rowAction={canWrite ? (row) => {
         if (row.kind === "poured") {
           const pour = brand.pours.find(p => `pour:${p.id}` === row.key)!;

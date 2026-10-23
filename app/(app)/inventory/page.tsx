@@ -4,7 +4,9 @@
 // movement-form.tsx, the one append-only inventory write; on hand is read at
 // bin grain (get_bin_on_hand) and summed per SKU here. Combined live drawing
 // slots into FinishedGoodsView; MovementRecordedView is not mounted here
-// because it is the single-row echo.
+// because it is the single-row echo. Add SKU in Catalog sits beside Record
+// movement, and the form's empty SKU picker links Catalog, only for a user who
+// may create a SKU (#1113).
 import { E } from "@/components/mgr/e";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
@@ -19,6 +21,9 @@ import { MovementForm } from "./movement-form";
 import { formatDateTime } from "@/lib/date-format";
 import { movementFormInstanceKey } from "@/lib/composer/state";
 import { movementInput, type MovementInput, type MovementKind } from "@/lib/commands/movement-input";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/inventory") };
 
 type Sku = { id: string; name: string; format_volume: { bbl_per_unit: number | null } | null; brands: { name: string } | null };
 type Location = { id: string; name: string; uses: string[] };
@@ -47,7 +52,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const locationById = new Map(locations.map((l) => [l.id, l.name]));
   const locationName = (id: string) => locationById.get(id) ?? "—";
   const canMove = brewery.roles.includes("admin") || brewery.roles.includes("warehouse");
-  const canAddSku = brewery.roles.includes("admin") || brewery.roles.includes("sales");
+  const skusHref = canRun(ctx, "create_sku") ? "/catalog" : null;
   const requestedQty = Number(params.qty);
   const handoffId = isUuid(params.movementHandoff) ? params.movementHandoff : undefined;
   const initial: Partial<MovementInput> | undefined = recordMovement === "1" ? {
@@ -64,8 +69,8 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   return (
     <FinishedGoodsView
       model={toFinishedGoodsViewProps(assembleFinishedGoods(skus, onHand, atp, value))}
-      createAction={canMove ? <MovementForm key={movementFormInstanceKey(handoffId)} timeZone={brewery.timeZone} autoOpen={recordMovement === "1"} initial={initial} skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} /> : null}
-      afterHeader={canAddSku ? E.btn("Add SKU", "g", "/catalog") : undefined}
+      createAction={canMove ? <MovementForm key={movementFormInstanceKey(handoffId)} timeZone={brewery.timeZone} autoOpen={recordMovement === "1"} initial={initial} skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} skusHref={skusHref} /> : null}
+      addSkuHref={skusHref}
       linkRows
       footer={
         <>

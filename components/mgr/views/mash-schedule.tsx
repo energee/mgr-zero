@@ -6,6 +6,7 @@ import { Fragment, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
 import { MASH_STEP_KINDS } from "@/lib/mgr/enums";
+import { sentenceCase } from "@/lib/mgr/labels";
 import { mashStepDetail, mashSummary, type MashStep, type MashStepFields } from "@/lib/mgr/recipe-process-view";
 
 /** The verbs every ordered-list row carries: Edit, and move up or down while a draft is open. */
@@ -42,7 +43,7 @@ export function MashScheduleView({ title = "Mash schedule", steps, header, ...ve
 export function MashStepView({ fields, onChange, footer }: { fields: MashStepFields; onChange?: (patch: Partial<MashStepFields>) => void; footer?: ReactNode }) {
   return <>
     {E.edit("Step name", fields.name, "text", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ name: nextValue }) : undefined, required: true })}
-    {E.pick("Type", fields.kind, (MASH_STEP_KINDS.map(k => ({ value: k, label: k }))), { onChange: onChange ? (nextValue: string) => onChange?.({ kind: nextValue }) : undefined })}
+    {E.pick("Type", fields.kind, MASH_STEP_KINDS.map(k => ({ value: k, label: sentenceCase(k) })), { onChange: onChange ? (nextValue: string) => onChange?.({ kind: nextValue }) : undefined })}
     {E.cols(
       E.edit("Temp °F", fields.tempF, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ tempF: nextValue }) : undefined, required: true, step: "any" }),
       E.edit("Duration min", fields.minutes, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ minutes: nextValue }) : undefined, required: true, min: "1", step: "1" }),

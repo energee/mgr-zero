@@ -325,7 +325,7 @@ function filterRows(tab: HTMLElement) {
 }
 
 // A tap the resolver leaves alone still has to do something a reader can see.
-// An add-a-line verb ("+ add ingredient", "Add stop") grows the list by one
+// An add-a-line verb ("Add ingredient", "Add stop") grows the list by one
 // unsaved line; a commit verb in a sheet closes the sheet, and one on a page
 // returns to where the reader came from, as the command would; with no trail
 // to return along it flashes done. Selects, switches, steppers and links out

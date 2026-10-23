@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { completeQboOAuth, qboConfig, QboOAuthClient } from "@/lib/qbo";
-import { claimQboOAuth, completeQboOAuthStore, failQboOAuth, qboOAuthAlreadyCompleted, qboRealmInUse } from "@/lib/supabase/integration-tokens";
+import { claimQboOAuth, completeQboOAuthStore, failQboOAuth, holdQboOAuthTokens, qboOAuthExchangeState, qboRealmInUse } from "@/lib/supabase/integration-tokens";
 import { getActiveBrewery } from "@/lib/brewery";
 
 export async function GET(request: Request) {
@@ -16,21 +16,27 @@ export async function GET(request: Request) {
     const activeBrewery = await getActiveBrewery();
     if (typeof actorId !== "string" || !activeBrewery.roles.includes("admin")
       || (picked && picked !== activeBrewery.id)) throw new Error("oauth state invalid");
-    // QuickBooks can deliver a second callback for one consent; the first
-    // already connected, so the replay reports that instead of a failure.
+    // QuickBooks can deliver a second callback for one consent. Its claim
+    // fails because the first one claimed the state; if the first is still
+    // exchanging or already completed, the replay is not a failure (#1034).
     const claim = async (stateHash: string, actor: string, breweryId: string, redirectUri: string) => {
       const claimed = await claimQboOAuth(stateHash, actor, breweryId, redirectUri);
-      if (!claimed && await qboOAuthAlreadyCompleted(stateHash, actor, breweryId)) throw new AlreadyConnected();
-      return claimed;
+      if (claimed) return claimed;
+      const first = await qboOAuthExchangeState(stateHash, actor, breweryId);
+      if (first === "completed" || first === "exchanging") throw new DuplicateCallback(first);
+      return null;
     };
     try {
       await completeQboOAuth({
         request, actorId, selectedBreweryId: activeBrewery.id, redirectUri: config.redirectUri,
         client: new QboOAuthClient(config),
-        store: { claim, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
+        store: { claim, hold: holdQboOAuthTokens, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
       });
     } catch (error) {
-      if (!(error instanceof AlreadyConnected)) throw error;
+      if (!(error instanceof DuplicateCallback)) throw error;
+      // The first callback is still exchanging: return with no flag, so
+      // Accounting shows only its stored connection status (#1034).
+      if (error.firstState === "exchanging") return NextResponse.redirect(destination, 303);
     }
     destination.searchParams.set("connected", "1");
   } catch {
@@ -39,4 +45,6 @@ export async function GET(request: Request) {
   return NextResponse.redirect(destination, 303);
 }
 
-class AlreadyConnected extends Error {}
+class DuplicateCallback extends Error {
+  constructor(readonly firstState: "completed" | "exchanging") { super("duplicate QuickBooks OAuth callback"); }
+}

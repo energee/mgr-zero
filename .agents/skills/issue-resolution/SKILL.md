@@ -39,14 +39,15 @@ observe RED, fix the shared root cause, then observe GREEN. Update customer docs
 when the visible behavior changes.
 
 For screen work, also use `.agents/skills/screen-parity/SKILL.md`; it owns the
-inventory/live composition contract and exact proof suite. Do not start schema
-or database work while screens are the repository focus unless requested.
+inventory/live composition contract and exact proof suite.
 
 ### Repair a PR conflict
 
-Fetch the PR head and its declared base, then merge the base into the checked-out
-head branch. Prefer a merge for an already-pushed or stacked branch; do not
-rewrite shared history merely to make it linear.
+Run `scripts/land-pr.sh <pr>` from the PR's worktree; never merge `main` by
+hand (AGENTS.md Negative 19). It merges `origin/main` and resolves only a
+`supabase/migrations.lock.json` conflict. On any other conflict it exits 2 and
+leaves the merge in progress: resolve those hunks as below, commit, and rerun
+it. Do not rebase a pushed branch to make history linear.
 
 Resolve each hunk by intent:
 

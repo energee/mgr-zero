@@ -1,5 +1,8 @@
 // tests/keg-report-view.test.ts — get_keg_report → Keg report view-model (issue #278).
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { KegReportView } from "@/components/mgr/views/keg-report";
 import { toKegReportViewProps } from "@/lib/mgr/keg-report-view";
 
 const report = {
@@ -8,6 +11,7 @@ const report = {
   aging: [{ bucket: "0-30", kegs: 96, deposit_cents: 288000 }, { bucket: "90+", kegs: 9, deposit_cents: 27000 }],
   customers: [{ customer_id: "c", name: "Ridgeline Tap Room", over_90: 9, oldest_at: "2026-05-12T16:00:00+00:00" }],
   mismatches: [],
+  activePools: 1,
 };
 
 describe("toKegReportViewProps", () => {
@@ -27,10 +31,27 @@ describe("toKegReportViewProps", () => {
     ]);
     expect(toKegReportViewProps({ ...report, mismatches }, "America/New_York", "/kegs").mismatches[0].href).toBe("/kegs/customers/c");
   });
-  it("an empty fleet is the empty state", () => {
-    const m = toKegReportViewProps({ fleet: { out: 0, total: 0, utilization: null }, bySize: [], aging: [], customers: [], mismatches: [] }, "America/New_York");
+  it("customer and mismatch rows are row links to the balance, not an Open balance verb (#1026)", () => {
+    const mismatches = [{ customer_id: "m", name: "Al’s Bar", pool_id: "p", pool_name: "Owned", keg_size: "half_bbl", kegs_out: 3, kegs_on_deposit: 2 }];
+    const model = toKegReportViewProps({ ...report, mismatches }, "America/New_York", "/kegs");
+    const html = renderToStaticMarkup(createElement(KegReportView, { model }));
+    expect(html).toMatch(/<a[^>]*href="\/kegs\/customers\/c"[^>]*>(?:(?!<\/a>)[\s\S])*Ridgeline Tap Room/);
+    expect(html).toMatch(/<a[^>]*href="\/kegs\/customers\/m"[^>]*>(?:(?!<\/a>)[\s\S])*Al’s Bar/);
+    expect(html).not.toMatch(/Open balance/);
+  });
+  it("no pool at all is the add-a-pool empty state", () => {
+    const m = toKegReportViewProps({ fleet: { out: 0, total: 0, utilization: null }, bySize: [], aging: [], customers: [], mismatches: [], activePools: 0 }, "America/New_York");
     expect(m.headline).toEqual(["—", "0 of 0 kegs out"]);
-    expect(m.empty?.title).toBe("No owned keg pools");
+    expect(m.empty).toEqual({ title: "No keg pools", description: "Add a keg pool on Keg fleet, then record kegs acquired to see utilization.", action: "Open Keg fleet" });
+  });
+  it("a pool with no kegs acquired says to record them, not that no pool exists (#988)", () => {
+    const m = toKegReportViewProps({ fleet: { out: 0, total: 0, utilization: null }, bySize: [], aging: [], customers: [], mismatches: [], activePools: 1 }, "America/New_York");
+    expect(m.empty).toEqual({ title: "No kegs recorded yet", description: "Record kegs acquired into a pool on Keg fleet to see utilization.", action: "Open Keg fleet" });
+  });
+  it("the empty state's action opens Keg fleet, where pools are added and kegs recorded (#1119)", () => {
+    const model = toKegReportViewProps({ fleet: { out: 0, total: 0, utilization: null }, bySize: [], aging: [], customers: [], mismatches: [], activePools: 0 }, "America/New_York", "/kegs");
+    const html = renderToStaticMarkup(createElement(KegReportView, { model }));
+    expect(html).toMatch(/<a[^>]*href="\/kegs"[^>]*>(?:(?!<\/a>)[\s\S])*Open Keg fleet/);
   });
   it("a customer with nothing over 90 days still lists with the oldest date", () => {
     const m = toKegReportViewProps({ ...report, customers: [{ customer_id: "c", name: "Al’s", over_90: 0, oldest_at: "2026-09-01T00:00:00+00:00" }] }, "America/New_York");

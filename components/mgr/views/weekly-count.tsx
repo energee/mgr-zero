@@ -8,8 +8,8 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { OrderQuantity } from "@/components/mgr/views/new-order";
-import { LinkTabs } from "@/components/mgr/work-tabs";
-import { varianceBbl } from "@/lib/mgr/taproom-variance-view";
+import { ScopePick, type ScopeOption } from "@/components/mgr/scope-pick";
+import { varianceBbl, varianceReason } from "@/lib/mgr/taproom-variance-view";
 import { countBrandComparison, countLocked, isShortage, projectionExpectedText, projectionMatchesCountDraft, updateCountDisposition, updateCountQuantity, updateCorrectionQuantity, updateCorrectionReason, type TaproomCountState } from "@/lib/mgr/taproom-count-state";
 import type { TaproomCorrectionState } from "@/lib/mgr/taproom-count-state";
 import type { StaffRole } from "@/lib/commands/registry";
@@ -17,11 +17,13 @@ import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
 const bbl = (value: number | null) => value === null ? "unavailable" : varianceBbl(value);
 
 export function WeeklyCountPrintAction({ busy = false, empty = false, error, onPrint }: { busy?: boolean; empty?: boolean; error?: string | null; onPrint?: () => void }) {
-  return <div className="flex flex-wrap items-center gap-3 print:hidden"><Button type="button" variant="ghost" disabled={busy} onClick={onPrint}>{busy ? "Checking stock…" : "Print current stock labels"}</Button>{empty && <span className="text-sm text-muted-foreground">No current positive stock to print.</span>}<CommandFormMessage error={error} /></div>;
+  return <div className="flex flex-wrap items-center gap-3 print:hidden"><Button type="button" variant="outline" disabled={busy} onClick={onPrint}>{busy ? "Checking stock…" : "Print current stock labels"}</Button>{empty && <span className="text-sm text-muted-foreground">No current positive stock to print.</span>}<CommandFormMessage error={error} /></div>;
 }
 
 export type WeeklyCountViewModel = {
-  backHref?: string; boardHref?: string; varianceHref?: string; locations: [string, string?][]; location: string;
+  backHref?: string; boardHref?: string; varianceHref?: string;
+  /** Taprooms; `location` is the selected option's value (a location id live). */
+  locations: ScopeOption[]; location: string;
   draft?: TaproomCountState; roles: readonly StaffRole[]; lotLabels: Record<string, string>;
   receipt?: { date: string; recorded: string; priorHref?: string; correction?: string; correctionForm?: TaproomCorrectionState; canCorrect: boolean; lines: { key: string; name: string; detail: string; result: string }[] };
   history: { key: string; date: string; detail: string; href?: string }[];
@@ -34,22 +36,22 @@ export function WeeklyCountView({ model, draft, correction }: { model: WeeklyCou
     <div className="contents print:hidden">
       {E.back("Beer", "Weekly count", undefined, model.backHref)}
       {(model.boardHref || model.varianceHref) && <div className="flex flex-wrap gap-3 text-sm">{model.boardHref && <Link className="underline" href={model.boardHref}>Tap board</Link>}{model.varianceHref && <Link className="underline" href={model.varianceHref}>Variance by brand</Link>}</div>}
-      {model.locations.length > 0 && (model.locations.some(([, href]) => href) ? <LinkTabs items={model.locations.map(([name, href]) => [name, href ?? "#"])} current={model.location} className="w-full" /> : E.tabs(model.locations.map(([name]) => name), model.locations.findIndex(([name]) => name === model.location), "w-full"))}
+      {model.locations.length > 0 && <ScopePick label="Location" value={model.location} options={model.locations} />}
     </div>
     {model.locations.length === 0 ? E.blank("No taproom locations yet. Ask Admin to add one under Locations.") : <>
       {draft !== undefined ? draft : model.draft && <WeeklyCountDraftView state={model.draft} roles={model.roles} lotLabels={model.lotLabels} timeZone={model.timeZone} />}
       <div className="contents print:hidden">
         {model.receipt && <section aria-label="Saved count" className="flex flex-col gap-3">
           {E.ttl(`Saved count · ${model.receipt.date}`)}
-          {E.note(<>{model.receipt.recorded}{model.receipt.priorHref && <> · <Link href={model.receipt.priorHref}>prior count</Link></>}</>)}
-          {model.receipt.correction && E.note(model.receipt.correction)}
+          <p className="text-sm text-muted-foreground">{model.receipt.recorded}{model.receipt.priorHref && <> · <Link href={model.receipt.priorHref}>prior count</Link></>}</p>
+          {model.receipt.correction && <p className="text-sm text-muted-foreground">{model.receipt.correction}</p>}
           {model.receipt.lines.map(line => <div key={line.key}>{E.row(line.name, line.detail, <span className="break-all text-xs">{line.result}</span>)}</div>)}
           {hasAnyRole(model.roles, ["admin"]) && model.receipt.canCorrect && (correction !== undefined ? correction : model.receipt.correctionForm && <WeeklyCountCorrectionView state={model.receipt.correctionForm} />)}
         </section>}
         {E.ttl("Recent saved counts")}
         <p className="text-sm text-muted-foreground">Newest 50 at this taproom.</p>
-        {model.history.length === 0 ? E.blank("No saved counts yet") : model.history.map(count => <div key={count.key}>{E.row(`Weekly count · ${count.date}`, count.detail, E.act("Open count", "primary", count.href))}</div>)}
-        {E.note("Admin can correct only the latest saved count when a quantity was counted too low. Warehouse and Taproom read the correction history without the action. The original receipt remains in the audit trail.")}
+        {model.history.length === 0 ? E.blank("No saved counts yet") : model.history.map(count => <div key={count.key}>{E.nav(`Weekly count · ${count.date}`, count.detail, "", undefined, count.href)}</div>)}
+        {E.info("Only Admin can correct a count. Admin can correct only the latest count, once, when a sold quantity was counted too low. Everyone else sees the correction in the history. The original count stays in the audit trail.")}
       </div>
     </>}
   </>;
@@ -74,26 +76,25 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
   return <>
     <div className="contents print:hidden">
     {E.ttl("Expected consumption")}
-    {E.note(prior ? <>Captured prior · {priorHref ? <Link href={priorHref}>{formatDate(prior.counted_on)}</Link> : formatDate(prior.counted_on)} · reopen saved count</> : "Captured prior · first count")}
+    {prior && <p className="text-xs text-muted-foreground">Last count {priorHref ? <Link href={priorHref}>{formatDate(prior.counted_on)}</Link> : formatDate(prior.counted_on)}</p>}
     {!aligned ? <CommandFormMessage tone="warning">Expected comparison unavailable because a newer saved count changed its baseline. {state.attempt.kind === "unknown" || state.attempt.kind === "submitting" ? "Recover the frozen submission before starting a fresh recount." : "Start a fresh recount."}</CommandFormMessage>
-      : expected ? <p className="text-sm">Expected total {expected}</p> : <p className="text-sm">Expected consumption unavailable · {(projection?.reason ?? "no usable POS observation").replaceAll("_", " ")}</p>}
+      : expected ? <p className="text-sm">Expected total {expected}</p> : <p className="text-sm">Expected consumption unavailable.{projection?.reason && ` ${varianceReason(projection.reason)}.`}</p>}
     {aligned && projection?.starts_at && projection.as_of && <p className="text-xs text-muted-foreground">{formatDateTime(projection.starts_at, timeZone)} through {formatDateTime(projection.as_of, timeZone)}</p>}
     {comparison.map(row => <div key={row.brandId}>{E.row(row.brandName, `expected ${bbl(row.expectedBbl)} · draft actual ${row.complete ? bbl(row.actualBbl) : "Enter all buckets"}`, `difference ${bbl(row.differenceBbl)}`)}</div>)}
     {comparison.length > 0 && <p className="text-xs text-muted-foreground">Draft actual is an estimate from this snapshot&apos;s package volumes. Expected minus actual is a comparison only; the saved receipt is authoritative.</p>}
     {aligned && projection && ((projection.unmapped_lines ?? 0) > 0 || (projection.ignored_lines ?? 0) > 0 || Number(projection.excluded_bbl) > 0 || Number(projection.unattributed_bbl) > 0) && <p className="text-xs text-muted-foreground">Coverage {projection.coverage_complete ? "complete" : "incomplete"} · {projection.unmapped_lines} unmapped · {projection.ignored_lines} ignored · {projection.excluded_bbl} bbl excluded · {projection.unattributed_bbl} bbl unattributed</p>}
-    <Button type="button" variant="ghost" disabled={projectionBusy || locked || !aligned} onClick={onRefreshExpected}>{projectionBusy ? "Refreshing…" : "Refresh expected"}</Button>
+    <Button type="button" variant="outline" className="md:self-start" disabled={projectionBusy || locked || !aligned} onClick={onRefreshExpected}>{projectionBusy ? "Refreshing…" : "Refresh expected"}</Button>
     <CommandFormMessage error={projectionError} />
     </div>
     <form onSubmit={event => { event.preventDefault(); onSubmit?.(event); }} className="flex flex-col gap-3" aria-label="Count every stock bucket">
       <div className="contents print:hidden">
       {E.ttl("Count every stock bucket")}
-      {E.note(`Server date ${formatDate(state.draft.countedOn)} · whole remaining packages only · enter zero explicitly. A partly full keg is one.`)}
+      {E.info(`Count whole packages for ${formatDate(state.draft.countedOn)}; a partly full keg counts as one. Enter 0 for none.`)}
       </div>
       {print !== undefined ? print : <WeeklyCountPrintAction />}
       <div className="contents print:hidden">
-      {E.note("Print includes only current positive stock and keeps the captured worksheet row numbers.")}
       {state.draft.lines.some(line => line.lotId !== null) && onlyRoles(roles, ["taproom"]) && E.note("Tracked lots use the full worksheet row numbers shown here. Use Print current stock labels before counting; do not guess a lot.")}
-      {state.draft.lines.length === 0 && E.blank("No stock buckets are recorded at this taproom. Saving records an empty observation.")}
+      {state.draft.lines.length === 0 && E.blank("No stock is recorded at this taproom. Record count saves a count of zero for today. Your next count compares against it.")}
       <fieldset disabled={locked} className="contents">
         {state.draft.lines.map((line, index) => {
           const lot = line.lotId ? (onlyRoles(roles, ["taproom"]) ? `Tracked worksheet row ${index + 1}` : `Lot ${lotLabels[line.key] ?? "label unavailable"} · worksheet row ${index + 1}`) : `Untracked stock · worksheet row ${index + 1}`;

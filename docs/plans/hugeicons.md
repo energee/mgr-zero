@@ -43,7 +43,7 @@ About twenty placements product-wide; most screens show two or three.
 
 `E.btn` / `E.act` verbs; the irreversible button (color already carries
 it); `E.tape`; tables; chips; composer; venue frames (they speak the vendor's
-language). Lucide stays inside `components/ui/*` for shadcn chrome.
+language). Lucide stays inside `components/ui/*` for shadcn chrome, and for the shadcn Data Table sort arrows in `components/mgr/sort-head.tsx`.
 
 ## Treatment
 

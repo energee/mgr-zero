@@ -37,14 +37,22 @@ it("leaves unspecified return-source quantities blank", () => {
 });
 
 describe("Adjust lines view", () => {
-  it("maps picked-below-ordered as a warning stepper", () => {
+  it("notes a line ordered below what was picked", () => {
     const model = toAdjustLinesViewProps(orderAdjustLines);
     expect(model.backTo).toBe("ORD-0229");
-    expect(model.lines.map((l) => [l.name, l.qty, l.detail, l.tone])).toEqual([
-      ["Hazy IPA · ½ bbl keg", 4, "", ""],
-      ["Pils · 16 oz case", 7, "picked 10", "w"],
-      ["Stout · ⅙ bbl keg", 2, "", ""],
+    expect(model.lines.map((l) => [l.group, l.name, l.qty, l.detail])).toEqual([
+      ["Hazy IPA", "½ bbl keg", 4, ""],
+      ["Pils", "16 oz case", 7, "picked 10"],
+      ["Stout", "⅙ bbl keg", 2, ""],
     ]);
+  });
+
+  it("draws the Pick-style table: Product, Format, Ordered; a SKU picker only on an added line", () => {
+    const model = toAdjustLinesViewProps(orderAdjustLines);
+    const markup = html(createElement(AdjustLinesView, { model: { ...model, lines: [...model.lines, { key: "new", added: true, name: "", detail: "", qty: "" }] } }));
+    expect(markup.match(/<th[^>]*>[\s\S]*?<\/th>/g)?.map((h) => h.replace(/<[^>]+>/g, ""))).toEqual(["Product", "Format", "Ordered"]);
+    expect(markup.match(/<tr/g)).toHaveLength(5);
+    expect(markup.match(/aria-label="Line \d+ SKU"/g)).toEqual(['aria-label="Line 4 SKU"']);
   });
 
   it("the drawing still shows Save lines and the customer-cut reason", () => {
@@ -99,15 +107,34 @@ describe("Pick view", () => {
     const model = toPickViewProps(orderPick);
     expect(model.backTo).toBe("ORD-0231");
     expect(model.title).toBe("Pick · Warehouse");
+    expect(model.subtitle).toBe("Ridgeline Tap Room · ships Sep 10, 2026");
     expect(model.lines.map((l) => [l.qty, l.tone])).toEqual([[4, "ok"], [10, "ok"], [2, "ok"]]);
   });
 
-  it("the drawing still shows Print pick sheet and Done picking", () => {
+  it("draws one table row per format under Product, Format, Ordered, Actual, with Print pick sheet and Done picking", () => {
     const markup = html(createElement(PickView, { model: toPickViewProps(orderPick) }));
-    expect(markup).toMatch(/From Warehouse/);
+    expect(markup.match(/<th[^>]*>[\s\S]*?<\/th>/g)?.map((h) => h.replace(/<[^>]+>/g, ""))).toEqual(["Product", "Format", "Ordered", "Actual"]);
+    expect(markup.match(/<tr/g)).toHaveLength(4);
+    expect(markup).toMatch(/Ridgeline Tap Room · ships Sep 10, 2026/);
     expect(markup).toMatch(/Print pick sheet/);
     expect(markup).toMatch(/>Done picking</);
     expect(markup).toMatch(/aria-label="Decrease"/);
+  });
+
+  it("groups lines under their brand, each named by its format, brands then formats in name order", () => {
+    const sku = (brand: string, format: string) => ({ name: `${brand} · ${format}`, brands: { name: brand }, formats: { name: format } });
+    const at = (id: string, skus: ReturnType<typeof sku>) => ({ id, sku_id: id, qty_ordered: 1, qty_picked: null, skus });
+    const model = toPickViewProps({ ...orderPick, lines: [at("a", sku("Hazy", "Half")), at("b", sku("Pils", "Case")), at("c", sku("Hazy", "Case"))] });
+    expect(model.lines.map((l) => [l.group, l.name])).toEqual([["Hazy", "Case"], ["Hazy", "Half"], ["Pils", "Case"]]);
+    // The brand is named once, on its first row.
+    const cells = html(createElement(PickView, { model })).match(/<tr[\s\S]*?<\/tr>/g)!.slice(1).map((r) => r.match(/<td[^>]*>([\s\S]*?)<\/td>/)![1].replace(/<[^>]+>/g, ""));
+    expect(cells).toEqual(["Hazy", "", "Pils"]);
+  });
+
+  it("names a brand with its staff alias, the way Catalog does", () => {
+    const skus = { name: "Appaloosa · Case", brands: { name: "Appaloosa", alias: "Animal #14" }, formats: { name: "Case" } };
+    const model = toPickViewProps({ ...orderPick, lines: [{ id: "a", sku_id: "a", qty_ordered: 1, qty_picked: null, skus }] });
+    expect(model.lines[0].group).toBe("Appaloosa · Animal #14");
   });
 
   it("caps each pick field at the ordered quantity (#471)", () => {

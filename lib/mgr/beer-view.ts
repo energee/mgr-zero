@@ -5,7 +5,6 @@ export type BeerNavView = { key: string; title: string; detail: string; href?: s
 
 export type BeerViewModel = {
   navs: BeerNavView[];
-  blank: string;
   stock?: { key: string; title: string; detail: string; qty: string }[];
   stockEmpty?: string;
 };
@@ -13,21 +12,21 @@ export type BeerViewModel = {
 export type BeerOverview = {
   fgShortages: number;
   taproomBelowPar: number;
+  /** Open tap intervals: kegs on tap now, guest kegs included. */
   openTaps: number;
+  /** Open vessel occupancies: one per tank holding beer. */
   openOccupancies: number;
   materialShortages: number;
   kegsOut: number;
 };
 
-export type BeerSnapshot = BeerViewModel | {
+/** The live page and the inventory fixture both pass get_beer_overview's counts. */
+export type BeerSnapshot = {
   overview: BeerOverview;
   showTaproom?: boolean;
 };
 
-const BLANK = "Each summary opens its dedicated area; this page does not expand indefinitely.";
-
 export function toBeerViewProps(s: BeerSnapshot): BeerViewModel {
-  if ("navs" in s) return { navs: s.navs, blank: s.blank };
   const o = s.overview;
   const navs: BeerNavView[] = [
     { key: "fg", title: "Finished goods", detail: `${plural(o.fgShortages, "shortage")} · ATP by SKU`, href: "/inventory" },
@@ -35,20 +34,22 @@ export function toBeerViewProps(s: BeerSnapshot): BeerViewModel {
   if (s.showTaproom) {
     navs.push(
       { key: "taproom", title: "Taproom", detail: `${plural(o.taproomBelowPar, "SKU")} below par · weekly count`, href: "/taproom" },
-      { key: "taps", title: "Taps", detail: `${plural(o.openTaps, "keg")} open · Tap board`, href: "/taproom/board" },
+      { key: "taps", title: "Taps", detail: `${plural(o.openTaps, "keg")} on tap · Tap board`, href: "/taproom/board" },
     );
   }
   navs.push(
-    { key: "cellar", title: "Cellar", detail: `${plural(o.openOccupancies, "tank")} with beer`, href: "/cellar" },
-    { key: "materials", title: "Materials", detail: plural(o.materialShortages, "shortage"), href: "/materials" },
+    { key: "cellar", title: "Cellar", detail: plural(o.openOccupancies, "occupied tank"), href: "/cellar" },
+    // On a phone this row is the only way into Materials on hand, so it stays.
+    { key: "materials", title: "Materials", detail: "on hand · definitions · cycle count", href: "/materials" },
+    // The count is material_requirements rows short > 0, the rows Planning lists (#989).
+    { key: "shortages", title: "Shortages", detail: plural(o.materialShortages, "shortage"), href: "/planning" },
     { key: "kegs", title: "Kegs", detail: `${o.kegsOut} out at customers`, href: "/kegs" },
   );
-  return { navs, blank: BLANK };
+  return { navs };
 }
 
 export function taproomBeerView(stock: { skuId: string; locationId: string; sku: string; location: string; qty: number }[]): BeerViewModel {
   return {
-    blank: "",
     navs: [
       { key: "count", title: "Weekly count", detail: "record physical stock and review expected consumption", href: "/taproom" },
       { key: "board", title: "Tap board", detail: "open, swap, and kick kegs", href: "/taproom/board" },

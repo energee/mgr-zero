@@ -7,7 +7,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ConfirmDeleteControl } from "../components/mgr/views/confirm-delete";
-import { FileSnapshotControl } from "../components/mgr/views/file-snapshot";
+import { FileSnapshotForm } from "../components/mgr/views/file-snapshot";
 import { TeamMemberView } from "../components/mgr/views/team-controls";
 import { PriceGroupView } from "../components/mgr/views/price-group";
 import { BinView } from "../components/mgr/views/bin";
@@ -36,11 +36,13 @@ describe("ConfirmDeleteControl", () => {
     expect(onDelete).not.toHaveBeenCalled();
   });
 
-  it("draws an irreversible tone and can hold the trigger disabled", () => {
-    const html = renderToStaticMarkup(createElement(ConfirmDeleteControl, { title: "Save filed snapshot", tone: "irreversible", disabled: true, name: "File it?", warning: "Once." }));
+  it("draws an irreversible tone and holds the trigger closed beside the reason it names (#1122)", () => {
+    const html = renderToStaticMarkup(createElement(ConfirmDeleteControl, { title: "Save filed snapshot", tone: "irreversible", reason: "Save is off: Kegs do not balance.", name: "File it?", warning: "Once." }));
     const [trigger] = buttons(html);
     expect(trigger).toContain('data-variant="irreversible"');
     expect(trigger).toMatch(DISABLED);
+    const describedBy = trigger?.match(/aria-describedby="([^"]+)"/)?.[1];
+    expect(html).toMatch(new RegExp(`<p id="${describedBy}"[^>]*>Save is off: Kegs do not balance\\.</p>`));
   });
 });
 
@@ -51,14 +53,18 @@ describe("Save filed snapshot", () => {
     expect(save).toContain('aria-haspopup="dialog"');
     expect(save).toContain('data-variant="irreversible"');
     const live = readFileSync("app/(app)/compliance/[period]/file-button.tsx", "utf8");
-    expect(live).toMatch(/<FileSnapshotControl\b/);
-    expect(live).toMatch(/onDelete=\{\(\) => run\("file_compliance_report"/);
+    expect(live).toMatch(/<FileSnapshotForm\b/);
+    expect(live).toMatch(/onFile=\{\(\) => run\("file_compliance_report"/);
+    expect(live).not.toMatch(/<Input\b|<Label\b/);
   });
 
-  it("says the filing is once and is not transmitted", () => {
-    const html = renderToStaticMarkup(createElement(FileSnapshotControl, {}));
-    expect(html).toContain('aria-haspopup="dialog"');
-    expect(html).not.toMatch(DISABLED);
+  it("opens while nothing blocks it, and the sheet says MGR does not file with TTB", () => {
+    const html = renderToStaticMarkup(createElement(FileSnapshotForm, { reason: null }));
+    const [save] = buttons(html);
+    expect(save).toContain('aria-haspopup="dialog"');
+    expect(save).not.toMatch(DISABLED);
+    // The closed sheet renders no body, so the copy is read from the warning prop itself.
+    expect(readFileSync("components/mgr/views/file-snapshot.tsx", "utf8")).toMatch(/warning="This does not file with TTB or the state; file there yourself first\./);
   });
 });
 
@@ -88,7 +94,7 @@ describe("row deletes go through the confirm sheet", () => {
     ["app/(app)/pricing/group-form.tsx", "delete_format", /<RemovePourControl[^]*?onDelete=\{\(\) => form\.run\("delete_format"/],
     ["app/(app)/pricing/group-form.tsx", "delete_price_group", /<DeletePriceGroupControl[^]*?onDelete=\{\(\) => form\.run\("delete_price_group"/],
     ["app/(app)/locations/bin-form.tsx", "delete_bin", /<RemoveBinControl[^]*?onDelete=\{\(\) => form\.run\("delete_bin"/],
-    ["app/(app)/pricing/price-cell-form.tsx", "clear_channel_price", /<ConfirmDeleteControl[^]*?onDelete=\{\(\) => form\.run\("clear_channel_price"/],
+    ["app/(app)/pricing/price-cell-form.tsx", "clear_channel_price", /<ConfirmDeleteControl[^]*?onDelete=\{\(\) => action\.run\("clear_channel_price"/],
   ])("%s runs %s only after confirming", (path, command, binding) => {
     const src = readFileSync(path, "utf8");
     expect(src).toMatch(binding);
@@ -99,7 +105,9 @@ describe("row deletes go through the confirm sheet", () => {
     const source = (path: string) => readFileSync(path, "utf8");
     expect(source("app/(app)/locations/bin-form.tsx")).toMatch(/aria-label=\{bin \? `Edit \$\{bin\.name\}`/);
     expect(source("app/(app)/settings/channels/channel-form.tsx")).toMatch(/aria-label=\{isEdit \? `Edit \$\{channel\.name\}`/);
-    expect(source("app/(app)/pricing/price-cell-form.tsx")).toMatch(/className="sr-only"/);
+    // The inline price field is named group · format on channel; its visible text is only the amount.
+    expect(source("app/(app)/pricing/price-cell-form.tsx")).toMatch(/label=\{`\$\{groupName\} · \$\{formatName\} on \$\{channelName\}`\}/);
+    expect(source("components/mgr/views/price-groups.tsx")).toMatch(/<InputGroupInput aria-label=\{label\}/);
     expect(source("components/mgr/command-form.tsx")).toMatch(/aria-label=\{name \? `Edit \$\{name\}`/);
   });
 });

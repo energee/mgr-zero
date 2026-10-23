@@ -5,19 +5,19 @@
 import { useState, useId, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
-import { CUSTOMER_TYPES, PAYMENT_TERMS } from "@/lib/mgr/enums";
-import { COUNTRY_OPTIONS, PAYMENT_TERM_LABEL, sentenceCase } from "@/lib/mgr/labels";
+import { PAYMENT_TERMS } from "@/lib/mgr/enums";
+import { COUNTRY_OPTIONS, CUSTOMER_TYPE_OPTIONS, PAYMENT_TERM_LABEL, sentenceCase } from "@/lib/mgr/labels";
 import { TAX_TREATMENTS } from "@/lib/mgr/tax-treatments";
 import { E } from "@/components/mgr/e";
-import type { CustomerEditValues, CustomerViewModel } from "@/lib/mgr/customer-view";
+import { FieldDescription } from "@/components/ui/field";
+import { CUSTOMER_ALIAS_HELP, type CustomerEditValues, type CustomerViewModel } from "@/lib/mgr/customer-view";
 import { DeleteCustomerControl } from "./delete-customer";
 import { RevokePortalUserControl } from "./revoke-portal-user";
 
 export type { CustomerEditValues, CustomerViewModel };
 
-const TYPE_OPTIONS = CUSTOMER_TYPES.map(value => ({ value, label: sentenceCase(value) }));
 const TERMS_OPTIONS = PAYMENT_TERMS.map(value => ({ value, label: PAYMENT_TERM_LABEL[value] }));
-const TAX_OPTIONS = [{ value: "", label: "Inherit from channel" }, ...TAX_TREATMENTS.map(value => ({ value, label: sentenceCase(value) }))];
+const TAX_OPTIONS = [{ value: "", label: "Inherit sale channel" }, ...TAX_TREATMENTS.map(value => ({ value, label: sentenceCase(value) }))];
 
 export type CustomerDetailSlot = {
   shipTos?: { key: string; title: string; detail: string; action?: ReactNode }[];
@@ -64,9 +64,11 @@ export function CustomerView({
             <h2 className="mb-3 font-heading text-xl font-semibold">Account details</h2>
             <div className="flex flex-col gap-4">
               {E.edit("Customer name", values.name, "text", undefined, { ...controls("name"), required: true })}
-              {/* Staff-only, like a brand alias; never shown to the customer. */}
-              {E.edit("Alias", values.alias, "text", undefined, { ...controls("alias"), placeholder: "Staff only" })}
-              {E.pick("Type", values.type, TYPE_OPTIONS, controls("type"))}
+              <div className="flex min-w-0 flex-col gap-2">
+                {E.edit("Alias", values.alias, "text", undefined, { ...controls("alias"), "aria-describedby": `${formId}-alias-help` })}
+                <FieldDescription id={`${formId}-alias-help`}>{CUSTOMER_ALIAS_HELP}</FieldDescription>
+              </div>
+              {E.pick("Type", values.type, CUSTOMER_TYPE_OPTIONS, controls("type"))}
               {E.pick("Country", values.country, COUNTRY_OPTIONS, { ...controls("country"), required: true })}
               {/* Only a US customer has a state; another country has none. */}
               {values.country === "US" && E.edit("State", values.state, "text", undefined, { ...controls("state"), required: true, maxLength: 2, minLength: 2 })}
@@ -116,7 +118,7 @@ export function CustomerView({
           <section aria-label="Customer activity" className="flex flex-col gap-3">
             <h2 className="font-heading text-xl font-semibold">Customer activity</h2>
             {E.nav("Orders", detail ? "Orders for this customer" : model.orders, "", undefined, detail?.ordersHref)}
-            {E.row("Customer keg balance", detail ? "Kegs out and deposits held" : model.kegBalance, E.act("Open", "primary", detail?.kegHref))}
+            {E.nav("Customer keg balance", detail ? "Kegs out and deposits held" : model.kegBalance, "", undefined, detail?.kegHref)}
           </section>
         </div>
       </div>

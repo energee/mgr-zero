@@ -1,4 +1,5 @@
 import { canRetireCommandFailure } from "@/lib/commands/failure";
+import { submitReason } from "@/lib/mgr/submit-reason";
 
 export type TapInterval = {
   id: string;
@@ -26,10 +27,11 @@ export type TapHistory = TapInterval & {
 };
 
 export type TapBoardSnapshot = { open: TapInterval[]; history: TapHistory[] };
+type IncomingKeg = { skuId: string } | { label: string; nominalBbl: number };
 export type TapCommandPayload =
-  | { locationId: string; keg: { skuId: string } | { label: string; nominalBbl: number }; tapNumber?: string; openingFill: .25 | .5 | .6 | 1 }
+  | { locationId: string; keg: IncomingKeg; tapNumber?: string; openingFill: .25 | .5 | .6 | 1 }
   | { openIntervalId: string; closeFill: 0 | .25 | .5; reason: string }
-  | { openIntervalId: string; incomingKeg?: { skuId: string } | { label: string; nominalBbl: number }; tapNumber?: string; incomingOpeningFill: .25 | .5 | .6 | 1; closeFill: 0 | .25 | .5; reason: string };
+  | { openIntervalId: string; incomingKeg?: IncomingKeg; tapNumber?: string; incomingOpeningFill: .25 | .5 | .6 | 1; closeFill: 0 | .25 | .5; reason: string };
 
 type Attempt =
   | { kind: "idle" }
@@ -58,11 +60,14 @@ export type TapBoardSheet = {
 export type TapBoardState = { snapshot: TapBoardSnapshot; sheet: TapBoardSheet | null };
 export const TAP_BOARD_POLL_MS = 30_000;
 
-export function openTapBoardSheet(snapshot: TapBoardSnapshot, kind: TapBoardSheet["kind"], interval: TapInterval | null, locationId = ""): TapBoardState {
+/** `firstSkuId` is the keg SKU a new tap starts on (the first in the picker),
+ *  so the inventory and the live board open the same sheet. A swap or kick
+ *  starts on its open keg's SKU instead. */
+export function openTapBoardSheet(snapshot: TapBoardSnapshot, kind: TapBoardSheet["kind"], interval: TapInterval | null, locationId = "", firstSkuId = ""): TapBoardState {
   return { snapshot, sheet: { kind, interval, attempt: { kind: "idle" }, fields: {
     locationId: interval?.location_id ?? locationId,
     identity: kind === "swap" ? interval?.sku_id ? "same" : "guest" : "own",
-    skuId: interval?.sku_id ?? "",
+    skuId: interval ? interval.sku_id ?? "" : firstSkuId,
     guestLabel: "",
     guestNominalBbl: "",
     tapNumber: interval?.tap_number ?? "",
@@ -119,30 +124,50 @@ export function pollErrorAfterTapBoardSave(current: string | null, result: TapBo
   return result.refreshError === null ? current : "Tap action saved. Board refresh failed; reload when the connection returns.";
 }
 
-function keg(fields: TapSheetFields) {
-  if (fields.identity === "own") {
-    if (!fields.skuId) throw new Error("Choose an own packaged keg SKU.");
-    return { skuId: fields.skuId };
-  }
+type TapSheetNeeds = Partial<Record<"reason" | "skuId" | "guestLabel" | "guestNominalBbl", string>>;
+
+/** What the sheet's fields still lack, keyed by field, each phrased as a need
+ *  ("a guest keg label"). The one rule set: the withheld submit names these
+ *  (tapSheetReason), the guest fields mark theirs, and payload() refuses them.
+ *  One case is not a need: a "same" swap whose open keg has no SKU to reuse.
+ *  The picker disables that option, and payload() refuses it if it arrives. */
+export function tapSheetNeeds(sheet: TapBoardSheet): TapSheetNeeds {
+  const fields = sheet.fields, needs: TapSheetNeeds = {};
+  if (sheet.kind !== "tap" && !fields.reason.trim()) needs.reason = "a closing reason";
+  if (sheet.kind === "kick") return needs;
+  if (fields.identity === "own" && !fields.skuId) needs.skuId = "a packaged keg SKU";
   if (fields.identity === "guest") {
-    const label = fields.guestLabel.trim(), nominalBbl = Number(fields.guestNominalBbl);
-    if (!label || !Number.isFinite(nominalBbl) || nominalBbl <= 0) throw new Error("Guest kegs need a label and positive nominal BBL.");
-    return { label, nominalBbl };
+    const nominalBbl = Number(fields.guestNominalBbl);
+    if (!fields.guestLabel.trim()) needs.guestLabel = "a guest keg label";
+    if (!(Number.isFinite(nominalBbl) && nominalBbl > 0)) needs.guestNominalBbl = "a guest nominal BBL above zero";
   }
+  return needs;
+}
+
+/** Why Tap keg, Kick keg or Swap is withheld, or null when the sheet is ready. */
+export const tapSheetReason = (sheet: TapBoardSheet) => submitReason(Object.values(tapSheetNeeds(sheet)));
+
+/** The keg going on, once tapSheetNeeds is empty. "same" (a swap reusing the
+ *  open keg's SKU) sends none; a tap sheet never has identity "same". */
+function incomingKeg(fields: TapSheetFields): IncomingKeg | undefined {
+  if (fields.identity === "own") return { skuId: fields.skuId };
+  if (fields.identity === "guest") return { label: fields.guestLabel.trim(), nominalBbl: Number(fields.guestNominalBbl) };
 }
 
 function payload(sheet: TapBoardSheet): TapCommandPayload {
+  const reason = tapSheetReason(sheet);
+  if (reason) throw new Error(reason);
   const tapNumber = sheet.fields.tapNumber.trim() || undefined;
-  if (sheet.kind === "tap") return { locationId: sheet.fields.locationId, keg: keg(sheet.fields)!, tapNumber, openingFill: sheet.fields.openingFill };
+  // A tap sheet's identity is "own" or "guest", so incomingKeg returns a keg.
+  if (sheet.kind === "tap") return { locationId: sheet.fields.locationId, keg: incomingKeg(sheet.fields)!, tapNumber, openingFill: sheet.fields.openingFill };
   if (!sheet.interval) throw new Error("Choose an open keg.");
   const close = { openIntervalId: sheet.interval.id, closeFill: sheet.fields.closeFill, reason: sheet.fields.reason.trim() };
-  if (!close.reason) throw new Error("Choose a closing reason.");
   if (sheet.kind === "kick") return close;
   if (sheet.fields.identity === "same") {
-    if (!sheet.interval.sku_id) throw new Error("Guest replacements need an explicit identity.");
+    if (!sheet.interval.sku_id) throw new Error("The open keg has no SKU to reuse. Choose Own keg or Guest keg.");
     return { ...close, tapNumber, incomingOpeningFill: sheet.fields.openingFill };
   }
-  return { ...close, incomingKeg: keg(sheet.fields), tapNumber, incomingOpeningFill: sheet.fields.openingFill };
+  return { ...close, incomingKeg: incomingKeg(sheet.fields), tapNumber, incomingOpeningFill: sheet.fields.openingFill };
 }
 
 export function beginTapBoardAttempt(state: TapBoardState, requestId: string): TapBoardState {
@@ -170,3 +195,14 @@ export function setTapBoardError(state: TapBoardState, message: string): TapBoar
 export const tapBoardCommand = (sheet: TapBoardSheet) => sheet.kind === "tap" ? "tap_keg" : sheet.kind === "kick" ? "kick_keg" : "swap_keg";
 
 export const tapLabel = (tap: TapInterval) => tap.sku_name ?? tap.label ?? "Keg";
+
+/** The fill chips' labels, on one percent scale (#1192). The tiles and the
+ *  history print these same words, so "Full" is the one word for a full keg.
+ *  Labels only: the stored fills are fixed by the tap_intervals CHECK constraints. */
+export const OPENING_FILLS = [[.25, "25%"], [.5, "50%"], [.6, "60%"], [1, "Full"]] as const;
+export const CLOSING_FILLS = [[0, "Empty"], [.25, "About 25% left"], [.5, "About 50% left"]] as const;
+
+/** The chip label for a stored fill. The CHECK constraints keep every stored
+ *  fill in its list, so the lookup always finds one. */
+export const fillLabel = (options: readonly (readonly [number, string])[], fill: number) =>
+  options.find(([value]) => value === Number(fill))![1];

@@ -11,19 +11,18 @@ export const complianceMonthsDemo: ComplianceMonthsViewModel = {
   cadences: ["Monthly", "Quarterly", "Annual"],
   cadence: 0,
   months: [
-    { key: "2026-09", title: "September 2026", detail: "in progress · file once the month ends", tone: "w" },
-    { key: "2026-08", title: "August 2026", detail: "needs amendment · filed 2026-09-02", tone: "w" },
-    { key: "2026-07", title: "July 2026", detail: "filed 2026-08-04 · 38.75 bbl taxable", tone: "ok" },
+    { key: "2026-09", title: "September 2026", detail: "In progress · File after the month ends", tone: "w" },
+    { key: "2026-08", title: "August 2026", detail: "Needs amendment · Filed Sep 2, 2026", tone: "w" },
+    { key: "2026-07", title: "July 2026", detail: "Filed Aug 4, 2026 · 38.75 bbl taxpaid", tone: "ok" },
   ],
   registry: { key: "registry", title: "Licenses", detail: "the brewery’s state licenses" },
-  lots: [{ key: "l-hz", title: "L-240831-HZ", detail: "Hazy IPA · packaged 2026-08-31" }],
+  lots: [{ key: "l-hz", title: "L-240831-HZ", detail: "Hazy IPA · packaged Aug 31, 2026" }],
 };
 
 export const licensesDemo: LicensesSnapshot = {
   licenses: [
     { id: "pa", state: "PA", kind: "brewery", license_no: "G-21884", expires_on: "2027-06-30", note: null },
   ],
-  note: "Order confirmation does not read licenses yet; a warning for an unlicensed destination state is planned and will never block.",
 };
 
 export const brandApprovalStout: BrandApprovalViewModel = {
@@ -72,7 +71,7 @@ export const lotTraceHazy: LotTraceSnapshot = {
     { sku_id: "case", bin_id: "cooler", sku: "Hazy IPA · 16 oz case", bin: "Cooler", location: "Warehouse", qty: 118, bbl: 7.61 },
   ],
   recipients: [],
-  warning: "Only recorded lot identities are traced. Historical untracked stock and consumption cannot be assigned to this lot.",
+  warning: "Stock recorded without this lot code is not traced here.",
 };
 
 

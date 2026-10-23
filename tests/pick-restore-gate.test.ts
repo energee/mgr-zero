@@ -9,7 +9,7 @@ it("keeps the re-entry explanation while any line still needs an observation", (
   expect(source).toContain('error ?? (needsCounts.length ? "Re-enter every line before saving." : draftError)');
 });
 it("keeps Done picking text while restoration prevents submission", () => {
-  const html = renderToStaticMarkup(createElement(PickView, { model: { backTo: "Order", title: "Pick", info: "Warehouse", lines: [] }, disabled: true }));
+  const html = renderToStaticMarkup(createElement(PickView, { model: { backTo: "Order", title: "Pick", subtitle: "Warehouse", lines: [] }, disabled: true }));
   expect(html).toContain("Done picking");
   expect(html).not.toContain("Saving");
   expect(html).toMatch(/type="submit"[^>]*disabled/);

@@ -25,7 +25,7 @@ export function FormatForm({ format, materials, contents, deleteAction, canCompo
     onSuccess: data => { if (!format) router.push(`/catalog/formats/${(data as { id: string }).id}`); },
   });
   const controls = formatControls(model, patch);
-  return <CommandForm open={form.open} onOpenChange={next => { if (!form.submitting) form.setOpen(next); }} title={format ? "Edit format" : "New format"} trigger={<Button variant="outline">{format ? "Edit format" : "New Format"}</Button>}>
+  return <CommandForm open={form.open} onOpenChange={next => { if (!form.submitting) form.setOpen(next); }} title={format ? "Edit format" : "New format"} trigger={<Button variant="outline">{format ? "Edit format" : "New format"}</Button>}>
     <FormatView formId={formId} model={model} controls={controls} editing={Boolean(format)} canCompose={!format || canCompose} materials={materials} contents={contents} deleteAction={deleteAction}
       componentOptions={componentOptions} componentRows={components} onComponentRowsChange={setComponents}
       onSubmit={event => { if (!valid) { event.preventDefault(); return; } void form.submit(event); }}

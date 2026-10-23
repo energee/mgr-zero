@@ -7,10 +7,13 @@ import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { CustomerView } from "../components/mgr/views/customer";
 import { CustomersView } from "../components/mgr/views/customers";
+import { ListControls } from "../components/mgr/list-controls";
 import { ShipToView } from "../components/mgr/views/ship-to";
 import { customerRidgeline, customersList, shipToMain } from "../lib/mgr/fixtures/customers";
 import { ALS, RIDGELINE } from "../lib/mgr/fixtures/demo";
-import { toCustomerViewProps } from "../lib/mgr/customer-view";
+import { CUSTOMER_ALIAS_HELP, toCustomerViewProps } from "../lib/mgr/customer-view";
+import { CUSTOMER_TYPES } from "../lib/mgr/enums";
+import { CUSTOMER_TYPE_OPTIONS } from "../lib/mgr/labels";
 import { toCustomersViewProps } from "../lib/mgr/customers-view";
 import { shipToAddress, shipToFormFields, toShipToViewProps } from "../lib/mgr/ship-to-view";
 
@@ -33,9 +36,27 @@ describe("Customers list", () => {
     expect(body.props.model).toEqual(toCustomersViewProps(customersList));
   });
 
-  it("the inventory list still offers Add customer and Open", () => {
-    expect(html(screen("Customers").body)).toMatch(/>Add customer</);
-    expect(html(screen("Customers").body)).toMatch(/>Open</);
+  // #994: both Customers records draw live's search strip, as Recipes, Vendors and Materials do.
+  it.each(["Customers", "Customers missing email"])("the %s inventory record passes ListControls as its search", (name) => {
+    const body = screen(name).body as { props: { search?: { type: unknown; props: { search: { label: string } } } } };
+    expect(body.props.search?.type).toBe(ListControls);
+    expect(body.props.search?.props.search.label).toBe("Search customers");
+  });
+
+  it("the inventory list offers New customer, as live does, and each row opens by its arrow, not an Open verb (#996, #1026)", () => {
+    const markup = html(screen("Customers").body);
+    expect(markup).toMatch(/>New customer</);
+    expect(readFileSync("app/(app)/customers/customer-form.tsx", "utf8")).toContain('"New customer"');
+    expect(markup).not.toMatch(/>Open</);
+    const first = toCustomersViewProps(customersList).rows[0]!.title;
+    expect(markup.split('data-slot="item"').find(item => item.includes(first))).toContain('aria-label="Open"');
+  });
+
+  it("a live customer row is one link to its detail page (#996)", () => {
+    const model = toCustomersViewProps(customersList);
+    const markup = html(createElement(CustomersView, { model, linkRows: true, createAction: null, search: null }));
+    expect(markup).toContain(`href="${model.rows[0]!.href}"`);
+    expect(markup).not.toMatch(/>Open</);
   });
 
   it("the live Customers page mounts CustomersView with no second E.* tree", () => {
@@ -101,7 +122,9 @@ describe("Customer detail", () => {
     expect(markup).toMatch(/Type/);
     expect(markup).toMatch(/Retailer/);
     expect(markup).toMatch(/Main/);
-    expect(markup).toMatch(/>Open</);
+    // The keg balance row only navigates: one row link, not an Open verb (#1026).
+    expect(markup).toMatch(/<a[^>]*href="\/kegs\/x"[^>]*>[\s\S]*?Customer keg balance/);
+    expect(markup).not.toMatch(/>Open</);
     expect(markup).toMatch(/>Save customer</);
     expect(markup).toMatch(/Customer name/);
   });
@@ -138,6 +161,13 @@ it("distinguishes a resolved missing-email review from an empty customer book", 
   expect(markup).not.toContain("No customers yet");
 });
 
+// #994: an empty search is not an empty customer book.
+it("says no customers match, not no customers yet, when a search is on", () => {
+  expect(toCustomersViewProps({ customers: [], filtered: true }).empty).toEqual({ title: "No customers match", description: "Clear the search to see every customer." });
+  expect(toCustomersViewProps({ customers: [], missingPortalEmail: true, filtered: true }).empty?.title).toBe("No customers match");
+  expect(toCustomersViewProps({ customers: [] }).empty?.title).toBe("No customers yet");
+});
+
 it("keeps Accounting Review in the shared filtered customer inventory", () => {
   expect(screen("Accounting").to?.Review).toBe("Customers missing email");
   const body = screen("Customers missing email").body as { type: unknown; props: { model: { missingPortalEmail?: boolean } } };
@@ -167,12 +197,37 @@ describe("country and alias", () => {
     expect(usMarkup).toContain(">Country<");
     expect(usMarkup).toContain(">United States<");
     expect(usMarkup).toContain(">State<");
-    expect(usMarkup).toContain('placeholder="Staff only"');
+    // The alias says what it is in a note that stays while typing, not a placeholder (#1131).
+    expect(usMarkup).not.toContain('placeholder="Staff only"');
+    const aliasHelp = usMarkup.match(/<input[^>]*aria-describedby="([^"]+-alias-help)"/)?.[1];
+    expect(aliasHelp).toBeDefined();
+    expect(usMarkup).toContain(`id="${aliasHelp}"`);
+    expect(usMarkup).toContain(CUSTOMER_ALIAS_HELP);
     const foreign = toCustomerViewProps(jp);
     expect(foreign.editValues).toMatchObject({ country: "JP", state: "", alias: "Tokyo" });
     const jpMarkup = html(createElement(CustomerView, { model: foreign }));
     expect(jpMarkup).toContain(">Japan<");
     expect(jpMarkup).not.toContain(">State<");
+  });
+
+  it("offers each customer type once, in sentence case, on both customer forms (#1131)", () => {
+    expect(CUSTOMER_TYPE_OPTIONS).toEqual([
+      { value: "distributor", label: "Distributor" }, { value: "retailer", label: "Retailer" },
+      { value: "brewery", label: "Brewery" }, { value: "other", label: "Other" },
+    ]);
+    expect(new Set(CUSTOMER_TYPES).size).toBe(CUSTOMER_TYPES.length);
+    expect(readFileSync("components/mgr/views/customer.tsx", "utf8")).toContain("CUSTOMER_TYPE_OPTIONS");
+    const form = readFileSync("app/(app)/customers/customer-form.tsx", "utf8");
+    expect(form).not.toContain("@/components/ui/select");
+    expect(form).toContain("CUSTOMER_TYPE_OPTIONS");
+  });
+
+  it("the New customer dialog explains the alias and says where ship-tos are added (#1131)", () => {
+    const form = readFileSync("app/(app)/customers/customer-form.tsx", "utf8");
+    expect(form).not.toContain("Staff only");
+    expect(form).toContain("{CUSTOMER_ALIAS_HELP}");
+    // Create only: an existing customer already has a page to add ship-tos on.
+    expect(form).toContain('!isEdit && E.info("Add ship-to addresses on the customer’s page after you create the customer.")');
   });
 
   it("the save input sends country and alias, a state only for US, and drops a blank alias", async () => {

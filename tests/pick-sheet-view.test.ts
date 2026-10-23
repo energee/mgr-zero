@@ -17,7 +17,8 @@ describe("Pick sheet view loop", () => {
     const model = toPickSheetViewProps(pickSheet);
     expect(model.empty).toBeUndefined();
     expect(model.groups).toHaveLength(1);
-    expect(model.groups[0]?.title).toBe("2026-09-03");
+    expect(model.groups[0]?.title).toBe("Sep 3, 2026");
+    expect(model.groups[0]?.key).toBe("2026-09-03");
     expect(model.groups[0]?.rows.map((r) => r.title)).toEqual([
       "Ridgeline Tap Room · ORD-0231",
       "Al’s Bar · ORD-0232",
@@ -29,7 +30,7 @@ describe("Pick sheet view loop", () => {
       "/orders/00000000-0000-4000-8000-000000000232",
       "/orders/00000000-0000-4000-8000-000000000234",
     ]);
-    expect(model.groups[0]?.totals).toBe("Hazy IPA · ½ bbl keg 9 · Pils · 16 oz case 22");
+    expect(model.groups[0]?.totals.map((t) => [t.group, t.name, t.qty])).toEqual([["Hazy IPA", "½ bbl keg", 9], ["Pils", "16 oz case", 22]]);
   });
 
   it("marks a row whose order was changed after pick (#811)", () => {
@@ -38,6 +39,15 @@ describe("Pick sheet view loop", () => {
     expect(rows.map((r) => r.changedAfterPick)).toEqual([undefined, true, undefined]);
     expect(html(toPickSheetViewProps({ orders }))).toContain("changed after pick");
     expect(html()).not.toContain("changed after pick");
+  });
+
+  it("a row that is no longer confirmed has no verb; it is a row link, not an Open verb (#1026)", () => {
+    const orders = pickSheet.orders.map((o, i) => i === 1 ? { ...o, status: "picked" } : o);
+    const model = toPickSheetViewProps({ orders });
+    expect(model.groups[0]!.rows.map((r) => r.verb)).toEqual(["Pick", undefined, "Pick"]);
+    const markup = html(model, { linkRows: true });
+    expect(markup).toMatch(/<a[^>]*href="\/orders\/00000000-0000-4000-8000-000000000232"[^>]*>(?:(?!<\/a>)[\s\S])*Al’s Bar · ORD-0232/);
+    expect(markup).not.toMatch(/>Open</);
   });
 
   it("names an empty sheet without inventing rows", () => {
@@ -53,7 +63,7 @@ describe("Pick sheet view loop", () => {
         { ...pickSheet.orders[1]!, requested_ship_date: null },
       ],
     });
-    expect(model.groups.map((g) => g.title)).toEqual(["2026-09-02", "Unscheduled"]);
+    expect(model.groups.map((g) => g.title)).toEqual(["Sep 2, 2026", "Unscheduled"]);
     expect(model.groups[0]?.rows).toHaveLength(1);
     expect(model.groups[1]?.rows[0]?.title).toMatch(/^Al’s Bar ·/);
   });
@@ -66,7 +76,9 @@ describe("Pick sheet view loop", () => {
     expect(markup).toMatch(/Teresa’s · ORD-0234/);
     expect(markup).toMatch(/3 lines/);
     expect(markup).toMatch(/>Totals</);
-    expect(markup).toMatch(/Hazy IPA · ½ bbl keg 9 · Pils · 16 oz case 22/);
+    // Totals is the same table as Pick: one row per format, the beer named on its first row.
+    expect(markup.match(/<th[^>]*>[\s\S]*?<\/th>/g)?.map((h) => h.replace(/<[^>]+>/g, ""))).toEqual(["Product", "Format", "Qty"]);
+    expect(markup).toMatch(/>Hazy IPA<[\s\S]*>½ bbl keg<[\s\S]*>9<[\s\S]*>Pils<[\s\S]*>16 oz case<[\s\S]*>22</);
     expect(markup).toContain(">Pick<");
     expect(markup).toMatch(/Thu 9\/3/);
   });

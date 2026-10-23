@@ -10,6 +10,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toLicensesViewProps } from "@/lib/mgr/licenses-view";
 import "@/lib/commands/all";
 import { LicenseForm } from "./license-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/compliance/licenses") };
 
 export default async function LicensesPage() {
   const brewery = await getActiveBrewery();
@@ -20,7 +23,6 @@ export default async function LicensesPage() {
       model={toLicensesViewProps({
         backHref: "/compliance",
         licenses,
-        note: "Order confirmation does not read licenses yet; a warning for an unlicensed destination state is planned and will never block.",
       })}
       actions={Object.fromEntries(licenses.map((license) => [license.id, <LicenseForm key={`${license.id}-${license.license_no}-${license.expires_on}`} license={license} />]))}
       addLicenses={<div className="py-2"><LicenseForm /></div>}

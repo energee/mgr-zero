@@ -11,8 +11,11 @@ later price change never rewrites an existing order. Mutations return
 
 Confirming creates allocations and returns `{ order_id, warnings }`, where
 `warnings` is `[{ sku_id, atp }]` for any SKU whose available-to-promise went
-negative. These are soft warnings. The confirm still succeeds, because the
-brewery, not the API, decides whether to oversell.
+negative. Adjusting lines returns the same shape, listing each SKU now on the
+order that is below zero. Setting a standing allocation returns
+`{ allocation_id, status, warnings }`, and warns only when the set leaves its
+SKU below zero; a release never warns. These are soft warnings. The write still
+succeeds, because the brewery, not the API, decides whether to oversell.
 
 Shipping is one transaction: inventory movements, allocation fulfilment and
 (unless deferred) the invoice, returning `{ order_id, invoice_id }`.
@@ -36,13 +39,17 @@ Order and invoice history queries page with a cursor; see [History paging](/docs
 
 The legacy invoice `paid_at` field is a payment-confirmation/state marker, not an actual settlement date. Older values can be invoice modification times; newer confirmations use the sync transaction time. Do not display it as a payment date. Current balance and remote state still determine whether an invoice is payable. A partial payment remains due; zero balance with positive attributable cash is paid, and credit-only closure is settled. No actual settlement date is supplied for either one or multiple payments.
 
+An invoice QuickBooks never received takes payments recorded in MGR (`record_invoice_payment`), and MGR's ledger owns its balance. For such an invoice, `paid_at` is the brewery-local start of the day its last payment was received. `list_invoices` carries the unvoided sum as `local_paid_cents`. `get_invoice` carries each payment, voided ones with their reasons, as `payments`, and the unvoided sum as `localPaidCents`.
+
+An Admin can write off such an invoice with `write_off_invoice` before it is fully paid, for its remaining balance. Its payments stay, and it takes no new payment.
+
 {/* ops:orders */}
 
 ## adjust_order_lines [#adjust_order_lines]
 
 `command` · admin, sales
 
-Replace lines on a confirmed/picked order; re-syncs allocations and returnable-keg deposits; on a picked order, an added or raised line sends it back to confirmed for a re-pick, and staged excess flags a restock
+Replace lines on a submitted/confirmed/picked order; a submitted order holds no allocations until confirm, otherwise re-syncs allocations and returnable-keg deposits; on a picked order, an added or raised line sends it back to confirmed for a re-pick, and staged excess flags a restock; returns ATP soft warnings
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -159,7 +166,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Confirmed/picked orders grouped by requested ship date with lines
+Confirmed/picked orders grouped by requested ship date with lines (each SKU with its brand name and staff alias, and format name)
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -176,7 +183,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-One invoice with its lines
+One invoice with its lines and the payments recorded in MGR
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -211,7 +218,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-One order with lines, keg deposits, events, shipment, brewery ATP, and on-hand stock at its fulfillment source
+One order with lines (each SKU with its brand name and staff alias, and format name), keg deposits, events, shipment, brewery ATP, and on-hand stock at its fulfillment source
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -296,7 +303,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Invoices and credit memos with current total plus frozen local subtotal, newest first
+Invoices and credit memos with current total plus frozen local subtotal and the sum of payments recorded in MGR, newest first
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -405,6 +412,27 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_historical_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000", "shipToId": "00000000-0000-0000-0000-000000000000", "pickedUpOn": "2026-01-31", "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1, "unitPriceCents": 1 } ] } }'
 ```
 
+## record_invoice_payment [#record_invoice_payment]
+
+`command` · admin, sales
+
+Record a payment received outside QuickBooks on an invoice QuickBooks never received; paid in full marks the invoice paid on the latest received day of its payments; returns the remaining balance
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `invoiceId` | uuid | yes |
+| `amountCents` | integer | yes |
+| `receivedOn` | date (YYYY-MM-DD) | yes |
+| `method` | cash or check or ach or other | yes |
+| `reference` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_invoice_payment", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "invoiceId": "00000000-0000-0000-0000-000000000000", "amountCents": 1, "receivedOn": "2026-01-31", "method": "cash" } }'
+```
+
 ## record_pick [#record_pick]
 
 `command` · admin, warehouse
@@ -500,7 +528,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Set or release a standing taproom allocation (source 'taproom_standing') for a SKU at a location
+Set or release a standing taproom allocation (source 'taproom_standing') for a SKU at a location; returns an ATP soft warning
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -576,11 +604,29 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_draft_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "orderId": "00000000-0000-0000-0000-000000000000", "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
 ```
 
+## void_invoice_payment [#void_invoice_payment]
+
+`command` · admin, sales
+
+Void a payment recorded in MGR with a reason, the only correction; the payment row is kept, and an invoice that drops below its total is no longer paid; returns the balance
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `paymentId` | uuid | yes |
+| `reason` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "void_invoice_payment", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "paymentId": "00000000-0000-0000-0000-000000000000", "reason": "string" } }'
+```
+
 ## write_off_invoice [#write_off_invoice]
 
 `command` · admin
 
-Mark a QuickBooks-voided or deleted invoice written off in MGR without recording cash or changing QuickBooks
+Mark an invoice written off in MGR without recording cash or changing QuickBooks: one voided or deleted in QuickBooks, or an unpaid one QuickBooks never received (its MGR payments stay)
 
 | Field | Type | Required |
 | --- | --- | --- |

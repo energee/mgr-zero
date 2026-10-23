@@ -20,6 +20,7 @@ jobs:
     outputs:
       new: ${{ steps.window.outputs.new }}
       changed: ${{ steps.validate.outputs.changed }}
+      findings: ${{ steps.validate.outputs.findings }}
       head: ${{ steps.window.outputs.head }}
       open_pr: ${{ steps.prepare.outputs.open_pr }}
       dream_sha: ${{ steps.prepare.outputs.dream_sha }}
@@ -141,6 +142,8 @@ jobs:
         run: |
           # Inside .git so Read can see it without git add including it in the bundle.
           git --no-pager log --no-ext-diff --stat "$ACCEPTED_BASE..$MAIN_HEAD" > .git/dream-evidence.log
+          # Documentation added in the window, for dreaming.md "Integrate new and missed documentation".
+          git diff --name-only --diff-filter=A "$ACCEPTED_BASE" "$MAIN_HEAD" -- '*.md' '*.mdx' > .git/dream-new-docs.txt
 
       - name: Run dream
         if: steps.window.outputs.new == 'true'
@@ -159,7 +162,7 @@ jobs:
             ${{ steps.window.outputs.head }}. Read .agents/agents/dreaming.md and follow it exactly.
             Open watchdog issues (WATCHDOG_ISSUES): ${{ steps.watchdog.outputs.list }}
           # Cross-document synthesis needs stronger reasoning than bounded maintenance.
-          claude_args: '--model sonnet --permission-mode dontAsk --disallowedTools "Bash(git:*)" --allowedTools "Read,Glob,Grep,Edit(.agents/MEMORY.md),Edit(.agents/PROGRESS.md),Edit(.agents/ARCHITECTURE.md),Edit(.agents/DRIFT.md),Edit(.agents/agents/*.md),Edit(AGENTS.md),Write(.agents/MEMORY.md),Write(.agents/PROGRESS.md),Write(.agents/ARCHITECTURE.md),Write(.agents/DRIFT.md),Write(.agents/agents/*.md),Write(AGENTS.md),Bash(gh pr list:*),Bash(gh pr view:*)"'
+          claude_args: '--model sonnet --permission-mode dontAsk --disallowedTools "Bash(git:*)" --allowedTools "Read,Glob,Grep,Edit(.agents/MEMORY.md),Edit(.agents/PROGRESS.md),Edit(.agents/ARCHITECTURE.md),Edit(.agents/DRIFT.md),Edit(.agents/agents/*.md),Edit(AGENTS.md),Write(.agents/MEMORY.md),Write(.agents/PROGRESS.md),Write(.agents/ARCHITECTURE.md),Write(.agents/DRIFT.md),Write(.agents/agents/*.md),Write(AGENTS.md),Write(.dream-findings.jsonl),Bash(gh pr list:*),Bash(gh pr view:*)"'
 
       - name: Validate dream changes
         if: steps.window.outputs.new == 'true'
@@ -172,6 +175,12 @@ jobs:
           DREAM_LOGIN: ${{ steps.prepare.outputs.login }}
           DREAM_EMAIL: ${{ steps.prepare.outputs.email }}
         run: |
+          # Overlooked-documentation findings become issues in the report job, never part of the dream.
+          if [ -s .dream-findings.jsonl ]; then
+            mv .dream-findings.jsonl "$RUNNER_TEMP/dream-findings.jsonl"
+            echo "findings=true" >> "$GITHUB_OUTPUT"
+          fi
+          rm -f .dream-findings.jsonl
           git add -A
           changed=$(git diff --cached --name-only)
           if [ -z "$changed" ]; then
@@ -203,6 +212,37 @@ jobs:
           name: dream-bundle
           if-no-files-found: error
           path: dream.bundle
+
+      # always(): a dream rejected by validation still reports what it found.
+      - name: Save dream findings
+        if: always() && steps.validate.outputs.findings == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dream-findings
+          if-no-files-found: error
+          path: ${{ runner.temp }}/dream-findings.jsonl
+
+  # The model job has no issue access; this deterministic job files what it overlooked.
+  report:
+    needs: maintain
+    if: always() && needs.maintain.outputs.findings == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dream-findings
+          path: ${{ runner.temp }}
+      - name: List overlooked documentation in the agent's Docs gaps issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/file-doc-findings.sh "$RUNNER_TEMP/dream-findings.jsonl" "dreaming agent"
 
   publish:
     needs: maintain

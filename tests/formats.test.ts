@@ -125,6 +125,15 @@ describe("format_components", () => {
     await expect(runCommand("replace_format_components", { formatId: four.id, components: [{ childFormatId: caseFmt.id, qty: 1 }] }, ctx)).rejects.toThrow(/cycle|one level|derives/i);
     await expect(runCommand("replace_format_components", { formatId: caseFmt.id, components: [{ childFormatId: caseFmt.id, qty: 1 }] }, ctx)).rejects.toThrow(/cycle|one level/i);
   });
+
+  it("a case with its own volume composes when that volume is its contents' total; a mismatch is refused", async () => {
+    const four = await runCommand("upsert_format", { name: "Typed four pack", basis: "packaged", packageType: "can", bblPerUnit: 0.01612903, unitsPerCase: 4 }, ctx) as { id: string };
+    const caseFmt = await runCommand("upsert_format", { name: "Typed case", basis: "packaged", packageType: "can", bblPerUnit: 0.09677419, unitsPerCase: 24 }, ctx) as { id: string };
+    await expect(runCommand("replace_format_components", { formatId: caseFmt.id, components: [{ childFormatId: four.id, qty: 5 }] }, ctx)).rejects.toThrow(/volume/i);
+    const composed = await runCommand("replace_format_components", { formatId: caseFmt.id, components: [{ childFormatId: four.id, qty: 6 }] }, ctx) as { bbl_per_unit: string; composed: boolean };
+    expect(Number(composed.bbl_per_unit)).toBe(0.09677419);
+    expect(composed.composed).toBe(true);
+  });
 });
 
 describe("format_bom", () => {

@@ -6,6 +6,10 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { ChatHealth } from "@/lib/commands/chat";
 import "@/lib/commands/all";
 import { ChatDisconnect } from "../chat-settings-client";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/settings/chat/disconnect") };
+
 export default async function DisconnectChatPage() {
   const { ctx } = await requireAdminContext("Disconnect Slack");
   const health = await runCommand("get_chat_integration_health", {}, ctx) as ChatHealth;

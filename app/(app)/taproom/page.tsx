@@ -1,14 +1,18 @@
-import { formatDateTime } from "@/lib/date-format";
+import { formatDate, formatDateTime } from "@/lib/date-format";
 import { WeeklyCountView } from "@/components/mgr/views/weekly-count";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { requirePagePermission, runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { TaproomCountSnapshot } from "@/lib/mgr/taproom-count-state";
 import { plural } from "@/lib/mgr/plural";
+import { varianceReason } from "@/lib/mgr/taproom-variance-view";
 import type { TaproomLineMovementType } from "@/lib/supabase/rpc-results";
 import "@/lib/commands/all";
 import { TaproomCountCorrection, TaproomCountForm, TaproomPrintWorksheet, type DraftProjection, type PrintLabel } from "./count-form";
 import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/taproom") };
 
 type Location = { id: string; name: string; uses: string[] };
 type CountHeader = { id: string; root_id: string; effective_id: string; location_id: string; counted_on: string; observed_at: string; counted_by: string; created_at: string; prior_count_id: string | null; corrected_at: string | null; corrected_by: string | null; correction_reason: string | null; observations: number; movements: number; depleted_units: number; destroyed_units: number };
@@ -43,10 +47,10 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
   const roles = brewery.roles;
   return <WeeklyCountView model={{
     backHref: "/beer", boardHref: `/taproom/board?location=${location.id}`, varianceHref: `/taproom/variance?location=${location.id}`,
-    locations: locations.map(item => [item.name, `/taproom?location=${item.id}`]), location: location.name, roles, lotLabels, timeZone: brewery.timeZone,
+    locations: locations.map(item => ({ value: item.id, label: item.name, href: `/taproom?location=${item.id}` })), location: location.id, roles, lotLabels, timeZone: brewery.timeZone,
     receipt: shownReceipt ? {
-      date: shownReceipt.counted_on, canCorrect: shownReceipt.correction_eligible,
-      recorded: `Recorded by ${shownReceipt.counted_by === ctx.userId ? "you" : "staff"} at ${formatDateTime(shownReceipt.created_at, brewery.timeZone)}${shownReceipt.prior_count_id ? "" : " · first count"}`,
+      date: formatDate(shownReceipt.counted_on), canCorrect: shownReceipt.correction_eligible,
+      recorded: `Recorded by ${shownReceipt.counted_by === ctx.userId ? "you" : "staff"} at ${formatDateTime(shownReceipt.created_at, brewery.timeZone)}${shownReceipt.prior_count_id ? "" : `. ${varianceReason("missing_baseline")}.`}`,
       priorHref: shownReceipt.prior_count_id ? `/taproom?location=${location.id}&count=${shownReceipt.prior_count_id}` : undefined,
       correction: shownReceipt.corrected_at ? `Corrected by ${shownReceipt.corrected_by === ctx.userId ? "you" : "Admin"} at ${formatDateTime(shownReceipt.corrected_at, brewery.timeZone)} · ${shownReceipt.correction_reason}` : undefined,
       lines: shownReceipt.lines.map((line, index) => {
@@ -58,7 +62,7 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
           result: line.movement_id ? `movement ${line.movement_id}` : "matched · no movement" };
       }),
     } : undefined,
-    history: history.map(count => ({ key: count.id, date: count.counted_on, detail: `${formatDateTime(count.created_at, brewery.timeZone)} · ${plural(count.observations, "observation")} · ${plural(count.movements, "movement")} · ${plural(count.depleted_units, "unit")} depleted · ${plural(count.destroyed_units, "unit")} destroyed${count.corrected_at ? ` · corrected ${formatDateTime(count.corrected_at, brewery.timeZone)} by Admin` : ""}`, href: `/taproom?location=${location.id}&count=${count.id}` })),
+    history: history.map(count => ({ key: count.id, date: formatDate(count.counted_on), detail: `${formatDateTime(count.created_at, brewery.timeZone)} · ${plural(count.observations, "observation")} · ${plural(count.movements, "movement")} · ${plural(count.depleted_units, "unit")} depleted · ${plural(count.destroyed_units, "unit")} destroyed${count.corrected_at ? ` · corrected ${formatDateTime(count.corrected_at, brewery.timeZone)} by Admin` : ""}`, href: `/taproom?location=${location.id}&count=${count.id}` })),
   }}
     draft={<TaproomCountForm key={`${location.id}:${snapshot.revision}`} breweryId={brewery.id} snapshot={snapshot} projection={projection} lotLabels={lotLabels} roles={roles} timeZone={brewery.timeZone}
       print={<TaproomPrintWorksheet key={`${location.id}:${snapshot.revision}`} breweryId={brewery.id} locationId={location.id} locationName={location.name} revision={snapshot.revision} initialLabels={printLabels} />} />}

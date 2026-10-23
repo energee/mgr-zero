@@ -1,9 +1,10 @@
 // tests/orders-list-view.test.ts — Orders list and New order inventory share
 // adapters with list_orders / form snapshots. Views own no sample data.
-import { readFileSync } from "node:fs";
 import { createElement, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+// The live Status pick navigates with the app router; outside Next it needs a stand-in.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => "/orders" }));
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", roles: ["sales"], timeZone: "America/Los_Angeles" }) }));
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ roles: ["sales"] }) }));
 vi.mock("@/lib/commands/all", () => ({}));
@@ -23,26 +24,64 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const html = (name: string) => renderToStaticMarkup(createElement("div", null, screen(name).body));
 
 describe("Orders list view loop", () => {
+  const verb = (row: { action?: { verb: string } }) => row.action?.verb ?? "Open";
+
   it.each([
     ["sales", ["Finish", "Confirm", "Open", "Open", "Open", "Open", "Open"]],
     ["warehouse", ["Open", "Open", "Pick", "Ship", "Put back", "Open", "Open"]],
     ["admin", ["Finish", "Confirm", "Pick", "Ship", "Put back", "Open", "Open"]],
   ])("offers only authorized actions for %s", (role, verbs) => {
     const states = ["draft", "submitted", "confirmed", "picked", "picked", "shipped", "cancelled"] as const;
-    const rows = toOrdersListViewProps({ roles: [role], orders: states.map((status, i) => ({ ...ordersWorkList.orders[0], id: String(i), status, needs_restock: i === 4 })) }).rows;
-    expect(rows.map(r => r.verb)).toEqual(verbs);
+    const rows = toOrdersListViewProps({ roles: [role], linked: true, orders: states.map((status, i) => ({ ...ordersWorkList.orders[0], id: String(i), status, needs_restock: i === 4 })) }).rows;
+    expect(rows.map(verb)).toEqual(verbs);
     for (const [i, row] of rows.entries()) {
-      expect(row.href).toBe(`/orders/${i}${row.verb === "Confirm" ? "/confirm" : row.verb === "Put back" ? "/restock" : ""}`);
+      // The order number always opens the order; Open would repeat it, so no action is drawn.
+      expect(row.href).toBe(`/orders/${i}`);
+      if (row.action) expect(row.action.href).toBe(`/orders/${i}${row.action.verb === "Confirm" ? "/confirm" : row.action.verb === "Put back" ? "/restock" : ""}`);
+      // Lifecycle status stays its own fact whatever the action.
+      expect(row.status).toBe(states[i]);
     }
   });
 
-  it("maps list_orders-shaped rows through nextAction", () => {
-    const model = toOrdersListViewProps(ordersWorkList);
-    expect(renderToStaticMarkup(createElement(OrdersView, { model }))).not.toContain("sales default");
-    expect(model.rows.map((r) => r.verb)).toEqual(["Confirm", "Open", "Open", "Finish"]);
-    expect(model.rows[0]?.title).toMatch(/^ORD-0231 ·/);
-    expect(model.rows[1]?.warning).toBe(true);
-    expect(model.rows[1]?.verb).toBe("Open");
+  it("keeps order facts separate: number, customer, requested date, status, restock", () => {
+    const [submitted, , , , transfer] = toOrdersListViewProps({ ...ordersWorkList, roles: ["admin"] }).rows;
+    expect(submitted).toMatchObject({ orderNo: "ORD-0231", customer: "Ridgeline Tap Room", shipDate: "Sep 10, 2026", status: "submitted", restock: false });
+    // No customer join: the transfer fallback, never an invented destination.
+    expect(transfer).toMatchObject({ orderNo: "Order", customer: null, shipDate: null });
+    const staged = toOrdersListViewProps({ ...ordersWorkList, roles: ["admin"] }).rows.find((r) => r.restock)!;
+    expect(staged.action?.verb).toBe("Put back");
+  });
+
+  it("prints a requested date as its calendar day and a missing one as null, never today", () => {
+    const at = (requested_ship_date: string | null, order_no: number | null = 1) =>
+      toOrdersListViewProps({ roles: ["sales"], orders: [{ ...ordersWorkList.orders[0], requested_ship_date, order_no }] }).rows[0]!;
+    expect(at("2026-10-19").shipDate).toBe("Oct 19, 2026");
+    expect(at(null).shipDate).toBeNull();
+    // Before a number exists the row says "Order" (docNo's fallback).
+    expect(at(null, null).orderNo).toBe("Order");
+  });
+
+  it("leaves inventory rows, actions, status options and Clear inert", () => {
+    const model = toOrdersListViewProps({ ...ordersWorkList, roles: ["admin"], customer: "Ridgeline Tap Room", customerId: "c1" });
+    expect(model.rows.every((r) => r.href === undefined && (r.action?.href === undefined))).toBe(true);
+    expect(model.statusOptions.every((o) => o.href === undefined)).toBe(true);
+    expect(model.customer).toEqual({ name: "Ridgeline Tap Room" });
+  });
+
+  it("offers every status in one Status pick; each keeps the customer and drops the cursor", () => {
+    const model = toOrdersListViewProps({ roles: ["sales"], linked: true, status: "picked", customer: "Ridgeline Tap Room", customerId: "c1", orders: [] });
+    expect(model.status).toBe("picked");
+    expect(model.statusOptions.map((o) => o.label)).toEqual(["All states", "Draft", "Submitted", "Confirmed", "Picked", "Shipped", "Cancelled"]);
+    expect(model.statusOptions[0]).toEqual({ value: "all", label: "All states", href: "/orders?customerId=c1" });
+    expect(model.statusOptions[2]?.href).toBe("/orders?customerId=c1&status=submitted");
+    // Clear removes only the customer scope.
+    expect(model.customer).toEqual({ name: "Ridgeline Tap Room", clearHref: "/orders?status=picked" });
+    expect(toOrdersListViewProps({ roles: ["sales"], linked: true, orders: [] })).toMatchObject({ status: "all", customer: undefined });
+  });
+
+  it("prints the ship date in the one date format, never ISO (#991)", () => {
+    const model = toOrdersListViewProps({ roles: ["sales"], orders: [{ ...ordersWorkList.orders[0], requested_ship_date: "2026-09-14" }] });
+    expect(model.rows[0]?.shipDate).toBe("Sep 14, 2026");
   });
 
   it("names an empty filtered list without inventing rows", () => {
@@ -60,8 +99,19 @@ describe("Orders list view loop", () => {
     const page = await OrdersPage({ searchParams: Promise.resolve({ customerId: "c1" }) });
     expect(page.props.customerName).toBe("Ridgeline Tap Room");
     const html = renderToStaticMarkup(createElement(OrdersClient, { ...page.props }));
-    expect(html).toContain("Ridgeline Tap Room");
-    expect(html).not.toMatch(/>Customer</);
+    expect(html).toMatch(/Customer: <strong[^>]*>Ridgeline Tap Room<\/strong>/);
+    expect(html).toContain('href="/orders"');
+  });
+
+  it("draws a register: headed columns on the desk, the same facts labeled on the phone", () => {
+    const html = renderToStaticMarkup(createElement(OrdersView, { model: toOrdersListViewProps({ ...ordersWorkList, roles: ["admin"], linked: true }) }));
+    // A header is its text, whether plain or inside its sort button.
+    const headers = [...html.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)].map(match => match[1].replace(/<[^>]*>/g, ""));
+    expect(headers).toEqual(expect.arrayContaining(["Order", "Customer", "Requested ship date", "Status"]));
+    expect(html).toContain(">Not scheduled<");
+    expect(html).toContain(">Restock staged<");
+    expect(html).toContain('href="/orders/00000000-0000-4000-8000-000000000231"');
+    expect(html).not.toMatch(/>Open</);
   });
 
   it("the Orders inventory record is OrdersView painted from that fixture", () => {
@@ -71,10 +121,10 @@ describe("Orders list view loop", () => {
     expect(body.props.model).toEqual(toOrdersListViewProps(ordersWorkList));
   });
 
-  it("the inventory list still offers New order and the next-action verbs", () => {
-    expect(readFileSync("components/mgr/views/orders-list.tsx", "utf8")).toMatch(/import \{ WORK_CHIPS, WORK_TABS \} from "@\/lib\/mgr\/work-view"/);
+  it("the inventory list offers New order, the Status pick and the sales verbs only", () => {
     expect(html("Orders")).toMatch(/>Orders</);
     expect(html("Orders")).toMatch(/>New order</);
+    expect(html("Orders")).toMatch(/>Status</);
     expect(html("Orders")).toMatch(/>Confirm</);
     expect(html("Orders")).not.toMatch(/>Put back</);
     expect(html("Orders")).not.toMatch(/>Pick</);
@@ -86,7 +136,7 @@ describe("Orders list view loop", () => {
     expect(page.type).toBe(OrdersClient);
     const list = OrdersClient(page.props);
     expect(list.type).toBe(OrdersView);
-    expect(list.props.model).toEqual(toOrdersListViewProps(ordersWorkList));
+    expect(list.props.model).toEqual(toOrdersListViewProps({ ...ordersWorkList, linked: true }));
     expect(renderToStaticMarkup(list.props.createAction)).toContain('href="/orders/new"');
     expect(list.props.feedback.type).toBe(QueryFeedback);
     expect(list.props.feedback.props.timeZone).toBe("America/Los_Angeles");

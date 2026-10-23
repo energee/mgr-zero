@@ -6,6 +6,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import type { RouteList } from "../labels";
 import { RouteForm } from "../route-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/routes/new") };
 
 export default async function NewRoutePage() {
   const brewery = await getActiveBrewery();

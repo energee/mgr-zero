@@ -1,17 +1,16 @@
 // app/(app)/replenishment/replenish-form.tsx — source-warehouse select plus
 // an editable par/on-hand/suggested table; submits create_replenishment_order
 // (fromLocationId, toLocationId, lines), which creates a confirmed taproom
-// transfer order in one step.
+// transfer order in one step. With no other warehouse, From warehouse says how
+// a location becomes one; the create button names what it still needs
+// (replenishReason).
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { replenishmentLines } from "@/lib/replenishment-form";
+import { replenishmentLines, replenishReason } from "@/lib/replenishment-form";
 
 type Suggestion = { skuId: string; sku: string; par: number; onHand: number; suggested: number };
 type Location = { id: string; name: string };
@@ -45,23 +44,7 @@ export function ReplenishForm({
       if (!canCreate) { e.preventDefault(); return; }
       void form.submit(e);
     }} className="flex flex-col gap-4">
-      <div className="flex max-w-xs flex-col gap-2">
-        <Label htmlFor="replen-from">From warehouse</Label>
-        <Select disabled={!canCreate} value={fromLocationId} onValueChange={setFromLocationId}>
-          <SelectTrigger id="replen-from">
-            <SelectValue placeholder="Select warehouse" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {warehouses.map((w) => (
-                <SelectItem key={w.id} value={w.id}>
-                  {w.name}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </div>
+      {E.pick("From warehouse", fromLocationId, warehouses.map((w) => ({ value: w.id, label: w.name })), { id: "replen-from", placeholder: "Select warehouse", disabled: !canCreate, onChange: setFromLocationId, empty: { text: "No other location has the Warehouse use. An admin sets a location's Uses in Locations.", label: "Open Locations", href: "/locations" } })}
 
       {suggestions.length ? (
         <table className="w-full text-sm">
@@ -93,10 +76,8 @@ export function ReplenishForm({
       )}
 
       <CommandFormMessage error={form.error} />
-      {canCreate && <div>
-        <Button type="submit" disabled={form.submitting || !fromLocationId || lines.length === 0}>
-          {form.submitting ? "Creating…" : "Create replenishment order"}
-        </Button>
+      {canCreate && <div className="flex flex-col gap-2">
+        {E.submit("Create replenishment order", { submitting: form.submitting, reason: replenishReason(fromLocationId, lines), busy: "Creating…", className: "w-fit" })}
       </div>}
     </form>
   );

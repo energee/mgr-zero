@@ -480,7 +480,7 @@ describe("trace_lot", () => {
     const owner = await makeStaffCtx(brewery.id, "admin");
     const cat = await seedCatalog(brewery.id, { product: "Trace Blend", sku: "Blend keg", packageType: "keg", bblPerUnit: 0.5 });
     const loc = await seedLocation(brewery.id);
-    const vessel = (name: string) => runCommand("upsert_vessel", { name, kind: "fermenter", capacityBbl: 60 }, brewer) as Promise<{ id: string }>;
+    const vessel = (name: string) => runCommand("upsert_vessel", { name, kind: "fermenter", capacityBbl: 60 }, owner) as Promise<{ id: string }>;
     const [sourceTank, intermediateTank, receivingTank, lateTank] = await Promise.all([
       vessel("TRACE-SOURCE"), vessel("TRACE-INTERMEDIATE"), vessel("TRACE-RECEIVING"), vessel("TRACE-LATE"),
     ]);
@@ -564,9 +564,10 @@ describe("trace_lot", () => {
 
   it("follows the lot to its run, tank, and batch, and lists every ledger movement tagged with it", async () => {
     const brewer = await makeStaffCtx(b.id, "brewer");
+    const owner = await makeStaffCtx(b.id, "admin");
     const cat = await seedCatalog(b.id, { product: "Trace Porter", sku: "Porter case", packageType: "can", bblPerUnit: 0.0645 });
     const loc = await seedLocation(b.id, { name: "Trace warehouse" });
-    const vessel = await runCommand("upsert_vessel", { name: "FV-TRACE", kind: "fermenter", capacityBbl: 60 }, brewer) as { id: string };
+    const vessel = await runCommand("upsert_vessel", { name: "FV-TRACE", kind: "fermenter", capacityBbl: 60 }, owner) as { id: string };
     const batch = await runCommand("schedule_batch", { plannedOn: "2025-11-01", plannedBbl: 30, intendedBrandId: cat.brandId }, brewer) as { id: string; batch_no: number };
     const dayOut = await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 30, brewedOn: "2025-11-01" }, brewer) as { occupancy: { id: string } };
     const run = await runCommand("schedule_packaging_run", { brandId: cat.brandId, plannedOn: "2025-12-01", occupancyId: dayOut.occupancy.id, outputs: [{ skuId: cat.skuId, qtyPlanned: 400 }] }, brewer) as { id: string };
@@ -605,7 +606,7 @@ describe("cellar transfer loss (#428)", () => {
     const [start, end, today] = sql(`select concat_ws('|', date_trunc('month', (now() at time zone timezone)::date)::date,
       (date_trunc('month', (now() at time zone timezone)::date) + interval '1 month - 1 day')::date, (now() at time zone timezone)::date)
       from breweries where id='${brewery.id}'`, true)[0].split("|");
-    const vessel = (name: string) => runCommand("upsert_vessel", { name, kind: "fermenter", capacityBbl: 20 }, brewer) as Promise<{ id: string }>;
+    const vessel = (name: string) => runCommand("upsert_vessel", { name, kind: "fermenter", capacityBbl: 20 }, owner) as Promise<{ id: string }>;
     const [fv1, fv2] = [await vessel("FV1"), await vessel("FV2")];
     const batch = await runCommand("schedule_batch", { plannedOn: today, plannedBbl: 10 }, brewer) as { id: string };
     const brewed = await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: fv1.id, initialBbl: 10, brewedOn: today }, brewer) as { occupancy: { id: string } };
@@ -617,7 +618,7 @@ describe("cellar transfer loss (#428)", () => {
   });
 
   // #485: the loss is one volume_adjustments row, so the report reads it once and
-  // Review auto-reconciled losses can reattribute it like a completion loss.
+  // Review cellar losses can reattribute it like a completion loss.
   it("writes the loss as a reattributable cellar loss the report counts once", async () => {
     const brewery = await makeBrewery();
     const brewer = await makeStaffCtx(brewery.id, "brewer");
@@ -625,7 +626,7 @@ describe("cellar transfer loss (#428)", () => {
     const [start, end, today] = sql(`select concat_ws('|', date_trunc('month', (now() at time zone timezone)::date)::date,
       (date_trunc('month', (now() at time zone timezone)::date) + interval '1 month - 1 day')::date, (now() at time zone timezone)::date)
       from breweries where id='${brewery.id}'`, true)[0].split("|");
-    const vessel = (name: string) => runCommand("upsert_vessel", { name, kind: "fermenter", capacityBbl: 20 }, brewer) as Promise<{ id: string }>;
+    const vessel = (name: string) => runCommand("upsert_vessel", { name, kind: "fermenter", capacityBbl: 20 }, owner) as Promise<{ id: string }>;
     const [fv1, fv2] = [await vessel("FV1"), await vessel("FV2")];
     const batch = await runCommand("schedule_batch", { plannedOn: today, plannedBbl: 10 }, brewer) as { id: string };
     const brewed = await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: fv1.id, initialBbl: 10, brewedOn: today }, brewer) as { occupancy: { id: string } };

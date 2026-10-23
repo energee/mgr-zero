@@ -2,6 +2,9 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
+import { NOTIFICATION_REASON_LABEL } from "../lib/chat/contracts";
+import { personalChatPreferences } from "../lib/mgr/fixtures/chat";
+import { CHAT_PREVIEW_FIXTURES } from "../lib/chat/preview-fixtures";
 import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView } from "../components/mgr/views/chat";
 import { SCREENS } from "../components/mgr/screens";
 
@@ -13,8 +16,8 @@ it("keeps reading cadence restricted to whole hours", () => {
 });
 
 it("preserves personal notification reasons before linking and gates taproom quiet hours", () => {
-  const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { preferences: [{ reason: "pick_due", enabled: true }], quietStart: null, quietEnd: null, timezone: "America/New_York", link: null }, canSetQuietHours: false }));
-  expect(html).toContain("pick due");
+  const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { preferences: [{ reason: "pick_due", enabled: true }], quietStart: null, quietEnd: null, timezone: "America/New_York", link: null, installationActive: true, breweryQuietHours: null }, canSetQuietHours: false }));
+  expect(html).toContain("Pick due");
   expect(html).toContain("Link MGR account");
   expect(html).not.toContain("Save my quiet hours");
   expect(html).not.toContain("Unlink my Slack");
@@ -56,15 +59,16 @@ it("requires an actual link intent before showing identity consent", () => {
 });
 
 it("keeps real linked identities and unlink errors without fixture paths", () => {
-  const html = renderToStaticMarkup(createElement(ChatLinkedPeopleView, { people: [{ id: "real-link", name: "Actual user", roles: ["brewer"], slackIdentity: "U123", linkedAt: "2026-09-12" }], busy: true, error: "Permission changed" }));
+  const html = renderToStaticMarkup(createElement(ChatLinkedPeopleView, { people: [{ id: "real-link", name: "Actual user", roles: ["brewer"], slackIdentity: "U123", linkedAt: "2026-09-12T02:00:00Z" }], timeZone: "America/New_York", busy: true, error: "Permission changed" }));
   expect(html).toContain("Slack U123");
+  expect(html).toContain("linked Sep 11, 2026");
   expect(html).toContain("Permission changed");
   expect(html).toContain("disabled");
   expect(html).not.toContain('href="/');
 });
 
 it("shows every linked staff role rather than selecting a primary role", () => {
-  const html = renderToStaticMarkup(createElement(ChatLinkedPeopleView, { people: [{ id: "multi", name: "Multi-role staff", roles: ["sales", "brewer"], slackIdentity: "U456", linkedAt: "2026-10-16" }] }));
+  const html = renderToStaticMarkup(createElement(ChatLinkedPeopleView, { people: [{ id: "multi", name: "Multi-role staff", roles: ["sales", "brewer"], slackIdentity: "U456", linkedAt: "2026-10-16" }], timeZone: "America/New_York" }));
   expect(html).toContain("sales, brewer");
   expect(html).toContain("Slack U456");
 });
@@ -79,4 +83,52 @@ it("keys every element the chat settings page hands ChatSettingsView", () => {
     expect(element, slot).not.toBeNull();
     expect(element![2], `${slot} <${element![1]}>`).toMatch(/\bkey=/);
   }
+});
+
+// #1146: staff read sentence-case reasons, the same words Slack's own
+// preferences dialog uses, and plain instructions without developer terms.
+it("labels each personal reason in plain words with no repeated sublabel", () => {
+  const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: personalChatPreferences }));
+  for (const { reason } of personalChatPreferences.preferences) {
+    expect(html).toContain(`aria-label="${NOTIFICATION_REASON_LABEL[reason]}"`);
+    // The raw reason id with spaces ("pick due") must never be drawn as a label.
+    const rawReasonText = reason.replaceAll("_", " ");
+    expect(html).not.toMatch(new RegExp(`[>"]${rawReasonText}[<"]`));
+  }
+  expect(html).not.toContain("Personal reminders<");
+  expect(html).not.toContain("App Home");
+});
+
+// #1208: the link steps wait for the brewery's Slack installation to be
+// active, which the preferences query reports, not the server env check.
+it("does not send staff to link Slack until the brewery's Slack is connected", () => {
+  const unlinked = { ...personalChatPreferences, link: null };
+  const available = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { ...unlinked, installationActive: true } }));
+  expect(available).toContain("Link MGR account");
+  const unavailable = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { ...unlinked, installationActive: false } }));
+  expect(unavailable).not.toContain("Link MGR account");
+  expect(unavailable).toContain("Slack isn’t connected for your brewery yet.");
+  expect(unavailable).toContain("aria-label=\"Pick due\"");
+});
+
+// #1208: staff read the brewery quiet hours they fall back to, whether or not
+// their role can set its own.
+it("shows the brewery quiet hours read-only to every role", () => {
+  const quiet = { ...personalChatPreferences, breweryQuietHours: { start: "22:00:00", end: "07:00:00", timezone: "America/Chicago" } };
+  for (const canSetQuietHours of [true, false]) {
+    const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: quiet, canSetQuietHours }));
+    expect(html).toContain("Brewery quiet hours");
+    expect(html).toContain("10:00 PM – 7:00 AM · 9 hours · America/Chicago");
+  }
+  const off = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { ...personalChatPreferences, breweryQuietHours: null } }));
+  expect(off).toMatch(/Brewery quiet hours.*Off/);
+});
+
+// The "All preview states" picker renders only when NODE_ENV is "development";
+// vitest runs with NODE_ENV "test", so this checks what staff see.
+it("omits fixture wording and the dev-only state picker from Chat settings", () => {
+  const html = renderToStaticMarkup(createElement(ChatSettingsView, { health: { installation: null, queue: {}, lastCallback: null, lastDelivery: null, destinations: [], linkedCount: 0 }, configured: false, timezone: "America/New_York", readingDueHours: 24, previewFixtures: CHAT_PREVIEW_FIXTURES }));
+  expect(html).toContain("Sample data");
+  expect(html).not.toMatch(/fixture|server setup|All preview states/i);
+  expect(html).not.toContain(">Chat notifications<");
 });

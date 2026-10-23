@@ -10,6 +10,7 @@ import "@/lib/commands/all";
 
 let b: { id: string };
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
+let owner: Awaited<ReturnType<typeof makeStaffCtx>>;
 let malt: string;
 let hop: string;
 
@@ -18,6 +19,7 @@ let hop: string;
 beforeAll(async () => {
   b = await makeBrewery();
   ctx = await makeStaffCtx(b.id, "brewer");
+  owner = await makeStaffCtx(b.id, "admin");
   malt = await seedMaterial(b.id, { name: "Pale Ale Malt", category: "malt", extractPotential: 1.037 });
   hop = await seedMaterial(b.id, { name: "Citra", category: "hop" });
 });
@@ -73,6 +75,25 @@ describe("recipes and immutable versions", () => {
 
     const listed = (await runCommand("list_recipes", {}, ctx)) as { id: string }[];
     expect(listed.map((r) => r.id)).toContain(recipe.id);
+  });
+
+  it("list_recipes q matches the recipe name in the query, with % and _ literal (#994)", async () => {
+    const own = await makeStaffCtx((await makeBrewery()).id, "brewer");
+    for (const name of ["Hazy 100% IPA", "West_Coast", "WestXCoast"]) await runCommand("create_recipe", { name }, own);
+    const names = async (q: string) => ((await runCommand("list_recipes", { q }, own)) as { name: string }[]).map((r) => r.name);
+    expect(await names("west")).toEqual(["West_Coast", "WestXCoast"]);
+    expect(await names("100%")).toEqual(["Hazy 100% IPA"]);
+    expect(await names("t_c")).toEqual(["West_Coast"]);
+    expect(await names("nothing")).toEqual([]);
+  });
+
+  it("list_recipes q treats * as literal text (#1029)", async () => {
+    const own = await makeStaffCtx((await makeBrewery()).id, "brewer");
+    for (const name of ["Plain Pils", "Star*Gazer"]) await runCommand("create_recipe", { name }, own);
+    const names = async (q: string) => ((await runCommand("list_recipes", { q }, own)) as { name: string }[]).map((r) => r.name);
+    expect(await names("*")).toEqual(["Star*Gazer"]);
+    expect(await names("r*g")).toEqual(["Star*Gazer"]);
+    expect(await names(".")).toEqual([]);
   });
 
   it("get_recipe returns the requested older version and lists all versions", async () => {
@@ -156,7 +177,7 @@ describe("recipes and immutable versions", () => {
 
 describe("brew turns (#807)", () => {
   it("allows a new-period turn after the first turn's period was filed", async () => {
-    const vessel = await runCommand("upsert_vessel", { name: "FV period turns", kind: "fermenter", capacityBbl: 20 }, ctx) as { id: string };
+    const vessel = await runCommand("upsert_vessel", { name: "FV period turns", kind: "fermenter", capacityBbl: 20 }, owner) as { id: string };
     const batch = await runCommand("schedule_batch", { plannedOn: "2026-09-30", plannedBbl: 20 }, ctx) as { id: string };
     const firstInput = { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 10, brewedOn: "2026-09-30" };
     await runCommand("record_brew_day", firstInput, ctx);
@@ -168,7 +189,7 @@ describe("brew turns (#807)", () => {
   it("records two turns into one open tank and replays each without adding volume", async () => {
     const vessel = await runCommand("upsert_vessel", {
       name: "FV double batch", kind: "fermenter", capacityBbl: 20,
-    }, ctx) as { id: string };
+    }, owner) as { id: string };
     const batch = await runCommand("schedule_batch", {
       plannedOn: "2026-10-01", plannedBbl: 20,
     }, ctx) as { id: string };
@@ -214,12 +235,12 @@ describe("vessels, scheduling and brew day", () => {
   let fv: string;
 
   it("creates and renames a vessel, and lists it", async () => {
-    const v = (await runCommand("upsert_vessel", { name: "FV1", kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
+    const v = (await runCommand("upsert_vessel", { name: "FV1", kind: "fermenter", capacityBbl: 30 }, owner)) as { id: string };
     expect(v.id).toBeTruthy();
     fv = v.id;
 
     const renamed = (await runCommand("upsert_vessel",
-      { id: fv, name: "FV-1", kind: "fermenter", capacityBbl: 31 }, ctx)) as { id: string; name: string; capacity_bbl: number };
+      { id: fv, name: "FV-1", kind: "fermenter", capacityBbl: 31 }, owner)) as { id: string; name: string; capacity_bbl: number };
     expect(renamed).toMatchObject({ id: fv, name: "FV-1", capacity_bbl: 31 });
 
     const listed = (await runCommand("list_vessels", {}, ctx)) as { id: string; name: string }[];
@@ -266,7 +287,7 @@ describe("vessels, scheduling and brew day", () => {
 // "25 / 20 bbl". Knockout volume can never exceed vessels.capacity_bbl.
 describe("brew day refuses more than the vessel holds", () => {
   it("refuses 25 bbl into a 20 bbl fermenter, leaves the batch unbrewed, and accepts a full 20", async () => {
-    const vessel = (await runCommand("upsert_vessel", { name: "FV-CAP20", kind: "fermenter", capacityBbl: 20 }, ctx)) as { id: string };
+    const vessel = (await runCommand("upsert_vessel", { name: "FV-CAP20", kind: "fermenter", capacityBbl: 20 }, owner)) as { id: string };
     const batch = (await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 25 }, ctx)) as { id: string };
 
     await expect(runCommand("record_brew_day",
@@ -290,7 +311,7 @@ describe("brew day refuses more than the vessel holds", () => {
 // reports `occupied` rather than dying on the raw constraint name.
 describe("brew day overlaps a closed occupancy", () => {
   it("refuses a backdated brew inside a closed stretch, and allows one after it", async () => {
-    const vessel = (await runCommand("upsert_vessel", { name: "FV-BACKDATE", kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
+    const vessel = (await runCommand("upsert_vessel", { name: "FV-BACKDATE", kind: "fermenter", capacityBbl: 30 }, owner)) as { id: string };
     const first = (await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 30 }, ctx)) as { id: string };
     await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: first.id, vesselId: vessel.id, initialBbl: 30, brewedOn: "2026-10-01" }, ctx);
 
@@ -321,8 +342,8 @@ describe("brew day overlaps a closed occupancy", () => {
   it("brews into a vessel emptied earlier the same day", async () => {
     // "Today" is the brewery's local day, the window record_brew_day uses.
     const [today] = sql(`select (now() at time zone timezone)::date::text from breweries where id = '${b.id}'`, true);
-    const vessel = (await runCommand("upsert_vessel", { name: "FV-SAMEDAY", kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
-    const brite = (await runCommand("upsert_vessel", { name: "BR-SAMEDAY", kind: "brite", capacityBbl: 30 }, ctx)) as { id: string };
+    const vessel = (await runCommand("upsert_vessel", { name: "FV-SAMEDAY", kind: "fermenter", capacityBbl: 30 }, owner)) as { id: string };
+    const brite = (await runCommand("upsert_vessel", { name: "BR-SAMEDAY", kind: "brite", capacityBbl: 30 }, owner)) as { id: string };
     const first = (await runCommand("schedule_batch", { plannedOn: today, plannedBbl: 10 }, ctx)) as { id: string };
     const brewed = (await runCommand("record_brew_day",
       { actuals: [], confirmEmpty: true, batchId: first.id, vesselId: vessel.id, initialBbl: 10, brewedOn: today }, ctx)) as { occupancy: { id: string } };
@@ -346,7 +367,7 @@ describe("brew day overlaps a closed occupancy", () => {
   // start after that close instead of reporting the vessel occupied.
   it("uses the brewery's time zone for the same-day window", async () => {
     await admin.from("breweries").update({ timezone: "America/New_York" }).eq("id", b.id);
-    const vessel = (await runCommand("upsert_vessel", { name: "FV-EVENING", kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
+    const vessel = (await runCommand("upsert_vessel", { name: "FV-EVENING", kind: "fermenter", capacityBbl: 30 }, owner)) as { id: string };
     const first = (await runCommand("schedule_batch", { plannedOn: "2026-11-01", plannedBbl: 10 }, ctx)) as { id: string };
     const brewed = (await runCommand("record_brew_day",
       { actuals: [], confirmEmpty: true, batchId: first.id, vesselId: vessel.id, initialBbl: 10, brewedOn: "2026-11-01" }, ctx)) as { occupancy: { started_at: string } };
@@ -379,7 +400,8 @@ describe("vessels and batches refuse other tenants and other roles", () => {
   beforeAll(async () => {
     other = await makeBrewery();
     otherCtx = await makeStaffCtx(other.id, "brewer");
-    otherVessel = ((await runCommand("upsert_vessel", { name: "Their FV", kind: "fermenter", capacityBbl: 20 }, otherCtx)) as { id: string }).id;
+    const otherOwner = await makeStaffCtx(other.id, "admin");
+    otherVessel = ((await runCommand("upsert_vessel", { name: "Their FV", kind: "fermenter", capacityBbl: 20 }, otherOwner)) as { id: string }).id;
     otherBrand = (await seedCatalog(other.id)).brandId;
     otherBatch = ((await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 20 }, otherCtx)) as { id: string }).id;
 
@@ -393,7 +415,7 @@ describe("vessels and batches refuse other tenants and other roles", () => {
 
   it("refuses another brewery's vessel, brand, recipe version and batch", async () => {
     await expect(runCommand("upsert_vessel",
-      { id: otherVessel, name: "Stolen", kind: "fermenter", capacityBbl: 20 }, ctx)).rejects.toThrow(/vessel not found/);
+      { id: otherVessel, name: "Stolen", kind: "fermenter", capacityBbl: 20 }, owner)).rejects.toThrow(/vessel not found/);
 
     await expect(runCommand("schedule_batch",
       { intendedBrandId: otherBrand, plannedOn: "2026-10-01", plannedBbl: 10 }, ctx)).rejects.toThrow(/brand not found/);
@@ -404,7 +426,7 @@ describe("vessels and batches refuse other tenants and other roles", () => {
     await expect(runCommand("record_brew_day",
       { actuals: [], confirmEmpty: true, batchId: mine.id, vesselId: otherVessel, initialBbl: 10, brewedOn: "2026-10-01" }, ctx)).rejects.toThrow(/vessel not found/);
 
-    const myVessel = (await runCommand("upsert_vessel", { name: "FV-TENANCY", kind: "fermenter", capacityBbl: 20 }, ctx)) as { id: string };
+    const myVessel = (await runCommand("upsert_vessel", { name: "FV-TENANCY", kind: "fermenter", capacityBbl: 20 }, owner)) as { id: string };
     await expect(runCommand("record_brew_day",
       { actuals: [], confirmEmpty: true, batchId: otherBatch, vesselId: myVessel.id, initialBbl: 10, brewedOn: "2026-10-01" }, ctx)).rejects.toThrow(/batch not found/);
 
@@ -446,7 +468,7 @@ describe("cellar transfers", () => {
 
   // A brewed batch sitting in its own fermenter, ready to be moved.
   async function brew(name: string, bbl: number, brewedOn: string) {
-    const vessel = (await runCommand("upsert_vessel", { name, kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
+    const vessel = (await runCommand("upsert_vessel", { name, kind: "fermenter", capacityBbl: 30 }, owner)) as { id: string };
     const batch = (await runCommand("schedule_batch", { plannedOn: brewedOn, plannedBbl: bbl }, ctx)) as { id: string };
     const day = (await runCommand("record_brew_day",
       { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: bbl, brewedOn }, ctx)) as { occupancy: { id: string } };
@@ -455,7 +477,7 @@ describe("cellar transfers", () => {
 
   it("moves part of a batch into an empty vessel, then closes the source when it empties", async () => {
     const source = await brew("XFER-FV1", 10, "2026-11-01");
-    const brite = (await runCommand("upsert_vessel", { name: "XFER-BR1", kind: "brite", capacityBbl: 30 }, ctx)) as { id: string };
+    const brite = (await runCommand("upsert_vessel", { name: "XFER-BR1", kind: "brite", capacityBbl: 30 }, owner)) as { id: string };
 
     const first = (await runCommand("record_cellar_transfer",
       { fromOccupancyId: source.occupancyId, toVesselId: brite.id, volumeBbl: 5 }, ctx)) as {
@@ -497,7 +519,7 @@ describe("cellar transfers", () => {
 
   it("refuses more than is in the vessel, its own vessel, and a closed source", async () => {
     const source = await brew("XFER-FV2", 8, "2026-11-03");
-    const target = (await runCommand("upsert_vessel", { name: "XFER-BR2", kind: "brite", capacityBbl: 30 }, ctx)) as { id: string };
+    const target = (await runCommand("upsert_vessel", { name: "XFER-BR2", kind: "brite", capacityBbl: 30 }, owner)) as { id: string };
 
     await expect(runCommand("record_cellar_transfer",
       { fromOccupancyId: source.occupancyId, toVesselId: target.id, volumeBbl: 8, lossBbl: 0.5 }, ctx))
@@ -523,7 +545,7 @@ describe("cellar transfers", () => {
     await expect(runCommand("record_cellar_transfer",
       { fromOccupancyId: donor.occupancyId, toVesselId: host.vesselId, volumeBbl: 10 }, ctx))
       .rejects.toThrow(/CAP-FV1 holds 30 bbl/);
-    const small = (await runCommand("upsert_vessel", { name: "CAP-BR5", kind: "brite", capacityBbl: 5 }, ctx)) as { id: string };
+    const small = (await runCommand("upsert_vessel", { name: "CAP-BR5", kind: "brite", capacityBbl: 5 }, owner)) as { id: string };
     await expect(runCommand("record_cellar_transfer",
       { fromOccupancyId: donor.occupancyId, toVesselId: small.id, volumeBbl: 6 }, ctx))
       .rejects.toThrow(/CAP-BR5 holds 5 bbl/);
@@ -540,7 +562,8 @@ describe("cellar transfers", () => {
     const mine = await brew("XFER-FV3", 5, "2026-11-04");
     const otherB = await makeBrewery();
     const otherCtx = await makeStaffCtx(otherB.id, "brewer");
-    const theirVessel = (await runCommand("upsert_vessel", { name: "Their BR", kind: "brite", capacityBbl: 30 }, otherCtx)) as { id: string };
+    const otherOwner = await makeStaffCtx(otherB.id, "admin");
+    const theirVessel = (await runCommand("upsert_vessel", { name: "Their BR", kind: "brite", capacityBbl: 30 }, otherOwner)) as { id: string };
 
     await expect(runCommand("record_cellar_transfer",
       { fromOccupancyId: mine.occupancyId, toVesselId: theirVessel.id, volumeBbl: 1 }, ctx)).rejects.toThrow(/vessel not found/);
@@ -561,7 +584,7 @@ describe("fermentation readings", () => {
   let occupancyId: string;
 
   beforeAll(async () => {
-    const vessel = (await runCommand("upsert_vessel", { name: "READ-FV1", kind: "fermenter", capacityBbl: 20 }, ctx)) as { id: string };
+    const vessel = (await runCommand("upsert_vessel", { name: "READ-FV1", kind: "fermenter", capacityBbl: 20 }, owner)) as { id: string };
     const batch = (await runCommand("schedule_batch", { plannedOn: "2026-11-10", plannedBbl: 12 }, ctx)) as { id: string };
     const day = (await runCommand("record_brew_day",
       { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 12, brewedOn: "2026-11-10" }, ctx)) as { occupancy: { id: string } };
@@ -593,7 +616,7 @@ describe("fermentation readings", () => {
     await expect(runCommand("record_fermentation_reading", { occupancyId, at: "2026-11-11T19:00:00Z", tempF: 68 }, sales))
       .rejects.toThrow(/permission denied/);
 
-    const brite = (await runCommand("upsert_vessel", { name: "READ-BR1", kind: "brite", capacityBbl: 20 }, ctx)) as { id: string };
+    const brite = (await runCommand("upsert_vessel", { name: "READ-BR1", kind: "brite", capacityBbl: 20 }, owner)) as { id: string };
     await runCommand("record_cellar_transfer", { fromOccupancyId: occupancyId, toVesselId: brite.id, volumeBbl: 12 }, ctx);
     await expect(runCommand("record_fermentation_reading", { occupancyId, at: "2026-11-12T18:00:00Z", tempF: 68 }, ctx))
       .rejects.toThrow(/closed/);
@@ -605,8 +628,8 @@ describe("fermentation readings", () => {
 // open, rather than whichever row the Map kept last (#439).
 describe("a batch split across tanks", () => {
   it("lists every open vessel and keeps the brew-day tank on get_brew_day", async () => {
-    const fv = (await runCommand("upsert_vessel", { name: `FV-SPLIT ${crypto.randomUUID()}`, kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string; name: string };
-    const bt = (await runCommand("upsert_vessel", { name: `BT-SPLIT ${crypto.randomUUID()}`, kind: "brite", capacityBbl: 30 }, ctx)) as { id: string; name: string };
+    const fv = (await runCommand("upsert_vessel", { name: `FV-SPLIT ${crypto.randomUUID()}`, kind: "fermenter", capacityBbl: 30 }, owner)) as { id: string; name: string };
+    const bt = (await runCommand("upsert_vessel", { name: `BT-SPLIT ${crypto.randomUUID()}`, kind: "brite", capacityBbl: 30 }, owner)) as { id: string; name: string };
     const batch = (await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 20 }, ctx)) as { id: string };
     await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: fv.id, initialBbl: 20, brewedOn: "2026-10-01" }, ctx);
     const first = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as { occupancy: { id: string } };

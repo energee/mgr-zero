@@ -1,5 +1,5 @@
 // app/(app)/transfers/[id]/page.tsx — one stock transfer: header, lines with
-// from/to bins, and the next verb (transfer-actions.tsx): Submit, Record pick,
+// from/to bins, and the next verb (transfer-actions.tsx): Record pick,
 // Receive, or Cancel transfer. Receiving posts the paired ledger rows; the
 // page then shows what moved. A cancelled transfer shows its reason. Same movements as Complete transfer, no invoice.
 import type { BinMoveStock } from "@/lib/commands/inventory";
@@ -11,6 +11,9 @@ import { toTransferDetailViewProps } from "@/lib/mgr/transfer-detail-view";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { TransferActions } from "./transfer-actions";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/transfers") };
 
 type Detail = {
   transfer: { id: string; from_location_id: string; transfer_no: number | null; status: string; note: string | null; cancel_reason: string | null; received_at: string | null; from_location: { name: string } | null; to_location: { name: string } | null };

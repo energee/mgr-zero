@@ -1,14 +1,17 @@
 // tests/batch-addition.test.ts — record_batch_addition (issue #278, Cellar
 // addition): one batch_additions row plus its consumption movement against an
 // open occupancy; the bin is the one holding the most of that material (and
-// lot); lot required when the material is lot-tracked; idempotent by request.
+// lot); lot required when the material is lot-tracked; idempotent by request;
+// serialized with the other material writers so a bin never drains twice.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedLocation, seedMaterial, seedMovement } from "./helpers";
+import { Client } from "pg";
+import { admin, DB, makeBrewery, makeStaffCtx, seedLocation, seedMaterial, seedMovement } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 let breweryId: string;
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
+let owner: Awaited<ReturnType<typeof makeStaffCtx>>;
 let loc: Awaited<ReturnType<typeof seedLocation>>;
 let occupancyId: string;
 let citra: string;
@@ -18,8 +21,9 @@ let salt: string;
 beforeAll(async () => {
   breweryId = (await makeBrewery()).id;
   ctx = await makeStaffCtx(breweryId, "brewer");
+  owner = await makeStaffCtx(breweryId, "admin");
   loc = await seedLocation(breweryId);
-  const vessel = (await runCommand("upsert_vessel", { name: "FV1", kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
+  const vessel = (await runCommand("upsert_vessel", { name: "FV1", kind: "fermenter", capacityBbl: 30 }, owner)) as { id: string };
   const batch = (await runCommand("schedule_batch", { plannedOn: "2026-09-01", plannedBbl: 20 }, ctx)) as { id: string };
   const day = (await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 20, brewedOn: "2026-09-01" }, ctx)) as { occupancy: { id: string } };
   occupancyId = day.occupancy.id;
@@ -62,5 +66,52 @@ describe("record_batch_addition", () => {
   it("refuses a closed occupancy", async () => {
     await admin.from("vessel_occupancies").update({ ended_at: new Date().toISOString() }).eq("id", occupancyId);
     await expect(runCommand("record_batch_addition", { occupancyId, materialId: salt, stage: "other", qty: 1 }, ctx)).rejects.toThrow();
+  });
+});
+
+// Other material writers (bin moves, transfer receives, counts) check stock
+// under the material_movements table lock; the addition must wait on that same
+// lock, or both pass their checks against the same bin and drive it negative.
+describe("record_batch_addition under a concurrent material writer", () => {
+  it("waits for the writer's lock and then refuses what the writer already drained", async () => {
+    const vessel = (await runCommand("upsert_vessel", { name: "FV-race", kind: "fermenter", capacityBbl: 30 }, owner)) as { id: string };
+    const batch = (await runCommand("schedule_batch", { plannedOn: "2026-09-01", plannedBbl: 20 }, ctx)) as { id: string };
+    const day = (await runCommand("record_brew_day", { actuals: [], confirmEmpty: true, batchId: batch.id, vesselId: vessel.id, initialBbl: 20, brewedOn: "2026-09-01" }, ctx)) as { occupancy: { id: string } };
+    const mosaic = await seedMaterial(breweryId, { name: "Mosaic", category: "other" });
+    await seedMovement(breweryId, { materialId: mosaic, locationId: loc.id, binId: loc.binId, qty: 5, createdBy: ctx.userId });
+
+    const writer = new Client({ connectionString: DB });
+    const adder = new Client({ connectionString: DB });
+    await writer.connect();
+    await adder.connect();
+    try {
+      await writer.query("set lock_timeout='7s'");
+      await adder.query("set statement_timeout='8s'; set lock_timeout='7s'");
+      // The writer drains the whole bin under the same lock the other material writers take.
+      await writer.query("begin");
+      await writer.query("lock table public.material_movements in share row exclusive mode");
+      await writer.query(
+        "insert into public.material_movements (brewery_id, material_id, location_id, bin_id, qty, type, created_by) values ($1,$2,$3,$4,-5,'adjustment',$5)",
+        [breweryId, mosaic, loc.id, loc.binId, ctx.userId],
+      );
+
+      await adder.query("select set_config('request.jwt.claim.sub',$1,false)", [ctx.userId]);
+      await adder.query("set role authenticated");
+      const pid = (await adder.query("select pg_backend_pid() pid")).rows[0].pid;
+      const adding = adder.query(
+        "select public.record_batch_addition($1,$2,$3,'other',null,5,null,$4)",
+        [breweryId, day.occupancy.id, mosaic, crypto.randomUUID()],
+      );
+      adding.catch(() => {});
+      await expect.poll(async () => (await writer.query("select wait_event_type from pg_stat_activity where pid=$1", [pid])).rows[0]?.wait_event_type, { timeout: 3000 }).toBe("Lock");
+      await writer.query("commit");
+
+      await expect(adding).rejects.toThrow(/on hand/);
+      const { data } = await admin.from("material_movements").select("qty").eq("material_id", mosaic);
+      expect(data!.reduce((sum, m) => sum + Number(m.qty), 0)).toBe(0);
+    } finally {
+      await writer.query("rollback").catch(() => {});
+      await Promise.all([writer.end(), adder.end()]);
+    }
   });
 });

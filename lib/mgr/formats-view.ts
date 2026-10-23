@@ -1,13 +1,17 @@
 // lib/mgr/formats-view.ts — view-model for the Formats table. list_formats
 // plus optional format_components paint Basis / Volume / From.
 import type { EmptyState } from "./empty-state";
-import { formatVolume } from "@/lib/volume";
+import { formatVolume, OUNCES_PER_BBL } from "@/lib/volume";
+import type { SortValue } from "./table-sort";
 import { effectiveBbl } from "./format-view";
 
 export type FormatsRowView = {
   key: string;
   /** Format, Basis, Volume, From; the format's name is the row's link. */
   cells: string[];
+  /** Sort values for Format, Basis, Volume: Volume sorts by barrels, because
+   *  the column prints oz, gal, and bbl. From sorts by its own text. */
+  sort: SortValue[];
   /** Where the name links; live only (formatHref). */
   href?: string;
 };
@@ -75,14 +79,20 @@ export function toFormatsViewProps({ formats, components = formats.flatMap(forma
     empty: formats.length === 0 ? { title: "No formats yet", description: "A format is a container a beer ships in: a 1/2 bbl keg, a 16 oz can." } : undefined,
     rows: formats.map((f) => {
       const volume = effectiveBbl(f);
+      const name = f.brands ? `${f.brands.name} · ${f.name}` : f.name;
       return {
         key: f.id,
         href: formatHref?.(f),
         cells: [
-          f.brands ? `${f.brands.name} · ${f.name}` : f.name,
+          name,
           f.basis,
           f.basis === "poured" ? (f.ounces != null ? `${f.ounces} oz` : "—") : volume != null ? formatVolume(volume) : "—",
           fromOf(f, formats, components),
+        ],
+        sort: [
+          name,
+          f.basis,
+          f.basis === "poured" ? (f.ounces != null ? f.ounces / OUNCES_PER_BBL : null) : volume != null ? Number(volume) : null,
         ],
       };
     }),

@@ -14,6 +14,9 @@ import { KegEventForm } from "./event-form";
 import { money } from "@/lib/mgr/money";
 import { KIND_LABEL, SIZE_LABEL } from "@/lib/mgr/keg-labels";
 import { PoolForm, type Pool } from "./pool-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/kegs") };
 
 type Fleet = {
   pools: (Pool & { vendor_id: string | null })[];
@@ -39,7 +42,7 @@ export default async function KegsPage() {
   return (
     <KegFleetView
       model={toKegFleetViewProps({
-        backHref: "/inventory",
+        backHref: "/beer",
         shortages: fleet.shortages.map(kegShortageText),
         pools: fleet.pools.map((p) => {
           const rows = fleet.rows.filter((r) => r.pool_id === p.id && r.qty !== 0);

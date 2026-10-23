@@ -16,7 +16,8 @@
 # failed (including an added migration that sorts before main's newest, which
 # `supabase db push` refuses: rename it later, rerun), 4 CI failed for a real
 # reason, 5 push did not land, 6 main gained a migration since the sync (rerun
-# to resync).
+# to resync), 7 no claude-code-review.yml run passed both its simplify and
+# claude-review jobs (read that run; the `review` label reruns it).
 # Env: CLAUDE_SESSION_URL
 # (added as a Claude-Session trailer to the regeneration commit when set).
 set -uo pipefail
@@ -32,6 +33,38 @@ cd "$wt" || exit 1
 echo "== #$n $b @ $wt"
 [ "$(git branch --show-current)" = "$b" ] || { echo "wrong branch"; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "dirty tree"; exit 1; }
+
+# Every human PR merges after one claude-code-review.yml run in which both jobs
+# succeeded: `simplify` (Claude Code's /simplify, which pushes its fixes to the
+# branch) and `claude-review`. Job success, not a comment, is the signal: the
+# review plugin posts nothing when no finding clears its confidence bar. That
+# workflow skips drafts, so mark the PR ready, or relabel it when no run passed,
+# then wait for the run before syncing: the sync below merges simplify's push.
+reviewed() {
+  local id
+  for id in $(gh run list --workflow claude-code-review.yml --branch "$b" --limit 10 --json databaseId --jq '.[].databaseId'); do
+    [ "$(gh run view "$id" --json jobs --jq '[.jobs[]|select(.conclusion=="success")|.name]|sort|join(",")')" = claude-review,simplify ] && return 0
+  done
+  return 1
+}
+running() { [ -n "$(gh run list --workflow claude-code-review.yml --branch "$b" --json status --jq '.[]|select(.status!="completed")|.status')" ]; }
+# Exempt, as the workflow skips them: bot PRs, and PRs editing the workflow
+# itself (claude-code-action refuses a workflow file that differs from main's).
+gated=$(gh pr view "$n" --json author --jq '.author.is_bot|not') || exit 1
+gh pr diff "$n" --name-only | grep -qx .github/workflows/claude-code-review.yml && gated=false
+if [ "$gated" = true ] && ! reviewed; then
+  if [ "$(gh pr view "$n" --json isDraft --jq .isDraft)" = true ]; then
+    gh pr ready "$n" || exit 1
+  else
+    # Only a fresh add fires `labeled`, so drop the label first; that fails
+    # harmlessly when the PR lacks it, and the add is the step that must work.
+    gh pr edit "$n" --remove-label review >/dev/null 2>&1
+    gh pr edit "$n" --add-label review >/dev/null || exit 1
+  fi
+  sleep 30
+  for _ in $(seq 40); do running || break; sleep 30; done
+  reviewed || { echo "#$n has no Claude Code Review run where simplify and claude-review both succeeded; read that run"; exit 7; }
+fi
 
 git fetch -q origin
 # The remote may have moved (another session, GitHub's Update branch): merge it, never reset.

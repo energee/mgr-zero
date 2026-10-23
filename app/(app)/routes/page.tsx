@@ -1,29 +1,35 @@
 // app/(app)/routes/page.tsx — Work › Deliveries (screen record Routes): every
-// route not yet returned from list_routes with its next verb, the shipped
+// route not yet returned from list_routes with its next verb (routeNext; an
+// assigned route not yet departed is a plain row link), the shipped
 // orders and picked transfers on no route, and New route → /routes/new.
-// Warehouse and Admin.
-import { E } from "@/components/mgr/e";
+// Warehouse and Admin. New route is size="sm" like every Work list's create
+// button, so the tab strip sits at the same height (#1226).
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { RoutesView } from "@/components/mgr/views/routes";
 import { getActiveBrewery } from "@/lib/brewery";
+import { formatDate } from "@/lib/date-format";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { workHrefsFor } from "@/components/mgr/work-tabs";
-import { toRoutesViewProps } from "@/lib/mgr/routes-view";
+import { routeNext, toRoutesViewProps } from "@/lib/mgr/routes-view";
 import "@/lib/commands/all";
 import { driverLabel, type RouteList } from "./labels";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/routes") };
 
 export default async function RoutesPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const { routes, unassigned } = (await runCommand("list_routes", {}, ctx)) as RouteList;
-  return <RoutesView model={toRoutesViewProps({ title: "Work", subtitle: "routes", rows: [
+  return <RoutesView model={toRoutesViewProps({ title: "Deliveries", subtitle: "", rows: [
     ...routes.map(route => ({
-      key: route.id, title: (route.name ?? "Route") + " · " + route.delivery_date,
-      detail: route.departed_at ? "departed · " + route.stops.filter(stop => stop.delivered_at).length + " of " + route.stops.length + " delivered" : route.stops.length + (route.stops.length === 1 ? " stop · " : " stops · ") + driverLabel(route.driver_user_id),
-      verb: route.departed_at ? "Resume" : route.driver_user_id ? "Open" : "Assign",
-      tone: route.departed_at ? "info" as const : route.driver_user_id ? "primary" as const : "attention" as const,
+      key: route.id, title: (route.name ?? "Route") + " · " + formatDate(route.delivery_date),
+      detail: route.departed_at ? "departed · " + route.stops.filter(stop => stop.delivered_at).length + " of " + route.stops.length + " delivered" : route.stops.length + (route.stops.length === 1 ? " stop · " : " stops · ") + driverLabel(route),
+      ...routeNext(route),
       href: "/routes/" + route.id, warning: !route.driver_user_id,
     })),
     ...unassigned.map(document => ({ key: document.id, title: document.label, detail: "shipped · no route", verb: "Add to route", tone: "attention" as const, href: "/routes/new", warning: true })),
-  ] })} createAction={E.btn("New route", "p", "/routes/new")} workHrefs={workHrefsFor(brewery.roles)} />;
+  ] })} createAction={<Button size="sm" asChild><Link href="/routes/new">New route</Link></Button>} workHrefs={workHrefsFor(brewery.roles)} />;
 }

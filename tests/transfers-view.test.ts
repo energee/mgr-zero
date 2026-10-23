@@ -21,7 +21,8 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 describe("Transfers list", () => {
   it("maps list_stock_transfers onto Pick / Receive and Work chips", () => {
     const model = toTransfersViewProps(transfersList);
-    expect(model.title).toBe("Work");
+    // Each Work kind page is titled by its kind, in the inventory as live (#1037).
+    expect(model.title).toBe("Transfers");
     expect(model.workChipIndex).toBe(2);
     expect(model.workChips).toBe(WORK_CHIPS);
     expect(model.workTabs).toBe(WORK_TABS);
@@ -31,8 +32,21 @@ describe("Transfers list", () => {
     ]);
   });
 
+  it("a received or cancelled transfer has no verb; its row is a link, not an Open verb (#1026)", () => {
+    const base = { from_name: "Warehouse", to_name: "Taproom", line_count: 1 };
+    const model = toTransfersViewProps({ transfers: [
+      { ...base, id: "rec", transfer_no: 8, status: "received" },
+      { ...base, id: "can", transfer_no: 9, status: "cancelled" },
+    ] });
+    expect(model.rows.map((r) => r.verb)).toEqual([undefined, undefined]);
+    const html = htmlOf(createElement(TransfersView, { model, createAction: null, linkRows: true }));
+    expect(html).toMatch(/<a[^>]*href="\/transfers\/rec"[^>]*>(?:(?!<\/a>)[\s\S])*TRF-0008/);
+    expect(html).toMatch(/<a[^>]*href="\/transfers\/can"[^>]*>(?:(?!<\/a>)[\s\S])*TRF-0009/);
+    expect(html).not.toMatch(/>Open</);
+  });
+
   it("live title Transfers omits inventing rows on empty", () => {
-    const model = toTransfersViewProps({ transfers: [], title: "Transfers" });
+    const model = toTransfersViewProps({ transfers: [] });
     expect(model.title).toBe("Transfers");
     expect(model.empty?.title).toBe("No transfers yet");
   });
@@ -50,7 +64,7 @@ describe("Transfers list", () => {
 
   it("binds live actions and permitted navigation without replacing the tabs", () => {
     const html = htmlOf(createElement(TransfersView, {
-      model: toTransfersViewProps({ ...transfersList, title: "Transfers" }),
+      model: toTransfersViewProps(transfersList),
       createAction: "NEW",
       workHrefs: { all: "/work", transfers: "/transfers" },
       linkRows: true,
@@ -99,9 +113,15 @@ describe("New transfer view", () => {
   it("renders Create transfer and the two SKU rows", () => {
     const html = htmlOf(createElement(NewTransferView, { model: toNewTransferViewProps(newTransferDraft) }));
     expect(html).toMatch(/>Create transfer</);
+    expect(readFileSync("app/(app)/transfers/new-transfer-form.tsx", "utf8")).toMatch(/"Create transfer"/);
     expect(html).toContain(SKU_HAZY.name);
     expect(html).toContain(SKU_PILS.name);
     expect(html).not.toMatch(/→/);
+  });
+
+  it("draws no in-sheet title or back link; the dialog names it (#1120)", () => {
+    const html = htmlOf(createElement(NewTransferView, { model: toNewTransferViewProps(newTransferDraft) }));
+    expect(html).not.toMatch(/<h1\b|<a\b/);
   });
 
   it("the New transfer inventory record is NewTransferView", () => {

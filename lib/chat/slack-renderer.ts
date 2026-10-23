@@ -2,7 +2,7 @@
 // Pure functions: no provider calls, no tenant reads. Every operational
 // button is an MGR deep link; integration buttons carry only an opaque intent
 // id. Text is clipped to Slack's block limits.
-import type { PortableAction, PortableNotification } from "./contracts";
+import { NOTIFICATION_REASON_LABEL, type PortableAction, type PortableNotification } from "./contracts";
 
 type Block = Record<string, unknown>;
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
@@ -20,8 +20,8 @@ const intentButton = (action: PortableAction, intentId: string): Block => ({
 });
 const actions = (elements: Block[]): Block[] => (elements.length ? [{ type: "actions", elements: elements.slice(0, 25) }] : []);
 
-// A subject's safeLabel sometimes already carries its reason ("FV2 · reading
-// overdue"), so appending the title would read "… · Reading overdue" twice.
+// A subject's safeLabel can already carry its reason ("FV2 · fermentation
+// reading overdue"), so appending the title would say it twice.
 // Used by every surface that composes label and title on one line: App Home
 // rows and the message fallback text Slack shows in the notification list.
 // endsWith, not includes: a label whose own words happen to contain the reason
@@ -39,16 +39,11 @@ const rowLabel = (n: PortableNotification) => {
 const openPathFor = (n: PortableNotification) =>
   n.actions.find((a) => a.id === "open_mgr")?.url ?? `/orders/${n.subject.id}`;
 
-const REASON_LABEL: Record<PortableNotification["reason"], string> = {
-  submitted_order: "Review submitted order", pick_due: "Pick due", restock_due: "Put back staged beer", delivery_next: "Next stop",
-  fermentation_reading_overdue: "Reading overdue", invoice_question: "Buyer asked about an invoice", operations_digest: "Operations",
-};
-
 type MessageOptions = { mgrBaseUrl: string; intentId: string; resolved?: boolean };
 
 export function renderSlackMessage(n: PortableNotification, o: MessageOptions): { text: string; blocks: Block[] } {
   const openPath = openPathFor(n);
-  const status = o.resolved ? "Resolved" : REASON_LABEL[n.reason] + (n.urgency === "attention" ? " · needs attention" : "");
+  const status = o.resolved ? "Resolved" : NOTIFICATION_REASON_LABEL[n.reason] + (n.urgency === "attention" ? " · needs attention" : "");
   const text = `${rowLabel(n)}${o.resolved ? " · Resolved" : ""}`;
   const blocks: Block[] = [header(n.subject.safeLabel), section(`*${n.title}*\n${n.detail}`), context(status)];
   if (!o.resolved) {
@@ -113,7 +108,7 @@ export function renderSlackPreferences(intentId: string, quiet?: { start: string
     title: { type: "plain_text", text: "Notification preferences" }, submit: { type: "plain_text", text: "Save" }, close: { type: "plain_text", text: "Cancel" },
     blocks: [
       section("Choose a reason to mute or unmute. Quiet hours apply to all your chat reminders. Today is always current."),
-      field("reason", "Notification reason", { type: "static_select", options: Object.entries(REASON_LABEL).map(([value, label]) => option(label, value)) }),
+      field("reason", "Notification reason", { type: "static_select", options: Object.entries(NOTIFICATION_REASON_LABEL).map(([value, label]) => option(label, value)) }),
       field("enabled", "Delivery for this reason", { type: "static_select", options: [option("Enabled", "true"), option("Muted", "false")] }),
       field("start", "Quiet hours start (HH:MM)", { type: "plain_text_input", ...(quiet?.start ? { initial_value: quiet.start.slice(0,5) } : {}) }, true),
       field("end", "Quiet hours end (HH:MM)", { type: "plain_text_input", ...(quiet?.end ? { initial_value: quiet.end.slice(0,5) } : {}) }, true),

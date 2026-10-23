@@ -1,7 +1,13 @@
 // lib/mgr/catalog-view.ts — view-model for Catalog. list_brands plus
-// list_price_groups (and optional list_sale_channels / water-profile count)
-// paint the inventory Catalog drawing.
+// list_price_groups paint the brand table and the Price groups row;
+// toCatalogScopes builds the Sort and Category picks above the table.
+import type { ListScope } from "@/components/mgr/list-controls";
+import type { Approval } from "@/lib/commands/compliance";
+import { approvalDate } from "./brand-view";
 import type { EmptyState } from "./empty-state";
+import type { BrandSort } from "./enums";
+import { BRAND_SORTS } from "./enums";
+import { BRAND_SORT_LABEL } from "./labels";
 import { plural } from "./plural";
 
 /** One brand row's facts, each drawn in its own column. */
@@ -16,6 +22,8 @@ export type CatalogBrandView = {
   abv: string;
   /** Packaged SKUs plus the pours its price group owns, active or not: "4". */
   skus: string;
+  /** Recorded COLA approvals: "None", one's TTB ID and approval date, or "2 on file". */
+  cola: string;
   href: string;
 };
 
@@ -25,11 +33,10 @@ export type CatalogViewModel = {
   empty?: EmptyState;
   priceGroups: string;
   priceGroupsHref: string;
-  waterProfiles?: string;
-  waterProfilesHref?: string;
+  waterProfilesHref: string;
 };
 
-/** list_brands row: brand facts plus nested style and SKUs. */
+/** list_brands row: brand facts plus nested style, SKUs and recorded COLA approvals. */
 export type CatalogBrandRow = {
   id: string;
   name: string;
@@ -38,32 +45,36 @@ export type CatalogBrandRow = {
   styles: { name: string } | null;
   skus: { id: string }[];
   pours?: { id: string }[];
+  colas: Pick<Approval, "ttb_id" | "approved_on">[];
 };
 
 export type CatalogSnapshot = {
   brands: CatalogBrandRow[];
   /** list_price_groups. */
   priceGroups: { id: string; name: string }[];
-  /** list_sale_channels. Inventory uses the count for "N channels". */
-  channels?: { id: string; name: string }[];
-  /** Inventory-only until list_water_profiles exists. */
-  waterProfileCount?: number;
   backHref?: string;
   /** A search or category is on, so an empty list means no match, not no brands. */
   filtered?: boolean;
 };
 
-const NOT_SET = "Not set";
+/** A brand's missing style or ABV; Catalog sorts it as empty (last). */
+export const NOT_SET = "Not set";
+
+/** Shows only saved COLAs: "None", one COLA's TTB ID and date, or a count when
+ *  there are several (the brand page lists each). */
+function colaFact(colas: CatalogBrandRow["colas"]): string {
+  if (colas.length === 0) return "None";
+  if (colas.length > 1) return `${colas.length} on file`;
+  const { ttb_id, approved_on } = colas[0]!;
+  return `TTB ID ${ttb_id} · ${approvalDate(approved_on)}`;
+}
 
 export function toCatalogViewProps({
   brands,
   priceGroups,
-  channels,
-  waterProfileCount,
   backHref,
   filtered,
 }: CatalogSnapshot): CatalogViewModel {
-  const groupCopy = plural(priceGroups.length, "group");
   return {
     backHref,
     empty: brands.length > 0 ? undefined
@@ -76,12 +87,36 @@ export function toCatalogViewProps({
       style: b.styles?.name ?? NOT_SET,
       abv: b.abv == null || b.abv === "" ? NOT_SET : `${Number(b.abv)}%`,
       skus: String(b.skus.length + (b.pours?.length ?? 0)),
+      cola: colaFact(b.colas),
       href: `/catalog/brands/${b.id}`,
     })),
-    priceGroups: channels
-      ? `${plural(channels.length, "channel")} · ${groupCopy}`
-      : groupCopy,
+    priceGroups: plural(priceGroups.length, "group"),
     priceGroupsHref: "/pricing",
-    waterProfiles: waterProfileCount == null ? undefined : plural(waterProfileCount, "profile"),
+    waterProfilesHref: "/catalog/water-profiles",
   };
+}
+
+/** The Sort and Category settings, the brewery's category names, and (live)
+ *  the link for one changed setting. The inventory leaves `href` out. */
+export type CatalogScopeInput = {
+  sort: BrandSort;
+  category: string;
+  categories: string[];
+  href?: (patch: { sort?: BrandSort; category?: string }) => string;
+};
+
+/** Sort, then Category once the brewery has a category. "All categories" is
+ *  the empty value, and a category not in the list reads as All. */
+export function toCatalogScopes({ sort, category, categories, href }: CatalogScopeInput): ListScope[] {
+  const sortScope: ListScope = {
+    label: "Sort",
+    value: sort,
+    options: BRAND_SORTS.map((value) => ({ value, label: BRAND_SORT_LABEL[value], href: href?.({ sort: value }) })),
+  };
+  if (!categories.length) return [sortScope];
+  return [sortScope, {
+    label: "Category",
+    value: categories.includes(category) ? category : "",
+    options: ["", ...categories].map((name) => ({ value: name, label: name || "All categories", href: href?.({ category: name }) })),
+  }];
 }

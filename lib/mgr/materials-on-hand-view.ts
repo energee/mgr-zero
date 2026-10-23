@@ -4,10 +4,7 @@ export type MaterialsOnHandRowView = {
   key: string;
   title: string;
   detail: string;
-  verb: string;
-  tone: "info" | "attention" | "success" | "primary";
   warning?: boolean;
-  disabled?: boolean;
 };
 
 export type MaterialsOnHandViewModel = {
@@ -19,9 +16,14 @@ export type MaterialsOnHandViewModel = {
 export type MaterialsOnHandSnapshot = {
   backHref?: string;
   rows?: MaterialsOnHandRowView[];
+  /** A search is on, so an empty list means no match, not no materials. */
+  filtered?: boolean;
 };
 
 export function toMaterialsOnHandViewProps(s: MaterialsOnHandSnapshot): MaterialsOnHandViewModel {
   const rows = s.rows ?? [];
-  return { backHref: s.backHref, rows, empty: rows.length === 0 ? { title: "No materials yet", description: "Receive a purchase order to put materials on hand." } : undefined };
+  const empty = rows.length > 0 ? undefined
+    : s.filtered ? { title: "No materials match", description: "Clear the search to see every material." }
+    : { title: "No materials yet", description: "Add a material, then receive a purchase order to put it on hand." };
+  return { backHref: s.backHref, rows, empty };
 }

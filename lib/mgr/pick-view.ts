@@ -1,10 +1,14 @@
 // lib/mgr/pick-view.ts — view-model for the Pick sheet.
+import { formatDate } from "@/lib/date-format";
+import { brandLabel, byBrand, type BrandedSku } from "./brand-lines";
 import { docNo } from "./doc-no";
 
 export type PickLineView = {
   key: string;
+  /** Brand heading; lines arrive grouped by it (brand-lines.ts). */
+  group?: string;
+  /** Format under the brand, or the SKU name when it has no brand and format. */
   name: string;
-  detail: string;
   qty: number;
   /** qty_ordered: record_pick refuses a pick above it (#471), so the field caps here. */
   ordered: number;
@@ -15,13 +19,14 @@ export type PickViewModel = {
   backTo: string;
   backHref?: string;
   title: string;
-  info: string;
+  /** Who the pick is for and when it ships, under the title. */
+  subtitle: string;
   lines: PickLineView[];
 };
 
 export type PickSnapshot = {
   backHref?: string;
-  order: { id: string; order_no: number | null; from_location_id: string };
+  order: { id: string; order_no: number | null; from_location_id: string; requested_ship_date?: string | null; customers?: { name: string } | null };
   lines: {
     id: string;
     sku_id: string;
@@ -29,26 +34,25 @@ export type PickSnapshot = {
     qty_picked: number | null;
     /** Latest server short_pick event for this line; invalidates unchanged counts after recovery replay. */
     shortPickEventId?: string;
-    skus: { name: string } | null;
+    skus: BrandedSku;
   }[];
   locations: { id: string; name: string }[];
 };
 
-/** Map get_order onto PickView. Count defaults to qty_picked, else qty_ordered. */
+/** Map get_order onto PickView, lines grouped by brand. Count defaults to qty_picked, else qty_ordered. */
 export function toPickViewProps({ order, lines, locations, backHref }: PickSnapshot): PickViewModel {
   const source = locations.find((l) => l.id === order.from_location_id)?.name ?? "—";
   return {
     backTo: docNo("ORD", order.order_no, "Order"),
     backHref,
     title: `Pick · ${source}`,
-    info: `From ${source} · lines start at ordered; touch only exceptions.`,
-    lines: lines.map((l) => {
+    subtitle: `${order.customers?.name ?? "Taproom transfer"}${order.requested_ship_date ? ` · ships ${formatDate(order.requested_ship_date)}` : ""}`,
+    lines: byBrand(lines).map((l) => {
       const ordered = Number(l.qty_ordered);
       const qty = Number(l.qty_picked ?? ordered);
       return {
         key: l.id,
-        name: l.skus?.name ?? "Line",
-        detail: `ordered ${ordered}`,
+        ...brandLabel(l.skus),
         qty,
         ordered,
         tone: qty < ordered ? "w" : "ok",

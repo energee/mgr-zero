@@ -168,5 +168,23 @@ describe("country, alias and search", () => {
     expect(await ids(`Tavour ${tag}`)).toEqual([c.id]);
     expect(await ids(tag)).toEqual([c.id, jp.id]);
     expect(await ids(`${tag}%`)).toEqual([]);
+    expect(await ids(`Tavour_${tag}`)).toEqual([]);
+  });
+  it("list_customers q treats * as literal text in the name and the alias (#1029)", async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    const add = async (name: string, alias?: string) =>
+      (await runCommand("upsert_customer", { name, alias, type: "retailer", state: "PA", saleChannelId: wholesale }, ctx) as { id: string }).id;
+    const plain = await add(`Plain ${tag}`);
+    const star = await add(`Star ${tag}*`);
+    const aliased = await add(`Aliased ${tag}`, `Pint ${tag}*`);
+    const comma = await add(`Comma ${tag}, (Inc)`);
+    const ids = async (q: string) => (await runCommand("list_customers", { q }, ctx) as { id: string }[]).map(r => r.id);
+    expect(await ids(`${tag}*`)).toEqual([aliased, star]);
+    expect(await ids("*")).not.toContain(plain);
+    expect(await ids(`${tag}, (inc`)).toEqual([comma]);
+    const quote = await add(`Quote"Brand ${tag}`);
+    const slash = await add(`Back\\Slash ${tag}`);
+    expect(await ids(`e"B`)).toEqual([quote]);
+    expect(await ids("k\\S")).toEqual([slash]);
   });
 });

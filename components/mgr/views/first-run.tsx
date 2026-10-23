@@ -1,8 +1,10 @@
 // components/mgr/views/first-run.tsx — First-run checklist. Live slots
-// LocationForm / InviteForm / Add brand; inventory draws the expanded step 1.
+// LocationForm / InviteForm / New brand; inventory draws the expanded step 1
+// with the same LocationFields the Add location dialog mounts.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { FirstRunViewModel } from "@/lib/mgr/first-run-view";
+import { LocationFields } from "./location";
 
 export type { FirstRunViewModel };
 
@@ -20,8 +22,7 @@ export function FirstRunView({
       {steps ?? (
         <>
           {E.row("1 · Add locations", "inline form expanded", "in progress", "ok")}
-          {E.fld("Location name", "Warehouse")}
-          {E.chips(["Warehouse", "Taproom"])}
+          <LocationFields name="Warehouse" uses={["warehouse"]} />
           {E.btn("Add location")}
           {E.row("2 · Import CSV", "customers, catalog or opening balances", E.act("Import CSV"))}
           {E.row("3 · Add a brand", "or let the import create them", E.act("Add"))}

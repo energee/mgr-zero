@@ -88,13 +88,35 @@ export type PosLocationRow = {
   mgrLocationId: string;
 };
 
+/**
+ * A Square variation MGR did not publish that has sold: Menu asks to map or ignore it while
+ * queued, and lets a mapped or ignored one change. `target` is the current choice in the
+ * Mapping picker's terms (`sku:<id>`, `format:<id>`, `ignore`, or "" while queued).
+ */
 export type PosVariationRow = {
   externalItemId: string;
   externalVariationId: string;
   label: string;
   detail: string;
-  disposition: "queued" | "ignored" | "mapped";
+  disposition: "queued" | "mapped" | "ignored";
+  target: string;
 };
+
+/** One `list_pos_variations` row, as Menu's "Also in Square" shows it. */
+export function toPosVariationRow(row: {
+  externalItemId: string; externalVariationId: string; itemName: string | null; variationName: string | null;
+  disposition: PosVariationRow["disposition"]; skuId: string | null; formatId: string | null; mappingLabel: string | null;
+}): PosVariationRow {
+  let target = "";
+  if (row.disposition === "ignored") target = "ignore";
+  else if (row.skuId) target = `sku:${row.skuId}`;
+  else if (row.formatId) target = `format:${row.formatId}`;
+  return {
+    externalItemId: row.externalItemId, externalVariationId: row.externalVariationId,
+    label: [row.itemName, row.variationName].filter(Boolean).join(" · ") || row.externalVariationId,
+    detail: row.mappingLabel ?? "Sold in Square · not from MGR", disposition: row.disposition, target,
+  };
+}
 
 export type PosSaleRow = {
   id: string;
@@ -127,9 +149,36 @@ export type PosMenuModel = {
   channelName?: string;
   items: PosMenuItem[];
   excluded: PosMenuItem[];
-  externalItems: { label: string; detail: string; disposition: "queued" | "ignored"; href?: string }[];
+  /** Square items MGR did not publish that have sold; the page fills this from `list_pos_variations({ selling: true })`. */
+  externalItems: PosVariationRow[];
   message?: string;
+  /** Set when no Square location is mapped: what is missing and, for an admin, where to fix it. */
+  setup?: PosMenuSetup;
 };
+
+/** The Menu's empty state. `action` is absent for roles that cannot open Point of sale settings. */
+export type PosMenuSetup = { title: string; description: string; action?: { label: string; href?: string } };
+
+/**
+ * The Menu's empty state when no Square location is mapped (#997), from
+ * whether Square is connected (#1039, readable by every Menu role since #1083)
+ * and how many Square locations MGR has seen. Not connected means connect
+ * Square, since locations outlive a disconnect; connected with none seen means
+ * none has synced yet; otherwise only the mapping is missing. Point of sale
+ * settings are admin-only, so an admin gets the link and anyone else is told
+ * what to ask an admin for.
+ */
+export function toPosMenuSetup({ admin, connected, observed }: { admin: boolean; connected: boolean; observed: number }): PosMenuSetup {
+  if (!connected) return admin
+    ? { title: "Square isn’t connected", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" } }
+    : { title: "Square isn’t connected", description: "Ask an admin to reconnect it." };
+  if (observed === 0) return admin
+    ? { title: "No Square locations yet", description: "Square is connected, but no locations are synced yet. Sync the Square catalog, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" } }
+    : { title: "No Square locations yet", description: "Square is connected, but no locations are synced yet. Ask an admin to sync and map one." };
+  return admin
+    ? { title: "No Square location mapped", description: "Square locations were found, but none is mapped to an MGR location.", action: { label: "Map Square locations", href: "/settings/pos/locations" } }
+    : { title: "No Square location mapped", description: "Square locations were found, but none is mapped to an MGR location. Ask an admin to map one." };
+}
 
 const price = (cents: number | null) => cents == null ? "No price" : money(cents);
 
@@ -140,7 +189,10 @@ type PosMenuSnapshotItem = {
 export type PosMenuSnapshot = {
   location?: { name?: string }; bin?: { name?: string }; channel?: { name?: string };
   items?: PosMenuSnapshotItem[]; excluded?: PosMenuSnapshotItem[];
-  externalItems?: { itemName?: string; variationName?: string; disposition: "queued" | "ignored" }[];
+  /** Case stock in the menu bin offered as its child format (a case is six four-packs). */
+  packaged?: { brandId: string; skuId: string; formatId: string; brand: string; format: string; qty: number; priceCents: number | null; available: boolean }[];
+  /** The API's unmapped variations sold at this location; Menu reads `list_pos_variations({ selling: true })` instead. */
+  externalItems?: { externalItemId: string; externalVariationId: string; itemName?: string; variationName?: string }[];
 } | null;
 
 export function toPosMenuModel(snapshot: PosMenuSnapshot, locations: { externalLocationId: string; name: string }[], selectedLocationId: string): PosMenuModel {
@@ -156,11 +208,7 @@ export function toPosMenuModel(snapshot: PosMenuSnapshot, locations: { externalL
     selectedLocationId, locationName: snapshot?.location?.name ?? selected?.name ?? "Square location",
     binName: snapshot?.bin?.name, channelName: snapshot?.channel?.name,
     items: (snapshot?.items ?? []).map(item), excluded: (snapshot?.excluded ?? []).map(item),
-    externalItems: (snapshot?.externalItems ?? []).map(row => ({
-      label: [row.itemName, row.variationName].filter(Boolean).join(" · "),
-      detail: row.disposition === "ignored" ? "Explicitly ignored" : "Not mapped · sales stay queued",
-      disposition: row.disposition, href: "/settings/pos/mapping",
-    })),
-    message: !selected ? "No mapped Square location is available." : !snapshot ? "Choose an MGR bin and sales channel before publishing." : undefined,
+    externalItems: [],
+    message: selected && !snapshot ? "Choose an MGR bin and sales channel before publishing." : undefined,
   };
 }

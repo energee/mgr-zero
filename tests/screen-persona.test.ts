@@ -22,7 +22,7 @@ describe("persona", () => {
     const screen = asPersona(by("My notification preferences"), { id: "taproom", roles: ["taproom"], name: "Taproom staff", handle: "@taproom" });
     const html = renderToStaticMarkup(createElement("div", null, screen.body));
     expect(html).not.toContain("Save my quiet hours");
-    expect(html).toContain("pick due");
+    expect(html).toContain("Pick due");
     expect(html).toContain("More");
   });
   it.each([
@@ -35,6 +35,16 @@ describe("persona", () => {
     const html = renderToStaticMarkup(createElement("div", null, screen.body));
     expect(html.includes("Post Bill to QuickBooks")).toBe(canPost);
     expect(html).toContain("QuickBooks Bill");
+  });
+  it.each([
+    ["Cellar map", "Add vessel"],
+    ["Batches", "New vessel"],
+    ["Vessel detail", "Save vessel"],
+    ["Vessel detail", "Delete vessel"],
+  ] as const)("draws %s's %s only for an admin", (name, label) => {
+    const html = (id: "admin" | "brewer") => renderToStaticMarkup(createElement("div", null, asPersona(by(name), personaFor(id)).body));
+    expect(html("admin")).toContain(label);
+    expect(html("brewer")).not.toContain(label);
   });
   it("is one demo user per staff role, each on the Team screen with that role", () => {
     expect(PERSONAS.map((p) => p.id)).toEqual(["admin", "sales", "warehouse", "brewer"]);

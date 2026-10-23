@@ -4,6 +4,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { PosLocationRow } from "@/lib/mgr/pos-view";
 import "@/lib/commands/all";
 import { PosRouteSheet, SquareLocationsControl } from "@/components/mgr/views/pos-controls";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/settings/pos/locations") };
 
 type ObservedLocation = { externalLocationId: string; name: string | null; status: string | null; available: boolean; mappingLabel: string | null; mgrLocationId: string | null };
 

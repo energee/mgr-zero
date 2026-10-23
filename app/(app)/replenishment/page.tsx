@@ -1,13 +1,16 @@
 import { ParsView } from "@/components/mgr/views/pars";
 import { toParsViewProps } from "@/lib/mgr/pars-view";
 import { E } from "@/components/mgr/e";
-import { LinkTabs } from "@/components/mgr/work-tabs";
+import { ScopePick } from "@/components/mgr/scope-pick";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { ReplenishForm } from "./replenish-form";
 import { QuantityForm, ReleaseAllocationForm } from "./quantity-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/replenishment") };
 
 type LocationRow = { id: string; name: string; uses: ("warehouse" | "taproom" | "storage")[] };
 type Shortfall = { skuId: string; skuName: string; onHand: number; allocated: number; atp: number; reservations: { id: string; source: string; ref: string; qty: number; orderId?: string; orderNo?: number }[] };
@@ -57,7 +60,7 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
       {sku && <div>{shortfalls.length === 0 && E.note("This SKU has no current shortfall.")}{E.btn("All shortfalls", "g", "/replenishment")}</div>}
       {taprooms.length === 0
         ? E.blank("No taprooms yet: add one under Locations")
-        : <LinkTabs items={taprooms.map((t): [string, string] => [t.name, `/replenishment?location=${t.id}${sku ? `&sku=${sku}` : ""}`])} current={taprooms.find((t) => t.id === toLocationId)?.name ?? ""} className="w-full md:w-fit" />}
+        : <ScopePick label="Location" value={toLocationId!} options={taprooms.map((t) => ({ value: t.id, label: t.name, href: `/replenishment?location=${t.id}${sku ? `&sku=${sku}` : ""}` }))} />}
       {toLocationId && <>
         {canEdit && <div className="flex flex-wrap gap-2">
           <QuantityForm key={`par-${toLocationId}-${JSON.stringify(suggestions)}`} locationId={toLocationId} skus={skus} kind="par" values={parValues} />

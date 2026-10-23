@@ -1,9 +1,9 @@
 // tests/gravity-unit.test.ts — the display/entry half of the gravity unit
-// preference. Storage is always °Plato (Ted's ruling); these two pure
+// preference. Storage is always °Plato (Ted's ruling); these pure
 // functions are the only place a brewer's chosen unit turns a stored Plato
 // number into text and typed text back into Plato. Pure: no database.
 import { describe, expect, it } from "vitest";
-import { formatGravity, INVALID_GRAVITY, parseGravity } from "@/lib/mgr/gravity-unit";
+import { formatGravity, gravityUnitLabel, gravityUnitShort, INVALID_GRAVITY, parseGravity } from "@/lib/mgr/gravity-unit";
 import { platoToSg, sgToPlato } from "@/lib/recipe-gravity";
 
 describe("formatGravity", () => {
@@ -15,6 +15,18 @@ describe("formatGravity", () => {
   it("prints SG to three decimals, converted from the stored Plato", () => {
     expect(formatGravity(12.5, "sg")).toBe("1.050");
     expect(formatGravity(0, "sg")).toBe("1.000");
+  });
+});
+
+describe("gravityUnitShort", () => {
+  it("names Plato with the same °P symbol formatGravity prints (#1160)", () => {
+    expect(gravityUnitShort("plato")).toBe("°P");
+    expect(gravityUnitShort("sg")).toBe("SG");
+  });
+
+  it("is the symbol inside the Units label", () => {
+    expect(gravityUnitLabel("plato")).toBe("Plato (°P)");
+    expect(gravityUnitLabel("sg")).toBe("Specific gravity (SG)");
   });
 });
 

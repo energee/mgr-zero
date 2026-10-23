@@ -40,7 +40,7 @@ describe("packaging views", () => {
 
   it("labels material identity and planned quantity separately with the requirements vocabulary", () => {
     const html = htmlOf(createElement(SchedulePackagingRunView, { model: schedulePackagingRun }));
-    const headers = [...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map(match => match[1]);
+    const headers = [...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map(match => match[1].replace(/<[^>]*>/g, ""));
     expect(headers).toEqual(["Material", "Planned", "On hand", "Short"]);
     const cells = [...html.matchAll(/<td\b[^>]*>(.*?)<\/td>/g)].map(match => match[1]);
     expect(cells.slice(0, 8)).toEqual(["cans", "2,832 each", "3,100", "0", "ends", "2,832 each", "2,400", "432"]);
@@ -60,6 +60,36 @@ describe("packaging views", () => {
     expect(repackForm).toMatch(/toRepackView\(/);
     expect(repackForm).not.toMatch(/Child qty|childSkuId, setChildSkuId/);
     expect(page).not.toMatch(/\bE\./);
+  });
+
+  it("an empty list says how to plan a run, and a list with runs has no empty state (#1129)", () => {
+    const model = toPackagingRunsViewProps([], DEMO_TIME_ZONE);
+    expect(model.empty).toEqual({ title: "No runs planned", description: expect.stringContaining("Schedule run") });
+    const html = htmlOf(createElement(PackagingRunsView, { model, actions: null }));
+    expect(html).toContain("No runs planned");
+    expect(html).toContain(model.empty?.description);
+    expect(toPackagingRunsViewProps(packagingRuns, DEMO_TIME_ZONE).empty).toBeUndefined();
+  });
+
+  it("prints an upcoming run's planned day in the one date format (#991)", () => {
+    const [upcoming] = toPackagingRunsViewProps([{
+      id: "u", run_no: 8, planned_on: "2026-09-05", started_at: null, closed_at: null, cancelled_at: null,
+      brand_name: "Pils", vessel_name: "FV1", qty_planned: 10,
+    }], DEMO_TIME_ZONE).upcoming;
+    expect(upcoming.detail).toMatch(/^Sep 5, 2026 · FV1/);
+  });
+
+  it("a finished run is a row link with no Open verb, so it never reads as reopen (#996)", () => {
+    const base = { planned_on: "2026-09-01", started_at: "2026-09-03T15:00:00Z", brand_name: "Pils", vessel_name: "FV1", qty_planned: 10 };
+    const model = toPackagingRunsViewProps([
+      { ...base, id: "closed", run_no: 7, closed_at: "2026-09-04T18:30:00Z", cancelled_at: null },
+      { ...base, id: "cancelled", run_no: 8, closed_at: null, cancelled_at: "2026-09-04T18:30:00Z" },
+    ], DEMO_TIME_ZONE, (id) => `/packaging/${id}`);
+    expect(model.recent.map((row) => row.verb)).toEqual([undefined, undefined]);
+    const markup = htmlOf(createElement(PackagingRunsView, { model, actions: null }));
+    expect(markup).toContain('href="/packaging/closed"');
+    expect(markup).toContain('href="/packaging/cancelled"');
+    expect(markup).not.toMatch(/>Open</);
   });
 
   it("dates a closed run by when it closed, not when it was planned (#439)", () => {
@@ -100,5 +130,24 @@ describe("packaging views", () => {
     expect(model).toMatchObject({ leftLabel: "Left in FV1", leftInSource: "15 bbl" });
     // A planned SKU with no known barrels per unit leaves the remainder unknown, not guessed.
     expect(toSchedulePackagingRunView(data, { brandId: "b1", occupancyId: "o1", plannedOn: "", qty: { s2: "3" } }).leftInSource).toBeUndefined();
+  });
+
+  // #1125: copy and labels only; repack has no damage input.
+  it("labels the Repack fields and says plainly that repack records no damage", () => {
+    const html = htmlOf(createElement(RepackView, { model: repackCase, footer: null }));
+    const forId = /<label[^>]*for="([^"]+)"[^>]*>Packages to repack<\/label>/.exec(html)?.[1];
+    expect(forId).toBeTruthy();
+    expect(html).toMatch(new RegExp(`<input[^>]*id="${forId}"`));
+    expect(html).toMatch(/>Package to break down</);
+    expect(html).not.toMatch(/Damaged on break/);
+    expect(html).toContain("Repack doesn’t record damage");
+  });
+
+  it("explains Untracked stock where the Lot picker offers it, tied to the picker", () => {
+    // The inventory fixture carries the lot list, so the frame shows the picker and its help.
+    const html = htmlOf(createElement(RepackView, { model: repackCase, footer: null }));
+    const id = /<p[^>]*id="([^"]+)"[^>]*>Untracked stock is stock recorded without a lot\./.exec(html)?.[1];
+    expect(id).toBeTruthy();
+    expect(html).toMatch(new RegExp(`<button[^>]*aria-label="Lot"[^>]*aria-describedby="${id}"|<button[^>]*aria-describedby="${id}"[^>]*aria-label="Lot"`));
   });
 });

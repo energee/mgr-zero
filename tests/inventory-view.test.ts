@@ -14,6 +14,7 @@ import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, re
 import { assembleFinishedGoods, skuLabel, toFinishedGoodsViewProps } from "../lib/mgr/finished-goods-view";
 import { toMovementRecordedViewProps } from "../lib/mgr/movement-recorded-view";
 import { toRecordMovementViewProps } from "../lib/mgr/record-movement-view";
+import { MOVEMENT_KIND_LABELS } from "../lib/movement-form";
 import { toReverseMovementViewProps } from "../lib/mgr/reverse-movement-view";
 import { formatVolume } from "../lib/volume";
 
@@ -59,9 +60,12 @@ describe("Finished goods view", () => {
     expect(model.rows).toEqual([]);
   });
 
-  it("the inventory drawing offers Add SKU and a worded Shortfall, with no Review and no live hrefs (#942)", () => {
+  it("the inventory drawing offers Record movement, Add SKU in Catalog and a worded Shortfall, with no Review and no live hrefs (#942, #1113)", () => {
     const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList) }));
-    expect(html).toMatch(/>Add SKU</);
+    // Inert in the frame: the explorer resolves "Record movement" by screen name.
+    expect(html).toMatch(/<button[^>]*>Record movement<\/button>/);
+    expect(html.indexOf(">Record movement<")).toBeLessThan(html.indexOf(">Add SKU in Catalog<"));
+    expect(html).toMatch(/>Add SKU in Catalog</);
     expect(html).toMatch(/>Shortfall</);
     expect(html).not.toMatch(/>Review</);
     expect(html).toContain(SKU_HAZY.name);
@@ -82,17 +86,39 @@ describe("Finished goods view", () => {
     expect(html).not.toMatch(/>Review</);
   });
 
-  it("createAction, afterHeader, and footer slot for live Finished goods", () => {
+  it("live Finished goods puts Record movement and Add SKU in Catalog together in the header, above the table (#1113)", () => {
     const html = htmlOf(createElement(FinishedGoodsView, {
       model: toFinishedGoodsViewProps(finishedGoodsList),
       createAction: "MOVE",
-      afterHeader: "ADD SKU",
+      addSkuHref: "/catalog",
       footer: "LEDGER",
     }));
-    expect(html).toMatch(/MOVE/);
-    expect(html).not.toMatch(/>Add SKU</);
-    expect(html).toMatch(/ADD SKU/);
+    const title = html.indexOf(">Finished goods</h1>");
+    const move = html.indexOf("MOVE");
+    expect(title).toBeGreaterThan(-1);
+    expect(move).toBeGreaterThan(title);
+    expect(html.slice(move)).toMatch(/^MOVE.*?<a[^>]*href="\/catalog"[^>]*>Add SKU in Catalog<\/a>/);
+    expect(html.indexOf("Add SKU in Catalog")).toBeLessThan(html.indexOf("<table"));
     expect(html).toMatch(/LEDGER/);
+  });
+
+  it("a user who may not create a SKU gets no Add SKU in Catalog (#1113)", () => {
+    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList), createAction: "MOVE", addSkuHref: null }));
+    expect(html).toMatch(/MOVE/);
+    expect(html).not.toMatch(/Add SKU/);
+  });
+
+  it("a reader who may neither record a movement nor create a SKU gets a bare title, with no empty action row (#1113)", () => {
+    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList), createAction: null, addSkuHref: null }));
+    expect(html).toMatch(/<div><div class="flex flex-col gap-1"><a[^>]*>.*?Beer<\/a><h1[^>]*>Finished goods<\/h1><\/div>/);
+    expect(html).not.toMatch(/Record movement|Add SKU/);
+  });
+
+  it("the live page gates Add SKU in Catalog and the empty SKU picker's link on create_sku, one href for both (#1113)", () => {
+    const src = readFileSync("app/(app)/inventory/page.tsx", "utf8");
+    expect(src).toMatch(/const skusHref = canRun\(ctx, "create_sku"\) \? "\/catalog" : null;/);
+    expect(src).toMatch(/<MovementForm\b[^\n]*skusHref=\{skusHref\}/);
+    expect(src).toMatch(/addSkuHref=\{skusHref\}/);
   });
 
   it("the Finished goods inventory record is FinishedGoodsView", () => {
@@ -132,21 +158,26 @@ describe("Finished goods view", () => {
 
   it("opens the deep-linked movement form once instead of reopening after Close", () => {
     const form = readFileSync("app/(app)/inventory/movement-form.tsx", "utf8");
-    // Opened by initial state, never by an effect, so Close stays closed and the prefill survives (#441).
+    // Opened by initial state, never by an effect, so Close stays closed (#441).
+    // Closing it also clears ?recordMovement and its prefill from the URL (#1107, tests/movement-form.test.ts).
     expect(form).toMatch(/defaultOpen: autoOpen/);
     expect(form).not.toMatch(/setOpen\(true\)/);
   });
 });
 
 describe("Record movement view", () => {
-  it("maps festival removal onto chips index 4 and the Hazy preview", () => {
+  it("maps festival removal onto its kind and the Hazy preview", () => {
     const model = toRecordMovementViewProps(recordMovementFestival);
     expect(model.kind).toBe("Festival removal");
-    expect(model.kindIndex).toBe(4);
     expect(model.sku).toBe(SKU_HAZY.name);
     expect(model.bin).toBe("Cold");
     expect(model.channel).toBe("Taproom");
     expect(model.preview).toBe(`Preview: −1 SKU unit · ${formatVolume("0.50000000")} · Festival removal · PA · amounts are entered positive`);
+  });
+
+  it("lists the live form's kinds in the staff guide's order (#1168)", () => {
+    expect(MOVEMENT_KIND_LABELS).toEqual(["Opening balance", "Production in", "Adjustment", "Depletion", "Destruction", "Loss", "Sample", "Festival removal", "Return in"]);
+    expect(toRecordMovementViewProps(recordMovementFestival).kindOptions).toEqual(MOVEMENT_KIND_LABELS);
   });
 
   it("renders Kind, SKU, Destination state, and Record movement", () => {
@@ -157,6 +188,32 @@ describe("Record movement view", () => {
     expect(html).toMatch(/>Record movement</);
     expect(html).toContain(formatVolume("0.50000000"));
     expect(html).not.toMatch(/→/);
+  });
+
+  it("a drawn quantity and destination state error mark their own field, each linked to its message (#1113)", () => {
+    const model = { ...toRecordMovementViewProps(recordMovementFestival), destStateInput: true, destState: "P", qty: "-3", errors: { qty: "QTY WRONG", destState: "STATE WRONG" } };
+    const html = htmlOf(createElement(RecordMovementView, { model }));
+    for (const message of ["QTY WRONG", "STATE WRONG"]) {
+      const id = html.match(new RegExp(`id="([^"]+-error)"[^>]*>${message}<`))?.[1];
+      expect(id, message).toBeTruthy();
+      expect(html).toMatch(new RegExp(`aria-invalid="true"[^>]*aria-describedby="${id}"|aria-describedby="${id}"[^>]*aria-invalid="true"`));
+    }
+  });
+
+  it("a live form keeps the quantity error back until the field is left (#1113)", () => {
+    const model = { ...toRecordMovementViewProps(recordMovementFestival), qty: "-3", errors: { qty: "QTY WRONG" } };
+    const html = htmlOf(createElement(RecordMovementView, { model, controls: { qty: () => {} } }));
+    expect(html).not.toContain("QTY WRONG");
+  });
+
+  it("an empty SKU picker says so and links Catalog, or names who adds SKUs (#1113)", () => {
+    const empty = { ...toRecordMovementViewProps(recordMovementFestival), sku: "", skuOptions: [] };
+    const drawn = htmlOf(createElement(RecordMovementView, { model: empty }));
+    expect(drawn).toMatch(/No SKUs yet\. <a (?=[^>]*data-to="Catalog")(?=[^>]*href="#")[^>]*>Add a SKU</);
+    expect(htmlOf(createElement(RecordMovementView, { model: { ...empty, skusHref: "/catalog" } }))).toMatch(/href="\/catalog"[^>]*>Add a SKU</);
+    const readOnly = htmlOf(createElement(RecordMovementView, { model: { ...empty, skusHref: null } }));
+    expect(readOnly).toContain("No SKUs yet. An admin or sales member adds them in Catalog.");
+    expect(readOnly).not.toContain("Add a SKU");
   });
 
   it("the Record movement inventory record mounts RecordMovementView with a sibling pin", () => {
@@ -172,7 +229,8 @@ describe("Record movement view", () => {
 describe("Movement recorded view", () => {
   it("maps the festival echo onto the tape and gated correction", () => {
     const model = toMovementRecordedViewProps(movementRecordedFestival);
-    expect(model.title).toBe("Hazy IPA · ½ bbl");
+    expect(model.sku).toBe("Hazy IPA · ½ bbl");
+    expect(model).not.toHaveProperty("backHref");
     expect(model.tapeLabel).toBe("−1 keg · Festival removal · PA");
     expect(model.tapeDetail).toBe(`${formatVolume("0.50000000")} · just now`);
     expect(model.correctionGate).toMatch(/latest eligible saved weekly count/i);
@@ -187,8 +245,16 @@ describe("Movement recorded view", () => {
     expect(html).not.toMatch(/→/);
   });
 
-  it("the Movement recorded inventory record is MovementRecordedView", () => {
-    const body = screen("Movement recorded").body as { type: unknown; props: { model: unknown } };
+  it("draws no in-sheet title or back link, and names the SKU in a row (#1167)", () => {
+    const html = htmlOf(createElement(MovementRecordedView, { model: toMovementRecordedViewProps(movementRecordedFestival) }));
+    expect(html).not.toMatch(/<h1\b|<a\b/);
+    expect(html).toMatch(/<dt[^>]*>SKU<\/dt><dd[^>]*>Hazy IPA · ½ bbl<\/dd>/);
+  });
+
+  it("the Movement recorded inventory record is a sheet drawing MovementRecordedView", () => {
+    const record = screen("Movement recorded");
+    expect(record.surface).toBe("sheet");
+    const body = record.body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(MovementRecordedView);
     expect(body.props.model).toEqual(toMovementRecordedViewProps(movementRecordedFestival));
   });

@@ -7,6 +7,7 @@
 import { z } from "zod";
 import { canRun, CommandError, completeRows, defineQuery, inChunks, PAGE_SIZE, runCommand, STAFF_ROLES, unwrap } from "./registry";
 import type { TodayItem } from "./today";
+import { formatDate } from "@/lib/date-format";
 import { poNo } from "@/lib/mgr/doc-no";
 import { plural } from "@/lib/mgr/plural";
 import { TODAY_VERB } from "@/lib/mgr/today-view";
@@ -56,7 +57,7 @@ export function labeledTaproomStock(
 
 defineQuery({
   name: "get_beer_overview",
-  description: "Counts behind the Beer landing: finished-goods shortages, taproom SKUs below par, open taps, tanks with beer, material shortages and kegs out at customers",
+  description: "Counts behind the Beer landing: finished-goods shortages, taproom SKUs below par, kegs on tap, occupied tanks, material shortages and kegs out at customers",
   input: z.object({}), roles: STAFF_ROLES,
   handler: async (ctx) => {
     const b = ctx.breweryId;
@@ -97,7 +98,7 @@ defineQuery({
   description: "Everything in motion for the Work landing: Today's rows plus the open purchase orders and routes the caller may open, each tagged with its Work chip and sorted by due date",
   input: z.object({}), roles: ["admin", "sales", "warehouse", "brewer"],
   handler: async (ctx): Promise<WorkRow[]> => {
-    // ponytail: transfers, batches and runs ride on Today's rows only; their list pages are one tap away
+    // ponytail: Today supplies orders, routes and batches only; stock transfers and runs are never listed on Work (their list pages are one tap away)
     const [today, pos, routes] = await Promise.all([
       runCommand("get_today", {}, ctx) as Promise<TodayItem[]>,
       canRun(ctx, "list_purchase_orders") ? runCommand("list_purchase_orders", {}, ctx) as Promise<{ id: string; po_no: number; status: string; expected_on: string | null; vendor_name: string | null }[]> : [],
@@ -111,11 +112,11 @@ defineQuery({
     const rows: WorkRow[] = [
       ...today.map((t) => ({ kind: KIND[t.reason], id: t.subjectId, label: t.safeLabel, detail: t.detail, href: t.href, verb: TODAY_VERB[t.reason][0], tone: TODAY_VERB[t.reason][1], dueAt: t.dueAt })),
       ...pos.map((p) => ({
-        kind: "POs" as const, id: p.id, label: `${poNo(p.po_no)} · ${p.vendor_name ?? "vendor"}`, detail: p.status.replace("_", " ") + (p.expected_on ? ` · due ${p.expected_on}` : ""),
+        kind: "POs" as const, id: p.id, label: `${poNo(p.po_no)} · ${p.vendor_name ?? "vendor"}`, detail: p.status.replace("_", " ") + (p.expected_on ? ` · due ${formatDate(p.expected_on)}` : ""),
         href: `/purchase-orders/${p.id}`, verb: p.status === "draft" ? "Send" : "Receive", tone: "info" as const, dueAt: p.expected_on,
       })),
       ...routes.map((r) => ({
-        kind: "routes" as const, id: r.id, label: r.name ?? "Route", detail: `${plural(r.deliveries[0]?.count ?? 0, "stop")} · ${r.delivery_date}`,
+        kind: "routes" as const, id: r.id, label: r.name ?? "Route", detail: `${plural(r.deliveries[0]?.count ?? 0, "stop")} · ${formatDate(r.delivery_date)}`,
         href: `/routes/${r.id}`, verb: r.departed_at ? "Return" : "Depart", tone: "info" as const, dueAt: r.delivery_date,
       })),
     ];

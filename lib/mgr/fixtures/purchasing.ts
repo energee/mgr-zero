@@ -4,7 +4,6 @@ import type { ContractViewModel } from "@/lib/mgr/contract-view";
 import type { ContractsSnapshot } from "@/lib/mgr/contracts-view";
 import type { CycleCountViewModel } from "@/lib/mgr/cycle-count-view";
 import type { MaterialViewModel } from "@/lib/mgr/material-view";
-import type { MaterialsSnapshot } from "@/lib/mgr/materials-view";
 import type { MaterialsOnHandSnapshot } from "@/lib/mgr/materials-on-hand-view";
 import type { NewPoViewModel } from "@/lib/mgr/new-po-view";
 import type { PurchaseOrdersSnapshot } from "@/lib/mgr/purchase-orders-view";
@@ -14,10 +13,10 @@ import type { VendorViewModel } from "@/lib/mgr/vendor-view";
 import type { VendorsSnapshot } from "@/lib/mgr/vendors-view";
 
 export const purchaseOrdersWarehouse: PurchaseOrdersSnapshot = {
-  title: "Work",
+  title: "Purchase orders",
   subtitle: "warehouse default",
   rows: [
-    { key: "po142", title: "PO-0142 · Country Malt", detail: "sent · due Thu", verb: "Receive", tone: "info" },
+    { key: "po142", title: "PO-0142 · Country Malt", detail: "sent Sep 7, 2026 · expected Sep 10, 2026", verb: "Receive", tone: "info" },
     { key: "po141", title: "PO-0141 · YCH", detail: "partially received · 1 Citra box due", verb: "Receive", tone: "info", warning: true },
     { key: "po143", title: "PO-0143 · CanSource", detail: "draft · 4 pallets", verb: "Send", tone: "info" },
   ],
@@ -33,11 +32,20 @@ export const newPoCountryMalt: NewPoViewModel = {
   ],
 };
 
+/** New PO on a brewery with no vendors yet and one line typed wrong: the
+ *  empty picker, field errors and withheld Save draft (#1121–#1123). */
+export const newPoIncomplete: NewPoViewModel = {
+  vendor: "",
+  vendors: [],
+  expected: "",
+  lines: [{ key: "malt", materialId: "malt", title: "2-row · 55 lb bags", detail: "lot-tracked", qty: "-4", cost: "-3", lot: "" }],
+};
+
 export const receivePoCountryMalt: ReceivePoViewModel = {
   state: "sent", closure: "cancel", closureReason: "Vendor cannot fulfil this order", locationId: "warehouse", binId: "shelf", receivedOn: "2026-09-10",
   locations: [{ id: "warehouse", name: "Warehouse" }], bins: [{ id: "shelf", name: "Shelf" }],
   title: "PO-0142 · Country Malt",
-  status: "sent Mon · expected Thu · nothing received yet",
+  status: "Marked sent Sep 7, 2026 · expected Sep 10, 2026",
   lines: [
     {
       key: "malt", title: "2-row · 55 lb bags", detail: "expected 40 · lot from the PO", qty: 42, warning: true,
@@ -98,7 +106,7 @@ export const receiptPoBillRejected: ReceiptViewModel = {
 };
 
 export const correctReceiptCountryMalt: ReceivePoViewModel = {
-  title: "PO-0142 · correct receipt", state: "correction", status: "Received 2026-09-10",
+  title: "PO-0142 · correct receipt", state: "correction", status: "Received Sep 10, 2026",
   correctionReason: "Two malt bags were counted twice",
   lines: receivePoCountryMalt.lines?.map(line => ({ ...line, qty: line.key === "malt" ? 40 : line.qty,
     detail: `originally counted ${line.qty} purchase units`, lotOptions: undefined, note: undefined })),
@@ -108,10 +116,10 @@ export const correctReceiptCountryMalt: ReceivePoViewModel = {
 
 export const materialsOnHandList: MaterialsOnHandSnapshot = {
   rows: [
-    { key: "cans", title: "Cans · 16 oz", detail: "3,100 each · 2 lots · best by none", verb: "Count", tone: "info" },
-    { key: "citra", title: "Citra 2026 · YCH", detail: "262 lb · 1 lot · best by 8/31/27", verb: "Count", tone: "info" },
-    { key: "malt", title: "2-row 2026 · Country Malt", detail: "8,800 lb · 3 lots · best by 3/15/27", verb: "Count", tone: "info" },
-    { key: "yeast", title: "Yeast · WLP066", detail: "2 brinks · 2 lots · best by 9/8/26", verb: "Count", tone: "info", warning: true },
+    { key: "cans", title: "Cans · 16 oz", detail: "3,100 each · 2 lots · best by none" },
+    { key: "citra", title: "Citra 2026 · YCH", detail: "262 lb · 1 lot · best by Aug 31, 2027" },
+    { key: "malt", title: "2-row 2026 · Country Malt", detail: "8,800 lb · 3 lots · best by Mar 15, 2027" },
+    { key: "yeast", title: "Yeast · WLP066", detail: "2 brinks · 2 lots · best by Sep 8, 2026", warning: true },
   ],
 };
 
@@ -125,14 +133,6 @@ export const cycleCountCans: CycleCountViewModel = {
   locationId: "warehouse", binId: "shelf",
   locations: [{ id: "warehouse", name: "Warehouse" }],
   bins: [{ id: "shelf", name: "Shelf" }],
-};
-
-export const materialsList: MaterialsSnapshot = {
-  rows: [
-    { key: "citra", title: "Citra", detail: "hop · lb · 262 lb on hand", verb: "Edit" },
-    { key: "malt", title: "2-row", detail: "grain · lb · 8,800 lb on hand", verb: "Edit" },
-    { key: "cans", title: "Cans · 16 oz", detail: "packaging · each · 3,100 on hand", verb: "Edit" },
-  ],
 };
 
 export const materialCitra: MaterialViewModel = {

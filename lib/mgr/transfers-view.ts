@@ -4,8 +4,10 @@ import { plural } from "./plural";
 import { trfNo } from "./doc-no";
 import { WORK_CHIPS, WORK_TABS } from "./work-view";
 
-const VERB: Record<string, { label: string; tone: "info" | "attention" | "success" | "primary" }> = {
-  draft: { label: "Submit", tone: "info" },
+// A transfer's next action by status. Received and cancelled transfers have
+// none: their row is a plain link, because "Open" on a closed record reads as
+// reopen (#996, #1026).
+const VERB: Record<string, { label: string; tone: "info" | "success" }> = {
   submitted: { label: "Pick", tone: "info" },
   picked: { label: "Receive", tone: "success" },
   in_transit: { label: "Receive", tone: "success" },
@@ -16,8 +18,8 @@ export type TransfersRowView = {
   title: string;
   detail: string;
   href: string;
-  verb: string;
-  tone: "info" | "attention" | "success" | "primary";
+  verb?: string;
+  tone?: "info" | "success";
   warning: boolean;
 };
 
@@ -41,27 +43,25 @@ export type TransfersRowSnapshot = {
 
 export type TransfersSnapshot = {
   transfers: TransfersRowSnapshot[];
-  /** Inventory Work list title. Live uses "Transfers". */
-  title?: string;
 };
 
-export function toTransfersViewProps({ transfers, title }: TransfersSnapshot): TransfersViewModel {
+export function toTransfersViewProps({ transfers }: TransfersSnapshot): TransfersViewModel {
   return {
-    title: title ?? "Work",
+    title: "Transfers",
     empty: transfers.length === 0 ? { title: "No transfers yet", description: "A transfer moves stock between two locations." } : undefined,
     workChips: WORK_CHIPS,
     workChipIndex: 2,
     workTabs: WORK_TABS,
     rows: transfers.map((t) => {
-      const verb = VERB[t.status] ?? { label: "Open", tone: "primary" as const };
+      const verb = VERB[t.status];
       const open = t.status !== "received" && t.status !== "cancelled";
       return {
         key: t.id,
         title: trfNo(t.transfer_no),
         detail: `${t.from_name} to ${t.to_name} · ${plural(t.line_count, "line")} · ${t.status.replaceAll("_", " ")}`,
         href: `/transfers/${t.id}`,
-        verb: verb.label,
-        tone: verb.tone,
+        verb: verb?.label,
+        tone: verb?.tone,
         warning: open,
       };
     }),

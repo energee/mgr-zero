@@ -5,6 +5,9 @@ import { optionalPageQuery, requirePagePermission } from "@/lib/mgr/page-query";
 import { pageCursor } from "@/lib/mgr/history-page";
 import { OrdersClient } from "./orders-client";
 import "@/lib/commands/all";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/orders") };
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string; customerId?: string; cursor?: string | string[] }> }) {
   const [params, brewery] = await Promise.all([searchParams, getActiveBrewery()]);

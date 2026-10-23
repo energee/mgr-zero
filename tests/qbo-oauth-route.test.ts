@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const lifecycle = vi.hoisted(() => ({
-  claim: vi.fn(), complete: vi.fn(), fail: vi.fn(), realmInUse: vi.fn(), alreadyCompleted: vi.fn(),
+  claim: vi.fn(), hold: vi.fn(), complete: vi.fn(), fail: vi.fn(), realmInUse: vi.fn(), exchangeState: vi.fn(),
 }));
 const session = vi.hoisted(() => ({ breweryCookie: "brewery-1" as string | undefined, roles: ["admin"] }));
 
@@ -22,9 +22,10 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/supabase/integration-tokens", () => ({
   claimQboOAuth: lifecycle.claim,
   completeQboOAuthStore: lifecycle.complete,
+  holdQboOAuthTokens: lifecycle.hold,
   failQboOAuth: lifecycle.fail,
   qboRealmInUse: lifecycle.realmInUse,
-  qboOAuthAlreadyCompleted: lifecycle.alreadyCompleted,
+  qboOAuthExchangeState: lifecycle.exchangeState,
 }));
 
 import { GET } from "@/app/api/integrations/qbo/oauth/route";
@@ -39,8 +40,9 @@ describe("QuickBooks OAuth callback route", () => {
     vi.stubEnv("QBO_API_BASE", "https://sandbox-quickbooks.api.intuit.com");
     lifecycle.claim.mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: ["com.intuit.quickbooks.accounting"] });
     lifecycle.fail.mockResolvedValue(undefined);
+    lifecycle.hold.mockResolvedValue(undefined);
     lifecycle.realmInUse.mockResolvedValue(false);
-    lifecycle.alreadyCompleted.mockResolvedValue(false);
+    lifecycle.exchangeState.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -100,14 +102,14 @@ describe("QuickBooks OAuth callback route", () => {
     ));
 
     expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?error=oauth");
-    expect(lifecycle.alreadyCompleted).toHaveBeenCalled();
+    expect(lifecycle.exchangeState).toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
     expect(lifecycle.complete).not.toHaveBeenCalled();
   });
 
   it("reports connected when a duplicate callback replays a state this Admin already completed", async () => {
     lifecycle.claim.mockResolvedValue(null);
-    lifecycle.alreadyCompleted.mockResolvedValue(true);
+    lifecycle.exchangeState.mockResolvedValue("completed");
     const fetch = vi.fn<typeof globalThis.fetch>();
     vi.stubGlobal("fetch", fetch);
 
@@ -116,7 +118,39 @@ describe("QuickBooks OAuth callback route", () => {
     ));
 
     expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?connected=1");
-    expect(lifecycle.alreadyCompleted).toHaveBeenCalledWith(expect.stringMatching(/^[0-9a-f]{64}$/), "actor-1", "brewery-1");
+    expect(lifecycle.exchangeState).toHaveBeenCalledWith(expect.stringMatching(/^[0-9a-f]{64}$/), "actor-1", "brewery-1");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(lifecycle.complete).not.toHaveBeenCalled();
+  });
+
+  it("returns to Accounting with no flag while the first callback for this state is still exchanging", async () => {
+    lifecycle.claim.mockResolvedValue(null);
+    lifecycle.exchangeState.mockResolvedValue("exchanging");
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    vi.stubGlobal("fetch", fetch);
+
+    const response = await GET(new Request(
+      "https://mgr.test/api/integrations/qbo/oauth?code=second-code&state=opaque&realmId=realm-1",
+    ));
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting");
+    expect(lifecycle.exchangeState).toHaveBeenCalledWith(expect.stringMatching(/^[0-9a-f]{64}$/), "actor-1", "brewery-1");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(lifecycle.complete).not.toHaveBeenCalled();
+  });
+
+  it("reports an OAuth error when a duplicate callback finds the first one failed", async () => {
+    lifecycle.claim.mockResolvedValue(null);
+    lifecycle.exchangeState.mockResolvedValue("recovery_required");
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    vi.stubGlobal("fetch", fetch);
+
+    const response = await GET(new Request(
+      "https://mgr.test/api/integrations/qbo/oauth?code=second-code&state=opaque&realmId=realm-1",
+    ));
+
+    expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?error=oauth");
     expect(fetch).not.toHaveBeenCalled();
     expect(lifecycle.complete).not.toHaveBeenCalled();
   });

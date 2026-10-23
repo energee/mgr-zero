@@ -5,16 +5,18 @@
 // (recipes/[id]/recipe-version-form.tsx) passes `controls`: the fields become
 // controlled, the schedule and ingredient rows open their sheets through
 // `slots`, the bottom button submits, and `controls.blockedReason` says what the
-// draft still lacks. Without `controls`, Create recipe version sits in the
-// title row. parentForm draws the recipe's parent fields (name, style, brand,
-// note) at the top.
+// draft still lacks. Without `controls`, New recipe version sits in the
+// title row. parentForm draws the recipe's parent fields (name, brand and
+// note) at the top. Show totals at is a page-only batch size, never saved:
+// typed, each brew-day line shows its batch total in packs, and off the read
+// page each line not in whole packs offers "Round to N × size", down and up.
 "use client";
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
-import { RECIPE_NUMBERS, type RecipeNumberKey, type RecipeScheduleView, type RecipeViewModel } from "@/lib/mgr/recipe-view";
+import { batchTotalText, packRounding, RECIPE_NUMBERS, type RecipeIngredientView, type RecipeNumberKey, type RecipeScheduleView, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 
 export type { RecipeViewModel };
 
@@ -29,6 +31,8 @@ export type RecipeControls = {
 };
 /** Rows that open a sheet on the live draft; each replaces the fixture's static row with the same row as trigger. */
 export type RecipeSlots = { addIngredient?: ReactNode; mash?: ReactNode; fermentation?: ReactNode; water?: ReactNode };
+/** The draft's add-ingredient row: drawn here when no slot is passed, and the live IngredientSheet's trigger. */
+export const ADD_INGREDIENT_ROW = E.row("Add ingredient", "Material, stage and timing", "");
 
 export function RecipeView({
   model,
@@ -40,10 +44,29 @@ export function RecipeView({
   model: RecipeViewModel;
   parentForm?: ReactNode;
   controls?: RecipeControls;
-  /** A cut version: numbers and notes read out as text, schedules as rows, nothing that looks editable. */
+  /** A cut version: numbers and notes read out as text, schedules as rows, nothing that edits it (Show totals at only sizes the totals). */
   readOnly?: boolean;
   slots?: RecipeSlots;
 }) {
+  const [totalsAt, setTotalsAt] = useState(model.totalsAtBbl ?? "");
+  const bbl = Number(totalsAt);
+  const packed = (model.ingredients ?? []).some((row) => row.pack);
+  // A brew-day line's total at the typed size, then Whole packs or (off the read page) its Round choices.
+  const packFoot = ({ pack, onRound }: RecipeIngredientView) => {
+    if (!pack || !(bbl > 0)) return undefined;
+    const rounding = packRounding(pack, bbl);
+    return (
+      <>
+        <span className="text-sm">{bbl} bbl {E.arrow()} {batchTotalText(pack, bbl)}</span>
+        {rounding?.whole ? <span>{E.status("Whole packs", "ok")}</span> : null}
+        {rounding && !readOnly && rounding.choices.length ? (
+          <div className="flex flex-col gap-2 md:flex-row md:justify-end">
+            {rounding.choices.map((c) => <Fragment key={c.label}>{E.btn(c.label, "g", undefined, onRound ? () => onRound(c.perBbl) : undefined)}</Fragment>)}
+          </div>
+        ) : null}
+      </>
+    );
+  };
   const bind = (key: RecipeNumberKey | "notes") => (controls ? { onChange: (value: string) => controls.set(key, value) } : undefined);
   // A schedule: the live draft's sheet trigger, else its heading, rows and summary on a cut version, else the row that opens its screen.
   const schedule = (s: RecipeScheduleView | undefined, slot: ReactNode) => {
@@ -100,10 +123,16 @@ export function RecipeView({
     <>
       {head}
       {E.ttl("Ingredients")}
+      {packed ? (
+        <>
+          {E.edit("Show totals at (bbl)", totalsAt, "number", undefined, { onChange: setTotalsAt, min: 0 })}
+          {bbl > 0 ? null : E.polite("Enter a batch size to see totals in packs.")}
+        </>
+      ) : null}
       {(model.ingredients ?? []).map((row) => (
-        <Fragment key={row.key}>{E.row(row.title, row.detail, row.action ?? row.qty)}</Fragment>
+        <Fragment key={row.key}>{E.row(row.title, row.detail, row.action ?? row.qty, "", undefined, packFoot(row))}</Fragment>
       ))}
-      {slots.addIngredient ?? (readOnly ? null : E.row("+ add ingredient", "material · stage · timing", ""))}
+      {slots.addIngredient ?? (readOnly ? null : ADD_INGREDIENT_ROW)}
       {E.ttl("Process")}
       {numbers}
       {schedule(model.mash, slots.mash)}
@@ -122,7 +151,7 @@ export function RecipeView({
     </>
   );
   // The draft submits at the bottom; every other surface (the live read page and the inventory frame alike) puts its one verb in the title row.
-  const verb = controls || model.historical ? undefined : E.btn("Create recipe version", "p", model.createHref);
+  const verb = controls || model.historical ? undefined : E.btn("New recipe version", "p", model.createHref);
   return (
     <>
       {E.back(model.backLabel ?? "Recipes", model.title, verb, model.backHref)}

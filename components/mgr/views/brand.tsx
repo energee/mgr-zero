@@ -2,9 +2,12 @@
 // (fixture values, uncontrolled) and app/(app)/catalog/brands/[id] (controlled
 // through `controls`, bound to upsert_brand). Two columns from 48rem, stacked
 // below, as on Customer: the left is the form Save brand commits (identity,
-// selling, sell sheet); the right is what saves on its own (SKUs, compliance
-// sheets). The header badges carry the state a reader scrolls for: COLA
-// pending (a jump link to Compliance), price group or Unpriced, category, SKU
+// selling, sell sheet); the right is what saves on its own (Sells as,
+// compliance sheets). Sells as is one switch per packaged format (on means the
+// brand sells it: an active SKU), then the packages inside the switched-on
+// ones and the price group's pours, each with its prices; pours and prices
+// are edited on the price group, which the section links to. The header
+// badges carry the state a reader scrolls for: COLA pending (a jump link to Compliance), price group or Unpriced, category, SKU
 // count. Until its first save, a new brand's right column is one note.
 // Style is typed against the brewery's own styles as suggestions: an
 // unmatched entry is the Add path. The recipe cost suggests a price group
@@ -14,8 +17,10 @@
 import { Fragment, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
+import { FieldDescription } from "@/components/ui/field";
 import { RegistryInput, RegistrySelect, rowAction } from "@/components/mgr/views/registry-fields";
 import { BRAND_ABV } from "@/lib/mgr/brand-abv";
+import type { SellsAsRow } from "@/lib/mgr/brand-sells-view";
 import type { BrandViewModel } from "@/lib/mgr/brand-view";
 import type { PriceGroupSuggestion } from "@/lib/mgr/price-group-suggestion";
 
@@ -24,6 +29,12 @@ export type { BrandViewModel };
 export type BrandControls = Partial<Record<"name" | "alias" | "style" | "abv" | "category" | "priceGroup" | "description" | "hops", (value: string) => void>>;
 
 const asOptions = (names: string[]) => names.map((name) => ({ value: name, label: name }));
+
+/** A switched-on format's SKU sheet: the live slot, or the drawn verb; a format with no SKU has nothing to open. */
+function sellsDetail(row: SellsAsRow, details?: (row: SellsAsRow) => ReactNode): ReactNode {
+  if (!row.skuId) return null;
+  return details ? details(row) : E.act("Edit SKU");
+}
 
 /** Use fills the select from the live control; the inventory draws the verb. Only a banded suggestion has anything to use. */
 function suggestionAction(suggestion: PriceGroupSuggestion, priceGroup?: (id: string) => void): ReactNode {
@@ -43,19 +54,31 @@ export function BrandView({
   actions = {},
   addCompliance,
   categoryAction,
+  onSellsAs,
+  sellsDetails,
+  sellsDisabled = false,
+  sellsMessages,
 }: {
   model: BrandViewModel;
   controls?: BrandControls;
   createAction?: ReactNode;
   messages?: ReactNode;
   footer?: ReactNode;
-  /** Live: the SKU list row is a link. */
+  /** Live: Edit on price group is a link. */
   linkRows?: boolean;
   /** Live: per-row Edit sheets keyed by compliance row; null suppresses the drawn verb. */
   actions?: Record<string, ReactNode>;
   /** Live: the Add approval / Add registration sheets; null hides them. */
   addCompliance?: ReactNode;
   categoryAction?: ReactNode;
+  /** Live: a Sells as switch was flipped; without it the inventory draws uncontrolled switches. */
+  onSellsAs?: (row: SellsAsRow, on: boolean) => void;
+  /** Live: the SKU sheet for a row that has a SKU; without it the inventory draws Edit SKU. */
+  sellsDetails?: (row: SellsAsRow) => ReactNode;
+  /** Live: no permission to switch, or a switch is saving. */
+  sellsDisabled?: boolean;
+  /** Live: a failed switch's error, under the switches. */
+  sellsMessages?: ReactNode;
 }) {
   return (
     <div className="@container flex min-w-0 flex-col gap-6">
@@ -71,8 +94,11 @@ export function BrandView({
         <section aria-label="Brand details" className="flex min-w-0 flex-col gap-4">
           {E.cols(
             <RegistryInput label="Brand name" value={model.name} onChange={controls.name} required />,
-            // Staff-only: an informal name such as a series number. Never on the portal, Square or SKU names.
-            <RegistryInput label="Alias" value={model.alias} onChange={controls.alias} placeholder="Staff only" />,
+            // Staff-only: list_brands and SKU search match it; Catalog notes it under the name, pickers beside it. Never on the portal, Square or SKU names.
+            <div className="flex min-w-0 flex-col gap-2">
+              {E.edit("Alias", model.alias, "text", undefined, { id: "brand-alias", onChange: controls.alias, "aria-describedby": "brand-alias-help" })}
+              <FieldDescription id="brand-alias-help">An informal name staff use, such as a series number. Search finds the beer by it. Catalog shows it under the name, and staff pickers show it beside the name. Buyers never see it.</FieldDescription>
+            </div>,
           )}
           {E.cols(
             <RegistryInput label="Style" value={model.style} onChange={controls.style} suggestions={model.styleOptions} />,
@@ -93,10 +119,23 @@ export function BrandView({
           {messages}
           {footer !== undefined ? footer : E.btn("Save brand")}
         </section>
-        <section aria-label="SKUs and compliance" className="flex min-w-0 flex-col gap-3">
+        <section aria-label="Sells as and compliance" className="flex min-w-0 flex-col gap-3">
           {model.isNew ? E.info("Save the brand to add SKUs and compliance.") : (
             <>
-              {E.nav("SKU list", model.skuList, "", undefined, linkRows ? model.skuListHref : undefined)}
+              {E.ttl("Sells as", "sells-as")}
+              {model.sells.packages.map((row) => (
+                <div key={row.formatId}>{E.row(row.name, row.prices, (
+                  <span className="flex items-center gap-2">
+                    {sellsDetail(row, sellsDetails)}
+                    {E.sw(row.on, `Sells as ${row.name}`, onSellsAs && ((on) => onSellsAs(row, on)), sellsDisabled)}
+                  </span>
+                ))}</div>
+              ))}
+              {sellsMessages}
+              {model.sells.contents.map((line) => <div key={line.key}>{E.row(line.label, line.prices)}</div>)}
+              {E.ttl("Pours")}
+              {model.sells.pours.map((pour) => <div key={pour.key}>{E.row(pour.name, `${pour.size} · ${pour.prices}`)}</div>)}
+              {E.nav("Edit on price group", "", "", undefined, linkRows ? model.sells.priceGroupHref : undefined)}
               {E.ttl("Compliance", "compliance")}
               {model.compliance.map((row) => (
                 <div key={row.key}>{E.row(row.title, row.detail, rowAction(row, actions), row.warning ? "w" : "")}</div>

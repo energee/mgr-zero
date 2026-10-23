@@ -281,6 +281,7 @@ export function countFailureKind(status: number | null, message: string, retryin
   return status !== null && canRetireCommandFailure(status, false, code) ? "error" : "unknown";
 }
 
+/** The expected volume ("1.5 bbl") that follows "Expected total"; null when unknown. */
 export function projectionExpectedText(projection: { expected_bbl: number | null }): string | null {
-  return projection.expected_bbl === null ? null : `${bblExact(projection.expected_bbl, 4)} expected`;
+  return projection.expected_bbl === null ? null : bblExact(projection.expected_bbl, 4);
 }

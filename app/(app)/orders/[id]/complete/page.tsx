@@ -6,6 +6,9 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import type { ShipSources } from "@/lib/commands/orders";
 import { ShipForm, type ShippingSnapshot } from "../ship-form";
 import "@/lib/commands/all";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/orders") };
 
 export default async function CompleteTransferPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

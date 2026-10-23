@@ -1,10 +1,14 @@
 import { TapBoardView } from "@/components/mgr/views/tap-board";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
+import { canRun } from "@/lib/commands/registry";
 import { requirePagePermission, runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { TapBoardSnapshot, TapHistory, TapInterval } from "@/lib/mgr/tap-board-state";
 import "@/lib/commands/all";
 import { TapBoard, type TapSku } from "./tap-board";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/taproom/board") };
 
 type Location = { id: string; name: string; uses: string[] };
 type Sku = { id: string; name: string; format_volume: { bbl_per_unit: number | null } | null };
@@ -31,6 +35,7 @@ export default async function TapBoardPage({ searchParams }: { searchParams: Pro
 
   return <TapBoard key={location.id} breweryId={brewery.id} locationId={location.id} initial={initial} skus={skus} timeZone={brewery.timeZone} navigation={{
     backHref: "/beer", countHref: `/taproom?location=${location.id}`, varianceHref: `/taproom/variance?location=${location.id}`,
-    locations: locations.map(item => [item.name, `/taproom/board?location=${item.id}`]), location: location.name,
+    skusHref: canRun(ctx, "create_sku") ? "/catalog" : null,
+    locations: locations.map(item => ({ value: item.id, label: item.name, href: `/taproom/board?location=${item.id}` })), location: location.id,
   }} />;
 }

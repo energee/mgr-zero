@@ -1,7 +1,11 @@
-import { expect, it } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import { InvoicesView } from "../components/mgr/views/invoices";
+import { QboStaffInvoiceLinkView } from "../components/mgr/views/accounting";
 import { toInvoiceListRow, type InvoiceListRecord } from "../lib/mgr/invoices-view";
 
-const invoice: InvoiceListRecord = { id: "actual", invoice_no: 1042, kind: "invoice", due_on: "2026-09-12", paid_at: null, qbo_sync_status: "pushed", qbo_sync_error: null, qbo_remote_state: "live", qbo_balance_cents: 0, qbo_cash_collected_cents: 0, qbo_accountant_drift: false, written_off_at: null, subtotal_cents: 98000, total_cents: 104000, has_pending_qbo_push: false, customers: { name: "Actual customer" } };
+const invoice: InvoiceListRecord = { id: "actual", invoice_no: 1042, kind: "invoice", due_on: "2026-09-12", paid_at: null, qbo_sync_status: "pushed", qbo_sync_error: null, qbo_remote_state: "live", qbo_balance_cents: 0, qbo_cash_collected_cents: 0, qbo_accountant_drift: false, written_off_at: null, subtotal_cents: 98000, total_cents: 104000, has_pending_qbo_push: false, qbo_invoice_id: "qbo-1042", local_paid_cents: 0, was_pushed_to_qbo: false, customers: { name: "Actual customer" } };
 
 it("keeps structured identity, money, payment, and accounting facts separate", () => {
   const row = toInvoiceListRow(invoice, ["admin"], true, "America/New_York");
@@ -36,12 +40,13 @@ it("preserves current totals, credit settlement, and voided invoices without inv
   expect(voided.quickbooksHref).toBeNull();
 });
 
-it("separates failed accounting pushes from unverified payment evidence", () => {
-  const failed = { ...invoice, qbo_sync_status: "push_failed" as const, qbo_sync_error: "QuickBooks rejected the invoice", qbo_balance_cents: null };
+it("hands a rejected push's balance to MGR's ledger and keeps the mapping fix (#1045)", () => {
+  // A rejected push created no QuickBooks document, so the ledger owns the balance.
+  const failed = { ...invoice, qbo_invoice_id: null, qbo_sync_status: "push_failed" as const, qbo_sync_error: "QuickBooks rejected the invoice", qbo_balance_cents: null };
   const row = toInvoiceListRow(failed, ["admin"], true, "America/New_York");
   expect(row.needsMapping).toBe(true);
-  expect(row.payment).toBe("Payment unverified");
-  expect(row.balance.cents).toBeNull();
+  expect(row.payment).toBe("Balance due");
+  expect(row.balance).toEqual({ cents: 104000, value: "$1,040.00" });
   expect(row.accounting).toContain(failed.qbo_sync_error);
   expect(toInvoiceListRow(failed, ["sales"], true, "America/New_York").needsMapping).toBe(true);
   expect(toInvoiceListRow(failed, ["admin"], false, "America/New_York").needsMapping).toBe(false);
@@ -108,6 +113,97 @@ it("marks outstanding invoices overdue only after the brewery-local due day", ()
   }
 });
 
+it("#1025 does not mark an unknown balance overdue, while a rejected push's ledger balance can be (#1045)", () => {
+  const now = new Date("2026-10-04T12:00:00Z");
+  const failed = toInvoiceListRow({ ...invoice, qbo_invoice_id: null, qbo_sync_status: "push_failed", qbo_sync_error: "rejected", qbo_balance_cents: null }, ["admin"], true, "UTC", now);
+  expect(failed.payment).toBe("Balance due");
+  expect(failed.overdue).toBe(true);
+  const unknownPush = toInvoiceListRow({ ...invoice, qbo_invoice_id: null, qbo_sync_status: "pending", has_pending_qbo_push: true, qbo_balance_cents: null }, ["admin"], true, "UTC", now);
+  expect(unknownPush.payment).toBe("Payment status unavailable");
+  expect(unknownPush.overdue).toBe(false);
+  expect(toInvoiceListRow({ ...invoice, qbo_balance_cents: null }, ["admin"], true, "UTC", now).overdue).toBe(false);
+});
+
+describe("an invoice whose balance MGR's payment ledger owns (#1045)", () => {
+  const now = new Date("2026-10-04T12:00:00Z");
+  const local: InvoiceListRecord = { ...invoice, qbo_invoice_id: null, qbo_sync_status: "pending", qbo_balance_cents: null, qbo_cash_collected_cents: 0 };
+  const row = (change: Partial<InvoiceListRecord> = {}, connected = true) => toInvoiceListRow({ ...local, ...change }, ["admin"], connected, "UTC", now);
+
+  it("reads Balance due, Partial payment or Paid from the ledger's balance", () => {
+    expect(row().payment).toBe("Balance due");
+    expect(row().balance).toEqual({ cents: 104000, value: "$1,040.00" });
+    const partial = row({ local_paid_cents: 40000 });
+    expect(partial.payment).toBe("Partial payment");
+    expect(partial.balance).toEqual({ cents: 64000, value: "$640.00" });
+    const paid = row({ local_paid_cents: 104000, paid_at: "2026-09-30T04:00:00Z" });
+    expect(paid.payment).toBe("Paid");
+    expect(paid.balance).toEqual({ cents: 0, value: "$0.00" });
+  });
+
+  it("is Overdue past its due day until it is paid", () => {
+    expect(row().overdue).toBe(true);
+    expect(row({ local_paid_cents: 40000 }).overdue).toBe(true);
+    expect(row({ local_paid_cents: 104000, paid_at: "2026-09-30T04:00:00Z" }).overdue).toBe(false);
+    expect(row({ due_on: "2026-10-04" }).overdue).toBe(false);
+  });
+
+  it("reads Written off, not Overdue, once written off, even partly paid (#1228)", () => {
+    for (const change of [{}, { local_paid_cents: 40000 }]) {
+      const writtenOff = row({ ...change, written_off_at: "2026-10-03T12:00:00Z" });
+      expect(writtenOff.payment).toBe("Written off");
+      expect(writtenOff.accounting).toBe("Written off in MGR");
+      expect(writtenOff.overdue).toBe(false);
+    }
+  });
+
+  it("captions a row with payments Payments recorded in MGR and offers no QuickBooks action", () => {
+    expect(row({ local_paid_cents: 40000 }).accounting).toBe("Payments recorded in MGR");
+    expect(row({ local_paid_cents: 40000 }, false).accounting).toBe("Payments recorded in MGR");
+    const failed = row({ qbo_sync_status: "push_failed", qbo_sync_error: "QuickBooks rejected the invoice", local_paid_cents: 40000 });
+    expect(failed.needsMapping).toBe(false);
+    expect(failed.accounting).toBe("Payments recorded in MGR");
+    expect(failed.quickbooksHref).toBeNull();
+  });
+
+  it("drops the caption when every payment is voided (Q8)", () => {
+    const voided = row({ local_paid_cents: 0 });
+    expect(voided.accounting).toBe("Not pushed to QuickBooks");
+    expect(voided.payment).toBe("Balance due");
+  });
+
+  it("reads a $0.00 invoice as No payment due, never overdue", () => {
+    const zero = row({ total_cents: 0, subtotal_cents: 0 });
+    expect(zero.payment).toBe("No payment due");
+    expect(zero.balance).toEqual({ cents: 0, value: "$0.00" });
+    expect(zero.overdue).toBe(false);
+  });
+
+  it("keeps an invoice pushed to a previous QuickBooks company unknown (Q4)", () => {
+    const purged = row({ was_pushed_to_qbo: true });
+    expect(purged.payment).toBe("Payment status unavailable");
+    expect(purged.balance).toEqual({ cents: null, value: "Unavailable" });
+    expect(purged.overdue).toBe(false);
+  });
+});
+
+it("heads the balance column Balance, since MGR's ledger can own it (#1045)", () => {
+  const html = renderToStaticMarkup(createElement(InvoicesView, { rows: [toInvoiceListRow(invoice, ["admin"], true, "UTC")], backHref: "/more" }));
+  expect(html).toContain(">Balance<");
+  expect(html).not.toContain("QuickBooks balance");
+});
+
+it("#1025 draws an ordinary row without an accounting caption, QuickBooks as a secondary action, and no dead link", () => {
+  const ordinary = toInvoiceListRow(invoice, ["admin"], true, "UTC");
+  const linked = { ...toInvoiceListRow({ ...invoice, id: "linked", quickbooks_link: { href: "https://app.qbo.intuit.com/app/invoice?txnId=7", reason: null } }, ["admin"], true, "UTC"), href: "/invoices/linked" };
+  const html = renderToStaticMarkup(createElement(InvoicesView, { rows: [ordinary, linked], backHref: "/more" }));
+  expect(html).not.toContain("No accounting exception");
+  expect(html).not.toContain('href="#"');
+  expect(html).toContain('href="/invoices/linked"');
+  expect(html).toMatch(/<a[^>]*data-variant="outline"[^>]*href="https:\/\/app\.qbo[^"]*"[^>]*>Open in QuickBooks/);
+  const detail = renderToStaticMarkup(createElement(QboStaffInvoiceLinkView, { link: { href: "https://app.qbo.intuit.com/x", reason: null } }));
+  expect(detail).toContain('data-variant="outline"');
+});
+
 it("reads a historical not_synced invoice as paid and not in QuickBooks, with nothing to fix", () => {
   const historical = { ...invoice, qbo_sync_status: "not_synced" as const, paid_at: "2025-08-14T16:00:00Z", due_on: "2025-08-14", qbo_balance_cents: null };
   const row = toInvoiceListRow(historical, ["admin"], true, "America/New_York", new Date("2026-10-15T12:00:00Z"));
@@ -115,4 +211,39 @@ it("reads a historical not_synced invoice as paid and not in QuickBooks, with no
   expect(row.payment).toBe("Paid");
   expect(row.overdue).toBe(false);
   expect(row.needsMapping).toBe(false);
+});
+
+it("#1030 starts the Accounting cell at the left edge its header uses", () => {
+  const voided = toInvoiceListRow({ ...invoice, qbo_remote_state: "voided" }, ["admin"], false, "UTC");
+  const html = renderToStaticMarkup(createElement(InvoicesView, { rows: [voided], backHref: "/more" }));
+  // The label may sit inside the header's sort button; the th carries the alignment.
+  expect(html).toMatch(/<th[^>]*class="[^"]*text-left[^"]*"[^>]*>(?:(?!<\/th>)[\s\S])*>Accounting<(?:(?!<\/th>)[\s\S])*<\/th>/);
+  expect(html).not.toContain("items-end");
+});
+
+it("#1135 shows the sync only while QuickBooks is connected, and writes the email note for staff", () => {
+  const draw = (connected: boolean, canConnect = true) => renderToStaticMarkup(createElement(InvoicesView, {
+    rows: [], connection: { connected, detail: "QuickBooks status", canConnect, connectHref: "/settings/accounting/connect" },
+    sync: createElement("span", null, "live sync"),
+  }));
+  expect(draw(true)).toContain("live sync");
+  expect(draw(true)).not.toContain("Payment status may be stale until QuickBooks is reconnected");
+  const admin = draw(false);
+  expect(admin).not.toContain("live sync");
+  expect(admin).toContain('href="/settings/accounting/connect"');
+  expect(admin).toContain("Payment status may be stale until QuickBooks is reconnected and synced.");
+  expect(admin).toContain("MGR can’t tell whether QuickBooks emailed an invoice.");
+  expect(admin).not.toContain("invoice query");
+  const sales = draw(false, false);
+  expect(sales).not.toContain("live sync");
+  expect(sales).toContain("Admin must connect");
+  expect(sales).not.toContain('href="/settings/accounting/connect"');
+});
+
+it("#1135 falls back to the shared sync view only while connected", () => {
+  const draw = (connected: boolean) => renderToStaticMarkup(createElement(InvoicesView, {
+    rows: [], connection: { connected, detail: "QuickBooks status", canConnect: true, connectHref: "/settings/accounting/connect" },
+  }));
+  expect(draw(true)).toContain("Sync QuickBooks");
+  expect(draw(false)).not.toContain("Sync QuickBooks");
 });

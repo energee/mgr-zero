@@ -1,4 +1,7 @@
-// lib/mgr/route-view.ts — view-model for Route (planned builder).
+// lib/mgr/route-view.ts — view-model for Route (planned builder), and what
+// its Save route plan still needs.
+import { submitReason } from "@/lib/mgr/submit-reason";
+
 export type RouteStopView = {
   key: string;
   title: string;
@@ -9,7 +12,6 @@ export type RouteStopView = {
 
 export type RouteViewModel = {
   backHref?: string;
-  backTo?: string;
   title: string;
   date?: string;
   driverId?: string;
@@ -26,4 +28,12 @@ export function toggleRouteStop(selection: Record<string, number>, id: string, o
   const next = { ...selection };
   if (on) next[id] = Math.max(0, ...Object.values(next)) + 1; else delete next[id];
   return next;
+}
+
+/** A route plan needs its delivery date and at least one stop. */
+export function routeReason({ date, selection }: Pick<RouteViewModel, "date" | "selection">): string | null {
+  const missing: string[] = [];
+  if (!date) missing.push("a delivery date");
+  if (Object.keys(selection).length === 0) missing.push("a stop");
+  return submitReason(missing);
 }

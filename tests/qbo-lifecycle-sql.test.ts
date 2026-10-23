@@ -11,8 +11,9 @@ import {
   completeQboOAuthStore,
   disconnectQbo,
   failQboOAuth,
+  holdQboOAuthTokens,
   qboRealmInUse,
-  qboOAuthAlreadyCompleted,
+  qboOAuthExchangeState,
   getQboHealth,
   readVersionedIntegrationTokens,
 } from "@/lib/supabase/integration-tokens";
@@ -156,7 +157,7 @@ describe("QuickBooks durable lifecycle", () => {
     await completeQboOAuth({
       request: new Request(`${config.redirectUri}?code=one-time-code&state=${authorize.searchParams.get("state")}&realmId=${realm}`),
       actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri: config.redirectUri,
-      client: oauthClient, store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
+      client: oauthClient, store: { claim: claimQboOAuth, hold: holdQboOAuthTokens, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
     });
     expect((await admin.from("qbo_connections").select("granted_scopes").eq("brewery_id", brewery.id).single()).data?.granted_scopes)
       .toEqual(requestedScopes);
@@ -186,7 +187,7 @@ describe("QuickBooks durable lifecycle", () => {
     await completeQboOAuth({
       request: new Request(`${config.redirectUri}?code=narrow-code&state=${narrow.searchParams.get("state")}&realmId=${realm}`),
       actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri: config.redirectUri,
-      client: narrowClient, store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
+      client: narrowClient, store: { claim: claimQboOAuth, hold: holdQboOAuthTokens, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse },
     });
     expect((await admin.from("qbo_connections").select("granted_scopes").eq("brewery_id", brewery.id).single()).data?.granted_scopes)
       .toEqual([QBO_ACCOUNTING_SCOPE]);
@@ -211,7 +212,7 @@ describe("QuickBooks durable lifecycle", () => {
     });
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (url) =>
       String(url).includes("/tokens/bearer") ? tokenResponse() : companyResponse());
-    const store = { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse };
+    const store = { claim: claimQboOAuth, hold: holdQboOAuthTokens, complete: completeQboOAuthStore, fail: failQboOAuth, realmInUse: qboRealmInUse };
     const begin = (state: string) => ctx.db.rpc("begin_qbo_oauth", {
       p_brewery: brewery.id, p_redirect_uri: redirectUri, p_state_hash: hash(state),
       p_provider_intent: "connect", p_request_id: crypto.randomUUID(),
@@ -288,16 +289,18 @@ describe("QuickBooks durable lifecycle", () => {
     expect((await begin(validState)).error).toBeNull();
     await expect(callback(supersededState)).rejects.toThrow("oauth state invalid");
     expect(fetch).not.toHaveBeenCalled();
-    await expect(qboOAuthAlreadyCompleted(hash(validState), ctx.userId, brewery.id)).resolves.toBe(false);
+    await expect(qboOAuthExchangeState(hash(validState), ctx.userId, brewery.id)).resolves.toBe("pending");
     await expect(callback(validState)).resolves.toEqual(expect.any(String));
     await expect(callback(validState)).rejects.toThrow("oauth state invalid");
     expect(fetch).toHaveBeenCalledTimes(2);
-    // A replayed callback is recognisable as already completed, but only for
-    // the Admin and brewery that completed it; superseded state is not.
-    await expect(qboOAuthAlreadyCompleted(hash(validState), ctx.userId, brewery.id)).resolves.toBe(true);
-    await expect(qboOAuthAlreadyCompleted(hash(validState), otherAdmin.userId, brewery.id)).resolves.toBe(false);
-    await expect(qboOAuthAlreadyCompleted(hash(validState), ctx.userId, legitimateBrewery.id)).resolves.toBe(false);
-    await expect(qboOAuthAlreadyCompleted(hash(supersededState), ctx.userId, brewery.id)).resolves.toBe(false);
+    // A replayed callback can read how the first one ended, but only for the
+    // Admin and brewery that began it; a superseded state reads
+    // 'recovery_required', so the route still reports error=oauth.
+    await expect(qboOAuthExchangeState(hash(validState), ctx.userId, brewery.id)).resolves.toBe("completed");
+    await expect(qboOAuthExchangeState(hash(validState), otherAdmin.userId, brewery.id)).resolves.toBeNull();
+    await expect(qboOAuthExchangeState(hash(validState), ctx.userId, legitimateBrewery.id)).resolves.toBeNull();
+    await expect(qboOAuthExchangeState(hash(supersededState), ctx.userId, brewery.id)).resolves.toBe("recovery_required");
+    await expect(qboOAuthExchangeState(hash(`unknown-${crypto.randomUUID()}`), ctx.userId, brewery.id)).resolves.toBeNull();
 
     const lostState = `lost-${crypto.randomUUID()}`;
     expect((await begin(lostState)).error).toBeNull();
@@ -326,6 +329,9 @@ describe("QuickBooks durable lifecycle", () => {
       client: new QboOAuthClient(config, delayedFetch), store,
     });
     await vi.waitFor(() => expect(delayedFetch).toHaveBeenCalledTimes(1));
+    // #1034: a duplicate callback arriving now finds the first still exchanging.
+    await expect(qboOAuthExchangeState(hash(delayedState), ctx.userId, brewery.id)).resolves.toBe("exchanging");
+    await expect(qboOAuthExchangeState(hash(delayedState), otherAdmin.userId, brewery.id)).resolves.toBeNull();
     const connection = await admin.from("qbo_connections").select("id").eq("brewery_id", brewery.id).single();
     expect(connection.error).toBeNull();
     await expect(disconnectQbo(ctx, connection.data!.id, vi.fn().mockResolvedValue(undefined), crypto.randomUUID()))
@@ -553,7 +559,7 @@ describe("QuickBooks durable lifecycle", () => {
       .toMatchObject({ state: change === "disconnect" ? "disconnected" : "connected", last_error: null });
   });
 
-  it("lets a concurrent refresh loser use the winner and rejects a response that arrives after disconnect", async () => {
+  it("makes a concurrent refresh caller wait for and use the holder's result, and rejects a response that arrives after disconnect", async () => {
     const config = {
       clientId: "client-id", clientSecret: "client-secret", redirectUri: "https://mgr.test/qbo",
       apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com",
@@ -571,13 +577,14 @@ describe("QuickBooks durable lifecycle", () => {
     const refreshClient = (suffix: string) => new QboOAuthClient(config, vi.fn<typeof globalThis.fetch>(() =>
       new Promise<Response>((resolve) => releases.push((response) => resolve(response)))).mockName(suffix));
     const refreshes = [refreshQboCredentials(ctx, refreshClient("a")), refreshQboCredentials(ctx, refreshClient("b"))];
-    await vi.waitFor(() => expect(releases).toHaveLength(2));
-    releases[0](new Response(JSON.stringify({ access_token: "race-access-a", refresh_token: "race-refresh-a", expires_in: 3600 }), { status: 200 }));
-    releases[1](new Response(JSON.stringify({ access_token: "race-access-b", refresh_token: "race-refresh-b", expires_in: 3600 }), { status: 200 }));
+    // The refresh lease (#1032) lets one caller reach Intuit; the other waits.
+    // Unserialized, the second caller would add a second request no one releases, and the test would time out.
+    await vi.waitFor(() => expect(releases).toHaveLength(1));
+    releases[0](new Response(JSON.stringify({ access_token: "race-access", refresh_token: "race-refresh", expires_in: 3600 }), { status: 200 }));
     const winners = (await Promise.all(refreshes)).map((tokens) => tokens.accessToken);
     const persisted = await readVersionedIntegrationTokens(ctx, "qbo");
-    expect(winners).toEqual([persisted.accessToken, persisted.accessToken]);
-    expect(persisted.refreshToken).toMatch(/^race-refresh-[ab]$/);
+    expect(winners).toEqual(["race-access", "race-access"]);
+    expect(persisted).toMatchObject({ accessToken: "race-access", refreshToken: "race-refresh" });
 
     let releaseLate!: (response: Response) => void;
     const lateFetch = vi.fn<typeof globalThis.fetch>(() => new Promise<Response>((resolve) => { releaseLate = resolve; }));

@@ -16,7 +16,8 @@ import {
 } from "../lib/mgr/fixtures/delivery";
 import { toggleRouteStop } from "../lib/mgr/route-view";
 import { workHrefsFor } from "../components/mgr/work-tabs";
-import { toRoutesViewProps } from "../lib/mgr/routes-view";
+import { routeNext, toRoutesViewProps } from "../lib/mgr/routes-view";
+import { driverLabel, driverOptions } from "../app/(app)/routes/labels";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
@@ -26,7 +27,7 @@ describe("Routes", () => {
   it("keeps Transfers and Packaging Work navigation in their shared views", () => {
     for (const [route, view] of [["transfers", "transfers"], ["packaging", "packaging-runs"], ["purchase-orders", "purchase-orders"]]) {
       expect(src(`app/(app)/${route}/page.tsx`)).toContain("workHrefs={workHrefsFor(brewery.roles)}");
-      expect(src(`components/mgr/views/${view}.tsx`)).toContain("<TabBar");
+      expect(src(`components/mgr/views/${view}.tsx`)).toContain("<WorkKindTabs");
       expect(src(`components/mgr/views/${view}.tsx`)).not.toMatch(/tabs\?: ReactNode/);
     }
   });
@@ -40,6 +41,52 @@ describe("Routes", () => {
     expect(isValidElement(screen("Routes").body)).toBe(true);
     expect(body.type).toBe(RoutesView);
     expect(body.props.model).toEqual(toRoutesViewProps(routesDriver));
+  });
+
+  it("a route names its next action; an assigned route not yet departed has none (#1026)", () => {
+    expect(routeNext({ departed_at: "2026-09-10T14:00:00Z", driver_user_id: "d" })).toEqual({ verb: "Resume", tone: "info" });
+    expect(routeNext({ departed_at: null, driver_user_id: null })).toEqual({ verb: "Assign", tone: "attention" });
+    expect(routeNext({ departed_at: null, driver_user_id: "d" })).toBeUndefined();
+  });
+
+  // #1124: a driver reads as their roster email, never an id fragment or a made-up name.
+  it("labels a route's driver by roster email, or says why there is none", () => {
+    expect(driverLabel({ driver_user_id: "4d6d4e58-0000-4000-8000-000000000000", driver_email: "sam@example.test" })).toBe("sam@example.test");
+    expect(driverLabel({ driver_user_id: null, driver_email: null })).toBe("driver not assigned");
+    expect(driverLabel({ driver_user_id: "4d6d4e58-0000-4000-8000-000000000000", driver_email: null })).toBe("driver not on the team");
+  });
+
+  // #1124: the Driver picker reads like Team (email, then roles in order), and keeps a saved driver who can no longer drive.
+  it("builds the Driver picker from the roster, keeping a saved driver who is not eligible", () => {
+    const sam = { user_id: "a", email: "sam@example.test", roles: ["warehouse", "admin"] };
+    expect(driverOptions([sam], null)).toEqual([{ id: "a", label: "sam@example.test · Admin, Warehouse" }]);
+    expect(driverOptions([sam], { driver_user_id: "a", driver_email: "sam@example.test" })).toHaveLength(1);
+    expect(driverOptions([sam], { driver_user_id: "b", driver_email: null })[1]).toEqual({ id: "b", label: "driver not on the team" });
+    expect(driverOptions([sam], { driver_user_id: "b", driver_email: "riley@example.test" })[1]).toEqual({ id: "b", label: "riley@example.test · can no longer drive" });
+  });
+
+  it("an assigned route is a row link, not an Open verb; Resume and Assign stay verbs (#1026)", () => {
+    const model = toRoutesViewProps({ title: "Routes", subtitle: "", rows: [
+      { key: "r", title: "Route C · 2026-09-12", detail: "2 stops · Dana", href: "/routes/r" },
+      { key: "a", title: "Route A · 2026-09-10", detail: "departed", verb: "Resume", tone: "info", href: "/routes/a" },
+    ] });
+    const html = htmlOf(createElement(RoutesView, { model, createAction: null }));
+    expect(html).toMatch(/<a[^>]*href="\/routes\/r"[^>]*>(?:(?!<\/a>)[\s\S])*Route C · 2026-09-12/);
+    expect(html).toMatch(/>Resume</);
+    expect(html).not.toMatch(/>Open</);
+  });
+
+  it("headed Deliveries, the sidebar's name, in the inventory and the live page (#1104)", () => {
+    expect(htmlOf(createElement(RoutesView, { model: toRoutesViewProps(routesDriver) }))).toMatch(/<h1[^>]*>Deliveries</);
+    expect(src("app/(app)/routes/page.tsx")).toContain('toRoutesViewProps({ title: "Deliveries"');
+  });
+
+  it("names the live Work tab links by the sidebar and keeps their pages (#1104)", () => {
+    const html = htmlOf(createElement(RoutesView, { model: toRoutesViewProps(routesDriver), workHrefs: workHrefsFor(["warehouse"]) }));
+    const links = [...html.matchAll(/<a\b[^>]*role="tab"[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/g)].map(([, href, text]) => [text, href]);
+    expect(links).toEqual([
+      ["All", "/work"], ["Orders", "/orders"], ["Transfers", "/transfers"], ["Packaging", "/packaging"], ["Purchase orders", "/purchase-orders"], ["Deliveries", "/routes"],
+    ]);
   });
 
   it("renders New route without leaking live hrefs", () => {
@@ -79,6 +126,16 @@ describe("Route", () => {
     const empty = htmlOf(createElement(RouteView, { model: { ...routeAPlan, saved: false, selection: {} } }));
     expect(empty).not.toContain("Depart route");
     expect(empty).toMatch(/<button[^>]*disabled[^>]*>Save route plan/);
+  });
+  it("returns to Deliveries, the Routes screen's sidebar name, from every page under it (#1104)", () => {
+    for (const node of [
+      createElement(RouteView, { model: routeAPlan }),
+      createElement(DriverRouteView, { model: driverRouteA }),
+      createElement(ReturnRouteView, { model: returnRouteA }),
+    ]) expect(htmlOf(node)).toMatch(/<a\b[^>]*data-to="Routes"[^>]*>.*?Deliveries<\/a>/);
+    for (const file of ["app/(app)/routes/[id]/page.tsx", "app/(app)/routes/route-form.tsx"]) {
+      expect(src(file)).not.toContain('backTo: "Routes"');
+    }
   });
   it("keeps Work route links within the staff navigation permissions", () => {
     expect(workHrefsFor(["brewer"])).toEqual({ all: "/work", batches: "/batches", runs: "/packaging" });

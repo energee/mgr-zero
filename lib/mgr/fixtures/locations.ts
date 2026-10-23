@@ -32,19 +32,16 @@ export const locationTaproom: LocationSnapshot = {
   timezone: "America/New_York",
 };
 
-/** Taproom Walk-in / Cold / Dry with inventory qty copy. */
+/** Taproom Walk-in / Cold / Dry. `stock` is get_bin_move_stock's one row per
+ *  stock identity: three in Walk-in, one in Cold, and Dry holds nothing. */
 export const locationBinsTaproom: LocationBinsSnapshot = {
   location: { id: LOC_TAPROOM.id, name: LOC_TAPROOM.name },
   backLabel: "Location detail",
-  bins: [
-    { ...TAPROOM_BINS[0], detail: "38 cases · 12 kegs" },
-    { ...TAPROOM_BINS[1], detail: "22 cases" },
-    { ...TAPROOM_BINS[2], detail: "6 cases" },
-  ],
+  bins: [...TAPROOM_BINS],
+  stock: [{ bin_id: BIN_WALKIN }, { bin_id: BIN_WALKIN }, { bin_id: BIN_WALKIN }, { bin_id: BIN_COLD }],
 };
 
 /** Cold bin sheet. */
 export const binCold: BinSnapshot = {
-  id: BIN_COLD,
   name: "Cold",
 };

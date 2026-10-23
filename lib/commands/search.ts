@@ -9,8 +9,9 @@
 // brewery's catalog outgrows prefix matching.
 import { z } from "zod";
 import { canRun, defineQuery, unwrap, type Ctx } from "./registry";
+import { formatDate } from "@/lib/date-format";
 import { docNo, poNo, batNo } from "@/lib/mgr/doc-no";
-import { escapeLike } from "@/lib/escape-like";
+import { escapeRegex } from "@/lib/escape-regex";
 
 export const SEARCH_KINDS = ["sku", "order", "invoice", "lot", "customer", "po", "batch", "material_lot"] as const;
 export type SearchKind = (typeof SEARCH_KINDS)[number];
@@ -41,7 +42,7 @@ type Row = Record<string, unknown>;
 
 async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[]> {
   const b = ctx.breweryId;
-  const prefix = `${escapeLike(q)}%`;
+  const prefix = `^${escapeRegex(q)}`; // an anchored imatch: case-insensitive prefix
   const doc = DOC.find(([re, k]) => k === kind && re.test(q));
   // The prefixes accept unbounded digits; a value past int4 would make Postgres
   // raise rather than simply not match, so it is no match here.
@@ -53,23 +54,23 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
       // A SKU matches on its own name or its brand's staff-only alias ("Animal #14").
       // PostgREST cannot `or` a column with an embedded one, so two prefix reads merge.
       const [byName, byAlias] = await Promise.all([
-        unwrap(ctx.db.from("skus").select("id, name, brands(name)").eq("brewery_id", b).ilike("name", prefix).limit(LIMIT)),
-        unwrap(ctx.db.from("skus").select("id, name, brands!inner(name)").eq("brewery_id", b).ilike("brands.alias", prefix).limit(LIMIT)),
+        unwrap(ctx.db.from("skus").select("id, name, brands(name)").eq("brewery_id", b).regexIMatch("name", prefix).limit(LIMIT)),
+        unwrap(ctx.db.from("skus").select("id, name, brands!inner(name)").eq("brewery_id", b).regexIMatch("brands.alias", prefix).limit(LIMIT)),
       ]) as [Row[], Row[]];
       const rows = [...new Map([...byName, ...byAlias].map((r) => [r.id as string, r])).values()].slice(0, LIMIT);
       return rows.map((r) => hit(r.id as string, r.name as string, (r.brands as { name: string } | null)?.name ?? "SKU", `/catalog`));
     }
     case "customer": {
-      const rows = await unwrap(ctx.db.from("customers").select("id, name, state").eq("brewery_id", b).ilike("name", prefix).limit(LIMIT)) as Row[];
+      const rows = await unwrap(ctx.db.from("customers").select("id, name, state").eq("brewery_id", b).regexIMatch("name", prefix).limit(LIMIT)) as Row[];
       return rows.map((r) => hit(r.id as string, r.name as string, `customer · ${r.state}`, `/customers/${r.id}`));
     }
     case "material_lot": {
-      const rows = await unwrap(ctx.db.from("material_lots").select("id,lot_code,materials(name)").eq("brewery_id", b).ilike("lot_code", prefix).limit(LIMIT)) as Row[];
+      const rows = await unwrap(ctx.db.from("material_lots").select("id,lot_code,materials(name)").eq("brewery_id", b).regexIMatch("lot_code", prefix).limit(LIMIT)) as Row[];
       return rows.map(row => hit(row.id as string, row.lot_code as string, `${(row.materials as { name: string } | null)?.name ?? "Material"} · ingredient lot`, `/compliance/material-lots/${row.id}`, (row.lot_code as string).toLowerCase() === q.toLowerCase()));
     }
     case "lot": {
-      const rows = await unwrap(ctx.db.from("lots").select("id, code, packaged_on, brands(name)").eq("brewery_id", b).ilike("code", prefix).limit(LIMIT)) as Row[];
-      return rows.map((r) => hit(r.id as string, r.code as string, `${(r.brands as { name: string } | null)?.name ?? "lot"} · packaged ${r.packaged_on}`, `/compliance/lots/${r.id}`, (r.code as string).toLowerCase() === q.toLowerCase()));
+      const rows = await unwrap(ctx.db.from("lots").select("id, code, packaged_on, brands(name)").eq("brewery_id", b).regexIMatch("code", prefix).limit(LIMIT)) as Row[];
+      return rows.map((r) => hit(r.id as string, r.code as string, `${(r.brands as { name: string } | null)?.name ?? "lot"} · packaged ${formatDate(r.packaged_on as string)}`, `/compliance/lots/${r.id}`, (r.code as string).toLowerCase() === q.toLowerCase()));
     }
     case "order": {
       if (n === null) return [];
@@ -89,7 +90,7 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
     case "batch": {
       if (n === null) return [];
       const rows = await unwrap(ctx.db.from("batches").select("id, batch_no, planned_on, brands:intended_brand_id(name)").eq("brewery_id", b).eq("batch_no", n)) as Row[];
-      return rows.map((r) => hit(r.id as string, `${batNo(r.batch_no as number)} · ${(r.brands as { name: string } | null)?.name ?? ""}`, `planned ${r.planned_on}`, `/batches/${r.id}`, true));
+      return rows.map((r) => hit(r.id as string, `${batNo(r.batch_no as number)} · ${(r.brands as { name: string } | null)?.name ?? ""}`, `planned ${formatDate(r.planned_on as string)}`, `/batches/${r.id}`, true));
     }
   }
 }

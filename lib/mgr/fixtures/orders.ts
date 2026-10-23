@@ -1,7 +1,7 @@
 // lib/mgr/fixtures/orders.ts — get_order-shaped snapshots for inventory
 // frames. Views never own sample data: screens pass toXViewProps(snapshot).
 import { OUNCES_PER_BBL } from "@/lib/volume";
-import { ALS, LOC_TAPROOM, LOC_WAREHOUSE, LOCATIONS, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT, TERESA } from "./demo";
+import { ALS, branded, LOC_TAPROOM, LOC_WAREHOUSE, LOCATIONS, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT, TERESA } from "./demo";
 import type { CompleteTransferSnapshot } from "@/lib/mgr/complete-transfer-view";
 import type { ConfirmOrderSnapshot } from "@/lib/mgr/confirm-order-view";
 import type { NewOrderSnapshot } from "@/lib/mgr/new-order-view";
@@ -15,6 +15,9 @@ const ORDER_231 = "00000000-0000-4000-8000-000000000231";
 const ORDER_088 = "00000000-0000-4000-8000-000000000088";
 const ORDER_234 = "00000000-0000-4000-8000-000000000234";
 const ORDER_237 = "00000000-0000-4000-8000-000000000237";
+const ORDER_248 = "00000000-0000-4000-8000-000000000248";
+const ORDER_238 = "00000000-0000-4000-8000-000000000238";
+const ORDER_TRANSFER = "00000000-0000-4000-8000-000000000240";
 
 const line = (
   id: string,
@@ -28,6 +31,7 @@ const line = (
   qty_picked,
   qty_shipped: null,
   unit_price_cents: sku.unit_price_cents,
+  one_way_fee_cents: null as number | null,
   skus: { name: sku.name },
 });
 
@@ -50,8 +54,9 @@ export const orderPickedRestock: OrderSnapshot = {
   lines: [
     line("l-hazy", SKU_HAZY, 4, 4),
     line("l-pils", SKU_PILS, 7, 10),
-    line("l-stout", SKU_STOUT, 2, 2),
+    { ...line("l-stout", SKU_STOUT, 2, 2), one_way_fee_cents: 800 },
   ],
+  deposits: [{ order_line_id: "l-hazy", description: "Returnable keg deposit", qty_ordered: 4, unit_price_cents: 3000, amount_cents: 12000 }],
   events: [
     { id: "e1", event: "created", actor: "Ted", payload: {}, created_at: "2026-09-01T13:02:00.000Z" },
     { id: "e2", event: "submitted", actor: "Ted", payload: {}, created_at: "2026-09-01T13:05:00.000Z" },
@@ -68,6 +73,41 @@ export const orderPickedRestock: OrderSnapshot = {
   atp: [
     { sku_id: SKU_HAZY.sku_id, qty: 11 },
     { sku_id: SKU_STOUT.sku_id, qty: 7 },
+  ],
+  locations: LOCATIONS,
+};
+
+/** Confirmed wholesale order with every charge frozen: the #976 price-summary
+ *  case. Prices are the ones captured on the lines, not the demo catalog's. */
+export const orderConfirmedWholesale: OrderSnapshot = {
+  timeZone: DEMO_TIME_ZONE,
+  order: {
+    id: ORDER_248,
+    order_no: 248,
+    kind: "wholesale",
+    status: "confirmed",
+    po_number: "RTR-AUTUMN-1042",
+    requested_ship_date: "2026-10-20",
+    note: "Use the side receiving entrance. Call the receiving desk before unloading.",
+    needs_restock: false,
+    from_location_id: LOC_WAREHOUSE.id,
+    customers: { name: RIDGELINE.name },
+    ship_tos: { label: "Main", country: "US", city: "Phoenixville", state: "PA" },
+  },
+  lines: [
+    { ...line("l-hazy", { ...SKU_HAZY, unit_price_cents: 12500 }, 4, null) },
+    { ...line("l-stout", { ...SKU_STOUT, unit_price_cents: 8000 }, 3, null), one_way_fee_cents: 800 },
+    { ...line("l-pils", { ...SKU_PILS, unit_price_cents: 3600 }, 8, null) },
+  ],
+  deposits: [{ order_line_id: "l-hazy", description: "Returnable keg deposit", qty_ordered: 4, unit_price_cents: 3000, amount_cents: 12000 }],
+  events: [
+    { id: "e1", event: "created", actor: "Ted", payload: {}, created_at: "2026-10-16T13:02:00.000Z" },
+    { id: "e2", event: "submitted", actor: "Ted", payload: {}, created_at: "2026-10-16T13:05:00.000Z" },
+    { id: "e3", event: "confirmed", actor: "Maria", payload: {}, created_at: "2026-10-16T14:10:00.000Z" },
+  ],
+  atp: [
+    { sku_id: SKU_HAZY.sku_id, qty: 11 },
+    { sku_id: SKU_STOUT.sku_id, qty: 0 },
   ],
   locations: LOCATIONS,
 };
@@ -93,8 +133,8 @@ export const orderSubmittedRidgeline: ConfirmOrderSnapshot = {
     customers: { name: RIDGELINE.name },
   },
   lines: [
-    { id: "l-hazy", sku_id: SKU_HAZY.sku_id, qty_ordered: 4, skus: { name: SKU_HAZY.name } },
-    { id: "l-pils", sku_id: SKU_PILS.sku_id, qty_ordered: 10, skus: { name: SKU_PILS.name } },
+    { id: "l-hazy", sku_id: SKU_HAZY.sku_id, qty_ordered: 4, skus: branded(SKU_HAZY) },
+    { id: "l-pils", sku_id: SKU_PILS.sku_id, qty_ordered: 10, skus: branded(SKU_PILS) },
   ],
   atp: [
     { sku_id: SKU_HAZY.sku_id, qty: 11 },
@@ -122,7 +162,8 @@ export const orderTransferComplete: CompleteTransferSnapshot = {
   locations: LOCATIONS,
 };
 
-/** Work → Orders list: the four next-action rows the inventory draws. */
+/** Work → Orders list: one row per next action, plus a staged restock, a
+ *  transfer without a customer or number, and an undated long customer name. */
 export const ordersWorkList: OrdersListSnapshot = {
   roles: ["sales"],
   orders: [
@@ -157,6 +198,24 @@ export const ordersWorkList: OrdersListSnapshot = {
       requested_ship_date: "2026-09-11",
       needs_restock: false,
       customers: { name: TERESA.name },
+    },
+    {
+      // No customer join and no number yet: the transfer and "Order" fallbacks.
+      id: ORDER_TRANSFER,
+      order_no: null,
+      status: "confirmed",
+      requested_ship_date: null,
+      needs_restock: false,
+      customers: null,
+    },
+    {
+      // A long customer name wraps in full on the phone.
+      id: ORDER_238,
+      order_no: 238,
+      status: "submitted",
+      requested_ship_date: null,
+      needs_restock: false,
+      customers: { name: "North Orchard Neighborhood Market and Gathering Hall" },
     },
   ],
 };

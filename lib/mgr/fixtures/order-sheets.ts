@@ -2,7 +2,7 @@
 // Adjust / Short pick / Pick / Ship / Shipment done / Return sheets. Identities
 // come from demo.ts; order numbers match fixtures/orders.ts (229, 231).
 import { OUNCES_PER_BBL } from "@/lib/volume";
-import { ALS, LOC_TAPROOM, LOC_WAREHOUSE, LOCATIONS, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT } from "./demo";
+import { ALS, branded, LOC_TAPROOM, LOC_WAREHOUSE, LOCATIONS, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT } from "./demo";
 import type { AdjustLinesSnapshot } from "@/lib/mgr/adjust-lines-view";
 import type { PickSnapshot } from "@/lib/mgr/pick-view";
 import type { ReturnCreditSnapshot } from "@/lib/mgr/return-credit-view";
@@ -54,19 +54,19 @@ const line = (
 export const orderAdjustLines: AdjustLinesSnapshot = {
   order: { id: ORDER_229, order_no: 229, customers: { name: ALS.name } },
   lines: [
-    line("l-hazy", SKU_HAZY, 4, 4),
-    line("l-pils", SKU_PILS, 7, 10),
-    line("l-stout", SKU_STOUT, 2, 2),
+    { ...line("l-hazy", SKU_HAZY, 4, 4), skus: branded(SKU_HAZY) },
+    { ...line("l-pils", SKU_PILS, 7, 10), skus: branded(SKU_PILS) },
+    { ...line("l-stout", SKU_STOUT, 2, 2), skus: branded(SKU_STOUT) },
   ],
 };
 
-/** Warehouse pick of Ridgeline: counts start at ordered. */
+/** Warehouse pick of Ridgeline: counts start at ordered, lines under their brand. */
 export const orderPick: PickSnapshot = {
-  order: { id: ORDER_231, order_no: 231, from_location_id: LOC_WAREHOUSE.id },
+  order: { id: ORDER_231, order_no: 231, from_location_id: LOC_WAREHOUSE.id, requested_ship_date: "2026-09-10", customers: { name: RIDGELINE.name } },
   lines: [
-    line("l-hazy", SKU_HAZY, 4, null),
-    line("l-pils", SKU_PILS, 10, null),
-    line("l-stout", SKU_STOUT, 2, null),
+    { ...line("l-hazy", SKU_HAZY, 4, null), skus: branded(SKU_HAZY) },
+    { ...line("l-pils", SKU_PILS, 10, null), skus: branded(SKU_PILS) },
+    { ...line("l-stout", SKU_STOUT, 2, null), skus: branded(SKU_STOUT) },
   ],
   locations: LOCATIONS,
 };

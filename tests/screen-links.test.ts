@@ -14,10 +14,12 @@ const names = new Set(SCREENS.map((s) => s.name));
 
 describe("resolveTap", () => {
   it("keeps batch history and exact occupancy reading destinations distinct", () => {
-    expect(resolveTap(by("Batches"), "Brew")).toBe("Brew day");
+    expect(resolveTap(by("Batches"), "Brew")).toBe("Brew prep");
     expect(resolveTap(by("Batches"), "B-0409")).toBe("Brew day");
     expect(resolveTap(by("Batches"), "FV1")).toBe("Vessel detail");
     expect(resolveTap(by("Batches"), "Reading")).toBe("Fermentation reading");
+    expect(resolveTap(by("Batches"), "New batch")).toBe("New batch");
+    expect(resolveTap(by("New batch"), "Schedule batch")).toBe("Batches");
   });
   it("opens the live invitation sheet and import route", () => {
     for (const name of ["Team", "First-run checklist"]) {
@@ -115,8 +117,8 @@ describe("reported explorer flows", () => {
     ["Disconnect Square", "Disconnect Square", "Connect Square"],
     ["Connect QuickBooks", "Connect QuickBooks", "Accounting"],
     ["Connect Square", "Connect Square", "Square locations"],
-    ["Point of sale", "Square QuickBooks connectorReview the separate taproom revenue feed", "Square → QuickBooks connector"],
-    ["Square → QuickBooks connector", "Open Accounting", "Accounting"],
+    ["Point of sale", "Taproom sales in QuickBooksSquare’s own connector, separate from MGR", "Taproom sales in QuickBooks"],
+    ["Taproom sales in QuickBooks", "Open Accounting", "Accounting"],
   ])("%s: %s → %s", (screen, tap, target) => {
     expect(resolveTap(by(screen), tap)).toBe(target);
   });
@@ -131,7 +133,7 @@ describe("reported explorer flows", () => {
   });
 
   it("keeps deep-linked sheets over their owning pages", () => {
-    for (const [sheet, page] of [["Question invoice", "Pay invoice"], ["Square locations", "Point of sale"], ["Square → QuickBooks connector", "Point of sale"], ["Disconnect Square", "Point of sale"], ["POS item", "Menu"], ["Disconnect Slack", "Chat settings"]]) {
+    for (const [sheet, page] of [["Question invoice", "Pay invoice"], ["Square locations", "Point of sale"], ["Taproom sales in QuickBooks", "Point of sale"], ["Disconnect Square", "Point of sale"], ["POS item", "Menu"], ["Disconnect Slack", "Chat settings"]]) {
       expect(SCREENS[pageUnder([], SCREENS.indexOf(by(sheet)))].name).toBe(page);
     }
   });
@@ -144,7 +146,6 @@ describe("reported explorer flows", () => {
 describe("isInertOn", () => {
   it("opens mapping controls locally without redirecting QuickBooks edits to POS", () => {
     for (const name of ["QuickBooks mappings", "Invoice mappings"]) expect(isInertOn(by(name), "Map")).toBe(true);
-    expect(isInertOn(by("POS mapping"), "Map")).toBe(false);
   });
   it("still suppresses an inert label the screen does not map", () => {
     expect(isInertOn(by("Pars and allocation"), "Paid")).toBe(true);

@@ -23,7 +23,14 @@ it("keeps correction permission and explicit slot suppression in the shared page
   expect(render("admin")).toContain("Correct count");
   expect(render("warehouse")).not.toContain("Correct count");
   expect(render("admin")).not.toContain("Record count");
-  expect(render("admin")).toContain("Open count");
+  expect(render("admin")).not.toContain("Open count");
+});
+
+it("a saved count in the history is a row link to that count, not an Open count verb (#1026)", () => {
+  const history = [{ ...weeklyCount.history[0]!, href: "/taproom/count/sep1" }];
+  const html = renderToStaticMarkup(createElement(WeeklyCountView, { model: { ...weeklyCount, history }, draft: null }));
+  expect(html).toMatch(/<a[^>]*href="\/taproom\/count\/sep1"[^>]*>(?:(?!<\/a>)[\s\S])*Weekly count · Sep 1, 2026/);
+  expect(html).not.toContain("Open count");
 });
 
 it("the live draft, correction and print bindings delegate to shared controls", () => {
@@ -46,6 +53,41 @@ it("marks the count quantities invalid when the save was rejected", () => {
   const rejected = failCountAttempt(beginCountAttempt(state, "request"), "error", "Bin no longer holds that lot");
   const html = renderToStaticMarkup(createElement(WeeklyCountDraftView, { state: rejected, roles: ["taproom"], lotLabels: {}, timeZone: "America/New_York" }));
   expect(html).toContain('aria-invalid="true"');
+});
+
+it("#1117 draws routine guidance as neutral help, never the amber warning note", () => {
+  const html = renderToStaticMarkup(createElement(WeeklyCountView, { model: weeklyCount, draft: null }));
+  expect(html).toContain("Latest uncorrected count");
+  expect(html).toContain("Only Admin can correct a count. Admin can correct only the latest count, once, when a sold quantity was counted too low.");
+  expect(html).not.toContain("without the action");
+  expect(html).not.toContain("bg-warning");
+  const corrected = renderToStaticMarkup(createElement(WeeklyCountView, { model: { ...weeklyCount, receipt: { ...weeklyCount.receipt!, correction: "Corrected by Admin at Sep 9, 2026 · miscounted" } }, draft: null }));
+  expect(corrected).toContain("Corrected by Admin");
+  expect(corrected).not.toContain("bg-warning");
+});
+
+it("#1117 says in plain words why expected consumption is unavailable", () => {
+  const empty = { location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "captured", lines: [] };
+  const render = (reason: string) => renderToStaticMarkup(createElement(WeeklyCountDraftView, { state: countDraftFromSnapshot(empty, { prior_count: null, expected_bbl: null, reason, rows: [] }), roles: ["taproom"], lotLabels: {}, timeZone: "America/New_York" }));
+  const first = render("missing_baseline");
+  expect(first).toContain("Expected consumption unavailable. First count, so there is nothing to compare against.");
+  expect(first).not.toContain("missing baseline");
+  expect(render("unmapped_pos_lines")).toContain("Some POS items still need mapping.");
+  const unloaded = renderToStaticMarkup(createElement(WeeklyCountDraftView, { state: countDraftFromSnapshot(empty, null), roles: ["taproom"], lotLabels: {}, timeZone: "America/New_York" }));
+  expect(unloaded).toContain("Expected consumption unavailable.</p>");
+  expect(unloaded).not.toContain("POS sales data");
+});
+
+it("#1117 draws Refresh expected and Print current stock labels as visible buttons", () => {
+  const html = renderToStaticMarkup(createElement(WeeklyCountDraftView, { state: countDraftFromSnapshot({ location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "captured", lines: [] }, null), roles: ["taproom"], lotLabels: {}, timeZone: "America/New_York" }));
+  for (const label of ["Refresh expected", "Print current stock labels"]) expect(html).toMatch(new RegExp(`<button[^>]*data-variant="outline"[^>]*>${label}</button>`));
+});
+
+it("#1117 explains that recording a taproom with no stock saves a zero count", () => {
+  const html = renderToStaticMarkup(createElement(WeeklyCountDraftView, { state: countDraftFromSnapshot({ location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "captured", lines: [] }, null), roles: ["taproom"], lotLabels: {}, timeZone: "America/New_York" }));
+  expect(html).toContain("No stock is recorded at this taproom. Record count saves a count of zero for today. Your next count compares against it.");
+  expect(html).not.toContain("empty observation");
+  expect(html).toMatch(/<button(?![^>]*\sdisabled="")[^>]*type="submit"[^>]*>Record count<\/button>/);
 });
 
 it("#814 shows the shared shortage disposition picker and freezes it on uncertain retry", () => {

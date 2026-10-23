@@ -113,7 +113,11 @@ export type ChatHealth = {
   linkedCount: number; queue: Record<string, number>; lastCallback: string | null; lastDelivery: string | null;
   destinations: { id: string; channelId: string; state: string; privacy: string; reason: string | null }[];
 };
-export type ChatPreferences = { preferences: { reason: typeof REASONS[number]; enabled: boolean; personalDestinationId?: string | null }[]; destinations?: { id: string; external_destination_id: string }[]; quietStart: string | null; quietEnd: string | null; timezone: string; link: { id: string; external_user_id: string } | null };
+/** One person's chat preferences. `installationActive` and `breweryQuietHours`
+ *  come from get_staff_chat_installation, so non-admin staff can read them
+ *  while chat_installations stays admin-only. */
+export type ChatPreferences = { preferences: { reason: typeof REASONS[number]; enabled: boolean; personalDestinationId?: string | null }[]; destinations?: { id: string; external_destination_id: string }[]; quietStart: string | null; quietEnd: string | null; timezone: string; link: { id: string; external_user_id: string } | null;
+  installationActive: boolean; breweryQuietHours: { start: string; end: string; timezone: string } | null };
 export type ChatLinkIntent = { brewery: string; mgrIdentity: string; slackIdentity: string; workspace: string; expiresAt: string };
 export type ChatLinkedPerson = { id: string; name: string; roles: StaffRole[]; slackIdentity: string; linkedAt: string };
 
@@ -127,24 +131,29 @@ defineQuery({ name: "get_chat_link_intent", description: "Preview both identitie
   input: z.object({ proof: z.string().min(1).max(256) }), roles: STAFF_ROLES,
   handler: (ctx, i) => unwrap(ctx.db.rpc("get_chat_link_intent", { p_brewery: ctx.breweryId, p_proof_hash: sha256(i.proof) })) as Promise<ChatLinkIntent | null>,
 });
-defineQuery({ name: "get_notification_preferences", description: "Read your own reason preferences, personal quiet hours and Slack link",
+// Personal delivery never sends operations_digest (chat_fanout_deliveries), so
+// it has no personal switch; it goes only to the operations channel.
+const PERSONAL_REASONS = REASONS.filter((reason) => reason !== "operations_digest");
+defineQuery({ name: "get_notification_preferences", description: "Read your own reason preferences, personal quiet hours and Slack link, plus whether the brewery's Slack is active and its quiet hours",
   input: z.object({}), roles: STAFF_ROLES,
   handler: async (ctx): Promise<ChatPreferences> => {
-    const [preferences, brewery, link, destinations] = await Promise.all([
+    const [preferences, brewery, link, destinations, installation] = await Promise.all([
       unwrap(ctx.db.from("notification_preferences").select("reason, enabled, personal_destination_id, quiet_hours_start, quiet_hours_end, quiet_hours_timezone").eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId)),
       unwrap(ctx.db.from("staff_brewery").select("timezone").eq("id", ctx.breweryId).single()),
       unwrap(ctx.db.from("chat_user_links").select("id, external_user_id").eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId).eq("state", "active").maybeSingle()),
       unwrap(ctx.db.from("notification_destinations").select("id, external_destination_id").eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId).eq("kind", "personal").eq("state", "active").not("validated_at", "is", null)),
+      unwrap(ctx.db.rpc("get_staff_chat_installation", { p_brewery: ctx.breweryId })) as Promise<{ active: boolean; quietHours: ChatPreferences["breweryQuietHours"] }>,
     ]);
     const quiet = preferences?.find((p) => p.quiet_hours_start !== null);
     if (!brewery?.timezone) throw new CommandError("staff membership brewery is unavailable");
     const timezone = quiet?.quiet_hours_timezone ?? brewery.timezone;
-    return { preferences: REASONS.map((reason) => {
+    return { preferences: PERSONAL_REASONS.map((reason) => {
       const saved = preferences?.find(p => p.reason === reason);
       return { reason, enabled: saved?.enabled ?? true,
         ...(saved?.personal_destination_id ? { personalDestinationId: saved.personal_destination_id } : {}) };
     }),
-      quietStart: quiet?.quiet_hours_start ?? null, quietEnd: quiet?.quiet_hours_end ?? null, timezone, link, destinations: destinations ?? [] };
+      quietStart: quiet?.quiet_hours_start ?? null, quietEnd: quiet?.quiet_hours_end ?? null, timezone, link, destinations: destinations ?? [],
+      installationActive: installation.active, breweryQuietHours: installation.quietHours };
   },
 });
 defineQuery({ name: "list_chat_channels", description: "List private active Slack channels with the bot present and no sharing",

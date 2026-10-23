@@ -368,20 +368,22 @@ recorded. It is an audit surface, not decoration, and never implies a row can be
 
 | Token | Light | Dark | Role |
 |---|---|---|---|
-| `--background` | `#FAFAF7` | `#1B1C18` | Page ground |
-| `--card` / `--popover` | `#FFFFFF` | `#22231F` / `#262721` | Cards, sheets, menus |
-| `--foreground` | `#1E1F1A` | `#EDEDE6` | Text |
-| `--primary` | `#6453B3` | `#ab9df2` | Mutable primary action, active nav, progress |
-| `--irreversible` | `#0F6B78` | `#78dce8` | Append-only, filed, external, sign-out actions only |
-| `--attention` / `--attention-foreground` | `#FFF0E7` / `#99451C` | `#33271F` / `#fc9867` | Review (needs attention) surface and text |
-| `--warning` / `--warning-foreground` | `#FDF3DC` / `#755800` | `#26231A` / `#ffd866` | Warning surface and text; never yellow on white |
-| `--border` | `#E3E3DC` | `#33342E` | Hairline dividers |
+| `--background` | `#FAFAF7` | `#102040` | Page ground |
+| `--card` / `--popover` | `#FFFFFF` | `#152a50` / `#1a3058` | Cards, sheets, menus |
+| `--foreground` | `#1E1F1A` | `#dddddd` | Text |
+| `--primary` | `#6453B3` | `#60a4ec` | Mutable primary action, active nav, progress |
+| `--irreversible` | `#0F6B78` | `#60b6cb` | Append-only, filed, external, sign-out actions only |
+| `--destructive` | `#B52D51` | `#ff7a70` | Errors and destructive actions; passes AA as text on card and popover |
+| `--attention` / `--attention-foreground` | `#FFF0E7` / `#99451C` | `#2e2350` / `#e26be2` | Review (needs attention) surface and text |
+| `--warning` / `--warning-foreground` | `#FDF3DC` / `#755800` | `#2f3326` / `#ffe763` | Warning surface and text; never yellow on white |
+| `--border` | `#E3E3DC` | `#2a4478` | Hairline dividers |
 
 The remaining shadcn tokens (secondary, muted, accent, destructive, sidebar,
 chart) are set in `app/globals.css`; that file is the source of truth. The
 mood is Linear-quiet: near-grayscale neutrals with a faint warm tint, one
-violet accent, cyan reserved for irreversible actions, orange for review, yellow for
-warning.
+violet accent, teal reserved for irreversible actions, orange for review and yellow
+for warning. Dark mode is the Aardvark Blue terminal scheme: a navy ground, its blue
+as the accent and its cyan for irreversible actions.
 
 Every pair passes WCAG AA in both modes. Semantic pairs replace manual `dark:`
 overrides. The irreversible accent never decorates headings, tabs, validation/errors,

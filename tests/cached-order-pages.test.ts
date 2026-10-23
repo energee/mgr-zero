@@ -8,6 +8,8 @@ vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: (name: stri
     : name === "list_orders" ? { rows: [], nextCursor: null } : [];
   return { data: state.pending ? undefined : data, error: state.error, isPending: state.pending, isFetching: state.fetching, isPaused: state.paused, dataUpdatedAt: state.pending ? 0 : Date.parse("2026-09-13T12:00:00Z"), refetch: vi.fn() };
 } }));
+// The Orders Status pick navigates with the app router; outside Next it needs a stand-in.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => "/orders" }));
 import { NewOrderClient } from "@/app/(app)/orders/new/new-order-client";
 import { OrdersClient } from "@/app/(app)/orders/orders-client";
 import { OrderForm } from "@/app/(app)/orders/order-form";
@@ -57,7 +59,9 @@ it("does not describe a cold cache as empty data or render skeletons", () => {
 it("preserves customer filters and read-only Warehouse controls", () => {
   const html = renderToStaticMarkup(OrdersClient({ roles: ["warehouse"], timeZone, status: "draft", customerId: "buyer" }));
   expect(state.calls).toEqual([["list_orders", { status: "draft", customerId: "buyer", cursor: undefined }]]);
-  expect(html).toContain("customerId=buyer");
+  // The customer scope line's Clear keeps the status; each Status option keeps the customer (tests/orders-list-view.test.ts).
+  expect(html).toContain("Customer: <strong");
+  expect(html).toContain('href="/orders?status=draft"');
   expect(html).not.toContain("New order");
 });
 

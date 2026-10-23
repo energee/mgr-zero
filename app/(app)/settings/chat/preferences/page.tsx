@@ -6,6 +6,10 @@ import type { ChatPreferences } from "@/lib/commands/chat";
 import "@/lib/commands/all";
 import { ChatPersonalPreferences } from "../chat-settings-client";
 import { onlyRoles } from "@/lib/mgr/roles";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/settings/chat/preferences") };
+
 export default async function ChatPreferencesPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);

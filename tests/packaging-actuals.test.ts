@@ -28,13 +28,14 @@ import { sql } from "./helpers";
 async function fixture() {
   const brewery = await makeBrewery();
   const ctx = await makeStaffCtx(brewery.id, "brewer");
+  const owner = await makeStaffCtx(brewery.id, "admin");
   const catalog = await seedCatalog(brewery.id, { bblPerUnit: 0.001 });
   const destination = await seedLocation(brewery.id);
   const materialId = await seedMaterial(brewery.id, { name: "Actual cans", category: "packaging", uom: "each" });
   const bom = await admin.from("format_bom").insert({ brewery_id: brewery.id, format_id: catalog.formatId, material_id: materialId, qty_per_unit: 1 });
   if (bom.error) throw bom.error;
   await seedMovement(brewery.id, { materialId, locationId: destination.id, binId: destination.binId, qty: 100, type: "receipt", createdBy: ctx.userId });
-  const vessel = await runCommand("upsert_vessel", { name: "Actual tank", kind: "fermenter", capacityBbl: 10 }, ctx) as { id: string };
+  const vessel = await runCommand("upsert_vessel", { name: "Actual tank", kind: "fermenter", capacityBbl: 10 }, owner) as { id: string };
   const batch = await runCommand("schedule_batch", { intendedBrandId: catalog.brandId, plannedBbl: 1, plannedOn: "2026-09-28" }, ctx) as { id: string };
   const brew = await runCommand("record_brew_day", { batchId: batch.id, vesselId: vessel.id, brewedOn: "2026-09-28", initialBbl: 1, actuals: [], confirmEmpty: true }, ctx) as { occupancy: { id: string } };
   const run = await runCommand("schedule_packaging_run", { brandId: catalog.brandId, occupancyId: brew.occupancy.id, plannedOn: "2026-09-28", outputs: [{ skuId: catalog.skuId, qtyPlanned: 100 }] }, ctx) as { id: string };
@@ -152,8 +153,10 @@ it("replays a completed pre-upgrade close without permitting a new unconfirmed c
 });
 
 import { Client } from "pg";
-import { DB } from "./helpers";
-it.each(["materials", "skus", "format_bom", "material_lots", "inventory_movements", "material_movements"])("refuses a busy %s writer without waiting while holding other locks", async table => {
+import { DB, closePgSessions, pgSession } from "./helpers";
+afterEach(closePgSessions);
+const lockedTables = ["materials", "skus", "format_bom", "material_lots", "inventory_movements", "material_movements"];
+it.each(lockedTables)("refuses as busy when a %s writer holds its lock through every retry", async table => {
   const f = await fixture();
   const writer = new Client({ connectionString: DB });
   const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
@@ -165,6 +168,37 @@ it.each(["materials", "skus", "format_bom", "material_lots", "inventory_movement
   } finally { await writer.query("rollback"); await writer.end(); }
   await runCommand("close_packaging_run", f.input, f.ctx, execution);
   expect((await admin.from("packaging_material_records").select("id").eq("run_id", f.run.id)).data).toHaveLength(1);
+});
+
+// #1234: autovacuum holds SHARE UPDATE EXCLUSIVE on a table for a moment. The
+// close retries its whole lock set instead of refusing at the first conflict.
+it.each(lockedTables)("closes once a brief autovacuum-mode lock on %s is released", async table => {
+  const f = await fixture();
+  const holder = await pgSession();
+  await holder.query(`begin; lock table public.${table} in share update exclusive mode`);
+  const released = new Promise(resolve => setTimeout(resolve, 300)).then(() => holder.query("commit"));
+  await runCommand("close_packaging_run", f.input, f.ctx);
+  await released;
+  expect((await admin.from("packaging_material_records").select("id").eq("run_id", f.run.id)).data).toHaveLength(1);
+});
+
+// #1234: a close never waits while holding part of its lock set. A ledger
+// writer that arrives while the close is stalled is never a deadlock victim
+// (it would be if the close held skus EXCLUSIVE while waiting on material_lots).
+it("lets a concurrent ledger writer through while a close waits out a brief lock", async () => {
+  const f = await fixture();
+  const warehouse = await makeStaffCtx(f.brewery.id, "warehouse");
+  const holder = await pgSession();
+  await holder.query("begin; lock table public.material_lots in share update exclusive mode");
+  const close = runCommand("close_packaging_run", f.input, f.ctx);
+  close.catch(() => {});
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const movement = runCommand("record_movement", { skuId: f.catalog.skuId, locationId: f.destination.id, binId: f.destination.binId, qty: 1, type: "adjustment" }, warehouse);
+  movement.catch(() => {});
+  await new Promise(resolve => setTimeout(resolve, 200));
+  await holder.query("commit");
+  await expect(movement).resolves.toBeDefined();
+  await expect(close).resolves.toBeDefined();
 });
 
 

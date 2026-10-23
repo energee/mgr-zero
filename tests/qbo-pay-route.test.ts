@@ -45,6 +45,8 @@ vi.mock("@/lib/supabase/integration-tokens", async (importOriginal) => ({
   },
   confirmPortalInvoicePayment: async () => state.confirmed,
   compareAndSwapPortalInvoicePaymentTokens: async () => true,
+  leaseQboTokenRefresh: async () => "leased",
+  releaseQboTokenRefresh: async () => undefined,
 }));
 
 vi.mock("@/lib/qbo", async (importOriginal) => {

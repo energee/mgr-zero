@@ -16,13 +16,13 @@ export const matrix = {
   sale_channels: "deny", channel_prices: "deny", price_group_barcodes: "deny", inventory_movements: "deny", allocations: "deny",
   taproom_pars: "taproom", tap_intervals: "tenant", taproom_counts: "tenant", taproom_count_lines: "tenant", recipes: "deny", recipe_versions: "deny", recipe_ingredients: "deny", recipe_water_additions: "deny",
   vessels: "deny", batches: "deny", vessel_occupancies: "deny", transfers: "deny", volume_adjustments: "deny", volume_adjustment_reclassifications: "deny",
-  fermentation_readings: "deny", material_movements: "deny", batch_additions: "deny", brew_records: "deny", packaging_runs: "deny",
+  fermentation_readings: "deny", material_movements: "deny", batch_additions: "deny", brew_records: "deny", brew_pulls: "deny", packaging_runs: "deny",
   lots: "deny", packaging_run_outputs: "deny", packaging_run_consumptions: "deny", packaging_material_records: "deny", packaging_material_actuals: "deny", material_contracts: "deny",
   purchase_orders: "deny", purchase_order_lines: "deny", receipts: "deny", receipt_lines: "deny",
   material_counts: "deny", material_count_lines: "deny", orders: "deny", order_lines: "deny", order_deposit_lines: "deny", order_events: "deny",
-  shipments: "deny", invoices: "deny", invoice_questions: "deny", invoice_lines: "deny", keg_events: "deny",
+  shipments: "deny", invoices: "deny", invoice_questions: "deny", invoice_lines: "deny", invoice_payments: "deny", invoice_payment_voids: "deny", keg_events: "deny",
   stock_transfers: "deny", stock_transfer_lines: "deny", qbo_connections: "deny", qbo_pushes: "deny", qbo_customer_snapshots: "deny", qbo_customer_decisions: "deny", pos_connections: "deny",
-  pos_locations: "tenant", pos_item_mappings: "tenant", pos_catalog_variations: "deny", pos_catalog_items: "deny", pos_catalog_ownership: "deny", pos_menus: "deny", pos_menu_lines: "deny", pos_sales: "deny", pos_sale_expectations: "deny", pos_sales_coverage: "deny", brand_approvals: "deny",
+  pos_locations: "tenant", pos_item_mappings: "tenant", pos_catalog_variations: "deny", pos_catalog_items: "deny", pos_catalog_ownership: "deny", pos_menus: "deny", pos_menu_lines: "deny", pos_sales: "deny", pos_sale_expectations: "deny", pos_sales_coverage: "deny", brand_approvals: "cola",
   state_registrations: "deny", brewery_state_licenses: "deny", report_filings: "deny", routes: "deny",
   reporting_basis_corrections: "deny", report_basis_amendments: "deny",
   deliveries: "deny", chat_installations: "deny", chat_user_links: "self", notification_destinations: "self",
@@ -52,6 +52,7 @@ const serviceOnly = new Set<Table>(["brewery_counters", "volume_adjustment_recla
 const privilegedRead: Partial<Record<Table, true>> = {
   qbo_customer_snapshots: true, qbo_customer_decisions: true,
   reporting_basis_corrections: true, report_basis_amendments: true,
+  invoice_payments: true, invoice_payment_voids: true,
 };
 export const day = "2026-09-08";
 export const now = "2026-09-08T12:00:00Z";
@@ -110,6 +111,7 @@ export async function fixtures() {
   await put("fermentation_readings", { batch_id: batch.id, occupancy_id: occupancy.id, gravity_plato: 5, created_by: owner.id });
   const consumption = await put("material_movements", { material_id: material.id, location_id: wh.id, bin_id: wh.binId, qty: -1, type: "consumption", created_by: owner.id });
   await put("batch_additions", { batch_id: batch.id, stage: "mash", movement_id: consumption.id });
+  await put("brew_pulls", { batch_id: batch.id, material_id: material.id, location_id: wh.id, bin_id: wh.binId, qty: 1, updated_by: owner.id });
   const run = await put("packaging_runs", { brand_id: cat.brandId, planned_on: day, created_by: owner.id });
   await put("lots", { packaging_run_id: run.id, brand_id: cat.brandId, code: "PRIVATE-LOT", packaged_on: day });
   await put("packaging_run_outputs", { run_id: run.id, sku_id: cat.skuId, qty_planned: 1 });
@@ -132,6 +134,11 @@ export async function fixtures() {
   const invoice = await put("invoices", { customer_id: customer.customerId, kind: "invoice" });
   await put("invoice_questions", { invoice_id: invoice.id, customer_id: customer.customerId, body: "Private question", created_by: owner.id });
   await put("invoice_lines", { invoice_id: invoice.id, sku_id: cat.skuId, description: "IPA", qty: 1, unit_price_cents: 1200 });
+  // Authenticated has no insert grant on the payment ledger, so its rows go in with privileged SQL.
+  sql(`with payment as (insert into public.invoice_payments(brewery_id,invoice_id,amount_cents,received_on,method,recorded_by)
+      values ('${brewery.id}','${invoice.id}',500,'${day}','check','${owner.id}') returning id)
+    insert into public.invoice_payment_voids(brewery_id,payment_id,reason,voided_by)
+    select '${brewery.id}',id,'Authorization fixture','${owner.id}' from payment`, true);
   const transfer = await put("stock_transfers", { from_location_id: wh.id, to_location_id: taps[0].id, created_by: owner.id });
   await put("stock_transfer_lines", { transfer_id: transfer.id, sku_id: cat.skuId, qty: 1, from_bin_id: wh.binId, to_bin_id: taps[0].binId });
   const qboConnection = await put("qbo_connections", { realm_id: `realm-${brewery.id}` });
@@ -153,6 +160,7 @@ export async function fixtures() {
   sql(`select private.reconcile_pos_sale('${brewery.id}','${sale.id}')`);
   await put("pos_sales_coverage", { connection_id: pos.id, external_location_id: "L1", location_id: taps[0].id, starts_at: "2026-09-01T00:00:00Z", ends_at: now, complete: true });
   await put("brand_approvals", { brand_id: cat.brandId, kind: "cola", ttb_id: "PRIVATE-COLA" });
+  await put("brand_approvals", { brand_id: cat.brandId, kind: "formula", ttb_id: "PRIVATE-FORMULA" });
   await put("state_registrations", { brand_id: cat.brandId, state: "PA" });
   await put("brewery_state_licenses", { state: "PA", kind: "brewery" });
   const filing = await put("report_filings", { jurisdiction: "TTB", period_start: day, period_end: day, figures: { private: true } });

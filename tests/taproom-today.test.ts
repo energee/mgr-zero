@@ -12,7 +12,7 @@ it("shows permitted Taproom exits from observed facts without inventing due poli
     ["Variance · 4 weeks", "Review", `/taproom/variance?location=${location.id}&weeks=4`],
   ]);
   expect(rows[0].detail).toContain("no open kegs observed");
-  expect(rows[1].detail).toContain("last saved 2026-09-07");
+  expect(rows[1].detail).toContain("last saved Sep 7, 2026 at 10:00 AM");
   expect(rows[2].detail).toContain("0 bbl expected minus actual");
   expect(JSON.stringify(rows)).not.toMatch(/overdue|shift/i);
 });
@@ -30,4 +30,11 @@ it("labels mapped variance from incomplete POS coverage as partial", () => {
     periods: [{ coverage_complete: false, reason: null }],
   }, "America/New_York");
   expect(rows[2].detail).toContain("0.25 bbl expected minus actual · partial POS coverage");
+});
+
+it("says how many kegs are on tap at the location (#1119)", () => {
+  const open = [{ opened_at: "2026-09-08T15:20:00Z" }, { opened_at: "2026-09-08T14:00:00Z" }] as Parameters<typeof taproomTodayRows>[1];
+  const [board] = taproomTodayRows(location, open, [], report, "America/New_York");
+  expect(board.detail).toMatch(/^Main taproom · 2 kegs on tap · last opened /);
+  expect(taproomTodayRows(location, open.slice(0, 1), [], report, "America/New_York")[0].detail).toContain("1 keg on tap");
 });

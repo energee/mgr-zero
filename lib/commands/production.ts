@@ -13,6 +13,7 @@ import { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/li
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, CommandError, type Ctx, latestOf } from "./registry";
 import { brandNames, isoDate } from "./packaging";
 import { recipeGravity } from "@/lib/recipe-gravity";
+import { escapeRegex } from "@/lib/escape-regex";
 import { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
 
 // The process spec (recipe-builder spec D2, D6, D7). Stored as given; the RPC
@@ -133,37 +134,44 @@ defineQuery({
   },
 });
 
-// Water profiles: a catalog entity of six ions in ppm (Water profiles /
-// Water profile screens). One upsert creates (no profileId) or edits.
+// Water profiles (Water profiles / Water profile screens): a catalog entity of
+// six ions in ppm, plus optional alkalinity as CaCO3, the water's own pH and
+// notes (#1205). One upsert creates (no profileId) or edits; an edit writes
+// every field, so leaving an optional one out clears it.
 const ppm = z.number().nonnegative().max(999_999.9); // numeric(7,1)
 defineQuery({
-  name: "list_water_profiles", description: "Water profiles, alphabetical: a name and six ions in ppm",
+  name: "list_water_profiles", description: "Water profiles, alphabetical: a name, six ions in ppm, and alkalinity as CaCO3, water pH and notes when set",
   input: z.object({}), roles: ["admin", "brewer"],
   handler: (ctx) => unwrap(ctx.db.from("water_profiles")
-    .select("id, name, calcium_ppm, magnesium_ppm, sodium_ppm, sulfate_ppm, chloride_ppm, bicarbonate_ppm")
+    .select("id, name, calcium_ppm, magnesium_ppm, sodium_ppm, sulfate_ppm, chloride_ppm, bicarbonate_ppm, alkalinity_ppm, water_ph, note")
     .eq("brewery_id", ctx.breweryId).order("name")),
 });
 defineCommand({
-  name: "upsert_water_profile", description: "Create a water profile, or edit one by profileId: its name and six ions in ppm",
+  name: "upsert_water_profile", description: "Create a water profile, or edit one by profileId: its name, six ions in ppm, and optional alkalinity as CaCO3, water pH and notes",
   input: z.object({
     profileId: z.string().uuid().optional(), name: z.string().trim().min(1),
     calciumPpm: ppm, magnesiumPpm: ppm, sodiumPpm: ppm, sulfatePpm: ppm, chloridePpm: ppm, bicarbonatePpm: ppm,
+    alkalinityPpm: ppm.optional().describe("Total alkalinity as CaCO3, in ppm"),
+    waterPh: z.number().min(0).max(14).optional().describe("The water's own pH, not a recipe's target mash pH"),
+    note: z.string().trim().max(2000).optional().describe("Free text; blank stores none"),
   }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_water_profile", {
     p_brewery: ctx.breweryId, p_profile: i.profileId ?? null, p_name: i.name, p_calcium: i.calciumPpm, p_magnesium: i.magnesiumPpm,
-    p_sodium: i.sodiumPpm, p_sulfate: i.sulfatePpm, p_chloride: i.chloridePpm, p_bicarbonate: i.bicarbonatePpm, p_request_id: execution.requestId,
+    p_sodium: i.sodiumPpm, p_sulfate: i.sulfatePpm, p_chloride: i.chloridePpm, p_bicarbonate: i.bicarbonatePpm,
+    p_alkalinity: i.alkalinityPpm ?? null, p_ph: i.waterPh ?? null, p_note: i.note || null, p_request_id: execution.requestId,
   })),
 });
 
 // Each recipe carries its latest version (id and number): schedule_batch names
 // a *version*, so the batch picker needs it without a get_recipe per recipe.
 defineQuery({
-  name: "list_recipes", description: "Recipes, alphabetical, with the brand each one brews and its latest version",
-  input: z.object({}), roles: ["admin", "brewer"],
-  handler: async (ctx) => {
-    const recipes = (await unwrap(ctx.db.from("recipes").select("id, name, brand_id, note, created_at")
-      .eq("brewery_id", ctx.breweryId).order("name"))) ?? [];
+  name: "list_recipes", description: "Recipes, alphabetical, with the brand each one brews and its latest version; optionally only those whose name contains q",
+  input: z.object({ q: z.string().trim().max(100).optional().describe("Only recipes whose name contains this text") }), roles: ["admin", "brewer"],
+  handler: async (ctx, i) => {
+    let query = ctx.db.from("recipes").select("id, name, brand_id, note, created_at").eq("brewery_id", ctx.breweryId);
+    if (i.q) query = query.regexIMatch("name", escapeRegex(i.q));
+    const recipes = (await unwrap(query.order("name"))) ?? [];
     if (recipes.length === 0) return [];
     const versions = (await unwrap(ctx.db.from("recipe_versions").select("id, recipe_id, version")
       .in("recipe_id", recipes.map((r) => r.id as string)).order("version", { ascending: false }))) ?? [];
@@ -237,18 +245,29 @@ defineCommand({
     kind: z.enum(VESSEL_KINDS),
     capacityBbl: bbl,
   }),
-  roles: ["admin", "brewer"],
+  roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_vessel", {
     p_brewery: ctx.breweryId, p_vessel: i.id ?? null, p_name: i.name, p_kind: i.kind,
     p_capacity_bbl: i.capacityBbl, p_request_id: execution.requestId,
   })),
 });
 
+defineCommand({
+  name: "delete_vessel", description: "Delete a vessel that never held beer, or retire one with batch history so that history keeps it; a vessel holding beer is refused. The result's retired flag says which",
+  input: z.object({ vesselId: z.string().uuid() }),
+  roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_vessel", {
+    p_brewery: ctx.breweryId, p_vessel: i.vesselId, p_request_id: execution.requestId,
+  })),
+});
+
 defineQuery({
-  name: "list_vessels", description: "Vessels, alphabetical, with kind and capacity",
-  input: z.object({}), roles: ["admin", "brewer"],
-  handler: (ctx) => unwrap(ctx.db.from("vessels").select("id, name, kind, capacity_bbl, active")
-    .eq("brewery_id", ctx.breweryId).order("name")),
+  name: "list_vessels", description: "Vessels, alphabetical, with kind and capacity; includes retired vessels when retired is true",
+  input: z.object({ retired: z.boolean().optional() }), roles: ["admin", "brewer"],
+  handler: (ctx, i) => {
+    const query = ctx.db.from("vessels").select("id, name, kind, capacity_bbl, active").eq("brewery_id", ctx.breweryId);
+    return unwrap((i.retired ? query : query.eq("active", true)).order("name"));
+  },
 });
 
 // Scheduling is intent: both the brand and the recipe version are optional, and
@@ -280,9 +299,15 @@ const brewProcess = processInput.extend({
   boilMinutes: z.number().int().nonnegative().optional(), mashWaterGal: z.number().positive().optional(),
   spargeWaterGal: z.number().nonnegative().optional(), targetMashPh: z.number().min(4).max(7).optional(),
 });
+// A Prep pull is a brew actual before brew day: no stage, and zero is allowed
+// (nothing pulled yet).
+const brewPull = brewActual.omit({ stage: true }).extend({ qty: z.number().nonnegative().multipleOf(0.0001) });
+function brewPullRow(a: z.infer<typeof brewPull>) {
+  return { material_id: a.materialId, recipe_ingredient_id: a.recipeIngredientId ?? null,
+    location_id: a.locationId, bin_id: a.binId, lot_id: a.lotId ?? null, qty: a.qty };
+}
 function brewActualRows(actuals: z.infer<typeof brewActual>[]) {
-  return actuals.map(a => ({ material_id: a.materialId, recipe_ingredient_id: a.recipeIngredientId ?? null, stage: a.stage,
-    location_id: a.locationId, bin_id: a.binId, lot_id: a.lotId ?? null, qty: a.qty }));
+  return actuals.map(a => ({ ...brewPullRow(a), stage: a.stage }));
 }
 
 defineQuery({
@@ -312,6 +337,17 @@ defineCommand({
     p_brewery: ctx.breweryId, p_batch: i.batchId, p_vessel: i.vesselId,
     p_actuals: i.actuals && brewActualRows(i.actuals), p_process: i.process, p_confirm_empty: i.confirmEmpty,
     p_initial_bbl: i.initialBbl, p_brewed_on: i.brewedOn, p_request_id: execution.requestId,
+  })),
+});
+
+// Prep is a draft: a full replace of the batch's pulls and planned tank, read
+// back by get_brew_day_plan. record_brew_day still does the consuming.
+defineCommand({
+  name: "save_batch_pulls", description: "Prep saves the lots and amounts pulled for a planned batch and its planned tank; moves no stock",
+  input: z.object({ batchId: z.string().uuid(), vesselId: z.string().uuid().nullable(), lines: z.array(brewPull) }),
+  roles: ["admin", "brewer"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("save_batch_pulls", {
+    p_brewery: ctx.breweryId, p_batch: i.batchId, p_vessel: i.vesselId, p_lines: i.lines.map(brewPullRow), p_request_id: execution.requestId,
   })),
 });
 

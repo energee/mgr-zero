@@ -6,17 +6,22 @@
 // one run — admin/warehouse only (record_repack's own roles), so it is hidden
 // from a brewer rather than offered and refused.
 // Repack's parents come from list_repack_parents: each composed SKU with the
-// child it breaks into, so the sheet derives the outbound leg.
+// child it breaks into, so the sheet derives the outbound leg. With none, its
+// Break note links Catalog only for a user who may set a format's contents.
 import { PackagingRunsView } from "@/components/mgr/views/packaging-runs";
 import { workHrefsFor } from "@/components/mgr/work-tabs";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
+import { canRun } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
 import type { ScheduleRunData } from "@/lib/mgr/schedule-packaging-run-view";
 import { ScheduleRunForm } from "./schedule-run-form";
 import { RepackForm, type RepackParent } from "./repack-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/packaging") };
 
 type Run = {
   id: string; run_no: number; brand_id: string; occupancy_id: string | null; planned_on: string;
@@ -44,6 +49,6 @@ export default async function PackagingPage({ searchParams }: { searchParams: Pr
   return <PackagingRunsView
     model={toPackagingRunsViewProps(runs, brewery.timeZone, (id) => `/packaging/${id}`)}
     workHrefs={workHrefsFor(brewery.roles)}
-    actions={<div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skus} />{canRepack ? <RepackForm autoOpen={repack === "1"} locations={locations} bins={bins} parents={parents} /> : null}</div>}
+    actions={<div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skus} />{canRepack ? <RepackForm autoOpen={repack === "1"} locations={locations} bins={bins} parents={parents} formatsHref={canRun(ctx, "create_composed_format") ? "/catalog" : null} /> : null}</div>}
   />;
 }

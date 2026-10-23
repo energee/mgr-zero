@@ -11,7 +11,7 @@ describe('pours in the sellable SKU catalog', () => {
     expect(view.rows[0].detail).not.toContain('bbl');
   });
   it('counts pours without adding another brand row', () => {
-    const view = toCatalogViewProps({ brands: [{ id:'brand', name:'Lupula', abv:7, styles:null, skus:[{id:'case'}], pours:[pour] }], priceGroups:[] });
+    const view = toCatalogViewProps({ brands: [{ id:'brand', name:'Lupula', abv:7, styles:null, skus:[{id:'case'}], pours:[pour], colas:[] }], priceGroups:[] });
     expect(view.brands).toHaveLength(1);
     expect(view.brands[0].skus).toBe('2');
   });

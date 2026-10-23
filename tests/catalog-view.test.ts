@@ -10,6 +10,7 @@ import { CatalogView } from "../components/mgr/views/catalog";
 import { FormatView } from "../components/mgr/views/format";
 import { FormatFixture } from "../components/mgr/fixture-adapters";
 import { FormatsView } from "../components/mgr/views/formats";
+import { ListControls } from "../components/mgr/list-controls";
 import { PackageBomView } from "../components/mgr/views/package-bom";
 import { SkuListView } from "../components/mgr/views/sku-list";
 import { SkuView } from "../components/mgr/views/sku";
@@ -24,7 +25,7 @@ import {
 } from "../lib/mgr/fixtures/catalog";
 import { SKU_HAZY, SKU_PILS, SKU_STOUT } from "../lib/mgr/fixtures/demo";
 import { brandLabel, toBrandViewProps, UNPRICED } from "../lib/mgr/brand-view";
-import { toCatalogViewProps } from "../lib/mgr/catalog-view";
+import { toCatalogScopes, toCatalogViewProps } from "../lib/mgr/catalog-view";
 import { toFormatViewProps } from "../lib/mgr/format-view";
 import { toFormatsViewProps } from "../lib/mgr/formats-view";
 import { toPackageBomViewProps } from "../lib/mgr/package-bom-view";
@@ -48,21 +49,38 @@ describe("Catalog view", () => {
     ]);
     // The name is the link to that brand's page; Catalog draws no Edit brand button.
     expect(model.brands[0]?.href).toBe(`/catalog/brands/${model.brands[0]!.key}`);
-    expect(model.priceGroups).toBe("3 channels · 8 groups");
-    expect(model.waterProfiles).toBe("3 profiles");
+    // Price groups names only the groups: no channel count (#965).
+    expect(model.priceGroups).toBe("8 groups");
     expect(model.backHref).toBeUndefined();
   });
 
   it("says Not set for a missing style or ABV, and keeps a real zero ABV and zero SKUs", () => {
     const model = toCatalogViewProps({ priceGroups: [], brands: [
-      { id: "unset", name: "Unset", abv: null, styles: null, skus: [] },
-      { id: "blank", name: "Blank", abv: "", styles: null, skus: [] },
-      { id: "zero", name: "Zero", abv: "0.00", styles: { name: "Non-alcoholic" }, skus: [] },
+      { id: "unset", name: "Unset", abv: null, styles: null, skus: [], colas: [] },
+      { id: "blank", name: "Blank", abv: "", styles: null, skus: [], colas: [] },
+      { id: "zero", name: "Zero", abv: "0.00", styles: { name: "Non-alcoholic" }, skus: [], colas: [] },
     ] });
     expect(model.brands.map(({ style, abv, skus }) => [style, abv, skus])).toEqual([
       ["Not set", "Not set", "0"],
       ["Not set", "Not set", "0"],
       ["Non-alcoholic", "0%", "0"],
+    ]);
+  });
+
+  // #965: only recorded COLA approvals (list_brands already left formulas out) decide the cell.
+  it("says None, one COLA's TTB ID and date, or how many are on file", () => {
+    const brand = { abv: null, styles: null, skus: [] };
+    const model = toCatalogViewProps({ priceGroups: [], brands: [
+      { ...brand, id: "none", name: "None", colas: [] },
+      { ...brand, id: "one", name: "One", colas: [{ ttb_id: "00123456789012", approved_on: "2026-10-02" }] },
+      { ...brand, id: "undated", name: "Undated", colas: [{ ttb_id: "26001001000123", approved_on: null }] },
+      { ...brand, id: "two", name: "Two", colas: [{ ttb_id: "1", approved_on: null }, { ttb_id: "2", approved_on: "2026-01-15" }] },
+    ] });
+    expect(model.brands.map(({ cola }) => cola)).toEqual([
+      "None",
+      "TTB ID 00123456789012 · approved Oct 2, 2026",
+      "TTB ID 26001001000123 · approval date unknown",
+      "2 on file",
     ]);
   });
 
@@ -88,8 +106,8 @@ describe("Catalog view", () => {
     const inert = htmlOf(createElement(CatalogView, { model }));
     expect(inert).not.toMatch(/href="\/catalog\/brands\//);
     expect(inert.match(/<button\b[^>]*data-tap[^>]*>Hazy IPA<\/button>/g)).toHaveLength(2);
-    const html = htmlOf(createElement(CatalogView, { model, linkRows: true }));
-    expect([...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map((m) => m[1])).toEqual(["Brand", "Style", "ABV", "SKUs"]);
+    const html = htmlOf(createElement(CatalogView, { model, links: { brands: true, priceGroups: true, waterProfiles: true } }));
+    expect([...html.matchAll(/<th\b[^>]*>(.*?)<\/th>/g)].map((m) => m[1].replace(/<[^>]*>/g, ""))).toEqual(["Brand", "Style", "ABV", "SKUs", "COLA"]);
     // One link per brand in the desktop table, then one in the phone list; the
     // positioned link covers the record without adding another focus target.
     const links = [...html.matchAll(/<a\b([^>]*)>(.*?)<\/a>/g)]
@@ -101,7 +119,7 @@ describe("Catalog view", () => {
     const records = html.split(/data-slot="item"(?=[\s>])/).slice(1).filter((chunk) => /^[^>]*role="listitem"/.test(chunk));
     expect(records).toHaveLength(model.brands.length);
     for (const record of records) {
-      expect([...record.matchAll(/<dt\b[^>]*>(.*?)<\/dt>/g)].map((m) => m[1])).toEqual(["Style", "ABV", "SKUs"]);
+      expect([...record.matchAll(/<dt\b[^>]*>(.*?)<\/dt>/g)].map((m) => m[1])).toEqual(["Style", "ABV", "SKUs", "COLA"]);
     }
   });
 
@@ -112,18 +130,57 @@ describe("Catalog view", () => {
     const html = renderToStaticMarkup(createElement(BrandView, { model }));
     expect(html).toContain("Alias");
     expect(html).toContain("Animal #14");
+    // What the alias is for stays visible while typing (#1131).
+    expect(html).not.toContain('placeholder="Staff only"');
+    expect(html).toMatch(/<input[^>]*aria-describedby="brand-alias-help"/);
+    expect(html).toMatch(/id="brand-alias-help"[^>]*>An informal name staff use, such as a series number\./);
   });
 
-  it("omits water profiles when the snapshot has no count", () => {
-    const model = toCatalogViewProps({
-      brands: catalogBrands.brands,
-      priceGroups: catalogBrands.priceGroups,
-      channels: catalogBrands.channels,
-    });
-    expect(model.waterProfiles).toBeUndefined();
-    const html = htmlOf(createElement(CatalogView, { model }));
-    expect(html).not.toMatch(/Water profiles/);
-    expect(html).toMatch(/Price groups/);
+  // #965: inventory and live draw the same Water profiles row, with no invented count.
+  it("draws Water profiles as source and target profiles, linked only live", () => {
+    const model = toCatalogViewProps(catalogBrands);
+    const inert = htmlOf(createElement(CatalogView, { model }));
+    expect(inert).toMatch(/Water profiles/);
+    expect(inert).toMatch(/Source and target profiles/);
+    expect(inert).not.toMatch(/href="\/catalog\/water-profiles"/);
+    expect(htmlOf(createElement(CatalogView, { model, links: { brands: true, priceGroups: true, waterProfiles: true } }))).toMatch(/href="\/catalog\/water-profiles"/);
+  });
+
+  // #965: Sort and Category are labeled ScopePick selects; each option is the
+  // link that changes only that setting, so search and the other one stay.
+  it("builds Sort and Category scopes whose options link with one setting changed", () => {
+    const href = (patch: { sort?: string; category?: string }) => JSON.stringify(patch);
+    const [sort, category] = toCatalogScopes({ sort: "abv", category: "Core", categories: ["Core", "Seasonal"], href });
+    expect(sort).toEqual({ label: "Sort", value: "abv", options: [
+      { value: "name", label: "Name", href: '{"sort":"name"}' },
+      { value: "abv", label: "ABV", href: '{"sort":"abv"}' },
+      { value: "newest", label: "Newest", href: '{"sort":"newest"}' },
+    ] });
+    expect(category).toEqual({ label: "Category", value: "Core", options: [
+      { value: "", label: "All categories", href: '{"category":""}' },
+      { value: "Core", label: "Core", href: '{"category":"Core"}' },
+      { value: "Seasonal", label: "Seasonal", href: '{"category":"Seasonal"}' },
+    ] });
+  });
+
+  it("hides Category with no categories, and shows All categories for an unknown one", () => {
+    expect(toCatalogScopes({ sort: "name", category: "", categories: [] }).map((s) => s.label)).toEqual(["Sort"]);
+    const [, category] = toCatalogScopes({ sort: "name", category: "Gone", categories: ["Core"] });
+    expect(category?.value).toBe("");
+    // The inventory passes no href, so its picks stay inert.
+    expect(category?.options.every((o) => o.href === undefined)).toBe(true);
+  });
+
+  it("draws search, then labeled Sort and Category selects, not tab rows", () => {
+    const html = htmlOf(createElement(ListControls, {
+      search: { label: "Search brands or aliases", value: "", keep: {} },
+      scopes: toCatalogScopes({ sort: "name", category: "", categories: ["Core"] }),
+    }));
+    expect(html).toMatch(/role="search"/);
+    expect(html).not.toMatch(/role="tablist"/);
+    expect([...html.matchAll(/<label\b[^>]*>(.*?)<\/label>/g)].map((m) => m[1])).toEqual(["Sort", "Category"]);
+    expect(html).toMatch(/>Name</);
+    expect(html).toMatch(/>All categories</);
   });
 
   // docs/plans/list-filters.md: an empty search is not an empty catalog.
@@ -139,37 +196,53 @@ describe("Catalog view", () => {
     expect(html.indexOf('role="search"')).toBeLessThan(html.indexOf(brandOf(SKU_HAZY)));
   });
 
-  it("renders Add brand, Hazy IPA, Price groups, and Water profiles", () => {
+  it("renders New brand, Hazy IPA, Price groups, and Water profiles", () => {
     const html = htmlOf(createElement(CatalogView, { model: toCatalogViewProps(catalogBrands) }));
-    expect(html).toMatch(/>Add brand</);
+    expect(html).toMatch(/>New brand</);
     expect(html).toContain(brandOf(SKU_HAZY));
     for (const fact of [">IPA<", ">6.8%<", ">4<"]) expect(html).toContain(fact);
     expect(html).toMatch(/Price groups/);
-    expect(html).toMatch(/3 channels · 8 groups/);
+    expect(html).toMatch(/8 groups/);
+    expect(html).not.toMatch(/channel/);
     expect(html).toMatch(/Water profiles/);
-    expect(html).toMatch(/3 profiles/);
     expect(html).not.toMatch(/→/);
   });
 
-  it("createAction, footer, and linkRows slot for live Catalog", () => {
+  // #1062: each row links on its own gate, so a role may open Price groups without the brands.
+  it("createAction and per-link gates slot for live Catalog", () => {
     const html = htmlOf(createElement(CatalogView, {
       model: toCatalogViewProps(catalogBrands),
       createAction: "NEW BRAND",
-      footer: "FORMATS SLOT",
-      linkRows: true,
+      links: { brands: false, priceGroups: true, waterProfiles: false },
     }));
     expect(html).toMatch(/NEW BRAND/);
-    expect(html).not.toMatch(/>Add brand</);
-    expect(html).toMatch(/FORMATS SLOT/);
+    expect(html).not.toMatch(/>New brand</);
     expect(html).toMatch(/href="\/pricing"/);
+    expect(html).not.toMatch(/href="\/catalog\/(brands|water-profiles)/);
     expect(html).toContain(brandOf(SKU_HAZY));
+  });
+
+  // #1062: live, a row the viewer cannot open is plain, not the inventory's dead tap.
+  it("draws a live row without its link as plain text, with no tap or Open", () => {
+    const html = htmlOf(createElement(CatalogView, {
+      model: toCatalogViewProps(catalogBrands),
+      createAction: null,
+      links: { brands: false, priceGroups: false, waterProfiles: false },
+    }));
+    expect(html).toContain(brandOf(SKU_HAZY));
+    expect(html).toMatch(/Price groups/);
+    expect(html).toMatch(/Water profiles/);
+    expect(html).not.toMatch(/\sdata-tap[\s>=]/);
+    expect(html).not.toContain('aria-label="Open"');
+    // Sort headers stay buttons; the brand name is no longer one.
+    expect(html).not.toMatch(new RegExp(`<button\\b[^>]*>${brandOf(SKU_HAZY)}<`));
   });
 
   it("draws one entry per brand without separate pour rows", () => {
     const model = toCatalogViewProps(catalogBrands);
     const html = htmlOf(createElement(CatalogView, {
       model,
-      linkRows: true,
+      links: { brands: true, priceGroups: false, waterProfiles: false },
     }));
     // The shared view still owns the rows: the slot cannot replace them.
     expect(html).toContain(brandOf(SKU_HAZY));
@@ -196,6 +269,12 @@ describe("Catalog view", () => {
     expect(body.props.model).toEqual(toCatalogViewProps(catalogBrands));
   });
 
+  it("the format create verb reads New format in sentence case, inventory and live alike (#1026)", () => {
+    expect(htmlOf(screen("Catalog").body)).toMatch(/>New format</);
+    expect(resolveTap(screen("Catalog"), "New format")).toBe("Format");
+    expect(readFileSync("app/(app)/catalog/format-form.tsx", "utf8")).not.toMatch(/New Format/);
+  });
+
   it("a brand or format name opens its screen in the explorer", () => {
     const packaged = formatsInventory.formats.filter((format) => format.basis === "packaged");
     for (const row of toFormatsViewProps({ ...formatsInventory, formats: packaged }).rows) expect(resolveTap(screen("Catalog"), row.cells[0]!), row.cells[0]).toBe("Format");
@@ -207,7 +286,7 @@ describe("Catalog view", () => {
     const src = readFileSync("app/(app)/catalog/page.tsx", "utf8");
     expect(src).toMatch(/from "@\/components\/mgr\/views\/catalog"/);
     expect(src).toMatch(/<CatalogView\b/);
-    // Brand is a page, not a dialog: New Brand links to it, as does each row.
+    // Brand is a page, not a dialog: New brand links to it, as does each row.
     expect(src).not.toMatch(/<BrandForm\b/);
     expect(src).toMatch(/"\/catalog\/brands\/new"/);
     expect(src).toContain("formats={toFormatsViewProps(");
@@ -215,6 +294,9 @@ describe("Catalog view", () => {
     expect(shared).toMatch(/from "@\/components\/mgr\/views\/formats"/);
     expect(shared).toMatch(/<FormatsView\b/);
     expect(src).not.toMatch(/waterProfileCount/);
+    // Live and inventory build the Sort and Category picks with the same adapter.
+    expect(src).toContain("toCatalogScopes(");
+    expect(readFileSync("components/mgr/screens.tsx", "utf8")).toContain("toCatalogScopes(");
     expect(src).toMatch(/backHref: "\/more"/);
     // The page no longer redraws the brand rows or nests packages in them.
     expect(src).not.toMatch(/brands=\{/);
@@ -228,7 +310,7 @@ describe("Brand view", () => {
     expect(toBrandViewProps({ ...brandHazy, categories: undefined }).categoryOptions).toEqual([]);
     expect(htmlOf(screen("Brand").body as ReactNode)).toContain("Manage categories");
   });
-  it("maps list_brands onto style, ABV, category, price group, and SKU list", () => {
+  it("maps list_brands onto style, ABV, category, price group, and Sells as", () => {
     const model = toBrandViewProps(brandHazy);
     expect(model.name).toBe(brandOf(SKU_HAZY));
     expect(model.style).toBe(brandOf(SKU_HAZY));
@@ -239,11 +321,13 @@ describe("Brand view", () => {
     expect(model.suggestion).toMatchObject({ kind: "group", title: "Suggested group 2" });
     expect(model.description).toBe("Juicy, soft, Citra-forward");
     expect(model.hops).toBe("Citra, Mosaic");
-    expect(model.skuList).toBe("3 active packages · 1 pour");
+    expect(model.sells.packages.map((p) => [p.name, p.on])).toEqual([["Case", true], ["Half", true], ["Quarter", false], ["Sixtel", true]]);
+    expect(model.sells.contents.map((c) => c.label)).toEqual(["Four Pack · 6 per Case"]);
+    expect(model.sells.pours.map((p) => [p.name, p.size, p.prices])).toEqual([["Glass", "16 oz", "Taproom $8.00"]]);
     expect(model.styleOptions).toContain("Add “Cold IPA”");
     expect(model.compliance.map((row) => row.title)).toEqual(["COLA TTB ID 25318001000034", "OH registration"]);
-    expect(model.compliance[0]).toMatchObject({ detail: "approved 2026-01-15 · serial 260135", verb: "Edit" });
-    expect(model.compliance[1]).toMatchObject({ detail: "OH-88214 · expires 2026-12-31", verb: "Edit" });
+    expect(model.compliance[0]).toMatchObject({ detail: "approved Jan 15, 2026 · serial 260135", verb: "Edit" });
+    expect(model.compliance[1]).toMatchObject({ detail: "OH-88214 · expires Dec 31, 2026", verb: "Edit" });
   });
 
   it("has no suggestion without a recipe, and Unpriced when on no group", () => {
@@ -271,11 +355,18 @@ describe("Brand view", () => {
     expect(errors).not.toContain('unique "key" prop');
   });
 
-  it("renders Save brand, Sell sheet, and SKU list", () => {
+  it("renders Save brand, Sell sheet, and Sells as", () => {
     const html = htmlOf(createElement(BrandView, { model: toBrandViewProps(brandHazy) }));
     expect(html).toMatch(/>Save brand</);
     expect(html).toMatch(/Sell sheet/);
-    expect(html).toMatch(/SKU list/);
+    expect(html).toMatch(/>Sells as</);
+    expect(html).not.toMatch(/SKU list/);
+    expect(html.match(/role="switch"/g)).toHaveLength(4);
+    expect(html).toContain('aria-label="Sells as Half"');
+    expect(html).toMatch(/Four Pack · 6 per Case/);
+    expect(html).toMatch(/>Glass</);
+    expect(html).toMatch(/>Edit on price group</);
+    expect(html.match(/>Edit SKU</g)).toHaveLength(3);
     expect(html).toMatch(/3 active packages/);
     expect(html).toMatch(/Compliance/);
     expect(html).toMatch(/COLA TTB ID 25318001000034/);
@@ -290,15 +381,30 @@ describe("Brand view", () => {
     expect(html).not.toMatch(/→/);
   });
 
-  it("footer null hides Save brand; linkRows hrefs SKU list", () => {
+  it("footer null hides Save brand; linkRows links Edit on price group", () => {
     const html = htmlOf(createElement(BrandView, {
       model: toBrandViewProps(brandHazy),
       footer: null,
       linkRows: true,
     }));
     expect(html).not.toMatch(/>Save brand</);
-    expect(html).toMatch(/href="\/catalog\/brands\/[^"]+\/skus"/);
-    expect(html).toMatch(/SKU list/);
+    expect(html).toMatch(/href="\/pricing"/);
+  });
+
+  it("live Sells as: switches follow the model, details come from the slot, and sellsDisabled locks them", () => {
+    const model = toBrandViewProps(brandHazy);
+    const html = htmlOf(createElement(BrandView, {
+      model,
+      onSellsAs: () => {},
+      sellsDetails: (row) => `DETAILS ${row.name}`,
+      sellsDisabled: true,
+    }));
+    expect(html.match(/aria-checked="true"/g)).toHaveLength(3);
+    expect(html.match(/role="switch"[^>]*disabled=""|disabled=""[^>]*role="switch"/g)).toHaveLength(4);
+    // A format with no SKU yet has nothing to open.
+    expect(html).toContain("DETAILS Half");
+    expect(html).not.toContain("DETAILS Quarter");
+    expect(html).not.toMatch(/>Edit SKU</);
   });
 
   it("titles the page with the saved name and alias, not the typed field", () => {
@@ -332,15 +438,15 @@ describe("Brand view", () => {
     expect(model.badges).toEqual([]);
     const html = htmlOf(createElement(BrandView, { model }));
     expect(html).toMatch(/Save the brand to add SKUs and compliance/);
-    expect(html).not.toMatch(/SKU list|>Compliance</);
+    expect(html).not.toMatch(/>Sells as<|>Compliance</);
   });
 
-  it("lays the form beside SKUs and Compliance, with Save brand inside the form", () => {
+  it("lays the form beside Sells as and Compliance, with Save brand inside the form", () => {
     const html = htmlOf(createElement(BrandView, { model: toBrandViewProps(brandHazy) }));
-    const form = html.slice(html.indexOf('aria-label="Brand details"'), html.indexOf('aria-label="SKUs and compliance"'));
+    const form = html.slice(html.indexOf('aria-label="Brand details"'), html.indexOf('aria-label="Sells as and compliance"'));
     expect(form).toMatch(/Selling/);
     expect(form).toMatch(/>Save brand</);
-    expect(form).not.toMatch(/SKU list/);
+    expect(form).not.toMatch(/>Sells as</);
     expect(html).toMatch(/id="compliance"/);
     expect(html).toMatch(/ABV %/);
   });
@@ -420,12 +526,12 @@ describe("SKU view", () => {
     expect(html).toMatch(/½ bbl keg/);
   });
 
-  it("the live SKU forms mount the shared controlled SkuView", () => {
+  it("the live SKU form mounts the shared controlled SkuView", () => {
     const form = readFileSync("app/(app)/catalog/sku-form.tsx", "utf8");
     expect(form).toMatch(/from "@\/components\/mgr\/views\/sku"/);
-    expect(form.match(/<SkuView\b/g)).toHaveLength(2);
+    expect(form.match(/<SkuView\b/g)).toHaveLength(1);
     expect(form).toMatch(/controls=\{\{/);
-    // Only the live-only Name input is drawn here; Format, Active and UPC are the view's.
+    // Active and UPC are the view's; this file draws no inputs of its own.
     expect(form).not.toMatch(/<Select\b|<Input\b/);
     expect(form).not.toMatch(/aria-label="UPC/);
   });
@@ -475,6 +581,13 @@ describe("SKU list view", () => {
     expect(barcodeOf(barcodes, null, cased.format_id)).toBeUndefined();
   });
 
+  it("an empty brand points at Sells as on the Brand page", () => {
+    expect(toSkuListViewProps({ ...skuListHazy, skus: [], pours: [] }).empty).toEqual({
+      title: "No SKUs yet",
+      description: "Switch a package on under Sells as on the Brand page.",
+    });
+  });
+
   it("renders Add SKU, Edit, and the three packages", () => {
     const html = htmlOf(createElement(SkuListView, { model: toSkuListViewProps(skuListHazy) }));
     expect(html).toMatch(/>Add SKU</);
@@ -509,14 +622,17 @@ describe("SKU list view", () => {
     const page = readFileSync("app/(app)/catalog/brands/[id]/skus/page.tsx", "utf8");
     expect(page).toMatch(/from "@\/components\/mgr\/views\/sku-list"/);
     expect(page).toMatch(/<SkuListView\b/);
-    expect(page).toMatch(/createAction=\{canWrite \? <SkuForm/);
+    // Packages are switched on under Sells as; this page only edits them.
+    expect(page).toMatch(/createAction=\{null\}/);
+    expect(page).not.toMatch(/<SkuForm\b/);
     expect(page).toMatch(/<SkuEditForm\b/);
-    expect(page).toMatch(/backHref: `\/catalog\/brands\/\$\{id\}`/);
+    expect(page).toMatch(/backHref: `\/catalog\/brands\/\$\{id\}#sells-as`/);
   });
 
   it("the SKU list inventory record is SkuListView", () => {
-    const body = screen("SKU list").body as { type: unknown; props: { model: unknown } };
+    const body = screen("SKU list").body as { type: unknown; props: { model: unknown; createAction: unknown } };
     expect(body.type).toBe(SkuListView);
+    expect(body.props.createAction).toBeNull();
     expect(body.props.model).toEqual(toSkuListViewProps(skuListHazy));
   });
 });
@@ -543,6 +659,13 @@ describe("Formats view", () => {
       ["½ bbl keg", "packaged", formatVolume("0.50000000"), "unit"],
       ["Hazy IPA · Pint", "poured", "16 oz", "Hazy IPA"],
     ]);
+  });
+
+  it("sorts Volume by barrels across oz, gal and bbl, and a missing figure as empty", () => {
+    const model = toFormatsViewProps(formatsInventory);
+    expect(model.rows.map((r) => r.sort[2])).toEqual([0.00403226, 0.01612903, 0.09677419, 0.5, 16 / 3968]);
+    const unfinished = toFormatsViewProps({ formats: [{ id: "u", name: "Unfinished", basis: "packaged", package_type: "can", bbl_per_unit: null }] });
+    expect(unfinished.rows[0].sort[2]).toBeNull();
   });
 
   it("renders Add format and the five format names", () => {

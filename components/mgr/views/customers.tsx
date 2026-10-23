@@ -1,6 +1,6 @@
 // components/mgr/views/customers.tsx — Customers list. Live passes
-// CustomerForm as createAction and linkRows; inventory uses Add customer
-// and unlabeled Open.
+// CustomerForm as createAction and linkRows; inventory uses New customer
+// and unlinked rows.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { CustomersViewModel } from "@/lib/mgr/customers-view";
@@ -16,21 +16,21 @@ export function CustomersView({
 }: {
   model: CustomersViewModel;
   createAction?: ReactNode;
-  /** Live has no search yet; pass null to hide. Inventory draws E.search. */
+  /** The search strip (components/mgr/list-controls.tsx), in live and inventory alike. */
   search?: ReactNode;
   linkRows?: boolean;
   backHref?: string;
 }) {
   return (
     <>
-      {E.back("More", "Customers", createAction !== undefined ? createAction : E.btn("Add customer"), backHref)}
+      {E.back("More", "Customers", createAction !== undefined ? createAction : E.btn("New customer"), backHref)}
       {model.missingPortalEmail && E.info("Customers without a current portal login email. Open a customer and use Invite to add buyer access; Remove access replaces an obsolete login. Email presence is a readiness check, not proof of delivery or sending.")}
-      {search !== undefined ? search : E.search("Search customers")}
+      {search}
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (
           <Fragment key={row.key}>
-            {E.row(row.title, row.detail, E.act("Open", "primary", linkRows ? row.href : undefined), row.warning ? "w" : "")}
+            {E.nav(row.title, row.detail, row.warning ? "w" : "", undefined, linkRows ? row.href : undefined)}
           </Fragment>
         ))}
     </>

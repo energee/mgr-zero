@@ -1,4 +1,5 @@
 // lib/mgr/entry-view.ts — view-model for Sign in / Reset / Set password family.
+import { sentenceCase } from "@/lib/mgr/labels";
 export type EntryViewModel = {
   title: string;
   inputs: string[];
@@ -14,8 +15,8 @@ export type EntryViewModel = {
   extraPrimary?: string;
 };
 
-export function toAcceptInviteViewProps(breweryName: string, role: string): EntryViewModel {
-  return { title: `Join ${breweryName}`, inputs: ["Your name", "Choose a password"], field: { label: "Role", value: role }, primary: `Join ${breweryName}` };
+export function toAcceptInviteViewProps(breweryName: string, roles: readonly string[]): EntryViewModel {
+  return { title: `Join ${breweryName}`, inputs: ["Your name", "Choose a password"], field: { label: "Role", value: roles.map(sentenceCase).join(", ") }, primary: `Join ${breweryName}` };
 }
 
 export const expiredInviteModel: EntryViewModel = {
@@ -36,6 +37,13 @@ export const noMembershipModel: EntryViewModel = {
   info: "Contact your brewery administrator about access.",
   primary: "Create brewery", extraPrimary: "Sign out",
 };
+/** A staff login on no customer account sees this when it opens the portal; staff roles never grant the portal (#1145). */
+export const portalStaffOnlyModel: EntryViewModel = {
+  title: "Portal is for customers", inputs: [],
+  note: "The portal is for customer accounts. You are signed in as staff.",
+  info: "To use the portal yourself, ask an Admin or Sales to invite your email to a customer account.",
+  primary: "Back to Today", extraPrimary: "Sign out",
+};
 export const expiredResetModel: EntryViewModel = {
   title: "Reset link expired", inputs: [],
   note: "This reset link is no longer valid.", primary: "Request a new link",
@@ -46,8 +54,11 @@ const SET_PASSWORD_ERRORS: Record<string, string> = {
   weak_password: "Choose a stronger password.",
 };
 
-/** `error` is the `?error=` code; any other value (a crafted link) shows the generic error, never its own text. */
+/**
+ * `error` is the `?error=` code; any other value (a crafted link) shows the generic error, never its own text.
+ * Headed Change password, like the Me link that opens it; the recovery link lands on the same page (#1108).
+ */
 export function toSetPasswordViewProps(account: string, error?: string): EntryViewModel {
   const message = error ? SET_PASSWORD_ERRORS[error] ?? "Your password was not saved. Try again." : undefined;
-  return { title: "Set new password", inputs: ["Choose a password"], field: { label: "Account", value: account }, primary: "Save password", error: message };
+  return { title: "Change password", inputs: ["Choose a password"], field: { label: "Account", value: account }, primary: "Save password", error: message };
 }

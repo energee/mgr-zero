@@ -24,6 +24,39 @@ export const invoiceIsSettledWithoutPayment = (invoice: Parameters<typeof invoic
 export const invoiceIsCreditable = (invoice: Parameters<typeof invoiceCurrentState>[0] & { kind: "invoice" | "credit_memo" }) =>
   invoice.kind === "invoice" && ["unpaid", "paid"].includes(invoiceCurrentState(invoice));
 
+/** The facts that decide who owns an invoice's balance. The names are
+ *  InvoiceListRecord's, so a register row passes as is. */
+type LedgerInvoice = {
+  kind: "invoice" | "credit_memo";
+  qbo_invoice_id: string | null;
+  paid_at: string | null;
+  qbo_balance_cents?: number | null;
+  has_pending_qbo_push: boolean;
+  was_pushed_to_qbo: boolean;
+  local_paid_cents: number;
+};
+
+/** True when MGR's payment ledger, not QuickBooks, owns this invoice's balance
+ *  (#1045, docs/plans/invoice-local-payments.md): an invoice QuickBooks never
+ *  identified, with no pending push, never pushed to any company, and not
+ *  marked paid outside the ledger, as a historical import is.
+ *  record_invoice_payment refuses the same invoices. */
+export function invoiceLedgerOwnsBalance(invoice: LedgerInvoice): boolean {
+  return invoice.kind === "invoice"
+    && invoice.qbo_invoice_id == null
+    && !invoice.has_pending_qbo_push
+    && !invoice.was_pushed_to_qbo
+    && (invoice.paid_at == null || invoice.local_paid_cents > 0);
+}
+
+/** The ledger's balance (total minus unvoided payments, never below zero) when
+ *  the ledger owns it; otherwise QuickBooks' balance, which stays null when
+ *  unknown and is never read as zero. */
+export function invoiceBalanceCents(invoice: LedgerInvoice, totalCents: number): number | null {
+  if (invoiceLedgerOwnsBalance(invoice)) return Math.max(0, totalCents - invoice.local_paid_cents);
+  return invoice.qbo_balance_cents ?? null;
+}
+
 export function invoiceCurrentTotalCents(
   invoice: { kind: "invoice" | "credit_memo"; qbo_total_cents?: number | null },
   localTotalCents: number,

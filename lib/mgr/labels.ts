@@ -2,11 +2,15 @@
 // Database values are snake_case (or already spaced, as the record-movement
 // fixtures are); operators see sentence case. Issue #333.
 import type { ImportKind } from "@/lib/import-csv";
-import { COUNTRY_CODES, COUNTRY_NAMES, type BrandSort, type CountryCode, type PaymentTerm } from "@/lib/mgr/enums";
+import { COUNTRY_CODES, COUNTRY_NAMES, CUSTOMER_TYPES, LOCATION_USES, STAFF_ROLES, type BrandSort, type CountryCode, type PaymentMethod, type PaymentTerm } from "@/lib/mgr/enums";
 
 /** "opening_balance" / "opening balance" → "Opening balance". */
 export const sentenceCase = (value: string) =>
   value.replace(/_/g, " ").replace(/^./, (letter) => letter.toUpperCase());
+
+/** A member's roles as staff read them, in STAFF_ROLES order: ["warehouse", "admin"] → "Admin, Warehouse". */
+export const staffRolesLabel = (roles: readonly string[]) =>
+  STAFF_ROLES.filter((role) => roles.includes(role)).map(sentenceCase).join(", ");
 
 /** Import kinds carry product names the humanizer cannot derive; the staff
  *  guide's Kind column is the source of truth. */
@@ -26,7 +30,18 @@ export const PAYMENT_TERM_LABEL: Record<PaymentTerm, string> = { due_on_receipt:
 /** A stored payment term as the operator reads it; an unknown value prints as stored. */
 export const paymentTermLabel = (term: string) => PAYMENT_TERM_LABEL[term as PaymentTerm] ?? term;
 
-/** Catalog's sort tabs, in BRAND_SORTS order (lib/mgr/enums.ts). */
+/** How an invoice payment's method reads; the stored values are PAYMENT_METHODS in lib/mgr/enums.ts (#1045). */
+export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = { cash: "Cash", check: "Check", ach: "ACH", other: "Other" };
+
+/** How a QuickBooks or Square connection state reads as a status (qbo_connections / pos_connections.state).
+ *  "Reconnect required" names what recovery_required asks the admin to do (#1151). */
+const CONNECTION_STATE_LABEL: Record<string, string> = { connected: "Connected", disconnected: "Not connected", recovery_required: "Reconnect required" };
+
+/** A stored connection state as a status; the check constraints allow only the three above, so the
+ *  sentence-case fallback only keeps a future state readable until it gets its own label. */
+export const connectionStateLabel = (state: string) => CONNECTION_STATE_LABEL[state] ?? sentenceCase(state);
+
+/** Catalog's Sort options, in BRAND_SORTS order (lib/mgr/enums.ts). */
 export const BRAND_SORT_LABEL: Record<BrandSort, string> = { name: "Name", abv: "ABV", newest: "Newest" };
 
 /** A record as staff see it: its name, then its staff-only alias when it has one
@@ -39,3 +54,15 @@ export const countryName = (code: string) => COUNTRY_NAMES[code as CountryCode] 
 /** The country picker's options, by name; the stored value is the code (COUNTRY_CODES). */
 export const COUNTRY_OPTIONS = COUNTRY_CODES.map((value) => ({ value, label: COUNTRY_NAMES[value] }))
   .sort((a, b) => a.label.localeCompare(b.label, "en"));
+
+/** The customer Type picker's options, shared by New customer and Customer detail; the stored value is the enum. */
+export const CUSTOMER_TYPE_OPTIONS = CUSTOMER_TYPES.map((value) => ({ value, label: sentenceCase(value) }));
+
+/** The location Uses picker's options; the stored value is the location_kind enum. */
+export const LOCATION_USE_OPTIONS = LOCATION_USES.map((value) => ({ value, label: sentenceCase(value) }));
+
+/** A location's uses as staff read them: ["storage", "taproom"] → "Storage · Taproom". */
+export const locationUsesLabel = (uses: readonly string[]) => uses.map(sentenceCase).join(" · ");
+
+/** An IANA zone as read: "America/New_York" → "America / New York". */
+export const timezoneLabel = (timezone: string) => timezone.replaceAll("_", " ").replaceAll("/", " / ");

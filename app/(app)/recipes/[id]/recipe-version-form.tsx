@@ -14,12 +14,14 @@
 // shared parent fields sit on top and one save runs create_recipe then
 // create_recipe_version, landing on the recipe. Efficiency and attenuation
 // are typed as percents, as the inventory draws them, and sent as fractions.
+// Each brew-day line carries its pack (ingredientPack), so RecipeView's Round
+// choices rewrite that line's per-bbl amount through the same change().
 "use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { E } from "@/components/mgr/e";
-import { RecipeView } from "@/components/mgr/views/recipe";
+import { ADD_INGREDIENT_ROW, RecipeView } from "@/components/mgr/views/recipe";
 import { BLANK_RECIPE, NewRecipeFieldsView, type NewRecipeBrand } from "@/components/mgr/views/new-recipe";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
@@ -27,8 +29,8 @@ import { useCommandContext } from "@/lib/brewery-provider";
 import { gravityBlockers, recipeGravity } from "@/lib/recipe-gravity";
 import { plural } from "@/lib/mgr/plural";
 import { readRecipeDraft, recipeDraftKey, shouldKeepDraft, writeRecipeDraft } from "@/lib/mgr/recipe-draft";
-import { draftBlocker, gravityBlockerText, noMashText, RECIPE_NUMBERS, type RecipeDraft, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
-import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashRowSummary, materialLookup, optionalNumber as num, removeAt, upsertAt, type RecipeMaterial, type MashStep, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import { draftBlocker, gravityBlockerText, ingredientPack, noMashText, RECIPE_NUMBERS, type RecipeDraft, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
+import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashRowSummary, materialLookup, optionalNumber as num, removeAt, upsertAt, waterRowSummary, type RecipeMaterial, type MashStep, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, WaterSheet } from "./schedule-sheets";
 
 type Numbers = Record<RecipeNumberKey, string>;
@@ -146,7 +148,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
   const target = profiles.find((p) => p.id === water.targetProfileId)?.name;
   const mashRow = { title: `Mash schedule · ${plural(mashSchedule.length, "step")}`, detail: mashRowSummary(mashSchedule) };
   const fermentationRow = { title: `Fermentation schedule · ${plural(fermentationSchedule.length, "stage")}`, detail: fermentationSchedule.length ? fermentationSummary(fermentationSchedule) : "No stages yet" };
-  const waterRow = { title: "Water", detail: `${target ? `target ${target}` : "no target"} · ${plural(water.additions.length, "addition")}` };
+  const waterRow = { title: "Water", detail: waterRowSummary(target, water.additions.length) };
 
   return (
     <RecipeView
@@ -155,6 +157,8 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
         ingredients: lines.map((l, i) => ({
           key: `${i}-${l.materialId}`, title: material.name(l.materialId), detail: ingredientDetail(l.stage, l.timingMinutes, l.perBblQty, material.unit(l.materialId)), qty: "",
           action: <IngredientSheet line={l} materials={sheetMaterials} onSave={(f) => change({ lines: upsertAt(draft.lines, i, f) })} onDelete={() => change({ lines: removeAt(draft.lines, i) })} trigger={E.act(<>Edit<span className="sr-only"> {material.name(l.materialId)}</span></>)} />,
+          pack: ingredientPack(l.stage, Number(l.perBblQty), material.get(l.materialId)),
+          onRound: (perBbl: number) => change({ lines: upsertAt(draft.lines, i, { ...l, perBblQty: String(perBbl) }) }),
         })),
         mash: mashRow, fermentation: fermentationRow, water: waterRow,
         predicted: preview ? `Predicted: OG ${formatGravity(preview.ogPlato, unit)} · FG ${formatGravity(preview.fgPlato, unit)} · ABV ${preview.abv.toFixed(1)}%` : gravityWhy ?? undefined,
@@ -172,7 +176,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
         submitLabel: creating && !parentLocked ? "Create recipe" : "Create recipe version",
       }}
       slots={{
-        addIngredient: <IngredientSheet materials={sheetMaterials} onSave={(f) => change({ lines: [...draft.lines, f] })} trigger={E.row("+ add ingredient", "material · stage · timing", "")} />,
+        addIngredient: <IngredientSheet materials={sheetMaterials} onSave={(f) => change({ lines: [...draft.lines, f] })} trigger={ADD_INGREDIENT_ROW} />,
         mash: <MashScheduleSheet steps={mashSchedule} onChange={(mashSchedule) => change({ mashSchedule })} trigger={E.nav(mashRow.title, mashRow.detail)} />,
         fermentation: <FermentationScheduleSheet stages={fermentationSchedule} onChange={(fermentationSchedule) => change({ fermentationSchedule })} trigger={E.nav(fermentationRow.title, fermentationRow.detail)} />,
         water: <WaterSheet water={water} profiles={profiles} materials={materials} onChange={(water) => change({ water })} trigger={E.nav(waterRow.title, waterRow.detail)} />,

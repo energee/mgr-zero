@@ -2,8 +2,11 @@ import { SquareConnectorView } from "@/components/mgr/views/pos";
 import { E } from "@/components/mgr/e";
 import { requireAdminContext } from "@/lib/brewery";
 import { PosRouteSheet } from "@/components/mgr/views/pos-controls";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/settings/pos/connector") };
 
 export default async function SquareConnectorPage() {
-  await requireAdminContext("Square to QuickBooks connector");
-  return <>{E.back("Point of sale", "Square and QuickBooks connector", undefined, "/settings/pos")}<PosRouteSheet title="Square and QuickBooks connector" backHref="/settings/pos"><SquareConnectorView accountingHref="/settings/accounting" /></PosRouteSheet></>;
+  await requireAdminContext("Taproom sales in QuickBooks");
+  return <>{E.back("Point of sale", "Taproom sales in QuickBooks", undefined, "/settings/pos")}<PosRouteSheet title="Taproom sales in QuickBooks" backHref="/settings/pos"><SquareConnectorView accountingHref="/settings/accounting" /></PosRouteSheet></>;
 }

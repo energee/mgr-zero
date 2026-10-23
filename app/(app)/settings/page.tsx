@@ -14,6 +14,9 @@ import { AiModelSettingsForm } from "./ai-model-settings-form";
 import { getGatewayLanguageModels } from "@/lib/chat/models";
 import { ReportingBasisForm } from "./reporting-basis-form";
 import type { Filing, ReportingBasisCorrection } from "@/lib/commands/compliance";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/settings") };
 
 export default async function SettingsPage() {
   const brewery = await getActiveBrewery();

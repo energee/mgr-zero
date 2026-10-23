@@ -11,7 +11,7 @@ const roles = ["admin", "warehouse"] as const;
 const readRoles = ["admin", "sales", "warehouse"] as const;
 
 defineCommand({
-  name: "create_stock_transfer", description: "Draft a stock transfer between two locations: sku, material or keg-pool lines, each with a from-bin and a to-bin",
+  name: "create_stock_transfer", description: "Create a submitted stock transfer between two locations: sku, material or keg-pool lines, each with a from-bin and a to-bin; record its pick next",
   roles: [...roles],
   input: z.object({
     fromLocationId: z.string().uuid(), toLocationId: z.string().uuid(),
@@ -29,13 +29,6 @@ defineCommand({
     })) as { transfer_id: string };
     return { transferId: r.transfer_id };
   },
-});
-
-defineCommand({
-  name: "submit_stock_transfer", description: "Submit a draft stock transfer",
-  roles: [...roles],
-  input: z.object({ transferId: z.string().uuid() }),
-  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("submit_stock_transfer", { p_transfer: i.transferId, p_request_id: execution.requestId })),
 });
 
 defineCommand({
@@ -85,7 +78,7 @@ defineQuery({
 defineQuery({
   name: "list_stock_transfers", description: "Stock transfers, newest first, with their lines",
   roles: [...readRoles],
-  input: z.object({ status: z.enum(["draft", "submitted", "picked", "in_transit", "received", "cancelled"]).optional() }),
+  input: z.object({ status: z.enum(["submitted", "picked", "in_transit", "received", "cancelled"]).optional() }),
   // Paged past PostgREST's 1000-row cap (#759); id breaks created_at ties so pages never overlap.
   handler: (ctx, i) => completeRows("Stock transfers", start => {
     let q = ctx.db.from("stock_transfers").select("*, stock_transfer_lines(*)", { count: "exact" }).eq("brewery_id", ctx.breweryId);

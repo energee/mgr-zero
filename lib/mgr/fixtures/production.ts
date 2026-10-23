@@ -2,20 +2,22 @@
 // snapshots. Views own no sample data.
 import type { BatchesSnapshot } from "@/lib/mgr/batches-view";
 import type { BrewDayViewModel } from "@/lib/mgr/brew-day-view";
+import { startAtPlan, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
 import type { RecipeViewModel } from "@/lib/mgr/recipe-view";
 import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
+import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
 import type { ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
 import type { VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
 import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
-import { fermentationSummary, mashRowSummary, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { fermentationSummary, ingredientDetail, mashRowSummary, waterRowSummary, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 import { plural } from "@/lib/mgr/plural";
 import { waterProfiles } from "./catalog";
 
 export const cellarMapBrewer: CellarMapViewModel = {
   readingHref: null,
-  readingHint: "Several tanks hold beer. Open a tank to record its reading.",
+  actionHint: "Several tanks hold beer. Open a tank to record its reading.",
   tiles: [
     { name: "FV1", detail: "Pils · 12.8 / 15 bbl", reading: "1.9 °P · read 4 h", fill: 85 },
     { name: "FV2", detail: "Hazy · 9.0 / 15 bbl", reading: "7.5 °P · read 8 h", fill: 60 },
@@ -28,11 +30,11 @@ export const cellarMapBrewer: CellarMapViewModel = {
 };
 
 export const batchesBrewer: BatchesSnapshot = {
-  title: "Work",
+  title: "Batches",
   vessels: [
-    { key: "fv1", name: "FV1", kind: "fermenter", capacityBbl: 15, active: true },
-    { key: "fv3", name: "FV3", kind: "fermenter", capacityBbl: 15, active: true },
-    { key: "fv4", name: "FV4", kind: "fermenter", capacityBbl: 10, active: false },
+    { key: "fv1", name: "FV1", kind: "Fermenter", capacityBbl: 15, active: true },
+    { key: "fv3", name: "FV3", kind: "Fermenter", capacityBbl: 15, active: true },
+    { key: "fv4", name: "FV4", kind: "Fermenter", capacityBbl: 10, active: false },
   ],
   planned: [
     { key: "b0416", batchNo: "B-0416", brand: "Hazy IPA", recipe: "Hazy IPA", plannedOn: "Sep 4, 2026", plannedBbl: 15, vessel: null, brewable: true },
@@ -52,14 +54,13 @@ export const batchesBrewer: BatchesSnapshot = {
 };
 
 export const batchesEmpty: BatchesSnapshot = {
-  title: "Work",
+  title: "Batches",
   planned: [],
   active: [],
   vessels: [],
 };
 
 export const scheduleBatchHazy: ScheduleBatchViewModel = {
-  title: "B-0416 · Hazy",
   recipeId: "hazy-v4",
   recipe: "Hazy IPA v4",
   recipeOptions: [{ id: "hazy-v4", label: "Hazy IPA v4" }, { id: "pils-v3", label: "Pils v3" }, { id: "stout-v2", label: "Stout v2" }],
@@ -101,19 +102,79 @@ export const brewDayTurnsHazy: BrewDayViewModel = {
   })),
 };
 
+/** BAT-202 Mineral #6 v1, 22 bbl: its mash, boil and whirlpool ingredients, each starting at plan. */
+const mineralIngredients: BrewIngredient[] = ([
+  { key: "malted-oats", name: "Malted Oats", materialId: "malted-oats", stage: "mash", plan: 1650, unit: "lb", packSize: 55, source: { lot: "MO-2611", bin: "Malt room / A2", materialId: "malted-oats", locationId: "malt-room", binId: "a2", lotId: "mo-2611" } },
+  { key: "pilsen", name: "Briess Pilsen", materialId: "pilsen", stage: "mash", plan: 400, unit: "lb", packSize: 50, source: { lot: "BP-0918", bin: "Malt room / A1", materialId: "pilsen", locationId: "malt-room", binId: "a1", lotId: "bp-0918" } },
+  { key: "chit", name: "Chit Malt", materialId: "chit", stage: "mash", plan: 220, unit: "lb", packSize: 50, source: null },
+  { key: "rolled-oats", name: "Rolled Oats", materialId: "rolled-oats", stage: "mash", plan: 200, unit: "lb", packSize: 50, source: { lot: null, bin: "Dry storage / D1", materialId: "rolled-oats", locationId: "dry-storage", binId: "d1", lotId: null } },
+  { key: "white-wheat", name: "Briess White Wheat", materialId: "white-wheat", stage: "mash", plan: 200, unit: "lb", packSize: 50, source: { lot: "WW-0822", bin: "Malt room / A3", materialId: "white-wheat", locationId: "malt-room", binId: "a3", lotId: "ww-0822" } },
+  { key: "crystals", name: "Brewer’s Crystals", materialId: "crystals", stage: "boil", plan: 110, unit: "lb", packSize: 55, source: { lot: "BC-0710", bin: "Dry storage / D2", materialId: "crystals", locationId: "dry-storage", binId: "d2", lotId: "bc-0710" } },
+  { key: "nelson", name: "Freestyle Nelson Sauvin 2026", materialId: "nelson", stage: "whirlpool", plan: 44, unit: "lb", packSize: 44, source: { lot: "NS-26-114", bin: "Hop freezer / F1", materialId: "nelson", locationId: "hop-freezer", binId: "f1", lotId: "ns-26-114" } },
+] satisfies Omit<BrewIngredient, "packs" | "loose">[]).map(startAtPlan);
+
+const mineralVessels = [1, 2, 3, 4, 5, 6].map(n => ({ id: `fv${n}`, name: `FV${n}`, kind: "fermenter", capacity_bbl: 25.5 }));
+
+/** Prep mid-pull: Briess Pilsen came up 7.5 sacks, so it reads short. */
+export const brewPrepMineral: BrewPrepViewModel = {
+  title: "BAT-202 · Mineral #6 v1 · 22 bbl",
+  planned: "22 bbl · Oct 22, 2026",
+  vesselId: "fv3",
+  vessels: mineralVessels,
+  ingredients: mineralIngredients.map(row => row.key === "pilsen" ? { ...row, packs: "7.5", loose: "0" } : row),
+  later: "Fermentation 1 · Dry hop 6",
+};
+
+/** Chit Malt sits in two bins, so Prep could not pick its source alone: Edit offers both. */
+const chitStock = [
+  { material_id: "chit", material_name: "Chit Malt", unit: "lb", location_id: "malt-room", location_name: "Malt room", bin_id: "a4", bin_name: "A4", lot_id: "cm-0907", lot_code: "CM-0907", qty: 150 },
+  { material_id: "chit", material_name: "Chit Malt", unit: "lb", location_id: "malt-room", location_name: "Malt room", bin_id: "a5", bin_name: "A5", lot_id: "cm-1002", lot_code: "CM-1002", qty: 300 },
+];
+
+/** The stock behind each sourced line, so a confirmed row reads green (timelineTone checks it against stock). */
+const lineStock = mineralIngredients.flatMap(row => row.source ? [{
+  material_id: row.materialId, material_name: row.name, unit: row.unit, location_id: row.source.locationId, location_name: row.source.bin.split(" / ")[0],
+  bin_id: row.source.binId, bin_name: row.source.bin.split(" / ")[1], lot_id: row.source.lotId, lot_code: row.source.lot, qty: 2000,
+}] : []);
+
+/** Brew day mid-mash: the first two mash rows confirmed, so Mash is the open stage on a phone. */
+export const brewTimelineMineral: BrewTimelineViewModel = {
+  title: brewPrepMineral.title,
+  planned: brewPrepMineral.planned,
+  sources: [...lineStock, ...chitStock],
+  ingredients: brewPrepMineral.ingredients.map(row => ({ ...row, confirmed: row.key === "malted-oats" || row.key === "pilsen" })),
+  targets: { mash: "152 °F · 60 min · pH 5.3", lauter: "pre-boil 25 bbl", boil: "60 min", whirlpool: "180 °F · 20 min", knockout: "66 °F" },
+  process: { mashWaterGal: "620", targetMashPh: "5.3" },
+  vesselId: "fv3",
+  vessels: mineralVessels,
+  initialBbl: "22",
+  brewedOn: "2026-10-22",
+};
+
 export const vesselFv3: VesselDetailViewModel = {
   title: "FV3",
-  occupancy: { title: "Stout · BATCH-0168", detail: "13.5 / 15 bbl · 90% full", verb: "Open batch", warning: true },
-  currentReading: "5.2 °P · 68.2 °F · overdue 31 h",
-  history: [
-    { key: "r1", title: "9/02 · 7:10 AM", detail: "5.2 °P · 68.2 °F", who: "Dana" },
-    { key: "r2", title: "9/01 · 7:04 AM", detail: "6.8 °P · 67.9 °F", who: "Ali" },
-    { key: "r3", title: "8/31 · 6:58 AM", detail: "8.6 °P · 67.5 °F", who: "Dana" },
-  ],
+  occupancy: { title: "Stout · BATCH-0168", detail: "13.5 / 15 bbl · 90% full", warning: true },
+  readings: {
+    current: "5.2 °P · 68.2 °F · overdue 31 h",
+    history: [
+      { key: "r1", title: "Sep 2, 2026, 7:10 AM", detail: "5.2 °P · 68.2 °F", who: "Dana" },
+      { key: "r2", title: "Sep 1, 2026, 7:04 AM", detail: "6.8 °P · 67.9 °F", who: "Ali" },
+      { key: "r3", title: "Aug 31, 2026, 6:58 AM", detail: "8.6 °P · 67.5 °F", who: "Dana" },
+    ],
+  },
   name: "FV3",
   type: "Fermenter",
   typeOptions: ["Fermenter", "Brite", "Barrel", "Kettle", "Other"],
   capacity: "15",
+};
+
+/** New vessel before it is filled in: no name, no capacity, and no readings. */
+export const vesselNew: VesselDetailViewModel = {
+  title: "New vessel",
+  name: "",
+  type: "Fermenter",
+  typeOptions: ["Fermenter", "Brite", "Barrel", "Kettle", "Other"],
+  capacity: "",
 };
 
 const packagingPlan = {
@@ -138,15 +199,18 @@ export const runClosedHazy: RunClosedViewModel = {
   bblDrawn: 40,
   lot: { id: "lot-hazy", code: "L-260905-HZ", packaged_on: "2026-09-05", best_by: null },
   outputs: [{ sku_id: "cases", sku_name: "Hazy cases", qty_actual: 118 }],
+  timeZone: DEMO_TIME_ZONE,
 };
 
 /** Brands the Create recipe sheet offers; a recipe is brewed toward one, optionally. */
 export const recipeBrandOptions = [{ id: "hazy", name: "Hazy IPA" }, { id: "pils", name: "Pils" }, { id: "stout", name: "Stout" }];
 
+/** list_recipes rows, drawn by the live adapter: two with a current version, one saved without one. */
 export const recipesList: RecipesSnapshot = {
-  rows: [
-    { key: "hazy", title: "Hazy IPA v4", detail: "IPA · 15 bbl · updated Aug 28" },
-    { key: "pils", title: "Pils v3", detail: "German pils · 15 bbl · updated Aug 21" },
+  recipes: [
+    { id: "hazy", name: "Hazy IPA", brand: "Hazy IPA", latest_version: 4 },
+    { id: "pils", name: "Pils", brand: "Pils", latest_version: 3 },
+    { id: "saison", name: "Farmhouse saison", brand: null, latest_version: null },
   ],
 };
 
@@ -180,11 +244,13 @@ export const recipeHazyV4: RecipeViewModel = {
   recipeNote: "The flagship. Keep it soft and juicy.",
   priceGroup: "3",
   priceGroupOptions: ["Not decided", "1", "2", "3", "4", "5", "6", "7", "8"],
+  // 2-row comes in 50 lb sacks and Citra in 44 lb boxes; the dry hop is a cellar stage, so it has no pack total.
   ingredients: [
-    { key: "malt", title: "2-row", detail: "mash · 44 lb / bbl", qty: "" },
-    { key: "boil", title: "Citra", detail: "boil · 10 min · 0.4 lb / bbl", qty: "" },
-    { key: "dh", title: "Citra", detail: "dry hop · day 4 · 1.2 lb / bbl", qty: "" },
+    { key: "malt", title: "2-row", detail: ingredientDetail("mash", null, 44, "lb"), qty: "", pack: { perBbl: 44, factor: 50, unit: "lb" } },
+    { key: "boil", title: "Citra", detail: ingredientDetail("boil", 10, 0.4, "lb"), qty: "", pack: { perBbl: 0.4, factor: 44, unit: "lb" } },
+    { key: "dh", title: "Citra", detail: ingredientDetail("dry_hop", null, 1.2, "lb"), qty: "" },
   ],
+  totalsAtBbl: "22",
   preBoil: "16.8",
   boilMin: "60",
   whirlpoolMin: "20",
@@ -197,7 +263,7 @@ export const recipeHazyV4: RecipeViewModel = {
   // PR D drops the dry-hop day argument with the dry-hop row.
   fermentation: { title: `Fermentation schedule · ${plural(FERM_STAGES.length, "stage")}`, detail: fermentationSummary(FERM_STAGES, 4) },
   // The live draft's Water row: target and addition count (recipe-version-form.tsx); the Water frame names the source.
-  water: { title: "Water", detail: `target ${waterProfiles.find((p) => p.id === WATER_HAZY.targetProfileId)?.name} · ${plural(WATER_HAZY.additions.length, "addition")}` },
+  water: { title: "Water", detail: waterRowSummary(waterProfiles.find((p) => p.id === WATER_HAZY.targetProfileId)?.name, WATER_HAZY.additions.length) },
   notes: "Whirlpool hard, knock out cold.",
   predicted: "Predicted: OG 15.2 °P · FG 3.3 °P · ABV 6.5%",
   tape: [

@@ -5,6 +5,7 @@ const input = {
   skuId: "00000000-0000-4000-8000-000000000001", locationId: "00000000-0000-4000-8000-000000000002",
   binId: "00000000-0000-4000-8000-000000000003", qty: -1, type: "loss",
 };
+const previewToken = "00000000-0000-4000-8000-000000000004";
 const awaitingPart = (proposal: unknown) => ({ type: "tool-record_movement", state: "output-available", output: { status: "awaiting_confirmation", proposal } });
 const awaiting = (proposal: unknown) => [{ role: "assistant", parts: [awaitingPart(proposal)] }];
 
@@ -23,8 +24,8 @@ describe("composer UI messages", () => {
   });
 
   it("finds the latest server proposal tool output", () => {
-    expect(latestComposerProposal(awaiting({ name: "record_movement", input, effects: [rpcEffect], warnings: [], version: {}, previewToken: "token" })))
-      .toMatchObject({ proposal: { name: "record_movement", input: { qty: -1 }, previewToken: "token" } });
+    expect(latestComposerProposal(awaiting({ name: "record_movement", input, effects: [rpcEffect], warnings: [], version: {}, previewToken })))
+      .toMatchObject({ proposal: { name: "record_movement", input: { qty: -1 }, previewToken } });
   });
 
   it("reports no proposal when none is awaiting", () => {
@@ -36,10 +37,11 @@ describe("composer UI messages", () => {
   // message instead of a proposal, so it never reaches the commit button, and
   // never throws out of the staff layout's render (#463).
   it.each([
-    ["another command", { name: "update_sku", input, effects: [], warnings: [], previewToken: "token" }],
-    ["an invalid movement input", { name: "record_movement", input: { qty: -1 }, effects: [], warnings: [], previewToken: "token" }],
+    ["another command", { name: "update_sku", input, effects: [], warnings: [], previewToken }],
+    ["an invalid movement input", { name: "record_movement", input: { qty: -1 }, effects: [], warnings: [], previewToken }],
     ["a missing preview token", { name: "record_movement", input, effects: [], warnings: [] }],
-    ["malformed effects", { name: "record_movement", input, effects: [{ qty: -1 }], warnings: [], previewToken: "token" }],
+    ["a preview token that is not a UUID", { name: "record_movement", input, effects: [], warnings: [], previewToken: "token" }],
+    ["malformed effects", { name: "record_movement", input, effects: [{ qty: -1 }], warnings: [], previewToken }],
   ])("rejects %s with a plain message and logs the detail", (_, proposal) => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     expect(latestComposerProposal(awaiting(proposal))).toEqual({ proposal: null, error: PROPOSAL_ERROR });

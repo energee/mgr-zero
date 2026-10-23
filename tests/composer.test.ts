@@ -13,7 +13,8 @@ import { ComposerStripView } from "@/components/mgr/views/composer-strip";
 import { chatModelFromSettings, gatewayLanguageModels, modelMatches, modelProvider } from "@/lib/chat/models";
 import { canRun } from "@/lib/commands/registry";
 import "@/lib/commands/all";
-import { movementFormHref, movementFormInstanceKey } from "@/lib/composer/state";
+import { composerProposal, movementFormHref, movementFormInstanceKey } from "@/lib/composer/state";
+import { isUuid } from "@/lib/commands/context";
 import { isComposerShortcut } from "@/components/mgr/composer";
 
 const ids = {
@@ -34,14 +35,16 @@ describe("AI composer", () => {
     expect(chatModelFromSettings(null, "anthropic/claude-sonnet-4.5")).toBe("anthropic/claude-sonnet-4.5");
   });
 
-  it("offers every language model returned by Gateway", () => {
-    expect(gatewayLanguageModels([
+  it("offers every language model returned by Gateway, by id and name only", () => {
+    // Gateway also returns pricing; Settings does not show it (#1147), so it is not passed on.
+    const catalog = [
       { id: "openai/gpt-5.4", name: "GPT-5.4", modelType: "language", pricing: { input: "0.0000025", output: "0.000015" } },
       { id: "google/veo", name: "Veo", modelType: "video" },
       { id: "anthropic/claude", name: "Claude", modelType: null },
-    ])).toEqual([
+    ];
+    expect(gatewayLanguageModels(catalog)).toEqual([
       { id: "anthropic/claude", name: "Claude" },
-      { id: "openai/gpt-5.4", name: "GPT-5.4", pricing: { input: "0.0000025", output: "0.000015" } },
+      { id: "openai/gpt-5.4", name: "GPT-5.4" },
     ]);
   });
 
@@ -63,15 +66,16 @@ describe("AI composer", () => {
   it("renders model selection as a shared Settings control", () => {
     const html = renderToStaticMarkup(createElement(AiModelSettingsView, {
       value: "openai/gpt-5.4",
-      models: [{ id: "openai/gpt-5.4", name: "GPT-5.4", pricing: { input: "0.0000025", output: "0.000015" } }],
+      models: [{ id: "openai/gpt-5.4", name: "GPT-5.4" }],
     }));
     const text = html.replace(/<[^>]*>/g, "");
     expect(html).toContain("AI model");
     expect(html).toMatch(/data-slot="input-group-control"[^>]*value="GPT-5\.4"/);
     expect(text).not.toContain("openai/gpt-5.4");
-    expect(text).toContain("Input $2.50 · Output $15.00 / 1M tokens");
+    // Token prices and the Vercel catalog link are vendor detail, not brewery settings (#1147).
+    expect(text).not.toMatch(/tokens|\$/);
     expect(text).toContain("openai");
-    expect(html).toContain('href="https://vercel.com/ai-gateway/models"');
+    expect(html).not.toContain("vercel.com");
     expect(html).toContain("<title>OpenAI</title>");
     expect(html).toContain('placeholder="Search models…"');
     expect(readFileSync("components/mgr/views/ai-model-settings.tsx", "utf8")).not.toMatch(/<select\b/);
@@ -109,9 +113,10 @@ describe("AI composer", () => {
     expect(unknown).not.toContain("<title>Vercel</title>");
   });
 
-  it("shows the brewery model in the conversation header", () => {
-    const html = renderToStaticMarkup(createElement(ComposerConversationView, { messages: [], model: "openai/gpt-5.4" }));
-    expect(html).toContain("openai/gpt-5.4");
+  it("names no model in the conversation header (#998)", () => {
+    const html = renderToStaticMarkup(createElement(ComposerConversationView, { messages: [] }));
+    expect(html).toContain("Answers use your brewery data and permissions.");
+    expect(html).not.toContain(" · ");
   });
 
   it("renders assistant markdown", () => {
@@ -129,6 +134,24 @@ describe("AI composer", () => {
     expect(Object.fromEntries(url.searchParams)).toMatchObject({ recordMovement: "1", ...ids, qty: "-0.5", type: "depletion", note: "Festival tent", movementHandoff: handoffId });
     expect(movementFormInstanceKey()).toBe("manual");
     expect(readFileSync("app/(app)/inventory/page.tsx", "utf8")).toContain("key={movementFormInstanceKey(handoffId)}");
+  });
+
+  // /inventory keys MovementForm on ?movementHandoff. Without a per-proposal
+  // id, Open as form on /inventory soft-navigates into the mounted "manual"
+  // form, which reads its open state and prefill only on mount (#1166).
+  it("keys Open as form by the proposal's preview token so the form remounts (#1166)", () => {
+    const token = (n: number) => `9999999${n}-9999-4999-8999-999999999999`;
+    // The key page.tsx gives the form for the link Open as form builds; the
+    // page drops a non-UUID ?movementHandoff (chat-messages.test.ts pins that
+    // a proposal cannot carry one).
+    const formKey = (previewToken: string) => {
+      const proposal = composerProposal.parse({ name: "record_movement", input: { ...ids, qty: -1, type: "loss" }, previewToken, effects: [], warnings: [] });
+      const handoffId = new URL(movementFormHref(proposal.input, proposal.previewToken), "https://mgr.test").searchParams.get("movementHandoff") ?? undefined;
+      return movementFormInstanceKey(isUuid(handoffId) ? handoffId : undefined);
+    };
+    expect(formKey(token(1))).toBe(`composer:${token(1)}`);
+    expect(formKey(token(2))).not.toBe(formKey(token(1)));
+    expect(readFileSync("components/mgr/composer-conversation.tsx", "utf8")).toContain("movementFormHref(proposal.input, proposal.previewToken)");
   });
 
   it("keeps chat and history staff-only", () => {

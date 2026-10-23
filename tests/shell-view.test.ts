@@ -30,6 +30,7 @@ import {
   portalForgotPassword,
   portalSetPassword,
   portalSignIn,
+  portalStaffOnly,
   resetPassword,
   setPassword,
   signIn,
@@ -52,6 +53,7 @@ import {
 import { workWarehouse } from "../lib/mgr/fixtures/work";
 import { taproomBeerView, toBeerViewProps } from "../lib/mgr/beer-view";
 import { toMoreViewProps } from "../lib/mgr/more-view";
+import { searchEmptyMessage } from "../lib/mgr/search-palette-state";
 import { toTodayViewProps } from "../lib/mgr/today-view";
 import { filterWorkRows, toWorkViewProps, workFromQuery } from "../lib/mgr/work-view";
 import { plural } from "../lib/mgr/plural";
@@ -92,6 +94,7 @@ describe("Today view", () => {
     const model = toTodayViewProps(todayWarehouse);
     expect(model.rows.map((r) => [r.title, r.verb])).toEqual([
       ["3 orders ready", "Pick"],
+      ["ORD-0228", "Pick"],
       ["Staged · ORD-0229", "Put back"],
       ["PO-0142 · Country Malt", "Receive"],
       ["Next delivery · Ridgeline", "Resume"],
@@ -204,11 +207,19 @@ describe("Beer view", () => {
     expect(model.navs.map((r) => [r.title, r.detail])).toEqual([
       ["Finished goods", `${plural(2, "shortage")} · ATP by SKU`],
       ["Taproom", `${plural(1, "SKU")} below par · weekly count`],
-      ["Taps", `${plural(11, "keg")} open · Tap board`],
-      ["Cellar", `${plural(6, "tank")} with beer`],
-      ["Materials", plural(3, "shortage")],
+      ["Taps", `${plural(11, "keg")} on tap · Tap board`],
+      ["Cellar", plural(6, "occupied tank")],
+      ["Materials", "on hand · definitions · cycle count"],
+      ["Shortages", plural(3, "shortage")],
       ["Kegs", "142 out at customers"],
     ]);
+  });
+
+  it("keeps Materials on hand reachable and sends the shortage count to Planning, which lists those rows (#989)", () => {
+    const model = toBeerViewProps({ overview: { fgShortages: 0, taproomBelowPar: 0, openTaps: 0, openOccupancies: 0, materialShortages: 55, kegsOut: 0 } });
+    expect(model.navs.find((r) => r.key === "materials")?.href).toBe("/materials");
+    expect(model.navs.find((r) => r.key === "shortages")).toMatchObject({ title: "Shortages", detail: "55 shortages", href: "/planning" });
+    expect(screen("Beer").to).toMatchObject({ Materials: "Materials on hand", Shortages: "Planning" });
   });
 
   it("omits Taproom and Taps when showTaproom is false", () => {
@@ -223,7 +234,7 @@ describe("Beer view", () => {
       },
       showTaproom: false,
     });
-    expect(model.navs.map((r) => r.title)).toEqual(["Finished goods", "Cellar", "Materials", "Kegs"]);
+    expect(model.navs.map((r) => r.title)).toEqual(["Finished goods", "Cellar", "Materials", "Shortages", "Kegs"]);
   });
 
   it("the inventory drawing still offers Finished goods and does not leak live hrefs", () => {
@@ -237,6 +248,12 @@ describe("Beer view", () => {
     const body = screen("Beer").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(BeerView);
     expect(body.props.model).toEqual(toBeerViewProps(beerOverview));
+  });
+
+  it("the Beer inventory record prints its counts through the same adapter as live (#1119)", () => {
+    const html = htmlOf(screen("Beer").body);
+    expect(html).toContain("11 kegs on tap · Tap board");
+    expect(html).toContain("6 occupied tanks");
   });
 
   it("the live Beer page mounts BeerView", () => {
@@ -280,6 +297,8 @@ describe("Work view", () => {
   it("the live Work adapter delegates its controls and rows to WorkView", () => {
     const page = src("app/(app)/work/page.tsx");
     expect(page).toMatch(/<WorkList\b/);
+    // New order opens the form, not the Orders list (#1129).
+    expect(page).toContain('<Link href="/orders/new">New order</Link>');
     const adapter = src("app/(app)/work/work-list.tsx");
     expect(adapter).toMatch(/<WorkView\b/);
     expect(adapter).not.toMatch(/<Tabs\b|E\.row/);
@@ -287,10 +306,23 @@ describe("Work view", () => {
 });
 
 describe("More view", () => {
-  it("maps the designed More list", () => {
+  it("maps the designed More list under every area, each card in one", () => {
     const model = toMoreViewProps(moreNavs);
-    expect(model.navs[0]?.title).toBe("Invoices");
-    expect(model.navs.some((r) => r.title === "Settings")).toBe(true);
+    expect(model.groups.map((g) => g.group)).toEqual(["Sales", "Production", "Setup", "Integrations"]);
+    expect(model.groups[0]?.items[0]?.title).toBe("Invoices");
+    expect(model.groups.flatMap((g) => g.items)).toHaveLength(moreNavs.length);
+  });
+
+  it("hides an area heading when the role has no card under it (#1159)", () => {
+    // The live page's mapping, for a role whose More is Chat and Units.
+    const model = toMoreViewProps([
+      { key: "/settings/chat", title: "Chat", group: "Integrations" },
+      { key: "/settings/units", title: "Units", group: "Setup" },
+    ]);
+    expect(model.groups.map((g) => [g.group, g.items.map((r) => r.title)])).toEqual([["Setup", ["Units"]], ["Integrations", ["Chat"]]]);
+    const html = renderToStaticMarkup(createElement(MoreView, { model }));
+    expect(html).toContain(">Setup</h2>");
+    expect(html).not.toContain(">Sales</h2>");
   });
 
   it("the More inventory record is MoreView", () => {
@@ -304,6 +336,8 @@ describe("More view", () => {
     expect(page).toMatch(/from "@\/components\/mgr\/views\/more"/);
     expect(page).toMatch(/<MoreView\b/);
     expect(page).not.toMatch(/from "@\/components\/mgr\/e"/);
+    // Each card carries its nav entry's area, so the live page groups as the frame does.
+    expect(page).toContain("group: c.group");
   });
 });
 
@@ -326,8 +360,9 @@ describe("Search view", () => {
     const palette = src("components/mgr/search-palette.tsx");
     expect(palette).toMatch(/<SearchView\b/);
     expect(palette).not.toMatch(/<Command\b|<CommandInput\b|<CommandGroup\b|<CommandItem\b/);
-    expect(palette).toContain("No pages or records found · Try a page name, record name, or document number.");
-    expect(screen("Search").states).toContainEqual(["empty", "No pages or records found · Try a page name, record name, or document number."]);
+    expect(palette).toMatch(/emptyMessage=\{searchEmptyMessage\(/);
+    expect(screen("Search").states).toContainEqual(["first use", searchEmptyMessage("", "idle", true)]);
+    expect(screen("Search").states).toContainEqual(["empty", searchEmptyMessage("zzz", "ready", true)]);
   });
 });
 
@@ -463,6 +498,7 @@ describe("Entry views", () => {
     ["Portal forgot password", portalForgotPassword],
     ["Portal set password", portalSetPassword],
     ["No membership", noMembership],
+    ["Portal staff only", portalStaffOnly],
     ["Expired reset", expiredReset],
   ] as const)("the %s inventory record is EntryView", (name, fixture) => {
     const body = screen(name).body as { type: unknown; props: { model: unknown } };

@@ -8,9 +8,9 @@ import { FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { breweryOperatingDefaultsCommand, type BrewerySettingsValues } from "@/lib/mgr/settings-view";
+import { timezoneLabel } from "@/lib/mgr/labels";
 
 const TIMEZONES = Intl.supportedValuesOf("timeZone");
-const timezoneLabel = (timezone: string) => timezone.replaceAll("_", " ").replaceAll("/", " / ");
 
 /** The Brewery details section of Settings: its own form, named by its legend, saved only by Save brewery. */
 export function BrewerySettingsFormView({ initial, onSave, busy = false, error = null, basisLocked = false }: {
@@ -59,10 +59,14 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
           {E.edit("Books opened on · optional", values.booksOpenedOn, "date", undefined, { onChange: (nextValue: string) => change("booksOpenedOn", nextValue), id: `${id}-booksOpenedOn`, disabled: basisLocked, "aria-describedby": `${id}-booksOpenedOn-help` })}
           <FieldDescription id={`${id}-booksOpenedOn-help`}>{basisLocked ? "Filed reporting basis. Use Correct reporting basis below to record a correction and flag affected periods." : "Set or clear before your first filed snapshot. Later changes require a recorded admin correction."}</FieldDescription>
         </div>
-        {E.edit("One-way keg fee ($)", values.oneWayKegFee, "number", undefined, { onChange: (nextValue: string) => change("oneWayKegFee", nextValue), id: `${id}-oneWayKegFee`, min: 0, step: 0.01 })}
+        <div className="flex min-w-0 flex-col gap-2">
+          {E.edit("One-way keg fee ($)", values.oneWayKegFee, "number", undefined, { onChange: (nextValue: string) => change("oneWayKegFee", nextValue), id: `${id}-oneWayKegFee`, min: 0, step: 0.01, "aria-describedby": `${id}-oneWayKegFee-help` })}
+          <FieldDescription id={`${id}-oneWayKegFee-help`}>Charged for each one-way keg shipped. Blank or 0 means no fee.</FieldDescription>
+        </div>
         <div className="flex min-w-0 flex-col gap-2 [&>[data-slot=button-group]]:w-full">
           <Label htmlFor={`${id}-hours`}>Reading overdue after (hours)</Label>
-          {E.stq(Number(values.hours), "Reading overdue after (hours)", { id: `${id}-hours`, value: values.hours, onChange: value => change("hours", value), min: 1, max: 168 })}
+          {E.stq(Number(values.hours), "Reading overdue after (hours)", { id: `${id}-hours`, value: values.hours, onChange: value => change("hours", value), min: 1, max: 168, "aria-describedby": `${id}-hours-help` })}
+          <FieldDescription id={`${id}-hours-help`}>Required: a whole number from 1 to 168. It cannot be blank or 0.</FieldDescription>
         </div>
         <div className="flex min-w-0 flex-col gap-2">
           {E.edit("Days to package", values.daysToPackage, "number", undefined, { onChange: (value) => change("daysToPackage", value), id: `${id}-daysToPackage`, min: 1, max: 120, step: 1, required: true })}

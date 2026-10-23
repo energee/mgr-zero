@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { CommandForm } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
 import {
-  ConnectSquareView, DisconnectSquareView, PosItemView, PosMappingView, PosMenuView, PosSyncActions, SquareLocationsView,
+  ConnectSquareView, DisconnectSquareView, PosItemView, PosMenuView, PosSyncActions, SquareLocationsView,
 } from "@/components/mgr/views/pos";
 import { Button } from "@/components/ui/button";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { revocationConfirmed } from "@/lib/mgr/integration-disconnect";
 import { toCents } from "@/lib/mgr/money";
-import { isTerminalPublication, publicationNotice, readPublicationOutcome, selectExactCommandAttempt, shouldStartNewCommandAttempt, syncFailureMessage, syncResultMessage, type ExactCommandAttempt, type PosLocationRow, type PosMenuModel, type PosSaleRow, type PosVariationRow } from "@/lib/mgr/pos-view";
+import { isTerminalPublication, publicationNotice, readPublicationOutcome, selectExactCommandAttempt, shouldStartNewCommandAttempt, syncFailureMessage, syncResultMessage, type ExactCommandAttempt, type PosLocationRow, type PosMenuModel } from "@/lib/mgr/pos-view";
 
 /**
  * One exact-identity command: a repeat resumes the attempt this tab holds (or
@@ -90,22 +90,6 @@ export function SquareLocationsControl({ rows, locations }: { rows: PosLocationR
     onSave={(row, mgrLocationId) => void action.run("set_pos_location_mapping", { posLocationId: row.externalLocationId, mgrLocationId }, undefined, { target: row.externalLocationId })} />;
 }
 
-export function PosMappingControl({ variations, targets, sales, coverage, canSync, back }: {
-  variations: PosVariationRow[]; targets: { value: string; label: string }[]; sales: PosSaleRow[]; coverage: string[];
-  canSync: boolean; back: { href: string; label: string };
-}) {
-  const action = useCommandAction();
-  return <PosMappingView variations={variations} targets={targets} sales={sales} coverage={coverage} busy={action.busy} error={action.error} backHref={back.href} backLabel={back.label}
-    syncAction={canSync ? <SquareSyncControls /> : undefined} onSave={(row, target) => {
-      const [kind, id] = target.split(":", 2);
-      void action.run("set_pos_item_mapping", {
-        externalItemId: row.externalItemId, externalVariationId: row.externalVariationId,
-        disposition: kind === "ignore" ? "ignored" : "mapped",
-        ...(kind === "sku" ? { skuId: id } : kind === "format" ? { formatId: id } : {}),
-      }, undefined, { target: `${row.externalItemId}:${row.externalVariationId}` });
-    }} />;
-}
-
 /** A publication's outcome. A confirmed publish reads out in the always-mounted
  *  status region; any other outcome stays an E.note alert with its retry verbs. */
 export function PublicationResult({ action, onRetry, onCorrected }: { action: ExactCommand; onRetry: () => void; onCorrected: () => void }) {
@@ -123,14 +107,25 @@ export function PublicationResult({ action, onRetry, onCorrected }: { action: Ex
   </div>;
 }
 
-export function PosMenuControl({ model, bins, channels }: {
+export function PosMenuControl({ model, bins, channels, targets }: {
   model: PosMenuModel; bins: { id: string; name: string }[]; channels: { id: string; name: string }[];
+  targets: { value: string; label: string }[];
 }) {
   const command = useCommandAction(), publication = useExactCommand();
+  const [savingKey, setSavingKey] = useState<string>();
   const outcome = readPublicationOutcome(publication.result);
   const terminal = isTerminalPublication(outcome?.status);
   const publish = (newAttempt = false, retryConflict = false) => publication.run("publish_pos_menu", { posLocationId: model.selectedLocationId, ...(retryConflict ? { retryConflict: true } : {}) }, newAttempt, model.selectedLocationId);
-  return <PosMenuView model={model} bins={bins} channels={channels} busy={command.busy || publication.busy} error={command.error ?? publication.error} backHref="/more"
+  return <PosMenuView model={model} bins={bins} channels={channels} targets={targets} busy={command.busy || publication.busy} savingKey={savingKey} error={command.error ?? publication.error} backHref="/more"
+    onMap={(row, target) => {
+      const [kind, id] = target.split(":", 2);
+      setSavingKey(`${row.externalItemId}:${row.externalVariationId}`);
+      void command.run("set_pos_item_mapping", {
+        externalItemId: row.externalItemId, externalVariationId: row.externalVariationId,
+        disposition: kind === "ignore" ? "ignored" : "mapped",
+        ...(kind === "sku" ? { skuId: id } : kind === "format" ? { formatId: id } : {}),
+      }, undefined, { target: `${row.externalItemId}:${row.externalVariationId}` });
+    }}
     notice={<PublicationResult action={publication} onRetry={() => void publish()} onCorrected={() => void publish(true, outcome?.errorCode === "version_mismatch")} />}
     onConfigure={(binId, saleChannelId) => void command.run("configure_pos_menu", { posLocationId: model.selectedLocationId, binId, saleChannelId })}
     onPublish={() => void publish(terminal || publication.failure?.kind === "definitive", outcome?.status === "rejected" && outcome.errorCode === "version_mismatch")} />;

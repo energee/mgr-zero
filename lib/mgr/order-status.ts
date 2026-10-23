@@ -4,9 +4,12 @@
 // lifecycle step, and the portal says it in buyer words. Staged beer outranks
 // the lifecycle everywhere, so the restock override lives here too rather than
 // in each caller.
+import { formatDate } from "@/lib/date-format";
 import { hasAnyRole } from "@/lib/mgr/roles";
 
-export type OrderStatus = "draft" | "submitted" | "confirmed" | "picked" | "shipped" | "cancelled";
+/** Every lifecycle state in order, so a status filter cannot drift from the type. */
+export const ORDER_STATUSES = ["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
 export type ActionTone = "primary" | "success" | "info" | "attention";
 
 /** verb, tone, and the path under the order that finishes it. */
@@ -50,6 +53,7 @@ const BUYER: Record<OrderStatus, string> = {
   draft: "Draft", submitted: "Placed", confirmed: "Confirmed", picked: "Being picked", shipped: "Shipped", cancelled: "Cancelled",
 };
 
-/** "Placed · ships 2026-09-10" — the one line both portal order surfaces print. */
+/** "Placed · ships Sep 10, 2026" — the one line both portal order surfaces
+ *  print. requested_ship_date is a date column, so it needs no time zone. */
 export const buyerStatus = (status: string, requestedShipDate?: string | null) =>
-  `${BUYER[status as OrderStatus] ?? status}${requestedShipDate ? ` · ships ${requestedShipDate}` : ""}`;
+  `${BUYER[status as OrderStatus] ?? status}${requestedShipDate ? ` · ships ${formatDate(requestedShipDate)}` : ""}`;

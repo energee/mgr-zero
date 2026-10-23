@@ -1,5 +1,6 @@
 import { formatDate } from "@/lib/date-format";
 import { runNo } from "@/lib/mgr/doc-no";
+import type { EmptyState } from "@/lib/mgr/empty-state";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
 
 export type PackagingRunSnapshot = {
@@ -25,7 +26,7 @@ export type PackagingRunRowView = {
   title: string;
   detail: string;
   verb?: string;
-  tone?: "info" | "attention" | "success";
+  tone?: "info" | "attention";
   warning?: boolean;
   href?: string;
 };
@@ -33,13 +34,17 @@ export type PackagingRunRowView = {
 export type PackagingRunsViewModel = {
   upcoming: PackagingRunRowView[];
   recent: PackagingRunRowView[];
+  /** Set only when there are no runs at all. */
+  empty?: EmptyState;
   workChips: string[];
   workTabs: Record<string, string>;
 };
 
 function row(run: PackagingRunSnapshot, timeZone: string, href?: string): PackagingRunRowView {
   const title = `${runNo(run.run_no)} · ${run.brand_name ?? "no brand"}`;
-  if (run.cancelled_at) return { key: run.id, title, detail: `Cancelled · ${formatDate(run.cancelled_at, timeZone)}`, verb: "Open", tone: "info", href };
+  // A finished run has no next action; its row is a plain link, because
+  // "Open" on a closed run reads as reopen (#996).
+  if (run.cancelled_at) return { key: run.id, title, detail: `Cancelled · ${formatDate(run.cancelled_at, timeZone)}`, href };
   if (run.closed_at) {
     const detail = [
       `closed ${formatDate(run.closed_at, timeZone)}`,
@@ -48,10 +53,10 @@ function row(run: PackagingRunSnapshot, timeZone: string, href?: string): Packag
       run.yield_percent === undefined ? undefined : `${run.yield_percent}% yield`,
       run.loss_bbl ? `${run.loss_bbl} bbl loss` : undefined,
     ].filter(Boolean).join(" · ");
-    return { key: run.id, title, detail, verb: href ? "Open" : undefined, tone: "success", warning: Boolean(run.loss_bbl), href };
+    return { key: run.id, title, detail, warning: Boolean(run.loss_bbl), href };
   }
   const verb = run.material_shortfall ? "Resolve" : run.started_at ? "Close" : run.vessel_name ? "Start" : "Pick source";
-  const detail = [run.planned_on, run.vessel_name ?? "no source yet", run.qty_planned ? `${run.qty_planned} ${run.planned_unit ?? "units"} planned` : undefined, run.material_shortfall].filter(Boolean).join(" · ");
+  const detail = [formatDate(run.planned_on), run.vessel_name ?? "no source yet", run.qty_planned ? `${run.qty_planned} ${run.planned_unit ?? "units"} planned` : undefined, run.material_shortfall].filter(Boolean).join(" · ");
   return { key: run.id, title, detail, verb, tone: run.material_shortfall || run.started_at ? "attention" : "info", warning: Boolean(run.material_shortfall), href };
 }
 
@@ -63,6 +68,7 @@ export function toPackagingRunsViewProps(runs: PackagingRunSnapshot[], timeZone:
   return {
     upcoming: runs.filter((run) => !finished(run)).map((run) => row(run, timeZone, hrefFor?.(run.id))),
     recent: runs.filter(finished).map((run) => row(run, timeZone, hrefFor?.(run.id))),
+    empty: runs.length === 0 ? { title: "No runs planned", description: "Select Schedule run to plan one: a date, a brand, and how many of each SKU." } : undefined,
     workChips: WORK_CHIPS,
     workTabs: WORK_TABS,
   };

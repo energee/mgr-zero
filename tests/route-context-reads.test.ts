@@ -8,6 +8,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const reads = vi.hoisted(() => [] as { table: string; eq: [string, unknown][] }[]);
 const scopes = vi.hoisted(() => [] as Record<string, string>[]);
 const selection = vi.hoisted(() => ({ customerId: undefined as string | undefined }));
+// Tables whose reads never settle, to prove another read does not wait on them.
+const hanging = vi.hoisted(() => new Set<string>());
 const BREWERY = "00000000-0000-4000-8000-000000000001";
 const USER = "00000000-0000-4000-8000-000000000002";
 const OTHER_BREWERY = "00000000-0000-4000-8000-000000000003";
@@ -48,7 +50,8 @@ vi.mock("@/lib/supabase/server", () => ({
             return query;
           },
           maybeSingle: () => Promise.resolve({ data: error ? null : rows[0] ?? null, error }),
-          then: (resolve: (value: { data: unknown[] | null; error: typeof error }) => unknown) => Promise.resolve(resolve({ data: error ? null : rows, error })),
+          then: (resolve: (value: { data: unknown[] | null; error: typeof error }) => unknown) =>
+            hanging.has(table) ? new Promise(() => {}) : Promise.resolve(resolve({ data: error ? null : rows, error })),
         };
         return query;
       },
@@ -59,7 +62,7 @@ vi.mock("@/lib/supabase/server", () => ({
 import { createRequestAuthContext } from "@/lib/auth/request-context";
 import { buildRouteContext, ctxForBearer } from "@/lib/commands/context";
 
-beforeEach(() => { reads.length = 0; scopes.length = 0; selection.customerId = undefined; });
+beforeEach(() => { reads.length = 0; scopes.length = 0; selection.customerId = undefined; hanging.clear(); });
 
 describe("command route context (#759)", () => {
   it("reads all the caller's roles at this brewery without the staff_brewery projection", async () => {
@@ -67,6 +70,20 @@ describe("command route context (#759)", () => {
     expect(reads.map(read => read.table)).toEqual(["brewery_users"]);
     expect(reads[0].eq).toEqual(expect.arrayContaining([["user_id", USER], ["brewery_id", OTHER_BREWERY]]));
     expect(scopes).toEqual([{ "x-mgr-actor-id": USER, "x-mgr-brewery-id": OTHER_BREWERY }]);
+  });
+
+  // staff_brewery and portal_brewery already return only the caller's
+  // breweries, so a layout's two membership reads cost one round trip, not two.
+  it("reads staff_brewery without waiting for brewery_users", async () => {
+    hanging.add("brewery_users");
+    void createRequestAuthContext().getStaffMemberships();
+    await vi.waitFor(() => expect(reads.map(read => read.table)).toEqual(["brewery_users", "staff_brewery"]));
+  });
+
+  it("reads portal_brewery without waiting for portal_customers", async () => {
+    hanging.add("portal_customers");
+    void createRequestAuthContext().getCustomerMemberships();
+    await vi.waitFor(() => expect(reads.map(read => read.table)).toEqual(["portal_customers", "portal_brewery"]));
   });
 
   it("reuses memberships a page already loaded instead of reading roles again", async () => {

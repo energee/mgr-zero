@@ -9,6 +9,8 @@ import { describe, expect, it, vi } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { BatchesView } from "../components/mgr/views/batches";
 import { BrewDayView } from "../components/mgr/views/brew-day";
+import { BrewPrepView } from "../components/mgr/views/brew-prep";
+import { BrewTimelineView } from "../components/mgr/views/brew-timeline";
 import { ClosePackagingRunView } from "../components/mgr/views/close-packaging-run";
 import { RecipeView } from "../components/mgr/views/recipe";
 import { RecipesView } from "../components/mgr/views/recipes";
@@ -16,18 +18,37 @@ import { RunClosedView } from "../components/mgr/views/run-closed";
 import { ScheduleBatchView } from "../components/mgr/views/schedule-batch";
 import { VesselDetailView } from "../components/mgr/views/vessel-detail";
 import {
-  batchesBrewer, brewDayHazy, brewDayTurnsHazy, closePackagingRunHazy, recipeHazyV4, recipesList,
-  runClosedHazy, scheduleBatchHazy, vesselFv3,
+  batchesBrewer, brewDayHazy, brewDayTurnsHazy, brewPrepMineral, brewTimelineMineral, closePackagingRunHazy, recipeHazyV4, recipesList,
+  runClosedHazy, scheduleBatchHazy, vesselFv3, vesselNew, cellarTransferPils, cellarAdditionCitra,
 } from "../lib/mgr/fixtures/production";
 import { toBatchesViewProps, batchesFromQuery, type BatchListRow } from "../lib/mgr/batches-view";
 import { brewTurnModel, canRecordBrewDay } from "../lib/mgr/brew-day-view";
 import { PlanActions } from "../components/mgr/views/plan-actions";
 import { toRecipesViewProps } from "../lib/mgr/recipes-view";
+import { resolveTap } from "../lib/mgr/screen-links";
 import { formatVesselReading } from "../lib/mgr/vessel-detail-view";
 import { cellarReadings, toCellarMapViewProps } from "../lib/mgr/cellar-map-view";
 import { CellarMapView } from "../components/mgr/views/cellar-map";
+import { CellarTransferView } from "../components/mgr/views/cellar-transfer";
+import { CellarAdditionView } from "../components/mgr/views/cellar-addition";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
+
+describe("Production dates (#991)", () => {
+  it("prints packaged, best-by, planned and brewed days in the one date format", () => {
+    const closed = htmlOf(createElement(RunClosedView, { model: { ...runClosedHazy, lot: { ...runClosedHazy.lot!, best_by: "2027-03-04" } } }));
+    expect(closed).toContain("Sep 5, 2026");
+    expect(closed).toContain("Mar 4, 2027");
+    // created_at is an instant: 02:00 UTC on Sep 6 is still Sep 5 in New York.
+    const history = htmlOf(createElement(RunClosedView, { model: { ...runClosedHazy, timeZone: "America/New_York", records: [{ ...runClosedHazy.records![0]!, created_at: "2026-09-06T02:00:00Z" }] } }));
+    expect(history).toMatch(/Original close<[^]*?Sep 5, 2026/);
+    expect(history).not.toContain("2026-09-06");
+    expect(htmlOf(createElement(ClosePackagingRunView, { model: { title: "Run", plannedOn: "2026-09-28" } }))).toContain("Sep 28, 2026");
+    const brewed = htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, recorded: true } }));
+    expect(brewed).toContain("Sep 4, 2026");
+    expect(brewed).not.toMatch(/Brewed on<[^]*?2026-09-04/);
+  });
+});
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
 
@@ -43,10 +64,34 @@ it("cellar derives fills from occupancy and keeps links explicit", () => {
   expect(toCellarMapViewProps([{ ...vessels[0], capacity_bbl: 0 }], occupancies).tiles[0].fill).toBeUndefined();
 });
 
+describe("vessels are admin-managed", () => {
+  it("a brewer reads vessel facts as text, with no Save or Delete", () => {
+    const html = htmlOf(createElement(VesselDetailView, { model: vesselFv3, editable: false, remove: "Delete vessel" }));
+    expect(html).toContain(vesselFv3.name);
+    expect(html).toContain("Capacity (bbl)");
+    expect(html).not.toContain("<input");
+    expect(html).not.toContain("Save vessel");
+    expect(html).not.toContain("Delete vessel");
+  });
+
+  it("a retired vessel says so", () => {
+    expect(htmlOf(createElement(VesselDetailView, { model: { ...vesselFv3, retired: true } }))).toContain("retired");
+    expect(htmlOf(createElement(VesselDetailView, { model: vesselFv3 }))).not.toContain("retired");
+  });
+
+  it("hides Add vessel and New vessel when their href is null", () => {
+    const model = toCellarMapViewProps([{ id: "v1", name: "Tank", capacity_bbl: 10 }], []);
+    expect(htmlOf(createElement(CellarMapView, { model }))).toContain("Add vessel");
+    expect(htmlOf(createElement(CellarMapView, { model: { ...model, addHref: null } }))).not.toContain("Add vessel");
+    expect(htmlOf(createElement(BatchesView, { model: toBatchesViewProps(batchesBrewer) }))).toContain("New vessel");
+    expect(htmlOf(createElement(BatchesView, { model: toBatchesViewProps(batchesBrewer), newVesselHref: null }))).not.toContain("New vessel");
+  });
+});
+
 it("vessel readings preserve optional measurements and do not invent actors", () => {
   const reading = { id: "r1", at: "2026-09-12", temp_f: 68, gravity_plato: null, ph: null, note: null };
   expect(formatVesselReading(reading, "plato")).toBe("68 °F");
-  const html = htmlOf(createElement(VesselDetailView, { model: { ...vesselFv3, occupancy: undefined, history: [{ key: "r1", title: reading.at, detail: "68 °F" }] }, submitting: true, messages: "Save failed", footer: null }));
+  const html = htmlOf(createElement(VesselDetailView, { model: { ...vesselFv3, occupancy: undefined, readings: { current: "68 °F", history: [{ key: "r1", title: reading.at, detail: "68 °F" }] } }, submitting: true, messages: "Save failed", footer: null }));
   expect(html).toContain("No open occupancy");
   expect(html).toContain("Save failed");
   expect(html).toContain("disabled");
@@ -77,6 +122,8 @@ describe("Batches view", () => {
   });
   it("offers Brew only on the planned fixture batches", () => {
     const model = toBatchesViewProps(batchesBrewer);
+    expect(model.title).toBe("Batches");
+    expect(batchesFromQuery([], []).title).toBe("Batches");
     expect(model.planned.map(row => row.brewable)).toEqual([true, true]);
     expect(model.active.map(row => row.brewable)).toEqual([false, false, false]);
     expect(model.workChipIndex).toBe(3);
@@ -84,7 +131,7 @@ describe("Batches view", () => {
 
   it("maps each vessel to its own fields and edit destination", () => {
     const vessels = batchesFromQuery([], [{ id: "v4", name: "FV4", kind: "fermenter", capacity_bbl: 10, active: false }], { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}` }).vessels;
-    expect(vessels).toEqual([{ key: "v4", name: "FV4", kind: "fermenter", capacityBbl: 10, active: false, href: "/cellar/vessels/v4" }]);
+    expect(vessels).toEqual([{ key: "v4", name: "FV4", kind: "Fermenter", capacityBbl: 10, active: false, href: "/cellar/vessels/v4" }]);
   });
 
   it("the Batches inventory record is BatchesView", () => {
@@ -104,17 +151,19 @@ describe("Batches view", () => {
   });
 });
 
-describe("Schedule batch view", () => {
-  it("the Schedule batch inventory record is ScheduleBatchView", () => {
-    const body = screen("Schedule batch").body as { type: unknown; props: { model: unknown } };
+describe("New batch sheet", () => {
+  it("the New batch inventory record is a sheet drawing ScheduleBatchView", () => {
+    const record = screen("New batch");
+    expect(record.surface).toBe("sheet");
+    const body = record.body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(ScheduleBatchView);
     expect(body.props.model).toEqual(scheduleBatchHazy);
   });
 
-  it("renders Save schedule without leaking live hrefs", () => {
+  it("renders Schedule batch with no in-sheet title or back link (#1120, #1127)", () => {
     const html = htmlOf(createElement(ScheduleBatchView, { model: scheduleBatchHazy }));
-    expect(html).toMatch(/>Save schedule</);
-    expect(html).not.toMatch(/href="\/batches"/);
+    expect(html).toMatch(/>Schedule batch</);
+    expect(html).not.toMatch(/<h1\b|<a\b/);
     expect(html).toMatch(/Note · optional/);
   });
 
@@ -128,14 +177,29 @@ describe("Schedule batch view", () => {
 });
 
 describe("Brew day view", () => {
-  it("keeps plan actions on the first brew but not on an additional turn", () => {
-    const planActions = createElement(PlanActions, { plannedOn: "2026-09-04" });
-    const planned = htmlOf(createElement(BrewDayView, { model: brewDayHazy, planActions }));
-    for (const label of ["Change plan", "Reschedule", "Cancel plan"]) expect(planned).toContain(label);
-    const turn = htmlOf(createElement(BrewDayView, { model: brewTurnModel(brewDayTurnsHazy), planActions }));
-    expect(turn).toContain("Record brew turn");
-    for (const label of ["Change plan", "Reschedule", "Cancel plan"]) expect(turn).not.toContain(label);
+  it("folds Change plan at the foot of both planned tabs, after the form that saves or records", () => {
+    const planActions = createElement(PlanActions, { plannedOn: "2026-10-22" });
+    for (const html of [htmlOf(createElement(BrewPrepView, { model: brewPrepMineral, planActions })), htmlOf(createElement(BrewTimelineView, { model: brewTimelineMineral, planActions }))]) {
+      for (const label of ["Reschedule or cancel", "Change plan", "Reschedule", "Cancel plan"]) expect(html).toContain(label);
+      expect(html.indexOf("<details class=\"rounded border p-3\"><summary")).toBeGreaterThan(html.lastIndexOf("</form>"));
+      expect(html.indexOf("Planned")).toBeLessThan(html.indexOf("<form"));
+    }
   });
+  it("draws Cancel plan as a small control beside Reschedule, not a full-width button (#995)", () => {
+    const html = htmlOf(createElement(PlanActions, { plannedOn: "2026-09-04" }));
+    const cancel = /<button[^>]*>Cancel plan<\/button>/.exec(html)?.[0] ?? "";
+    expect(cancel).toContain('data-size="sm"');
+    expect(html.indexOf("Reschedule")).toBeLessThan(html.indexOf("Cancel plan"));
+    expect(html).toMatch(/<div class="flex flex-wrap[^"]*">[\s\S]*Reschedule[\s\S]*Cancel plan/);
+  });
+
+  it("rounds a pinned plan's per-bbl quantity the way the recipe page does (#995)", () => {
+    const model = { ...brewDayHazy, plan: { ...brewDayHazy.plan!, ingredients: [{ id: "i", material_id: "m", materialName: "2-row", unit: "lb", stage: "mash" as const, per_bbl_qty: 18.181818 }] } };
+    const html = htmlOf(createElement(BrewDayView, { model }));
+    expect(html).toContain("18.2 lb per bbl");
+    expect(html).not.toContain("18.181818");
+  });
+
   it("makes multiple recorded turns reachable in the inventory", () => {
     const html = htmlOf(screen("Brew day").body);
     for (const label of ["Add brew turn", "Correct turn 1", "Correct turn 2", "Turn 1", "Turn 2"]) expect(html).toContain(label);
@@ -155,7 +219,7 @@ describe("Brew day view", () => {
     const html = htmlOf(createElement(BrewDayView, { model: brewDayHazy, busy: true, error: "Vessel occupied" }));
     expect(html).toContain("Vessel occupied");
     expect(html).toContain('value="14.6"');
-    expect(html).toContain("September 4, 2026");
+    expect(html).toContain("Sep 4, 2026");
     expect(html).toContain("disabled");
     expect(html).toContain("Confirm actual ingredients");
     expect(html).not.toContain('href="/');
@@ -168,7 +232,7 @@ describe("Brew day view", () => {
   it("the Brew day inventory record is BrewDayView", () => {
     const body = screen("Brew day").body as { props: { children: { type: unknown; props: { model: unknown } }[] } };
     expect(body.props.children.map(view => view.type)).toEqual([BrewDayView, BrewDayView]);
-    expect(body.props.children.map(view => view.props.model)).toEqual([brewDayHazy, brewDayTurnsHazy]);
+    expect(body.props.children.map(view => view.props.model)).toEqual([brewDayTurnsHazy, brewTurnModel(brewDayTurnsHazy)]);
   });
 
   it("renders Record brew day and knockout", () => {
@@ -178,16 +242,120 @@ describe("Brew day view", () => {
     expect(html).toMatch(/FV2/);
   });
 
-  it("the live batch page delegates both states through RecordBrewDayForm to BrewDayView", () => {
+  it("the live batch page sends a planned batch to BrewTimelineView and a recorded or cancelled one to BrewDayView", () => {
     const page = src("app/(app)/batches/[id]/page.tsx");
     const form = src("app/(app)/batches/[id]/record-brew-day-form.tsx");
     expect(form).toMatch(/from "@\/components\/mgr\/views\/brew-day"/);
     expect(form).toMatch(/<BrewDayView\b/);
+    expect(form).toMatch(/from "@\/components\/mgr\/views\/brew-timeline"/);
+    expect(form).toMatch(/<BrewTimelineView\b/);
     expect(page).toMatch(/<RecordBrewDayForm\b/);
+    expect(page).toMatch(/<RecordBrewTimelineForm\b/);
+  });
+
+  it("the live batch page sends a planned batch's Prep tab to PrepForm, which binds BrewPrepView to save_batch_pulls", () => {
+    const page = src("app/(app)/batches/[id]/page.tsx");
+    const prep = src("app/(app)/batches/[id]/prep-form.tsx");
+    expect(page).toMatch(/<PrepForm\b/);
+    expect(page).toMatch(/openBrewTab\(tab, plan\.pulls\.length > 0\)/);
+    expect(prep).toMatch(/from "@\/components\/mgr\/views\/brew-prep"/);
+    expect(prep).toMatch(/<BrewPrepView\b/);
+    expect(prep).toMatch(/run\("save_batch_pulls", \{ batchId, \.\.\.brewPullsPayload\(values\) \}/);
+    expect(prep).toMatch(/onPrint=\{\(\) => window\.print\(\)\}/);
+  });
+
+  it("the Brew prep inventory record is BrewPrepView", () => {
+    const body = screen("Brew prep").body as { type: unknown; props: { model: unknown } };
+    expect(body.type).toBe(BrewPrepView);
+    expect(body.props.model).toEqual(brewPrepMineral);
+    expect((body.props as { planActions?: { type: unknown } }).planActions?.type).toBe(PlanActions);
+  });
+
+  it("links both tabs when live passes tab hrefs, and leaves them inert in the inventory", () => {
+    const hrefs = { Prep: "/batches/b1?tab=prep", "Brew day": "/batches/b1?tab=brew-day" };
+    const prep = htmlOf(createElement(BrewPrepView, { model: brewPrepMineral, tabHrefs: hrefs }));
+    const timeline = htmlOf(createElement(BrewTimelineView, { model: brewTimelineMineral, tabHrefs: hrefs }));
+    for (const html of [prep, timeline]) {
+      expect(html).toContain('href="/batches/b1?tab=prep"');
+      expect(html).toContain('href="/batches/b1?tab=brew-day"');
+    }
+    expect(htmlOf(createElement(BrewPrepView, { model: brewPrepMineral }))).not.toContain("?tab=");
+  });
+
+  it("Choose lot opens no inline pick without stock, and is disabled when the given stock holds none of the material", () => {
+    const html = htmlOf(createElement(BrewPrepView, { model: { ...brewPrepMineral, sources: [] } }));
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Choose lot<\/button>/);
+    expect(htmlOf(createElement(BrewPrepView, { model: brewPrepMineral }))).not.toMatch(/<button[^>]*disabled=""[^>]*>Choose lot<\/button>/);
+  });
+
+  it("the Brew day timeline inventory record is BrewTimelineView with Change plan", () => {
+    const body = screen("Brew day timeline").body as { type: unknown; props: { model: unknown; planActions: { type: unknown } } };
+    expect(body.type).toBe(BrewTimelineView);
+    expect(body.props.model).toEqual(brewTimelineMineral);
+    expect(body.props.planActions.type).toBe(PlanActions);
+  });
+
+  it("draws the timeline's planned facts above the record form and Change plan after it, so their fields never submit it", () => {
+    const html = htmlOf(createElement(BrewTimelineView, { model: brewTimelineMineral, planActions: createElement(PlanActions, { plannedOn: "2026-10-22" }) }));
+    expect(html.indexOf("22 bbl · Oct 22, 2026")).toBeLessThan(html.indexOf("<form"));
+    expect(html.indexOf("Change plan")).toBeGreaterThan(html.lastIndexOf("</form>"));
+    expect(html).not.toContain("Confirm no ingredients used");
+  });
+
+  it("offers Confirm no ingredients used on the timeline only when nothing is pulled", () => {
+    const none = { ...brewTimelineMineral, ingredients: brewTimelineMineral.ingredients.map(row => ({ ...row, packs: "0", loose: "0" })) };
+    expect(htmlOf(createElement(BrewTimelineView, { model: none }))).toContain("Confirm no ingredients used");
   });
 });
 
 describe("Vessel detail view", () => {
+  it("the occupancy row is a link to its batch, not an Open batch verb (#1026)", () => {
+    const html = htmlOf(createElement(VesselDetailView, { model: { ...vesselFv3, occupancy: { title: "Stout · BATCH-0168", detail: "13.5 / 15 bbl", href: "/batches/b1" } } }));
+    expect(html).toMatch(/<a[^>]*href="\/batches\/b1"[^>]*>(?:(?!<\/a>)[\s\S])*Stout · BATCH-0168/);
+    expect(html).not.toMatch(/Open batch/);
+    expect(src("app/(app)/cellar/vessels/[id]/page.tsx")).not.toMatch(/Open batch/);
+  });
+
+  it("a vessel not saved yet shows only its facts: no occupancy or readings (#1116)", () => {
+    const html = htmlOf(createElement(VesselDetailView, { model: vesselNew }));
+    for (const gone of ["No open occupancy", "Current reading", "Reading history", "No readings yet"]) expect(html).not.toContain(gone);
+    expect(html).toContain("Vessel facts");
+    // An existing empty vessel still says it is empty and has no readings.
+    const empty = htmlOf(createElement(VesselDetailView, { model: { ...vesselFv3, occupancy: undefined, readings: { current: "No readings yet", history: [] } } }));
+    for (const shown of ["No open occupancy", "Current reading", "Reading history"]) expect(empty).toContain(shown);
+  });
+
+  it("the live New vessel page passes no readings, so it draws only the facts (#1116)", () => {
+    const newLine = src("app/(app)/cellar/vessels/[id]/page.tsx").split("\n").find(line => line.includes('id === "new") return'));
+    expect(newLine).toMatch(/<VesselForm\b/);
+    expect(newLine).not.toMatch(/readings|occupancy/);
+  });
+
+  it("the New vessel inventory record draws the not-yet-saved vessel with what Save still needs (#1116)", () => {
+    const record = screen("New vessel");
+    const body = record.body as { type: unknown; props: { model: unknown; reason: unknown } };
+    expect(body.type).toBe(VesselDetailView);
+    expect(body.props.model).toEqual(vesselNew);
+    expect(body.props.reason).toBe("Still needed: a name and a capacity above zero.");
+    // Like the live page, the capacity starts blank, so no field error is drawn yet.
+    expect(htmlOf(record.body)).not.toContain("Enter a capacity above zero.");
+    expect(screen("Cellar map").to?.["Add vessel"]).toBe("New vessel");
+    expect(screen("Batches").to?.["New vessel"]).toBe("New vessel");
+  });
+
+  it("the back link names the page it opens: Cellar (#1116)", () => {
+    const html = htmlOf(createElement(VesselDetailView, { model: vesselFv3 }));
+    expect(html).toMatch(/<a[^>]*>(?:(?!<\/a>)[\s\S])*Cellar<\/a>/);
+    // "Cellar map" stays only as the inventory screen it opens (data-to), never as copy.
+    expect(html).toContain('data-to="Cellar map"');
+    expect(html.replace(/data-to="[^"]*"/g, "")).not.toContain("Cellar map");
+  });
+
+  it("a refused New vessel names New vessel, and editing a vessel keeps the incomplete state (#1116)", () => {
+    expect(src("app/(app)/cellar/vessels/[id]/page.tsx")).toContain('requirePagePermission(ctx, id === "new" ? "upsert_vessel" : "list_vessels", id === "new" ? "New vessel" : "Vessel detail")');
+    expect(screen("Vessel detail").states?.map(([state]) => state)).toContain("incomplete");
+  });
+
   it("the Vessel detail inventory record is VesselDetailView", () => {
     const body = screen("Vessel detail").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(VesselDetailView);
@@ -239,12 +407,29 @@ describe("Recipes view", () => {
         { id: "r2", name: "Stout", brand: "Stout", latest_version: null },
       ],
     });
-    expect(model.rows[0]).toEqual({ key: "r1", title: "Hazy IPA v1", detail: "no brand yet", href: "/recipes/r1" });
-    expect(model.rows[1]).toMatchObject({ title: "Stout", detail: "no version yet", warning: true, href: "/recipes/r2" });
-    const html = htmlOf(createElement(RecipesView, { model }));
+    expect(model.rows[0]).toEqual({ key: "r1", title: "Hazy IPA v1", detail: "No brand yet", href: "/recipes/r1" });
+    expect(model.rows[1]).toMatchObject({ title: "Stout", detail: "No version yet", warning: true, href: "/recipes/r2" });
+    const html = htmlOf(createElement(RecipesView, { model, linkRows: true }));
     expect(html).toContain('href="/recipes/r1"');
     expect(html).toContain('href="/recipes/r2"');
     expect(html).not.toContain(">Open<");
+  });
+
+  it("links Water profiles, where a version's source and target come from (#1140)", () => {
+    const live = htmlOf(createElement(RecipesView, { model: toRecipesViewProps({ recipes: [], waterProfilesHref: "/catalog/water-profiles" }) }));
+    expect(live).toMatch(/<a[^>]*href="\/catalog\/water-profiles"[^>]*>[^]*?Water profiles/);
+    // The inventory frame leaves the row for the explorer, which walks it to the Water profiles record.
+    expect(htmlOf(screen("Recipes").body)).toContain("Water profiles");
+    expect(resolveTap(screen("Recipes"), "Water profiles")).toBe("Water profiles");
+    // The renamed create row still opens the Ingredient record, not the global inert list.
+    expect(resolveTap(screen("Recipe"), "Add ingredient")).toBe("Ingredient");
+  });
+
+  it("draws the inventory list through the live adapter, a recipe with no version included", () => {
+    const { rows } = toRecipesViewProps(recipesList);
+    expect(rows.map((r) => r.detail)).toEqual(["Hazy IPA", "Pils", "No version yet"]);
+    expect(rows[2]).toMatchObject({ title: "Farmhouse saison", warning: true });
+    expect(htmlOf(screen("Recipes").body)).not.toMatch(/15 bbl · updated/);
   });
 
 
@@ -297,12 +482,21 @@ it("explains a disabled cellar Reading instead of leaving a dead end (#715)", ()
   const one = [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2 }];
   const two = [...one, { vessel_id: "v2", occupancy_id: "o2", brand_name: null, bbl: 3 }];
   const reading = (occupancyId: string) => `/cellar/${occupancyId}/reading`;
-  expect(toCellarMapViewProps(vessels, one, {}, {}, reading).readingHint).toBeUndefined();
-  expect(toCellarMapViewProps(vessels, two, {}, {}, reading).readingHint).toBe("Several tanks hold beer. Open a tank to record its reading.");
-  expect(toCellarMapViewProps(vessels, [], {}, {}, reading).readingHint).toBe("No tank holds beer, so there is nothing to read.");
+  expect(toCellarMapViewProps(vessels, one, {}, {}, reading).actionHint).toBeUndefined();
+  expect(toCellarMapViewProps(vessels, two, {}, {}, reading).actionHint).toBe("Several tanks hold beer. Open a tank to record its reading.");
+  // #1115: Transfer and Addition are off for the same reason, so the one note names all three.
+  expect(toCellarMapViewProps(vessels, [], {}, {}, reading).actionHint).toBe("No tank holds beer, so there is nothing to read, transfer or add to.");
   const html = htmlOf(createElement(CellarMapView, { model: toCellarMapViewProps(vessels, two, {}, { v1: "/cellar/vessels/v1" }, reading) }));
   expect(html).toContain("Open a tank to record its reading.");
   expect(html).not.toContain("/reading");
+});
+
+// #994: an empty search is not an empty recipe book.
+describe("Recipes search", () => {
+  it("says no recipes match, not no recipes yet, when a search is on", () => {
+    expect(toRecipesViewProps({ recipes: [], filtered: true }).empty).toEqual({ title: "No recipes match", description: "Clear the search to see every recipe." });
+    expect(toRecipesViewProps({ recipes: [] }).empty?.title).toBe("No recipes yet");
+  });
 });
 
 describe("cellar readings (#700)", () => {
@@ -322,5 +516,64 @@ describe("cellar readings (#700)", () => {
     expect(page).not.toContain("list_fermentation_readings");
     // #759: and only the open batches, so the row cap is never spent on finished ones.
     expect(page).toContain('runCommand("list_batches", { readings: true, open: true }, ctx)');
+  });
+});
+
+// #1115: a field standing alone in a cellar sheet names itself on screen, not only to a screen reader.
+const labelled = (html: string, text: string) => {
+  const forId = new RegExp(`<label[^>]*for="([^"]+)"[^>]*>${text}</label>`).exec(html)?.[1];
+  return Boolean(forId) && new RegExp(`<input[^>]*id="${forId}"`).test(html);
+};
+
+// A single-choice chip group (Radix renders role="radiogroup") is named by its visible heading.
+const headed = (html: string, text: string) => {
+  const id = new RegExp(`<label[^>]*id="([^"]+)"[^>]*>${text}</label>`).exec(html)?.[1];
+  return Boolean(id) && new RegExp(`role="radiogroup"[^>]*aria-labelledby="${id}"|aria-labelledby="${id}"[^>]*role="radiogroup"`).test(html);
+};
+// A picker's help line is tied to it: the trigger's aria-describedby is the line's id.
+const described = (html: string, text: string) => {
+  const id = new RegExp(`<p[^>]*id="([^"]+)"[^>]*>${text}</p>`).exec(html)?.[1];
+  return Boolean(id) && html.includes(`aria-describedby="${id}"`);
+};
+
+describe("cellar sheets label every field (#1115)", () => {
+  it("transfer shows Barrels moving, explains From and To, and heads the remainder choice", () => {
+    const html = htmlOf(createElement(CellarTransferView, { model: cellarTransferPils, footer: null }));
+    expect(labelled(html, "Barrels moving")).toBe(true);
+    expect(headed(html, "What happens to the remainder")).toBe(true);
+    expect(described(html, "The tank the beer leaves.")).toBe(true);
+    expect(described(html, "The tank the beer goes into. One that already holds beer is a blend.")).toBe(true);
+  });
+
+  it("addition shows Quantity and Title Case stage chips under a Stage heading", () => {
+    const html = htmlOf(createElement(CellarAdditionView, { model: cellarAdditionCitra, footer: null }));
+    expect(labelled(html, "Quantity")).toBe(true);
+    expect(headed(html, "Stage")).toBe(true);
+    for (const chip of ["Dry hop", "Fermentation", "Other"]) expect(html).toMatch(new RegExp(`>${chip}</button>`));
+  });
+
+  it("addition says what is still needed as guidance, not as an amber warning", () => {
+    const html = htmlOf(createElement(CellarAdditionView, { model: { ...cellarAdditionCitra, occupancyId: "" }, footer: null }));
+    expect(html).toMatch(/bg-info[\s\S]*Choose a tank/);
+    expect(html).not.toContain("bg-warning");
+    // Over what the lot holds is a real error, so it stays amber.
+    expect(htmlOf(createElement(CellarAdditionView, { model: { ...cellarAdditionCitra, qty: "41" }, footer: null }))).toMatch(/bg-warning[\s\S]*Only 40 lb of L-0790 on hand/);
+  });
+
+  it("with no beer in any tank, all three actions are off under one note, even without a reading path", () => {
+    const vessels = [{ id: "v1", name: "FV1", capacity_bbl: 10 }];
+    const empty = toCellarMapViewProps(vessels, []);
+    expect(empty.actionsOff).toBe(true);
+    expect(empty.actionHint).toBe("No tank holds beer, so there is nothing to read, transfer or add to.");
+    expect(toCellarMapViewProps(vessels, [{ vessel_id: "v1", occupancy_id: "o1", brand_name: null, bbl: 2 }]).actionsOff).toBe(false);
+    const html = htmlOf(createElement(CellarMapView, { model: empty }));
+    for (const verb of ["Reading", "Transfer", "Addition"]) expect(html).toMatch(new RegExp(`<button[^>]*disabled=""[^>]*>${verb}</button>`));
+    expect(html).toContain("nothing to read, transfer or add to");
+  });
+
+  it("draws Brew day as a link to Batches, not as a peer action button", () => {
+    const html = htmlOf(createElement(CellarMapView, { model: { tiles: [], brewHref: "/batches" } }));
+    expect(html).toMatch(/<a[^>]*href="\/batches"[^>]*>Start a brew day in Batches<\/a>/);
+    expect(html).not.toMatch(/data-slot="button"[^>]*href="\/batches"/);
   });
 });

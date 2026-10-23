@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
+import { AccountInvitationsView } from "../components/mgr/views/account-invitations";
 import { EntryView } from "../components/mgr/views/entry";
 import { toAcceptInviteViewProps, toSetPasswordViewProps } from "../lib/mgr/entry-view";
 import { expiredInvite } from "../lib/mgr/fixtures/entry";
@@ -25,11 +26,15 @@ it("shows fixed text for a ?error= code, never the query string itself (#472)", 
   expect(toSetPasswordViewProps("a@example.com", "Call 555-0100 to verify your account").error).toBe("Your password was not saved. Try again.");
 });
 
+it("heads the password page Change password, like the Me link that opens it (#1108)", () => {
+  expect(toSetPasswordViewProps("a@example.com").title).toBe("Change password");
+});
+
 it("binds verified invitation display data and keeps password validation", () => {
-  const model = toAcceptInviteViewProps("Actual brewery", "customer");
+  const model = toAcceptInviteViewProps("Actual brewery", ["customer"]);
   const html = renderToStaticMarkup(createElement(EntryView, { model, defaults: { name: "Actual buyer" } }));
   expect(html).toContain("Join Actual brewery");
-  expect(html).toContain("customer");
+  expect(html).toContain("Customer");
   expect(html).toContain('name="name"');
   expect(html).toContain('value="Actual buyer"');
   expect(html).toContain('type="password"');
@@ -42,4 +47,13 @@ it("keeps both expired-invite recovery links explicit", () => {
   expect(html).toContain('href="/reset"');
   expect(html).toContain('href="/login"');
   expect(renderToStaticMarkup(createElement(EntryView, { model: expiredInvite }))).not.toContain('href="/');
+});
+
+it("shows invited roles in sentence case on both invitation landings (#1153)", () => {
+  const accept = renderToStaticMarkup(createElement(EntryView, { model: toAcceptInviteViewProps("Actual brewery", ["warehouse", "brewer"]) }));
+  expect(accept).toContain("Warehouse, Brewer");
+  const invitations = renderToStaticMarkup(createElement(AccountInvitationsView, { invitations: [
+    { id: "staff", breweryName: "Actual brewery", kind: "staff", role: "sales", customerName: null, expiresAt: "2026-10-29" },
+  ] }));
+  expect(invitations).toContain("Staff · Sales");
 });

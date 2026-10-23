@@ -9,6 +9,9 @@ import { toRecipeMaterial, toWaterProfileOption, type RecipeMaterial, type Water
 import "@/lib/commands/all";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { RecipeEditor } from "../[id]/recipe-version-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/recipes/new") };
 
 type Named = { id: string; name: string; alias?: string | null };
 
