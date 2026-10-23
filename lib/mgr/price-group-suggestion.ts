@@ -1,8 +1,9 @@
 // lib/mgr/price-group-suggestion.ts — which price group a brand's recipe cost
 // points at. Ceilings are $/bbl on price_groups (a stored threshold); the
 // cost is recipe_version_costs (derived from last receipt costs, never
-// stored). Groups sort by position and each ceiling's lower bound is the
-// previous group's, so the first ceiling that covers the cost is the band.
+// stored). Groups sort by position, those without a ceiling are skipped, and
+// the first ceiling at or above the cost is the band. Ceilings need not rise
+// with position, so a band is not "above the previous group's ceiling".
 // Nothing here assigns: the Brand page offers Use and a person confirms.
 import { money } from "./money";
 import { plural } from "./plural";
