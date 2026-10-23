@@ -42,9 +42,10 @@ describe("SCREENS", () => {
     expect(String(SCREENS.find((s) => s.name === "Brew day")!.writes)).toContain("record_brew_day");
   });
 
-  it("sets the brewery's source water once, in Settings", () => {
+  it("links Source water in Settings to the Water profiles catalog", () => {
     const settings = text("Settings");
     expect(settings).toMatch(/Source water/);
+    expect(SCREENS.find((s) => s.name === "Settings")!.to?.["Source water"]).toBe("Water profiles");
   });
 
   it("makes a recipe version executable without restating the batch size", () => {
@@ -58,7 +59,7 @@ describe("SCREENS", () => {
     expect(recipe).toContain("Process");
     expect(recipe).toContain("Mash schedule · 3 steps");
     expect(recipe).toContain("Fermentation schedule · 4 stages");
-    expect(recipe).toMatch(/Water\s+target /);
+    expect(recipe).toMatch(/Water\s+Target /);
     // Spec D4: one place holds the mash temperature, and it is the schedule.
     expect(recipe).not.toMatch(/Mash temp/);
     // Spec D3: quantities are per barrel; the batch names its size on Brew day.
@@ -74,7 +75,7 @@ describe("SCREENS", () => {
     const drawn = text("Recipe");
     // The water row is titled Water, as on the live draft; the Water frame names the source.
     expect(drawn).not.toContain("Water · Municipal Denver");
-    expect(drawn).toContain("target Hazy target · 3 additions");
+    expect(drawn).toContain("Target Hazy target · 3 additions");
     expect(recipe.to?.Water).toBe("Water");
     expect(text("Water")).toContain("Municipal · Denver");
     expect(drawn).toContain("Total 85 min · 152 °F saccharification rest");
@@ -114,7 +115,8 @@ describe("SCREENS", () => {
     expect(mash).toContain("Saccharification");
     expect(mash).toContain("152 °F");
     expect(mash).toContain("Total 85 min");
-    expect(mash).toMatch(/recorded mash temperature; the gravity prediction does not use it/);
+    expect(mash).toContain("The 152 °F rest is recorded as the mash temperature.");
+    expect(mash).not.toMatch(/gravity prediction/);
     expect(mash).toContain("Add step");
   });
 
@@ -243,7 +245,7 @@ describe("SCREENS", () => {
   it("draws connection recovery and confirmation surfaces", () => {
     const expected = new Map<string, Screen["surface"]>([
       ["Connect QuickBooks", undefined], ["Mapping conflict", "sheet"], ["Disconnect QuickBooks", "sheet"],
-      ["Connect Square", undefined], ["Square locations", "sheet"], ["Square → QuickBooks connector", "sheet"], ["Disconnect Square", "sheet"],
+      ["Connect Square", undefined], ["Square locations", "sheet"], ["Taproom sales in QuickBooks", "sheet"], ["Disconnect Square", "sheet"],
       ["Linked people", undefined], ["Link your Slack", "entry"], ["Disconnect Slack", "sheet"],
     ]);
     for (const [name, surface] of expected) {
@@ -495,7 +497,15 @@ describe("SCREENS", () => {
 
   it("renders the controlled date value used by live shared forms", () => {
     const html = renderToStaticMarkup(createElement(DatePicker, { label: "Date", defaultValue: "", value: "2027-08-31", onChange: () => {} }));
-    expect(html).toContain("August 31, 2027");
+    // The app-wide record date (lib/date-format.ts formatDate).
+    expect(html).toContain("Aug 31, 2027");
+  });
+
+  it("shows a date typed with a year below 1000 instead of failing the form", () => {
+    // The native date input reports each year digit as typed: 0002, 0020, 0202, 2026.
+    const html = renderToStaticMarkup(createElement(DatePicker, { label: "Date", value: "0002-10-22", name: "date", onChange: () => {} }));
+    expect(html).toContain("Oct 22, 2");
+    expect(html).toContain('value="0002-10-22"');
   });
 
   it("points a date field at its description, as the other fields do", () => {
@@ -566,8 +576,11 @@ describe("SCREENS", () => {
     expect(sku).not.toMatch(/bbl per unit|Units per case|Package BOM|Packaging overrides/);
 
     const format = body("Format");
-    expect(format).toContain('aria-label="Size of one container"');
-    expect(format).toMatch(/data-slot="input-group"[\s\S]*aria-label="Size of one container"[\s\S]*role="tablist"/);
+    // The visible label names the input (no aria-label overriding it), and the unit bar rides in its group.
+    const sizeId = /<label[^>]*for="([^"]+)"[^>]*>Size of one container<\/label>/.exec(format)?.[1];
+    expect(sizeId).toBeTruthy();
+    expect(format).toMatch(new RegExp(`data-slot="input-group"[\\s\\S]*<input[^>]*id="${sizeId}"[\\s\\S]*role="tablist"`));
+    expect(format).not.toContain('aria-label="Size of one container"');
     expect(format).toContain("Container");
     expect(format).toContain("Beer per package");
     expect(format).toContain("Containers per package");
@@ -675,11 +688,14 @@ describe("SCREENS", () => {
   it("draws locked-out landings and the composer question", () => {
     // Issue 83: no-membership, expired invite/reset, session expiry with the
     // outbox kept, and the composer question (chips, no Commit).
-    for (const name of ["No membership", "Expired invite", "Expired reset", "Session expired", "Composer question"]) {
+    for (const name of ["No membership", "Portal staff only", "Expired invite", "Expired reset", "Session expired", "Composer question"]) {
       expect(SCREENS.some((s) => s.name === name), name).toBe(true);
     }
     const q = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Composer question")!.body));
     expect(q).not.toMatch(/Commit/);
+    const staffOnly = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Portal staff only")!.body));
+    expect(staffOnly).toMatch(/Back to Today/);
+    expect(staffOnly).not.toMatch(/Create brewery/);
     const accept = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Accept invite")!.body));
     expect(accept).toMatch(/name|Name/i);
     const search = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Search")!.body));
@@ -916,7 +932,7 @@ describe("SCREENS", () => {
     expect(body("Brand")).not.toContain("tax class");
     expect(JSON.stringify(brand.states)).toMatch(/tax class/);
     // Every date field is the calendar picker; no screen falls back to the OS date input.
-    for (const name of ["New order", "Schedule batch", "Schedule packaging run", "Receive PO", "Brew day", "Packaging plan"]) {
+    for (const name of ["New order", "New batch", "Schedule packaging run", "Receive PO", "Brew day", "Packaging plan"]) {
       expect(html(name), name).toContain('data-slot="popover-trigger"');
     }
     for (const s of SCREENS) {
@@ -942,7 +958,7 @@ describe("SCREENS", () => {
     const named = [
       "Today", "Taproom", "Order", "Cellar map", "Tap board", "Swap keg",
       "Weekly count", "Brew day", "Route", "Settings", "Brand", "Vendors",
-      "Planning", "Schedule batch", "Vessel detail", "Kick keg", "Return route",
+      "Planning", "New batch", "Vessel detail", "Kick keg", "Return route",
     ];
     const filled = (html: string) =>
       (html.match(/<button\b[^>]*>/g) ?? []).filter((b) =>

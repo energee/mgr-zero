@@ -24,8 +24,8 @@ export const settingsDemo: SettingsViewModel = {
   oneWayKegFee: "10.00",
   aiModel: "anthropic/claude-sonnet-4.5",
   aiModels: [
-    { id: "anthropic/claude-sonnet-4.5", name: "Claude Sonnet 4.5", pricing: { input: "0.000003", output: "0.000015" } },
-    { id: "openai/gpt-5.4", name: "GPT-5.4", pricing: { input: "0.0000025", output: "0.000015" } },
+    { id: "anthropic/claude-sonnet-4.5", name: "Claude Sonnet 4.5" },
+    { id: "openai/gpt-5.4", name: "GPT-5.4" },
   ],
   deployment: "dedicated",
   warehouseId: "00000000-0000-4000-8000-0000000000f1",

@@ -17,7 +17,7 @@ import { useBrewery } from "@/lib/brewery-provider";
 import { command } from "@/lib/commands/client";
 import type { StaffRole } from "@/lib/commands/registry";
 import type { SearchHit, SearchKind } from "@/lib/commands/search";
-import { excludeSeen, restrictToOptions, searchCacheKey, searchLoading, searchDestinations } from "@/lib/mgr/search-palette-state";
+import { excludeSeen, restrictToOptions, searchCacheKey, searchDestinations, searchEmptyMessage, searchLoading, type SearchStatus } from "@/lib/mgr/search-palette-state";
 
 const HEADING: Record<SearchKind, string> = { sku: "SKUs", order: "Orders", invoice: "Invoices", material_lot: "Ingredient lots", lot: "Lots", customer: "Customers", po: "Purchase orders", batch: "Batches" };
 
@@ -29,8 +29,6 @@ export function SearchCacheProvider({ children }: { children: React.ReactNode })
   const [cache] = useState(() => new Map<string, SearchHit[]>());
   return <SearchCache.Provider value={cache}>{children}</SearchCache.Provider>;
 }
-
-type SearchStatus = "idle" | "loading" | "ready" | "error" | "offline";
 
 export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHits, heading, sub, roles, onNavigate }: { roles?: readonly StaffRole[]; onNavigate?: (href: string) => void; placeholder?: string; kinds?: SearchKind[]; onPick?: (hit: SearchHit) => void; initialHits?: SearchHit[]; heading?: string; sub?: string }) {
   const breweryId = useBrewery();
@@ -95,9 +93,11 @@ export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHi
     heading: kind === "recent" ? "Recent" : HEADING[kind],
     items: items.map(hit => [hit.label, hit.detail, `${hit.kind}:${hit.id}`]),
   }));
+  // NavItem.about is optional in the type, so a page with no line renders an
+  // empty detail; every STAFF_NAV entry has one (tests/mgr-nav.test.ts enforces it).
   if (pages.length) viewGroups.unshift({
     heading: "Pages",
-    items: pages.map(page => [page.label, page.about ?? "Open page", `page:${page.href}`]),
+    items: pages.map(page => [page.label, page.about ?? "", `page:${page.href}`]),
   });
   const before = <>
     {loading && <div role="status" aria-label="Loading results" className="space-y-2 p-3">{[1, 2, 3].map(n => <Skeleton key={n} className="h-12" />)}</div>}
@@ -106,7 +106,7 @@ export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHi
   </>;
   return <SearchView model={{ placeholder, heading, sub, groups: viewGroups }}
     value={q} onValueChange={setQ} shouldFilter={false} before={before}
-    emptyMessage={term && currentStatus === "ready" ? roles ? "No pages or records found · Try a page name, record name, or document number." : "No records found · Try a record name or number." : ""}
+    emptyMessage={searchEmptyMessage(term, currentStatus, Boolean(roles))}
     onSelect={key => {
       const page = pages.find(page => `page:${page.href}` === key);
       if (page) { navigate(page.href); return; }

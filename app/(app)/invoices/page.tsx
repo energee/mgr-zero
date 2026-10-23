@@ -3,6 +3,7 @@ import { historyPage, pageCursor, type HistoryPage, type HistoryRow } from "@/li
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { toInvoiceListRow, type InvoiceListRecord } from "@/lib/mgr/invoices-view";
 import { getActiveBrewery } from "@/lib/brewery";
+import { connectionStateLabel } from "@/lib/mgr/labels";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
@@ -22,7 +23,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   return <InvoicesView pagination={page.pagination} backHref="/more" rows={page.rows.map(invoice => ({
     ...toInvoiceListRow(invoice, brewery.roles, Boolean(health?.connected), brewery.timeZone), href: `/invoices/${invoice.id}`,
   }))} connection={health ? {
-    connected: health.connected, detail: health.connected ? `connected · ${qboCompanyName(health) ?? "verified company"}` : health.state.replaceAll("_", " "),
+    connected: health.connected, detail: health.connected ? `Connected · ${qboCompanyName(health) ?? "verified company"}` : connectionStateLabel(health.state),
     canConnect: brewery.roles.includes("admin"), connectHref: "/settings/accounting/connect",
-  } : undefined} sync={<QboSyncButton status={syncStatus ? toQboSyncViewProps(syncStatus, brewery.timeZone) : undefined} disabled={!health?.connected} />} />;
+  } : undefined} sync={<QboSyncButton status={syncStatus ? toQboSyncViewProps(syncStatus, brewery.timeZone) : undefined} />} />;
 }

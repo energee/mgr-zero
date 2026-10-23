@@ -48,7 +48,8 @@ export function PointOfSaleView({ model, sales = [], coverage = [], syncAction, 
       {E.ttl("Recent Square facts")}
       {sales.length ? sales.map(sale => <div key={sale.id}>{sale.href || sale.openable ? E.nav(sale.label, sale.detail, sale.status === "mapped" ? "ok" : "w", undefined, sale.href) : E.row(sale.label, sale.detail, sale.amount, sale.status === "mapped" ? "ok" : "w")}</div>) : E.blank("No Square sale facts yet")}
     </>}
-    {E.nav(<>Square {E.arrow()} QuickBooks connector</>, "Review the separate taproom revenue feed", "w", SquareMark, paths?.connector)}
+    {/* Square's own QuickBooks connector is a Square seller setting, so its note lives with Square, not under Accounting. */}
+    {E.nav("Taproom sales in QuickBooks", "Square’s own connector, separate from MGR", "w", SquareMark, paths?.connector)}
   </>;
 }
 
@@ -60,7 +61,7 @@ export function ConnectSquareView({ configured = true, busy = false, error, onCo
     {E.info("MGR publishes owned catalog items to Square and reads completed sales as expected consumption.")}
     {E.note("Connecting does not publish a menu, import old sales, or change inventory.")}
     <Button disabled={!configured || busy} onClick={onConnect}>{busy ? "Opening Square…" : "Connect Square"}</Button>
-    {!configured && <p className="text-sm text-muted-foreground">Square setup is unavailable until the server connection values are configured.</p>}
+    {!configured && <p className="text-sm text-muted-foreground">Square isn’t turned on in MGR yet.</p>}
     <CommandFormMessage error={error ?? null} />
   </>;
 }

@@ -1,6 +1,6 @@
 // tests/recipe-process-view.test.ts — draft helpers for the schedule sheets (issue #278).
 import { describe, expect, it } from "vitest";
-import { fermentationSummary, ionReadout, mashRowSummary, mashStepDetail, mashSummary, moveItem, perBblDisplay, processReadout, profileIons, splitByStage, suggestAdditions, upsertAt, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { fermentationSummary, ingredientDetail, ionReadout, mashRowSummary, mashStepDetail, mashSummary, moveItem, perBblDisplay, processReadout, profileIons, splitByStage, suggestAdditions, upsertAt, waterAdditionDetail, waterRowSummary, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 
 const mash: MashStep[] = [
   { name: "Mash-in", kind: "infusion", tempF: 104, minutes: 15 },
@@ -20,7 +20,7 @@ describe("schedule drafts", () => {
     expect(upsertAt(mash, 1, { ...mash[1], minutes: 45 })[1].minutes).toBe(45);
   });
   it("the longest in-range rest wins over the first, as the RPC derives mash_temp_f", () => {
-    expect(mashSummary([{ name: "Beta", kind: "rest", tempF: 145, minutes: 20 }, { name: "Alpha", kind: "rest", tempF: 158, minutes: 40 }])).toBe("Total 60 min · the 158 °F rest is the recorded mash temperature; the gravity prediction does not use it.");
+    expect(mashSummary([{ name: "Beta", kind: "rest", tempF: 145, minutes: 20 }, { name: "Alpha", kind: "rest", tempF: 158, minutes: 40 }])).toBe("Total 60 min. The 158 °F rest is recorded as the mash temperature.");
   });
   it("reads a cut version's process facts out, skipping what it does not carry", () => {
     const names = (id: string | null) => (id === "hazy" ? "Hazy target" : null);
@@ -29,11 +29,24 @@ describe("schedule drafts", () => {
     ]);
   });
   it("summaries name the recorded mash-temperature rest and the total days", () => {
-    expect(mashSummary(mash)).toBe("Total 85 min · the 152 °F rest is the recorded mash temperature; the gravity prediction does not use it.");
-    expect(mashSummary([{ name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 }])).toBe("Total 10 min · no rest between 144 and 162 °F, so no mash temperature is recorded.");
+    expect(mashSummary(mash)).toBe("Total 85 min. The 152 °F rest is recorded as the mash temperature.");
+    expect(mashSummary([{ name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 }])).toBe("Total 10 min. No rest falls between 144 and 162 °F, so no mash temperature is recorded.");
     expect(fermentationSummary(ferm)).toBe("Total 6 days.");
     expect(fermentationSummary(ferm, 4)).toBe("Total 6 days · dry hop day 4 falls in Primary.");
     expect(fermentationSummary(ferm, 9)).toBe("Total 6 days · dry hop day 9 is after the last stage.");
+  });
+  it("an ingredient row names its stage in sentence case, as the Stage pick does (#1139)", () => {
+    expect(ingredientDetail("dry_hop", 4, "1.2", "lb")).toBe("Dry hop · 4 min · 1.2 lb / bbl");
+    expect(ingredientDetail("mash", null, "40.9")).toBe("Mash · 40.9 / bbl");
+  });
+  it("a water addition row reads its amount and its stage in sentence case (#1139)", () => {
+    expect(waterAdditionDetail({ qty: 4, unit: "g", stage: "mash" })).toBe("4 g · Mash");
+    expect(waterAdditionDetail({ qty: 3, unit: "mL", stage: "sparge" })).toBe("3 mL · Sparge");
+  });
+  it("the water row summary names the target profile and counts the additions, in sentence case (#1139)", () => {
+    expect(waterRowSummary("Hazy target", 3)).toBe("Target Hazy target · 3 additions");
+    expect(waterRowSummary(undefined, 0)).toBe("No target · 0 additions");
+    expect(waterRowSummary(undefined, 1)).toBe("No target · 1 addition");
   });
   it("prints a per-bbl quantity to three significant digits, never two fraction digits", () => {
     expect(perBblDisplay(40.909091)).toBe("40.9");
@@ -46,7 +59,7 @@ describe("schedule drafts", () => {
     expect(mashRowSummary([{ name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 }])).toBe("Total 10 min · no saccharification rest");
   });
   it("a mash step's detail hides the kind when it repeats the name", () => {
-    expect(mashStepDetail({ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 })).toBe("infusion · 152 °F · 60 min");
+    expect(mashStepDetail({ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 })).toBe("Infusion · 152 °F · 60 min");
     expect(mashStepDetail({ name: "Rest", kind: "rest", tempF: 145, minutes: 20 })).toBe("145 °F · 20 min");
   });
 });

@@ -27,10 +27,17 @@ it("preserves unavailable setup, errors, and explicit payment settings", () => {
   expect(connect).toContain("disabled");
   expect(connect).toContain("Authorization failed");
   expect(connect).toContain('data-variant="irreversible"');
+  // The admin cannot set server values, and MGR has no support channel to promise (#1151).
+  expect(connect).toContain("QuickBooks isn’t turned on in MGR yet.");
+  expect(connect).not.toContain("server connection values");
+  expect(connect).not.toContain("support");
   const defaults = renderToStaticMarkup(createElement(QboDefaultsView, { allowAch: false, allowCard: true, disabled: true }));
   expect(defaults).toContain('aria-checked="false"');
   expect(defaults).toContain('aria-checked="true"');
   expect(defaults).toContain("Save push defaults");
+  // Matches OnlinePaymentsRow: turning both off affects new invoices only.
+  expect(defaults).toContain("invoices pushed earlier keep theirs");
+  expect(defaults).not.toContain("cannot pay online at all");
 });
 
 it("offers the disconnect action by default and does not leak fixture paths", () => {
@@ -47,7 +54,7 @@ it("offers the disconnect action by default and does not leak fixture paths", ()
 it("reports portal-email presence without claiming delivery or blocking push", () => {
   const model = { ...toAccountingViewProps({ connected: false, state: "disconnected" as const, realmLabel: null, lastError: null }, "America/New_York"), missingEmails: 2, customersHref: "/customers?missingEmail=1" };
   const markup = renderToStaticMarkup(createElement(AccountingView, { model }));
-  expect(markup).toContain("2 · no portal login email");
+  expect(markup).toContain("2 customers have no portal login email");
   expect(markup).toContain('href="/customers?missingEmail=1"');
   expect(markup).not.toContain("cannot be pushed");
 });
@@ -55,15 +62,15 @@ it("reports portal-email presence without claiming delivery or blocking push", (
 it("names the connected company, keeps its id as a separate fact, and labels the QuickBooks environment", () => {
   const model = toAccountingViewProps({ connected: true, state: "connected", connectionId: "c1", realmLabel: "Test Company", realmId: "4620816365342151800", lastError: null }, "America/New_York", undefined, "sandbox");
   expect(model.company).toBe("Test Company");
-  expect(model.status).toBe("connected · sandbox");
+  expect(model.status).toBe("Connected · sandbox");
   expect(model.companyId).toBe("4620816365342151800");
   const html = renderToStaticMarkup(createElement(AccountingView, { model, connection: null, defaults: null, sync: null }));
   expect(html).toContain("Test Company");
-  expect(html).toContain("connected · sandbox");
+  expect(html).toContain("Connected · sandbox");
   expect(html).toContain("4620816365342151800");
   // A label that is only the id (connected before CompanyName was stored) is not repeated as a name.
   expect(toAccountingViewProps({ connected: true, state: "connected", realmLabel: "4620816365342151800", realmId: "4620816365342151800", lastError: null }, "America/New_York", undefined, "production").company).toBe("QuickBooks Online");
-  expect(toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null }, "America/New_York", undefined, "production").status).toBe("disconnected");
+  expect(toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null }, "America/New_York", undefined, "production").status).toBe("Not connected");
 });
 
 it("reads the QuickBooks environment from the configured API host", () => {
@@ -75,4 +82,33 @@ it("treats a realm-id label as no company name", () => {
   expect(qboCompanyName({ realmLabel: "Test Company", realmId: "4620816365342151800" })).toBe("Test Company");
   expect(qboCompanyName({ realmLabel: "4620816365342151800", realmId: "4620816365342151800" })).toBeNull();
   expect(qboCompanyName({ realmLabel: null })).toBeNull();
+});
+
+it("reads connection statuses, online payments and portal logins as sentences (#1151)", () => {
+  const health = { connected: false, state: "disconnected" as const, realmLabel: null, lastError: null };
+  const render = (model: ReturnType<typeof toAccountingViewProps>) => renderToStaticMarkup(createElement(AccountingView, { model, connection: null, sync: null }));
+  expect(toAccountingViewProps({ ...health, state: "recovery_required", connectionId: "c1" }, "America/New_York").status).toBe("Reconnect required");
+  const disconnected = render(toAccountingViewProps(health, "America/New_York", 0));
+  expect(disconnected).toContain("Not connected");
+  expect(disconnected).not.toContain("fail closed");
+  // True whether QuickBooks was never connected, needs reconnecting, or is not turned on.
+  expect(disconnected).toContain("Needs a QuickBooks connection");
+  expect(disconnected).toContain("Not available");
+  const recovery = render(toAccountingViewProps({ ...health, state: "recovery_required", connectionId: "c1" }, "America/New_York"));
+  expect(recovery).toContain("Needs a QuickBooks connection");
+  expect(recovery).not.toContain("Connect QuickBooks first");
+  expect(disconnected).toContain("All customers have a portal login email");
+  // The section heading names Push defaults; the locked card under it does not repeat it.
+  expect(disconnected.match(/Push defaults/g)).toHaveLength(1);
+  const connected = render(toAccountingViewProps({ ...health, connected: true, state: "connected", connectionId: "c1" }, "America/New_York", 1));
+  expect(connected).toContain("Through each invoice’s QuickBooks payment link");
+  expect(connected).not.toContain("Not available");
+  expect(connected).toContain("1 customer has no portal login email");
+  // OnlinePaymentsRow: both options off means customers cannot pay new invoices online.
+  const bothOff = render(toAccountingViewProps({ ...health, connected: true, state: "connected", connectionId: "c1", allowAch: false, allowCard: false }, "America/New_York"));
+  expect(bothOff).toContain("Bank transfer and card are off for new invoices");
+  expect(bothOff).toContain(">Off<");
+  expect(bothOff).not.toContain("Through each invoice’s QuickBooks payment link");
+  const achOnly = render(toAccountingViewProps({ ...health, connected: true, state: "connected", connectionId: "c1", allowAch: true, allowCard: false }, "America/New_York"));
+  expect(achOnly).toContain("Through each invoice’s QuickBooks payment link");
 });

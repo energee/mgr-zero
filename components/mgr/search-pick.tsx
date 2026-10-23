@@ -15,7 +15,7 @@ export type SearchPickOption = { value: string; label: string };
 /** The caller supplies options and request feedback. While `optionsReady` is
  *  false nothing says "no match", so a pending read never looks empty; a
  *  retained value missing from `options` still shows `selectedLabel`. */
-export function SearchPick({ value, label, options, onChange, title, placeholder, searchPlaceholder, noMatchMessage, emptyMessage = noMatchMessage, selectedLabel, feedback, optionsReady = true, errorId, id, disabled, previewAction }: {
+export function SearchPick({ value, label, options, onChange, title, placeholder, searchPlaceholder, noMatchMessage, emptyMessage = noMatchMessage, selectedLabel, feedback, optionsReady = true, errorId, invalid, id, disabled, previewAction }: {
   value: string;
   /** The trigger's accessible name. */
   label: string;
@@ -33,7 +33,10 @@ export function SearchPick({ value, label, options, onChange, title, placeholder
   selectedLabel?: string;
   feedback?: ReactNode;
   optionsReady?: boolean;
+  /** aria-describedby of the trigger: the ids of any messages about the value. */
   errorId?: string;
+  /** Marks the trigger invalid (aria-invalid), beside its errorId message. */
+  invalid?: boolean;
   id?: string;
   disabled?: boolean;
   /** Lets an inventory preview keep this picker interaction local. */
@@ -41,7 +44,7 @@ export function SearchPick({ value, label, options, onChange, title, placeholder
 }) {
   const [open, setOpen] = useState(false);
   return <CommandForm title={title} open={open} onOpenChange={setOpen} previewAction={previewAction}
-    trigger={<Button type="button" id={id} disabled={disabled} variant="ghost" className="h-auto min-h-11 max-w-full justify-start whitespace-normal text-left" aria-label={label} aria-describedby={errorId} data-preview-action={previewAction || undefined}>{options.find(option => option.value === value)?.label ?? (value && selectedLabel ? selectedLabel : placeholder)}</Button>}>
+    trigger={<Button type="button" id={id} disabled={disabled} variant="ghost" className="h-auto min-h-11 max-w-full justify-start whitespace-normal text-left" aria-label={label} aria-describedby={errorId} aria-invalid={invalid || undefined} data-preview-action={previewAction || undefined}>{options.find(option => option.value === value)?.label ?? (value && selectedLabel ? selectedLabel : placeholder)}</Button>}>
     {feedback}
     <Command><CommandInput placeholder={searchPlaceholder} /><CommandList>{optionsReady && <CommandEmpty>{options.length ? noMatchMessage : emptyMessage}</CommandEmpty>}
       {options.map(option => <CommandItem key={option.value} value={option.value} keywords={[option.label]} onSelect={() => { onChange?.(option.value); setOpen(false); }}>{option.label}</CommandItem>)}
