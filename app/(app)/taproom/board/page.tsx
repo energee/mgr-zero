@@ -1,6 +1,7 @@
 import { TapBoardView } from "@/components/mgr/views/tap-board";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
+import { canRun } from "@/lib/commands/registry";
 import { requirePagePermission, runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { TapBoardSnapshot, TapHistory, TapInterval } from "@/lib/mgr/tap-board-state";
 import "@/lib/commands/all";
@@ -31,6 +32,7 @@ export default async function TapBoardPage({ searchParams }: { searchParams: Pro
 
   return <TapBoard key={location.id} breweryId={brewery.id} locationId={location.id} initial={initial} skus={skus} timeZone={brewery.timeZone} navigation={{
     backHref: "/beer", countHref: `/taproom?location=${location.id}`, varianceHref: `/taproom/variance?location=${location.id}`,
+    skusHref: canRun(ctx, "create_sku") ? "/catalog" : null,
     locations: locations.map(item => ({ value: item.id, label: item.name, href: `/taproom/board?location=${item.id}` })), location: location.id,
   }} />;
 }

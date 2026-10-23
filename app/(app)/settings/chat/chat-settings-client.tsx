@@ -31,9 +31,9 @@ export function ChatSettingsControls({ installation, readingDueHours, timezone, 
   />;
 }
 
-export function ChatPersonalPreferences({ preferences, canSetQuietHours = true, back, backHref }: { preferences: ChatPreferences; canSetQuietHours?: boolean; back: string; backHref: string }) {
+export function ChatPersonalPreferences({ preferences, configured, canSetQuietHours = true, back, backHref }: { preferences: ChatPreferences; configured: boolean; canSetQuietHours?: boolean; back: string; backHref: string }) {
   const action = useCommandAction();
-  return <ChatPersonalPreferencesView preferences={preferences} canSetQuietHours={canSetQuietHours} back={back} backHref={backHref} busy={action.busy} error={action.error}
+  return <ChatPersonalPreferencesView preferences={preferences} configured={configured} canSetQuietHours={canSetQuietHours} back={back} backHref={backHref} busy={action.busy} error={action.error}
     onUnlink={() => { if (preferences.link) void action.run("unlink_chat_user", { linkId: preferences.link.id }, undefined, { target: preferences.link.id }); }}
     onPreference={(reason, enabled) => void action.run("set_notification_preference", { reason, enabled }, undefined, { target: reason })}
     onDestination={(reason, personalDestinationId) => void action.run("set_notification_destination", { reason, personalDestinationId }, undefined, { target: reason })}

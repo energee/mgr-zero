@@ -21,7 +21,11 @@ export type MonthlyComplianceViewModel = ComplianceFiguresViewModel & {
   backHref?: string;
   filingDate?: string;
   amendments?: { id: string; oldBasis: string; newBasis: string; actor: string; at: string; reason: string; invalidPeriod: boolean; figures: ComplianceFiguresViewModel }[];
+  /** The report's warnings in staff words (plainWarning), drawn under step 2's figures. */
   warnings: string[];
+  /** Why Save filed snapshot is off, printed beside it: the blocking warnings in the same
+   *  words as step 2 (#1143, #1122); null when the report balances. */
+  fileReason: string | null;
   losses: { source: LossReview; key: string; title: string; detail: string; allocations: { key: string; title: string; detail: string; bbl: string }[] }[];
 };
 
@@ -41,9 +45,26 @@ const REMOVAL_LABEL: Record<string, string> = {
   taxable: "Taxpaid removals", export: "Export", vessel_supplies: "Supplies for vessels", research: "Research",
   transfer_in_bond: "Transferred in bond", destruction: "Destroyed", loss: "Losses", sample: "Samples", festival_removal: "Festival removals",
 };
-const CLASS_LABEL = { keg: "kegs", can: "cans", bottle: "bottles" } as const;
+const CLASS_LABEL = { keg: "Kegs", can: "Cans", bottle: "Bottles" } as const;
 const removalBbl = (key: string, value: number) => key === "loss" ? bblExact(value, 8) : bblFixed(value);
 const label = (value: string) => REMOVAL_LABEL[value] ?? sentenceCase(value);
+
+/** generate_compliance_report's one warning that does not block filing; its other
+ *  warnings are the reasons `balances` is false. This must match the SQL literal
+ *  exactly (supabase/migrations/20261013100000_file_cellar_taproom_removals.sql);
+ *  if the SQL wording changes, the note leaks into the Save-off reason. */
+const UNASSIGNED_WARNING = "Some supporting facts have no recorded destination. Review Unassigned; MGR does not infer a state.";
+
+/** One report warning in staff words (#1143). The SQL writes three shapes; any
+ *  other warning is shown as written, so a new one is never hidden. */
+function plainWarning(warning: string): string {
+  if (warning === UNASSIGNED_WARNING) return "Some transactions have no recorded destination. Check the Unassigned row; MGR does not guess a state.";
+  const unbalanced = /^(keg|can|bottle) does not balance$/.exec(warning)?.[1] as keyof typeof CLASS_LABEL | undefined;
+  if (unbalanced) return `${CLASS_LABEL[unbalanced]} do not balance.`;
+  const unclassified = /^unclassified movement type (.+)$/.exec(warning)?.[1];
+  if (unclassified) return `${sentenceCase(unclassified)} movements have no report column.`;
+  return warning;
+}
 
 function toComplianceFigures(figures: Report["figures"]): ComplianceFiguresViewModel {
   return {
@@ -77,16 +98,19 @@ export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot
       invalidPeriod: row.correction.new_basis !== null && figures.periodStart < row.correction.new_basis,
       figures: toComplianceFigures(row.new_figures),
     })),
-    warnings: snapshot.report.warnings,
+    warnings: snapshot.report.warnings.map(plainWarning),
+    // The SQL sets `balances` to "no blocking warnings" and appends the Unassigned note after,
+    // so a false `balances` always leaves at least one warning for the reason to name.
+    fileReason: figures.balances ? null : `Save is off: ${snapshot.report.warnings.filter((warning) => warning !== UNASSIGNED_WARNING).map(plainWarning).join(" ")}`,
     losses: snapshot.losses.map((loss) => ({
       source: loss,
       key: loss.adjustment_id,
       title: `Batch ${loss.batch_no} · ${loss.kind} loss`,
-      detail: `Original generic loss ${loss.original_bbl} bbl · remaining ${loss.remaining_bbl} bbl`,
+      detail: `Recorded ${loss.original_bbl} bbl · ${loss.remaining_bbl} bbl left to reattribute`,
       allocations: loss.allocations.map((allocation) => ({
         key: allocation.id,
         title: `${allocation.classification[0].toUpperCase()}${allocation.classification.slice(1)}`,
-        detail: `${allocation.destination_state ? `Destination ${allocation.destination_state}` : allocation.tax_treatment ? `Frozen ${label(allocation.tax_treatment)}` : ""} · prior allocation`.replace(/^ · /, ""),
+        detail: `${allocation.destination_state ? `Destination ${allocation.destination_state}` : allocation.tax_treatment ? `Reported as ${label(allocation.tax_treatment)}` : ""} · reattributed earlier`.replace(/^ · /, ""),
         bbl: `${allocation.bbl} bbl`,
       })),
     })),

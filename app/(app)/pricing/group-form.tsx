@@ -6,17 +6,20 @@
 // the way the channel Delete does. An existing group also adds and edits pours
 // (PourForm) and removes them (delete_format) in the same error slot; both
 // removals confirm first. Each packaged format's UPC edits in its own sheet
-// (BarcodeForm, set_price_group_barcode).
+// (BarcodeForm, set_price_group_barcode). Save price group is withheld, with
+// its reason beside it, until the group has a name.
 "use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { E } from "@/components/mgr/e";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { DeletePriceGroupControl, PriceGroupView, RemovePourControl, type PriceGroupViewModel } from "@/components/mgr/views/price-group";
 import { PourForm } from "@/app/(app)/catalog/pour-form";
 import { BarcodeForm } from "./barcode-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { toCents } from "@/lib/mgr/money";
+import { priceGroupReason } from "@/lib/mgr/price-group-view";
 
 export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGroupViewModel }) {
   const [draft, setDraft] = useState(model);
@@ -60,7 +63,7 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
               <DeletePriceGroupControl group={model.name} busy={form.busy} error={form.error}
                 onDelete={() => form.run("delete_price_group", { priceGroupId: groupId }, undefined, { target: groupId })} />
             )}
-            <Button type="submit" disabled={form.busy}>{form.submitting ? "Saving…" : "Save price group"}</Button>
+            {E.submit("Save price group", { submitting: form.submitting, disabled: form.busy, reason: priceGroupReason(draft) })}
           </CommandFormFooter>}
         />
       </form>

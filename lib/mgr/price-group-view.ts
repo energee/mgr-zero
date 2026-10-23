@@ -3,9 +3,11 @@
 // list_price_group_barcodes; the Prices line
 // summarises list_channel_prices for that group. Without a groupId it is the
 // same row before it exists (the create form): blank name, next position,
-// under the last group's ceiling, no Prices line.
+// under the last group's ceiling, no Prices line. priceGroupReason says what
+// the sheet's Save still needs.
 import { dollarsInput, money } from "./money";
 import { plural } from "./plural";
+import { submitReason } from "./submit-reason";
 import { barcodeOf, byPosition, formatLabel, type PriceGroupRow, type PriceGroupsSnapshot } from "./price-groups-view";
 
 export type PriceGroupViewModel = {
@@ -69,3 +71,8 @@ export function toPriceGroupViewProps(snapshot: PriceGroupSnapshot): PriceGroupV
     }),
   };
 }
+
+/** What Save price group still needs. Only the name needs a reason here:
+ *  Position is enforced by its own required, min 1 input, and Cost ceiling is
+ *  optional, so a blank ceiling is valid. */
+export const priceGroupReason = ({ name }: { name: string }) => submitReason(name.trim() ? [] : ["a group name"]);

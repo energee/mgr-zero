@@ -182,7 +182,14 @@ describe("toRecipePageModel", () => {
   it("draws the empty recipe with no invented numbers", () => {
     const model = toRecipePageModel({ ...snapshot, version: null, ingredients: [], waterAdditions: [] }, ctx);
     expect(model.title).toBe("Pale");
-    expect(model.empty).toBeTruthy();
+    // Says what a version records and the next step, true to create_recipe_version (#1140).
+    expect(model.empty).toEqual({
+      title: "No version yet",
+      description: "A version records this recipe's ingredients, mash and fermentation schedules, water and process targets, and never changes once saved. Select New recipe version to write the first one.",
+    });
+    const drawn = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model }));
+    expect(drawn).toContain("No version yet");
+    expect(drawn).toContain("Select New recipe version to write the first one.");
     expect(model.mash).toBeUndefined();
     expect(model.saved).toBeUndefined();
   });
@@ -222,7 +229,7 @@ describe("batch totals in packs", () => {
     expect(batchTotalText({ perBbl: up.perBbl, factor: 50, unit: "lb" }, 3000)).toBe("50.001 lb = 1 × 50 lb + 0.001 lb");
   });
   it("draws totals only once a batch size is typed, and Round only on the draft", () => {
-    const model = { title: "Pale v3", ingredients: [{ key: "i1", title: "2-row", detail: "mash · 10 lb / bbl", qty: "", pack: malt }] };
+    const model = { title: "Pale v3", ingredients: [{ key: "i1", title: "2-row", detail: "Mash · 10 lb / bbl", qty: "", pack: malt }] };
     const draw = (m: typeof model & { totalsAtBbl?: string }, readOnly: boolean) => renderToStaticMarkup(createElement(RecipeView, { model: m, readOnly }));
     expect(draw(model, true)).toContain("Enter a batch size to see totals in packs");
     expect(draw(model, true)).not.toContain("220 lb");

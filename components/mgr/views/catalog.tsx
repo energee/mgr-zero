@@ -1,7 +1,10 @@
-// Catalog draws one row per brand in the shared RecordTable: the name links to
-// the brand, with its alias under it, and the COLA column reads its recorded
-// approvals. What a brand sells (packages and pours) lives under its Sells as.
+// Catalog draws one row per brand in the shared RecordTable: live, the name
+// links to the brand for a role that may open it, with its alias under it, and
+// the COLA column reads its recorded approvals. What a brand sells (packages
+// and pours) lives under its Sells as.
 // Price groups and Water profiles rows follow; inventory and live draw both.
+// Live, a row the viewer may not open is plain (no tap, no Open); the
+// inventory, which passes no links, keeps every row an inert tap.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { NOT_SET, type CatalogViewModel } from "@/lib/mgr/catalog-view";
@@ -10,10 +13,14 @@ import { RecordTable } from "@/components/mgr/views/record-table";
 
 export type { CatalogViewModel };
 
+/** A link row; href null (live, not openable) draws it plain, undefined an inert tap. */
+const navRow = (title: string, subtitle: ReactNode, href: string | null | undefined) =>
+  href === null ? E.row(title, subtitle) : E.nav(title, subtitle, "", undefined, href);
+
 export function CatalogView({
   model,
   createAction,
-  linkRows,
+  links,
   formats,
   formatAction,
   controls,
@@ -22,11 +29,12 @@ export function CatalogView({
   /** The search, Sort and Category strip (components/mgr/list-controls.tsx). */
   controls?: ReactNode;
   createAction?: ReactNode;
-  /** Live: brand names, Price groups and water profiles are links. Inventory leaves them unlabeled taps. */
-  linkRows?: boolean;
+  /** Live: which rows are links, each only for a role its page lets in; the rest draw plain. Inventory leaves them all inert taps. */
+  links?: { brands: boolean; priceGroups: boolean; waterProfiles: boolean };
   formats?: FormatsViewModel;
   formatAction?: ReactNode;
 }) {
+  // Each `links && (...)` below gives undefined (no links: the inventory's inert tap) or, live, the path or null (denied: drawn plain).
   return (
     <>
       {E.back("More", "Catalog", createAction !== undefined ? createAction : E.btn("New brand"), model.backHref)}
@@ -42,11 +50,11 @@ export function CatalogView({
             // A style or ABV that is not set sorts last, not as the words.
             sort: [brand.name, brand.style === NOT_SET ? null : brand.style, brand.abv === NOT_SET ? null : brand.abv, brand.skus, brand.cola],
             note: brand.alias,
-            href: linkRows ? brand.href : undefined,
+            href: links && (links.brands ? brand.href : null),
           }))}
         />}
-      {E.nav("Price groups", model.priceGroups, "", undefined, linkRows ? model.priceGroupsHref : undefined)}
-      {E.nav("Water profiles", "Source and target profiles", "", undefined, linkRows ? model.waterProfilesHref : undefined)}
+      {navRow("Price groups", model.priceGroups, links && (links.priceGroups ? model.priceGroupsHref : null))}
+      {navRow("Water profiles", "Source and target profiles", links && (links.waterProfiles ? model.waterProfilesHref : null))}
       {formats && <FormatsView model={formats} header={E.hd("Formats", "", formatAction !== undefined ? formatAction : E.btn("New format"))} />}
     </>
   );

@@ -2,6 +2,8 @@
 import { z } from "zod";
 import { COUNTRY_CODES, CUSTOMER_TYPES, PAYMENT_TERMS, US_STATE_CODES } from "@/lib/mgr/enums";
 export const IMPORT_ROW_CAP = 5000;
+/** The row cap as operators read it ("5,000"), in the upload help and the over-cap error. */
+export const IMPORT_ROW_CAP_LABEL = IMPORT_ROW_CAP.toLocaleString("en-US");
 export const IMPORT_KINDS = ["customers", "ship_tos", "products_skus", "channel_prices", "opening_balances"] as const;
 export type ImportKind = typeof IMPORT_KINDS[number];
 // usOnly: required only when the row's country is US (the default), as in
@@ -109,7 +111,7 @@ export function parseCsv(input: string): { headers: string[]; rows: string[][] }
   const text = input.replace(/^\uFEFF/, "").replace(/^sep=,\r?\n/i, "");
   const records: string[][] = []; let row: string[] = [], value = "", quoted = false, closed = false;
   const field = () => { row.push(value); value = ""; closed = false; };
-  const record = () => { const blank = !row.length && !value && !closed; field(); if (!blank) records.push(row); row = []; if (records.length > IMPORT_ROW_CAP + 1) throw new Error(`At most ${IMPORT_ROW_CAP} rows per batch`); };
+  const record = () => { const blank = !row.length && !value && !closed; field(); if (!blank) records.push(row); row = []; if (records.length > IMPORT_ROW_CAP + 1) throw new Error(`At most ${IMPORT_ROW_CAP_LABEL} rows per batch`); };
   for (let n = 0; n < text.length; n++) {
     const c = text[n];
     if (quoted) {

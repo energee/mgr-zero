@@ -4,6 +4,6 @@
 export type EmptyState = {
   /** The fact: "No brands yet". */
   title: string;
-  /** The next step, one sentence. Omit when there is nothing useful to say. */
+  /** The next step, one sentence, after at most one sentence of context the reader needs first. Omit when there is nothing useful to say. */
   description?: string;
 };

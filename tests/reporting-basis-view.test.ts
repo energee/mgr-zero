@@ -22,8 +22,8 @@ describe("reporting basis correction presentation", () => {
     expect(isValidElement(body) && body.type).toBe(MonthlyComplianceView);
     const model = toMonthlyComplianceViewProps(monthlyComplianceAmended);
     expect(isValidElement<{ model: unknown }>(body) && body.props.model).toEqual(model);
-    expect(model.lines.find(line => line[0] === "cans")).toEqual(["cans", "12.60", "18.00", "14.90", "15.70"]);
-    expect(model.amendments?.[0].figures.lines.find(line => line[0] === "cans")).toEqual(["cans", "14.60", "18.00", "14.90", "17.70"]);
+    expect(model.lines.find(line => line[0] === "Cans")).toEqual(["Cans", "12.60", "18.00", "14.90", "15.70"]);
+    expect(model.amendments?.[0].figures.lines.find(line => line[0] === "Cans")).toEqual(["Cans", "14.60", "18.00", "14.90", "17.70"]);
     const html = renderToStaticMarkup(createElement(MonthlyComplianceView, { model }));
     expect(html).toContain("Needs amendment");
     expect(html).toContain("Latest recorded correction");
