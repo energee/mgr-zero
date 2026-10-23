@@ -98,7 +98,7 @@ defineQuery({
   description: "Everything in motion for the Work landing: Today's rows plus the open purchase orders and routes the caller may open, each tagged with its Work chip and sorted by due date",
   input: z.object({}), roles: ["admin", "sales", "warehouse", "brewer"],
   handler: async (ctx): Promise<WorkRow[]> => {
-    // ponytail: transfers, batches and runs ride on Today's rows only; their list pages are one tap away
+    // ponytail: Today supplies orders, routes and batches only; stock transfers and runs are never listed on Work (their list pages are one tap away)
     const [today, pos, routes] = await Promise.all([
       runCommand("get_today", {}, ctx) as Promise<TodayItem[]>,
       canRun(ctx, "list_purchase_orders") ? runCommand("list_purchase_orders", {}, ctx) as Promise<{ id: string; po_no: number; status: string; expected_on: string | null; vendor_name: string | null }[]> : [],
