@@ -466,7 +466,7 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", tab: "Work", name: "Work", job: "Everything currently in motion, ordered by next due action",
     reads: "list_work", writes: "none",
     states: DEFAULT_STATES,
-    spec: "Warehouse default rows shown; the chips are the kinds the role may open (a brewer has no POs or routes) and an explicit chip choice is remembered. Rows sort by urgency/due time, not newest activity.",
+    spec: "Warehouse default rows shown; the chips are the kinds the role may open (a brewer has no Purchase orders or Deliveries), each kind chip labeled with its sidebar name, and an explicit chip choice is remembered. Rows sort by urgency/due time, not newest activity.",
     body: <WorkView model={toWorkViewProps(workWarehouse)} />,
   },
   {
@@ -776,11 +776,12 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Beer",
     name: "Finished goods",
+    to: { "Add SKU in Catalog": "Catalog" },
     job: "See sellable beer by SKU and act on shortages",
     reads: "get_on_hand · get_atp · get_inventory_value",
     writes: "none [SKU creation happens on its own surface]",
-    states: [["uncosted", "units without receipt cost are counted but not valued"], ["permission", "value total shows only for Admin and Sales"], ["short", "a negative Available says Shortfall and links to the competing orders"], ["empty", "no finished goods yet: Add SKU is the only action"]],
-    spec: "The Beer landing's Finished goods row opens this list. On hand, allocated and available sit in aligned columns on the desk and as labeled values on the phone; the SKU name opens SKU detail, and Shortfall under a negative Available opens the shortfall. Add SKU opens the existing product and SKU flow. Inventory value uses frozen packaging-close cost and separately counts units without cost.",
+    states: [["uncosted", "units without receipt cost are counted but not valued"], ["permission", "value total shows only for Admin and Sales"], ["short", "a negative Available says Shortfall and links to the competing orders"], ["empty", "no finished goods yet: the header actions are the only ones"]],
+    spec: "The Beer landing's Finished goods row opens this list. On hand, allocated and available sit in aligned columns on the desk and as labeled values on the phone; the SKU name opens SKU detail, and Shortfall under a negative Available opens the shortfall. The header holds the page actions. Record movement is for Admin and Warehouse. Add SKU in Catalog is for Admin and Sales and opens Catalog, where SKUs are made. Inventory value uses frozen packaging-close cost and separately counts units without cost.",
     body: <FinishedGoodsView model={toFinishedGoodsViewProps(finishedGoodsList)} />,
   },
   {
@@ -815,7 +816,7 @@ export const SCREENS: Screen[] = [
     job: "Enter a positive amount; the form derives direction and the server calculates barrels",
     reads: "list_skus · list_locations · list_bins · get_atp",
     writes: "record_movement [existing; one append-only inventory movement]",
-    states: [["no kind", "No kind preselected · Record movement unavailable until one is chosen", 1], ["offline", "Wait for a connection; movements are never queued"], ["stale", "ATP changed · preview again", 1], ["permission", "admin or warehouse required · sales reads Beer only", 1], ["echo", "Committed row · eligible standalone adjustment/loss correction opens inventory SKU detail"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
+    states: [["no kind", "No kind preselected · Still needed: a kind, beside the withheld Record movement", 1], ["incomplete", "Still needed names each missing field; the preview appears once nothing is missing", 1], ["invalid quantity", "Zero or less, or a third decimal place, is marked under Quantity once the field is left · the kind signs it; two decimals are allowed", 1], ["no SKUs", "No SKUs yet · Add a SKU opens Catalog for Admin · Warehouse is told who adds them", 1], ["offline", "Wait for a connection; movements are never queued"], ["stale", "ATP changed · preview again", 1], ["permission", "admin or warehouse required · sales reads Beer only", 1], ["echo", "Committed row · eligible standalone adjustment/loss correction opens inventory SKU detail"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
     spec: "The form derives the signed API quantity from the movement kind (adjustments ask Add or Remove); the server derives 0.50000000 bbl and never accepts client-supplied barrels. It requires a live connection and is never put in the offline outbox. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. This frame carries Hazy IPA into PA, which is registered, so the warning is a state rather than drawn copy. Channel stays.",
     body: (<>
       <RecordMovementView model={toRecordMovementViewProps(recordMovementFestival)} footer={null} />
@@ -1845,8 +1846,8 @@ export const SCREENS: Screen[] = [
     job: "See what is planned, what is due and what closed, and schedule the next run",
     reads: "list_packaging_runs · list_brands · list_occupancies · list_skus · list_locations · list_bins",
     writes: "none [scheduling and closing happen on their own surfaces]",
-    states: [["short", "a planned run whose materials fall short says so on the row and its next action is Resolve, not Start"], ["due today", "the same row also appears in Today for the brewer"], ["closed", "recent runs stay for a few weeks with lot, output and yield; after that they are history under Search and Lot trace"], ["empty", "no runs planned: the button is the only thing on the page"]],
-    spec: "The Work list with the Runs tab active, which is the packaging list: Work is where everything in motion lives, so runs get no rail entry of their own. Upcoming sorts by planned date and every row names its next action. Recent breaks Work's in-motion rule on purpose, because a brewer plans the next run against the last one's yield; it is kept short and the full history stays in Search. Schedule run opens the sheet; a row opens the run, where closing happens.",
+    states: [["short", "a planned run whose materials fall short says so on the row and its next action is Resolve, not Start"], ["due today", "the same row also appears in Today for the brewer"], ["closed", "recent runs stay for a few weeks with lot, output and yield; after that they are history under Search and Lot trace"], ["empty", "no runs planned: the empty state points at Schedule run"]],
+    spec: "The Work list with the Packaging tab active, which is the packaging list: Work is where everything in motion lives, so runs get no rail entry of their own. Upcoming sorts by planned date and every row names its next action. Recent breaks Work's in-motion rule on purpose, because a brewer plans the next run against the last one's yield; it is kept short and the full history stays in Search. Schedule run opens the sheet; a row opens the run, where closing happens.",
     body: <PackagingRunsView model={toPackagingRunsViewProps(packagingRuns, DEMO_TIME_ZONE)} />,
   },
   {
@@ -1896,7 +1897,7 @@ export const SCREENS: Screen[] = [
     reads: "list_purchase_orders",
     writes: "none [creation and receiving happen on their own surfaces]",
     states: [["draft", "Send is the next action"], ["partial", "Receive stays available for the remainder"], ["empty", "no open purchase orders: New PO is the only action"]],
-    spec: "The Work list with the POs tab active. Each row names the next action; New PO opens the existing vendor purchase draft, and Receive PO returns here.",
+    spec: "The Work list with the Purchase orders tab active. Each row names the next action; New PO opens the existing vendor purchase draft, and Receive PO returns here.",
     body: <PurchaseOrdersView model={toPurchaseOrdersViewProps(purchaseOrdersWarehouse)} />,
   },
   {
@@ -2889,10 +2890,10 @@ export const SCREENS: Screen[] = [
     name: "Location bins",
     to: { "Walk-in": "Bin", Cold: "Bin", Dry: "Bin", "Add bin": "Bin" },
     job: "Subdivide a location without making every query carry an or-null",
-    reads: "list_locations · list_bins",
+    reads: "list_locations · list_bins · get_bin_move_stock",
     writes: "create_bin · update_bin · delete_bin",
-    states: [["permission", "warehouse or admin required", 1], ["last bin", "a location keeps at least one · rename it instead", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1], ["move unavailable", "fewer than two bins or no stock · Move stock says why", 1]],
-    spec: "Opened from Location detail. Every location starts with Walk-in, Cold and Dry. Rename or remove what doesn’t match the building, but a location always keeps one bin, so no on-hand or availability query carries a nullable branch. Bins are physical subdivisions a menu can read; they are explicitly not tap lines (§16.8). Par on a bin waits on a later schema change.",
+    states: [["permission", "warehouse or admin required", 1], ["last bin", "a location keeps at least one · rename it instead", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1], ["empty", "nothing stored in any bin · says so and opens Record movement for this location, in place of Move stock"], ["move unavailable", "stock but only one bin · Move stock says why", 1], ["no stock access", "staff who cannot read bin stock see the bins without counts"]],
+    spec: "Opened from Location detail. The title names the location, and each bin says how many kinds of stock it holds, or Empty. Every location starts with Walk-in, Cold and Dry. Rename or remove what doesn’t match the building, but a location always keeps one bin, so no on-hand or availability query carries a nullable branch. Bins are physical subdivisions a menu can read; they are explicitly not tap lines (§16.8). Par on a bin waits on a later schema change.",
     body: <LocationBinsView model={toLocationBinsViewProps(locationBinsTaproom)} />,
   },
   {
@@ -2905,7 +2906,8 @@ export const SCREENS: Screen[] = [
     job: "Create or edit one physical subdivision of a location",
     reads: "list_bins",
     writes: "create_bin · update_bin · delete_bin",
-    states: [["permission", "warehouse or admin required", 1], ["last bin", "rename it instead of removing it", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1], ["empty", "safe to remove"]],
+    states: [["permission", "warehouse or admin required", 1], ["last bin", "rename it instead of removing it", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1], ["menu bin", "a POS menu uses it · point the menu at another bin first", 1], ["never used", "Remove asks to confirm first"]],
+    spec: "Titled with the bin’s name (Edit bin · Cold), or Add bin. Remove sits in its own section below Save and opens a confirmation that states the rule. Taps are not bins; the note links the Tap board.",
     body: <BinView model={toBinViewProps(binCold)} />,
   },
   {
