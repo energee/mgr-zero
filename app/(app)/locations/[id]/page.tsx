@@ -12,6 +12,9 @@ import { isUuid } from "@/lib/commands/context";
 import type { LocationUse } from "@/lib/mgr/enums";
 import { notFound } from "next/navigation";
 import { LocationForm } from "../location-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/locations") };
 
 type LocationRow = { id: string; name: string; uses: LocationUse[] };
 
