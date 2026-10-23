@@ -124,6 +124,12 @@ describe("live page exclusion decisions", () => {
     expect((await TaproomPage(params)).props.model.receipt.lines[0].detail).toContain("LOT-797");
   });
 
+  it("#1117 a first saved count's receipt says in words that there is nothing to compare against", async () => {
+    const recorded = (await TaproomPage({ searchParams: Promise.resolve({ location: "tap", count: "count" }) })).props.model.receipt.recorded;
+    expect(recorded).toContain("This is the first count, so there is nothing to compare against yet.");
+    expect(recorded).not.toContain("· first count");
+  });
+
   it("reads invoice questions with the actual registry's union permission", async () => {
     pageState.roles = ["warehouse"];
     await InvoiceDetailPage({ params: Promise.resolve({ id: "invoice" }) });

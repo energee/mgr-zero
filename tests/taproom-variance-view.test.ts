@@ -9,8 +9,14 @@ it("keeps unavailable variance distinct from measured zero and labels incomplete
   expect(varianceBbl(null)).toBe("—");
   expect(varianceBbl(0)).toBe("0 bbl");
   expect(varianceBbl(-0.5)).toBe("-0.5 bbl");
-  expect(varianceReason("missing_baseline")).toBe("First count · no prior observation");
-  expect(varianceReason("no_pos_coverage")).toBe("No usable POS coverage");
+});
+
+it("#1117 names every reason the draft projection and the report return in plain words", () => {
+  expect(varianceReason("missing_baseline")).toBe("This is the first count, so there is nothing to compare against yet");
+  expect(varianceReason("no_pos_coverage")).toBe("No POS sales data covers this period");
+  expect(varianceReason("incomplete_pos_coverage")).toBe("POS sales data covers only part of this period");
+  expect(varianceReason("unmapped_pos_lines")).toBe("Some POS items still need mapping");
+  expect(varianceReason(null)).toBe("Comparable");
 });
 
 it("preserves nulls, coverage, exclusions and absent trends in the shared report", () => {
@@ -25,6 +31,8 @@ it("preserves nulls, coverage, exclusions and absent trends in the shared report
   expect(html).toContain("3 unmapped POS lines");
   expect(html).toContain("variance —");
   expect(html).toContain("Recurring brand trend");
+  expect(html).toContain("Not available yet.");
+  expect(html).not.toContain("Shows after");
   expect(html).not.toContain("short 4 weeks running");
   expect(html).not.toContain('href="/taproom');
 });
@@ -35,4 +43,27 @@ it("#814 displays destruction separately from sold actual", () => {
     report: { ...report, rows: [{ ...report.rows[0], destroyed_bbl: 2 }], periods: [{ ...report.periods[0], destroyed_bbl: 2 }] } } }));
   expect(html).toContain("Destroyed");
   expect(html).toContain("destroyed 2 bbl");
+});
+
+it("#1118 shows one empty state when no count period ends in the window", () => {
+  const report = { ...taproomVariance.report!, reason: "no_completed_periods", rows: [], periods: [] };
+  const html = renderToStaticMarkup(createElement(TaproomVarianceView, { model: { weeks: 4, timeZone: "America/New_York", report } }));
+  expect(html.match(/No completed count periods in this window/g)).toHaveLength(1);
+  expect(html).not.toContain("No saved count endings");
+  expect(html).not.toContain("Completed periods");
+});
+
+it("#1118 titles the page once, with the name the nav uses", () => {
+  const html = renderToStaticMarkup(createElement(TaproomVarianceView, { model: taproomVariance }));
+  expect(html.match(/>Variance by brand</g)).toHaveLength(1);
+  expect(html).toMatch(/<h1[^>]*>Variance by brand<\/h1>/);
+});
+
+it("#1118 draws the week tabs as the full-width TabBar the inventory draws", () => {
+  const weekHrefs = { "4 weeks": "/taproom/variance?weeks=4", "12 weeks": "/taproom/variance?weeks=12" };
+  const live = renderToStaticMarkup(createElement(TaproomVarianceView, { model: { ...taproomVariance, weekHrefs } }));
+  const tabs = (html: string) => html.match(/<div role="tablist"[^>]*>/)?.[0];
+  expect(live).toContain('href="/taproom/variance?weeks=12"');
+  expect(tabs(live)).toBe(tabs(renderToStaticMarkup(createElement(TaproomVarianceView, { model: taproomVariance }))));
+  expect(tabs(live)).not.toContain("md:w-fit");
 });
