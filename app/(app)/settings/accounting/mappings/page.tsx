@@ -4,6 +4,9 @@ import { requireAdminContext } from "@/lib/brewery";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { QboMappingForm } from "../qbo-controls";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/settings/accounting/mappings") };
 
 type Customer = { id: string; name: string; qbo_customer_id: string | null; qbo_realm_id: string | null };
 type Sku = { id: string; name: string; qbo_item_id: string | null; qbo_realm_id: string | null };

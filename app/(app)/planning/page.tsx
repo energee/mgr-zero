@@ -14,6 +14,9 @@ import { toPlanningViewProps, type MaterialRequirementSnapshot } from "@/lib/mgr
 import { breweryDate } from "@/lib/date-format";
 import "@/lib/commands/all";
 import { DraftButton } from "./draft-button";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/planning") };
 
 export default async function PlanningPage() {
   const brewery = await getActiveBrewery();

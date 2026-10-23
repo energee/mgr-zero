@@ -11,6 +11,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toWaterProfilesViewProps, waterProfilesBack, type WaterProfile } from "@/lib/mgr/water-profiles-view";
 import "@/lib/commands/all";
 import { WaterProfileForm } from "./water-profile-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/catalog/water-profiles") };
 
 export default async function WaterProfilesPage() {
   const brewery = await getActiveBrewery();

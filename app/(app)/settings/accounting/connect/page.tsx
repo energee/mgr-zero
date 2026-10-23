@@ -4,6 +4,9 @@ import { isQboConfigured } from "@/lib/qbo";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { QboConnectionAction } from "../qbo-controls";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/settings/accounting/connect") };
 
 export default async function ConnectQuickBooksPage() {
   const { ctx } = await requireAdminContext("Connect QuickBooks");

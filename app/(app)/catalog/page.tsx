@@ -21,6 +21,9 @@ import { FormatForm } from "./format-form";
 import { ListControls } from "@/components/mgr/list-controls";
 import { listParams } from "@/lib/mgr/list-params";
 import { BRAND_SORTS } from "@/lib/mgr/enums";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/catalog") };
 
 type PriceGroup = { id: string; name: string };
 type Sku = { id: string; name: string; format_id: string; active: boolean; upc: string | null };

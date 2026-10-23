@@ -5,6 +5,9 @@ import { disconnectStatus, type DisconnectHealth } from "@/lib/mgr/integration-d
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { PosRouteSheet, SquareDisconnectControl } from "@/components/mgr/views/pos-controls";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/settings/pos/disconnect") };
 
 export default async function DisconnectSquarePage() {
   const { ctx } = await requireAdminContext("Disconnect Square");

@@ -10,6 +10,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { kegHistoryScope, toKegHistoryViewProps } from "@/lib/mgr/keg-history-view";
 import "@/lib/commands/all";
 import { REASON_LABEL, SIZE_LABEL } from "@/lib/mgr/keg-labels";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/kegs/history") };
 
 type Named = { id: string; name: string };
 type Event = { id: string; pool_id: string; keg_size: string; qty: number; reason: string; customer_id: string | null; at: string; note: string | null };

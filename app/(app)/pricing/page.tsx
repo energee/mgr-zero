@@ -20,6 +20,9 @@ import { PourForm } from "@/app/(app)/catalog/pour-form";
 import { PriceCellForm } from "./price-cell-form";
 import { GroupForm } from "./group-form";
 import type { PriceGroupBarcode, PriceGroupRow, PriceGroupsSnapshot } from "@/lib/mgr/price-groups-view";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/pricing") };
 
 export default async function PricingPage({ searchParams }: { searchParams?: Promise<{ channel?: string }> } = {}) {
   const { channel: channelId } = (await searchParams) ?? {};

@@ -13,6 +13,9 @@ import { workHrefsFor } from "@/components/mgr/work-tabs";
 import { routeNext, toRoutesViewProps } from "@/lib/mgr/routes-view";
 import "@/lib/commands/all";
 import { driverLabel, type RouteList } from "./labels";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/routes") };
 
 export default async function RoutesPage() {
   const brewery = await getActiveBrewery();

@@ -11,6 +11,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { cadenceOf, JURISDICTION, periodKey, recentPeriods, type Cadence } from "@/lib/compliance-period";
 import { noPeriodsYet, periodRow } from "@/lib/mgr/compliance-months-view";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/compliance") };
 
 const CADENCES: [Cadence, string][] = [["month", "Monthly"], ["quarter", "Quarterly"], ["year", "Annual"]];
 

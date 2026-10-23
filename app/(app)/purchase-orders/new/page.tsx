@@ -3,6 +3,9 @@ import { buildContext } from "@/lib/commands/context";
 import { runPageQuery, requirePagePermission } from "@/lib/mgr/page-query";
 import { NewPoForm } from "../new-po-form";
 import "@/lib/commands/all";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/purchase-orders/new") };
 
 export default async function NewPurchaseOrderPage() {
   const brewery = await getActiveBrewery();

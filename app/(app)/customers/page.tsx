@@ -12,6 +12,9 @@ import "@/lib/commands/all";
 import { CustomerForm } from "./customer-form";
 import { ListControls } from "@/components/mgr/list-controls";
 import { listParams } from "@/lib/mgr/list-params";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/customers") };
 
 type SaleChannel = { id: string; name: string };
 type Customer = { id: string; name: string; alias: string | null; type: string; country: string; state: string | null; payment_terms: string; sale_channels: { name: string } };
