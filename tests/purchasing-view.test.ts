@@ -29,7 +29,7 @@ import { toMaterialsOnHandViewProps } from "../lib/mgr/materials-on-hand-view";
 import { purchaseOrderNext, toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
 import { receiptBillPresentation, receiptBillRequest, toPostedReceiptViewProps, type ReceiptSnapshot } from "../lib/mgr/receipt-view";
 import { toVendorsViewProps } from "../lib/mgr/vendors-view";
-import { poLineCounts } from "../lib/mgr/new-po-view";
+import { newPoReason } from "../lib/mgr/new-po-view";
 import { CLOSURE_FORM_ID } from "../lib/mgr/receive-po-view";
 import { beginRecovery, discardRecovery } from "../lib/commands/recovery";
 
@@ -282,6 +282,12 @@ describe("Materials", () => {
     expect((screen("Materials").body as { type: unknown }).type).toBe(MaterialsView);
   });
 
+  // #1111: Materials on hand is the only way into the definitions list, so its back link returns there.
+  it("the definitions list goes back to Materials on hand", () => {
+    expect(htmlOf(createElement(MaterialsView, { model: { rows: [] } }))).toMatch(/Materials on hand<\/a>/);
+    expect(src("app/(app)/materials/page.tsx")).toMatch(/toMaterialsViewProps\(\{\s*backHref: "\/materials",/);
+  });
+
   it("count keeps real bin identities, decimal input, explicit preview and nullable footer", () => {
     const pick = vi.spyOn(E, "pick");
     const html = htmlOf(createElement(CycleCountView, {
@@ -304,6 +310,20 @@ describe("Materials", () => {
     const html = htmlOf(createElement(MaterialView, { model: materialCitra }));
     expect(html).toMatch(/>Save material</);
     expect(html).toMatch(/Default vendor/);
+  });
+
+  // #1112: each unit field says what it holds, and the help is a brewer's example, not schema talk.
+  it("MaterialView names each unit field and explains them in plain words", () => {
+    const pick = vi.spyOn(E, "pick");
+    const edit = vi.spyOn(E, "edit");
+    const html = htmlOf(createElement(MaterialView, { model: materialCitra }));
+    expect(pick).toHaveBeenCalledWith("Base unit", "lb", expect.anything(), expect.anything());
+    expect(pick).toHaveBeenCalledWith("Purchase unit", "each", expect.anything(), expect.anything());
+    expect(edit).toHaveBeenCalledWith("Base units per purchase unit", "44", "number", undefined, expect.anything());
+    pick.mockRestore();
+    edit.mockRestore();
+    expect(html).toContain("For hops bought in 44 lb boxes, set Base unit to lb, Purchase unit to each, and Base units per purchase unit to 44.");
+    expect(html).not.toMatch(/schema/i);
   });
 
   // #430: the potential recipe predictions read, asked only where it applies.
@@ -342,7 +362,7 @@ describe("Vendors", () => {
     const html = htmlOf(createElement(VendorView, { model: vendorYch }));
     expect(html).toMatch(/>Save vendor</);
     expect(html).toMatch(/Phone/);
-    expect(html).toContain("Planning uses this lead time to calculate when to buy. Received orders show a separate observed average.");
+    expect(html).toContain("When Planning lists a material short and it resolves to this vendor, its buy-by date is the needed-by date less this lead time. Received orders show a separate observed average.");
   });
 
   it("the live vendor form mounts the shared controlled body", () => {
@@ -398,6 +418,9 @@ describe("Vendors and Materials on hand search", () => {
     expect(toVendorsViewProps({ rows: [] }).empty?.title).toBe("No vendors yet");
     expect(toMaterialsOnHandViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No materials match", description: "Clear the search to see every material." });
     expect(toMaterialsOnHandViewProps({ rows: [] }).empty?.title).toBe("No materials yet");
+    // #1112: the page's only action is Add material, so the empty state starts there. Receiving
+    // is the one step that works for every material: a lot-tracked one with no lot can't be counted in.
+    expect(toMaterialsOnHandViewProps({ rows: [] }).empty?.description).toBe("Add a material, then receive a purchase order to put it on hand.");
     // A vendor search narrows Contracts too, so its empty footer is a no-match, not no contracts.
     expect(toContractsViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No contracts match", description: "Clear the search to see every contract." });
     expect(toContractsViewProps({ rows: [] }).empty?.title).toBe("No contracts yet");
@@ -407,18 +430,19 @@ describe("Vendors and Materials on hand search", () => {
 });
 
 describe("New PO lines", () => {
-  // One check decides which rows count: the view flags a row that falls short
-  // and the form saves only when every row counts, so the two cannot disagree.
+  // One check decides which rows count: the form saves only when newPoReason
+  // finds nothing missing, and the view marks the same bad values per field.
   it("a line counts only with a material and a positive quantity", () => {
-    expect(poLineCounts({ materialId: "malt", qty: "4" })).toBe(true);
-    expect(poLineCounts({ materialId: "malt", qty: 0.5 })).toBe(true);
-    expect(poLineCounts({ materialId: "malt", qty: "0" })).toBe(false);
-    expect(poLineCounts({ materialId: "malt", qty: "" })).toBe(false);
-    expect(poLineCounts({ materialId: "", qty: "4" })).toBe(false);
-    expect(poLineCounts({ qty: 4 })).toBe(false);
+    const counts = (line: { materialId?: string; qty: number | string }) => newPoReason({ vendor: "v", lines: [{ ...line, cost: "" }] }) === null;
+    expect(counts({ materialId: "malt", qty: "4" })).toBe(true);
+    expect(counts({ materialId: "malt", qty: 0.5 })).toBe(true);
+    expect(counts({ materialId: "malt", qty: "0" })).toBe(false);
+    expect(counts({ materialId: "malt", qty: "" })).toBe(false);
+    expect(counts({ materialId: "", qty: "4" })).toBe(false);
+    expect(counts({ qty: 4 })).toBe(false);
   });
 
-  it("every row is required, removable when there is more than one, and a zero quantity is flagged", () => {
+  it("every row is required, removable when there is more than one, and a zero quantity is flagged once left", () => {
     const noop = () => {};
     const remove = vi.fn();
     const model = {
@@ -432,8 +456,12 @@ describe("New PO lines", () => {
     const html = renderToStaticMarkup(createElement(NewPoView, { model, controls: { material: noop, quantity: noop, remove } }));
     const line = (n: number) => html.slice(html.indexOf(`Line ${n} material`), html.indexOf(`Line ${n} unit cost`));
     expect(line(1)).toContain("required");
-    expect(line(1)).not.toContain('aria-invalid="true"');
-    expect(line(2)).toContain('aria-invalid="true"');
+    // A live line waits for its quantity's blur (useTouchedLines); a drawn one shows the state it depicts.
+    expect(html).not.toContain('aria-invalid="true"');
+    const drawn = renderToStaticMarkup(createElement(NewPoView, { model, controls: { remove } }));
+    const drawnLine = (n: number) => drawn.slice(drawn.indexOf(`Line ${n} material`), drawn.indexOf(`Line ${n} unit cost`));
+    expect(drawnLine(1)).not.toContain('aria-invalid="true"');
+    expect(drawnLine(2)).toContain('aria-invalid="true"');
     expect(html.match(/>Remove</g)).toHaveLength(2);
     const single = renderToStaticMarkup(createElement(NewPoView, { model: { ...model, lines: model.lines.slice(0, 1) }, controls: { remove } }));
     expect(single).not.toContain(">Remove<");
@@ -447,7 +475,6 @@ describe("New PO lines", () => {
 
   it("the live form saves only when every line counts, through the shared check", () => {
     const form = src("app/(app)/purchase-orders/new-po-form.tsx");
-    expect(form).toContain("lines.every(poLineCounts)");
     expect(form).toMatch(/remove: index =>/);
     expect(src("components/mgr/views/new-po.tsx")).not.toMatch(/const started\b/);
   });

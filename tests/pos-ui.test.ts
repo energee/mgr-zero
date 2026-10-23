@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { PointOfSaleView, PosItemView, PosMenuView } from "@/components/mgr/views/pos";
+import { ConnectSquareView, PointOfSaleView, PosItemView, PosMenuView } from "@/components/mgr/views/pos";
 import { SCREENS } from "@/components/mgr/screens";
 import { classifyCommandFailure } from "@/lib/commands/client";
 import { isTerminalPublication, publicationNotice, readPublicationOutcome, reconcileBooleanChange, selectExactCommandAttempt, shouldStartNewCommandAttempt, syncFailureMessage, syncResultMessage, toPosMenuSetup, toPosVariationRow } from "@/lib/mgr/pos-view";
@@ -118,6 +118,17 @@ describe("POS UI truth", () => {
     expect(pos).not.toMatch(/>Open</);
   });
 
+  it("describes Square's own QuickBooks feed as taproom sales, not a second provider (#1151)", () => {
+    const pos = renderToStaticMarkup(createElement(PointOfSaleView, { model: { connected: false, merchant: "", state: "Not connected" }, paths: { connector: "/settings/pos/connector" } }));
+    expect(pos).toMatch(/<a[^>]*href="\/settings\/pos\/connector"[^>]*>(?:(?!<\/a>)[\s\S])*Taproom sales in QuickBooks/);
+    expect(pos).toContain("Square’s own connector, separate from MGR");
+    expect(pos).not.toContain("QuickBooks connector");
+    const connect = renderToStaticMarkup(createElement(ConnectSquareView, { configured: false }));
+    expect(connect).toContain("Square isn’t turned on in MGR yet.");
+    expect(connect).not.toContain("support");
+    expect(connect).not.toContain("server connection values");
+  });
+
   it("keeps live POS route sheets on the inventory body layout", () => {
     expect(readFileSync("components/mgr/views/pos-controls.tsx", "utf8"))
       .toContain('<div className="flex flex-col gap-2">{children}</div>');
@@ -162,13 +173,13 @@ describe("POS UI truth", () => {
   it("maps every live POS route to its inventory screen", () => {
     const routes = new Map(SCREEN_ROUTES.map((route) => [route.name, route.file]));
     expect(Object.fromEntries([...routes].filter(([name]) => [
-      "Point of sale", "Connect Square", "Square locations", "Square → QuickBooks connector",
+      "Point of sale", "Connect Square", "Square locations", "Taproom sales in QuickBooks",
       "Disconnect Square", "POS sale detail", "Menu", "POS item",
     ].includes(name)))).toEqual({
       "Point of sale": "app/(app)/settings/pos/page.tsx",
       "Connect Square": "app/(app)/settings/pos/connect/page.tsx",
       "Square locations": "app/(app)/settings/pos/locations/page.tsx",
-      "Square → QuickBooks connector": "app/(app)/settings/pos/connector/page.tsx",
+      "Taproom sales in QuickBooks": "app/(app)/settings/pos/connector/page.tsx",
       "Disconnect Square": "app/(app)/settings/pos/disconnect/page.tsx",
       "POS sale detail": "app/(app)/settings/pos/sales/[id]/page.tsx",
       Menu: "app/(app)/menu/page.tsx",
