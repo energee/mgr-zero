@@ -9,7 +9,7 @@
 import { command } from "@/lib/commands/client";
 import { useBrewery } from "@/lib/brewery-provider";
 import type { BinMoveStock } from "@/lib/commands/inventory";
-import { movementFieldErrors, movementFields, movementReason, requiresChannel, requiresDestState } from "@/lib/movement-form";
+import { MOVEMENT_TYPES, movementFieldErrors, movementFields, movementReason, requiresChannel, requiresDestState, type MovementType } from "@/lib/movement-form";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { formatVolume } from "@/lib/volume";
 import { useEffect, useState } from "react";
@@ -24,14 +24,7 @@ import { formatDateTime } from "@/lib/date-format";
 import { toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
 import type { MovementInput } from "@/lib/commands/movement-input";
 
-// Staff-facing movement types; sale_removal/taproom_transfer are produced by
-// order flows (plan 1B), not entered manually here.
-const MOVEMENT_TYPES = [
-  "opening_balance", "production_in", "adjustment", "depletion",
-  "destruction", "loss", "sample", "festival_removal", "return_in",
-] as const;
 type MovementReceipt = { id: string; created_at: string; sku_id: string; location_id: string; bin_id: string; qty: number; bbl: number; type: string; dest_state: string | null; sale_channel_id: string | null; lot_id: string | null; ref: string | null; note: string | null };
-type MovementType = (typeof MOVEMENT_TYPES)[number];
 
 export function MovementForm({
   autoOpen = false,
@@ -117,9 +110,9 @@ export function MovementForm({
   const availableLots = stock.filter(item => item.kind === "sku" && item.stock_id === skuId && item.bin_id === binId && item.lot_id);
   const lotOptions = ["Untracked / legacy stock", ...availableLots.map(item => `${item.lot_code} · ${item.qty} available`)];
   const movementModel: RecordMovementViewModel = {
-    // kindIndex -1 means no kind is chosen yet. The view draws from the empty
-    // `kind`, which shows the Select kind placeholder and no pressed toggle.
-    kind: sentenceCase(type), kindIndex: type ? MOVEMENT_TYPES.indexOf(type) : -1, kindOptions,
+    // An empty `kind` (none chosen yet) shows the Select kind placeholder and
+    // no pressed toggle.
+    kind: sentenceCase(type), kindOptions,
     sku: selectedSku?.label ?? "", skuId, skuOptions: skus.map(item => ({ value: item.id, label: item.label })), skusHref,
     location: selectedLocation?.name ?? "", locationOptions: locations.map(item => item.name),
     bin: selectedBin?.name ?? "", binOptions: bins.filter(item => item.location_id === locationId).map(item => item.name),

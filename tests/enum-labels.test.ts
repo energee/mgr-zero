@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { connectionStateLabel, sentenceCase, importKindLabel } from "@/lib/mgr/labels";
-import { MOVEMENT_KIND_OPTIONS } from "@/lib/mgr/record-movement-view";
+import { MOVEMENT_TYPES } from "@/lib/movement-form";
 import { toLocationsViewProps } from "@/lib/mgr/locations-view";
 import { TAX_TREATMENTS } from "@/lib/mgr/tax-treatments";
 import { IMPORT_KINDS } from "@/lib/import-csv";
@@ -30,11 +30,12 @@ describe("import kinds", () => {
 
 describe("movement reasons", () => {
   it("offers reasons an operator can read — capitalized, never snake_case", () => {
-    for (const option of MOVEMENT_KIND_OPTIONS) {
+    const options = MOVEMENT_TYPES.map(sentenceCase);
+    for (const option of options) {
       expect(option).not.toMatch(/_/);
       expect(option[0]).toBe(option[0]!.toUpperCase());
     }
-    expect(MOVEMENT_KIND_OPTIONS).toContain("Festival removal");
+    expect(options).toContain("Festival removal");
   });
 });
 
