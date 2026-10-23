@@ -5260,6 +5260,9 @@ isOneToOne: false
 "list_open_taps":
 { Args: { "p_brewery": string,"p_location": string }; Returns: Json
                            },
+"list_sale_channels":
+{ Args: { "p_brewery": string }; Returns: Json
+                           },
 "list_tap_history":
 { Args: { "p_brewery": string,"p_location": string }; Returns: Json
                            },

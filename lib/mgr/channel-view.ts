@@ -8,10 +8,14 @@ import { TAX_TREATMENTS, type TaxTreatment } from "./tax-treatments";
  *  chip order and the treatment list can never drift apart. */
 export const CHANNEL_TAX_TREATMENTS = TAX_TREATMENTS.map(sentenceCase);
 
-/** What a treatment means, shown under the chips while it is selected. Only
- *  Export has settled wording (#1149); the others wait for confirmed copy. */
+/** What a treatment means, shown under the chips while it is selected. The
+ *  four tax-free removals carry their TTB meaning (#1149, #1207); Taxable,
+ *  the ordinary case, has none. */
 const TAX_TREATMENT_HINTS: Partial<Record<TaxTreatment, string>> = {
   export: "Sold for shipment outside the US, not taxed.",
+  vessel_supplies: "Supplies for ships or aircraft in foreign trade, not taxed.",
+  research: "Used for lab analysis, research or testing, not taxed.",
+  transfer_in_bond: "Sent to another brewery in bond; that brewery pays the tax.",
 };
 
 export type ChannelViewModel = {

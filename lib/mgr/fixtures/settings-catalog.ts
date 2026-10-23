@@ -10,13 +10,14 @@ const CH_TAPROOM = "00000000-0000-4000-8000-0000000000h2";
 const CH_DTC = "00000000-0000-4000-8000-0000000000h3";
 const CH_EXPORT = "00000000-0000-4000-8000-0000000000h4";
 
-/** Settings → Sale channels: four seeded names with inventory movement counts. */
+/** Settings → Sale channels: four seeded names with inventory movement counts,
+ *  so every one is in use. */
 export const saleChannelsList: SaleChannelsSnapshot = {
   channels: [
-    { id: CH_WHOLESALE, name: "Wholesale", tax_treatment: "taxable", movements: 118 },
-    { id: CH_TAPROOM, name: "Taproom", tax_treatment: "taxable", movements: 402 },
-    { id: CH_DTC, name: "DTC", tax_treatment: "taxable", movements: 34 },
-    { id: CH_EXPORT, name: "Export", tax_treatment: "export", movements: 6 },
+    { id: CH_WHOLESALE, name: "Wholesale", tax_treatment: "taxable", in_use: true, system_code: null, movements: 118 },
+    { id: CH_TAPROOM, name: "Taproom", tax_treatment: "taxable", in_use: true, system_code: "taproom", movements: 402 },
+    { id: CH_DTC, name: "DTC", tax_treatment: "taxable", in_use: true, system_code: null, movements: 34 },
+    { id: CH_EXPORT, name: "Export", tax_treatment: "export", in_use: true, system_code: null, movements: 6 },
   ],
 };
 

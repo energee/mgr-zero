@@ -33,18 +33,39 @@ describe("Sale channels view", () => {
   it("live-shaped rows omit movement counts and label snake_case treatments", () => {
     const model = toSaleChannelsViewProps({
       channels: [
-        { id: "c1", name: "Taproom", tax_treatment: "taxable" },
-        { id: "c2", name: "Bond", tax_treatment: "transfer_in_bond" },
+        { id: "c1", name: "Taproom", tax_treatment: "taxable", in_use: true, system_code: "taproom" },
+        { id: "c2", name: "Bond", tax_treatment: "transfer_in_bond", in_use: false, system_code: null },
       ],
     });
     expect(model.rows.map((r) => r.detail)).toEqual(["Taxable", "Transfer in bond"]);
   });
 
-  it("states the in-use rule only for a role that may delete (#1149)", () => {
-    expect(toSaleChannelsViewProps({ ...saleChannelsList, canDelete: true }).inUseRule).toBe(CHANNEL_IN_USE_RULE);
-    expect(toSaleChannelsViewProps(saleChannelsList).inUseRule).toBeUndefined();
+  // #1207: Delete shows only where delete_sale_channel would succeed.
+  const mixed = {
+    channels: [
+      { id: "c1", name: "Taproom", tax_treatment: "taxable", in_use: false, system_code: "taproom" },
+      { id: "c2", name: "Wholesale", tax_treatment: "taxable", in_use: true, system_code: null },
+      { id: "c3", name: "Festival", tax_treatment: "taxable", in_use: false, system_code: null },
+    ],
+  };
+
+  it("offers Delete only on an unused channel that is not the system Taproom (#1207)", () => {
+    expect(toSaleChannelsViewProps({ ...mixed, canDelete: true }).rows.map((r) => [r.title, r.deletable]))
+      .toEqual([["Taproom", false], ["Wholesale", false], ["Festival", true]]);
+    expect(toSaleChannelsViewProps(mixed).rows.map((r) => r.deletable)).toEqual([false, false, false]);
+  });
+
+  it("states the rule only where a role that may delete sees a row without Delete (#1149, #1207)", () => {
+    expect(toSaleChannelsViewProps({ ...mixed, canDelete: true }).inUseRule).toBe(CHANNEL_IN_USE_RULE);
+    expect(toSaleChannelsViewProps(mixed).inUseRule).toBeUndefined();
+    // Every row offers Delete, so there is nothing to explain.
+    expect(toSaleChannelsViewProps({ channels: [mixed.channels[2]!], canDelete: true }).inUseRule).toBeUndefined();
     // An empty list offers no Delete, so it states no rule.
     expect(toSaleChannelsViewProps({ channels: [], canDelete: true }).inUseRule).toBeUndefined();
+  });
+
+  it("the rule names the system Taproom channel the RPC refuses (#1207)", () => {
+    expect(CHANNEL_IN_USE_RULE).toMatch(/system Taproom channel/);
   });
 
   it("the staff guide quotes the in-use rule the screen states", () => {
@@ -91,7 +112,7 @@ describe("Sale channels view", () => {
       model,
       createAction: "ADD",
       info: "LIVE INFO",
-      rowTrailing: (id) => `T-${id}`,
+      rowTrailing: (row) => `T-${row.key}`,
     }));
     expect(html).toMatch(/ADD/);
     expect(html).not.toMatch(/>Add channel</);
@@ -128,6 +149,8 @@ describe("Sale channels view", () => {
     expect(src).toContain('canRun(ctx, "upsert_sale_channel")');
     expect(src).toContain('canRun(ctx, "delete_sale_channel")');
     expect(src).toContain("toSaleChannelsViewProps({ channels, canDelete, backHref");
+    // Delete is drawn only on a row the model marks deletable (#1207).
+    expect(src).toMatch(/row\.deletable && <DeleteCommandButton\b/);
   });
 });
 
@@ -156,8 +179,14 @@ describe("Channel view", () => {
     });
     expect(model.taxIndex).toBe(2);
     expect(model.taxOptions[2]).toBe("Vessel supplies");
-    // Only Export has settled hint copy (#1149); the rest stay unhinted.
-    expect(model.taxHint).toBeUndefined();
+    expect(model.taxHint).toBe("Supplies for ships or aircraft in foreign trade, not taxed.");
+  });
+
+  it("hints Research and Transfer in bond with their TTB meaning, and leaves Taxable plain (#1207)", () => {
+    const hint = (tax_treatment: string) => toChannelViewProps({ id: "c", name: "C", tax_treatment }).taxHint;
+    expect(hint("research")).toBe("Used for lab analysis, research or testing, not taxed.");
+    expect(hint("transfer_in_bond")).toBe("Sent to another brewery in bond; that brewery pays the tax.");
+    expect(hint("taxable")).toBeUndefined();
   });
 
   it("renders Channel name, labelled export chips with their hint, override info, and Save channel", () => {

@@ -17,6 +17,7 @@ const AUTHENTICATED_RPCS = [
   "kick_keg(uuid,uuid,numeric,text,uuid)",
   "swap_keg(uuid,uuid,numeric,text,uuid,text,numeric,text,numeric,uuid)",
   "list_open_taps(uuid,uuid)",
+  "list_sale_channels(uuid)",
   "list_tap_history(uuid,uuid)",
   "get_taproom_count_snapshot(uuid,uuid)", "get_taproom_print_labels(uuid,uuid,text)", "get_taproom_count(uuid,uuid)", "list_taproom_counts(uuid,uuid)",
   "record_taproom_count(uuid,uuid,date,text,jsonb,uuid)", "correct_taproom_count(uuid,uuid,jsonb,text,uuid)",
