@@ -2,11 +2,15 @@
 // Database values are snake_case (or already spaced, as the record-movement
 // fixtures are); operators see sentence case. Issue #333.
 import type { ImportKind } from "@/lib/import-csv";
-import { COUNTRY_CODES, COUNTRY_NAMES, CUSTOMER_TYPES, LOCATION_USES, type BrandSort, type CountryCode, type PaymentTerm } from "@/lib/mgr/enums";
+import { COUNTRY_CODES, COUNTRY_NAMES, CUSTOMER_TYPES, LOCATION_USES, STAFF_ROLES, type BrandSort, type CountryCode, type PaymentTerm } from "@/lib/mgr/enums";
 
 /** "opening_balance" / "opening balance" → "Opening balance". */
 export const sentenceCase = (value: string) =>
   value.replace(/_/g, " ").replace(/^./, (letter) => letter.toUpperCase());
+
+/** A member's roles as staff read them, in STAFF_ROLES order: ["warehouse", "admin"] → "Admin, Warehouse". */
+export const staffRolesLabel = (roles: readonly string[]) =>
+  STAFF_ROLES.filter((role) => roles.includes(role)).map(sentenceCase).join(", ");
 
 /** Import kinds carry product names the humanizer cannot derive; the staff
  *  guide's Kind column is the source of truth. */

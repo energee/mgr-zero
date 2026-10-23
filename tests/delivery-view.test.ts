@@ -17,6 +17,7 @@ import {
 import { toggleRouteStop } from "../lib/mgr/route-view";
 import { workHrefsFor } from "../components/mgr/work-tabs";
 import { routeNext, toRoutesViewProps } from "../lib/mgr/routes-view";
+import { driverLabel, driverOptions } from "../app/(app)/routes/labels";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
@@ -46,6 +47,22 @@ describe("Routes", () => {
     expect(routeNext({ departed_at: "2026-09-10T14:00:00Z", driver_user_id: "d" })).toEqual({ verb: "Resume", tone: "info" });
     expect(routeNext({ departed_at: null, driver_user_id: null })).toEqual({ verb: "Assign", tone: "attention" });
     expect(routeNext({ departed_at: null, driver_user_id: "d" })).toBeUndefined();
+  });
+
+  // #1124: a driver reads as their roster email, never an id fragment or a made-up name.
+  it("labels a route's driver by roster email, or says why there is none", () => {
+    expect(driverLabel({ driver_user_id: "4d6d4e58-0000-4000-8000-000000000000", driver_email: "sam@example.test" })).toBe("sam@example.test");
+    expect(driverLabel({ driver_user_id: null, driver_email: null })).toBe("driver not assigned");
+    expect(driverLabel({ driver_user_id: "4d6d4e58-0000-4000-8000-000000000000", driver_email: null })).toBe("driver not on the team");
+  });
+
+  // #1124: the Driver picker reads like Team (email, then roles in order), and keeps a saved driver who can no longer drive.
+  it("builds the Driver picker from the roster, keeping a saved driver who is not eligible", () => {
+    const sam = { user_id: "a", email: "sam@example.test", roles: ["warehouse", "admin"] };
+    expect(driverOptions([sam], null)).toEqual([{ id: "a", label: "sam@example.test · Admin, Warehouse" }]);
+    expect(driverOptions([sam], { driver_user_id: "a", driver_email: "sam@example.test" })).toHaveLength(1);
+    expect(driverOptions([sam], { driver_user_id: "b", driver_email: null })[1]).toEqual({ id: "b", label: "driver not on the team" });
+    expect(driverOptions([sam], { driver_user_id: "b", driver_email: "riley@example.test" })[1]).toEqual({ id: "b", label: "riley@example.test · can no longer drive" });
   });
 
   it("an assigned route is a row link, not an Open verb; Resume and Assign stay verbs (#1026)", () => {

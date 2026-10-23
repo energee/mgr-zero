@@ -33,7 +33,7 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
   }
   const openStops = route.stops.filter((s) => !s.delivered_at);
   const next = openStops[0];
-  const driverVehicle = [driverLabel(route.driver_user_id), route.vehicle].filter(Boolean).join(" · ");
+  const driverVehicle = [driverLabel(route), route.vehicle].filter(Boolean).join(" · ");
   const departed = formatTime(route.departed_at, brewery.timeZone);
   const action = route.returned_at ? E.status(`Returned ${formatTime(route.returned_at, brewery.timeZone)}`, "ok") : <ReturnRoute routeId={route.id} open={openStops.length} />;
   if (openStops.length === 0) {

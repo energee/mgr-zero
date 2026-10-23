@@ -6,8 +6,7 @@ import type { TeamMember } from "@/lib/commands/invites";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { getRequestIdentity } from "@/lib/auth/request-context";
 import { deniedHref } from "@/lib/mgr/denied";
-import { STAFF_ROLES } from "@/lib/mgr/enums";
-import { sentenceCase } from "@/lib/mgr/labels";
+import { staffRolesLabel } from "@/lib/mgr/labels";
 import "@/lib/commands/all";
 import { InviteForm } from "./invite-form";
 import { MemberForm } from "./member-form";
@@ -23,7 +22,7 @@ export default async function TeamPage() {
         rows: members.map((m) => ({
           key: m.userId,
           title: m.handle,
-          detail: `${m.email} · ${STAFF_ROLES.filter(role => m.roles.includes(role)).map(sentenceCase).join(", ")}`,
+          detail: `${m.email} · ${staffRolesLabel(m.roles)}`,
           you: m.userId === identity?.userId,
         })),
       }}
