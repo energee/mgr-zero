@@ -357,3 +357,41 @@ describe("record_invoice_payment and void_invoice_payment commands", () => {
       .toEqual([...PAYMENT_METHODS].sort());
   });
 });
+
+describe("list_invoices and get_invoice carry the ledger", () => {
+  type ListRow = { id: string; local_paid_cents: number; has_pending_qbo_push: boolean; was_pushed_to_qbo: boolean };
+  const listRow = async (f: Fixture) =>
+    ((await runCommand("list_invoices", {}, f.sales)) as { rows: ListRow[] }).rows.find(row => row.id === f.invoiceId)!;
+  const detail = async (f: Fixture) => (await runCommand("get_invoice", { invoiceId: f.invoiceId }, f.sales)) as
+    { payments: unknown[]; localPaidCents: number; hasPendingPush: boolean; wasPushedToQbo: boolean };
+
+  it("returns the unvoided sum and every payment, a voided one with its reason, newest received first", async () => {
+    const f = await localInvoice();
+    const kept = await runCommand("record_invoice_payment",
+      { invoiceId: f.invoiceId, amountCents: 2500, receivedOn: "2026-10-19", method: "cash" }, f.sales) as { paymentId: string };
+    const mistaken = await runCommand("record_invoice_payment",
+      { invoiceId: f.invoiceId, amountCents: 4000, receivedOn: "2026-10-20", method: "check", reference: "Check 1001" }, f.sales) as { paymentId: string };
+    await runCommand("void_invoice_payment", { paymentId: mistaken.paymentId, reason: "Entered twice" }, f.sales);
+
+    expect(await listRow(f)).toMatchObject({ local_paid_cents: 2500, has_pending_qbo_push: false, was_pushed_to_qbo: false });
+    const read = await detail(f);
+    expect(read.localPaidCents).toBe(2500);
+    expect(read.payments).toEqual([
+      { id: mistaken.paymentId, amount_cents: 4000, received_on: "2026-10-20", method: "check", reference: "Check 1001", void: { reason: "Entered twice" } },
+      { id: kept.paymentId, amount_cents: 2500, received_on: "2026-10-19", method: "cash", reference: null, void: null },
+    ]);
+  });
+
+  it("reports a pending push, and a push to a previous QuickBooks company", async () => {
+    const pending = await localInvoice();
+    await pushOf(pending, "pending");
+    expect(await listRow(pending)).toMatchObject({ has_pending_qbo_push: true, was_pushed_to_qbo: false });
+    expect(await detail(pending)).toMatchObject({ hasPendingPush: true, wasPushedToQbo: false, payments: [], localPaidCents: 0 });
+
+    const purged = await localInvoice();
+    await pushOf(purged, "pushed");
+    await changeRealm(purged);
+    expect(await listRow(purged)).toMatchObject({ has_pending_qbo_push: false, was_pushed_to_qbo: true, local_paid_cents: 0 });
+    expect(await detail(purged)).toMatchObject({ hasPendingPush: false, wasPushedToQbo: true });
+  });
+});

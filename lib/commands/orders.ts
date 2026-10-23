@@ -395,7 +395,7 @@ async function invoiceStaffLinks(ctx: Ctx, invoices: (QboInvoiceIdentity & { id:
 }
 
 defineQuery({
-  name: "list_invoices", description: "Invoices and credit memos with current total plus frozen local subtotal, newest first",
+  name: "list_invoices", description: "Invoices and credit memos with current total plus frozen local subtotal and the sum of payments recorded in MGR, newest first",
   roles: [...readRoles],
   input: z.object({ customerId: z.string().uuid().optional(), ...historyInput }),
   handler: async (ctx, i) => {
@@ -405,34 +405,46 @@ defineQuery({
     const invoices = page.rows;
     const ids = invoices.map(inv => inv.id);
     const staffLinksPromise = invoiceStaffLinks(ctx, invoices);
-    const [totals, pendingPushes] = ids.length ? await Promise.all([
-      unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents").in("invoice_id", ids)) as PromiseLike<{ invoice_id: string; subtotal_cents: number }[]>,
-      unwrap(ctx.db.from("qbo_pushes").select("invoice_id").in("invoice_id", ids).eq("status", "pending")) as PromiseLike<{ invoice_id: string }[]>,
+    const [totals, pushes] = ids.length ? await Promise.all([
+      unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents, local_paid_cents").in("invoice_id", ids)) as PromiseLike<{ invoice_id: string; subtotal_cents: number; local_paid_cents: number }[]>,
+      unwrap(ctx.db.from("qbo_pushes").select("invoice_id, status").in("invoice_id", ids).in("status", ["pending", "pushed"])) as PromiseLike<{ invoice_id: string; status: "pending" | "pushed" }[]>,
     ]) : [[], []];
     const staffLinks = await staffLinksPromise;
-    const subtotalById = new Map(totals.map(t => [t.invoice_id, t.subtotal_cents]));
-    const pending = new Set(pendingPushes.map(push => push.invoice_id));
+    const totalsById = new Map(totals.map(t => [t.invoice_id, t]));
+    const hasPush = (id: string, status: "pending" | "pushed") => pushes.some(push => push.invoice_id === id && push.status === status);
     return { ...page, rows: invoices.map(inv => {
-      const subtotal_cents = subtotalById.get(inv.id) ?? 0;
-      return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents), has_pending_qbo_push: pending.has(inv.id), quickbooks_link: staffLinks.get(inv.id) ?? null };
+      const { subtotal_cents = 0, local_paid_cents = 0 } = totalsById.get(inv.id) ?? {};
+      return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents), local_paid_cents,
+        has_pending_qbo_push: hasPush(inv.id, "pending"), was_pushed_to_qbo: hasPush(inv.id, "pushed"), quickbooks_link: staffLinks.get(inv.id) ?? null };
     }) };
   },
 });
 
 defineQuery({
-  name: "get_invoice", description: "One invoice with its lines",
+  name: "get_invoice", description: "One invoice with its lines and the payments recorded in MGR",
   roles: [...readRoles],
   input: z.object({ invoiceId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    const [invoice, invLines, pendingPush] = await Promise.all([
+    const [invoice, invLines, pushes, payments] = await Promise.all([
       unwrap(ctx.db.from("invoices").select("*, customers(id,name,qbo_customer_id,qbo_realm_id)").eq("id", i.invoiceId).eq("brewery_id", ctx.breweryId).single()),
       completeRows("Invoice lines", start => ctx.db.from("invoice_lines").select("*, skus(name,qbo_item_id,qbo_realm_id)", { count: "exact" })
         .eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).order("kind").order("id").range(start, start + PAGE_SIZE - 1)),
-      unwrap(ctx.db.from("qbo_pushes").select("id").eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).eq("status", "pending").maybeSingle()),
+      completeRows("Invoice pushes", start => ctx.db.from("qbo_pushes").select("id, status", { count: "exact" })
+        .eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).in("status", ["pending", "pushed"]).order("id").range(start, start + PAGE_SIZE - 1)),
+      // A void is its own row. PostgREST embeds it as one object or null, since
+      // (brewery_id, payment_id) is unique; the generated types still say an array.
+      completeRows("Invoice payments", start => ctx.db.from("invoice_payments")
+        .select("id, amount_cents, received_on, method, reference, invoice_payment_voids(reason)", { count: "exact" })
+        .eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId)
+        .order("received_on", { ascending: false }).order("id").range(start, start + PAGE_SIZE - 1)),
     ]);
     if (!invoice) throw new Error("Invoice not found");
     const staffLinks = await invoiceStaffLinks(ctx, [invoice]);
-    return { invoice, lines: invLines, hasPendingPush: Boolean(pendingPush), quickbooksLink: staffLinks.get(invoice.id) ?? null };
+    const ledger = payments.map(({ invoice_payment_voids: voids, ...payment }) => ({ ...payment, void: voids as unknown as { reason: string } | null }));
+    return { invoice, lines: invLines, payments: ledger,
+      localPaidCents: ledger.reduce((sum, payment) => payment.void ? sum : sum + payment.amount_cents, 0),
+      hasPendingPush: pushes.some(push => push.status === "pending"), wasPushedToQbo: pushes.some(push => push.status === "pushed"),
+      quickbooksLink: staffLinks.get(invoice.id) ?? null };
   },
 });
 

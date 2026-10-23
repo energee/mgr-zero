@@ -5,7 +5,7 @@ import { InvoicesView } from "../components/mgr/views/invoices";
 import { QboStaffInvoiceLinkView } from "../components/mgr/views/accounting";
 import { toInvoiceListRow, type InvoiceListRecord } from "../lib/mgr/invoices-view";
 
-const invoice: InvoiceListRecord = { id: "actual", invoice_no: 1042, kind: "invoice", due_on: "2026-09-12", paid_at: null, qbo_sync_status: "pushed", qbo_sync_error: null, qbo_remote_state: "live", qbo_balance_cents: 0, qbo_cash_collected_cents: 0, qbo_accountant_drift: false, written_off_at: null, subtotal_cents: 98000, total_cents: 104000, has_pending_qbo_push: false, customers: { name: "Actual customer" } };
+const invoice: InvoiceListRecord = { id: "actual", invoice_no: 1042, kind: "invoice", due_on: "2026-09-12", paid_at: null, qbo_sync_status: "pushed", qbo_sync_error: null, qbo_remote_state: "live", qbo_balance_cents: 0, qbo_cash_collected_cents: 0, qbo_accountant_drift: false, written_off_at: null, subtotal_cents: 98000, total_cents: 104000, has_pending_qbo_push: false, qbo_invoice_id: "qbo-1042", local_paid_cents: 0, was_pushed_to_qbo: false, customers: { name: "Actual customer" } };
 
 it("keeps structured identity, money, payment, and accounting facts separate", () => {
   const row = toInvoiceListRow(invoice, ["admin"], true, "America/New_York");
