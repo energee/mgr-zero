@@ -156,7 +156,7 @@ const AUTHENTICATED_RPCS = [
   "create_chat_conversation(uuid,text,uuid)",
   "append_chat_message(uuid,uuid,text,text,uuid)",
   "list_chat_conversations(uuid)",
-  "get_chat_history(uuid,uuid)",
+  "get_chat_history(uuid,uuid,integer)",
   "record_material_count(uuid,uuid,uuid,date,jsonb,uuid,text)",
   "get_material_count_preview(uuid,uuid,uuid,jsonb)",
   "record_pick(uuid,jsonb,uuid)",

@@ -18,10 +18,10 @@ export default async function RoutesPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const { routes, unassigned } = (await runCommand("list_routes", {}, ctx)) as RouteList;
-  return <RoutesView model={toRoutesViewProps({ title: "Routes", subtitle: "", rows: [
+  return <RoutesView model={toRoutesViewProps({ title: "Deliveries", subtitle: "", rows: [
     ...routes.map(route => ({
       key: route.id, title: (route.name ?? "Route") + " · " + formatDate(route.delivery_date),
-      detail: route.departed_at ? "departed · " + route.stops.filter(stop => stop.delivered_at).length + " of " + route.stops.length + " delivered" : route.stops.length + (route.stops.length === 1 ? " stop · " : " stops · ") + driverLabel(route.driver_user_id),
+      detail: route.departed_at ? "departed · " + route.stops.filter(stop => stop.delivered_at).length + " of " + route.stops.length + " delivered" : route.stops.length + (route.stops.length === 1 ? " stop · " : " stops · ") + driverLabel(route),
       ...routeNext(route),
       href: "/routes/" + route.id, warning: !route.driver_user_id,
     })),

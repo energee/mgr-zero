@@ -4,7 +4,6 @@ import type { ContractViewModel } from "@/lib/mgr/contract-view";
 import type { ContractsSnapshot } from "@/lib/mgr/contracts-view";
 import type { CycleCountViewModel } from "@/lib/mgr/cycle-count-view";
 import type { MaterialViewModel } from "@/lib/mgr/material-view";
-import type { MaterialsSnapshot } from "@/lib/mgr/materials-view";
 import type { MaterialsOnHandSnapshot } from "@/lib/mgr/materials-on-hand-view";
 import type { NewPoViewModel } from "@/lib/mgr/new-po-view";
 import type { PurchaseOrdersSnapshot } from "@/lib/mgr/purchase-orders-view";
@@ -117,10 +116,10 @@ export const correctReceiptCountryMalt: ReceivePoViewModel = {
 
 export const materialsOnHandList: MaterialsOnHandSnapshot = {
   rows: [
-    { key: "cans", title: "Cans · 16 oz", detail: "3,100 each · 2 lots · best by none", verb: "Count", tone: "info" },
-    { key: "citra", title: "Citra 2026 · YCH", detail: "262 lb · 1 lot · best by Aug 31, 2027", verb: "Count", tone: "info" },
-    { key: "malt", title: "2-row 2026 · Country Malt", detail: "8,800 lb · 3 lots · best by Mar 15, 2027", verb: "Count", tone: "info" },
-    { key: "yeast", title: "Yeast · WLP066", detail: "2 brinks · 2 lots · best by Sep 8, 2026", verb: "Count", tone: "info", warning: true },
+    { key: "cans", title: "Cans · 16 oz", detail: "3,100 each · 2 lots · best by none" },
+    { key: "citra", title: "Citra 2026 · YCH", detail: "262 lb · 1 lot · best by Aug 31, 2027" },
+    { key: "malt", title: "2-row 2026 · Country Malt", detail: "8,800 lb · 3 lots · best by Mar 15, 2027" },
+    { key: "yeast", title: "Yeast · WLP066", detail: "2 brinks · 2 lots · best by Sep 8, 2026", warning: true },
   ],
 };
 
@@ -134,14 +133,6 @@ export const cycleCountCans: CycleCountViewModel = {
   locationId: "warehouse", binId: "shelf",
   locations: [{ id: "warehouse", name: "Warehouse" }],
   bins: [{ id: "shelf", name: "Shelf" }],
-};
-
-export const materialsList: MaterialsSnapshot = {
-  rows: [
-    { key: "citra", title: "Citra", detail: "hop · lb · 262 lb on hand", verb: "Edit" },
-    { key: "malt", title: "2-row", detail: "grain · lb · 8,800 lb on hand", verb: "Edit" },
-    { key: "cans", title: "Cans · 16 oz", detail: "packaging · each · 3,100 on hand", verb: "Edit" },
-  ],
 };
 
 export const materialCitra: MaterialViewModel = {

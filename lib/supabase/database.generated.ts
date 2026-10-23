@@ -5108,7 +5108,7 @@ isOneToOne: false
 { Args: { "p_delivery": string,"p_now"?: string }; Returns: Json
                            },
 "get_chat_history":
-{ Args: { "p_brewery": string,"p_conversation": string }; Returns: Json
+{ Args: { "p_brewery": string,"p_conversation": string,"p_recent_turns"?: number }; Returns: Json
                            },
 "get_chat_home_items":
 { Args: { "p_external_user_id": string,"p_installation": string }; Returns: Json

@@ -195,3 +195,14 @@ export function setTapBoardError(state: TapBoardState, message: string): TapBoar
 export const tapBoardCommand = (sheet: TapBoardSheet) => sheet.kind === "tap" ? "tap_keg" : sheet.kind === "kick" ? "kick_keg" : "swap_keg";
 
 export const tapLabel = (tap: TapInterval) => tap.sku_name ?? tap.label ?? "Keg";
+
+/** The fill chips' labels, on one percent scale (#1192). The tiles and the
+ *  history print these same words, so "Full" is the one word for a full keg.
+ *  Labels only: the stored fills are fixed by the tap_intervals CHECK constraints. */
+export const OPENING_FILLS = [[.25, "25%"], [.5, "50%"], [.6, "60%"], [1, "Full"]] as const;
+export const CLOSING_FILLS = [[0, "Empty"], [.25, "About 25% left"], [.5, "About 50% left"]] as const;
+
+/** The chip label for a stored fill. The CHECK constraints keep every stored
+ *  fill in its list, so the lookup always finds one. */
+export const fillLabel = (options: readonly (readonly [number, string])[], fill: number) =>
+  options.find(([value]) => value === Number(fill))![1];
