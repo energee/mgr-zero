@@ -2,6 +2,7 @@ import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, completeRows, inChunks, PAGE_SIZE, Ctx, CommandExecution, CommandError, STAFF_ROLES } from "./registry";
 import { stockLine } from "./stock-line";
 import { movementInput } from "./movement-input";
+import { LOCATION_USES } from "@/lib/mgr/enums";
 import type { Database } from "@/lib/supabase/database";
 
 /**
@@ -226,7 +227,7 @@ defineQuery({
 defineQuery({
   // Brewers read locations too: a packaging run puts its output somewhere.
   name: "list_locations", description: "Locations and what each is used for, alphabetical; `use` keeps only the places put to that use (a place with several uses answers to each of them)",
-  input: z.object({ use: z.enum(["warehouse", "taproom", "storage"]).optional() }), roles: STAFF_ROLES,
+  input: z.object({ use: z.enum(LOCATION_USES).optional() }), roles: STAFF_ROLES,
   aiExposed: true,
   handler: async (ctx, i) => {
     // Postgres does the membership test (`uses @> {use}`): asking for taprooms

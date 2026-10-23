@@ -1,6 +1,7 @@
 // app/(app)/locations/[id]/page.tsx — Location detail (screen record
 // Location detail): name and uses with Edit → update_location. Timezone is
-// the brewery's; bins open /locations/[id]/bins.
+// the brewery's (Settings → Timezone, read from the membership); bins open
+// /locations/[id]/bins.
 import { LocationView } from "@/components/mgr/views/location";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -8,10 +9,11 @@ import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { isUuid } from "@/lib/commands/context";
+import type { LocationUse } from "@/lib/mgr/enums";
 import { notFound } from "next/navigation";
 import { LocationForm } from "../location-form";
 
-type LocationRow = { id: string; name: string; uses: ("warehouse" | "taproom" | "storage")[] };
+type LocationRow = { id: string; name: string; uses: LocationUse[] };
 
 export default async function LocationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,7 +24,7 @@ export default async function LocationPage({ params }: { params: Promise<{ id: s
   if (!location) notFound();
   const bins = (await runCommand("list_bins", { locationId: id }, ctx)) as { name: string }[];
   return <LocationView
-    model={toLocationViewProps({ location, bins, backHref: "/locations" })}
+    model={toLocationViewProps({ location, bins, timezone: brewery.timeZone, backHref: "/locations" })}
     headerAction={brewery.roles.includes("admin") ? <LocationForm location={location} /> : null}
     readOnly
     footer={null}
