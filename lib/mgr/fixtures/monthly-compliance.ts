@@ -39,6 +39,25 @@ export const monthlyComplianceSeptember: MonthlyComplianceSnapshot = {
   report: { ...monthlyComplianceAugust.report, figures: { ...monthlyComplianceAugust.report.figures, periodStart: "2026-09-01", periodEnd: "2026-09-30" } },
 };
 
+/** August that does not balance (#1143), so Save is withheld. Its warnings are
+ *  written as generate_compliance_report writes them: kegs do not balance, an
+ *  unclassified keg_swap movement, and the Unassigned note. */
+export const monthlyComplianceUnbalanced: MonthlyComplianceSnapshot = {
+  ...monthlyComplianceAugust,
+  report: {
+    figures: {
+      ...monthlyComplianceAugust.report.figures, balances: false,
+      stateTransactions: [...monthlyComplianceAugust.report.figures.stateTransactions!,
+        { state: "Unassigned", kind: "sale_removal", eventDate: "2026-08-20", sourceId: "shipment-unassigned", originalSourceId: null, volumeBbl: 0.5, salesCents: 0, sourceStatus: "posted" }],
+    },
+    warnings: [
+      "keg does not balance",
+      "unclassified movement type keg_swap",
+      "Some supporting facts have no recorded destination. Review Unassigned; MGR does not infer a state.",
+    ],
+  },
+};
+
 /** Original filed figures beside the immutable correction evidence. */
 export const monthlyComplianceAmended: MonthlyComplianceSnapshot = {
   ...monthlyComplianceAugust,

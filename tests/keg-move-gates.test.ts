@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { KegFleetView, KegEventFields, KegPoolFields } from "@/components/mgr/views/keg-fleet";
 import { kegFleetMicrostar } from "@/lib/mgr/fixtures/kegs";
-import { kegEventUnavailable, needsKegCustomer, toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
+import { kegEventUnavailable, needsKegCustomer, toKegFleetViewProps, type KegPoolValue } from "@/lib/mgr/keg-fleet-view";
 import { moveStockUnavailable } from "@/lib/movement-form";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 
@@ -53,6 +53,25 @@ describe("Keg fleet shared fields", () => {
     expect(out).toContain("Move stock");
     expect(out).toContain("Add a bin first.");
     expect(out).not.toContain("live form");
+  });
+
+  it("says which pools each money field applies to, and why an owned pool has no vendor (#1119)", () => {
+    const fields = (kind: KegPoolValue["kind"], editing = false) => html(createElement(KegPoolFields, { value: { name: "A", kind, vendorId: "", perFill: "", deposit: "0.00", active: true }, vendors: [], editing, onChange: () => {} }));
+    const owned = fields("owned");
+    expect(owned).toContain("None · the brewery owns these kegs");
+    expect(owned).not.toContain("owned pools have no vendor");
+    for (const kind of ["owned", "leased"] as const) expect(fields(kind)).toContain("Only a Pay per fill pool needs this. Leave it blank.");
+    expect(fields("pay_per_fill")).toContain("Required: what the vendor charges for each keg filled.");
+    // update_keg_pool keeps a stored cost when the field is cleared, so Edit never says to leave it blank.
+    for (const kind of ["owned", "leased"] as const) {
+      const edit = fields(kind, true);
+      expect(edit).toContain("Only a Pay per fill pool needs this. Once set, it can be changed but not removed.");
+      expect(edit).not.toContain("Leave it blank");
+    }
+    // ensure_order_deposit_lines charges deposits on wholesale orders only.
+    expect(owned).toContain("Charged on wholesale orders for each keg from this pool. 0 means no deposit.");
+    expect(owned).toMatch(/id="pool-per-fill"[^>]*aria-describedby="pool-per-fill-help"|aria-describedby="pool-per-fill-help"[^>]*id="pool-per-fill"/);
+    expect(owned).toMatch(/id="pool-deposit"[^>]*aria-describedby="pool-deposit-help"|aria-describedby="pool-deposit-help"[^>]*id="pool-deposit"/);
   });
 
   it("pool and event fields are E controls, with an In service switch", () => {

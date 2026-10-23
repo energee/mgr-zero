@@ -52,13 +52,18 @@ function Register({ rows }: { rows: InvoiceListRow[] }) {
   />;
 }
 
+/** The staff Invoices register. `sync` is the manual sync control: the live
+ *  page passes its QboSyncButton, the inventory a QboSyncView with fixture
+ *  status; omitted, a static QboSyncView is drawn. */
 export function InvoicesView({ rows, backHref, connection, sync, pagination }: { pagination?: HistoryNavigationProps; rows: InvoiceListRow[]; backHref?: string; connection?: { connected: boolean; detail: string; connectHref?: string; canConnect: boolean }; sync?: ReactNode }) {
   return <>
     {E.back("More", "Invoices", undefined, backHref)}
     {connection ? E.row("QuickBooks", connection.detail, connection.connected ? "" : connection.canConnect ? E.act("Connect", "attention", connection.connectHref) : "Admin must connect", connection.connected ? "ok" : "w", QuickBooksMark) : E.fld("QuickBooks", "Financial actions require Admin or Sales")}
-    {connection && (sync !== undefined ? sync : <QboSyncView disabled={!connection.connected} />)}
+    {/* Sync needs a live connection; while disconnected the QuickBooks row above carries the only next step. */}
+    {connection?.connected && (sync !== undefined ? sync : <QboSyncView />)}
+    {connection && !connection.connected && E.info("Payment status may be stale until QuickBooks is reconnected and synced.")}
     {rows.length ? <Register rows={rows} /> : E.blank("No invoices yet")}
     <HistoryNavigation {...pagination} />
-    {E.gated("Email delivery status", "The current invoice query does not report whether QuickBooks emailed an invoice.")}
+    {E.gated("Email delivery status", "MGR can’t tell whether QuickBooks emailed an invoice.")}
   </>;
 }
