@@ -10,11 +10,12 @@
 "use client";
 
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { XIcon } from "lucide-react";
+import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { isValidElement } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Icon } from "@/components/mgr/icon";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +27,7 @@ import { cn } from "@/lib/utils";
 function FormClose({ className, onClose, previewAction }: { className: string; onClose?: (open: boolean) => void; previewAction?: boolean }) {
   return (
     <Button type="button" variant="destructive" size="icon-sm" className={className} onClick={() => onClose?.(false)} data-preview-action={previewAction || undefined}>
-      <XIcon />
+      <Icon icon={Cancel01Icon} />
       <span className="sr-only">Close</span>
     </Button>
   );

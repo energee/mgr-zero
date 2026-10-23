@@ -371,18 +371,19 @@ recorded. It is an audit surface, not decoration, and never implies a row can be
 | `--background` | `#FAFAF7` | `#102040` | Page ground |
 | `--card` / `--popover` | `#FFFFFF` | `#152a50` / `#1a3058` | Cards, sheets, menus |
 | `--foreground` | `#1E1F1A` | `#dddddd` | Text |
-| `--primary` | `#6F4FD6` | `#60a4ec` | Mutable primary action, active nav, progress |
+| `--primary` | `#6453B3` | `#60a4ec` | Mutable primary action, active nav, progress |
 | `--irreversible` | `#0F6B78` | `#60b6cb` | Append-only, filed, external, sign-out actions only |
 | `--destructive` | `#B52D51` | `#ff7a70` | Errors and destructive actions; passes AA as text on card and popover |
-| `--warning` / `--warning-foreground` | `#FDECD2` / `#8A4A00` | `#2f3326` / `#ffe763` | Attention surface and text; never yellow on white |
+| `--attention` / `--attention-foreground` | `#FFF0E7` / `#99451C` | `#2e2350` / `#e26be2` | Review (needs attention) surface and text |
+| `--warning` / `--warning-foreground` | `#FDF3DC` / `#755800` | `#2f3326` / `#ffe763` | Warning surface and text; never yellow on white |
 | `--border` | `#E3E3DC` | `#2a4478` | Hairline dividers |
 
 The remaining shadcn tokens (secondary, muted, accent, destructive, sidebar,
 chart) are set in `app/globals.css`; that file is the source of truth. The
 mood is Linear-quiet: near-grayscale neutrals with a faint warm tint, one
-violet accent, teal reserved for irreversible actions, amber for attention.
-Dark mode is the Aardvark Blue terminal scheme: a navy ground, its blue as the
-accent and its cyan for irreversible actions.
+violet accent, teal reserved for irreversible actions, orange for review and yellow
+for warning. Dark mode is the Aardvark Blue terminal scheme: a navy ground, its blue
+as the accent and its cyan for irreversible actions.
 
 Every pair passes WCAG AA in both modes. Semantic pairs replace manual `dark:`
 overrides. The irreversible accent never decorates headings, tabs, validation/errors,
@@ -394,8 +395,8 @@ command classes named above.
   phone primary label.
 - Data: **JetBrains Mono** for quantities, units, times, document numbers, tape rows; all
   numerals use `font-variant-numeric: tabular-nums`.
-- Scale: 12 / 14 / 16 / 20 / 28 / 44; 16px phone gutter, 8px grid, 4px equipment-like
-  radius rather than pill-heavy consumer styling.
+- Scale: 12 / 14 / 16 / 20 / 28 / 44; 16px phone gutter, 8px grid, 6px (`--radius: 0.375rem`)
+  equipment-like radius rather than pill-heavy consumer styling.
 - Every target is ≥48×48px. Under `(pointer: coarse)`, primary actions and QtyPad keys are
   ≥56px high, adjacent targets have ≥8px separation, rules are 2px, and icons use 2px
   stroke. Pointer type, not viewport, handles a cooler wall tablet.
