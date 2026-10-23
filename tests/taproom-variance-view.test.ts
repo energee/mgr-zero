@@ -12,8 +12,8 @@ it("keeps unavailable variance distinct from measured zero and labels incomplete
 });
 
 it("#1117 names every reason the draft projection and the report return in plain words", () => {
-  expect(varianceReason("missing_baseline")).toBe("This is the first count, so there is nothing to compare against yet");
-  expect(varianceReason("no_pos_coverage")).toBe("No POS sales data covers this period");
+  expect(varianceReason("missing_baseline")).toBe("First count, so there is nothing to compare against");
+  expect(varianceReason("no_pos_coverage")).toBe("No usable POS sales data covers this period");
   expect(varianceReason("incomplete_pos_coverage")).toBe("POS sales data covers only part of this period");
   expect(varianceReason("unmapped_pos_lines")).toBe("Some POS items still need mapping");
   expect(varianceReason(null)).toBe("Comparable");
@@ -50,7 +50,26 @@ it("#1118 shows one empty state when no count period ends in the window", () => 
   const html = renderToStaticMarkup(createElement(TaproomVarianceView, { model: { weeks: 4, timeZone: "America/New_York", report } }));
   expect(html.match(/No completed count periods in this window/g)).toHaveLength(1);
   expect(html).not.toContain("No saved count endings");
+  expect(html).not.toContain("Count periods");
+});
+
+it("#1118 a window holding only a first count lists it under Count periods, not as a completed period", () => {
+  const report = { ...taproomVariance.report!, reason: "no_completed_periods", rows: [], periods: [{ ...taproomVariance.report!.periods[0], prior_count_id: null, starts_at: null, expected_bbl: null, reason: "missing_baseline" }] };
+  const html = renderToStaticMarkup(createElement(TaproomVarianceView, { model: { weeks: 4, timeZone: "America/New_York", report } }));
+  expect(html).toContain("No completed count periods in this window");
+  expect(html).toContain(">Count periods</h2>");
   expect(html).not.toContain("Completed periods");
+  expect(html).toContain("First count, so there is nothing to compare against · coverage");
+});
+
+it("#1118 shows the week-by-week tip only beside a trend, and reading help as neutral info", () => {
+  const { trend: _trend, ...gated } = taproomVariance;
+  const html = renderToStaticMarkup(createElement(TaproomVarianceView, { model: gated }));
+  expect(html).toContain("Not available yet.");
+  expect(html).not.toContain("A brand short every week");
+  expect(html).toContain("A dash means a value is unavailable");
+  expect(html).not.toContain("bg-warning");
+  expect(renderToStaticMarkup(createElement(TaproomVarianceView, { model: taproomVariance }))).toContain("A brand short every week");
 });
 
 it("#1118 titles the page once, with the name the nav uses", () => {

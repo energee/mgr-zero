@@ -44,14 +44,14 @@ export function WeeklyCountView({ model, draft, correction }: { model: WeeklyCou
         {model.receipt && <section aria-label="Saved count" className="flex flex-col gap-3">
           {E.ttl(`Saved count · ${model.receipt.date}`)}
           <p className="text-sm text-muted-foreground">{model.receipt.recorded}{model.receipt.priorHref && <> · <Link href={model.receipt.priorHref}>prior count</Link></>}</p>
-          {model.receipt.correction && E.note(model.receipt.correction)}
+          {model.receipt.correction && <p className="text-sm text-muted-foreground">{model.receipt.correction}</p>}
           {model.receipt.lines.map(line => <div key={line.key}>{E.row(line.name, line.detail, <span className="break-all text-xs">{line.result}</span>)}</div>)}
           {hasAnyRole(model.roles, ["admin"]) && model.receipt.canCorrect && (correction !== undefined ? correction : model.receipt.correctionForm && <WeeklyCountCorrectionView state={model.receipt.correctionForm} />)}
         </section>}
         {E.ttl("Recent saved counts")}
         <p className="text-sm text-muted-foreground">Newest 50 at this taproom.</p>
         {model.history.length === 0 ? E.blank("No saved counts yet") : model.history.map(count => <div key={count.key}>{E.nav(`Weekly count · ${count.date}`, count.detail, "", undefined, count.href)}</div>)}
-        {E.info("Only Admin can correct a count, and only the latest one, when a quantity was counted too low. Everyone else can see the correction in the history. The original count stays in the audit trail.")}
+        {E.info("Only Admin can correct a count. Admin can correct only the latest count, once, when a sold quantity was counted too low. Everyone else sees the correction in the history. The original count stays in the audit trail.")}
       </div>
     </>}
   </>;
@@ -78,7 +78,7 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
     {E.ttl("Expected consumption")}
     {prior && <p className="text-xs text-muted-foreground">Last count {priorHref ? <Link href={priorHref}>{formatDate(prior.counted_on)}</Link> : formatDate(prior.counted_on)}</p>}
     {!aligned ? <CommandFormMessage tone="warning">Expected comparison unavailable because a newer saved count changed its baseline. {state.attempt.kind === "unknown" || state.attempt.kind === "submitting" ? "Recover the frozen submission before starting a fresh recount." : "Start a fresh recount."}</CommandFormMessage>
-      : expected ? <p className="text-sm">Expected total {expected}</p> : <p className="text-sm">Expected consumption unavailable. {varianceReason(projection?.reason ?? "no_pos_coverage")}.</p>}
+      : expected ? <p className="text-sm">Expected total {expected}</p> : <p className="text-sm">Expected consumption unavailable.{projection?.reason && ` ${varianceReason(projection.reason)}.`}</p>}
     {aligned && projection?.starts_at && projection.as_of && <p className="text-xs text-muted-foreground">{formatDateTime(projection.starts_at, timeZone)} through {formatDateTime(projection.as_of, timeZone)}</p>}
     {comparison.map(row => <div key={row.brandId}>{E.row(row.brandName, `expected ${bbl(row.expectedBbl)} · draft actual ${row.complete ? bbl(row.actualBbl) : "Enter all buckets"}`, `difference ${bbl(row.differenceBbl)}`)}</div>)}
     {comparison.length > 0 && <p className="text-xs text-muted-foreground">Draft actual is an estimate from this snapshot&apos;s package volumes. Expected minus actual is a comparison only; the saved receipt is authoritative.</p>}
@@ -94,7 +94,7 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
       {print !== undefined ? print : <WeeklyCountPrintAction />}
       <div className="contents print:hidden">
       {state.draft.lines.some(line => line.lotId !== null) && onlyRoles(roles, ["taproom"]) && E.note("Tracked lots use the full worksheet row numbers shown here. Use Print current stock labels before counting; do not guess a lot.")}
-      {state.draft.lines.length === 0 && E.blank("No stock is recorded at this taproom. Record count saves that nothing is on hand today, which starts the next expected comparison.")}
+      {state.draft.lines.length === 0 && E.blank("No stock is recorded at this taproom. Record count saves a count of zero for today. Your next count compares against it.")}
       <fieldset disabled={locked} className="contents">
         {state.draft.lines.map((line, index) => {
           const lot = line.lotId ? (onlyRoles(roles, ["taproom"]) ? `Tracked worksheet row ${index + 1}` : `Lot ${lotLabels[line.key] ?? "label unavailable"} · worksheet row ${index + 1}`) : `Untracked stock · worksheet row ${index + 1}`;

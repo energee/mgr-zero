@@ -126,7 +126,7 @@ describe("live page exclusion decisions", () => {
 
   it("#1117 a first saved count's receipt says in words that there is nothing to compare against", async () => {
     const recorded = (await TaproomPage({ searchParams: Promise.resolve({ location: "tap", count: "count" }) })).props.model.receipt.recorded;
-    expect(recorded).toContain("This is the first count, so there is nothing to compare against yet.");
+    expect(recorded).toContain(". First count, so there is nothing to compare against.");
     expect(recorded).not.toContain("· first count");
   });
 
