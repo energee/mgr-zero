@@ -99,7 +99,6 @@ export function MovementForm({
     destState: receipt.dest_state ?? undefined,
     bbl: String(receipt.bbl),
     when: formatDateTime(receipt.created_at, timeZone),
-    backHref: "/inventory",
     details: [
       { label: "Location", value: `${locations.find(l => l.id === receipt.location_id)?.name ?? receipt.location_id} / ${bins.find(b => b.id === receipt.bin_id)?.name ?? receipt.bin_id}` },
       ...(receipt.sale_channel_id ? [{ label: "Channel", value: channels.find(c => c.id === receipt.sale_channel_id)?.name ?? receipt.sale_channel_id }] : []),

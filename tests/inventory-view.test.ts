@@ -224,7 +224,8 @@ describe("Record movement view", () => {
 describe("Movement recorded view", () => {
   it("maps the festival echo onto the tape and gated correction", () => {
     const model = toMovementRecordedViewProps(movementRecordedFestival);
-    expect(model.title).toBe("Hazy IPA · ½ bbl");
+    expect(model.sku).toBe("Hazy IPA · ½ bbl");
+    expect(model).not.toHaveProperty("backHref");
     expect(model.tapeLabel).toBe("−1 keg · Festival removal · PA");
     expect(model.tapeDetail).toBe(`${formatVolume("0.50000000")} · just now`);
     expect(model.correctionGate).toMatch(/latest eligible saved weekly count/i);
@@ -239,8 +240,16 @@ describe("Movement recorded view", () => {
     expect(html).not.toMatch(/→/);
   });
 
-  it("the Movement recorded inventory record is MovementRecordedView", () => {
-    const body = screen("Movement recorded").body as { type: unknown; props: { model: unknown } };
+  it("draws no in-sheet title or back link, and names the SKU in a row (#1167)", () => {
+    const html = htmlOf(createElement(MovementRecordedView, { model: toMovementRecordedViewProps(movementRecordedFestival) }));
+    expect(html).not.toMatch(/<h1\b|<a\b/);
+    expect(html).toMatch(/<dt[^>]*>SKU<\/dt><dd[^>]*>Hazy IPA · ½ bbl<\/dd>/);
+  });
+
+  it("the Movement recorded inventory record is a sheet drawing MovementRecordedView", () => {
+    const record = screen("Movement recorded");
+    expect(record.surface).toBe("sheet");
+    const body = record.body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(MovementRecordedView);
     expect(body.props.model).toEqual(toMovementRecordedViewProps(movementRecordedFestival));
   });
