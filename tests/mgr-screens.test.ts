@@ -645,6 +645,17 @@ describe("SCREENS", () => {
     expect(SCREENS.find((x) => x.name === "Repack")!.writes).not.toMatch(/SCHEMA-GATE/);
   });
 
+  it("gives every Work create form the shared E.pin footer (#1226)", () => {
+    // One placement: primary on the right on the desk, full width on a phone.
+    // The live pages mount these same views, so the record is the proof.
+    const pinned = (name: string) => body(name).match(/<div data-pin="true"[^>]*>([\s\S]*?)<\/div>/)?.[1] ?? "";
+    for (const [name, verb] of [["New PO", "Save draft"], ["New order", "Save draft"], ["Route", "Save route plan"]]) {
+      expect(pinned(name), `${name}: commit inside the pin`).toMatch(new RegExp(`<button[^>]*>${verb}</button>`));
+    }
+    // Depart is the planned route's one primary, so it is last: rightmost on the desk.
+    expect(pinned("Route")).toMatch(/Save route plan<\/button>[\s\S]*Depart route<\/button>$/);
+  });
+
   it("puts the commit on the row, not a second copy at the top", () => {
     // Issue 97: Today-family top buttons duplicated the row verb; Order had
     // Adjust line plus trailing adjust; Confirm order said Next: confirm twice.

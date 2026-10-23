@@ -477,7 +477,7 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", tab: "More", name: "More", job: "Setup and desk review, never standing work",
     reads: "none [role navigation manifest]", writes: "none",
     states: DEFAULT_STATES,
-    spec: "Role-filtered; hidden entries leave no gaps. Standing work remains in Today, Beer or Work.",
+    spec: "Role-filtered; hidden entries leave no gaps. Entries sit under Sales, Production, Setup and Integrations headings, and an area with none of the role's entries has no heading. The rail's More group uses the same headings. Standing work remains in Today, Beer or Work.",
     body: <MoreView model={toMoreViewProps(moreNavs)} />,
   },
   {
@@ -704,10 +704,10 @@ export const SCREENS: Screen[] = [
     tab: "More",
     name: "Team",
     job: "Roster, staff roles, invitations and membership removal",
-    reads: "list_team_members",
-    writes: "invite_staff [existing] · update_staff_role · revoke_staff",
-    states: [["last admin", "removing Admin refused · keep one admin", 1], ["permission", "admin only", 1]],
-    spec: "A person shows as @handle, derived from their email. Roles are listed in enum order: Admin, Sales, Warehouse, Brewer, Taproom. Admin invites one staff role and can assign several roles to another member; permissions are the union of the held roles. The roster does not distinguish pending acceptance. Removing membership leaves the sign-in account.",
+    reads: "list_team_members · list_pending_invitations",
+    writes: "invite_staff [existing] · update_staff_role · revoke_staff · resend_account_invitation · revoke_account_invitation",
+    states: [["last admin", "removing Admin refused · keep one admin", 1], ["permission", "admin only", 1], ["no pending invitations", "section hidden"]],
+    spec: "A person shows as @handle, derived from their email. Roles are listed in enum order: Admin, Sales, Warehouse, Brewer, Taproom. Admin invites one staff role and can assign several roles to another member; permissions are the union of the held roles. A new account joins the roster when its invite email is sent. Pending invitations lists invitations an existing account has not yet accepted: email, role and the day sent, with no expiry. Resend issues it again with the same role. Cancel confirms, then revokes it. After either, the old invitation can no longer be accepted. Removing membership leaves the sign-in account.",
     body: <TeamView model={teamRoster} />,
   },
   {
@@ -767,12 +767,12 @@ export const SCREENS: Screen[] = [
     name: "Import",
     // The kind chips carry record names ("Customers", "Ship-tos"); authored
     // here so a tap selects the kind instead of resolving to those screens.
-    to: { "Import 2 ready rows": "Import", "Back to mapping": "Import", Customers: "Import", "Ship-tos": "Import", "Products / SKUs": "Import", "Channel prices": "Import", "Opening balances": "Import" },
-    job: "Upload, map, preview and independently commit valid rows",
+    to: { "Import 2 rows": "Import", "Back to matching columns": "Import", Customers: "Import", "Ship-tos": "Import", "Products / SKUs": "Import", "Channel prices": "Import", "Opening balances": "Import" },
+    job: "Upload, match columns, review and import valid rows, each on its own",
     reads: "list_skus · list_locations · list_bins · list_customers · list_formats · list_price_groups · list_sale_channels",
     writes: "import_csv",
-    states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Commit disabled · fix mapping", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "same requestId returns original committed and blocked results"], ["permission", "Import requires admin", 1], ["upload", "kind chosen · its columns listed as required, optional, or required for a US address · reference columns take a name or ID"]],
-    spec: "Before upload, the screen lists the chosen kind's columns from the import field contract and marks each one required, optional, or required for a US address. One logical row is atomic; siblings commit independently. Reference ID cells accept a UUID or trimmed, case-insensitive exact name; missing or ambiguous names block the row. Bin names are scoped to the location, and pour formats to the price group. Product imports use packaged formats. Preview is editable on phone and desk. All-invalid batches cannot commit. Same-batch retry preserves raw cells and returns original results; correction starts only blocked rows with a new identity. Reloading the same tab restores an unresolved batch; Discard saved request drops it after a confirming step and sends nothing.",
+    states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Import disabled · fix column matches", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "same requestId returns original committed and blocked results"], ["permission", "Import requires admin", 1], ["upload", "kind chosen · its columns listed as required, optional, or required for a US address · reference columns take a name or ID · Download template saves a header-only CSV of those columns"]],
+    spec: "The steps are Upload, Match columns, Review and Import. Before upload, the screen lists the chosen kind's columns from the import field contract and marks each one required, optional, or required for a US address. Download template saves a CSV whose only row is those column names, built in the browser from the same list. One logical row is atomic; siblings commit independently. Reference ID cells accept a UUID or trimmed, case-insensitive exact name; missing or ambiguous names block the row. Bin names are scoped to the location, and pour formats to the price group. Product imports use packaged formats. Review is editable on phone and desk. All-invalid batches cannot be imported. Same-batch retry preserves raw cells and returns original results; correction starts only blocked rows with a new identity. Reloading the same tab restores an unresolved batch; Discard saved request drops it after a confirming step and sends nothing.",
     body: <ImportView model={importPreview} />,
   },
   {
@@ -2232,7 +2232,7 @@ export const SCREENS: Screen[] = [
     job: "Choose a monthly, quarterly, or annual reporting period and see whether its snapshot was filed",
     reads: "list_compliance_reports · list_lots",
     writes: "none",
-    states: [["not filed", "Not filed · Ready to review", 1], ["in progress", "the current period: reviewable · In progress · File after the month ends"], ["filed", "the snapshot saved in MGR · Filed <date> · <bbl> taxpaid"], ["lots", "every packaged lot opens its trace"], ["no period yet", "every recent period starts before the books opened · names that date and the first period MGR can report"]],
+    states: [["not filed", "Not filed · Ready to review", 1], ["no activity", "an ended, unfiled period with no movement, cellar removal or invoice · Not filed · No activity", 1], ["in progress", "the current period: reviewable · In progress · File after the month ends"], ["filed", "the snapshot saved in MGR · Filed <date> · <bbl> taxpaid"], ["lots", "every packaged lot opens its trace"], ["no period yet", "every recent period starts before the books opened · names that date and the first period MGR can report"]],
     spec: "This is the shared destination for the Licenses back link, the period rows, and the lot trace. Monthly, Quarterly, and Annual tabs swap the list: the last three months, four calendar quarters, or two calendar years show, less any that start before the books-opened date, plus every filed period of that length. A tab left with no period says No monthly (quarterly, annual) period yet. A TTB filing is exactly one calendar month, quarter, or year; the API takes other jurisdictions and ranges.",
     body: <ComplianceMonthsView model={complianceMonthsDemo} />,
   },
@@ -2585,8 +2585,8 @@ export const SCREENS: Screen[] = [
     job: "Control personal Slack delivery without changing assigned MGR work",
     reads: "get_notification_preferences",
     writes: "set_notification_preference · set_notification_destination · set_personal_quiet_hours · unlink_chat_user",
-    states: [["unlinked", "preferences remain available before linking"], ["linked", "unlink only your Slack identity"], ["permission", "every staff role; Taproom cannot set personal quiet hours", 1], ["Slack unavailable", "a note replaces the link steps", 1], ["error", "keep entered quiet hours and show the command error", 1]],
-    spec: "Personal delivery preferences do not change MGR work, App Home or team digests. Each reason uses the label Slack's preferences dialog shows. Clearing both personal times follows the brewery quiet hours.",
+    states: [["unlinked", "preferences remain available before linking"], ["linked", "unlink only your Slack identity"], ["permission", "every staff role; Taproom cannot set personal quiet hours", 1], ["Slack not connected", "a note replaces the link steps until the brewery's Slack is active", 1], ["error", "keep entered quiet hours and show the command error", 1]],
+    spec: "Personal delivery preferences do not change MGR work, App Home or team digests. Each reason uses the label Slack's preferences dialog shows. The brewery quiet hours show read-only to every role; clearing both personal times follows them.",
     body: <ChatPersonalPreferencesView preferences={personalChatPreferences} />,
   },
   {
@@ -2794,7 +2794,7 @@ export const SCREENS: Screen[] = [
     job: "Name the channels this brewery sells through and what each one is taxed as",
     reads: "list_sale_channels",
     writes: "upsert_sale_channel · delete_sale_channel",
-    states: [["permission", "admin required", 1], ["in use", "rule stated above the list and in the delete confirm · a foreign key refuses the delete, human copy, not a 23503", 1], ["seeded", "four defaults arrive with the brewery"], ["inherit", "a customer with no override takes the channel default"]],
+    states: [["permission", "admin required", 1], ["in use", "no Delete on a channel a record uses or on the system Taproom channel · rule stated above the list and in the delete confirm · a foreign key or the Taproom check refuses the delete, human copy, not a 23503", 1], ["seeded", "four defaults arrive with the brewery"], ["inherit", "a customer with no override takes the channel default"]],
     spec: "The channel carries a name and a default tax treatment and nothing else: removal classification stays on the movement type, which is why #42 rejected giving the channel a removal flag or a required-destination-state flag. Resolution order is customer override → channel default, and the resolved value is frozen onto the movement at write time so editing a customer in March never restates January.",
     body: <SaleChannelsView model={toSaleChannelsViewProps({ ...saleChannelsList, canDelete: true })} />,
   },
@@ -2809,7 +2809,7 @@ export const SCREENS: Screen[] = [
     reads: "list_sale_channels",
     writes: "upsert_sale_channel",
     states: [["permission", "admin required", 1], ["new", "titled Add channel · name and tax treatment required"], ["edit", "titled with the channel being edited"]],
-    spec: "Drawn editing the Export channel. The sheet has no Delete: removal and its in-use rule live on the Sale channels list. The selected tax treatment shows its meaning under the chips where the wording is settled, which today is Export only, so an Export channel and the Export treatment are not confused.",
+    spec: "Drawn editing the Export channel. The sheet has no Delete: removal and its in-use rule live on the Sale channels list. The selected tax treatment shows its TTB meaning under the chips for each removal without payment of tax (Export, Vessel supplies, Research, Transfer in bond), so an Export channel and the Export treatment are not confused. Taxable has no hint.",
     body: <ChannelView model={toChannelViewProps(channelExport)} />,
   },
   {
@@ -2861,7 +2861,7 @@ export const SCREENS: Screen[] = [
     reads: "list_water_profiles",
     writes: "none [creation and editing happen on Water profile]",
     states: [["permission", "brewer or admin required", 1], ["empty", "no profiles yet: Add water profile is the only action"]],
-    spec: "A catalog entity beside Formats and price groups, because a profile is referenced by many recipes and edited in one place: a new water report is one edit, not fifty. No quick-create dialog, which v1 needed only because profiles were buried inside the recipe form; reached from Catalog or Settings (Admin), or from Recipes or a recipe’s Water sheet (Brewer and Admin), Add water profile is already one tap away. A profile is not marked as a source or a target; a recipe version can pick any profile as either. The back arrow follows the role: Catalog for Admin, Recipes for Brewer.",
+    spec: "A catalog entity beside Formats and price groups, because a profile is referenced by many recipes and edited in one place: a new water report is one edit, not fifty. No quick-create dialog, which v1 needed only because profiles were buried inside the recipe form; reached from Catalog or Settings (Admin), or from Recipes or a recipe’s Water sheet (Brewer and Admin), Add water profile is already one tap away. A profile is not marked as a source or a target; a recipe version can pick any profile as either. Each row reads the six ions, then alkalinity and water pH when the profile has them. The back arrow follows the role: Catalog for Admin, Recipes for Brewer.",
     body: <WaterProfilesView model={toWaterProfilesViewProps({ profiles: waterProfiles })} />,
   },
   {
@@ -2871,12 +2871,12 @@ export const SCREENS: Screen[] = [
     surface: "sheet",
     name: "Water profile",
     to: { "Save water profile": "Water profiles" },
-    job: "Name a water and its six ions",
+    job: "Name a water, its six ions, and optionally its alkalinity, pH and notes",
     reads: "list_water_profiles",
     writes: "upsert_water_profile [one RPC; insert when profileId is empty, else edit]",
     states: [["permission", "brewer or admin required", 1], ["in use", "a profile a recipe references cannot be deleted", 1]],
-    spec: "Six ions in parts per million (ppm, the same as mg/L), the set every brewing water calculation reads. Each is required and none can be negative, as the help line above the fields says. Every ion input points to that line, so a screen reader reads it too. No ion arithmetic here: this screen records a measurement or a target, and any delta between two profiles is a calculation this slice does not build.",
-    body: <WaterProfileView fields={toWaterProfileFields(waterProfiles[2])} />,
+    spec: "Six ions in parts per million (ppm, the same as mg/L), the set every brewing water calculation reads. Each is required and none can be negative, as the help line above the fields says. Every ion input points to that line, so a screen reader reads it too. Three optional fields follow. Alkalinity as CaCO3 is in ppm and cannot be negative; bicarbonate does not replace it. Water pH is the water’s own pH, from 0 to 14. One help line above the three says they are optional and that water pH is not a recipe’s target mash pH; each of the three points to it. Notes are free text of up to 2000 characters. Clearing an optional field on an edit removes it. No ion arithmetic here: this screen records a measurement or a target, and any delta between two profiles is a calculation this slice does not build.",
+    body: <WaterProfileView fields={toWaterProfileFields(waterProfiles[0])} />,
   },
   {
     step: 8,
@@ -3158,10 +3158,10 @@ export const SCREENS: Screen[] = [
     spec: "Rows are rebuilt from owning MGR queries. App Home remains current during quiet hours and is optional for future providers.",
     body: (<>
       {S.h("Today · 4 waiting")}
-      {S.sa("*ORD-0231 · Review submitted order*\nsubmitted · ships today · sales", "Open")}
+      {S.sa("*ORD-0231 · Order submitted*\nsubmitted · ships today · sales", "Open")}
       {S.sa("*ORD-0235 · Pick due*\nships tomorrow · warehouse", "Open")}
-      {S.sa("*Route A · next stop*\nassigned to you · 9:30 AM", "Open")}
-      {S.sa("*FV2 · reading overdue*\nlast reading 26 h ago · brewer", "Open")}
+      {S.sa("*Route A · stop 3 · Next delivery stop*\nassigned to you · 9:30 AM", "Open")}
+      {S.sa("*FV2 · Fermentation reading overdue*\nlast reading 26 h ago · brewer", "Open")}
       {S.acts([["Open Today in MGR", "pri"]])}
     </>),
   },

@@ -6,6 +6,9 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import type { ReturnSource } from "@/lib/commands/orders";
 import "@/lib/commands/all";
 import { RefusedReturnForm } from "./return-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/work/deliveries") };
 
 type Outstanding = { order_line_id: string; sku_id: string; sku_name: string; outstanding_qty: number; customer_name: string; invoice_timing: string };
 export default async function ReturnPage({ params }: { params: Promise<{ id: string }> }) {

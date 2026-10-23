@@ -17,6 +17,7 @@ const AUTHENTICATED_RPCS = [
   "kick_keg(uuid,uuid,numeric,text,uuid)",
   "swap_keg(uuid,uuid,numeric,text,uuid,text,numeric,text,numeric,uuid)",
   "list_open_taps(uuid,uuid)",
+  "list_sale_channels(uuid)",
   "list_tap_history(uuid,uuid)",
   "get_taproom_count_snapshot(uuid,uuid)", "get_taproom_print_labels(uuid,uuid,text)", "get_taproom_count(uuid,uuid)", "list_taproom_counts(uuid,uuid)",
   "record_taproom_count(uuid,uuid,date,text,jsonb,uuid)", "correct_taproom_count(uuid,uuid,jsonb,text,uuid)",
@@ -25,6 +26,7 @@ const AUTHENTICATED_RPCS = [
   "pos_order_versions()",
   "get_chat_integration_health(uuid)",
   "get_chat_link_intent(uuid,text)",
+  "get_staff_chat_installation(uuid)",
   "configure_pos_menu(uuid,text,uuid,uuid,uuid)",
   "get_pos_menu(uuid,text)",
   "get_square_connected(uuid)",
@@ -33,6 +35,7 @@ const AUTHENTICATED_RPCS = [
   "set_brewery_operating_defaults(uuid,integer,uuid,integer)",
   "set_brewery_books_opened_on(uuid,date,uuid)",
   "correct_reporting_basis(uuid,date,date,text,uuid)",
+  "list_compliance_active_months(uuid,date,date)",
   "set_one_way_keg_fee(uuid,integer,uuid)",
   "set_brewery_ai_model(uuid,text,uuid)",
 
@@ -41,6 +44,8 @@ const AUTHENTICATED_RPCS = [
   "accept_account_invitation(uuid,uuid)",
   "list_my_invitations()",
   "revoke_account_invitation(uuid,uuid,uuid)",
+  "list_pending_invitations(uuid)",
+  "resend_account_invitation(uuid,uuid,uuid)",
   "claim_invite_request(uuid,text,text,staff_role,uuid,uuid)",
   "complete_invite_membership(uuid)",
   "record_invite_failure(uuid)",
@@ -228,7 +233,7 @@ const AUTHENTICATED_RPCS = [
   "upsert_state_registration(uuid,uuid,text,text,date,date,uuid,text[])",
   "upsert_vendor(uuid,uuid,text,text,text,integer,text,boolean,uuid)",
   "upsert_vessel(uuid,uuid,text,vessel_kind,numeric,uuid)",
-  "upsert_water_profile(uuid,uuid,text,numeric,numeric,numeric,numeric,numeric,numeric,uuid)",
+  "upsert_water_profile(uuid,uuid,text,numeric,numeric,numeric,numeric,numeric,numeric,numeric,numeric,text,uuid)",
 ];
 
 describe("authenticated RPC allowlist", () => {

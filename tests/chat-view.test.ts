@@ -16,7 +16,7 @@ it("keeps reading cadence restricted to whole hours", () => {
 });
 
 it("preserves personal notification reasons before linking and gates taproom quiet hours", () => {
-  const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { preferences: [{ reason: "pick_due", enabled: true }], quietStart: null, quietEnd: null, timezone: "America/New_York", link: null }, canSetQuietHours: false }));
+  const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { preferences: [{ reason: "pick_due", enabled: true }], quietStart: null, quietEnd: null, timezone: "America/New_York", link: null, installationActive: true, breweryQuietHours: null }, canSetQuietHours: false }));
   expect(html).toContain("Pick due");
   expect(html).toContain("Link MGR account");
   expect(html).not.toContain("Save my quiet hours");
@@ -99,14 +99,29 @@ it("labels each personal reason in plain words with no repeated sublabel", () =>
   expect(html).not.toContain("App Home");
 });
 
-it("does not send staff to link Slack while Slack is unavailable", () => {
+// #1208: the link steps wait for the brewery's Slack installation to be
+// active, which the preferences query reports, not the server env check.
+it("does not send staff to link Slack until the brewery's Slack is connected", () => {
   const unlinked = { ...personalChatPreferences, link: null };
-  const available = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: unlinked }));
+  const available = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { ...unlinked, installationActive: true } }));
   expect(available).toContain("Link MGR account");
-  const unavailable = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: unlinked, configured: false }));
+  const unavailable = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { ...unlinked, installationActive: false } }));
   expect(unavailable).not.toContain("Link MGR account");
-  expect(unavailable).toContain("Slack isn’t available for your brewery yet.");
+  expect(unavailable).toContain("Slack isn’t connected for your brewery yet.");
   expect(unavailable).toContain("aria-label=\"Pick due\"");
+});
+
+// #1208: staff read the brewery quiet hours they fall back to, whether or not
+// their role can set its own.
+it("shows the brewery quiet hours read-only to every role", () => {
+  const quiet = { ...personalChatPreferences, breweryQuietHours: { start: "22:00:00", end: "07:00:00", timezone: "America/Chicago" } };
+  for (const canSetQuietHours of [true, false]) {
+    const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: quiet, canSetQuietHours }));
+    expect(html).toContain("Brewery quiet hours");
+    expect(html).toContain("10:00 PM – 7:00 AM · 9 hours · America/Chicago");
+  }
+  const off = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { ...personalChatPreferences, breweryQuietHours: null } }));
+  expect(off).toMatch(/Brewery quiet hours.*Off/);
 });
 
 // The "All preview states" picker renders only when NODE_ENV is "development";

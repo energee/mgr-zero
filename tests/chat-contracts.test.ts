@@ -11,7 +11,7 @@ const validNotification: PortableNotification = {
   reason: "submitted_order",
   urgency: "attention",
   subject: { type: "order", id: "order-0231", safeLabel: "ORD-0231" },
-  title: "Review submitted order",
+  title: "Order submitted",
   detail: "Requested Thu · sales review required",
   dueAt: "2026-09-03T09:00:00.000Z",
   ownerClass: "sales",

@@ -2,7 +2,7 @@
 // docs/plans/sale-channels-customizable.md) that replaced the `sale_channel`
 // enum, plus the tax treatment frozen onto every classified removal (§16.3).
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, ins, makeBrewery, makeStaff, makeStaffCtx, asUser, seedCatalog, seedLocation, channelId } from "./helpers";
+import { admin, ins, makeBrewery, makeStaff, makeStaffCtx, asUser, seedCatalog, seedLocation, seedCustomer, priceSku, sql, channelId } from "./helpers";
 
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
@@ -162,16 +162,80 @@ describe("sale channel commands", () => {
     const c = await makeStaffCtx(b.id, "admin");
     const { skuId: sku } = await seedCatalog(b.id, { packageType: "keg", bblPerUnit: 0.5 });
     const loc = await seedLocation(b.id);
-    const taproom = await channelId(b.id, "Taproom");
+    const wholesale = await channelId(b.id, "Wholesale");
     await stockBin(b.id, sku, loc, c.userId);
     const movement = await c.db.rpc("record_inventory_movement", {
       p_brewery: b.id, p_sku: sku, p_location: loc.id, p_bin: loc.binId, p_qty: -1,
-      p_type: "sale_removal", p_sale_channel: taproom, p_dest_state: "PA", p_note: null,
+      p_type: "sale_removal", p_sale_channel: wholesale, p_dest_state: "PA", p_note: null,
       p_request_id: crypto.randomUUID(), p_lot: null, p_origin: "ui", p_conversation: null, p_preview_token: null,
     });
     expect(movement.error).toBeNull();
-    await expect(runCommand("delete_sale_channel", { channelId: taproom }, c))
+    await expect(runCommand("delete_sale_channel", { channelId: wholesale }, c))
       .rejects.toMatchObject({ message: "channel is in use" });
+  });
+
+  // #1207: the system Taproom channel is refused by the RPC itself, even when
+  // nothing references it and after a rename.
+  it("delete_sale_channel refuses the system Taproom channel even when nothing uses it", async () => {
+    const b = await makeBrewery();
+    const c = await makeStaffCtx(b.id, "admin");
+    const taproom = await channelId(b.id, "Taproom");
+    await runCommand("upsert_sale_channel", { id: taproom, name: "Bar", taxTreatment: "taxable" }, c);
+    await expect(runCommand("delete_sale_channel", { channelId: taproom }, c))
+      .rejects.toMatchObject({ message: expect.stringMatching(/system Taproom channel cannot be deleted/) });
+    expect((await runCommand("list_sale_channels", {}, c) as { id: string }[]).map((r) => r.id)).toContain(taproom);
+  });
+
+  // #1207: in_use is true exactly when a foreign key would refuse the delete.
+  // These are every table that references sale_channels; a new one fails here
+  // until list_sale_channels checks it too.
+  it("only movements, customers, orders, price cells and Square menus reference a channel", () => {
+    expect(sql(`select conrelid::regclass::text from pg_constraint
+      where confrelid = 'public.sale_channels'::regclass and contype = 'f' order by 1`, true))
+      .toEqual(["channel_prices", "customers", "inventory_movements", "orders", "pos_menus"]);
+  });
+
+  it("list_sale_channels flags each channel a foreign key holds, and Delete succeeds exactly where it is unflagged", async () => {
+    const b = await makeBrewery();
+    const c = await makeStaffCtx(b.id, "admin");
+    const make = async (name: string) => ((await runCommand("upsert_sale_channel", { name, taxTreatment: "taxable" }, c)) as { id: string }).id;
+    const [byMovement, byCustomer, byOrder, byPrice, byMenu] = [
+      await make("By movement"), await make("By customer"), await make("By order"), await make("By price"), await make("By menu")];
+    const { skuId, brandId, formatId } = await seedCatalog(b.id, { packageType: "keg", bblPerUnit: 0.5 });
+    const loc = await seedLocation(b.id, { uses: ["warehouse", "taproom"] });
+    await stockBin(b.id, skuId, loc, c.userId);
+    expect((await c.db.rpc("record_inventory_movement", {
+      p_brewery: b.id, p_sku: skuId, p_location: loc.id, p_bin: loc.binId, p_qty: -1,
+      p_type: "sale_removal", p_sale_channel: byMovement, p_dest_state: "PA", p_note: null,
+      p_request_id: crypto.randomUUID(), p_lot: null, p_origin: "ui", p_conversation: null, p_preview_token: null,
+    })).error).toBeNull();
+    const customer = await seedCustomer(b.id, { saleChannelId: byCustomer });
+    await ins("orders", { brewery_id: b.id, kind: "wholesale", customer_id: customer.customerId, ship_to_id: customer.shipToId,
+      sale_channel_id: byOrder, from_location_id: loc.id, created_by: c.userId });
+    await priceSku(b.id, { saleChannelId: byPrice, brandId, formatId, cents: 1000 });
+    const connection = await admin.from("pos_connections").insert({ brewery_id: b.id,
+      merchant_id: `flag-menu-${crypto.randomUUID()}`, state: "connected" }).select("id").single();
+    expect(connection.error).toBeNull();
+    expect((await admin.from("pos_locations").insert({ brewery_id: b.id, connection_id: connection.data!.id,
+      external_location_id: "FLAG-MENU", location_id: loc.id })).error).toBeNull();
+    await runCommand("configure_pos_menu", { posLocationId: "FLAG-MENU", binId: loc.binId, saleChannelId: byMenu }, c);
+
+    for (const role of ["admin", "sales", "warehouse"] as const) {
+      const reader = role === "admin" ? c : await makeStaffCtx(b.id, role);
+      const rows = (await runCommand("list_sale_channels", {}, reader)) as { name: string; in_use: boolean; system_code: string | null }[];
+      expect(Object.fromEntries(rows.map((r) => [r.name, r.in_use])), role).toEqual({
+        "By customer": true, "By menu": true, "By movement": true, "By order": true, "By price": true,
+        DTC: false, Export: false, Taproom: false, Wholesale: false,
+      });
+      expect(rows.filter((r) => r.system_code === "taproom").map((r) => r.name)).toEqual(["Taproom"]);
+    }
+
+    const rows = (await runCommand("list_sale_channels", {}, c)) as { id: string; name: string; in_use: boolean; system_code: string | null }[];
+    for (const row of rows) {
+      const deleted = runCommand("delete_sale_channel", { channelId: row.id }, c);
+      if (row.in_use || row.system_code) await expect(deleted, row.name).rejects.toBeTruthy();
+      else await expect(deleted, row.name).resolves.toBeTruthy();
+    }
   });
 
   // CHANNEL_IN_USE_RULE names the Square menu; pos_menus holds a plain foreign key.

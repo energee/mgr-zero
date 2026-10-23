@@ -14,6 +14,9 @@ import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
 import "@/lib/commands/all";
 import { money } from "@/lib/mgr/money";
 import { SIZE_LABEL } from "@/lib/mgr/keg-labels";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/kegs/customers") };
 
 type Balance = {
   rows: { pool_id: string; pool_name: string; keg_size: string; kegs_out: number; kegs_on_deposit: number; deposit_cents: number; mismatch: boolean }[];

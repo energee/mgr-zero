@@ -313,3 +313,29 @@ it("replays a completed shared destination after replacing its installation with
     expect(provider).not.toHaveBeenCalled();
   } finally { provider.mockRestore(); }
 });
+
+// #1208: every staff role reads the brewery's quiet hours and whether Slack is
+// connected through get_notification_preferences, while chat_installations
+// stays admin-only. The Operations digest switch is gone: personal delivery
+// never sends that reason.
+it("shows staff the brewery quiet hours and connection without widening installation reads", async () => {
+  const brewery = await makeBrewery();
+  const owner = await makeStaffCtx(brewery.id);
+  const sales = await makeStaffCtx(brewery.id, "sales"), taproom = await makeStaffCtx(brewery.id, "taproom");
+  expect(await runCommand("get_notification_preferences", {}, sales)).toMatchObject({ installationActive: false, breweryQuietHours: null });
+  const pending = await ins("chat_installations", { brewery_id: brewery.id, provider: "slack", external_installation_id: crypto.randomUUID(), display_label: "Workspace 1208",
+    state: "pending", installer_user_id: owner.userId, token_store_key: crypto.randomUUID(), quiet_hours_start: "22:00", quiet_hours_end: "07:00" });
+  expect(await runCommand("get_notification_preferences", {}, sales)).toMatchObject({ installationActive: false });
+  await admin.from("chat_installations").update({ state: "active" }).eq("id", pending.id);
+  for (const staff of [sales, taproom]) {
+    const read = await runCommand("get_notification_preferences", {}, staff) as Record<string, unknown> & { preferences: { reason: string }[] };
+    expect(read).toMatchObject({ installationActive: true, breweryQuietHours: { start: "22:00:00", end: "07:00:00", timezone: brewery.timezone } });
+    expect(read.preferences.map(({ reason }) => reason)).not.toContain("operations_digest");
+    expect(JSON.stringify(read)).not.toMatch(/Workspace 1208|token_store_key|installer|external_installation_id/);
+  }
+  expect((await sales.db.from("chat_installations").select("id")).data).toEqual([]);
+  await admin.from("chat_installations").update({ quiet_hours_start: null, quiet_hours_end: null }).eq("id", pending.id);
+  expect(await runCommand("get_notification_preferences", {}, sales)).toMatchObject({ installationActive: true, breweryQuietHours: null });
+  const outsider = await makeStaffCtx((await makeBrewery()).id, "sales");
+  expect((await rawDatabase(outsider.db).rpc("get_staff_chat_installation", { p_brewery: brewery.id })).error?.code).toBe("42501");
+});

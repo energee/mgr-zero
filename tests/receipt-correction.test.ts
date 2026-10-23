@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedLocation, sql } from "./helpers";
+import { afterEach, describe, expect, it } from "vitest";
+import { admin, closePgSessions, makeBrewery, makeStaffCtx, pgSession, seedLocation, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+
+afterEach(closePgSessions);
 
 async function received(qty = 10) {
   const brewery = await makeBrewery();
@@ -119,6 +121,31 @@ it("serializes competing corrections and keeps one effective receipt", async () 
   expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
   expect(results.filter(result => result.status === "rejected")).toHaveLength(1);
   expect((await admin.from("receipts").select("id").eq("po_id", f.po.id)).data).toHaveLength(2);
+});
+
+// #1234: autovacuum's SHARE UPDATE EXCLUSIVE lasts a moment; the correction
+// retries its lock set instead of refusing at the first conflict.
+it("corrects once a brief autovacuum-mode lock on material lots is released", async () => {
+  const f = await received();
+  const holder = await pgSession();
+  await holder.query("begin; lock table public.material_lots in share update exclusive mode");
+  const released = new Promise(resolve => setTimeout(resolve, 300)).then(() => holder.query("commit"));
+  await runCommand("correct_purchase_receipt", {
+    receiptId: f.receiptId, reason: "Recount", lines: [{ poLineId: f.lineId, qtyCounted: 6, lotCode: "ORIGINAL", bestBy: "2027-01-01" }],
+  }, f.ctx);
+  await released;
+  expect((await admin.from("receipts").select("id").eq("po_id", f.po.id)).data).toHaveLength(2);
+});
+
+it("refuses as a retryable conflict, not a server error, when material stock stays busy", async () => {
+  const f = await received();
+  const writer = await pgSession();
+  await writer.query("begin; lock table public.material_movements in row exclusive mode");
+  await expect(runCommand("correct_purchase_receipt", {
+    receiptId: f.receiptId, reason: "Recount", lines: [{ poLineId: f.lineId, qtyCounted: 6, lotCode: "ORIGINAL", bestBy: "2027-01-01" }],
+  }, f.ctx)).rejects.toMatchObject({ code: "conflict", status: 409, message: expect.stringContaining("busy") });
+  await writer.query("rollback");
+  expect((await admin.from("receipts").select("id").eq("po_id", f.po.id)).data).toHaveLength(1);
 });
 
 it("corrects an exclusive unused lot best-by while preserving every revision", async () => {

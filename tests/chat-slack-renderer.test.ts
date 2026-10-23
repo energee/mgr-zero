@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { CHAT_PREVIEW_FIXTURES } from "@/lib/chat/preview-fixtures";
 import { renderSlackDigest, renderSlackHome, renderSlackMessage } from "@/lib/chat/slack-renderer";
+import type { PortableNotification } from "@/lib/chat/contracts";
 
 type Block = { type: string; text?: { type: string; text: string }; elements?: Record<string, unknown>[]; [k: string]: unknown };
 const MGR = "https://mgr.test";
@@ -44,6 +45,14 @@ describe("Slack renderer", () => {
         expect(JSON.stringify(blocks)).not.toMatch(/xox[baprs]-|@[a-z0-9.]+\.[a-z]{2,}/i);
       }
     }
+  });
+
+  // #1208: the delivered title and status name the event, not a task.
+  it("titles a delivered message with its reason's event name", () => {
+    const item = CHAT_PREVIEW_FIXTURES.find((f) => f.id === "app-home")!.items.find((i) => i.reason === "submitted_order")!;
+    const { blocks } = renderSlackMessage(item, { mgrBaseUrl: MGR, intentId: "intent-1" });
+    expect((blocks as Block[])[1].text!.text).toMatch(/^\*Order submitted\*\n/);
+    expect(JSON.stringify(blocks)).toContain('"text":"Order submitted · needs attention"');
   });
 
   it("drops actions and marks the message resolved when the occurrence resolved", () => {
@@ -94,11 +103,13 @@ describe("Slack renderer", () => {
 });
 
 describe("Slack renderer · surface polish", () => {
-  // renderSlackHome built each row as `*${safeLabel} · ${title}*`, but two
-  // fixtures already carry the reason inside safeLabel, so the row read
-  // "Route A · next stop · Next stop".
+  // renderSlackHome built each row as `*${safeLabel} · ${title}*`, so a subject
+  // label that already carried the reason read "Route A · next stop · Next stop".
+  // The samples no longer carry it, so one row here does.
+  const carried = (items: readonly PortableNotification[]) =>
+    [...items, { ...items[0], subject: { ...items[0].subject, safeLabel: `${items[0].subject.safeLabel} · ${items[0].title.toLowerCase()}` } }];
   it("never repeats the reason when a subject label already carries it", () => {
-    const items = CHAT_PREVIEW_FIXTURES.find((f) => f.id === "app-home")!.items;
+    const items = carried(CHAT_PREVIEW_FIXTURES.find((f) => f.id === "app-home")!.items);
     const home = renderSlackHome({ linked: true, items, mgrBaseUrl: MGR });
     const rows = (home.blocks as Block[]).filter((b) => b.type === "section" && b.accessory);
     expect(rows.length).toBe(items.length);
@@ -113,7 +124,7 @@ describe("Slack renderer · surface polish", () => {
   // the notification list and channel preview, which is the surface a person
   // actually reads first.
   it("never repeats the reason in the message fallback text", () => {
-    for (const item of CHAT_PREVIEW_FIXTURES.find((f) => f.id === "app-home")!.items) {
+    for (const item of carried(CHAT_PREVIEW_FIXTURES.find((f) => f.id === "app-home")!.items)) {
       const { text } = renderSlackMessage(item, { mgrBaseUrl: MGR, intentId: "intent-1" });
       expect(text.toLowerCase().split(item.title.toLowerCase()).length - 1, `"${text}"`).toBe(1);
     }

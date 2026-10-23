@@ -16,6 +16,11 @@ export const IMPORT_FIELDS: Record<ImportKind, Field[]> = {
   channel_prices: [{ name: "saleChannelId", required: true, lookup: "channels" }, { name: "priceGroupId", required: true, lookup: "groups" }, { name: "formatId", required: true, lookup: "formats" }, { name: "unitPriceCents", required: true, type: "cents" }],
   opening_balances: [{ name: "skuId", required: true, lookup: "skus" }, { name: "locationId", required: true, lookup: "locations" }, { name: "binId", required: true, lookup: "bins" }, { name: "qty", required: true, type: "positive" }, { name: "note" }],
 };
+/** The upload step's Download template file: a header row of the kind's columns, in list order.
+ *  Field names hold no commas or quotes, so no cell needs quoting. */
+export function importTemplateCsv(kind: ImportKind): string {
+  return `${IMPORT_FIELDS[kind].map(field => field.name).join(",")}\r\n`;
+}
 /** The channel_prices reference columns; together they name one price cell. */
 export const PRICE_REFERENCE_FIELDS = IMPORT_FIELDS.channel_prices.filter(f => f.lookup).map(f => f.name);
 export type ImportLookups = Record<string, { id: string; name: string; location_id?: string; basis?: string; price_group_id?: string | null }[]>;

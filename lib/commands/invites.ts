@@ -71,6 +71,25 @@ definePreTenantCommand({
   })),
 });
 
+export type PendingInvitation = { id: string; email: string; role: StaffRole; createdAt: string };
+
+defineQuery({
+  name: "list_pending_invitations", description: "Staff invitations an existing account has not yet accepted (admin): invite id, email, role and when it was sent",
+  input: z.object({}), roles: ["admin"],
+  handler: async (ctx): Promise<PendingInvitation[]> => {
+    const rows = await unwrap(ctx.db.rpc("list_pending_invitations", { p_brewery: ctx.breweryId })) as { id: string; email: string; role: StaffRole; created_at: string }[];
+    return rows.map((r) => ({ id: r.id, email: r.email, role: r.role, createdAt: r.created_at }));
+  },
+});
+
+defineCommand({
+  name: "resend_account_invitation", description: "Resend a pending existing-account invitation with the same role (admin); the old invitation can no longer be accepted",
+  roles: ["admin"], input: z.object({ inviteId: z.uuid() }),
+  handler: (ctx, input, execution) => unwrap(ctx.db.rpc("resend_account_invitation", {
+    p_brewery: ctx.breweryId, p_invite: input.inviteId, p_request_id: execution.requestId,
+  })),
+});
+
 defineCommand({
   name: "revoke_account_invitation", description: "Revoke a pending existing-account invitation.",
   roles: ["admin", "sales"], input: z.object({ inviteId: z.uuid() }),

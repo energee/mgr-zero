@@ -30,12 +30,12 @@ const portableNotificationSchema = z.object({
 
 export type NotificationReason = z.infer<typeof notificationReasonSchema>;
 
-/** The words a person reads for each reason: the delivered notification's
- *  title, its Slack message status, Slack's preferences dialog, and MGR's own
- *  notification preferences. */
+/** The words a person reads for each reason, named for the event that
+ *  happened: the delivered notification's title, its Slack message status,
+ *  Slack's preferences dialog, and MGR's own notification preferences. */
 export const NOTIFICATION_REASON_LABEL: Record<NotificationReason, string> = {
-  submitted_order: "Review submitted order", pick_due: "Pick due", restock_due: "Put back staged beer", delivery_next: "Next stop",
-  fermentation_reading_overdue: "Reading overdue", invoice_question: "Buyer asked about an invoice", operations_digest: "Operations digest",
+  submitted_order: "Order submitted", pick_due: "Pick due", restock_due: "Restock due", delivery_next: "Next delivery stop",
+  fermentation_reading_overdue: "Fermentation reading overdue", invoice_question: "Invoice question", operations_digest: "Operations digest",
 };
 
 export type PortableAction = z.infer<typeof portableActionSchema>;
