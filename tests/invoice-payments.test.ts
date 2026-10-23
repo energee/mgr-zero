@@ -429,3 +429,56 @@ describe("list_invoices and get_invoice carry the ledger", () => {
     }
   });
 });
+
+describe("write_off_invoice on an invoice MGR's ledger owns (#1228)", () => {
+  /** Calls write_off_invoice as `ctx` (an Admin of the invoice's brewery by default). */
+  async function writeOff(f: Fixture, input: Record<string, unknown> = {}, ctx?: Ctx) {
+    return (ctx ?? await makeStaffCtx(f.breweryId, "admin")).db.rpc("write_off_invoice", {
+      p_brewery: f.breweryId, p_invoice: f.invoiceId, p_reason: "Customer closed", p_request_id: crypto.randomUUID(), ...input,
+    });
+  }
+  const writtenOff = (f: Fixture) =>
+    sql(`select (written_off_at is not null)::text || '|' || coalesce(written_off_reason,'') from public.invoices where id='${f.invoiceId}'`, true)[0];
+
+  it("writes off an unpaid invoice QuickBooks never received, with replay and the reason rule", async () => {
+    const f = await localInvoice();
+    const adminCtx = await makeStaffCtx(f.breweryId, "admin");
+    expect((await writeOff(f, { p_reason: "  " }, adminCtx)).error?.message).toMatch(/write-off reason must be 1 to 500 characters/);
+    const requestId = crypto.randomUUID();
+    const first = await writeOff(f, { p_request_id: requestId, p_reason: "  Customer closed  " }, adminCtx);
+    expect(first.error).toBeNull();
+    expect(first.data).toEqual({ invoiceId: f.invoiceId, status: "written_off", reason: "Customer closed" });
+    expect((await writeOff(f, { p_request_id: requestId, p_reason: "  Customer closed  " }, adminCtx)).data).toEqual(first.data);
+    expect(writtenOff(f)).toBe("true|Customer closed");
+    expect((await writeOff(f, {}, adminCtx)).error?.message).toMatch(/can be written off/);
+  });
+
+  it("writes off a partly paid invoice for its remaining balance and keeps the payments (owner decision)", async () => {
+    const f = await localInvoice();
+    expect((await record(f, { p_amount_cents: 4000 })).error).toBeNull();
+    expect((await writeOff(f)).error).toBeNull();
+    expect(writtenOff(f)).toBe("true|Customer closed");
+    expect(sql(`select local_paid_cents from public.invoice_totals where invoice_id='${f.invoiceId}'`, true)).toEqual(["4000"]);
+    expect(paidAtLocal(f)).toBe("");
+    expect((await record(f, { p_amount_cents: 100 })).error?.message).toMatch(/a written-off invoice takes no payment/);
+  });
+
+  it("still refuses a paid, pushed, pending or QuickBooks invoice, a credit memo, and Sales", async () => {
+    const paid = await localInvoice();
+    expect((await record(paid, { p_amount_cents: 10000 })).error).toBeNull();
+    const historical = await localInvoice({ paid_at: new Date().toISOString(), qbo_sync_status: "not_synced" });
+    const pending = await localInvoice();
+    await pushOf(pending, "pending");
+    const purged = await localInvoice();
+    await pushOf(purged, "pushed");
+    await changeRealm(purged);
+    const live = await localInvoice({ qbo_invoice_id: "remote-9", qbo_sync_status: "pushed" });
+    const memo = await localInvoice({ kind: "credit_memo" });
+    for (const [name, f] of Object.entries({ paid, historical, pending, purged, live, memo })) {
+      expect((await writeOff(f)).error?.message, name).toMatch(/can be written off/);
+      expect(writtenOff(f), name).toBe("false|");
+    }
+    const unpaid = await localInvoice();
+    expect((await writeOff(unpaid, {}, unpaid.sales)).error?.code).toBe("42501");
+  });
+});
