@@ -44,10 +44,10 @@ export function RouteView({ model, controls, busy = false, error, onSave, onDepa
         )}</div>;
       })}
       <CommandFormMessage error={error} />
-      <div className="flex flex-col gap-2 md:flex-row">
-        {E.submit("Save route plan", { submitting: busy, reason, variant: model.saved ? "outline" : "default", className: "w-full md:w-fit" })}
-        {model.saved && <Button type="button" className="w-full md:w-fit" disabled={busy || !model.savedDriverId} onClick={onDepart}>Depart route</Button>}
-      </div>
+      {E.pin(<>
+        {E.submit("Save route plan", { submitting: busy, reason, variant: model.saved ? "outline" : "default" })}
+        {model.saved && <Button type="button" disabled={busy || !model.savedDriverId} onClick={onDepart}>Depart route</Button>}
+      </>)}
       {model.saved && !model.savedDriverId && E.note("Assign a driver and save before departing.")}
     </form>
   </>;

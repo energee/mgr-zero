@@ -9,6 +9,9 @@ import type { ReturnSource } from "@/lib/commands/orders";
 import { SIZE_LABEL } from "@/lib/mgr/keg-labels";
 import { CreditMemoForm, type ReturnLine } from "../credit-memo-form";
 import "@/lib/commands/all";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/invoices") };
 
 type Invoice = { id: string; invoice_no: number | null; shipment_id: string | null; kind: string };
 type Line = { id: string; kind: string; sku_id: string | null; keg_size: string | null; qty: number; unit_price_cents: number; description: string; skus: { name: string } | null };

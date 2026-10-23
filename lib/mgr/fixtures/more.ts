@@ -1,22 +1,29 @@
 // lib/mgr/fixtures/more.ts — More landing navs for the inventory drawing. A
 // card that is also a More entry in lib/mgr/nav.ts quotes that entry's
-// `about` line through navAbout, as the live page prints it.
+// `about` line through navAbout and files under that entry's area, as the live
+// page does. Formats and Bins are not nav entries, so they name their own.
 import type { MoreNavView } from "@/lib/mgr/more-view";
-import { navAbout } from "@/lib/mgr/nav";
+import { navAbout, STAFF_NAV } from "@/lib/mgr/nav";
+
+const moreEntries = STAFF_NAV.find((t) => t.label === "More")!.children!;
+
+/** The card for the More entry labelled `title`, as the live page draws it. */
+const entry = (key: string, title: string, mark?: MoreNavView["mark"]): MoreNavView =>
+  ({ key, title, detail: navAbout(title), group: moreEntries.find((c) => c.label === title)!.group, mark });
 
 export const moreNavs: MoreNavView[] = [
-  { key: "invoices", title: "Invoices", detail: navAbout("Invoices"), mark: "qbo" },
-  { key: "catalog", title: "Catalog", detail: navAbout("Catalog") },
-  { key: "prices", title: "Price groups", detail: navAbout("Price groups") },
-  { key: "customers", title: "Customers", detail: navAbout("Customers") },
-  { key: "recipes", title: "Recipes", detail: navAbout("Recipes") },
-  { key: "compliance", title: "Compliance", detail: navAbout("Compliance") },
-  { key: "vendors", title: "Vendors", detail: navAbout("Vendors") },
-  { key: "channels", title: "Sale channels", detail: navAbout("Sale channels") },
-  { key: "formats", title: "Formats", detail: "Define package formats and their volumes" },
-  { key: "planning", title: "Planning", detail: navAbout("Planning") },
-  { key: "settings", title: "Settings", detail: navAbout("Settings") },
-  { key: "locations", title: "Locations", detail: navAbout("Locations") },
-  { key: "bins", title: "Bins", detail: "Subdivide a location into bins" },
-  { key: "chat", title: "Chat", detail: navAbout("Chat") },
+  entry("invoices", "Invoices", "qbo"),
+  entry("catalog", "Catalog"),
+  entry("prices", "Price groups"),
+  entry("customers", "Customers"),
+  entry("recipes", "Recipes"),
+  entry("compliance", "Compliance"),
+  entry("vendors", "Vendors"),
+  entry("channels", "Sale channels"),
+  { key: "formats", title: "Formats", detail: "Define package formats and their volumes", group: "Sales" },
+  entry("planning", "Planning"),
+  entry("settings", "Settings"),
+  entry("locations", "Locations"),
+  { key: "bins", title: "Bins", detail: "Subdivide a location into bins", group: "Setup" },
+  entry("chat", "Chat"),
 ];

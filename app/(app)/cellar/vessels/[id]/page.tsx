@@ -10,6 +10,9 @@ import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { batNo } from "@/lib/mgr/doc-no";
 import { formatDateTime } from "@/lib/date-format";
 import "@/lib/commands/all";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/cellar/vessels") };
 
 type Vessel = { id: string; name: string; kind: string; capacity_bbl: number; active: boolean };
 type Occupancy = { occupancy_id: string; vessel_id: string; batch_id: string; batch_no: number | null; brand_name: string | null; bbl: number };

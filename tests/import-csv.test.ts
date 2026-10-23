@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { importRowKey, parseCsv, mapCsvRows, readyImportRowNumbers, readyImportRows, validateImportRow } from "@/lib/import-csv";
+import { IMPORT_FIELDS, IMPORT_KINDS, importRowKey, importTemplateCsv, parseCsv, mapCsvRows, readyImportRowNumbers, readyImportRows, validateImportRow } from "@/lib/import-csv";
 it("parses BOM, CRLF, quoted commas/newlines and escaped quotes", () => {
   expect(parseCsv('\uFEFFname,note\r\n"A, B","one\r\ntwo ""quoted"""\r\n')).toEqual({ headers: ["name", "note"], rows: [["A, B", 'one\r\ntwo "quoted"']] });
 });
@@ -145,4 +145,15 @@ describe("country and alias columns", () => {
     expect(validateImportRow("ship_tos", { customerId, label: "Main" })).toEqual(["state is required"]);
     expect(validateImportRow("ship_tos", { customerId, label: "Main", state: "OH" })).toEqual([]);
   });
+});
+
+// #1206: the Download template file is the upload step's column list as a header row.
+it("builds each kind's template as a header row of exactly its listed columns", () => {
+  for (const kind of IMPORT_KINDS) {
+    const names = IMPORT_FIELDS[kind].map(field => field.name);
+    const template = importTemplateCsv(kind);
+    expect(template).toBe(`${names.join(",")}\r\n`);
+    // A filled-in template parses with headers that match every field on their own.
+    expect(parseCsv(`${template}${names.map(() => "x").join(",")}\r\n`).headers).toEqual(names);
+  }
 });

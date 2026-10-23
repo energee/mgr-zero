@@ -11,6 +11,9 @@ import { runPageQuery as runCommand, requirePagePermission } from "@/lib/mgr/pag
 import { orNotFound } from "@/lib/mgr/not-found";
 import "@/lib/commands/all";
 import { ConfirmOrderForm } from "./confirm-buttons";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/orders") };
 
 type Order = { id: string; order_no: number | null; status: string; requested_ship_date: string | null; from_location_id: string; customers: { name: string } | null };
 type Line = { id: string; sku_id: string; qty_ordered: number; skus: { name: string } | null };

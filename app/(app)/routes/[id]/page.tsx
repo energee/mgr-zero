@@ -15,6 +15,9 @@ import { formatTime } from "@/lib/time-window";
 import { driverLabel, type RouteList } from "../labels";
 import { RouteForm } from "../route-form";
 import { ReturnRoute } from "../route-run";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/routes") };
 
 export default async function RoutePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

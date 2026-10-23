@@ -54,6 +54,6 @@ export function NewPoView({ model, controls = {}, messages, footer, submitting =
     </fieldset>
     {messages}
     {E.sp()}
-    {footer !== undefined ? footer : E.submit("Save draft", { submitting, reason })}
+    {footer !== undefined ? footer : E.pin(E.submit("Save draft", { submitting, reason }))}
   </>;
 }
