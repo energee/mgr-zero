@@ -11,7 +11,6 @@ export function TaproomVarianceView({ model }: { model: TaproomVarianceViewModel
     {E.back("Beer", "Variance by brand", undefined, model.backHref)}
     {(model.countHref || model.boardHref) && <div className="flex flex-wrap gap-3 text-sm">{model.countHref && <Link className="underline" href={model.countHref}>Weekly count</Link>}{model.boardHref && <Link className="underline" href={model.boardHref}>Tap board</Link>}</div>}
     {model.locations && <ScopePick label="Location" value={model.location ?? ""} options={model.locations} />}
-    {/* The page title names the brand table, so no second heading sits between the scope and it (#1118). */}
     <TabBar names={[...VARIANCE_WEEK_TABS]} on={model.weeks === 12 ? 1 : 0} cls="w-full" hrefs={model.weekHrefs} />
     {!report ? E.blank("No taproom locations yet. Ask Admin to add one under Locations.") : <>
       {report.rows.length === 0 ? E.blank(report.reason === "no_completed_periods" ? "No completed count periods in this window" : "No comparable brand totals yet") : E.tbl(["Brand", "Expected", "Actual", "Destroyed", "Variance"], report.rows.map(row => [row.brand_name, bbl(row.expected_bbl), bbl(row.actual_bbl), bbl(row.destroyed_bbl), bbl(row.variance_bbl)]), ["l", "r", "r", "r", "r"])}

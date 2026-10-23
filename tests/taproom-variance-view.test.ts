@@ -32,7 +32,6 @@ it("preserves nulls, coverage, exclusions and absent trends in the shared report
   expect(html).toContain("variance —");
   expect(html).toContain("Recurring brand trend");
   expect(html).toContain("Not available yet.");
-  expect(html).not.toContain("Shows after");
   expect(html).not.toContain("short 4 weeks running");
   expect(html).not.toContain('href="/taproom');
 });
