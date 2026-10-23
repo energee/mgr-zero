@@ -11,6 +11,9 @@ import { toTransferDetailViewProps } from "@/lib/mgr/transfer-detail-view";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { TransferActions } from "./transfer-actions";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/transfers") };
 
 type Detail = {
   transfer: { id: string; from_location_id: string; transfer_no: number | null; status: string; note: string | null; cancel_reason: string | null; received_at: string | null; from_location: { name: string } | null; to_location: { name: string } | null };

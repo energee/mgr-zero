@@ -11,6 +11,9 @@ import { toSkuOption } from "@/lib/order-form-rules";
 import { AdjustLinesForm } from "../adjust-lines-form";
 import type { AdjustLinesSavedLine } from "@/lib/mgr/adjust-lines-view";
 import "@/lib/commands/all";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/orders") };
 
 type SkuRow = { id: string; name: string; brands: { name: string } | null };
 

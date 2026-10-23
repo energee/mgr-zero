@@ -25,12 +25,12 @@ it("keeps missing mappings and preview cells empty rather than undefined", () =>
 it("shares an editable mixed preview and prevents all-invalid batches from committing", () => {
   const html = renderToStaticMarkup(createElement(ImportView, { model: importPreview }));
   expect(html).toContain("2 ready · 1 blocked");
-  expect(html).toContain("Import 2 ready rows");
+  expect(html).toContain("Import 2 rows");
   expect(html).toContain("Edit row 2");
   expect(html).toContain('data-slot="toggle-group-item"');
   expect(html).not.toContain('href="/');
   const blocked = renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, validation: importPreview.rows.map(() => ["Invalid row"]) } }));
-  expect(blocked).toMatch(/<button[^>]*disabled[^>]*>Import 0 ready rows/);
+  expect(blocked).toMatch(/<button[^>]*disabled[^>]*>Import 0 rows/);
 });
 
 it("shows only usable packaged format references when mapping product imports (#819)", () => {
@@ -72,7 +72,7 @@ it("offers Import another file only once results are recovered, never past an un
 it("names its steps, labels the kind choice and lists the chosen kind's columns before upload (#1150)", () => {
   const upload = (kind: typeof importPreview.kind) => renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, kind, step: 0, rows: [], validation: [] } }));
   const html = upload("customers");
-  for (const step of ["Upload", "Map", "Preview", "Commit"]) expect(html).toContain(`>${step}</span>`);
+  for (const step of ["Upload", "Match columns", "Review", "Import"]) expect(html).toContain(`>${step}</span>`);
   expect(html).toMatch(/<legend[^>]*>What are you importing\?<\/legend>/);
   expect(html).not.toContain("Quoted commas");
   expect(html).toContain("Customers columns");
@@ -86,4 +86,19 @@ it("names its steps, labels the kind choice and lists the chosen kind's columns 
   const balances = upload("opening_balances");
   for (const field of IMPORT_FIELDS.opening_balances) expect(balances).toContain(`<code>${field.name}</code>`);
   expect(balances).not.toContain("<code>saleChannelId</code>");
+});
+
+it("names the buttons after the steps, offers the template only before upload, and explains each step in plain words (#1206)", () => {
+  const at = (step: number) => renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, step, headers: ["name"], csvRowCount: 3 } }));
+  const upload = at(0), match = at(1), review = at(2), results = at(3);
+  expect(upload).toMatch(/<button[^>]*>Download template<\/button>/);
+  expect(upload).toContain(">Match columns</button>");
+  for (const later of [match, review, results]) expect(later).not.toContain("Download template");
+  expect(match).toContain(">Review 3 rows</button>");
+  expect(review).toContain(">Back to matching columns</button>");
+  expect(review).toContain(">Import 2 rows</button>");
+  const html = upload + match + review + results;
+  for (const jargon of ["Map", "map ", "mapping", "Preview", "References accept", "case-insensitive", "Retry returns original results", "commits independently", "Committing", "need recovery", "unresolved"]) {
+    expect(html.replace(/<[^>]*>/g, " "), jargon).not.toContain(jargon);
+  }
 });

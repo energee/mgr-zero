@@ -180,6 +180,7 @@ export const TAPS: [string | RegExp, string][] = [
  * them as gaps. The explorer simply leaves them alone. */
 export const INERT: (string | RegExp)[] = [
   "Export state transactions",
+  "Download template",
   "Open Ask MGR",
   "Guide",
   "Reschedule",
@@ -258,7 +259,7 @@ export const INERT: (string | RegExp)[] = [
   "Found \u00b7 Al\u2019s Bar",
   "Hazy \u00b7 \u00bd bbl keg",
   "Import 2 customer rows",
-  /^Import \d+ ready rows$/,
+  /^Import \d+ rows$/,
   "Increase",
   "Keg deposits held",
   "Last delivery",
