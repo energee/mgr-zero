@@ -26,6 +26,12 @@ it("shows fixed text for a ?error= code, never the query string itself (#472)", 
   expect(toSetPasswordViewProps("a@example.com", "Call 555-0100 to verify your account").error).toBe("Your password was not saved. Try again.");
 });
 
+it("heads the Me sheet's change flow Change password and the recovery landing Set new password (#1108)", () => {
+  expect(toSetPasswordViewProps("a@example.com").title).toBe("Set new password");
+  expect(toSetPasswordViewProps("a@example.com", "weak_password", true).title).toBe("Change password");
+  expect(readFileSync("components/mgr/me-sheet.tsx", "utf8")).toContain('href="/password?change=1"');
+});
+
 it("binds verified invitation display data and keeps password validation", () => {
   const model = toAcceptInviteViewProps("Actual brewery", ["customer"]);
   const html = renderToStaticMarkup(createElement(EntryView, { model, defaults: { name: "Actual buyer" } }));

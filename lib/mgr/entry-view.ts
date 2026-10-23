@@ -54,8 +54,11 @@ const SET_PASSWORD_ERRORS: Record<string, string> = {
   weak_password: "Choose a stronger password.",
 };
 
-/** `error` is the `?error=` code; any other value (a crafted link) shows the generic error, never its own text. */
-export function toSetPasswordViewProps(account: string, error?: string): EntryViewModel {
+/**
+ * `error` is the `?error=` code; any other value (a crafted link) shows the generic error, never its own text.
+ * `change` is the Me sheet's Change password (`?change=1`), headed like its link; a recovery link gets Set new password.
+ */
+export function toSetPasswordViewProps(account: string, error?: string, change = false): EntryViewModel {
   const message = error ? SET_PASSWORD_ERRORS[error] ?? "Your password was not saved. Try again." : undefined;
-  return { title: "Set new password", inputs: ["Choose a password"], field: { label: "Account", value: account }, primary: "Save password", error: message };
+  return { title: change ? "Change password" : "Set new password", inputs: ["Choose a password"], field: { label: "Account", value: account }, primary: "Save password", error: message };
 }

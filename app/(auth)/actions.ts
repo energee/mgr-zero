@@ -73,7 +73,8 @@ export async function savePassword(form: FormData) {
   const db = await createServerClient();
   const { error } = await db.auth.updateUser({ password: String(form.get("password")) });
   // The code, never the message: the page maps it to fixed text (toSetPasswordViewProps).
-  if (error) redirect(`/password?error=${encodeURIComponent(error.code ?? "1")}`);
+  // `change` keeps the Me sheet's Change password heading on the retry.
+  if (error) redirect(`/password?${form.get("change") ? "change=1&" : ""}error=${encodeURIComponent(error.code ?? "1")}`);
   redirect(await home(createRequestAuthContext(() => Promise.resolve(db))));
 }
 

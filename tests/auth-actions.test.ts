@@ -45,4 +45,13 @@ describe("set new password", () => {
     form.set("password", "hunter2hunter2");
     await expect(savePassword(form)).rejects.toThrow("redirect:/password?error=same_password");
   });
+
+  it("keeps the Me sheet's Change password heading on the retry (#1108)", async () => {
+    const { savePassword } = await import("@/app/(auth)/actions");
+    auth.updateUser.mockResolvedValue({ error: { code: "weak_password", message: "Password is too weak." } });
+    const form = new FormData();
+    form.set("password", "hunter2hunter2");
+    form.set("change", "1");
+    await expect(savePassword(form)).rejects.toThrow("redirect:/password?change=1&error=weak_password");
+  });
 });
