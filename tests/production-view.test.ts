@@ -218,7 +218,7 @@ describe("Brew day view", () => {
     const html = htmlOf(createElement(BrewDayView, { model: brewDayHazy, busy: true, error: "Vessel occupied" }));
     expect(html).toContain("Vessel occupied");
     expect(html).toContain('value="14.6"');
-    expect(html).toContain("September 4, 2026");
+    expect(html).toContain("Sep 4, 2026");
     expect(html).toContain("disabled");
     expect(html).toContain("Confirm actual ingredients");
     expect(html).not.toContain('href="/');
