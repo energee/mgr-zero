@@ -3,7 +3,8 @@
 // quarter YYYY-Qn, or a year YYYY (lib/compliance-period.ts) — generated from the ledger, or the filed
 // snapshot once one exists; a period that starts before the books opened
 // explains itself instead (#987). Completion losses remain reviewable through
-// append-only category allocations. MGR saves snapshots but never transmits a filing.
+// append-only category allocations. Saving a snapshot records the filing in
+// MGR; it never files with TTB or the state.
 import { MonthlyComplianceView, PeriodBeforeBooksView } from "@/components/mgr/views/monthly-compliance";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -32,10 +33,11 @@ export default async function PeriodPage({ params }: { params: Promise<{ period:
     return <PeriodBeforeBooksView title={periodLabel(period)} state={beforeBooksState(periodLabel(period), booksOpenedOn, hasAnyRole(brewery.roles, ["admin"]))} backHref="/compliance" />;
   }
   const report: Report = filing ? { figures: filing.figures, warnings: [] } : (await runCommand("generate_compliance_report", { jurisdiction: JURISDICTION, ...range }, ctx)) as Report;
+  const model = toMonthlyComplianceViewProps({ monthLabel: periodLabel(period), timeZone: brewery.timeZone, report, filing, losses, backHref: "/compliance" });
   return <MonthlyComplianceView
-    model={toMonthlyComplianceViewProps({ monthLabel: periodLabel(period), timeZone: brewery.timeZone, report, filing, losses, backHref: "/compliance" })}
+    model={model}
     lossAction={(loss) => <LossReviewForm loss={loss} />}
     monthOpen={!filing && !periodOver(period, today)}
-    fileAction={filing ? undefined : <FileButton jurisdiction={JURISDICTION} {...range} balances={report.figures.balances} />}
+    fileAction={filing ? undefined : <FileButton jurisdiction={JURISDICTION} {...range} reason={model.fileReason} />}
   />;
 }

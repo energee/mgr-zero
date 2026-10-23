@@ -1,7 +1,7 @@
 // app/(app)/compliance/page.tsx — Compliance months (screen record Compliance
 // months): ?cadence=month|quarter|year picks the tab; the recent periods of
-// that cadence and every filed one, each with its filing state, the registry
-// link, and the lots a trace can start from. Sales and Admin.
+// that cadence and every filed one, each with its filing state (periodRow), the
+// Licenses link, and the lots a trace can start from. Sales and Admin.
 import { ComplianceMonthsView } from "@/components/mgr/views/compliance-months";
 import { getActiveBrewery } from "@/lib/brewery";
 import { formatDate } from "@/lib/date-format";
@@ -9,9 +9,8 @@ import { buildContext } from "@/lib/commands/context";
 import type { Filing, LotRowOut } from "@/lib/commands/compliance";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
-import { bblFixed } from "@/lib/volume";
-import { cadenceOf, JURISDICTION, periodKey, periodLabel, periodOver, recentPeriods, type Cadence } from "@/lib/compliance-period";
-import { noPeriodsYet } from "@/lib/mgr/compliance-months-view";
+import { cadenceOf, JURISDICTION, periodKey, recentPeriods, type Cadence } from "@/lib/compliance-period";
+import { noPeriodsYet, periodRow } from "@/lib/mgr/compliance-months-view";
 
 const CADENCES: [Cadence, string][] = [["month", "Monthly"], ["quarter", "Quarterly"], ["year", "Annual"]];
 
@@ -26,20 +25,13 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
     const key = periodKey(f.period_start, f.period_end);
     return key && cadenceOf(key) === cadence ? [[key, f] as const] : [];
   }));
-  // A filing row whose filed_at is unset still reads as filed; only its day is unknown.
-  const filedLabel = (f: Filing) => f.filed_at ? `filed ${formatDate(f.filed_at, brewery.timeZone)}` : "filed";
   const months = [...new Set([...recentPeriods(today, cadence, booksOpenedOn), ...filed.keys()])].sort().reverse();
   return (
     <ComplianceMonthsView
       model={{
         cadences: CADENCES.map(([, name]) => name),
         cadence: on,
-        months: months.map((m) => {
-          const f = filed.get(m);
-          return f
-            ? { key: m, title: periodLabel(m), detail: f.needs_amendment ? `needs amendment · ${filedLabel(f)}` : `${filedLabel(f)} · ${bblFixed(f.figures.removals.taxable ?? 0)} taxable`, tone: f.needs_amendment ? "w" as const : "ok" as const, href: `/compliance/${m}` }
-            : { key: m, title: periodLabel(m), detail: periodOver(m, today) ? "not filed · ready to review" : `in progress · file once the ${cadence} ends`, tone: "w" as const, href: `/compliance/${m}` };
-        }),
+        months: months.map((m) => ({ ...periodRow(m, filed.get(m), today, brewery.timeZone), href: `/compliance/${m}` })),
         empty: booksOpenedOn ? noPeriodsYet(cadence, booksOpenedOn) : undefined,
         registry: { key: "registry", title: "Licenses", detail: "the brewery’s state licenses", href: "/compliance/licenses" },
         lots: lots.map((l) => ({ key: l.id, title: l.code, detail: `${l.brands?.name ?? ""} · packaged ${formatDate(l.packaged_on)}`, href: `/compliance/lots/${l.id}` })),

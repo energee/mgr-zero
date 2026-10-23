@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { MonthlyComplianceView, PeriodBeforeBooksView } from "../components/mgr/views/monthly-compliance";
-import { monthlyComplianceAmended, monthlyComplianceAugust } from "../lib/mgr/fixtures/monthly-compliance";
+import { monthlyComplianceAmended, monthlyComplianceAugust, monthlyComplianceUnbalanced } from "../lib/mgr/fixtures/monthly-compliance";
 import { beforeBooksState, toMonthlyComplianceViewProps } from "../lib/mgr/monthly-compliance-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -44,14 +44,58 @@ describe("Monthly compliance view", () => {
     expect(model.filingDate).toBe("Sep 2, 2026");
   });
 
-  it("draws the period in progress: reviewable, File once the period ends replaces Save (#579)", () => {
+  it("draws the period in progress: reviewable, a when-to-record line replaces Save (#579, #1143)", () => {
     const body = SCREENS.find((screen) => screen.name === "Period in progress")!.body as { type: unknown; props: { monthOpen?: boolean } };
     expect(body.type).toBe(MonthlyComplianceView);
     expect(body.props.monthOpen).toBe(true);
     const html = htmlOf(body as ReactNode);
     expect(html).toMatch(/September 2026/);
-    expect(html).toMatch(/File once the period ends/);
+    expect(html).toMatch(/You can record the filing after September 2026 ends/);
     expect(html).not.toMatch(/Save filed snapshot/);
+  });
+
+  it("says before Save that MGR does not file with TTB, in plain sentence-case copy (#1143)", () => {
+    const html = htmlOf(createElement(MonthlyComplianceView, { model: toMonthlyComplianceViewProps(monthlyComplianceAugust) }));
+    const notice = html.indexOf("MGR does not file with TTB");
+    expect(notice).toBeGreaterThan(-1);
+    expect(notice).toBeLessThan(html.indexOf("Save filed snapshot"));
+    expect(html).not.toMatch(/auto-reconciled|immutable|transmit|\bfacts\b|outward|removal category|allocations change/i);
+    for (const header of ["Class", "Begin", "In", "Out", "End", "State", "Removed (bbl)", "Returned (bbl)", "Adjustments (bbl)", "Net (bbl)", "Sales", "Credits", "Net sales"]) expect(html).toContain(`>${header}</th>`);
+    expect(toMonthlyComplianceViewProps(monthlyComplianceAugust).lines.map((line) => line[0])).toEqual(["Kegs", "Cans", "Bottles"]);
+  });
+
+  it("names why Save is off beside it, in the same words as the step 2 notes (#1143, #1122)", () => {
+    expect(toMonthlyComplianceViewProps(monthlyComplianceAugust).fileReason).toBeNull();
+    const model = toMonthlyComplianceViewProps(monthlyComplianceUnbalanced);
+    // The non-blocking Unassigned note stays in step 2 and out of the reason.
+    expect(model.warnings).toEqual([
+      "Kegs do not balance.",
+      "Keg swap movements have no report column.",
+      "Some transactions have no recorded destination. Check the Unassigned row; MGR does not guess a state.",
+    ]);
+    expect(model.fileReason).toBe("Save is off: Kegs do not balance. Keg swap movements have no report column.");
+    const body = SCREENS.find((screen) => screen.name === "Report does not balance")!.body as { type: unknown; props: { model: unknown } };
+    expect(body.type).toBe(MonthlyComplianceView);
+    expect(body.props.model).toEqual(model);
+    const html = htmlOf(body as ReactNode);
+    expect(html).not.toMatch(/\bfacts\b|does not balance|unclassified/);
+    const save = html.match(/<button[^>]*>Save filed snapshot<\/button>/)?.[0] ?? "";
+    expect(save).toMatch(/\sdisabled=""/);
+    const describedBy = save.match(/aria-describedby="([^"]+)"/)?.[1];
+    expect(html).toContain(`<p id="${describedBy}" class="text-sm text-muted-foreground md:self-center">${model.fileReason}</p>`);
+  });
+
+  it("passes an unknown server warning through unchanged and still withholds Save", () => {
+    const report = { figures: { ...monthlyComplianceAugust.report.figures, balances: false }, warnings: ["something new"] };
+    const model = toMonthlyComplianceViewProps({ ...monthlyComplianceAugust, report });
+    expect(model.warnings).toEqual(["something new"]);
+    expect(model.fileReason).toBe("Save is off: something new");
+  });
+
+  it("on a filed period says the snapshot is the record, not to record it again (#1143)", () => {
+    const html = htmlOf(createElement(MonthlyComplianceView, { model: toMonthlyComplianceViewProps(monthlyComplianceAmended) }));
+    expect(html).toContain("MGR does not file with TTB or the state. This snapshot records the figures as filed.");
+    expect(html).not.toMatch(/then record the filing here/);
   });
 
   it("keeps fixture actions inert and supports null live actions", () => {
@@ -59,7 +103,9 @@ describe("Monthly compliance view", () => {
     const fixture = htmlOf(createElement(MonthlyComplianceView, { model }));
     expect(fixture).not.toMatch(/href="\/compliance/);
     expect(fixture).toMatch(/0\.05741935 bbl/);
-    expect(fixture).toMatch(/Destination PA · prior allocation/);
+    expect(fixture).toMatch(/Destination PA · reattributed earlier/);
+    expect(fixture).toMatch(/Recorded 0\.05741935 bbl · 0\.03741935 bbl left to reattribute/);
+    expect(fixture).not.toMatch(/generic|prior allocation|Frozen|non-additive/);
     expect(htmlOf(createElement(MonthlyComplianceView, { model, lossAction: () => null, fileAction: null }))).not.toMatch(/Reattribute loss|Save filed snapshot/);
   });
 

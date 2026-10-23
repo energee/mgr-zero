@@ -68,9 +68,7 @@ export function TapBoard({ breweryId, locationId, initial, skus, timeZone, navig
   }, [refresh]);
 
   function open(kind: "tap" | "kick" | "swap", interval: TapInterval | null) {
-    let next = openTapBoardSheet(state.snapshot, kind, interval, locationId);
-    if (kind === "tap" && skus[0]) next = editTapBoardSheet(next, { skuId: skus[0].id });
-    setState(next);
+    setState(openTapBoardSheet(state.snapshot, kind, interval, locationId, skus[0]?.id));
   }
 
   function edit(fields: Partial<TapSheetFields>) {

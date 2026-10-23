@@ -2,7 +2,7 @@
 // Database values are snake_case (or already spaced, as the record-movement
 // fixtures are); operators see sentence case. Issue #333.
 import type { ImportKind } from "@/lib/import-csv";
-import { COUNTRY_CODES, COUNTRY_NAMES, type BrandSort, type CountryCode, type PaymentTerm } from "@/lib/mgr/enums";
+import { COUNTRY_CODES, COUNTRY_NAMES, CUSTOMER_TYPES, type BrandSort, type CountryCode, type PaymentTerm } from "@/lib/mgr/enums";
 
 /** "opening_balance" / "opening balance" → "Opening balance". */
 export const sentenceCase = (value: string) =>
@@ -47,3 +47,6 @@ export const countryName = (code: string) => COUNTRY_NAMES[code as CountryCode] 
 /** The country picker's options, by name; the stored value is the code (COUNTRY_CODES). */
 export const COUNTRY_OPTIONS = COUNTRY_CODES.map((value) => ({ value, label: COUNTRY_NAMES[value] }))
   .sort((a, b) => a.label.localeCompare(b.label, "en"));
+
+/** The customer Type picker's options, shared by New customer and Customer detail; the stored value is the enum. */
+export const CUSTOMER_TYPE_OPTIONS = CUSTOMER_TYPES.map((value) => ({ value, label: sentenceCase(value) }));

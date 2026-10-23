@@ -39,6 +39,7 @@ import { importPreview } from "@/lib/mgr/fixtures/import";
 import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView } from "@/components/mgr/views/chat";
 import { linkedChatPeople, chatLinkIntent, chatRecovery, chatDisconnected, chatConnected, personalChatPreferences } from "@/lib/mgr/fixtures/chat";
 import { CHAT_PREVIEW_FIXTURES } from "@/lib/chat/preview-fixtures";
+import { NOTIFICATION_REASON_LABEL } from "@/lib/chat/contracts";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { ShipmentSourcesView } from "@/components/mgr/views/shipment-sources";
 import { shipmentSources } from "@/lib/mgr/fixtures/order-sheets";
@@ -178,7 +179,7 @@ import { beerOverview } from "@/lib/mgr/fixtures/beer";
 import { brandHazy, catalogBrands, formatCan, formatsInventory, packageBomCase, skuHazyHalf, skuListHazy, waterProfiles } from "@/lib/mgr/fixtures/catalog";
 import { customerRidgeline, customersList, customersMissingEmail, shipToMain } from "@/lib/mgr/fixtures/customers";
 import { deniedInvoices } from "@/lib/mgr/fixtures/denied";
-import { expiredInvite, expiredReset, noMembership, portalForgotPassword, portalSetPassword, portalSignIn, resetPassword, setPassword, signIn } from "@/lib/mgr/fixtures/entry";
+import { expiredInvite, expiredReset, noMembership, portalForgotPassword, portalSetPassword, portalSignIn, portalStaffOnly, resetPassword, setPassword, signIn } from "@/lib/mgr/fixtures/entry";
 import { firstRunDemo } from "@/lib/mgr/fixtures/first-run";
 import { meMaria } from "@/lib/mgr/fixtures/me";
 import { moreNavs } from "@/lib/mgr/fixtures/more";
@@ -196,7 +197,7 @@ import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, order
 import { parsPils } from "@/lib/mgr/fixtures/pars";
 import {
   batchesBrewer, brewDayTurnsHazy, brewPrepMineral, brewTimelineMineral, closePackagingRunHazy, FERM_STAGES, MASH_STEPS, recipeBrandOptions, recipeHazyV4, recipesList, WATER_HAZY,
-  runClosedHazy, scheduleBatchHazy, vesselFv3,
+  runClosedHazy, scheduleBatchHazy, vesselFv3, vesselNew,
 } from "@/lib/mgr/fixtures/production";
 import { PICK_SHEET_DATE_CHIPS, pickSheet } from "@/lib/mgr/fixtures/pick-sheet";
 import { ridgelineComingUp, ridgelineReviewOrder, ridgelineShop } from "@/lib/mgr/fixtures/portal";
@@ -213,7 +214,7 @@ import {
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
 import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
 import { planningDemo } from "@/lib/mgr/fixtures/planning";
-import { monthlyComplianceAmended, monthlyComplianceAugust, monthlyComplianceSeptember } from "@/lib/mgr/fixtures/monthly-compliance";
+import { monthlyComplianceAmended, monthlyComplianceAugust, monthlyComplianceSeptember, monthlyComplianceUnbalanced } from "@/lib/mgr/fixtures/monthly-compliance";
 import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
 import {
   brandApprovalStout, complianceMonthsDemo, licensesDemo, licensePaBrewery, lotTraceHazy, materialLotTraceCitra, stateRegistrationHazy,
@@ -249,10 +250,12 @@ import { toMaterialsViewProps } from "@/lib/mgr/materials-view";
 import { toMaterialsOnHandViewProps } from "@/lib/mgr/materials-on-hand-view";
 import { ComposerConversationView } from "@/components/mgr/views/composer-conversation";
 import { ComposerProposalView, OfflineOutboxView } from "@/components/mgr/views/composer";
+import { COMPOSER_SETUP_ACTIVITY, COMPOSER_SETUP_TIMEOUT_MESSAGE, COMPOSER_SETUP_TIMEOUT_MS } from "@/lib/composer/setup";
 import { toMoreViewProps } from "@/lib/mgr/more-view";
 import { MOVEMENT_CORRECTION_GATE, toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
 import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
 import { newPoReason } from "@/lib/mgr/new-po-view";
+import { vesselReason } from "@/lib/mgr/vessel-detail-view";
 import { submitReason } from "@/lib/mgr/submit-reason";
 import { toNewTransferViewProps } from "@/lib/mgr/new-transfer-view";
 import { toOrderViewProps } from "@/lib/mgr/order-view";
@@ -474,8 +477,8 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Search", job: "Find permitted pages and records",
     reads: "search_entities", writes: "none",
-    states: [["empty", "No pages or records found · Try a page name, record name, or document number."], ["loading", "row-shaped skeletons"], ["offline", "cached matches only", 1], ["permission", "Results honor row access"], ["document number", "ORD-0231 matches exactly and sorts first"]],
-    spec: "Pages are matched by name from the same role-filtered shipped navigation as the shell and appear in their own Pages group, even while records load or fail. Entity pickers offer records only. One registered search across the entity kinds the caller's role can read; results are grouped by kind and arrow keys move between matches; filtering never widens what is permitted, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
+    states: [["first use", "Type a page name, record name, or document number."], ["empty", "No pages or records found · Try a page name, record name, or document number."], ["loading", "row-shaped skeletons"], ["offline", "cached matches only", 1], ["permission", "Results honor row access"], ["document number", "ORD-0231 matches exactly and sorts first"]],
+    spec: "Pages are matched by name from the same role-filtered shipped navigation as the shell and appear in their own Pages group, even while records load or fail; each shows its navigation entry's one-line description, the same line a More card shows. Before a term, the latest five opened records show as Recent, or, when there are none, a first-use hint names what to type. Entity pickers offer records only. One registered search across the entity kinds the caller's role can read; results are grouped by kind and arrow keys move between matches; filtering never widens what is permitted, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
     body: <SearchView model={searchPalette} />,
   },
   {
@@ -536,6 +539,15 @@ export const SCREENS: Screen[] = [
     spec: "After sign-in with no brewery and no customer account. The queue is empty because nothing was writable.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: <EntryView model={noMembership} />,
+  },
+  {
+    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Portal staff only",
+    job: "A staff login on no customer account opens the portal",
+    reads: "none", writes: "none",
+    states: [["staff only", "back to Today or sign out"]],
+    spec: "Staff roles never open a customer's portal, so a portal page sends a staff login on no customer account here. A login that is also on customer accounts opens only those accounts. No customer picker or preview.",
+    hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
+    body: <EntryView model={portalStaffOnly} />,
   },
   {
     step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired invite",
@@ -745,8 +757,8 @@ export const SCREENS: Screen[] = [
     job: "Upload, map, preview and independently commit valid rows",
     reads: "list_skus · list_locations · list_bins · list_customers · list_formats · list_price_groups · list_sale_channels",
     writes: "import_csv",
-    states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Commit disabled · fix mapping", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "same requestId returns original committed and blocked results"], ["permission", "Import requires admin", 1]],
-    spec: "One logical row is atomic; siblings commit independently. Reference ID cells accept a UUID or trimmed, case-insensitive exact name; missing or ambiguous names block the row. Bin names are scoped to the location, and pour formats to the price group. Product imports use packaged formats. Preview is editable on phone and desk. All-invalid batches cannot commit. Same-batch retry preserves raw cells and returns original results; correction starts only blocked rows with a new identity. Reloading the same tab restores an unresolved batch; Discard saved request drops it after a confirming step and sends nothing.",
+    states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Commit disabled · fix mapping", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "same requestId returns original committed and blocked results"], ["permission", "Import requires admin", 1], ["upload", "kind chosen · its columns listed as required, optional, or required for a US address · reference columns take a name or ID"]],
+    spec: "Before upload, the screen lists the chosen kind's columns from the import field contract and marks each one required, optional, or required for a US address. One logical row is atomic; siblings commit independently. Reference ID cells accept a UUID or trimmed, case-insensitive exact name; missing or ambiguous names block the row. Bin names are scoped to the location, and pour formats to the price group. Product imports use packaged formats. Preview is editable on phone and desk. All-invalid batches cannot commit. Same-batch retry preserves raw cells and returns original results; correction starts only blocked rows with a new identity. Reloading the same tab restores an unresolved batch; Discard saved request drops it after a confirming step and sends nothing.",
     body: <ImportView model={importPreview} />,
   },
   {
@@ -847,6 +859,20 @@ export const SCREENS: Screen[] = [
         onCommit={() => undefined}
       />
     </>,
+  },
+  {
+    step: 4,
+    slice: 1,
+    tab: "Today",
+    group: "Global",
+    name: "Composer setup",
+    to: { "Retry setup": "Composer setup", Minimize: "Today" },
+    job: "Open your latest conversation, or start your first, before you can type",
+    reads: "list_chat_conversations · get_chat_history",
+    writes: "create_chat_conversation [first open only; one request id across retries]",
+    states: [["opening", "pulsing bar · Retry setup · input disabled"], ["timed out", `after ${COMPOSER_SETUP_TIMEOUT_MS / 1000} seconds: ${COMPOSER_SETUP_TIMEOUT_MESSAGE} · Try again`, 1], ["failed", "the server's message · Try again", 1]],
+    spec: `Setup restores the latest conversation and its history, or creates one. A stalled load ends after ${COMPOSER_SETUP_TIMEOUT_MS / 1000} seconds in the failure alert. Try again re-runs setup with the same create request id, so a retry never makes a second conversation.`,
+    body: <ComposerConversationView messages={[]} activity={COMPOSER_SETUP_ACTIVITY} onSetupRetry={() => undefined} />,
   },
   {
     step: 4,
@@ -1612,7 +1638,7 @@ export const SCREENS: Screen[] = [
     slice: 4,
     tab: "Beer",
     name: "Cellar map",
-    to: { "FV3 \u00b7 fermenter \u00b7 15 bbl": "Vessel detail" , "Add vessel": "Vessel detail" },
+    to: { "FV3 \u00b7 fermenter \u00b7 15 bbl": "Vessel detail" , "Add vessel": "New vessel" },
     job: "Occupancy is the subject: fill, gravity and overdue lead every tile",
     reads: "list_occupancies · list_vessels · list_batches · list_fermentation_readings · get_gravity_unit · get_batch_completion_preview",
     writes: "upsert_vessel [mutable single rows; admin] · complete_batch",
@@ -1629,9 +1655,22 @@ export const SCREENS: Screen[] = [
     job: "Inspect one vessel's occupancy and readings and edit its physical facts",
     reads: "list_vessels · list_occupancies · list_fermentation_readings · get_gravity_unit",
     writes: "upsert_vessel [mutable facts only] · delete_vessel",
-    states: [["permission", "brewer or admin required", 1], ["brewer", "vessel facts read-only; no Save or Delete"], ["occupied", "batch and fill shown"], ["empty", "available for a batch"], ["reading overdue", "last reading flagged", 1], ["holding beer", "delete refused", 1], ["with batch history", "retired, not deleted"]],
+    states: [["permission", "brewer or admin required", 1], ["brewer", "vessel facts read-only; no Save or Delete"], ["occupied", "batch and fill shown"], ["empty", "available for a batch"], ["reading overdue", "last reading flagged", 1], ["holding beer", "delete refused", 1], ["with batch history", "retired, not deleted"], ["incomplete", "Save vessel says what is still needed; a capacity of 0 or less is marked at its field", 1]],
     spec: "Batch occupancy and reading history are records; only the vessel name, type and capacity are editable here, and only by an admin. A brewer sees the facts as text. Delete vessel confirms first. A vessel holding beer is refused. A vessel that has held beer is retired: it leaves the cellar, transfer targets and brew day, while its batch history and the Batches vessel table keep it. A vessel that never held beer is deleted.",
     body: <VesselDetailView model={vesselFv3} remove={<RemoveVesselControl vessel="FV3" />} />,
+  },
+  {
+    step: 7,
+    slice: 4,
+    tab: "Beer",
+    name: "New vessel",
+    to: { "Save vessel": "Cellar map" },
+    job: "Add a vessel: its name, type and capacity",
+    reads: "none",
+    writes: "upsert_vessel",
+    states: [["permission", "admin only", 1], ["new", "only the vessel facts; occupancy and readings appear on Vessel detail once it is saved"], ["incomplete", "Save vessel says what is still needed; a capacity of 0 or less is marked at its field", 1]],
+    spec: "Add vessel on Cellar and New vessel on Batches open this page: Vessel detail before the vessel exists. A vessel not saved yet has no occupancy or readings, so only its facts are drawn. Save vessel stays withheld until it has a name and a capacity above zero, and the sentence beside it names what is missing. A typed capacity of 0 or less is marked under the field once it is left. Save vessel returns to Cellar.",
+    body: <VesselDetailView model={vesselNew} reason={vesselReason(vesselNew)} />,
   },
   {
     step: 7,
@@ -1673,7 +1712,7 @@ export const SCREENS: Screen[] = [
     slice: 4,
     tab: "Work",
     name: "Batches",
-    to: { Brew: "Brew prep", "New vessel": "Vessel detail" },
+    to: { Brew: "Brew prep", "New vessel": "New vessel" },
     job: "See planned and active batches with the next brew or cellar action",
     reads: "list_batches · list_vessels · list_brands · list_recipes · get_gravity_unit",
     writes: "none [scheduling happens on the New batch sheet; recording on Brew day or Fermentation reading; existing commands]",
@@ -1971,7 +2010,7 @@ export const SCREENS: Screen[] = [
     job: "Create or edit one material definition",
     reads: "list_materials",
     writes: "upsert_material",
-    states: [["permission", "warehouse or brewer required", 1], ["new", "name, kind and unit required"], ["in use", "unit change refused", 1], ["lot-tracked", "every receipt and consumption names a lot; off means none may"], ["malt or adjunct", "extract potential asked; recipe predictions read it"]],
+    states: [["permission", "warehouse or brewer required", 1], ["new", "name, kind and base unit required"], ["in use", "units change refused", 1], ["lot-tracked", "every receipt and consumption names a lot; off means none may"], ["malt or adjunct", "extract potential asked; recipe predictions read it"]],
     spec: "Inventory quantities and lots are not edited on the definition, and neither is lead time: the wait is a property of who fulfils an order, so it lives on the vendor. The purchase-unit factor does live here, because a hop box and a can pallet from one supplier are different numbers, and the factor is what turns counted bags into base units on Receive PO.",
     body: <MaterialView model={materialCitra} />,
   },
@@ -2161,8 +2200,8 @@ export const SCREENS: Screen[] = [
     job: "Choose a monthly, quarterly, or annual reporting period and see whether its snapshot was filed",
     reads: "list_compliance_reports · list_lots",
     writes: "none",
-    states: [["not filed", "ready to review", 1], ["in progress", "the current period: reviewable, filed once it ends"], ["filed", "immutable snapshot saved"], ["lots", "every packaged lot opens its trace"], ["no period yet", "every recent period starts before the books opened · names that date and the first period MGR can report"]],
-    spec: "This is the shared destination for the registry back link, the period rows, and the lot trace. Monthly, Quarterly, and Annual tabs swap the list: the last three months, four calendar quarters, or two calendar years show, less any that start before the books-opened date, plus every filed period of that length. A tab left with no period says No monthly (quarterly, annual) period yet. A TTB filing is exactly one calendar month, quarter, or year; the API takes other jurisdictions and ranges.",
+    states: [["not filed", "Not filed · Ready to review", 1], ["in progress", "the current period: reviewable · In progress · File after the month ends"], ["filed", "the snapshot saved in MGR · Filed <date> · <bbl> taxpaid"], ["lots", "every packaged lot opens its trace"], ["no period yet", "every recent period starts before the books opened · names that date and the first period MGR can report"]],
+    spec: "This is the shared destination for the Licenses back link, the period rows, and the lot trace. Monthly, Quarterly, and Annual tabs swap the list: the last three months, four calendar quarters, or two calendar years show, less any that start before the books-opened date, plus every filed period of that length. A tab left with no period says No monthly (quarterly, annual) period yet. A TTB filing is exactly one calendar month, quarter, or year; the API takes other jurisdictions and ranges.",
     body: <ComplianceMonthsView model={complianceMonthsDemo} />,
   },
   {
@@ -2171,12 +2210,22 @@ export const SCREENS: Screen[] = [
     tab: "More",
     name: "Monthly compliance",
     to: { Confirm: "Monthly compliance", "Reattribute loss": "Monthly compliance" },
-    job: "Generate from ledgers, review, then record the external filing",
+    job: "Generate from ledgers, review, then record in MGR a filing made with TTB outside it",
     reads: "list_compliance_reports · generate_compliance_report · get_loss_review",
     writes: "file_compliance_report · reattribute_loss",
-    states: [["current", "generated from the ledger now"], ["does not balance", "a movement type the report cannot classify is named · Save stays off", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
-    spec: "Admin and Sales review exact generic cellar losses (each batch completion loss and each cellar transfer loss) and allocate each remainder to Sample, Taproom, or Destruction through append-only category changes, never free-text note matching. Corrections post in the period they are saved and leave earlier filed snapshots unchanged. The identity checks are v1 lessons drawn in user copy: balance per class, one additive removal total, an explanatory non-additive cellar breakdown, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Destination-state totals and Export state transactions retain exact supporting movement BBL and invoice/credit cents, including source-linked returns and signed adjustments. Filed exports use the saved facts; missing historical facts are explicit. Removals are keyed by frozen tax treatment; direct cellar Taproom volume files once, as a removal under its frozen Taproom tax treatment (taxpaid for the default channel).",
+    states: [["current", "generated from the ledger now"], ["does not balance", "step 2 names what does not balance · Save is off, with the reason beside it", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
+    spec: "Admin and Sales review exact generic cellar losses (each batch completion loss and each cellar transfer loss) and allocate each remainder to Sample, Taproom, or Destruction through append-only category changes, never free-text note matching. Corrections post in the period they are saved and leave earlier filed snapshots unchanged. The identity checks are v1 lessons drawn in user copy: balance per class, one additive removal total, an explanatory non-additive cellar breakdown, 0.00 never blank. Step 3 says before Save that MGR does not file with TTB or the state: Save filed snapshot only records the filing in MGR. Beer in process is the tanks now, not at period end, and says so. Destination-state totals and Export state transactions retain exact supporting movement BBL and invoice/credit cents, including source-linked returns and signed adjustments. Filed exports use the saved facts; missing historical facts are explicit. Removals are keyed by frozen tax treatment; direct cellar Taproom volume files once, as a removal under its frozen Taproom tax treatment (taxpaid for the default channel).",
     body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAugust)} />,
+  },
+  {
+    step: 7, slice: 6, tab: "More", name: "Report does not balance",
+    to: { "Reattribute loss": "Report does not balance" },
+    job: "See why a period's filing cannot be recorded yet, and what to check",
+    reads: "list_compliance_reports · generate_compliance_report · get_loss_review",
+    writes: "reattribute_loss",
+    states: [["does not balance", "step 2 notes name each class that does not balance and any movement with no report column · Save is off, the same words beside it"], ["unassigned", "a transaction with no recorded destination is noted in step 2 and does not hold Save", 1]],
+    spec: "The same Monthly compliance page when the generated report does not balance. The adapter puts the report's warnings in staff words and builds the reason beside Save from the blocking ones; the Unassigned note never blocks. A warning it does not recognize is shown as written.",
+    body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceUnbalanced)} />,
   },
   {
     step: 7, slice: 6, tab: "More", name: "Filed period needs amendment",
@@ -2206,7 +2255,7 @@ export const SCREENS: Screen[] = [
     job: "Review the current period from the ledger before it can be filed",
     reads: "list_compliance_reports · generate_compliance_report · get_loss_review",
     writes: "reattribute_loss",
-    states: [["in progress", "the period has not ended · File once the period ends replaces Save"], ["filed early", "refused: a period is filed only after it ends", 1]],
+    states: [["in progress", "the period has not ended · \"You can record the filing after <period> ends\" in place of Save"], ["filed early", "refused: a period is filed only after it ends", 1]],
     spec: "The same Monthly compliance page while its month, quarter, or year is still running. Figures and losses are reviewable and losses can be reattributed, but the snapshot is not offered until the period ends, so a filing never freezes part of one.",
     body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceSeptember)} monthOpen />,
   },
@@ -2323,7 +2372,7 @@ export const SCREENS: Screen[] = [
     job: "Review unreturned aging and utilization across the keg fleet",
     reads: "get_keg_report [utilization from keg_fleet_totals; aging is FIFO over keg_events, returns retire the oldest shipment first; deposit mismatches join keg_customer_balances, keg_deposit_balances, lost keg events, and keg deposit refund lines]",
     writes: "none",
-    states: [["permission", "warehouse or admin required", 1], ["aging", "unreturned kegs grouped by age, deposits at the pool rate"], ["deposit mismatch", "after a refund, kegs on deposit disagree with kegs out plus kegs lost, per customer, pool and size", 1], ["utilization", "out divided by fleet, per pool and size"], ["no pools", "no keg pool yet · add one on Keg fleet"], ["no kegs", "a pool exists but no kegs acquired · record them on Keg fleet"]],
+    states: [["permission", "warehouse or admin required", 1], ["aging", "unreturned kegs grouped by age, deposits at the pool rate"], ["deposit mismatch", "after a refund, kegs on deposit disagree with kegs out plus kegs lost, per customer, pool and size", 1], ["utilization", "out divided by fleet, per pool and size"], ["no pools", "no keg pool yet · Open Keg fleet to add one"], ["no kegs", "a pool exists but no kegs acquired · Open Keg fleet to record them"]],
     spec: "Aging identifies who needs follow-up; utilization shows whether the fleet is working or sitting. The ledger counts kegs rather than serials, so a return closes the oldest open shipment. A deposit refund and the Returned keg event are separate records, so the report lists every customer, pool and size with a refunded deposit whose deposit count disagrees with kegs out plus kegs lost.",
     body: <KegReportView model={toKegReportViewProps(kegReportOwned, DEMO_TIME_ZONE)} />,
   },
@@ -2336,7 +2385,7 @@ export const SCREENS: Screen[] = [
     job: "What is on, since when, and roughly how much is left",
     reads: "list_open_taps · list_tap_history · list_skus · list_locations",
     writes: "tap_keg · swap_keg · kick_keg",
-    states: [["swap", "one act, one record · never kick-then-tap"], ["already swapped", "second attempt fails · safe closer and time shown", 1], ["not in taproom stock", "server-derived flag · expected shares excluded", 1], ["guest or event keg", "explicit label and nominal size · no numeric yield", 1], ["no number", "sorts last · a number is never required"], ["duplicate number", "shown as entered · nothing downstream reads it"], ["kicked", "interval closed with a reason · the tap goes empty"], ["no POS", "no usable numerator · no bar", 1]],
+    states: [["swap", "one act, one record · never kick-then-tap"], ["already swapped", "second attempt fails · safe closer and time shown", 1], ["not in taproom stock", "server-derived flag · expected shares excluded", 1], ["guest or event keg", "explicit label and nominal size · no numeric yield", 1], ["no number", "sorts last · a number is never required"], ["duplicate number", "shown as entered · nothing downstream reads it"], ["kicked", "interval closed with a reason · the tap goes empty"], ["no POS", "no usable numerator · no bar", 1], ["not ready", "submit withheld · the line beside it names what is missing"], ["no keg SKUs", "no keg SKU with a keg volume · the picker says so and points to Catalog · guest keg still works", 1]],
     redrawn: true,
     spec: <>A row offers Swap and Kick. Swap closes one interval and opens the replacement atomically; an own replacement defaults to the outgoing SKU, while a guest replacement requires its own label and positive nominal BBL. Tap numbers are optional and may repeat, and unnumbered rows sort last. Opening and closing fill chips are coarse observations and never inventory quantities. A 30-second poll updates only the board and recent history, preserving dirty and uncertain sheets. Exact retries keep the original request. Own package size and inventory exclusion come from the server. Guest labels never match POS facts, so guest rows show no numeric yield. No usable numerator means no bar. Every action here writes zero finished-goods movements; weekly count owns depletion.</>,
     body: <TapBoardView state={tapBoard} skus={tapBoardSkus} timeZone={DEMO_TIME_ZONE} navigation={{ locations: [{ value: "taproom", label: "Taproom" }, { value: "downtown", label: "Downtown" }], location: "taproom" }} recentEvents={[{ title: "Recent · Kolsch tapped", detail: "Dana · Tue 4:10pm" }, { title: "Recent · Saison swapped in", detail: "Ali · Thu 11:20am" }]} />,
@@ -2365,7 +2414,7 @@ export const SCREENS: Screen[] = [
     job: "Close one keg and open the next in a single record",
     reads: "list_open_taps · list_tap_history · list_skus",
     writes: "swap_keg",
-    states: permitted("taproom, warehouse or admin required").concat([["same own SKU", "the follow keg is the default · one atomic record"], ["guest keg", "explicit label and positive nominal BBL"], ["already swapped", "safe closer and time shown · nothing opens", 1], ["no number", "left blank · the keg sorts last on the board"], ["close fill", "three chips · never a typed number", 1], ["unknown response", "retry the frozen request unchanged", 1]]),
+    states: permitted("taproom, warehouse or admin required").concat([["same own SKU", "the follow keg is the default · one atomic record"], ["guest keg", "explicit label and positive nominal BBL"], ["already swapped", "safe closer and time shown · nothing opens", 1], ["no number", "left blank · the keg sorts last on the board"], ["close fill", "three chips · never a typed number", 1], ["not ready", "submit withheld · the line beside it names what is missing (a packaged keg SKU, guest label or size)"], ["unknown response", "retry the frozen request unchanged", 1]]),
     spec: <>Swap is one atomic act: it closes the selected interval and opens the replacement, so a half-finished swap is not a state. The default reuses only an outgoing own SKU; a guest replacement always needs an explicit label and positive nominal BBL. The server freezes own nominal volume and decides inventory exclusion. Tap number stays optional and nonunique. Opening and closing chips are coarse observations and never ledger quantities. An already-closed conflict names the safe closer and time from recent history. An uncertain response freezes the payload and request ID for exact retry.</>,
     body: <TapKegView sheet={swapKeg} skus={tapBoardSkus} timeZone={DEMO_TIME_ZONE} closedFact="Helles was swapped out at 7:42pm by Ali" />,
   },
@@ -2477,8 +2526,8 @@ export const SCREENS: Screen[] = [
     job: "Explain the projection before an admin installs a provider",
     reads: "get_chat_integration_health",
     writes: "begin_chat_installation [admin-only, single-use OAuth intent]",
-    states: [["permission", "admin only", 1], ["OAuth cancelled", "remain disconnected · try again", 1]],
-    spec: "This is production Settings UI, not a developer demo. Preview surfaces remain available while disconnected and use non-sensitive fixtures.",
+    states: [["permission", "admin only", 1], ["OAuth cancelled", "remain disconnected · try again", 1], ["not available", "Connect Slack disabled · ask MGR support", 1]],
+    spec: "This is production Settings UI, not a developer demo. Preview surfaces remain available while disconnected and are labelled as sample data.",
     body: <ChatSettingsView health={chatDisconnected} timezone="America/New_York" readingDueHours={24} previewFixtures={CHAT_PREVIEW_FIXTURES} />,
   },
   {
@@ -2492,7 +2541,7 @@ export const SCREENS: Screen[] = [
     reads: "get_chat_integration_health · get_notification_preferences · get_brewery_operating_defaults · [presentation: ten provider-free fixtures]",
     writes: "set_notification_destination · set_brewery_quiet_hours · set_brewery_operating_defaults · disable_chat_installation · disconnect_chat_installation",
     states: [["permission", "admin only", 1], ["healthy", "last callback and delivery shown"], ["retrying", "queue count + redacted reason", 1], ["disabled", "no sends; previews still work", 1]],
-    spec: "Preview picker renders the same provider-neutral fixtures consumed by renderer contract tests. It never queries live customer data or sends a message. Reading cadence is MGR-owned and controls both Today and chat.",
+    spec: "Four preview tabs render the same provider-neutral fixtures consumed by renderer contract tests, labelled as sample data. The All preview states picker shows only in development. Previews never query live customer data or send a message. Reading cadence is MGR-owned and controls both Today and chat.",
     body: <ChatSettingsView health={chatConnected} timezone="America/New_York" readingDueHours={24} channels={[{ id: "COPS", name: "mgr-operations" }]} channel="COPS" previewFixtures={CHAT_PREVIEW_FIXTURES} />,
   },
   {
@@ -2504,8 +2553,8 @@ export const SCREENS: Screen[] = [
     job: "Control personal Slack delivery without changing assigned MGR work",
     reads: "get_notification_preferences",
     writes: "set_notification_preference · set_notification_destination · set_personal_quiet_hours · unlink_chat_user",
-    states: [["unlinked", "preferences remain available before linking"], ["linked", "unlink only your Slack identity"], ["permission", "every staff role; Taproom cannot set personal quiet hours", 1], ["error", "keep entered quiet hours and show the command error", 1]],
-    spec: "Personal delivery preferences do not change MGR work, App Home or team digests. Clearing both personal times follows the brewery quiet hours.",
+    states: [["unlinked", "preferences remain available before linking"], ["linked", "unlink only your Slack identity"], ["permission", "every staff role; Taproom cannot set personal quiet hours", 1], ["Slack unavailable", "a note replaces the link steps", 1], ["error", "keep entered quiet hours and show the command error", 1]],
+    spec: "Personal delivery preferences do not change MGR work, App Home or team digests. Each reason uses the label Slack's preferences dialog shows. Clearing both personal times follows the brewery quiet hours.",
     body: <ChatPersonalPreferencesView preferences={personalChatPreferences} />,
   },
   {
@@ -3075,8 +3124,8 @@ export const SCREENS: Screen[] = [
     spec: "Rows are rebuilt from owning MGR queries. App Home remains current during quiet hours and is optional for future providers.",
     body: (<>
       {S.h("Today · 4 waiting")}
-      {S.sa("*ORD-0231 · Review submitted order*\nsubmitted · ships Sep 3, 2026 · sales", "Open")}
-      {S.sa("*ORD-0235 · Pick due*\nships Sep 4, 2026 · warehouse", "Open")}
+      {S.sa("*ORD-0231 · Review submitted order*\nsubmitted · ships today · sales", "Open")}
+      {S.sa("*ORD-0235 · Pick due*\nships tomorrow · warehouse", "Open")}
       {S.sa("*Route A · next stop*\nassigned to you · 9:30 AM", "Open")}
       {S.sa("*FV2 · reading overdue*\nlast reading 26 h ago · brewer", "Open")}
       {S.acts([["Open Today in MGR", "pri"]])}
@@ -3121,10 +3170,10 @@ export const SCREENS: Screen[] = [
     states: [["saved", "update App Home and close"], ["invalid hours", "name the correction", 1], ["unsupported provider", "open authenticated MGR fallback", 1]],
     spec: "Snooze and mute affect personal delivery only. App Home and MGR Today still show current work.",
     body: (<>
-      {S.toggle("Submitted orders")}
-      {S.toggle("Picks due")}
-      {S.toggle("Assigned deliveries")}
-      {S.toggle("Fermentation readings")}
+      {S.toggle(NOTIFICATION_REASON_LABEL.submitted_order)}
+      {S.toggle(NOTIFICATION_REASON_LABEL.pick_due)}
+      {S.toggle(NOTIFICATION_REASON_LABEL.delivery_next)}
+      {S.toggle(NOTIFICATION_REASON_LABEL.fermentation_reading_overdue)}
       {S.select("Quiet hours", "9:00 PM–6:00 AM")}
       {S.ctx("Snooze and mute affect personal delivery only. MGR still shows the work as due.")}
     </>),
@@ -3153,7 +3202,7 @@ export const SCREENS: Screen[] = [
     spec: "Future phase only. This fixture intentionally carries an ATP warning, so Slack cannot confirm it.",
     body: (<>
       {S.ctx("Future phase only")}
-      {S.f([["Order", "ORD-0231 · 3 lines · ships Sep 3, 2026 · Submitted"], ["Warning", "Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR."]])}
+      {S.f([["Order", "ORD-0231 · 3 lines · ships today · Submitted"], ["Warning", "Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR."]])}
       {S.dis("Confirm order", "This order needs the full MGR review")}
     </>),
   },
