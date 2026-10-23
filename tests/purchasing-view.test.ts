@@ -11,7 +11,6 @@ import { ContractsView } from "../components/mgr/views/contracts";
 import { CycleCountView, CycleCountFooter } from "../components/mgr/views/cycle-count";
 import { E, splitPinned } from "../components/mgr/e";
 import { MaterialView } from "../components/mgr/views/material";
-import { MaterialsView } from "../components/mgr/views/materials";
 import { MaterialsOnHandView } from "../components/mgr/views/materials-on-hand";
 import { NewPoView } from "../components/mgr/views/new-po";
 import { PurchaseOrdersView } from "../components/mgr/views/purchase-orders";
@@ -278,14 +277,26 @@ describe("Materials", () => {
     expect(src("app/(app)/materials/count-form.tsx")).toContain("footer={E.pin(<CycleCountFooter");
   });
 
-  it("the Materials inventory record is MaterialsView", () => {
-    expect((screen("Materials").body as { type: unknown }).type).toBe(MaterialsView);
+  // #1165: the definitions list was the same rows with Edit for Count, so each row now offers both.
+  it("each Materials on hand row offers Edit beside Count, and no definitions list remains", () => {
+    const html = htmlOf(createElement(MaterialsOnHandView, { model: toMaterialsOnHandViewProps(materialsOnHandList) }));
+    expect(html.match(/>Edit</g)).toHaveLength(materialsOnHandList.rows!.length);
+    expect(html.match(/>Edit<[\s\S]*?>Count</g)).toHaveLength(materialsOnHandList.rows!.length);
+    expect(html).not.toContain("Material definitions");
+    expect(SCREENS.find((s) => s.name === "Materials")).toBeUndefined();
+    expect(src("app/(app)/materials/page.tsx")).not.toMatch(/definitions/);
   });
 
-  // #1111: Materials on hand is the only way into the definitions list, so its back link returns there.
-  it("the definitions list goes back to Materials on hand", () => {
-    expect(htmlOf(createElement(MaterialsView, { model: { rows: [] } }))).toMatch(/Materials on hand<\/a>/);
-    expect(src("app/(app)/materials/page.tsx")).toMatch(/toMaterialsViewProps\(\{\s*backHref: "\/materials",/);
+  it("the live page slots MaterialForm and CountForm into each row", () => {
+    const edit = vi.fn(() => "live edit");
+    const count = vi.fn(() => "live count");
+    const model = toMaterialsOnHandViewProps(materialsOnHandList);
+    const html = htmlOf(createElement(MaterialsOnHandView, { model, rowEdit: edit, rowCount: count }));
+    expect(edit).toHaveBeenCalledTimes(model.rows.length);
+    expect(count).toHaveBeenCalledTimes(model.rows.length);
+    expect(html).not.toMatch(/>Edit<|>Count</);
+    expect(src("app/(app)/materials/page.tsx")).toMatch(/rowEdit=\{[\s\S]*<MaterialForm material=/);
+    expect(src("app/(app)/materials/page.tsx")).toMatch(/rowCount=\{[\s\S]*<CountForm\b/);
   });
 
   it("count keeps real bin identities, decimal input, explicit preview and nullable footer", () => {

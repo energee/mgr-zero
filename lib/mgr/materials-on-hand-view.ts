@@ -4,10 +4,7 @@ export type MaterialsOnHandRowView = {
   key: string;
   title: string;
   detail: string;
-  verb: string;
-  tone: "info" | "attention" | "success" | "primary";
   warning?: boolean;
-  disabled?: boolean;
 };
 
 export type MaterialsOnHandViewModel = {
