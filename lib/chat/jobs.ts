@@ -158,9 +158,12 @@ export async function runChatCallbackBatch({ limit = 25, now = new Date(), db = 
 // starts. It covers the pacing wait (at most 1s) plus about 4s of provider
 // round-trip. Once a lease lapses, the next lease call hands the row to
 // another worker, so a send after that point posts the message twice (#1158).
-// A provider call that runs longer than the margin is the remaining accepted
-// duplicate window (spec §20). A skipped row is re-leased by a later batch
-// with `attempt_count + 1`, which lengthens its backoff after a real failure.
+// The Slack client times a call out at 3 s and never retries or waits out a
+// 429 inside it (slack-adapter.ts, #1247), so a send ends inside the margin.
+// A send Slack accepted but answered too late is retried: the remaining
+// accepted duplicate window (spec §20). A skipped row is re-leased by a later
+// batch with `attempt_count + 1`, which lengthens its backoff after a real
+// failure.
 const LEASE_SAFETY_MS = 5_000;
 
 // Leases due deliveries, re-checks everything from server state, then sends or
