@@ -318,7 +318,7 @@ describe("line errors in the views", () => {
     expect(markup).toMatch(new RegExp(`aria-describedby="${materialEmpty}"`));
     const link = markup.match(/<a [^>]*>Add a material<\/a>/)?.[0];
     expect(link).toContain('href="/materials"');
-    expect(link).toContain('data-to="Materials"');
+    expect(link).toContain('data-to="Materials on hand"');
     expect(html(createElement(ContractView, { model: contractYchCitra }))).not.toMatch(/No vendors yet|No materials yet/);
   });
 

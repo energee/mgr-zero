@@ -100,7 +100,6 @@ import { MaterialLotTraceView } from "@/components/mgr/views/material-lot-trace"
 import { toMaterialLotTraceViewProps } from "@/lib/mgr/material-lot-trace-view";
 import { LotTraceView } from "@/components/mgr/views/lot-trace";
 import { MaterialView } from "@/components/mgr/views/material";
-import { MaterialsView } from "@/components/mgr/views/materials";
 import { MaterialsOnHandView } from "@/components/mgr/views/materials-on-hand";
 import { LocationsView } from "@/components/mgr/views/locations";
 import { MeView } from "@/components/mgr/views/me";
@@ -208,7 +207,7 @@ import { priceGroupTwo, pricingGrid } from "@/lib/mgr/fixtures/pricing";
 import { channelExport, saleChannelsList, unitsPlato } from "@/lib/mgr/fixtures/settings-catalog";
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
 import {
-  contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsList, materialsOnHandList,
+  contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsOnHandList,
   correctReceiptCountryMalt, newPoCountryMalt, newPoIncomplete, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
@@ -246,7 +245,6 @@ import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
 import { toLotTraceViewProps } from "@/lib/mgr/lot-trace-view";
 import { toLocationsViewProps } from "@/lib/mgr/locations-view";
-import { toMaterialsViewProps } from "@/lib/mgr/materials-view";
 import { toMaterialsOnHandViewProps } from "@/lib/mgr/materials-on-hand-view";
 import { ComposerConversationView } from "@/components/mgr/views/composer-conversation";
 import { ComposerProposalView, OfflineOutboxView } from "@/components/mgr/views/composer";
@@ -1964,12 +1962,12 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Beer",
     name: "Materials on hand",
-    to: { "Cans \u00b7 16 oz": "Material", "Citra 2026 \u00b7 YCH": "Material", "2-row 2026 \u00b7 Country Malt": "Material", "Yeast \u00b7 WLP066": "Material" },
-    job: "See material quantities, lots and best-by dates and start a count",
-    reads: "get_material_on_hand",
-    writes: "none [counts happen in the Cycle count sheet]",
+    to: { Edit: "Material", "Cans \u00b7 16 oz": "Material", "Citra 2026 \u00b7 YCH": "Material", "2-row 2026 \u00b7 Country Malt": "Material", "Yeast \u00b7 WLP066": "Material" },
+    job: "See material quantities, lots and best-by dates, edit a material, and start a count",
+    reads: "list_materials · get_material_on_hand",
+    writes: "none [edits happen in the Material sheet, counts in the Cycle count sheet]",
     states: [["expiring", "the earliest best-by date needs attention"], ["empty", "no materials yet: Add material is the only action"]],
-    spec: "The Beer landing's Materials row opens this list. Count opens Cycle count for that material; Add material opens the existing material and vendor flow.",
+    spec: "The Beer landing's Materials row opens this list. Edit opens Material for that material's definition; Count opens Cycle count for its stock; Add material opens the existing material and vendor flow. One list serves both, so there is no separate definitions list.",
     body: <MaterialsOnHandView model={toMaterialsOnHandViewProps(materialsOnHandList)} controls={<ListControls search={{ label: "Search materials", value: "", keep: {} }} />} />,
   },
   {
@@ -2003,22 +2001,9 @@ export const SCREENS: Screen[] = [
     step: 7,
     slice: 2,
     tab: "More",
-    name: "Materials",
-    to: { Edit: "Material" },
-    job: "List material definitions separately from on-hand lots",
-    reads: "list_materials",
-    writes: "none [creation and editing happen on Material]",
-    states: [["permission", "warehouse or brewer required", 1], ["active", "available to recipes and purchase orders"], ["inactive", "history remains", 1], ["empty", "Add material is the only action"]],
-    spec: "This list owns material facts; Materials on hand remains the inventory view.",
-    body: <MaterialsView model={toMaterialsViewProps(materialsList)} />,
-  },
-  {
-    step: 7,
-    slice: 2,
-    tab: "More",
     surface: "sheet",
     name: "Material",
-    to: { "Save material": "Materials" },
+    to: { "Save material": "Materials on hand" },
     job: "Create or edit one material definition",
     reads: "list_materials",
     writes: "upsert_material",

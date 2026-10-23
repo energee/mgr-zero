@@ -276,7 +276,7 @@ describe("SCREENS", () => {
   it("draws the missing More and Settings destinations", () => {
     const expected = new Map<string, Screen["surface"]>([
       ["Customer detail", undefined], ["Ship-to form", "sheet"], ["Compliance months", undefined],
-      ["Locations", undefined], ["Location detail", undefined], ["Materials", undefined],
+      ["Locations", undefined], ["Location detail", undefined],
       ["Material", "sheet"], ["Vendor", "sheet"], ["Contracts", undefined],
       ["Contract", "sheet"], ["SKU list", undefined], ["Team member", "sheet"],
     ]);
@@ -854,7 +854,7 @@ describe("SCREENS", () => {
       ["Packaging runs", "Schedule run"], ["Purchase orders", "New PO"], ["Routes", "New route"],
       ["Locations", "Add location"], ["Finished goods", "Add SKU in Catalog"], ["Customers", "New customer"],
       ["Catalog", "New brand"],
-      ["Materials on hand", "Add material"], ["Vendors", "Add vendor"], ["Materials", "Add material"],
+      ["Materials on hand", "Add material"], ["Vendors", "Add vendor"],
       ["Contracts", "Add contract"], ["Recipes", "New recipe"], ["Price groups", "New price group"],
     ] as const) {
       const html = body(name);
