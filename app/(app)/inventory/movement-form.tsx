@@ -9,7 +9,7 @@
 import { command } from "@/lib/commands/client";
 import { useBrewery } from "@/lib/brewery-provider";
 import type { BinMoveStock } from "@/lib/commands/inventory";
-import { MOVEMENT_TYPES, movementFieldErrors, movementFields, movementReason, requiresChannel, requiresDestState, type MovementType } from "@/lib/movement-form";
+import { MOVEMENT_KIND_LABELS, MOVEMENT_TYPES, movementFieldErrors, movementFields, movementReason, requiresChannel, requiresDestState, type MovementType } from "@/lib/movement-form";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { formatVolume } from "@/lib/volume";
 import { useEffect, useState } from "react";
@@ -102,7 +102,6 @@ export function MovementForm({
       ...(receipt.ref ? [{ label: "Source reference", value: receipt.ref }] : []),
     ],
   }) : null;
-  const kindOptions: string[] = MOVEMENT_TYPES.map(sentenceCase);
   const selectedSku = skus.find(item => item.id === skuId);
   const selectedLocation = locations.find(item => item.id === locationId);
   const selectedBin = bins.find(item => item.id === binId);
@@ -112,7 +111,7 @@ export function MovementForm({
   const movementModel: RecordMovementViewModel = {
     // An empty `kind` (none chosen yet) shows the Select kind placeholder and
     // no pressed toggle.
-    kind: sentenceCase(type), kindOptions,
+    kind: sentenceCase(type), kindOptions: MOVEMENT_KIND_LABELS,
     sku: selectedSku?.label ?? "", skuId, skuOptions: skus.map(item => ({ value: item.id, label: item.label })), skusHref,
     location: selectedLocation?.name ?? "", locationOptions: locations.map(item => item.name),
     bin: selectedBin?.name ?? "", binOptions: bins.filter(item => item.location_id === locationId).map(item => item.name),
@@ -157,7 +156,7 @@ export function MovementForm({
           <RecordMovementView
             model={movementModel}
             controls={{
-              kind: value => { const next = MOVEMENT_TYPES[kindOptions.indexOf(value)]; if (next) onTypeChange(next); },
+              kind: value => { const next = MOVEMENT_TYPES[MOVEMENT_KIND_LABELS.indexOf(value)]; if (next) onTypeChange(next); },
               sku: value => { setSkuId(value); setLotId(""); },
               location: value => { const id = locations.find(item => item.name === value)?.id ?? ""; setLocationId(id); setLotId(""); setBinId(bins.find(item => item.location_id === id)?.id ?? ""); },
               bin: value => { setBinId(bins.find(item => item.location_id === locationId && item.name === value)?.id ?? ""); setLotId(""); },

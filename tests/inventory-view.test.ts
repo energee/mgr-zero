@@ -14,8 +14,7 @@ import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, re
 import { assembleFinishedGoods, skuLabel, toFinishedGoodsViewProps } from "../lib/mgr/finished-goods-view";
 import { toMovementRecordedViewProps } from "../lib/mgr/movement-recorded-view";
 import { toRecordMovementViewProps } from "../lib/mgr/record-movement-view";
-import { sentenceCase } from "../lib/mgr/labels";
-import { MOVEMENT_TYPES } from "../lib/movement-form";
+import { MOVEMENT_KIND_LABELS } from "../lib/movement-form";
 import { toReverseMovementViewProps } from "../lib/mgr/reverse-movement-view";
 import { formatVolume } from "../lib/volume";
 
@@ -177,9 +176,8 @@ describe("Record movement view", () => {
   });
 
   it("lists the live form's kinds in the staff guide's order (#1168)", () => {
-    const live = MOVEMENT_TYPES.map(sentenceCase);
-    expect(live).toEqual(["Opening balance", "Production in", "Adjustment", "Depletion", "Destruction", "Loss", "Sample", "Festival removal", "Return in"]);
-    expect(toRecordMovementViewProps(recordMovementFestival).kindOptions).toEqual(live);
+    expect(MOVEMENT_KIND_LABELS).toEqual(["Opening balance", "Production in", "Adjustment", "Depletion", "Destruction", "Loss", "Sample", "Festival removal", "Return in"]);
+    expect(toRecordMovementViewProps(recordMovementFestival).kindOptions).toEqual(MOVEMENT_KIND_LABELS);
   });
 
   it("renders Kind, SKU, Destination state, and Record movement", () => {

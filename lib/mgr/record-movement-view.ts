@@ -1,7 +1,7 @@
 // lib/mgr/record-movement-view.ts — view-model for the shared Record movement sheet.
 import { formatVolume } from "@/lib/volume";
 import { sentenceCase } from "@/lib/mgr/labels";
-import { MOVEMENT_TYPES, type MovementFieldErrors, type MovementType } from "@/lib/movement-form";
+import { MOVEMENT_KIND_LABELS, type MovementFieldErrors, type MovementType } from "@/lib/movement-form";
 
 export const MOVEMENT_CHANNEL_OPTIONS = ["Wholesale", "Taproom", "DTC", "Export"];
 
@@ -58,7 +58,7 @@ export function toRecordMovementViewProps(s: RecordMovementSnapshot): RecordMove
   const sign = s.kind === "opening_balance" || s.kind === "adjustment" ? "" : "−";
   return {
     kind,
-    kindOptions: MOVEMENT_TYPES.map(sentenceCase),
+    kindOptions: MOVEMENT_KIND_LABELS,
     sku: s.sku,
     skuOptions: [{ value: s.sku, label: s.sku }],
     location: s.location,
