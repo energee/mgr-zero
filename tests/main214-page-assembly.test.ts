@@ -34,7 +34,7 @@ async function query(name: string, input?: { basis?: string; missingPortalEmail?
     case "list_customers": state.customerInput = input ?? {}; return [customer];
     case "list_locations": return [{ id: "location", name: "Cold room", uses: ["warehouse"] }];
     case "list_bins": return [{ id: "bin", name: "Cold" }];
-    case "get_bin_move_stock": return [{ skuId: "sku", qty: 4 }];
+    case "get_bin_move_stock": return [{ bin_id: "bin", skuId: "sku", qty: 4 }];
     // #994: the searched lists record their input and find nothing, so the no-match copy shows.
     case "list_recipes": case "list_vendors_and_contracts": case "list_materials": state.inputs[name] = input; return [];
     case "list_vendors": case "get_material_on_hand": return [];
@@ -143,12 +143,15 @@ it("customer view keeps tax edit prefill, default ship-to, filtered Orders, Invi
 it("bins shared view retains actual stock move inputs and suppresses Warehouse-only queries for sales", async () => {
   const page = await BinsPage({ params: Promise.resolve({ id: "location" }) });
   expect(page.type).toBe(LocationBinsView);
-  expect(page.props.footer.props.stock).toEqual([{ skuId: "sku", qty: 4 }]);
+  expect(page.props.footer.props.stock).toEqual([{ bin_id: "bin", skuId: "sku", qty: 4 }]);
   expect(page.props.footer.props.bins[0].id).toBe("bin");
+  // #1154: the title names the location and the row says what the bin holds.
+  expect(render(page)).toMatch(/Bins at Cold room[\s\S]*Cold[\s\S]*1 kind of stock/);
   state.roles = ["sales"]; state.calls = [];
   const readonly = await BinsPage({ params: Promise.resolve({ id: "location" }) });
   expect(state.calls).not.toContain("get_bin_move_stock");
-  expect(render(readonly)).not.toMatch(/Add bin|Edit bin|Move stock/);
+  // Sales never reads bin stock, so the row claims neither a count nor Empty.
+  expect(render(readonly)).not.toMatch(/Add bin|Edit bin|Move stock|of stock|Empty|Nothing is stored/);
 });
 it("pricing shared tables draw a group's pour as a column by its name, with a cell on that group", async () => {
   const page = await PricingPage();
