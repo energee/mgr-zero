@@ -1,16 +1,12 @@
 // lib/mgr/record-movement-view.ts — view-model for the shared Record movement sheet.
 import { formatVolume } from "@/lib/volume";
-import type { MovementFieldErrors } from "@/lib/movement-form";
-
-export const MOVEMENT_KIND_OPTIONS = [
-  "Opening balance", "Depletion", "Loss", "Sample", "Festival removal", "Destruction", "Adjustment", "Production in", "Return in",
-] as const;
+import { sentenceCase } from "@/lib/mgr/labels";
+import { MOVEMENT_KIND_LABELS, type MovementFieldErrors, type MovementType } from "@/lib/movement-form";
 
 export const MOVEMENT_CHANNEL_OPTIONS = ["Wholesale", "Taproom", "DTC", "Export"];
 
 export type RecordMovementViewModel = {
   kind: string;
-  kindIndex: number;
   kindOptions: string[];
   sku: string;
   /** The picked option's value (the live form's SKU id); sku is its label. */
@@ -44,7 +40,7 @@ export type RecordMovementViewModel = {
 };
 
 export type RecordMovementSnapshot = {
-  kind: (typeof MOVEMENT_KIND_OPTIONS)[number];
+  kind: MovementType;
   sku: string;
   location: string;
   locationOptions: string[];
@@ -58,12 +54,11 @@ export type RecordMovementSnapshot = {
 };
 
 export function toRecordMovementViewProps(s: RecordMovementSnapshot): RecordMovementViewModel {
-  const kindIndex = MOVEMENT_KIND_OPTIONS.indexOf(s.kind);
-  const sign = s.kind === "Opening balance" || s.kind === "Adjustment" ? "" : "−";
+  const kind = sentenceCase(s.kind);
+  const sign = s.kind === "opening_balance" || s.kind === "adjustment" ? "" : "−";
   return {
-    kind: s.kind,
-    kindIndex: kindIndex < 0 ? 0 : kindIndex,
-    kindOptions: [...MOVEMENT_KIND_OPTIONS],
+    kind,
+    kindOptions: MOVEMENT_KIND_LABELS,
     sku: s.sku,
     skuOptions: [{ value: s.sku, label: s.sku }],
     location: s.location,
@@ -75,7 +70,7 @@ export function toRecordMovementViewProps(s: RecordMovementSnapshot): RecordMove
     destState: s.destState,
     destStateOptions: s.destStateOptions,
     qty: String(s.qty),
-    preview: `Preview: ${sign}${s.qty} SKU unit · ${formatVolume(s.bbl)} · ${s.kind} · ${s.destState.split(" · ")[0]} · amounts are entered positive`,
+    preview: `Preview: ${sign}${s.qty} SKU unit · ${formatVolume(s.bbl)} · ${kind} · ${s.destState.split(" · ")[0]} · amounts are entered positive`,
     lot: "Untracked / legacy stock",
     lotOptions: ["Untracked / legacy stock"],
     note: "",

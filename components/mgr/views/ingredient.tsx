@@ -12,6 +12,7 @@
 import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { sentenceCase } from "@/lib/mgr/labels";
+import { noMaterialsPick } from "@/lib/mgr/materials-view";
 import { INGREDIENT_STAGES, type IngredientLine } from "@/lib/mgr/recipe-process-view";
 
 export type IngredientFields = IngredientLine;
@@ -29,7 +30,7 @@ export function IngredientView({ fields, materials, onChange, footer }: {
   const unit = materials.find((m) => m.id === fields.materialId)?.unit;
   const qtyLabel = unit ? `Quantity per bbl (${unit})` : "Quantity per bbl";
   return <>
-    {E.searchPick("Material", fields.materialId, materials.map((m) => ({ value: m.id, label: m.category ? `${m.name} · ${m.category}` : m.name })), { id: `${id}-material`, placeholder: "Choose a material", empty: { text: "No materials yet.", label: "Add a material", href: "/materials", to: "Materials" }, ...bind("materialId") })}
+    {E.searchPick("Material", fields.materialId, materials.map((m) => ({ value: m.id, label: m.category ? `${m.name} · ${m.category}` : m.name })), { id: `${id}-material`, placeholder: "Choose a material", empty: noMaterialsPick("/materials"), ...bind("materialId") })}
     {E.pick("Stage", fields.stage, INGREDIENT_STAGE_OPTIONS, bind("stage"))}
     {E.inline(
       E.qty(fields.perBblQty, unit ? `${unit} / bbl` : "/ bbl", qtyLabel, `${id}-qty`, bind("perBblQty")),

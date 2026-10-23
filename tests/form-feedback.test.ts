@@ -30,6 +30,8 @@ import { vesselCapacityError, vesselReason } from "@/lib/mgr/vessel-detail-view"
 import { VesselDetailView } from "@/components/mgr/views/vessel-detail";
 import { VesselForm } from "@/app/(app)/batches/vessel-form";
 import { vesselFv3 } from "@/lib/mgr/fixtures/production";
+import { ContractView } from "@/components/mgr/views/contract";
+import { contractYchCitra } from "@/lib/mgr/fixtures/purchasing";
 
 // The live forms render without a router or a command round trip.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {} }) }));
@@ -304,6 +306,20 @@ describe("line errors in the views", () => {
     const other = html(createElement(NewTransferView, { model: { ...transfer, skusHref: null } }));
     expect(other).toContain("No SKUs yet. An admin or sales member adds them in Catalog.");
     expect(other).not.toContain("Add a SKU");
+  });
+
+  it("New contract's empty Vendor picker points at Add vendor on its page, its empty Material picker links Materials; each note is tied to its picker (#1123)", () => {
+    const markup = html(createElement(ContractView, { model: { ...contractYchCitra, vendorId: "", vendorOptions: [], materialId: "", materialOptions: [] } }));
+    const vendorEmpty = markup.match(/<p[^>]*id="([^"]+-empty)"[^>]*>No vendors yet\. Close this form and choose Add vendor\.<\/p>/)?.[1];
+    const materialEmpty = markup.match(/<p[^>]*id="([^"]+-empty)"[^>]*>No materials yet\./)?.[1];
+    expect(vendorEmpty).toBeTruthy();
+    expect(materialEmpty).toBeTruthy();
+    expect(markup).toMatch(new RegExp(`aria-describedby="${vendorEmpty}"`));
+    expect(markup).toMatch(new RegExp(`aria-describedby="${materialEmpty}"`));
+    const link = markup.match(/<a [^>]*>Add a material<\/a>/)?.[0];
+    expect(link).toContain('href="/materials"');
+    expect(link).toContain('data-to="Materials on hand"');
+    expect(html(createElement(ContractView, { model: contractYchCitra }))).not.toMatch(/No vendors yet|No materials yet/);
   });
 
   it("a chosen location with no bins says so under its bin picker", () => {
