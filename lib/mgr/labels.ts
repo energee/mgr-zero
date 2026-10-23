@@ -26,6 +26,14 @@ export const PAYMENT_TERM_LABEL: Record<PaymentTerm, string> = { due_on_receipt:
 /** A stored payment term as the operator reads it; an unknown value prints as stored. */
 export const paymentTermLabel = (term: string) => PAYMENT_TERM_LABEL[term as PaymentTerm] ?? term;
 
+/** How a QuickBooks or Square connection state reads as a status (qbo_connections / pos_connections.state).
+ *  "Reconnect required" names what recovery_required asks the admin to do (#1151). */
+const CONNECTION_STATE_LABEL: Record<string, string> = { connected: "Connected", disconnected: "Not connected", recovery_required: "Reconnect required" };
+
+/** A stored connection state as a status; the check constraints allow only the three above, so the
+ *  sentence-case fallback only keeps a future state readable until it gets its own label. */
+export const connectionStateLabel = (state: string) => CONNECTION_STATE_LABEL[state] ?? sentenceCase(state);
+
 /** Catalog's Sort options, in BRAND_SORTS order (lib/mgr/enums.ts). */
 export const BRAND_SORT_LABEL: Record<BrandSort, string> = { name: "Name", abv: "ABV", newest: "Newest" };
 

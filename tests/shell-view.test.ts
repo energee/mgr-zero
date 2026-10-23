@@ -30,6 +30,7 @@ import {
   portalForgotPassword,
   portalSetPassword,
   portalSignIn,
+  portalStaffOnly,
   resetPassword,
   setPassword,
   signIn,
@@ -52,6 +53,7 @@ import {
 import { workWarehouse } from "../lib/mgr/fixtures/work";
 import { taproomBeerView, toBeerViewProps } from "../lib/mgr/beer-view";
 import { toMoreViewProps } from "../lib/mgr/more-view";
+import { searchEmptyMessage } from "../lib/mgr/search-palette-state";
 import { toTodayViewProps } from "../lib/mgr/today-view";
 import { filterWorkRows, toWorkViewProps, workFromQuery } from "../lib/mgr/work-view";
 import { plural } from "../lib/mgr/plural";
@@ -335,8 +337,9 @@ describe("Search view", () => {
     const palette = src("components/mgr/search-palette.tsx");
     expect(palette).toMatch(/<SearchView\b/);
     expect(palette).not.toMatch(/<Command\b|<CommandInput\b|<CommandGroup\b|<CommandItem\b/);
-    expect(palette).toContain("No pages or records found · Try a page name, record name, or document number.");
-    expect(screen("Search").states).toContainEqual(["empty", "No pages or records found · Try a page name, record name, or document number."]);
+    expect(palette).toMatch(/emptyMessage=\{searchEmptyMessage\(/);
+    expect(screen("Search").states).toContainEqual(["first use", searchEmptyMessage("", "idle", true)]);
+    expect(screen("Search").states).toContainEqual(["empty", searchEmptyMessage("zzz", "ready", true)]);
   });
 });
 
@@ -472,6 +475,7 @@ describe("Entry views", () => {
     ["Portal forgot password", portalForgotPassword],
     ["Portal set password", portalSetPassword],
     ["No membership", noMembership],
+    ["Portal staff only", portalStaffOnly],
     ["Expired reset", expiredReset],
   ] as const)("the %s inventory record is EntryView", (name, fixture) => {
     const body = screen(name).body as { type: unknown; props: { model: unknown } };

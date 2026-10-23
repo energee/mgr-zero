@@ -1,4 +1,5 @@
 import { Children, createElement, isValidElement, type ComponentProps, type ReactElement, type ReactNode } from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import { InviteView, TeamMemberView } from "../components/mgr/views/team-controls";
@@ -77,6 +78,32 @@ it("keeps buyer invitations fixed and staff invitations inclusive of taproom", (
   const buyer = renderToStaticMarkup(createElement(InviteView, { buyer: true }));
   expect(buyer).toContain("Buyer");
   expect(buyer).not.toContain("Warehouse");
+});
+
+it("describes each staff role in a full sentence under the role picker (#1153)", () => {
+  const help = (role: string) => renderToStaticMarkup(createElement(InviteView, { buyer: false, role }));
+  expect(help("admin")).toContain("Can use every staff screen and action, including Team and Settings.");
+  expect(help("sales")).toContain("Can manage the catalog, customers, pricing, orders, invoices and compliance reports.");
+  expect(help("warehouse")).toContain("Can pick, ship and deliver orders, run packaging, place purchase orders, and receive, count and transfer stock and kegs.");
+  expect(help("brewer")).toContain("Can manage recipes, batches, cellar work and packaging runs.");
+  expect(help("taproom")).toContain("Can change taproom taps, record taproom counts, view variance and set personal preferences.");
+});
+
+it("explains both invitation paths in a neutral note that names Invitations (#1153)", () => {
+  const html = renderToStaticMarkup(createElement(InviteView, { buyer: false }));
+  const note = html.match(/<div\b[^>]*role="note"[^>]*>[\s\S]*?<\/div>/)?.[0] ?? "";
+  expect(note).toContain("bg-info");
+  expect(note).not.toContain("warning");
+  const text = note.replace(/<[^>]+>/g, "");
+  expect(text).toBe("New accounts get an email to set up their login. Existing accounts get no email. They see the invitation in Invitations the next time they sign in, or at /invitations. Access starts once they accept, within seven days.");
+  expect(html).not.toContain("Keep this page open");
+});
+
+it("reports a sent invitation in a neutral status line that matches the dialog note (#1153)", () => {
+  const src = readFileSync("app/(app)/settings/team/invite-form.tsx", "utf8");
+  expect(src).not.toContain('tone="warning"');
+  expect(src).toContain('<div role="status">{E.polite(sent)}</div>');
+  expect(src).toContain("Invitation pending. They see it in Invitations the next time they sign in.");
 });
 
 it("locks both membership actions during either pending write and retains errors", () => {
