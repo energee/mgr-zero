@@ -148,3 +148,17 @@ it("#1030 starts the Accounting cell at the left edge its header uses", () => {
   expect(html).toMatch(/<th[^>]*class="[^"]*text-left[^"]*"[^>]*>(?:(?!<\/th>)[\s\S])*>Accounting<(?:(?!<\/th>)[\s\S])*<\/th>/);
   expect(html).not.toContain("items-end");
 });
+
+it("#1135 shows Sync QuickBooks only while QuickBooks is connected, and writes the email note for staff", () => {
+  const draw = (connected: boolean) => renderToStaticMarkup(createElement(InvoicesView, {
+    rows: [], connection: { connected, detail: connected ? "Connected · Ridge company" : "Not connected", canConnect: true, connectHref: "/settings/accounting/connect" },
+  }));
+  expect(draw(true)).toContain("Sync QuickBooks");
+  const disconnected = draw(false);
+  expect(disconnected).not.toContain("Sync QuickBooks");
+  expect(disconnected).not.toContain("Last successful sync");
+  expect(disconnected).toContain("Not connected");
+  expect(disconnected).toContain("Connect");
+  expect(disconnected).toContain("MGR can’t tell whether QuickBooks emailed an invoice.");
+  expect(disconnected).not.toContain("invoice query");
+});

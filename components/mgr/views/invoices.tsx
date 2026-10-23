@@ -56,9 +56,10 @@ export function InvoicesView({ rows, backHref, connection, sync, pagination }: {
   return <>
     {E.back("More", "Invoices", undefined, backHref)}
     {connection ? E.row("QuickBooks", connection.detail, connection.connected ? "" : connection.canConnect ? E.act("Connect", "attention", connection.connectHref) : "Admin must connect", connection.connected ? "ok" : "w", QuickBooksMark) : E.fld("QuickBooks", "Financial actions require Admin or Sales")}
-    {connection && (sync !== undefined ? sync : <QboSyncView disabled={!connection.connected} />)}
+    {/* Sync needs a live connection, so a disconnected register offers only Connect. */}
+    {connection?.connected && (sync !== undefined ? sync : <QboSyncView />)}
     {rows.length ? <Register rows={rows} /> : E.blank("No invoices yet")}
     <HistoryNavigation {...pagination} />
-    {E.gated("Email delivery status", "The current invoice query does not report whether QuickBooks emailed an invoice.")}
+    {E.gated("Email delivery status", "MGR can’t tell whether QuickBooks emailed an invoice.")}
   </>;
 }
