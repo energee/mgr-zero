@@ -70,6 +70,7 @@ const AUTHENTICATED_RPCS = [
   "write_off_invoice(uuid,uuid,text,uuid)",
   "record_invoice_payment(uuid,uuid,integer,date,text,text,uuid)",
   "void_invoice_payment(uuid,uuid,text,uuid)",
+  "invoice_push_facts(uuid,uuid[])",
   "start_qbo_push(uuid,uuid,text,uuid)",
   "set_qbo_vendor_mapping(uuid,uuid,text,uuid)",
   "set_qbo_purchase_account(uuid,text,uuid)",

@@ -138,6 +138,13 @@ describe("record_invoice_payment and void_invoice_payment", () => {
     expect(sql(`select local_paid_cents from public.invoice_totals where invoice_id='${f.invoiceId}'`, true)).toEqual(["6000"]);
   });
 
+  it("dates paid_at by the latest received day, even when a backdated payment completes the total", async () => {
+    const f = await localInvoice();
+    expect((await record(f, { p_amount_cents: 6000, p_received_on: "2026-10-20" })).error).toBeNull();
+    expect((await record(f, { p_amount_cents: 4000, p_received_on: "2026-10-05", p_method: "cash" })).error).toBeNull();
+    expect(paidAtLocal(f)).toBe("2026-10-20 00:00:00");
+  });
+
   it("replays the first result for one request id and refuses a changed payload", async () => {
     const f = await localInvoice();
     const requestId = crypto.randomUUID();
@@ -360,9 +367,9 @@ describe("record_invoice_payment and void_invoice_payment commands", () => {
 
 describe("list_invoices and get_invoice carry the ledger", () => {
   type ListRow = { id: string; local_paid_cents: number; has_pending_qbo_push: boolean; was_pushed_to_qbo: boolean };
-  const listRow = async (f: Fixture) =>
-    ((await runCommand("list_invoices", {}, f.sales)) as { rows: ListRow[] }).rows.find(row => row.id === f.invoiceId)!;
-  const detail = async (f: Fixture) => (await runCommand("get_invoice", { invoiceId: f.invoiceId }, f.sales)) as
+  const listRow = async (f: Fixture, ctx: Ctx = f.sales) =>
+    ((await runCommand("list_invoices", {}, ctx)) as { rows: ListRow[] }).rows.find(row => row.id === f.invoiceId)!;
+  const detail = async (f: Fixture, ctx: Ctx = f.sales) => (await runCommand("get_invoice", { invoiceId: f.invoiceId }, ctx)) as
     { payments: unknown[]; localPaidCents: number; hasPendingPush: boolean; wasPushedToQbo: boolean };
 
   it("returns the unvoided sum and every payment, a voided one with its reason, newest received first", async () => {
@@ -393,5 +400,32 @@ describe("list_invoices and get_invoice carry the ledger", () => {
     await changeRealm(purged);
     expect(await listRow(purged)).toMatchObject({ has_pending_qbo_push: false, was_pushed_to_qbo: true, local_paid_cents: 0 });
     expect(await detail(purged)).toMatchObject({ hasPendingPush: false, wasPushedToQbo: true });
+  });
+
+  // qbo_pushes is readable by Admin and Sales only, so the push facts come from
+  // invoice_push_facts: a warehouse reader must never see such an invoice as ledger-owned.
+  it("reports the same push facts to a warehouse reader", async () => {
+    const pending = await localInvoice();
+    await pushOf(pending, "pending");
+    const warehouse = await makeStaffCtx(pending.breweryId, "warehouse");
+    expect(await listRow(pending, warehouse)).toMatchObject({ has_pending_qbo_push: true, was_pushed_to_qbo: false });
+    expect(await detail(pending, warehouse)).toMatchObject({ hasPendingPush: true, wasPushedToQbo: false });
+
+    const purged = await localInvoice();
+    await pushOf(purged, "pushed");
+    await changeRealm(purged);
+    const purgedWarehouse = await makeStaffCtx(purged.breweryId, "warehouse");
+    expect(await listRow(purged, purgedWarehouse)).toMatchObject({ has_pending_qbo_push: false, was_pushed_to_qbo: true });
+    expect(await detail(purged, purgedWarehouse)).toMatchObject({ hasPendingPush: false, wasPushedToQbo: true });
+  });
+
+  it("refuses push facts to a brewer and to another brewery's staff", async () => {
+    const f = await localInvoice();
+    const brewer = await makeStaffCtx(f.breweryId, "brewer");
+    const other = await makeStaffCtx((await makeBrewery()).id, "warehouse");
+    for (const ctx of [brewer, other]) {
+      const result = await ctx.db.rpc("invoice_push_facts", { p_brewery: f.breweryId, p_invoices: [f.invoiceId] });
+      expect(result.error?.code).toBe("42501");
+    }
   });
 });

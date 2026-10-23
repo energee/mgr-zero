@@ -64,6 +64,9 @@ create trigger immutable_history before update or delete on public.invoice_payme
 
 -- Copied from: 20260910120847_deploy_current_schema.sql:1748; only
 -- local_paid_cents is new, appended last as create or replace view requires.
+-- The view is security_invoker and now reads invoice_payments, which
+-- service_role cannot select, so service_role can no longer select this view;
+-- no service path reads it (list_invoices reads it as the signed-in user).
 -- list_invoices reads it beside subtotal_cents in the same request.
 -- collected_cents stays QuickBooks cash only; local_paid_cents is the ledger's
 -- unvoided sum. A reader wanting all cash collected adds both for a
@@ -95,7 +98,7 @@ create function public.record_invoice_payment(
   p_method text, p_reference text, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_actor uuid; v_replay jsonb; v_inv public.invoices; v_tz text;
-  v_total int; v_paid int; v_payment uuid; v_reference text := nullif(btrim(p_reference), '');
+  v_total int; v_paid_before int; v_payment uuid; v_reference text := nullif(btrim(p_reference), '');
 begin
   v_actor := private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'record_invoice_payment', p_request_id,
@@ -127,22 +130,28 @@ begin
 
   select coalesce(sum(amount_cents), 0) into v_total from public.invoice_lines
     where invoice_id = p_invoice and brewery_id = p_brewery;
-  select coalesce(sum(local_paid_cents), 0) into v_paid from public.invoice_totals
+  -- The unvoided sum before this payment.
+  select coalesce(sum(local_paid_cents), 0) into v_paid_before from public.invoice_totals
     where invoice_id = p_invoice and brewery_id = p_brewery;
   -- Also refuses every payment on a $0.00 invoice: nothing is due (Design 4).
-  if p_amount_cents > v_total - v_paid then  -- Q1
+  if p_amount_cents > v_total - v_paid_before then  -- Q1
     raise exception 'a payment cannot be more than the balance due'; end if;
 
   insert into public.invoice_payments (brewery_id, invoice_id, amount_cents, received_on, method, reference, recorded_by)
   values (p_brewery, p_invoice, p_amount_cents, p_received_on, p_method, v_reference, v_actor)
   returning id into v_payment;
-  -- Paid in full: the brewery-local start of the received day, as record_historical_order dates paid_at.
-  if v_paid + p_amount_cents = v_total then
-    update public.invoices set paid_at = p_received_on::timestamp at time zone v_tz
+  -- Paid in full: the brewery-local start of the latest received day among the
+  -- unvoided payments, as record_historical_order dates paid_at. A backdated
+  -- payment can complete the total, so this payment's day is not always the last.
+  if v_paid_before + p_amount_cents = v_total then
+    update public.invoices set paid_at = (select max(p.received_on) from public.invoice_payments p
+        where p.invoice_id = p_invoice and p.brewery_id = p_brewery
+          and not exists (select 1 from public.invoice_payment_voids v where v.payment_id = p.id and v.brewery_id = p.brewery_id)
+      )::timestamp at time zone v_tz
       where id = p_invoice and brewery_id = p_brewery;
   end if;
   return private.complete_command_request(p_request_id, jsonb_build_object(
-    'paymentId', v_payment, 'invoiceId', p_invoice, 'balanceCents', v_total - v_paid - p_amount_cents));
+    'paymentId', v_payment, 'invoiceId', p_invoice, 'balanceCents', v_total - v_paid_before - p_amount_cents));
 end $$;
 revoke all on function public.record_invoice_payment(uuid, uuid, int, date, text, text, uuid)
   from public, anon, authenticated, service_role;
@@ -190,7 +199,27 @@ end $$;
 revoke all on function public.void_invoice_payment(uuid, uuid, text, uuid) from public, anon, authenticated, service_role;
 grant execute on function public.void_invoice_payment(uuid, uuid, text, uuid) to authenticated;
 
--- Copied from: 20261016100800_historical_orders.sql; only the local-payment refusal is new.
+-- The QuickBooks push facts that decide who owns an invoice's balance
+-- (invoiceLedgerOwnsBalance): a pending push (Q3) and a successful one (Q4).
+-- qbo_pushes is readable by Admin and Sales only (integration_operator_read),
+-- but list_invoices and get_invoice also serve Warehouse, which would otherwise
+-- see no push and read an unknown balance as owed. This returns only the two
+-- flags, to the roles of those reads; an invoice with neither has no row.
+create function public.invoice_push_facts(p_brewery uuid, p_invoices uuid[])
+returns table (invoice_id uuid, has_pending_push boolean, was_pushed boolean)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales','warehouse']::public.staff_role[]);
+  return query select p.invoice_id, bool_or(p.status = 'pending'), bool_or(p.status = 'pushed')
+    from public.qbo_pushes p
+    where p.brewery_id = p_brewery and p.invoice_id = any(p_invoices) and p.status in ('pending','pushed')
+    group by p.invoice_id;
+end $$;
+revoke all on function public.invoice_push_facts(uuid, uuid[]) from public, anon, authenticated, service_role;
+grant execute on function public.invoice_push_facts(uuid, uuid[]) to authenticated;
+
+-- Copied from: 20261016100800_historical_orders.sql; only the local-payment
+-- refusal and the two replay comments are new.
 -- It sits beside the written-off and historical refusals, after the invoice row lock.
 CREATE OR REPLACE FUNCTION public.start_qbo_push(p_brewery uuid, p_invoice uuid, p_new_attempt_reason text, p_request_id uuid)
  RETURNS jsonb
@@ -210,6 +239,7 @@ begin
 
   v_replay:=private.claim_command_request(p_brewery,'push_invoice_to_qbo',p_request_id,
     jsonb_strip_nulls(jsonb_build_object('invoiceId',p_invoice,'newAttemptReason',p_new_attempt_reason)));
+  -- Replay of a push that already finished: return its outcome, before any refusal.
   if v_replay is not null then
     select * into v_push from public.qbo_pushes
       where id=nullif(v_replay->>'pushId','')::uuid and brewery_id=p_brewery and invoice_id=p_invoice for update;
@@ -228,6 +258,7 @@ begin
   if exists (select 1 from public.invoice_payments p where p.invoice_id=p_invoice and p.brewery_id=p_brewery
       and not exists (select 1 from public.invoice_payment_voids v where v.payment_id=p.id and v.brewery_id=p.brewery_id))
     then raise exception 'payments for this invoice are recorded in MGR, so it is not sent to QuickBooks'; end if;  -- Q8: voided payments do not block
+  -- Any other replay (its push not finished): the first result, once the refusals above pass.
   if v_replay is not null then
     return v_replay;
   end if;

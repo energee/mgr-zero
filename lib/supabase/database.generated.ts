@@ -5196,6 +5196,11 @@ isOneToOne: false
 "import_csv_row":
 { Args: { "p_brewery": string,"p_request_id": string,"p_row_n": number }; Returns: Json
                            },
+"invoice_push_facts":
+{ Args: { "p_brewery": string,"p_invoices": (string)[] }; Returns: {
+              "has_pending_push": boolean,"invoice_id": string,"was_pushed": boolean
+            }[]
+                           },
 "is_staff_of":
 { Args: { "b": string }; Returns: boolean
                            },

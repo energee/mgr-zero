@@ -394,6 +394,19 @@ async function invoiceStaffLinks(ctx: Ctx, invoices: (QboInvoiceIdentity & { id:
     pushByEntity.get(`${invoice.id}:${invoice.qbo_invoice_id}`))]));
 }
 
+type InvoicePushFacts = { has_pending_push: boolean; was_pushed: boolean };
+
+/** Each invoice's pending and successful QuickBooks pushes, by invoice id; an
+ *  invoice with neither is absent. Read through invoice_push_facts, because
+ *  qbo_pushes is readable by Admin and Sales only and Warehouse also reads
+ *  invoices: without the facts, a pending or earlier-pushed invoice would look
+ *  ledger-owned to Warehouse (invoiceLedgerOwnsBalance, #1045). */
+async function invoicePushFacts(ctx: Ctx, invoiceIds: string[]) {
+  const rows = await unwrap(ctx.db.rpc("invoice_push_facts", { p_brewery: ctx.breweryId, p_invoices: invoiceIds }));
+  // A set-returning RPC answers [] for no rows; data is null only beside an error, which unwrap threw.
+  return new Map<string, InvoicePushFacts>(rows!.map(({ invoice_id, ...facts }) => [invoice_id, facts]));
+}
+
 defineQuery({
   name: "list_invoices", description: "Invoices and credit memos with current total plus frozen local subtotal and the sum of payments recorded in MGR, newest first",
   roles: [...readRoles],
@@ -407,16 +420,15 @@ defineQuery({
     const staffLinksPromise = invoiceStaffLinks(ctx, invoices);
     const [totals, pushes] = ids.length ? await Promise.all([
       unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents, local_paid_cents").in("invoice_id", ids)) as PromiseLike<{ invoice_id: string; subtotal_cents: number; local_paid_cents: number }[]>,
-      unwrap(ctx.db.from("qbo_pushes").select("invoice_id, status").in("invoice_id", ids).in("status", ["pending", "pushed"])) as PromiseLike<{ invoice_id: string; status: "pending" | "pushed" }[]>,
-    ]) : [[], []];
+      invoicePushFacts(ctx, ids),
+    ]) : [[], new Map<string, InvoicePushFacts>()];
     const staffLinks = await staffLinksPromise;
     const totalsById = new Map(totals.map(t => [t.invoice_id, t]));
-    const pending = new Set(pushes.filter(push => push.status === "pending").map(push => push.invoice_id));
-    const pushed = new Set(pushes.filter(push => push.status === "pushed").map(push => push.invoice_id));
     return { ...page, rows: invoices.map(inv => {
       const { subtotal_cents = 0, local_paid_cents = 0 } = totalsById.get(inv.id) ?? {};
+      const push = pushes.get(inv.id);
       return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents), local_paid_cents,
-        has_pending_qbo_push: pending.has(inv.id), was_pushed_to_qbo: pushed.has(inv.id), quickbooks_link: staffLinks.get(inv.id) ?? null };
+        has_pending_qbo_push: push?.has_pending_push ?? false, was_pushed_to_qbo: push?.was_pushed ?? false, quickbooks_link: staffLinks.get(inv.id) ?? null };
     }) };
   },
 });
@@ -430,8 +442,7 @@ defineQuery({
       unwrap(ctx.db.from("invoices").select("*, customers(id,name,qbo_customer_id,qbo_realm_id)").eq("id", i.invoiceId).eq("brewery_id", ctx.breweryId).single()),
       completeRows("Invoice lines", start => ctx.db.from("invoice_lines").select("*, skus(name,qbo_item_id,qbo_realm_id)", { count: "exact" })
         .eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).order("kind").order("id").range(start, start + PAGE_SIZE - 1)),
-      completeRows("Invoice pushes", start => ctx.db.from("qbo_pushes").select("id, status", { count: "exact" })
-        .eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).in("status", ["pending", "pushed"]).order("id").range(start, start + PAGE_SIZE - 1)),
+      invoicePushFacts(ctx, [i.invoiceId]),
       // A void is its own row. PostgREST embeds it as one object or null, since
       // (brewery_id, payment_id) is unique; the generated types still say an array.
       completeRows("Invoice payments", start => ctx.db.from("invoice_payments")
@@ -442,9 +453,10 @@ defineQuery({
     if (!invoice) throw new Error("Invoice not found");
     const staffLinks = await invoiceStaffLinks(ctx, [invoice]);
     const ledger = payments.map(({ invoice_payment_voids: voids, ...payment }) => ({ ...payment, void: voids as unknown as { reason: string } | null }));
+    const push = pushes.get(invoice.id);
     return { invoice, lines: invLines, payments: ledger,
       localPaidCents: ledger.reduce((sum, payment) => payment.void ? sum : sum + payment.amount_cents, 0),
-      hasPendingPush: pushes.some(push => push.status === "pending"), wasPushedToQbo: pushes.some(push => push.status === "pushed"),
+      hasPendingPush: push?.has_pending_push ?? false, wasPushedToQbo: push?.was_pushed ?? false,
       quickbooksLink: staffLinks.get(invoice.id) ?? null };
   },
 });

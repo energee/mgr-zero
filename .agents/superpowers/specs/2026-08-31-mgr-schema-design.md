@@ -369,6 +369,13 @@ Both tables: append-only. The `immutable_history` trigger
 `preserve_reporting_basis_history`) refuses every update and delete. Grants:
 `authenticated` select only; `service_role` none. RLS: `staff_read` select for
 Admin, Sales and Warehouse, the roles of `get_invoice` and `list_invoices`.
+Those reads take each invoice's pending and successful QuickBooks pushes from
+`invoice_push_facts(p_brewery, p_invoices)` (security definer, the same three
+roles): `qbo_pushes` is readable by Admin and Sales only, and Warehouse must not
+read a pending or earlier-pushed invoice as ledger-owned.
+
+`service_role` cannot select `invoice_totals` since #1045: the view is
+`security_invoker` and reads `invoice_payments`. No service path reads it.
 
 ### Views
 - `invoice_totals` — `subtotal_cents = sum(amount_cents)` per invoice, plus the QBO columns,
