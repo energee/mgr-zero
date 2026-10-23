@@ -9,6 +9,9 @@ import { defaultWorkKinds, type WorkRow } from "@/lib/commands/landings";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { WorkList } from "./work-list";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/work") };
 
 export default async function WorkPage() {
   const brewery = await getActiveBrewery();

@@ -7,6 +7,9 @@ import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toKegReportViewProps, type KegReport } from "@/lib/mgr/keg-report-view";
 import "@/lib/commands/all";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/kegs/report") };
 
 export default async function KegReportPage() {
   const brewery = await getActiveBrewery();

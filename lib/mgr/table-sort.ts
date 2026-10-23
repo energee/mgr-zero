@@ -18,9 +18,24 @@ const DATE_AT_END = new RegExp(PRINTED_DATE.source.slice(1));
 const FIGURE = /^[−-]?\$?[\d,]+(\.\d+)?%?$/;
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 
+type LazyNode = { $$typeof: symbol; _payload: unknown; _init: (payload: unknown) => ReactNode };
+
+/** The node a lazy wrapper stands for; any other node as is. During SSR the
+ *  RSC stream hands a server page's element cell to a client table wrapped
+ *  in React.lazy, while the browser decodes the plain element. Reading
+ *  through the wrapper makes both renders draw the same table (#1232).
+ *  _init returns the node, or throws while it is still loading, which
+ *  suspends the caller's render the way React's own lazy rendering does. */
+export function unwrapLazy(node: ReactNode): ReactNode {
+  const lazy = node as LazyNode | null;
+  if (typeof node !== "object" || lazy?.$$typeof !== Symbol.for("react.lazy")) return node;
+  return unwrapLazy(lazy._init(lazy._payload));
+}
+
 /** The text a node draws: host elements and fragments by their children. A
  *  function component's text is not in the tree, so it reads as "". */
 function text(node: ReactNode): string {
+  node = unwrapLazy(node);
   if (typeof node === "string" || typeof node === "number") return String(node);
   if (Array.isArray(node)) return node.map(text).join("");
   if (isValidElement<{ children?: ReactNode }>(node) && (typeof node.type === "string" || node.type === Fragment)) return text(node.props.children);

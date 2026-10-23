@@ -18,7 +18,7 @@ export function MeView({ model, footer, switchAction, avatar }: {
       {E.ttl("Brewery")}
       {model.breweries.map((brewery) => <Fragment key={brewery.id ?? brewery.name}>{E.row(
         brewery.name,
-        brewery.current ? "current" : "",
+        "",
         brewery.current ? "✓" : switchAction && brewery.id ? (
           <form action={switchAction}>
             <input type="hidden" name="breweryId" value={brewery.id} />

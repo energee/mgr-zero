@@ -6,6 +6,9 @@ import { deniedHref } from "@/lib/mgr/denied";
 import type { ImportLookups } from "@/lib/import-csv";
 import "@/lib/commands/all";
 import { ImportWizard } from "./import-wizard";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/settings/import") };
 
 export default async function ImportPage() {
   const brewery = await getActiveBrewery();

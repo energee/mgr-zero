@@ -2,7 +2,7 @@
 // boundary: role filtering leaves no gaps, and the active tab is the longest
 // href prefix of the current path (so /orders/123 lights Work, / lights Today).
 import { describe, expect, it } from "vitest";
-import { activeChild, activeTab, canOpen, isUnder, navAbout, shippedNav, navFor, PORTAL_NAV, STAFF_NAV } from "../lib/mgr/nav";
+import { activeChild, activeTab, canOpen, isUnder, navAbout, navTitle, shippedNav, navFor, PORTAL_NAV, STAFF_NAV } from "../lib/mgr/nav";
 import { STAFF_ROLES } from "../lib/mgr/enums";
 import { workHrefsFor } from "../components/mgr/work-tabs";
 
@@ -102,6 +102,22 @@ describe("canOpen", () => {
       expect.soft(canOpen([role], "/settings/units"), role).toBe(true);
     }
     expect(canOpen(["warehouse"], "/more")).toBe(true);
+  });
+});
+
+describe("navTitle", () => {
+  it("names a page after the deepest nav entry covering its route (#1109)", () => {
+    expect(navTitle("/")).toBe("Today");
+    expect(navTitle("/orders")).toBe("Orders");
+    expect(navTitle("/routes")).toBe("Deliveries");
+    expect(navTitle("/taproom/board")).toBe("Taps");
+    expect(navTitle("/settings/units")).toBe("Units");
+    // A page with no entry of its own follows the section it sits in.
+    expect(navTitle("/settings/team")).toBe("Settings");
+    expect(navTitle("/orders/new")).toBe("Orders");
+  });
+  it("throws for a route no entry covers, so a moved page fails loudly", () => {
+    expect(() => navTitle("/denied")).toThrow(/denied/);
   });
 });
 

@@ -3,6 +3,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { isSquareConfigured } from "@/lib/pos";
 import "@/lib/commands/all";
 import { SquareConnectControl } from "@/components/mgr/views/pos-controls";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/settings/pos/connect") };
 
 export default async function ConnectSquarePage() {
   const { ctx } = await requireAdminContext("Connect Square");

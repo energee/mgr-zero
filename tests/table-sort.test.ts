@@ -23,6 +23,12 @@ describe("cellSortValue", () => {
     expect(cellSortValue(["a", 1])).toBe("a1");
   });
 
+  it("reads a resolved lazy wrapper (how SSR receives a server page's element cell) by its element's text", () => {
+    const lazy = (node: unknown) => ({ $$typeof: Symbol.for("react.lazy"), _payload: node, _init: (payload: unknown) => payload });
+    expect(cellSortValue(lazy(createElement("div", null, "QuickBooks connection required")) as never)).toBe("QuickBooks connection required");
+    expect(cellSortValue(createElement(Fragment, null, lazy(createElement("b", null, "Overdue")) as never, " Sep 12, 2026"))).toBe("Overdue Sep 12, 2026");
+  });
+
   it("reads a function component as null: its text is not in the tree", () => {
     const Available = () => createElement("span", null, "12");
     expect(cellSortValue(createElement(Available))).toBeNull();

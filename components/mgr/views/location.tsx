@@ -1,10 +1,48 @@
-// components/mgr/views/location.tsx — Location detail drawing. Inventory
-// paints edits + Save. Live is read-only flds with LocationForm in the header.
-import type { ReactNode } from "react";
+// components/mgr/views/location.tsx — Location detail drawing, and the
+// location fields it shares with the live Add/Edit location dialog
+// (LocationForm) and the first-run Add location step. Inventory paints the
+// fields + Save. Live is read-only flds with LocationForm in the header.
+import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { FieldDescription } from "@/components/ui/field";
+import type { LocationUse } from "@/lib/mgr/enums";
+import { LOCATION_USE_OPTIONS } from "@/lib/mgr/labels";
 import type { LocationViewModel } from "@/lib/mgr/location-view";
 
 export type { LocationViewModel };
+
+// Each sentence names a real gate: list_locations({ use }) on the tap board,
+// weekly count, variance and Replenishment; taproom staff RLS on stock;
+// the From warehouse and Portal fulfillment warehouse pickers.
+const USES_HINT = "Choose one or more. One place can be all three. The tap board, weekly count, variance and Replenishment list only locations with Taproom. Taproom staff see stock only at those locations. From warehouse on Replenishment and the Portal fulfillment warehouse list only locations with Warehouse.";
+// create_location seeds these three bins; Location bins (admin, warehouse) edits them.
+const BINS_NOTE = "Bins are the rooms and racks inside a location where stock sits. Every new location starts with Cold, Dry and Walk-in. Admin and Warehouse add, rename or remove bins under Location bins.";
+
+/** Location name and Uses, plus what a bin is. Uses takes several answers:
+ *  every taproom or warehouse guard asks whether that use is among them.
+ *  Fixtures pass no controls and draw the values unwired. */
+export function LocationFields({ name, uses, controls = {} }: {
+  name: string;
+  uses: LocationUse[];
+  controls?: { name?: (value: string) => void; uses?: (value: LocationUse[]) => void };
+}) {
+  const nameId = useId();
+  const hintId = useId();
+  const setUses = controls.uses;
+  return (
+    <>
+      {/* Required only when wired to a form; fixtures pass no controls. */}
+      {E.edit("Location name", name, "text", undefined, { id: nameId, onChange: controls.name, required: Boolean(controls.name) })}
+      {E.picks("Uses", uses, LOCATION_USE_OPTIONS, {
+        // The options are LOCATION_USES, so every picked value is a LocationUse.
+        onChange: setUses ? (next) => setUses(next as LocationUse[]) : undefined,
+        "aria-describedby": hintId,
+        description: <FieldDescription id={hintId}>{USES_HINT}</FieldDescription>,
+      })}
+      {E.info(BINS_NOTE)}
+    </>
+  );
+}
 
 export function LocationView({
   model,
@@ -23,14 +61,14 @@ export function LocationView({
       {E.back("Locations", model.name, headerAction, model.backHref)}
       {readOnly ? (
         <>
-          {E.fld("Uses", model.uses.join(" · "))}
+          {E.fld("Uses", model.usesLabel)}
           {E.fld("Timezone", model.timezone)}
           {E.nav("Location bins", model.bins, "", undefined, model.binsHref)}
+          {E.info(BINS_NOTE)}
         </>
       ) : (
         <>
-          {E.edit("Location name", model.name)}
-          {E.picks("Uses", model.uses, model.useOptions)}
+          <LocationFields name={model.name} uses={model.uses} />
           {E.fld("Timezone", model.timezone)}
           {E.nav("Location bins", model.bins)}
         </>

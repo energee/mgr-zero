@@ -10,6 +10,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toLicensesViewProps } from "@/lib/mgr/licenses-view";
 import "@/lib/commands/all";
 import { LicenseForm } from "./license-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/compliance/licenses") };
 
 export default async function LicensesPage() {
   const brewery = await getActiveBrewery();

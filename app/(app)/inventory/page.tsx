@@ -21,6 +21,9 @@ import { MovementForm } from "./movement-form";
 import { formatDateTime } from "@/lib/date-format";
 import { movementFormInstanceKey } from "@/lib/composer/state";
 import { movementInput, type MovementInput, type MovementKind } from "@/lib/commands/movement-input";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/inventory") };
 
 type Sku = { id: string; name: string; format_volume: { bbl_per_unit: number | null } | null; brands: { name: string } | null };
 type Location = { id: string; name: string; uses: string[] };

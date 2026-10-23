@@ -6,6 +6,9 @@ import { buildContext } from "@/lib/commands/context";
 import { requirePagePermission } from "@/lib/mgr/page-query";
 import { NewOrderClient } from "./new-order-client";
 import "@/lib/commands/all";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/orders/new") };
 
 export default async function NewOrderPage() {
   const brewery = await getActiveBrewery();

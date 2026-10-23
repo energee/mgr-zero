@@ -124,7 +124,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "write_off_invoice", description: "Mark a QuickBooks-voided or deleted invoice written off in MGR without recording cash or changing QuickBooks",
+  name: "write_off_invoice", description: "Mark an invoice written off in MGR without recording cash or changing QuickBooks: one voided or deleted in QuickBooks, or an unpaid one QuickBooks never received (its MGR payments stay)",
   input: z.object({ invoiceId: z.string().uuid(), reason: z.string().trim().min(1).max(500) }),
   roles: ["admin"], requiresConfirmation: true,
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("write_off_invoice", {

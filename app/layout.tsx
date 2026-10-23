@@ -18,8 +18,10 @@ const instrumentSans = Instrument_Sans({ variable: "--font-instrument-sans", sub
 const familjenGrotesk = Familjen_Grotesk({ variable: "--font-familjen-grotesk", subsets: ["latin"], preload: false });
 const jetbrainsMono = JetBrains_Mono({ variable: "--font-jetbrains-mono", subsets: ["latin"], preload: false });
 
+// A page's own title reads "<title> · MGR" (staff pages name it with
+// navTitle in lib/mgr/nav.ts); a page without one falls back to plain "MGR".
 export const metadata: Metadata = {
-  title: "MGR",
+  title: { default: "MGR", template: "%s · MGR" },
   description: "Brewery operations management",
 };
 

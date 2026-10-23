@@ -1,6 +1,6 @@
 // tests/record-table.test.ts — the shared register contract (#1025): rich
 // cells, wrapping names, index-keyed columns, and an explicit destination.
-import { createElement, Fragment } from "react";
+import { createElement, Fragment, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, it, vi } from "vitest";
 import { RecordTable } from "../components/mgr/views/record-table";
@@ -109,6 +109,27 @@ it("sorts a component column by the row's explicit sort value", () => {
     rows: [{ key: "a", cells: ["Alpha", createElement(Comp)], sort: [null, 3] }],
   })));
   expect(out[1]).toContain('aria-sort="none"');
+});
+
+/** During SSR the Flight client hands a server page's element cell to this
+ *  client component wrapped in a resolved React.lazy; the browser decodes the
+ *  same cell as a plain element. Both renders must draw the same markup (#1232). */
+const lazy = (node: ReactElement) => ({ $$typeof: Symbol.for("react.lazy"), _payload: node, _init: (payload: ReactElement) => payload }) as unknown as ReactElement;
+
+it("#1232 sorts the same columns whether a cell arrives as an element or as the RSC stream's lazy wrapper", () => {
+  const cell = createElement("div", null, "QuickBooks connection required");
+  const render = (accounting: ReactElement) => heads(renderToStaticMarkup(createElement(RecordTable, {
+    headers: ["Document", "Accounting"], align: ["l", "l"], rows: [{ key: "a", cells: ["INV-1", accounting] }],
+  })));
+  const client = render(cell);
+  expect(client[1]).toContain('aria-sort="none"');
+  expect(render(lazy(cell))).toEqual(client);
+});
+
+it("#1232 keeps a lazy-wrapped badge-led date on one line, as the client draws it", () => {
+  const cell = createElement(Fragment, null, createElement("span", null, "Overdue"), " ", "Oct 3, 2026");
+  const [, due] = classesOf(renderToStaticMarkup(createElement(RecordTable, { headers: ["Name", "Due"], align: ["l", "l"], rows: [{ key: "a", cells: ["Alpha", lazy(cell)] }] })), "td");
+  expect(due).toContain("whitespace-nowrap");
 });
 
 it("draws plain headers when the table is not sortable", () => {

@@ -18,6 +18,10 @@ export type TaproomCount = {
   })[];
 };
 
+// record_invoice_payment and void_invoice_payment: the payment, its invoice, and
+// the invoice's balance after the write (total minus unvoided payments).
+type InvoicePaymentResult = { paymentId: string; invoiceId: string; balanceCents: number };
+
 export type RpcResults = {
   create_order: { order_id: string };
   create_stock_transfer: { transfer_id: string };
@@ -33,6 +37,8 @@ export type RpcResults = {
   record_chat_callback_receipt: { receipt_id: string; installation_id: string; brewery_id: string; disposition: string; duplicate: boolean; result: RpcResults["consume_chat_action_intent"] | null } | null;
   consume_chat_action_intent: { disposition: string; intentId?: string; quietHours?: { start: string | null; end: string | null; timezone: string | null } };
   start_qbo_push: import("@/lib/qbo").QboPushStart;
+  record_invoice_payment: InvoicePaymentResult;
+  void_invoice_payment: InvoicePaymentResult;
 
   get_taproom_count_snapshot: TaproomCountSnapshot;
   get_taproom_count: TaproomCount;

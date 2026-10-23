@@ -11,6 +11,9 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toTransfersViewProps } from "@/lib/mgr/transfers-view";
 import "@/lib/commands/all";
 import { NewTransferForm } from "./new-transfer-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/transfers") };
 
 type Transfer = { id: string; transfer_no: number | null; status: string; from_location_id: string; to_location_id: string; stock_transfer_lines: { id: string }[] };
 type Location = { id: string; name: string; uses: string[] };
