@@ -1,7 +1,7 @@
 // app/(app)/batches/new-batch-form.tsx — CommandForm for schedule_batch:
 // date and planned barrels commit the slot; brand and recipe version are
 // both optional statements of intent (identity is required at packaging,
-// not here). Save schedule names what it still needs (scheduleBatchReason).
+// not here). Schedule batch names what it still needs (scheduleBatchReason).
 "use client";
 
 import { brandLabel } from "@/lib/mgr/brand-view";
@@ -31,8 +31,6 @@ export function NewBatchForm({ brands, recipeVersions }: { brands: Brand[]; reci
   });
   const reason = scheduleBatchReason({ date: plannedOn, plannedBbl });
   const model = {
-    backHref: "/batches",
-    title: "New batch",
     recipeId: recipeVersionId,
     recipe: recipeVersions.find(({ id }) => id === recipeVersionId)?.label ?? "Not decided",
     recipeOptions: recipeVersions,
@@ -52,14 +50,14 @@ export function NewBatchForm({ brands, recipeVersions }: { brands: Brand[]; reci
     note: setNote,
   };
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Schedule batch" trigger={<Button size="sm">New batch</Button>}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="New batch" trigger={<Button size="sm">New batch</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <ScheduleBatchView
           model={model}
           controls={controls}
           messages={<CommandFormMessage error={form.error} />}
           footer={
-            <CommandFormFooter>{E.submit("Save schedule", { submitting: form.submitting, reason })}</CommandFormFooter>
+            <CommandFormFooter>{E.submit("Schedule batch", { submitting: form.submitting, reason })}</CommandFormFooter>
           }
         />
       </form>

@@ -131,7 +131,7 @@ export function OrderForm({
         addLine, removeLine,
       }} messages={<>
         {readiness.hint && <p id="order-form-hint" className="text-sm text-muted-foreground">
-          {readiness.hint} Go to <Link href="/customers" className="underline">Customers</Link> or <Link href="/catalog" className="underline">Catalog</Link>.
+          {readiness.hint} {readiness.goTo.map(part => typeof part === "string" ? part : <Link key={part.href} href={part.href} className="underline">{part.label}</Link>)}
         </p>}
         <CommandFormMessage error={form.error} />
       </>} submitting={form.submitting} reason={readiness.reason} />
