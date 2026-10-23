@@ -14,6 +14,7 @@ import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, re
 import { assembleFinishedGoods, skuLabel, toFinishedGoodsViewProps } from "../lib/mgr/finished-goods-view";
 import { toMovementRecordedViewProps } from "../lib/mgr/movement-recorded-view";
 import { toRecordMovementViewProps } from "../lib/mgr/record-movement-view";
+import { MOVEMENT_KIND_LABELS } from "../lib/movement-form";
 import { toReverseMovementViewProps } from "../lib/mgr/reverse-movement-view";
 import { formatVolume } from "../lib/volume";
 
@@ -165,14 +166,18 @@ describe("Finished goods view", () => {
 });
 
 describe("Record movement view", () => {
-  it("maps festival removal onto chips index 4 and the Hazy preview", () => {
+  it("maps festival removal onto its kind and the Hazy preview", () => {
     const model = toRecordMovementViewProps(recordMovementFestival);
     expect(model.kind).toBe("Festival removal");
-    expect(model.kindIndex).toBe(4);
     expect(model.sku).toBe(SKU_HAZY.name);
     expect(model.bin).toBe("Cold");
     expect(model.channel).toBe("Taproom");
     expect(model.preview).toBe(`Preview: −1 SKU unit · ${formatVolume("0.50000000")} · Festival removal · PA · amounts are entered positive`);
+  });
+
+  it("lists the live form's kinds in the staff guide's order (#1168)", () => {
+    expect(MOVEMENT_KIND_LABELS).toEqual(["Opening balance", "Production in", "Adjustment", "Depletion", "Destruction", "Loss", "Sample", "Festival removal", "Return in"]);
+    expect(toRecordMovementViewProps(recordMovementFestival).kindOptions).toEqual(MOVEMENT_KIND_LABELS);
   });
 
   it("renders Kind, SKU, Destination state, and Record movement", () => {

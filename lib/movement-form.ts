@@ -4,7 +4,19 @@
 // needs, and how the positive form quantity becomes the signed API input.
 import type { BinMoveStock } from "./commands/inventory";
 import { movementInput } from "./commands/movement-input";
+import { sentenceCase } from "@/lib/mgr/labels";
 import { submitReason } from "@/lib/mgr/submit-reason";
+
+/** The staff-facing movement kinds, in the staff guide's order. The live form
+ *  and the inventory frame both list these (#1168). sale_removal and
+ *  taproom_transfer come from order flows, so they are not entered here. */
+export const MOVEMENT_TYPES = [
+  "opening_balance", "production_in", "adjustment", "depletion",
+  "destruction", "loss", "sample", "festival_removal", "return_in",
+] as const;
+export type MovementType = (typeof MOVEMENT_TYPES)[number];
+/** The kind options both lists show, index-aligned with MOVEMENT_TYPES. */
+export const MOVEMENT_KIND_LABELS = MOVEMENT_TYPES.map(sentenceCase);
 
 /** Mirrors the DB CHECK (removal_shape): sale_removal and depletion each name a
  *  channel, and only depletion is staff-facing here (sale_removal comes from
@@ -69,11 +81,4 @@ export const binStockKey = (stock: BinMoveStock) => JSON.stringify([stock.bin_id
 
 export function selectedBinStock(stock: BinMoveStock[], source: string) {
   return stock.find(row => binStockKey(row) === source);
-}
-
-/** Why Move stock is not offered at this location, or null when it is: a bin move needs a second bin and some stock to move. */
-export function moveStockUnavailable({ bins, stock }: { bins: number; stock: number }): string | null {
-  if (bins < 2) return "Moving stock needs at least two bins at this location. Add a bin first.";
-  if (stock === 0) return "No stock is on hand in this location's bins.";
-  return null;
 }

@@ -297,6 +297,8 @@ describe("Work view", () => {
   it("the live Work adapter delegates its controls and rows to WorkView", () => {
     const page = src("app/(app)/work/page.tsx");
     expect(page).toMatch(/<WorkList\b/);
+    // New order opens the form, not the Orders list (#1129).
+    expect(page).toContain('E.btn("New order", "g", "/orders/new")');
     const adapter = src("app/(app)/work/work-list.tsx");
     expect(adapter).toMatch(/<WorkView\b/);
     expect(adapter).not.toMatch(/<Tabs\b|E\.row/);
