@@ -112,7 +112,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Remove a sale channel nothing references
+Remove a sale channel nothing references; the system Taproom channel is never removed
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -229,7 +229,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Sale channels with their tax treatment, alphabetical
+Sale channels with their tax treatment, alphabetical; in_use says a record references the channel, and system_code 'taproom' marks the system Taproom channel
 
 Takes no input.
 

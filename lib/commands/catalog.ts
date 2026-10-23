@@ -206,15 +206,16 @@ defineCommand({
 // through, each with the tax treatment frozen onto the movements it classifies.
 // Editing the list is admin work; anyone who records or reads a movement needs
 // to see it. No channel name is load-bearing: an order carries its own channel,
-// so shipping never looks one up by name and every row renames and deletes
-// alike (whatever references a channel holds it by on delete restrict).
+// so shipping never looks one up by name and every row renames alike. A
+// channel anything references is held by a foreign key, and the system
+// Taproom channel is never deleted (#1207).
 const TAX_TREATMENTS = ["taxable", "export", "vessel_supplies", "research", "transfer_in_bond"] as const;
 
 defineQuery({
-  name: "list_sale_channels", description: "Sale channels with their tax treatment, alphabetical",
+  name: "list_sale_channels", description: "Sale channels with their tax treatment, alphabetical; in_use says a record references the channel, and system_code 'taproom' marks the system Taproom channel",
   input: z.object({}), roles: ["admin", "sales", "warehouse"],
   aiExposed: true,
-  handler: (ctx) => unwrap(ctx.db.from("sale_channels").select("id, name, tax_treatment").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: (ctx) => unwrap(ctx.db.rpc("list_sale_channels", { p_brewery: ctx.breweryId })),
 });
 
 defineCommand({
@@ -227,7 +228,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "delete_sale_channel", description: "Remove a sale channel nothing references",
+  name: "delete_sale_channel", description: "Remove a sale channel nothing references; the system Taproom channel is never removed",
   input: z.object({ channelId: z.string().uuid() }),
   roles: ["admin"],
   handler: async (ctx, i, execution) => {
@@ -237,7 +238,8 @@ defineCommand({
     // inventory_movements, customers, orders and channel_prices reference the
     // channel `on delete restrict` and pos_menus by a plain foreign key, so a
     // channel in use comes back as a raw foreign-key violation; say it in
-    // product terms rather than letting it fall through to a generic 500.
+    // product terms rather than letting it fall through to a generic 500. The
+    // RPC refuses the system Taproom channel itself, in its own words.
     if (result.error?.code === "23503") throw new CommandError("channel is in use");
     return unwrap(Promise.resolve(result));
   },
