@@ -394,6 +394,8 @@ export { WORK_TABS } from "@/lib/mgr/work-view";
 const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]];
 /** DEFAULT_STATES with the permission note swapped for who may open the screen. */
 const permitted = (who: string): NonNullable<Screen["states"]> => [["permission", who, 1], ...DEFAULT_STATES.filter(([st]) => st !== "permission")];
+/** Settings and its no-warehouse variant draw the same page, so they read and write the same. */
+const SETTINGS_IO = { reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_operating_defaults · set_books_opened_on · correct_reporting_basis · set_brewery_ai_model · update_location · set_portal_fulfillment_source" };
 
 export const SCREENS: Screen[] = [
   // step 1 — foundations and both authenticated shells
@@ -489,7 +491,7 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", tab: "More", name: "Settings", job: "Edit brewery/location basics and route to rare setup",
     to: { "Source water": "Water profiles" },
-    reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_operating_defaults · set_books_opened_on · correct_reporting_basis · set_brewery_ai_model · update_location · set_portal_fulfillment_source",
+    ...SETTINGS_IO,
     states: [...permitted("admin only"), ["filed basis", "ordinary field is locked · recorded correction flags every affected filed period"], ["correction history", "immutable old/new basis, actor, time and reason"], ["uncertain correction", "fields freeze · retry unchanged request"]],
     spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Days to package is the brewery-wide projected packaging estimate, default 14 and whole days from 1 to 120. It adds to the actual brew date, or planned date before brewing. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Brewery details, Ask MGR and Wholesale fulfillment are three forms, each saved only by its own button. After filing, the ordinary books date is locked; Correct reporting basis has its own save and immutable correction history. Deployment mode is read-only. Team opens the Team frame.",
     body: <SettingsView model={settingsDemo} />,
@@ -497,9 +499,9 @@ export const SCREENS: Screen[] = [
   {
     step: 8, slice: "all", tab: "More", name: "Settings no warehouse", job: "Say why the portal has no fulfillment warehouse to choose",
     to: { "Source water": "Water profiles" },
-    reads: "get_brewery · list_locations", writes: "none",
-    states: [["no warehouse", "picker disabled · note names the Warehouse use · Edit locations opens Locations"]],
-    spec: "Wholesale fulfillment offers only locations whose Uses include Warehouse. With none, the disabled picker says so beneath it and Edit locations opens Locations, where an admin adds that use. Save warehouse says it still needs a warehouse.",
+    ...SETTINGS_IO,
+    states: [["permission", "admin only", 1], ["no warehouse", "picker disabled · note names Warehouse in Uses · Edit locations opens Locations"], ["warehouse use removed", "a saved source no longer offered starts unchosen · Save warehouse still needs a warehouse"]],
+    spec: "Wholesale fulfillment offers only locations whose Uses include Warehouse. With none, the disabled picker says so beneath it and Edit locations opens Locations, where an admin adds Warehouse to a location's Uses. Save warehouse says it still needs a warehouse.",
     body: <SettingsView model={{ ...settingsDemo, warehouseId: null, warehouseOptions: [] }} />,
   },
   {

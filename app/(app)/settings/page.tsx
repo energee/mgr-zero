@@ -2,7 +2,6 @@ import { getServerEnv } from "@/lib/env/server";
 import { SettingsView } from "@/components/mgr/views/settings";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { canRun } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { redirect } from "next/navigation";
 import { deniedHref } from "@/lib/mgr/denied";
@@ -60,7 +59,7 @@ export default async function SettingsPage() {
       }}
       breweryForm={<SettingsForm key={row.books_opened_on ?? "unset"} brewery={row} hasFiledReports={hasFiledReports} />}
       reportingBasisForm={<ReportingBasisForm key={row.books_opened_on ?? "unset"} basis={row.books_opened_on} history={basisCorrections} timeZone={row.timezone} />}
-      fulfillmentForm={<PortalFulfillmentForm key={row.portal_fulfillment_location_id ?? "unconfigured"} locations={warehouses} currentId={row.portal_fulfillment_location_id} locationsHref={canRun(ctx, "update_location") ? "/locations" : null} />}
+      fulfillmentForm={<PortalFulfillmentForm key={row.portal_fulfillment_location_id ?? "unconfigured"} locations={warehouses} currentId={row.portal_fulfillment_location_id} />}
       aiModelForm={<AiModelSettingsForm current={ai.model} models={aiModels} />}
       hrefs={{ water: "/catalog/water-profiles", locations: "/locations", team: "/settings/team", accounting: "/settings/accounting", pos: "/settings/pos", chat: "/settings/chat", import: "/settings/import" }}
     />

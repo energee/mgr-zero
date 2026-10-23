@@ -1225,7 +1225,9 @@ The [screen explorer](/docs/screens-explore) is a drawing of MGR, including scre
 
 ### Portal fulfillment warehouse
 
-In **Settings**, under **Wholesale fulfillment**, Admin can see the current **Portal fulfillment warehouse**, choose a warehouse directly in Settings, and **Save warehouse**. Only locations whose **Uses** include **Warehouse** are offered. If none do, the picker says so and **Save warehouse** says it still needs a warehouse; follow **Edit locations** and add **Warehouse** to a location's **Uses**, then come back and choose it. This source is used for new portal orders; other brewery settings do not change it.
+<Screen name="Settings no warehouse" />
+
+In **Settings**, under **Wholesale fulfillment**, Admin can see the current **Portal fulfillment warehouse**, choose a warehouse directly in Settings, and **Save warehouse**. Only locations whose **Uses** include **Warehouse** are offered. Until you choose one, **Save warehouse** says *Still needed: a warehouse.* If no location is a warehouse, the picker says so. Follow **Edit locations**, add **Warehouse** to a location's **Uses**, then come back and choose it. If the saved warehouse later loses its **Warehouse** use, the picker starts empty again. This source is used for new portal orders; other brewery settings do not change it.
 
 For cross-location stock transfers, receiving shows the recorded lots at each source bin. Enter the quantity from each source so it totals the received line; finished goods and material transfers preserve that lot on both legs. Manual inventory movements also offer the recorded lot in the selected SKU/bin. Select it for samples, losses or other lot-specific changes; historical untracked balances stay untracked.
 

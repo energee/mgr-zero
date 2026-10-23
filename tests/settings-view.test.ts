@@ -125,28 +125,35 @@ describe("Settings sections (#1025)", () => {
 });
 
 describe("Wholesale fulfillment with no warehouse (#1147)", () => {
-  const empty = (locationsHref?: string | null) => renderToStaticMarkup(createElement(PortalFulfillmentView, { locations: [], currentId: null, locationsHref }));
-  const text = (html: string) => html.replace(/<[^>]*>/g, "");
+  const view = (props: { locations?: { id: string; name: string }[]; currentId?: string | null; locationsHref?: string } = {}) =>
+    renderToStaticMarkup(createElement(PortalFulfillmentView, { locations: [], currentId: null, ...props }));
+  const text = (html: string) => html.replace(/<[^>]*>/g, "").replaceAll("&#x27;", "'");
+  const save = (html: string) => /<button([^>]*)>Save warehouse<\/button>/.exec(html)?.[1] ?? "";
 
-  it("says a location appears only when its Uses include Warehouse, and links Edit locations", () => {
-    const html = empty("/locations");
-    expect(text(html)).toContain("No location has the Warehouse use yet.");
+  it("names the Uses field and links Edit locations under the disabled picker", () => {
+    const html = view({ locationsHref: "/locations" });
+    expect(text(html)).toContain("No location has Warehouse in its Uses. Add Warehouse to a location's Uses, then choose it here.");
     const link = /<a([^>]*)>Edit locations<\/a>/.exec(html)?.[1];
     expect(link).toContain('href="/locations"');
     expect(link).toContain('data-to="Locations"');
-    expect(text(html)).not.toContain("Add a warehouse before enabling portal orders.");
+    expect(/<button[^>]*id="portal-warehouse"[^>]*>/.exec(html)?.[0]).toMatch(/aria-describedby="portal-warehouse-empty"/);
   });
 
-  it("names the admin instead of linking when the viewer may not edit locations", () => {
-    const html = empty(null);
-    expect(html).not.toContain("Edit locations");
-    expect(text(html)).toContain("An admin adds the Warehouse use to a location in Locations.");
-  });
-
-  it("says why Save warehouse is withheld", () => {
-    expect(text(empty("/locations"))).toContain("Still needed: a warehouse.");
-    const chosen = renderToStaticMarkup(createElement(PortalFulfillmentView, { locations: settingsDemo.warehouseOptions, currentId: settingsDemo.warehouseId }));
+  it("withholds Save warehouse and says why", () => {
+    const html = view();
+    expect(text(html)).toContain("Still needed: a warehouse.");
+    const reasonId = /<p id="([^"]+)"[^>]*>Still needed: a warehouse\.<\/p>/.exec(html)?.[1];
+    expect(save(html)).toContain(' disabled=""');
+    expect(save(html)).toContain(`aria-describedby="${reasonId}"`);
+    const chosen = view({ locations: settingsDemo.warehouseOptions, currentId: settingsDemo.warehouseId });
     expect(chosen).not.toContain("Still needed");
+    expect(save(chosen)).not.toContain(' disabled=""');
+  });
+
+  it("withholds Save warehouse when the saved location no longer has the Warehouse use", () => {
+    const html = view({ currentId: settingsDemo.warehouseId });
+    expect(text(html)).toContain("Still needed: a warehouse.");
+    expect(save(html)).toContain(' disabled=""');
   });
 
   it("leaves Settings one Locations row: People and places", () => {
