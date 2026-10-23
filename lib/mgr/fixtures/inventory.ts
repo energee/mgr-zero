@@ -19,7 +19,7 @@ export const finishedGoodsList: FinishedGoodsSnapshot = {
 
 /** Festival removal of one Hazy ½ bbl keg from Warehouse · Cold into PA. */
 export const recordMovementFestival: RecordMovementSnapshot = {
-  kind: "Festival removal",
+  kind: "festival_removal",
   sku: SKU_HAZY.name,
   location: LOC_WAREHOUSE.name,
   locationOptions: [LOC_WAREHOUSE.name, LOC_TAPROOM.name],
