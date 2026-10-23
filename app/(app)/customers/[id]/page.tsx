@@ -14,6 +14,9 @@ import { DeleteCustomerControl } from "@/components/mgr/views/delete-customer";
 import { RevokePortalUserControl } from "@/components/mgr/views/revoke-portal-user";
 import type { PortalUser } from "@/lib/commands/invites";
 import { shipToAddress } from "@/lib/mgr/ship-to-view";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/customers") };
 
 type Customer = { id: string; name: string; alias: string | null; type: CustomerType; country: string; state: string | null; sale_channel_id: string; license_no: string | null; payment_terms: string; tax_treatment: TaxTreatment | null; sale_channels: { name: string } };
 type ShipTo = { id: string; label: string; country: string; address1: string | null; address2: string | null; city: string | null; state: string | null; zip: string | null; is_default: boolean };

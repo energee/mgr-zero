@@ -1,7 +1,8 @@
 // app/(app)/more/page.tsx — More: setup and desk review, never standing work.
 // The rows are the role's More entries from the navigation manifest
-// (lib/mgr/nav.ts), so a hidden entry leaves no gap and a planned one never
-// appears; the phone More tab lands here instead of on the first child.
+// (lib/mgr/nav.ts), under their area headings, so a hidden entry leaves no
+// gap, an area with none of the role's entries has no heading, and a planned
+// one never appears; the phone More tab lands here instead of on the first child.
 import { MoreView } from "@/components/mgr/views/more";
 import { getActiveBrewery } from "@/lib/brewery";
 import { navFor, shippedNav, STAFF_NAV, navTitle } from "@/lib/mgr/nav";
@@ -14,7 +15,7 @@ export default async function MorePage() {
   const items = navFor(shippedNav(STAFF_NAV), brewery.roles).find((t) => t.label === "More")?.children ?? [];
   return (
     <MoreView
-      model={toMoreViewProps(items.map((c) => ({ key: c.href, title: c.label, detail: c.about ?? "", href: c.href })))}
+      model={toMoreViewProps(items.map((c) => ({ key: c.href, title: c.label, detail: c.about ?? "", href: c.href, group: c.group })))}
       linkRows
     />
   );

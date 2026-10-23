@@ -5246,6 +5246,9 @@ isOneToOne: false
 "list_chat_user_links":
 { Args: { "p_brewery": string }; Returns: Json
                            },
+"list_compliance_active_months":
+{ Args: { "p_brewery": string,"p_end": string,"p_start": string }; Returns: (string)[]
+                           },
 "list_customer_users":
 { Args: { "p_brewery": string,"p_customer": string }; Returns: {
               "created_at": string,"email": string,"user_id": string
@@ -5261,6 +5264,9 @@ isOneToOne: false
 { Args: { "p_brewery": string }; Returns: {
               "created_at": string,"email": string,"id": string,"role": Database["public"]['Enums']["staff_role"]
             }[]
+                           },
+"list_sale_channels":
+{ Args: { "p_brewery": string }; Returns: Json
                            },
 "list_tap_history":
 { Args: { "p_brewery": string,"p_location": string }; Returns: Json

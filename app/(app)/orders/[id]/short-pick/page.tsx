@@ -6,6 +6,9 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import type { ShortPickSnapshot } from "@/lib/mgr/short-pick-view";
 import { ShortPickForm } from "../short-pick-form";
 import "@/lib/commands/all";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/orders") };
 
 export default async function ShortPickPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ line?: string; qty?: string }> }) {
   const { id } = await params;

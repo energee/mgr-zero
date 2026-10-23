@@ -9,6 +9,9 @@ import { toLotTraceViewProps } from "@/lib/mgr/lot-trace-view";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import type { LotTraceSnapshot } from "@/lib/mgr/lot-trace-view";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/compliance/lots") };
 
 export default async function LotTracePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

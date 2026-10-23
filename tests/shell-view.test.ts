@@ -298,7 +298,7 @@ describe("Work view", () => {
     const page = src("app/(app)/work/page.tsx");
     expect(page).toMatch(/<WorkList\b/);
     // New order opens the form, not the Orders list (#1129).
-    expect(page).toContain('E.btn("New order", "g", "/orders/new")');
+    expect(page).toContain('<Link href="/orders/new">New order</Link>');
     const adapter = src("app/(app)/work/work-list.tsx");
     expect(adapter).toMatch(/<WorkView\b/);
     expect(adapter).not.toMatch(/<Tabs\b|E\.row/);
@@ -306,10 +306,23 @@ describe("Work view", () => {
 });
 
 describe("More view", () => {
-  it("maps the designed More list", () => {
+  it("maps the designed More list under every area, each card in one", () => {
     const model = toMoreViewProps(moreNavs);
-    expect(model.navs[0]?.title).toBe("Invoices");
-    expect(model.navs.some((r) => r.title === "Settings")).toBe(true);
+    expect(model.groups.map((g) => g.group)).toEqual(["Sales", "Production", "Setup", "Integrations"]);
+    expect(model.groups[0]?.items[0]?.title).toBe("Invoices");
+    expect(model.groups.flatMap((g) => g.items)).toHaveLength(moreNavs.length);
+  });
+
+  it("hides an area heading when the role has no card under it (#1159)", () => {
+    // The live page's mapping, for a role whose More is Chat and Units.
+    const model = toMoreViewProps([
+      { key: "/settings/chat", title: "Chat", group: "Integrations" },
+      { key: "/settings/units", title: "Units", group: "Setup" },
+    ]);
+    expect(model.groups.map((g) => [g.group, g.items.map((r) => r.title)])).toEqual([["Setup", ["Units"]], ["Integrations", ["Chat"]]]);
+    const html = renderToStaticMarkup(createElement(MoreView, { model }));
+    expect(html).toContain(">Setup</h2>");
+    expect(html).not.toContain(">Sales</h2>");
   });
 
   it("the More inventory record is MoreView", () => {
@@ -323,6 +336,8 @@ describe("More view", () => {
     expect(page).toMatch(/from "@\/components\/mgr\/views\/more"/);
     expect(page).toMatch(/<MoreView\b/);
     expect(page).not.toMatch(/from "@\/components\/mgr\/e"/);
+    // Each card carries its nav entry's area, so the live page groups as the frame does.
+    expect(page).toContain("group: c.group");
   });
 });
 
