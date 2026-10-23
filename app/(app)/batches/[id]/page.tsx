@@ -22,6 +22,9 @@ import { batNo } from "@/lib/mgr/doc-no";
 import { ChangePlan } from "../../plan-actions";
 import { PrepForm } from "./prep-form";
 import { RecordBrewDayForm, RecordBrewTimelineForm } from "./record-brew-day-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/batches") };
 
 type Batch = {
   id: string; batch_no: number | null; intended_brand_id: string | null; recipe_version_id: string | null;

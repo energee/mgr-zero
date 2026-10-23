@@ -13,6 +13,9 @@ import { docNo } from "@/lib/mgr/doc-no";
 import { orNotFound } from "@/lib/mgr/not-found";
 import type { ShipToSnapshot } from "@/lib/mgr/ship-to-view";
 import { DeliveredForm } from "./delivered-form";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/work/deliveries") };
 
 type Stop = {
   delivery: {

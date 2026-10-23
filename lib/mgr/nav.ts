@@ -1,8 +1,8 @@
 // lib/mgr/nav.ts — the navigation manifests both shells consume (plan §3):
 // the four staff tabs with their desktop-rail children, the portal's tabs,
 // and the pure helpers AppShell needs — role filtering (a hidden entry
-// leaves no gap), shipped filtering, and active tab/child resolution — plus
-// navTitle, which names each staff page's browser tab. Planned
+// leaves no gap), shipped filtering, area grouping, and active tab/child
+// resolution — plus navTitle, which names each staff page's browser tab. Planned
 // subareas (Taproom, Batches, Menu, …) are listed with `planned: true` and an
 // anchor on the parent route they will one day belong to, so the docs and the
 // screen inventory (components/mgr/screen-frame.tsx) still know the groups;
@@ -17,6 +17,11 @@ import type { IconSvgElement } from "@/components/mgr/icon";
 import type { StaffRole } from "@/lib/commands/registry";
 import { hasAnyRole } from "./roles";
 
+/** The areas More's entries are filed under, in the order they are drawn
+ * (#1159). The More page and the rail's More group both head each area. */
+const NAV_GROUPS = ["Sales", "Production", "Setup", "Integrations"] as const;
+export type NavGroup = (typeof NAV_GROUPS)[number];
+
 export type NavItem = {
   label: string;
   href: string;
@@ -28,6 +33,9 @@ export type NavItem = {
    * and Settings quotes it through navAbout; tests/mgr-nav.test.ts requires
    * it on every staff entry. */
   about?: string;
+  /** The area heading this child sits under; tests/mgr-nav.test.ts requires
+   * it on every More child. Beer and Work children have none. */
+  group?: NavGroup;
   /** Not built yet: shown in the design inventory, hidden by shippedNav(). */
   planned?: true;
   /** Desktop rail sub-entries; the tab itself is the phone target. */
@@ -76,21 +84,21 @@ export const STAFF_NAV: readonly NavItem[] = [
     icon: Settings01Icon,
     about: "Open setup and office pages",
     children: [
-      { label: "Invoices", href: "/invoices", roles: ["sales"], about: "See what customers owe and open an invoice" },
-      { label: "Catalog", href: "/catalog", roles: ["sales"], about: "Define brands, formats and SKUs" },
-      { label: "Menu", href: "/menu", roles: ["warehouse"], about: "Choose what Square sells, where and for how much" },
-      { label: "Customers", href: "/customers", roles: ["sales"], about: "Manage accounts, ship-tos and portal users" },
-      { label: "Price groups", href: "/pricing", roles: ["sales"], about: "Set prices by group for each sale channel" },
-      { label: "Recipes", href: "/recipes", roles: ["brewer"], about: "Write recipes and their versions" },
-      { label: "Vendors", href: "/vendors", roles: ["brewer", "warehouse"], about: "Manage vendors, their terms and contracts" },
-      { label: "Compliance", href: "/compliance", roles: ["sales"], about: "Review and file compliance reports" },
-      { label: "Planning", href: "/planning", roles: ["brewer", "warehouse"], about: "See what planned work is short of" },
-      { label: "Import", href: "/settings/import", roles: ["admin"], about: "Bring in customers, ship-tos, SKUs, prices and opening stock from CSV" },
-      { label: "Settings", href: "/settings", roles: ["admin"], about: "Edit brewery details and connect integrations" },
-      { label: "Chat", href: "/settings/chat", about: "Link Slack and set your notifications" },
-      { label: "Sale channels", href: "/settings/channels", roles: ["admin"], about: "Name how you sell and how each is taxed" },
-      { label: "Locations", href: "/locations", roles: ["admin"], about: "Manage warehouses, taprooms and their bins" },
-      { label: "Units", href: "/settings/units", about: "Choose how gravity is shown" },
+      { label: "Invoices", href: "/invoices", roles: ["sales"], group: "Sales", about: "See what customers owe and open an invoice" },
+      { label: "Catalog", href: "/catalog", roles: ["sales"], group: "Sales", about: "Define brands, formats and SKUs" },
+      { label: "Menu", href: "/menu", roles: ["warehouse"], group: "Integrations", about: "Choose what Square sells, where and for how much" },
+      { label: "Customers", href: "/customers", roles: ["sales"], group: "Sales", about: "Manage accounts, ship-tos and portal users" },
+      { label: "Price groups", href: "/pricing", roles: ["sales"], group: "Sales", about: "Set prices by group for each sale channel" },
+      { label: "Recipes", href: "/recipes", roles: ["brewer"], group: "Production", about: "Write recipes and their versions" },
+      { label: "Vendors", href: "/vendors", roles: ["brewer", "warehouse"], group: "Production", about: "Manage vendors, their terms and contracts" },
+      { label: "Compliance", href: "/compliance", roles: ["sales"], group: "Sales", about: "Review and file compliance reports" },
+      { label: "Planning", href: "/planning", roles: ["brewer", "warehouse"], group: "Production", about: "See what planned work is short of" },
+      { label: "Import", href: "/settings/import", roles: ["admin"], group: "Setup", about: "Bring in customers, ship-tos, SKUs, prices and opening stock from CSV" },
+      { label: "Settings", href: "/settings", roles: ["admin"], group: "Setup", about: "Edit brewery details and connect integrations" },
+      { label: "Chat", href: "/settings/chat", group: "Integrations", about: "Link Slack and set your notifications" },
+      { label: "Sale channels", href: "/settings/channels", roles: ["admin"], group: "Setup", about: "Name how you sell and how each is taxed" },
+      { label: "Locations", href: "/locations", roles: ["admin"], group: "Setup", about: "Manage warehouses, taprooms and their bins" },
+      { label: "Units", href: "/settings/units", group: "Setup", about: "Choose how gravity is shown" },
     ],
   },
 ];
@@ -127,6 +135,18 @@ export function shippedNav(items: readonly NavItem[]): NavItem[] {
     .filter((i) => !i.planned)
     .map((i) => (i.children ? { ...i, children: i.children.filter((c) => !c.planned) } : i))
     .filter((i) => !i.children || i.children.length > 0);
+}
+
+/**
+ * Split a tab's children under their area headings, in NAV_GROUPS order, each
+ * keeping its order within the area. Children with no area come first under
+ * no heading (Beer, Work). Pass role-filtered children: an area left with no
+ * child is dropped, so its heading is never drawn empty.
+ */
+export function navGroups<T extends { group?: NavGroup }>(items: readonly T[]): { group?: NavGroup; items: T[] }[] {
+  return [undefined, ...NAV_GROUPS]
+    .map((group) => ({ group, items: items.filter((i) => i.group === group) }))
+    .filter((g) => g.items.length > 0);
 }
 
 /** Every STAFF_NAV entry, groups and their children alike. */
@@ -175,11 +195,13 @@ export function canOpen(roles: readonly StaffRole[], path: string): boolean {
 /**
  * The browser-tab title of the staff page at `path` (#1109): the label of the
  * deepest STAFF_NAV entry covering it. /routes reads "Deliveries";
- * /settings/team has no entry and follows Settings. Each static page exports
- * `metadata = { title: navTitle("<its route>") }`, and the root layout's
+ * /settings/team has no entry and follows Settings. Each page exports
+ * `metadata = { title: navTitle("<its route>") }`; a record page passes its
+ * static parent, so /orders/[id] reads "Orders" (#1230). The root layout's
  * template appends " · MGR". Throws for a path no STAFF_NAV entry covers, so
  * a page outside the nav fails at build. tests/page-titles.test.ts catches a
- * page that passes a route other than its own, such as a moved page.
+ * page that passes a route other than its own static route, such as a moved
+ * page.
  */
 export function navTitle(path: string): string {
   const entry = coveringEntry(path);

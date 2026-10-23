@@ -15,6 +15,9 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import { poNo } from "@/lib/mgr/doc-no";
 import { OPEN_PO_STATUSES } from "@/lib/mgr/receive-po-view";
 import { ReceiveForm, ReceiptBillAdapter, type PoLine } from "./po-actions";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/purchase-orders") };
 
 type Po = {
   id: string; po_no: number; vendor_id: string; status: string; ordered_on: string | null; expected_on: string | null;
