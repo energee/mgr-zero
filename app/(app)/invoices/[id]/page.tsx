@@ -8,7 +8,9 @@
 // run record_invoice_payment, and Void on each unvoided payment for a viewer
 // who may run void_invoice_payment; otherwise both slots are null.
 // QuickBooks mapping, exact retry, corrected re-push and local write-off use
-// the same registered commands as the API. An unknown id renders not-found.
+// the same registered commands as the API. Write off also shows on an invoice
+// that takes a payment (MGR's ledger owns it and money is due, #1228) for a
+// viewer who may run write_off_invoice. An unknown id renders not-found.
 import { InvoiceReturnButton, InvoiceView } from "@/components/mgr/views/invoice";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -51,6 +53,9 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const recordPayment = model.paymentBalanceCents != null && canRun(ctx, "record_invoice_payment")
     ? <RecordPaymentForm invoiceId={invoice.id} balanceCents={model.paymentBalanceCents} today={breweryDate(brewery.timeZone)} quickbooksConnected={Boolean(health?.connected)} />
     : null;
+  const accountingActions = model.paymentBalanceCents != null && canRun(ctx, "write_off_invoice")
+    ? [...presentation.actions, "write_off" as const]
+    : presentation.actions;
   return (
     <InvoiceView
       model={model}
@@ -60,7 +65,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       correction={memo}
       questionAction={(q) => <MarkAnswered questionId={q.id} />}
       quickbooks={{ detail: presentation.detail }}
-      accountingActions={<QboInvoiceActions invoiceId={invoice.id} invoiceLabel={model.title} actions={presentation.actions} />}
+      accountingActions={<QboInvoiceActions invoiceId={invoice.id} invoiceLabel={model.title} actions={accountingActions} />}
     />
   );
 }

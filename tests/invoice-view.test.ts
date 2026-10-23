@@ -319,6 +319,15 @@ describe("Invoice payments recorded in MGR (#1045)", () => {
   it("takes no payment on a credit memo", () => {
     expect(toInvoiceViewProps(creditMemoAls).paymentBalanceCents).toBeNull();
   });
+  it("reads Written off, with no balance due, once a partly paid invoice is written off (#1228)", () => {
+    const model = toInvoiceViewProps({
+      ...invoiceLocalPartlyPaid,
+      invoice: { ...invoiceLocalPartlyPaid.invoice, written_off_at: "2026-10-23T12:00:00Z" },
+    });
+    expect(model.state).toEqual({ label: "Written off", tone: "ok" });
+    expect(model.summary.settlement).toBeUndefined();
+    expect(model.payments).toHaveLength(2);
+  });
 });
 
 describe("Invoice view: the Payments section (#1045)", () => {
