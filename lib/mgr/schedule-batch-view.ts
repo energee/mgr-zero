@@ -1,10 +1,8 @@
-// lib/mgr/schedule-batch-view.ts — view-model for Schedule batch, and what
-// its Save schedule still needs.
+// lib/mgr/schedule-batch-view.ts — view-model for the New batch sheet, and
+// what its Schedule batch still needs.
 import { submitReason } from "@/lib/mgr/submit-reason";
 
 export type ScheduleBatchViewModel = {
-  backHref?: string;
-  title: string;
   recipeId?: string;
   recipe: string;
   recipeOptions: { id: string; label: string }[];

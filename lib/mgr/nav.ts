@@ -21,7 +21,11 @@ export type NavItem = {
   href: string;
   /** Omitted = every role. Admin always sees everything. */
   roles?: readonly StaffRole[];
-  /** One line of what this area is for; the More landing prints it. */
+  /** One sentence-case line of what you do there, without a trailing period,
+   * accurate for every role that can open the entry.
+   * The More landing prints it under the card, Search under a Pages match,
+   * and Settings quotes it through navAbout; tests/mgr-nav.test.ts requires
+   * it on every staff entry. */
   about?: string;
   /** Not built yet: shown in the design inventory, hidden by shippedNav(). */
   planned?: true;
@@ -33,56 +37,59 @@ export type NavItem = {
 };
 
 export const STAFF_NAV: readonly NavItem[] = [
-  { label: "Today", href: "/", icon: Home01Icon },
+  { label: "Today", href: "/", icon: Home01Icon, about: "See the work waiting on you" },
   {
     label: "Beer",
     href: "/beer",
     icon: BeerIcon,
+    about: "See beer and supplies on hand",
     children: [
-      { label: "Inventory", href: "/inventory", roles: ["sales", "warehouse"] },
-      { label: "Taproom", href: "/taproom", roles: ["warehouse", "taproom"] },
-      { label: "Taps", href: "/taproom/board", roles: ["warehouse", "taproom"] },
-      { label: "Variance by brand", href: "/taproom/variance", roles: ["warehouse", "taproom"] },
-      { label: "Cellar", href: "/cellar", roles: ["brewer"] },
-      { label: "Materials", href: "/materials", roles: ["brewer", "warehouse"] },
-      { label: "Kegs", href: "/kegs", roles: ["warehouse"] },
+      { label: "Inventory", href: "/inventory", roles: ["sales", "warehouse"], about: "See finished goods on hand and available" },
+      { label: "Taproom", href: "/taproom", roles: ["warehouse", "taproom"], about: "Record the weekly taproom count" },
+      { label: "Taps", href: "/taproom/board", roles: ["warehouse", "taproom"], about: "See what is pouring and swap kegs" },
+      { label: "Variance by brand", href: "/taproom/variance", roles: ["warehouse", "taproom"], about: "Compare what sold with what was counted" },
+      { label: "Cellar", href: "/cellar", roles: ["brewer"], about: "Track tanks, readings and additions" },
+      { label: "Materials", href: "/materials", roles: ["brewer", "warehouse"], about: "Count ingredients and packaging on hand" },
+      { label: "Kegs", href: "/kegs", roles: ["warehouse"], about: "Track keg pools, events and customer balances" },
     ],
   },
   {
     label: "Work",
     href: "/work",
     icon: Package01Icon,
+    about: "See everything in motion, by next due date",
     children: [
-      { label: "Orders", href: "/orders", roles: ["sales", "warehouse"] },
-      { label: "Pick", href: "/pick", roles: ["warehouse"] },
-      { label: "Replenishment", href: "/replenishment", roles: ["sales", "warehouse"] },
-      { label: "Transfers", href: "/transfers", roles: ["warehouse"] },
-      { label: "Batches", href: "/batches", roles: ["brewer"] },
-      { label: "Packaging", href: "/packaging", roles: ["brewer", "warehouse"] },
-      { label: "Purchase orders", href: "/purchase-orders", roles: ["warehouse"] },
-      { label: "Deliveries", href: "/routes", roles: ["warehouse"] },
+      { label: "Orders", href: "/orders", roles: ["sales", "warehouse"], about: "Find orders and take the next step" },
+      { label: "Pick", href: "/pick", roles: ["warehouse"], about: "Pick confirmed orders by ship date" },
+      { label: "Replenishment", href: "/replenishment", roles: ["sales", "warehouse"], about: "Keep taprooms stocked to their pars" },
+      { label: "Transfers", href: "/transfers", roles: ["warehouse"], about: "Move stock between locations" },
+      { label: "Batches", href: "/batches", roles: ["brewer"], about: "Schedule and brew batches" },
+      { label: "Packaging", href: "/packaging", roles: ["brewer", "warehouse"], about: "Schedule and close packaging runs" },
+      { label: "Purchase orders", href: "/purchase-orders", roles: ["warehouse"], about: "Order from vendors and receive what arrives" },
+      { label: "Deliveries", href: "/routes", roles: ["warehouse"], about: "Build and run delivery routes" },
     ],
   },
   {
     label: "More",
     href: "/more",
     icon: Settings01Icon,
+    about: "Open setup and office pages",
     children: [
-      { label: "Invoices", href: "/invoices", roles: ["sales"], about: "QuickBooks Online mapping and push" },
-      { label: "Catalog", href: "/catalog", roles: ["sales"], about: "brands and SKUs" },
-      { label: "Menu", href: "/menu", roles: ["warehouse"], about: "Square menu, availability and location prices" },
-      { label: "Customers", href: "/customers", roles: ["sales"], about: "accounts and ship-tos" },
-      { label: "Price groups", href: "/pricing", roles: ["sales"], about: "rows of the price grid" },
-      { label: "Recipes", href: "/recipes", roles: ["brewer"], about: "formulas and versions" },
-      { label: "Vendors", href: "/vendors", roles: ["brewer", "warehouse"], about: "who you buy from" },
-      { label: "Compliance", href: "/compliance", roles: ["sales"], about: "reports and filing status" },
-      { label: "Planning", href: "/planning", roles: ["brewer", "warehouse"] },
-      { label: "Import", href: "/settings/import", roles: ["admin"] },
-      { label: "Settings", href: "/settings", roles: ["admin"], about: "brewery and integrations" },
-      { label: "Chat", href: "/settings/chat", about: "Slack and personal notification preferences" },
-      { label: "Sale channels", href: "/settings/channels", roles: ["admin"], about: "tax treatment" },
-      { label: "Locations", href: "/locations", roles: ["admin"], about: "warehouses, taprooms and bins" },
-      { label: "Units", href: "/settings/units", about: "gravity display" },
+      { label: "Invoices", href: "/invoices", roles: ["sales"], about: "See what customers owe and open an invoice" },
+      { label: "Catalog", href: "/catalog", roles: ["sales"], about: "Define brands, formats and SKUs" },
+      { label: "Menu", href: "/menu", roles: ["warehouse"], about: "Choose what Square sells, where and for how much" },
+      { label: "Customers", href: "/customers", roles: ["sales"], about: "Manage accounts, ship-tos and portal users" },
+      { label: "Price groups", href: "/pricing", roles: ["sales"], about: "Set prices by group for each sale channel" },
+      { label: "Recipes", href: "/recipes", roles: ["brewer"], about: "Write recipes and their versions" },
+      { label: "Vendors", href: "/vendors", roles: ["brewer", "warehouse"], about: "Manage vendors, their terms and contracts" },
+      { label: "Compliance", href: "/compliance", roles: ["sales"], about: "Review and file compliance reports" },
+      { label: "Planning", href: "/planning", roles: ["brewer", "warehouse"], about: "See what planned work is short of" },
+      { label: "Import", href: "/settings/import", roles: ["admin"], about: "Bring in customers, ship-tos, SKUs, prices and opening stock from CSV" },
+      { label: "Settings", href: "/settings", roles: ["admin"], about: "Edit brewery details and connect integrations" },
+      { label: "Chat", href: "/settings/chat", about: "Link Slack and set your notifications" },
+      { label: "Sale channels", href: "/settings/channels", roles: ["admin"], about: "Name how you sell and how each is taxed" },
+      { label: "Locations", href: "/locations", roles: ["admin"], about: "Manage warehouses, taprooms and their bins" },
+      { label: "Units", href: "/settings/units", about: "Choose how gravity is shown" },
     ],
   },
 ];
@@ -119,6 +126,18 @@ export function shippedNav(items: readonly NavItem[]): NavItem[] {
     .filter((i) => !i.planned)
     .map((i) => (i.children ? { ...i, children: i.children.filter((c) => !c.planned) } : i))
     .filter((i) => !i.children || i.children.length > 0);
+}
+
+/**
+ * The `about` line of the STAFF_NAV entry labelled `label`, so a surface that
+ * describes the same page (a Settings row, an inventory fixture) quotes it
+ * instead of keeping its own copy. Throws for a label with no line, so a
+ * renamed entry fails loudly rather than drawing a blank description.
+ */
+export function navAbout(label: string): string {
+  const about = STAFF_NAV.flatMap((i) => [i, ...(i.children ?? [])]).find((i) => i.label === label)?.about;
+  if (!about) throw new Error(`STAFF_NAV has no about line for ${label}`);
+  return about;
 }
 
 /** True when `pathname` is `href` or a route beneath it ("/" only matches itself). */

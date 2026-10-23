@@ -11,7 +11,7 @@ export function KegReportView({ model }: { model: KegReportViewModel }) {
   return (
     <>
       {E.back("Keg fleet", "Keg report", undefined, model.backHref)}
-      {model.empty ? E.blank(model.empty) : (
+      {model.empty ? E.blank(model.empty, undefined, E.btn(model.empty.action, "p", model.backHref)) : (
         <>
           {E.num(model.headline[0], model.headline[1])}
           {E.tbl(["Age", "Kegs", "Deposits"], model.aging, ["l", "r", "r"])}
