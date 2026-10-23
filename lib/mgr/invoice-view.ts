@@ -221,9 +221,8 @@ function invoiceSummary(snapshot: InvoiceSnapshot, localCents: number, totalCent
  *  invoice (no QuickBooks identity, pending push or earlier push) that is not
  *  written off, not paid, and still has money due. */
 function invoiceTakesPayment(snapshot: InvoiceSnapshot, totalCents: number) {
-  const ledger = ledgerFacts(snapshot);
-  return invoiceLedgerOwnsBalance(ledger) && !snapshot.invoice.written_off_at && snapshot.invoice.paid_at == null
-    && (invoiceBalanceCents(ledger, totalCents) ?? 0) > 0;
+  return invoiceLedgerOwnsBalance(ledgerFacts(snapshot)) && !snapshot.invoice.written_off_at && snapshot.invoice.paid_at == null
+    && totalCents > snapshot.localPaidCents;
 }
 
 const paymentView = (p: InvoicePaymentRecord): InvoicePaymentView => ({

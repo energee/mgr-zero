@@ -411,11 +411,12 @@ defineQuery({
     ]) : [[], []];
     const staffLinks = await staffLinksPromise;
     const totalsById = new Map(totals.map(t => [t.invoice_id, t]));
-    const hasPush = (id: string, status: "pending" | "pushed") => pushes.some(push => push.invoice_id === id && push.status === status);
+    const pending = new Set(pushes.filter(push => push.status === "pending").map(push => push.invoice_id));
+    const pushed = new Set(pushes.filter(push => push.status === "pushed").map(push => push.invoice_id));
     return { ...page, rows: invoices.map(inv => {
       const { subtotal_cents = 0, local_paid_cents = 0 } = totalsById.get(inv.id) ?? {};
       return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents), local_paid_cents,
-        has_pending_qbo_push: hasPush(inv.id, "pending"), was_pushed_to_qbo: hasPush(inv.id, "pushed"), quickbooks_link: staffLinks.get(inv.id) ?? null };
+        has_pending_qbo_push: pending.has(inv.id), was_pushed_to_qbo: pushed.has(inv.id), quickbooks_link: staffLinks.get(inv.id) ?? null };
     }) };
   },
 });
