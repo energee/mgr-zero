@@ -1,5 +1,6 @@
 // lib/mgr/record-movement-view.ts — view-model for the shared Record movement sheet.
 import { formatVolume } from "@/lib/volume";
+import type { MovementFieldErrors } from "@/lib/movement-form";
 
 export const MOVEMENT_KIND_OPTIONS = [
   "Opening balance", "Depletion", "Loss", "Sample", "Festival removal", "Destruction", "Adjustment", "Production in", "Return in",
@@ -16,6 +17,10 @@ export type RecordMovementViewModel = {
   skuId?: string;
   /** SKU names are not unique, so the live form keys options by SKU id. */
   skuOptions: { value: string; label: string }[];
+  /** Where SKUs are made, for a user who may make one (create_sku). null when
+   *  this user may not, so the empty SKU note names who can; the inventory
+   *  leaves it out and the link stays inert. */
+  skusHref?: string | null;
   location: string;
   locationOptions: string[];
   bin: string;
@@ -26,7 +31,11 @@ export type RecordMovementViewModel = {
   destStateOptions: string[];
   destStateInput?: boolean;
   qty: string;
-  preview: string;
+  /** The typed fields' corrections (movementFieldErrors). A live form shows
+   *  each once its field is left; a fixture shows it at once. */
+  errors?: MovementFieldErrors;
+  /** Absent until the form is complete: the submit's reason says what is missing. */
+  preview?: string;
   direction?: string;
   directionOptions?: string[];
   lot?: string;

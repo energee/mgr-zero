@@ -11,7 +11,7 @@ import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
 import type { ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
 import type { VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
 import type { CellarMapViewModel } from "@/lib/mgr/cellar-map-view";
-import { fermentationSummary, mashRowSummary, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { fermentationSummary, ingredientDetail, mashRowSummary, waterRowSummary, type FermentationStage, type MashStep, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 import { plural } from "@/lib/mgr/plural";
 import { waterProfiles } from "./catalog";
 
@@ -205,10 +205,12 @@ export const runClosedHazy: RunClosedViewModel = {
 /** Brands the Create recipe sheet offers; a recipe is brewed toward one, optionally. */
 export const recipeBrandOptions = [{ id: "hazy", name: "Hazy IPA" }, { id: "pils", name: "Pils" }, { id: "stout", name: "Stout" }];
 
+/** list_recipes rows, drawn by the live adapter: two with a current version, one saved without one. */
 export const recipesList: RecipesSnapshot = {
-  rows: [
-    { key: "hazy", title: "Hazy IPA v4", detail: "IPA · 15 bbl · updated Aug 28" },
-    { key: "pils", title: "Pils v3", detail: "German pils · 15 bbl · updated Aug 21" },
+  recipes: [
+    { id: "hazy", name: "Hazy IPA", brand: "Hazy IPA", latest_version: 4 },
+    { id: "pils", name: "Pils", brand: "Pils", latest_version: 3 },
+    { id: "saison", name: "Farmhouse saison", brand: null, latest_version: null },
   ],
 };
 
@@ -244,9 +246,9 @@ export const recipeHazyV4: RecipeViewModel = {
   priceGroupOptions: ["Not decided", "1", "2", "3", "4", "5", "6", "7", "8"],
   // 2-row comes in 50 lb sacks and Citra in 44 lb boxes; the dry hop is a cellar stage, so it has no pack total.
   ingredients: [
-    { key: "malt", title: "2-row", detail: "mash · 44 lb / bbl", qty: "", pack: { perBbl: 44, factor: 50, unit: "lb" } },
-    { key: "boil", title: "Citra", detail: "boil · 10 min · 0.4 lb / bbl", qty: "", pack: { perBbl: 0.4, factor: 44, unit: "lb" } },
-    { key: "dh", title: "Citra", detail: "dry hop · day 4 · 1.2 lb / bbl", qty: "" },
+    { key: "malt", title: "2-row", detail: ingredientDetail("mash", null, 44, "lb"), qty: "", pack: { perBbl: 44, factor: 50, unit: "lb" } },
+    { key: "boil", title: "Citra", detail: ingredientDetail("boil", 10, 0.4, "lb"), qty: "", pack: { perBbl: 0.4, factor: 44, unit: "lb" } },
+    { key: "dh", title: "Citra", detail: ingredientDetail("dry_hop", null, 1.2, "lb"), qty: "" },
   ],
   totalsAtBbl: "22",
   preBoil: "16.8",
@@ -261,7 +263,7 @@ export const recipeHazyV4: RecipeViewModel = {
   // PR D drops the dry-hop day argument with the dry-hop row.
   fermentation: { title: `Fermentation schedule · ${plural(FERM_STAGES.length, "stage")}`, detail: fermentationSummary(FERM_STAGES, 4) },
   // The live draft's Water row: target and addition count (recipe-version-form.tsx); the Water frame names the source.
-  water: { title: "Water", detail: `target ${waterProfiles.find((p) => p.id === WATER_HAZY.targetProfileId)?.name} · ${plural(WATER_HAZY.additions.length, "addition")}` },
+  water: { title: "Water", detail: waterRowSummary(waterProfiles.find((p) => p.id === WATER_HAZY.targetProfileId)?.name, WATER_HAZY.additions.length) },
   notes: "Whirlpool hard, knock out cold.",
   predicted: "Predicted: OG 15.2 °P · FG 3.3 °P · ABV 6.5%",
   tape: [

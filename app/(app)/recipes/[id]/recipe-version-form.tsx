@@ -21,7 +21,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { E } from "@/components/mgr/e";
-import { RecipeView } from "@/components/mgr/views/recipe";
+import { ADD_INGREDIENT_ROW, RecipeView } from "@/components/mgr/views/recipe";
 import { BLANK_RECIPE, NewRecipeFieldsView, type NewRecipeBrand } from "@/components/mgr/views/new-recipe";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
@@ -30,7 +30,7 @@ import { gravityBlockers, recipeGravity } from "@/lib/recipe-gravity";
 import { plural } from "@/lib/mgr/plural";
 import { readRecipeDraft, recipeDraftKey, shouldKeepDraft, writeRecipeDraft } from "@/lib/mgr/recipe-draft";
 import { draftBlocker, gravityBlockerText, ingredientPack, noMashText, RECIPE_NUMBERS, type RecipeDraft, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
-import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashRowSummary, materialLookup, optionalNumber as num, removeAt, upsertAt, type RecipeMaterial, type MashStep, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashRowSummary, materialLookup, optionalNumber as num, removeAt, upsertAt, waterRowSummary, type RecipeMaterial, type MashStep, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, WaterSheet } from "./schedule-sheets";
 
 type Numbers = Record<RecipeNumberKey, string>;
@@ -148,7 +148,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
   const target = profiles.find((p) => p.id === water.targetProfileId)?.name;
   const mashRow = { title: `Mash schedule · ${plural(mashSchedule.length, "step")}`, detail: mashRowSummary(mashSchedule) };
   const fermentationRow = { title: `Fermentation schedule · ${plural(fermentationSchedule.length, "stage")}`, detail: fermentationSchedule.length ? fermentationSummary(fermentationSchedule) : "No stages yet" };
-  const waterRow = { title: "Water", detail: `${target ? `target ${target}` : "no target"} · ${plural(water.additions.length, "addition")}` };
+  const waterRow = { title: "Water", detail: waterRowSummary(target, water.additions.length) };
 
   return (
     <RecipeView
@@ -176,7 +176,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
         submitLabel: creating && !parentLocked ? "Create recipe" : "Create recipe version",
       }}
       slots={{
-        addIngredient: <IngredientSheet materials={sheetMaterials} onSave={(f) => change({ lines: [...draft.lines, f] })} trigger={E.row("+ add ingredient", "material · stage · timing", "")} />,
+        addIngredient: <IngredientSheet materials={sheetMaterials} onSave={(f) => change({ lines: [...draft.lines, f] })} trigger={ADD_INGREDIENT_ROW} />,
         mash: <MashScheduleSheet steps={mashSchedule} onChange={(mashSchedule) => change({ mashSchedule })} trigger={E.nav(mashRow.title, mashRow.detail)} />,
         fermentation: <FermentationScheduleSheet stages={fermentationSchedule} onChange={(fermentationSchedule) => change({ fermentationSchedule })} trigger={E.nav(fermentationRow.title, fermentationRow.detail)} />,
         water: <WaterSheet water={water} profiles={profiles} materials={materials} onChange={(water) => change({ water })} trigger={E.nav(waterRow.title, waterRow.detail)} />,
