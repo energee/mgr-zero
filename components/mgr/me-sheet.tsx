@@ -44,7 +44,7 @@ export function MeSheetActions({ guide }: { guide: "/docs/staff-guide" | "/docs/
   return (
     <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
       <Button variant="outline" className="w-full md:w-fit md:self-end" asChild><Link href={guide}>Guide</Link></Button>
-      <Button variant="outline" className="w-full md:w-fit md:self-end" asChild><Link href="/password?change=1">Change password</Link></Button>
+      <Button variant="outline" className="w-full md:w-fit md:self-end" asChild><Link href="/password">Change password</Link></Button>
       <form action={logout}>
         <Button type="submit" variant="destructive" className="w-full md:w-fit md:self-end">Sign out</Button>
       </form>

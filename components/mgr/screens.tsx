@@ -488,7 +488,7 @@ export const SCREENS: Screen[] = [
     to: { "Maria Alvarez": "Me" },
     reads: "supabase_auth_get_session [platform] · get_first_run_state", writes: "supabase_auth_sign_out [platform]",
     states: [["dedicated mode", "switcher hidden · one brewery"], ["single membership", "switcher hidden"]],
-    spec: "Opened from the header Me control. Brewery switcher renders only in SaaS mode with more than one membership. Change password opens Set new password headed Change password, as portal Me opens Portal set password: a signed-in person should not have to sign out and use the recovery flow. No notification history, no settings; those live under More.",
+    spec: "Opened from the header Me control. Brewery switcher renders only in SaaS mode with more than one membership. Change password opens Set new password (headed Change password), as portal Me opens Portal set password: a signed-in person should not have to sign out and use the recovery flow. No notification history, no settings; those live under More.",
     body: <MeView model={meMaria} />,
   },
   {
@@ -644,7 +644,7 @@ export const SCREENS: Screen[] = [
     job: "Recovery-token landing; distinct from joining a brewery",
     reads: "supabase_auth_get_session [platform; recovery token]",
     writes: "supabase_auth_update_user [platform; membership unchanged]",
-    states: [["expired link", "Request a new reset link", 1], ["wrong audience", "portal user lands in the portal shell"], ["from Me", "headed Change password, like the Me link"]],
+    states: [["expired link", "Request a new reset link", 1], ["wrong audience", "portal user lands in the portal shell"]],
     spec: "The recovery token opens this, never Accept invite: no role row, no “Join” copy. After Save the existing membership decides the shell.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: <EntryView model={setPassword} />,
