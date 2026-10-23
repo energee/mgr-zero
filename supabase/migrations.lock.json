@@ -174,5 +174,6 @@
   "20261022140000_qbo_oauth_exchange_state.sql": "c822d775267070461a41f4a976399c6b2aaac29c051c701f830d46f4eaf9a52f",
   "20261023100000_bounded_chat_history.sql": "c2b41282b0d3b4fa33f841aad9bf37673dc88717e196bbfa5a5e255ba3fa6c1d",
   "20261023120000_taproom_read_policies_once_per_query.sql": "79956cf3a6ef26ffc2ad0a484b325fe62547c3f152bfa1462535db5baa3b7a4c",
-  "20261023130000_invoice_payments.sql": "cd158f2aa6d534577feb1ecbd8bff7295e235a81dc061d9307cf3da4b0b592be"
+  "20261023130000_invoice_payments.sql": "cd158f2aa6d534577feb1ecbd8bff7295e235a81dc061d9307cf3da4b0b592be",
+  "20261023140000_ledger_write_off.sql": "0013cdf44f1fedba84147b5e6762dc70d2402f6c70fae90cc301d06ab3925444"
 }

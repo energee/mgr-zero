@@ -147,6 +147,15 @@ describe("an invoice whose balance MGR's payment ledger owns (#1045)", () => {
     expect(row({ due_on: "2026-10-04" }).overdue).toBe(false);
   });
 
+  it("reads Written off, not Overdue, once written off, even partly paid (#1228)", () => {
+    for (const change of [{}, { local_paid_cents: 40000 }]) {
+      const writtenOff = row({ ...change, written_off_at: "2026-10-03T12:00:00Z" });
+      expect(writtenOff.payment).toBe("Written off");
+      expect(writtenOff.accounting).toBe("Written off in MGR");
+      expect(writtenOff.overdue).toBe(false);
+    }
+  });
+
   it("captions a row with payments Payments recorded in MGR and offers no QuickBooks action", () => {
     expect(row({ local_paid_cents: 40000 }).accounting).toBe("Payments recorded in MGR");
     expect(row({ local_paid_cents: 40000 }, false).accounting).toBe("Payments recorded in MGR");
