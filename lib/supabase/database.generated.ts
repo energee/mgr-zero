@@ -5257,6 +5257,11 @@ isOneToOne: false
 "list_open_taps":
 { Args: { "p_brewery": string,"p_location": string }; Returns: Json
                            },
+"list_pending_invitations":
+{ Args: { "p_brewery": string }; Returns: {
+              "created_at": string,"email": string,"id": string,"role": Database["public"]['Enums']["staff_role"]
+            }[]
+                           },
 "list_tap_history":
 { Args: { "p_brewery": string,"p_location": string }; Returns: Json
                            },
@@ -5502,6 +5507,9 @@ isOneToOne: false
                            },
 "reschedule_packaging_run":
 { Args: { "p_brewery": string,"p_planned_on": string,"p_request_id": string,"p_run": string }; Returns: Json
+                           },
+"resend_account_invitation":
+{ Args: { "p_brewery": string,"p_invite": string,"p_request_id": string }; Returns: Json
                            },
 "resolve_chat_actor":
 { Args: { "p_external_installation_id": string,"p_external_user_id": string,"p_provider": string }; Returns: Json

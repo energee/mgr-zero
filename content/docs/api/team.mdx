@@ -39,6 +39,16 @@ membership is later removed does not restore it, and a new invitation is
 required. `revoke_account_invitation` returns `{ inviteId }` and only affects
 an invitation still `pending_consent`.
 
+`list_pending_invitations` returns the brewery's staff invitations still
+`pending_consent` and not expired: `{ id, email, role, createdAt }`, oldest
+first. A new-account invitation never appears: its membership is granted
+when the Auth invitation is sent. `resend_account_invitation` takes the
+`inviteId` of a `pending_consent` invitation. It revokes that invitation and
+returns `{ inviteId }` for a new one with the same email and role, sent by
+the caller, with a fresh seven-day consent window. Only the new invitation
+can be accepted. Replaying the same request ID returns the same new
+`inviteId`.
+
 `provision_brewery` omits `breweryId`; authenticated callers send name, a valid
 timezone, and optional `ttb`. One transaction creates the brewery and first
 admin membership and returns the brewery UUID. Replay returns that UUID without
@@ -424,6 +434,21 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "name": "list_my_invitations", "input": {} }'
 ```
 
+## list_pending_invitations [#list_pending_invitations]
+
+`query` · admin
+
+Staff invitations an existing account has not yet accepted (admin): invite id, email, role and when it was sent
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_pending_invitations", "input": {} }'
+```
+
 ## list_pos_locations [#list_pos_locations]
 
 `query` · admin, warehouse
@@ -542,6 +567,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "publish_pos_menu", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string" } }'
+```
+
+## resend_account_invitation [#resend_account_invitation]
+
+`command` · admin
+
+Resend a pending existing-account invitation with the same role (admin); the old invitation can no longer be accepted
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `inviteId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "resend_account_invitation", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "inviteId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 ## revoke_account_invitation [#revoke_account_invitation]

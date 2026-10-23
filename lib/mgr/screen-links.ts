@@ -221,6 +221,9 @@ export const INERT: (string | RegExp)[] = [
   // Customer detail → Portal users rows: a buyer is named, not opened.
   "jordan@ridgelinetap.com",
   "orders@ridgelinetap.com",
+  // Team → Pending invitations: the invitee is named, not opened; Resend acts in place.
+  "jo@demobrewing.com",
+  "Resend",
   "Buyer asked about this invoice",
   "Casey Lin",
   "Change",
