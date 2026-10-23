@@ -25,13 +25,19 @@ export type ComposerEffect = z.infer<typeof composerEffect>;
 export const composerProposal = z.object({
   name: z.literal("record_movement"),
   input: movementInput,
-  previewToken: z.string().min(1),
+  // A UUID, as preview_inventory_movement mints it: the command route accepts
+  // no other shape, and Open as form reuses it as the ?movementHandoff key,
+  // which the Inventory page drops unless it is a UUID.
+  previewToken: z.uuid(),
   effects: z.array(composerEffect),
   warnings: z.array(z.string()),
 });
 export type ComposerProposal = z.infer<typeof composerProposal>;
 
-export function movementFormHref(input: MovementInput, handoffId?: string) {
+/** The Record movement deep link for a proposal. `handoffId` (the proposal's
+ *  previewToken) becomes ?movementHandoff, which the Inventory page keys the
+ *  form on, so a new proposal remounts a form already mounted there (#1166). */
+export function movementFormHref(input: MovementInput, handoffId: string) {
   const query = new URLSearchParams({
     recordMovement: "1", skuId: input.skuId, locationId: input.locationId,
     binId: input.binId, qty: String(input.qty), type: input.type,
@@ -40,7 +46,7 @@ export function movementFormHref(input: MovementInput, handoffId?: string) {
   if (input.saleChannelId) query.set("saleChannelId", input.saleChannelId);
   if (input.destState) query.set("destState", input.destState);
   if (input.note) query.set("note", input.note);
-  if (handoffId) query.set("movementHandoff", handoffId);
+  query.set("movementHandoff", handoffId);
   return `/inventory?${query}`;
 }
 
