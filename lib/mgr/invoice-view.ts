@@ -1,12 +1,16 @@
 // lib/mgr/invoice-view.ts — view-model for one invoice, read as a document
 // (#977). get_invoice + list_invoice_questions paint the domain; adapters
 // supply mapping facts. It also owns the invoice's price summary: subtotals by
-// exact line kind, the current total, and the QuickBooks balance and cash.
+// exact line kind, the current total, and the balance and cash, from
+// QuickBooks or from the payments recorded in MGR (#1045), and whether the
+// invoice takes a payment.
 import { formatDate } from "@/lib/date-format";
 import type { PriceSummaryModel } from "@/components/mgr/views/price-summary";
 import { docNo } from "./doc-no";
-import { money } from "./money";
-import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment } from "./invoice-state";
+import type { PaymentMethod } from "./enums";
+import { PAYMENT_METHOD_LABEL } from "./labels";
+import { money, toCents } from "./money";
+import { invoiceBalanceCents, invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment, invoiceLedgerOwnsBalance } from "./invoice-state";
 
 export type InvoiceLineView = {
   key: string;
@@ -38,6 +42,20 @@ export type InvoiceMappingView = {
   unavailable?: boolean;
 };
 
+/** One get_invoice payment; void is its invoice_payment_voids row, or null. */
+export type InvoicePaymentRecord = { id: string; amount_cents: number; received_on: string; method: PaymentMethod; reference: string | null; void: { reason: string } | null };
+
+export type InvoicePaymentView = {
+  key: string;
+  id: string;
+  amount: string;
+  receivedOn: string;
+  method: string;
+  reference?: string;
+  /** Set only on a voided payment. */
+  voidReason?: string;
+};
+
 export type InvoiceViewModel = {
   backHref?: string;
   title: string;
@@ -50,6 +68,10 @@ export type InvoiceViewModel = {
   lines: InvoiceLineView[];
   questions: InvoiceQuestionView[];
   mappings?: InvoiceMappingView[];
+  /** Payments recorded in MGR, newest received first, voided ones included. */
+  payments: InvoicePaymentView[];
+  /** record_invoice_payment would accept a payment: the same refusals, said here, not in the page. */
+  takesPayment: boolean;
 };
 
 export type InvoiceSnapshot = {
@@ -63,6 +85,8 @@ export type InvoiceSnapshot = {
     issued_on: string;
     due_on: string | null;
     paid_at: string | null;
+    /** Set once QuickBooks identified the invoice; then QuickBooks owns its balance. */
+    qbo_invoice_id: string | null;
     qbo_remote_state?: "live" | "voided" | "deleted";
     qbo_balance_cents?: number | null;
     qbo_total_cents?: number | null;
@@ -94,6 +118,11 @@ export type InvoiceSnapshot = {
   }[];
   /** Mapping facts from the connected company, or fixture equivalents. */
   mappings?: InvoiceMappingView[];
+  /** get_invoice's ledger: the payments, a pending or a successful push, and the unvoided sum. */
+  payments: InvoicePaymentRecord[];
+  hasPendingPush: boolean;
+  wasPushedToQbo: boolean;
+  localPaidCents: number;
 };
 
 export function invoiceMappingRows(customer: { name: string; qbo_customer_id: string | null; qbo_realm_id: string | null } | null,
@@ -124,7 +153,13 @@ const KIND_GROUPS: [label: string, kinds: string[]][] = [
 ];
 const kindGroup = (kind: string) => KIND_GROUPS.find(([, kinds]) => kinds.includes(kind))?.[0] ?? "Adjustments";
 
-function invoiceState(invoice: InvoiceSnapshot["invoice"]): InvoiceViewModel["state"] {
+/** The facts invoice-state.ts reads to decide who owns the balance, in its names. */
+const ledgerFacts = ({ invoice, hasPendingPush, wasPushedToQbo, localPaidCents }: InvoiceSnapshot) => ({
+  ...invoice, has_pending_qbo_push: hasPendingPush, was_pushed_to_qbo: wasPushedToQbo, local_paid_cents: localPaidCents,
+});
+
+function invoiceState(snapshot: InvoiceSnapshot, totalCents: number): InvoiceViewModel["state"] {
+  const { invoice } = snapshot;
   if (invoice.kind === "credit_memo") return { label: "Credit memo", tone: "ok" };
   const state = invoiceCurrentState(invoice);
   if (state === "paid") return { label: "Paid", tone: "ok" };
@@ -132,18 +167,23 @@ function invoiceState(invoice: InvoiceSnapshot["invoice"]): InvoiceViewModel["st
   if (state === "voided") return { label: "Voided", tone: "w" };
   if (state === "deleted") return { label: "Deleted in QuickBooks", tone: "w" };
   if (invoiceIsSettledWithoutPayment(invoice)) return { label: "Settled", tone: "ok" };
-  const partlyPaid = (invoice.qbo_cash_collected_cents ?? 0) > 0 && (invoice.qbo_balance_cents ?? 0) > 0;
+  // All lines priced at zero: settled, never overdue, and takes no payment (Design 4).
+  if (invoiceLedgerOwnsBalance(ledgerFacts(snapshot)) && totalCents <= 0) return { label: "No payment due", tone: "ok" };
+  const partlyPaid = snapshot.localPaidCents > 0
+    || ((invoice.qbo_cash_collected_cents ?? 0) > 0 && (invoice.qbo_balance_cents ?? 0) > 0);
   return { label: partlyPaid ? "Partially paid" : "Unpaid", tone: "" };
 }
 
 /** The invoice's money: subtotals by kind, one total, then the balance and
- *  cash QuickBooks supplied. The QuickBooks total (zero included) wins over
- *  the local sum. Only the sync's accountant-edit flag makes it "edited": then
- *  the frozen MGR subtotal is labeled beside it. An unedited taxed invoice
- *  differs only by QuickBooks tax, which gets its own row. Only an invoice
- *  still owed shows a balance (a paid one only when QuickBooks supplied it): a
- *  credit memo, voided, deleted or written-off document is not money due. */
-function invoiceSummary(invoice: InvoiceSnapshot["invoice"], lines: InvoiceSnapshot["lines"]): PriceSummaryModel {
+ *  cash. The QuickBooks total (zero included) wins over the local sum. Only
+ *  the sync's accountant-edit flag makes it "edited": then the frozen MGR
+ *  subtotal is labeled beside it. An unedited taxed invoice differs only by
+ *  QuickBooks tax, which gets its own row. The balance is invoiceBalanceCents:
+ *  MGR's ledger or QuickBooks. Only an invoice still owed shows it (a paid one
+ *  only when the balance is known): a credit memo, voided, deleted or
+ *  written-off document is not money due. */
+function invoiceSummary(snapshot: InvoiceSnapshot, localCents: number, totalCents: number): PriceSummaryModel {
+  const { invoice, lines } = snapshot;
   const byGroup = new Map<string, number>();
   for (const line of lines) {
     const group = kindGroup(line.kind);
@@ -152,8 +192,6 @@ function invoiceSummary(invoice: InvoiceSnapshot["invoice"], lines: InvoiceSnaps
   const rows = [...KIND_GROUPS.map(([label]) => label), "Adjustments"]
     .filter((label) => byGroup.has(label))
     .map((label) => ({ label, value: money(byGroup.get(label)!) }));
-  const localCents = lines.reduce((sum, l) => sum + l.amount_cents, 0);
-  const totalCents = invoiceCurrentTotalCents(invoice, localCents);
   if (invoice.kind === "credit_memo") {
     return { rows, total: { label: "Credit memo total", value: money(totalCents) }, note: "Credit issued to the customer, not money they owe." };
   }
@@ -162,10 +200,12 @@ function invoiceSummary(invoice: InvoiceSnapshot["invoice"], lines: InvoiceSnaps
   else if (invoice.qbo_tax_cents != null && invoice.qbo_tax_cents > 0) rows.push({ label: "Tax (QuickBooks)", value: money(invoice.qbo_tax_cents) });
   const state = invoiceCurrentState(invoice);
   const cash = invoice.qbo_cash_collected_cents ?? 0;
-  const owedOrKnown = state === "unpaid" || (state === "paid" && invoice.qbo_balance_cents != null);
+  const balance = invoiceBalanceCents(ledgerFacts(snapshot), totalCents);
+  const owedOrKnown = state === "unpaid" || (state === "paid" && balance != null);
   const settlement = owedOrKnown ? [
-    { label: "Outstanding balance", value: invoice.qbo_balance_cents == null ? "Unknown" : money(invoice.qbo_balance_cents), strong: true },
+    { label: "Outstanding balance", value: balance == null ? "Unknown" : money(balance), strong: true },
     ...(cash > 0 ? [{ label: "Cash received in QuickBooks", value: money(cash) }] : []),
+    ...(snapshot.localPaidCents > 0 ? [{ label: "Paid in MGR", value: money(snapshot.localPaidCents) }] : []),
   ] : undefined;
   return {
     rows,
@@ -177,19 +217,53 @@ function invoiceSummary(invoice: InvoiceSnapshot["invoice"], lines: InvoiceSnaps
   };
 }
 
+/** record_invoice_payment's refusals, mirrored: only a ledger-owned
+ *  invoice (no QuickBooks identity, pending push or earlier push) that is not
+ *  written off, not paid, and still has money due. */
+function invoiceTakesPayment(snapshot: InvoiceSnapshot, totalCents: number) {
+  const ledger = ledgerFacts(snapshot);
+  return invoiceLedgerOwnsBalance(ledger) && !snapshot.invoice.written_off_at && snapshot.invoice.paid_at == null
+    && (invoiceBalanceCents(ledger, totalCents) ?? 0) > 0;
+}
+
+const paymentView = (p: InvoicePaymentRecord): InvoicePaymentView => ({
+  key: p.id,
+  id: p.id,
+  amount: money(p.amount_cents),
+  receivedOn: formatDate(p.received_on),
+  method: PAYMENT_METHOD_LABEL[p.method],
+  ...(p.reference ? { reference: p.reference } : {}),
+  ...(p.void ? { voidReason: p.void.reason } : {}),
+});
+
+/** The Record payment form's value: dollars and a YYYY-MM-DD day, as typed. */
+export type InvoicePaymentValue = { amount: string; receivedOn: string; method: PaymentMethod | ""; reference: string };
+
+/** Ready to submit: more than $0.00 and at most the balance (Q1), a method, and
+ *  a received day no later than today; a day before issue is a prepayment (Q10).
+ *  record_invoice_payment checks the same again. */
+export function invoicePaymentReady(value: InvoicePaymentValue, balanceCents: number, today: string): boolean {
+  const cents = toCents(value.amount);
+  return cents !== undefined && cents > 0 && cents <= balanceCents
+    && value.receivedOn !== "" && value.receivedOn <= today && value.method !== "";
+}
+
 /** Map a get_invoice + list_invoice_questions payload onto InvoiceView. */
-export function toInvoiceViewProps({ invoice, lines, questions, mappings, backHref, timeZone }: InvoiceSnapshot): InvoiceViewModel {
+export function toInvoiceViewProps(snapshot: InvoiceSnapshot): InvoiceViewModel {
+  const { invoice, lines, questions, mappings, backHref, timeZone } = snapshot;
   const credit = invoice.kind === "credit_memo";
+  const localCents = lines.reduce((sum, l) => sum + l.amount_cents, 0);
+  const totalCents = invoiceCurrentTotalCents(invoice, localCents);
   return {
     backHref,
     title: docNo(credit ? "CM" : "INV", invoice.invoice_no, credit ? "Credit memo" : "Invoice"),
     customer: invoice.customers?.name ?? "—",
-    state: invoiceState(invoice),
+    state: invoiceState(snapshot, totalCents),
     facts: [
       { label: "Issued", value: formatDate(invoice.issued_on) },
       { label: "Due", value: invoice.due_on ? formatDate(invoice.due_on) : "Not set" },
     ],
-    summary: invoiceSummary(invoice, lines),
+    summary: invoiceSummary(snapshot, localCents, totalCents),
     lines: lines.map((l) => {
       const name = l.skus?.name ?? l.description;
       return {
@@ -208,6 +282,9 @@ export function toInvoiceViewProps({ invoice, lines, questions, mappings, backHr
       askedOn: formatDate(q.created_at, timeZone),
       answered: Boolean(q.answered_at),
     })),
-    mappings,
+    // An unvoided payment blocks the push the mapping rows serve, as in qboInvoicePresentation.
+    mappings: snapshot.localPaidCents > 0 ? undefined : mappings,
+    payments: snapshot.payments.map(paymentView),
+    takesPayment: invoiceTakesPayment(snapshot, totalCents),
   };
 }

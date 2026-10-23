@@ -13,7 +13,7 @@ import { canRun } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
-import { invoiceMappingRows, toInvoiceViewProps } from "@/lib/mgr/invoice-view";
+import { invoiceMappingRows, toInvoiceViewProps, type InvoicePaymentRecord } from "@/lib/mgr/invoice-view";
 import { MarkAnswered } from "./mark-answered";
 import { qboInvoicePresentation, type QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
 import { invoiceIsCreditable } from "@/lib/mgr/invoice-state";
@@ -27,11 +27,11 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [{ invoice, lines, hasPendingPush, localPaidCents, quickbooksLink }, questions, health] = (await Promise.all([
+  const [{ invoice, lines, payments, hasPendingPush, wasPushedToQbo, localPaidCents, quickbooksLink }, questions, health] = (await Promise.all([
     orNotFound(runCommand("get_invoice", { invoiceId: id }, ctx)),
     canRun(ctx, "list_invoice_questions") ? runCommand("list_invoice_questions", { invoiceId: id }, ctx) : [],
     brewery.roles.includes("admin") || brewery.roles.includes("sales") ? runCommand("get_qbo_connection", {}, ctx) : null,
-  ])) as [{ invoice: Invoice; lines: InvoiceLine[]; hasPendingPush: boolean; localPaidCents: number; quickbooksLink: QboStaffInvoiceLink | null }, Question[], { connected: boolean; state: string; realmId?: string; realmLabel: string | null; depositItemId?: string | null; oneWayFeeItemId?: string | null } | null];
+  ])) as [{ invoice: Invoice; lines: InvoiceLine[]; payments: InvoicePaymentRecord[]; hasPendingPush: boolean; wasPushedToQbo: boolean; localPaidCents: number; quickbooksLink: QboStaffInvoiceLink | null }, Question[], { connected: boolean; state: string; realmId?: string; realmLabel: string | null; depositItemId?: string | null; oneWayFeeItemId?: string | null } | null];
   const credit = invoice.kind === "credit_memo";
   const memo = invoiceIsCreditable(invoice) && canRun(ctx, "return_shipment")
     ? <InvoiceReturnButton href={`/invoices/${invoice.id}/return`} />
@@ -42,7 +42,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const presentation = qboInvoicePresentation({ kind: invoice.kind, roles: brewery.roles, connected: Boolean(health?.connected), syncStatus: invoice.qbo_sync_status, localPaidCents, hasPendingPush, syncError: invoice.qbo_sync_error, remoteState: invoice.qbo_remote_state, balanceCents: invoice.qbo_balance_cents, cashCollectedCents: invoice.qbo_cash_collected_cents, totalCents: invoice.qbo_total_cents, accountantDrift: invoice.qbo_accountant_drift, writtenOff: Boolean(invoice.written_off_at), missingMappings: Boolean(missingMappings) });
   const mappings = !credit && realm && (brewery.roles.includes("admin") || brewery.roles.includes("sales"))
     ? invoiceMappingRows(invoice.customers, lines, realm, health?.depositItemId, `/invoices/${invoice.id}/mapping`, brewery.roles.includes("admin") ? "/settings/accounting/mappings" : undefined, health?.oneWayFeeItemId) : undefined;
-  const model = toInvoiceViewProps({ invoice, lines, questions, mappings, backHref: "/invoices", timeZone: brewery.timeZone });
+  const model = toInvoiceViewProps({ invoice, lines, questions, mappings, payments, hasPendingPush, wasPushedToQbo, localPaidCents, backHref: "/invoices", timeZone: brewery.timeZone });
   return (
     <InvoiceView
       model={model}
