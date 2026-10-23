@@ -207,8 +207,8 @@ describe("Beer view", () => {
     expect(model.navs.map((r) => [r.title, r.detail])).toEqual([
       ["Finished goods", `${plural(2, "shortage")} · ATP by SKU`],
       ["Taproom", `${plural(1, "SKU")} below par · weekly count`],
-      ["Taps", `${plural(11, "keg")} open · Tap board`],
-      ["Cellar", `${plural(6, "tank")} with beer`],
+      ["Taps", `${plural(11, "keg")} on tap · Tap board`],
+      ["Cellar", plural(6, "occupied tank")],
       ["Materials", "on hand · definitions · cycle count"],
       ["Shortages", plural(3, "shortage")],
       ["Kegs", "142 out at customers"],
@@ -248,6 +248,12 @@ describe("Beer view", () => {
     const body = screen("Beer").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(BeerView);
     expect(body.props.model).toEqual(toBeerViewProps(beerOverview));
+  });
+
+  it("the Beer inventory record prints its counts through the same adapter as live (#1119)", () => {
+    const html = htmlOf(screen("Beer").body);
+    expect(html).toContain("11 kegs on tap · Tap board");
+    expect(html).toContain("6 occupied tanks");
   });
 
   it("the live Beer page mounts BeerView", () => {
