@@ -8,9 +8,9 @@ import { FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { breweryOperatingDefaultsCommand, type BrewerySettingsValues } from "@/lib/mgr/settings-view";
+import { timezoneLabel } from "@/lib/mgr/labels";
 
 const TIMEZONES = Intl.supportedValuesOf("timeZone");
-const timezoneLabel = (timezone: string) => timezone.replaceAll("_", " ").replaceAll("/", " / ");
 
 /** The Brewery details section of Settings: its own form, named by its legend, saved only by Save brewery. */
 export function BrewerySettingsFormView({ initial, onSave, busy = false, error = null, basisLocked = false }: {

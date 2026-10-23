@@ -2,7 +2,7 @@
 // Database values are snake_case (or already spaced, as the record-movement
 // fixtures are); operators see sentence case. Issue #333.
 import type { ImportKind } from "@/lib/import-csv";
-import { COUNTRY_CODES, COUNTRY_NAMES, CUSTOMER_TYPES, type BrandSort, type CountryCode, type PaymentTerm } from "@/lib/mgr/enums";
+import { COUNTRY_CODES, COUNTRY_NAMES, CUSTOMER_TYPES, LOCATION_USES, type BrandSort, type CountryCode, type PaymentTerm } from "@/lib/mgr/enums";
 
 /** "opening_balance" / "opening balance" → "Opening balance". */
 export const sentenceCase = (value: string) =>
@@ -50,3 +50,12 @@ export const COUNTRY_OPTIONS = COUNTRY_CODES.map((value) => ({ value, label: COU
 
 /** The customer Type picker's options, shared by New customer and Customer detail; the stored value is the enum. */
 export const CUSTOMER_TYPE_OPTIONS = CUSTOMER_TYPES.map((value) => ({ value, label: sentenceCase(value) }));
+
+/** The location Uses picker's options; the stored value is the location_kind enum. */
+export const LOCATION_USE_OPTIONS = LOCATION_USES.map((value) => ({ value, label: sentenceCase(value) }));
+
+/** A location's uses as staff read them: ["storage", "taproom"] → "Storage · Taproom". */
+export const locationUsesLabel = (uses: readonly string[]) => uses.map(sentenceCase).join(" · ");
+
+/** An IANA zone as read: "America/New_York" → "America / New York". */
+export const timezoneLabel = (timezone: string) => timezone.replaceAll("_", " ").replaceAll("/", " / ");

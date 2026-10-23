@@ -1,7 +1,7 @@
 // lib/mgr/locations-view.ts — view-model for the Locations list (list_locations).
 import type { EmptyState } from "./empty-state";
 import { plural } from "./plural";
-import { sentenceCase } from "./labels";
+import { locationUsesLabel } from "./labels";
 
 export type LocationsRowView = {
   key: string;
@@ -39,7 +39,7 @@ function detail(l: LocationsRowSnapshot): string {
   if (l.units != null) extras.push(plural(l.units, "inventory unit"));
   if (l.taps != null) extras.push(plural(l.taps, "tap"));
   if (l.bins != null) extras.push(plural(l.bins, "bin"));
-  const uses = l.uses.map(sentenceCase).join(" · ");
+  const uses = locationUsesLabel(l.uses);
   return extras.length ? `${uses} · ${extras.join(" · ")}` : uses;
 }
 

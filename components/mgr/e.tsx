@@ -425,13 +425,16 @@ export const E = {
   /** A time-of-day window as one two-thumb range: start and end are 24-hour "hh:mm". */
   window: (label: string, start: string, end: string) => <TimeWindowField label={label} start={start} end={end} />,
   /** Several picked values at once: a location is often a taproom and storage
-   *  and a warehouse, so the control has to admit more than one answer. */
-  picks: (label: string, values: string[], options: (string | { value: string; label: string })[], controls?: { onChange?: (values: string[]) => void; disabled?: boolean; "aria-invalid"?: boolean }) => (
+   *  and a warehouse, so the control has to admit more than one answer. Picked
+   *  values fill bright (#493): the outline on-state alone reads as faint grey.
+   *  `description` is drawn under the group; pass its id as aria-describedby. */
+  picks: (label: string, values: string[], options: (string | { value: string; label: string })[], controls?: { onChange?: (values: string[]) => void; disabled?: boolean; "aria-invalid"?: boolean; "aria-describedby"?: string; description?: ReactNode }) => (
     <Field data-disabled={controls?.disabled} data-invalid={controls?.["aria-invalid"]}>
       <FieldLabel>{label}</FieldLabel>
-      <ToggleGroup type="multiple" {...(controls?.onChange ? { value: values, onValueChange: controls.onChange } : { defaultValue: values })} disabled={controls?.disabled} aria-invalid={controls?.["aria-invalid"]} variant="outline" size="sm" aria-label={label} className="flex-wrap justify-start">
-        {options.map(o => typeof o === "string" ? <ToggleGroupItem key={o} value={o}>{o}</ToggleGroupItem> : <ToggleGroupItem key={o.value} value={o.value}>{o.label}</ToggleGroupItem>)}
+      <ToggleGroup type="multiple" {...(controls?.onChange ? { value: values, onValueChange: controls.onChange } : { defaultValue: values })} disabled={controls?.disabled} aria-invalid={controls?.["aria-invalid"]} aria-describedby={controls?.["aria-describedby"]} variant="outline" size="sm" aria-label={label} className="flex-wrap justify-start">
+        {options.map(o => typeof o === "string" ? <ToggleGroupItem key={o} value={o} className={BRIGHT_ON}>{o}</ToggleGroupItem> : <ToggleGroupItem key={o.value} value={o.value} className={BRIGHT_ON}>{o.label}</ToggleGroupItem>)}
       </ToggleGroup>
+      {controls?.description}
     </Field>
   ),
   /** A picked value: a Select for short fixed lists; long lists (SKU, customer) keep opening Entity picker.
