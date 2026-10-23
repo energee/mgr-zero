@@ -37,6 +37,13 @@ function Pick({ label, value, options, onChange, disabled, empty }: { label: str
  *  Admin and Warehouse who make transfers and repacks (RepackView shares it). */
 export const NO_BINS: PickEmpty = { text: "This location has no bins.", label: "Open Locations", href: "/locations", to: "Locations" };
 
+/** An empty SKU picker's note. `href` is Catalog for a user who may create a
+ *  SKU, undefined in the inventory (the link stays "#"), or null, and then the
+ *  note names who can. RecordMovementView shares it. */
+export const noSkus = (href: string | null | undefined): PickEmpty => href === null
+  ? { text: "No SKUs yet. An admin or sales member adds them in Catalog." }
+  : { text: "No SKUs yet.", label: "Add a SKU", href, to: "Catalog" };
+
 export function NewTransferView({
   model,
   controls = {},
@@ -50,9 +57,6 @@ export function NewTransferView({
 }) {
   const id = useId();
   const touched = useTouchedLines(!controls.lineQty);
-  const noSkus: PickEmpty = model.skusHref === null
-    ? { text: "No SKUs yet. An admin or sales member adds them in Catalog." }
-    : { text: "No SKUs yet.", label: "Add a SKU", href: model.skusHref, to: "Catalog" };
   return (
     <>
       <Pick label="From" value={model.from} options={model.fromOptions} onChange={controls.from} />
@@ -65,7 +69,7 @@ export function NewTransferView({
         const ids = lineErrorIds(`${id}-${index}`, errors);
         return <div key={`${line.title}:${index}`} className="flex flex-col gap-1">
           <div className="flex gap-2">
-            {E.pick(`Line ${index + 1} SKU`, line.sku ?? line.title, model.skuOptions, { onChange: controls.lineSku ? value => controls.lineSku?.(index, value) : undefined, placeholder: "SKU", displayValue: line.title || undefined, hideLabel: true, id: `${id}-sku-${index}`, empty: noSkus, "aria-invalid": errors.sku ? true : undefined, "aria-describedby": ids.sku })}
+            {E.pick(`Line ${index + 1} SKU`, line.sku ?? line.title, model.skuOptions, { onChange: controls.lineSku ? value => controls.lineSku?.(index, value) : undefined, placeholder: "SKU", displayValue: line.title || undefined, hideLabel: true, id: `${id}-sku-${index}`, empty: noSkus(model.skusHref), "aria-invalid": errors.sku ? true : undefined, "aria-describedby": ids.sku })}
             {E.edit(`Line ${index + 1} qty`, String(line.qty), "number", undefined, { onChange: controls.lineQty ? (nextValue: string) => controls.lineQty?.(index, nextValue) : undefined, onBlur: () => touched.touch(index), min: "0", step: "any", hideLabel: true, id: `${id}-qty-${index}`, "aria-invalid": errors.qty ? true : undefined, "aria-describedby": ids.qty })}
             {model.lines.length > 1 ? <Button type="button" variant="ghost" onClick={() => { controls.removeLine?.(index); touched.remove(index); }}>Remove</Button> : null}
           </div>

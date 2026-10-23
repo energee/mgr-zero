@@ -1,8 +1,10 @@
 // lib/mgr/touched-lines.ts — which repeated form lines the user has left, so a
 // line's field errors wait until its quantity loses focus instead of
 // interrupting the typing (#1121). Shared by New order, Edit draft, New PO and
-// New transfer. An inventory fixture has no live fields to leave, so its
-// errors show at once: the fixture is the state it depicts.
+// New transfer. Record movement has fields, not lines, so it keys each field
+// as a named slot (QTY, DEST_STATE in components/mgr/views/record-movement.tsx)
+// and touches it on that field's blur. An inventory fixture has no live fields
+// to leave, so its errors show at once: the fixture is the state it depicts.
 import { useState } from "react";
 
 /** The touched set after line `index` is removed: later lines move up one. */
