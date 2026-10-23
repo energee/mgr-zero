@@ -56,7 +56,7 @@ export const invoiceFailedAls: InvoiceSnapshot = {
 
 /** INV-1039's accounting line, from the same authority the live page uses. */
 export const invoiceFailedAlsAccounting = qboInvoicePresentation({
-  kind: "invoice", roles: ["sales"], connected: true, syncStatus: "push_failed", syncError: "QuickBooks item mapping required",
+  kind: "invoice", roles: ["sales"], connected: true, syncStatus: "push_failed", localPaidCents: 0, syncError: "QuickBooks item mapping required",
 });
 
 /** Pushed and partly paid: $615 total, $300 cash received, $315 outstanding. */

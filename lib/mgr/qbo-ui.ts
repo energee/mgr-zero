@@ -32,12 +32,15 @@ export function qboMappingVersion(currentId?: string | null) {
   return `saved:${currentId ?? ""}`;
 }
 
-/** paidStatusShown means detail already conveys full paid status; callers need not repeat it. */
+/** paidStatusShown means detail already conveys full paid status; callers need not repeat it.
+ * localPaidCents is the unvoided sum of payments recorded in MGR; above zero,
+ * start_qbo_push refuses the invoice, so no push action is offered (#1045). */
 export function qboInvoicePresentation(input: {
   kind: "invoice" | "credit_memo";
   roles: readonly StaffRole[];
   connected: boolean;
   syncStatus: "pending" | "pushed" | "push_failed" | "not_synced";
+  localPaidCents: number;
   hasPendingPush?: boolean;
   syncError?: string | null;
   remoteState?: "live" | "voided" | "deleted";
@@ -52,6 +55,8 @@ export function qboInvoicePresentation(input: {
   if (input.writtenOff) return { detail: "written off in MGR", actions: [] };
   // A historical order (record_historical_order) is never sent to QuickBooks.
   if (input.syncStatus === "not_synced") return { detail: "not in QuickBooks (before the books opened)", actions: [] };
+  // Only unvoided payments count, so voiding them all brings the push back (Q8).
+  if (input.localPaidCents > 0) return { detail: "Payments recorded in MGR · not sent to QuickBooks", actions: [] };
   if (!hasAnyRole(input.roles, ["admin", "sales"])) {
     return { detail: input.syncStatus === "pushed" ? "QuickBooks status available to Sales" : "not pushed", actions: [] };
   }

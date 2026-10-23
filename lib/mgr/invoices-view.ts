@@ -66,7 +66,7 @@ function accountingFact(inv: InvoiceListRecord, state: InvoiceCurrentState, role
  * inventory fixtures pin now so overdue presentation does not drift over time. */
 export function toInvoiceListRow(inv: InvoiceListRecord, roles: readonly StaffRole[], connected: boolean, timeZone: string, now: Date = new Date()): InvoiceListRow {
   const state = invoiceCurrentState(inv);
-  const qbo = qboInvoicePresentation({ kind: inv.kind, roles, connected, syncStatus: inv.qbo_sync_status, hasPendingPush: inv.has_pending_qbo_push, syncError: inv.qbo_sync_error, remoteState: inv.qbo_remote_state, balanceCents: inv.qbo_balance_cents, cashCollectedCents: inv.qbo_cash_collected_cents, totalCents: inv.total_cents, accountantDrift: inv.qbo_accountant_drift, writtenOff: Boolean(inv.written_off_at) });
+  const qbo = qboInvoicePresentation({ kind: inv.kind, roles, connected, syncStatus: inv.qbo_sync_status, localPaidCents: inv.local_paid_cents, hasPendingPush: inv.has_pending_qbo_push, syncError: inv.qbo_sync_error, remoteState: inv.qbo_remote_state, balanceCents: inv.qbo_balance_cents, cashCollectedCents: inv.qbo_cash_collected_cents, totalCents: inv.total_cents, accountantDrift: inv.qbo_accountant_drift, writtenOff: Boolean(inv.written_off_at) });
   const dueDay = inv.kind === "invoice" ? inv.due_on : null;
   return {
     id: inv.id,

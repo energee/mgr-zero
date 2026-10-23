@@ -27,11 +27,11 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [{ invoice, lines, hasPendingPush, quickbooksLink }, questions, health] = (await Promise.all([
+  const [{ invoice, lines, hasPendingPush, localPaidCents, quickbooksLink }, questions, health] = (await Promise.all([
     orNotFound(runCommand("get_invoice", { invoiceId: id }, ctx)),
     canRun(ctx, "list_invoice_questions") ? runCommand("list_invoice_questions", { invoiceId: id }, ctx) : [],
     brewery.roles.includes("admin") || brewery.roles.includes("sales") ? runCommand("get_qbo_connection", {}, ctx) : null,
-  ])) as [{ invoice: Invoice; lines: InvoiceLine[]; hasPendingPush: boolean; quickbooksLink: QboStaffInvoiceLink | null }, Question[], { connected: boolean; state: string; realmId?: string; realmLabel: string | null; depositItemId?: string | null; oneWayFeeItemId?: string | null } | null];
+  ])) as [{ invoice: Invoice; lines: InvoiceLine[]; hasPendingPush: boolean; localPaidCents: number; quickbooksLink: QboStaffInvoiceLink | null }, Question[], { connected: boolean; state: string; realmId?: string; realmLabel: string | null; depositItemId?: string | null; oneWayFeeItemId?: string | null } | null];
   const credit = invoice.kind === "credit_memo";
   const memo = invoiceIsCreditable(invoice) && canRun(ctx, "return_shipment")
     ? <InvoiceReturnButton href={`/invoices/${invoice.id}/return`} />
@@ -39,7 +39,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const realm = health?.connected ? health.realmId : null;
   const missingMappings = !invoice.customers?.qbo_customer_id || (realm && invoice.customers.qbo_realm_id !== realm)
     || lines.some(line => line.kind === "sku" ? !line.skus?.qbo_item_id || (realm && line.skus.qbo_realm_id !== realm) : /keg_deposit/.test(line.kind) ? !health?.depositItemId : line.kind === "one_way_keg_fee" && !health?.oneWayFeeItemId);
-  const presentation = qboInvoicePresentation({ kind: invoice.kind, roles: brewery.roles, connected: Boolean(health?.connected), syncStatus: invoice.qbo_sync_status, hasPendingPush, syncError: invoice.qbo_sync_error, remoteState: invoice.qbo_remote_state, balanceCents: invoice.qbo_balance_cents, cashCollectedCents: invoice.qbo_cash_collected_cents, totalCents: invoice.qbo_total_cents, accountantDrift: invoice.qbo_accountant_drift, writtenOff: Boolean(invoice.written_off_at), missingMappings: Boolean(missingMappings) });
+  const presentation = qboInvoicePresentation({ kind: invoice.kind, roles: brewery.roles, connected: Boolean(health?.connected), syncStatus: invoice.qbo_sync_status, localPaidCents, hasPendingPush, syncError: invoice.qbo_sync_error, remoteState: invoice.qbo_remote_state, balanceCents: invoice.qbo_balance_cents, cashCollectedCents: invoice.qbo_cash_collected_cents, totalCents: invoice.qbo_total_cents, accountantDrift: invoice.qbo_accountant_drift, writtenOff: Boolean(invoice.written_off_at), missingMappings: Boolean(missingMappings) });
   const mappings = !credit && realm && (brewery.roles.includes("admin") || brewery.roles.includes("sales"))
     ? invoiceMappingRows(invoice.customers, lines, realm, health?.depositItemId, `/invoices/${invoice.id}/mapping`, brewery.roles.includes("admin") ? "/settings/accounting/mappings" : undefined, health?.oneWayFeeItemId) : undefined;
   const model = toInvoiceViewProps({ invoice, lines, questions, mappings, backHref: "/invoices", timeZone: brewery.timeZone });

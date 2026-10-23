@@ -134,7 +134,7 @@ describe("QuickBooks current invoice state", () => {
     const read = await new QboOAuthClient(config, transport).readInvoice("realm", "credit", "access", new Map(), "CreditMemo");
     if (!read.ok) throw new Error("unexpected provider failure");
     expect(read.balanceCents).toBeNull();
-    expect(qboInvoicePresentation({ kind: "credit_memo", roles: ["sales"], connected: true, syncStatus: "pushed",
+    expect(qboInvoicePresentation({ kind: "credit_memo", roles: ["sales"], connected: true, syncStatus: "pushed", localPaidCents: 0,
       remoteState: "live", totalCents: read.totalCents, balanceCents: read.balanceCents, cashCollectedCents: read.cashCollectedCents }))
       .toEqual({ detail: "pushed to QuickBooks", actions: [] });
   });
