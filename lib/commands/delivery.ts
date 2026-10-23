@@ -5,7 +5,9 @@
 // orders.ts (Program 1) and stamps transfer stops without invoicing.
 import { z } from "zod";
 import { docNo, trfNo } from "@/lib/mgr/doc-no";
-import { breweryToday, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, rows, unwrap } from "./registry";
+import { hasAnyRole } from "@/lib/mgr/roles";
+import type { TeamMember } from "./invites";
+import { breweryToday, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, rows, runCommand, unwrap } from "./registry";
 
 const ROLES = ["admin", "warehouse"] as const;
 const READ = ["admin", "warehouse", "sales"] as const;
@@ -44,7 +46,7 @@ const shipmentDoc = (s: ShipmentRow): StopDoc => ({ id: s.id, kind: "shipment", 
 const transferDoc = (t: TransferRow): StopDoc => ({ id: t.id, kind: "transfer", label: [trfNo(t.transfer_no), t.to_location?.name].filter(Boolean).join(" · ") });
 
 defineQuery({
-  name: "list_routes", description: "Delivery routes with their stops (one route by id, one day, or every route not yet returned), the shipped orders and picked transfers on no route, and the members who may drive",
+  name: "list_routes", description: "Delivery routes (one route by id, one day, or every route not yet returned) with their stops and their driver's roster email, null once the driver has left the team; the shipped orders and picked transfers on no route; and the members who may drive, with their emails",
   roles: [...READ],
   input: z.object({ id: z.string().uuid().optional(), date: z.string().date().optional() }),
   handler: async (ctx, i) => {
@@ -55,13 +57,14 @@ defineQuery({
     // ponytail: a carrier-shipped order still waits in "unassigned" until someone routes it; a
     // shipment-level "handed to carrier" state is the upgrade path once that list outgrows one screen.
     // A pickup order (orders.pickup) is the customer collecting it, so it never waits here.
-    const [routes, shipments, transfers, drivers, today] = await Promise.all([
+    const [routes, shipments, transfers, team, today] = await Promise.all([
       rows<RouteRow>(q),
       completeRows("Unrouted shipments", (start) => ctx.db.from("shipments").select(`id, ${SHIPMENT_LABEL}, deliveries(id)`, { count: "exact" })
         .eq("brewery_id", ctx.breweryId).is("deliveries", null).eq("orders.pickup", false).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<ShipmentRow[]>,
       completeRows("Unrouted transfers", (start) => ctx.db.from("stock_transfers").select(`id, ${TRANSFER_LABEL}, deliveries(id)`, { count: "exact" })
         .eq("brewery_id", ctx.breweryId).in("status", ["picked", "in_transit"]).is("deliveries", null).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<TransferRow[]>,
-      unwrap(ctx.db.from("brewery_users").select("user_id, roles").eq("brewery_id", ctx.breweryId).overlaps("roles", ["admin", "warehouse"])),
+      // The roster names each driver by email (#1124); it lists only current members.
+      runCommand("list_team_members", {}, ctx) as Promise<TeamMember[]>,
       breweryToday(ctx),
     ]);
     const routeIds = routes.map((r) => r.id);
@@ -75,15 +78,18 @@ defineQuery({
     for (const r of outstanding) outstandingByStop.set(r.delivery_id, (outstandingByStop.get(r.delivery_id) ?? 0) + Number(r.outstanding_qty));
     deliveries.sort((a, b) => a.stop_no - b.stop_no);
     const stopsByRoute = Map.groupBy(deliveries, (d) => d.route_id);
+    const emails = new Map(team.map((m) => [m.userId, m.email]));
     return {
       routes: routes.map((r) => ({
         ...r,
+        driver_email: r.driver_user_id ? emails.get(r.driver_user_id) ?? null : null,
         stops: (stopsByRoute.get(r.id) ?? []).map(({ shipments: sh, stock_transfers: tr, ...d }) => ({
           ...d, outstanding_qty: outstandingByStop.get(d.id) ?? 0, label: sh ? shipmentDoc(sh).label : tr ? transferDoc(tr).label : "Stop",
         })),
       })),
       unassigned: [...shipments.map(shipmentDoc), ...transfers.map(transferDoc)],
-      drivers,
+      drivers: team.filter((m) => hasAnyRole(m.roles, ROLES))
+        .map((m) => ({ user_id: m.userId, email: m.email, roles: m.roles })),
       today,
     };
   },

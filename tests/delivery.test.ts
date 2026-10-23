@@ -89,9 +89,23 @@ describe("save_route and list_routes", () => {
     const listed = await runCommand("list_routes", { date: "2030-01-01" }, combined) as {
       drivers: { user_id: string; roles: StaffRole[] }[];
     };
+    const email = (await admin.auth.admin.getUserById(combined.userId)).data.user!.email;
     expect(listed.drivers.filter(driver => driver.user_id === combined.userId))
-      .toEqual([{ user_id: combined.userId, roles: ["sales", "warehouse"] }]);
+      .toEqual([{ user_id: combined.userId, email, roles: ["sales", "warehouse"] }]);
     expect(listed.drivers.some(driver => driver.user_id === nonDriver.userId)).toBe(false);
+  });
+
+  // #1124: a route names its driver by roster email; a driver no longer on the team has none.
+  it("names each route's driver by roster email, and none once the driver leaves the team", async () => {
+    const driver = await makeStaffCtx(b.id, "warehouse");
+    const email = (await admin.auth.admin.getUserById(driver.userId)).data.user!.email;
+    const { routeId } = await runCommand("save_route", {
+      name: "Named driver", deliveryDate: "2030-02-01", driverUserId: driver.userId, stops: [{ shipmentId: await shipment(), stopNo: 1 }],
+    }, adminCtx) as { routeId: string };
+    const driverOf = async () => (await runCommand("list_routes", { id: routeId }, adminCtx) as { routes: { driver_user_id: string; driver_email: string | null }[] }).routes[0];
+    expect(await driverOf()).toMatchObject({ driver_user_id: driver.userId, driver_email: email });
+    await runCommand("revoke_staff", { userId: driver.userId }, adminCtx);
+    expect(await driverOf()).toMatchObject({ driver_user_id: driver.userId, driver_email: null });
   });
 
   it("saves a mixed route, lists it by date, and refuses a shipment already on an open route", async () => {

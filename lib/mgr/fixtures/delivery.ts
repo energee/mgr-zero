@@ -20,7 +20,7 @@ export const routeAPlan: RouteViewModel = {
   title: "Route A · Sep 10, 2026",
   date: "2026-09-10",
   driverId: "7f3a21c0",
-  driverOptions: [{ id: "7f3a21c0", label: "driver 7f3a21c0 · warehouse" }, { id: "2b9e44d1", label: "driver 2b9e44d1 · admin" }],
+  driverOptions: [{ id: "7f3a21c0", label: "sam@example.test · warehouse" }, { id: "2b9e44d1", label: "riley@example.test · admin" }],
   saved: true,
   savedDriverId: "7f3a21c0",
   selection: { s1: 1, s2: 2, s3: 3 },
@@ -36,7 +36,7 @@ export const routeAPlan: RouteViewModel = {
 
 export const returnRouteA: ReturnRouteViewModel = {
   title: "Route A · Sep 10, 2026",
-  driverVehicle: "driver 7f3a21c0 · Box truck 2",
+  driverVehicle: "sam@example.test · Box truck 2",
   departed: "8:10 AM",
   stops: [
     { key: "s1", title: "Stop 1 · ORD-0231 · Ridgeline · Tap Room", detail: "delivered 8:42 AM" },
@@ -47,7 +47,7 @@ export const returnRouteA: ReturnRouteViewModel = {
 
 export const driverRouteA: DriverRouteViewModel = {
   title: "Route A · Sep 10, 2026",
-  driverVehicle: "driver 7f3a21c0 · Box truck 2",
+  driverVehicle: "sam@example.test · Box truck 2",
   departed: "8:10 AM",
   stops: [
     { key: "s1", title: "Stop 1 · ORD-0231 · Ridgeline · Tap Room", detail: "next", verb: "Resume", warning: true },
