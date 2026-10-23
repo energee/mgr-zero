@@ -184,6 +184,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Recipe", file: "app/(app)/recipes/[id]/page.tsx", additionalFiles: ["app/(app)/recipes/new/page.tsx", "app/(app)/recipes/[id]/new/page.tsx"] },
   { name: "Compliance months", file: "app/(app)/compliance/page.tsx" },
   { name: "Monthly compliance", file: "app/(app)/compliance/[period]/page.tsx" },
+  { name: "Report does not balance", file: "app/(app)/compliance/[period]/page.tsx" },
   { name: "Filed period needs amendment", file: "app/(app)/compliance/[period]/page.tsx" },
   { name: "Period in progress", file: "app/(app)/compliance/[period]/page.tsx" },
   { name: "Period before the books opened", file: "app/(app)/compliance/[period]/page.tsx" },

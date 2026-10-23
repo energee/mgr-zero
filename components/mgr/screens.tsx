@@ -214,7 +214,7 @@ import {
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
 import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
 import { planningDemo } from "@/lib/mgr/fixtures/planning";
-import { monthlyComplianceAmended, monthlyComplianceAugust, monthlyComplianceSeptember } from "@/lib/mgr/fixtures/monthly-compliance";
+import { monthlyComplianceAmended, monthlyComplianceAugust, monthlyComplianceSeptember, monthlyComplianceUnbalanced } from "@/lib/mgr/fixtures/monthly-compliance";
 import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
 import {
   brandApprovalStout, complianceMonthsDemo, licensesDemo, licensePaBrewery, lotTraceHazy, materialLotTraceCitra, stateRegistrationHazy,
@@ -2200,8 +2200,8 @@ export const SCREENS: Screen[] = [
     job: "Choose a monthly, quarterly, or annual reporting period and see whether its snapshot was filed",
     reads: "list_compliance_reports · list_lots",
     writes: "none",
-    states: [["not filed", "ready to review", 1], ["in progress", "the current period: reviewable, filed once it ends"], ["filed", "immutable snapshot saved"], ["lots", "every packaged lot opens its trace"], ["no period yet", "every recent period starts before the books opened · names that date and the first period MGR can report"]],
-    spec: "This is the shared destination for the registry back link, the period rows, and the lot trace. Monthly, Quarterly, and Annual tabs swap the list: the last three months, four calendar quarters, or two calendar years show, less any that start before the books-opened date, plus every filed period of that length. A tab left with no period says No monthly (quarterly, annual) period yet. A TTB filing is exactly one calendar month, quarter, or year; the API takes other jurisdictions and ranges.",
+    states: [["not filed", "Not filed · Ready to review", 1], ["in progress", "the current period: reviewable · In progress · File after the month ends"], ["filed", "the snapshot saved in MGR · Filed <date> · <bbl> taxpaid"], ["lots", "every packaged lot opens its trace"], ["no period yet", "every recent period starts before the books opened · names that date and the first period MGR can report"]],
+    spec: "This is the shared destination for the Licenses back link, the period rows, and the lot trace. Monthly, Quarterly, and Annual tabs swap the list: the last three months, four calendar quarters, or two calendar years show, less any that start before the books-opened date, plus every filed period of that length. A tab left with no period says No monthly (quarterly, annual) period yet. A TTB filing is exactly one calendar month, quarter, or year; the API takes other jurisdictions and ranges.",
     body: <ComplianceMonthsView model={complianceMonthsDemo} />,
   },
   {
@@ -2210,12 +2210,22 @@ export const SCREENS: Screen[] = [
     tab: "More",
     name: "Monthly compliance",
     to: { Confirm: "Monthly compliance", "Reattribute loss": "Monthly compliance" },
-    job: "Generate from ledgers, review, then record the external filing",
+    job: "Generate from ledgers, review, then record in MGR a filing made with TTB outside it",
     reads: "list_compliance_reports · generate_compliance_report · get_loss_review",
     writes: "file_compliance_report · reattribute_loss",
-    states: [["current", "generated from the ledger now"], ["does not balance", "a movement type the report cannot classify is named · Save stays off", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
-    spec: "Admin and Sales review exact generic cellar losses (each batch completion loss and each cellar transfer loss) and allocate each remainder to Sample, Taproom, or Destruction through append-only category changes, never free-text note matching. Corrections post in the period they are saved and leave earlier filed snapshots unchanged. The identity checks are v1 lessons drawn in user copy: balance per class, one additive removal total, an explanatory non-additive cellar breakdown, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Destination-state totals and Export state transactions retain exact supporting movement BBL and invoice/credit cents, including source-linked returns and signed adjustments. Filed exports use the saved facts; missing historical facts are explicit. Removals are keyed by frozen tax treatment; direct cellar Taproom volume files once, as a removal under its frozen Taproom tax treatment (taxpaid for the default channel).",
+    states: [["current", "generated from the ledger now"], ["does not balance", "step 2 names what does not balance · Save is off, with the reason beside it", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
+    spec: "Admin and Sales review exact generic cellar losses (each batch completion loss and each cellar transfer loss) and allocate each remainder to Sample, Taproom, or Destruction through append-only category changes, never free-text note matching. Corrections post in the period they are saved and leave earlier filed snapshots unchanged. The identity checks are v1 lessons drawn in user copy: balance per class, one additive removal total, an explanatory non-additive cellar breakdown, 0.00 never blank. Step 3 says before Save that MGR does not file with TTB or the state: Save filed snapshot only records the filing in MGR. Beer in process is the tanks now, not at period end, and says so. Destination-state totals and Export state transactions retain exact supporting movement BBL and invoice/credit cents, including source-linked returns and signed adjustments. Filed exports use the saved facts; missing historical facts are explicit. Removals are keyed by frozen tax treatment; direct cellar Taproom volume files once, as a removal under its frozen Taproom tax treatment (taxpaid for the default channel).",
     body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAugust)} />,
+  },
+  {
+    step: 7, slice: 6, tab: "More", name: "Report does not balance",
+    to: { "Reattribute loss": "Report does not balance" },
+    job: "See why a period's filing cannot be recorded yet, and what to check",
+    reads: "list_compliance_reports · generate_compliance_report · get_loss_review",
+    writes: "reattribute_loss",
+    states: [["does not balance", "step 2 notes name each class that does not balance and any movement with no report column · Save is off, the same words beside it"], ["unassigned", "a transaction with no recorded destination is noted in step 2 and does not hold Save", 1]],
+    spec: "The same Monthly compliance page when the generated report does not balance. The adapter puts the report's warnings in staff words and builds the reason beside Save from the blocking ones; the Unassigned note never blocks. A warning it does not recognize is shown as written.",
+    body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceUnbalanced)} />,
   },
   {
     step: 7, slice: 6, tab: "More", name: "Filed period needs amendment",
@@ -2245,7 +2255,7 @@ export const SCREENS: Screen[] = [
     job: "Review the current period from the ledger before it can be filed",
     reads: "list_compliance_reports · generate_compliance_report · get_loss_review",
     writes: "reattribute_loss",
-    states: [["in progress", "the period has not ended · File once the period ends replaces Save"], ["filed early", "refused: a period is filed only after it ends", 1]],
+    states: [["in progress", "the period has not ended · \"You can record the filing after <period> ends\" in place of Save"], ["filed early", "refused: a period is filed only after it ends", 1]],
     spec: "The same Monthly compliance page while its month, quarter, or year is still running. Figures and losses are reviewable and losses can be reattributed, but the snapshot is not offered until the period ends, so a filing never freezes part of one.",
     body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceSeptember)} monthOpen />,
   },
