@@ -9,7 +9,6 @@ export type ReturnRouteStopView = {
 
 export type ReturnRouteViewModel = {
   backHref?: string;
-  backTo?: string;
   title: string;
   driverVehicle: string;
   departed: string;

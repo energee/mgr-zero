@@ -11,7 +11,7 @@ export function PackagingRunsView({ model, actions, workHrefs }: { model: Packag
   return <>
     {E.hd("Packaging", "", actions !== undefined ? actions : E.btn("Schedule run"))}
     <WorkKindTabs chips={model.workChips} current={model.workChips[4]} tabs={model.workTabs} hrefs={workHrefs} />
-    {model.upcoming.length || model.recent.length ? <>{rows("Upcoming", model.upcoming)}{rows("Recent", model.recent)}</> : E.blank("No runs planned")}
+    {model.empty ? E.blank(model.empty) : <>{rows("Upcoming", model.upcoming)}{rows("Recent", model.recent)}</>}
     {model.recent.length ? E.info("Recent keeps the last few weeks. Older runs are under Search and Lot trace.") : null}
   </>;
 }

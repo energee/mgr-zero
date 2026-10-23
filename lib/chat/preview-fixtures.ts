@@ -103,7 +103,7 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
     fields: [
       { label: "Vessel", value: "FV2 · Hazy IPA" },
       { label: "Last reading", value: "26 h ago" },
-      { label: "Reading", value: "4.2 °Plato · 68 °F" },
+      { label: "Reading", value: "4.2 °P · 68 °F" },
     ],
     items: [],
     gated: { label: "Record reading", reason: "Open this reading in MGR for now" },
