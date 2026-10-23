@@ -2,10 +2,12 @@ import { assert } from "vitest";
 // tests/stock-transfers.test.ts — a stock transfer is a document between two
 // locations (spec 2026-09-06 Decision 3), never a third order kind; a move
 // inside one location is move_stock_bin and writes no document.
-import { describe, it, expect } from "vitest";
-import { admin, insertFixture, makeBrewery, makeStaffCtx, seedCustomer, seedLocation, seedCatalog, sql } from "./helpers";
+import { afterEach, describe, it, expect } from "vitest";
+import { admin, closePgSessions, insertFixture, makeBrewery, makeStaffCtx, seedCustomer, seedLocation, seedCatalog, sql, staffSession } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+
+afterEach(closePgSessions);
 
 describe("stock_transfers schema", () => {
   it("rejects a transfer whose from and to location are equal", async () => {
@@ -306,6 +308,29 @@ it("bin stock reads all 1,001 grouped identities beyond the API row cap", async 
     select '${b.id}', '${skuId}', '${loc.id}', id, 1, 'opening_balance', '${ctx.userId}' from public.bins where location_id = '${loc.id}' and name like 'QA-%';`);
   const result = await runCommand("get_bin_move_stock", { locationId: loc.id }, ctx) as unknown[];
   expect(result).toHaveLength(1001);
+});
+
+// #1198: right after a bulk insert, statistics lag (autovacuum has not analyzed
+// yet) and Postgres may join skus in a nested loop that rescans it per movement
+// row. skus' read policy then runs once for each other brewery's SKU on every
+// rescan. When that policy called taproom_can (~0.4 ms a call), 1,001 rows took
+// past the 8 s statement timeout in CI. The settings pin that plan, so the test
+// does not depend on when autovacuum runs; 100 other SKUs keep the old policy
+// far past the timeout.
+it("bin stock stays inside the statement timeout when stale statistics rescan skus per row (#1198)", async () => {
+  const b = await makeBrewery(), ctx = await makeStaffCtx(b.id, "warehouse");
+  const loc = await seedLocation(b.id, { name: "Many bins", uses: ["warehouse"] });
+  const { skuId } = await seedCatalog(b.id);
+  const other = await makeBrewery(), { formatId } = await seedCatalog(other.id);
+  sql(`insert into public.bins (brewery_id, location_id, name) select '${b.id}', '${loc.id}', 'QA-' || n from generate_series(1,1001) n;
+    insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, created_by)
+    select '${b.id}', '${skuId}', '${loc.id}', id, 1, 'opening_balance', '${ctx.userId}' from public.bins where location_id = '${loc.id}' and name like 'QA-%';
+    with brand as (insert into public.brands (brewery_id, name) select '${other.id}', 'Other ' || n from generate_series(1,100) n returning id)
+    insert into public.skus (brewery_id, brand_id, format_id, name) select '${other.id}', id, '${formatId}', 'Other SKU' from brand;`);
+  const session = await staffSession(ctx.userId);
+  await session.query("set local enable_hashjoin = off; set local enable_mergejoin = off; set local enable_indexscan = off; set local enable_bitmapscan = off; set local enable_material = off");
+  const { rows } = await session.query("select count(*)::int as n from public.bin_move_stock where brewery_id = $1 and location_id = $2 and qty > 0", [b.id, loc.id]);
+  expect(rows[0].n).toBe(1001);
 });
 
 // #451: every bin move and transfer receipt refuses to take more out of the

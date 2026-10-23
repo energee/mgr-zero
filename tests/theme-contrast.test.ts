@@ -89,11 +89,15 @@ it("applies the stored or OS theme, as a function and as the inline script (#986
   }
 });
 
+// Location Uses is drawn by E.picks in both the inventory and the live dialog
+// (LocationFields, #1148), so the multi-select owns the bright on-state.
 it("paints selected Location Uses with the AA-checked primary pair, not the hover wash (#493)", () => {
   const e = readFileSync(new URL("../components/mgr/e.tsx", import.meta.url), "utf8");
   expect(e).toContain('export const BRIGHT_ON = "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground";');
-  const form = readFileSync(new URL("../app/(app)/locations/location-form.tsx", import.meta.url), "utf8");
-  expect(form).toMatch(/<ToggleGroupItem[^>]*className=\{BRIGHT_ON\}/);
+  const picks = /\n  picks: [\s\S]*?\n  \),\n/.exec(e)?.[0] ?? "";
+  expect(picks.match(/<ToggleGroupItem[^>]*className=\{BRIGHT_ON\}/g)).toHaveLength(2);
+  const location = readFileSync(new URL("../components/mgr/views/location.tsx", import.meta.url), "utf8");
+  expect(location).toMatch(/E\.picks\("Uses"/);
 });
 
 // A row action (E.act) paints its tone's fill over the page surface at rest,

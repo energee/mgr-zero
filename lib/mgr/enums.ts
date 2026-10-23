@@ -33,6 +33,11 @@ export const FERMENTATION_STAGE_KINDS = ["primary", "secondary", "diacetyl rest"
 export const WATER_ADDITION_STAGES = ["mash", "sparge", "kettle"] as const;
 export const WATER_ADDITION_UNITS = ["g", "mL", "oz"] as const;
 
+// Location uses (location_kind enum; the location Uses picker). A place may
+// have several; guards test membership.
+export const LOCATION_USES = ["warehouse", "taproom", "storage"] as const;
+export type LocationUse = (typeof LOCATION_USES)[number];
+
 // Customer types (customer_type enum; lib/commands/customers.ts, the customer forms).
 export const CUSTOMER_TYPES = ["distributor", "retailer", "brewery", "other"] as const;
 export type CustomerType = (typeof CUSTOMER_TYPES)[number];

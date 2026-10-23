@@ -1,24 +1,24 @@
 // lib/mgr/location-view.ts — view-model for Location detail (list_locations + list_bins).
-import { sentenceCase } from "./labels";
+import type { LocationUse } from "./enums";
+import { locationUsesLabel, timezoneLabel } from "./labels";
 
 export type LocationViewModel = {
   backHref?: string;
   name: string;
-  /** Every use this place is put to, titled. A site is often several at once. */
-  uses: string[];
-  useOptions: string[];
+  /** Every use this place is put to, as stored; the Uses picker selects these. */
+  uses: LocationUse[];
+  /** The same uses as staff read them: "Storage · Taproom · Warehouse". */
+  usesLabel: string;
   timezone: string;
   bins: string;
   binsHref: string;
 };
 
-const USES = ["Warehouse", "Taproom", "Storage"];
-
 export type LocationSnapshot = {
-  location: { id: string; name: string; uses: string[] };
+  location: { id: string; name: string; uses: LocationUse[] };
   bins: { name: string }[];
-  /** Inventory: IANA zone after "Brewery default". Live omits this. */
-  timezone?: string;
+  /** The brewery's IANA zone (Settings → Timezone); a location has none of its own. */
+  timezone: string;
   backHref?: string;
 };
 
@@ -31,9 +31,9 @@ export function toLocationViewProps({
   return {
     backHref,
     name: location.name,
-    uses: location.uses.map(sentenceCase),
-    useOptions: USES,
-    timezone: timezone ? `Brewery default · ${timezone}` : "Brewery default",
+    uses: location.uses,
+    usesLabel: locationUsesLabel(location.uses),
+    timezone: `Brewery default · ${timezoneLabel(timezone)}`,
     bins: bins.map((b) => b.name).join(" · ") || "none",
     binsHref: `/locations/${location.id}/bins`,
   };

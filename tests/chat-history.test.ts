@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
 import { getCommandDefinition, runCommand, type Ctx } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+import { MAX_HISTORY_MESSAGES } from "@/lib/chat/model-messages";
+import { loadComposerSetup } from "@/lib/composer/setup";
 import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
 
 describe("scoped composer history and provenance", () => {
@@ -46,6 +48,30 @@ describe("scoped composer history and provenance", () => {
       conversationId: conversation.id, role: "user", content: "Wrong brewery",
     }, foreignTenant)).rejects.toMatchObject({ code: "permission_denied" });
     expect(sql(`select count(*) from private.chat_messages where conversation_id='${conversation.id}'`)).toEqual(["1"]);
+  });
+
+  it("drawer setup restores only the newest text turns of a long conversation, oldest first (#1169)", async () => {
+    const author = await makeStaffCtx(breweryId, "admin");
+    const conversation = await runCommand("create_chat_conversation", { title: "Long" }, author) as { id: string };
+    // One text turn per second; every fifth second also stores a result row.
+    const turns = MAX_HISTORY_MESSAGES + 5;
+    sql(`insert into private.chat_messages(conversation_id,brewery_id,actor_id,role,content,created_at)
+      select '${conversation.id}','${breweryId}','${author.userId}',
+        case when i%2=0 then 'user' else 'assistant' end,'turn '||i,now()-interval '1 hour'+i*interval '1 second'
+      from generate_series(1,${turns}) i;
+      insert into private.chat_messages(conversation_id,brewery_id,actor_id,role,result,created_at)
+      select '${conversation.id}','${breweryId}','${author.userId}','result','{"id":"x"}',now()-interval '1 hour'+i*interval '1 second'
+      from generate_series(5,${turns},5) i`);
+    const run = (name: string, input: unknown) => runCommand(name, input, author);
+    const setup = await loadComposerSetup(run, { current: undefined }, new AbortController().signal);
+    expect(setup.conversationId).toBe(conversation.id);
+    expect(setup.messages.map((message) => (message.parts[0] as { text: string }).text)).toEqual(
+      Array.from({ length: MAX_HISTORY_MESSAGES }, (_, index) => `turn ${turns - MAX_HISTORY_MESSAGES + 1 + index}`),
+    );
+    const page = await runCommand("get_chat_history", { conversationId: conversation.id, recentTurns: 3 }, author) as {
+      messages: { role: string }[];
+    };
+    expect(page.messages.map((message) => message.role)).toEqual(["assistant", "user", "assistant"]);
   });
 
   it("rejects direct composer RPCs after the current actor changes from staff to customer, then preserves staff compatibility", async () => {

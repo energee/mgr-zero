@@ -7,7 +7,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { BinView, RemoveBinControl } from "../components/mgr/views/bin";
-import { LocationView } from "../components/mgr/views/location";
+import { FirstRunView } from "../components/mgr/views/first-run";
+import { LocationFields, LocationView } from "../components/mgr/views/location";
 import { LocationBinsView } from "../components/mgr/views/location-bins";
 import { LocationsView } from "../components/mgr/views/locations";
 import { LOC_TAPROOM, LOC_WAREHOUSE } from "../lib/mgr/fixtures/demo";
@@ -19,6 +20,9 @@ import { toLocationsViewProps } from "../lib/mgr/locations-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
+// The on-screen copy, spelled out so a wording change is a test change (#1148).
+const USES_HINT = "Choose one or more. One place can be all three. The tap board, weekly count, variance and Replenishment list only locations with Taproom. Taproom staff see stock only at those locations. From warehouse on Replenishment and the Portal fulfillment warehouse list only locations with Warehouse.";
+const BINS_NOTE = "Bins are the rooms and racks inside a location where stock sits. Every new location starts with Cold, Dry and Walk-in. Admin and Warehouse add, rename or remove bins under Location bins.";
 
 describe("Locations list", () => {
   it("maps list_locations through every use, with optional units / taps / bins copy", () => {
@@ -105,27 +109,19 @@ describe("Locations list", () => {
 });
 
 describe("Location detail", () => {
-  it("maps a list_locations row plus bins and timezone extras", () => {
+  it("maps a list_locations row plus bins and the brewery's zone by name (#1148)", () => {
     const model = toLocationViewProps(locationTaproom);
     expect(model.name).toBe(LOC_TAPROOM.name);
-    expect(model.uses).toEqual(["Storage", "Taproom", "Warehouse"]);
-    expect(model.useOptions).toEqual(["Warehouse", "Taproom", "Storage"]);
-    expect(model.timezone).toBe("Brewery default · America/New_York");
+    expect(model.uses).toEqual(["storage", "taproom", "warehouse"]);
+    expect(model.usesLabel).toBe("Storage · Taproom · Warehouse");
+    expect(model.timezone).toBe("Brewery default · America / New York");
     expect(model.bins).toBe("Walk-in · Cold · Dry");
     expect(model.binsHref).toBe(`/locations/${LOC_TAPROOM.id}/bins`);
     expect(model.backHref).toBeUndefined();
   });
 
-  it("timezone without an IANA extra is the brewery default", () => {
-    const model = toLocationViewProps({
-      location: locationTaproom.location,
-      bins: locationTaproom.bins,
-    });
-    expect(model.timezone).toBe("Brewery default");
-  });
-
   it("empty bins copy is none", () => {
-    const model = toLocationViewProps({ location: locationTaproom.location, bins: [] });
+    const model = toLocationViewProps({ ...locationTaproom, bins: [] });
     expect(model.bins).toBe("none");
   });
 
@@ -138,7 +134,7 @@ describe("Location detail", () => {
     expect(html).toMatch(/Storage/);
     expect(html).toMatch(/Warehouse/);
     expect(html).toMatch(/Timezone/);
-    expect(html).toMatch(/Brewery default · America\/New_York/);
+    expect(html).toMatch(/Brewery default · America \/ New York/);
     expect(html).toMatch(/Location bins/);
     expect(html).toMatch(/Walk-in · Cold · Dry/);
     expect(html).not.toMatch(/>Open</);
@@ -158,6 +154,62 @@ describe("Location detail", () => {
     expect(html).toMatch(new RegExp(`<a[^>]*href="/locations/${LOC_TAPROOM.id}/bins"[^>]*>(?:(?!</a>)[\\s\\S])*Location bins`));
     expect(html).not.toMatch(/>Save location</);
     expect(html).not.toMatch(/Location name/);
+  });
+
+  it("Uses says it takes several answers and names the screens each use gates (#1148)", () => {
+    const html = htmlOf(createElement(LocationFields, { name: "Taproom", uses: ["taproom", "storage"] }));
+    const group = /<div[^>]*data-slot="toggle-group"[^>]*>/.exec(html)?.[0] ?? "";
+    expect(group).toMatch(/aria-label="Uses"/);
+    const hintId = /aria-describedby="([^"]+)"/.exec(group)?.[1];
+    expect(hintId).toBeTruthy();
+    expect(html).toContain(`id="${hintId}"`);
+    expect(html).toContain(">" + USES_HINT + "<");
+    // Selected uses fill with the AA-checked primary pair, not the hover wash (#493).
+    expect(html).toMatch(/<button[^>]*data-state="on"[^>]*data-\[state=on\]:bg-primary[^>]*>Taproom</);
+    expect(html).toMatch(/<button[^>]*data-state="off"[^>]*>Warehouse</);
+  });
+
+  it("the Location name label focuses its input (#1148)", () => {
+    const html = htmlOf(createElement(LocationFields, { name: "Taproom", uses: ["taproom"] }));
+    const labelFor = /<label[^>]*for="([^"]+)"[^>]*>Location name</.exec(html)?.[1];
+    expect(labelFor).toBeTruthy();
+    expect(html).toMatch(new RegExp(`<input[^>]*id="${labelFor}"`));
+  });
+
+  it("the location fields say what a bin is and where bins are kept (#1148)", () => {
+    const html = htmlOf(createElement(LocationFields, { name: "", uses: ["warehouse"] }));
+    expect(html).toContain(BINS_NOTE);
+  });
+
+  it("the read-only detail explains bins beside the Location bins link (#1148)", () => {
+    const html = htmlOf(createElement(LocationView, { model: toLocationViewProps(locationTaproom), readOnly: true }));
+    expect(html).toContain(BINS_NOTE);
+  });
+
+  it("the inventory drawing paints the same location fields the live dialog mounts", () => {
+    const html = htmlOf(createElement(LocationView, { model: toLocationViewProps(locationTaproom) }));
+    const fields = renderToStaticMarkup(createElement(LocationFields, { name: LOC_TAPROOM.name, uses: ["storage", "taproom", "warehouse"] }));
+    // useId differs between the two renders; compare with the ids removed.
+    const withoutIds = (markup: string) => markup.replace(/(id|for|aria-describedby)="[^"]*"/g, "");
+    expect(withoutIds(html)).toContain(withoutIds(fields));
+  });
+
+  it("the live Add/Edit location dialog mounts the shared LocationFields (#1148)", () => {
+    const src = readFileSync("app/(app)/locations/location-form.tsx", "utf8");
+    expect(src).toMatch(/from "@\/components\/mgr\/views\/location"/);
+    expect(src).toMatch(/<LocationFields\b[^>]*controls=\{\{ name: setName, uses: setUses \}\}/);
+    expect(src).not.toMatch(/<Label\b|<Input\b|<ToggleGroup\b/);
+  });
+
+  it("the inventory first-run step draws the same multi-select fields, not single-choice chips (#1148)", () => {
+    const html = htmlOf(createElement(FirstRunView, { model: { brewery: "Demo Brewing", steps: "5 steps" } }));
+    expect(html).toContain(USES_HINT);
+    expect(html).toMatch(/<div[^>]*data-slot="toggle-group"[^>]*aria-label="Uses"/);
+  });
+
+  it("the live first-run step names every use and that one place can be several (#1148)", () => {
+    const src = readFileSync("app/(app)/first-run.tsx", "utf8");
+    expect(src).toContain('E.row("1 · Add locations", "warehouse, taproom, storage, or several at once"');
   });
 
   it("a footer slot replaces Save location", () => {
@@ -182,6 +234,8 @@ describe("Location detail", () => {
     expect(src).toMatch(/readOnly/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/backHref: "\/locations"/);
+    // The zone is the brewery's (Settings → Timezone), read from the membership (#1148).
+    expect(src).toMatch(/timezone: brewery\.timeZone/);
   });
 });
 
