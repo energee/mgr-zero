@@ -1,4 +1,5 @@
 // lib/mgr/entry-view.ts — view-model for Sign in / Reset / Set password family.
+import { sentenceCase } from "@/lib/mgr/labels";
 export type EntryViewModel = {
   title: string;
   inputs: string[];
@@ -14,8 +15,8 @@ export type EntryViewModel = {
   extraPrimary?: string;
 };
 
-export function toAcceptInviteViewProps(breweryName: string, role: string): EntryViewModel {
-  return { title: `Join ${breweryName}`, inputs: ["Your name", "Choose a password"], field: { label: "Role", value: role }, primary: `Join ${breweryName}` };
+export function toAcceptInviteViewProps(breweryName: string, roles: readonly string[]): EntryViewModel {
+  return { title: `Join ${breweryName}`, inputs: ["Your name", "Choose a password"], field: { label: "Role", value: roles.map(sentenceCase).join(", ") }, primary: `Join ${breweryName}` };
 }
 
 export const expiredInviteModel: EntryViewModel = {
