@@ -100,6 +100,7 @@ describe("taproom complete public RLS read boundary", () => {
       customers: "list_customers", ship_tos: "get_customer", sale_channels: "list_sale_channels",
       orders: "list_orders", order_lines: "get_order", order_events: "get_order", order_deposit_lines: "get_order", shipments: "get_order",
       invoices: "list_invoices", invoice_lines: "get_invoice", invoice_questions: "list_invoice_questions",
+      invoice_payments: "get_invoice", invoice_payment_voids: "get_invoice",
       deliveries: "get_delivery_stop", routes: "list_routes", stock_transfers: "list_stock_transfers", stock_transfer_lines: "get_stock_transfer",
       lots: "list_movements", channel_prices: "list_channel_prices", price_group_barcodes: "list_price_group_barcodes",
       report_filings: "list_compliance_reports", brand_approvals: "list_brands",

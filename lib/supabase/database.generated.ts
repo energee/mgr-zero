@@ -1001,6 +1001,64 @@ isOneToOne: false
       referencedColumns: ["id","brewery_id"]
     }
                   ]
+                },"invoice_payment_voids": {
+                  Row: {
+                    "brewery_id": string,"id": string,"payment_id": string,"reason": string,"voided_at": string,"voided_by": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "brewery_id": string,"id"?: string,"payment_id": string,"reason": string,"voided_at"?: string,"voided_by": string
+                  }
+                  Update: {
+                    "brewery_id"?: string,"id"?: string,"payment_id"?: string,"reason"?: string,"voided_at"?: string,"voided_by"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "invoice_payment_voids_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "invoice_payment_voids_payment_id_brewery_id_fkey"
+      columns: ["payment_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "invoice_payments"
+      referencedColumns: ["id","brewery_id"]
+    }
+                  ]
+                },"invoice_payments": {
+                  Row: {
+                    "amount_cents": number,"brewery_id": string,"id": string,"invoice_id": string,"method": string,"received_on": string,"recorded_at": string,"recorded_by": string,"reference": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount_cents": number,"brewery_id": string,"id"?: string,"invoice_id": string,"method": string,"received_on": string,"recorded_at"?: string,"recorded_by": string,"reference"?: string | null
+                  }
+                  Update: {
+                    "amount_cents"?: number,"brewery_id"?: string,"id"?: string,"invoice_id"?: string,"method"?: string,"received_on"?: string,"recorded_at"?: string,"recorded_by"?: string,"reference"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "invoice_payments_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "invoice_payments_invoice_id_brewery_id_fkey"
+      columns: ["invoice_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "invoice_totals"
+      referencedColumns: ["invoice_id","brewery_id"]
+    },{
+      foreignKeyName: "invoice_payments_invoice_id_brewery_id_fkey"
+      columns: ["invoice_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "invoices"
+      referencedColumns: ["id","brewery_id"]
+    }
+                  ]
                 },"invoice_questions": {
                   Row: {
                     "answered_at": string | null,"answered_by": string | null,"body": string,"brewery_id": string,"created_at": string,"created_by": string,"customer_id": string,"id": string,"invoice_id": string
@@ -3816,7 +3874,7 @@ isOneToOne: false
                   ]
                 },"invoice_totals": {
                   Row: {
-                    "brewery_id": string | null,"collected_cents": number | null,"customer_id": string | null,"invoice_id": string | null,"kind": Database["public"]['Enums']["invoice_kind"] | null,"paid_at": string | null,"qbo_balance_cents": number | null,"qbo_sync_status": Database["public"]['Enums']["qbo_sync_status"] | null,"qbo_tax_cents": number | null,"qbo_total_cents": number | null,"subtotal_cents": number | null
+                    "brewery_id": string | null,"collected_cents": number | null,"customer_id": string | null,"invoice_id": string | null,"kind": Database["public"]['Enums']["invoice_kind"] | null,"local_paid_cents": number | null,"paid_at": string | null,"qbo_balance_cents": number | null,"qbo_sync_status": Database["public"]['Enums']["qbo_sync_status"] | null,"qbo_tax_cents": number | null,"qbo_total_cents": number | null,"subtotal_cents": number | null
                   }
                   ComputedFields: never
                   Relationships: [
