@@ -22,7 +22,7 @@ const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", nu
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 // The on-screen copy, spelled out so a wording change is a test change (#1148).
 const USES_HINT = "Choose one or more. One place can be all three. The tap board, weekly count, variance and Replenishment list only locations with Taproom. Taproom staff see stock only at those locations. From warehouse on Replenishment and the Portal fulfillment warehouse list only locations with Warehouse.";
-const BINS_NOTE = "Bins are the rooms and racks inside a location where stock sits. Every new location starts with Cold, Dry and Walk-in. To add, rename or remove bins, open Location bins on the location page.";
+const BINS_NOTE = "Bins are the rooms and racks inside a location where stock sits. Every new location starts with Cold, Dry and Walk-in. Admin and Warehouse add, rename or remove bins under Location bins.";
 
 describe("Locations list", () => {
   it("maps list_locations through every use, with optional units / taps / bins copy", () => {

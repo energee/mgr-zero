@@ -12,11 +12,11 @@ import type { LocationViewModel } from "@/lib/mgr/location-view";
 export type { LocationViewModel };
 
 // Each sentence names a real gate: list_locations({ use }) on the tap board,
-// weekly count, variance, Today and Replenishment; taproom staff RLS on stock;
+// weekly count, variance and Replenishment; taproom staff RLS on stock;
 // the From warehouse and Portal fulfillment warehouse pickers.
 const USES_HINT = "Choose one or more. One place can be all three. The tap board, weekly count, variance and Replenishment list only locations with Taproom. Taproom staff see stock only at those locations. From warehouse on Replenishment and the Portal fulfillment warehouse list only locations with Warehouse.";
 // create_location seeds these three bins; Location bins (admin, warehouse) edits them.
-const BINS_NOTE = "Bins are the rooms and racks inside a location where stock sits. Every new location starts with Cold, Dry and Walk-in. To add, rename or remove bins, open Location bins on the location page.";
+const BINS_NOTE = "Bins are the rooms and racks inside a location where stock sits. Every new location starts with Cold, Dry and Walk-in. Admin and Warehouse add, rename or remove bins under Location bins.";
 
 /** Location name and Uses, plus what a bin is. Uses takes several answers:
  *  every taproom or warehouse guard asks whether that use is among them.
@@ -31,6 +31,7 @@ export function LocationFields({ name, uses, controls = {} }: {
   const setUses = controls.uses;
   return (
     <>
+      {/* Required only when wired to a form; fixtures pass no controls. */}
       {E.edit("Location name", name, "text", undefined, { id: nameId, onChange: controls.name, required: Boolean(controls.name) })}
       {E.picks("Uses", uses, LOCATION_USE_OPTIONS, {
         // The options are LOCATION_USES, so every picked value is a LocationUse.
