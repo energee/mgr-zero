@@ -63,8 +63,7 @@ it("#1118 a window holding only a first count lists it under Count periods, not 
 });
 
 it("#1118 shows the week-by-week tip only beside a trend, and reading help as neutral info", () => {
-  const { trend: _trend, ...gated } = taproomVariance;
-  const html = renderToStaticMarkup(createElement(TaproomVarianceView, { model: gated }));
+  const html = renderToStaticMarkup(createElement(TaproomVarianceView, { model: { ...taproomVariance, trend: undefined } }));
   expect(html).toContain("Not available yet.");
   expect(html).not.toContain("A brand short every week");
   expect(html).toContain("A dash means a value is unavailable");
