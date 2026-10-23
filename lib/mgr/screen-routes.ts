@@ -146,6 +146,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Account", file: "app/(portal)/portal/account/page.tsx" },
   { name: "Portal Me", file: "app/(portal)/layout.tsx" },
   { name: "Vessel detail", file: "app/(app)/cellar/vessels/[id]/page.tsx" },
+  { name: "New vessel", file: "app/(app)/cellar/vessels/[id]/page.tsx" },
   { name: "Cellar map", file: "app/(app)/cellar/page.tsx" },
   { name: "Cellar transfer", file: "app/(app)/cellar/cellar-transfer-form.tsx" },
   { name: "Cellar addition", file: "app/(app)/cellar/cellar-addition-form.tsx" },

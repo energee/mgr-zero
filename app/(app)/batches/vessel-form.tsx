@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { RemoveVesselControl, VesselDetailView } from "@/components/mgr/views/vessel-detail";
-import type { VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
+import { vesselReason, type VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 
 /** Admin edit of one vessel; `vesselId` is absent for a new vessel, which has nothing to delete. */
@@ -13,14 +13,14 @@ export function VesselForm({ vesselId, model }: { vesselId?: string; model: Vess
   const [kind, setKind] = useState(model.type);
   const [capacity, setCapacity] = useState(model.capacity);
   const action = useCommandAction();
-  const disabled = !name.trim() || !Number.isFinite(Number(capacity)) || Number(capacity) <= 0;
+  const reason = vesselReason({ name, capacity });
   return <form className="flex flex-col gap-3" onSubmit={event => {
     event.preventDefault();
-    if (action.busy || disabled) return;
+    if (action.busy || reason) return;
     void action.run("upsert_vessel", { id: vesselId, name, kind: kind.toLowerCase(), capacityBbl: Number(capacity) }, () => router.push("/cellar"));
   }}>
     <VesselDetailView model={{ ...model, name, type: kind, capacity }} onName={setName} onType={setKind} onCapacity={setCapacity}
-      disabled={disabled} submitting={action.busy} messages={<CommandFormMessage error={action.error} />}
+      reason={reason} submitting={action.busy} messages={<CommandFormMessage error={action.error} />}
       remove={vesselId && !model.retired && <RemoveVesselControl vessel={model.title} busy={action.busy} error={action.error}
         onDelete={() => action.run("delete_vessel", { vesselId }, () => router.push("/cellar"))} />} />
   </form>;
