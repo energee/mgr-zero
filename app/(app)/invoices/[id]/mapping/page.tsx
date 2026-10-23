@@ -7,6 +7,9 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { QboMappingForm } from "@/app/(app)/settings/accounting/qbo-controls";
+import { navTitle } from "@/lib/mgr/nav";
+
+export const metadata = { title: navTitle("/invoices") };
 
 type Snapshot = { invoice: { id: string; customers: { id: string; name: string; qbo_customer_id: string | null } | null }; lines: { id: string; kind: string; sku_id: string | null; description: string; skus: { name: string; qbo_item_id: string | null } | null }[] };
 export default async function InvoiceMappingPage({ params }: { params: Promise<{ id: string }> }) {

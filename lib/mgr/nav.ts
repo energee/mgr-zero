@@ -195,11 +195,13 @@ export function canOpen(roles: readonly StaffRole[], path: string): boolean {
 /**
  * The browser-tab title of the staff page at `path` (#1109): the label of the
  * deepest STAFF_NAV entry covering it. /routes reads "Deliveries";
- * /settings/team has no entry and follows Settings. Each static page exports
- * `metadata = { title: navTitle("<its route>") }`, and the root layout's
+ * /settings/team has no entry and follows Settings. Each page exports
+ * `metadata = { title: navTitle("<its route>") }`; a record page passes its
+ * static parent, so /orders/[id] reads "Orders" (#1230). The root layout's
  * template appends " · MGR". Throws for a path no STAFF_NAV entry covers, so
  * a page outside the nav fails at build. tests/page-titles.test.ts catches a
- * page that passes a route other than its own, such as a moved page.
+ * page that passes a route other than its own static route, such as a moved
+ * page.
  */
 export function navTitle(path: string): string {
   const entry = coveringEntry(path);
