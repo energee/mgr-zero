@@ -11,6 +11,7 @@ export const routesDriver: RoutesSnapshot = {
   rows: [
     { key: "a", title: "Route A · Sep 10, 2026", detail: "departed · 1 of 3 delivered", verb: "Resume", tone: "info" },
     { key: "b", title: "Route B · Sep 11, 2026", detail: "2 stops · driver not assigned", verb: "Assign", tone: "attention", warning: true },
+    { key: "c", title: "Route C · Sep 12, 2026", detail: "2 stops · sam@example.test" },
     { key: "ord", title: "ORD-0236 · Ridgeline · Dock", detail: "shipped · no route", verb: "Add to route", tone: "attention", warning: true },
     { key: "trf", title: "TRF-0004 · Storage", detail: "shipped · no route", verb: "Add to route", tone: "attention", warning: true },
   ],
@@ -20,7 +21,7 @@ export const routeAPlan: RouteViewModel = {
   title: "Route A · Sep 10, 2026",
   date: "2026-09-10",
   driverId: "7f3a21c0",
-  driverOptions: [{ id: "7f3a21c0", label: "sam@example.test · warehouse" }, { id: "2b9e44d1", label: "riley@example.test · admin" }],
+  driverOptions: [{ id: "7f3a21c0", label: "sam@example.test · Warehouse" }, { id: "2b9e44d1", label: "riley@example.test · Admin" }],
   saved: true,
   savedDriverId: "7f3a21c0",
   selection: { s1: 1, s2: 2, s3: 3 },

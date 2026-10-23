@@ -46,7 +46,7 @@ const shipmentDoc = (s: ShipmentRow): StopDoc => ({ id: s.id, kind: "shipment", 
 const transferDoc = (t: TransferRow): StopDoc => ({ id: t.id, kind: "transfer", label: [trfNo(t.transfer_no), t.to_location?.name].filter(Boolean).join(" · ") });
 
 defineQuery({
-  name: "list_routes", description: "Delivery routes (one route by id, one day, or every route not yet returned) with their stops and their driver's roster email, null once the driver has left the team; the shipped orders and picked transfers on no route; and the members who may drive, with their emails",
+  name: "list_routes", description: "Delivery routes (one route by id, one day, or every route not yet returned) with their stops and their driver's roster email (null when no driver is assigned or the driver has left the team); the shipped orders and picked transfers on no route; and the members who may drive, with their emails",
   roles: [...READ],
   input: z.object({ id: z.string().uuid().optional(), date: z.string().date().optional() }),
   handler: async (ctx, i) => {
