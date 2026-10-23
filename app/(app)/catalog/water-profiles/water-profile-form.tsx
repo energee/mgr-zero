@@ -1,6 +1,6 @@
 // app/(app)/catalog/water-profiles/water-profile-form.tsx — CommandForm for
-// upsert_water_profile around the shared WaterProfileView: Add profile with no
-// profile, Edit with one.
+// upsert_water_profile around the shared WaterProfileView: Add water profile
+// with no profile, Edit with one.
 "use client";
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -19,8 +19,8 @@ export function WaterProfileForm({ profile }: { profile?: WaterProfile }) {
   });
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title={profile ? "Edit water profile" : "Add water profile"}
-      trigger={sheetTrigger(Boolean(profile), "Add profile", profile?.name)}
-      footer={<CommandFormFooter><Button form={formId} type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Save profile"}</Button></CommandFormFooter>}>
+      trigger={sheetTrigger(Boolean(profile), "Add water profile", profile?.name)}
+      footer={<CommandFormFooter><Button form={formId} type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Save water profile"}</Button></CommandFormFooter>}>
       <form id={formId} onSubmit={form.submit} className="flex flex-col gap-3">
         <WaterProfileView fields={fields} onChange={(patch) => setFields((f) => ({ ...f, ...patch }))} submitting={form.submitting} footer={null} messages={<CommandFormMessage error={form.error} />} />
       </form>
