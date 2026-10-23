@@ -8,7 +8,7 @@ import type { Ctx } from "./registry";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { ORDER_STATUSES, salesRoles, warehouseRoles } from "@/lib/mgr/order-status";
 import { hasAnyRole } from "@/lib/mgr/roles";
-import { REFUSAL_REASONS } from "@/lib/mgr/enums";
+import { PAYMENT_METHODS, REFUSAL_REASONS } from "@/lib/mgr/enums";
 import { isoDate } from "./packaging";
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
 
@@ -337,6 +337,31 @@ defineCommand({
   roles: [...salesRoles],
   input: z.object({ questionId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("resolve_invoice_question", { p_brewery: ctx.breweryId, p_question: i.questionId, p_request_id: execution.requestId })),
+});
+
+// Payments recorded in MGR (#1045, docs/plans/invoice-local-payments.md). The
+// RPCs hold every rule: only an invoice QuickBooks never received, no more
+// than the balance, no future received date in the brewery's zone.
+defineCommand({
+  name: "record_invoice_payment", description: "Record a payment received outside QuickBooks on an invoice QuickBooks never received; paid in full marks the invoice paid on the received day; returns the remaining balance",
+  roles: [...salesRoles],
+  input: z.object({
+    invoiceId: z.string().uuid(), amountCents: z.number().int().positive(), receivedOn: isoDate,
+    method: z.enum(PAYMENT_METHODS), reference: z.string().trim().max(200).optional(),
+  }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_invoice_payment", {
+    p_brewery: ctx.breweryId, p_invoice: i.invoiceId, p_amount_cents: i.amountCents, p_received_on: i.receivedOn,
+    p_method: i.method, p_reference: i.reference ?? null, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "void_invoice_payment", description: "Void a payment recorded in MGR with a reason, the only correction; the payment row is kept, and an invoice that drops below its total is no longer paid; returns the balance",
+  roles: [...salesRoles], requiresConfirmation: true,
+  input: z.object({ paymentId: z.string().uuid(), reason: z.string().trim().min(1).max(500) }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("void_invoice_payment", {
+    p_brewery: ctx.breweryId, p_payment: i.paymentId, p_reason: i.reason, p_request_id: execution.requestId,
+  })),
 });
 
 defineQuery({

@@ -5,6 +5,7 @@ import { Client } from "pg";
 import { describe, expect, it, vi } from "vitest";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+import { PAYMENT_METHODS } from "@/lib/mgr/enums";
 import { admin, DB, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, sql } from "./helpers";
 
 /** A $100.00 invoice QuickBooks never received, with a Sales member to act on it. */
@@ -316,5 +317,40 @@ describe("start_qbo_push and local payments", () => {
       if (pushing) await Promise.allSettled([pushing]);
       await Promise.all([payer.client.end(), pusher.client.end()]);
     }
+  });
+});
+
+describe("record_invoice_payment and void_invoice_payment commands", () => {
+  const payment = { amountCents: 2500, receivedOn: "2026-10-20", method: "check" };
+
+  it("refuses a warehouse member in the registry, before the RPC", async () => {
+    const f = await localInvoice();
+    const warehouse = await makeStaffCtx(f.breweryId, "warehouse");
+    await expect(runCommand("record_invoice_payment", { invoiceId: f.invoiceId, ...payment }, warehouse))
+      .rejects.toMatchObject({ status: 403, code: "permission_denied" });
+    await expect(runCommand("void_invoice_payment", { paymentId: crypto.randomUUID(), reason: "Entered twice" }, warehouse))
+      .rejects.toMatchObject({ status: 403, code: "permission_denied" });
+  });
+
+  it("trims the reference, refuses a received date that is not a date, and voids with a reason", async () => {
+    const f = await localInvoice();
+    const recorded = await runCommand("record_invoice_payment", { invoiceId: f.invoiceId, ...payment, reference: "  Check 1001  " }, f.sales);
+    expect(recorded).toMatchObject({ invoiceId: f.invoiceId, balanceCents: 7500 });
+    expect(sql(`select reference from public.invoice_payments where invoice_id='${f.invoiceId}'`, true)).toEqual(["Check 1001"]);
+    await expect(runCommand("record_invoice_payment", { invoiceId: f.invoiceId, ...payment, receivedOn: "Oct 20" }, f.sales))
+      .rejects.toMatchObject({ code: "invalid_input" });
+    const { paymentId } = recorded as { paymentId: string };
+    await expect(runCommand("void_invoice_payment", { paymentId, reason: "  " }, f.sales)).rejects.toMatchObject({ code: "invalid_input" });
+    expect(await runCommand("void_invoice_payment", { paymentId, reason: "Entered twice" }, f.sales))
+      .toEqual({ paymentId, invoiceId: f.invoiceId, balanceCents: 10000 });
+  });
+
+  it("stores every PAYMENT_METHODS value, so the list and the database check agree", async () => {
+    const f = await localInvoice();
+    for (const method of PAYMENT_METHODS) {
+      await runCommand("record_invoice_payment", { invoiceId: f.invoiceId, ...payment, method }, f.sales);
+    }
+    expect(sql(`select method from public.invoice_payments where invoice_id='${f.invoiceId}' order by recorded_at, method`, true).sort())
+      .toEqual([...PAYMENT_METHODS].sort());
   });
 });
