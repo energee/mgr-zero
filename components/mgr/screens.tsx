@@ -3199,7 +3199,7 @@ export const SCREENS: Screen[] = [
     spec: "Future phase only. Personal destination, canonical preview and explicit Record reading confirmation. A new reading corrects history; prior rows never edit.",
     body: (<>
       {S.ctx("Future phase only")}
-      {S.f([["Vessel", "FV2 · Hazy IPA"], ["Last reading", "26 h ago"], ["Reading", "4.2 °Plato · 68 °F"]])}
+      {S.f([["Vessel", "FV2 · Hazy IPA"], ["Last reading", "26 h ago"], ["Reading", "4.2 °P · 68 °F"]])}
       {S.dis("Record reading", "Open this reading in MGR for now")}
     </>),
   },
