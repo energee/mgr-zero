@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { QboOAuthClient, syncQboInvoices } from "@/lib/qbo";
 import { beginQboInvoiceSync, completeQboInvoiceSync } from "@/lib/supabase/integration-tokens";
 import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
-import { invoiceCurrentState } from "@/lib/mgr/invoice-state";
+import { invoiceBalanceCents, invoiceCurrentState, invoiceLedgerOwnsBalance } from "@/lib/mgr/invoice-state";
 import { qboInvoicePresentation } from "@/lib/mgr/qbo-ui";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { toPortalInvoiceViewProps } from "@/lib/mgr/portal-invoice-view";
@@ -763,5 +763,51 @@ describe("QuickBooks current invoice state", () => {
     }
     expect(toPortalInvoicesViewProps({ customerName: "Buyer", invoices: [{ ...invoice, invoice_lines: [{ amount_cents: 10000 }] }] }).rows[0])
       .toMatchObject({ detail: "voided", unpaid: false });
+  });
+});
+
+// #1045 Design 2: MGR's payment ledger owns the balance of an invoice QuickBooks never received.
+describe("who owns an invoice balance", () => {
+  const neverPushed = {
+    kind: "invoice" as const, qbo_invoice_id: null, paid_at: null, qbo_balance_cents: null,
+    has_pending_qbo_push: false, was_pushed_to_qbo: false, local_paid_cents: 0,
+  };
+
+  it.each([
+    ["a never-pushed unpaid invoice", neverPushed],
+    // A rejected push (push_failed) created no QuickBooks document: no identity, no pushed row.
+    ["an unpaid invoice whose push was rejected", { ...neverPushed }],
+    // A company change nulled the identity and balance of an invoice that was never pushed.
+    ["a purged never-pushed unpaid invoice", { ...neverPushed, qbo_balance_cents: null }],
+    // Voided payments leave the unvoided sum at zero.
+    ["an invoice whose payments are all voided", { ...neverPushed, local_paid_cents: 0 }],
+    ["an invoice the ledger paid in full", { ...neverPushed, paid_at: "2026-10-20T04:00:00Z", local_paid_cents: 5000 }],
+  ])("the ledger owns %s", (_name, invoice) => {
+    expect(invoiceLedgerOwnsBalance(invoice)).toBe(true);
+  });
+
+  it.each([
+    ["an invoice with a pending push (Q3)", { ...neverPushed, has_pending_qbo_push: true }],
+    ["an invoice pushed and then purged by a company change (Q4)", { ...neverPushed, was_pushed_to_qbo: true }],
+    ["an invoice with a QuickBooks identity", { ...neverPushed, qbo_invoice_id: "qbo-1042" }],
+    ["a credit memo", { ...neverPushed, kind: "credit_memo" as const }],
+    ["an invoice paid outside the ledger, such as a historical import (Q7)", { ...neverPushed, paid_at: "2026-09-01T04:00:00Z" }],
+  ])("QuickBooks owns %s", (_name, invoice) => {
+    expect(invoiceLedgerOwnsBalance(invoice)).toBe(false);
+  });
+
+  it("subtracts payments from the total when the ledger owns the balance", () => {
+    expect(invoiceBalanceCents({ ...neverPushed, local_paid_cents: 3000 }, 10000)).toBe(7000);
+  });
+
+  it("gives a ledger-owned $0.00 invoice a zero balance, never a negative one (Design 4)", () => {
+    expect(invoiceBalanceCents(neverPushed, 0)).toBe(0);
+    expect(invoiceBalanceCents(neverPushed, -500)).toBe(0);
+  });
+
+  it("never turns a null QuickBooks balance into zero", () => {
+    expect(invoiceBalanceCents({ ...neverPushed, has_pending_qbo_push: true }, 10000)).toBeNull();
+    expect(invoiceBalanceCents({ ...neverPushed, was_pushed_to_qbo: true, qbo_balance_cents: undefined }, 10000)).toBeNull();
+    expect(invoiceBalanceCents({ ...neverPushed, qbo_invoice_id: "qbo-1042", qbo_balance_cents: 2500 }, 10000)).toBe(2500);
   });
 });

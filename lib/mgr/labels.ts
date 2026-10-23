@@ -2,7 +2,7 @@
 // Database values are snake_case (or already spaced, as the record-movement
 // fixtures are); operators see sentence case. Issue #333.
 import type { ImportKind } from "@/lib/import-csv";
-import { COUNTRY_CODES, COUNTRY_NAMES, CUSTOMER_TYPES, type BrandSort, type CountryCode, type PaymentTerm } from "@/lib/mgr/enums";
+import { COUNTRY_CODES, COUNTRY_NAMES, CUSTOMER_TYPES, type BrandSort, type CountryCode, type PaymentMethod, type PaymentTerm } from "@/lib/mgr/enums";
 
 /** "opening_balance" / "opening balance" → "Opening balance". */
 export const sentenceCase = (value: string) =>
@@ -25,6 +25,9 @@ export const PAYMENT_TERM_LABEL: Record<PaymentTerm, string> = { due_on_receipt:
 
 /** A stored payment term as the operator reads it; an unknown value prints as stored. */
 export const paymentTermLabel = (term: string) => PAYMENT_TERM_LABEL[term as PaymentTerm] ?? term;
+
+/** How an invoice payment's method reads; the stored values are PAYMENT_METHODS in lib/mgr/enums.ts (#1045). */
+export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = { cash: "Cash", check: "Check", ach: "ACH", other: "Other" };
 
 /** How a QuickBooks or Square connection state reads as a status (qbo_connections / pos_connections.state).
  *  "Reconnect required" names what recovery_required asks the admin to do (#1151). */
