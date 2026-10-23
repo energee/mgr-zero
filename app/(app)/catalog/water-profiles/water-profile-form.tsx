@@ -1,20 +1,23 @@
 // app/(app)/catalog/water-profiles/water-profile-form.tsx — CommandForm for
 // upsert_water_profile around the shared WaterProfileView: Add water profile
-// with no profile, Edit with one.
+// with no profile, Edit with one. Save waits for a name, six nonnegative ions,
+// and any alkalinity (nonnegative) or water pH (0–14) entered in range.
 "use client";
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage, sheetTrigger } from "@/components/mgr/command-form";
 import { WaterProfileView } from "@/components/mgr/views/water-profile";
-import { IONS, toWaterProfileFields, type WaterProfile } from "@/lib/mgr/water-profiles-view";
+import { IONS, toWaterProfileFields, toWaterProfileInput, type WaterProfile } from "@/lib/mgr/water-profiles-view";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 export function WaterProfileForm({ profile }: { profile?: WaterProfile }) {
   const formId = useId();
   const [fields, setFields] = useState(() => toWaterProfileFields(profile));
-  const ready = fields.name.trim() !== "" && IONS.every(([key]) => fields[key] !== "" && Number(fields[key]) >= 0);
+  const ph = Number(fields.water_ph);
+  const ready = fields.name.trim() !== "" && IONS.every(([key]) => fields[key] !== "" && Number(fields[key]) >= 0)
+    && (fields.alkalinity_ppm === "" || Number(fields.alkalinity_ppm) >= 0) && (fields.water_ph === "" || (ph >= 0 && ph <= 14));
   const form = useCommandForm("upsert_water_profile", {
-    build: () => ({ profileId: profile?.id, name: fields.name, ...Object.fromEntries(IONS.map(([key, , input]) => [input, Number(fields[key])])) }),
+    build: () => ({ profileId: profile?.id, ...toWaterProfileInput(fields) }),
     reset: () => setFields(toWaterProfileFields(profile)),
   });
   return (

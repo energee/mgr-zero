@@ -134,26 +134,32 @@ defineQuery({
   },
 });
 
-// Water profiles: a catalog entity of six ions in ppm (Water profiles /
-// Water profile screens). One upsert creates (no profileId) or edits.
+// Water profiles (Water profiles / Water profile screens): a catalog entity of
+// six ions in ppm, plus optional alkalinity as CaCO3, the water's own pH and
+// notes (#1205). One upsert creates (no profileId) or edits; an edit writes
+// every field, so leaving an optional one out clears it.
 const ppm = z.number().nonnegative().max(999_999.9); // numeric(7,1)
 defineQuery({
-  name: "list_water_profiles", description: "Water profiles, alphabetical: a name and six ions in ppm",
+  name: "list_water_profiles", description: "Water profiles, alphabetical: a name, six ions in ppm, and alkalinity as CaCO3, water pH and notes when set",
   input: z.object({}), roles: ["admin", "brewer"],
   handler: (ctx) => unwrap(ctx.db.from("water_profiles")
-    .select("id, name, calcium_ppm, magnesium_ppm, sodium_ppm, sulfate_ppm, chloride_ppm, bicarbonate_ppm")
+    .select("id, name, calcium_ppm, magnesium_ppm, sodium_ppm, sulfate_ppm, chloride_ppm, bicarbonate_ppm, alkalinity_ppm, water_ph, note")
     .eq("brewery_id", ctx.breweryId).order("name")),
 });
 defineCommand({
-  name: "upsert_water_profile", description: "Create a water profile, or edit one by profileId: its name and six ions in ppm",
+  name: "upsert_water_profile", description: "Create a water profile, or edit one by profileId: its name, six ions in ppm, and optional alkalinity as CaCO3, water pH and notes",
   input: z.object({
     profileId: z.string().uuid().optional(), name: z.string().trim().min(1),
     calciumPpm: ppm, magnesiumPpm: ppm, sodiumPpm: ppm, sulfatePpm: ppm, chloridePpm: ppm, bicarbonatePpm: ppm,
+    alkalinityPpm: ppm.optional().describe("Total alkalinity as CaCO3, in ppm"),
+    waterPh: z.number().min(0).max(14).optional().describe("The water's own pH, not a recipe's target mash pH"),
+    note: z.string().trim().max(2000).optional().describe("Free text; blank stores none"),
   }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_water_profile", {
     p_brewery: ctx.breweryId, p_profile: i.profileId ?? null, p_name: i.name, p_calcium: i.calciumPpm, p_magnesium: i.magnesiumPpm,
-    p_sodium: i.sodiumPpm, p_sulfate: i.sulfatePpm, p_chloride: i.chloridePpm, p_bicarbonate: i.bicarbonatePpm, p_request_id: execution.requestId,
+    p_sodium: i.sodiumPpm, p_sulfate: i.sulfatePpm, p_chloride: i.chloridePpm, p_bicarbonate: i.bicarbonatePpm,
+    p_alkalinity: i.alkalinityPpm ?? null, p_ph: i.waterPh ?? null, p_note: i.note || null, p_request_id: execution.requestId,
   })),
 });
 

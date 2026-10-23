@@ -299,7 +299,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-Water profiles, alphabetical: a name and six ions in ppm
+Water profiles, alphabetical: a name, six ions in ppm, and alkalinity as CaCO3, water pH and notes when set
 
 Takes no input.
 
@@ -519,7 +519,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, brewer
 
-Create a water profile, or edit one by profileId: its name and six ions in ppm
+Create a water profile, or edit one by profileId: its name, six ions in ppm, and optional alkalinity as CaCO3, water pH and notes
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -531,6 +531,9 @@ Create a water profile, or edit one by profileId: its name and six ions in ppm
 | `chloridePpm` | number | yes |
 | `bicarbonatePpm` | number | yes |
 | `profileId` | uuid | no |
+| `alkalinityPpm` | number | no |
+| `waterPh` | number | no |
+| `note` | string | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
