@@ -1,12 +1,15 @@
 // Shared saved-draft editor; inventory supplies fixtures, staff supplies authorized save effects.
+// A line it cannot save marks its SKU or its quantity, with the message under
+// the row, once the user leaves the quantity (draftLineErrors, #1121).
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { Button } from "@/components/ui/button";
-import { OrderSkuPicker, OrderQuantity, PickupSwitch } from "./new-order";
-import { isCompleteLine } from "@/lib/order-form-rules";
+import { LineErrorMessages, lineErrorIds, OrderSkuPicker, OrderQuantity, PickupSwitch } from "./new-order";
+import { draftLineErrors } from "@/lib/order-form-rules";
+import { useTouchedLines } from "@/lib/mgr/touched-lines";
 
 export type EditDraftOrderModel = {
   title: string;
@@ -40,13 +43,10 @@ export function EditDraftOrderView({ model, onSave, busy = false, error }: {
   const [poNumber, setPoNumber] = useState(model.poNumber);
   const [pickup, setPickup] = useState(model.pickup);
   const [lines, setLines] = useState(model.lines);
-  const lineErrors = lines.map((line, index) => {
-    if (!model.skus.some(sku => sku.id === line.skuId)) return `Line ${index + 1}: choose an available SKU.`;
-    if (!isCompleteLine(line) || !Number.isFinite(Number(line.qty)) || Number(line.qty) < 0.01) return `Line ${index + 1}: enter a quantity of at least 0.01.`;
-    if (lines.findIndex(other => other.skuId === line.skuId) !== index) return `Line ${index + 1}: this SKU is already on another line. Combine its quantities or remove this line.`;
-    return null;
-  });
-  const ready = lines.length > 0 && lineErrors.every(error => error === null)
+  const errorPrefix = useId();
+  const touched = useTouchedLines(!onSave);
+  const lineErrors = draftLineErrors(lines, model.skus.map(sku => sku.id));
+  const ready = lines.length > 0 && lineErrors.every(errors => !errors.sku && !errors.qty)
     && (model.kind !== "wholesale" || model.shipTos.some(shipTo => shipTo.id === shipToId));
   function updateLine(index: number, patch: Partial<EditDraftOrderModel["lines"][number]>) {
     setLines(previous => previous.map((line, i) => i === index ? { ...line, ...patch } : line));
@@ -63,12 +63,16 @@ export function EditDraftOrderView({ model, onSave, busy = false, error }: {
     {E.edit("Requested ship", requestedShipDate, "date", undefined, { onChange: setRequestedShipDate, disabled: busy })}
     {E.edit("Customer PO", poNumber, "text", undefined, { onChange: setPoNumber, disabled: busy })}
     {model.kind === "wholesale" && <PickupSwitch on={pickup} onChange={setPickup} disabled={busy} />}
-    {lines.map((line, index) => <div key={index}>
-      {E.row(<OrderSkuPicker label={`Line ${index + 1} SKU`} value={line.skuId} options={model.skus} onChange={value => updateLine(index, { skuId: value })} />,
-        "", <OrderQuantity contextualLabels label={`Line ${index + 1} quantity`} value={line.qty} onChange={qty => updateLine(index, { qty })} required invalid={Boolean(lineErrors[index])} />)}
-      {lineErrors[index] && <p className="text-sm text-destructive" role="alert">{lineErrors[index]}</p>}
-      {lines.length > 1 && <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setLines(previous => previous.filter((_, i) => i !== index))}>Remove</Button>}
-    </div>)}
+    {lines.map((line, index) => {
+      const errors = touched.shown(index) ? lineErrors[index] : {};
+      const ids = lineErrorIds(`${errorPrefix}-${index}`, errors);
+      return <div key={index}>
+      {E.row(<OrderSkuPicker label={`Line ${index + 1} SKU`} value={line.skuId} options={model.skus} invalid={Boolean(errors.sku)} errorId={ids.sku} onChange={value => updateLine(index, { skuId: value })} />,
+        "", <OrderQuantity contextualLabels label={`Line ${index + 1} quantity`} value={line.qty} onChange={qty => updateLine(index, { qty })} onBlur={() => touched.touch(index)} required invalid={Boolean(errors.qty)} errorId={ids.qty} />)}
+      <LineErrorMessages id={`${errorPrefix}-${index}`} errors={errors} />
+      {lines.length > 1 && <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => { setLines(previous => previous.filter((_, i) => i !== index)); touched.remove(index); }}>Remove</Button>}
+    </div>;
+    })}
     <Button type="button" variant="ghost" className="w-fit" disabled={busy} onClick={() => setLines(previous => [...previous, { skuId: "", qty: "" }])}>Add line</Button>
     {!ready && E.info("Choose an available SKU once and a quantity of at least 0.01 for every line, or remove the invalid line.")}
     {E.info("Saving keeps this order a draft and refreshes line prices. Submit from the order when ready.")}

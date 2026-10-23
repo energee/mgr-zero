@@ -1,5 +1,6 @@
 // components/mgr/date-picker.tsx — the labelled calendar date field behind
-// E.edit(label, value, "date"). Popover + shadcn Calendar; value is ISO yyyy-mm-dd.
+// E.edit(label, value, "date"). Popover + shadcn Calendar; value is ISO yyyy-mm-dd,
+// shown in the app-wide date format (lib/date-format.ts formatDate).
 "use client";
 
 import { Icon } from "@/components/mgr/icon";
@@ -7,13 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { formatDate } from "@/lib/date-format";
 import { Calendar03Icon } from "@hugeicons/core-free-icons";
 import * as React from "react";
-
-// Pinned, not the ambient locale: the server formats during SSR and the browser
-// on hydration, so an implicit locale renders two different strings and React
-// reports a hydration mismatch.
-const longDate = new Intl.DateTimeFormat("en-US", { dateStyle: "long" });
 
 /** An ISO date in local time ("T00:00"; a bare date string parses as UTC). Empty or malformed is no date. */
 function parseISODate(value: string) {
@@ -21,9 +18,10 @@ function parseISODate(value: string) {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
+/** yyyy-mm-dd. The year is padded too: a native date input reports each year digit as typed (0002). */
 function formatISODate(date: Date) {
-  const part = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${part(date.getMonth() + 1)}-${part(date.getDate())}`;
+  const part = (value: number, width = 2) => String(value).padStart(width, "0");
+  return `${part(date.getFullYear(), 4)}-${part(date.getMonth() + 1)}-${part(date.getDate())}`;
 }
 
 /** `aria-describedby` names the help text the caller composes beside the field. */
@@ -31,8 +29,10 @@ export function DatePicker({ label, defaultValue = "", value, onChange, disabled
   const [internalDate, setInternalDate] = React.useState<Date | undefined>(() => parseISODate(defaultValue));
   const controlled = value !== undefined;
   const date = controlled ? parseISODate(value) : internalDate;
+  // A calendar day, so formatDate reads it without a time zone, like every record date.
+  const isoDate = date ? formatISODate(date) : "";
   // Picking a day closes the calendar; left open, it covers the form's own
-  // submit button (Save schedule) until Escape (#493).
+  // submit button (Schedule batch) until Escape (#493).
   const [open, setOpen] = React.useState(false);
   const selectDate = (next: Date | undefined) => {
     if (!controlled) setInternalDate(next);
@@ -40,7 +40,7 @@ export function DatePicker({ label, defaultValue = "", value, onChange, disabled
     setOpen(false);
   };
   // A <label for> does not name a button, so the trigger points back at both the
-  // label and itself: "Best by, September 5, 2026".
+  // label and itself: "Best by, Sep 5, 2026".
   const labelId = React.useId();
   const triggerId = React.useId();
 
@@ -57,16 +57,18 @@ export function DatePicker({ label, defaultValue = "", value, onChange, disabled
             aria-describedby={describedBy}
             variant="outline"
             className="w-full min-w-0 shrink justify-start text-left font-normal"
+            // The trigger opens its calendar in place, so the screen explorer never routes it.
+            data-preview-action
           >
             <Icon icon={Calendar03Icon} data-icon="inline-start" />
-            {date ? longDate.format(date) : "Pick a date"}
+            {isoDate ? formatDate(isoDate) : "Pick a date"}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
           <Calendar mode="single" selected={date} onSelect={selectDate} defaultMonth={date} />
         </PopoverContent>
       </Popover>
-      {(required || name) && <input type="date" aria-label={label} className="sr-only" tabIndex={-1} name={name} required={required} disabled={disabled} value={date ? formatISODate(date) : ""} onChange={event => selectDate(parseISODate(event.target.value))} />}
+      {(required || name) && <input type="date" aria-label={label} className="sr-only" tabIndex={-1} name={name} required={required} disabled={disabled} value={isoDate} onChange={event => selectDate(parseISODate(event.target.value))} />}
     </Field>
   );
 }
