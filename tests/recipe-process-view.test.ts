@@ -30,7 +30,7 @@ describe("schedule drafts", () => {
   });
   it("summaries name the recorded mash-temperature rest and the total days", () => {
     expect(mashSummary(mash)).toBe("Total 85 min. The 152 °F rest is recorded as the mash temperature.");
-    expect(mashSummary([{ name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 }])).toBe("Total 10 min. No rest is between 144 and 162 °F, so no mash temperature is recorded.");
+    expect(mashSummary([{ name: "Mash-out", kind: "direct heat", tempF: 168, minutes: 10 }])).toBe("Total 10 min. No rest falls between 144 and 162 °F, so no mash temperature is recorded.");
     expect(fermentationSummary(ferm)).toBe("Total 6 days.");
     expect(fermentationSummary(ferm, 4)).toBe("Total 6 days · dry hop day 4 falls in Primary.");
     expect(fermentationSummary(ferm, 9)).toBe("Total 6 days · dry hop day 9 is after the last stage.");

@@ -4,6 +4,7 @@
 // `createHref` and `waterProfilesHref` are the live destinations of the More
 // back, New recipe and the Water profiles row (where a version's source and
 // target come from); fixtures leave them unset so the inventory frame stays inert.
+// Inventory and live both pass list_recipes rows, so the frame draws live copy.
 import type { EmptyState } from "./empty-state";
 export type RecipesRowView = {
   key: string;
@@ -25,8 +26,7 @@ export type RecipesSnapshot = {
   backHref?: string;
   createHref?: string;
   waterProfilesHref?: string;
-  rows?: RecipesRowView[];
-  recipes?: { id: string; name: string; brand?: string | null; latest_version: number | null }[];
+  recipes: { id: string; name: string; brand?: string | null; latest_version: number | null }[];
   /** A search is on, so an empty list means no match, not no recipes. */
   filtered?: boolean;
 };
@@ -35,17 +35,12 @@ const NO_RECIPES: EmptyState = { title: "No recipes yet", description: "A recipe
 const NO_MATCH: EmptyState = { title: "No recipes match", description: "Clear the search to see every recipe." };
 
 export function toRecipesViewProps(s: RecipesSnapshot): RecipesViewModel {
-  const { backHref, createHref, waterProfilesHref } = s;
-  const empty = (count: number) => count > 0 ? undefined : s.filtered ? NO_MATCH : NO_RECIPES;
-  if (s.rows) {
-    return { backHref, createHref, waterProfilesHref, rows: s.rows, empty: empty(s.rows.length) };
-  }
-  const recipes = s.recipes ?? [];
+  const { backHref, createHref, waterProfilesHref, recipes } = s;
   return {
     backHref,
     createHref,
     waterProfilesHref,
-    empty: empty(recipes.length),
+    empty: recipes.length > 0 ? undefined : s.filtered ? NO_MATCH : NO_RECIPES,
     rows: recipes.map((r) => {
       const href = `/recipes/${r.id}`;
       if (r.latest_version === null) {

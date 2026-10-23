@@ -185,8 +185,11 @@ describe("toRecipePageModel", () => {
     // Says what a version records and the next step, true to create_recipe_version (#1140).
     expect(model.empty).toEqual({
       title: "No version yet",
-      description: "A version records how this recipe is brewed: its ingredients, mash and fermentation schedules, water and process targets. A saved version never changes. Select New recipe version to write the first one.",
+      description: "A version records this recipe's ingredients, mash and fermentation schedules, water and process targets, and never changes once saved. Select New recipe version to write the first one.",
     });
+    const drawn = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model }));
+    expect(drawn).toContain("No version yet");
+    expect(drawn).toContain("Select New recipe version to write the first one.");
     expect(model.mash).toBeUndefined();
     expect(model.saved).toBeUndefined();
   });

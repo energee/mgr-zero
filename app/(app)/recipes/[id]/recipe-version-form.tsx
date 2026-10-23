@@ -21,7 +21,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { E } from "@/components/mgr/e";
-import { RecipeView } from "@/components/mgr/views/recipe";
+import { ADD_INGREDIENT_ROW, RecipeView } from "@/components/mgr/views/recipe";
 import { BLANK_RECIPE, NewRecipeFieldsView, type NewRecipeBrand } from "@/components/mgr/views/new-recipe";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
@@ -176,7 +176,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
         submitLabel: creating && !parentLocked ? "Create recipe" : "Create recipe version",
       }}
       slots={{
-        addIngredient: <IngredientSheet materials={sheetMaterials} onSave={(f) => change({ lines: [...draft.lines, f] })} trigger={E.row("Add ingredient", "Material, stage and timing", "")} />,
+        addIngredient: <IngredientSheet materials={sheetMaterials} onSave={(f) => change({ lines: [...draft.lines, f] })} trigger={ADD_INGREDIENT_ROW} />,
         mash: <MashScheduleSheet steps={mashSchedule} onChange={(mashSchedule) => change({ mashSchedule })} trigger={E.nav(mashRow.title, mashRow.detail)} />,
         fermentation: <FermentationScheduleSheet stages={fermentationSchedule} onChange={(fermentationSchedule) => change({ fermentationSchedule })} trigger={E.nav(fermentationRow.title, fermentationRow.detail)} />,
         water: <WaterSheet water={water} profiles={profiles} materials={materials} onChange={(water) => change({ water })} trigger={E.nav(waterRow.title, waterRow.detail)} />,

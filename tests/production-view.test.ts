@@ -369,7 +369,7 @@ describe("Recipes view", () => {
     });
     expect(model.rows[0]).toEqual({ key: "r1", title: "Hazy IPA v1", detail: "No brand yet", href: "/recipes/r1" });
     expect(model.rows[1]).toMatchObject({ title: "Stout", detail: "No version yet", warning: true, href: "/recipes/r2" });
-    const html = htmlOf(createElement(RecipesView, { model }));
+    const html = htmlOf(createElement(RecipesView, { model, linkRows: true }));
     expect(html).toContain('href="/recipes/r1"');
     expect(html).toContain('href="/recipes/r2"');
     expect(html).not.toContain(">Open<");
@@ -381,6 +381,15 @@ describe("Recipes view", () => {
     // The inventory frame leaves the row for the explorer, which walks it to the Water profiles record.
     expect(htmlOf(screen("Recipes").body)).toContain("Water profiles");
     expect(resolveTap(screen("Recipes"), "Water profiles")).toBe("Water profiles");
+    // The renamed create row still opens the Ingredient record, not the global inert list.
+    expect(resolveTap(screen("Recipe"), "Add ingredient")).toBe("Ingredient");
+  });
+
+  it("draws the inventory list through the live adapter, a recipe with no version included", () => {
+    const { rows } = toRecipesViewProps(recipesList);
+    expect(rows.map((r) => r.detail)).toEqual(["Hazy IPA", "Pils", "No version yet"]);
+    expect(rows[2]).toMatchObject({ title: "Farmhouse saison", warning: true });
+    expect(htmlOf(screen("Recipes").body)).not.toMatch(/15 bbl · updated/);
   });
 
 

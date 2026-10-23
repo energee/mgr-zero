@@ -2,6 +2,7 @@
 import { cloneElement, Fragment, useId, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { formatDate } from "@/lib/date-format";
+import { sentenceCase } from "@/lib/mgr/labels";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
@@ -45,7 +46,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord }: 
         {E.fld("Confirmed knockout", `${record.initial_bbl} bbl`)}
         {record.correction_reason && E.fld("Correction reason", record.correction_reason)}
         <BrewPlanSheet plan={record.plan_snapshot} frozen />
-        {record.additions.map(row => <Fragment key={row.id}>{E.fld(row.material_name, `${row.confirmed_qty} ${row.unit} · ${row.stage} · ${row.lot_code ?? "Untracked"} · ${row.location_name} / ${row.bin_name}`)}</Fragment>)}
+        {record.additions.map(row => <Fragment key={row.id}>{E.fld(row.material_name, `${row.confirmed_qty} ${row.unit} · ${sentenceCase(row.stage)} · ${row.lot_code ?? "Untracked"} · ${row.location_name} / ${row.bin_name}`)}</Fragment>)}
         {!record.additions.length && E.note("Confirmed no ingredients used.")}
         {processFields.map(([key, label]) => record.process[key] === undefined ? null : <Fragment key={key}>{E.fld(label, String(record.process[key]))}</Fragment>)}
       </section>)}
@@ -84,7 +85,7 @@ function BrewPlanSheet({ plan, frozen }: { plan?: BrewPlan; frozen: boolean }) {
   return <>
       <details open><summary className="font-medium">{frozen ? "Frozen recipe plan" : "Pinned recipe plan"}</summary>
         {E.fld("Recipe", plan?.recipe ?? "No recipe")}
-        {(plan?.ingredients ?? []).map(row => <Fragment key={row.id}>{E.fld(row.materialName, `${perBblDisplay(row.per_bbl_qty)} ${row.unit} per bbl · ${row.stage}`)}</Fragment>)}
+        {(plan?.ingredients ?? []).map(row => <Fragment key={row.id}>{E.fld(row.materialName, `${perBblDisplay(row.per_bbl_qty)} ${row.unit} per bbl · ${sentenceCase(row.stage)}`)}</Fragment>)}
         {(plan?.version?.mash_schedule ?? []).map((row, index) => <Fragment key={index}>{E.fld(row.name, `${row.temp_f ?? row.tempF ?? "—"} °F · ${row.minutes} min`)}</Fragment>)}
         {(plan?.waterAdditions ?? []).map((row, index) => <Fragment key={index}>{E.fld(row.materialName, `${row.qty} ${row.unit} planned; confirm actual use in ${row.baseUnit}`)}</Fragment>)}
       </details>

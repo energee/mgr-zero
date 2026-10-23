@@ -194,7 +194,7 @@ export function packRounding(p: RecipePack, bbl: number): { whole: boolean; choi
 /** What a version holds (create_recipe_version's input) and the one next step, New recipe version in the title row. */
 const NO_VERSION: EmptyState = {
   title: "No version yet",
-  description: "A version records how this recipe is brewed: its ingredients, mash and fermentation schedules, water and process targets. A saved version never changes. Select New recipe version to write the first one.",
+  description: "A version records this recipe's ingredients, mash and fermentation schedules, water and process targets, and never changes once saved. Select New recipe version to write the first one.",
 };
 
 /** The read page's selected saved version, or the empty state before the first version. */

@@ -13,9 +13,9 @@ import { NewRecipeFieldsView } from "../components/mgr/views/new-recipe";
 import { INGREDIENT_STAGE_OPTIONS, IngredientView } from "../components/mgr/views/ingredient";
 import { MashStepView } from "../components/mgr/views/mash-schedule";
 import { FermentationStageView } from "../components/mgr/views/fermentation-schedule";
-import { WaterAdditionView } from "../components/mgr/views/water";
+import { WaterAdditionView, WaterView } from "../components/mgr/views/water";
 import { BrewDayView } from "../components/mgr/views/brew-day";
-import { INGREDIENT_STAGES } from "../lib/mgr/recipe-process-view";
+import { EMPTY_WATER, INGREDIENT_STAGES } from "../lib/mgr/recipe-process-view";
 import { RecipeView } from "../components/mgr/views/recipe";
 import { recipeHazyV4 } from "../lib/mgr/fixtures/production";
 import { SCREEN_ROUTES } from "../lib/mgr/screen-routes";
@@ -211,8 +211,9 @@ describe("recipe form copy (#1139)", () => {
 
   it("the brand note says what to do, in brewer words", () => {
     const fields = html(createElement(NewRecipeFieldsView, { brands: [] }));
-    expect(fields).toContain("Pick the brand this recipe brews, or leave it undecided. New batches start with this brand, and packaging always asks for one.");
-    expect(fields).not.toMatch(/intent only|identity is required/);
+    expect(fields).toContain("Pick the brand this recipe brews, or leave it undecided. Packaging always asks for the brand.");
+    // Schedule batch starts at Not decided whatever recipe is picked, so the note promises no pre-fill.
+    expect(fields).not.toMatch(/intent only|identity is required|New batches start/);
   });
 
   it("the add-ingredient row reads like every other create action", () => {
@@ -231,6 +232,12 @@ describe("recipe form copy (#1139)", () => {
     expect(html(createElement(WaterAdditionView, { fields: { materialId: "", qty: "", unit: "g", stage: "sparge" }, materials: [] }))).toMatch(/>Sparge</);
   });
 
+  it("the add-addition row reads like the add-ingredient row", () => {
+    const water = html(createElement(WaterView, { water: EMPTY_WATER, profiles: [], materials: [] }));
+    expect(water).toContain("Material, amount and stage");
+    expect(water).not.toContain("material · amount · stage");
+  });
+
   it("brew day's Stage pick reuses the recipe's stage options", () => {
     const brew = html(createElement(BrewDayView, { model: {
       title: "Batch", vesselId: "v", vessels: [{ id: "v", name: "FV", kind: "fermenter", capacity_bbl: 10 }], initialBbl: "2", brewedOn: "2026-10-01",
@@ -238,5 +245,20 @@ describe("recipe form copy (#1139)", () => {
     } }));
     expect(brew).toMatch(/>Dry hop</);
     expect(brew).not.toMatch(/>dry_hop</);
+  });
+
+  it("brew day's plan and recorded rows name the stage as the pick does", () => {
+    const ingredient = { id: "i", material_id: "citra", materialName: "Citra", unit: "lb", stage: "dry_hop" as const, per_bbl_qty: 1.2 };
+    const planned = html(createElement(BrewDayView, { model: {
+      title: "Batch", vesselId: "v", vessels: [], initialBbl: "2", brewedOn: "2026-10-01", plan: { ingredients: [ingredient] },
+    } }));
+    expect(planned).toContain("1.2 lb per bbl · Dry hop");
+    const recorded = html(createElement(BrewDayView, { model: {
+      title: "Batch", vesselId: "", vessels: [], initialBbl: "2", brewedOn: "2026-10-01", recorded: true,
+      records: [{ id: "r", turn: 1, initial_bbl: 2, brewed_on: "2026-10-01", created_at: "2026-10-01", correction_reason: null, corrects_id: null, plan_snapshot: {}, process: {},
+        additions: [{ id: "a", material_name: "Citra", unit: "lb", confirmed_qty: 2, stage: "dry_hop", recipe_ingredient_id: null, lot_code: null, location_name: "Cellar", bin_name: "Cold", source: { material_id: "citra", location_id: "c", bin_id: "b", lot_id: null } }] }],
+    } }));
+    expect(recorded).toContain("2 lb · Dry hop · Untracked");
+    expect(planned + recorded).not.toContain("dry_hop");
   });
 });

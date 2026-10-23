@@ -47,7 +47,7 @@ export function WaterView({ title = "Water", water, profiles, materials, header,
     {E.edit("Target mash pH", water.targetMashPh, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ targetMashPh: nextValue }) : undefined, min: "4", max: "7", step: "0.01" })}
     {E.ttl("Salts and acids")}
     {water.additions.map((a, i) => <Fragment key={`${i}-${a.materialId}`}>{listRow(name(materials, a.materialId), waterAdditionDetail(a), i, water.additions.length, verbs)}</Fragment>)}
-    {E.row("Add addition", "material · amount · stage", E.act("Add", "primary", undefined, onAdd))}
+    {E.row("Add addition", "Material, amount and stage", E.act("Add", "primary", undefined, onAdd))}
     {chemistry === "gated"
       ? E.gated("Suggest additions", "salt suggestions are not part of this release")
       : E.btn("Suggest additions", chemistry === "ready" ? "g" : "g disabled", undefined, () => onChange?.({ additions: suggestAdditions(water, source!, target!, materials) }))}

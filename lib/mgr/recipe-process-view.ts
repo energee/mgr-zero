@@ -61,7 +61,7 @@ export const removeAt = <T>(list: readonly T[], index: number): T[] => list.filt
 /** The Mash schedule sheet's footer: the total, then which rest (if any) is recorded as the version's mash temperature. */
 export function mashSummary(steps: readonly MashStep[]): string {
   const rest = saccharificationRest(steps);
-  return `Total ${totalMinutes(steps)} min. ${rest ? `The ${rest.tempF} °F rest is recorded as the mash temperature.` : "No rest is between 144 and 162 °F, so no mash temperature is recorded."}`;
+  return `Total ${totalMinutes(steps)} min. ${rest ? `The ${rest.tempF} °F rest is recorded as the mash temperature.` : "No rest falls between 144 and 162 °F, so no mash temperature is recorded."}`;
 }
 
 /** The one-line mash summary a recipe row shows: "Total 60 min · 152 °F saccharification rest". */
@@ -73,7 +73,7 @@ export function mashRowSummary(steps: readonly MashStep[]): string {
 /** A water addition row's detail, "4 g · Mash": on the Water sheet and on a cut version's read-out. */
 export const waterAdditionDetail = (a: { qty: number; unit: string; stage: string }) => `${a.qty} ${a.unit} · ${sentenceCase(a.stage)}`;
 
-/** The draft's Water row detail: "Target Hazy target · 3 additions", or "No target · 0 additions". */
+/** The Water row detail, "Target Hazy target · 3 additions" or "No target · 0 additions": on the recipe draft and on the Water sheet's trigger. */
 export const waterRowSummary = (targetName: string | undefined, additions: number) =>
   `${targetName ? `Target ${targetName}` : "No target"} · ${plural(additions, "addition")}`;
 

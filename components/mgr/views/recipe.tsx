@@ -31,6 +31,8 @@ export type RecipeControls = {
 };
 /** Rows that open a sheet on the live draft; each replaces the fixture's static row with the same row as trigger. */
 export type RecipeSlots = { addIngredient?: ReactNode; mash?: ReactNode; fermentation?: ReactNode; water?: ReactNode };
+/** The draft's add-ingredient row: drawn here when no slot is passed, and the live IngredientSheet's trigger. */
+export const ADD_INGREDIENT_ROW = E.row("Add ingredient", "Material, stage and timing", "");
 
 export function RecipeView({
   model,
@@ -130,7 +132,7 @@ export function RecipeView({
       {(model.ingredients ?? []).map((row) => (
         <Fragment key={row.key}>{E.row(row.title, row.detail, row.action ?? row.qty, "", undefined, packFoot(row))}</Fragment>
       ))}
-      {slots.addIngredient ?? (readOnly ? null : E.row("Add ingredient", "Material, stage and timing", ""))}
+      {slots.addIngredient ?? (readOnly ? null : ADD_INGREDIENT_ROW)}
       {E.ttl("Process")}
       {numbers}
       {schedule(model.mash, slots.mash)}
