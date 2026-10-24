@@ -3,6 +3,7 @@
 // (derived from receipts, never stored), receipts so far, and the one next
 // action for its state (po-actions.tsx): Mark sent or Receive, plus reason-bearing
 // cancellation before receipts or short closure after receiving.
+import { cache } from "react";
 import { formatVariance, receiptHref, toPostedReceiptViewProps, type ReceiptSnapshot } from "@/lib/mgr/receipt-view";
 import { notFound } from "next/navigation";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -17,7 +18,14 @@ import { OPEN_PO_STATUSES } from "@/lib/mgr/receive-po-view";
 import { ReceiveForm, ReceiptBillAdapter, type PoLine } from "./po-actions";
 import { navTitle } from "@/lib/mgr/nav";
 
-export const metadata = { title: navTitle("/purchase-orders") };
+type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ receipt?: string; correctReceipt?: string }> };
+
+export async function generateMetadata({ params, searchParams }: Props) {
+  const { id } = await params;
+  const { receipt, correctReceipt } = await searchParams;
+  await getPurchaseOrderPageData(id, receipt, correctReceipt);
+  return { title: navTitle("/purchase-orders") };
+}
 
 type Po = {
   id: string; po_no: number; vendor_id: string; status: string; ordered_on: string | null; expected_on: string | null;
@@ -41,29 +49,35 @@ function statusLine(po: Po) {
   return `${sent}${expected}${po.status === "partially_received" ? " · partially received" : po.status === "received" ? " · received" : ""}`;
 }
 
-export default async function PurchaseOrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ receipt?: string; correctReceipt?: string }> }) {
-  const { id } = await params;
-  const { receipt, correctReceipt } = await searchParams;
+const getPurchaseOrderPageData = cache(async function getPurchaseOrderPageData(id: string, receipt?: string, correctReceipt?: string) {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const po = await orNotFound(runCommand("get_purchase_order", { poId: id, correctionReceiptId: correctReceipt }, ctx)) as Po;
+  let receiptModel: ReturnType<typeof toPostedReceiptViewProps>;
+  if (receipt && !(correctReceipt && po.correction_receipt)) {
+    // Warehouse retains receipt access without acquiring admin-only accounting reads or actions.
+    const canPost = canRun(ctx, "post_receipt_bill");
+    const health = canPost ? await runCommand("get_qbo_connection", {}, ctx) as QboHealth : null;
+    receiptModel = toPostedReceiptViewProps(po, receipt, `/purchase-orders/${po.id}`, {
+      canPost, connected: health?.connected ?? false,
+      mappingsReady: Boolean(health?.purchaseAccountId && health.realmId && po.vendor?.qbo_vendor_id && po.vendor.qbo_realm_id === health.realmId),
+      mappingHref: "/settings/accounting/mappings",
+    });
+    if (!receiptModel) notFound();
+  }
+  return { ctx, po, receiptModel };
+});
+
+export default async function PurchaseOrderPage({ params, searchParams }: Props) {
+  const { id } = await params;
+  const { receipt, correctReceipt } = await searchParams;
+  const { ctx, po, receiptModel } = await getPurchaseOrderPageData(id, receipt, correctReceipt);
   if (correctReceipt && po.correction_receipt) {
     return <ReceiveForm key={correctReceipt} poId={po.id} correctionReceiptId={correctReceipt}
       lines={po.correction_lines} locations={[]} bins={[]} today={po.correction_receipt.received_on}
       model={{ title: `${poNo(po.po_no)} · correct receipt`, state: "correction", status: `Received ${formatDate(po.correction_receipt.received_on)}`, backHref: receiptHref(`/purchase-orders/${po.id}`, correctReceipt) }} />;
   }
-  if (receipt) {
-    // Warehouse retains receipt access without acquiring admin-only accounting reads or actions.
-    const canPost = canRun(ctx, "post_receipt_bill");
-    const health = canPost ? await runCommand("get_qbo_connection", {}, ctx) as QboHealth : null;
-    const model = toPostedReceiptViewProps(po, receipt, `/purchase-orders/${po.id}`, {
-      canPost, connected: health?.connected ?? false,
-      mappingsReady: Boolean(health?.purchaseAccountId && health.realmId && po.vendor?.qbo_vendor_id && po.vendor.qbo_realm_id === health.realmId),
-      mappingHref: "/settings/accounting/mappings",
-    });
-    if (!model) notFound();
-    return <ReceiptBillAdapter model={model} />;
-  }
+  if (receiptModel) return <ReceiptBillAdapter model={receiptModel} />;
   const [locations, bins, today] = await Promise.all([runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx), breweryToday(ctx)]) as [Location[], Bin[], string];
   const lineById = new Map(po.lines.map(line => [line.id, line]));
   return <ReceiveForm key={`${po.status}:${po.receipts.length}`} poId={po.id} lines={po.lines} locations={locations} bins={bins} today={today} model={{

@@ -137,13 +137,13 @@ export const cycleCountCans: CycleCountViewModel = {
 
 export const materialCitra: MaterialViewModel = {
   name: "Citra",
-  kind: "Hop",
-  kindOptions: ["Malt", "Hop", "Yeast", "Adjunct", "Chemical", "Packaging", "Other"],
+  kind: "hop",
+  kindOptions: ["malt", "hop", "yeast", "adjunct", "chemical", "packaging", "other"],
   baseUnits: "44",
   purchaseUnit: "each",
-  purchaseUnitOptions: ["each", "lb", "kg", "oz", "g", "l", "gal", "ml"],
+  purchaseUnitOptions: ["lb", "kg", "oz", "g", "each", "l", "gal", "ml"],
   unit: "lb",
-  unitOptions: ["lb", "oz", "kg", "each"],
+  unitOptions: ["lb", "kg", "oz", "g", "each", "l", "gal", "ml"],
   defaultVendorId: "ych",
   defaultVendorOptions: [
     { id: "ych", label: "YCH" },

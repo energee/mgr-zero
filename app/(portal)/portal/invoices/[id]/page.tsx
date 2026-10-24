@@ -9,12 +9,23 @@ import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { toPortalInvoiceViewProps, type PortalInvoiceSnapshot } from "@/lib/mgr/portal-invoice-view";
 import { QuestionForm } from "./question-form";
+import { cache } from "react";
+
+const getInvoiceData = cache(async function getInvoiceData(id: string) {
+  const { ctx } = await getPortalContext();
+  return orNotFound(runCommand("portal_invoice", { invoiceId: id }, ctx) as Promise<PortalInvoiceSnapshot>);
+});
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await getInvoiceData(id);
+  return {};
+}
 
 export default async function PortalInvoicePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ payment?: string }> }) {
   const { id } = await params;
   const failedPayment = (await searchParams).payment === "unavailable";
-  const { customer, ctx } = await getPortalContext();
-  const snapshot = await orNotFound(runCommand("portal_invoice", { invoiceId: id }, ctx) as Promise<PortalInvoiceSnapshot>);
+  const snapshot = await getInvoiceData(id);
   const model = toPortalInvoiceViewProps({ ...snapshot, backHref: "/portal/invoices" });
   // The Pay route redirects here with ?payment=unavailable when QuickBooks
   // returns no link; the invoice then renders as unavailable.

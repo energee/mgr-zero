@@ -12,7 +12,7 @@ import { SCREENS } from "../components/mgr/screens";
 import { NewRecipeFieldsView } from "../components/mgr/views/new-recipe";
 import { INGREDIENT_STAGE_OPTIONS, IngredientView } from "../components/mgr/views/ingredient";
 import { MashStepView } from "../components/mgr/views/mash-schedule";
-import { FermentationStageView } from "../components/mgr/views/fermentation-schedule";
+import { FermentationScheduleView, FermentationStageView } from "../components/mgr/views/fermentation-schedule";
 import { WaterAdditionView, WaterView } from "../components/mgr/views/water";
 import { BrewDayView } from "../components/mgr/views/brew-day";
 import { EMPTY_WATER, INGREDIENT_STAGES } from "../lib/mgr/recipe-process-view";
@@ -97,6 +97,15 @@ describe("Recipe creation", () => {
       expect(forId).toBeTruthy();
       expect(html).toContain(`id="${forId}"`);
       expect(html).toMatch(new RegExp(`<input[^>]*id="${forId}"[^>]*>`));
+    });
+
+    it("quantity and timing use matching numeric steppers, including fractional quantities (#1263)", () => {
+      const html = draw("citra");
+      expect(html.match(/aria-label="Decrease"/g)).toHaveLength(2);
+      expect(html.match(/aria-label="Increase"/g)).toHaveLength(2);
+      expect(html).toMatch(/<input[^>]*aria-label="Quantity per bbl \(lb\)"[^>]*value="1.2"/);
+      expect(html).toMatch(/<input[^>]*aria-label="Timing min · optional"[^>]*value=""/);
+      expect(html.match(/step="any"/g)).toHaveLength(2);
     });
 
     it("the material trigger acts in place on the Ingredient record", () => {
@@ -189,7 +198,7 @@ describe("Recipe creation", () => {
     // Quantity is per barrel in the picked material's own unit, never a retyped one.
     const ing = renderToStaticMarkup(createElement(IngredientView, { fields: { materialId: "citra", stage: "dry_hop", perBblQty: "1.2", timingMinutes: "" }, materials: [{ id: "citra", name: "Citra", unit: "lb" }] }));
     expect(ing).toMatch(/Quantity per bbl/);
-    expect(ing).toMatch(/lb \/ bbl/);
+    expect(ing).toMatch(/Quantity per bbl \(lb\)/);
     expect(ing).not.toMatch(/Per bbl</);
     expect(sheets).not.toMatch(/<select\b/);
     // Edit is already a Button: it must be the trigger itself, never wrapped in a second button.
@@ -236,6 +245,13 @@ describe("recipe form copy (#1139)", () => {
     const water = html(createElement(WaterView, { water: EMPTY_WATER, profiles: [], materials: [] }));
     expect(water).toContain("Material, amount and stage");
     expect(water).not.toContain("material · amount · stage");
+  });
+
+  it("fermentation explains how to start planning an empty schedule (#1263)", () => {
+    const schedule = html(createElement(FermentationScheduleView, { stages: [] }));
+    expect(schedule).toContain("No stages yet");
+    expect(schedule).toContain("Add a stage to plan temperatures and timing.");
+    expect(schedule).not.toContain("Add stage is the only action.");
   });
 
   it("brew day's Stage pick reuses the recipe's stage options", () => {

@@ -6,15 +6,14 @@ import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, STAFF_ROLES, CommandError, type StaffRole } from "./registry";
 import { sha256 } from "@/lib/hash";
 import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
+import { notificationQuietHoursSchema, personalQuietHoursSchema, quietHoursWindowSchema } from "@/lib/chat/quiet-hours";
 
 const REASONS = ["submitted_order", "pick_due", "restock_due", "delivery_next", "fermentation_reading_overdue", "invoice_question", "operations_digest"] as const;
-const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM");
-const quietHours = z.object({ start: hhmm, end: hhmm, timezone: z.string().min(1).optional() }).nullable().optional();
 
 defineCommand({
   name: "set_notification_preference",
   description: "Mute/unmute one notification reason for yourself and optionally override your quiet hours (chat delivery only; MGR Today is unaffected)",
-  input: z.object({ reason: z.enum(REASONS), enabled: z.boolean(), quietHours }),
+  input: z.object({ reason: z.enum(REASONS), enabled: z.boolean(), quietHours: notificationQuietHoursSchema.nullable().optional() }),
   roles: STAFF_ROLES,
   handler: async (ctx, i, execution) => {
     if (onlyRoles(ctx.roles, ["taproom"]) && i.quietHours !== undefined) throw new CommandError("permission denied", 403, "permission_denied");
@@ -30,7 +29,7 @@ defineCommand({
 defineCommand({
   name: "set_brewery_quiet_hours",
   description: "Set the brewery-wide quiet hours (brewery time) that delay every personal chat notification; null clears them",
-  input: z.object({ installationId: z.string().uuid(), start: hhmm.nullable(), end: hhmm.nullable() }),
+  input: quietHoursWindowSchema.safeExtend({ installationId: z.string().uuid() }),
   roles: ["admin"],
   handler: async (ctx, i, execution) => {
     await unwrap(ctx.db.rpc("set_brewery_quiet_hours", { p_brewery: ctx.breweryId, p_request_id: execution.requestId, p_installation: i.installationId, p_start: i.start, p_end: i.end }));
@@ -101,7 +100,7 @@ defineCommand({
 defineCommand({
   name: "set_personal_quiet_hours",
   description: "Override personal chat quiet hours for every reason; null clears the override",
-  input: z.object({ start: hhmm.nullable(), end: hhmm.nullable(), timezone: z.string().min(1).nullable().optional() }),
+  input: personalQuietHoursSchema,
   roles: ["admin", "sales", "warehouse", "brewer"],
   handler: async (ctx, i, execution) => await unwrap(ctx.db.rpc("set_personal_quiet_hours", {
     p_brewery: ctx.breweryId, p_start: i.start, p_end: i.end, p_timezone: i.timezone ?? null, p_request_id: execution.requestId,

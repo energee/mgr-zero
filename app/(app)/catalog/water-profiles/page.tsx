@@ -3,7 +3,8 @@
 // pick any one as its source or its target). Each row has Edit →
 // water-profile-form.tsx; Add water profile opens the same sheet empty.
 // Brewer and Admin. Admin arrives from Catalog or Settings, both arrive from
-// Recipes or a recipe's Water sheet, and the back arrow follows the role (waterProfilesBack).
+// Recipes or a recipe's Water sheet. Settings keeps its return destination;
+// other entries use a role-accessible default (waterProfilesBack).
 import { WaterProfilesView } from "@/components/mgr/views/water-profiles";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -15,12 +16,13 @@ import { navTitle } from "@/lib/mgr/nav";
 
 export const metadata = { title: navTitle("/catalog/water-profiles") };
 
-export default async function WaterProfilesPage() {
+export default async function WaterProfilesPage({ searchParams }: { searchParams: Promise<{ from?: string | string[] }> }) {
+  const params = await searchParams;
   const brewery = await getActiveBrewery();
   const profiles = (await runCommand("list_water_profiles", {}, await buildContext(brewery.id))) as WaterProfile[];
   return (
     <WaterProfilesView
-      model={toWaterProfilesViewProps({ profiles, back: waterProfilesBack(brewery.roles) })}
+      model={toWaterProfilesViewProps({ profiles, back: waterProfilesBack(brewery.roles, params.from) })}
       createAction={<WaterProfileForm />}
       profileActions={Object.fromEntries(profiles.map((p) => [p.id, <WaterProfileForm key={JSON.stringify(p)} profile={p} />]))}
     />

@@ -3,7 +3,7 @@ import { E } from "../components/mgr/e";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TapBoardView, TapKegView } from "../components/mgr/views/tap-board";
-import { openTapBoardSheet, fillLabel, OPENING_FILLS, CLOSING_FILLS } from "../lib/mgr/tap-board-state";
+import { openTapBoardSheet, editTapBoardSheet, beginTapBoardAttempt, fillLabel, OPENING_FILLS, CLOSING_FILLS } from "../lib/mgr/tap-board-state";
 import { tapBoard, tapBoardSkus, kickKeg, swapKeg } from "../lib/mgr/fixtures/taproom";
 import { SCREENS } from "../components/mgr/screens";
 import { isInertOn } from "../lib/mgr/screen-links";
@@ -77,27 +77,50 @@ describe("Tap keg sheet feedback (#1114)", () => {
     expect(renderToStaticMarkup(createElement(TapKegView, { sheet: kickKeg, skus: tapBoardSkus, timeZone: "America/New_York" }))).not.toContain("Still needed");
   });
 
-  it("offers no selectable placeholder keg, and says where keg SKUs come from when there are none", () => {
+  it("offers no selectable placeholder and limits Catalog recovery links to an empty picker with permission", () => {
     const pick = vi.spyOn(E, "pick");
     render({ skus: [] });
     const call = pick.mock.calls.find(([label]) => label === "Packaged keg SKU")!;
     pick.mockRestore();
     expect(call[2]).toEqual([]);
     expect(call[3]).toMatchObject({ placeholder: "Choose a keg" });
-    const none = "No keg SKUs with a keg volume yet. Guest keg is still available.";
-    expect(render({ skus: [], skusHref: "/catalog" })).toMatch(/No keg SKUs with a keg volume yet\. Guest keg is still available\. <a [^>]*href="\/catalog"[^>]*>Add a keg SKU<\/a>/);
-    const plain = `${none} An admin or sales member adds keg SKUs in Catalog.`;
-    expect(render({ skus: [], skusHref: null })).toContain(plain);
-    // The inventory passes no href: plain text, never a link to "#".
-    expect(render({ skus: [] })).toContain(plain);
-    expect(render({ skus: [] })).not.toContain('href="#"');
-    expect(render()).not.toContain("No keg SKUs");
+    expect(render({ skus: [], skusHref: "/catalog" })).toContain('href="/catalog"');
+    expect(render({ skus: [], skusHref: null })).not.toMatch(/<a\b/);
+    // The inventory passes no href: it must not create an inert recovery link.
+    expect(render({ skus: [] })).not.toMatch(/<a\b/);
+    expect(render({ skusHref: "/catalog" })).not.toContain('href="/catalog"');
   });
 
-  it("names both guest needs and marks no guest field before it is left", () => {
+  it("withholds submission without marking untouched guest fields", () => {
     const html = render({ sheet: { ...tap, fields: { ...tap.fields, identity: "guest" } } });
-    expect(html).toContain("Still needed: a guest keg label and a guest nominal bbl above zero.");
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled=/);
     expect(html).not.toContain('aria-invalid="true"');
+  });
+
+  it("updates the footer and command through the Identity picker when no keg SKUs exist", () => {
+    let state = openTapBoardSheet({ open: [], history: [] }, "tap", null, "actual-location");
+    const onEdit = (patch: Parameters<typeof editTapBoardSheet>[1]) => { state = editTapBoardSheet(state, patch); };
+    const pick = vi.spyOn(E, "pick");
+    render({ sheet: state.sheet!, skus: [], onEdit });
+    const identity = pick.mock.calls.find(([label]) => label === "Identity")!;
+    pick.mockRestore();
+    identity[3]!.onChange!("guest");
+    const guestHtml = render({ sheet: state.sheet!, skus: [] });
+    expect(guestHtml).not.toContain("Packaged keg SKU");
+    expect(guestHtml).toMatch(/<button[^>]*type="submit"[^>]*disabled=/);
+
+    const edit = vi.spyOn(E, "edit");
+    render({ sheet: state.sheet!, skus: [], onEdit });
+    const label = edit.mock.calls.find(([name]) => name === "Guest keg label")!;
+    const size = edit.mock.calls.find(([, , type]) => type === "number")!;
+    edit.mockRestore();
+    label[4]!.onChange!("Guest cider");
+    size[4]!.onChange!("0.25");
+    const readyHtml = render({ sheet: state.sheet!, skus: [] });
+    expect(readyHtml).not.toMatch(/<button[^>]*type="submit"[^>]*disabled=/);
+    const attempt = beginTapBoardAttempt(state, "guest-request").sheet!.attempt;
+    expect(attempt).toMatchObject({ kind: "submitting", payload: { keg: { label: "Guest cider", nominalBbl: .25 } } });
+    expect(attempt).not.toHaveProperty("payload.keg.skuId");
   });
 
   it("labels the fill chips on one percent scale and the tap number plainly", () => {

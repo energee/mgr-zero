@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { E } from "@/components/mgr/e";
 import { PackageBomView } from "@/components/mgr/views/package-bom";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -16,7 +17,11 @@ import { DeleteCommandButton } from "../../../delete-command-button";
 import { DeleteFormatControl } from "@/components/mgr/views/delete-format";
 import { navTitle } from "@/lib/mgr/nav";
 
-export const metadata = { title: navTitle("/catalog/formats") };
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await getFormatPageData(id);
+  return { title: navTitle("/catalog/formats") };
+}
 
 type Detail = {
   format: { price_group_id: string | null; price_groups: { name: string } | null; ounces: number | null; id: string; name: string; basis: "packaged" | "poured"; bbl_per_unit: string | null; package_type: string | null; keg_size: string | null; units_per_case: number | null };
@@ -27,11 +32,16 @@ type Detail = {
   usedAsChild: boolean;
 };
 
-export default async function FormatPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+const getFormatPageData = cache(async function getFormatPageData(id: string) {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const data = await orNotFound(runCommand("get_format_composition", { formatId: id }, ctx)) as Detail;
+  return { ctx, data };
+});
+
+export default async function FormatPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { ctx, data } = await getFormatPageData(id);
   const writable = ctx.roles.includes("admin") || ctx.roles.includes("sales");
   if (data.format.basis === "poured") {
     const f = data.format;

@@ -4,6 +4,7 @@ import { basisCorrectionDemo, DEMO_TIME_ZONE } from "./settings";
 export const monthlyComplianceAugust: MonthlyComplianceSnapshot = {
   monthLabel: "August 2026",
   timeZone: DEMO_TIME_ZONE,
+  today: "2026-09-15",
   losses: [{
     adjustment_id: "loss-1042", batch_id: "batch-1042", batch_no: 1042, closed_at: "2026-08-31", kind: "completion",
     original_bbl: "0.05741935", remaining_bbl: "0.03741935",

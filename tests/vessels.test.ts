@@ -4,7 +4,7 @@
 // vessels unless asked, so cellar, transfer and brew day never offer them, and
 // the database refuses beer into a retired vessel. A retired name is free again.
 import { beforeAll, describe, expect, it } from "vitest";
-import { ins, makeBrewery, makeStaffCtx } from "./helpers";
+import { ins, makeBrewery, makeStaffCtx, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -74,5 +74,52 @@ describe("vessels are admin-managed", () => {
     await expect(runCommand("record_cellar_transfer", { fromOccupancyId: brewed.occupancy.id, toVesselId: v.id, volumeBbl: 5 }, owner)).rejects.toThrow(/vessel is retired/);
     // Every writer that opens an occupancy goes through the same table trigger.
     await expect(ins("vessel_occupancies", { brewery_id: owner.breweryId, vessel_id: v.id, batch_id: next.id })).rejects.toThrow(/vessel is retired/);
+  });
+});
+
+describe("vessel capacity uses exact numeric(10,3) precision", () => {
+  it.each([0.0001, 0.0009, 0.0011, 1.2345, 10_000_000])("refuses direct RPC capacity %s before storage can round it", async capacity => {
+    const requestId = crypto.randomUUID();
+    const args = { p_brewery: owner.breweryId, p_vessel: null, p_name: `FV precision ${requestId}`, p_kind: "fermenter" as const, p_capacity_bbl: capacity, p_request_id: requestId };
+    const refused = await owner.db.rpc("upsert_vessel", args);
+    expect(refused.error?.code).toBe("P0001");
+    expect(refused.error?.message).toMatch(/Capacity must|decimal places/);
+    expect((await owner.db.from("vessels").select("id").eq("name", args.p_name)).data).toEqual([]);
+    // A refused transaction leaves no claim behind: corrected input can reuse
+    // this key without conflict, not just succeed under a fresh key.
+    const corrected = await owner.db.rpc("upsert_vessel", { ...args, p_capacity_bbl: 0.001 });
+    expect(corrected.error).toBeNull();
+    expect(corrected.data).toMatchObject({ capacity_bbl: 0.001 });
+    await expect(runCommand("upsert_vessel", { name: `FV command ${requestId}`, kind: "fermenter", capacityBbl: capacity }, owner)).rejects.toMatchObject({ status: 400 });
+  });
+
+  it.each([0.001, 0.01, 25.555, 9_999_999.999])("stores and replays the exact boundary %s without changing a later edit", async capacity => {
+    const args = { p_brewery: owner.breweryId, p_vessel: null, p_name: `FV boundary ${crypto.randomUUID()}`, p_kind: "fermenter" as const, p_capacity_bbl: capacity, p_request_id: crypto.randomUUID() };
+    const first = await owner.db.rpc("upsert_vessel", args);
+    expect(first.error).toBeNull();
+    const row = first.data as { id: string; capacity_bbl: number };
+    expect(row.capacity_bbl).toBe(capacity);
+    const edited = await owner.db.rpc("upsert_vessel", { ...args, p_vessel: row.id, p_capacity_bbl: 2, p_request_id: crypto.randomUUID() });
+    expect(edited.error).toBeNull();
+    const replayed = await owner.db.rpc("upsert_vessel", args);
+    expect(replayed.error).toBeNull();
+    expect(replayed.data).toEqual(first.data);
+    expect((await owner.db.from("vessels").select("capacity_bbl").eq("id", row.id).single()).data?.capacity_bbl).toBe(2);
+  });
+
+  it("replays a pre-validation committed capacity through the actual command boundary", async () => {
+    const requestId = crypto.randomUUID();
+    const vesselId = crypto.randomUUID();
+    // Recreate the old RPC transaction: the ledger hashed 1.2345, while the
+    // numeric(10,3) column stored 1.235. No production function is replaced.
+    sql(`select set_config('request.jwt.claim.sub', '${owner.userId}', true);
+      select private.claim_command_request('${owner.breweryId}', 'upsert_vessel', '${requestId}',
+        jsonb_build_object('brewery', '${owner.breweryId}'::uuid, 'vessel', null, 'name', 'FV legacy precision', 'kind', 'fermenter', 'capacity_bbl', 1.2345));
+      insert into public.vessels(id, brewery_id, name, kind, capacity_bbl)
+        values ('${vesselId}', '${owner.breweryId}', 'FV legacy precision', 'fermenter', 1.2345);
+      select private.complete_command_request('${requestId}', (select to_jsonb(v) from public.vessels v where id='${vesselId}'));`);
+    const execution = { requestId, correlationId: crypto.randomUUID(), origin: "ui" as const };
+    expect(await runCommand("upsert_vessel", { name: "FV legacy precision", kind: "fermenter", capacityBbl: 1.2345 }, owner, execution)).toMatchObject({ id: vesselId, capacity_bbl: 1.235 });
+    await expect(runCommand("upsert_vessel", { name: "FV new precision", kind: "fermenter", capacityBbl: 1.2345 }, owner)).rejects.toMatchObject({ status: 400, message: "Use no more than 3 decimal places for capacity." });
   });
 });

@@ -27,12 +27,14 @@ export function WorkView({
   const wanted = chip ?? localChip;
   const selected = model.workChips.includes(wanted) ? wanted : model.workChips[0];
   const rows = filterWorkRows(model, selected);
-  const list = rows.length === 0 ? E.blank(workEmpty(selected)) : rows.map(row => <Fragment key={row.key}>
+  const newOrder = createAction !== undefined ? createAction : E.btn("New order", "g");
+  const emptyAction = model.rows.length === 0 && (selected === "all" || selected === "orders") ? newOrder : undefined;
+  const list = rows.length === 0 ? E.blank(workEmpty(selected), undefined, emptyAction) : rows.map(row => <Fragment key={row.key}>
     {E.row(row.title, row.detail, E.act(row.verb, row.tone, row.href), row.warning ? "w" : "", row.icon ? ICON[row.icon] : undefined)}
   </Fragment>);
   return (
     <>
-      {E.hd("Work", undefined, createAction !== undefined ? createAction : E.btn("New order", "g"))}
+      {E.hd("Work", undefined, newOrder)}
       {/* The rows are the selected tab's panel: see TabBar's `panel` (#727).
           This strip filters the list in place, so it is not WorkKindTabs, which
           navigates; both draw the same full-width TabBar (#992). */}
