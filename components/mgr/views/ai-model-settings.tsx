@@ -1,15 +1,18 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { E } from "@/components/mgr/e";
+import { CommandFormFooter } from "@/components/mgr/command-form";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, useComboboxSearch } from "@/components/ui/combobox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { InputGroupAddon } from "@/components/ui/input-group";
 import { AiModelIcon } from "@/components/mgr/ai-model-icon";
 import { modelMatches, modelProvider, type GatewayModelOption } from "@/lib/chat/models";
+import { aiModelSettingsReason } from "@/lib/mgr/settings-view";
 
 /** The Ask MGR section of Settings: its own form, named by its legend, saved only by Save AI model (Enter submits it). */
-export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = false, error }: {
+export function AiModelSettingsView({ value, initial = value, models, onChange, onSubmit, busy = false, error }: {
   value: string;
+  initial?: string;
   models: GatewayModelOption[];
   onChange?: (value: string) => void;
   onSubmit?: () => void;
@@ -20,7 +23,8 @@ export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = 
   const selected = known ?? { id: value, name: value };
   const options = known ? models : [selected, ...models];
   const { open, anchor, props: search } = useComboboxSearch(selected.name);
-  return <form onSubmit={(event) => { event.preventDefault(); onSubmit?.(); }}>
+  const reason = aiModelSettingsReason(value, initial, models);
+  return <form onSubmit={(event) => { event.preventDefault(); if (!busy && !reason) onSubmit?.(); }}>
     <FieldSet className="min-w-0">
       <FieldLegend><h2 className="font-heading text-xl font-semibold">Ask MGR</h2></FieldLegend>
       <FieldGroup>
@@ -46,12 +50,12 @@ export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = 
               <ComboboxList>{(model: GatewayModelOption) => <ComboboxItem key={model.id} value={model}><AiModelIcon modelId={model.id} /><span className="grid gap-0.5"><span>{model.name}</span><span className="text-xs capitalize text-muted-foreground">{modelProvider(model.id)}</span></span></ComboboxItem>}</ComboboxList>
             </ComboboxContent>
           </Combobox>
-          <FieldDescription><span className="capitalize">{modelProvider(selected.id)}</span>. Used by Ask MGR for everyone at this brewery.</FieldDescription>
+          <FieldDescription>Used by Ask MGR for everyone at this brewery.</FieldDescription>
           {models.length === 0 && <FieldDescription>The Gateway model catalog is unavailable. The saved model remains active.</FieldDescription>}
           <FieldError>{error}</FieldError>
         </Field>
       </FieldGroup>
-      <Button type="submit" className="w-full @min-[24rem]:w-auto @min-[24rem]:self-end" disabled={!onSubmit || busy || models.length === 0}>{busy ? "Saving…" : "Save AI model"}</Button>
+      <CommandFormFooter className="@min-[24rem]:flex-row @min-[24rem]:items-center @min-[24rem]:justify-end">{E.submit("Save AI model", { submitting: busy, disabled: !onSubmit, reason })}</CommandFormFooter>
     </FieldSet>
   </form>;
 }

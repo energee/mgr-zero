@@ -231,7 +231,7 @@ describe("Menu with no mapped Square location (#997)", () => {
 
   it("tells a non-admin that Square is disconnected, with no settings link (#1083)", () => {
     const html = unmapped({ admin: false, connected: false, observed: 2 });
-    expect(html).toMatch(/Square isn’t connected<\/[^>]+>(?:(?!Square isn’t)[\s\S])*Ask an admin to reconnect it\./);
+    expect(html).toMatch(/Square isn’t connected<\/[^>]+>(?:(?!Square isn’t)[\s\S])*Ask an admin to connect Square\./);
     expect(html).not.toContain("were found");
     expect(html).not.toContain("/settings/pos");
     expect(html).not.toContain("Set up Square");

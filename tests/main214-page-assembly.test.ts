@@ -220,6 +220,24 @@ it.each([
   expect(html).toContain('value="west"');
   expect(html).toContain(empty);
 });
+
+it.each([
+  { roles: ["admin"], mayOrder: true },
+  { roles: ["warehouse"], mayOrder: true },
+  { roles: ["brewer"], mayOrder: false },
+  { roles: ["brewer", "warehouse"], mayOrder: true },
+])("Materials empty recovery respects the actual page permissions for $roles", async ({ roles, mayOrder }) => {
+  state.roles = roles;
+  const page = await MaterialsPage({ searchParams: Promise.resolve({}) });
+  const html = render(page);
+  expect(html).toContain("No materials yet");
+  expect(html).toContain("Add material");
+  expect(html.includes('href="/purchase-orders"')).toBe(mayOrder);
+  expect(page.props.model.purchaseOrdersHref).toBe(mayOrder ? "/purchase-orders" : null);
+  const filtered = render(await MaterialsPage({ searchParams: Promise.resolve({ q: "missing" }) }));
+  expect(filtered).toContain("No materials match");
+  expect(filtered).not.toContain('href="/purchase-orders"');
+});
 // #1021 review: a search with text offers a way back to the whole list, keeping the other params.
 it("offers Clear search while a search is on, and keeps the other params", async () => {
   const html = render(await CustomersPage({ searchParams: Promise.resolve({ q: "buy", missingEmail: "1" }) }));

@@ -9,7 +9,9 @@ Every operation in this reference lists the roles allowed to call it. Staff
 roles never grant customer-portal membership. Revoking a brewery membership
 ends its access without deleting the history that member wrote.
 
-`list_team_members` returns a `roles` array for each member.
+`list_team_members` returns `{ userId, name, email, roles, createdAt }` for each
+member. `name` is the saved Auth profile full name, or the full email address
+when no nonblank name is saved. Profile names are display-only and never grant permissions.
 `update_staff_role` replaces a member's roles with the nonempty `roles` array
 in its input; duplicate values are removed and the response uses enum order.
 Removing `admin` is a demotion even when other roles remain, and is refused
@@ -500,7 +502,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Staff roster for the brewery: user id, email, @handle (the email's local part) and roles
+Staff roster for the brewery: user id, name (email when no profile name is saved), email and roles
 
 Takes no input.
 
@@ -697,15 +699,15 @@ Set the brewery-wide quiet hours (brewery time) that delay every personal chat n
 
 | Field | Type | Required |
 | --- | --- | --- |
-| `installationId` | uuid | yes |
 | `start` | string or null | yes |
 | `end` | string or null | yes |
+| `installationId` | uuid | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_brewery_quiet_hours", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "installationId": "00000000-0000-0000-0000-000000000000", "start": "12:00", "end": "12:00" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_brewery_quiet_hours", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "start": null, "end": null, "installationId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 ## set_my_gravity_unit [#set_my_gravity_unit]

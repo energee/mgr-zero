@@ -26,6 +26,14 @@ export type RepackViewModel = {
   formatsHref?: string | null;
 };
 
+/** Repack allows fractions; its paired movements store numeric(12,2) units. */
+export function repackQuantityError(qty: string): string | undefined {
+  if (/[eE]/.test(qty)) return "Enter a decimal number without exponent notation.";
+  const value = Number(qty);
+  if (!qty.trim() || !Number.isFinite(value) || value <= 0) return "Enter a quantity above zero.";
+  if (value > 9999999999.99) return "Enter a quantity no greater than 9,999,999,999.99.";
+}
+
 /** What Confirm repack waits for. A parent with no single composition row is
  *  withheld separately, by `unavailable` (REPACK_UNAVAILABLE). */
 export function repackReason(i: { parentSkuId: string; locationId: string; binId: string; qty: string }): string | null {
@@ -33,7 +41,7 @@ export function repackReason(i: { parentSkuId: string; locationId: string; binId
   if (!i.parentSkuId) missing.push("a SKU to break");
   if (!i.locationId) missing.push("a location");
   if (!i.binId) missing.push("a bin");
-  if (!(Number(i.qty) > 0)) missing.push("a quantity above zero");
+  if (repackQuantityError(i.qty)) missing.push("a quantity above zero");
   return submitReason(missing);
 }
 

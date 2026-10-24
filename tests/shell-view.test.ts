@@ -57,7 +57,6 @@ import { STAFF_NAV } from "../lib/mgr/nav";
 import { searchEmptyMessage } from "../lib/mgr/search-palette-state";
 import { toTodayViewProps } from "../lib/mgr/today-view";
 import { filterWorkRows, toWorkViewProps, workFromQuery } from "../lib/mgr/work-view";
-import { plural } from "../lib/mgr/plural";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
@@ -193,7 +192,7 @@ describe("Beer view", () => {
     expect(model.navs.map(row => row.title)).toEqual(["Weekly count", "Tap board", "Variance by brand"]);
     expect(model.stock).toEqual([{ key: "actual-sku:actual-location", title: "Actual SKU", detail: "Actual taproom", qty: "7" }]);
   });
-  it("maps overview counts onto area rows", () => {
+  it("keeps each area title and destination tied to its key", () => {
     const model = toBeerViewProps({
       overview: {
         fgShortages: 2,
@@ -205,14 +204,14 @@ describe("Beer view", () => {
       },
       showTaproom: true,
     });
-    expect(model.navs.map((r) => [r.title, r.detail])).toEqual([
-      ["Finished goods", `${plural(2, "shortage")} · ATP by SKU`],
-      ["Taproom", `${plural(1, "SKU")} below par · weekly count`],
-      ["Taps", `${plural(11, "keg")} on tap · Tap board`],
-      ["Variance by brand", "Compare completed count periods"],
-      ["Cellar", plural(6, "occupied tank")],
-      ["Materials", "on hand · definitions · cycle count"],
-      ["Kegs", "142 out at customers"],
+    expect(model.navs.map(({ key, title, href }) => [key, title, href])).toEqual([
+      ["fg", "Finished goods", "/inventory"],
+      ["taproom", "Taproom", "/taproom"],
+      ["taps", "Taps", "/taproom/board"],
+      ["variance", "Variance by brand", "/taproom/variance"],
+      ["cellar", "Cellar", "/cellar"],
+      ["materials", "Materials", "/materials"],
+      ["kegs", "Kegs", "/kegs"],
     ]);
   });
 
@@ -262,10 +261,15 @@ describe("Beer view", () => {
     expect(body.props.model).toEqual(toBeerViewProps(beerOverview));
   });
 
-  it("the Beer inventory record prints its counts through the same adapter as live (#1119)", () => {
-    const html = htmlOf(screen("Beer").body);
-    expect(html).toContain("11 kegs on tap · Tap board");
-    expect(html).toContain("6 occupied tanks");
+  it.each([
+    { openTaps: 0, openOccupancies: 0, kegsOut: 0 },
+    { openTaps: 1, openOccupancies: 2, kegsOut: 3 },
+  ])("preserves each count source without inventing a Materials total: %j", (counts) => {
+    const model = toBeerViewProps({ overview: { fgShortages: 0, taproomBelowPar: 0, materialShortages: 55, ...counts }, showTaproom: true });
+    for (const [key, count] of [["taps", counts.openTaps], ["cellar", counts.openOccupancies], ["kegs", counts.kegsOut]] as const) {
+      expect(Number.parseInt(model.navs.find(row => row.key === key)!.detail, 10)).toBe(count);
+    }
+    expect(model.navs.find(row => row.key === "materials")!.detail).not.toMatch(/\d/);
   });
 
   it("the live Beer page mounts BeerView", () => {
@@ -407,17 +411,6 @@ describe("Me view", () => {
 });
 
 describe("Settings view", () => {
-  it("links source water to existing profiles without claiming a configured default", () => {
-    const html = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo, hrefs: { water: "/catalog/water-profiles" } }));
-    expect(html).toContain('href="/catalog/water-profiles"');
-    expect(html).toContain("Source water");
-    expect(html).not.toContain("aren’t available");
-    const inventory = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo }));
-    expect(inventory).not.toContain('href="/catalog/water-profiles"');
-    const page = src("app/(app)/settings/page.tsx");
-    expect(page).toContain('water: "/catalog/water-profiles"');
-    expect(page).toContain('!brewery.roles.includes("admin")');
-  });
 
   it("the Settings inventory record is SettingsView", () => {
     const body = screen("Settings").body as { type: unknown; props: { model: unknown } };

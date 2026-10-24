@@ -112,9 +112,21 @@ describe("navTitle", () => {
     expect(navTitle("/routes")).toBe("Deliveries");
     expect(navTitle("/taproom/board")).toBe("Taps");
     expect(navTitle("/settings/units")).toBe("Units");
-    // A page with no entry of its own follows the section it sits in.
-    expect(navTitle("/settings/team")).toBe("Settings");
+    expect(navTitle("/settings/team")).toBe("Team");
     expect(navTitle("/orders/new")).toBe("Orders");
+  });
+  it.each([
+    ["/kegs/report", "Keg report"],
+    ["/kegs/history", "Keg history"],
+    ["/cellar/vessels/new", "New vessel"],
+    ["/catalog/water-profiles", "Water profiles"],
+    ["/catalog/brands/new", "New brand"],
+    ["/recipes/new", "New recipe"],
+    ["/compliance/licenses", "Licenses"],
+    ["/settings/accounting", "Accounting"],
+    ["/settings/pos", "Point of sale"],
+  ])("names the subpage %s rather than its section (#1255)", (route, title) => {
+    expect(navTitle(route)).toBe(title);
   });
   it("throws for a route no entry covers, so a moved page fails loudly", () => {
     expect(() => navTitle("/denied")).toThrow(/denied/);

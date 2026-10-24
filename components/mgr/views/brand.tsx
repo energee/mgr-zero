@@ -14,12 +14,14 @@
 // (lib/mgr/price-group-suggestion.ts); Use only fills the select, and Save
 // brand is still the commit. ABV is the shared numeric stepper, bounded by
 // BRAND_ABV like upsert_brand's schema.
-import { Fragment, type ReactNode } from "react";
+"use client";
+import { Fragment, useId, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
 import { FieldDescription } from "@/components/ui/field";
 import { RegistryInput, RegistrySelect, rowAction } from "@/components/mgr/views/registry-fields";
-import { BRAND_ABV } from "@/lib/mgr/brand-abv";
+import { BRAND_ABV, brandAbvError } from "@/lib/mgr/brand-abv";
+import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import type { SellsAsRow } from "@/lib/mgr/brand-sells-view";
 import type { BrandViewModel } from "@/lib/mgr/brand-view";
 import type { PriceGroupSuggestion } from "@/lib/mgr/price-group-suggestion";
@@ -49,9 +51,11 @@ export function BrandView({
   model,
   controls = {},
   createAction,
+  validationAttempted = false,
   messages,
   footer,
   linkRows,
+  pricingHref,
   actions = {},
   addCompliance,
   categoryAction,
@@ -59,15 +63,19 @@ export function BrandView({
   sellsDetails,
   sellsDisabled = false,
   sellsMessages,
+  formatAction,
   busy = false,
 }: {
   model: BrandViewModel;
   controls?: BrandControls;
   createAction?: ReactNode;
+  validationAttempted?: boolean;
   messages?: ReactNode;
   footer?: ReactNode;
-  /** Live: Edit on price group is a link. */
+  /** Live: true links to pricing; false hides the action for a denied role. */
   linkRows?: boolean;
+  /** Brand editing and price-group setup both require Admin or Sales. */
+  pricingHref?: string;
   /** Live: per-row Edit sheets keyed by compliance row; null suppresses the drawn verb. */
   actions?: Record<string, ReactNode>;
   /** Live: the Add approval / Add registration sheets; null hides them. */
@@ -81,8 +89,12 @@ export function BrandView({
   sellsDisabled?: boolean;
   /** Live: a failed switch's error, under the switches. */
   sellsMessages?: ReactNode;
+  /** Live: permitted link to Catalog's format setup; null hides the action. */
+  formatAction?: ReactNode;
   busy?: boolean;
 }) {
+  const abvId = useId();
+  const touched = useTouchedLines(!controls.abv || validationAttempted);
   return (
     <div className="@container flex min-w-0 flex-col gap-6">
       <header className="flex flex-col gap-2">
@@ -105,7 +117,10 @@ export function BrandView({
           )}
           {E.cols(
             <RegistryInput label="Style" value={model.style} onChange={controls.style} suggestions={model.styleOptions} />,
-            E.edit("ABV %", model.abv, "number", undefined, { onChange: controls.abv, min: String(BRAND_ABV.min), max: String(BRAND_ABV.max), step: "0.1" }),
+            <div className="flex min-w-0 flex-col gap-2">
+              {E.edit("ABV %", model.abv, "number", undefined, { id: abvId, onChange: controls.abv, onBlur: () => touched.touch(0), error: touched.shown(0) ? brandAbvError(model.abv) : undefined, min: BRAND_ABV.min, max: BRAND_ABV.max, step: "any", "aria-describedby": `${abvId}-help` })}
+              <FieldDescription id={`${abvId}-help`}>Optional percentage from 0 to 99.99. Decimals such as 5.55 are valid; stored to two decimal places, with extra decimals rounded.</FieldDescription>
+            </div>,
           )}
           <div className="flex flex-col gap-1">
             <RegistrySelect label="Category" value={model.category} options={[{ value: "", label: "Uncategorized" }, ...asOptions(model.categoryOptions)]} onChange={controls.category} />
@@ -113,6 +128,7 @@ export function BrandView({
           </div>
           {E.ttl("Selling")}
           <RegistrySelect label="Price group" value={model.priceGroup} options={model.priceGroupOptions} onChange={controls.priceGroup} />
+          <FieldDescription>{model.priceGroupOptions.length === 1 && <>No price groups yet. </>}{E.link("Manage price groups", "Price groups", pricingHref)}. Leave No price group to keep this brand unpriced.</FieldDescription>
           {model.suggestion
             ? E.row(model.suggestion.title, model.suggestion.detail, suggestionAction(model.suggestion, controls.priceGroup), model.suggestion.kind === "unknown" ? "w" : "")
             : null}
@@ -120,12 +136,16 @@ export function BrandView({
           <RegistryInput label="Description" value={model.description} onChange={controls.description} />
           <RegistryInput label="Hops" value={model.hops} onChange={controls.hops} />
           {messages}
-          {footer !== undefined ? footer : E.submit("Save brand", { submitting: busy, reason: submitReason(model.name.trim() ? [] : ["a brand name"]), className: "w-full md:w-fit md:self-end" })}
+          {footer !== undefined ? footer : E.submit("Save brand", { submitting: busy, reason: brandAbvError(model.abv) ?? submitReason(model.name.trim() ? [] : ["a brand name"]), className: "w-full md:w-fit md:self-end" })}
         </section>
         <section aria-label="Sells as and compliance" className="flex min-w-0 flex-col gap-3">
           {model.isNew ? E.info("Save the brand to add SKUs and compliance.") : (
             <>
               {E.ttl("Sells as", "sells-as")}
+              {model.sells.packages.length
+                ? E.info("Switch on a packaged format to create a SKU for this brand. A format alone is not a SKU.")
+                : E.info("Add a packaged format in Catalog, then return here and switch it on to create this brand’s SKU.")}
+              {formatAction !== undefined ? formatAction : E.btn("Manage formats", "g")}
               {model.sells.packages.map((row) => (
                 <div key={row.formatId}>{E.row(row.name, row.prices, (
                   <span className="flex items-center gap-2">
@@ -138,7 +158,10 @@ export function BrandView({
               {model.sells.contents.map((line) => <div key={line.key}>{E.row(line.label, line.prices)}</div>)}
               {E.ttl("Pours")}
               {model.sells.pours.map((pour) => <div key={pour.key}>{E.row(pour.name, `${pour.size} · ${pour.prices}`)}</div>)}
-              {E.nav("Edit on price group", "", "", undefined, linkRows ? model.sells.priceGroupHref : undefined)}
+              {model.sells.pours.length === 0 && E.info(model.sells.unpriced
+                ? "Choose a price group and save the brand before adding pours or setting prices."
+                : "No pours on this price group. Add a pour on Price groups; pours are servings, not SKUs.")}
+              {!model.sells.unpriced && linkRows !== false && E.nav("Edit on price group", "", "", undefined, linkRows ? model.sells.priceGroupHref : undefined)}
               {E.ttl("Compliance", "compliance")}
               {model.compliance.map((row) => (
                 <div key={row.key}>{E.row(row.title, row.detail, rowAction(row, actions), row.warning ? "w" : "")}</div>

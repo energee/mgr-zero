@@ -174,9 +174,9 @@ export const phone = z.string().trim().refine(
 // Maps a Supabase/PostgREST error to the public CommandError envelope. P0001 is
 // `raise exception` without an errcode, i.e. the domain rules our own RPCs
 // raise, so its message is the user-facing one. 23505 (unique violation) is a
-// 409 and 22003 (numeric out of range) a 400, each with a fixed message: the
-// raw text names constraints and column types, so it is only logged (#422,
-// #427). Anything unlisted is logged
+// 409; 22003 (numeric out of range) and 22023 (invalid parameter) are 400s.
+// These use fixed messages: raw text may name constraints, types or internal
+// arguments, so it is only logged (#422, #427, #1306). Anything unlisted is logged
 // here and surfaces as a generic 500 so raw Postgres text never reaches a
 // client (security audit A2); detail pages turn not_found into the not-found
 // route (lib/mgr/not-found.ts).
@@ -197,6 +197,9 @@ function rpcError(error: { message: string; code?: string }): CommandError {
     case "22003":
       console.error("database error 22003:", error.message);
       return new CommandError("A number is out of range.");
+    case "22023":
+      console.error("database error 22023:", error.message);
+      return new CommandError("An input value is invalid.", 400, "invalid_input");
     case "PGRST116": return new CommandError("record not found", 404, "not_found");
     case "P0001": return new CommandError(error.message);
     default:

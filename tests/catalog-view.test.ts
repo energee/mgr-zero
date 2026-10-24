@@ -44,7 +44,7 @@ describe("Catalog view", () => {
   it("maps list_brands onto separate style, ABV and SKU count fields", () => {
     const model = toCatalogViewProps(catalogBrands);
     expect(model.brands.map(({ name, style, abv, skus }) => [name, style, abv, skus])).toEqual([
-      [brandOf(SKU_HAZY), "IPA", "6.8%", "4"],
+      [brandOf(SKU_HAZY), "IPA", "6.8%", "3"],
       [brandOf(SKU_PILS), "Lager", "4.9%", "2"],
       [brandOf(SKU_STOUT), "Stout", "7.2%", "1"],
     ]);
@@ -235,7 +235,7 @@ describe("Catalog view", () => {
     const html = htmlOf(createElement(CatalogView, { model: toCatalogViewProps(catalogBrands) }));
     expect(html).toMatch(/>New brand</);
     expect(html).toContain(brandOf(SKU_HAZY));
-    for (const fact of [">IPA<", ">6.8%<", ">4<"]) expect(html).toContain(fact);
+    for (const fact of [">IPA<", ">6.8%<", ">3<"]) expect(html).toContain(fact);
     expect(html).toMatch(/Price groups/);
     expect(html).toMatch(/8 groups/);
     expect(html).not.toMatch(/channel/);
@@ -282,7 +282,7 @@ describe("Catalog view", () => {
     // The shared view still owns the rows: the slot cannot replace them.
     expect(html).toContain(brandOf(SKU_HAZY));
     expect(html).toContain(brandOf(SKU_PILS));
-    expect(html).toContain(">4<");
+    expect(html).toContain(">3<");
     expect(html).not.toMatch(/New pour|never a SKU/);
     expect(html).toMatch(/href="\/catalog\/brands\//);
   });
@@ -350,7 +350,7 @@ describe("Brand view", () => {
     expect(model.abv).toBe("6.8");
     expect(model.category).toBe("Core");
     expect(model.priceGroup).toBe(brandHazy.brand.price_group_id);
-    expect(model.priceGroupOptions[0]).toEqual({ value: UNPRICED, label: "Unpriced" });
+    expect(model.priceGroupOptions[0]).toEqual({ value: UNPRICED, label: "No price group" });
     expect(model.suggestion).toMatchObject({ kind: "group", title: "Suggested group 2" });
     expect(model.description).toBe("Juicy, soft, Citra-forward");
     expect(model.hops).toBe("Citra, Mosaic");

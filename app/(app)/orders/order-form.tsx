@@ -115,11 +115,11 @@ export function OrderForm({
       void form.submit(event);
     }} className="contents" aria-describedby={readiness.hint ? "order-form-hint" : undefined}>
       <NewOrderView feedback={feedback} skuFeedback={skuFeedback} skuOptionsReady={skuOptionsReady}
-        skuEmptyMessage={channel === undefined ? undefined : "No active SKUs are priced for this customer. Check Price groups or choose another customer."} model={{
+        skuEmptyMessage={channel === undefined || !skus.length ? undefined : "No active SKUs are priced for this customer. Check Price groups or choose another customer."} model={{
         kind, customer: customerId, shipTo: shipToId, source: fromLocationId, destination: toLocationId,
         customers: customers.map(customer => ({ id: customer.id, label: customer.name })),
         shipTos, sources: locations.map(location => ({ id: location.id, label: location.name })), skus: skuOptions,
-        requestedShip: requestedShipDate, po: poNumber, pickup, backHref: "/orders", customersHref: "/customers",
+        requestedShip: requestedShipDate, po: poNumber, pickup, backHref: "/orders", customersHref: "/customers", catalogHref: "/catalog",
         lines: lines.map(line => ({ ...line,
           name: skuOptions.find(sku => sku.id === line.skuId)?.label ?? skus.find(sku => sku.id === line.skuId)?.label ?? (line.skuId ? "Selected SKU" : ""),
           skuError: skuOptionsReady && isUnavailableSku(line.skuId, availableSkuIds) ? "This SKU is unavailable for this order. Choose an available SKU or remove this line." : undefined,
