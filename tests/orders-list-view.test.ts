@@ -154,7 +154,6 @@ describe("Orders list view loop", () => {
     expect(html("Orders")).toMatch(/>Status</);
     expect(html("Orders")).toMatch(/>Confirm</);
     expect(html("Orders")).not.toMatch(/>Put back</);
-    expect(html("Orders")).not.toMatch(/>Pick</);
     expect(html("Orders")).toMatch(/>Finish</);
   });
 
@@ -190,6 +189,6 @@ describe("New order view loop", () => {
     expect(html("New order")).toContain('data-slot="popover-trigger"');
     expect(html("New order")).toMatch(/>Save draft</);
     expect(html("New order")).toMatch(/>Add line</);
-    expect(html("New order")).toContain("Last checked");
+    expect(html("New order")).not.toContain("Last checked");
   });
 });

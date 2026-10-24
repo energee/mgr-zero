@@ -106,9 +106,9 @@ export function MovementForm({
   const selectedBin = bins.find(item => item.id === binId);
   const selectedChannel = channels.find(item => item.id === saleChannelId);
   const availableLots = stock.filter(item => item.kind === "sku" && item.stock_id === skuId && item.bin_id === binId && item.lot_id);
-  const lotOptions = ["Untracked / legacy stock", ...availableLots.map(item => `${item.lot_code} · ${item.qty} available`)];
+  const lotOptions = ["No lot (untracked)", ...availableLots.map(item => `${item.lot_code} · ${item.qty} available`)];
   const movementModel: RecordMovementViewModel = {
-    // An empty `kind` (none chosen yet) shows the Select kind placeholder and
+    // An empty `kind` shows the Select movement type placeholder and
     // no pressed toggle.
     kind: sentenceCase(type), kindOptions: MOVEMENT_KIND_LABELS,
     sku: selectedSku?.label ?? "", skuId, skuOptions: skus.map(item => ({ value: item.id, label: item.label })), skusHref,
@@ -121,7 +121,7 @@ export function MovementForm({
     preview: fields ? `Preview: ${fields.qty > 0 ? "+" : ""}${fields.qty} SKU units${unitVolume != null ? ` · ${formatVolume(fields.qty * unitVolume)}` : ""} · ${sentenceCase(type)}${fields.destState ? ` · ${fields.destState}` : ""}. Volume is calculated when recorded.` : undefined,
     direction: type === "adjustment" ? direction === "add" ? "Add stock" : "Remove stock" : undefined,
     directionOptions: type === "adjustment" ? ["Add stock", "Remove stock"] : undefined,
-    lot: lotId ? availableLots.map(item => ({ id: item.lot_id, label: `${item.lot_code} · ${item.qty} available` })).find(item => item.id === lotId)?.label ?? lotId : "Untracked / legacy stock",
+    lot: lotId ? availableLots.map(item => ({ id: item.lot_id, label: `${item.lot_code} · ${item.qty} available` })).find(item => item.id === lotId)?.label ?? lotId : "No lot (untracked)",
     lotOptions,
     note,
   };
@@ -162,7 +162,7 @@ export function MovementForm({
               channel: value => setSaleChannelId(channels.find(item => item.name === value)?.id ?? ""),
               destState: value => setDestState(value.toUpperCase()),
               direction: value => setDirection(value === "Remove stock" ? "remove" : "add"),
-              lot: value => setLotId(value === "Untracked / legacy stock" ? "" : availableLots.find(item => `${item.lot_code} · ${item.qty} available` === value)?.lot_id ?? ""),
+              lot: value => setLotId(value === "No lot (untracked)" ? "" : availableLots.find(item => `${item.lot_code} · ${item.qty} available` === value)?.lot_id ?? ""),
               qty: setQty,
               note: setNote,
             }}

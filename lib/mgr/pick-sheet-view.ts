@@ -1,12 +1,12 @@
 // lib/mgr/pick-sheet-view.ts — view-model for Work → Pick sheet.
 // Groups daily_pick_sheet rows by requested_ship_date the way the live page
 // does; weekday chips stay a filters slot, not this mapping. Each date totals
-// its lines per SKU, grouped by brand like Pick (brand-lines.ts).
+// its lines per SKU, grouped by format like Pick (brand-lines.ts).
 import type { EmptyState } from "./empty-state";
 import { formatDate } from "@/lib/date-format";
 import { docNo } from "./doc-no";
 import { plural } from "./plural";
-import { brandLabel, byBrand, type BrandedSku } from "./brand-lines";
+import { formatLabel, byFormat, type BrandedSku } from "./brand-lines";
 
 export type PickSheetRowView = {
   key: string;
@@ -83,7 +83,7 @@ export function toPickSheetViewProps({ orders }: PickSheetSnapshot): PickSheetVi
         key: shipDate,
         title: shipDate === "Unscheduled" ? shipDate : formatDate(shipDate),
         rows,
-        totals: byBrand([...totals].map(([key, t]) => ({ key, ...t }))).map((t) => ({ key: t.key, ...brandLabel(t.skus), qty: t.qty })),
+        totals: byFormat([...totals].map(([key, t]) => ({ key, ...t }))).map((t) => ({ key: t.key, ...formatLabel(t.skus), qty: t.qty })),
       };
     }),
   };

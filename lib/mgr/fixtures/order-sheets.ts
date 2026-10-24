@@ -60,7 +60,7 @@ export const orderAdjustLines: AdjustLinesSnapshot = {
   ],
 };
 
-/** Warehouse pick of Ridgeline: counts start at ordered, lines under their brand. */
+/** Warehouse pick of Ridgeline: counts start at ordered, lines under their format. */
 export const orderPick: PickSnapshot = {
   order: { id: ORDER_231, order_no: 231, from_location_id: LOC_WAREHOUSE.id, requested_ship_date: "2026-09-10", customers: { name: RIDGELINE.name } },
   lines: [

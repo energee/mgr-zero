@@ -461,7 +461,7 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 1, slice: "all", tab: "Beer", name: "Beer", job: "Inventory, cellar, materials and kegs",
-    to: { Taproom: "Weekly count", Materials: "Materials on hand", Shortages: "Planning" },
+    to: { Taproom: "Weekly count", Materials: "Materials on hand", "Variance by brand": "Variance by brand" },
     reads: "get_beer_overview", writes: "none",
     states: DEFAULT_STATES,
     body: <BeerView model={toBeerViewProps(beerOverview)} />,
@@ -477,7 +477,7 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", tab: "More", name: "More", job: "Setup and desk review, never standing work",
     reads: "none [role navigation manifest]", writes: "none",
     states: DEFAULT_STATES,
-    spec: "Role-filtered; hidden entries leave no gaps. Entries sit under Sales, Production, Setup and Integrations headings, and an area with none of the role's entries has no heading. The rail's More group uses the same headings. Standing work remains in Today, Beer or Work.",
+    spec: "Role-filtered; hidden entries leave no gaps. Entries sit under Sales, Production, Setup and Menu and chat headings, and an area with none of the role's entries has no heading. The rail's More group uses the same headings. Standing work remains in Today, Beer or Work.",
     body: <MoreView model={toMoreViewProps(moreNavs)} />,
   },
   {
@@ -645,11 +645,11 @@ export const SCREENS: Screen[] = [
     group: "Entry",
     surface: "entry",
     name: "Set new password",
-    job: "Recovery-token landing; distinct from joining a brewery",
-    reads: "supabase_auth_get_session [platform; recovery token]",
-    writes: "supabase_auth_update_user [platform; membership unchanged]",
-    states: [["expired link", "Request a new reset link", 1], ["wrong audience", "portal user lands in the portal shell"]],
-    spec: "The recovery token opens this, never Accept invite: no role row, no “Join” copy. After Save the existing membership decides the shell.",
+    job: "Change a password with current credentials or a verified recovery link",
+    reads: "supabase_auth_get_user · supabase_auth_get_claims [platform]",
+    writes: "supabase_auth_sign_in_with_password · supabase_auth_update_user · supabase_auth_sign_out [platform; membership unchanged]",
+    states: [["incorrect current password", "Correct the current password or request a reset link", 1], ["mismatch", "The new passwords do not match", 1], ["recovery", "Verified recovery omits current password; sign in again after saving"]],
+    spec: "Current credentials are checked before changing a password. Only Auth-verified recovery skips the old password; URL flags and metadata never do. Other sessions lose refresh access. Recovery signs out after Save.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: <EntryView model={setPassword} />,
   },
@@ -690,11 +690,11 @@ export const SCREENS: Screen[] = [
     surface: "entry",
     name: "Portal set password",
     to: { "Save password": "Shop" },
-    job: "Recovery-token landing for a buyer; lands in the portal",
-    reads: "supabase_auth_get_session [platform; recovery token]",
-    writes: "supabase_auth_update_user [platform]",
+    job: "Change a buyer password with current credentials or verified recovery",
+    reads: "supabase_auth_get_user · supabase_auth_get_claims [platform]",
+    writes: "supabase_auth_sign_in_with_password · supabase_auth_update_user · supabase_auth_sign_out [platform]",
     states: DEFAULT_STATES,
-    spec: "After Save, a customer membership opens Order, not Today.",
+    spec: "Current-password changes retain access to Order. Verified recovery signs in again on Portal sign in after Save. Need a reset link? opens Portal forgot password.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: <EntryView model={portalSetPassword} />,
   },
@@ -820,7 +820,7 @@ export const SCREENS: Screen[] = [
     job: "Enter a positive amount; the form derives direction and the server calculates barrels",
     reads: "list_skus · list_locations · list_bins · get_atp",
     writes: "record_movement [existing; one append-only inventory movement]",
-    states: [["no kind", "No kind preselected · Still needed: a kind, beside the withheld Record movement", 1], ["incomplete", "Still needed names each missing field; the preview appears once nothing is missing", 1], ["invalid quantity", "Zero or less, or a third decimal place, is marked under Quantity once the field is left · the kind signs it; two decimals are allowed", 1], ["no SKUs", "No SKUs yet · Add a SKU opens Catalog for Admin · Warehouse is told who adds them", 1], ["offline", "Wait for a connection; movements are never queued"], ["stale", "ATP changed · preview again", 1], ["permission", "admin or warehouse required · sales reads Beer only", 1], ["echo", "Committed row · eligible standalone adjustment/loss correction opens inventory SKU detail"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
+    states: [["no movement type", "No movement type preselected · Still needed: movement type, beside the withheld Record movement", 1], ["incomplete", "Still needed names each missing field; the preview appears once nothing is missing", 1], ["invalid quantity", "Zero or less, or a third decimal place, is marked under Quantity once the field is left · the movement type signs it; two decimals are allowed", 1], ["no SKUs", "No SKUs yet · Add a SKU opens Catalog for Admin · Warehouse is told who adds them", 1], ["offline", "Wait for a connection; movements are never queued"], ["stale", "ATP changed · preview again", 1], ["permission", "admin or warehouse required · sales reads Beer only", 1], ["echo", "Committed row · eligible standalone adjustment/loss correction opens inventory SKU detail"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
     spec: "The form derives the signed API quantity from the movement kind (adjustments ask Add or Remove); the server derives 0.50000000 bbl and never accepts client-supplied barrels. It requires a live connection and is never put in the offline outbox. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. This frame carries Hazy IPA into PA, which is registered, so the warning is a state rather than drawn copy. Channel stays.",
     body: (<>
       <RecordMovementView model={toRecordMovementViewProps(recordMovementFestival)} footer={null} />
@@ -1052,7 +1052,7 @@ export const SCREENS: Screen[] = [
     reads: "get_order",
     writes: "record_pick · resolve_short_pick",
     states: [["permission", "warehouse or admin required", 1], ["short pick", "a line below ordered opens the Short pick frame", 1], ["partly picked", "reopened after a kept-owed line · counted lines start at what was picked"], ["concurrent", "another picker changed qty"], ["cancelled", "staged · restock now", 1], ["offline", "queue whole pick set once"]],
-    spec: "2 taps from Today: Pick → Done picking (all-as-ordered only). The sheet is just the order: one table row per format (Product · Format · Ordered · Actual), the brand named once on its first row, under the customer and ship date. Shortage is not a chip here: entering a count below ordered opens Short pick.",
+    spec: "2 taps from Today: Pick → Done picking (all-as-ordered only). The sheet is just the order: one table row per SKU (Format · Product · Ordered · Actual), grouped by package format then brand name, with the format named once on its first row, under the customer and ship date. Brands keep their staff aliases. Shortage is not a chip here: entering a count below ordered opens Short pick.",
     to: { "16 oz case": "SKU detail" },
     body: <PickView model={toPickViewProps(orderPick)} />,
   },
@@ -1170,7 +1170,7 @@ export const SCREENS: Screen[] = [
     reads: "daily_pick_sheet [confirmed orders by requested ship date, one fulfillment source]",
     writes: "none",
     states: [["day chosen", "confirmed orders requesting that ship date"], ["totals", "read-only · what to bring to the floor in one trip"], ["empty", "nothing confirmed for that day"], ["changed after pick", "the row carries the marker · count only the added or raised lines", 1], ["mixed sources", "one source at a time · a Taproom order is not on the Warehouse sheet", 1]],
-    spec: "A staging aid, not a command surface: nothing here writes, and a row opens that order's Pick, which is where counting happens. Totals sum the day so a picker carries one load out instead of walking back per order; they are read-only because a total spans orders and picking is per-order. Scoped to one fulfillment source, since a sheet mixing Warehouse and Taproom lines would send someone to the wrong room.",
+    spec: "A staging aid, not a command surface: nothing here writes, and a row opens that order's Pick, which is where counting happens. Each ship date shows its order count, with Orders and Totals side by side on wide screens and stacked on smaller screens and in print. Totals group by package format then brand name, with each format named once and brand aliases retained. They show all ordered quantities, including picked orders, not quantities left to pick. They are read-only because a total spans orders and picking is per-order. A changed-after-pick row reminds the picker to count only the added or raised lines. Scoped to one fulfillment source, since a sheet mixing Warehouse and Taproom lines would send someone to the wrong room.",
     body: <PickSheetView model={toPickSheetViewProps(pickSheet)} filters={E.chips(PICK_SHEET_DATE_CHIPS, 1)} />,
   },
   {
@@ -1235,8 +1235,8 @@ export const SCREENS: Screen[] = [
     reads: "list_customers · list_locations · list_skus · get_atp",
     writes: "create_order",
     states: [...permitted("sales or admin required"), ["pricing loading", "Loading customer-priced SKUs; no empty claim"], ["pricing offline", "Waiting for connection; resumes on reconnect"], ["pricing failed", "error and Try again; cached choices marked last-known", 1], ["pricing empty", "no active SKUs priced for this customer; check Price groups"], ["customer changed", "unavailable selections keep quantities and labels; replace or remove before saving", 1], ["empty catalog", "names what is missing; links Customers (wholesale only) and Catalog, never Locations, which only an admin adds"]],
-    spec: "Source is required and becomes the order's from-location; the app never guesses “Warehouse.” Save draft lands on the Order screen, where Submit lives. The shared QueryFeedback sits below the heading: Last checked uses the oldest option-list check, Updating preserves inputs, and connection or retry feedback identifies last-known data. Visible customer, location and SKU options refresh every 30 seconds and on tab return or reconnect, without resetting the draft. Offline, error and empty states are supplied through the shared feedback contract rather than additional fixture frames. Customer pricing uses the same feedback below the PO field and inside Select SKU: initial loading, paused connection, failed read with Try again, and last-known cached choices stay distinct from a successful empty list. A customer change preserves quantities and selections; an unavailable SKU keeps its label and a visible warning until replaced or removed. Save draft cannot count or submit an unavailable selection.",
-    body: <NewOrderView model={toNewOrderViewProps(newOrderDraft)} feedback={<QueryFeedback timeZone={DEMO_TIME_ZONE} updatedAt={Date.parse("2026-09-13T12:00:00Z")} />} />,
+    spec: "Source is required and becomes the order's from-location; the app never guesses “Warehouse.” Save draft lands on the Order screen, where Submit lives. The shared QueryFeedback sits below the heading: Updating preserves inputs, and connection or retry feedback identifies last-known data without a Last checked timestamp on the unsaved form. Visible customer, location and SKU options refresh every 30 seconds and on tab return or reconnect, without resetting the draft. Offline, error and empty states are supplied through the shared feedback contract rather than additional fixture frames. Customer pricing uses the same feedback below the PO field and inside Select SKU: initial loading, paused connection, failed read with Try again, and last-known cached choices stay distinct from a successful empty list. A customer change preserves quantities and selections; an unavailable SKU keeps its label and a visible warning until replaced or removed. Save draft cannot count or submit an unavailable selection.",
+    body: <NewOrderView model={toNewOrderViewProps(newOrderDraft)} feedback={<QueryFeedback timeZone={DEMO_TIME_ZONE} showCheckedAt={false} updatedAt={Date.parse("2026-09-13T12:00:00Z")} />} />,
   },
   {
     step: 5, slice: 1, tab: "Work", name: "New order pricing loading",
@@ -1687,8 +1687,8 @@ export const SCREENS: Screen[] = [
     job: "Occupancy is the subject: fill, gravity and overdue lead every tile",
     reads: "list_occupancies · list_vessels · list_batches · list_fermentation_readings · get_gravity_unit · get_batch_completion_preview",
     writes: "upsert_vessel [mutable single rows; admin] · complete_batch",
-    states: [["brewer", "Add vessel hidden; vessels are admin-managed"], ["no beer", "Reading, Transfer, Addition off · one note says why", 1], ["beer in tanks", "named volume requires explicit loss acknowledgement", 1], ["open run", "complete batch refused"], ["negative residual", "reload cellar facts", 1], ["uncertain", "retry unchanged request", 1], ["saved", "batch and all open occupancies closed"]],
-    spec: "Complete batch reviews the server-derived baseline, frozen packaged output, prior attributed volume, threshold, residual and current beer in each open tank. Beer at or above max(0.05 bbl, 0.5% of baseline) requires an explicit acknowledgement naming the barrels and tanks being written off. The same shared completion surface freezes the acknowledgement during submission and uncertain retry, then atomically closes the batch and all of its open occupancies. A threshold-qualified residual becomes one typed nonphysical loss root; the form accepts no amount or cause. Tile fill derives from occupancy vs vessel capacity, never from a status column. Reading is the one primary; Transfer and Addition are outline, and with no beer in any tank all three are off under one note saying why. Brew day is not a cellar action: a link under the actions opens Batches. A tile opens Vessel detail. Retired vessels are not tiles. Add vessel shows only to an admin.",
+    states: [["brewer", "Add vessel hidden; vessels are admin-managed"], ["no vessels", "Add your tanks to start tracking the cellar · primary Add vessel for admin; no Batches link", 1], ["no beer", "Reading, Transfer, Addition off · one note says why", 1], ["beer in tanks", "named volume requires explicit loss acknowledgement", 1], ["open run", "complete batch refused"], ["negative residual", "reload cellar facts", 1], ["uncertain", "retry unchanged request", 1], ["saved", "batch and all open occupancies closed"]],
+    spec: "Complete batch reviews the server-derived baseline, frozen packaged output, prior attributed volume, threshold, residual and current beer in each open tank. Beer at or above max(0.05 bbl, 0.5% of baseline) requires an explicit acknowledgement naming the barrels and tanks being written off. The same shared completion surface freezes the acknowledgement during submission and uncertain retry, then atomically closes the batch and all of its open occupancies. A threshold-qualified residual becomes one typed nonphysical loss root; the form accepts no amount or cause. Tile fill derives from occupancy vs vessel capacity, never from a status column. With no vessels, the empty state says to add tanks and offers Add vessel as its primary action for an admin. Once a vessel exists, Reading is the one primary; Transfer and Addition are outline, and with no beer in any tank all three are off under one note saying why. Brew day is not a cellar action: once a vessel exists, a link under the actions opens Batches. A tile opens Vessel detail. Retired vessels are not tiles. Add vessel shows only to an admin.",
     body: <CellarMapView model={cellarMapBrewer} complete={<BatchCompletionFixture />} />,
   },
   {
@@ -2170,7 +2170,7 @@ export const SCREENS: Screen[] = [
     job: "State the temperatures and days a batch is meant to hold",
     reads: "get_recipe [a cut version’s fermentation schedule] · none [draft: the version form’s state]",
     writes: "create_recipe_version [written with their version, never alone]",
-    states: [["permission", "brewer or admin required", 1], ["draft", "stages add, reorder and delete"], ["frozen", "a cut version reads only · create the next version to change it", 1], ["empty", "no stages yet: Add stage is the only action"]],
+    states: [["permission", "brewer or admin required", 1], ["draft", "stages add, reorder and delete"], ["frozen", "a cut version reads only · create the next version to change it", 1], ["empty", "No stages yet. Add a stage to plan temperatures and timing."]],
     spec: "The same shape as Mash schedule and for the same reason. The footer places the dry hop because Recipe draws a dry hop on a day number, and a day number means nothing without this list: day 4 is the last day of Primary, which is why a brewer chose it. The separate fermentation-days and conditioning-days fields v1 kept beside this list are dropped, because the list sums to them and two sources for one number is the failure this design keeps removing.",
     body: (<>
       <FermentationScheduleView title="Hazy IPA v4 · Fermentation" stages={FERM_STAGES} dryHopDay={4} />
@@ -3158,10 +3158,10 @@ export const SCREENS: Screen[] = [
     spec: "Rows are rebuilt from owning MGR queries. App Home remains current during quiet hours and is optional for future providers.",
     body: (<>
       {S.h("Today · 4 waiting")}
-      {S.sa("*ORD-0231 · Order submitted*\nsubmitted · ships today · sales", "Open")}
-      {S.sa("*ORD-0235 · Pick due*\nships tomorrow · warehouse", "Open")}
-      {S.sa("*Route A · stop 3 · Next delivery stop*\nassigned to you · 9:30 AM", "Open")}
-      {S.sa("*FV2 · Fermentation reading overdue*\nlast reading 26 h ago · brewer", "Open")}
+      {S.sa("*ORD-0231 · Order submitted*\nSubmitted · Ships today · Sales", "Open")}
+      {S.sa("*ORD-0235 · Pick due*\nShips tomorrow · Warehouse", "Open")}
+      {S.sa("*Route A · stop 3 · Next delivery stop*\nAssigned to you · 9:30 AM", "Open")}
+      {S.sa("*FV2 · Fermentation reading overdue*\nLast reading 26 h ago · Brewer", "Open")}
       {S.acts([["Open Today in MGR", "pri"]])}
     </>),
   },
@@ -3175,8 +3175,8 @@ export const SCREENS: Screen[] = [
     spec: "The provider message is a projection. Deleting it does not change MGR. Deep links contain no trusted actor or tenant claims.",
     body: (<>
       {S.h("ORD-0235")}
-      {S.s("*Pick due*\nassigned to you")}
-      {S.ctx("Pick due · needs attention")}
+      {S.s("*Pick due*\nAssigned to you")}
+      {S.ctx("Pick due · Needs attention")}
       {S.acts([["Open pick in MGR", "pri"], ["Snooze"], ["Mute picks"]])}
     </>),
   },
@@ -3190,7 +3190,7 @@ export const SCREENS: Screen[] = [
     spec: "The destination must stay private, bot-member and non-external. Counts and safe operational labels only; details remain personal.",
     body: (<>
       {S.h("Morning operations · 6 waiting")}
-      {S.s("*Submitted orders:* 2 · need sales review\n*Picks due:* 2 · warehouse queue\n*Assigned deliveries:* 1 · next stops ready\n*Fermentation readings:* 1 · overdue")}
+      {S.s("*Submitted orders:* 2 · Need sales review\n*Picks due:* 2 · Warehouse queue\n*Assigned deliveries:* 1 · Next stops ready\n*Fermentation readings:* 1 · Overdue")}
       {S.ctx("Details and actions are available in each person’s private MGR App Home.")}
       {S.acts([["Open my MGR work", "pri"]])}
     </>),
@@ -3208,7 +3208,7 @@ export const SCREENS: Screen[] = [
       {S.toggle(NOTIFICATION_REASON_LABEL.pick_due)}
       {S.toggle(NOTIFICATION_REASON_LABEL.delivery_next)}
       {S.toggle(NOTIFICATION_REASON_LABEL.fermentation_reading_overdue)}
-      {S.select("Quiet hours", "9:00 PM–6:00 AM")}
+      {S.select("Sample quiet hours", "9:00 PM–6:00 AM")}
       {S.ctx("Snooze and mute affect personal delivery only. MGR still shows the work as due.")}
     </>),
   },
