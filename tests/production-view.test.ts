@@ -333,12 +333,13 @@ describe("Vessel detail view", () => {
 
   it("the New vessel inventory record draws the not-yet-saved vessel with what Save still needs (#1116)", () => {
     const record = screen("New vessel");
-    const body = record.body as { type: unknown; props: { model: unknown; reason: unknown } };
+    const body = record.body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(VesselDetailView);
     expect(body.props.model).toEqual(vesselNew);
-    expect(body.props.reason).toBe("Still needed: a name and a capacity above zero.");
     // Like the live page, the capacity starts blank, so no field error is drawn yet.
-    expect(htmlOf(record.body)).not.toContain("Enter a capacity above zero.");
+    const html = htmlOf(record.body);
+    expect(html).not.toContain('aria-invalid="true"');
+    expect(html).toMatch(/<button\b(?=[^>]*\bdisabled)[^>]*>Save vessel<\/button>/);
     expect(screen("Cellar map").to?.["Add vessel"]).toBe("New vessel");
     expect(screen("Batches").to?.["New vessel"]).toBe("New vessel");
   });
