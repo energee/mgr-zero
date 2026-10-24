@@ -151,7 +151,7 @@ Orders and New order reuse data already loaded in this tab. While visible, Order
 
 The brewery name in the header is the brewery whose records you are looking at. Navigation has up to four sections: **Today**, **Beer**, **Work**, and **More**. On a phone they sit as tabs along the bottom, and tapping the tab opens that group's primary page. On a wider screen they sit in a left rail; the toggle beside the brewery name collapses it to a narrow strip of icons, each naming itself when you point at it, and the page widens to fill the space. Browser tabs name the page, such as **Orders · MGR**, **Keg history · MGR**, **New vessel · MGR**, or **Team · MGR**. Recipe tabs include the recipe name and saved version; location tabs name the location, and its bins page reads **Bins at** that location. Compliance period tabs include the period, such as **September 2026 · Compliance · MGR**. Other individual records retain their section title, such as **Orders · MGR** or **Batches · MGR**.
 
-Scroll within the page to reach lower fields and actions. The header, collapsed **Ask MGR** handle, and phone tabs stay outside that scrolling area, so they do not cover packaging controls or other page actions, even in a short window.
+Scroll within the page to reach lower fields and actions. The header, collapsed **Ask MGR** control, and phone tabs stay outside that scrolling area, so they do not cover packaging controls or other page actions, even in a short window. On a phone, **Ask MGR** sits beside the tabs in the same bottom row, leaving more room for the page. Select it to open the conversation; its handle can then expand or minimize it.
 Related records appear as simple separated rows. The row's named action or arrow says what it will open or do; a switch or quantity control changes only that row.
 
 - **Beer** opens **Finished goods**, **Taproom**, **Taps**, **Variance by brand**, **Cellar**, **Materials**, and **Kegs**. Finished-goods shortages appear only on **Finished goods**, which opens Inventory. The other summaries show taproom SKUs below par, kegs on tap, occupied tanks, and kegs out at customers. **Variance by brand** opens the completed-count comparison for roles with taproom access. **Materials** opens materials on hand, where each material is edited and counted. For material shortages from planned work, open **More → Planning**.
@@ -909,6 +909,8 @@ The **Vessels** table at the bottom of Batches lists each vessel's **Kind** (suc
 A definite first validation rejection lets you correct the form and save again without discarding a saved request. An uncertain network or server result still keeps its original request for **Retry saved request**; a later rejection cannot establish whether that earlier save completed.
 
 The **Vessel facts** section heading separates these settings from occupancy and readings.
+
+The Vessels section is setup for brewing and cellar work, separate from the batch lists above it. If there are no vessels, **No vessels yet** appears as a short note beneath the setup action.
 
 Only an admin adds, edits, or deletes a vessel. **New vessel**, **Add vessel**, **Save vessel**, and **Delete vessel** appear only for an admin. A brewer opens Vessel detail to see the occupancy and readings, with the name, type, and capacity shown as text.
 
