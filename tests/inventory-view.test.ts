@@ -172,6 +172,8 @@ describe("Record movement view", () => {
     expect(model.sku).toBe(SKU_HAZY.name);
     expect(model.bin).toBe("Cold");
     expect(model.channel).toBe("Taproom");
+    expect(model.lot).toBe("No lot (untracked)");
+    expect(model.lotOptions).toEqual(["No lot (untracked)"]);
     expect(model.preview).toBe(`Preview: −1 SKU unit · ${formatVolume("0.50000000")} · Festival removal · PA · amounts are entered positive`);
   });
 
@@ -180,9 +182,11 @@ describe("Record movement view", () => {
     expect(toRecordMovementViewProps(recordMovementFestival).kindOptions).toEqual(MOVEMENT_KIND_LABELS);
   });
 
-  it("renders Kind, SKU, Destination state, and Record movement", () => {
+  it("renders Movement type, SKU, Destination state, and Record movement", () => {
     const html = htmlOf(createElement(RecordMovementView, { model: toRecordMovementViewProps(recordMovementFestival) }));
     expect(html).toMatch(/Festival removal/);
+    expect(html).toContain('aria-label="Movement type"');
+    expect(html).toContain("No lot (untracked)");
     expect(html).toContain(SKU_HAZY.name);
     expect(html).toMatch(/Destination state/);
     expect(html).toMatch(/>Record movement</);
