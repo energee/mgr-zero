@@ -27,7 +27,7 @@ export default function ComposerConversation({ chatConfigured, open, onOpenChang
   focusRequest: number;
   outboxCount: number;
   onOutbox: () => void;
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   const expectedContext = useCommandContext();
   const breweryId = expectedContext.breweryId ?? "";

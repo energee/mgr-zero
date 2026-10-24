@@ -85,7 +85,7 @@ describe("Ask MGR failure recovery (#1294)", () => {
 
   it("disables the actual live adapter before accepting prompts when AI is not configured", () => {
     const html = renderToStaticMarkup(createElement(BreweryProvider, { id: "brewery", actorId: "staff" },
-      createElement(ComposerConversation, { chatConfigured: false, open: true, onOpenChange: () => undefined, focusRequest: 0, outboxCount: 0, onOutbox: () => undefined, children: null })));
+      createElement(ComposerConversation, { chatConfigured: false, open: true, onOpenChange: () => undefined, focusRequest: 0, outboxCount: 0, onOutbox: () => undefined }, null)));
     expect(html).toContain(CHAT_FAILURES.not_configured.message);
     expect(html).toMatch(/<textarea[^>]*disabled=""/);
     expect(html).not.toContain("Try again");
