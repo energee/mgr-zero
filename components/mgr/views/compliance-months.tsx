@@ -20,7 +20,7 @@ export function ComplianceMonthsView({
 }) {
   return (
     <>
-      {E.hd("Compliance")}
+      {E.back("More", "Compliance", undefined, model.backHref)}
       <TabBar names={model.cadences} on={model.cadence} cls="w-full" hrefs={cadenceHrefs} />
       {model.months.length === 0 && model.empty ? E.blank(model.empty) : null}
       {model.months.map((row) => (

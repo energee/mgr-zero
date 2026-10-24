@@ -33,7 +33,7 @@ describe("composer UI messages", () => {
   });
 
   // The proposal crosses a trust boundary (server tool output, relayed through
-  // the model stream). A shape the drawer cannot render returns an operator
+  // the model stream). A shape the panel cannot render returns an operator
   // message instead of a proposal, so it never reaches the commit button, and
   // never throws out of the staff layout's render (#463).
   it.each([

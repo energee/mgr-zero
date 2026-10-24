@@ -275,6 +275,8 @@ const kegIdentity = z.union([
   z.object({ skuId: z.string().uuid(), label: z.never().optional(), nominalBbl: z.never().optional() }),
   z.object({ skuId: z.never().optional(), label: z.string().trim().min(1).max(200), nominalBbl: z.number().positive().finite() }),
 ]);
+// Preserve the old input contract so committed requests can reach replay.
+// The database validates new tap numbers only after claiming/replaying them.
 const tapNumber = z.string().trim().min(1).max(80).optional();
 defineCommand({
   name: "tap_keg", description: "Open a keg interval at an owned taproom. keg is {skuId} for an own packaged keg or {label, nominalBbl} for a guest; freezes size and flags absent stock. Optional tap numbers may repeat. Does not change inventory",
@@ -296,12 +298,12 @@ defineCommand({
     p_tap_number: i.tapNumber ?? null, p_opening_fill: i.incomingOpeningFill, p_request_id: e.requestId })),
 });
 defineQuery({
-  name: "list_open_taps", description: "All open intervals at one taproom, numbered first; frozen size, fill, safe SKU and brand labels, stock flag and opening actor ID/handle/time. No POS yield or remaining-volume estimate",
+  name: "list_open_taps", description: "All open intervals at one taproom, numbered first; frozen size, fill, safe SKU and brand labels, stock flag and opening actor ID/name/time. Missing actor names read staff. No POS yield or remaining-volume estimate",
   input: z.object({ locationId: z.string().uuid() }), roles: [...COUNT_ROLES],
   handler: (ctx,i) => unwrap(ctx.db.rpc("list_open_taps", { p_brewery: ctx.breweryId, p_location: i.locationId })),
 });
 defineQuery({
-  name: "list_tap_history", description: "The latest 50 closed intervals at one taproom with opening and closing actor IDs, safe handles, times, frozen nominal size, fill and reason",
+  name: "list_tap_history", description: "The latest 50 closed intervals at one taproom with opening and closing actor IDs, names (staff when missing), times, frozen nominal size, fill and reason",
   input: z.object({ locationId: z.string().uuid() }), roles: [...COUNT_ROLES],
   handler: (ctx,i) => unwrap(ctx.db.rpc("list_tap_history", { p_brewery: ctx.breweryId, p_location: i.locationId })),
 });

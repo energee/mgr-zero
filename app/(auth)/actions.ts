@@ -12,7 +12,7 @@ import { z } from "zod";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createRequestAuthContext, homePath } from "@/lib/auth/request-context";
-import { acceptInviteErrorPath, hasPendingInvitations, inviteAudience, inviteLanding } from "@/lib/auth/invite";
+import { acceptInviteErrorPath, inviteAudience, inviteLanding, signInDestination } from "@/lib/auth/invite";
 import { passwordReturnHref } from "@/lib/mgr/entry-view";
 import { hasRecentRecovery, PASSWORD_SAVED_COOKIE, passwordChangeErrors, signInPath } from "@/lib/auth/password";
 import { createServerClient, verifyCurrentPassword } from "@/lib/supabase/server";
@@ -21,18 +21,19 @@ import { createServerClient, verifyCurrentPassword } from "@/lib/supabase/server
 const SELECTION_COOKIE = { path: "/", sameSite: "lax" } as const;
 
 export async function login(form: FormData) {
+  const email = String(form.get("email") ?? "");
+  const back = signInPath(Boolean(form.get("portal")));
+  const failure = `${back}?error=1&email=${encodeURIComponent(email)}`;
   const db = await createServerClient();
   const { error } = await db.auth.signInWithPassword({
-    email: String(form.get("email")),
+    email,
     password: String(form.get("password")),
   });
-  const back = signInPath(Boolean(form.get("portal")));
-  if (error) redirect(`${back}?error=1`);
+  if (error) redirect(failure);
   const auth = createRequestAuthContext(() => Promise.resolve(db));
   const identity = await auth.getIdentity();
-  if (!identity) redirect(`${back}?error=1`);
-  const [pending, destination] = await Promise.all([hasPendingInvitations(db, identity.userId), homePath(auth)]);
-  redirect(pending ? "/invitations" : destination);
+  if (!identity) redirect(failure);
+  redirect(await signInDestination(auth));
 }
 
 /** Passwordless sign-in validates email even when browser validation is unavailable. */

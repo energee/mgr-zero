@@ -7,7 +7,7 @@ import { approvalDate } from "./brand-view";
 import type { EmptyState } from "./empty-state";
 import type { BrandSort } from "./enums";
 import { BRAND_SORTS } from "./enums";
-import { BRAND_SORT_LABEL } from "./labels";
+import { BRAND_SORT_LABEL, COLA_NOT_ON_FILE } from "./labels";
 import { plural } from "./plural";
 
 /** One brand row's facts, each drawn in its own column. */
@@ -22,8 +22,9 @@ export type CatalogBrandView = {
   abv: string;
   /** Saved packaged SKUs, active or not; eligible formats and pours are not SKUs. */
   skus: string;
-  /** Recorded COLA approvals: "None", one's TTB ID and approval date, or "2 on file". */
+  /** Recorded COLA approvals: "None on file", one's TTB ID and approval date, or "2 on file". */
   cola: string;
+  image?: { url: string; ttbId: string };
   href: string;
 };
 
@@ -46,7 +47,7 @@ export type CatalogBrandRow = {
   styles: { name: string } | null;
   skus: { id: string }[];
   pours?: { id: string }[];
-  colas: Pick<Approval, "ttb_id" | "approved_on">[];
+  colas: (Pick<Approval, "ttb_id" | "approved_on"> & { id?: string; image_url?: string | null })[];
 };
 
 export type CatalogSnapshot = {
@@ -61,13 +62,20 @@ export type CatalogSnapshot = {
 /** A brand's missing style or ABV; Catalog sorts it as empty (last). */
 export const NOT_SET = "Not set";
 
-/** Shows only saved COLAs: "None", one COLA's TTB ID and date, or a count when
+/** Shows only saved COLAs: "None on file", one COLA's TTB ID and date, or a count when
  *  there are several (the brand page lists each). */
 function colaFact(colas: CatalogBrandRow["colas"]): string {
-  if (colas.length === 0) return "None";
+  if (colas.length === 0) return COLA_NOT_ON_FILE;
   if (colas.length > 1) return `${colas.length} on file`;
   const { ttb_id, approved_on } = colas[0]!;
   return `TTB ID ${ttb_id} · ${approvalDate(approved_on)}`;
+}
+
+/** A label without an approval date is not an approved catalog image. */
+function latestColaImage(colas: CatalogBrandRow["colas"]): CatalogBrandView["image"] {
+  const latest = colas.filter(cola => cola.approved_on && cola.image_url)
+    .sort((a, b) => b.approved_on!.localeCompare(a.approved_on!) || b.ttb_id.localeCompare(a.ttb_id))[0];
+  return latest ? { url: latest.image_url!, ttbId: latest.ttb_id } : undefined;
 }
 
 export function toCatalogViewProps({
@@ -90,6 +98,7 @@ export function toCatalogViewProps({
       abv: b.abv == null || b.abv === "" ? NOT_SET : `${Number(b.abv)}%`,
       skus: String(b.skus.length),
       cola: colaFact(b.colas),
+      image: latestColaImage(b.colas),
       href: `/catalog/brands/${b.id}`,
     })),
     priceGroups: priceGroups.length === 0 ? "0 groups · Create one to price your brands" : plural(priceGroups.length, "group"),

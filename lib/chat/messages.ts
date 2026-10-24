@@ -10,14 +10,14 @@ export function composerMessageText(message: Message) {
   }).join("");
 }
 
-/** Operator-facing text for a proposal the drawer cannot show; the schema detail goes to the console. */
-export const PROPOSAL_ERROR = "MGR proposed a change this drawer cannot confirm. Nothing was recorded. Ask again, or use Record movement on Inventory.";
+/** Operator-facing text for a proposal the panel cannot show; the schema detail goes to the console. */
+export const PROPOSAL_ERROR = "MGR proposed a change this panel cannot confirm. Nothing was recorded. Ask again, or use Record movement on Inventory.";
 
 /**
  * The record_movement proposal awaiting confirmation in the newest assistant
  * message, or an operator error when that proposal fails composerProposal. The
  * agent can propose any AI-exposed command (ChatCommandProposal in
- * lib/chat/agent.ts), but the drawer renders and commits only record_movement,
+ * lib/chat/agent.ts), but the panel renders and commits only record_movement,
  * so anything else returns `error` and never reaches the commit button. Only
  * the newest assistant message counts: a later reply supersedes an older
  * proposal, valid or not. Returns a value rather than throwing because the

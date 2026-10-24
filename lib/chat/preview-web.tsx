@@ -19,11 +19,11 @@ const TONE_CLASS = { neutral: "text-muted-foreground", healthy: "text-success-fo
 const BTN = "inline-flex min-h-6 min-w-6 items-center rounded border px-3 py-1 text-sm";
 
 function Action({ action }: { action: PortableAction }) {
-  const disabled = !action.enabled;
   return (
-    <button data-preview-action type="button" className={BTN + (disabled ? " opacity-60" : "")} aria-disabled={disabled || undefined}>
+    <button data-preview-action type="button" className={BTN + " cursor-not-allowed opacity-60"} disabled aria-disabled="true">
       {action.label}
-      {disabled && action.disabledReason ? <small className="ml-2 text-xs">{action.disabledReason}</small> : null}
+      <small className="ml-2 text-xs">Preview</small>
+      {action.disabledReason ? <small className="ml-2 text-xs">{action.disabledReason}</small> : null}
     </button>
   );
 }
@@ -59,7 +59,7 @@ export function ChatPreview({ fixture }: { fixture: ChatPreviewFixture }) {
       {fixture.items.length > 0 ? <ul className="list-none">{fixture.items.map((item) => <Item key={item.resolutionKey} item={item} />)}</ul> : null}
       {fixture.gated ? (
         <div className="flex flex-col gap-1">
-          <button data-preview-action type="button" className={BTN + " opacity-60"} aria-disabled="true">{fixture.gated.label}</button>
+          <button data-preview-action type="button" className={BTN + " cursor-not-allowed opacity-60"} disabled aria-disabled="true">{fixture.gated.label}<small className="ml-2 text-xs">Preview</small></button>
           <small className="text-xs text-muted-foreground">{fixture.gated.reason}</small>
         </div>
       ) : null}
