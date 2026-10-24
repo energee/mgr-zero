@@ -19,6 +19,8 @@ export const brandLabel = nameWithAlias;
 /** A header badge: "w" is a warning; href makes it a jump link (COLA pending → Compliance). */
 export type BrandBadge = { key: string; label: string; tone: "" | "w"; href?: string };
 
+type BrandComplianceRow = RegistryRowView & { image?: { ttbId: string; url: string } };
+
 export type BrandViewModel = {
   backHref?: string;
   /** The saved name and alias, so the title (like the badges) does not follow the typing; "New brand" before the first save. */
@@ -45,7 +47,7 @@ export type BrandViewModel = {
   /** One switch per packaged format, the packages inside the switched-on ones, and the group's pours. */
   sells: BrandSellsModel;
   /** The brand's own compliance: its COLA/formula approvals and state registrations; a pending row when no COLA is on file. */
-  compliance: RegistryRowView[];
+  compliance: BrandComplianceRow[];
 };
 
 /** The select value for "no price group": the Select kit's own sentinel, never a name a real group could carry. */
@@ -86,14 +88,16 @@ export function approvalDate(approvedOn: string | null): string {
   return approvedOn ? `approved ${formatDate(approvedOn)}` : "approval date unknown";
 }
 
-/** A COLA is listed by its TTB ID (with its serial when known) and never expires; a formula keeps its TTB number; registrations do expire. */
-export function brandComplianceRows({ approvals, registrations }: NonNullable<BrandSnapshot["compliance"]>): RegistryRowView[] {
-  const rows: RegistryRowView[] = [
+/** COLAs keep their identifiers and optional dated label image; only registrations expire. */
+export function brandComplianceRows({ approvals, registrations }: NonNullable<BrandSnapshot["compliance"]>): BrandComplianceRow[] {
+  const rows: BrandComplianceRow[] = [
     ...approvals.map((approval) => ({
       key: approval.id,
       title: approval.kind === "cola" ? `COLA TTB ID ${approval.ttb_id}` : `Formula ${approval.ttb_id}`,
       detail: [approvalDate(approval.approved_on), approval.serial_number && `serial ${approval.serial_number}`].filter(Boolean).join(" · "),
       verb: "Edit",
+      ...(approval.kind === "cola" && approval.approved_on && approval.image_url
+        ? { image: { ttbId: approval.ttb_id, url: approval.image_url } } : {}),
     })),
     ...registrations.map((registration) => ({
       key: registration.id,
