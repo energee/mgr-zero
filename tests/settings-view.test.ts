@@ -5,8 +5,9 @@
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { booksOpenedChange, oneWayKegFeeChange, toBrewerySettingsValues, breweryOperatingDefaultsCommand } from "@/lib/mgr/settings-view";
+import { booksOpenedChange, oneWayKegFeeChange, toBrewerySettingsValues, breweryOperatingDefaultsCommand, brewerySettingsReason, refreshBrewerySettingsValues, aiModelSettingsReason } from "@/lib/mgr/settings-view";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
+import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
 import { SettingsView } from "@/components/mgr/views/settings";
 import { PortalFulfillmentView } from "@/components/mgr/views/portal-fulfillment";
 import { settingsDemo } from "@/lib/mgr/fixtures/settings";
@@ -22,6 +23,83 @@ const brewery = {
   pa_license_no: settingsDemo.paLicense, customer_phone: settingsDemo.phone,
   fermentation_reading_due_hours: 24, days_to_package: 14, books_opened_on: null, one_way_keg_fee_cents: 1000,
 };
+
+describe("Settings save readiness (#1316)", () => {
+  const initial = toBrewerySettingsValues(brewery);
+
+  it("requires an actual change and returns to pristine after reverting", () => {
+    expect(brewerySettingsReason(initial, initial)).toBe("Still needed: a change to brewery details.");
+    expect(brewerySettingsReason({ ...initial, name: "New brewery" }, initial)).toBeNull();
+    expect(brewerySettingsReason({ ...initial, name: ` ${initial.name} `, hours: "024" }, initial)).toContain("a change");
+    expect(brewerySettingsReason({ ...initial }, initial)).toContain("a change");
+  });
+
+  it("names missing details and the actual numeric ranges", () => {
+    expect(brewerySettingsReason({ ...initial, name: "   " }, initial)).toContain("a brewery name");
+    expect(brewerySettingsReason({ ...initial, timezone: "" }, initial)).toContain("a timezone");
+    for (const hours of ["", "0", "169", "1.5"]) {
+      expect(brewerySettingsReason({ ...initial, hours }, initial)).toContain("reading overdue hours from 1 to 168 (whole numbers)");
+    }
+    for (const daysToPackage of ["", "0", "121", "500", "1.5"]) {
+      expect(brewerySettingsReason({ ...initial, daysToPackage }, initial)).toContain("days to package from 1 to 120 (whole numbers)");
+    }
+    for (const daysToPackage of ["1", "120"]) {
+      expect(brewerySettingsReason({ ...initial, daysToPackage }, initial)).toBeNull();
+    }
+  });
+
+  it("refreshes untouched fields without dropping unsaved or uncertain edits", () => {
+    const values = { ...initial, name: "Unsaved brewery" };
+    const refreshed = { ...initial, hours: "48" };
+    expect(refreshBrewerySettingsValues(initial, values, refreshed)).toEqual({ ...refreshed, name: values.name });
+    const saved = { ...refreshed, name: values.name };
+    expect(brewerySettingsReason(refreshBrewerySettingsValues(refreshed, values, saved), saved)).toBeNull();
+  });
+
+  it("requires a changed available AI model without rejecting an unchanged saved model", () => {
+    const models = [{ id: "openai/gpt-5", name: "GPT-5" }];
+    expect(aiModelSettingsReason("old/model", "old/model", models)).toContain("a change");
+    expect(aiModelSettingsReason("openai/gpt-5", "old/model", models)).toBeNull();
+    expect(aiModelSettingsReason("", "old/model", models)).toContain("an available AI model");
+    expect(aiModelSettingsReason("not/available", "old/model", models)).toContain("an available AI model");
+    expect(aiModelSettingsReason("old/model", "old/model", [])).toContain("the Gateway model catalog");
+  });
+
+  it("withholds pristine submits in the shared inventory and names the reason", () => {
+    const html = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo }));
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Save brewery/);
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Save AI model/);
+    expect(html).toContain("Still needed: a change to brewery details.");
+    expect(html).toContain("Still needed: a change to the AI model.");
+  });
+
+  it("blocks pristine and pending brewery saves at the live adapter", () => {
+    action.run.mockReset();
+    const live = SettingsForm({ brewery });
+    live.props.onSave(live.props.initial);
+    expect(action.run).not.toHaveBeenCalled();
+    action.busy = true;
+    const pending = SettingsForm({ brewery });
+    pending.props.onSave({ ...pending.props.initial, name: "Changed" });
+    expect(action.run).not.toHaveBeenCalled();
+    action.busy = false;
+  });
+
+  it("guards AI Enter submission for pristine, invalid, pending and changed choices", () => {
+    const models = [{ id: "openai/gpt-5", name: "GPT-5" }];
+    for (const [value, busy, expected] of [["old/model", false, 0], ["missing/model", false, 0], ["openai/gpt-5", true, 0], ["openai/gpt-5", false, 1]] as const) {
+      const onSubmit = vi.fn();
+      let form: ReactElement<{ onSubmit: (event: { preventDefault: () => void }) => void }> | undefined;
+      function Capture() {
+        form = AiModelSettingsView({ value, initial: "old/model", models, busy, onSubmit });
+        return form;
+      }
+      renderToStaticMarkup(createElement(Capture));
+      form!.props.onSubmit({ preventDefault: vi.fn() });
+      expect(onSubmit).toHaveBeenCalledTimes(expected);
+    }
+  });
+});
 
 
 describe("packaging operating defaults", () => {
