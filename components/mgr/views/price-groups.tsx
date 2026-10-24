@@ -51,8 +51,8 @@ export function PriceCellInput({ label, value, onChange, onCommit, disabled, err
         </InputGroup>
         {children}
       </div>
-      {error ? <p id={feedbackId} role="alert" className="max-w-40 text-right text-xs text-destructive">{error}</p>
-        : status ? <p id={feedbackId} role="status" className="max-w-40 text-right text-xs text-muted-foreground">{status}</p> : null}
+      {error ? <p id={feedbackId} role="alert" className="max-w-40 whitespace-normal text-right text-xs text-destructive">{error}</p>
+        : status ? <p id={feedbackId} role="status" className="max-w-40 whitespace-normal text-right text-xs text-muted-foreground">{status}</p> : null}
     </form>
   );
 }

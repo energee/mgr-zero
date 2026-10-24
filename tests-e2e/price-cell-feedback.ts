@@ -59,6 +59,7 @@ try {
   leaveThroughClear("");
   waitStatus("Price unchanged. Use Clear and confirm to remove it.");
   assert.equal(readValue(), changed, "Blank keyboard departure must restore the persisted price");
+  assert.equal(ab("eval", `(() => { const feedback = ${cellExpression}.querySelector('[role=status]'); return feedback.scrollWidth <= feedback.clientWidth; })()`).result, true, "Restoration feedback must wrap inside its cell");
   loadCell();
   assert.equal(readValue(), changed);
 
@@ -66,6 +67,7 @@ try {
     leaveThroughClear(invalid);
     ab("wait", "--fn", `${inputExpression}?.getAttribute('aria-invalid') === 'true' && Boolean(${cellExpression}?.querySelector('[role=alert]'))`);
     assert.equal(readValue(), invalid, "Invalid draft must remain available to correct");
+    assert.equal(ab("eval", `(() => { const feedback = ${cellExpression}.querySelector('[role=alert]'); return feedback.scrollWidth <= feedback.clientWidth; })()`).result, true, "Validation must wrap inside its cell");
     loadCell();
     assert.equal(readValue(), changed, "Invalid draft must not replace the saved price");
   }
