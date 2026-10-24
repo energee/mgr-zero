@@ -121,7 +121,7 @@ describe("POS UI truth", () => {
   it("describes Square's own QuickBooks feed as taproom sales, not a second provider (#1151)", () => {
     const pos = renderToStaticMarkup(createElement(PointOfSaleView, { model: { connected: false, merchant: "", state: "Not connected" }, paths: { connector: "/settings/pos/connector" } }));
     expect(pos).toMatch(/<a[^>]*href="\/settings\/pos\/connector"[^>]*>(?:(?!<\/a>)[\s\S])*Taproom sales in QuickBooks/);
-    const connector = renderToStaticMarkup(createElement(SquareConnectorView, { accountingHref: "/settings/accounting" }));
+    const connector = renderToStaticMarkup(createElement<{ accountingHref?: string }>(SquareConnectorView, { accountingHref: "/settings/accounting" }));
     expect(connector).toMatch(/href="\/settings\/accounting"[^>]*>Open Accounting/);
     const connect = renderToStaticMarkup(createElement(ConnectSquareView, { configured: false }));
     expect(connect).toContain("Square isn’t turned on in MGR yet.");
