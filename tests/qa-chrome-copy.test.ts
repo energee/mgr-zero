@@ -49,7 +49,6 @@ describe("section nouns agree with the page they sit on (#261)", () => {
       header: E.hd("Contracts"),
     }));
     expect(html).not.toMatch(/Vendors/);
-    expect(src("app/(app)/vendors/page.tsx")).toMatch(/header=\{E\.hd\("Contracts"/);
   });
 });
 

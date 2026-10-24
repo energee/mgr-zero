@@ -69,7 +69,7 @@ describe("Catalog view", () => {
   });
 
   // #965: only recorded COLA approvals (list_brands already left formulas out) decide the cell.
-  it("says None, one COLA's TTB ID and date, or how many are on file", () => {
+  it("says None on file, one COLA's TTB ID and date, or how many are on file", () => {
     const brand = { abv: null, styles: null, skus: [] };
     const model = toCatalogViewProps({ priceGroups: [], brands: [
       { ...brand, id: "none", name: "None", colas: [] },
@@ -78,7 +78,7 @@ describe("Catalog view", () => {
       { ...brand, id: "two", name: "Two", colas: [{ ttb_id: "26001001000124", approved_on: null }, { ttb_id: "26001001000125", approved_on: "2026-01-15" }] },
     ] });
     expect(model.brands.map(({ cola }) => cola)).toEqual([
-      "None",
+      "None on file",
       "TTB ID 00123456789012 · approved Oct 2, 2026",
       "TTB ID 26001001000123 · approval date unknown",
       "2 on file",
@@ -365,14 +365,14 @@ describe("Brand view", () => {
     expect(model.priceGroup).toBe(UNPRICED);
   });
 
-  it("puts the pending COLA row first even when registrations exist", () => {
+  it("puts the missing COLA row first even when registrations exist", () => {
     const model = toBrandViewProps({ ...brandHazy, compliance: { approvals: [], registrations: brandHazy.compliance!.registrations } });
-    expect(model.compliance.map((row) => row.key)).toEqual(["cola-pending", "oh"]);
+    expect(model.compliance.map((row) => row.key)).toEqual(["cola-missing", "oh"]);
   });
 
-  it("flags a brand with no COLA as pending, with nothing to edit", () => {
+  it("reports no COLA on file without claiming an application is pending", () => {
     const model = toBrandViewProps({ ...brandHazy, compliance: { approvals: [], registrations: [] } });
-    expect(model.compliance).toEqual([{ key: "cola-pending", title: "COLA", detail: "pending", warning: true }]);
+    expect(model.compliance).toEqual([{ key: "cola-missing", title: "COLA", detail: "None on file" }]);
   });
 
   it("renders the field row without a React key warning (E.cols owns the keys)", () => {
@@ -451,7 +451,7 @@ describe("Brand view", () => {
     ]);
     const bare = toBrandViewProps({ ...brandHazy, compliance: { approvals: [], registrations: [] }, brand: { ...brandHazy.brand, price_group_id: null, category: null, skus: [], pours: [] } });
     expect(bare.badges).toEqual([
-      { key: "cola", label: "COLA pending", tone: "w", href: "#compliance" },
+      { key: "cola", label: "COLA · None on file", tone: "", href: "#compliance" },
       { key: "group", label: "Unpriced", tone: "w" },
     ]);
   });

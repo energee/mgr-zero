@@ -329,6 +329,8 @@ export type Screen = {
   /** Default page; other surfaces use the same entry, form, or chat wrapper as live. */
   surface?: "page" | "sheet" | "entry" | "composer";
   name: string;
+  /** Action-specific sheet title when the inventory record describes both New and Edit. */
+  sheetTitle?: string;
   job: ReactNode;
   reads: ReactNode;
   writes: ReactNode;
@@ -348,7 +350,7 @@ export type Screen = {
    * (`Adjust` on Order opens Short pick); the global rules in
    * lib/mgr/screen-links.ts cover labels that always mean the same screen. */
   to?: Record<string, string>;
-  /** Entry-screen header (mark + product name); sheets take their title from `name`. */
+  /** Entry-screen header (mark + product name); sheets use `sheetTitle` or `name`. */
   hd?: ReactNode;
   body: ReactNode;
 };
@@ -1319,6 +1321,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Ship-to form",
+    sheetTitle: "Edit ship-to",
     job: "Create or edit one delivery address for a customer",
     reads: "get_customer",
     writes: "upsert_ship_to",
@@ -1529,8 +1532,8 @@ export const SCREENS: Screen[] = [
     job: "Sellable brand facts and compliance, including selected COLA label images",
     reads: "list_brands [incl. the staff-only alias, SKUs and pours] · list_catalog_categories · list_formats [packaged, with contents] · list_channel_prices · list_sale_channels · list_keg_pools · get_compliance_registry [this brand’s approvals and registrations] · get_brand_recipe_cost [recipe cost per barrel and any uncosted ingredient] · get_cola_image",
     writes: "upsert_brand · save_catalog_category · delete_catalog_category · update_sku · create_sku · upsert_brand_approval · upsert_state_registration",
-    states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["sells as", "one switch per packaged Format · on creates the SKU or turns it back on"], ["switched off", "the SKU turns inactive, never deleted: hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"], ["COLA pending", "no approval on file: the brand is flagged until one is added", 1], ["suggested group", "the recipe cost lands in a ceiling band · Use fills the select, Save brand commits"], ["cost unknown", "an ingredient has no receipt cost yet: the sum is not shown as a cost", 1], ["saved first", "SKUs and compliance wait until the brand is saved; the first save moves to its page"], ["badges", "COLA pending jumps to Compliance; price group or Unpriced, category, active SKU count"]],
-    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. Sells as lists every packaged Format with a switch: on means the brand sells it, which is an active SKU, and Edit SKU opens that SKU's sheet (UPC, keg pool, batch share). Under the switches, each switched-on Format's contents read as lines (Four Pack · 6 per Case), then the price group's pours. A pour is a serving from the tap, not a SKU: the menu publishes brand × pour to Square, and a sale depletes the keg SKU. Every line shows its price per sale channel; prices and pours are edited on the price group. No container source editor here. Compliance is the brand’s: its COLA or formula approvals and its state registrations list under the sell sheet, each row opening its sheet, with Add approval and Add registration; a brand with no COLA is flagged pending. Manage categories opens beside Category: Admin and Sales can add, rename across all brands, and confirm deletion of unused categories. Uncategorized clears a brand’s assignment when saved. The brewery’s own licenses are the Licenses page under Compliance, never a brand row. Under the price group, the brand’s recipe cost per barrel (its last brewed version, else its newest) is read against the groups’ ceilings and names the band it falls in; Use only fills the select. A recipe with an ingredient that has never been received has no trustworthy cost, so the row says which ingredient instead of a number. No recipe, no row.",
+    states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["sells as", "one switch per packaged Format · on creates the SKU or turns it back on"], ["switched off", "the SKU turns inactive, never deleted: hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"], ["COLA · None on file", "no recorded COLA; no application status inferred"], ["suggested group", "the recipe cost lands in a ceiling band · Use fills the select, Save brand commits"], ["cost unknown", "an ingredient has no receipt cost yet: the sum is not shown as a cost", 1], ["saved first", "SKUs and compliance wait until the brand is saved; the first save moves to its page"], ["badges", "missing COLA jumps to Compliance; price group or Unpriced, category, active SKU count"]],
+    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. Sells as lists every packaged Format with a switch: on means the brand sells it, which is an active SKU, and Edit SKU opens that SKU's sheet (UPC, keg pool, batch share). Under the switches, each switched-on Format's contents read as lines (Four Pack · 6 per Case), then the price group's pours. A pour is a serving from the tap, not a SKU: the menu publishes brand × pour to Square, and a sale depletes the keg SKU. Every line shows its price per sale channel; prices and pours are edited on the price group. No container source editor here. Compliance is the brand’s: its COLA or formula approvals and its state registrations list under the sell sheet, each row opening its sheet, with Add approval and Add registration; a brand with no recorded COLA says None on file, as Catalog does. Manage categories opens beside Category: Admin and Sales can add, rename across all brands, and confirm deletion of unused categories. Uncategorized clears a brand’s assignment when saved. The brewery’s own licenses are the Licenses page under Compliance, never a brand row. Under the price group, the brand’s recipe cost per barrel (its last brewed version, else its newest) is read against the groups’ ceilings and names the band it falls in; Use only fills the select. A recipe with an ingredient that has never been received has no trustworthy cost, so the row says which ingredient instead of a number. No recipe, no row.",
     body: <BrandView model={toBrandViewProps(brandHazy)} images={{ cola: <ColaLabelImageView label="Hazy IPA · COLA 25318001000034" src="/mock/cola-label.svg" /> }} categoryAction={<CatalogCategoriesFixture categories={toBrandViewProps(brandHazy).categoryOptions} />} />,
   },
   {
@@ -2114,6 +2117,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Vendor",
+    sheetTitle: "Edit vendor",
     to: { "Save vendor": "Vendors" },
     job: "Create or edit one supplier and its purchase terms",
     reads: "list_vendors_and_contracts",
@@ -2141,6 +2145,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Contract",
+    sheetTitle: "Edit contract",
     to: { Vendor: "Entity picker", Material: "Entity picker", "Save contract": "Contracts" },
     job: "Create or edit one material purchasing commitment",
     reads: "list_materials · list_vendors_and_contracts",
@@ -2412,6 +2417,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "License",
+    sheetTitle: "Edit license",
     to: { "Save license": "Licenses" },
     job: "Record one brewery state license",
     reads: "get_compliance_registry",
