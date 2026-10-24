@@ -3,12 +3,21 @@
 // replenishment order still need, and which order lines are sent.
 import { submitReason } from "@/lib/mgr/submit-reason";
 
+/** Matches the quantity columns' numeric(12,2) range, without banning the
+ * command's fractional inputs: storage rounds them to two decimal places. */
+export function replenishmentQuantityError(qty: string): string | undefined {
+  if (/[eE]/.test(qty)) return "Enter a decimal number without exponent notation.";
+  const value = Number(qty);
+  if (!qty.trim() || !Number.isFinite(value) || value < 0) return "Enter a quantity of zero or more.";
+  if (value > 9999999999.99) return "Enter a quantity no greater than 9,999,999,999.99.";
+}
+
 /** Par and standing allocation need a SKU and a finite quantity of zero or
  *  more. Empty input must not silently become zero and release a reservation. */
 export function replenishmentQuantityReason(skuId: string, qty: string): string | null {
   const missing: string[] = [];
   if (!skuId) missing.push("a SKU");
-  if (!(qty.trim() !== "" && Number.isFinite(Number(qty)) && Number(qty) >= 0)) missing.push("a quantity of zero or more");
+  if (replenishmentQuantityError(qty)) missing.push("a quantity of zero or more");
   return submitReason(missing);
 }
 

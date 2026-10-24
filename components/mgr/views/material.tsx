@@ -3,6 +3,7 @@ import { E } from "@/components/mgr/e";
 import { NONE } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import type { MaterialViewModel } from "@/lib/mgr/material-view";
+import { sentenceCase } from "@/lib/mgr/labels";
 import type { ReactNode } from "react";
 import { Fragment } from "react";
 
@@ -18,15 +19,25 @@ const pick = (
   value: string,
   options: { value: string; label: string }[],
   change?: (value: string) => void,
+  placeholder?: string,
 ) => (
-  <Fragment key={label}>{E.pick(label, value, (options.map(option => (
-          { value: option.value, label: option.label }
-        ))), { onChange: change })}</Fragment>
+  <Fragment key={label}>{E.pick(label, value, options, { onChange: change, placeholder })}</Fragment>
 );
 
 /** Kinds whose extract feeds the recipe OG/FG/ABV prediction (#430). */
 /** Kinds whose extract potential feeds recipe gravity. */
 export const EXTRACT_KINDS = new Set(["malt", "adjunct"]);
+
+const UNIT_LABELS: Record<string, string> = {
+  lb: "Pounds (lb)",
+  kg: "Kilograms (kg)",
+  oz: "Ounces (oz)",
+  g: "Grams (g)",
+  each: "Each",
+  l: "Liters (L)",
+  gal: "Gallons (gal)",
+  ml: "Milliliters (mL)",
+};
 
 export function MaterialView({ model, controls = {}, messages, footer }: {
   model: MaterialViewModel;
@@ -34,9 +45,9 @@ export function MaterialView({ model, controls = {}, messages, footer }: {
   messages?: ReactNode;
   footer?: ReactNode;
 }) {
-  const kindOptions = model.kindOptions.map(value => ({ value, label: value }));
-  const purchaseUnitOptions = model.purchaseUnitOptions.map(value => ({ value, label: value }));
-  const unitOptions = model.unitOptions.map(value => ({ value, label: value }));
+  const kindOptions = model.kindOptions.map(value => ({ value, label: sentenceCase(value) }));
+  const purchaseUnitOptions = model.purchaseUnitOptions.map(value => ({ value, label: UNIT_LABELS[value] ?? value }));
+  const unitOptions = model.unitOptions.map(value => ({ value, label: UNIT_LABELS[value] ?? value }));
   const defaultVendorOptions = [
     { value: NONE, label: "None" },
     ...model.defaultVendorOptions.map(({ id, label }) => ({ value: id, label })),
@@ -48,7 +59,7 @@ export function MaterialView({ model, controls = {}, messages, footer }: {
   return (
     <>
       {E.edit("Material name", model.name, "text", undefined, { onChange: controls.name, required: Boolean(controls.name) })}
-      {pick("Kind", model.kind, kindOptions, controls.kind)}
+      {pick("Kind", model.kind, kindOptions, controls.kind, "Select kind")}
       {E.inline(
         pick("Base unit", model.unit, unitOptions, controls.unit),
         pick("Purchase unit", model.purchaseUnit, purchaseUnitOptions, controls.purchaseUnit),

@@ -57,7 +57,7 @@ describe("persona", () => {
     const team = renderToStaticMarkup(createElement("div", null, by("Team").body));
     for (const p of PERSONAS) {
       expect(team, `${p.name} is not on Team`).toContain(p.name);
-      expect(team, `${p.name} has another role on Team`).toContain(`${p.handle} · ${p.roles.map(sentenceCase).join(", ")}`);
+      expect(team, `${p.name} has another role on Team`).toContain(`${p.handle.slice(1)}@demobrewing.com · ${p.roles.map(sentenceCase).join(", ")}`);
       if (p.avatar) expect(team, `${p.name}'s face differs on Team`).toContain(p.avatar);
     }
   });
@@ -121,9 +121,10 @@ describe("persona", () => {
     expect(denied).toContain("You do not have access to Pick sheet.");
     expect(denied).toContain("@ted · sales");
     expect(denied).toContain("admin or warehouse");
-    expect(html("Orders")).not.toContain(">Pick<");
+    const pickAction = /<(?:button|a)\b[^>]*data-row-action[^>]*>Pick<\/(?:button|a)>/;
+    expect(html("Orders")).not.toMatch(pickAction);
     const warehouse = renderToStaticMarkup(createElement("div", null, asPersona(by("Orders"), personaFor("warehouse")).body));
-    expect(warehouse).toContain(">Pick<");
+    expect(warehouse).toMatch(pickAction);
     expect(warehouse).toContain(">Put back<");
     expect(warehouse).not.toContain(">Confirm<");
     expect(warehouse).not.toContain(">New order<");

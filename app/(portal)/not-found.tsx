@@ -3,6 +3,8 @@
 // Real failures still go to error.tsx.
 import Link from "next/link";
 
+export const metadata = { title: "Not found" };
+
 export default function PortalNotFound() {
   return (
     <div className="flex flex-col gap-2 text-sm">

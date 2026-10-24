@@ -109,7 +109,7 @@ describe("per-form reasons", () => {
     expect(orderFormReadiness({ ...base, customerId: "", shipToId: "", fromLocationId: "", lines: [{ skuId: "", qty: "" }] }).reason)
       .toBe("Still needed: a customer, a source location, and a SKU with a quantity above zero on each line.");
     expect(orderFormReadiness({ ...base, shipToId: "" }).reason).toBe("Still needed: a ship-to.");
-    expect(orderFormReadiness({ ...base, kind: "taproom_transfer" }).reason).toBe("Still needed: a To location.");
+    expect(orderFormReadiness({ ...base, kind: "taproom_transfer" }).reason).toBe("Still needed: a destination location.");
     expect(orderFormReadiness({ ...base, lines: [{ skuId: "gone", qty: "2" }] })).toMatchObject({ submittable: false, reason: "Still needed: an available SKU on each line." });
   });
 
@@ -147,14 +147,15 @@ describe("per-form reasons", () => {
   });
 
   it("Save vessel needs a name and a capacity above zero (#1116)", () => {
-    expect(vesselReason({ name: " ", capacity: "" })).toBe("Still needed: a name and a capacity above zero.");
-    expect(vesselReason({ name: "FV9", capacity: "0" })).toBe("Still needed: a capacity above zero.");
+    expect(vesselReason({ name: " ", capacity: "" })).toBe("Still needed: a name and a valid capacity.");
+    expect(vesselReason({ name: "FV9", capacity: "0" })).toBe("Still needed: a valid capacity.");
     expect(vesselReason({ name: "FV9", capacity: "15.5" })).toBeNull();
   });
 
   it("Vessel capacity marks a typed value that is not above zero, never a blank one (#1116)", () => {
     expect(vesselCapacityError("")).toBeUndefined();
-    for (const capacity of ["0", "-2", "abc"]) expect(vesselCapacityError(capacity)).toBe("Enter a capacity above zero.");
+    for (const capacity of ["0", "-2", "0.0001"]) expect(vesselCapacityError(capacity)).toBe("Capacity must be at least 0.001 bbl.");
+    expect(vesselCapacityError("abc")).toBe("Enter a valid capacity in bbl.");
     expect(vesselCapacityError("0.5")).toBeUndefined();
   });
 
@@ -292,12 +293,18 @@ describe("line errors in the views", () => {
     expect(markup).not.toContain('aria-invalid="true"');
   });
 
+  it.each(["wholesale", "taproom_transfer"] as const)("a live %s order waits for line interaction before marking either field", kind => {
+    const model = { ...toNewOrderViewProps(newOrderDraft), kind, lines: [{ name: "", skuId: "", qty: "-2", warning: false }] };
+    const markup = html(createElement(NewOrderView, { model, controls: { lineQty: () => {} } }));
+    expect(markup).not.toMatch(/Line 1:|aria-invalid="true"/);
+  });
+
   it("a drawn vessel capacity of 0 is marked at the field; a live one waits for the user to leave it (#1116)", () => {
     const drawn = html(createElement(VesselDetailView, { model: { ...vesselFv3, capacity: "0" } }));
-    const errorId = drawn.match(/id="([^"]+-error)"[^>]*>Enter a capacity above zero\.</)?.[1];
+    const errorId = drawn.match(/id="([^"]+-error)"[^>]*>Capacity must be at least 0\.001 bbl\.</)?.[1];
     expect(errorId).toBeTruthy();
     expect(drawn).toMatch(new RegExp(`aria-describedby="${errorId}"`));
-    expect(html(createElement(VesselDetailView, { model: { ...vesselFv3, capacity: "0" }, onCapacity: () => {} }))).not.toContain("Enter a capacity above zero.");
+    expect(html(createElement(VesselDetailView, { model: { ...vesselFv3, capacity: "0" }, onCapacity: () => {} }))).not.toContain("Capacity must be at least 0.001 bbl.");
   });
 
   it("an empty picker names who adds the record when this user cannot", () => {
@@ -353,13 +360,14 @@ describe("live forms withhold their submit with the reason", () => {
 
   it("New vessel, with no name or capacity (#1116)", () => {
     const model = { title: "New vessel", name: "", type: "Fermenter", typeOptions: ["Fermenter"], capacity: "" };
-    withheld(html(createElement(VesselForm, { model })), "Still needed: a name and a capacity above zero.");
+    withheld(html(createElement(VesselForm, { model })), "Still needed: a name and a valid capacity.");
   });
 
   it("Create replenishment order, with no warehouse and no lines", () => {
     withheld(html(createElement(ReplenishForm, {
       model: { locationId: "t", locationName: "Taproom", locations: [{ value: "t", label: "Taproom" }], warehouses: [], suggestions: [], allocations: [], shortfalls: [], canEdit: true },
       skus: [],
+      workHrefs: {},
     })), "Still needed: a warehouse to send from and a transfer quantity above zero.");
   });
 });

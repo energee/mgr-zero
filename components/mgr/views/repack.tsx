@@ -13,8 +13,8 @@ import { useId, type ReactNode } from "react";
 import { E, type PickEmpty } from "@/components/mgr/e";
 import { FieldDescription } from "@/components/ui/field";
 import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
-import { Qty } from "@/components/mgr/qty";
-import type { RepackOption, RepackViewModel } from "@/lib/mgr/repack-view";
+import { repackQuantityError, type RepackOption, type RepackViewModel } from "@/lib/mgr/repack-view";
+import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import { NO_BINS } from "./new-transfer";
 
 type FooterProps = { formId?: string; submitting?: boolean; reason?: string | null };
@@ -33,13 +33,14 @@ const pick = (id: string, label: string, value: string | undefined, options: Rep
 
 const BREAKS = "No SKU can be broken yet: a SKU breaks when its format is made of another format.";
 
-export function RepackView({ model, footer, messages, onParent, onLocation, onBin, onLot, onQuantity, submitting = false, reason }: {
+export function RepackView({ model, footer, messages, onParent, onLocation, onBin, onLot, onQuantity, submitted = false, submitting = false, reason }: {
   model: RepackViewModel; footer?: ReactNode; messages?: ReactNode;
   onParent?: (id: string) => void; onLocation?: (id: string) => void; onBin?: (id: string) => void; onLot?: (id: string) => void; onQuantity?: (value: string) => void;
-  submitting?: boolean; reason?: string | null;
+  submitted?: boolean; submitting?: boolean; reason?: string | null;
 }) {
   const id = useId();
   const untrackedHelp = useId();
+  const touched = useTouchedLines(!onQuantity || submitted);
   const noBreaks: PickEmpty = model.formatsHref === null
     ? { text: `${BREAKS} An admin or sales member sets a format's contents in Catalog.` }
     : { text: BREAKS, label: "Open Catalog", href: model.formatsHref, to: "Catalog" };
@@ -55,7 +56,8 @@ export function RepackView({ model, footer, messages, onParent, onLocation, onBi
         : E.fld("Location · bin", model.location)}
       {/* The lot the cases come out of; empty is lot-less stock, which the RPC refuses when the bin holds lotted cases. */}
       {E.pick("Lot", model.lotId ?? "", [{ value: "", label: "Untracked stock" }, ...(model.lots ?? []).map((o) => ({ value: o.id, label: o.name }))], { onChange: onLot, disabled: !model.binId, "aria-label": "Lot", "aria-describedby": untrackedHelp, description: <FieldDescription id={untrackedHelp}>Untracked stock is stock recorded without a lot. If this bin holds lotted packages, pick their lot.</FieldDescription> })}
-      <Qty label="Packages to repack" value={model.qty} unit={model.unit} onChange={onQuantity} />
+      {E.edit("Packages to repack", model.qty, "number", undefined, { id: `${id}-qty`, onChange: onQuantity, min: 0, step: "any", required: true, error: touched.shown(0) ? repackQuantityError(model.qty) : undefined, onBlur: () => touched.touch(0), "aria-describedby": `${id}-qty-help` })}
+      <FieldDescription id={`${id}-qty-help`}>{model.unit ? `Quantity in ${model.unit}. ` : ""}Fractional quantities are allowed; stored to two decimal places.</FieldDescription>
       {E.tape(model.tape)}
       {E.info(model.preview)}
       <FieldDescription>Repack doesn’t record damage. The count it adds comes from the package’s composition.</FieldDescription>
