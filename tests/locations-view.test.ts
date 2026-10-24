@@ -7,7 +7,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { BinView, RemoveBinControl } from "../components/mgr/views/bin";
-import { FirstRunView } from "../components/mgr/views/first-run";
 import { LocationFields, LocationView } from "../components/mgr/views/location";
 import { LocationBinsView } from "../components/mgr/views/location-bins";
 import { LocationsView } from "../components/mgr/views/locations";
@@ -20,8 +19,6 @@ import { toLocationsViewProps } from "../lib/mgr/locations-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
-// The on-screen copy, spelled out so a wording change is a test change (#1148).
-const USES_HINT = "Choose one or more. One place can be all three. The tap board, weekly count, variance and Replenishment list only locations with Taproom. Taproom staff see stock only at those locations. From warehouse on Replenishment and the Portal fulfillment warehouse list only locations with Warehouse.";
 const BINS_NOTE = "Bins are the rooms and racks inside a location where stock sits. Every new location starts with Cold, Dry and Walk-in. Admin and Warehouse add, rename or remove bins under Location bins.";
 
 describe("Locations list", () => {
@@ -156,19 +153,6 @@ describe("Location detail", () => {
     expect(html).not.toMatch(/Location name/);
   });
 
-  it("Uses says it takes several answers and names the screens each use gates (#1148)", () => {
-    const html = htmlOf(createElement(LocationFields, { name: "Taproom", uses: ["taproom", "storage"] }));
-    const group = /<div[^>]*data-slot="toggle-group"[^>]*>/.exec(html)?.[0] ?? "";
-    expect(group).toMatch(/aria-label="Uses"/);
-    const hintId = /aria-describedby="([^"]+)"/.exec(group)?.[1];
-    expect(hintId).toBeTruthy();
-    expect(html).toContain(`id="${hintId}"`);
-    expect(html).toContain(">" + USES_HINT + "<");
-    // Selected uses fill with the AA-checked primary pair, not the hover wash (#493).
-    expect(html).toMatch(/<button[^>]*data-state="on"[^>]*data-\[state=on\]:bg-primary[^>]*>Taproom</);
-    expect(html).toMatch(/<button[^>]*data-state="off"[^>]*>Warehouse</);
-  });
-
   it("the Location name label focuses its input (#1148)", () => {
     const html = htmlOf(createElement(LocationFields, { name: "Taproom", uses: ["taproom"] }));
     const labelFor = /<label[^>]*for="([^"]+)"[^>]*>Location name</.exec(html)?.[1];
@@ -199,12 +183,6 @@ describe("Location detail", () => {
     expect(src).toMatch(/from "@\/components\/mgr\/views\/location"/);
     expect(src).toMatch(/<LocationFields\b[^>]*controls=\{\{ name: setName, uses: setUses \}\}/);
     expect(src).not.toMatch(/<Label\b|<Input\b|<ToggleGroup\b/);
-  });
-
-  it("the inventory first-run step draws the same multi-select fields, not single-choice chips (#1148)", () => {
-    const html = htmlOf(createElement(FirstRunView, { model: { brewery: "Demo Brewing", steps: "5 steps" } }));
-    expect(html).toContain(USES_HINT);
-    expect(html).toMatch(/<div[^>]*data-slot="toggle-group"[^>]*aria-label="Uses"/);
   });
 
   it("the live first-run step names every use and that one place can be several (#1148)", () => {

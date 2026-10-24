@@ -115,9 +115,10 @@ describe("persona", () => {
     expect(denied).toContain("You do not have access to Pick sheet.");
     expect(denied).toContain("@ted · sales");
     expect(denied).toContain("admin or warehouse");
-    expect(html("Orders")).not.toContain(">Pick<");
+    const pickAction = /<(?:button|a)\b[^>]*data-row-action[^>]*>Pick<\/(?:button|a)>/;
+    expect(html("Orders")).not.toMatch(pickAction);
     const warehouse = renderToStaticMarkup(createElement("div", null, asPersona(by("Orders"), personaFor("warehouse")).body));
-    expect(warehouse).toContain(">Pick<");
+    expect(warehouse).toMatch(pickAction);
     expect(warehouse).toContain(">Put back<");
     expect(warehouse).not.toContain(">Confirm<");
     expect(warehouse).not.toContain(">New order<");

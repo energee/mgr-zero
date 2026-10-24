@@ -1,9 +1,8 @@
 "use client";
 
-// components/mgr/views/pick.tsx — the Pick sheet: one table row per format,
-// Product · Format · Ordered · Actual. The brand is named on its first row
-// only (lines arrive grouped by brand); Actual is the count field, and a count
-// below ordered shows Short beside it.
+// components/mgr/views/pick.tsx — the Pick sheet: one table row per SKU,
+// Format · Product · Ordered · Actual. The format is named on its first row
+// only; Actual is the count field, and a count below ordered shows Short.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
@@ -23,7 +22,7 @@ export function PickView({ model, footer, quantities, onQuantity, onShort, onPri
   return <>
     {E.back(model.backTo, model.title, undefined, model.backHref)}
     {E.polite(model.subtitle)}
-    {E.tbl(["Product", "Format", "Ordered", "Actual"], model.lines.map((line, i) => [
+    {E.tbl(["Format", "Product", "Ordered", "Actual"], model.lines.map((line, i) => [
       startsGroup(model.lines, i) ? E.brand(line.group) : "",
       line.name,
       line.ordered,
