@@ -1327,6 +1327,7 @@ export const SCREENS: Screen[] = [
   {
     step: 5, slice: 1, tab: "More", group: "QuickBooks Online",
     name: "Accounting unavailable",
+    to: { "QuickBooks Online": "Accounting unavailable", "Bank transfer (ACH) and card": "Accounting unavailable", "Customers missing a portal login email": "Customers missing email", Review: "Customers missing email" },
     job: "Explain that QuickBooks is not turned on before offering authorization",
     reads: "get_qbo_connection · count_customers_missing_portal_email",
     writes: "none",
@@ -1415,6 +1416,7 @@ export const SCREENS: Screen[] = [
   {
     step: 5, slice: 1, tab: "More",
     name: "Invoices unavailable",
+    to: { Connect: "Invoices unavailable", "Email delivery status": "Invoices unavailable" },
     job: "Show unavailable QuickBooks setup without implying an earlier connection",
     reads: "list_invoices · get_qbo_connection",
     writes: "none",
@@ -2681,6 +2683,7 @@ export const SCREENS: Screen[] = [
   {
     step: 7, slice: 7, tab: "More", group: "POS",
     name: "Point of sale unavailable",
+    to: { Connect: "Point of sale unavailable", Square: "Point of sale unavailable" },
     job: "Explain that Square is not turned on before opening its connection page",
     reads: "get_pos_integration_health",
     writes: "none",
