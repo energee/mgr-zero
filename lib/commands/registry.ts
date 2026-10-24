@@ -399,8 +399,10 @@ export async function runCommand(name: string, rawInput: unknown, ctx: Operation
   const allowed = canRun(ctx, name);
   if (!allowed) throw new CommandError(`permission denied: ${name} requires ${JSON.stringify(def.roles)}`, 403, "permission_denied");
   const parsed = def.input.safeParse(rawInput);
-  if (!parsed.success) throw new CommandError("Check the submitted values and try again.", 400, "invalid_input",
-    parsed.error.issues.map(issue => ({ path: issue.path.map(part => typeof part === "number" ? part : String(part)), code: issue.code, message: issue.message })));
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map(issue => ({ path: issue.path.map(part => typeof part === "number" ? part : String(part)), code: issue.code, message: issue.message }));
+    throw new CommandError(issues.map(issue => issue.message).join("; "), 400, "invalid_input", issues);
+  }
   const commandExecution = def.kind === "command" ? execution ?? createExecution() : undefined;
   if (commandExecution?.origin === "chat" && (!def.aiExposed || !def.preview || !def.requiresConfirmation
     || !commandExecution.previewToken || !commandExecution.conversationId)) {

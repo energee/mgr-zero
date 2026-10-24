@@ -9,9 +9,33 @@ it("carries structured schema issues without executing the rejected operation", 
   defineQuery({ name: "field_error_regression", roles: ["admin"], input: z.object({ email: z.email() }), handler: async () => { executed = true; } });
   const ctx: Ctx = { db: null as unknown as Ctx["db"], userId: "u", breweryId: "b", roles: ["admin"] };
   await expect(runCommand("field_error_regression", { email: "a@b" }, ctx)).rejects.toMatchObject({
-    status: 400, code: "invalid_input", message: "Check the submitted values and try again.",
+    status: 400, code: "invalid_input", message: expect.stringMatching(/email/i),
     issues: [{ path: ["email"], code: "invalid_format", message: expect.any(String) }],
   });
+  expect(executed).toBe(false);
+});
+
+it("keeps every public schema correction actionable for unmapped callers without executing", async () => {
+  let executed = false;
+  defineQuery({
+    name: "unmapped_field_error_regression", roles: ["admin"],
+    input: z.object({
+      first: z.string().min(1, "Enter the first value."),
+      second: z.string().min(1, "Enter the second value."),
+    }),
+    handler: async () => { executed = true; },
+  });
+  const ctx: Ctx = { db: null as unknown as Ctx["db"], userId: "u", breweryId: "b", roles: ["admin"] };
+  const failure = await runCommand("unmapped_field_error_regression", { first: "", second: "" }, ctx).catch(error => error);
+  expect(failure).toMatchObject({
+    status: 400, code: "invalid_input",
+    message: "Enter the first value.; Enter the second value.",
+    issues: [
+      { path: ["first"], code: "too_small", message: "Enter the first value." },
+      { path: ["second"], code: "too_small", message: "Enter the second value." },
+    ],
+  });
+  expect(inputErrorPresentation(failure, [])).toEqual({ error: failure.message, fieldErrors: {} });
   expect(executed).toBe(false);
 });
 
