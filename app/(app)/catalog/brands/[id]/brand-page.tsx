@@ -13,6 +13,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CommandFormMessage } from "@/components/mgr/command-form";
+import { E } from "@/components/mgr/e";
 import { BrandView } from "@/components/mgr/views/brand";
 import { CatalogCategoriesControl } from "@/components/mgr/views/catalog-categories";
 import { useCommandAction, useFields } from "@/lib/commands/use-command-form";
@@ -20,6 +21,7 @@ import { sellsAsCommand, type SellsAsRow } from "@/lib/mgr/brand-sells-view";
 import { toBrandViewProps, UNPRICED, type BrandSnapshot } from "@/lib/mgr/brand-view";
 import { reconcileBooleanChange } from "@/lib/mgr/pos-view";
 import type { KegPoolOption } from "@/lib/mgr/sku-view";
+import { brandAbvError } from "@/lib/mgr/brand-abv";
 import { SkuEditForm } from "../../sku-form";
 import { ApprovalForm, RegistrationForm } from "./compliance-forms";
 import { ColaImage } from "../../cola-image";
@@ -30,12 +32,13 @@ export type BrandRow = Omit<BrandSnapshot["brand"], "skus"> & { skus: BrandSku[]
 /** The Sells as reads; a format's package_type tells SkuEditForm whether it takes a keg pool. */
 export type SellsReads = Omit<NonNullable<BrandSnapshot["sells"]>, "formats"> & { formats: (NonNullable<BrandSnapshot["sells"]>["formats"][number] & { package_type: string | null })[] };
 
-export function BrandPage({ brand, styles, categories, priceGroups, compliance, cost, sells, pools, canSell }: {
+export function BrandPage({ brand, styles, categories, priceGroups, compliance, cost, sells, pools, canSell, canManageFormats, canPrice }: {
   brand: BrandRow | null; styles: string[]; categories: string[]; priceGroups: BrandSnapshot["priceGroups"]; compliance: BrandSnapshot["compliance"]; cost: BrandSnapshot["cost"];
-  sells?: SellsReads; pools: KegPoolOption[]; canSell: boolean;
+  sells?: SellsReads; pools: KegPoolOption[]; canSell: boolean; canManageFormats: boolean; canPrice: boolean;
 }) {
   const router = useRouter();
   const { busy, error, run } = useCommandAction();
+  const [validationAttempted, setValidationAttempted] = useState(false);
   const categoryAction = useCommandAction();
   const sellsAction = useCommandAction();
   // A switch's state until the refreshed SKUs arrive; new SKUs from the server replace every one.
@@ -49,6 +52,7 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
     name: brand?.name ?? "", alias: brand?.alias ?? "", style: brand?.styles?.name ?? "", abv: brand?.abv == null ? "" : String(brand.abv),
     description: brand?.description ?? "", category: brand?.category ?? "", priceGroupId: brand?.price_group_id ?? "", hops: brand?.hops ?? "",
   });
+  const ready = Boolean(f.name.trim()) && !brandAbvError(f.abv);
   // The view speaks in ids (UNPRICED for none); the command omits empty strings.
   const viewModel = toBrandViewProps({
     brand: { id: brand?.id ?? "", name: f.name, alias: f.alias, abv: f.abv, description: f.description, category: f.category, hops: f.hops, price_group_id: f.priceGroupId, styles: f.style ? { name: f.style } : null, skus: brand?.skus ?? [], pours: brand?.pours ?? [] },
@@ -83,6 +87,8 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
   };
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    setValidationAttempted(true);
+    if (busy || !ready) return;
     await run("upsert_brand", {
       id: brand?.id, name: f.name, alias: f.alias.trim() || undefined, style: f.style || undefined, abv: f.abv ? Number(f.abv) : undefined,
       description: f.description || undefined, category: f.category || undefined, priceGroupId: f.priceGroupId || undefined, hops: f.hops || undefined,
@@ -93,10 +99,11 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
     }, { refresh: Boolean(brand) }); // An edit re-reads in place; the push already loads a new brand's page.
   }
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
+    <form noValidate onSubmit={submit} className="flex flex-col gap-4">
       <BrandView
         model={model}
         controls={controls}
+        validationAttempted={validationAttempted}
         categoryAction={<CatalogCategoriesControl categories={categories} busy={categoryAction.busy} error={categoryAction.error}
           onSave={(name, previousName) => categoryAction.run("save_catalog_category", { name, previousName }, () => {
             if (!previousName || f.category === previousName) set("category")(name);
@@ -105,7 +112,9 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
             if (f.category === name) set("category")("");
           }, { target: name })}
         />}
-        linkRows
+        linkRows={canPrice}
+        formatAction={canManageFormats ? E.btn("Manage formats", "g", "/catalog") : null}
+        pricingHref="/pricing"
         messages={<CommandFormMessage error={error} />}
         busy={busy}
         actions={actions ?? undefined}

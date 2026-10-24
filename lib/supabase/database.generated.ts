@@ -5282,7 +5282,7 @@ isOneToOne: false
                            },
 "list_team_members":
 { Args: { "p_brewery": string }; Returns: {
-              "created_at": string,"email": string,"roles": (Database["public"]['Enums']["staff_role"])[],"user_id": string
+              "created_at": string,"email": string,"name": string,"roles": (Database["public"]['Enums']["staff_role"])[],"user_id": string
             }[]
                            },
 "mark_chat_installation_reauthorization":

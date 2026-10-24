@@ -148,12 +148,12 @@ export function toBrandViewProps({
     abv: brand.abv == null ? "" : String(brand.abv),
     category: brand.category ?? "",
     categoryOptions: categories,
-    priceGroup: brand.price_group_id ?? UNPRICED,
-    priceGroupOptions: [{ value: UNPRICED, label: "Unpriced" }, ...priceGroups.map((g) => ({ value: g.id, label: g.name }))],
+    priceGroup: brand.price_group_id || UNPRICED,
+    priceGroupOptions: [{ value: UNPRICED, label: "No price group" }, ...priceGroups.map((g) => ({ value: g.id, label: g.name }))],
     suggestion: cost ? suggestPriceGroup({ ...cost, groups: priceGroups }) : null,
     description: brand.description ?? "",
     hops: brand.hops ?? "",
-    sells: toBrandSellsModel({ brand: { ...brand, pours: brand.pours ?? [] }, ...sells }),
+    sells: toBrandSellsModel({ brand: { ...brand, price_group_id: saved.price_group_id, pours: brand.pours ?? [] }, ...sells }),
     compliance: rows,
   };
 }

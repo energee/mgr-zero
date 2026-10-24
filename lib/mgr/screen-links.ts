@@ -65,8 +65,8 @@ export const TAPS: [string | RegExp, string][] = [
   ["Shortfall", "Pars and allocation"],
   ["Choose who gets it", "Pars and allocation"],
   ["Count", "Cycle count"],
-  ["Add material", "Material"],
   ["Materials", "Materials on hand"],
+  ["Material", "Edit material"],
   ["Add SKU", "SKU"],
   ["Taps", "Tap board"],
   ["Cellar", "Cellar map"],
@@ -115,9 +115,9 @@ export const TAPS: [string | RegExp, string][] = [
   ["YCH", "Vendor"],
   ["Country Malt", "Vendor"],
   ["CanSource", "Vendor"],
-  ["Citra", "Material"],
-  ["2-row", "Material"],
-  ["Cans \u00b7 16 oz", "Material"],
+  ["Citra", "Edit material"],
+  ["2-row", "Edit material"],
+  ["Cans \u00b7 16 oz", "Edit material"],
   ["Add contract", "Contract"],
   [/^(YCH|Country Malt) · /, "Contract"],
   ["New recipe", "Recipe"],
@@ -408,7 +408,7 @@ export const isInertOn = (screen: Screen, label: string, to?: string | null) => 
   const l = label.trim();
   const localMapping = l === "Map" && ["QuickBooks mappings", "Invoice mappings"].includes(screen.name);
   const draftSku = screen.name === "Edit draft" && (/^Line \d+ SKU$/.test(l) || l === "Pils - case" || l === "Stout - case");
-  // The Ingredient sheet's material picker opens its own search; elsewhere "Material" walks to the Material screen.
+  // The Ingredient sheet's material picker opens its own search; elsewhere "Material" opens Edit material.
   const ingredientMaterial = screen.name === "Ingredient" && l === "Material";
   const replenishmentAction = screen.name === "Pars and allocation" && (
     ["Set taproom par", "Set standing allocation", "Review", "All shortfalls"].includes(l)

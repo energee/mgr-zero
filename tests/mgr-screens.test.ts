@@ -14,6 +14,10 @@ import { VenueFrame } from "../components/mgr/venue";
 import { AppShell } from "../components/mgr/app-shell";
 import { ScreenFrame } from "../components/mgr/screen-frame";
 import { DatePicker } from "../components/mgr/date-picker";
+import { BatchesView } from "../components/mgr/views/batches";
+import { BrewDayView } from "../components/mgr/views/brew-day";
+import { batchesFromQuery, toBatchesViewProps } from "../lib/mgr/batches-view";
+import type { BrewDayViewModel } from "../lib/mgr/brew-day-view";
 
 /** One screen's body as static markup, by name. Rendered once and kept: the
  *  suite asks for the same handful of screens across a dozen assertions. */
@@ -42,10 +46,11 @@ describe("SCREENS", () => {
     expect(String(SCREENS.find((s) => s.name === "Brew day")!.writes)).toContain("record_brew_day");
   });
 
-  it("links Source water in Settings to the Water profiles catalog", () => {
+  it("names the Settings water entry after the Water profiles catalog", () => {
     const settings = text("Settings");
-    expect(settings).toMatch(/Source water/);
-    expect(SCREENS.find((s) => s.name === "Settings")!.to?.["Source water"]).toBe("Water profiles");
+    expect(settings).toMatch(/Water profiles/);
+    expect(settings).not.toMatch(/Source water/);
+    expect(SCREENS.find((s) => s.name === "Settings")!.to?.["Water profiles"]).toBe("Water profiles");
   });
 
   it("makes a recipe version executable without restating the batch size", () => {
@@ -277,7 +282,7 @@ describe("SCREENS", () => {
     const expected = new Map<string, Screen["surface"]>([
       ["Customer detail", undefined], ["Ship-to form", "sheet"], ["Compliance months", undefined],
       ["Locations", undefined], ["Location detail", undefined],
-      ["Material", "sheet"], ["Vendor", "sheet"], ["Contracts", undefined],
+      ["Add material", "sheet"], ["Edit material", "sheet"], ["Vendor", "sheet"], ["Contracts", undefined],
       ["Contract", "sheet"], ["SKU list", undefined], ["Team member", "sheet"],
     ]);
     for (const [name, surface] of expected) {
@@ -459,13 +464,14 @@ describe("SCREENS", () => {
     expect(renderToStaticMarkup(VenueFrame({ venue: slack.venue!, children: slack.body }))).toContain('class="slk modal"');
   });
 
-  it("writes a person as @handle, never a domain-elided address", () => {
+  it("identifies Team members by name and full email, never a domain-elided address", () => {
     for (const s of SCREENS) {
       const html = renderToStaticMarkup(createElement("div", null, s.body));
-      // "maria@ · warehouse" reads as truncated data; a handle is "@maria".
+      // "maria@ · warehouse" reads as truncated data.
       expect.soft(html, `${s.name}: elided address`).not.toMatch(/[a-z0-9]@(?![a-z0-9.])/i);
     }
-    expect(body("Team")).toContain("@maria");
+    expect(body("Team")).toContain("Maria Alvarez");
+    expect(body("Team")).toContain("maria@demobrewing.com");
     // Pending acceptance is not exposed by the live roster.
     expect(body("Team")).not.toContain("pending");
   });
@@ -518,7 +524,7 @@ describe("SCREENS", () => {
     // The gallery shell signs in as admin (screen-frame.tsx) so every surface is
     // reachable, so the person the screens name has to be that admin.
     expect(body("Me")).toMatch(/Maria Alvarez[\s\S]*admin/);
-    expect(body("Team")).toMatch(/Maria Alvarez[\s\S]*@maria · Admin[\s\S]*you/);
+    expect(body("Team")).toMatch(/Maria Alvarez[\s\S]*maria@demobrewing\.com · Admin[\s\S]*you/);
     // Team member acts on someone else; removing yourself is the self state.
     expect(body("Team member")).not.toMatch(/Maria|@maria/);
 
@@ -1142,5 +1148,54 @@ describe("Invoice payments recorded in MGR (#1045)", () => {
   it("says the balance and paid state also come from MGR's ledger", () => {
     expect(String(by("Invoice")!.spec)).toContain("the balance comes from QuickBooks, or from MGR's payment ledger for an invoice QuickBooks never received");
     expect(String(by("Payment")?.spec)).not.toContain("there is deliberately no Mark paid button anywhere in MGR");
+  });
+});
+
+describe("Cancelled batch history (#1304)", () => {
+  const planned: BrewDayViewModel = {
+    title: "B-0001", planned: "0.5 bbl · Oct 15, 2026", vesselId: "",
+    initialBbl: "0.5", brewedOn: "2026-10-15", vessels: [],
+  };
+
+  it("labels a cancelled header from its status without losing its planned facts", () => {
+    const html = renderToStaticMarkup(createElement(BrewDayView, { model: { ...planned, cancelled: true } }));
+    expect(html).toMatch(/>Cancelled<\/[^>]+>[\s\S]*0\.5 bbl · Oct 15, 2026/);
+    expect(html).not.toMatch(/>Planned</);
+    expect(html).toContain("This plan remains in history");
+    expect(html).not.toContain("Record brew day");
+    expect(html).not.toContain("Confirm actual ingredients");
+  });
+
+  it("keeps an uncancelled plan labelled Planned and available to record", () => {
+    const html = renderToStaticMarkup(createElement(BrewDayView, { model: planned }));
+    expect(html).toMatch(/>Planned</);
+    expect(html).not.toMatch(/>Cancelled</);
+    expect(html).toContain("Record brew day");
+  });
+
+  it("collapses cancelled history without removing links or inventing a brand or recipe", () => {
+    const batch = { id: "cancelled", batch_no: 1, planned_on: "2026-10-15", planned_bbl: 0.5, brewed_on: null, closed_at: null, cancelled_at: "2026-10-16T12:00:00Z", brand_name: null, recipe_name: null, vessel_name: null, active_occupancies: [] };
+    const model = toBatchesViewProps(batchesFromQuery([batch, { ...batch, id: "planned", batch_no: 2, cancelled_at: null }], [], { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}` }));
+    expect(model.cancelled?.[0]).toMatchObject({ brand: null, recipe: null, brewable: false });
+    const html = renderToStaticMarkup(createElement(BatchesView, { model }));
+    const history = html.match(/<details\b[^>]*>[\s\S]*?<\/details>/)?.[0];
+    expect(history).toBeDefined();
+    expect(history).not.toMatch(/<details[^>]*\bopen/);
+    expect(history).toContain("Cancelled (1)");
+    expect(history).toContain('href="/batches/cancelled"');
+    expect(history).toContain("No brand yet");
+    expect(history).toContain("No recipe");
+    expect(history).not.toContain('href="/batches/planned"');
+    expect(history).not.toMatch(/>Brew</);
+    expect(html.slice(0, html.indexOf("<details"))).toContain('href="/batches/planned"');
+    const cancelledOnly = renderToStaticMarkup(createElement(BatchesView, { model: { ...model, planned: [] } }));
+    expect(cancelledOnly).toContain("Cancelled (1)");
+    expect(cancelledOnly).not.toContain("No batches yet");
+  });
+
+  it("does not offer an empty Cancelled section", () => {
+    const html = renderToStaticMarkup(createElement(BatchesView, { model: toBatchesViewProps({ title: "Batches", planned: [], active: [] }) }));
+    expect(html).not.toContain("<details");
+    expect(html).toContain("No batches yet");
   });
 });

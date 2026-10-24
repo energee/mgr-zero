@@ -1,6 +1,6 @@
 // app/(app)/routes/labels.ts — the list_routes result shape as the pages read
 // it, the one driver label, and the Driver picker's options. A driver shows as
-// their roster email (list_team_members); staff have no other display name.
+// their roster email (list_team_members), preserving the Driver picker's identity.
 import type { DeliveryRow, StopDoc } from "@/lib/commands/delivery";
 import { staffRolesLabel } from "@/lib/mgr/labels";
 

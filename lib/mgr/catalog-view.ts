@@ -20,7 +20,7 @@ export type CatalogBrandView = {
   style: string;
   /** "6.8%", a real "0%", or "Not set". */
   abv: string;
-  /** Packaged SKUs plus the pours its price group owns, active or not: "4". */
+  /** Saved packaged SKUs, active or not; eligible formats and pours are not SKUs. */
   skus: string;
   /** Recorded COLA approvals: "None", one's TTB ID and approval date, or "2 on file". */
   cola: string;
@@ -96,7 +96,7 @@ export function toCatalogViewProps({
       alias: b.alias || undefined,
       style: b.styles?.name ?? NOT_SET,
       abv: b.abv == null || b.abv === "" ? NOT_SET : `${Number(b.abv)}%`,
-      skus: String(b.skus.length + (b.pours?.length ?? 0)),
+      skus: String(b.skus.length),
       cola: colaFact(b.colas),
       image: latestColaImage(b.colas),
       href: `/catalog/brands/${b.id}`,

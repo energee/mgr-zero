@@ -132,8 +132,9 @@ export type FieldControls = Pick<React.InputHTMLAttributes<HTMLInputElement>, "i
 /** A picker with nothing to offer says so, and where the missing record is
  *  made (#1123). `href` is that page on a live screen; the inventory leaves it
  *  out and the link stays "#". `to` names the inventory screen it opens. With
- *  no `label` there is no link: `text` then names who can add the record. */
-export type PickEmpty = { text: string; href?: string; label?: string; to?: string };
+ *  no `label` there is no link: `text` then names who can add the record.
+ *  Draft editors can set `target` to keep unsaved work open during setup. */
+export type PickEmpty = { text: string; href?: string; label?: string; to?: string; target?: "_blank" };
 
 /** One aria-describedby value from several optional ids. */
 export const describedBy = (...ids: (string | undefined)[]) => ids.filter(Boolean).join(" ") || undefined;
@@ -153,7 +154,7 @@ function fieldError(controls?: Pick<FieldControls, "id" | "error" | "aria-invali
  *  unopenable picker still explains itself. */
 const emptyNote = (empty: PickEmpty, id?: string) => (
   <FieldDescription id={id}>
-    {empty.text}{empty.label ? <> <Link href={empty.href ?? "#"} data-to={empty.to}>{empty.label}</Link></> : null}
+    {empty.text}{empty.label ? <> <Link href={empty.href ?? "#"} data-to={empty.to} target={empty.target} rel={empty.target ? "noopener" : undefined}>{empty.label}</Link></> : null}
   </FieldDescription>
 );
 
@@ -465,13 +466,13 @@ export const E = {
    *  nothing is picked; `selectedLabel` names a retained value missing from `options`.
    *  With no options the open list says "No … to choose yet", never "No matching …";
    *  `empty` adds the note and link under the trigger. */
-  searchPick: (label: string, value: string, options: SearchPickOption[], controls?: Pick<FieldControls, "id" | "disabled" | "placeholder" | "hideLabel" | "onChange" | "aria-describedby"> & { selectedLabel?: string; previewAction?: boolean; empty?: PickEmpty }) => {
+  searchPick: (label: string, value: string, options: SearchPickOption[], controls?: Pick<FieldControls, "id" | "disabled" | "placeholder" | "hideLabel" | "onChange" | "aria-describedby"> & { selectedLabel?: string; previewAction?: boolean; outlined?: boolean; empty?: PickEmpty }) => {
     const empty = options.length ? undefined : controls?.empty;
     const emptyId = empty && controls?.id ? `${controls.id}-empty` : undefined;
     return (
     <Field data-disabled={controls?.disabled}>
       {!controls?.hideLabel && <FieldLabel htmlFor={controls?.id}>{label}</FieldLabel>}
-      <SearchPick label={label} value={value} options={options} onChange={controls?.onChange} id={controls?.id} disabled={controls?.disabled} errorId={describedBy(controls?.["aria-describedby"], emptyId)} selectedLabel={controls?.selectedLabel} previewAction={controls?.previewAction}
+      <SearchPick label={label} value={value} options={options} onChange={controls?.onChange} id={controls?.id} disabled={controls?.disabled} errorId={describedBy(controls?.["aria-describedby"], emptyId)} selectedLabel={controls?.selectedLabel} previewAction={controls?.previewAction} outlined={controls?.outlined}
         title={label} placeholder={controls?.placeholder ?? `Select ${label.toLowerCase()}`} searchPlaceholder={`Search ${label.toLowerCase()}`} noMatchMessage={`No matching ${label.toLowerCase()}`} emptyMessage={controls?.empty?.text ?? `No ${label.toLowerCase()} to choose yet`} />
       {empty && emptyNote(empty, emptyId)}
     </Field>

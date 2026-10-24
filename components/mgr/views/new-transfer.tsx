@@ -2,7 +2,7 @@
 // draws no title: the sheet it opens in (CommandForm live, ScreenSheet in the
 // inventory) already names it (#1120). An
 // entered line that cannot be sent marks its SKU or its quantity, with the
-// message under the line, once the user leaves the quantity (#1121). An empty
+// message under that field once the user leaves the quantity (#1121). An empty
 // SKU list says where SKUs are made, or who makes them, and a chosen location
 // with no bins says so under its bin picker (#1123).
 "use client";
@@ -70,7 +70,7 @@ export function NewTransferView({
         return <div key={`${line.title}:${index}`} className="flex flex-col gap-1">
           <div className="flex gap-2">
             {E.pick(`Line ${index + 1} SKU`, line.sku ?? line.title, model.skuOptions, { onChange: controls.lineSku ? value => controls.lineSku?.(index, value) : undefined, placeholder: "SKU", displayValue: line.title || undefined, hideLabel: true, id: `${id}-sku-${index}`, empty: noSkus(model.skusHref), "aria-invalid": errors.sku ? true : undefined, "aria-describedby": ids.sku })}
-            {E.edit(`Line ${index + 1} qty`, String(line.qty), "number", undefined, { onChange: controls.lineQty ? (nextValue: string) => controls.lineQty?.(index, nextValue) : undefined, onBlur: () => touched.touch(index), min: "0", step: "any", hideLabel: true, id: `${id}-qty-${index}`, "aria-invalid": errors.qty ? true : undefined, "aria-describedby": ids.qty })}
+            {E.edit(`Line ${index + 1} qty`, String(line.qty), "number", undefined, { onChange: controls.lineQty ? (nextValue: string) => controls.lineQty?.(index, nextValue) : undefined, onBlur: () => touched.touch(index), min: "0", step: "any", hideLabel: true, id: `${id}-${index}-qty`, error: errors.qty })}
             {model.lines.length > 1 ? <Button type="button" variant="ghost" onClick={() => { controls.removeLine?.(index); touched.remove(index); }}>Remove</Button> : null}
           </div>
           <LineErrorMessages id={`${id}-${index}`} errors={errors} />
@@ -78,6 +78,7 @@ export function NewTransferView({
       })}
       <Button type="button" variant="ghost" size="sm" className="w-fit" onClick={controls.addLine}>Add line</Button>
       </Field>
+      {E.info("Fractional quantities are allowed; stored to two decimal places.")}
       {messages}
       {footer !== undefined ? footer : E.btn("Create transfer")}
     </>

@@ -103,17 +103,14 @@ export function CustomerForm({
           </div>
           {E.pick("Type", type, CUSTOMER_TYPE_OPTIONS, { id: "customer-type", onChange: (value) => setType(value as CustomerType) })}
           {E.pick("Country", country, COUNTRY_OPTIONS, { id: "customer-country", onChange: setCountry, required: true })}
-          {country === "US" && <div className="flex flex-col gap-2">
-            <Label htmlFor="customer-state">State</Label>
-            <Input
-              id="customer-state"
-              value={state}
-              onChange={(e) => setState(e.target.value.toUpperCase())}
-              maxLength={2}
-              placeholder="NY"
-              required
-            />
-          </div>}
+          {E.edit(country === "US" ? "State (required)" : "State", country === "US" ? state : "Not applicable", "text", undefined, {
+            id: "customer-state",
+            onChange: value => setState(value.toUpperCase()),
+            maxLength: 2,
+            placeholder: "NY",
+            required: country === "US",
+            disabled: country !== "US",
+          })}
           <CustomerSaleChannelField value={saleChannelId} channels={channels} controls={{ id: "customer-sale-channel", onChange: setSaleChannelId }} />
           <div className="flex flex-col gap-2">
             <Label htmlFor="customer-license">License number</Label>

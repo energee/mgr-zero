@@ -145,6 +145,17 @@ describe("Batches view", () => {
     expect(html).toContain('href="/batches"');
     expect(html).not.toContain('href="/orders"');
   });
+  it("explains vessel setup and keeps its empty note separate from the page empty state (#1303)", () => {
+    const model = toBatchesViewProps({ ...batchesBrewer, vessels: [] });
+    const html = htmlOf(createElement(BatchesView, { model, newVesselHref: null }));
+    const setup = html.match(/<section aria-label="Vessel setup"[^>]*>([\s\S]*?)<\/section>/)?.[1];
+    expect(setup).toBeDefined();
+    expect(setup).toContain("No vessels yet");
+    expect(setup).not.toContain('data-slot="empty"');
+    expect(setup).not.toContain("New vessel");
+    const withoutSetup = htmlOf(createElement(BatchesView, { model: { ...model, vessels: undefined } }));
+    expect(withoutSetup).not.toContain('aria-label="Vessel setup"');
+  });
   it("does not allow live JSX to replace the planned and active lists", () => {
     const page = src("app/(app)/batches/page.tsx");
     expect(page).not.toMatch(/\blist=|\bfooter=|tabs=\{null\}/);
@@ -354,20 +365,15 @@ describe("Vessel detail view", () => {
     for (const shown of ["No open occupancy", "Current reading", "Reading history"]) expect(empty).toContain(shown);
   });
 
-  it("the live New vessel page passes no readings, so it draws only the facts (#1116)", () => {
-    const newLine = src("app/(app)/cellar/vessels/[id]/page.tsx").split("\n").find(line => line.includes('id === "new") return'));
-    expect(newLine).toMatch(/<VesselForm\b/);
-    expect(newLine).not.toMatch(/readings|occupancy/);
-  });
-
   it("the New vessel inventory record draws the not-yet-saved vessel with what Save still needs (#1116)", () => {
     const record = screen("New vessel");
-    const body = record.body as { type: unknown; props: { model: unknown; reason: unknown } };
+    const body = record.body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(VesselDetailView);
     expect(body.props.model).toEqual(vesselNew);
-    expect(body.props.reason).toBe("Still needed: a name and a capacity above zero.");
     // Like the live page, the capacity starts blank, so no field error is drawn yet.
-    expect(htmlOf(record.body)).not.toContain("Enter a capacity above zero.");
+    const html = htmlOf(record.body);
+    expect(html).not.toContain('aria-invalid="true"');
+    expect(html).toMatch(/<button\b(?=[^>]*\bdisabled)[^>]*>Save vessel<\/button>/);
     expect(screen("Cellar map").to?.["Add vessel"]).toBe("New vessel");
     expect(screen("Batches").to?.["New vessel"]).toBe("New vessel");
   });

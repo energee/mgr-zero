@@ -10,6 +10,7 @@ import { plural } from "@/lib/mgr/plural";
 import type { AccountingViewModel, QboSyncStatus } from "@/lib/mgr/accounting-view";
 import type { QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
 import type { DisconnectStatus } from "@/lib/mgr/integration-disconnect";
+import { integrationUnavailableReason } from "@/lib/mgr/integration-availability";
 
 export function QboStaffInvoiceLinkView({ link }: { link: QboStaffInvoiceLink | null | undefined }) {
   if (link === null) return null;
@@ -45,7 +46,7 @@ export function QboSyncView({ busy = false, disabled = false, error, onSync, sta
 
 export function QboConnectionView({ configured = true, reconnect = false, busy = false, error, onConnect }: { configured?: boolean; reconnect?: boolean; busy?: boolean; error?: string | null; onConnect?: () => void }) {
   return <div className="flex flex-col gap-2">
-    <SubmitButton label={reconnect ? "Reconnect QuickBooks" : "Connect QuickBooks"} type="button" data-variant="irreversible" className="bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" submitting={busy} busy="Opening QuickBooks…" reason={configured ? null : "QuickBooks isn’t turned on in MGR yet."} onClick={onConnect} />
+    <SubmitButton label={reconnect ? "Reconnect QuickBooks" : "Connect QuickBooks"} type="button" data-variant="irreversible" className="bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" submitting={busy} busy="Opening QuickBooks…" reason={configured ? null : integrationUnavailableReason.quickbooks} onClick={onConnect} />
     <CommandFormMessage error={error} />
   </div>;
 }
@@ -87,10 +88,10 @@ export function AccountingView({ model, connection, defaults, messages, sync }: 
     {!model.connected && (connection !== undefined ? connection : <QboConnectionView reconnect={model.reconnect} />)}
     <OnlinePaymentsRow model={model} />
     {model.connected && <>{E.fld("Company", model.company)}{model.companyId && E.fld("Company ID", model.companyId)}{model.access && E.fld("Access", model.access)}{E.nav("Mappings", "Customers, SKUs and returnable-keg deposits", "", undefined, model.mappingsHref)}</>}
-    {sync !== undefined ? sync : <QboSyncView status={model.syncStatus} disabled={!model.connected} />}
+    {(model.connected || model.reconnect) && (sync !== undefined ? sync : <QboSyncView status={model.syncStatus} disabled={!model.connected} />)}
     {E.ttl("Push defaults")}
     {defaults !== undefined ? defaults : model.defaults ? <QboDefaultsView {...model.defaults} disabled={!model.connected} /> : E.gated("Bank transfer (ACH) and card", "Connect QuickBooks to read and save the company's payment options.")}
-    {E.row("Customers missing a portal login email", missingEmailsDetail(model.missingEmails), E.act("Review", "primary", model.customersHref), model.missingEmails ? "w" : "")}
+    {E.row("Customers missing a portal login email", missingEmailsDetail(model.missingEmails), model.missingEmails !== 0 && E.act("Review", "primary", model.customersHref), model.missingEmails ? "w" : "")}
     {model.remoteRevocationUnresolved && E.note("Local access is disconnected. QuickBooks could not confirm remote revocation; reconnect to continue.", "alert")}
     {E.info("QuickBooks remains the accounting record. Connecting does not push existing invoices, and MGR never displays credentials.")}
   </>;

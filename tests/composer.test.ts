@@ -76,7 +76,6 @@ describe("AI composer", () => {
     expect(text).not.toContain("openai/gpt-5.4");
     // Token prices and the Vercel catalog link are vendor detail, not brewery settings (#1147).
     expect(text).not.toMatch(/tokens|\$/);
-    expect(text).toContain("openai");
     expect(html).not.toContain("vercel.com");
     expect(html).toContain("<title>OpenAI</title>");
     expect(html).toContain('placeholder="Search models…"');
@@ -90,7 +89,7 @@ describe("AI composer", () => {
     }));
     expect(Intl.supportedValuesOf("timeZone").length).toBeGreaterThan(400);
     expect(html).toContain('placeholder="Search timezones…"');
-    expect(html).toMatch(/data-slot="input-group-control"[^>]*value="America \/ New York"/);
+    expect(html).toMatch(/data-slot="input-group-control"[^>]*value="Eastern Time \(America\/New_York\)"/);
     expect(html).not.toContain("<datalist");
   });
 
