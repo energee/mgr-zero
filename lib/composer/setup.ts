@@ -1,6 +1,6 @@
-// lib/composer/setup.ts — opens the Ask MGR drawer's conversation: restores the
+// lib/composer/setup.ts — opens the Ask MGR panel's conversation: restores the
 // person's latest one with its newest text turns, or creates the first. A
-// timeout bounds the whole load, so a stalled request ends in the drawer's
+// timeout bounds the whole load, so a stalled request ends in the panel's
 // failure state with Try again instead of an endless opening message (#1105).
 import type { UIMessage } from "ai";
 import { MAX_HISTORY_MESSAGES } from "@/lib/chat/model-messages";
@@ -9,9 +9,9 @@ import { MAX_HISTORY_MESSAGES } from "@/lib/chat/model-messages";
 type StoredMessage = { id: string; role: "user" | "assistant"; content: string };
 type SetupRun = (name: string, input: unknown, requestId: string | undefined, signal: AbortSignal) => Promise<unknown>;
 
-/** What the drawer says while setup runs, beside its pulsing bar. */
+/** What the panel says while setup runs, beside its pulsing bar. */
 export const COMPOSER_SETUP_ACTIVITY = "Opening your conversation… You can type once it opens.";
-/** How long the drawer waits for setup before showing the failure and Try again. */
+/** How long the panel waits for setup before showing the failure and Try again. */
 export const COMPOSER_SETUP_TIMEOUT_MS = 15_000;
 export const COMPOSER_SETUP_TIMEOUT_MESSAGE = "Ask MGR could not start. Check your connection, then try again.";
 

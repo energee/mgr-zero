@@ -28,11 +28,9 @@ import {
 import { TapBoardView, type TapSku, type TapBoardNavigation } from "@/components/mgr/views/tap-board";
 export type { TapSku } from "@/components/mgr/views/tap-board";
 
-const actor = (label: string | null) => label ? `@${label}` : "staff";
-
 function closingFact(history: TapHistory[], interval: TapInterval | null, timeZone: string) {
   const closed = interval && history.find((row) => row.id === interval.id);
-  return closed ? `${tapLabel(closed)} was closed ${formatDateTime(closed.closed_at, timeZone)} by ${actor(closed.closed_by_label)}. Review the board before acting.` : null;
+  return closed ? `${tapLabel(closed)} was closed ${formatDateTime(closed.closed_at, timeZone)} by ${closed.closed_by_label || "staff"}. Review the board before acting.` : null;
 }
 
 /** `timeZone` is breweries.timezone, passed from the server page so SSR and hydration print the same times (#442). */

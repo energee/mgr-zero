@@ -31,11 +31,11 @@ registry number from Settings; nothing it returns is stored. It answers
 failure gets a 502 `upstream_unavailable`, so an empty `rows` is a real
 no-match. COLAs completed more than 15 years ago are not found.
 
-For `upsert_brand_approval`, a `kind` of `cola` requires a `ttbId` containing
-exactly 14 digits, preserved as text with leading zeros. Formula numbers and
-applicant serial numbers are separate identifiers; the COLA-only format does
-not apply to either. Malformed new COLA IDs are rejected before saving; an
-exact retry of a completed historical request still returns its original result.
+`get_cola_details` reads one TTB ID from TTB's public COLA detail page, live, under the brewery's TTB registry number; nothing it returns is stored. It answers `{ ttbId, permit, status, approvedOn, images }`, where each image has a `url` and a `label`. A COLA whose principal permit is not the brewery's gets a 403 `permission_denied`. A COLA that TTB does not report as `APPROVED` gets a 400 `bad_request`, and an approved COLA with no approval date gets a 502 `upstream_unavailable`.
+
+`get_cola_image` renders one of those image `url`s as `{ dataUrl }`, a base64 data URL, after a fresh TTB session checks the COLA again. The image must be a JPEG, PNG, GIF or WebP no larger than 8 MiB, and it must be a label on an approved COLA under the brewery's permit. Admin and Sales may preview any such label. Other staff roles may read only an image that an approved, dated COLA already saves on one of their brewery's brands; an image not saved that way returns 404 `not_found`.
+
+`upsert_brand_approval` takes `imageUrl`, a `url` from `get_cola_details`. The same request must also send `kind` `cola` and `approvedOn`, even on an edit; the endpoint does not read them from the stored record. Sending `approvedOn` as `null` clears the approval date and the stored image. Changing `ttbId` or `kind` removes an image that the request does not replace.
 
 {/* ops:compliance */}
 

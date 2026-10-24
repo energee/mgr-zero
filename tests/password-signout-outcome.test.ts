@@ -19,7 +19,7 @@ import { PASSWORD_SAVED_COOKIE } from "@/lib/auth/password";
  * All transport responses belong to this synthetic SDK boundary; no Auth user
  * or provider is created and no network request is sent.
  */
-async function signedInBoundary(failureScope: "local" | "global") {
+async function signedInBoundary(failureScope: "local" | "global" | "others") {
   const now = Math.floor(Date.now() / 1000);
   const user = { id: "13190000-0000-4000-8000-000000000001", aud: "authenticated", email: "password-outcome@test.local", app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() };
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
@@ -80,6 +80,28 @@ describe("saved password outcome after installed SDK cookie clearing", () => {
     expect(html).not.toContain("Reset link expired");
     expect(html).toContain(scope === "local" ? "Other sessions were signed out" : "could not confirm that other sessions were signed out");
     await expect(endPasswordSessions()).rejects.toThrow("redirect:/password?saved=1&error=revoke_failed");
+  });
+
+  it("ends a retained recovery session before offering a real sign-in", async () => {
+    savedCookies.clear();
+    const { db } = await signedInBoundary("others");
+    const form = new FormData();
+    form.set("password", "synthetic-new-password");
+    form.set("confirmPassword", "synthetic-new-password");
+    await expect(savePassword(form)).rejects.toThrow("redirect:/password?saved=1&error=revoke_failed");
+    expect((await db.auth.getSession()).data.session).not.toBeNull();
+
+    const page = await PasswordPage({ searchParams: Promise.resolve({ saved: "1", error: "revoke_failed" }) });
+    const html = renderToStaticMarkup(page);
+    expect(html).toContain("Password saved");
+    expect(html).toContain("Select Sign out all sessions to try again.");
+    expect(html).toContain("Sign out all sessions");
+    expect(html).not.toContain('href="/login"');
+    expect(html).not.toContain("Sign in with your new password");
+    expect(page.props.children[1].props.extraAction).toBe(endPasswordSessions);
+
+    await expect(page.props.children[1].props.extraAction()).rejects.toThrow("redirect:/login");
+    expect((await db.auth.getSession()).data.session).toBeNull();
   });
 
   it("ignores a crafted saved link that no save produced", async () => {
