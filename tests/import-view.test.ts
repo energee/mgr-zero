@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import { E } from "../components/mgr/e";
 import { ImportView } from "../components/mgr/views/import";
-import { IMPORT_FIELDS, IMPORT_FIELD_LABELS, IMPORT_KINDS } from "../lib/import-csv";
+import { IMPORT_FIELDS, IMPORT_FIELD_LABELS, IMPORT_KINDS, validateImportRows } from "../lib/import-csv";
 import { importPreview } from "../lib/mgr/fixtures/import";
 
 it("keeps missing mappings and preview cells empty rather than undefined", () => {
@@ -31,6 +31,46 @@ it("shares an editable mixed preview and prevents all-invalid batches from commi
   expect(html).not.toContain('href="/');
   const blocked = renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, validation: importPreview.rows.map(() => ["Invalid row"]) } }));
   expect(blocked).toMatch(/<button[^>]*disabled[^>]*>Import 0 rows/);
+});
+
+it("renders duplicate blocking, title-case headers and a useful blank-name editor title (#1314)", () => {
+  const table = vi.spyOn(E, "tbl");
+  try {
+    const rows = [importPreview.rows[0], { ...importPreview.rows[0] }, { ...importPreview.rows[0], name: "  " }];
+    const html = renderToStaticMarkup(createElement(ImportView, { model: {
+      ...importPreview, rows, validation: validateImportRows("customers", rows, importPreview.lookups),
+    } }));
+    expect(html).toContain("1 ready · 2 blocked");
+    expect(html).toContain("Duplicate of row 1: customer name");
+    expect(html).toContain("Import 1 rows");
+    expect(table.mock.calls[0][0]).toEqual(["Row", "Record", "Match", "State"]);
+    expect(html).toContain("Edit row 3 · Customers");
+  } finally {
+    table.mockRestore();
+  }
+});
+
+it("uses the shared enum picker for Type, preserving invalid CSV text until a choice is made (#1314)", () => {
+  const pick = vi.spyOn(E, "pick");
+  const edit = vi.spyOn(E, "edit");
+  const onEdit = vi.fn();
+  try {
+    const row = { ...importPreview.rows[0], type: "invalid type" };
+    const html = renderToStaticMarkup(createElement(ImportView, { model: {
+      ...importPreview, rows: [row], validation: validateImportRows("customers", [row], importPreview.lookups),
+    }, onEdit }));
+    const type = pick.mock.calls.find(call => call[3]?.["aria-label"] === "Row 1 type");
+    expect(type).toBeDefined();
+    expect(type![1]).toBe("invalid type");
+    expect(type![2]).toEqual([{ value: "", label: "Choose a value" }, ...IMPORT_FIELDS.customers.find(field => field.name === "type")!.values!]);
+    expect(html).toContain("invalid type");
+    expect(edit.mock.calls.some(call => call[4]?.["aria-label"] === "Row 1 type")).toBe(false);
+    type![3]!.onChange!("retailer");
+    expect(onEdit).toHaveBeenCalledWith(0, "type", "retailer");
+  } finally {
+    pick.mockRestore();
+    edit.mockRestore();
+  }
 });
 
 it("shows only usable packaged format references when mapping product imports (#819)", () => {

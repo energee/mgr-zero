@@ -5,7 +5,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Attachment, AttachmentContent, AttachmentDescription, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
-import { IMPORT_FIELDS, IMPORT_FIELD_LABELS, IMPORT_KINDS, IMPORT_ROW_CAP_LABEL, canReviewImport, importTemplateCsv, importTemplateName, readyImportRows, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
+import { IMPORT_FIELDS, IMPORT_FIELD_LABELS, IMPORT_KINDS, IMPORT_ROW_CAP_LABEL, canReviewImport, importTemplateCsv, importTemplateName, readyImportRows, validateImportRows, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 import { downloadCsv } from "@/lib/download-csv";
 import { importKindLabel } from "@/lib/mgr/labels";
 import { ConfirmDiscard } from "@/components/mgr/views/command-recovery";
@@ -40,7 +40,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
   const edit = (index: number, field: string, value: string) => {
     if (onEdit) return onEdit(index, field, value);
     const next = rows.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value } : row);
-    setDraft({ rows: next, validation: next.map(row => validateImportRow(kind, row, lookups)) });
+    setDraft({ rows: next, validation: validateImportRows(kind, next, lookups) });
   };
   const fields = IMPORT_FIELDS[kind], ready = readyImportRows(rows, validation).length;
   const canReview = canReviewImport(kind, mapping, model.headers ?? [], rows);
@@ -83,10 +83,12 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
     </>}
     {step === 2 && <>
       <p>{ready} ready · {rows.length - ready} blocked. Fix values here, or go back to matching columns. Only ready rows are imported, each one on its own. Fix blocked rows first, or they are left out.</p>
-      {E.tbl(["row", "record", "match", "state"], rows.map((row, index) => [String(index + 1), row.name ?? row.product ?? row.label ?? `Row ${index + 1}`, validation[index]?.join("; ") || "validated", validation[index]?.length ? "blocked" : "ready"]), ["r", "l", "l", "l"])}
-      {rows.map((row, index) => <details key={index}><summary>Edit row {index + 1} · {row.name ?? row.product ?? row.label ?? importKindLabel(kind)}</summary>
+      {E.tbl(["Row", "Record", "Match", "State"], rows.map((row, index) => [String(index + 1), row.name?.trim() || row.product?.trim() || row.label?.trim() || `Row ${index + 1}`, validation[index]?.join("; ") || "validated", validation[index]?.length ? "blocked" : "ready"]), ["r", "l", "l", "l"])}
+      {rows.map((row, index) => <details key={index}><summary>Edit row {index + 1} · {row.name?.trim() || row.product?.trim() || row.label?.trim() || importKindLabel(kind)}</summary>
         <div className="grid gap-3 py-3 sm:grid-cols-2">{fields.map(field => <Field key={field.name}>
-          {E.edit(`${IMPORT_FIELD_LABELS[field.name]}${field.required ? " *" : ""}`, row[field.name] ?? "", "text", undefined, { onChange: value => edit(index, field.name, value), "aria-label": `Row ${index + 1} ${IMPORT_FIELD_LABELS[field.name]}` })}
+          {field.values
+            ? E.pick(`${IMPORT_FIELD_LABELS[field.name]}${field.required ? " *" : ""}`, row[field.name]?.trim() ?? "", [{ value: "", label: "Choose a value" }, ...field.values], { onChange: value => edit(index, field.name, value), "aria-label": `Row ${index + 1} ${IMPORT_FIELD_LABELS[field.name]}`, displayValue: row[field.name]?.trim() || undefined })
+            : E.edit(`${IMPORT_FIELD_LABELS[field.name]}${field.required ? " *" : ""}`, row[field.name] ?? "", "text", undefined, { onChange: value => edit(index, field.name, value), "aria-label": `Row ${index + 1} ${IMPORT_FIELD_LABELS[field.name]}` })}
         </Field>)}</div>
       </details>)}
       <Button disabled={!ready || busy} onClick={onCommit}>{kind === "opening_balances" ? "Post opening balances" : `Import ${ready} ${ready === 1 ? "row" : "rows"}`}</Button>

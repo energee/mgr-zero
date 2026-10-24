@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { IMPORT_FIELDS, IMPORT_FIELD_LABELS, IMPORT_KINDS, canReviewImport, importRowKey, importTemplateCsv, importTemplateName, parseCsv, mapCsvRows, readyImportRowNumbers, readyImportRows, validateImportRow } from "@/lib/import-csv";
+import { IMPORT_FIELDS, IMPORT_FIELD_LABELS, IMPORT_KINDS, canReviewImport, importRowKey, importTemplateCsv, importTemplateName, parseCsv, mapCsvRows, readyImportRowNumbers, readyImportRows, validateImportRow, validateImportRows } from "@/lib/import-csv";
 it("parses BOM, CRLF, quoted commas/newlines and escaped quotes", () => {
   expect(parseCsv('\uFEFFname,note\r\n"A, B","one\r\ntwo ""quoted"""\r\n')).toEqual({ headers: ["name", "note"], rows: [["A, B", 'one\r\ntwo "quoted"']] });
 });
@@ -85,6 +85,46 @@ it("numbers each sent row by its preview row, so outcome row 2 is preview row 3 
   const sent = readyImportRowNumbers([[], ["type is required"], []]);
   expect(sent).toEqual([1, 3]);
   expect(sent[2 - 1]).toBe(3);
+});
+
+describe("within-file customer duplicates (#1314)", () => {
+  const customer = { name: "QA dup", type: "retailer", state: "PA", saleChannelId: crypto.randomUUID() };
+  it("blocks later ready rows by the server's name identity, not type or alias", () => {
+    const rows = [customer, { ...customer, name: " QA dup ", type: "distributor", alias: "different" }, { ...customer, name: "Other", alias: "different" }];
+    const validation = validateImportRows("customers", rows);
+    expect(validation).toEqual([[], ["Duplicate of row 1: customer name"], []]);
+    expect(readyImportRows(rows, validation)).toEqual([rows[0], rows[2]]);
+    expect(readyImportRowNumbers(validation)).toEqual([1, 3]);
+    expect(rows[1].name).toBe(" QA dup ");
+  });
+  it("keeps case significant but shares trimmed preview and execution identity", () => {
+    expect(validateImportRows("customers", [customer, { ...customer, name: "qa dup" }])).toEqual([[], []]);
+    for (const whitespace of ["\t", "\r\n", "\u00a0"]) {
+      const padded = { ...customer, name: `${whitespace}QA dup${whitespace}` };
+      expect(importRowKey("customers", padded, 1)).toBe(importRowKey("customers", customer, 0));
+      expect(validateImportRows("customers", [customer, padded])).toEqual([[], ["Duplicate of row 1: customer name"]]);
+      padded.name = `${whitespace}Different${whitespace}`;
+      expect(validateImportRows("customers", [customer, padded])).toEqual([[], []]);
+    }
+  });
+  it("lets a ready row through when an earlier same-name row is blocked, and recomputes after edits", () => {
+    const rows = [{ ...customer, type: "" }, customer, { ...customer }];
+    expect(validateImportRows("customers", rows)).toEqual([["type is required"], [], ["Duplicate of row 2: customer name"]]);
+    rows[0].type = "retailer";
+    expect(validateImportRows("customers", rows)).toEqual([[], ["Duplicate of row 1: customer name"], ["Duplicate of row 1: customer name"]]);
+    rows[0].name = "Different";
+    expect(validateImportRows("customers", rows)).toEqual([[], [], ["Duplicate of row 2: customer name"]]);
+  });
+  it("does not mistake serialization keys or append rows for duplicate identities", () => {
+    const product = { product: "Lager", formatId: crypto.randomUUID() };
+    expect(validateImportRows("products_skus", [product, { ...product, formatId: crypto.randomUUID() }])).toEqual([[], []]);
+    const shipTo = { customerId: crypto.randomUUID(), label: "Main", state: "PA" };
+    expect(validateImportRows("ship_tos", [shipTo, shipTo])).toEqual([[], []]);
+    const opening = { skuId: crypto.randomUUID(), locationId: crypto.randomUUID(), binId: crypto.randomUUID(), qty: "1" };
+    expect(validateImportRows("opening_balances", [opening, opening])).toEqual([[], []]);
+    const price = { saleChannelId: customer.saleChannelId, priceGroupId: crypto.randomUUID(), formatId: product.formatId, unitPriceCents: "100" };
+    expect(validateImportRows("channel_prices", [price, price])).toEqual([[], []]);
+  });
 });
 
 

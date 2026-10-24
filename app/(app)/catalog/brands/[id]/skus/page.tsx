@@ -3,6 +3,7 @@
 // Kept for old links: packages are switched on under the Brand page's Sells as,
 // so there is no New SKU here, and the back link lands on that section.
 // Existing serving identities remain the boundary for poured POS activity.
+import { cache } from "react";
 import type { KegPoolOption } from "@/lib/mgr/sku-view";
 import type { PriceGroupBarcode } from "@/lib/mgr/price-groups-view";
 import { notFound } from "next/navigation";
@@ -17,14 +18,17 @@ import { PourForm } from "../../../pour-form";
 import { SkuEditForm } from "../../../sku-form";
 import { navTitle } from "@/lib/mgr/nav";
 
-export const metadata = { title: navTitle("/catalog/brands") };
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await getSkuListPageData(id);
+  return { title: navTitle("/catalog/brands") };
+}
 
 type Sku = { id: string; name: string; format_id: string; active: boolean; upc: string | null; keg_pool_id: string | null; batch_share: number | string | null };
 type Brand = { id: string; name: string; price_group_id: string | null; price_groups: { name: string } | null; skus: Sku[]; pours: { id: string; name: string; ounces: number }[] };
 type Format = { package_type: string | null; id: string; name: string; bbl_per_unit: string | null; effective_bbl_per_unit: string | number | null };
 
-export default async function SkuListPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+const getSkuListPageData = cache(async function getSkuListPageData(id: string) {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const canWrite = brewery.roles.includes("admin") || brewery.roles.includes("sales");
@@ -38,6 +42,12 @@ export default async function SkuListPage({ params }: { params: Promise<{ id: st
     canRun(ctx, "list_price_group_barcodes") ? runCommand("list_price_group_barcodes", { brandId: id }, ctx) as Promise<PriceGroupBarcode[]> : Promise.resolve(undefined),
   ]);
   const brand = brands.find((b) => b.id === id) ?? notFound();
+  return { canWrite, formats, pools, barcodes, brand };
+});
+
+export default async function SkuListPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { canWrite, formats, pools, barcodes, brand } = await getSkuListPageData(id);
   const formatById = new Map(formats.map((f) => [f.id, f]));
   const skus = brand.skus.map((sku) => ({ ...sku, formats: formatById.get(sku.format_id) ?? null }));
   return (

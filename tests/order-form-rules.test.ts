@@ -64,6 +64,8 @@ describe("orderFormReadiness", () => {
       .toBe("Before creating an order, add a location and a SKU.");
     // A transfer does not need a customer.
     expect(orderFormReadiness({ ...empty, kind: "taproom_transfer", catalog: { customers: 0, locations: 1, skus: 1 } }).hint).toBeNull();
+    // The hint replaces Still needed; saving stays blocked.
+    expect(orderFormReadiness({ ...empty, catalog: { customers: 0, locations: 1, skus: 1 } })).toMatchObject({ submittable: false, reason: null });
   });
 
   it("the hint's Go to sentence links only the pages where Sales can add what is missing (#1127)", () => {

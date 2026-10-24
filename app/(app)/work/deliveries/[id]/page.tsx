@@ -14,8 +14,13 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import type { ShipToSnapshot } from "@/lib/mgr/ship-to-view";
 import { DeliveredForm } from "./delivered-form";
 import { navTitle } from "@/lib/mgr/nav";
+import { cache } from "react";
 
-export const metadata = { title: navTitle("/work/deliveries") };
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await getDeliveryData(id);
+  return { title: navTitle("/work/deliveries") };
+}
 
 type Stop = {
   delivery: {
@@ -27,12 +32,17 @@ type Stop = {
   lines: { id: string; name: string; qty: number; refused?: number }[];
   invoice: { id: string; invoice_no: number | null } | null;
 };
+const getDeliveryData = cache(async function getDeliveryData(id: string) {
+  const brewery = await getActiveBrewery();
+  const ctx = await buildContext(brewery.id);
+  const stop = await orNotFound(runCommand("get_delivery_stop", { deliveryId: id }, ctx) as Promise<Stop>);
+  return { ctx, stop };
+});
+
 
 export default async function DeliveryStopPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const brewery = await getActiveBrewery();
-  const ctx = await buildContext(brewery.id);
-  const { delivery, lines, invoice } = await orNotFound(runCommand("get_delivery_stop", { deliveryId: id }, ctx) as Promise<Stop>);
+  const { ctx, stop: { delivery, lines, invoice } } = await getDeliveryData(id);
   const order = delivery.shipments?.orders;
   const transfer = delivery.stock_transfers;
   const timing = transfer ? "None · stock transfer" : delivery.shipments?.invoice_timing === "on_delivery" ? "On delivery · saved" : "At ship";

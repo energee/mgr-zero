@@ -2,6 +2,7 @@
 // from/to bins, and the next verb (transfer-actions.tsx): Record pick,
 // Receive, or Cancel transfer. Receiving posts the paired ledger rows; the
 // page then shows what moved. A cancelled transfer shows its reason. Same movements as Complete transfer, no invoice.
+import { cache } from "react";
 import type { BinMoveStock } from "@/lib/commands/inventory";
 import { TransferDetailView } from "@/components/mgr/views/transfer-detail";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -13,7 +14,11 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import { TransferActions } from "./transfer-actions";
 import { navTitle } from "@/lib/mgr/nav";
 
-export const metadata = { title: navTitle("/transfers") };
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await getTransferPageData(id);
+  return { title: navTitle("/transfers") };
+}
 
 type Detail = {
   transfer: { id: string; from_location_id: string; transfer_no: number | null; status: string; note: string | null; cancel_reason: string | null; received_at: string | null; from_location: { name: string } | null; to_location: { name: string } | null };
@@ -21,11 +26,17 @@ type Detail = {
   bins: { id: string; name: string }[];
 };
 
-export default async function TransferPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+const getTransferPageData = cache(async function getTransferPageData(id: string) {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const { transfer, lines, bins } = await orNotFound(runCommand("get_stock_transfer", { transferId: id }, ctx) as Promise<Detail>);
+  const data = await orNotFound(runCommand("get_stock_transfer", { transferId: id }, ctx) as Promise<Detail>);
+  return { brewery, ctx, data };
+});
+
+export default async function TransferPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { brewery, ctx, data } = await getTransferPageData(id);
+  const { transfer, lines, bins } = data;
   const stock = brewery.roles.includes("admin") || brewery.roles.includes("warehouse") ? await runCommand("get_bin_move_stock", { locationId: transfer.from_location_id }, ctx) as BinMoveStock[] : [];
   const binById = new Map(bins.map((b) => [b.id, b.name]));
   const bin = (id: string) => binById.get(id) ?? "—";
