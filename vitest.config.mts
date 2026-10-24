@@ -25,6 +25,8 @@ const pureTests = [
   "tests/password-page.test.ts",
   "tests/auth-actions.test.ts",
   "tests/register-cell-keys.test.ts",
+  "tests/import-csv.test.ts",
+  "tests/import-view.test.ts",
   "tests/composer.test.ts",
   "tests/orders-list-view.test.ts",
   "tests/field-primitives.test.ts",
