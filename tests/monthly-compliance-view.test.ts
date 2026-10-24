@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { MonthlyComplianceView, PeriodBeforeBooksView } from "../components/mgr/views/monthly-compliance";
+import { DestinationStateExport } from "../components/mgr/views/destination-state-export";
 import { monthlyComplianceAmended, monthlyComplianceAugust, monthlyComplianceUnbalanced } from "../lib/mgr/fixtures/monthly-compliance";
 import { beforeBooksState, toMonthlyComplianceViewProps } from "../lib/mgr/monthly-compliance-view";
 
@@ -48,6 +49,13 @@ describe("compliance period status (#1310)", () => {
     const html = htmlOf(createElement(MonthlyComplianceView, { model }));
     expect(html).toContain("No transactions in this period. Nothing to export.");
     expect(html.match(/<button[^>]*>Export state transactions<\/button>/)?.[0]).toContain('disabled=""');
+    const exportButton = DestinationStateExport(model.stateExport!).props.children[1];
+    expect(exportButton.props.disabled).toBe(true);
+    expect(exportButton.props.onClick).toBeUndefined();
+    const populated = toMonthlyComplianceViewProps(monthlyComplianceAugust);
+    const populatedButton = DestinationStateExport(populated.stateExport!).props.children[1];
+    expect(populatedButton.props.disabled).toBe(false);
+    expect(populatedButton.props.onClick).toBeTypeOf("function");
   });
 });
 

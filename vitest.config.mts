@@ -21,6 +21,7 @@ const pureTests = [
   "tests/compliance-period.test.ts",
   "tests/reporting-basis-view.test.ts",
   "tests/confirm-destructive.test.ts",
+  "tests/screen-view-composition.test.ts",
   "tests/register-cell-keys.test.ts",
   "tests/migrations-applied.test.ts",
   "tests/test-db-schema-guard.test.ts",
