@@ -13,7 +13,7 @@ it("shares guest requirements and coarse fill controls without inventing own SKU
   const sheet = { ...state.sheet!, fields: { ...state.sheet!.fields, identity: "guest" as const } };
   const html = renderToStaticMarkup(createElement(TapKegView, { sheet, skus: [], timeZone: "America/New_York" }));
   expect(html).toContain("Guest keg label");
-  expect(html).toContain("Guest nominal BBL");
+  expect(html).toContain("Guest nominal bbl");
   expect(html).toContain("Opening fill");
   expect(html).toMatch(/maxlength="200"/i);
   expect(html).not.toContain("0.5 bbl");
@@ -26,7 +26,9 @@ it("retains both keg actions without nesting buttons or inventing yield bars", (
   expect(html).not.toMatch(/<button[^>]*>(?:(?!<\/button>)[\s\S])*<button/);
   expect(html).not.toContain('style="width:');
   expect(html).toContain("no guest yield");
-  expect(html).toContain("Recent · Porter · ⅙ bbl tapped");
+  expect(html).toContain("Porter · ⅙ bbl tapped");
+  expect(html).not.toContain("Recent ·");
+  expect(html).toContain('<ul aria-label="Recently tapped kegs"><li>');
   expect(html).not.toContain('href="/taproom');
   expect(isInertOn(SCREENS.find(screen => screen.name === "Tap board")!, "Tap keg")).toBe(true);
 });
@@ -94,7 +96,7 @@ describe("Tap keg sheet feedback (#1114)", () => {
 
   it("names both guest needs and marks no guest field before it is left", () => {
     const html = render({ sheet: { ...tap, fields: { ...tap.fields, identity: "guest" } } });
-    expect(html).toContain("Still needed: a guest keg label and a guest nominal BBL above zero.");
+    expect(html).toContain("Still needed: a guest keg label and a guest nominal bbl above zero.");
     expect(html).not.toContain('aria-invalid="true"');
   });
 
@@ -133,5 +135,39 @@ describe("Fill words match the chips (#1192)", () => {
     expect(html).toContain("Kicked empty · Empty · closed");
     const [closed] = tapBoard.snapshot.history;
     expect(board({ ...tapBoard, snapshot: { ...tapBoard.snapshot, history: [{ ...closed, closing_fill: .5, close_reason: "Off flavor" }] } })).toContain("Off flavor · About 50% left · closed");
+  });
+});
+
+describe("Tap board polish (#1302)", () => {
+  const render = (state = tapBoard) => renderToStaticMarkup(createElement(TapBoardView, { state, skus: tapBoardSkus, timeZone: "America/New_York", navigation: { locations: [{ value: "taproom", label: "Taproom" }], location: "taproom" } }));
+
+  it("only explains unnumbered sorting when an open keg is unnumbered", () => {
+    const numbered = { ...tapBoard, snapshot: { ...tapBoard.snapshot, open: tapBoard.snapshot.open.map(tap => ({ ...tap, tap_number: "3" })) } };
+    expect(render(numbered)).not.toContain("Unnumbered kegs sort last.");
+    expect(render({ ...numbered, snapshot: { ...numbered.snapshot, open: [{ ...numbered.snapshot.open[0], tap_number: null }] } })).toContain("Unnumbered kegs sort last.");
+    expect(render({ ...tapBoard, snapshot: { open: [], history: [] } })).not.toContain("Unnumbered kegs sort last.");
+  });
+
+  it("keeps legacy numbers visible and renders supplied actor names without inventing handles", () => {
+    const state = { ...tapBoard, snapshot: { open: [{ ...tapBoard.snapshot.open[0], tap_number: "abc", opened_by_label: "Dana Brewer" }], history: [] } };
+    const html = render(state);
+    expect(html).toContain("abc");
+    expect(html).toContain("Dana Brewer");
+    expect(html).not.toContain("@Dana Brewer");
+    expect(html).not.toMatch(/<[^>]*data-slot="empty"[^>]*>[\s\S]*No closed kegs yet/);
+    expect(html).toContain("No closed kegs yet.");
+  });
+
+  it("uses a numeric keypad without rounding a long identifier, and names invalid input", () => {
+    const state = openTapBoardSheet({ open: [], history: [] }, "tap", null, "taproom", tapBoardSkus[0].id);
+    const sheet = { ...state.sheet!, fields: { ...state.sheet!.fields, tapNumber: "abc" } };
+    const html = renderToStaticMarkup(createElement(TapKegView, { sheet, skus: tapBoardSkus, timeZone: "America/New_York" }));
+    expect(html).toMatch(/inputMode="numeric"/i);
+    expect(html).toMatch(/maxLength="80"/i);
+    expect(html).toContain("a positive whole tap number up to 9007199254740991, or no number");
+    const swap = renderToStaticMarkup(createElement(TapKegView, { sheet: swapKeg, skus: tapBoardSkus, timeZone: "America/New_York" }));
+    expect(swap).toContain("Swap closes this keg and opens its replacement together.");
+    expect(swap).not.toContain("atomic swap");
+    expect(swap).not.toContain("half-finished swap");
   });
 });
