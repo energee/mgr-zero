@@ -1,6 +1,6 @@
 // COLA review preserves brand identity and saves only the explicitly chosen label.
 import { describe, expect, it } from "vitest";
-import { colaApprovalInput, matchingBrandColas } from "../lib/mgr/cola-review";
+import { colaApprovalInput, defaultColaImage, matchingBrandColas, missingColaIds, soleColaId } from "../lib/mgr/cola-review";
 import { toCatalogViewProps } from "../lib/mgr/catalog-view";
 import type { ColaRecord, ColaDetails } from "../lib/ttb/colas";
 
@@ -35,5 +35,26 @@ describe("COLA bulk review", () => {
     expect(model.brands[0]?.image).toEqual({ url: "https://example.test/new.jpg", ttbId: "new" });
     const pendingOnly = toCatalogViewProps({ priceGroups: [], brands: [{ ...brand, abv: null, styles: null, skus: [], colas: [{ ttb_id: "pending", approved_on: null, image_url: "https://example.test/pending.jpg" }] }] });
     expect(pendingOnly.brands[0]?.image).toBeUndefined();
+  });
+
+  it("lists the brands with no COLA on file", () => {
+    const missing = { ...brand, id: "brand-2", colas: [] };
+    expect(missingColaIds([brand, missing])).toEqual(["brand-2"]);
+    expect(missingColaIds([brand])).toEqual([]);
+  });
+
+  it("chooses a COLA only when exactly one candidate matches", () => {
+    expect(soleColaId([record])).toBe(record.ttbId);
+    expect(soleColaId([record, { ...record, ttbId: "25318001000035" }])).toBe("");
+    expect(soleColaId([])).toBe("");
+  });
+
+  it("keeps a saved label, else chooses the only published label, else leaves the choice open", () => {
+    const back = { url: imageUrl.replace("label", "back"), label: "Back label" };
+    expect(defaultColaImage(details)).toBe(imageUrl);
+    expect(defaultColaImage({ ...details, images: [...details.images, back] })).toBe("");
+    expect(defaultColaImage({ ...details, images: [...details.images, back] }, back.url)).toBe(back.url);
+    expect(defaultColaImage(details, "https://example.test/gone.jpg")).toBe(imageUrl);
+    expect(defaultColaImage({ ...details, images: [] })).toBe("");
   });
 });
