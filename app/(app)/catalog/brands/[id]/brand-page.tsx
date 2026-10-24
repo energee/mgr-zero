@@ -30,9 +30,9 @@ export type BrandRow = Omit<BrandSnapshot["brand"], "skus"> & { skus: BrandSku[]
 /** The Sells as reads; a format's package_type tells SkuEditForm whether it takes a keg pool. */
 export type SellsReads = Omit<NonNullable<BrandSnapshot["sells"]>, "formats"> & { formats: (NonNullable<BrandSnapshot["sells"]>["formats"][number] & { package_type: string | null })[] };
 
-export function BrandPage({ brand, styles, categories, priceGroups, compliance, cost, sells, pools, canSell }: {
+export function BrandPage({ brand, styles, categories, priceGroups, compliance, cost, sells, pools, canSell, canManageFormats, canPrice }: {
   brand: BrandRow | null; styles: string[]; categories: string[]; priceGroups: BrandSnapshot["priceGroups"]; compliance: BrandSnapshot["compliance"]; cost: BrandSnapshot["cost"];
-  sells?: SellsReads; pools: KegPoolOption[]; canSell: boolean;
+  sells?: SellsReads; pools: KegPoolOption[]; canSell: boolean; canManageFormats: boolean; canPrice: boolean;
 }) {
   const router = useRouter();
   const { busy, error, run } = useCommandAction();
@@ -105,7 +105,8 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
             if (f.category === name) set("category")("");
           }, { target: name })}
         />}
-        linkRows
+        linkRows={canPrice}
+        formatAction={canManageFormats ? E.btn("Manage formats", "g", "/catalog") : null}
         messages={<CommandFormMessage error={error} />}
         footer={E.btn(busy ? "Saving…" : "Save brand", busy || !f.name.trim() ? "p disabled" : "p")}
         actions={actions ?? undefined}

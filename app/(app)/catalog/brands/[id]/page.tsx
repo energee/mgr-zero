@@ -58,6 +58,8 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
       sells={sells && { formats: sells[0], prices: sells[1], channels: sells[2] }}
       pools={sells?.[3] ?? []}
       canSell={canRun(ctx, "create_sku")}
+      canManageFormats={canRun(ctx, "upsert_format")}
+      canPrice={["list_sale_channels", "list_price_groups", "list_formats", "list_channel_prices", "list_price_group_barcodes"].every(name => canRun(ctx, name))}
     />
   );
 }
