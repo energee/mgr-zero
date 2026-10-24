@@ -10,14 +10,15 @@ import { useCommandQuery } from "@/components/mgr/query-provider";
 import type { PackagingRequirement } from "@/lib/mgr/packaging-actuals";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { E } from "@/components/mgr/e";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { SchedulePackagingRunView } from "@/components/mgr/views/schedule-packaging-run";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { plannedQty, toSchedulePackagingRunView, type ScheduleRunData, type ScheduleRunDraft } from "@/lib/mgr/schedule-packaging-run-view";
+import { plannedQty, scheduleRunReason, toSchedulePackagingRunView, type ScheduleRunData, type ScheduleRunDraft } from "@/lib/mgr/schedule-packaging-run-view";
 
 const EMPTY: ScheduleRunDraft = { brandId: "", occupancyId: "", plannedOn: "", qty: {} };
 
-export function ScheduleRunForm(data: ScheduleRunData) {
+export function ScheduleRunForm({ catalogHref, ...data }: ScheduleRunData & { catalogHref: string | null }) {
   const [draft, setDraft] = useState(EMPTY);
   const change = (patch: Partial<ScheduleRunDraft>) => setDraft((prev) => ({ ...prev, ...patch }));
   const model = toSchedulePackagingRunView(data, draft);
@@ -29,11 +30,11 @@ export function ScheduleRunForm(data: ScheduleRunData) {
     reset: () => setDraft(EMPTY),
   });
   const materials = useCommandQuery<{ planned: PackagingRequirement[] }>("get_packaging_material_plan", { outputs }, form.open && outputs.length > 0);
-  const ready = draft.brandId && draft.plannedOn && outputs.length > 0;
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Schedule run" trigger={<Button size="sm">Schedule run</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <SchedulePackagingRunView
+          catalogHref={catalogHref}
           model={{ ...model, materials: materials.data?.planned.map(row => [row.name, `${row.qty} ${row.unit}`, row.onHand ?? "—", row.short === undefined ? "—" : Math.max(0, row.short)]), materialsMessage: outputs.length ? "Loading material requirements…" : "Choose planned outputs to preview materials.", warning: materials.data?.planned.some(row => row.short !== undefined && row.short > 0) ? "Shortages do not prevent saving this plan. Closing requires enough stock for confirmed used plus lost quantities." : undefined }}
           controls={{
             plannedOn: (plannedOn) => change({ plannedOn }),
@@ -42,7 +43,7 @@ export function ScheduleRunForm(data: ScheduleRunData) {
             qty: (skuId, value) => setDraft((prev) => ({ ...prev, qty: { ...prev.qty, [skuId]: value } })),
           }}
           messages={<CommandFormMessage error={form.error ?? (materials.error instanceof Error ? materials.error.message : null)} />}
-          footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Save run plan"}</Button></CommandFormFooter>}
+          footer={<CommandFormFooter>{E.submit("Save run plan", { submitting: form.submitting, reason: scheduleRunReason(model) })}</CommandFormFooter>}
         />
       </form>
     </CommandForm>

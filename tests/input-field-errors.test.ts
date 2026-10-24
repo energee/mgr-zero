@@ -67,3 +67,21 @@ it("retains issues through client failure classification", () => {
   const error = new CommandResponseError("Check values", 400, "invalid_input", issues);
   expect(classifyCommandFailure(error)).toMatchObject({ issues, code: "invalid_input", status: 400 });
 });
+
+it.each([
+  [400, "invalid_input", "definitive"],
+  [401, undefined, "unknown"],
+  [409, "context_changed", "unknown"],
+  [429, "rate_limited", "definitive"],
+  [429, "invite_rate_limited", "definitive"],
+  [429, undefined, "unknown"],
+  [503, "admission_unavailable", "definitive"],
+  [503, undefined, "unknown"],
+  [500, "internal_error", "unknown"],
+] as const)("keeps structured presentation independent of recovery safety for %s/%s", (status, code, kind) => {
+  const issues = [{ path: ["email"], code: "invalid_format", message: "Invalid email address" }];
+  const detail = classifyCommandFailure(new CommandResponseError("Check values", status, code, issues));
+  expect(detail).toMatchObject({ status, kind, issues });
+  const presentation = inputErrorPresentation(detail, ["email"]);
+  expect(Object.keys(presentation.fieldErrors)).toEqual(code === "invalid_input" ? ["email"] : []);
+});

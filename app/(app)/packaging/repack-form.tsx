@@ -36,6 +36,7 @@ export function RepackForm({ locations, bins, parents, formatsHref, autoOpen = f
   const [qty, setQty] = useState("");
   const [stock, setStock] = useState<BinMoveStock[]>([]);
   const [stockError, setStockError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
   const parent = parents.find((p) => p.id === parentSkuId);
   const child = parent?.child ?? null;
   // An explicit pick wins; otherwise the bin's only lot (soleRepackLot).
@@ -43,7 +44,7 @@ export function RepackForm({ locations, bins, parents, formatsHref, autoOpen = f
   const form = useCommandForm("record_repack", {
     defaultOpen: autoOpen,
     build: () => ({ locationId, binId, parentSkuId, parentQty: Number(qty), childSkuId: child?.skuId ?? "", childQty: Number(qty) * (child?.quantity ?? 0), lotId: chosenLot || undefined }),
-    reset: () => { setLocationId(""); setBinId(""); setParentSkuId(""); setLotId(""); setQty(""); setStock([]); setStockError(null); },
+    reset: () => { setLocationId(""); setBinId(""); setParentSkuId(""); setLotId(""); setQty(""); setStock([]); setStockError(null); setSubmitted(false); },
   });
   useEffect(() => {
     if (!locationId || !form.open) return;
@@ -66,8 +67,16 @@ export function RepackForm({ locations, bins, parents, formatsHref, autoOpen = f
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Repack" trigger={<Button size="sm" variant="outline">Repack</Button>}
       footer={repackFooter(model, { formId, submitting: form.submitting, reason })}>
-      <form id={formId} onSubmit={form.submit} className="flex flex-col gap-3">
-        <RepackView model={model} footer={null} submitting={form.submitting} messages={<><CommandFormMessage error={stockError} /><CommandFormMessage error={form.error} /></>}
+      <form id={formId} noValidate onSubmit={event => {
+        setSubmitted(true);
+        if (form.submitting || reason || model.unavailable) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        void form.submit(event);
+      }} className="flex flex-col gap-3">
+        <RepackView model={model} footer={null} submitted={submitted} submitting={form.submitting} messages={<><CommandFormMessage error={stockError} /><CommandFormMessage error={form.error} /></>}
           onParent={(id) => { setParentSkuId(id); setLotId(""); }} onLocation={(id) => { setLocationId(id); setBinId(""); setLotId(""); }}
           onBin={(id) => { setBinId(id); setLotId(""); }} onLot={setLotId} onQuantity={setQty} />
       </form>

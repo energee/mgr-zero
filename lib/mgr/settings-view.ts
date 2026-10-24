@@ -2,6 +2,7 @@
 import type { GatewayModelOption } from "@/lib/chat/models";
 import { dollarsInput, toCents } from "@/lib/mgr/money";
 import type { ReportingBasisCorrection } from "@/lib/commands/compliance";
+import { submitReason } from "@/lib/mgr/submit-reason";
 
 export type BrewerySettings = {
   name: string; timezone: string; ttb_registry_no: string | null; pa_license_no: string | null;
@@ -32,6 +33,38 @@ export function breweryOperatingDefaultsCommand(values: Pick<BrewerySettingsValu
     valid: Number.isInteger(readingDueHours) && readingDueHours >= 1 && readingDueHours <= 168
       && Number.isInteger(daysToPackage) && daysToPackage >= 1 && daysToPackage <= 120,
   };
+}
+
+/** Compare the values sent by Settings, not harmless whitespace or numeric formatting. */
+export function brewerySettingsReason(values: BrewerySettingsValues, initial: BrewerySettingsValues): string | null {
+  const missing: string[] = [];
+  if (!values.name.trim()) missing.push("a brewery name");
+  if (!values.timezone.trim()) missing.push("a timezone");
+  const { readingDueHours, daysToPackage } = breweryOperatingDefaultsCommand(values).input;
+  if (!Number.isInteger(readingDueHours) || readingDueHours < 1 || readingDueHours > 168) missing.push("reading overdue hours from 1 to 168 (whole numbers)");
+  if (!Number.isInteger(daysToPackage) || daysToPackage < 1 || daysToPackage > 120) missing.push("days to package from 1 to 120 (whole numbers)");
+  if (missing.length) return submitReason(missing);
+  const changed = (Object.keys(values) as (keyof BrewerySettingsValues)[]).some(key => {
+    if (key === "hours" || key === "daysToPackage") return Number(values[key]) !== Number(initial[key]);
+    if (key === "oneWayKegFee") return (toCents(values[key]) ?? 0) !== (toCents(initial[key]) ?? 0);
+    return values[key].trim() !== initial[key].trim();
+  });
+  return submitReason(changed ? [] : ["a change to brewery details"]);
+}
+
+/** Server refreshes may arrive between independent writes. Keep locally edited fields. */
+export function refreshBrewerySettingsValues(previous: BrewerySettingsValues, values: BrewerySettingsValues, initial: BrewerySettingsValues): BrewerySettingsValues {
+  const refreshed = { ...values };
+  for (const key of Object.keys(initial) as (keyof BrewerySettingsValues)[]) {
+    if (values[key] === previous[key]) refreshed[key] = initial[key];
+  }
+  return refreshed;
+}
+
+export function aiModelSettingsReason(value: string, initial: string, models: GatewayModelOption[]): string | null {
+  if (!models.length) return submitReason(["the Gateway model catalog"]);
+  if (value === initial) return submitReason(["a change to the AI model"]);
+  return submitReason(models.some(model => model.id === value) ? [] : ["an available AI model"]);
 }
 
 export type SettingsViewModel = {

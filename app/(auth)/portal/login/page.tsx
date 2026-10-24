@@ -3,6 +3,8 @@
 // lands a customer-only account on the portal. Forgot password is a text link.
 import { LoginForm } from "@/components/login-form";
 
+export const metadata = { title: "Portal sign in" };
+
 const ERRORS: Record<string, string> = { "1": "Incorrect email or password." };
 
 export default async function PortalLoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {

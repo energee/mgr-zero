@@ -6,14 +6,16 @@
 
 import { useState } from "react";
 import { E } from "@/components/mgr/e";
+import { CustomerSaleChannelField, CustomerTaxTreatmentField } from "@/components/mgr/views/customer";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { FieldDescription } from "@/components/ui/field";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { PAYMENT_TERMS, type CustomerType, type PaymentTerm } from "@/lib/mgr/enums";
 import { CUSTOMER_ALIAS_HELP, type CustomerEditValues } from "@/lib/mgr/customer-view";
-import { COUNTRY_OPTIONS, CUSTOMER_TYPE_OPTIONS, PAYMENT_TERM_LABEL, paymentTermLabel, sentenceCase } from "@/lib/mgr/labels";
-import { TAX_TREATMENTS, type TaxTreatment } from "@/lib/mgr/tax-treatments";
+import { COUNTRY_OPTIONS, CUSTOMER_TYPE_OPTIONS, PAYMENT_TERM_LABEL, paymentTermLabel } from "@/lib/mgr/labels";
+import type { TaxTreatment } from "@/lib/mgr/tax-treatments";
+import { submitReason } from "@/lib/mgr/submit-reason";
 
 export type { TaxTreatment };
 
@@ -97,21 +99,32 @@ export function CustomerForm({
           </div>
           {E.pick("Type", type, CUSTOMER_TYPE_OPTIONS, { id: "customer-type", onChange: (value) => setType(value as CustomerType) })}
           {E.pick("Country", country, COUNTRY_OPTIONS, { id: "customer-country", onChange: setCountry, required: true, error: form.fieldErrors.country })}
-          {country === "US" && <div className="flex flex-col gap-2">
-            {E.edit("State", state, "text", undefined, { id: "customer-state", onChange: value => setState(value.toUpperCase()), maxLength: 2, placeholder: "PA", required: true, error: form.fieldErrors.state, "aria-describedby": "customer-state-help" })}
-            <FieldDescription id="customer-state-help">Use a two-letter US state code, such as PA.</FieldDescription>
-          </div>}
-          {E.pick("Sale channel", saleChannelId, channels.map((c) => ({ value: c.id, label: c.name })), { id: "customer-sale-channel", onChange: setSaleChannelId, required: true, error: form.fieldErrors.saleChannelId })}
+          <div className="flex flex-col gap-2">
+            {E.edit(country === "US" ? "State (required)" : "State", country === "US" ? state : "Not applicable", "text", undefined, {
+              id: "customer-state",
+              onChange: value => setState(value.toUpperCase()),
+              maxLength: 2,
+              placeholder: "PA",
+              required: country === "US",
+              disabled: country !== "US",
+              error: country === "US" ? form.fieldErrors.state : undefined,
+              "aria-describedby": country === "US" ? "customer-state-help" : undefined,
+            })}
+            {country === "US" && <FieldDescription id="customer-state-help">Use a two-letter US state code, such as PA.</FieldDescription>}
+          </div>
+          <CustomerSaleChannelField value={saleChannelId} channels={channels} controls={{ id: "customer-sale-channel", onChange: setSaleChannelId, error: form.fieldErrors.saleChannelId }} />
           {E.edit("License number", licenseNumber, "text", undefined, { id: "customer-license", onChange: setLicenseNumber, error: form.fieldErrors.licenseNumber })}
           {E.pick("Payment terms", paymentTerms, PAYMENT_TERMS.map(t => ({ value: t, label: PAYMENT_TERM_LABEL[t] })), { id: "customer-terms", onChange: setPaymentTerms, displayValue: paymentTermLabel(paymentTerms) })}
-          {E.pick("Tax treatment", taxTreatment, [{ value: "", label: "Inherit sale channel" }, ...TAX_TREATMENTS.map(t => ({ value: t, label: sentenceCase(t) }))], { id: "customer-tax", onChange: value => setTaxTreatment(value as TaxTreatment | ""), displayValue: taxTreatment ? sentenceCase(taxTreatment) : "Inherit sale channel" })}
+          <CustomerTaxTreatmentField value={taxTreatment} controls={{ id: "customer-tax", onChange: value => setTaxTreatment(value as TaxTreatment | "") }} />
           {/* upsert_customer takes no ship-to; ship-tos are upsert_ship_to on Customer detail. Create only: edit already has that page. */}
           {!isEdit && E.info("Add ship-to addresses on the customer’s page after you create the customer.")}
           <CommandFormMessage error={form.error} />
           <CommandFormFooter>
-            <Button type="submit" disabled={form.submitting}>
-              {form.submitting ? (isEdit ? "Saving…" : "Creating…") : isEdit ? "Save" : "Create"}
-            </Button>
+            {E.submit(isEdit ? "Save" : "Create", {
+              submitting: form.submitting,
+              busy: isEdit ? "Saving…" : "Creating…",
+              reason: submitReason(name.trim() ? [] : ["a name"]),
+            })}
           </CommandFormFooter>
         </form>
       </CommandForm>

@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { VendorView } from "@/components/mgr/views/vendor";
 import { ShipToView } from "@/components/mgr/views/ship-to";
 import { InviteView } from "@/components/mgr/views/team-controls";
@@ -23,6 +23,18 @@ it("renders vendor server phone corrections at an accessible highlighted field",
     errors: { phone: "Use a phone number, such as (503) 555-0142." },
   }));
   expectFieldError(html, "Use a phone number, such as (503) 555-0142.");
+});
+
+it("shows controlled vendor server errors without losing local attempted-state diagnostics", () => {
+  const model = { name: "Supplier", email: "not-an-email", phone: "", terms: "Net 30", termsOptions: ["Net 30"], leadDays: "-1" };
+  const controls = { email: vi.fn(), leadDays: vi.fn() };
+  const serverError = "Check this supplier email.";
+  const html = renderToStaticMarkup(createElement(VendorView, { model, controls, errors: { email: serverError } }));
+  expectFieldError(html, serverError);
+  expect(html.match(/aria-invalid="true"/g)).toHaveLength(1);
+  const attempted = renderToStaticMarkup(createElement(VendorView, { model, controls, errors: { email: serverError }, validationAttempted: true }));
+  expect(attempted.match(/aria-invalid="true"/g)).toHaveLength(2);
+  expect(attempted).toContain('value="-1"');
 });
 
 it("renders both state and ZIP corrections without losing ship-to values", () => {

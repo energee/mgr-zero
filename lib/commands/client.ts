@@ -3,6 +3,7 @@
 // three-argument calls still generate one UUID per invocation.
 import type { CommandContextExpectation, CommandOrigin } from "./registry";
 import type { InputIssue } from "./field-errors";
+import { canRetireCommandFailure } from "./failure";
 
 export const COMMAND_DATA_CHANGED = "mgr-command-data-changed";
 function notifyDataChanged(breweryId: string) {
@@ -28,7 +29,7 @@ export function classifyCommandFailure(error: unknown): CommandFailureDetail {
   // A rejection that is not an Error (a thrown string or bare object) has no
   // safe text of its own; show customer copy, never the internal command name (#762).
   const message = error instanceof Error ? error.message : "The request did not finish. Try again.";
-  const definitive = status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429;
+  const definitive = canRetireCommandFailure(status ?? 0, false, code);
   return { message, kind: definitive ? "definitive" : "unknown", ...(status === undefined ? {} : { status }), ...(code ? { code } : {}), ...(error instanceof CommandResponseError && error.issues ? { issues: error.issues } : {}) };
 }
 

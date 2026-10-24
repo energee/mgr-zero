@@ -7,6 +7,8 @@ import { ConfirmDeleteControl } from "./confirm-delete";
 import type { StaffRole } from "@/lib/commands/registry";
 import { STAFF_ROLES } from "@/lib/mgr/enums";
 import { sentenceCase } from "@/lib/mgr/labels";
+import { emailError } from "@/lib/mgr/email";
+import { useTouchedLines } from "@/lib/mgr/touched-lines";
 
 const ROLE_DESCRIPTIONS: Record<StaffRole, string> = {
   admin: "Can use every staff screen and action, including Team and Settings.",
@@ -24,18 +26,20 @@ function StaffRoleField({ value, onChange, disabled }: { value: string; onChange
 /** The invite form shared by Team, first-run and customer detail (InviteForm) and the inventory frames.
  *  Email and role are controlled when their props are passed (InviteForm) and kept in local state
  *  otherwise (the frames). The local role starts at Warehouse, the same default InviteForm resets to. */
-export function InviteView({ buyer, email, defaultEmail = "", role, onEmailChange, onRoleChange, onSubmit, busy = false, error, emailError }: {
+export function InviteView({ buyer, email, defaultEmail = "", role, onEmailChange, onRoleChange, onSubmit, busy = false, error, emailError: serverEmailError, validationAttempted = false }: {
   buyer: boolean; email?: string; defaultEmail?: string; role?: string; onEmailChange?: (value: string) => void; onRoleChange?: (value: string) => void;
-  onSubmit?: FormEventHandler<HTMLFormElement>; busy?: boolean; error?: string | null;
+  onSubmit?: FormEventHandler<HTMLFormElement>; busy?: boolean; error?: string | null; validationAttempted?: boolean;
   emailError?: string;
 }) {
   const id = useId(), [draftEmail, setEmail] = useState(defaultEmail), [draftRole, setRole] = useState("warehouse");
-  return <form noValidate onSubmit={event => { event.preventDefault(); if (!busy) onSubmit?.(event); }} className="flex flex-col gap-4">
-    {E.edit("Email", email ?? draftEmail, "email", undefined, { onChange: (nextValue: string) => { setEmail(nextValue); onEmailChange?.(nextValue); }, id, disabled: busy, required: true, error: emailError })}
+  const touched = useTouchedLines(validationAttempted);
+  const fieldError = emailError(email ?? draftEmail);
+  return <form noValidate onSubmit={event => { event.preventDefault(); touched.touch(0); if (!busy && !fieldError) onSubmit?.(event); }} className="flex flex-col gap-4">
+    {E.edit("Email", email ?? draftEmail, "email", undefined, { onChange: (nextValue: string) => { setEmail(nextValue); onEmailChange?.(nextValue); }, id, onBlur: () => touched.touch(0), error: serverEmailError ?? (touched.shown(0) ? fieldError : undefined), disabled: busy, required: true })}
     {buyer ? E.fld("Role", "Buyer") : <StaffRoleField value={role ?? draftRole} onChange={value => { setRole(value); onRoleChange?.(value); }} disabled={busy} />}
     {E.info("New accounts get an email to set up their login. Existing accounts get no email. They see the invitation in Invitations the next time they sign in, or at /invitations. Access starts once they accept, within seven days.")}
     <CommandFormMessage error={error} />
-    <CommandFormFooter><Button type="submit" disabled={busy}>{busy ? "Sending…" : "Send invite"}</Button></CommandFormFooter>
+    <CommandFormFooter><Button type="submit" disabled={busy || Boolean(fieldError)}>{busy ? "Sending…" : "Send invite"}</Button></CommandFormFooter>
   </form>;
 }
 
@@ -64,9 +68,8 @@ export function TeamMemberView({ name, email, avatar, savedRoles, roles, onRoles
   const [draftRoles, setRoles] = useState(savedRoles), busy = saving || removing, value = roles ?? draftRoles;
   const unchanged = value.length === savedRoles.length && value.every(role => savedRoles.includes(role));
   const empty = value.length === 0;
-  const removeName = name.replace(/^@/, "");
   return <>
-    {E.row(name, email, "", "", E.face({ src: avatar, name: removeName }))}
+    {E.row(name, email, "", "", E.face({ src: avatar, name }))}
     <form onSubmit={event => { event.preventDefault(); if (!busy && !empty && !unchanged) onSubmit?.(event); }} className="flex flex-col gap-4">
       {E.picks("Roles", STAFF_ROLES.filter(role => value.includes(role)), ROLE_OPTIONS, {
         onChange: next => { const selected = STAFF_ROLES.filter(role => next.includes(role)); setRoles(selected); onRolesChange?.(selected); },
@@ -77,9 +80,9 @@ export function TeamMemberView({ name, email, avatar, savedRoles, roles, onRoles
       <CommandFormMessage error={error ?? (empty ? "Choose at least one role." : null)} />
       <CommandFormFooter><Button type="submit" disabled={busy || empty || unchanged}>{saving ? "Saving…" : "Save roles"}</Button></CommandFormFooter>
     </form>
-    {E.note(`Removing ${removeName} ends this brewery membership.`)}
-    <ConfirmDeleteControl title={`Remove ${removeName}`} busy={busy} error={error} onDelete={onRemove} busyLabel="Removing…"
-      name={<>Remove <strong>{removeName}</strong> from this brewery?</>}
+    {E.note(`Removing ${name} ends this brewery membership.`)}
+    <ConfirmDeleteControl title={`Remove ${name}`} busy={busy} error={error} onDelete={onRemove} busyLabel="Removing…"
+      name={<>Remove <strong>{name}</strong> from this brewery?</>}
       warning="They lose access right away. Their sign-in account remains, and only a new invitation restores access." />
   </>;
 }
