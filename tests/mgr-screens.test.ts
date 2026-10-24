@@ -277,7 +277,7 @@ describe("SCREENS", () => {
     const expected = new Map<string, Screen["surface"]>([
       ["Customer detail", undefined], ["Ship-to form", "sheet"], ["Compliance months", undefined],
       ["Locations", undefined], ["Location detail", undefined],
-      ["Material", "sheet"], ["Vendor", "sheet"], ["Contracts", undefined],
+      ["Add material", "sheet"], ["Edit material", "sheet"], ["Vendor", "sheet"], ["Contracts", undefined],
       ["Contract", "sheet"], ["SKU list", undefined], ["Team member", "sheet"],
     ]);
     for (const [name, surface] of expected) {
