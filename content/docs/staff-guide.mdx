@@ -510,7 +510,15 @@ After shipping, the confirmation shows the recorded quantities and the invoice l
 
 *Admin and Warehouse can open Pick from the Work tab. The page also opens for Sales when the address is entered directly, but it is not linked in Sales navigation.*
 
-Open **Pick** to see confirmed and picked orders grouped by requested ship date. Orders without a date sit under **Unscheduled**. Under each date's orders, **Totals** is a table of what to pull: **Format**, **Product**, **Qty**. Lines group by package format, then alphabetically by brand, so all cases of the same format sit together across beers. Each format is named once; each beer keeps its alias. Confirmed orders without a ship date also stay on Today and Work for Warehouse and Admin as **pick due · no ship date**. They are always due and sort after dated work. Linked staff receive the same chat reminder. Each card names its confirmed or picked status and line count, including on the printed sheet. **Pick** opens a confirmed order, where picking is recorded; a picked order has no verb, and selecting its row opens it. Group totals summarize ordered quantities. A **changed after pick** tag on a card means the order was picked, then a line was added or raised: the rest is already staged, so count only the added or raised lines. The tag clears once the order is picked again.
+Open **Pick** to see confirmed and picked orders grouped by requested ship date. Each date shows its order count. Orders without a date sit under **Unscheduled**.
+
+Each date has an **Orders** list and a **Totals** table. They sit side by side on a wide screen and stack on smaller screens and in print. Each order names its confirmed or picked status and line count. **Pick** opens a confirmed order, where picking is recorded; selecting a picked order's row opens it for review.
+
+**Totals** shows **Format**, **Product**, and **Qty**. These are all ordered quantities for the date, including picked orders. They are not quantities left to pick. Lines group by package format, then alphabetically by brand, so all cases of the same format sit together across beers. Each format is named once; each beer keeps its alias.
+
+A **changed after pick** tag on an order means it was picked, then a line was added or raised. The row reminds you to count only those lines; the rest is already staged. The tag clears once the order is picked again.
+
+Confirmed orders without a ship date also stay on Today and Work for Warehouse and Admin as **pick due · no ship date**. They are always due and sort after dated work. Linked staff receive the same chat reminder.
 
 Select **Print** to open the browser print dialog. MGR hides the staff navigation in the printed copy. If nothing is ready, the page says **Nothing confirmed to pick**, and **Print** is unavailable with *Nothing to print yet.* beside it.
 
