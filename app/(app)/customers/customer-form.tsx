@@ -17,6 +17,7 @@ import { PAYMENT_TERMS, type CustomerType, type PaymentTerm } from "@/lib/mgr/en
 import { CUSTOMER_ALIAS_HELP, type CustomerEditValues } from "@/lib/mgr/customer-view";
 import { COUNTRY_OPTIONS, CUSTOMER_TYPE_OPTIONS, PAYMENT_TERM_LABEL, paymentTermLabel } from "@/lib/mgr/labels";
 import type { TaxTreatment } from "@/lib/mgr/tax-treatments";
+import { submitReason } from "@/lib/mgr/submit-reason";
 
 export type { TaxTreatment };
 
@@ -93,7 +94,7 @@ export function CustomerForm({
         </Button>}>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="customer-name">Name</Label>
+            <Label htmlFor="customer-name">Name (required)</Label>
             <Input id="customer-name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div className="flex flex-col gap-2">
@@ -124,9 +125,11 @@ export function CustomerForm({
           {!isEdit && E.info("Add ship-to addresses on the customer’s page after you create the customer.")}
           <CommandFormMessage error={form.error} />
           <CommandFormFooter>
-            <Button type="submit" disabled={form.submitting}>
-              {form.submitting ? (isEdit ? "Saving…" : "Creating…") : isEdit ? "Save" : "Create"}
-            </Button>
+            {E.submit(isEdit ? "Save" : "Create", {
+              submitting: form.submitting,
+              busy: isEdit ? "Saving…" : "Creating…",
+              reason: submitReason(name.trim() ? [] : ["a name"]),
+            })}
           </CommandFormFooter>
         </form>
       </CommandForm>
