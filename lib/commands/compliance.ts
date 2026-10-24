@@ -12,8 +12,10 @@ import type { LotTraceSources } from "@/lib/mgr/lot-trace-view";
 import { recipientsFor } from "./recall-recipients";
 import type { MaterialLotTraceSnapshot } from "@/lib/mgr/material-lot-trace-view";
 import { isoDate } from "./packaging";
-import { matchColas, searchColasByPermit, type ColaRecord } from "@/lib/ttb/colas";
-import { breweryToday, CommandError, completeRows, defineCommand, defineQuery, PAGE_SIZE, rows, stateCode, unwrap } from "./registry";
+import { getColaDetails, getColaImage, isColaImageUrl, matchColas, searchColasByPermit } from "@/lib/ttb/colas";
+import type { ColaDetails, ColaRecord } from "@/lib/ttb/colas";
+import { breweryToday, CommandError, completeRows, defineCommand, defineQuery, PAGE_SIZE, rows, STAFF_ROLES, stateCode, unwrap } from "./registry";
+import type { Ctx } from "./registry";
 
 const ROLES = ["admin", "sales"] as const;
 // The three registry upserts below keep a saved value when the caller omits
@@ -24,15 +26,16 @@ const text = z.string().nullable().optional();
 const cleared = (fields: Record<string, unknown>) => Object.keys(fields).filter((column) => fields[column] === null);
 
 defineCommand({
-  name: "upsert_brand_approval", description: "Record or edit one brand's COLA or formula approval: ttbId is a COLA's TTB-assigned ID or a formula's number, and serialNumber is a COLA's own applicant serial (a formula takes none); the same kind and ttbId on the same brand is one record; an edit keeps a field left out and clears one sent as null",
+  name: "upsert_brand_approval", description: "Record or edit one brand's COLA or formula approval: ttbId is a COLA's TTB-assigned ID or a formula's number, and serialNumber is a COLA's own applicant serial (a formula takes none); imageUrl selects an official TTB label attachment and requires an approved COLA date; the same kind and ttbId on the same brand is one record; an edit keeps a field left out and clears one sent as null; changing kind or TTB ID clears an omitted image",
   roles: [...ROLES],
   // Both identifiers are text: a TTB ID or serial may carry leading zeros.
-  input: z.object({ id: z.string().uuid().optional(), brandId: z.string().uuid(), kind: z.enum(["formula", "cola"]), ttbId: z.string().min(1), serialNumber: text, approvedOn: day, expiresOn: day, note: text })
-    .refine((i) => i.kind === "cola" || i.serialNumber == null, { path: ["serialNumber"], message: "Only a COLA has an applicant serial number" }),
+  input: z.object({ id: z.string().uuid().optional(), brandId: z.string().uuid(), kind: z.enum(["cola", "formula"]), ttbId: z.string().min(1), serialNumber: text, approvedOn: day, expiresOn: day, note: text, imageUrl: z.string().refine(isColaImageUrl, "Select an official TTB label image").nullable().optional() })
+    .refine((i) => i.kind === "cola" || i.serialNumber == null, { path: ["serialNumber"], message: "Only a COLA has an applicant serial number" })
+    .refine((i) => i.imageUrl == null || (i.kind === "cola" && i.approvedOn != null), { path: ["imageUrl"], message: "A selected label image requires an approved COLA with its approval date" }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_brand_approval", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_brand: i.brandId, p_kind: i.kind, p_ttb_id: i.ttbId, p_serial_number: i.serialNumber ?? null,
-    p_approved_on: i.approvedOn ?? null, p_expires_on: i.expiresOn ?? null, p_note: i.note ?? null, p_request_id: execution.requestId,
-    p_clear: cleared({ serial_number: i.serialNumber, approved_on: i.approvedOn, expires_on: i.expiresOn, note: i.note }),
+    p_approved_on: i.approvedOn ?? null, p_expires_on: i.expiresOn ?? null, p_note: i.note ?? null, p_image_url: i.imageUrl ?? null, p_request_id: execution.requestId,
+    p_clear: cleared({ serial_number: i.serialNumber, approved_on: i.approvedOn, expires_on: i.expiresOn, note: i.note, image_url: i.imageUrl }),
   })),
 });
 
@@ -58,7 +61,7 @@ defineCommand({
   })),
 });
 
-export type Approval = { id: string; brand_id: string; kind: "cola" | "formula"; ttb_id: string; serial_number: string | null; approved_on: string | null; expires_on: string | null; note: string | null };
+export type Approval = { id: string; brand_id: string; kind: "cola" | "formula"; ttb_id: string; serial_number: string | null; approved_on: string | null; expires_on: string | null; note: string | null; image_url?: string | null };
 export type Registration = { id: string; brand_id: string; state: string; registration_no: string | null; approved_on: string | null; expires_on: string | null };
 export type License = { id: string; state: string; kind: string; license_no: string | null; expires_on: string | null; note: string | null };
 export type RegistryBrand = { id: string; name: string; approvals: Approval[]; registrations: Registration[] };
@@ -96,6 +99,54 @@ defineQuery({
       throw new CommandError(`TTB's COLA registry did not answer: ${error instanceof Error ? error.message : String(error)}`, 502, "upstream_unavailable");
     });
     return { permit, rows: matchColas(found, i.name) };
+  },
+});
+
+const colaId = z.string().regex(/^\d{14}$/, "A TTB ID has exactly 14 digits");
+
+async function colaPermit(ctx: Ctx): Promise<string> {
+  const brewery = await unwrap(ctx.db.from("breweries").select("ttb_registry_no").eq("id", ctx.breweryId).single());
+  const permit = brewery?.ttb_registry_no?.trim();
+  if (!permit) throw new CommandError("Set the brewery's TTB registry number on Settings to retrieve COLA labels.", 400, "bad_request");
+  return permit;
+}
+
+function colaUpstreamError(error: unknown): never {
+  throw new CommandError(`Could not retrieve this COLA from TTB: ${error instanceof Error ? error.message : String(error)}`, 502, "upstream_unavailable");
+}
+
+defineQuery({
+  name: "get_cola_details",
+  description: "Retrieve an approved COLA's label image identifiers from TTB; refused unless its principal permit matches the brewery's TTB registry number; images render through get_cola_image",
+  roles: [...ROLES],
+  input: z.object({ ttbId: colaId }),
+  handler: async (ctx, i): Promise<ColaDetails> => {
+    const permit = await colaPermit(ctx);
+    const details = await getColaDetails(i.ttbId).catch(colaUpstreamError);
+    if (details.permit !== permit) throw new CommandError("This COLA does not belong to the brewery's TTB registry number.", 403, "permission_denied");
+    if (details.status !== "APPROVED") throw new CommandError(`This COLA is ${details.status}, not APPROVED.`, 400, "bad_request");
+    if (!details.approvedOn) throw new CommandError("TTB reports this COLA as approved but provides no approval date. Open the COLA on TTB to review it.", 502, "upstream_unavailable");
+    return details;
+  },
+});
+
+defineQuery({
+  name: "get_cola_image",
+  description: "Render one official approved COLA label as a bounded image data URL using a fresh TTB session; admin/sales may preview brewery-owned labels, other staff may view only an approved image saved on a brand",
+  roles: STAFF_ROLES,
+  input: z.object({ ttbId: colaId, url: z.string().refine(isColaImageUrl, "Use an official TTB label image URL") }),
+  handler: async (ctx, i): Promise<{ dataUrl: string }> => {
+    let permit: string;
+    if (ctx.roles.some((role) => role === "admin" || role === "sales")) {
+      permit = await colaPermit(ctx);
+    } else {
+      const savedPermit = await unwrap(ctx.db.rpc("get_saved_cola_image_permit", {
+        p_brewery: ctx.breweryId, p_ttb_id: i.ttbId, p_image_url: i.url,
+      }));
+      permit = savedPermit?.trim() ?? "";
+      if (!permit) throw new CommandError("Set the brewery's TTB registry number on Settings to retrieve COLA labels.", 400, "bad_request");
+    }
+    return getColaImage(i.ttbId, i.url, permit).catch(colaUpstreamError);
   },
 });
 

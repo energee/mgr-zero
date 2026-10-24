@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { closeWithConfirmedMaterials } from "./packaging-fixture";
 // tests/compliance.test.ts — Program 9: the compliance registry (brand
 // approvals, state registrations, brewery licenses), the period report
@@ -8,6 +9,7 @@ import { admin, channelId, ins, insertFixture, makeBrewery, makeStaffCtx, priceS
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { searchColasByPermit, type ColaRecord } from "@/lib/ttb/colas";
+import { STAFF_ROLES } from "@/lib/mgr/enums";
 
 // The TTB client is stubbed: tests never reach ttbonline.gov.
 vi.mock("@/lib/ttb/colas", async (orig) => ({ ...(await orig<typeof import("@/lib/ttb/colas")>()), searchColasByPermit: vi.fn() }));
@@ -52,7 +54,169 @@ describe("search_colas", () => {
   });
 });
 
+describe("approval label images", () => {
+  const imageUrl = "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Array.jpg&filetype=l";
+  const nextImageUrl = "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Dom1%20Final.jpg&filetype=l";
+
+  it("exposes only the permit needed for an exact saved approved COLA image to every staff role", async () => {
+    const brewery = await makeBrewery();
+    const permit = "BR-PA-IMAGE-PERMIT";
+    const updated = await admin.from("breweries").update({ ttb_registry_no: permit }).eq("id", brewery.id);
+    if (updated.error) throw updated.error;
+    const owner = await makeStaffCtx(brewery.id, "admin");
+    const { brandId: brand } = await seedCatalog(brewery.id, { product: "Image Permit", sku: "Image Permit case" });
+    const ttbId = "26001001000108";
+    await runCommand("upsert_brand_approval", { brandId: brand, kind: "cola", ttbId, approvedOn: "2026-01-02", imageUrl }, owner);
+    const args = { p_brewery: brewery.id, p_ttb_id: ttbId, p_image_url: imageUrl };
+    for (const role of STAFF_ROLES) {
+      const ctx = await makeStaffCtx(brewery.id, role);
+      const result = await ctx.db.rpc("get_saved_cola_image_permit", args);
+      expect(result.error, role).toBeNull();
+      expect(result.data, role).toBe(permit);
+      for (const mismatch of [{ p_ttb_id: "26001001000999" }, { p_image_url: nextImageUrl }, { p_image_url: null }]) {
+        expect((await ctx.db.rpc("get_saved_cola_image_permit", { ...args, ...mismatch })).error?.code).toBe("MG404");
+      }
+      if (role === "taproom") {
+        expect((await ctx.db.from("breweries").select("ttb_registry_no").eq("id", brewery.id)).data).toEqual([]);
+      }
+    }
+    const foreign = await makeStaffCtx((await makeBrewery()).id, "admin");
+    expect((await foreign.db.rpc("get_saved_cola_image_permit", args)).error?.code).toBe("42501");
+    expect((await foreign.db.rpc("get_saved_cola_image_permit", { ...args, p_brewery: foreign.breweryId })).error?.code).toBe("MG404");
+    await runCommand("upsert_brand_approval", { brandId: brand, kind: "formula", ttbId: "F-IMAGE-PERMIT", approvedOn: "2026-01-02" }, owner);
+    await runCommand("upsert_brand_approval", { brandId: brand, kind: "cola", ttbId: "26001001000109" }, owner);
+    for (const otherId of ["F-IMAGE-PERMIT", "26001001000109"]) {
+      expect((await owner.db.rpc("get_saved_cola_image_permit", { ...args, p_ttb_id: otherId })).error?.code).toBe("MG404");
+    }
+    const clearedPermit = await admin.from("breweries").update({ ttb_registry_no: null }).eq("id", brewery.id);
+    if (clearedPermit.error) throw clearedPermit.error;
+    const missingPermit = await owner.db.rpc("get_saved_cola_image_permit", args);
+    expect(missingPermit.error).toBeNull();
+    expect(missingPermit.data).toBeNull();
+  });
+
+  it("persists the selected official image, keeps omissions, clears null, and includes it in registry reads", async () => {
+    const { brandId: brand } = await seedCatalog(b.id, { product: "Image Keep", sku: "Image Keep case" });
+    const input = { brandId: brand, kind: "cola", ttbId: "26001001000102" };
+    const saved = await runCommand("upsert_brand_approval", { ...input, approvedOn: "2026-01-02", imageUrl }, sales) as { id: string };
+    expect(saved).toMatchObject({ image_url: imageUrl });
+    expect(await runCommand("upsert_brand_approval", { ...input, id: saved.id, note: "revised note" }, sales))
+      .toMatchObject({ image_url: imageUrl, approved_on: "2026-01-02" });
+    const registry = await runCommand("get_compliance_registry", {}, sales) as { brands: { id: string; approvals: { image_url: string | null }[] }[] };
+    expect(registry.brands.find(row => row.id === brand)?.approvals).toEqual([expect.objectContaining({ image_url: imageUrl })]);
+    const stored = await sales.db.from("brand_approvals").select("image_url").eq("id", saved.id).single();
+    expect(stored.error).toBeNull();
+    expect(stored.data?.image_url).toBe(imageUrl);
+    expect(await runCommand("upsert_brand_approval", { ...input, id: saved.id, imageUrl: null }, sales))
+      .toMatchObject({ image_url: null, approved_on: "2026-01-02" });
+  });
+
+  it("clears stale images when the TTB ID, kind, or approved status changes; an explicit new selection replaces it", async () => {
+    const { brandId: brand } = await seedCatalog(b.id, { product: "Image Stale", sku: "Image Stale case" });
+    const input = { brandId: brand, kind: "cola", ttbId: "26001001000103" };
+    const saved = await runCommand("upsert_brand_approval", { ...input, approvedOn: "2026-01-02", imageUrl }, sales) as { id: string };
+    const edit = { ...input, id: saved.id };
+    expect(await runCommand("upsert_brand_approval", { ...edit, ttbId: "26001001000104" }, sales)).toMatchObject({ image_url: null });
+    expect(await runCommand("upsert_brand_approval", { ...edit, ttbId: "26001001000105", approvedOn: "2026-01-03", imageUrl: nextImageUrl }, sales))
+      .toMatchObject({ image_url: nextImageUrl, approved_on: "2026-01-03" });
+    expect(await runCommand("upsert_brand_approval", { ...edit, kind: "formula", ttbId: "F-IMAGE" }, sales))
+      .toMatchObject({ image_url: null });
+    await runCommand("upsert_brand_approval", { ...edit, approvedOn: "2026-01-02", imageUrl }, sales);
+    expect(await runCommand("upsert_brand_approval", { ...edit, approvedOn: null }, sales))
+      .toMatchObject({ image_url: null, approved_on: null });
+  });
+
+  it("requires an approved COLA date for a new image, including direct RPC edits with an existing date", async () => {
+    const { brandId: brand } = await seedCatalog(b.id, { product: "Image Status", sku: "Image Status case" });
+    const input = { brandId: brand, kind: "cola", ttbId: "26001001000106", imageUrl };
+    for (const change of [{}, { approvedOn: null }, { kind: "formula", approvedOn: "2026-01-02" }]) {
+      await expect(runCommand("upsert_brand_approval", { ...input, ...change }, sales)).rejects.toMatchObject({ status: 400 });
+    }
+    const saved = await runCommand("upsert_brand_approval", { ...input, approvedOn: "2026-01-02" }, sales) as { id: string };
+    const args = {
+      p_brewery: b.id, p_id: saved.id, p_brand: brand, p_kind: "cola" as const, p_ttb_id: input.ttbId,
+      p_approved_on: null, p_expires_on: null, p_note: null, p_image_url: imageUrl,
+    };
+    for (const change of [{}, { p_approved_on: "2026-01-02", p_clear: ["approved_on"] }, { p_kind: "formula" as const, p_approved_on: "2026-01-02" }]) {
+      expect((await sales.db.rpc("upsert_brand_approval", { ...args, ...change, p_request_id: crypto.randomUUID() })).error?.message)
+        .toMatch(/approved COLA/);
+    }
+  });
+
+  it("keeps image writes tenant- and role-bound and supports direct RPC keep and clear", async () => {
+    const { brandId: brand } = await seedCatalog(b.id, { product: "Image Roles", sku: "Image Roles case" });
+    const args = {
+      p_brewery: b.id, p_id: null as string | null, p_brand: brand, p_kind: "cola" as const, p_ttb_id: "26001001000107",
+      p_approved_on: "2026-01-02" as string | null, p_expires_on: null, p_note: null, p_image_url: imageUrl as string | null,
+    };
+    const saved = await sales.db.rpc("upsert_brand_approval", { ...args, p_request_id: crypto.randomUUID() });
+    expect(saved.error).toBeNull();
+    expect(saved.data).toMatchObject({ image_url: imageUrl });
+    if (!saved.data || typeof saved.data !== "object" || Array.isArray(saved.data) || typeof saved.data.id !== "string") {
+      throw new Error("The approval RPC did not return an approval ID");
+    }
+    const id = saved.data.id;
+    const edit = { ...args, p_id: id, p_image_url: null, p_approved_on: null };
+    expect((await sales.db.rpc("upsert_brand_approval", { ...edit, p_request_id: crypto.randomUUID() })).data)
+      .toMatchObject({ image_url: imageUrl });
+    const warehouse = await makeStaffCtx(b.id, "warehouse");
+    const foreign = await makeStaffCtx((await makeBrewery()).id, "admin");
+    for (const ctx of [warehouse, foreign]) {
+      expect((await ctx.db.rpc("upsert_brand_approval", { ...edit, p_request_id: crypto.randomUUID() })).error?.code).toBe("42501");
+    }
+    expect((await warehouse.db.from("brand_approvals").select("image_url").eq("id", id)).data).toEqual([{ image_url: imageUrl }]);
+    expect((await foreign.db.from("brand_approvals").select("image_url").eq("id", id)).data).toEqual([]);
+    expect((await foreign.db.rpc("upsert_brand_approval", { ...args, p_brewery: foreign.breweryId, p_request_id: crypto.randomUUID() })).error).not.toBeNull();
+    expect((await sales.db.rpc("upsert_brand_approval", { ...edit, p_clear: ["image_url"], p_request_id: crypto.randomUUID() })).data)
+      .toMatchObject({ image_url: null });
+  });
+
+  it("rejects non-official image URLs in both the command and direct RPC", async () => {
+    const { brandId: brand } = await seedCatalog(b.id, { product: "Unsafe Image", sku: "Unsafe Image case" });
+    const input = { brandId: brand, kind: "cola", ttbId: "26001001000101", approvedOn: "2026-01-02" };
+    const urls = [
+      "https://example.com/label.png",
+      "javascript:alert(1)",
+      "https://www.ttbonline.gov.evil.test/label.png",
+      "https://www.ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&ttbid=26001001000101",
+      imageUrl.replace("https:", "http:"),
+      `${imageUrl}&redirect=https://example.com`,
+      imageUrl.replace("Array.jpg", "../Array.jpg"),
+      imageUrl.replace("Array.jpg", "%2fArray.jpg"),
+      imageUrl.replace("Array.jpg", "%5CArray.jpg"),
+      imageUrl.replace("Array.jpg", "%ZZ.jpg"),
+    ];
+    for (const imageUrl of urls) {
+      await expect(runCommand("upsert_brand_approval", { ...input, imageUrl }, sales)).rejects.toMatchObject({ status: 400 });
+      const direct = await sales.db.rpc("upsert_brand_approval", {
+        p_brewery: b.id, p_id: null, p_brand: brand, p_kind: "cola", p_ttb_id: input.ttbId,
+        p_approved_on: input.approvedOn, p_expires_on: null, p_note: null,
+        p_image_url: imageUrl, p_request_id: crypto.randomUUID(),
+      });
+      expect(direct.error?.code, imageUrl).toBe("23514");
+    }
+  });
+});
+
 describe("registry", () => {
+  it("keeps the recreated pre-image overload private until the forward migration retires it", () => {
+    const identifier = readFileSync(new URL("../supabase/migrations/20261024050002_cola_identifier_format.sql", import.meta.url), "utf8");
+    const reconciliation = readFileSync(new URL("../supabase/migrations/20261024193522_cola_identifier_image_reconciliation.sql", import.meta.url), "utf8");
+    const oldSignature = "public.upsert_brand_approval(uuid,uuid,uuid,public.approval_kind,text,date,date,text,uuid,text[],text)";
+    const currentSignature = "public.upsert_brand_approval(uuid,uuid,uuid,public.approval_kind,text,date,date,text,uuid,text[],text,text)";
+    expect(sql(`begin;
+      alter table public.brand_approvals drop constraint brand_approvals_cola_ttb_id_format;
+      ${identifier}
+      select role || ':' || has_function_privilege(role, '${oldSignature}', 'execute')::text
+        from (values ('anon'), ('authenticated'), ('service_role')) roles(role) order by role;
+      ${reconciliation}
+      select to_regprocedure('${oldSignature}') is null;
+      select has_function_privilege('authenticated', '${currentSignature}', 'execute');
+      select has_function_privilege('anon', '${currentSignature}', 'execute');
+      select has_function_privilege('service_role', '${currentSignature}', 'execute');
+      rollback;`, true)).toEqual(["anon:false", "authenticated:false", "service_role:false", "t", "t", "f", "f"]);
+  });
+
   it("sales records a COLA on a brand, a second identical one conflicts, warehouse is denied", async () => {
     const saved = await runCommand("upsert_brand_approval", { brandId, kind: "cola", ttbId: "23001001000123", approvedOn: "2026-01-15" }, sales) as { id: string; ttb_id: string };
     expect(saved.ttb_id).toBe("23001001000123");
@@ -71,12 +235,14 @@ describe("registry", () => {
     expect(saved.ttb_id).toBe("00318001000102");
     for (const ttbId of ["abc🍺", "2531800100003", "253180010000345", "2531800100003🍺", "1e13"]) {
       await expect(runCommand("upsert_brand_approval", { id: saved.id, brandId: brand, kind: "cola", ttbId }, sales)).rejects.toMatchObject({ status: 400 });
+      const requestId = crypto.randomUUID();
       const result = await sales.db.rpc("upsert_brand_approval", {
         p_brewery: b.id, p_id: saved.id, p_brand: brand, p_kind: "cola", p_ttb_id: ttbId,
-        p_approved_on: null, p_expires_on: null, p_note: null, p_request_id: crypto.randomUUID(),
+        p_approved_on: null, p_expires_on: null, p_note: null, p_request_id: requestId,
       });
       expect(result.error?.code).toBe("P0001");
       expect(result.error?.message).toContain("14-digit TTB ID");
+      expect(sql(`select count(*) from private.command_requests where actor_id='${sales.userId}' and request_id='${requestId}'`)).toEqual(["0"]);
     }
     const { data, error } = await sales.db.from("brand_approvals").select("ttb_id").eq("id", saved.id).single();
     expect(error).toBeNull();
@@ -107,6 +273,27 @@ describe("registry", () => {
     await expect(runCommand("upsert_brand_approval", input, sales)).rejects.toThrow("14-digit TTB ID");
     expect((await sales.db.from("brand_approvals").select("ttb_id").eq("id", current.id).single()).data?.ttb_id).toBe(current.ttb_id);
     expect(sql(`select count(*) from private.command_requests where actor_id='${sales.userId}' and request_id='${requestId}'`)).toEqual(["1"]);
+    const otherActor = await makeStaffCtx(b.id, "sales");
+    await expect(runCommand("upsert_brand_approval", input, otherActor, execution)).rejects.toMatchObject({ status: 400 });
+    expect(sql(`select count(*) from private.command_requests where actor_id='${otherActor.userId}' and request_id='${requestId}'`)).toEqual(["0"]);
+    const otherBrewery = await makeBrewery();
+    const membership = await admin.from("brewery_users").insert({ brewery_id: otherBrewery.id, user_id: sales.userId, roles: ["sales"] });
+    if (membership.error) throw membership.error;
+    await expect(runCommand("upsert_brand_approval", input, { ...sales, breweryId: otherBrewery.id }, execution)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it.each([null, "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Replay.jpg&filetype=l"])("preserves the image-aware completed payload hash with image %s", async imageUrl => {
+    const name = imageUrl ? "Image Replay selected" : "Image Replay omitted";
+    const { brandId: brand } = await seedCatalog(b.id, { product: name, sku: `${name} case` });
+    const input = { brandId: brand, kind: "cola", ttbId: "26001001000888", approvedOn: "2026-01-02", ...(imageUrl ? { imageUrl } : {}) };
+    const requestId = crypto.randomUUID();
+    const execution = { requestId, correlationId: requestId };
+    const saved = await runCommand("upsert_brand_approval", input, sales, execution);
+    const payload = { id: null, brand, kind: "cola", ttb_id: input.ttbId, serial_number: null, approved_on: input.approvedOn, expires_on: null, note: null, image_url: imageUrl, clear: [] };
+    expect(sql(`select payload_hash = extensions.digest('${JSON.stringify(payload)}'::jsonb::text,'sha256') from private.command_requests where actor_id='${sales.userId}' and request_id='${requestId}'`)).toEqual(["t"]);
+    expect(await runCommand("upsert_brand_approval", input, sales, execution)).toEqual(saved);
+    await expect(runCommand("upsert_brand_approval", { ...input, note: "changed" }, sales, execution)).rejects.toMatchObject({ status: 409 });
+    await expect(runCommand("upsert_brand_approval", { ...input, imageUrl: imageUrl ? imageUrl.replace("Replay.jpg", "Changed.jpg") : "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Changed.jpg&filetype=l" }, sales, execution)).rejects.toMatchObject({ status: 409 });
   });
 
   it("a COLA keeps its TTB ID and applicant serial as separate strings, edited independently (#730)", async () => {

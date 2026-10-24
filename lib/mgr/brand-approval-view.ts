@@ -1,7 +1,7 @@
 // lib/mgr/brand-approval-view.ts — view-model for Brand approval sheet. The
 // sheet is only ever opened from one brand, so the brand is stated, not picked.
 // Type-only import: this module stays client-safe (lib/ttb/colas.ts uses node:https).
-import type { ColaRecord } from "@/lib/ttb/colas";
+import type { ColaDetails, ColaRecord } from "@/lib/ttb/colas";
 
 export type BrandApprovalViewModel = {
   brand: string;
@@ -17,6 +17,14 @@ export type BrandApprovalViewModel = {
   searching?: boolean;
   /** search_colas' answer for this brand; undefined until Find COLA is pressed. */
   colas?: { permit: string; rows: ColaRecord[] };
+  /** Dated, approved details fetched from this TTB ID, independent of name search. */
+  colaDetails?: ColaDetails;
+  imageUrl?: string;
+  loadingCola?: boolean;
+  busy?: boolean;
+  /** Previously saved IDs are suggestions, never a restriction on direct entry. */
+  existingColaIds?: string[];
+  updatesExisting?: boolean;
 };
 
 export const APPROVAL_KINDS = [{ value: "cola", label: "COLA" }, { value: "formula", label: "Formula" }];
@@ -40,14 +48,21 @@ export function colaUrl(ttbId: string): string | null {
   return !approvalNumberError("cola", id) ? `https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&ttbid=${id}` : null;
 }
 
-/** The upsert_brand_approval input from the sheet's fields; an edit passes
- *  the record for its id.
- *  The upsert keeps the expiry and note the sheet does not show because they
- *  are omitted (#438, #522); an empty date or COLA serial is null so clearing
- *  it clears it. A formula sends no serial. Identifiers stay strings (#730). */
-export function approvalInput(brandId: string, f: { kind: string; ttbId: string; serialNumber: string; approvedOn: string }, existing?: { id: string }) {
+/** Keeps an explicit edit's identity; Add reuses the brand's matching approval.
+ *  Expiry and note stay omitted. Empty visible fields clear their columns.
+ *  Images are sent only with a dated COLA; clearing the date lets the RPC
+ *  remove the saved image. Identifiers preserve leading zeros. */
+export function approvalInput(
+  brandId: string,
+  f: { kind: string; ttbId: string; serialNumber: string; approvedOn: string; imageUrl?: string },
+  existing?: { id: string },
+  approvals: readonly { id: string; kind: string; ttb_id: string }[] = [],
+) {
+  const ttbId = f.ttbId.trim();
+  const saved = existing ?? approvals.find(approval => approval.kind === f.kind && approval.ttb_id === ttbId);
   const serial = f.kind === "cola" ? { serialNumber: f.serialNumber.trim() || null } : {};
-  return { id: existing?.id, brandId, kind: f.kind, ttbId: f.ttbId, ...serial, approvedOn: f.approvedOn || null };
+  const image = f.kind === "cola" && f.approvedOn && f.imageUrl ? { imageUrl: f.imageUrl } : {};
+  return { id: saved?.id, brandId, kind: f.kind, ttbId, ...serial, approvedOn: f.approvedOn || null, ...image };
 }
 
 /** What Use copies from a TTB COLA into the sheet: its TTB ID, serial (a
