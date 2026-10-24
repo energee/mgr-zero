@@ -27,12 +27,13 @@ function fillChips<Fill extends number>(label: string, options: readonly (readon
   return E.chips(options.map(([, text]) => text), options.findIndex(([fill]) => fill === value), false, { label, onChange: index => onChange(options[index][0]) });
 }
 
+const NO_KEG_SKUS = "No keg SKUs with a keg volume yet. Choose Guest keg under Identity to tap a guest without a packaged keg SKU.";
 /** Builds the keg SKU picker's empty state, shown when no active keg SKU has
  *  a keg volume. With `skusHref` (Catalog, for a user who may create a SKU) it
  *  links there; without it (the inventory, or anyone else) it says who adds them. */
 const kegSkuEmptyState = (skusHref: string | null | undefined): PickEmpty => skusHref
-  ? { text: "No keg SKUs with a keg volume yet. Choose Guest keg under Identity to tap a guest without a packaged keg SKU.", label: "Add a keg SKU", href: skusHref, to: "Catalog" }
-  : { text: "No keg SKUs with a keg volume yet. Choose Guest keg under Identity to tap a guest without a packaged keg SKU. An admin or sales member adds keg SKUs in Catalog." };
+  ? { text: NO_KEG_SKUS, label: "Add a keg SKU", href: skusHref, to: "Catalog" }
+  : { text: `${NO_KEG_SKUS} An admin or sales member adds keg SKUs in Catalog.` };
 
 /** `timeZone` is the brewery's: the server renders this client view first, so both sides must format in one zone (#442). */
 export function TapKegView({ sheet: controlledSheet, skus, skusHref, timeZone, onEdit, closedFact, onReload }: { sheet: TapBoardSheet; skus: TapSku[]; skusHref?: string | null; timeZone: string; onEdit?: (fields: Partial<TapSheetFields>) => void; closedFact?: string | null; onReload?: () => void }) {

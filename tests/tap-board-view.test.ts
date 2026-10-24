@@ -97,8 +97,9 @@ describe("Tap keg sheet feedback (#1114)", () => {
 
   it("updates the footer and command through the Identity picker when no keg SKUs exist", () => {
     let state = openTapBoardSheet({ open: [], history: [] }, "tap", null, "actual-location");
+    const onEdit = (patch: Parameters<typeof editTapBoardSheet>[1]) => { state = editTapBoardSheet(state, patch); };
     const pick = vi.spyOn(E, "pick");
-    render({ sheet: state.sheet!, skus: [], onEdit: patch => { state = editTapBoardSheet(state, patch); } });
+    render({ sheet: state.sheet!, skus: [], onEdit });
     const identity = pick.mock.calls.find(([label]) => label === "Identity")!;
     pick.mockRestore();
     identity[3]!.onChange!("guest");
@@ -108,7 +109,7 @@ describe("Tap keg sheet feedback (#1114)", () => {
     expect(guestHtml).toContain("Still needed: a guest keg label and a guest nominal BBL above zero.");
 
     const edit = vi.spyOn(E, "edit");
-    render({ sheet: state.sheet!, skus: [], onEdit: patch => { state = editTapBoardSheet(state, patch); } });
+    render({ sheet: state.sheet!, skus: [], onEdit });
     const label = edit.mock.calls.find(([name]) => name === "Guest keg label")!;
     const size = edit.mock.calls.find(([name]) => name === "Guest nominal BBL")!;
     edit.mockRestore();
@@ -119,7 +120,6 @@ describe("Tap keg sheet feedback (#1114)", () => {
     expect(readyHtml).not.toMatch(/<button[^>]*type="submit"[^>]*disabled=/);
     const attempt = beginTapBoardAttempt(state, "guest-request").sheet!.attempt;
     expect(attempt).toMatchObject({ kind: "submitting", payload: { keg: { label: "Guest cider", nominalBbl: .25 } } });
-    expect(attempt).toHaveProperty("payload.keg");
     expect(attempt).not.toHaveProperty("payload.keg.skuId");
   });
 
