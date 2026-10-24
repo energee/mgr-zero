@@ -1,9 +1,9 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery, requirePagePermission } from "@/lib/mgr/page-query";
-import { orNotFound } from "@/lib/mgr/not-found";
-import type { ShipSources } from "@/lib/commands/orders";
+import { getOrderPageData, getOrderShipSources } from "../../order-data";
 import { ShipForm, type ShippingSnapshot } from "../ship-form";
 import { ShipmentDoneView } from "@/components/mgr/views/shipment-done";
 import { toShipmentDoneViewProps } from "@/lib/mgr/shipment-done-view";
@@ -11,17 +11,32 @@ import type { KegShortage } from "@/lib/mgr/keg-fleet-view";
 import "@/lib/commands/all";
 import { navTitle } from "@/lib/mgr/nav";
 
-export const metadata = { title: navTitle("/orders") };
+type Snapshot = { order: ShippingSnapshot["order"] & { status: string }; lines: ShippingSnapshot["lines"]; events: { event: string; payload: { invoice_id?: string | null; warnings?: KegShortage[] } }[]; shipment: { invoice_timing: "now" | "on_delivery" } | null };
 
-export default async function ShipPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+const getShipPageData = cache(async function getShipPageData(id: string) {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "ship_order");
-  const [{ order, lines, events, shipment }, locations] = await Promise.all([
-    orNotFound(runPageQuery("get_order", { orderId: id }, ctx)) as Promise<{ order: ShippingSnapshot["order"] & { status: string }; lines: ShippingSnapshot["lines"]; events: { event: string; payload: { invoice_id?: string | null; warnings?: KegShortage[] } }[]; shipment: { invoice_timing: "now" | "on_delivery" } | null }>,
-    runPageQuery("list_locations", {}, ctx) as Promise<ShippingSnapshot["locations"]>,
-  ]);
+  const { snapshot } = await getOrderPageData(id);
+  return { ctx, snapshot: snapshot as Snapshot };
+});
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { snapshot: { order, shipment } } = await getShipPageData(id);
+  if (order.kind !== "wholesale") redirect(`/orders/${order.id}`);
+  if (!(order.status === "shipped" && shipment)) {
+    if (order.status !== "picked") redirect(`/orders/${order.id}`);
+    await getOrderShipSources(id);
+  }
+  return { title: navTitle("/orders") };
+}
+
+export default async function ShipPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { ctx, snapshot } = await getShipPageData(id);
+  const { order, lines, events, shipment } = snapshot;
+  const locations = await runPageQuery("list_locations", {}, ctx) as ShippingSnapshot["locations"];
   if (order.kind !== "wholesale") redirect(`/orders/${order.id}`);
   if (order.status === "shipped" && shipment) {
     const shipped = events.find(event => event.event === "shipped")?.payload;
@@ -30,6 +45,6 @@ export default async function ShipPage({ params }: { params: Promise<{ id: strin
     return <ShipmentDoneView model={toShipmentDoneViewProps({ order, lines, warnings: shipped?.warnings, invoice: detail?.invoice ?? null, invoiceTiming: shipment.invoice_timing, invoiceHref: invoiceId ? `/invoices/${invoiceId}` : undefined, backHref: `/orders/${order.id}` })} />;
   }
   if (order.status !== "picked") redirect(`/orders/${order.id}`);
-  const available = await orNotFound(runPageQuery("get_order_ship_sources", { orderId: id }, ctx)) as ShipSources;
+  const available = await getOrderShipSources(id);
   return <ShipForm snapshot={{ order, lines, locations, backHref: `/orders/${order.id}` }} available={available} />;
 }

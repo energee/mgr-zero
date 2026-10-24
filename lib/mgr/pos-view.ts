@@ -171,7 +171,7 @@ export type PosMenuSetup = { title: string; description: string; action?: { labe
 export function toPosMenuSetup({ admin, connected, observed }: { admin: boolean; connected: boolean; observed: number }): PosMenuSetup {
   if (!connected) return admin
     ? { title: "Square isn’t connected", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" } }
-    : { title: "Square isn’t connected", description: "Ask an admin to reconnect it." };
+    : { title: "Square isn’t connected", description: "Ask an admin to connect Square." };
   if (observed === 0) return admin
     ? { title: "No Square locations yet", description: "Square is connected, but no locations are synced yet. Sync the Square catalog, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" } }
     : { title: "No Square locations yet", description: "Square is connected, but no locations are synced yet. Ask an admin to sync and map one." };

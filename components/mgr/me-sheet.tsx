@@ -11,6 +11,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { logout } from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -41,10 +42,11 @@ export function MeSheet({ avatar, children, open, onOpenChange }: {
 
 /** `guide` is the customer guide for this audience. */
 export function MeSheetActions({ guide }: { guide: "/docs/staff-guide" | "/docs/portal-guide" }) {
+  const pathname = usePathname();
   return (
     <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
       <Button variant="outline" className="w-full md:w-fit md:self-end" asChild><Link href={guide} target="_blank" rel="noopener noreferrer">Guide<span className="sr-only"> (opens in a new tab)</span></Link></Button>
-      <Button variant="outline" className="w-full md:w-fit md:self-end" asChild><Link href="/password">Change password</Link></Button>
+      <Button variant="outline" className="w-full md:w-fit md:self-end" asChild><Link href={`/password?next=${encodeURIComponent(pathname)}`}>Change password</Link></Button>
       <form action={logout}>
         <Button type="submit" variant="destructive" className="w-full md:w-fit md:self-end">Sign out</Button>
       </form>

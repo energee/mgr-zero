@@ -7,7 +7,7 @@
 // (PourForm) and removes them (delete_format) in the same error slot; both
 // removals confirm first. Each packaged format's UPC edits in its own sheet
 // (BarcodeForm, set_price_group_barcode). Save price group is withheld, with
-// its reason beside it, until the group has a name.
+// its reason beside it, until the name, position and optional ceiling are valid.
 "use client";
 
 import { useState } from "react";
@@ -23,6 +23,7 @@ import { priceGroupReason } from "@/lib/mgr/price-group-view";
 
 export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGroupViewModel }) {
   const [draft, setDraft] = useState(model);
+  const [validationAttempted, setValidationAttempted] = useState(false);
   const edit = (key: "name" | "position" | "costCeilingInput") => (value: string) => setDraft((d) => ({ ...d, [key]: value }));
   const form = useCommandForm("upsert_price_group", {
     build: () => ({
@@ -31,7 +32,7 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
       position: Number(draft.position),
       costCeilingCents: toCents(draft.costCeilingInput),
     }),
-    reset: () => setDraft(model),
+    reset: () => { setDraft(model); setValidationAttempted(false); },
   });
 
   return (
@@ -43,12 +44,17 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
         ? <Button variant="link" size="sm" className="px-0 font-medium">{model.name}</Button>
         : <Button>New price group</Button>}
     >
-      <form onSubmit={form.submit} className="flex flex-col gap-4">
+      <form noValidate onSubmit={event => {
+        setValidationAttempted(true);
+        if (form.busy || priceGroupReason(draft)) { event.preventDefault(); event.stopPropagation(); return; }
+        void form.submit(event);
+      }} className="flex flex-col gap-4">
         <PriceGroupView
           // Only the three fields are drafts; pours come from the refreshed model, so
           // Add pour and Remove show up without reopening the dialog.
           model={{ ...model, name: draft.name, position: draft.position, costCeilingInput: draft.costCeilingInput }}
           controls={{ name: edit("name"), position: edit("position"), costCeiling: edit("costCeilingInput") }}
+          validationAttempted={validationAttempted}
           back={null}
           addPour={groupId ? <PourForm priceGroupId={groupId} groupName={model.name} /> : undefined}
           renderPour={groupId ? (pour) => <div className="flex gap-2">

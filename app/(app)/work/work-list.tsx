@@ -5,7 +5,7 @@
 
 import { useSyncExternalStore, type ReactNode } from "react";
 import { WorkView } from "@/components/mgr/views/work";
-import { WORK_CHIPS as CHIPS, workFromQuery } from "@/lib/mgr/work-view";
+import { WORK_FILTER_CHIPS as CHIPS, workFromQuery } from "@/lib/mgr/work-view";
 import type { WorkKind, WorkRow } from "@/lib/commands/landings";
 
 const KEY = "mgr-work-filter";
@@ -20,5 +20,5 @@ export function WorkList({ rows, defaults, createAction, chips }: { rows: WorkRo
   // The server renders "all"; the browser's remembered chip takes over after hydration.
   const chip = useSyncExternalStore(subscribe, remembered, () => "all");
   const pick = (v: string) => { try { localStorage.setItem(KEY, v); } catch { /* no storage */ } listeners.forEach((fn) => fn()); };
-  return <WorkView model={{ ...workFromQuery(rows, defaults), workChips: chips }} chip={chip} onChip={pick} createAction={createAction} />;
+  return <WorkView model={{ ...workFromQuery(rows, defaults), workChips: chips.filter(name => CHIPS.includes(name)) }} chip={chip} onChip={pick} createAction={createAction} />;
 }

@@ -40,7 +40,7 @@ describe("chat preview fixtures", () => {
   it("App Home and Personal queue fixtures share one relative ship-date wording", () => {
     const appHome = CHAT_PREVIEW_FIXTURES.find((fixture) => fixture.id === "app-home")!;
     const submitted = appHome.items.find((item) => item.reason === "submitted_order")!;
-    expect(submitted.detail).toBe("submitted · ships today · sales");
+    expect(submitted.detail).toBe("Submitted · Ships today · Sales");
     expect(JSON.stringify(SCREENS.find((screen) => screen.name === "Personal queue")!.body)).toContain(submitted.detail);
   });
 
@@ -57,7 +57,7 @@ describe("chat preview fixtures", () => {
 
   it("names the sample preferences reasons as Slack's preferences dialog does", () => {
     const preferences = CHAT_PREVIEW_FIXTURES.find(({ id }) => id === "preferences")!;
-    const reasons = preferences.fields.map(({ label }) => label).filter((label) => label !== "Quiet hours");
+    const reasons = preferences.fields.map(({ label }) => label).filter((label) => label !== "Sample quiet hours");
     expect(reasons.length).toBeGreaterThan(0);
     const venue = JSON.stringify(SCREENS.find((screen) => screen.name === "Notification preferences")!.body);
     const slackDialog = JSON.stringify(renderSlackPreferences("intent-1"));
@@ -95,10 +95,10 @@ describe("chat preview fixtures", () => {
     expect(fixture).toBeDefined();
     expect(fixture?.items).toEqual([]);
     expect(fixture?.fields).toEqual([
-      { label: "Submitted orders", value: "2 · need sales review" },
-      { label: "Picks due", value: "2 · warehouse queue" },
-      { label: "Assigned deliveries", value: "1 · next stops ready" },
-      { label: "Fermentation readings", value: "1 · overdue" },
+      { label: "Submitted orders", value: "2 · Need sales review" },
+      { label: "Picks due", value: "2 · Warehouse queue" },
+      { label: "Assigned deliveries", value: "1 · Next stops ready" },
+      { label: "Fermentation readings", value: "1 · Overdue" },
     ]);
   });
 
