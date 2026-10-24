@@ -1,13 +1,13 @@
 // lib/mgr/pick-view.ts — view-model for the Pick sheet.
 import { formatDate } from "@/lib/date-format";
-import { brandLabel, byBrand, type BrandedSku } from "./brand-lines";
+import { formatLabel, byFormat, type BrandedSku } from "./brand-lines";
 import { docNo } from "./doc-no";
 
 export type PickLineView = {
   key: string;
-  /** Brand heading; lines arrive grouped by it (brand-lines.ts). */
+  /** Format heading; lines arrive grouped by it (brand-lines.ts). */
   group?: string;
-  /** Format under the brand, or the SKU name when it has no brand and format. */
+  /** Brand with its alias, or the SKU name when it has no brand and format. */
   name: string;
   qty: number;
   /** qty_ordered: record_pick refuses a pick above it (#471), so the field caps here. */
@@ -39,7 +39,7 @@ export type PickSnapshot = {
   locations: { id: string; name: string }[];
 };
 
-/** Map get_order onto PickView, lines grouped by brand. Count defaults to qty_picked, else qty_ordered. */
+/** Map get_order onto PickView, lines grouped by format. Count defaults to qty_picked, else qty_ordered. */
 export function toPickViewProps({ order, lines, locations, backHref }: PickSnapshot): PickViewModel {
   const source = locations.find((l) => l.id === order.from_location_id)?.name ?? "—";
   return {
@@ -47,12 +47,12 @@ export function toPickViewProps({ order, lines, locations, backHref }: PickSnaps
     backHref,
     title: `Pick · ${source}`,
     subtitle: `${order.customers?.name ?? "Taproom transfer"}${order.requested_ship_date ? ` · ships ${formatDate(order.requested_ship_date)}` : ""}`,
-    lines: byBrand(lines).map((l) => {
+    lines: byFormat(lines).map((l) => {
       const ordered = Number(l.qty_ordered);
       const qty = Number(l.qty_picked ?? ordered);
       return {
         key: l.id,
-        ...brandLabel(l.skus),
+        ...formatLabel(l.skus),
         qty,
         ordered,
         tone: qty < ordered ? "w" : "ok",

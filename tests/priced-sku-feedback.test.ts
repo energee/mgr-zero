@@ -48,7 +48,7 @@ it("keeps cached eligible choices on failed refetch with recovery feedback", () 
   expect(props.reason).toBeNull();
   expect(props.model.skus).toHaveLength(1);
   expect(renderToStaticMarkup(props.skuFeedback)).toContain("Showing last-known data");
-  expect(renderToStaticMarkup(props.skuFeedback)).toContain("Dec 31, 1969, 4:00 PM");
+  expect(renderToStaticMarkup(props.skuFeedback)).not.toContain("Last checked");
   if (!isValidElement<{ retry: () => void }>(props.skuFeedback)) throw new Error("Missing pricing feedback");
   props.skuFeedback.props.retry(); expect(state.retry).toHaveBeenCalledOnce();
 });

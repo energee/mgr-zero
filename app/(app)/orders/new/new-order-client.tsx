@@ -19,7 +19,7 @@ export function NewOrderClient({ timeZone }: { timeZone: string }) {
     <QueryFeedback timeZone={timeZone} error={error} loading="Loading order options" paused={paused} retry={retry} />
   </>;
   return <OrderForm timeZone={timeZone}
-    feedback={<QueryFeedback timeZone={timeZone} error={error} fetching={fetching} paused={paused} updatedAt={Math.min(customers.dataUpdatedAt, locations.dataUpdatedAt, skus.dataUpdatedAt)} retry={retry} />}
+    feedback={<QueryFeedback timeZone={timeZone} showCheckedAt={false} error={error} fetching={fetching} paused={paused} updatedAt={Math.min(customers.dataUpdatedAt, locations.dataUpdatedAt, skus.dataUpdatedAt)} retry={retry} />}
     customers={customers.data} locations={locations.data} skus={skus.data.filter(sku => sku.active).map(toSkuOption)}
   />;
 }

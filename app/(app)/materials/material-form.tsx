@@ -49,7 +49,7 @@ export function MaterialForm({ material, vendors }: { material?: Material; vendo
   const ready = name.trim() && category && Number(factor) > 0;
   const trigger = material ? <Button variant="ghost" size="sm">Edit</Button> : <Button size="sm">Add material</Button>;
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Material" trigger={trigger}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title={material ? "Edit material" : "Add material"} trigger={trigger}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <MaterialView
           model={{ name, kind: category, kindOptions: KINDS, baseUnits: factor, purchaseUnit: purchaseUom, purchaseUnitOptions: UOMS, unit: baseUom, unitOptions: UOMS, defaultVendorId: vendorId, defaultVendorOptions: vendors.map(({ id, name: label }) => ({ id, label })), extractPotential: extract, lotTracked, active }}

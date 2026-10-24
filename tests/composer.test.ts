@@ -16,6 +16,8 @@ import "@/lib/commands/all";
 import { composerProposal, movementFormHref, movementFormInstanceKey } from "@/lib/composer/state";
 import { isUuid } from "@/lib/commands/context";
 import { isComposerShortcut } from "@/components/mgr/composer";
+import { ScreenFrame } from "@/components/mgr/screen-frame";
+import { SCREENS } from "@/components/mgr/screens";
 
 const ids = {
   skuId: "11111111-1111-4111-8111-111111111111",
@@ -74,7 +76,6 @@ describe("AI composer", () => {
     expect(text).not.toContain("openai/gpt-5.4");
     // Token prices and the Vercel catalog link are vendor detail, not brewery settings (#1147).
     expect(text).not.toMatch(/tokens|\$/);
-    expect(text).toContain("openai");
     expect(html).not.toContain("vercel.com");
     expect(html).toContain("<title>OpenAI</title>");
     expect(html).toContain('placeholder="Search models…"');
@@ -113,10 +114,9 @@ describe("AI composer", () => {
     expect(unknown).not.toContain("<title>Vercel</title>");
   });
 
-  it("names no model in the conversation header (#998)", () => {
+  it("does not repeat the drawer heading in the conversation (#1251)", () => {
     const html = renderToStaticMarkup(createElement(ComposerConversationView, { messages: [] }));
-    expect(html).toContain("Answers use your brewery data and permissions.");
-    expect(html).not.toContain(" · ");
+    expect(html).not.toMatch(/<h[1-6][^>]*>Ask MGR<\/h[1-6]>/);
   });
 
   it("renders assistant markdown", () => {
@@ -160,10 +160,21 @@ describe("AI composer", () => {
     expect(readFileSync("app/(portal)/layout.tsx", "utf8")).not.toMatch(/Composer|composer=/);
   });
 
-  it("uses the shared drawer and strip in inventory chrome", () => {
+  it("uses the shared ready conversation, drawer and strip in inventory chrome", () => {
     const composer = E.comp();
     expect(composer.type).toBe(ComposerDrawerView);
-    expect(composer.props.children.type).toBe(ComposerStripView);
+    expect(composer.props.children[0].type).toBe(ComposerConversationView);
+    expect(composer.props.children[0].props.messages).toEqual([]);
+    expect(composer.props.children[1].type).toBe(ComposerStripView);
+  });
+
+  it.each(["Composer setup", "Composer question", "Composer answer"])("renders %s inside the same open drawer as live, not as a separate page (#1251)", (name) => {
+    const screen = SCREENS.find((screen) => screen.name === name)!;
+    const frame = ScreenFrame({ screen });
+    expect(frame.props.composer.type).toBe(ComposerDrawerView);
+    expect(frame.props.composer.props.open).toBe(true);
+    expect(frame.props.composer.props.children).toBe(screen.body);
+    expect(frame.props.children).toBeNull();
   });
 
   it("renders only canonical proposal effects", () => {

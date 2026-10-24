@@ -19,7 +19,7 @@ import { hasAnyRole } from "./roles";
 
 /** The areas More's entries are filed under, in the order they are drawn
  * (#1159). The More page and the rail's More group both head each area. */
-const NAV_GROUPS = ["Sales", "Production", "Setup", "Integrations"] as const;
+const NAV_GROUPS = ["Sales", "Production", "Setup", "Menu and chat"] as const;
 export type NavGroup = (typeof NAV_GROUPS)[number];
 
 export type NavItem = {
@@ -86,7 +86,7 @@ export const STAFF_NAV: readonly NavItem[] = [
     children: [
       { label: "Invoices", href: "/invoices", roles: ["sales"], group: "Sales", about: "See what customers owe and open an invoice" },
       { label: "Catalog", href: "/catalog", roles: ["sales"], group: "Sales", about: "Define brands, formats and SKUs" },
-      { label: "Menu", href: "/menu", roles: ["warehouse"], group: "Integrations", about: "Choose what Square sells, where and for how much" },
+      { label: "Menu", href: "/menu", roles: ["warehouse"], group: "Menu and chat", about: "Choose what Square sells, where and for how much" },
       { label: "Customers", href: "/customers", roles: ["sales"], group: "Sales", about: "Manage accounts, ship-tos and portal users" },
       { label: "Price groups", href: "/pricing", roles: ["sales"], group: "Sales", about: "Set prices by group for each sale channel" },
       { label: "Recipes", href: "/recipes", roles: ["brewer"], group: "Production", about: "Write recipes and their versions" },
@@ -95,7 +95,7 @@ export const STAFF_NAV: readonly NavItem[] = [
       { label: "Planning", href: "/planning", roles: ["brewer", "warehouse"], group: "Production", about: "See what planned work is short of" },
       { label: "Import", href: "/settings/import", roles: ["admin"], group: "Setup", about: "Bring in customers, ship-tos, SKUs, prices and opening stock from CSV" },
       { label: "Settings", href: "/settings", roles: ["admin"], group: "Setup", about: "Edit brewery details and connect integrations" },
-      { label: "Chat", href: "/settings/chat", group: "Integrations", about: "Link Slack and set your notifications" },
+      { label: "Chat", href: "/settings/chat", group: "Menu and chat", about: "Link Slack and set your notifications" },
       { label: "Sale channels", href: "/settings/channels", roles: ["admin"], group: "Setup", about: "Name how you sell and how each is taxed" },
       { label: "Locations", href: "/locations", roles: ["admin"], group: "Setup", about: "Manage warehouses, taprooms and their bins" },
       { label: "Units", href: "/settings/units", group: "Setup", about: "Choose how gravity is shown" },
