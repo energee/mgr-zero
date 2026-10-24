@@ -46,7 +46,7 @@ export function AiModelSettingsView({ value, models, onChange, onSubmit, busy = 
               <ComboboxList>{(model: GatewayModelOption) => <ComboboxItem key={model.id} value={model}><AiModelIcon modelId={model.id} /><span className="grid gap-0.5"><span>{model.name}</span><span className="text-xs capitalize text-muted-foreground">{modelProvider(model.id)}</span></span></ComboboxItem>}</ComboboxList>
             </ComboboxContent>
           </Combobox>
-          <FieldDescription><span className="capitalize">{modelProvider(selected.id)}</span>. Used by Ask MGR for everyone at this brewery.</FieldDescription>
+          <FieldDescription>Used by Ask MGR for everyone at this brewery.</FieldDescription>
           {models.length === 0 && <FieldDescription>The Gateway model catalog is unavailable. The saved model remains active.</FieldDescription>}
           <FieldError>{error}</FieldError>
         </Field>

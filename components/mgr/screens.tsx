@@ -498,7 +498,7 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 1, slice: "all", tab: "More", name: "Settings", job: "Edit brewery/location basics and route to rare setup",
-    to: { "Source water": "Water profiles" },
+    to: { "Water profiles": "Water profiles" },
     ...SETTINGS_IO,
     states: [...permitted("admin only"), ["filed basis", "ordinary field is locked · recorded correction flags every affected filed period"], ["correction history", "immutable old/new basis, actor, time and reason"], ["uncertain correction", "fields freeze · retry unchanged request"]],
     spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Days to package is the brewery-wide projected packaging estimate, default 14 and whole days from 1 to 120. It adds to the actual brew date, or planned date before brewing. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Brewery details, Ask MGR and Wholesale fulfillment are three forms, each saved only by its own button. After filing, the ordinary books date is locked; Correct reporting basis has its own save and immutable correction history. Deployment mode is read-only. Team opens the Team frame.",
@@ -506,7 +506,7 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 8, slice: "all", tab: "More", name: "Settings no warehouse", job: "Say why the portal has no fulfillment warehouse to choose",
-    to: { "Source water": "Water profiles" },
+    to: { "Water profiles": "Water profiles" },
     ...SETTINGS_IO,
     states: [["permission", "admin only", 1], ["no warehouse", "picker disabled · note names Warehouse in Uses · Edit locations opens Locations"], ["warehouse use removed", "a saved source no longer offered starts unchosen · Save warehouse still needs a warehouse"]],
     spec: "Wholesale fulfillment offers only locations whose Uses include Warehouse. With none, the disabled picker says so beneath it and Edit locations opens Locations, where an admin adds Warehouse to a location's Uses. Save warehouse says it still needs a warehouse.",
@@ -2241,7 +2241,7 @@ export const SCREENS: Screen[] = [
     reads: "get_recipe [a cut version’s water] · list_water_profiles · none [draft: the version form’s state]",
     writes: "create_recipe_version [water values and the water additions are written with the version]",
     states: [["permission", "brewer or admin required", 1], ["source profile", "the version picks its source from Water profiles, which this sheet links to"], ["second source", "an osmosis blend or a second supply is another profile"], ["draft", "additions add, reorder and delete"], ["frozen", "a cut version reads only", 1], ["suggestions locked", "post-v1 scope; Suggest additions and the ion read-out stay locked until materials carry a salt identity, as in the live sheet"], ["off target", "post-v1 scope; once unlocked, an ion more than 20 ppm from target warns", 1]],
-    spec: "Source water is what comes out of the tap. Settings has no brewery-wide source default: each version picks its source from the Water profiles catalog, which Settings → Source water opens for Admin and the Water profiles row here opens for Brewer (Brewer has no Catalog), and an osmosis blend or a second supply is just another profile. v1 stored the ions per recipe, so every recipe repeated the same municipal profile and a new water report meant editing all of them; a catalog profile is edited once. Each addition carries one stage, not v1’s pair of timing and target: for water chemistry those are one axis wearing two hats, since a salt added at mash time goes into the mash by definition. Post-v1 scope: Suggest additions and the Against target read-out are locked here and live until materials carry a salt identity; when they open, both run the one shared water formula (waterChemistry) over mash plus sparge water. pH prediction is still not built.",
+    spec: "Source water is what comes out of the tap. Settings has no brewery-wide source default: each version picks its source from the Water profiles catalog, which Settings → Water profiles opens for Admin and the Water profiles row here opens for Brewer (Brewer has no Catalog), and an osmosis blend or a second supply is just another profile. v1 stored the ions per recipe, so every recipe repeated the same municipal profile and a new water report meant editing all of them; a catalog profile is edited once. Each addition carries one stage, not v1’s pair of timing and target: for water chemistry those are one axis wearing two hats, since a salt added at mash time goes into the mash by definition. Post-v1 scope: Suggest additions and the Against target read-out are locked here and live until materials carry a salt identity; when they open, both run the one shared water formula (waterChemistry) over mash plus sparge water. pH prediction is still not built.",
     body: (<>
       <WaterView title="Hazy IPA v4 · Water" water={WATER_HAZY} profiles={WATER_PROFILE_OPTIONS} materials={SALT_OPTIONS} />
     </>),
