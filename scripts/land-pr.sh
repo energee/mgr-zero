@@ -3,6 +3,8 @@
 # prove it locally, push, wait for CI (rerunning infra-only failures), and with
 # --merge merge it. One PR per call; chain calls to land a queue in order:
 #   for n in 562 570 560; do scripts/land-pr.sh $n --merge || break; done
+# --sync-only repairs branch conflicts without review, proof, push, or PR merge.
+# Run local proof and push the repaired branch before requesting review again.
 #
 # Local proof: tsc, lint, the PR's own test files, every test file that names a
 # SQL function the PR's migrations define (CI runs the whole suite, so an old
@@ -21,7 +23,7 @@
 # Env: CLAUDE_SESSION_URL
 # (added as a Claude-Session trailer to the regeneration commit when set).
 set -uo pipefail
-n=${1:?usage: scripts/land-pr.sh <pr> [--merge]}; do_merge=${2:-}
+n=${1:?usage: scripts/land-pr.sh <pr> [--merge|--sync-only]}; do_merge=${2:-}
 ROOT=$(cd "$(dirname "$0")/.." && git rev-parse --path-format=absolute --git-common-dir | xargs dirname)
 b=$(gh pr view "$n" --json headRefName --jq .headRefName) || exit 1
 wt=$(git -C "$ROOT" worktree list --porcelain | awk -v b="refs/heads/$b" '/^worktree/{w=$2} $0=="branch "b{print w}')
@@ -52,7 +54,7 @@ running() { [ -n "$(gh run list --workflow claude-code-review.yml --branch "$b" 
 # itself (claude-code-action refuses a workflow file that differs from main's).
 gated=$(gh pr view "$n" --json author --jq '.author.is_bot|not') || exit 1
 gh pr diff "$n" --name-only | grep -qx .github/workflows/claude-code-review.yml && gated=false
-if [ "$gated" = true ] && ! reviewed; then
+if [ "$do_merge" != --sync-only ] && [ "$gated" = true ] && ! reviewed; then
   if [ "$(gh pr view "$n" --json isDraft --jq .isDraft)" = true ]; then
     gh pr ready "$n" || exit 1
   else
@@ -77,8 +79,8 @@ if ! git merge --no-edit -q origin/main >/dev/null 2>&1; then
     echo "CONFLICT:"; git diff --name-only --diff-filter=U; exit 2
   fi
 fi
-bun run migrations:lock >/dev/null 2>&1
-bun run docs:api >/dev/null 2>&1
+bun run migrations:lock >/dev/null 2>&1 || exit 3
+bun run docs:api >/dev/null 2>&1 || exit 3
 if [ -n "$(git status --porcelain)" ]; then
   git add -A supabase/migrations.lock.json content/docs
   git commit -q -m "chore: regenerate migration lock and API reference after syncing main${CLAUDE_SESSION_URL:+
@@ -87,6 +89,10 @@ Claude-Session: $CLAUDE_SESSION_URL}"
 fi
 
 bun scripts/check-migration-order.ts origin/main || exit 3
+if [ "$do_merge" = --sync-only ]; then
+  echo "synced #$n; local proof, push, and review still required"
+  exit 0
+fi
 migs=$(git diff --name-only origin/main...HEAD -- 'supabase/migrations/*.sql')
 tests=$(git diff --name-only --diff-filter=d origin/main...HEAD -- 'tests/*.test.ts')
 for fn in $(cat $migs /dev/null | grep -oiE "create (or replace )?function [a-z_.]+" | awk '{print $NF}' | sed 's/.*\.//' | sort -u); do

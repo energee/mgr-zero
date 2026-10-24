@@ -24,6 +24,7 @@ import type { KegPoolOption } from "@/lib/mgr/sku-view";
 import { brandAbvError } from "@/lib/mgr/brand-abv";
 import { SkuEditForm } from "../../sku-form";
 import { ApprovalForm, RegistrationForm } from "./compliance-forms";
+import { ColaImage } from "../../cola-image";
 
 /** A list_brands SKU, with the facts SkuEditForm edits. */
 type BrandSku = BrandSnapshot["brand"]["skus"][number] & { name: string; keg_pool_id: string | null; batch_share: number | string | null };
@@ -62,10 +63,10 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
   const subject = brand ? { id: brand.id, name: brand.name } : null;
   const actions = subject
     && Object.fromEntries([
-      ...(compliance?.approvals ?? []).map((approval) => [approval.id, <ApprovalForm key={`${approval.id}-${approval.ttb_id}-${approval.approved_on}`} brand={subject} approval={approval} />] as const),
+      ...(compliance?.approvals ?? []).map((approval) => [approval.id, <ApprovalForm key={`${approval.id}-${approval.ttb_id}-${approval.approved_on}`} brand={subject} approval={approval} approvals={compliance?.approvals} />] as const),
       ...(compliance?.registrations ?? []).map((registration) => [registration.id, <RegistrationForm key={`${registration.id}-${registration.registration_no}-${registration.expires_on}`} brand={subject} registration={registration} />] as const),
     ]);
-  const addCompliance = subject && <div className="flex gap-2 py-2"><ApprovalForm brand={subject} /><RegistrationForm brand={subject} /></div>;
+  const addCompliance = subject && <div className="flex gap-2 py-2"><ApprovalForm brand={subject} approvals={compliance?.approvals} /><RegistrationForm brand={subject} /></div>;
   function onSellsAs(row: SellsAsRow, on: boolean) {
     const save = (next: boolean) => {
       const { name, input } = sellsAsCommand(row, next, brand!.id);
@@ -117,6 +118,7 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
         messages={<CommandFormMessage error={error} />}
         busy={busy}
         actions={actions ?? undefined}
+        images={Object.fromEntries(model.compliance.flatMap(row => row.image ? [[row.key, <ColaImage key={`${row.key}:${row.image.url}`} ttbId={row.image.ttbId} url={row.image.url} label={`${model.name} · COLA ${row.image.ttbId}`} />]] : []))}
         addCompliance={addCompliance}
         onSellsAs={onSellsAs}
         sellsDetails={skuSheet}

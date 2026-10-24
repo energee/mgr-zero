@@ -189,14 +189,14 @@ isOneToOne: false
                   ]
                 },"brand_approvals": {
                   Row: {
-                    "approved_on": string | null,"brand_id": string,"brewery_id": string,"expires_on": string | null,"id": string,"kind": Database["public"]['Enums']["approval_kind"],"note": string | null,"serial_number": string | null,"ttb_id": string
+                    "approved_on": string | null,"brand_id": string,"brewery_id": string,"expires_on": string | null,"id": string,"image_url": string | null,"kind": Database["public"]['Enums']["approval_kind"],"note": string | null,"serial_number": string | null,"ttb_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "approved_on"?: string | null,"brand_id": string,"brewery_id": string,"expires_on"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["approval_kind"],"note"?: string | null,"serial_number"?: string | null,"ttb_id": string
+                    "approved_on"?: string | null,"brand_id": string,"brewery_id": string,"expires_on"?: string | null,"id"?: string,"image_url"?: string | null,"kind": Database["public"]['Enums']["approval_kind"],"note"?: string | null,"serial_number"?: string | null,"ttb_id": string
                   }
                   Update: {
-                    "approved_on"?: string | null,"brand_id"?: string,"brewery_id"?: string,"expires_on"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["approval_kind"],"note"?: string | null,"serial_number"?: string | null,"ttb_id"?: string
+                    "approved_on"?: string | null,"brand_id"?: string,"brewery_id"?: string,"expires_on"?: string | null,"id"?: string,"image_url"?: string | null,"kind"?: Database["public"]['Enums']["approval_kind"],"note"?: string | null,"serial_number"?: string | null,"ttb_id"?: string
                   }
                   Relationships: [
                     {
@@ -5158,6 +5158,9 @@ isOneToOne: false
 "get_qbo_sync_status":
 { Args: { "p_brewery": string }; Returns: Json
                            },
+"get_saved_cola_image_permit":
+{ Args: { "p_brewery": string,"p_image_url": string,"p_ttb_id": string }; Returns: string
+                           },
 "get_square_connected":
 { Args: { "p_brewery": string }; Returns: boolean
                            },
@@ -5761,7 +5764,7 @@ isOneToOne: false
 { Args: { "p_abv": number,"p_alias"?: string,"p_brewery": string,"p_category": string,"p_description": string,"p_hops": string,"p_id": string,"p_name": string,"p_price_group": string,"p_request_id": string,"p_style": string }; Returns: Json
                            },
 "upsert_brand_approval":
-{ Args: { "p_approved_on": string,"p_brand": string,"p_brewery": string,"p_clear"?: (string)[],"p_expires_on": string,"p_id": string,"p_kind": Database["public"]['Enums']["approval_kind"],"p_note": string,"p_request_id": string,"p_serial_number"?: string,"p_ttb_id": string }; Returns: Json
+{ Args: { "p_approved_on": string,"p_brand": string,"p_brewery": string,"p_clear"?: (string)[],"p_expires_on": string,"p_id": string,"p_image_url"?: string,"p_kind": Database["public"]['Enums']["approval_kind"],"p_note": string,"p_request_id": string,"p_serial_number"?: string,"p_ttb_id": string }; Returns: Json
                            },
 "upsert_brewery_state_license":
 { Args: { "p_brewery": string,"p_clear"?: (string)[],"p_expires_on": string,"p_kind": string,"p_license_no": string,"p_note": string,"p_request_id": string,"p_state": string }; Returns: Json

@@ -53,6 +53,9 @@ import { BrewTimelineView } from "@/components/mgr/views/brew-timeline";
 import { BrandApprovalView } from "@/components/mgr/views/brand-approval";
 import { BrandView } from "@/components/mgr/views/brand";
 import { CatalogView } from "@/components/mgr/views/catalog";
+import { ColaReviewView } from "@/components/mgr/views/cola-review";
+import { ColaLabelImageView } from "@/components/mgr/views/cola-label-image";
+import { colaReviewBrands, colaReviewRecord, colaReviewDetails } from "@/lib/mgr/fixtures/cola-review";
 import { ListControls } from "@/components/mgr/list-controls";
 import { ChannelView } from "@/components/mgr/views/channel";
 import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
@@ -1496,9 +1499,9 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Catalog",
-    to: { "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand", "New format": "Format", "16 oz can": "Format", "four-pack": "Format", "case · 24×16oz": "Format", "½ bbl keg": "Format" },
+    to: { "Bulk process COLAs": "Bulk process COLAs", "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand", "New format": "Format", "16 oz can": "Format", "four-pack": "Format", "case · 24×16oz": "Format", "½ bbl keg": "Format" },
     job: "Define brands, their sellable formats and prices without ledger writes",
-    reads: "list_brands [incl. recorded COLA approvals] · list_skus · list_catalog_categories",
+    reads: "list_brands [incl. recorded COLA approvals and selected images] · list_skus · list_catalog_categories · get_cola_image",
     writes: "upsert_brand · create_sku · update_sku",
     states: DEFAULT_STATES,
     spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix.",
@@ -1523,12 +1526,12 @@ export const SCREENS: Screen[] = [
     tab: "More",
     name: "Brand",
     to: { Edit: "Brand approval", "COLA TTB ID 25318001000034": "Brand approval", "OH registration": "State registration", "Add approval": "Brand approval", "Add registration": "State registration", Use: "Brand", "Suggested group 2": "Brand", "Edit SKU": "SKU", "Four Pack · 6 per Case": "Format", Glass: "Price group", "Edit on price group": "Price group", "Manage formats": "Catalog" },
-    job: "Sellable facts without ledger writes, including the TTB fields",
-    reads: "list_brands [incl. the staff-only alias, SKUs and pours] · list_catalog_categories · list_formats [packaged, with contents] · list_channel_prices · list_sale_channels · list_keg_pools · get_compliance_registry [this brand’s approvals and registrations] · get_brand_recipe_cost [recipe cost per barrel and any uncosted ingredient]",
+    job: "Sellable brand facts and compliance, including selected COLA label images",
+    reads: "list_brands [incl. the staff-only alias, SKUs and pours] · list_catalog_categories · list_formats [packaged, with contents] · list_channel_prices · list_sale_channels · list_keg_pools · get_compliance_registry [this brand’s approvals and registrations] · get_brand_recipe_cost [recipe cost per barrel and any uncosted ingredient] · get_cola_image",
     writes: "upsert_brand · save_catalog_category · delete_catalog_category · update_sku · create_sku · upsert_brand_approval · upsert_state_registration",
     states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["sells as", "one switch per packaged Format · on creates the SKU or turns it back on"], ["switched off", "the SKU turns inactive, never deleted: hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"], ["COLA pending", "no approval on file: the brand is flagged until one is added", 1], ["suggested group", "the recipe cost lands in a ceiling band · Use fills the select, Save brand commits"], ["cost unknown", "an ingredient has no receipt cost yet: the sum is not shown as a cost", 1], ["saved first", "SKUs and compliance wait until the brand is saved; the first save moves to its page"], ["badges", "COLA pending jumps to Compliance; price group or Unpriced, category, active SKU count"]],
     spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. Sells as lists every packaged Format with a switch: on means the brand sells it, which is an active SKU, and Edit SKU opens that SKU's sheet (UPC, keg pool, batch share). Under the switches, each switched-on Format's contents read as lines (Four Pack · 6 per Case), then the price group's pours. A pour is a serving from the tap, not a SKU: the menu publishes brand × pour to Square, and a sale depletes the keg SKU. Every line shows its price per sale channel; prices and pours are edited on the price group. No container source editor here. Compliance is the brand’s: its COLA or formula approvals and its state registrations list under the sell sheet, each row opening its sheet, with Add approval and Add registration; a brand with no COLA is flagged pending. Manage categories opens beside Category: Admin and Sales can add, rename across all brands, and confirm deletion of unused categories. Uncategorized clears a brand’s assignment when saved. The brewery’s own licenses are the Licenses page under Compliance, never a brand row. Under the price group, the brand’s recipe cost per barrel (its last brewed version, else its newest) is read against the groups’ ceilings and names the band it falls in; Use only fills the select. A recipe with an ingredient that has never been received has no trustworthy cost, so the row says which ingredient instead of a number. No recipe, no row.",
-    body: <BrandView model={toBrandViewProps(brandHazy)} categoryAction={<CatalogCategoriesFixture categories={toBrandViewProps(brandHazy).categoryOptions} />} />,
+    body: <BrandView model={toBrandViewProps(brandHazy)} images={{ cola: <ColaLabelImageView label="Hazy IPA · COLA 25318001000034" src="/mock/cola-label.svg" /> }} categoryAction={<CatalogCategoriesFixture categories={toBrandViewProps(brandHazy).categoryOptions} />} />,
   },
   {
     step: 5,
@@ -2369,13 +2372,26 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Brand approval",
-    to: { "Save approval": "Brand", "Find COLA on TTB": "Brand approval", Use: "Brand approval", STOUT: "Brand approval", "OATMEAL STOUT": "Brand approval" },
+    to: { "Save approval": "Brand", "Find COLA on TTB": "Brand approval", "Load COLA by TTB ID": "Brand approval", Use: "Brand approval", STOUT: "Brand approval", "OATMEAL STOUT": "Brand approval" },
     job: "Record one brand’s federal approval status",
-    reads: "get_compliance_registry · search_colas",
+    reads: "get_compliance_registry · search_colas · get_cola_details · get_cola_image",
     writes: "upsert_brand_approval",
-    states: [["approved", "orders may proceed"], ["from a brand", "the subject is stated, not picked: the sheet is only ever opened from one brand"], ["duplicate", "the same number on the same brand is one record · conflict", 1], ["COLA search", "lists the brewery’s TTB COLAs matching the brand; Use fills TTB ID, serial and date approved"], ["no registry number", "Settings has no TTB registry number: the search says to add it", 1], ["no match", "no COLA under the permit matches the brand name"], ["TTB down", "TTB did not answer: an error, never an empty list", 1]],
-    spec: "A COLA has two identifiers: the TTB ID that TTB assigns (25318001000034), which is required, and the applicant’s own serial number (260135), which is optional; both are text, so leading zeros stay. Open COLA links TTB’s public COLA page built from the TTB ID alone, never the serial; with no TTB ID the sheet says to enter one, and the link does not verify approval or promise the page is reachable. A COLA never expires: the sheet asks for the two identifiers and the date TTB approved it, and offers no expiry; the expiry column is never written. A formula keeps its TTB formula number. The brand is stated rather than picked, because the sheet is reached from a brand. Find COLA searches TTB’s public COLA registry under the brewery’s TTB registry number from Settings, over the last 15 years, and lists the COLAs whose fanciful or brand name contains the brand’s name, newest first. Use fills the TTB ID, serial and date approved from TTB’s completed date; nothing is saved until Save approval.",
+    states: [["approved", "orders may proceed"], ["from a brand", "the subject is stated, not picked"], ["saved ID", "entering a COLA already on this brand updates its approval instead of adding a duplicate"], ["COLA search", "Use copies the identifiers and loads approved label choices"], ["direct TTB ID", "load an approved COLA by ID without matching the brand name"], ["label images", "choose a label; fields and image save together"], ["no registry number", "Settings has no TTB registry number: add it before loading labels", 1], ["no match", "enter a known TTB ID directly"], ["TTB down", "show a retrieval error, never an empty answer", 1]],
+    spec: "A COLA has a required TTB ID and an optional applicant serial number. Both identifiers preserve leading zeros. A formula keeps its formula number. A COLA does not expire. Find COLA searches the brewery's permit by brand name; Use loads that approval's label images. Load COLA by TTB ID accepts a known 14-digit ID directly, regardless of the label's name. Only an approved, dated COLA under the brewery's permit supplies images. A saved ID updates its existing approval when added again. Changing the ID or approval kind clears draft image choices. Save approval stores the fields and selected image together.",
     body: <BrandApprovalView model={brandApprovalStout} />,
+  },
+  {
+    step: 7,
+    slice: 6,
+    tab: "More",
+    surface: "sheet",
+    name: "Bulk process COLAs",
+    to: { "Open COLA on TTB": "Bulk process COLAs", "Choose Brand (front) or keg collar": "Bulk process COLAs", Skip: "Bulk process COLAs", "Save and next": "Bulk process COLAs" },
+    job: "Review the brewery’s approved labels and select a catalog image for each brand",
+    reads: "search_colas · get_cola_details · get_cola_image",
+    writes: "upsert_brand_approval",
+    states: [["selection", "choose from the brands currently shown in Catalog"], ["review", "choose a COLA and one label image; save or skip each brand"], ["no match", "show all labels under the permit or skip"], ["not approved", "TTB must report APPROVED before images can be selected", 1], ["complete", "saved choices stay; skipped brands are unchanged"]],
+    body: <ColaReviewView brands={colaReviewBrands} selected={colaReviewBrands.map(brand => brand.id)} queue={colaReviewBrands} index={0} saved={0} candidates={[colaReviewRecord]} ttbId={colaReviewRecord.ttbId} details={colaReviewDetails} imageUrl="" showAll={false} images={Object.fromEntries(colaReviewDetails.images.map(image => [image.url, <ColaLabelImageView key={image.url} label={image.label} src="/mock/cola-label.svg" />]))} />,
   },
   {
     step: 7,

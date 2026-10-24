@@ -184,5 +184,7 @@
   "20261023210000_staff_chat_installation.sql": "919d08ab3e3a9d5fa77abd8f384223dbbad30a2ae288ffd303ad0cd1b50b3404",
   "20261024034413_team_member_display_name.sql": "c664e3a8b14447e52dff4d9abd476e39fbece4686f0b30f70f023e31ded8e403",
   "20261024042812_vessel_capacity_precision.sql": "20f5d70bd57ddbcaf485e285ac0dc06fbb726db285a0c328dd036fa506421629",
-  "20261024042813_customer_name_nonblank.sql": "98be2ea8bbe161abaf703b3f7e487fb4f4188ca5f6812563f22674f606df80b5"
+  "20261024042813_customer_name_nonblank.sql": "98be2ea8bbe161abaf703b3f7e487fb4f4188ca5f6812563f22674f606df80b5",
+  "20261024044830_brand_approval_label_image.sql": "e8618f3a5bdaa693d8d425d2ab302a3eadd0f81374bdd25cb4de69d94ea20611",
+  "20261024045921_saved_cola_image_permit.sql": "8a7c1a1938bddf34fa1fe989e6d9816bf03ae74df38c6935dbcb496b938151ee"
 }
