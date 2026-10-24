@@ -40,7 +40,7 @@ import { importPreview } from "@/lib/mgr/fixtures/import";
 import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView } from "@/components/mgr/views/chat";
 import { linkedChatPeople, chatLinkIntent, chatRecovery, chatDisconnected, chatConnected, personalChatPreferences } from "@/lib/mgr/fixtures/chat";
 import { CHAT_PREVIEW_FIXTURES } from "@/lib/chat/preview-fixtures";
-import { NOTIFICATION_REASON_LABEL } from "@/lib/chat/contracts";
+import { NOTIFICATION_REASON_LABEL, PERSONAL_NOTIFICATION_REASONS } from "@/lib/chat/contracts";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { ShipmentSourcesView } from "@/components/mgr/views/shipment-sources";
 import { shipmentSources } from "@/lib/mgr/fixtures/order-sheets";
@@ -3289,10 +3289,7 @@ export const SCREENS: Screen[] = [
     states: [["saved", "update App Home and close"], ["invalid hours", "name the correction", 1], ["unsupported provider", "open authenticated MGR fallback", 1]],
     spec: "Snooze and mute affect personal delivery only. App Home and MGR Today still show current work.",
     body: (<>
-      {S.toggle(NOTIFICATION_REASON_LABEL.submitted_order)}
-      {S.toggle(NOTIFICATION_REASON_LABEL.pick_due)}
-      {S.toggle(NOTIFICATION_REASON_LABEL.delivery_next)}
-      {S.toggle(NOTIFICATION_REASON_LABEL.fermentation_reading_overdue)}
+      {PERSONAL_NOTIFICATION_REASONS.map(reason => <div key={reason}>{S.toggle(NOTIFICATION_REASON_LABEL[reason])}</div>)}
       {S.select("Sample quiet hours", "9:00 PM–6:00 AM")}
       {S.ctx("Snooze and mute affect personal delivery only. MGR still shows the work as due.")}
     </>),
