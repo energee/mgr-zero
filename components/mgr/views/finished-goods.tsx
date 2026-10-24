@@ -27,6 +27,7 @@ export function FinishedGoodsView({
   model,
   createAction,
   addSkuHref,
+  countHref,
   footer,
   linkRows,
 }: {
@@ -37,6 +38,8 @@ export function FinishedGoodsView({
   /** Where Add SKU in Catalog goes; null hides it for a user who may not
    *  create a SKU. The inventory leaves it out and the button stays inert. */
   addSkuHref?: string | null;
+  /** Weekly count records taproom stock only. null hides the pointer when denied. */
+  countHref?: string | null;
   /** Live: movements ledger. Inventory omits this. */
   footer?: ReactNode;
   /** Live: the name and Shortfall go to their pages. Inventory leaves the name
@@ -54,6 +57,7 @@ export function FinishedGoodsView({
   return (
     <>
       {E.back("Beer", "Finished goods", actions, model.backHref)}
+      {countHref !== null && E.info(<>For physical taproom stock, <Link href={countHref ?? "#"} data-to="Weekly count" className={RECORD_LINK}>Record taproom count</Link> in Weekly count.</>)}
       {model.valueLine !== undefined ? E.fld("Inventory value", model.valueLine) : null}
       {model.empty ? E.blank(model.empty) : <RecordTable
         headers={["SKU", "On hand", "Allocated", "Available"]}
