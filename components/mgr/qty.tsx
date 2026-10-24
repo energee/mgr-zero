@@ -145,10 +145,10 @@ export function TabBar({
   const value = String(on);
   return (
     <Tabs value={hrefs || onChange ? value : undefined} defaultValue={hrefs || onChange ? undefined : value} onValueChange={onChange && ((v) => onChange(names[Number(v)]))} className={panel === undefined ? "min-w-0" : "min-w-0 flex-1 gap-3"}>
-      <TabsList className={cn("rounded-xl border border-border", cls)} aria-label={label}>
+      <TabsList className={cn("rounded-xl border border-foreground/40 p-0", cls)} aria-label={label}>
         {names.map((n, i) => {
           const text = labels?.[n] ?? n;
-          return <TabsTrigger key={n} value={String(i)} data-to={to?.[n]} className="rounded-lg px-3" asChild={Boolean(hrefs?.[n])}>{hrefs?.[n] ? <Link href={hrefs[n]}>{text}</Link> : text}</TabsTrigger>;
+          return <TabsTrigger key={n} value={String(i)} data-to={to?.[n]} className="h-full rounded-none px-3 first:rounded-l-[calc(var(--radius-xl)-1px)] last:rounded-r-[calc(var(--radius-xl)-1px)] data-active:shadow-none data-active:ring-1 data-active:ring-inset data-active:ring-foreground/40" asChild={Boolean(hrefs?.[n])}>{hrefs?.[n] ? <Link href={hrefs[n]}>{text}</Link> : text}</TabsTrigger>;
         })}
       </TabsList>
       {panel === undefined ? null : names.map((n, i) => <TabsContent key={n} value={String(i)} tabIndex={-1} className="flex flex-col gap-3">{panel}</TabsContent>)}
