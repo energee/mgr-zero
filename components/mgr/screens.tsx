@@ -1052,7 +1052,7 @@ export const SCREENS: Screen[] = [
     reads: "get_order",
     writes: "record_pick · resolve_short_pick",
     states: [["permission", "warehouse or admin required", 1], ["short pick", "a line below ordered opens the Short pick frame", 1], ["partly picked", "reopened after a kept-owed line · counted lines start at what was picked"], ["concurrent", "another picker changed qty"], ["cancelled", "staged · restock now", 1], ["offline", "queue whole pick set once"]],
-    spec: "2 taps from Today: Pick → Done picking (all-as-ordered only). The sheet is just the order: one table row per format (Product · Format · Ordered · Actual), the brand named once on its first row, under the customer and ship date. Shortage is not a chip here: entering a count below ordered opens Short pick.",
+    spec: "2 taps from Today: Pick → Done picking (all-as-ordered only). The sheet is just the order: one table row per SKU (Format · Product · Ordered · Actual), grouped by package format then brand name, with the format named once on its first row, under the customer and ship date. Brands keep their staff aliases. Shortage is not a chip here: entering a count below ordered opens Short pick.",
     to: { "16 oz case": "SKU detail" },
     body: <PickView model={toPickViewProps(orderPick)} />,
   },
@@ -1170,7 +1170,7 @@ export const SCREENS: Screen[] = [
     reads: "daily_pick_sheet [confirmed orders by requested ship date, one fulfillment source]",
     writes: "none",
     states: [["day chosen", "confirmed orders requesting that ship date"], ["totals", "read-only · what to bring to the floor in one trip"], ["empty", "nothing confirmed for that day"], ["changed after pick", "the row carries the marker · count only the added or raised lines", 1], ["mixed sources", "one source at a time · a Taproom order is not on the Warehouse sheet", 1]],
-    spec: "A staging aid, not a command surface: nothing here writes, and a row opens that order's Pick, which is where counting happens. Totals sum the day so a picker carries one load out instead of walking back per order; they are read-only because a total spans orders and picking is per-order. Scoped to one fulfillment source, since a sheet mixing Warehouse and Taproom lines would send someone to the wrong room.",
+    spec: "A staging aid, not a command surface: nothing here writes, and a row opens that order's Pick, which is where counting happens. Totals group by package format then brand name, with each format named once and brand aliases retained. They sum the day so a picker carries one load out instead of walking back per order; they are read-only because a total spans orders and picking is per-order. Scoped to one fulfillment source, since a sheet mixing Warehouse and Taproom lines would send someone to the wrong room.",
     body: <PickSheetView model={toPickSheetViewProps(pickSheet)} filters={E.chips(PICK_SHEET_DATE_CHIPS, 1)} />,
   },
   {

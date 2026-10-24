@@ -1,7 +1,7 @@
 // components/mgr/views/pick-sheet.tsx — Work → Pick sheet. Live passes
 // PrintButton as printAction and its own filters (or null to hide chips);
 // inventory uses the weekday chips. Rows and totals come from the adapter;
-// Totals is the Pick table (Product · Format · Qty, the beer named once).
+// Totals is the Pick table (Format · Product · Qty, the format named once).
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { startsGroup } from "@/lib/mgr/brand-lines";
@@ -48,7 +48,7 @@ export function PickSheetView({
               </Fragment>
             ))}
             {E.ttl("Totals")}
-            {E.tbl(["Product", "Format", "Qty"], group.totals.map((t, i) => [startsGroup(group.totals, i) ? E.brand(t.group) : "", t.name, t.qty]), ["l", "l", "r"], { sortable: false, dense: true })}
+            {E.tbl(["Format", "Product", "Qty"], group.totals.map((t, i) => [startsGroup(group.totals, i) ? E.brand(t.group) : "", t.name, t.qty]), ["l", "l", "r"], { sortable: false, dense: true })}
           </Fragment>
         ))}
     </>

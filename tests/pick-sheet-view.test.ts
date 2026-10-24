@@ -30,7 +30,28 @@ describe("Pick sheet view loop", () => {
       "/orders/00000000-0000-4000-8000-000000000232",
       "/orders/00000000-0000-4000-8000-000000000234",
     ]);
-    expect(model.groups[0]?.totals.map((t) => [t.group, t.name, t.qty])).toEqual([["Hazy IPA", "½ bbl keg", 9], ["Pils", "16 oz case", 22]]);
+    expect(Object.fromEntries(model.groups[0]!.totals.map(t => [t.key, t.qty]))).toEqual({
+      [pickSheet.orders[0]!.order_lines[0]!.sku_id]: 9,
+      [pickSheet.orders[0]!.order_lines[1]!.sku_id]: 22,
+    });
+  });
+
+  it("totals each SKU across orders within its format, keeping brands together only inside that format", () => {
+    const line = (id: string, brand: string, format: string, qty: number) => ({
+      id, sku_id: id, qty_ordered: qty, qty_picked: null,
+      skus: { name: `${brand} · ${format}`, brands: { name: brand }, formats: { name: format } },
+    });
+    const model = toPickSheetViewProps({ orders: [
+      { ...pickSheet.orders[0]!, order_lines: [line("hazy-half", "Hazy", "Half", 4), line("pils-case", "Pils", "Case", 10), line("hazy-case", "Hazy", "Case", 2)] },
+      { ...pickSheet.orders[1]!, order_lines: [line("pils-case", "Pils", "Case", 3)] },
+    ] });
+    expect(model.groups[0]!.totals.map(t => [t.key, t.group, t.name, t.qty])).toEqual([
+      ["hazy-case", "Case", "Hazy", 2],
+      ["pils-case", "Case", "Pils", 13],
+      ["hazy-half", "Half", "Hazy", 4],
+    ]);
+    const cells = html(model).match(/<tr[\s\S]*?<\/tr>/g)!.slice(1).map(row => row.match(/<td[^>]*>([\s\S]*?)<\/td>/)![1].replace(/<[^>]+>/g, ""));
+    expect(cells).toEqual(["Case", "", "Half"]);
   });
 
   it("marks a row whose order was changed after pick (#811)", () => {
@@ -76,9 +97,6 @@ describe("Pick sheet view loop", () => {
     expect(markup).toMatch(/Teresa’s · ORD-0234/);
     expect(markup).toMatch(/3 lines/);
     expect(markup).toMatch(/>Totals</);
-    // Totals is the same table as Pick: one row per format, the beer named on its first row.
-    expect(markup.match(/<th[^>]*>[\s\S]*?<\/th>/g)?.map((h) => h.replace(/<[^>]+>/g, ""))).toEqual(["Product", "Format", "Qty"]);
-    expect(markup).toMatch(/>Hazy IPA<[\s\S]*>½ bbl keg<[\s\S]*>9<[\s\S]*>Pils<[\s\S]*>16 oz case<[\s\S]*>22</);
     expect(markup).toContain(">Pick<");
     expect(markup).toMatch(/Thu 9\/3/);
   });
