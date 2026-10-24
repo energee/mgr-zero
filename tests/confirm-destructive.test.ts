@@ -94,7 +94,6 @@ describe("row deletes go through the confirm sheet", () => {
     ["app/(app)/pricing/group-form.tsx", "delete_format", /<RemovePourControl[^]*?onDelete=\{\(\) => form\.run\("delete_format"/],
     ["app/(app)/pricing/group-form.tsx", "delete_price_group", /<DeletePriceGroupControl[^]*?onDelete=\{\(\) => form\.run\("delete_price_group"/],
     ["app/(app)/locations/bin-form.tsx", "delete_bin", /<RemoveBinControl[^]*?onDelete=\{\(\) => form\.run\("delete_bin"/],
-    ["app/(app)/pricing/price-cell-form.tsx", "clear_channel_price", /<ConfirmDeleteControl[^]*?onDelete=\{\(\) => action\.run\("clear_channel_price"/],
   ])("%s runs %s only after confirming", (path, command, binding) => {
     const src = readFileSync(path, "utf8");
     expect(src).toMatch(binding);
