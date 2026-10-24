@@ -52,7 +52,7 @@ export function SettingsView({
           <h2 id="settings-people" className="mb-2 font-heading text-xl font-semibold">People and places</h2>
           {E.nav("Team", model.team, "", undefined, hrefs.team)}
           {E.nav("Locations", model.locations, "", undefined, hrefs.locations)}
-          {E.nav("Source water", "Manage source and target water profiles", "", undefined, hrefs.water)}
+          {E.nav("Water profiles", "Manage source and target water profiles", "", undefined, hrefs.water)}
           {E.nav("Import", navAbout("Import"), "", undefined, hrefs.import)}
         </section>
         <section aria-labelledby="settings-connections" className="flex min-w-0 flex-col gap-2">

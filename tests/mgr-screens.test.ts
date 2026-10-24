@@ -42,10 +42,11 @@ describe("SCREENS", () => {
     expect(String(SCREENS.find((s) => s.name === "Brew day")!.writes)).toContain("record_brew_day");
   });
 
-  it("links Source water in Settings to the Water profiles catalog", () => {
+  it("names the Settings water entry after the Water profiles catalog", () => {
     const settings = text("Settings");
-    expect(settings).toMatch(/Source water/);
-    expect(SCREENS.find((s) => s.name === "Settings")!.to?.["Source water"]).toBe("Water profiles");
+    expect(settings).toMatch(/Water profiles/);
+    expect(settings).not.toMatch(/Source water/);
+    expect(SCREENS.find((s) => s.name === "Settings")!.to?.["Water profiles"]).toBe("Water profiles");
   });
 
   it("makes a recipe version executable without restating the batch size", () => {

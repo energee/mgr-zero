@@ -56,10 +56,6 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
         {field("pa", "PA license")}
         {field("phone", "Customer-facing phone", "tel")}
         <div className="flex min-w-0 flex-col gap-2">
-          {E.edit("Books opened on · optional", values.booksOpenedOn, "date", undefined, { onChange: (nextValue: string) => change("booksOpenedOn", nextValue), id: `${id}-booksOpenedOn`, disabled: basisLocked, "aria-describedby": `${id}-booksOpenedOn-help` })}
-          <FieldDescription id={`${id}-booksOpenedOn-help`}>{basisLocked ? "Filed reporting basis. Use Correct reporting basis below to record a correction and flag affected periods." : "Set or clear before your first filed snapshot. Later changes require a recorded admin correction."}</FieldDescription>
-        </div>
-        <div className="flex min-w-0 flex-col gap-2">
           {E.edit("One-way keg fee ($)", values.oneWayKegFee, "number", undefined, { onChange: (nextValue: string) => change("oneWayKegFee", nextValue), id: `${id}-oneWayKegFee`, min: 0, step: 0.01, "aria-describedby": `${id}-oneWayKegFee-help` })}
           <FieldDescription id={`${id}-oneWayKegFee-help`}>Charged for each one-way keg shipped. Blank or 0 means no fee.</FieldDescription>
         </div>
@@ -71,6 +67,10 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
         <div className="flex min-w-0 flex-col gap-2">
           {E.edit("Days to package", values.daysToPackage, "number", undefined, { onChange: (value) => change("daysToPackage", value), id: `${id}-daysToPackage`, min: 1, max: 120, step: 1, required: true })}
           <FieldDescription>Expected days from brewing to packaging. Planning uses this for projected batch packaging materials.</FieldDescription>
+        </div>
+        <div className="flex min-w-0 flex-col gap-2 @min-[24rem]:col-span-2">
+          {E.edit("Books opened on · optional", values.booksOpenedOn, "date", undefined, { onChange: (nextValue: string) => change("booksOpenedOn", nextValue), id: `${id}-booksOpenedOn`, disabled: basisLocked, "aria-describedby": `${id}-booksOpenedOn-help` })}
+          <FieldDescription id={`${id}-booksOpenedOn-help`}>{basisLocked ? "Filed reporting basis. Use Correct reporting basis below to record a correction and flag affected periods." : "Set or clear before your first filed snapshot. Later changes require a recorded admin correction."}</FieldDescription>
         </div>
       </div>
       <CommandFormMessage error={error} />
