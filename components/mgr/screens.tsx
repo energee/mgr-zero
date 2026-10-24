@@ -2170,7 +2170,7 @@ export const SCREENS: Screen[] = [
     job: "State the temperatures and days a batch is meant to hold",
     reads: "get_recipe [a cut version’s fermentation schedule] · none [draft: the version form’s state]",
     writes: "create_recipe_version [written with their version, never alone]",
-    states: [["permission", "brewer or admin required", 1], ["draft", "stages add, reorder and delete"], ["frozen", "a cut version reads only · create the next version to change it", 1], ["empty", "no stages yet: Add stage is the only action"]],
+    states: [["permission", "brewer or admin required", 1], ["draft", "stages add, reorder and delete"], ["frozen", "a cut version reads only · create the next version to change it", 1], ["empty", "No stages yet. Add a stage to plan temperatures and timing."]],
     spec: "The same shape as Mash schedule and for the same reason. The footer places the dry hop because Recipe draws a dry hop on a day number, and a day number means nothing without this list: day 4 is the last day of Primary, which is why a brewer chose it. The separate fermentation-days and conditioning-days fields v1 kept beside this list are dropped, because the list sums to them and two sources for one number is the failure this design keeps removing.",
     body: (<>
       <FermentationScheduleView title="Hazy IPA v4 · Fermentation" stages={FERM_STAGES} dryHopDay={4} />
