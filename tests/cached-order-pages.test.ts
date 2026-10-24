@@ -31,7 +31,7 @@ it("keeps cached form data mounted when a background refresh fails", () => {
   expect(NewOrderClient({ timeZone }).type).toBe(OrderForm);
 });
 
-it("feeds the existing form shared freshness feedback without replacing the form during refresh", () => {
+it("keeps option-refresh feedback without a Last checked timestamp on an unsaved order", () => {
   state.fetching = true;
   const form = NewOrderClient({ timeZone });
   expect(form.type).toBe(OrderForm);
@@ -40,10 +40,14 @@ it("feeds the existing form shared freshness feedback without replacing the form
   expect(form.props.feedback.props.timeZone).toBe(timeZone);
   const feedback = renderToStaticMarkup(form.props.feedback);
   expect(feedback).toContain("Updating");
-  expect(feedback).toContain("Last checked");
+  expect(feedback).not.toContain("Last checked");
   expect(feedback).not.toContain('role="status"');
   state.paused = true;
   expect(renderToStaticMarkup(NewOrderClient({ timeZone }).props.feedback)).toContain("Showing last-known data");
+});
+
+it("shows no freshness label on a blank, settled new order", () => {
+  expect(renderToStaticMarkup(NewOrderClient({ timeZone }).props.feedback)).toBe("");
 });
 
 it("does not describe a cold cache as empty data or render skeletons", () => {

@@ -54,7 +54,7 @@ it("keeps cached eligible choices on failed refetch with recovery feedback", () 
   expect(props.reason).toBeNull();
   expect(props.model.skus).toHaveLength(1);
   expect(renderToStaticMarkup(props.skuFeedback)).toContain("Showing last-known data");
-  expect(renderToStaticMarkup(props.skuFeedback)).toContain("Dec 31, 1969, 4:00 PM");
+  expect(renderToStaticMarkup(props.skuFeedback)).not.toContain("Last checked");
   if (!isValidElement<{ retry: () => void }>(props.skuFeedback)) throw new Error("Missing pricing feedback");
   props.skuFeedback.props.retry(); expect(state.retry).toHaveBeenCalledOnce();
 });
@@ -89,8 +89,9 @@ it("links a retained SKU error to its picker trigger without unsupported button 
 it("shared picker does not label a pending request as no matching SKUs", () => {
   state.useState.mockReturnValue([false, vi.fn()]);
   const picker = OrderSkuPicker({ value: "sku", label: "Line 1 SKU", options: [], selectedLabel: "Fixture Beer Keg", optionsReady: false, feedback: createElement("p", null, "Loading customer-priced SKUs") });
-  expect(picker.props.trigger.props.children).toBe("Fixture Beer Keg");
+  expect(renderToStaticMarkup(picker.props.trigger)).toContain("Fixture Beer Keg");
   expect(renderToStaticMarkup(picker.props.children)).not.toContain("No matching SKUs");
+  expect(renderToStaticMarkup(picker.props.children)).toContain("Loading customer-priced SKUs");
 });
 
 it("asks the existing query for each customer channel and disables it without a wholesale customer", () => {

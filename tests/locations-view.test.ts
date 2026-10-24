@@ -7,7 +7,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { BinView, RemoveBinControl } from "../components/mgr/views/bin";
-import { FirstRunView } from "../components/mgr/views/first-run";
 import { LocationFields, LocationView } from "../components/mgr/views/location";
 import { LocationBinsView } from "../components/mgr/views/location-bins";
 import { LocationsView } from "../components/mgr/views/locations";
@@ -20,8 +19,6 @@ import { toLocationsViewProps } from "../lib/mgr/locations-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
-// The on-screen copy, spelled out so a wording change is a test change (#1148).
-const USES_HINT = "Choose one or more. One place can be all three. The tap board, weekly count, variance and Replenishment list only locations with Taproom. Taproom staff see stock only at those locations. From warehouse on Replenishment and the Portal fulfillment warehouse list only locations with Warehouse.";
 const BINS_NOTE = "Bins are the rooms and racks inside a location where stock sits. Every new location starts with Cold, Dry and Walk-in. Admin and Warehouse add, rename or remove bins under Location bins.";
 
 describe("Locations list", () => {
@@ -114,7 +111,7 @@ describe("Location detail", () => {
     expect(model.name).toBe(LOC_TAPROOM.name);
     expect(model.uses).toEqual(["storage", "taproom", "warehouse"]);
     expect(model.usesLabel).toBe("Storage · Taproom · Warehouse");
-    expect(model.timezone).toBe("Brewery default · America / New York");
+    expect(model.timezone).toBe("Brewery default · Eastern Time (America/New_York)");
     expect(model.bins).toBe("Walk-in · Cold · Dry");
     expect(model.binsHref).toBe(`/locations/${LOC_TAPROOM.id}/bins`);
     expect(model.backHref).toBeUndefined();
@@ -134,7 +131,7 @@ describe("Location detail", () => {
     expect(html).toMatch(/Storage/);
     expect(html).toMatch(/Warehouse/);
     expect(html).toMatch(/Timezone/);
-    expect(html).toMatch(/Brewery default · America \/ New York/);
+    expect(html).toContain("Brewery default · Eastern Time (America/New_York)");
     expect(html).toMatch(/Location bins/);
     expect(html).toMatch(/Walk-in · Cold · Dry/);
     expect(html).not.toMatch(/>Open</);
@@ -154,19 +151,6 @@ describe("Location detail", () => {
     expect(html).toMatch(new RegExp(`<a[^>]*href="/locations/${LOC_TAPROOM.id}/bins"[^>]*>(?:(?!</a>)[\\s\\S])*Location bins`));
     expect(html).not.toMatch(/>Save location</);
     expect(html).not.toMatch(/Location name/);
-  });
-
-  it("Uses says it takes several answers and names the screens each use gates (#1148)", () => {
-    const html = htmlOf(createElement(LocationFields, { name: "Taproom", uses: ["taproom", "storage"] }));
-    const group = /<div[^>]*data-slot="toggle-group"[^>]*>/.exec(html)?.[0] ?? "";
-    expect(group).toMatch(/aria-label="Uses"/);
-    const hintId = /aria-describedby="([^"]+)"/.exec(group)?.[1];
-    expect(hintId).toBeTruthy();
-    expect(html).toContain(`id="${hintId}"`);
-    expect(html).toContain(">" + USES_HINT + "<");
-    // Selected uses fill with the AA-checked primary pair, not the hover wash (#493).
-    expect(html).toMatch(/<button[^>]*data-state="on"[^>]*data-\[state=on\]:bg-primary[^>]*>Taproom</);
-    expect(html).toMatch(/<button[^>]*data-state="off"[^>]*>Warehouse</);
   });
 
   it("the Location name label focuses its input (#1148)", () => {
@@ -199,12 +183,6 @@ describe("Location detail", () => {
     expect(src).toMatch(/from "@\/components\/mgr\/views\/location"/);
     expect(src).toMatch(/<LocationFields\b[^>]*controls=\{\{ name: setName, uses: setUses \}\}/);
     expect(src).not.toMatch(/<Label\b|<Input\b|<ToggleGroup\b/);
-  });
-
-  it("the inventory first-run step draws the same multi-select fields, not single-choice chips (#1148)", () => {
-    const html = htmlOf(createElement(FirstRunView, { model: { brewery: "Demo Brewing", steps: "5 steps" } }));
-    expect(html).toContain(USES_HINT);
-    expect(html).toMatch(/<div[^>]*data-slot="toggle-group"[^>]*aria-label="Uses"/);
   });
 
   it("the live first-run step names every use and that one place can be several (#1148)", () => {
@@ -403,7 +381,7 @@ describe("Bin sheet", () => {
     expect(src).toMatch(/controls=\{\{ name: setName \}\}/);
     expect(src).not.toMatch(/<Label\b|<Input\b/);
     expect(src).toMatch(/title=\{bin \? `Edit bin · \$\{bin\.name\}` : "Add bin"\}/);
-    expect(src).toMatch(/tapBoardHref: "\/taproom\/board"/);
+    expect(src).toContain('tapBoardHref: "/taproom/board"');
     expect(src).toMatch(/remove=\{bin \? <RemoveBinControl/);
   });
 

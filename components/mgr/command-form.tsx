@@ -19,14 +19,11 @@ import { Icon } from "@/components/mgr/icon";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
-// Every CommandForm holds unsubmitted edits, so its close is a discard: styled
-// destructive like the offline queue's Discard rather than the shadcn default
-// ghost X, and overridden here (not in components/ui) so a harmless Sheet like
-// MeSheet keeps its neutral close. Route it through the controlled boundary
-// directly so both the Dialog and aliased Sheet branches reset their form state.
+// Closing dismisses the surface; it is not a destructive domain action.
+// Route through the controlled boundary so both Dialog and Sheet reset form state.
 function FormClose({ className, onClose, previewAction }: { className: string; onClose?: (open: boolean) => void; previewAction?: boolean }) {
   return (
-    <Button type="button" variant="destructive" size="icon-sm" className={className} onClick={() => onClose?.(false)} data-preview-action={previewAction || undefined}>
+    <Button type="button" variant="ghost" size="icon-sm" className={className} onClick={() => onClose?.(false)} data-preview-action={previewAction || undefined}>
       <Icon icon={Cancel01Icon} />
       <span className="sr-only">Close</span>
     </Button>

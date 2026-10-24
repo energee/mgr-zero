@@ -17,6 +17,7 @@ import { SortTable } from "@/components/mgr/sort-table";
 import { SubmitButton, type SubmitButtonProps } from "@/components/mgr/submit-button";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
 import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
+import { ComposerConversationView } from "@/components/mgr/views/composer-conversation";
 import { ComposerDrawerView } from "@/components/mgr/views/composer-drawer";
 import { ComposerStripView } from "@/components/mgr/views/composer-strip";
 import { VolumeField } from "@/components/mgr/volume-field";
@@ -465,13 +466,13 @@ export const E = {
    *  nothing is picked; `selectedLabel` names a retained value missing from `options`.
    *  With no options the open list says "No … to choose yet", never "No matching …";
    *  `empty` adds the note and link under the trigger. */
-  searchPick: (label: string, value: string, options: SearchPickOption[], controls?: Pick<FieldControls, "id" | "disabled" | "placeholder" | "hideLabel" | "onChange" | "aria-describedby"> & { selectedLabel?: string; previewAction?: boolean; empty?: PickEmpty }) => {
+  searchPick: (label: string, value: string, options: SearchPickOption[], controls?: Pick<FieldControls, "id" | "disabled" | "placeholder" | "hideLabel" | "onChange" | "aria-describedby"> & { selectedLabel?: string; previewAction?: boolean; outlined?: boolean; empty?: PickEmpty }) => {
     const empty = options.length ? undefined : controls?.empty;
     const emptyId = empty && controls?.id ? `${controls.id}-empty` : undefined;
     return (
     <Field data-disabled={controls?.disabled}>
       {!controls?.hideLabel && <FieldLabel htmlFor={controls?.id}>{label}</FieldLabel>}
-      <SearchPick label={label} value={value} options={options} onChange={controls?.onChange} id={controls?.id} disabled={controls?.disabled} errorId={describedBy(controls?.["aria-describedby"], emptyId)} selectedLabel={controls?.selectedLabel} previewAction={controls?.previewAction}
+      <SearchPick label={label} value={value} options={options} onChange={controls?.onChange} id={controls?.id} disabled={controls?.disabled} errorId={describedBy(controls?.["aria-describedby"], emptyId)} selectedLabel={controls?.selectedLabel} previewAction={controls?.previewAction} outlined={controls?.outlined}
         title={label} placeholder={controls?.placeholder ?? `Select ${label.toLowerCase()}`} searchPlaceholder={`Search ${label.toLowerCase()}`} noMatchMessage={`No matching ${label.toLowerCase()}`} emptyMessage={controls?.empty?.text ?? `No ${label.toLowerCase()} to choose yet`} />
       {empty && emptyNote(empty, emptyId)}
     </Field>
@@ -580,7 +581,12 @@ export const E = {
    *  every call site writing the hole. */
   line: (t: React.ReactNode, s: React.ReactNode, n: React.ReactNode, cls: RowClass, fields: React.ReactNode) => E.row(t, s, n, cls, undefined, fields),
   sp: () => <div className="flex-1" />,
-  comp: (roles: readonly StaffRole[] = ["admin"], container?: HTMLElement | null) => <ComposerDrawerView container={container}><ComposerStripView disabled={!roles.length} actions={[{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }]} /></ComposerDrawerView>,
+  comp: (roles: readonly StaffRole[] = ["admin"], container?: HTMLElement | null) => (
+    <ComposerDrawerView container={container}>
+      <ComposerConversationView messages={[]} />
+      <ComposerStripView disabled={!roles.length} />
+    </ComposerDrawerView>
+  ),
 };
 
 function isPin(n: ReactNode) {
