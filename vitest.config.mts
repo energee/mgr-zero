@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
-// The existing screen-only proof contract, plus this harness's pure regressions.
+// The screen-only proof contract, pure form checks, and harness regressions.
 // Every unlisted file stays in the guarded database project.
 const pureTests = [
   "tests/mgr-screens.test.ts",
@@ -17,6 +17,14 @@ const pureTests = [
   "tests/screen-persona.test.ts",
   "tests/design-docs.test.ts",
   "tests/docs.test.ts",
+  "tests/field-number-notation.test.ts",
+  "tests/field-validation-followup.test.ts",
+  "tests/settings-field-validation.test.ts",
+  "tests/quantity-field-validation.test.ts",
+  "tests/quantity-field-blur.test.ts",
+  "tests/quantity-form-submission.test.ts",
+  "tests/water-profile-submission.test.ts",
+  "tests/pricing-view.test.ts",
   "tests/register-cell-keys.test.ts",
   "tests/migrations-applied.test.ts",
   "tests/test-db-schema-guard.test.ts",

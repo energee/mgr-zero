@@ -69,3 +69,11 @@ export function toWaterProfileInput(f: WaterProfileFields) {
     alkalinityPpm: optionalNumber(f.alkalinity_ppm), waterPh: optionalNumber(f.water_ph), note: f.note,
   };
 }
+
+/** Water pH is optional and accepts fractional values throughout the 0–14 range. */
+export function waterPhError(value: string): string | undefined {
+  if (value === "") return undefined;
+  if (/[eE]/.test(value)) return "Enter a decimal number without exponent notation.";
+  const ph = Number(value);
+  return Number.isFinite(ph) && ph >= 0 && ph <= 14 ? undefined : "Enter a water pH from 0 to 14.";
+}

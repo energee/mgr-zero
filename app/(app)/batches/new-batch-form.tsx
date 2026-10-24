@@ -51,7 +51,7 @@ export function NewBatchForm({ brands, recipeVersions }: { brands: Brand[]; reci
   };
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="New batch" trigger={<Button size="sm">New batch</Button>}>
-      <form onSubmit={form.submit} className="flex flex-col gap-4">
+      <form onSubmit={event => { if (reason) { event.preventDefault(); return; } void form.submit(event); }} className="flex flex-col gap-4">
         <ScheduleBatchView
           model={model}
           controls={controls}
