@@ -249,6 +249,7 @@ import { toLotTraceViewProps } from "@/lib/mgr/lot-trace-view";
 import { toLocationsViewProps } from "@/lib/mgr/locations-view";
 import { toMaterialsOnHandViewProps } from "@/lib/mgr/materials-on-hand-view";
 import { ComposerConversationView } from "@/components/mgr/views/composer-conversation";
+import { ComposerStripView } from "@/components/mgr/views/composer-strip";
 import { ComposerProposalView, OfflineOutboxView } from "@/components/mgr/views/composer";
 import { COMPOSER_SETUP_ACTIVITY, COMPOSER_SETUP_TIMEOUT_MESSAGE, COMPOSER_SETUP_TIMEOUT_MS } from "@/lib/composer/setup";
 import { toMoreViewProps } from "@/lib/mgr/more-view";
@@ -322,8 +323,8 @@ export type Screen = {
   group?: "Global" | "Entry" | "Portal" | "Desk" | "Chat" | "POS" | "QuickBooks Online";
   /** Portal tab, for PortalShell frames. */
   portal?: "Order" | "Orders" | "Invoices" | "Account";
-  /** Default page; `sheet` and `entry` frames render as a panel over the shell. */
-  surface?: "page" | "sheet" | "entry";
+  /** Default page; other surfaces use the same entry, form, or chat wrapper as live. */
+  surface?: "page" | "sheet" | "entry" | "composer";
   name: string;
   job: ReactNode;
   reads: ReactNode;
@@ -882,13 +883,14 @@ export const SCREENS: Screen[] = [
     tab: "Today",
     group: "Global",
     name: "Composer setup",
+    surface: "composer",
     to: { "Retry setup": "Composer setup", Minimize: "Today" },
     job: "Open your latest conversation, or start your first, before you can type",
     reads: "list_chat_conversations · get_chat_history",
     writes: "create_chat_conversation [first open only; one request id across retries]",
     states: [["opening", "pulsing bar · Retry setup · input disabled"], ["timed out", `after ${COMPOSER_SETUP_TIMEOUT_MS / 1000} seconds: ${COMPOSER_SETUP_TIMEOUT_MESSAGE} · Try again`, 1], ["failed", "the server's message · Try again", 1]],
     spec: `Setup restores the latest conversation and its history, or creates one. A stalled load ends after ${COMPOSER_SETUP_TIMEOUT_MS / 1000} seconds in the failure alert. Try again re-runs setup with the same create request id, so a retry never makes a second conversation.`,
-    body: <ComposerConversationView messages={[]} activity={COMPOSER_SETUP_ACTIVITY} onSetupRetry={() => undefined} />,
+    body: <><ComposerConversationView messages={[]} activity={COMPOSER_SETUP_ACTIVITY} onSetupRetry={() => undefined} /><ComposerStripView disabled /></>,
   },
   {
     step: 4,
@@ -896,16 +898,17 @@ export const SCREENS: Screen[] = [
     tab: "Today",
     group: "Global",
     name: "Composer question",
+    surface: "composer",
     to: { "New chat": "Composer question", Minimize: "Today" },
     job: "Ask one exact follow-up in the conversation; no Commit until every required field is known",
     reads: "list_skus · list_locations · list_bins · list_sale_channels · get_bin_move_stock",
     writes: "none",
     states: [["missing SKU", "structured picker · no Commit"], ["resolved", "Preview movement becomes available"]],
     spec: "The Gateway conversation asks for the first missing exact field. This state asks for the exact SKU / package and exposes no inferred candidate language or Commit verb.",
-    body: <ComposerConversationView messages={[
+    body: <><ComposerConversationView messages={[
       { id: "question-user", role: "user", content: "We blew a half of Hazy." },
       { id: "question-assistant", role: "assistant", content: "Which SKU / package: Hazy IPA · ½ bbl keg or Hazy IPA · case?" },
-    ]} />,
+    ]} /><ComposerStripView /></>,
   },
   {
     step: 4,
@@ -913,16 +916,17 @@ export const SCREENS: Screen[] = [
     tab: "Today",
     group: "Global",
     name: "Composer answer",
+    surface: "composer",
     to: { "Shortfall detail": "Pars and allocation", Review: "Pars and allocation", "New chat": "Composer answer", Minimize: "Today" },
     job: "Questions use named registered queries",
     reads: "get_atp · get_shortfalls",
     writes: "none",
     states: [["loading", "answer skeleton"], ["error", "Could not refresh ATP · Retry", 1], ["offline", "cached value + timestamp"]],
     spec: "The drawer handle is a visible button (Open, Expand, Minimize Ask MGR); no swipe-only interaction.",
-    body: <ComposerConversationView messages={[
+    body: <><ComposerConversationView messages={[
       { id: "answer-user", role: "user", content: "How much Hazy is available to promise?" },
       { id: "answer-assistant", role: "assistant", content: "11 × ½ bbl plus 40 cases are currently available to promise. Observed Sep 10, 2026, 10:00 AM." },
-    ]} />,
+    ]} /><ComposerStripView /></>,
   },
   {
     step: 4,
