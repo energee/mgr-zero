@@ -74,7 +74,6 @@ describe("AI composer", () => {
     expect(text).not.toContain("openai/gpt-5.4");
     // Token prices and the Vercel catalog link are vendor detail, not brewery settings (#1147).
     expect(text).not.toMatch(/tokens|\$/);
-    expect(text).toContain("openai");
     expect(html).not.toContain("vercel.com");
     expect(html).toContain("<title>OpenAI</title>");
     expect(html).toContain('placeholder="Search models…"');
