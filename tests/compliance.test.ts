@@ -24,7 +24,7 @@ beforeAll(async () => {
 
 describe("search_colas", () => {
   const cola = (fancifulName: string, brandName = "Test Brewing"): ColaRecord => ({
-    ttbId: crypto.randomUUID().slice(0, 14), permit: "BR-PA-TEST-1", serial: null, completedOn: "2026-01-02",
+    ttbId: "26001001000123", permit: "BR-PA-TEST-1", serial: null, completedOn: "2026-01-02",
     fancifulName, brandName, classCode: "901", className: "MALT BEVERAGE",
   });
 
@@ -63,6 +63,50 @@ describe("registry", () => {
     await expect(runCommand("upsert_brand_approval", { brandId, kind: "cola", ttbId: "23001001000123" }, sales)).rejects.toMatchObject({ status: 409 });
     const warehouse = await makeStaffCtx(b.id, "warehouse");
     await expect(runCommand("upsert_brand_approval", { brandId, kind: "formula", ttbId: "F-1" }, warehouse)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("requires the actual 14-digit COLA ID at both command and direct RPC boundaries", async () => {
+    const { brandId: brand } = await seedCatalog(b.id, { product: "Identifier Ale", sku: "Identifier Ale case" });
+    const saved = await runCommand("upsert_brand_approval", { brandId: brand, kind: "cola", ttbId: "00318001000102" }, sales) as { id: string; ttb_id: string };
+    expect(saved.ttb_id).toBe("00318001000102");
+    for (const ttbId of ["abc🍺", "2531800100003", "253180010000345", "2531800100003🍺", "1e13"]) {
+      await expect(runCommand("upsert_brand_approval", { id: saved.id, brandId: brand, kind: "cola", ttbId }, sales)).rejects.toMatchObject({ status: 400 });
+      const result = await sales.db.rpc("upsert_brand_approval", {
+        p_brewery: b.id, p_id: saved.id, p_brand: brand, p_kind: "cola", p_ttb_id: ttbId,
+        p_approved_on: null, p_expires_on: null, p_note: null, p_request_id: crypto.randomUUID(),
+      });
+      expect(result.error?.code).toBe("P0001");
+      expect(result.error?.message).toContain("14-digit TTB ID");
+    }
+    const { data, error } = await sales.db.from("brand_approvals").select("ttb_id").eq("id", saved.id).single();
+    expect(error).toBeNull();
+    expect(data?.ttb_id).toBe("00318001000102");
+    const formula = await sales.db.rpc("upsert_brand_approval", {
+      p_brewery: b.id, p_id: null, p_brand: brand, p_kind: "formula", p_ttb_id: "F-0042",
+      p_approved_on: null, p_expires_on: null, p_note: null, p_request_id: crypto.randomUUID(),
+    });
+    expect(formula.error).toBeNull();
+    expect(formula.data).toMatchObject({ kind: "formula", ttb_id: "F-0042" });
+  });
+
+  it("replays a completed legacy COLA through runCommand without permitting a new malformed write", async () => {
+    const { brandId: brand } = await seedCatalog(b.id, { product: "Recovered Label", sku: "Recovered Label case" });
+    const current = await runCommand("upsert_brand_approval", { brandId: brand, kind: "cola", ttbId: "26001001000777" }, sales) as { id: string; ttb_id: string };
+    // A pre-migration create result remains in the ledger even if the label's
+    // identifier was corrected later. Do not mutate the schema to seed history.
+    const legacy = { ...current, ttb_id: "legacy-COLA" };
+    const requestId = crypto.randomUUID();
+    const payload = { id: null, brand, kind: "cola", ttb_id: legacy.ttb_id, serial_number: null, approved_on: null, expires_on: null, note: null, clear: [] };
+    sql(`insert into private.command_requests(actor_id,brewery_id,request_id,command_name,payload_hash,result)
+      values('${sales.userId}','${b.id}','${requestId}','upsert_brand_approval',
+        extensions.digest('${JSON.stringify(payload)}'::jsonb::text,'sha256'),'${JSON.stringify(legacy)}'::jsonb)`);
+    const input = { brandId: brand, kind: "cola", ttbId: legacy.ttb_id };
+    const execution = { requestId, correlationId: requestId };
+    expect(await runCommand("upsert_brand_approval", input, sales, execution)).toEqual(legacy);
+    await expect(runCommand("upsert_brand_approval", { ...input, ttbId: "changed-legacy" }, sales, execution)).rejects.toMatchObject({ status: 409 });
+    await expect(runCommand("upsert_brand_approval", input, sales)).rejects.toThrow("14-digit TTB ID");
+    expect((await sales.db.from("brand_approvals").select("ttb_id").eq("id", current.id).single()).data?.ttb_id).toBe(current.ttb_id);
+    expect(sql(`select count(*) from private.command_requests where actor_id='${sales.userId}' and request_id='${requestId}'`)).toEqual(["1"]);
   });
 
   it("a COLA keeps its TTB ID and applicant serial as separate strings, edited independently (#730)", async () => {
@@ -108,10 +152,10 @@ describe("registry", () => {
 
   it("an upsert keeps a field the caller omits and clears one sent as null (#522)", async () => {
     const { brandId: brand } = await seedCatalog(b.id, { product: "Keep Porter", sku: "Keep Porter case" });
-    const approval = await runCommand("upsert_brand_approval", { brandId: brand, kind: "cola", ttbId: "K-1", approvedOn: "2026-01-02", expiresOn: "2030-01-02", note: "label v2" }, sales) as { id: string };
-    expect(await runCommand("upsert_brand_approval", { id: approval.id, brandId: brand, kind: "cola", ttbId: "K-1" }, sales))
+    const approval = await runCommand("upsert_brand_approval", { brandId: brand, kind: "cola", ttbId: "26002001000123", approvedOn: "2026-01-02", expiresOn: "2030-01-02", note: "label v2" }, sales) as { id: string };
+    expect(await runCommand("upsert_brand_approval", { id: approval.id, brandId: brand, kind: "cola", ttbId: "26002001000123" }, sales))
       .toMatchObject({ approved_on: "2026-01-02", expires_on: "2030-01-02", note: "label v2" });
-    expect(await runCommand("upsert_brand_approval", { id: approval.id, brandId: brand, kind: "cola", ttbId: "K-1", expiresOn: null, note: null }, sales))
+    expect(await runCommand("upsert_brand_approval", { id: approval.id, brandId: brand, kind: "cola", ttbId: "26002001000123", expiresOn: null, note: null }, sales))
       .toMatchObject({ approved_on: "2026-01-02", expires_on: null, note: null });
 
     await runCommand("upsert_state_registration", { brandId: brand, state: "MI", registrationNo: "MI-1", approvedOn: "2026-02-03", expiresOn: "2027-02-03" }, sales);

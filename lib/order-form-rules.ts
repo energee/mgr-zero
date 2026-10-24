@@ -1,3 +1,5 @@
+import { isNumber, numberNotationError } from "@/lib/mgr/quantity-input";
+
 // lib/order-form-rules.ts — the pure "is this New order form submittable" rule
 // behind app/(app)/orders/order-form.tsx. Mirrors the create_order input schema
 // in lib/commands/orders.ts and the orders check constraint; on an empty
@@ -35,7 +37,7 @@ export type OrderFormReadiness = {
 export const isBlankLine = (l: { skuId: string; qty: string }) => !l.skuId && !l.qty.trim();
 
 /** Every entered row needs a SKU and a finite, positive quantity. */
-export const isCompleteLine = (l: { skuId: string; qty: string }) => Boolean(l.skuId) && Number.isFinite(Number(l.qty)) && Number(l.qty) > 0;
+export const isCompleteLine = (l: { skuId: string; qty: string }) => Boolean(l.skuId) && isNumber(l.qty) && Number(l.qty) > 0 && Number(l.qty) <= 9_999_999_999.99;
 
 /** A line's corrections, one per field that is wrong, so each marks its own
  *  control. `sku` and `qty` are its SKU picker's and quantity's messages. */
@@ -49,7 +51,7 @@ export function orderLineError(line: { skuId: string; qty: string }, index: numb
   const qty = Number(line.qty);
   return {
     ...(line.skuId ? {} : { sku: `Line ${index + 1}: select a SKU${remove}.` }),
-    ...(Number.isFinite(qty) && qty > 0 ? {} : { qty: `Line ${index + 1}: enter a quantity greater than zero${remove}.` }),
+    ...(isNumber(line.qty) && qty > 0 && qty <= 9_999_999_999.99 ? {} : { qty: numberNotationError(line.qty) ?? `Line ${index + 1}: enter a quantity greater than zero and at most 9,999,999,999.99${remove}.` }),
   };
 }
 
@@ -70,7 +72,7 @@ export function draftLineErrors(lines: { skuId: string; qty: string }[], skuIds:
     else if (lines.findIndex((other) => other.skuId === line.skuId) !== index) sku = `Line ${n}: this SKU is already on another line. Combine its quantities or remove this line.`;
     return {
       ...(sku ? { sku } : {}),
-      ...(Number.isFinite(qty) && qty >= 0.01 ? {} : { qty: `Line ${n}: enter a quantity of at least 0.01.` }),
+      ...(isNumber(line.qty) && qty >= 0.01 && qty <= 9_999_999_999.99 ? {} : { qty: numberNotationError(line.qty) ?? `Line ${n}: enter a quantity from 0.01 to 9,999,999,999.99.` }),
     };
   });
 }

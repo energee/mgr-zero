@@ -16,7 +16,7 @@ import { scheduleBatchReason } from "@/lib/mgr/schedule-batch-view";
 type Brand = { id: string; name: string; alias?: string | null };
 type RecipeVersion = { id: string; label: string };
 
-export function NewBatchForm({ brands, recipeVersions }: { brands: Brand[]; recipeVersions: RecipeVersion[] }) {
+export function NewBatchForm({ brands, recipeVersions, today }: { brands: Brand[]; recipeVersions: RecipeVersion[]; today?: string }) {
   const [intendedBrandId, setIntendedBrandId] = useState("");
   const [recipeVersionId, setRecipeVersionId] = useState("");
   const [plannedOn, setPlannedOn] = useState("");
@@ -39,6 +39,7 @@ export function NewBatchForm({ brands, recipeVersions }: { brands: Brand[]; reci
     brandOptions: brands.map((b) => ({ id: b.id, label: brandLabel(b) })),
     plannedBbl,
     date: plannedOn,
+    today,
     note,
   };
   const optional = (set: (value: string) => void) => (value: string) => set(value === NONE ? "" : value);

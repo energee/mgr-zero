@@ -75,7 +75,7 @@ export function EditDraftOrderView({ model, onSave, busy = false, error }: {
     })}
     <Button type="button" variant="ghost" className="w-fit" disabled={busy} onClick={() => setLines(previous => [...previous, { skuId: "", qty: "" }])}>Add line</Button>
     {!ready && E.info("Choose an available SKU once and a quantity of at least 0.01 for every line, or remove the invalid line.")}
-    {E.info("Saving keeps this order a draft and refreshes line prices. Submit from the order when ready.")}
+    {E.info("Enter quantities from 0.01 to 9,999,999,999.99. Fractions are allowed; saved quantities are rounded to two decimal places. Saving keeps this order a draft and refreshes line prices. Submit from the order when ready.")}
     <CommandFormMessage error={error} />
     {E.sp()}
     <Button type="submit" className="w-full md:w-fit md:self-end" disabled={busy || !ready}>{busy ? "Saving..." : "Save draft"}</Button>

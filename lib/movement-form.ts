@@ -6,6 +6,7 @@ import type { BinMoveStock } from "./commands/inventory";
 import { movementInput } from "./commands/movement-input";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { submitReason } from "@/lib/mgr/submit-reason";
+import { numberNotationError } from "@/lib/mgr/quantity-input";
 
 /** The staff-facing movement kinds, in the staff guide's order. The live form
  *  and the inventory frame both list these (#1168). sale_removal and
@@ -43,7 +44,7 @@ function qtyError(qty: number): string | undefined {
 }
 
 export function movementFieldErrors(type: string, quantity: string, state: string): MovementFieldErrors {
-  const qty = qtyError(Number(quantity));
+  const qty = numberNotationError(quantity) ?? qtyError(Number(quantity));
   return {
     ...(qty ? { qty } : {}),
     ...(requiresDestState(type) && !/^[A-Z]{2}$/.test(state.trim().toUpperCase()) ? { destState: "Enter a two-letter state, such as PA." } : {}),

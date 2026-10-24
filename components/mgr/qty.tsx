@@ -10,34 +10,55 @@
 // never import this directly; they use E.qty, E.tabs and E.volume.
 "use client";
 import type { FieldControls } from "@/components/mgr/e";
-import { stepQuantity } from "@/lib/mgr/quantity-input";
+import { numberNotationError, stepQuantity } from "@/lib/mgr/quantity-input";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useId, useRef, type AriaAttributes, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type AriaAttributes, type ReactNode } from "react";
+
+/** Keep the lexical error on the input as well as on screen, including uncontrolled fixtures. */
+function useNumberNotation(value: string | undefined, initialValue = "") {
+  const input = useRef<HTMLInputElement>(null);
+  const [typed, setTyped] = useState(initialValue);
+  const error = numberNotationError(value ?? typed);
+  const errorId = useId();
+  useEffect(() => { input.current?.setCustomValidity(error ?? ""); }, [error]);
+  function changed(next: string) {
+    input.current?.setCustomValidity(numberNotationError(next) ?? "");
+    if (value === undefined) setTyped(next);
+  }
+  return { input, error, errorId, changed };
+}
 
 /** The same stepper for controlled forms and uncontrolled inventory fields. */
 export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, ...attributes }: Omit<FieldControls, "hideLabel" | "error"> & { label: string; value?: string; defaultValue?: string }) {
-  const input = useRef<HTMLInputElement>(null);
+  const notation = useNumberNotation(onChange ? value : undefined, value ?? defaultValue);
+  const input = notation.input;
+  const notationError = attributes["aria-invalid"] ? undefined : notation.error;
   const step = (direction: -1 | 1) => {
     const field = input.current;
-    if (!field || field.matches(":disabled") || field.readOnly) return;
+    if (!field || field.matches(":disabled") || field.readOnly || notation.error) return;
     const next = stepQuantity(field.value, direction, attributes.min === undefined ? undefined : Number(attributes.min), attributes.max === undefined ? undefined : Number(attributes.max));
     if (onChange) onChange(next);
     else field.value = next;
   };
-  return <ButtonGroup>
-    <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Decrease ${label}` : "Decrease"} disabled={attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.min !== undefined && Number(value) <= Number(attributes.min))} onClick={() => step(-1)}>−</Button>
+  return <div className="flex flex-col gap-2"><ButtonGroup>
+    <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Decrease ${label}` : "Decrease"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.min !== undefined && Number(value) <= Number(attributes.min))} onClick={() => step(-1)}>−</Button>
     {/* Grows with its digits (field-sizing) so a long quantity is not cut off (#493). */}
     {/* eslint-disable-next-line no-restricted-syntax -- Shared E numeric primitive; native spinners are hidden. */}
-    <Input ref={input} type="number" inputMode="decimal" step="any" aria-label={label} {...attributes} value={onChange ? value : undefined} defaultValue={onChange ? undefined : value ?? defaultValue} onChange={onChange ? event => onChange(event.target.value) : undefined} className="w-auto min-w-14 field-sizing-content [appearance:textfield] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
-    <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Increase ${label}` : "Increase"} disabled={attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.max !== undefined && Number(value) >= Number(attributes.max))} onClick={() => step(1)}>+</Button>
-  </ButtonGroup>;
+    <Input ref={input} type="number" inputMode="decimal" step="any" aria-label={label} {...attributes}
+      aria-invalid={Boolean(notation.error) || attributes["aria-invalid"]}
+      aria-describedby={[attributes["aria-describedby"], notationError ? notation.errorId : undefined].filter(Boolean).join(" ") || undefined}
+      value={onChange ? value : undefined} defaultValue={onChange ? undefined : value ?? defaultValue}
+      onChange={event => { notation.changed(event.target.value); onChange?.(event.target.value); }}
+      className="w-auto min-w-14 field-sizing-content [appearance:textfield] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+    <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Increase ${label}` : "Increase"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.max !== undefined && Number(value) >= Number(attributes.max))} onClick={() => step(1)}>+</Button>
+  </ButtonGroup>{notationError && <FieldError id={notation.errorId}>{notationError}</FieldError>}</div>;
 }
 
 /** A typed quantity under its visible label: the OS keyboard is the keypad, so
@@ -67,6 +88,8 @@ export function Qty({
 }) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
+  const notation = useNumberNotation(onChange ? value : undefined, value);
+  const notationError = invalid ? undefined : notation.error;
   return (
     <Field>
       <FieldLabel htmlFor={inputId}>{label}</FieldLabel>
@@ -78,14 +101,15 @@ export function Qty({
         {/* eslint-disable-next-line no-restricted-syntax -- Shared E volume primitive; native spinners are hidden. */}
         <InputGroupInput
           id={inputId}
+          ref={notation.input}
           type="number"
           inputMode="decimal"
           step="any"
           value={onChange ? value : undefined}
           defaultValue={onChange ? undefined : value}
-          onChange={(event) => onChange?.(event.target.value)}
-          aria-invalid={invalid}
-          aria-describedby={describedBy}
+          onChange={(event) => { notation.changed(event.target.value); onChange?.(event.target.value); }}
+          aria-invalid={Boolean(notation.error) || invalid}
+          aria-describedby={[describedBy, notationError ? notation.errorId : undefined].filter(Boolean).join(" ") || undefined}
           className="text-2xl font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
         {/* pr-0 for a unit switcher: a TabsList insets itself (p-[3px]), so the
@@ -94,6 +118,7 @@ export function Qty({
             inset of its own and keeps the padding. */}
         {unit ? <InputGroupAddon align="inline-end" className="has-[>[data-slot=tabs]]:pr-0">{unit}</InputGroupAddon> : null}
       </InputGroup>
+      {notationError && <FieldError id={notation.errorId}>{notationError}</FieldError>}
     </Field>
   );
 }
