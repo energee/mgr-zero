@@ -18,6 +18,8 @@ const pureTests = [
   "tests/design-docs.test.ts",
   "tests/docs.test.ts",
   "tests/register-cell-keys.test.ts",
+  "tests/import-csv.test.ts",
+  "tests/import-view.test.ts",
   "tests/migrations-applied.test.ts",
   "tests/test-db-schema-guard.test.ts",
   "tests/test-db-selection.test.ts",
