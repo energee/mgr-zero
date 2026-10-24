@@ -2900,7 +2900,7 @@ export const SCREENS: Screen[] = [
     reads: "list_water_profiles",
     writes: "none [creation and editing happen on Water profile]",
     states: [["permission", "brewer or admin required", 1], ["empty", "no profiles yet: Add water profile is the only action"]],
-    spec: "A catalog entity beside Formats and price groups, because a profile is referenced by many recipes and edited in one place: a new water report is one edit, not fifty. No quick-create dialog, which v1 needed only because profiles were buried inside the recipe form; reached from Catalog or Settings (Admin), or from Recipes or a recipe’s Water sheet (Brewer and Admin), Add water profile is already one tap away. A profile is not marked as a source or a target; a recipe version can pick any profile as either. Each row reads the six ions, then alkalinity and water pH when the profile has them. The back arrow follows the role: Catalog for Admin, Recipes for Brewer.",
+    spec: "A catalog entity beside Formats and price groups, because a profile is referenced by many recipes and edited in one place: a new water report is one edit, not fifty. No quick-create dialog, which v1 needed only because profiles were buried inside the recipe form; reached from Catalog or Settings (Admin), or from Recipes or a recipe’s Water sheet (Brewer and Admin), Add water profile is already one tap away. The empty state explicitly says profiles are not classified as source or target here; a recipe version chooses either role on its Water sheet. Each row reads the six ions, then alkalinity and water pH when the profile has them. Entering from Settings → Source water keeps Settings as the back destination for Admin. Other entries follow the role: Catalog for Admin, Recipes for Brewer.",
     body: <WaterProfilesView model={toWaterProfilesViewProps({ profiles: waterProfiles })} />,
   },
   {
@@ -2913,7 +2913,7 @@ export const SCREENS: Screen[] = [
     job: "Name a water, its six ions, and optionally its alkalinity, pH and notes",
     reads: "list_water_profiles",
     writes: "upsert_water_profile [one RPC; insert when profileId is empty, else edit]",
-    states: [["permission", "brewer or admin required", 1], ["in use", "a profile a recipe references cannot be deleted", 1]],
+    states: [["permission", "brewer or admin required", 1], ["in use", "a profile a recipe references cannot be deleted", 1], ["not ready", "Still needed beside Save water profile names missing or out-of-range values"]],
     spec: "Six ions in parts per million (ppm, the same as mg/L), the set every brewing water calculation reads. Each is required and none can be negative, as the help line above the fields says. Every ion input points to that line, so a screen reader reads it too. Three optional fields follow. Alkalinity as CaCO3 is in ppm and cannot be negative; bicarbonate does not replace it. Water pH is the water’s own pH, from 0 to 14. One help line above the three says they are optional and that water pH is not a recipe’s target mash pH; each of the three points to it. Notes are free text of up to 2000 characters. Clearing an optional field on an edit removes it. No ion arithmetic here: this screen records a measurement or a target, and any delta between two profiles is a calculation this slice does not build.",
     body: <WaterProfileView fields={toWaterProfileFields(waterProfiles[0])} />,
   },
@@ -3278,5 +3278,15 @@ export const SCREENS: Screen[] = [
       {S.f([["Order", "ORD-0231 · 3 lines · ships today · Submitted"], ["Warning", "Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR."]])}
       {S.dis("Confirm order", "This order needs the full MGR review")}
     </>),
+  },
+  {
+    step: 5, slice: 1, tab: "More", name: "Water profiles empty",
+    to: { "Add water profile": "Water profile" },
+    job: "Explain where source and target choices belong before the first profile",
+    reads: "list_water_profiles",
+    writes: "none [creation and editing happen on Water profile]",
+    states: [["empty", "no saved profiles · Add water profile"]],
+    spec: "The empty list uses the same water-profile catalog view as the populated list. Profiles have no source or target classification; those choices belong on a recipe’s Water sheet.",
+    body: <WaterProfilesView model={toWaterProfilesViewProps({ profiles: [] })} />,
   },
 ];
