@@ -71,7 +71,7 @@ import { TaproomVarianceView } from "@/components/mgr/views/taproom-variance";
 import { taproomVariance, weeklyCount } from "@/lib/mgr/fixtures/taproom";
 import { WeeklyCountView } from "@/components/mgr/views/weekly-count";
 import { TapBoardView, TapKegView } from "@/components/mgr/views/tap-board";
-import { AccountingView, ConnectQuickBooksView, DisconnectQuickBooksView, QboSyncView } from "@/components/mgr/views/accounting";
+import { AccountingView, ConnectQuickBooksView, DisconnectQuickBooksView, QboConnectionView, QboSyncView } from "@/components/mgr/views/accounting";
 import { accountingExpired, quickBooksMappings } from "@/lib/mgr/fixtures/accounting";
 import { tapBoard, tapBoardSkus, kickKeg, swapKeg } from "@/lib/mgr/fixtures/taproom";
 import { cellarAdditionCitra, cellarTransferPils } from "@/lib/mgr/fixtures/production";
@@ -1325,6 +1325,15 @@ export const SCREENS: Screen[] = [
     body: <AccountingView model={accountingExpired} />,
   },
   {
+    step: 5, slice: 1, tab: "More", group: "QuickBooks Online",
+    name: "Accounting unavailable",
+    job: "Explain that QuickBooks is not turned on before offering authorization",
+    reads: "get_qbo_connection · count_customers_missing_portal_email",
+    writes: "none",
+    states: [["not turned on", "Connect QuickBooks disabled; no prior connection or sync facts", 1]],
+    body: <AccountingView model={{ connected: false, canDisconnect: false, reconnect: false, company: "QuickBooks Online", status: "Not connected", remoteRevocationUnresolved: false }} connection={<QboConnectionView configured={false} />} />,
+  },
+  {
     step: 5,
     slice: 1,
     tab: "More",
@@ -1334,7 +1343,7 @@ export const SCREENS: Screen[] = [
     job: "Authorize one QuickBooks company and explain the data exchange before OAuth",
     reads: "get_qbo_connection [OAuth returns the selected company]",
     writes: "connect_qbo",
-    states: [["permission", "admin only", 1], ["cancelled", "return to Accounting unchanged"], ["already connected", "show Mapping conflict", 1]],
+    states: [["permission", "admin only", 1], ["not turned on", "disabled Connect QuickBooks with the same reason as Accounting and Invoices", 1], ["cancelled", "return to Accounting unchanged"], ["already connected", "show Mapping conflict", 1]],
     spec: "The disconnected Accounting state. OAuth is an external write, so the button is copper and the page says what MGR will exchange before leaving.",
     body: <ConnectQuickBooksView />,
   },
@@ -1399,9 +1408,18 @@ export const SCREENS: Screen[] = [
     job: "The AR list: what is due, what QuickBooks changed underneath it, and the drill-in for one invoice",
     reads: "list_invoices · get_qbo_connection · get_qbo_sync_status",
     writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping · push_invoice_to_qbo · sync_qbo_payments · write_off_invoice [existing commands] · Open in QuickBooks [verified company-bound invoice destination] · email delivery status [SCHEMA-GATE: post-v1 scope; the invoice query returns no delivery state]",
-    states: [["overdue", "outstanding invoice due before brewery-local today", 1], ["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping, push or sync; Sync QuickBooks is hidden, Admin sees Connect, Sales sees Admin must connect", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "payment status is confirmed by QuickBooks Online sync, or paid in full by payments recorded in MGR"], ["needs mapping", "a failed push Admin or Sales can fix; the drill-in resolves each mapping", 1]],
+    states: [["overdue", "outstanding invoice due before brewery-local today", 1], ["connection health", "QuickBooks · token healthy · company 9341"], ["not turned on", "disabled Connect before navigation with the same reason as Accounting", 1], ["never connected", "no stale-payment or reconnect warning"], ["expired", "Reconnect before mapping, push or sync; Sync QuickBooks is hidden, Admin sees Connect, Sales sees Admin must connect", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "payment status is confirmed by QuickBooks Online sync, or paid in full by payments recorded in MGR"], ["needs mapping", "a failed push Admin or Sales can fix; the drill-in resolves each mapping", 1]],
     spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the manual sync reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; collected revenue is a read-side rule, remote state live and balance zero, expressed once in the reporting view; no CHECK refuses a historical payment-confirmation marker, because paid-then-voided is a real history the row must be able to hold. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. An outstanding invoice is overdue only when its due date is before brewery-local today, not on the due day itself. Credit memos, invoices whose balance is unknown (push result unknown, pushed to a previous company, or not yet synced), and settled, paid, written-off, voided or deleted invoices are never marked overdue. Inventory pins its clock. Rows also carry the due date, push failure and credit-memo status; payments come back through manual sync and are read-only, except on an invoice QuickBooks never received, which takes Record payment. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
     body: <InvoicesView rows={invoiceList} connection={{ connected: true, detail: "Connected · company 9341", canConnect: true }} sync={<QboSyncView status={invoicesSync} />} />,
+  },
+  {
+    step: 5, slice: 1, tab: "More",
+    name: "Invoices unavailable",
+    job: "Show unavailable QuickBooks setup without implying an earlier connection",
+    reads: "list_invoices · get_qbo_connection",
+    writes: "none",
+    states: [["not turned on", "Connect disabled before navigation; no stale-payment warning", 1]],
+    body: <InvoicesView rows={[]} connection={{ connected: false, configured: false, reconnect: false, detail: "Not connected", canConnect: true }} />,
   },
   {
     step: 5,
@@ -2656,9 +2674,18 @@ export const SCREENS: Screen[] = [
     job: "Connect one POS provider and see both directions at a glance",
     reads: "get_pos_integration_health · list_pos_locations · list_pos_sales",
     writes: "sync_square_catalog · sync_square_sales · disconnect_square",
-    states: [["permission", "admin only", 1], ["no provider", "connect one before a menu can publish"], ["healthy", "catalog and sales both current"], ["sales lagging", "the menu still publishes", 1], ["token revoked", "publishing and sync both stop", 1], ["taproom sales in QuickBooks", "Square may send them through its own connector; MGR explains it, never detects it", 1], ["second location", "its own MGR location and its own channel", 1], ["unmapped location", "its sales cannot reconcile until it is mapped", 1], ["authorization failed", "note beside current health; the existing connection is kept"], ["partial sync", "never counts as complete coverage", 1], ["return", "retained as a source fact; never posts stock"]],
+    states: [["permission", "admin only", 1], ["not turned on", "disabled Connect before navigation with the same reason as Connect Square", 1], ["no provider", "connect one before a menu can publish"], ["healthy", "catalog and sales both current"], ["sales lagging", "the menu still publishes", 1], ["token revoked", "publishing and sync both stop", 1], ["taproom sales in QuickBooks", "Square may send them through its own connector; MGR explains it, never detects it", 1], ["second location", "its own MGR location and its own channel", 1], ["unmapped location", "its sales cannot reconcile until it is mapped", 1], ["authorization failed", "note beside current health; the existing connection is kept"], ["partial sync", "never counts as complete coverage", 1], ["return", "retained as a source fact; never posts stock"]],
     spec: "Square is the sole POS provider in this slice. This page reports connection, mapping, and completed sync state without exposing token material. Square’s optional QuickBooks connector remains a separate accountant-reviewed revenue feed: MGR provides a note and Accounting deep link, but does not detect, configure, or synchronize it.",
     body: <PointOfSaleView model={{ connected: true, merchant: "Demo Brewing LLC", state: "Connected", locations: "2 mapped · 1 needs mapping", lastSync: "Today · 6:58 PM" }} syncAction={<PosSyncActions />} coverage={["Taproom · Sep 1 to Sep 8"]} sales={[{ id: "sale-1", label: "Sale · Hazy IPA · pint", detail: "Taproom · current revision", amount: "$7.00", status: "mapped", openable: true }, { id: "return-1", label: "Return · Hazy IPA · pint", detail: "Taproom · current revision", amount: "−$7.00", status: "mapped", openable: true }]} />,
+  },
+  {
+    step: 7, slice: 7, tab: "More", group: "POS",
+    name: "Point of sale unavailable",
+    job: "Explain that Square is not turned on before opening its connection page",
+    reads: "get_pos_integration_health",
+    writes: "none",
+    states: [["not turned on", "Connect disabled before navigation; no prior seller or sales facts", 1]],
+    body: <PointOfSaleView model={{ connected: false, configured: false, merchant: "", state: "Not connected" }} />,
   },
 
   {
@@ -2671,7 +2698,7 @@ export const SCREENS: Screen[] = [
     job: "Authorize one Square seller and explain the data exchange before OAuth",
     reads: "get_pos_integration_health",
     writes: "connect_square",
-    states: [["permission", "admin only", 1], ["cancelled", "return to Point of sale unchanged"], ["connected", "continue to Square locations"]],
+    states: [["permission", "admin only", 1], ["not turned on", "disabled Connect Square with the same reason as Point of sale", 1], ["cancelled", "return to Point of sale unchanged"], ["connected", "continue to Square locations"]],
     spec: "The page explains both catalog writes and sales reads before leaving MGR.",
     body: <ConnectSquareView />,
   },
@@ -2745,7 +2772,7 @@ export const SCREENS: Screen[] = [
     job: "Say what Menu is missing when Square has no locations yet",
     reads: "list_pos_locations · get_square_connected",
     writes: "none",
-    states: [["admin", "Set up Square opens Point of sale"], ["connected, none synced", "Square is connected but no location has synced yet · Set up Square opens Point of sale to sync"], ["warehouse", "no link; says Square isn’t connected and asks an admin to reconnect it, because Point of sale settings are admin-only", 1]],
+    states: [["admin", "Set up Square opens Point of sale"], ["connected, none synced", "Square is connected but no location has synced yet · Set up Square opens Point of sale to sync"], ["warehouse", "no link; says Square isn’t connected and asks an admin to connect Square, because Point of sale settings are admin-only", 1]],
     spec: "Drawn as an admin. Square is not connected, never or since a disconnect (seen locations outlive one), so the title says Square isn’t connected, for Admin and Warehouse alike, and it has to be connected before any location can be mapped. If Square is connected but no location has synced yet, the same button says so instead. Every Menu role reads whether Square is connected, a yes or no and nothing else about the connection, so Warehouse is told the same state; only an admin can open Point of sale settings, so only an admin gets the button and Warehouse is asked to have an admin act instead of a link that would land on No access.",
     body: <PosMenuView model={{ locations: [], selectedLocationId: "", locationName: "Square location", items: [], excluded: [], externalItems: [], setup: { title: "Square isn’t connected", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square" } } }} />,
   },
