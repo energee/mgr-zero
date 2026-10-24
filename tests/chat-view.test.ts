@@ -118,7 +118,7 @@ it("shows the brewery quiet hours read-only to every role", () => {
   for (const canSetQuietHours of [true, false]) {
     const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: quiet, canSetQuietHours }));
     expect(html).toContain("Brewery quiet hours");
-    expect(html).toContain("10:00 PM – 7:00 AM · 9 hours · America/Chicago");
+    expect(html).toContain("10:00 PM – 7:00 AM · 9 hours · Central Time (America/Chicago)");
   }
   const off = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { ...personalChatPreferences, breweryQuietHours: null } }));
   expect(off).toMatch(/Brewery quiet hours.*Off/);

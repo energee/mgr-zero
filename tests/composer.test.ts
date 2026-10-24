@@ -88,7 +88,7 @@ describe("AI composer", () => {
     }));
     expect(Intl.supportedValuesOf("timeZone").length).toBeGreaterThan(400);
     expect(html).toContain('placeholder="Search timezones…"');
-    expect(html).toMatch(/data-slot="input-group-control"[^>]*value="America \/ New York"/);
+    expect(html).toMatch(/data-slot="input-group-control"[^>]*value="Eastern Time \(America\/New_York\)"/);
     expect(html).not.toContain("<datalist");
   });
 

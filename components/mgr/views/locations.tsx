@@ -1,11 +1,13 @@
-// components/mgr/views/locations.tsx — Locations list. Live passes
-// LocationForm as createAction, linkRows, and an Inventory-by-location
-// footer; inventory uses Add location and unlabeled Edit.
+// components/mgr/views/locations.tsx — Locations list and its cross-location stock link.
 import { Fragment, type ReactNode } from "react";
+import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import type { LocationsViewModel } from "@/lib/mgr/locations-view";
 
 export type { LocationsViewModel };
+export function LocationsInventoryLink({ href = "#" }: { href?: string }) {
+  return <Link href={href} data-to="Finished goods" className="text-xs text-muted-foreground underline underline-offset-2">See finished goods across all locations</Link>;
+}
 
 export function LocationsView({
   model,
@@ -17,7 +19,7 @@ export function LocationsView({
 }: {
   model: LocationsViewModel;
   createAction?: ReactNode;
-  /** Live: Inventory by location. Inventory omits this. */
+  /** Live supplies an authorized destination or null to hide the inventory link. */
   footer?: ReactNode;
   /** Live list: Edit is a link. Inventory leaves it unlabeled. */
   linkRows?: boolean;
@@ -34,7 +36,7 @@ export function LocationsView({
             {E.row(row.title, row.detail, E.act(rowActionLabel, "primary", linkRows ? row.href : undefined))}
           </Fragment>
         ))}
-      {footer}
+      {footer !== undefined ? footer : <LocationsInventoryLink />}
     </>
   );
 }

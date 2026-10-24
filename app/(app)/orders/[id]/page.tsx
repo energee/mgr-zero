@@ -1,7 +1,7 @@
 // app/(app)/orders/[id]/page.tsx — Order (screen record): the staff home for
 // one order: state and next action, order details and the before-tax price
 // summary, lines with ATP, keg charges, the event history (each entry names
-// who made it: staff by @handle, a portal buyer by email), and the restock
+// who made it: staff by saved name or email, a portal buyer by email), and the restock
 // flag, and (Admin and Sales, shipped only) Cost and margin from
 // get_order_cogs. The drawing is OrderView (shared with the inventory);
 // lifecycle-buttons.tsx holds the status-gated verbs: LifecycleButtons in the
@@ -49,7 +49,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     runCommand("list_team_members", {}, ctx) as Promise<TeamMember[]>,
     order.customer_id && canRun(ctx, "list_customer_users") ? runCommand("list_customer_users", { customerId: order.customer_id }, ctx) as Promise<PortalUser[]> : Promise.resolve([]),
   ]);
-  const actorNames = Object.fromEntries([...buyers.map((u) => [u.userId, u.email] as const), ...team.map((m) => [m.userId, m.handle] as const)]);
+  const actorNames = Object.fromEntries([...buyers.map((u) => [u.userId, u.email] as const), ...team.map((m) => [m.userId, m.name] as const)]);
   const model = toOrderViewProps({ order, lines, events, atp, locations, backHref: "/orders", timeZone: brewery.timeZone, cogs, deposits, actorNames });
   if (!canSell) model.confirmHref = undefined;
   if (!canRun(ctx, "update_draft_order")) model.editHref = undefined;

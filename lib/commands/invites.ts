@@ -19,14 +19,14 @@ defineCommand({
   handler: async (ctx, input, execution) => (await import("@/lib/supabase/invites")).inviteCustomerUser(ctx, input, execution),
 });
 
-export type TeamMember = { userId: string; email: string; handle: string; roles: StaffRole[]; createdAt: string };
+export type TeamMember = { userId: string; email: string; name: string; roles: StaffRole[]; createdAt: string };
 
 defineQuery({
-  name: "list_team_members", description: "Staff roster for the brewery: user id, email, @handle (the email's local part) and roles",
+  name: "list_team_members", description: "Staff roster for the brewery: user id, name (email when no profile name is saved), email and roles",
   input: z.object({}), roles: ["admin", "sales", "warehouse"],
   handler: async (ctx): Promise<TeamMember[]> => {
-    const rows = await unwrap(ctx.db.rpc("list_team_members", { p_brewery: ctx.breweryId })) as { user_id: string; email: string; roles: StaffRole[]; created_at: string }[];
-    return rows.map((r) => ({ userId: r.user_id, email: r.email, handle: `@${r.email.split("@")[0]}`, roles: r.roles, createdAt: r.created_at }));
+    const rows = await unwrap(ctx.db.rpc("list_team_members", { p_brewery: ctx.breweryId }));
+    return rows.map((r) => ({ userId: r.user_id, email: r.email, name: r.name, roles: r.roles, createdAt: r.created_at }));
   },
 });
 

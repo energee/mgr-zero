@@ -5,6 +5,8 @@ import { formatDate } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
+import { TimezoneField } from "@/components/mgr/timezone-field";
+import { timezoneLabel } from "@/lib/mgr/labels";
 import { formatWindow, parseClock } from "@/lib/time-window";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import type { ChatHealth, ChatLinkIntent, ChatLinkedPerson, ChatPreferences } from "@/lib/commands/chat";
@@ -86,11 +88,11 @@ export function ChatPersonalPreferencesView({ preferences, canSetQuietHours = tr
       </label>}
       </div>;
     })}
-    {E.fld("Brewery quiet hours", breweryQuiet ? `${formatWindow(parseClock(breweryQuiet.start), parseClock(breweryQuiet.end))} · ${breweryQuiet.timezone}` : "Off")}
+    {E.fld("Brewery quiet hours", breweryQuiet ? `${formatWindow(parseClock(breweryQuiet.start), parseClock(breweryQuiet.end))} · ${timezoneLabel(breweryQuiet.timezone)}` : "Off")}
     {canSetQuietHours && <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && Boolean(start) === Boolean(end)) onSaveQuiet?.(start, end, timezone); }}>
       {E.edit("My quiet hours start", start, "time", undefined, { onChange: (nextValue: string) => setStart(nextValue), id: `${id}-start`, disabled: busy })}
       {E.edit("My quiet hours end", end, "time", undefined, { onChange: (nextValue: string) => setEnd(nextValue), id: `${id}-end`, disabled: busy })}
-      {E.edit("My timezone", timezone, "text", undefined, { onChange: (nextValue: string) => setTimezone(nextValue), id: `${id}-timezone`, disabled: busy, required: true })}
+      <TimezoneField label="My timezone" value={timezone} onChange={setTimezone} disabled={busy} />
       <p className="text-sm text-muted-foreground">Clear both times to follow the brewery quiet hours.</p><Button disabled={busy || Boolean(start) !== Boolean(end)}>Save my quiet hours</Button>
     </form>}
     <CommandFormMessage error={error} />
@@ -103,7 +105,7 @@ export function ChatQuietHoursView({ start, end, timezone, busy = false, onChang
   const change = (start: string, end: string) => { setDraft({ start, end }); onChange?.(start, end); };
   return <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && Boolean(value.start) === Boolean(value.end)) onSave?.(value.start, value.end); }}>
     {value.start && value.end ? <TimeWindowField key={version} label="Quiet hours" start={value.start} end={value.end} step={1} disabled={busy} onChange={change} /> : E.fld("Quiet hours", value.start || value.end ? "Set both times" : "Off")}
-    <details><summary>Exact times · {timezone}</summary><div className="flex flex-col gap-3 pt-3">
+    <details><summary>Exact times · {timezoneLabel(timezone)}</summary><div className="flex flex-col gap-3 pt-3">
       {E.edit("Brewery quiet hours start", value.start, "time", undefined, { onChange: (nextValue: string) => { change(nextValue, value.end); setVersion(version + 1); }, id: `${id}-start`, disabled: busy })}
       {E.edit("Brewery quiet hours end", value.end, "time", undefined, { onChange: (nextValue: string) => { change(value.start, nextValue); setVersion(version + 1); }, id: `${id}-end`, disabled: busy })}
       <p className="text-sm text-muted-foreground">Clear both times to turn off brewery quiet hours.</p>

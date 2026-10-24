@@ -1,0 +1,30 @@
+"use client";
+
+import { useId } from "react";
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, useComboboxSearch } from "@/components/ui/combobox";
+import { Label } from "@/components/ui/label";
+import { timezoneLabel } from "@/lib/mgr/labels";
+
+const TIMEZONES = Intl.supportedValuesOf("timeZone");
+
+export function TimezoneField({ label = "Timezone", value, onChange, disabled = false }: {
+  label?: string;
+  value: string;
+  onChange: (timezone: string) => void;
+  disabled?: boolean;
+}) {
+  const id = useId();
+  const { anchor, props: search } = useComboboxSearch(timezoneLabel(value));
+  return <div className="flex min-w-0 flex-col gap-2">
+    <Label htmlFor={id}>{label}</Label>
+    <Combobox items={TIMEZONES.includes(value) ? TIMEZONES : [value, ...TIMEZONES]} value={value}
+      itemToStringLabel={timezoneLabel} itemToStringValue={(timezone) => timezone}
+      onValueChange={(timezone) => timezone && onChange(timezone)} disabled={disabled} {...search}>
+      <div ref={anchor}><ComboboxInput id={id} placeholder="Search timezones…" required /></div>
+      <ComboboxContent anchor={anchor}>
+        <ComboboxEmpty>No timezone found.</ComboboxEmpty>
+        <ComboboxList>{(timezone: string) => <ComboboxItem key={timezone} value={timezone}>{timezoneLabel(timezone)}</ComboboxItem>}</ComboboxList>
+      </ComboboxContent>
+    </Combobox>
+  </div>;
+}

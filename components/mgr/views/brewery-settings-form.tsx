@@ -3,14 +3,11 @@
 import { useId, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, useComboboxSearch } from "@/components/ui/combobox";
+import { TimezoneField } from "@/components/mgr/timezone-field";
 import { FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { breweryOperatingDefaultsCommand, type BrewerySettingsValues } from "@/lib/mgr/settings-view";
-import { timezoneLabel } from "@/lib/mgr/labels";
-
-const TIMEZONES = Intl.supportedValuesOf("timeZone");
 
 /** The Brewery details section of Settings: its own form, named by its legend, saved only by Save brewery. */
 export function BrewerySettingsFormView({ initial, onSave, busy = false, error = null, basisLocked = false }: {
@@ -21,7 +18,6 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
   basisLocked?: boolean;
 }) {
   const [values, setValues] = useState(initial);
-  const { anchor: timezoneAnchor, props: timezoneSearch } = useComboboxSearch(timezoneLabel(values.timezone));
   const id = useId();
   const change = (key: keyof BrewerySettingsValues, value: string) => setValues((current) => ({ ...current, [key]: value }));
   const defaults = breweryOperatingDefaultsCommand(values);
@@ -33,25 +29,7 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
       <FieldLegend><h2 className="font-heading text-xl font-semibold">Brewery details</h2></FieldLegend>
       <div className="grid gap-4 @min-[24rem]:grid-cols-2">
         {field("name", "Brewery name", "text", true)}
-        <div className="flex min-w-0 flex-col gap-2">
-          <Label htmlFor={`${id}-timezone`}>Timezone</Label>
-          <Combobox
-            items={TIMEZONES.includes(values.timezone) ? TIMEZONES : [values.timezone, ...TIMEZONES]}
-            value={values.timezone}
-            itemToStringLabel={timezoneLabel}
-            itemToStringValue={(timezone) => timezone}
-            onValueChange={(timezone) => timezone && change("timezone", timezone)}
-            {...timezoneSearch}
-          >
-            <div ref={timezoneAnchor}>
-              <ComboboxInput id={`${id}-timezone`} placeholder="Search timezones…" required />
-            </div>
-            <ComboboxContent anchor={timezoneAnchor}>
-              <ComboboxEmpty>No timezone found.</ComboboxEmpty>
-              <ComboboxList>{(timezone: string) => <ComboboxItem key={timezone} value={timezone}>{timezoneLabel(timezone)}</ComboboxItem>}</ComboboxList>
-            </ComboboxContent>
-          </Combobox>
-        </div>
+        <TimezoneField value={values.timezone} onChange={(timezone) => change("timezone", timezone)} />
         {field("ttb", "TTB registry number")}
         {field("pa", "PA license")}
         {field("phone", "Customer-facing phone", "tel")}
