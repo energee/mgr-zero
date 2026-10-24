@@ -27,7 +27,7 @@ defineCommand({
   name: "upsert_brand_approval", description: "Record or edit one brand's COLA or formula approval: ttbId is a COLA's TTB-assigned ID or a formula's number, and serialNumber is a COLA's own applicant serial (a formula takes none); the same kind and ttbId on the same brand is one record; an edit keeps a field left out and clears one sent as null",
   roles: [...ROLES],
   // Both identifiers are text: a TTB ID or serial may carry leading zeros.
-  input: z.object({ id: z.string().uuid().optional(), brandId: z.string().uuid(), kind: z.enum(["cola", "formula"]), ttbId: z.string().min(1), serialNumber: text, approvedOn: day, expiresOn: day, note: text })
+  input: z.object({ id: z.string().uuid().optional(), brandId: z.string().uuid(), kind: z.enum(["formula", "cola"]), ttbId: z.string().min(1), serialNumber: text, approvedOn: day, expiresOn: day, note: text })
     .refine((i) => i.kind === "cola" || i.serialNumber == null, { path: ["serialNumber"], message: "Only a COLA has an applicant serial number" }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_brand_approval", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_brand: i.brandId, p_kind: i.kind, p_ttb_id: i.ttbId, p_serial_number: i.serialNumber ?? null,

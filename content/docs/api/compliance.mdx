@@ -31,6 +31,12 @@ registry number from Settings; nothing it returns is stored. It answers
 failure gets a 502 `upstream_unavailable`, so an empty `rows` is a real
 no-match. COLAs completed more than 15 years ago are not found.
 
+For `upsert_brand_approval`, a `kind` of `cola` requires a `ttbId` containing
+exactly 14 digits, preserved as text with leading zeros. Formula numbers and
+applicant serial numbers are separate identifiers; the COLA-only format does
+not apply to either. Malformed new COLA IDs are rejected before saving; an
+exact retry of a completed historical request still returns its original result.
+
 {/* ops:compliance */}
 
 ## correct_reporting_basis [#correct_reporting_basis]
@@ -253,7 +259,7 @@ Record or edit one brand's COLA or formula approval: ttbId is a COLA's TTB-assig
 | Field | Type | Required |
 | --- | --- | --- |
 | `brandId` | uuid | yes |
-| `kind` | cola or formula | yes |
+| `kind` | formula or cola | yes |
 | `ttbId` | string | yes |
 | `id` | uuid | no |
 | `serialNumber` | string or null | no |
@@ -265,7 +271,7 @@ Record or edit one brand's COLA or formula approval: ttbId is a COLA's TTB-assig
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_brand_approval", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "brandId": "00000000-0000-0000-0000-000000000000", "kind": "cola", "ttbId": "string" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_brand_approval", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "brandId": "00000000-0000-0000-0000-000000000000", "kind": "formula", "ttbId": "string" } }'
 ```
 
 ## upsert_brewery_state_license [#upsert_brewery_state_license]

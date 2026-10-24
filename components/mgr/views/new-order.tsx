@@ -112,7 +112,7 @@ export function NewOrderView({ model, controls = {}, messages, feedback, skuFeed
     </div>;
     })}
     <Button type="button" variant="ghost" className="w-fit" onClick={controls.addLine}>Add line</Button>
-    {E.info("Order number is assigned when you save the draft.")}
+    {E.info("Enter quantities above zero and at most 9,999,999,999.99. Fractions are allowed; saved quantities are rounded to two decimal places. Order number is assigned when you save the draft.")}
     {messages}
     {E.sp()}
     {footer !== undefined ? footer : E.pin(E.submit("Save draft", { submitting, disabled, reason }))}

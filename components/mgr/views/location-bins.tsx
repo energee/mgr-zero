@@ -38,9 +38,12 @@ export function LocationBinsView({
   return (
     <>
       {E.back(model.backLabel, model.title, createAction, model.backHref)}
-      {model.rows.map((row) => (
-        <Fragment key={row.key}>{rowActions ? E.row(row.title, row.detail, rowActions[row.key]) : E.nav(row.title, row.detail)}</Fragment>
-      ))}
+      <div className="[&_[data-slot=item-content]]:min-w-0 [&_[data-slot=item-title]]:line-clamp-none [&_[data-slot=item-title]]:max-w-full">
+        {model.rows.map((row) => {
+          const title = <span className="min-w-0 whitespace-normal [overflow-wrap:anywhere]">{row.title}</span>;
+          return <Fragment key={row.key}>{rowActions ? E.row(title, row.detail, rowActions[row.key]) : E.nav(title, row.detail)}</Fragment>;
+        })}
+      </div>
       {belowRows(model, footer, createAction)}
     </>
   );

@@ -7,15 +7,15 @@ import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage, sheetTrigger } from "@/components/mgr/command-form";
 import { WaterProfileView } from "@/components/mgr/views/water-profile";
-import { IONS, toWaterProfileFields, toWaterProfileInput, type WaterProfile } from "@/lib/mgr/water-profiles-view";
+import { IONS, waterPpmError, toWaterProfileFields, toWaterProfileInput, type WaterProfile } from "@/lib/mgr/water-profiles-view";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 export function WaterProfileForm({ profile }: { profile?: WaterProfile }) {
   const formId = useId();
   const [fields, setFields] = useState(() => toWaterProfileFields(profile));
   const ph = Number(fields.water_ph);
-  const ready = fields.name.trim() !== "" && IONS.every(([key]) => fields[key] !== "" && Number(fields[key]) >= 0)
-    && (fields.alkalinity_ppm === "" || Number(fields.alkalinity_ppm) >= 0) && (fields.water_ph === "" || (ph >= 0 && ph <= 14));
+  const ready = fields.name.trim() !== "" && IONS.every(([key]) => !waterPpmError(fields[key]))
+    && !waterPpmError(fields.alkalinity_ppm, true) && (fields.water_ph === "" || (!/[eE]/.test(fields.water_ph) && Number.isFinite(ph) && ph >= 0 && ph <= 14));
   const form = useCommandForm("upsert_water_profile", {
     build: () => ({ profileId: profile?.id, ...toWaterProfileInput(fields) }),
     reset: () => setFields(toWaterProfileFields(profile)),

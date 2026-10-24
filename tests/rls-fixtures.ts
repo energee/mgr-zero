@@ -159,7 +159,7 @@ export async function fixtures() {
   const sale = await put("pos_sales", { connection_id: pos.id, external_order_id: "O1", external_line_id: "S1", external_item_id: "I1", external_variation_id: "V1", external_location_id: "L1", sold_at: now, qty: 1 });
   sql(`select private.reconcile_pos_sale('${brewery.id}','${sale.id}')`);
   await put("pos_sales_coverage", { connection_id: pos.id, external_location_id: "L1", location_id: taps[0].id, starts_at: "2026-09-01T00:00:00Z", ends_at: now, complete: true });
-  await put("brand_approvals", { brand_id: cat.brandId, kind: "cola", ttb_id: "PRIVATE-COLA" });
+  await put("brand_approvals", { brand_id: cat.brandId, kind: "cola", ttb_id: "26001001000999" });
   await put("brand_approvals", { brand_id: cat.brandId, kind: "formula", ttb_id: "PRIVATE-FORMULA" });
   await put("state_registrations", { brand_id: cat.brandId, state: "PA" });
   await put("brewery_state_licenses", { state: "PA", kind: "brewery" });

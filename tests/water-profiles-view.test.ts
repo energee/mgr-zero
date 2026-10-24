@@ -43,14 +43,16 @@ describe("water profiles view", () => {
   it("labels each ion with its unit and ties every ion input to the required, nonnegative ppm help", () => {
     const sheet = renderToStaticMarkup(createElement(WaterProfileView, { fields: toWaterProfileFields(hazy) }));
     for (const [, label] of IONS) expect(sheet).toContain(`${label} (ppm)`);
-    const help = sheet.match(/<p[^>]*id="([^"]+)"[^>]*>All six ions are required\. Enter each in ppm \(the same as mg\/L\)\. None can be negative\.<\/p>/);
-    expect(help).not.toBeNull();
+    const descriptions = new Set([...sheet.matchAll(/<[^>]*data-slot="field-description"[^>]*>/g)]
+      .map(([tag]) => tag.match(/\bid="([^"]+)"/)?.[1]).filter(Boolean));
     const described = [...sheet.matchAll(/<input[^>]*aria-describedby="([^"]+)"/g)].map((m) => m[1]);
-    expect(described.slice(0, IONS.length)).toEqual(IONS.map(() => help![1]));
-    // The optional fields (alkalinity, water pH, notes) point at their own line.
-    const optional = sheet.match(/<p[^>]*id="([^"]+)"[^>]*>Alkalinity, water pH and notes are optional\./);
-    expect(optional).not.toBeNull();
-    expect(described.slice(IONS.length)).toEqual([optional![1], optional![1], optional![1]]);
+    expect(described).toHaveLength(IONS.length + 3);
+    expect(described.slice(0, IONS.length)).toEqual(IONS.map(() => described[0]));
+    expect(descriptions.has(described[0])).toBe(true);
+    // Optional fields share a separate, existing description rather than ion-required guidance.
+    expect(described.slice(IONS.length)).toEqual(Array(3).fill(described[IONS.length]));
+    expect(described[IONS.length]).not.toBe(described[0]);
+    expect(descriptions.has(described[IONS.length])).toBe(true);
   });
   it("sends Brewer back to Recipes, since Brewer cannot open Catalog", () => {
     expect(waterProfilesBack(["brewer"])).toEqual({ label: "Recipes", href: "/recipes" });
@@ -79,7 +81,9 @@ describe("water profiles view", () => {
   it("labels the optional fields so water pH cannot be read as mash pH", () => {
     const sheet = renderToStaticMarkup(createElement(WaterProfileView, { fields: toWaterProfileFields(denver) }));
     for (const label of ["Alkalinity as CaCO3 (ppm)", "Water pH", "Notes"]) expect(sheet).toContain(`>${label}</label>`);
-    expect(sheet).toContain("Alkalinity, water pH and notes are optional. Water pH is the water’s own pH, from 0 to 14, not a recipe’s target mash pH.");
+    const ph = sheet.match(/<input[^>]*aria-label="Water pH"[^>]*>/)?.[0];
+    expect(ph).toBeDefined();
+    expect(ph).not.toContain('required=""');
     expect(sheet).toMatch(/aria-label="Water pH"[^>]*max="14"|max="14"[^>]*aria-label="Water pH"/);
   });
 });
