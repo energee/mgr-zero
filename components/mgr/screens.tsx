@@ -2809,7 +2809,7 @@ export const SCREENS: Screen[] = [
     reads: "list_sale_channels",
     writes: "upsert_sale_channel",
     states: [["permission", "admin required", 1], ["new", "titled Add channel · name and tax treatment required"], ["edit", "titled with the channel being edited"]],
-    spec: "Drawn editing the Export channel. The sheet has no Delete: removal and its in-use rule live on the Sale channels list. The selected tax treatment shows its TTB meaning under the chips for each removal without payment of tax (Export, Vessel supplies, Research, Transfer in bond), so an Export channel and the Export treatment are not confused. Taxable has no hint.",
+    spec: "Drawn editing the Export channel. The sheet has no Delete: removal and its in-use rule live on the Sale channels list. Every selected tax treatment shows its meaning under the chips, including the default Taxable choice. The four removals without payment of tax (Export, Vessel supplies, Research, Transfer in bond) keep their approved TTB meanings.",
     body: <ChannelView model={toChannelViewProps(channelExport)} />,
   },
   {
