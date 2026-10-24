@@ -33,7 +33,7 @@ export function IngredientView({ fields, materials, onChange, footer }: {
     {E.searchPick("Material", fields.materialId, materials.map((m) => ({ value: m.id, label: m.category ? `${m.name} · ${m.category}` : m.name })), { id: `${id}-material`, placeholder: "Choose a material", empty: noMaterialsPick("/materials"), ...bind("materialId") })}
     {E.pick("Stage", fields.stage, INGREDIENT_STAGE_OPTIONS, bind("stage"))}
     {E.inline(
-      E.qty(fields.perBblQty, unit ? `${unit} / bbl` : "/ bbl", qtyLabel, `${id}-qty`, bind("perBblQty")),
+      E.edit(qtyLabel, fields.perBblQty, "number", undefined, { id: `${id}-qty`, ...bind("perBblQty") }),
       E.edit("Timing min · optional", fields.timingMinutes, "number", undefined, bind("timingMinutes")),
     )}
     {footer !== undefined ? footer : E.btns([["Delete ingredient", "g"], "Save ingredient"])}
