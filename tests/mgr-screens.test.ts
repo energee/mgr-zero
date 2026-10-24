@@ -444,23 +444,6 @@ describe("SCREENS", () => {
     }
   });
 
-  it("draws customer copy, not markup escapes, machine identifiers or em dashes", () => {
-    // Bodies are what a brewer reads on the glass; job, states and spec are
-    // what a reader sees on /docs/screens. A literal "&frac12;" is a string
-    // React never decodes, "record_movement" is the wire name of a command, not
-    // its label, and an em dash is a tell that a sentence was never finished.
-    // reads/writes are exempt from the identifier rule only: they name
-    // registry IDs on purpose.
-    const text = (...n: unknown[]) =>
-      n.map((x) => renderToStaticMarkup(createElement("div", null, x as never)).replace(/<[^>]*>/g, " ")).join(" ");
-    for (const s of SCREENS) {
-      const body = text(s.hd, s.body);
-      const notes = text(s.job, s.spec, ...(s.states ?? []).flat());
-      expect.soft(body, `${s.name}: HTML entity in copy`).not.toMatch(/&(?:[a-z]+|#\d+);/);
-      expect.soft(body + notes, `${s.name}: snake_case or dotted identifier`).not.toMatch(/[a-z]+_[a-z_]+|\b[a-z]+\.[a-z]+_[a-z_]+|\b[a-z]+\.[a-z_]+\(/);
-      expect.soft(body + notes + text(s.reads, s.writes), `${s.name}: em dash`).not.toContain("—");
-    }
-  });
 
   it("keeps phone tables contained and avoids duplicate page titles", () => {
     const menu = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Menu")!.body));

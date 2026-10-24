@@ -7,6 +7,7 @@ import { sql } from "./helpers";
 const AUTHENTICATED_RPCS = [
   "consume_command_admission()",
   "get_beer_overview_aggregates(uuid)",
+  "get_saved_cola_image_permit(uuid,text,text)",
   "trace_lot_sources(uuid,uuid)",
   "trace_lot_ingredients(uuid,uuid)",
   "trace_material_lot(uuid,uuid)",
@@ -221,7 +222,7 @@ const AUTHENTICATED_RPCS = [
   "update_packaging_run(uuid,uuid,uuid,jsonb,timestamp with time zone,uuid)",
   "upsert_brand(uuid,uuid,text,text,numeric,text,text,uuid,text,uuid,text)",
   "set_recipe_brand(uuid,uuid,uuid,uuid)",
-  "upsert_brand_approval(uuid,uuid,uuid,approval_kind,text,date,date,text,uuid,text[],text)",
+  "upsert_brand_approval(uuid,uuid,uuid,approval_kind,text,date,date,text,uuid,text[],text,text)",
   "upsert_brewery_state_license(uuid,text,text,text,date,text,uuid,text[])",
   "upsert_customer(uuid,uuid,text,customer_type,text,uuid,text,text,tax_treatment,uuid,text,text)",
   "upsert_format(uuid,uuid,text,format_basis,package_type,keg_size,integer,numeric,uuid,uuid,numeric)",
