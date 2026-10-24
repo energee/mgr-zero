@@ -24,6 +24,7 @@ export type CatalogBrandView = {
   skus: string;
   /** Recorded COLA approvals: "None", one's TTB ID and approval date, or "2 on file". */
   cola: string;
+  image?: { url: string; ttbId: string };
   href: string;
 };
 
@@ -46,7 +47,7 @@ export type CatalogBrandRow = {
   styles: { name: string } | null;
   skus: { id: string }[];
   pours?: { id: string }[];
-  colas: Pick<Approval, "ttb_id" | "approved_on">[];
+  colas: (Pick<Approval, "ttb_id" | "approved_on"> & { id?: string; image_url?: string | null })[];
 };
 
 export type CatalogSnapshot = {
@@ -70,6 +71,13 @@ function colaFact(colas: CatalogBrandRow["colas"]): string {
   return `TTB ID ${ttb_id} · ${approvalDate(approved_on)}`;
 }
 
+/** A label without an approval date is not an approved catalog image. */
+function latestColaImage(colas: CatalogBrandRow["colas"]): CatalogBrandView["image"] {
+  const latest = colas.filter(cola => cola.approved_on && cola.image_url)
+    .sort((a, b) => b.approved_on!.localeCompare(a.approved_on!) || b.ttb_id.localeCompare(a.ttb_id))[0];
+  return latest ? { url: latest.image_url!, ttbId: latest.ttb_id } : undefined;
+}
+
 export function toCatalogViewProps({
   brands,
   priceGroups,
@@ -90,6 +98,7 @@ export function toCatalogViewProps({
       abv: b.abv == null || b.abv === "" ? NOT_SET : `${Number(b.abv)}%`,
       skus: String(b.skus.length),
       cola: colaFact(b.colas),
+      image: latestColaImage(b.colas),
       href: `/catalog/brands/${b.id}`,
     })),
     priceGroups: priceGroups.length === 0 ? "0 groups · Create one to price your brands" : plural(priceGroups.length, "group"),

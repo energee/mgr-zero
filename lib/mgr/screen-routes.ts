@@ -199,6 +199,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Period before the books opened", file: "app/(app)/compliance/[period]/page.tsx" },
   { name: "Licenses", file: "app/(app)/compliance/licenses/page.tsx" },
   { name: "Brand approval", file: "app/(app)/catalog/brands/[id]/compliance-forms.tsx" },
+  { name: "Bulk process COLAs", file: "app/(app)/catalog/cola-review.tsx" },
   { name: "State registration", file: "app/(app)/catalog/brands/[id]/compliance-forms.tsx" },
   { name: "License", file: "app/(app)/compliance/licenses/license-form.tsx" },
   { name: "Keg fleet", file: "app/(app)/kegs/page.tsx" },
