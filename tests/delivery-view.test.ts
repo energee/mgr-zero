@@ -128,6 +128,18 @@ describe("Route", () => {
     expect(empty).not.toContain("Depart route");
     expect(empty).toMatch(/<button[^>]*disabled[^>]*>Save route plan/);
   });
+  it("explains empty route stops and links live users to Orders (#1258)", () => {
+    const model = { ...routeAPlan, stops: [], selection: {}, saved: false, ordersHref: "/orders" };
+    const html = htmlOf(createElement(RouteView, { model }));
+    expect(html).toContain("confirm an order, pick its stock, then ship it");
+    expect(html).toContain("Shipped delivery orders appear here until assigned to a route");
+    expect(html).toContain("Pickup orders do not appear");
+    expect(html).toMatch(/<a[^>]*href="\/orders"[^>]*>Open Orders<\/a>/);
+    const inventory = htmlOf(createElement(RouteView, { model: { ...routeAPlan, stops: [] } }));
+    expect(inventory).toContain("Open Orders");
+    expect(inventory).not.toContain('href="/orders"');
+    expect(htmlOf(createElement(RouteView, { model: routeAPlan }))).not.toContain("Open Orders");
+  });
   it("returns to Deliveries, the Routes screen's sidebar name, from every page under it (#1104)", () => {
     for (const node of [
       createElement(RouteView, { model: routeAPlan }),

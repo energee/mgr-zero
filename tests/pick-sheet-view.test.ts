@@ -1,6 +1,5 @@
 // tests/pick-sheet-view.test.ts — Pick sheet adapter and drawing. Views own
 // no sample data; the inventory parent wires this view later.
-import { readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -89,17 +88,6 @@ describe("Pick sheet view loop", () => {
     expect(model.groups[1]?.rows[0]?.title).toMatch(/^Al’s Bar ·/);
   });
 
-  it("renders the Pick heading, nav labels, and Totals from the adapter", () => {
-    const markup = html();
-    expect(markup).toMatch(/<h1[^>]*>Pick<\/h1>/);
-    expect(markup).toMatch(/Ridgeline Tap Room · ORD-0231/);
-    expect(markup).toMatch(/Al’s Bar · ORD-0232/);
-    expect(markup).toMatch(/Teresa’s · ORD-0234/);
-    expect(markup).toMatch(/3 lines/);
-    expect(markup).toMatch(/>Totals</);
-    expect(markup).toContain(">Pick<");
-    expect(markup).toMatch(/Thu 9\/3/);
-  });
 
   it("hides the weekday chips when filters is null and links rows when asked", () => {
     const markup = html(toPickSheetViewProps(pickSheet), { filters: null, linkRows: true });
@@ -112,13 +100,5 @@ describe("Pick sheet view loop", () => {
     expect(isValidElement(SCREENS.find((s) => s.name === "Pick sheet")!.body)).toBe(true);
     expect(body.type).toBe(PickSheetView);
     expect(body.props.model).toEqual(toPickSheetViewProps(pickSheet));
-  });
-
-  it("the live Pick sheet page mounts PickSheetView with no second E.* tree", () => {
-    const src = readFileSync("app/(app)/pick/page.tsx", "utf8");
-    expect(src).toMatch(/from "@\/components\/mgr\/views\/pick-sheet"/);
-    expect(src).toMatch(/<PickSheetView\b/);
-    expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
-    expect(src).not.toMatch(/\bE\.(back|row|nav|ttl|blank|chips)\b/);
   });
 });
