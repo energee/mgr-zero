@@ -73,7 +73,7 @@ export function WaterSheet({ water, profiles, materials, onChange, trigger }: { 
     items={water.additions} onChange={(additions) => onChange({ ...water, additions })} toFields={toAdditionFields} ready={additionReady}
     toItem={(f) => ({ materialId: f.materialId, qty: Number(f.qty), unit: f.unit, stage: f.stage })}
     list={(p) => <WaterView water={{ ...water, additions: p.items }} profiles={profiles} materials={materials} profilesHref="/catalog/water-profiles" chemistryKnown={false /* until materials carry a salt identity (PR B) */} header={null} onChange={(patch) => onChange({ ...water, ...patch })} onEdit={p.onEdit} onMove={p.onMove} onAdd={p.onAdd} />}
-    item={(p) => <WaterAdditionView fields={p.fields} materials={materials} onChange={p.onChange} footer={p.footer} />} />;
+    item={(p) => <WaterAdditionView fields={p.fields} materials={materials} materialsHref="/materials" onChange={p.onChange} footer={p.footer} />} />;
 }
 
 const emptyLine = (): IngredientLine => ({ materialId: "", perBblQty: "", stage: "mash", timingMinutes: "" });

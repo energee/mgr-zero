@@ -8,6 +8,7 @@ import { E } from "@/components/mgr/e";
 import { WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { ionReadout, suggestAdditions, waterAdditionDetail, type SaltMaterial, type WaterAdditionFields, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import { noMaterialsPick } from "@/lib/mgr/materials-view";
 import { listRow, type ListRowProps } from "./mash-schedule";
 
 export type NamedOption = { id: string; name: string };
@@ -60,9 +61,9 @@ export function WaterView({ title = "Water", water, profiles, materials, header,
 }
 
 
-export function WaterAdditionView({ fields, materials, onChange, footer }: { fields: WaterAdditionFields; materials: NamedOption[]; onChange?: (patch: Partial<WaterAdditionFields>) => void; footer?: ReactNode }) {
+export function WaterAdditionView({ fields, materials, materialsHref, onChange, footer }: { fields: WaterAdditionFields; materials: NamedOption[]; materialsHref?: string; onChange?: (patch: Partial<WaterAdditionFields>) => void; footer?: ReactNode }) {
   return <>
-    {E.pick("Material", fields.materialId, [{ value: "", label: "Salt or acid" }, ...(materials.map((m) => ({ value: m.id, label: m.name })))], { onChange: onChange ? (nextValue: string) => onChange?.({ materialId: nextValue }) : undefined, required: true })}
+    {E.pick("Material", fields.materialId, [{ value: "", label: "Salt or acid" }, ...(materials.map((m) => ({ value: m.id, label: m.name })))], { onChange: onChange ? (nextValue: string) => onChange?.({ materialId: nextValue }) : undefined, required: true, empty: { ...noMaterialsPick(materialsHref), target: materialsHref ? "_blank" : undefined } })}
     {E.inline(
       E.edit("Amount", fields.qty, "number", undefined, { onChange: onChange ? (nextValue: string) => onChange?.({ qty: nextValue }) : undefined, required: true, min: "0", step: "any" }),
       E.pick("Unit", fields.unit, (WATER_ADDITION_UNITS.map(u => ({ value: u, label: u }))), { onChange: onChange ? (nextValue: string) => onChange?.({ unit: nextValue }) : undefined }),

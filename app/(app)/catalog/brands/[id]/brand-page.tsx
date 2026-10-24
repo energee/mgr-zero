@@ -106,6 +106,7 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
           }, { target: name })}
         />}
         linkRows
+        pricingHref="/pricing"
         messages={<CommandFormMessage error={error} />}
         footer={E.btn(busy ? "Saving…" : "Save brand", busy || !f.name.trim() ? "p disabled" : "p")}
         actions={actions ?? undefined}

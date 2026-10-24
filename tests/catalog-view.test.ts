@@ -317,7 +317,7 @@ describe("Brand view", () => {
     expect(model.abv).toBe("6.8");
     expect(model.category).toBe("Core");
     expect(model.priceGroup).toBe(brandHazy.brand.price_group_id);
-    expect(model.priceGroupOptions[0]).toEqual({ value: UNPRICED, label: "Unpriced" });
+    expect(model.priceGroupOptions[0]).toEqual({ value: UNPRICED, label: "No price group" });
     expect(model.suggestion).toMatchObject({ kind: "group", title: "Suggested group 2" });
     expect(model.description).toBe("Juicy, soft, Citra-forward");
     expect(model.hops).toBe("Citra, Mosaic");

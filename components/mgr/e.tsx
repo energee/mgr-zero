@@ -131,8 +131,9 @@ export type FieldControls = Pick<React.InputHTMLAttributes<HTMLInputElement>, "i
 /** A picker with nothing to offer says so, and where the missing record is
  *  made (#1123). `href` is that page on a live screen; the inventory leaves it
  *  out and the link stays "#". `to` names the inventory screen it opens. With
- *  no `label` there is no link: `text` then names who can add the record. */
-export type PickEmpty = { text: string; href?: string; label?: string; to?: string };
+ *  no `label` there is no link: `text` then names who can add the record.
+ *  Draft editors can set `target` to keep unsaved work open during setup. */
+export type PickEmpty = { text: string; href?: string; label?: string; to?: string; target?: "_blank" };
 
 /** One aria-describedby value from several optional ids. */
 export const describedBy = (...ids: (string | undefined)[]) => ids.filter(Boolean).join(" ") || undefined;
@@ -152,7 +153,7 @@ function fieldError(controls?: Pick<FieldControls, "id" | "error" | "aria-invali
  *  unopenable picker still explains itself. */
 const emptyNote = (empty: PickEmpty, id?: string) => (
   <FieldDescription id={id}>
-    {empty.text}{empty.label ? <> <Link href={empty.href ?? "#"} data-to={empty.to}>{empty.label}</Link></> : null}
+    {empty.text}{empty.label ? <> <Link href={empty.href ?? "#"} data-to={empty.to} target={empty.target} rel={empty.target ? "noopener" : undefined}>{empty.label}</Link></> : null}
   </FieldDescription>
 );
 
