@@ -1,0 +1,75 @@
+import { createServerClient as createSSR } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
+
+const boundary = vi.hoisted(() => ({ db: undefined as SupabaseClient | undefined }));
+vi.mock("@/lib/supabase/server", () => ({ createServerClient: async () => boundary.db, verifyCurrentPassword: vi.fn() }));
+vi.mock("next/navigation", () => ({ redirect: (path: string): never => { throw new Error(`redirect:${path}`); } }));
+
+import PasswordPage from "@/app/(auth)/password/page";
+import { endPasswordSessions, savePassword } from "@/app/(auth)/actions";
+
+/** Exercise the installed Auth and SSR cookie adapters, not a signOut stub.
+ * All transport responses belong to this synthetic SDK boundary; no Auth user
+ * or provider is created and no network request is sent.
+ */
+async function signedInBoundary(failureScope: "local" | "global") {
+  const now = Math.floor(Date.now() / 1000);
+  const user = { id: "13190000-0000-4000-8000-000000000001", aud: "authenticated", email: "password-outcome@test.local", app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() };
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const token = `${encode({ alg: "HS256", typ: "JWT" })}.${encode({ sub: user.id, exp: now + 3600, iat: now, amr: [{ method: "recovery", timestamp: now }] })}.c2lnbmF0dXJl`;
+  const jar = new Map<string, string>();
+  const removed: string[] = [];
+  const db = createSSR("https://password-outcome.supabase.co", "synthetic-publishable-key", {
+    auth: { autoRefreshToken: false },
+    global: { fetch: async (input) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      if (url.pathname.endsWith("/logout")) {
+        if (url.searchParams.get("scope") === failureScope) {
+          return new Response(JSON.stringify({ code: "unexpected_failure", msg: "Synthetic server failure" }), { status: 502, headers: { "Content-Type": "application/json" } });
+        }
+        return new Response(null, { status: 204 });
+      }
+      if (url.pathname.endsWith("/user")) return new Response(JSON.stringify(user), { status: 200, headers: { "Content-Type": "application/json" } });
+      throw new Error(`Unexpected SDK endpoint ${url.pathname}`);
+    } },
+    cookies: {
+      getAll: () => [...jar].map(([name, value]) => ({ name, value })),
+      setAll: (changes) => changes.forEach(({ name, value, options }) => {
+        if (options.maxAge === 0) { removed.push(name); jar.delete(name); }
+        else jar.set(name, value);
+      }),
+    },
+  });
+  const { error } = await db.auth.setSession({ access_token: token, refresh_token: "synthetic-refresh-token" });
+  expect(error).toBeNull();
+  expect(jar.size).toBeGreaterThan(0);
+  boundary.db = db;
+  return { db, removed };
+}
+
+describe("saved password outcome after installed SDK cookie clearing", () => {
+  it.each(["local", "global"] as const)("keeps saved result reachable after failed %s logout clears the session", async (scope) => {
+    const { db, removed } = await signedInBoundary(scope);
+    if (scope === "local") {
+      const form = new FormData();
+      form.set("password", "synthetic-new-password");
+      form.set("confirmPassword", "synthetic-new-password");
+      await expect(savePassword(form)).rejects.toThrow("redirect:/password?saved=1&error=signout_failed");
+    } else {
+      await expect(endPasswordSessions()).rejects.toThrow("redirect:/password?saved=1&error=revoke_failed");
+    }
+    expect(removed.some(name => name.includes("auth-token"))).toBe(true);
+    expect((await db.auth.getSession()).data.session).toBeNull();
+    const page = await PasswordPage({ searchParams: Promise.resolve({ saved: "1", error: scope === "local" ? "signout_failed" : "revoke_failed" }) });
+    const html = renderToStaticMarkup(page);
+    expect(html).toContain("Password saved");
+    expect(html).toContain("You do not need to change it again.");
+    expect(html).toContain('href="/login"');
+    expect(html).not.toContain('name="password"');
+    expect(html).not.toContain("Reset link expired");
+    expect(html).toContain(scope === "local" ? "Other sessions were signed out" : "could not confirm that other sessions were signed out");
+    await expect(endPasswordSessions()).rejects.toThrow("redirect:/password?saved=1&error=revoke_failed");
+  });
+});

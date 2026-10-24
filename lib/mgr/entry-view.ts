@@ -1,5 +1,6 @@
 // lib/mgr/entry-view.ts — view-model for Sign in / Reset / Set password family.
 import { sentenceCase } from "@/lib/mgr/labels";
+import type { PasswordErrors } from "@/lib/auth/password";
 export type EntryViewModel = {
   title: string;
   inputs: string[];
@@ -12,6 +13,7 @@ export type EntryViewModel = {
   info?: string;
   note?: string;
   error?: string;
+  passwordErrors?: PasswordErrors;
   extraPrimary?: string;
 };
 
@@ -52,13 +54,42 @@ export const expiredResetModel: EntryViewModel = {
 const SET_PASSWORD_ERRORS: Record<string, string> = {
   same_password: "Choose a password different from your current one.",
   weak_password: "Choose a stronger password.",
+  currentPassword: "Enter your current password, or request a reset link if you sign in without one.",
+  password: "Use at least 8 characters and choose a password different from your current one.",
+  confirmPassword: "Confirm your new password. The new passwords must match.",
+  wrong_current: "Your current password is incorrect.",
+  reauth_failed: "Your current password could not be checked. Try again, or request a reset link.",
 };
 
 /**
  * `error` is the `?error=` code; any other value (a crafted link) shows the generic error, never its own text.
  * Headed Change password, like the Me link that opens it; the recovery link lands on the same page (#1108).
  */
-export function toSetPasswordViewProps(account: string, error?: string): EntryViewModel {
+export function toSetPasswordViewProps(account: string, error?: string, recovery = false): EntryViewModel {
   const message = error ? SET_PASSWORD_ERRORS[error] ?? "Your password was not saved. Try again." : undefined;
-  return { title: "Change password", inputs: ["Choose a password"], field: { label: "Account", value: account }, primary: "Save password", error: message };
+  const passwordErrors: PasswordErrors = {};
+  if (error === "wrong_current" || error === "currentPassword") passwordErrors.currentPassword = message;
+  if (error === "password" || error === "weak_password" || error === "same_password") passwordErrors.password = message;
+  if (error === "confirmPassword") passwordErrors.confirmPassword = message;
+  return {
+    title: "Change password",
+    inputs: [...(recovery ? [] : ["Current password"]), "Choose a password", "Confirm new password"],
+    field: { label: "Account", value: account }, primary: "Save password",
+    note: recovery ? "Your reset link verified this account. Choose and confirm your new password." : undefined,
+    link: { label: "Need a reset link?", to: "Reset password" },
+    error: message, passwordErrors,
+  };
+}
+
+/** This outcome must remain readable after Auth clears cookies on a failed sign-out. */
+export function toPasswordSavedViewProps(error: string | undefined, canRetry: boolean): EntryViewModel {
+  let warning = "We could not confirm that other sessions were signed out.";
+  if (error === "signout_failed") warning = "Other sessions were signed out, but we could not confirm that this reset session ended.";
+  return {
+    title: "Password saved", inputs: [], primary: "Sign in with your new password",
+    note: "Your password was saved. You do not need to change it again.",
+    error: warning,
+    info: canRetry ? "Select Sign out all sessions to try again." : "Sign in with your new password, then use Sign out to end all sessions.",
+    extraPrimary: canRetry ? "Sign out all sessions" : undefined,
+  };
 }

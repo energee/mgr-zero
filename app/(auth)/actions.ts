@@ -13,7 +13,8 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
 import { acceptInviteErrorPath, hasPendingInvitations, inviteAudience, inviteLanding } from "@/lib/auth/invite";
-import { createServerClient } from "@/lib/supabase/server";
+import { hasRecentRecovery, passwordChangeErrors } from "@/lib/auth/password";
+import { createServerClient, verifyCurrentPassword } from "@/lib/supabase/server";
 
 /** The brewery and customer selection cookies share these options. */
 const SELECTION_COOKIE = { path: "/", sameSite: "lax" } as const;
@@ -68,13 +69,51 @@ export async function sendReset(form: FormData) {
   redirect(`/reset?sent=1${form.get("portal") ? "&portal=1" : ""}`);
 }
 
-/** Set new password / Portal set password: for the signed-in session (a recovery link or the Me sheet). */
+/** Changing a password requires current credentials or an Auth-verified recovery grant. */
 export async function savePassword(form: FormData) {
   const db = await createServerClient();
-  const { error } = await db.auth.updateUser({ password: String(form.get("password")) });
-  // The code, never the message: the page maps it to fixed text (toSetPasswordViewProps).
+  const { data: { user }, error: identityError } = await db.auth.getUser();
+  if (identityError || !user) redirect("/reset?expired=1");
+  const { data: verified, error: claimsError } = await db.auth.getClaims();
+  const recovery = !claimsError && hasRecentRecovery(verified?.claims ?? null, user.id);
+  const fields = {
+    currentPassword: String(form.get("currentPassword") ?? ""),
+    password: String(form.get("password") ?? ""),
+    confirmPassword: String(form.get("confirmPassword") ?? ""),
+  };
+  const errors = passwordChangeErrors(fields, recovery);
+  const invalid = Object.keys(errors)[0];
+  if (invalid) redirect(`/password?error=${invalid}`);
+  if (!recovery) {
+    if (!user.email) redirect("/password?error=currentPassword");
+    // Use the server-verified account, never an email or recovery flag from the form.
+    const reauthError = await verifyCurrentPassword(user.email, fields.currentPassword, user.id);
+    if (reauthError) redirect(`/password?error=${reauthError === "invalid_credentials" ? "wrong_current" : "reauth_failed"}`);
+  }
+  const { error } = await db.auth.updateUser({
+    password: fields.password,
+    ...(!recovery ? { current_password: fields.currentPassword } : {}),
+  });
   if (error) redirect(`/password?error=${encodeURIComponent(error.code ?? "1")}`);
+  const { error: revokeError } = await db.auth.signOut({ scope: "others" });
+  // The password has already changed: never ask the user to resubmit it on a revocation failure.
+  if (revokeError) redirect("/password?saved=1&error=revoke_failed");
+  if (recovery) {
+    const { error: signOutError } = await db.auth.signOut({ scope: "local" });
+    if (signOutError) redirect("/password?saved=1&error=signout_failed");
+    redirect("/login");
+  }
   redirect(await home(createRequestAuthContext(() => Promise.resolve(db))));
+}
+
+/** Explicit recovery when password saved but session revocation failed. */
+export async function endPasswordSessions() {
+  const db = await createServerClient();
+  const { data: { user }, error: identityError } = await db.auth.getUser();
+  if (identityError || !user) redirect("/password?saved=1&error=revoke_failed");
+  const { error } = await db.auth.signOut({ scope: "global" });
+  if (error) redirect("/password?saved=1&error=revoke_failed");
+  redirect("/login");
 }
 
 export async function acceptInvite(form: FormData) {
