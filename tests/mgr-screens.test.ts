@@ -428,7 +428,7 @@ describe("SCREENS", () => {
   it("marks pickable fields and never pins Required on a filled one", () => {
     const chevrons = new Map([
       ["Record movement", 1], ["Composer proposal", 1],
-      ["Brew day", 3], ["Schedule packaging run", 1], ["Cycle count", 1],
+      ["Brew day", 3], ["Cycle count", 1],
       ["Chat settings", 2], ["Package BOM", 1],
     ]);
     for (const s of SCREENS.filter((s) => !s.venue)) {
@@ -436,6 +436,9 @@ describe("SCREENS", () => {
       expect.soft(html, `${s.name}: Required pill`).not.toMatch(/<button[^>]*>Required<\/button>/);
       if (chevrons.has(s.name)) {
         expect.soft(html.match(/data-direction="forward"/g)?.length ?? 0, `${s.name}: picker affordances`).toBeGreaterThanOrEqual(chevrons.get(s.name)!);
+      }
+      if (s.name === "Schedule packaging run") {
+        expect.soft(html.match(/role="combobox"/g), "Schedule packaging run: Brand and Source tank dropdowns").toHaveLength(2);
       }
       expect.soft(html, `${s.name}: Unicode direction arrow`).not.toMatch(/[→›]/);
     }

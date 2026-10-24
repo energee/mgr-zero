@@ -66,11 +66,13 @@ export function ComposerDrawerView({ children, open, onOpenChange, container }: 
           </Button>
         </div>}
       >
-        <DrawerHeader className="sr-only">
-          <DrawerTitle>Ask MGR</DrawerTitle>
-          <DrawerDescription>Chat with your brewery data and complete work in MGR.</DrawerDescription>
-        </DrawerHeader>
-        <div className={`flex min-h-0 w-full flex-col gap-3 overflow-y-auto px-4 pt-2 ${snapPoint === minimized ? "h-0 overflow-hidden p-0" : snapPoint === EXPANDED ? "flex-1 pb-4 max-md:pb-[calc(4rem+env(safe-area-inset-bottom))]" : "h-[calc(30rem-2.75rem)] pb-4 max-md:h-[calc(27rem-2.75rem)]"}`}>{children}</div>
+        <div className={`flex min-h-0 w-full flex-col gap-3 overflow-y-auto px-4 pt-2 ${snapPoint === minimized ? "h-0 overflow-hidden p-0" : snapPoint === EXPANDED ? "flex-1 pb-4 max-md:pb-[calc(4rem+env(safe-area-inset-bottom))]" : "h-[calc(30rem-2.75rem)] pb-4 max-md:h-[calc(27rem-2.75rem)]"}`}>
+          <DrawerHeader className="gap-1 px-1 py-2">
+            <DrawerTitle>Ask MGR</DrawerTitle>
+            <DrawerDescription>Answers use your brewery data and permissions.</DrawerDescription>
+          </DrawerHeader>
+          {children}
+        </div>
       </DrawerContent>
       </DrawerPortal>
     </Drawer>

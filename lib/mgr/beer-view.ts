@@ -35,14 +35,13 @@ export function toBeerViewProps(s: BeerSnapshot): BeerViewModel {
     navs.push(
       { key: "taproom", title: "Taproom", detail: `${plural(o.taproomBelowPar, "SKU")} below par · weekly count`, href: "/taproom" },
       { key: "taps", title: "Taps", detail: `${plural(o.openTaps, "keg")} on tap · Tap board`, href: "/taproom/board" },
+      { key: "variance", title: "Variance by brand", detail: "Compare completed count periods", href: "/taproom/variance" },
     );
   }
   navs.push(
     { key: "cellar", title: "Cellar", detail: plural(o.openOccupancies, "occupied tank"), href: "/cellar" },
     // On a phone this row is the only way into Materials on hand, so it stays.
     { key: "materials", title: "Materials", detail: "on hand · definitions · cycle count", href: "/materials" },
-    // The count is material_requirements rows short > 0, the rows Planning lists (#989).
-    { key: "shortages", title: "Shortages", detail: plural(o.materialShortages, "shortage"), href: "/planning" },
     { key: "kegs", title: "Kegs", detail: `${o.kegsOut} out at customers`, href: "/kegs" },
   );
   return { navs };

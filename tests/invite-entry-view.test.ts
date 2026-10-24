@@ -20,9 +20,28 @@ it("uses the authenticated account in the shared password form", () => {
   expect(html).toMatch(/minlength="8"/i);
 });
 
+it("shares current-password and confirmation fields, autocomplete, and inline errors", () => {
+  const html = renderToStaticMarkup(createElement(EntryView, { model: toSetPasswordViewProps("actual@example.com", "wrong_current") }));
+  expect(html).toContain('name="currentPassword"');
+  expect(html).toContain('autoComplete="current-password"');
+  expect(html).toContain('name="confirmPassword"');
+  expect(html).toContain('aria-describedby="password-currentPassword-error"');
+  expect(html).toContain("Your current password is incorrect.");
+  expect(html).toContain("noValidate");
+});
+
+it("verified recovery shares confirmation but omits the current-password field", () => {
+  const html = renderToStaticMarkup(createElement(EntryView, { model: toSetPasswordViewProps("actual@example.com", undefined, true) }));
+  expect(html).not.toContain('name="currentPassword"');
+  expect(html).toContain('name="confirmPassword"');
+  expect(html).toContain("Your reset link verified this account.");
+});
+
 it("shows fixed text for a ?error= code, never the query string itself (#472)", () => {
   expect(toSetPasswordViewProps("a@example.com").error).toBeUndefined();
-  expect(toSetPasswordViewProps("a@example.com", "same_password").error).toBe("Choose a password different from your current one.");
+  // A field's own error is drawn beside it once, not repeated in the top alert.
+  expect(toSetPasswordViewProps("a@example.com", "wrong_current")).toMatchObject({ error: undefined, passwordErrors: { currentPassword: "Your current password is incorrect." } });
+  expect(toSetPasswordViewProps("a@example.com", "same_password").passwordErrors?.password).toBe("Choose a password different from your current one.");
   expect(toSetPasswordViewProps("a@example.com", "Call 555-0100 to verify your account").error).toBe("Your password was not saved. Try again.");
 });
 

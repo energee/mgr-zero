@@ -71,7 +71,7 @@ export function PickupSwitch({ on, onChange, disabled = false }: { on: boolean; 
 
 /** SKU request feedback is shared by the line list and its picker surface.
  *  `reason` (orderFormReadiness) withholds Save draft and is printed beside it;
- *  `disabled` withholds it without one, while SKU options load. */
+ *  `disabled` withholds it without one, while SKU options load or a setup hint shows. */
 export function NewOrderView({ model, controls = {}, messages, feedback, skuFeedback, skuOptionsReady = true, skuEmptyMessage, footer, submitting = false, disabled = false, reason }: { model: NewOrderViewModel; controls?: NewOrderControls; messages?: ReactNode; feedback?: ReactNode; skuFeedback?: ReactNode; skuOptionsReady?: boolean; skuEmptyMessage?: string; footer?: ReactNode; submitting?: boolean; disabled?: boolean; reason?: string | null }) {
   const errorPrefix = useId();
   const touched = useTouchedLines(!controls.lineQty);

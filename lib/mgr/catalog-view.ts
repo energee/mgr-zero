@@ -32,6 +32,7 @@ export type CatalogViewModel = {
   backHref?: string;
   brands: CatalogBrandView[];
   empty?: EmptyState;
+  showControls: boolean;
   priceGroups: string;
   priceGroupsHref: string;
   waterProfilesHref: string;
@@ -87,7 +88,8 @@ export function toCatalogViewProps({
     backHref,
     empty: brands.length > 0 ? undefined
       : filtered ? { title: "No brands match", description: "Clear the search or category to see every brand." }
-      : { title: "No brands yet", description: "Add a brand to start building the catalog." },
+      : { title: "No brands yet", description: "Add a brand, then add its SKUs (the sizes and packages you sell)." },
+    showControls: brands.length > 0 || Boolean(filtered),
     brands: brands.map((b) => ({
       key: b.id,
       name: b.name,
@@ -99,7 +101,7 @@ export function toCatalogViewProps({
       image: latestColaImage(b.colas),
       href: `/catalog/brands/${b.id}`,
     })),
-    priceGroups: plural(priceGroups.length, "group"),
+    priceGroups: priceGroups.length === 0 ? "0 groups · Create one to price your brands" : plural(priceGroups.length, "group"),
     priceGroupsHref: "/pricing",
     waterProfilesHref: "/catalog/water-profiles",
   };

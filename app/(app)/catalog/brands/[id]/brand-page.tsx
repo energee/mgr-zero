@@ -13,7 +13,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CommandFormMessage } from "@/components/mgr/command-form";
-import { E } from "@/components/mgr/e";
 import { BrandView } from "@/components/mgr/views/brand";
 import { CatalogCategoriesControl } from "@/components/mgr/views/catalog-categories";
 import { useCommandAction, useFields } from "@/lib/commands/use-command-form";
@@ -108,7 +107,7 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
         />}
         linkRows
         messages={<CommandFormMessage error={error} />}
-        footer={E.btn(busy ? "Saving…" : "Save brand", busy || !f.name.trim() ? "p disabled" : "p")}
+        busy={busy}
         actions={actions ?? undefined}
         images={Object.fromEntries(model.compliance.flatMap(row => row.image ? [[row.key, <ColaImage key={`${row.key}:${row.image.url}`} ttbId={row.image.ttbId} url={row.image.url} label={`${model.name} · COLA ${row.image.ttbId}`} />]] : []))}
         addCompliance={addCompliance}

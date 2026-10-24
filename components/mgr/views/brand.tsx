@@ -23,6 +23,7 @@ import { BRAND_ABV } from "@/lib/mgr/brand-abv";
 import type { SellsAsRow } from "@/lib/mgr/brand-sells-view";
 import type { BrandViewModel } from "@/lib/mgr/brand-view";
 import type { PriceGroupSuggestion } from "@/lib/mgr/price-group-suggestion";
+import { submitReason } from "@/lib/mgr/submit-reason";
 
 export type { BrandViewModel };
 
@@ -59,6 +60,7 @@ export function BrandView({
   sellsDetails,
   sellsDisabled = false,
   sellsMessages,
+  busy = false,
 }: {
   model: BrandViewModel;
   controls?: BrandControls;
@@ -82,6 +84,7 @@ export function BrandView({
   sellsDisabled?: boolean;
   /** Live: a failed switch's error, under the switches. */
   sellsMessages?: ReactNode;
+  busy?: boolean;
 }) {
   return (
     <div className="@container flex min-w-0 flex-col gap-6">
@@ -120,7 +123,7 @@ export function BrandView({
           <RegistryInput label="Description" value={model.description} onChange={controls.description} />
           <RegistryInput label="Hops" value={model.hops} onChange={controls.hops} />
           {messages}
-          {footer !== undefined ? footer : E.btn("Save brand")}
+          {footer !== undefined ? footer : E.submit("Save brand", { submitting: busy, reason: submitReason(model.name.trim() ? [] : ["a brand name"]), className: "w-full md:w-fit md:self-end" })}
         </section>
         <section aria-label="Sells as and compliance" className="flex min-w-0 flex-col gap-3">
           {model.isNew ? E.info("Save the brand to add SKUs and compliance.") : (

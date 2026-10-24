@@ -5,6 +5,7 @@ import { formatDate } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
+import { TimezonePicker } from "@/components/mgr/timezone-picker";
 import { formatWindow, parseClock } from "@/lib/time-window";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import type { ChatHealth, ChatLinkIntent, ChatLinkedPerson, ChatPreferences } from "@/lib/commands/chat";
@@ -13,13 +14,13 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChatPreview, ChatPreviewPicker } from "@/lib/chat/preview-web";
 import { NOTIFICATION_REASON_LABEL, type ChatPreviewFixture, type ChatPreviewId } from "@/lib/chat/contracts";
 
-const PREVIEW_TABS: [ChatPreviewId, string][] = [["app-home", "App Home"], ["personal-dm", "Personal DM"], ["team-digest", "Team digest"], ["preferences", "Preferences"]];
+const PREVIEW_TABS: [ChatPreviewId, string][] = [["app-home", "App Home"], ["personal-dm", "Personal DM"], ["team-digest", "Team digest"], ["preferences", "Sample preferences"]];
 
 export function ChatPreviewGallery({ fixtures }: { fixtures: readonly ChatPreviewFixture[] }) {
   const [selected, setSelected] = useState<ChatPreviewId>("app-home");
   const fixture = fixtures.find(item => item.id === selected);
   return <section data-chat-preview className="flex min-w-0 flex-col gap-4" aria-label="Preview surfaces">
-    {E.note("Sample data only. A preview never sends a Slack message.")}
+    {E.info("Sample data only. A preview never sends a Slack message.")}
     <Tabs value={selected} onValueChange={value => setSelected(value as ChatPreviewId)}>
       <TabsList variant="solid" className="w-full">{PREVIEW_TABS.map(([id, label]) => <TabsTrigger key={id} value={id}>{label}</TabsTrigger>)}</TabsList>
     </Tabs>
@@ -71,12 +72,12 @@ export function ChatPersonalPreferencesView({ preferences, canSetQuietHours = tr
   const [start, setStart] = useState(preferences.quietStart?.slice(0, 5) ?? "");
   const [end, setEnd] = useState(preferences.quietEnd?.slice(0, 5) ?? "");
   const [timezone, setTimezone] = useState(preferences.timezone);
-  const howToLink = preferences.installationActive ? E.info("To link your Slack, open the MGR app in Slack, go to its Home tab and choose Link MGR account. Then follow that link back here.") : E.note("Slack isn’t connected for your brewery yet.");
+  const howToLink = preferences.installationActive ? E.info("To link your Slack, open the MGR app in Slack, go to its Home tab and choose Link MGR account. Then follow that link back here.") : E.info("Slack isn’t connected for your brewery yet.");
   const breweryQuiet = preferences.breweryQuietHours;
   return <>
     {E.back(back, "My notification preferences", undefined, backHref)}
     {preferences.link ? E.row(`Slack user ${preferences.link.external_user_id}`, "Linked to your MGR account", <Button variant="outline" disabled={busy} onClick={onUnlink}>Unlink my Slack</Button>) : howToLink}
-    {E.note("These switches change only your personal Slack reminders. Your MGR work and assignments stay the same.")}
+    {E.info("These switches change only your personal Slack reminders. Your MGR work and assignments stay the same.")}
     {preferences.preferences.map(({ reason, enabled, personalDestinationId }) => {
       const label = NOTIFICATION_REASON_LABEL[reason];
       return <div key={reason}>
@@ -90,7 +91,7 @@ export function ChatPersonalPreferencesView({ preferences, canSetQuietHours = tr
     {canSetQuietHours && <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && Boolean(start) === Boolean(end)) onSaveQuiet?.(start, end, timezone); }}>
       {E.edit("My quiet hours start", start, "time", undefined, { onChange: (nextValue: string) => setStart(nextValue), id: `${id}-start`, disabled: busy })}
       {E.edit("My quiet hours end", end, "time", undefined, { onChange: (nextValue: string) => setEnd(nextValue), id: `${id}-end`, disabled: busy })}
-      {E.edit("My timezone", timezone, "text", undefined, { onChange: (nextValue: string) => setTimezone(nextValue), id: `${id}-timezone`, disabled: busy, required: true })}
+      <TimezonePicker id={`${id}-timezone`} label="My timezone" value={timezone} onChange={setTimezone} disabled={busy} />
       <p className="text-sm text-muted-foreground">Clear both times to follow the brewery quiet hours.</p><Button disabled={busy || Boolean(start) !== Boolean(end)}>Save my quiet hours</Button>
     </form>}
     <CommandFormMessage error={error} />

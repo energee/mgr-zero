@@ -40,12 +40,18 @@ export function CatalogView({
   formatAction?: ReactNode;
 }) {
   // Each `links && (...)` below gives undefined (no links: the inventory's inert tap) or, live, the path or null (denied: drawn plain).
+  const brandAction = createAction !== undefined ? createAction : E.btn("New brand");
+  const firstBrand = !model.showControls;
   return (
     <>
-      {E.back("More", "Catalog", <div className="flex flex-wrap gap-2">{colaAction !== undefined ? colaAction : E.btn("Bulk process COLAs", "g")}{createAction !== undefined ? createAction : E.btn("New brand")}</div>, model.backHref)}
-      {controls}
+      {E.back("More", "Catalog", firstBrand ? null : <div className="flex flex-wrap gap-2">
+        {colaAction !== undefined ? colaAction : E.btn("Bulk process COLAs", "g")}
+        {brandAction}
+      </div>, model.backHref)}
+      {E.info("Catalog holds your brands, formats, and SKUs. Save a brand, then turn on its formats under Sells as to create the SKUs you sell.")}
+      {model.showControls && controls}
       {model.empty
-        ? E.blank(model.empty)
+        ? E.blank(model.empty, undefined, firstBrand ? brandAction : undefined)
         : <RecordTable
           headers={["Brand", "Style", "ABV", "SKUs", "COLA"]}
           align={["l", "l", "r", "r", "l"]}

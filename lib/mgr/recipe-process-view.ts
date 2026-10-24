@@ -8,6 +8,7 @@ import { plural } from "./plural";
 import { isNumber, isPositive } from "./quantity-input";
 import { saccharificationRest, totalMinutes, type MashStep } from "./recipe-schedule";
 import { gramsOf, IONS, ION_LABELS, suggestSalts, waterChemistry, type Ions, type Salt } from "@/lib/water-chemistry";
+import { submitReason } from "./submit-reason";
 
 export type { MashStep };
 /** Where an ingredient enters the process; the command's enum and the editor's Stage pick. */
@@ -19,6 +20,14 @@ export const isBrewDayStage = (stage: string): stage is (typeof BREW_DAY_STAGES)
 /** One ingredient line as the editor holds it: strings until the version is built. */
 export type IngredientLine = { materialId: string; perBblQty: string; stage: IngredientStage; timingMinutes: string };
 export const lineReady = (l: IngredientLine) => l.materialId !== "" && Number(l.perBblQty) > 0 && (l.timingMinutes === "" || Number.isInteger(Number(l.timingMinutes)));
+/** The same prerequisites as lineReady, named beside Save ingredient without changing eligibility. */
+export function ingredientReason(line: IngredientLine): string | null {
+  return submitReason([
+    ...(!line.materialId ? ["a material"] : []),
+    ...(!(Number(line.perBblQty) > 0) ? ["a quantity per barrel above zero"] : []),
+    ...(line.timingMinutes !== "" && !Number.isInteger(Number(line.timingMinutes)) ? ["timing in whole minutes or left blank"] : []),
+  ]);
+}
 /** A per-bbl quantity to three significant digits: 40.909091 reads "40.9", 0.011364 reads "0.0114".
  *  Two fixed fraction digits would round small hop rates by 10-12%, so callers format with this before ingredientDetail. */
 export const perBblDisplay = (n: number): string => n.toLocaleString("en-US", { maximumSignificantDigits: 3 });
