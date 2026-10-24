@@ -19,26 +19,25 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useEffect, useId, useRef, useState, type AriaAttributes, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type AriaAttributes, type ReactNode, type RefObject } from "react";
 
 /** Keep the lexical error on the input as well as on screen, including uncontrolled fixtures. */
-function useNumberNotation(value: string | undefined, initialValue = "") {
-  const input = useRef<HTMLInputElement>(null);
+function useNumberNotation(input: RefObject<HTMLInputElement | null>, value: string | undefined, initialValue = "") {
   const [typed, setTyped] = useState(initialValue);
   const error = numberNotationError(value ?? typed);
   const errorId = useId();
-  useEffect(() => { input.current?.setCustomValidity(error ?? ""); }, [error]);
+  useEffect(() => { input.current?.setCustomValidity(error ?? ""); }, [error, input]);
   function changed(next: string) {
     input.current?.setCustomValidity(numberNotationError(next) ?? "");
     if (value === undefined) setTyped(next);
   }
-  return { input, error, errorId, changed };
+  return { error, errorId, changed };
 }
 
 /** The same stepper for controlled forms and uncontrolled inventory fields. */
 export function StepQuantity({ label, value, defaultValue, onChange, contextualLabels, ...attributes }: Omit<FieldControls, "hideLabel" | "error"> & { label: string; value?: string; defaultValue?: string }) {
-  const notation = useNumberNotation(onChange ? value : undefined, value ?? defaultValue);
-  const input = notation.input;
+  const input = useRef<HTMLInputElement>(null);
+  const notation = useNumberNotation(input, onChange ? value : undefined, value ?? defaultValue);
   const notationError = attributes["aria-invalid"] ? undefined : notation.error;
   const step = (direction: -1 | 1) => {
     const field = input.current;
@@ -88,7 +87,8 @@ export function Qty({
 }) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
-  const notation = useNumberNotation(onChange ? value : undefined, value);
+  const input = useRef<HTMLInputElement>(null);
+  const notation = useNumberNotation(input, onChange ? value : undefined, value);
   const notationError = invalid ? undefined : notation.error;
   return (
     <Field>
@@ -101,7 +101,7 @@ export function Qty({
         {/* eslint-disable-next-line no-restricted-syntax -- Shared E volume primitive; native spinners are hidden. */}
         <InputGroupInput
           id={inputId}
-          ref={notation.input}
+          ref={input}
           type="number"
           inputMode="decimal"
           step="any"
