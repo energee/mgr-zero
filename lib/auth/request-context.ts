@@ -50,20 +50,21 @@ export interface RequestAuthContext {
   getCustomerMembership(breweryId: string, customerId?: string): Promise<CustomerMembership | null>;
 }
 
-/** The existing entry destination: staff on Today, customer-only accounts in the portal. */
-export async function authHome(auth: RequestAuthContext): Promise<string> {
-  if (!(await auth.getIdentity())) return "/login?error=1";
-  if ((await auth.getStaffMemberships()).length) return "/";
-  if ((await auth.getCustomerMemberships()).length) return "/portal";
-  return "/no-membership";
-}
-
 /** One user's roles at one brewery (null when not staff there), read from the
  *  single brewery_users row; a database failure is a 500 db_error via unwrap.
  *  Shared by the cookie and bearer command contexts. */
 export async function staffRolesAt(db: SupabaseClient<Database>, userId: string, breweryId: string): Promise<StaffRole[] | null> {
   const row = await unwrap(db.from("brewery_users").select("roles").eq("user_id", userId).eq("brewery_id", breweryId).maybeSingle());
   return row?.roles ?? null;
+}
+
+/** Where a signed-in account belongs: staff on Today, a buyer in the portal.
+ *  Login and Save password land here; the password page uses it to keep a buyer on portal pages. */
+export async function homePath(auth: RequestAuthContext) {
+  if (!(await auth.getIdentity())) return "/login?error=1";
+  if ((await auth.getStaffMemberships()).length) return "/";
+  if ((await auth.getCustomerMemberships()).length) return "/portal";
+  return "/no-membership";
 }
 
 /**

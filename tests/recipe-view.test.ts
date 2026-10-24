@@ -12,7 +12,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { describe, expect, it } from "vitest";
-import { batchTotalText, draftBlocker, gravityBlockerText, ingredientPack, noMashText, packRounding, toRecipePageModel, versionNumbers, versionToDraft, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
+import { batchTotalText, draftBlocker, gravityBlockerText, ingredientPack, noMashText, packRounding, recipePageTitle, toRecipePageModel, versionNumbers, versionToDraft, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
 import type { IngredientLine, MashStep } from "@/lib/mgr/recipe-process-view";
 
 const version: NonNullable<RecipeSnapshot["version"]> = {
@@ -34,6 +34,12 @@ const snapshot: RecipeSnapshot = {
   waterAdditions: [{ material_id: "m-gypsum", qty: 40, unit: "g", stage: "mash" }],
   ogPlato: null, fgPlato: null, abv: null,
 };
+
+it("names recipe tabs with the same saved-version heading as the page (#1255)", () => {
+  expect(recipePageTitle(snapshot)).toBe("Pale v3");
+  expect(recipePageTitle({ ...snapshot, version: { ...version, version: 1 } })).toBe("Pale v1");
+  expect(recipePageTitle({ ...snapshot, version: null })).toBe("Pale");
+});
 
 describe("versionNumbers", () => {
   it("prints a fractional efficiency as its exact percent, never rounded", () => {

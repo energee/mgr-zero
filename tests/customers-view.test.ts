@@ -190,13 +190,16 @@ describe("country and alias", () => {
     expect(model.rows[1]?.detail).toBe("retailer · Japan · brewery remits");
   });
 
-  it("customer detail edits country and alias, and draws State only for a US customer", () => {
+  it("customer detail keeps State in place, required only for a US customer (#1306)", () => {
     const us = toCustomerViewProps(customerRidgeline);
     expect(us.editValues).toMatchObject({ country: "US", state: "PA", alias: "" });
     const usMarkup = html(createElement(CustomerView, { model: us }));
     expect(usMarkup).toContain(">Country<");
     expect(usMarkup).toContain(">United States<");
-    expect(usMarkup).toContain(">State<");
+    expect(usMarkup).toContain(">State (required)<");
+    const usState = usMarkup.match(/<input[^>]*aria-label="State \(required\)"[^>]*>/)?.[0];
+    expect(usState).toContain('required=""');
+    expect(usState).not.toContain('disabled=""');
     // The alias says what it is in a note that stays while typing, not a placeholder (#1131).
     expect(usMarkup).not.toContain('placeholder="Staff only"');
     const aliasHelp = usMarkup.match(/<input[^>]*aria-describedby="([^"]+-alias-help)"/)?.[1];
@@ -207,7 +210,11 @@ describe("country and alias", () => {
     expect(foreign.editValues).toMatchObject({ country: "JP", state: "", alias: "Tokyo" });
     const jpMarkup = html(createElement(CustomerView, { model: foreign }));
     expect(jpMarkup).toContain(">Japan<");
-    expect(jpMarkup).not.toContain(">State<");
+    expect(jpMarkup).toContain(">State<");
+    const jpState = jpMarkup.match(/<input[^>]*aria-label="State"[^>]*>/)?.[0];
+    expect(jpState).toContain('disabled=""');
+    expect(jpState).toContain('value="Not applicable"');
+    expect(jpState).not.toContain('required=""');
   });
 
   it("offers each customer type once, in sentence case, on both customer forms (#1131)", () => {
@@ -220,6 +227,16 @@ describe("country and alias", () => {
     const form = readFileSync("app/(app)/customers/customer-form.tsx", "utf8");
     expect(form).not.toContain("@/components/ui/select");
     expect(form).toContain("CUSTOMER_TYPE_OPTIONS");
+  });
+
+  it("explains the channel abbreviation and separates export pricing from export tax (#1261)", () => {
+    const model = toCustomerViewProps(customerRidgeline);
+    model.editValues.saleChannelId = model.channelOptions.find(channel => channel.name === "DTC")!.id;
+    const markup = html(createElement(CustomerView, { model }));
+    expect(markup).toContain("Direct to consumer (DTC)");
+    expect(markup).toMatch(/sale channel sets prices and the default tax treatment/);
+    expect(markup).toMatch(/Export channel does not override a customer’s tax treatment/);
+    expect(markup).toMatch(/Export tax treatment means shipment outside the US without payment of tax/);
   });
 
   it("the New customer dialog explains the alias and says where ship-tos are added (#1131)", () => {

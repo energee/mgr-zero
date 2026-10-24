@@ -12,6 +12,8 @@ import { redirect } from "next/navigation"
 import { getRequestAuthContext } from "@/lib/auth/request-context"
 import { signInDestination } from "@/lib/auth/invite"
 
+export const metadata = { title: "Sign in" };
+
 const ERRORS: Record<string, string> = {
   "1": "Incorrect email or password.",
   email: "Enter a valid email address.",

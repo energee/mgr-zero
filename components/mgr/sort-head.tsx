@@ -88,10 +88,10 @@ export function SortHead({ sort, className, children }: { sort: ColumnSortContro
   const Arrow = sort.sorted ? ARROW[sort.sorted] : ArrowUpDown;
   return (
     <TableHead className={className} aria-sort={sort.sorted ? ARIA_SORT[sort.sorted] : "none"}>
-      {/* -mx-2.5 cancels the button's own padding, so the label lines up with
-          its column. data-preview-action: the click sorts in place, so the
-          screen explorer does not treat it as a tap to another screen. */}
-      <Button type="button" variant="ghost" size="sm" className="-mx-2.5 h-auto min-h-7 text-sm whitespace-normal" onClick={sort.toggle} data-preview-action>
+      {/* Cancel only the cell's 8px inset; a wider negative margin creates
+          horizontal overflow even when the table itself fits.
+          data-preview-action keeps inventory sorting on the same screen. */}
+      <Button type="button" variant="ghost" size="sm" className="-mx-2 h-auto min-h-7 px-2 text-sm whitespace-normal" onClick={sort.toggle} data-preview-action>
         {children}
         <Arrow aria-hidden className={sort.sorted ? undefined : "text-muted-foreground"} />
       </Button>

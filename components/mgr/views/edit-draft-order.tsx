@@ -1,6 +1,5 @@
 // Shared saved-draft editor; inventory supplies fixtures, staff supplies authorized save effects.
-// A line it cannot save marks its SKU or its quantity, with the message under
-// the row, once the user leaves the quantity (draftLineErrors, #1121).
+// A line it cannot save marks its SKU or quantity after blur (#1121).
 "use client";
 
 import { useId, useState } from "react";
@@ -68,7 +67,7 @@ export function EditDraftOrderView({ model, onSave, busy = false, error }: {
       const ids = lineErrorIds(`${errorPrefix}-${index}`, errors);
       return <div key={index}>
       {E.row(<OrderSkuPicker label={`Line ${index + 1} SKU`} value={line.skuId} options={model.skus} invalid={Boolean(errors.sku)} errorId={ids.sku} onChange={value => updateLine(index, { skuId: value })} />,
-        "", <OrderQuantity contextualLabels label={`Line ${index + 1} quantity`} value={line.qty} onChange={qty => updateLine(index, { qty })} onBlur={() => touched.touch(index)} required invalid={Boolean(errors.qty)} errorId={ids.qty} />)}
+        "", <OrderQuantity contextualLabels label={`Line ${index + 1} quantity`} value={line.qty} onChange={qty => updateLine(index, { qty })} onBlur={() => touched.touch(index)} required id={`${errorPrefix}-${index}-qty`} error={errors.qty} />)}
       <LineErrorMessages id={`${errorPrefix}-${index}`} errors={errors} />
       {lines.length > 1 && <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => { setLines(previous => previous.filter((_, i) => i !== index)); touched.remove(index); }}>Remove</Button>}
     </div>;
