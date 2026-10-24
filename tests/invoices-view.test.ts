@@ -223,7 +223,7 @@ it("#1030 starts the Accounting cell at the left edge its header uses", () => {
 
 it("#1135 shows the sync only while QuickBooks is connected, and writes the email note for staff", () => {
   const draw = (connected: boolean, canConnect = true) => renderToStaticMarkup(createElement(InvoicesView, {
-    rows: [], connection: { connected, detail: "QuickBooks status", canConnect, connectHref: "/settings/accounting/connect" },
+    rows: [], connection: { connected, reconnect: true, detail: "QuickBooks status", canConnect, connectHref: "/settings/accounting/connect" },
     sync: createElement("span", null, "live sync"),
   }));
   expect(draw(true)).toContain("live sync");
