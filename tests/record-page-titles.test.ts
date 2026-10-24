@@ -12,6 +12,8 @@ import { isUuid } from "@/lib/commands/context";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { navTitle } from "@/lib/mgr/nav";
 import { periodLabel, periodRange } from "@/lib/compliance-period";
+import { recipePageTitle } from "@/lib/mgr/recipe-view";
+import { noMembershipModel, portalStaffOnlyModel } from "@/lib/mgr/entry-view";
 
 const ROOT = join(__dirname, "..");
 const MISSING = "afffffff-ffff-4fff-8fff-ffffffffffff";
@@ -47,7 +49,7 @@ function requestBindings() {
   };
   const ctx = { roles: ["admin"], userId: "actor", breweryId: "brewery" };
   const bindings: Record<string, unknown> = {
-    cache, notFound, redirect, orNotFound, isUuid, navTitle, periodLabel, periodRange,
+    cache, notFound, redirect, orNotFound, isUuid, navTitle, periodLabel, periodRange, recipePageTitle,
     getActiveBrewery: async () => ({ id: "brewery", roles: ["admin"], timeZone: "UTC" }),
     buildContext: async () => ctx,
     getPortalContext: async () => ({ customer: { customerId: "customer" }, ctx }),
@@ -143,5 +145,76 @@ describe("missing-record browser metadata", () => {
     const file = `app/${group}/not-found.tsx`;
     expect(loadPage(file, {}).metadata).toEqual({ title: "Not found" });
     expect(readFileSync(join(ROOT, file), "utf8")).not.toContain("<title");
+  });
+});
+
+describe("successful record metadata", () => {
+  it.each([
+    ["cellar/vessels/[id]", "list_vessels", "New vessel", "Cellar"],
+    ["catalog/brands/[id]", "list_brands", "New brand", "Catalog"],
+  ])("distinguishes creation and saved records at %s", async (route, primary, creationTitle, savedTitle) => {
+    const { bindings } = requestBindings();
+    const query = bindings.runCommand as (name: string) => Promise<unknown>;
+    const read = async (name: string) => name === primary ? [{ id: MISSING, name: "Saved record" }] : query(name);
+    const page = loadPage(`app/(app)/${route}/page.tsx`, { ...bindings, runCommand: read, runPageQuery: read });
+    expect(await page.generateMetadata({ params: Promise.resolve({ id: "new" }), searchParams: Promise.resolve({}) })).toEqual({ title: creationTitle });
+    expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({}) })).toEqual({ title: savedTitle });
+  });
+
+  it("names the recipe and selected version instead of its section", async () => {
+    const { bindings } = requestBindings();
+    const data = loadPage("app/(app)/recipes/recipe-data.ts", {
+      ...bindings,
+      runPageQuery: async (name: string, input: { recipeId: string; version?: number }) => {
+        expect(name).toBe("get_recipe");
+        expect(input.recipeId).toBe(MISSING);
+        return { recipe: { name: "Cedar pale" }, version: { version: input.version ?? 3 } };
+      },
+    });
+    const page = loadPage("app/(app)/recipes/[id]/page.tsx", { ...bindings, ...data });
+    expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({ v: "1" }) })).toEqual({ title: "Cedar pale v1" });
+    expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({}) })).toEqual({ title: "Cedar pale v3" });
+  });
+
+  it("names the next recipe version after its recipe", async () => {
+    const { bindings } = requestBindings();
+    const data = loadPage("app/(app)/recipes/recipe-data.ts", {
+      ...bindings,
+      runPageQuery: async () => ({ recipe: { name: "Cedar pale" } }),
+    });
+    const page = loadPage("app/(app)/recipes/[id]/new/page.tsx", { ...bindings, ...data });
+    expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({}) })).toEqual({ title: "Cedar pale · new version" });
+  });
+
+  it.each([
+    ["locations/[id]", "North warehouse"],
+    ["locations/[id]/bins", "Bins at North warehouse"],
+  ])("names %s after its authorized location", async (route, title) => {
+    const { bindings } = requestBindings();
+    const data = loadPage("app/(app)/locations/location-data.ts", {
+      ...bindings,
+      runPageQuery: async () => [{ id: MISSING, name: "North warehouse" }],
+    });
+    const page = loadPage(`app/(app)/${route}/page.tsx`, { ...bindings, ...data });
+    expect(await page.generateMetadata({ params: Promise.resolve({ id: MISSING }), searchParams: Promise.resolve({}) })).toEqual({ title });
+  });
+
+  it.each([
+    ["2026-09", "September 2026 · Compliance"],
+    ["2026-Q3", "Q3 2026 · Compliance"],
+    ["2026", "2026 · Compliance"],
+  ])("labels compliance period %s", async (period, title) => {
+    const { bindings } = requestBindings();
+    const page = loadPage("app/(app)/compliance/[period]/page.tsx", bindings);
+    expect(await page.generateMetadata({ params: Promise.resolve({ period }), searchParams: Promise.resolve({}) })).toEqual({ title });
+  });
+
+  it.each([true, false])("matches the no-membership heading for staff=%s", async (staff) => {
+    const page = loadPage("app/(auth)/no-membership/page.tsx", {
+      getStaffMemberships: async () => staff ? [{}] : [],
+      portalStaffOnlyModel,
+      noMembershipModel,
+    });
+    expect(await page.generateMetadata({ params: Promise.resolve({}), searchParams: Promise.resolve({}) })).toEqual({ title: staff ? "Portal is for customers" : "No brewery yet" });
   });
 });

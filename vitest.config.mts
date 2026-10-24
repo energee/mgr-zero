@@ -23,7 +23,6 @@ const pureTests = [
   "tests/test-db-selection.test.ts",
   "tests/record-page-titles.test.ts",
   "tests/detail-not-found-pages.test.ts",
-  "tests/page-titles.test.ts",
   "tests/priced-sku-feedback.test.ts",
   "tests/order-pick-pages.test.ts",
   "tests/edit-draft-page.test.ts",
