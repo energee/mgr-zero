@@ -24,11 +24,12 @@ export function ComposerConversationView({ messages, activity, error, onRetry, o
   onSetupRetry?: () => void;
 }) {
   return (
-    <section aria-label="MGR conversation" className="flex min-h-48 flex-1 flex-col overflow-hidden">
-      <header className="flex justify-end px-1">
+    <section aria-label="MGR conversation" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <header className="flex shrink-0 items-start justify-between gap-2 px-1 py-2 sm:items-center">
+        <p className="text-xs text-muted-foreground">Answers use your brewery data and permissions.</p>
         <Button type="button" size="sm" variant="ghost" onClick={onSetupRetry ?? onNewChat}>{onSetupRetry ? "Retry setup" : "New chat"}</Button>
       </header>
-      <div role="log" aria-live="polite" className="min-h-40 flex-1 space-y-4 overflow-y-auto px-1 py-3">
+      <div role="log" aria-live="polite" className="flex min-h-40 flex-1 flex-col gap-4 overflow-y-auto px-1 py-3">
         {messages.length === 0 && !activity && !error && <Empty className="p-3">
           <EmptyHeader>
             <EmptyDescription className="flex flex-col gap-2">

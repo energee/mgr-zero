@@ -9,6 +9,7 @@ import type { EntryViewModel } from "@/lib/mgr/entry-view";
 import { passwordChangeErrors, type PasswordErrors } from "@/lib/auth/password";
 import type { ReactNode } from "react";
 import { Fragment, useId, useState, type FormEvent } from "react";
+import { useFormStatus } from "react-dom";
 
 export type { EntryViewModel };
 
@@ -16,6 +17,11 @@ const INPUT_NAMES: Record<string, string> = {
   Email: "email", "Your name": "name",
   "Current password": "currentPassword", "Confirm new password": "confirmPassword",
 };
+
+function EntrySubmit({ label, pendingLabel }: { label: string; pendingLabel: string }) {
+  const { pending } = useFormStatus();
+  return E.submit(label, { busy: pendingLabel, submitting: pending, "aria-busy": pending });
+}
 
 export function EntryView({
   model,
@@ -86,9 +92,14 @@ export function EntryView({
       })}</Fragment>
     );
   });
-  const primary = primaryHref === null ? null : primaryHref ? (
-    <Button asChild><Link href={primaryHref}>{model.primary}</Link></Button>
-  ) : <Button type={action || emailLink || passwordChange ? "submit" : "button"}>{model.primary}</Button>;
+  let primary: ReactNode = null;
+  if (primaryHref) {
+    primary = <Button asChild><Link href={primaryHref}>{model.primary}</Link></Button>;
+  } else if (primaryHref !== null) {
+    primary = model.pendingLabel
+      ? <EntrySubmit label={model.primary} pendingLabel={model.pendingLabel} />
+      : <Button type={action || emailLink || passwordChange ? "submit" : "button"}>{model.primary}</Button>;
+  }
   const controls = (
     <FieldGroup>
       {hidden}

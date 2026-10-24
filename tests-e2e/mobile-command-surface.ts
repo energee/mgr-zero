@@ -96,8 +96,7 @@ try {
             const popupZ = Number(getComputedStyle(list.parentElement).zIndex);
             const covering = [...document.querySelectorAll('nav[aria-label=Tabs],[data-mgr-composer]')].some(e => {
               const c = e.getBoundingClientRect();
-              const layer = e.hasAttribute('data-mgr-composer') ? e.parentElement : e;
-              return c.width > 0 && c.top < r.bottom && c.bottom > r.top && c.left < r.right && c.right > r.left && Number(getComputedStyle(layer).zIndex) > popupZ;
+              return c.width > 0 && c.top < r.bottom && c.bottom > r.top && c.left < r.right && c.right > r.left && Number(getComputedStyle(e).zIndex) > popupZ;
             });
             return popupZ >= Number(getComputedStyle(surface).zIndex) && !covering && (hit === item || item.contains(hit));
           })()`);
@@ -115,11 +114,10 @@ try {
           body.scrollTop = body.scrollHeight;
           const r = button.getBoundingClientRect();
           const z = Number(getComputedStyle(surface).zIndex);
-          const chrome = [...document.querySelectorAll('nav[aria-label=Tabs],[data-slot=drawer-popup]')];
+          const chrome = [...document.querySelectorAll('nav[aria-label=Tabs],[data-mgr-composer]')];
           const covering = chrome.filter(e => {
             const c = e.getBoundingClientRect();
-            const layer = e.matches('[data-slot=drawer-popup]') ? e.parentElement : e;
-            return c.width > 0 && c.height > 0 && c.left < r.right && c.right > r.left && c.top < r.bottom && c.bottom > r.top && Number(getComputedStyle(layer).zIndex) > z;
+            return c.width > 0 && c.height > 0 && c.left < r.right && c.right > r.left && c.top < r.bottom && c.bottom > r.top && Number(getComputedStyle(e).zIndex) > z;
           });
           const points = [[r.x + r.width / 2, r.y + r.height / 2], [r.left + 2, r.y + r.height / 2], [r.right - 2, r.y + r.height / 2], [r.x + r.width / 2, r.top + 2], [r.x + r.width / 2, r.bottom - 2]];
           return { coarse: matchMedia('(pointer: coarse)').matches, visible: r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight, covering: covering.map(e => e.getAttribute('aria-label') || e.dataset.slot), reachable: points.every(([x, y]) => { const hit = document.elementFromPoint(x, y); return hit === button || button.contains(hit); }) };
@@ -155,8 +153,7 @@ try {
         return {
           coarse: matchMedia('(pointer: coarse)').matches,
           disabled: control.disabled,
-          pageBottom: bounds.bottom,
-          composerTop: composer.top,
+          chatVisible: composer.width > 0 && composer.height > 0,
           rect: r.toJSON(),
           reachable: points.every(([x, y]) => { const hit = document.elementFromPoint(x, y); return hit === control || control.contains(hit); }),
           contained: r.top >= bounds.top && r.bottom <= bounds.bottom,
@@ -165,7 +162,7 @@ try {
       })()`).result;
       assert.equal(measurement.coarse, coarse, "Pointer emulation must match scenario");
       assert.equal(measurement.disabled, false, `${screen}: enabled control`);
-      assert.ok(measurement.pageBottom <= measurement.composerTop + 1, `${screen}: page must not scroll behind collapsed composer`);
+      assert.equal(measurement.chatVisible, false, `${screen}: closed chat must not cover page controls`);
       assert.equal(measurement.contained, true, `${screen}: control within page scroll region`);
       assert.equal(measurement.reachable, true, `${screen}: center and edges hit the actual control`);
       assert.equal(measurement.overflow, false, `${screen}: no document overflow`);
@@ -193,7 +190,6 @@ try {
       const embedded = browser("eval", `(() => {
         document.documentElement.classList.toggle('dark', ${coarse});
         const box = document.querySelector('.screen-box');
-        const page = box.querySelector('[data-mgr-page-scroll]');
         const composer = box.querySelector('[data-mgr-composer]');
         const control = ${screen === "Close packaging run" ? "box.querySelector('[aria-label=\"Finished goods bin\"]')" : `[...box.querySelectorAll('button')].find(b => b.textContent.trim() === ${JSON.stringify(action)})`};
         box.scrollIntoView({ block: 'center' });
@@ -204,9 +200,7 @@ try {
           contained: box.contains(composer),
           coarse: matchMedia('(pointer: coarse)').matches,
           frameScroll: box.scrollTop,
-          frameBottom: box.getBoundingClientRect().bottom,
-          pageBottom: page.getBoundingClientRect().bottom,
-          composerTop: composer.getBoundingClientRect().top,
+          chatVisible: composer.getBoundingClientRect().width > 0,
           rect: r.toJSON(),
           reachable: points.every(([x,y]) => { const hit = document.elementFromPoint(x,y); return hit === control || control.contains(hit); }),
         };
@@ -214,8 +208,7 @@ try {
       assert.equal(embedded.coarse, coarse);
       assert.equal(embedded.contained, true, `${screen}: composer belongs to explorer container`);
       assert.equal(embedded.frameScroll, 0, `${screen}: fixed explorer frame must not scroll with its page`);
-      assert.ok(embedded.frameBottom - embedded.composerTop <= 46, `${screen}: minimized composer remains a handle`);
-      assert.ok(embedded.pageBottom <= embedded.composerTop + 1, `${screen}: embedded page stops above composer`);
+      assert.equal(embedded.chatVisible, false, `${screen}: closed chat must not cover the explorer frame`);
       assert.equal(embedded.reachable, true, `${screen}: embedded control center and edges`);
       console.log(JSON.stringify({ explorer: screen, ...embedded }));
       if (process.argv[2]) browser("screenshot", `${process.argv[2]}/explorer-${index}-${coarse ? "coarse-dark" : "fine-light"}.png`);
@@ -232,13 +225,14 @@ try {
   browser("wait", "--fn", "!!document.querySelector('[data-mgr-composer]')");
   const tabs = browser("eval", `(() => {
     const nav = document.querySelector('nav[aria-label=Tabs]');
-    const drawer = document.querySelector('[data-mgr-composer]');
-    return { navZ: Number(getComputedStyle(nav).zIndex), drawerZ: Number(getComputedStyle(drawer.parentElement).zIndex), reachable: [...nav.querySelectorAll('a')].every(a => { const r = a.getBoundingClientRect(); const hit = document.elementFromPoint(r.right - 12, r.y + r.height / 2); return a === hit || a.contains(hit); }) };
+    const chat = document.querySelector('[data-mgr-composer]').getBoundingClientRect();
+    return { navZ: Number(getComputedStyle(nav).zIndex), chatVisible: chat.width > 0 && chat.height > 0, reachable: [...nav.querySelectorAll('a')].every(a => { const r = a.getBoundingClientRect(); const hit = document.elementFromPoint(r.right - 12, r.y + r.height / 2); return a === hit || a.contains(hit); }) };
   })()`);
-  assert.ok(tabs.result.drawerZ < tabs.result.navZ && tabs.result.navZ < 50, "Chrome must stay below modals with Tabs above composer");
-  assert.equal(tabs.result.reachable, true, "Tabs must remain usable with minimized composer");
-  console.log(JSON.stringify({ minimizedComposer: tabs.result }));
-  console.log("PASS: Reading and Count actions, Count Location Select, packaging bin/correction controls with fine and coarse pointers, and minimized-composer Tabs.");
+  assert.equal(tabs.result.chatVisible, false, "Closed chat must not cover phone navigation");
+  assert.ok(tabs.result.navZ < 50, "Phone navigation must stay below modal forms");
+  assert.equal(tabs.result.reachable, true, "Tabs must remain usable with chat closed");
+  console.log(JSON.stringify({ closedChat: tabs.result }));
+  console.log("PASS: Reading and Count actions, Count Location Select, packaging bin/correction controls with fine and coarse pointers, and phone navigation with chat closed.");
 } finally {
   await cleanup();
 }

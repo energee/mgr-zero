@@ -5,9 +5,10 @@
 // fields inert and E.link for the group; live hands in GroupForm,
 // PriceCellForm and PourForm through the renderGroup / renderCell /
 // renderAddPour slots and keeps the same table around them.
-import type { ReactNode } from "react";
+import { useId, type ComponentProps, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { LinkTabs } from "@/components/mgr/work-tabs";
+import { ConfirmDeleteControl } from "@/components/mgr/views/confirm-delete";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import type { PriceGroupsChannelView, PriceGroupsRowView, PriceGroupsViewModel } from "@/lib/mgr/price-groups-view";
@@ -15,31 +16,56 @@ import type { PriceGroupsChannelView, PriceGroupsRowView, PriceGroupsViewModel }
 export type { PriceGroupsViewModel };
 
 /** One price cell: "$" and a decimal field, "—" when unpriced. Enter or leaving the cell commits (live only). */
-export function PriceCellInput({ label, value, onChange, onCommit, disabled, error, children }: {
+export function PriceCellInput({ label, value, onChange, onCommit, disabled, error, status, children }: {
   /** Names the cell for assistive tech: group · format on channel. */
   label: string;
   value: string;
   onChange?: (value: string) => void;
-  onCommit?: () => void;
+  onCommit?: () => void | Promise<void>;
   disabled?: boolean;
   error?: string | null;
-  /** Beside the field: the live Clear confirm while a priced cell is emptied. */
+  status?: string | null;
+  /** Beside the field: the explicit, confirmed Clear action for a priced cell. */
   children?: ReactNode;
 }) {
+  const feedbackId = useId();
   return (
-    <form className="flex flex-col items-end gap-1" {...(onCommit ? { onSubmit: (event) => { event.preventDefault(); onCommit(); }, onBlur: onCommit } : {})}>
+    <form className="flex flex-col items-end gap-1" {...(onCommit ? {
+      onSubmit: (event) => { event.preventDefault(); event.stopPropagation(); void onCommit(); },
+      onBlur: (event) => {
+        const form = event.currentTarget;
+        // Follow focus through Clear to the next cell, but ignore portal events.
+        if (!form.contains(event.target) || form.contains(event.relatedTarget)) return;
+        // Opening Clear is not a save, whether activated by mouse or keyboard.
+        if (event.target instanceof HTMLElement && event.target.closest('[aria-haspopup="dialog"][data-state="open"]')) return;
+        if (event.relatedTarget instanceof HTMLElement && event.relatedTarget.closest('[role="dialog"]')) return;
+        void onCommit();
+      },
+    } : {})}>
       <div className="flex items-center gap-1">
         <InputGroup className="w-28">
           <InputGroupAddon>$</InputGroupAddon>
-          <InputGroupInput aria-label={label} inputMode="decimal" placeholder="—" autoComplete="off" disabled={disabled} aria-invalid={Boolean(error)}
+          <InputGroupInput aria-label={label} inputMode="decimal" placeholder="—" autoComplete="off" disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={error || status ? feedbackId : undefined}
             className="text-right tabular-nums"
             {...(onChange ? { value, onChange: (event) => onChange(event.target.value) } : { defaultValue: value })} />
         </InputGroup>
         {children}
       </div>
-      {error ? <p role="alert" className="max-w-40 text-right text-xs text-destructive">{error}</p> : null}
+      {error ? <p id={feedbackId} role="alert" className="max-w-40 whitespace-normal text-right text-xs text-destructive">{error}</p>
+        : status ? <p id={feedbackId} role="status" className="max-w-40 whitespace-normal text-right text-xs text-muted-foreground">{status}</p> : null}
     </form>
   );
+}
+
+/** The same explicit Clear surface in the inventory and live grid. */
+export function PriceCellClear({ groupName, formatName, channelName, ...action }: {
+  groupName: string;
+  formatName: string;
+  channelName: string;
+} & Pick<ComponentProps<typeof ConfirmDeleteControl>, "busy" | "reason" | "error" | "onDelete">) {
+  return <ConfirmDeleteControl title="Clear price" triggerLabel="Clear" size="sm" busyLabel="Clearing…" {...action}
+    name={<>Clear the {groupName} · {formatName} price on <strong>{channelName}</strong>?</>}
+    warning="Every SKU of a brand on this group becomes unpriced in this format on this channel and cannot sell there until a price is saved again." />;
 }
 
 /** A pour column's cell on a group without that pour: opens Add pour with the name filled in. */
@@ -51,7 +77,9 @@ export function PriceGroupsView({
   model,
   createAction,
   renderGroup = (row) => E.link(row.name, "Price group"),
-  renderCell = (channel, row, col, value) => <PriceCellInput label={`${row.name} · ${model.formats[col]} on ${channel.name}`} value={value ?? ""} />,
+  renderCell = (channel, row, col, value) => <PriceCellInput label={`${row.name} · ${model.formats[col]} on ${channel.name}`} value={value ?? ""}>
+    {value !== null ? <PriceCellClear groupName={row.name} formatName={model.formats[col]!} channelName={channel.name} /> : null}
+  </PriceCellInput>,
   renderAddPour = (row, pour) => addPourTrigger(pour, row.name),
   backHref,
 }: {

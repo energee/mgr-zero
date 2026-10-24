@@ -14,6 +14,7 @@ export type ComplianceNavView = {
 };
 
 export type ComplianceMonthsViewModel = {
+  backHref?: string;
   /** The filing cadence tabs (Monthly, Quarterly, Annual) and the one shown. */
   cadences: string[];
   cadence: number;

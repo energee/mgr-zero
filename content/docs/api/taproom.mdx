@@ -286,7 +286,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, taproom
 
-All open intervals at one taproom, numbered first; frozen size, fill, safe SKU and brand labels, stock flag and opening actor ID/handle/time. No POS yield or remaining-volume estimate
+All open intervals at one taproom, numbered first; frozen size, fill, safe SKU and brand labels, stock flag and opening actor ID/name/time. Missing actor names read staff. No POS yield or remaining-volume estimate
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -303,7 +303,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, taproom
 
-The latest 50 closed intervals at one taproom with opening and closing actor IDs, safe handles, times, frozen nominal size, fill and reason
+The latest 50 closed intervals at one taproom with opening and closing actor IDs, names (staff when missing), times, frozen nominal size, fill and reason
 
 | Field | Type | Required |
 | --- | --- | --- |
