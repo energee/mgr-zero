@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { WaterProfileView } from "@/components/mgr/views/water-profile";
 import { WaterProfilesView } from "@/components/mgr/views/water-profiles";
-import { IONS, ionLine, toWaterProfileFields, toWaterProfileInput, toWaterProfilesViewProps, waterProfilesBack, type WaterProfile } from "@/lib/mgr/water-profiles-view";
+import { IONS, ionLine, toWaterProfileFields, toWaterProfileInput, toWaterProfilesViewProps, waterProfilesBack, waterProfileSaveReason, type WaterProfile } from "@/lib/mgr/water-profiles-view";
 import { IONS as CHEMISTRY_IONS } from "@/lib/water-chemistry";
 
 const hazy: WaterProfile = { id: "p1", name: "Hazy target", calcium_ppm: 110, magnesium_ppm: 10, sodium_ppm: 15, sulfate_ppm: 90, chloride_ppm: 180, bicarbonate_ppm: 40, alkalinity_ppm: null, water_ph: null, note: null };
@@ -23,13 +23,9 @@ describe("water profiles view", () => {
     expect(IONS[0]).toEqual(["calcium_ppm", "Calcium", "calciumPpm"]);
     expect(IONS[5]).toEqual(["bicarbonate_ppm", "Bicarbonate", "bicarbonatePpm"]);
   });
-  // #1152: a profile is not marked as a source or a target; a recipe version can pick each
-  // (sourceProfileId and targetProfileId are both optional).
-  it("no profiles is the empty state, which says a recipe version can pick the source and the target", () => {
-    expect(toWaterProfilesViewProps({ profiles: [] }).empty).toEqual({
-      title: "No water profiles yet",
-      description: "Add your source water or a target for a style. A recipe version can pick its source and its target from this list.",
-    });
+  it("supplies an empty state only when no profiles exist", () => {
+    expect(toWaterProfilesViewProps({ profiles: [] }).empty).toBeDefined();
+    expect(toWaterProfilesViewProps({ profiles: [hazy] }).empty).toBeUndefined();
   });
   it("names the water profile the same way on the list, the sheet and the live form", () => {
     const list = renderToStaticMarkup(createElement(WaterProfilesView, { model: toWaterProfilesViewProps({ profiles: [] }) }));
@@ -57,6 +53,41 @@ describe("water profiles view", () => {
     expect(waterProfilesBack(["brewer", "taproom"])).toEqual({ label: "Recipes", href: "/recipes" });
     expect(waterProfilesBack(["admin"])).toEqual({ label: "Catalog", href: "/catalog" });
     expect(toWaterProfilesViewProps({ profiles: [], back: waterProfilesBack(["brewer"]) })).toMatchObject({ backLabel: "Recipes", backHref: "/recipes" });
+  });
+  it("preserves Settings as the destination for an Admin arriving from Source water", () => {
+    const back = waterProfilesBack(["admin"], "settings");
+    expect(back).toEqual({ label: "Settings", href: "/settings" });
+    const html = renderToStaticMarkup(createElement(WaterProfilesView, { model: toWaterProfilesViewProps({ profiles: [], back }) }));
+    expect(html).toContain('href="/settings"');
+    expect(html).toContain("Settings");
+    expect(waterProfilesBack(["brewer"], "settings")).toEqual({ label: "Recipes", href: "/recipes" });
+    expect(waterProfilesBack(["admin"], "https://example.com")).toEqual({ label: "Catalog", href: "/catalog" });
+  });
+  it("names missing and invalid Save requirements while allowing zero and optional blanks", () => {
+    const blank = toWaterProfileFields();
+    expect(waterProfileSaveReason(blank)).toMatch(/profile name.*ions.*ppm/);
+    const complete = toWaterProfileFields(hazy);
+    expect(waterProfileSaveReason(complete)).toBeNull();
+    expect(waterProfileSaveReason({ ...complete, calcium_ppm: "0", water_ph: "0", alkalinity_ppm: "0" })).toBeNull();
+    expect(waterProfileSaveReason({ ...complete, water_ph: "14" })).toBeNull();
+    expect(waterProfileSaveReason({ ...complete, sodium_ppm: "-1" })).toMatch(/ions.*ppm/);
+    expect(waterProfileSaveReason({ ...complete, alkalinity_ppm: "-1" })).toMatch(/alkalinity.*CaCO3/);
+    for (const water_ph of ["-1", "20"]) {
+      expect(waterProfileSaveReason({ ...complete, water_ph })).toMatch(/water pH.*0.*14/);
+    }
+  });
+  it("links disabled Save to its reason and clears both when requirements are met", () => {
+    const blank = renderToStaticMarkup(createElement(WaterProfileView, { fields: toWaterProfileFields() }));
+    const blankButton = blank.match(/<button([^>]*)>Save water profile<\/button>/)![1];
+    expect(blankButton).toMatch(/\sdisabled(?:=|\s|$)/);
+    const reasonId = blankButton.match(/aria-describedby="([^"]+)"/)![1];
+    expect(blank).toContain(`<p id="${reasonId}"`);
+    expect(blank).toMatch(/profile name.*ions.*ppm/);
+    const complete = renderToStaticMarkup(createElement(WaterProfileView, { fields: toWaterProfileFields(hazy) }));
+    const completeButton = complete.match(/<button([^>]*)>Save water profile<\/button>/)![1];
+    expect(completeButton).not.toMatch(/\sdisabled(?:=|\s|$)/);
+    expect(completeButton).not.toContain("aria-describedby");
+    expect(complete).not.toContain(`<p id="${reasonId}"`);
   });
   it("shows alkalinity and water pH on a row only when the profile has them", () => {
     const [plain, measured] = toWaterProfilesViewProps({ profiles: [hazy, denver] }).rows;

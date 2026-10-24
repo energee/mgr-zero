@@ -7,16 +7,26 @@ import type { ReturnSource } from "@/lib/commands/orders";
 import "@/lib/commands/all";
 import { RefusedReturnForm } from "./return-form";
 import { navTitle } from "@/lib/mgr/nav";
+import { cache } from "react";
 
-export const metadata = { title: navTitle("/work/deliveries") };
+const getReturnData = cache(async function getReturnData(id: string) {
+  const brewery = await getActiveBrewery();
+  const ctx = await buildContext(brewery.id);
+  const stop = await orNotFound(runPageQuery("get_delivery_stop", { deliveryId: id }, ctx)) as { invoice: { id: string } | null };
+  return { ctx, stop };
+});
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await getReturnData(id);
+  return { title: navTitle("/work/deliveries") };
+}
 
 type Outstanding = { order_line_id: string; sku_id: string; sku_name: string; outstanding_qty: number; customer_name: string; invoice_timing: string };
 export default async function ReturnPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const brewery = await getActiveBrewery();
-  const ctx = await buildContext(brewery.id);
-  const [stop, lines, sources, locations, bins] = await Promise.all([
-    orNotFound(runPageQuery("get_delivery_stop", { deliveryId: id }, ctx)) as Promise<{ invoice: { id: string } | null }>,
+  const { ctx, stop } = await getReturnData(id);
+  const [lines, sources, locations, bins] = await Promise.all([
     runPageQuery("list_refused_returns", { deliveryId: id }, ctx) as Promise<Outstanding[]>,
     runPageQuery("get_invoice_return_sources", { deliveryId: id }, ctx) as Promise<ReturnSource[]>,
     runPageQuery("list_locations", {}, ctx) as Promise<{ id: string; name: string }[]>,

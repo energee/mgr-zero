@@ -31,7 +31,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord }: 
   const ready = canRecordBrewDay(value);
   const header = <>
     {E.back("Batches", model.title, undefined, model.backHref)}
-    {model.planned && E.fld("Planned", model.planned)}
+    {model.planned && E.fld(model.cancelled ? "Cancelled" : "Planned", model.planned)}
     {model.note && E.fld("Note", model.note)}
   </>;
   return <>

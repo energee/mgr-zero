@@ -32,7 +32,7 @@ describe("desktop rail", () => {
 
   it("heads More's sub-items with their areas (#1159)", () => {
     const html = shell(true);
-    for (const area of ["Sales", "Production", "Setup", "Integrations"]) expect.soft(html).toContain(`>${area}</li>`);
+    for (const area of ["Sales", "Production", "Setup", "Menu and chat"]) expect.soft(html).toContain(`>${area}</li>`);
   });
 
   it("wraps the label so the collapsed width can hide it", () => {

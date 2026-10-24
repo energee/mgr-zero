@@ -79,6 +79,27 @@ describe("Work filter tab accessibility (#727)", () => {
     expect(shown).toContain(workEmpty("all").description);
   });
 
+  it("offers the same authorized New order action in a truly empty All or Orders panel (#1129)", () => {
+    const createAction = createElement("a", { href: "/orders/new" }, "New order");
+    for (const chip of ["all", "orders"]) {
+      const { shown } = expectTabsToControlPanels(render(createElement(WorkView, { model: toWorkViewProps({ rows: [] }), chip, createAction })));
+      expect(shown).toContain('href="/orders/new"');
+    }
+    const { shown } = expectTabsToControlPanels(render(createElement(WorkView, { model: toWorkViewProps({ rows: [] }), createAction: null })));
+    expect(shown).not.toContain("New order");
+  });
+
+  it("does not suggest a new order for another kind or an empty filter over existing work (#1129)", () => {
+    const createAction = createElement("a", { href: "/orders/new" }, "New order");
+    for (const chip of ["transfers", "batches", "runs", "POs", "routes"]) {
+      const { shown } = expectTabsToControlPanels(render(createElement(WorkView, { model: toWorkViewProps({ rows: [] }), chip, createAction })));
+      expect(shown).not.toContain("New order");
+    }
+    const model = toWorkViewProps({ rows: [workWarehouse.rows[0]] });
+    const { shown } = expectTabsToControlPanels(render(createElement(WorkView, { model, chip: "batches", createAction })));
+    expect(shown).not.toContain("New order");
+  });
+
   it("points the Transfers and Packaging chips to their own pages, since list_work never lists them (#1129)", () => {
     const empty = (chip: string) => expectTabsToControlPanels(render(createElement(WorkView, { model: toWorkViewProps({ rows: [] }), chip }))).shown;
     expect(empty("transfers")).toContain("Stock transfers are listed on the Transfers page");
