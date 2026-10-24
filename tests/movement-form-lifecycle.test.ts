@@ -29,7 +29,7 @@ let url: URL;
 const navigate = (href: string) => {
   url = new URL(href, "http://mgr.test");
   vi.stubGlobal("location", url);
-  window.location = url;
+  Object.assign(window, { location: url });
 };
 const history = {
   replaceState: vi.fn((_state: unknown, _unused: string, href: string) => navigate(href)),
