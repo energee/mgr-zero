@@ -17,6 +17,7 @@ const pureTests = [
   "tests/screen-persona.test.ts",
   "tests/design-docs.test.ts",
   "tests/docs.test.ts",
+  "tests/shell-view.test.ts",
   "tests/register-cell-keys.test.ts",
   "tests/migrations-applied.test.ts",
   "tests/test-db-schema-guard.test.ts",
