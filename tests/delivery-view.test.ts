@@ -86,6 +86,7 @@ describe("Routes", () => {
     const links = [...html.matchAll(/<a\b[^>]*role="tab"[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/g)].map(([, href, text]) => [text, href]);
     expect(links).toEqual([
       ["All", "/work"], ["Orders", "/orders"], ["Transfers", "/transfers"], ["Packaging", "/packaging"], ["Purchase orders", "/purchase-orders"], ["Deliveries", "/routes"],
+      ["Pick", "/pick"], ["Replenishment", "/replenishment"],
     ]);
   });
 

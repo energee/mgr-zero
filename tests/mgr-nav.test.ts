@@ -140,7 +140,7 @@ describe("multi-role navigation", () => {
     expect(canOpen(roles, "/batches/new")).toBe(true);
     expect(canOpen(roles, "/customers/example")).toBe(true);
     expect(canOpen(roles, "/settings")).toBe(false);
-    expect(workHrefsFor(roles)).toEqual({ all: "/work", orders: "/orders", batches: "/batches", runs: "/packaging" });
+    expect(workHrefsFor(roles)).toEqual({ all: "/work", orders: "/orders", batches: "/batches", runs: "/packaging", replenishment: "/replenishment" });
     expect(navFor(STAFF_NAV, roles).some(item => item.href.startsWith("/portal"))).toBe(false);
     expect(PORTAL_NAV.map(item => item.href)).toEqual(["/portal", "/portal/orders", "/portal/invoices", "/portal/account"]);
   });

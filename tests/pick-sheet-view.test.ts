@@ -68,9 +68,9 @@ describe("Pick sheet view loop", () => {
     expect(model.groups[1]?.rows[0]?.title).toMatch(/^Al’s Bar ·/);
   });
 
-  it("renders Pick sheet, nav labels, and Totals from the adapter", () => {
+  it("renders the Pick heading, nav labels, and Totals from the adapter", () => {
     const markup = html();
-    expect(markup).toMatch(/Pick sheet/);
+    expect(markup).toMatch(/<h1[^>]*>Pick<\/h1>/);
     expect(markup).toMatch(/Ridgeline Tap Room · ORD-0231/);
     expect(markup).toMatch(/Al’s Bar · ORD-0232/);
     expect(markup).toMatch(/Teresa’s · ORD-0234/);

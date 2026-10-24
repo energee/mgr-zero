@@ -6,6 +6,8 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { startsGroup } from "@/lib/mgr/brand-lines";
 import type { PickSheetViewModel } from "@/lib/mgr/pick-sheet-view";
+import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
+import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 
 export type { PickSheetViewModel };
 
@@ -17,6 +19,7 @@ export function PickSheetView({
   filters,
   linkRows,
   backHref,
+  workHrefs,
 }: {
   model: PickSheetViewModel;
   printAction?: ReactNode;
@@ -25,10 +28,12 @@ export function PickSheetView({
   /** Live list: the whole row is the order link. Inventory leaves taps unlabeled. */
   linkRows?: boolean;
   backHref?: string;
+  workHrefs?: Record<string, string>;
 }) {
   return (
     <>
-      {E.back("Work", "Pick sheet", printAction, backHref)}
+      {E.back("Work", "Pick", printAction, backHref)}
+      <WorkKindTabs chips={WORK_CHIPS} current="pick" tabs={WORK_TABS} hrefs={workHrefs} />
       {filters !== undefined ? filters : E.chips(DATE_CHIPS, 1)}
       {model.empty
         ? E.blank(model.empty)
