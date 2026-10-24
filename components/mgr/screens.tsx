@@ -3158,10 +3158,10 @@ export const SCREENS: Screen[] = [
     spec: "Rows are rebuilt from owning MGR queries. App Home remains current during quiet hours and is optional for future providers.",
     body: (<>
       {S.h("Today · 4 waiting")}
-      {S.sa("*ORD-0231 · Order submitted*\nsubmitted · ships today · sales", "Open")}
-      {S.sa("*ORD-0235 · Pick due*\nships tomorrow · warehouse", "Open")}
-      {S.sa("*Route A · stop 3 · Next delivery stop*\nassigned to you · 9:30 AM", "Open")}
-      {S.sa("*FV2 · Fermentation reading overdue*\nlast reading 26 h ago · brewer", "Open")}
+      {S.sa("*ORD-0231 · Order submitted*\nSubmitted · Ships today · Sales", "Open")}
+      {S.sa("*ORD-0235 · Pick due*\nShips tomorrow · Warehouse", "Open")}
+      {S.sa("*Route A · stop 3 · Next delivery stop*\nAssigned to you · 9:30 AM", "Open")}
+      {S.sa("*FV2 · Fermentation reading overdue*\nLast reading 26 h ago · Brewer", "Open")}
       {S.acts([["Open Today in MGR", "pri"]])}
     </>),
   },
@@ -3175,8 +3175,8 @@ export const SCREENS: Screen[] = [
     spec: "The provider message is a projection. Deleting it does not change MGR. Deep links contain no trusted actor or tenant claims.",
     body: (<>
       {S.h("ORD-0235")}
-      {S.s("*Pick due*\nassigned to you")}
-      {S.ctx("Pick due · needs attention")}
+      {S.s("*Pick due*\nAssigned to you")}
+      {S.ctx("Pick due · Needs attention")}
       {S.acts([["Open pick in MGR", "pri"], ["Snooze"], ["Mute picks"]])}
     </>),
   },
@@ -3190,7 +3190,7 @@ export const SCREENS: Screen[] = [
     spec: "The destination must stay private, bot-member and non-external. Counts and safe operational labels only; details remain personal.",
     body: (<>
       {S.h("Morning operations · 6 waiting")}
-      {S.s("*Submitted orders:* 2 · need sales review\n*Picks due:* 2 · warehouse queue\n*Assigned deliveries:* 1 · next stops ready\n*Fermentation readings:* 1 · overdue")}
+      {S.s("*Submitted orders:* 2 · Need sales review\n*Picks due:* 2 · Warehouse queue\n*Assigned deliveries:* 1 · Next stops ready\n*Fermentation readings:* 1 · Overdue")}
       {S.ctx("Details and actions are available in each person’s private MGR App Home.")}
       {S.acts([["Open my MGR work", "pri"]])}
     </>),
@@ -3208,7 +3208,7 @@ export const SCREENS: Screen[] = [
       {S.toggle(NOTIFICATION_REASON_LABEL.pick_due)}
       {S.toggle(NOTIFICATION_REASON_LABEL.delivery_next)}
       {S.toggle(NOTIFICATION_REASON_LABEL.fermentation_reading_overdue)}
-      {S.select("Quiet hours", "9:00 PM–6:00 AM")}
+      {S.select("Sample quiet hours", "9:00 PM–6:00 AM")}
       {S.ctx("Snooze and mute affect personal delivery only. MGR still shows the work as due.")}
     </>),
   },
