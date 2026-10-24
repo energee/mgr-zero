@@ -75,16 +75,32 @@ describe("set new password", () => {
     expect(auth.updateUser).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { field: "currentPassword", value: "" },
+    { field: "password", value: "short" },
+    { field: "confirmPassword", value: "a typo" },
+  ])("retains the local exit when $field is invalid", async ({ field, value }) => {
+    await expect(savePassword(changeForm({ [field]: value, next: "/orders" }))).rejects.toThrow(`redirect:/password?error=${field}&next=%2Forders`);
+    expect(verifyCurrentPassword).not.toHaveBeenCalled();
+    expect(auth.updateUser).not.toHaveBeenCalled();
+  });
+
   it("rejects wrong current password and never changes the account", async () => {
     verifyCurrentPassword.mockResolvedValue("invalid_credentials");
-    await expect(savePassword(changeForm({ email: "attacker@example.com" }))).rejects.toThrow(new Error("redirect:/password?error=wrong_current"));
+    await expect(savePassword(changeForm({ email: "attacker@example.com", next: "/orders" }))).rejects.toThrow(new Error("redirect:/password?error=wrong_current&next=%2Forders"));
     expect(verifyCurrentPassword).toHaveBeenCalledWith("owner@example.com", "old-password", "owner");
     expect(auth.updateUser).not.toHaveBeenCalled();
     expect(auth.signOut).not.toHaveBeenCalled();
   });
 
+  it("retains the local exit when current-password verification fails", async () => {
+    verifyCurrentPassword.mockResolvedValue("unexpected_failure");
+    await expect(savePassword(changeForm({ next: "/orders" }))).rejects.toThrow("redirect:/password?error=reauth_failed&next=%2Forders");
+    expect(auth.updateUser).not.toHaveBeenCalled();
+  });
+
   it("saves with current password then revokes only other sessions", async () => {
-    await expect(savePassword(changeForm())).rejects.toThrow(new Error("redirect:/"));
+    await expect(savePassword(changeForm({ next: "/orders" }))).rejects.toThrow(new Error("redirect:/"));
     expect(auth.updateUser).toHaveBeenCalledWith({ password: "new-password", current_password: "old-password" });
     expect(auth.signOut).toHaveBeenCalledWith({ scope: "others" });
     expect(auth.updateUser.mock.invocationCallOrder[0]).toBeLessThan(auth.signOut.mock.invocationCallOrder[0]);
@@ -98,7 +114,7 @@ describe("set new password", () => {
 
   it("accepts Auth-verified recovery without an old password and ends the recovery session", async () => {
     auth.getClaims.mockResolvedValue({ data: { claims: { sub: "owner", amr: [{ method: "recovery", timestamp: Math.floor(Date.now() / 1000) }] } }, error: null });
-    await expect(savePassword(changeForm({ currentPassword: "" }))).rejects.toThrow(new Error("redirect:/login"));
+    await expect(savePassword(changeForm({ currentPassword: "", next: "/orders" }))).rejects.toThrow(new Error("redirect:/login"));
     expect(verifyCurrentPassword).not.toHaveBeenCalled();
     expect(auth.updateUser).toHaveBeenCalledWith({ password: "new-password" });
     expect(auth.signOut.mock.calls).toEqual([[{ scope: "others" }], [{ scope: "local" }]]);
@@ -106,15 +122,23 @@ describe("set new password", () => {
 
   it("reports a saved password separately when session revocation fails", async () => {
     auth.signOut.mockResolvedValue({ error: { code: "unexpected_failure" } });
-    await expect(savePassword(changeForm())).rejects.toThrow(new Error("redirect:/password?saved=1&error=revoke_failed"));
+    await expect(savePassword(changeForm({ next: "/orders" }))).rejects.toThrow(new Error("redirect:/password?saved=1&error=revoke_failed&next=%2Forders"));
     expect(auth.updateUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains the saved outcome and local exit when the recovery session cannot end", async () => {
+    auth.getClaims.mockResolvedValue({ data: { claims: { sub: "owner", amr: [{ method: "recovery", timestamp: Math.floor(Date.now() / 1000) }] } }, error: null });
+    auth.signOut.mockResolvedValueOnce({ error: null }).mockResolvedValueOnce({ error: { code: "unexpected_failure" } });
+    await expect(savePassword(changeForm({ currentPassword: "", next: "/orders" }))).rejects.toThrow("redirect:/password?saved=1&error=signout_failed&next=%2Forders");
+    expect(auth.updateUser).toHaveBeenCalledTimes(1);
+    expect(cookieStore.set).toHaveBeenCalledWith(PASSWORD_SAVED_COOKIE, "1", expect.objectContaining({ httpOnly: true }));
   });
 
   it("sends a buyer's recovery back to the portal sign-in", async () => {
     memberships.staff = [];
     memberships.customer = [{}];
     auth.getClaims.mockResolvedValue({ data: { claims: { sub: "owner", amr: [{ method: "recovery", timestamp: Math.floor(Date.now() / 1000) }] } }, error: null });
-    await expect(savePassword(changeForm({ currentPassword: "" }))).rejects.toThrow(new Error("redirect:/portal/login"));
+    await expect(savePassword(changeForm({ currentPassword: "", next: "/orders" }))).rejects.toThrow(new Error("redirect:/portal/login"));
   });
 
   it("keeps a buyer's saved outcome on the portal and marks it as really saved", async () => {
@@ -127,7 +151,17 @@ describe("set new password", () => {
 
   it("does not ask an account without an email for a current password", async () => {
     auth.getUser.mockResolvedValue({ data: { user: { id: "owner", email: undefined } }, error: null });
-    await expect(savePassword(changeForm())).rejects.toThrow(new Error("redirect:/password?error=reauth_failed"));
+    await expect(savePassword(changeForm({ next: "/orders" }))).rejects.toThrow(new Error("redirect:/password?error=reauth_failed&next=%2Forders"));
     expect(auth.updateUser).not.toHaveBeenCalled();
+  });
+
+  it("preserves the local exit after a refused password (#1250)", async () => {
+    auth.updateUser.mockResolvedValue({ error: { code: "same_password" } });
+    await expect(savePassword(changeForm({ next: "/orders" }))).rejects.toThrow("redirect:/password?error=same_password&next=%2Forders");
+  });
+
+  it.each(["https://attacker.example", "//attacker.example", "/password"])("does not preserve unsafe or looping next %s", async (next) => {
+    auth.updateUser.mockResolvedValue({ error: { code: "same_password" } });
+    await expect(savePassword(changeForm({ next }))).rejects.toThrow("redirect:/password?error=same_password&next=%2F");
   });
 });
