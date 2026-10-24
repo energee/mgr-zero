@@ -140,7 +140,7 @@ describe("multi-role navigation", () => {
     expect(canOpen(roles, "/batches/new")).toBe(true);
     expect(canOpen(roles, "/customers/example")).toBe(true);
     expect(canOpen(roles, "/settings")).toBe(false);
-    expect(workHrefsFor(roles)).toEqual({ all: "/work", orders: "/orders", batches: "/batches", runs: "/packaging" });
+    expect(workHrefsFor(roles)).toEqual({ all: "/work", orders: "/orders", batches: "/batches", runs: "/packaging", replenishment: "/replenishment" });
     expect(navFor(STAFF_NAV, roles).some(item => item.href.startsWith("/portal"))).toBe(false);
     expect(PORTAL_NAV.map(item => item.href)).toEqual(["/portal", "/portal/orders", "/portal/invoices", "/portal/account"]);
   });
@@ -170,19 +170,19 @@ describe("navGroups (#1159)", () => {
     for (const c of STAFF_NAV.find(t => t.label === "More")!.children!) expect.soft(c.group, c.label).toBeDefined();
   });
 
-  it("draws admin's More under Sales, Production, Setup and Integrations", () => {
+  it("draws admin's More under Sales, Production, Setup and Menu and chat", () => {
     expect(drawn(moreFor(["admin"]))).toEqual([
       ["Sales", ["Invoices", "Catalog", "Customers", "Price groups", "Compliance"]],
       ["Production", ["Recipes", "Vendors", "Planning"]],
       ["Setup", ["Import", "Settings", "Sale channels", "Locations", "Units"]],
-      ["Integrations", ["Menu", "Chat"]],
+      ["Menu and chat", ["Menu", "Chat"]],
     ]);
   });
 
   it("drops an area the role has no entry under", () => {
-    expect(drawn(moreFor(["taproom"]))).toEqual([["Setup", ["Units"]], ["Integrations", ["Chat"]]]);
-    expect(drawn(moreFor(["brewer"]))).toEqual([["Production", ["Recipes", "Vendors", "Planning"]], ["Setup", ["Units"]], ["Integrations", ["Chat"]]]);
-    expect(drawn(moreFor(["warehouse"]))).toEqual([["Production", ["Vendors", "Planning"]], ["Setup", ["Units"]], ["Integrations", ["Menu", "Chat"]]]);
+    expect(drawn(moreFor(["taproom"]))).toEqual([["Setup", ["Units"]], ["Menu and chat", ["Chat"]]]);
+    expect(drawn(moreFor(["brewer"]))).toEqual([["Production", ["Recipes", "Vendors", "Planning"]], ["Setup", ["Units"]], ["Menu and chat", ["Chat"]]]);
+    expect(drawn(moreFor(["warehouse"]))).toEqual([["Production", ["Vendors", "Planning"]], ["Setup", ["Units"]], ["Menu and chat", ["Menu", "Chat"]]]);
   });
 
   it("keeps a tab's ungrouped children together under no heading", () => {
