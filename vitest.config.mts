@@ -21,6 +21,8 @@ const pureTests = [
   "tests/catalog-sku-redirects.test.ts",
   "tests/brand-sells-view.test.ts",
   "tests/catalog-view.test.ts",
+  "tests/pour-sku-catalog.test.ts",
+  "tests/app-screen-parity.test.ts",
   "tests/register-cell-keys.test.ts",
   "tests/migrations-applied.test.ts",
   "tests/test-db-schema-guard.test.ts",

@@ -199,9 +199,8 @@ export function canOpen(roles: readonly StaffRole[], path: string): boolean {
  * `metadata = { title: navTitle("<its route>") }`; a record page passes its
  * static parent, so /orders/[id] reads "Orders" (#1230). The root layout's
  * template appends " · MGR". Throws for a path no STAFF_NAV entry covers, so
- * a page outside the nav fails at build. tests/page-titles.test.ts catches a
- * page that passes a route other than its own static route, such as a moved
- * page.
+ * a page outside the nav fails at build. tests/mgr-nav.test.ts exercises
+ * title selection and rejects uncovered routes.
  */
 export function navTitle(path: string): string {
   const entry = coveringEntry(path);

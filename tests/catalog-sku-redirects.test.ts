@@ -1,9 +1,8 @@
-import { expect, it, vi } from "vitest";
+import { expect, it } from "vitest";
+import config from "@/next.config";
 
-vi.mock("next/navigation", () => ({ redirect: (href: string) => { throw new Error(`redirect:${href}`); } }));
-import CatalogSkusPage from "@/app/(app)/catalog/skus/page";
-import NewCatalogSkuPage from "@/app/(app)/catalog/skus/new/page";
-
-it.each([CatalogSkusPage, NewCatalogSkuPage])("redirects named SKU URLs to the brand-first Catalog flow", page => {
-  expect(page).toThrow("redirect:/catalog");
+it.each(["/catalog/skus", "/catalog/skus/new"])("redirects %s to the brand-first Catalog flow", async source => {
+  expect(await config.redirects!()).toContainEqual({
+    source, destination: "/catalog", permanent: false,
+  });
 });
