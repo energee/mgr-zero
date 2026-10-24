@@ -56,6 +56,8 @@ describe("chat preview fixtures", () => {
   });
 
   it("names the sample preferences reasons as Slack's preferences dialog does", () => {
+    const personalLabels = Object.entries(NOTIFICATION_REASON_LABEL).filter(([reason]) => reason !== "operations_digest").map(([, label]) => label);
+    expect(CHAT_PREVIEW_FIXTURES.find(({ id }) => id === "preferences")!.fields.slice(0, -1).map(({ label }) => label)).toEqual(personalLabels);
     const preferences = CHAT_PREVIEW_FIXTURES.find(({ id }) => id === "preferences")!;
     const reasons = preferences.fields.map(({ label }) => label).filter((label) => label !== "Quiet hours");
     expect(reasons.length).toBeGreaterThan(0);
@@ -112,6 +114,19 @@ describe("chat preview fixtures", () => {
 });
 
 describe("chat preview web renderer", () => {
+  it("makes every sample action visibly disabled instead of accepting no-op clicks", () => {
+    for (const fixture of CHAT_PREVIEW_FIXTURES) {
+      const html = renderToStaticMarkup(createElement(ChatPreview, { fixture }));
+      const buttons = html.match(/<button\b[^>]*data-preview-action[^>]*>[\s\S]*?<\/button>/g) ?? [];
+      const expectedActions = fixture.actions.length + fixture.items.reduce((total, item) => total + item.actions.length, 0) + Number(Boolean(fixture.gated));
+      expect(buttons, fixture.id).toHaveLength(expectedActions);
+      for (const button of buttons) {
+        expect(button, fixture.id).toMatch(/\bdisabled=""/);
+        expect(button, fixture.id).toContain("Preview");
+      }
+    }
+  });
+
   it("isolates headings and radio groups when settings frames appear together", () => {
     const fixture = CHAT_PREVIEW_FIXTURES[0];
     const html = renderToStaticMarkup(createElement("div", null, ...[1, 2].map(key => createElement("div", { key }, createElement(ChatPreview, { fixture }), createElement(ChatPreviewPicker, { selected: "app-home", onSelect: () => {} })))));

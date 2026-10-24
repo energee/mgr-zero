@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import type { ChatHealth, ChatLinkIntent, ChatPreferences, ChatLinkedPerson } from "@/lib/commands/chat";
+import type { ChatSettingSave } from "@/lib/mgr/chat-save-feedback";
 import { ChatConnectionView, ChatDisableView, ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatSettingsFieldsView, ChatDeliveryView, ChatPersonalPreferencesView } from "@/components/mgr/views/chat";
 
 export function ChatConnectionAction({ installationId, configured }: { installationId?: string; configured: boolean }) {
@@ -21,23 +22,25 @@ export function ChatSettingsControls({ installation, readingDueHours, timezone, 
   const [hours, setHours] = useState(String(readingDueHours));
   const [start, setStart] = useState(installation.quietStart?.slice(0, 5) ?? "");
   const [end, setEnd] = useState(installation.quietEnd?.slice(0, 5) ?? "");
-  return <ChatSettingsFieldsView installation={installation} timezone={timezone} hours={hours} start={start} end={end} channels={channels} channel={channel} configured={configured} busy={action.busy} error={action.error}
+  const [saved, setSaved] = useState<ChatSettingSave | null>(null);
+  return <ChatSettingsFieldsView installation={installation} timezone={timezone} hours={hours} start={start} end={end} channels={channels} channel={channel} configured={configured} busy={action.busy} saved={action.succeeded === saved?.name ? saved : null} error={action.error}
     onLoadChannels={() => void action.run("list_chat_channels", { installationId: installation.id }, data => { setChannels(data as { id: string; name: string }[]); setChannel(""); }, { durable: false })}
-    onChannel={setChannel} onSaveChannel={() => void action.run("set_notification_destination", { installationId: installation.id, externalDestinationId: channel })}
+    onChannel={setChannel} onSaveChannel={() => void action.run("set_notification_destination", { installationId: installation.id, externalDestinationId: channel }, () => setSaved({ name: "set_notification_destination", channel }))}
     onQuietChange={(start, end) => { setStart(start); setEnd(end); }}
-    onSaveQuiet={(start, end) => void action.run("set_brewery_quiet_hours", { installationId: installation.id, start: start || null, end: end || null })}
-    onHours={setHours} onSaveHours={() => void action.run("set_brewery_operating_defaults", { readingDueHours: Number(hours) })}
+    onSaveQuiet={(start, end) => void action.run("set_brewery_quiet_hours", { installationId: installation.id, start: start || null, end: end || null }, () => setSaved({ name: "set_brewery_quiet_hours", start, end }))}
+    onHours={setHours} onSaveHours={() => void action.run("set_brewery_operating_defaults", { readingDueHours: Number(hours) }, () => setSaved({ name: "set_brewery_operating_defaults", hours }))}
     delivery={null}
   />;
 }
 
 export function ChatPersonalPreferences({ preferences, canSetQuietHours = true, back, backHref }: { preferences: ChatPreferences; canSetQuietHours?: boolean; back: string; backHref: string }) {
   const action = useCommandAction();
-  return <ChatPersonalPreferencesView preferences={preferences} canSetQuietHours={canSetQuietHours} back={back} backHref={backHref} busy={action.busy} error={action.error}
+  const [savedQuiet, setSavedQuiet] = useState<ChatSettingSave | null>(null);
+  return <ChatPersonalPreferencesView preferences={preferences} canSetQuietHours={canSetQuietHours} back={back} backHref={backHref} busy={action.busy} saved={action.succeeded === "set_notification_preference" || action.succeeded === "set_notification_destination"} savedQuiet={action.succeeded === savedQuiet?.name ? savedQuiet : null} error={action.error}
     onUnlink={() => { if (preferences.link) void action.run("unlink_chat_user", { linkId: preferences.link.id }, undefined, { target: preferences.link.id }); }}
     onPreference={(reason, enabled) => void action.run("set_notification_preference", { reason, enabled }, undefined, { target: reason })}
     onDestination={(reason, personalDestinationId) => void action.run("set_notification_destination", { reason, personalDestinationId }, undefined, { target: reason })}
-    onSaveQuiet={(start, end, timezone) => void action.run("set_personal_quiet_hours", { start: start || null, end: end || null, timezone })}
+    onSaveQuiet={(start, end, timezone) => void action.run("set_personal_quiet_hours", { start: start || null, end: end || null, timezone }, () => setSavedQuiet({ name: "set_personal_quiet_hours", start, end, timezone }))}
   />;
 }
 

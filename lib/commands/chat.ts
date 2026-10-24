@@ -6,6 +6,7 @@ import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, STAFF_ROLES, CommandError, type StaffRole } from "./registry";
 import { sha256 } from "@/lib/hash";
 import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
+import { PERSONAL_NOTIFICATION_REASONS } from "@/lib/chat/contracts";
 
 const REASONS = ["submitted_order", "pick_due", "restock_due", "delivery_next", "fermentation_reading_overdue", "invoice_question", "operations_digest"] as const;
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM");
@@ -131,9 +132,6 @@ defineQuery({ name: "get_chat_link_intent", description: "Preview both identitie
   input: z.object({ proof: z.string().min(1).max(256) }), roles: STAFF_ROLES,
   handler: (ctx, i) => unwrap(ctx.db.rpc("get_chat_link_intent", { p_brewery: ctx.breweryId, p_proof_hash: sha256(i.proof) })) as Promise<ChatLinkIntent | null>,
 });
-// Personal delivery never sends operations_digest (chat_fanout_deliveries), so
-// it has no personal switch; it goes only to the operations channel.
-const PERSONAL_REASONS = REASONS.filter((reason) => reason !== "operations_digest");
 defineQuery({ name: "get_notification_preferences", description: "Read your own reason preferences, personal quiet hours and Slack link, plus whether the brewery's Slack is active and its quiet hours",
   input: z.object({}), roles: STAFF_ROLES,
   handler: async (ctx): Promise<ChatPreferences> => {
@@ -147,7 +145,7 @@ defineQuery({ name: "get_notification_preferences", description: "Read your own 
     const quiet = preferences?.find((p) => p.quiet_hours_start !== null);
     if (!brewery?.timezone) throw new CommandError("staff membership brewery is unavailable");
     const timezone = quiet?.quiet_hours_timezone ?? brewery.timezone;
-    return { preferences: PERSONAL_REASONS.map((reason) => {
+    return { preferences: PERSONAL_NOTIFICATION_REASONS.map((reason) => {
       const saved = preferences?.find(p => p.reason === reason);
       return { reason, enabled: saved?.enabled ?? true,
         ...(saved?.personal_destination_id ? { personalDestinationId: saved.personal_destination_id } : {}) };

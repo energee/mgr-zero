@@ -1182,6 +1182,8 @@ Changing your gravity unit only changes how gravity is shown and typed. Your rea
 
 Open **Units** from the **More** navigation. Gravity is the only unit you choose there. **Brewery default** (Admin only) is what everyone here sees unless they choose otherwise. **Your preference** is yours: choose **Plato (°P)**, **Specific gravity (SG)**, or **Use brewery default** to go back to following the brewery. **Preview** shows one reading converted into the unit you see, such as *A reading of 12.5 °P shows as 1.050 SG.* The choice applies wherever MGR shows or asks for a gravity: the fermentation reading form and log, and the predicted OG and FG on a recipe.
 
+Unit choices save immediately. **Saving…** changes to **Saved** only after MGR confirms the save. A failed or uncertain request shows its error instead of a success confirmation.
+
 In specific gravity you may type either spelling: `1.050` or `1050`. A dry finished beer can read below water: an FG of `0.998` is kept as is (about -0.5 °P), and in Plato you may type a negative figure such as `-0.5`.
 
 ## Link your Slack account [#slack]
@@ -1191,6 +1193,10 @@ In specific gravity you may type either spelling: `1.050` or `1050`. A dry finis
 <Screen name="Link your Slack" />
 
 Every staff member can open **More → Chat** to set personal notification reasons, even before linking Slack. Each personal reason (**Order submitted**, **Pick due**, **Restock due**, **Next delivery stop**, **Fermentation reading overdue**, **Invoice question**) has its own switch, named as in Slack's preferences dialog and in the title of each Slack reminder. Those choices remain available after unlinking. For each reason, you can select one of your existing verified, active personal destinations; leaving the default keeps the existing delivery behavior. Every staff member sees the brewery quiet hours, or **Off** when none are set; clearing both personal times follows them. Admin, Sales, Warehouse, and Brewer can also change personal quiet hours and snooze eligible reminders; Taproom cannot. An admin also manages the brewery connection, its private operations channel, brewery quiet hours, reading cadence, linked people, and health from Chat.
+
+Personal reminder switches save immediately; quiet hours save when you choose **Save my quiet hours**. The page announces **Saved** only after a successful save. While a request is pending it shows **Saving…**; failed or uncertain requests keep their error and saved-request recovery.
+
+Each confirmation belongs to the setting you saved. Editing its draft hides **Saved** until the values match that successful save again; saving a reminder switch never saves a quiet-hours draft.
 
 To connect or reauthorize a workspace, finish while signed in as the same MGR administrator who started the connection. That person must still be an administrator. If another administrator takes over, they must start a new connection attempt from Chat settings rather than finish the earlier link.
 
@@ -1203,6 +1209,8 @@ Linked eligible staff receive private Slack messages when assigned work first be
 The brewery digest goes only to one admin-approved private, non-shared Slack channel where MGR is already a member. Public, archived, and Slack Connect channels cannot be selected. It runs on the brewery's local morning and midday windows; the default fermentation reading cadence is 24 hours. Personal mutes, snoozes, and quiet hours affect Slack delivery only, not Today or the shared digest.
 
 In Chat settings, **Load private channels**, choose a channel, then **Save operations channel**. Adjust the brewery quiet-hours range or open **Exact times** for minute-precise entry; clear both times to turn quiet hours off, then save. Reading cadence accepts 1–168 hours. **Connection permissions** shows required and granted scopes. The four preview tabs show App Home, Personal DM, Team digest, and Preferences. Each is labelled **Sample data**: the orders and stops in it are made up, and a preview never sends a Slack message. The sample Preferences dialog's **Save preferences** is disabled; change your own reasons under **My notification preferences**. If Slack is not available for your brewery yet, **Connect Slack** is disabled; ask MGR support to turn it on. Turning **Slack delivery** off disables the integration; use reauthorization to enable delivery again.
+
+All sample action buttons are disabled and marked **Preview**. Sample preferences use the same six personal reminder names as your real preferences; their quiet hours are sample values, not your brewery’s settings.
 
 Slack is a view of current MGR work. Operational forms such as fermentation readings and order confirmation show **Open in MGR** and do not submit the domain change from Slack. MGR rechecks the current item, assignment, role, and channel before sending or updating a message.
 
