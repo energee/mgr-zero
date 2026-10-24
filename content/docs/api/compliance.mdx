@@ -91,6 +91,41 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "generate_compliance_report", "input": { "jurisdiction": "CA", "periodStart": "2026-01-31", "periodEnd": "2026-01-31" } }'
 ```
 
+## get_cola_details [#get_cola_details]
+
+`query` · admin, sales
+
+Retrieve an approved COLA's label image identifiers from TTB; refused unless its principal permit matches the brewery's TTB registry number; images render through get_cola_image
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `ttbId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_cola_details", "input": { "ttbId": "25318001000034" } }'
+```
+
+## get_cola_image [#get_cola_image]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+Render one official approved COLA label as a bounded image data URL using a fresh TTB session; admin/sales may preview brewery-owned labels, other staff may view only an approved image saved on a brand
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `ttbId` | string | yes |
+| `url` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_cola_image", "input": { "ttbId": "25318001000034", "url": "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Array.jpg&filetype=l" } }'
+```
+
 ## get_compliance_registry [#get_compliance_registry]
 
 `query` · admin, sales
@@ -248,7 +283,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Record or edit one brand's COLA or formula approval: ttbId is a COLA's TTB-assigned ID or a formula's number, and serialNumber is a COLA's own applicant serial (a formula takes none); the same kind and ttbId on the same brand is one record; an edit keeps a field left out and clears one sent as null
+Record or edit one brand's COLA or formula approval: ttbId is a COLA's TTB-assigned ID or a formula's number, and serialNumber is a COLA's own applicant serial (a formula takes none); imageUrl selects an official TTB label attachment and requires an approved COLA date; the same kind and ttbId on the same brand is one record; an edit keeps a field left out and clears one sent as null; changing kind or TTB ID clears an omitted image
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -260,6 +295,7 @@ Record or edit one brand's COLA or formula approval: ttbId is a COLA's TTB-assig
 | `approvedOn` | date (YYYY-MM-DD) or null | no |
 | `expiresOn` | date (YYYY-MM-DD) or null | no |
 | `note` | string or null | no |
+| `imageUrl` | string or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

@@ -345,7 +345,7 @@ defineQuery({
     category: z.string().trim().optional(),
   }), roles: STAFF_ROLES,
   handler: async (ctx, i) => {
-    let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source, batch_share), colas:brand_approvals(ttb_id, approved_on)")
+    let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source, batch_share), colas:brand_approvals(id, ttb_id, approved_on, image_url)")
       .eq("brewery_id", ctx.breweryId).eq("colas.kind", "cola");
     if (i.q) {
       // An unanchored imatch is a case-insensitive contains. A PostgREST or() value is double-quoted,
