@@ -14,10 +14,11 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { ScopePick, type ScopeOption } from "@/components/mgr/scope-pick";
 import { tapLabel, fillLabel, OPENING_FILLS, CLOSING_FILLS, tapSheetNeeds, tapSheetReason, openTapBoardSheet, editTapBoardSheet, type TapBoardState, type TapBoardSheet, type TapSheetFields, type TapInterval } from "@/lib/mgr/tap-board-state";
+import { TAP_NUMBER_MAX_DIGITS } from "@/lib/tap-number";
 
 export type TapSku = { id: string; name: string; nominalBbl: number };
 const volume = (value: number) => bblExact(value, 4);
-const actor = (label: string | null) => label ? `@${label}` : "staff";
+const actor = (label: string | null) => label || "staff";
 // "opened full" / "opened 60%": the Opening fill chip's own word (#1192).
 const opened = (tap: TapInterval) => `opened ${fillLabel(OPENING_FILLS, tap.opening_fill).toLowerCase()}`;
 
@@ -38,14 +39,13 @@ const kegSkuEmptyState = (skusHref: string | null | undefined): PickEmpty => sku
 export function TapKegView({ sheet: controlledSheet, skus, skusHref, timeZone, onEdit, closedFact, onReload }: { sheet: TapBoardSheet; skus: TapSku[]; skusHref?: string | null; timeZone: string; onEdit?: (fields: Partial<TapSheetFields>) => void; closedFact?: string | null; onReload?: () => void }) {
   const idPrefix = useId();
   const [internalSheet, setInternalSheet] = useState(controlledSheet);
-  // A guest field's error waits until the user leaves it (#1121). The BBL
-  // stepper's −/+ never focus the input, so that path relies on the submit reason.
-  const [blurred, setBlurred] = useState<{ guestLabel?: true; guestNominalBbl?: true }>({});
+  // Field errors wait until the user leaves the field.
+  const [blurred, setBlurred] = useState<{ guestLabel?: true; guestNominalBbl?: true; tapNumber?: true }>({});
   const sheet = onEdit ? controlledSheet : internalSheet;
   const locked = sheet.attempt.kind === "submitting" || sheet.attempt.kind === "unknown";
   const edit = (patch: Partial<TapSheetFields>) => { if (!locked) { if (onEdit) onEdit(patch); else setInternalSheet(current => ({ ...current, fields: { ...current.fields, ...patch } })); } };
   const needs = tapSheetNeeds(sheet);
-  const guestError = (field: "guestLabel" | "guestNominalBbl") => blurred[field] && needs[field] ? `Enter ${needs[field]}.` : undefined;
+  const fieldError = (field: "guestLabel" | "guestNominalBbl" | "tapNumber") => blurred[field] && needs[field] ? `Enter ${needs[field]}.` : undefined;
   // E.submit and IrreversibleSubmit show "Saving" themselves from submit.submitting.
   const label = sheet.attempt.kind === "unknown" ? "Retry unchanged" : VERBS[sheet.kind];
   const submit = { submitting: sheet.attempt.kind === "submitting", reason: tapSheetReason(sheet) };
@@ -67,22 +67,22 @@ export function TapKegView({ sheet: controlledSheet, skus, skusHref, timeZone, o
         {sheet.fields.identity !== "guest" && E.pick("Packaged keg SKU", sheet.fields.identity === "same" ? sheet.interval?.sku_id ?? "" : sheet.fields.skuId, skuOptions, { id: `${idPrefix}-sku`, placeholder: "Choose a keg", empty: kegSkuEmptyState(skusHref), onChange: (nextValue: string) => edit({ identity: "own", skuId: nextValue }), required: true })}
         {E.pick("Identity", String(sheet.fields.identity), [...(sheet.kind === "swap" ? [{ value: "same", label: "Same own SKU", disabled: !sheet.interval?.sku_id }] : []), { value: "own", label: "Own keg" }, { value: "guest", label: "Guest keg" }], { id: `${idPrefix}-identity`, onChange: (nextValue: string) => edit({ identity: nextValue as TapSheetFields["identity"] }) })}
         {sheet.fields.identity === "guest" && <>
-          {E.edit("Guest keg label", sheet.fields.guestLabel, "text", undefined, { id: `${idPrefix}-guest-label`, onChange: (nextValue: string) => edit({ guestLabel: nextValue }), onBlur: () => setBlurred(current => ({ ...current, guestLabel: true })), error: guestError("guestLabel"), required: true, maxLength: 200 })}
-          {E.edit("Guest nominal BBL", sheet.fields.guestNominalBbl, "number", undefined, { id: `${idPrefix}-guest-bbl`, onChange: (nextValue: string) => edit({ guestNominalBbl: nextValue }), onBlur: () => setBlurred(current => ({ ...current, guestNominalBbl: true })), error: guestError("guestNominalBbl"), required: true, min: "0", step: "any" })}
+          {E.edit("Guest keg label", sheet.fields.guestLabel, "text", undefined, { id: `${idPrefix}-guest-label`, onChange: (nextValue: string) => edit({ guestLabel: nextValue }), onBlur: () => setBlurred(current => ({ ...current, guestLabel: true })), error: fieldError("guestLabel"), required: true, maxLength: 200 })}
+          {E.edit("Guest nominal bbl", sheet.fields.guestNominalBbl, "number", undefined, { id: `${idPrefix}-guest-bbl`, onChange: (nextValue: string) => edit({ guestNominalBbl: nextValue }), onBlur: () => setBlurred(current => ({ ...current, guestNominalBbl: true })), error: fieldError("guestNominalBbl"), required: true, min: "0", step: "any" })}
         </>}
         <div className="flex min-w-0 flex-col gap-2">
-          {E.edit("Tap number · optional", sheet.fields.tapNumber, "text", undefined, { id: `${idPrefix}-tap-number`, onChange: (nextValue: string) => edit({ tapNumber: nextValue }), maxLength: 80, "aria-describedby": `${idPrefix}-tap-number-help` })}
+          {E.edit("Tap number · optional", sheet.fields.tapNumber, "text", undefined, { id: `${idPrefix}-tap-number`, inputMode: "numeric", onChange: (nextValue: string) => edit({ tapNumber: nextValue }), onBlur: () => setBlurred(current => ({ ...current, tapNumber: true })), error: fieldError("tapNumber"), maxLength: TAP_NUMBER_MAX_DIGITS, "aria-describedby": `${idPrefix}-tap-number-help` })}
           <FieldDescription id={`${idPrefix}-tap-number-help`}>Two kegs can share a number. A keg with no number sorts last.</FieldDescription>
         </div>
         {E.ttl("Opening fill")}
         {fillChips("Opening fill", OPENING_FILLS, sheet.fields.openingFill, openingFill => edit({ openingFill }))}
       </>}
     </fieldset>
-    {E.info(`Remaining is a rough observation. ${sheet.kind === "swap" ? "The atomic swap" : "This action"} does not change finished-goods inventory.`)}
+    {E.info("Remaining is a rough observation. This action does not change finished-goods inventory.")}
     {sheet.attempt.kind === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The request and fields are frozen; retry unchanged to recover the original result.</CommandFormMessage>}
     {sheet.attempt.kind === "error" && <CommandFormMessage error={sheet.attempt.message} />}
     <CommandFormFooter>{sheet.kind === "swap" ? <IrreversibleSubmit label={label} {...submit} /> : E.submit(label, { ...submit, variant: sheet.kind === "kick" ? "destructive" : "default" })}</CommandFormFooter>
-    {sheet.kind === "swap" && E.note("The swap is one record. A half-finished swap is not a state this can reach.")}
+    {sheet.kind === "swap" && E.note("Swap closes this keg and opens its replacement together. If either change cannot be saved, neither is saved.")}
   </>;
 }
 
@@ -101,7 +101,7 @@ export function TapBoardView({ state: controlledState, skus, timeZone, navigatio
   const open = onOpen ?? ((kind: "tap" | "kick" | "swap", interval: TapInterval | null) => setInternalState(current => openTapBoardSheet(current.snapshot, kind, interval, navigation.location, skus[0]?.id)));
   const edit = onEdit ?? ((fields: Partial<TapSheetFields>) => setInternalState(current => editTapBoardSheet(current, fields)));
   const sheet = state.sheet;
-  const recent = recentEvents ?? [...state.snapshot.open].sort((a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime()).slice(0, 2).map(tap => ({ title: `Recent · ${tapLabel(tap)} tapped`, detail: `${actor(tap.opened_by_label)} · ${formatDateTime(tap.opened_at, timeZone)}` }));
+  const recent = recentEvents ?? [...state.snapshot.open].sort((a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime()).slice(0, 2).map(tap => ({ title: `${tapLabel(tap)} tapped`, detail: `${actor(tap.opened_by_label)} · ${formatDateTime(tap.opened_at, timeZone)}` }));
   const closed = sheet?.interval && state.snapshot.history.find(tap => tap.id === sheet.interval?.id);
   const locked = sheet?.attempt.kind === "submitting" || sheet?.attempt.kind === "unknown";
   const actions = (tap: TapInterval) => <div className="mt-2 flex flex-wrap gap-1"><Button type="button" size="sm" variant="outline" onClick={() => open("swap", tap)}>Swap</Button><Button type="button" size="sm" variant="destructive" onClick={() => open("kick", tap)}>Kick</Button></div>;
@@ -119,9 +119,9 @@ export function TapBoardView({ state: controlledState, skus, timeZone, navigatio
       {E.tiles(state.snapshot.open.filter(tap => tap.sku_id).map(tap => [tap.tap_number ?? "unnumbered", tapLabel(tap), <>{volume(tap.nominal_bbl)} · on <time dateTime={tap.opened_at} title={formatDateTime(tap.opened_at, timeZone)}>{formatWeekday(tap.opened_at, timeZone)}</time> · {actor(tap.opened_by_label)} · {opened(tap)}{tap.not_in_inventory ? " · not in taproom stock · excluded from variance" : ""}</>, tap.not_in_inventory ? 1 : 0, undefined, undefined, actions(tap)]))}
       {state.snapshot.open.filter(tap => !tap.sku_id).map(tap => <div key={tap.id}>{E.row(`${tap.tap_number ?? "unnumbered"} · ${tapLabel(tap)} · keg`, `nominal ${volume(tap.nominal_bbl)} · on ${formatDateTime(tap.opened_at, timeZone)} by ${actor(tap.opened_by_label)} · ${opened(tap)}${tap.not_in_inventory ? " · not in taproom stock · excluded from variance" : ""} · no guest yield`, actions(tap), "w")}</div>)}
     </>}
-    {E.info("Unnumbered kegs sort last.")}
-    {recent.map((event, index) => <div key={index}>{E.row(event.title, event.detail)}</div>)}
+    {state.snapshot.open.some(tap => tap.tap_number === null) && E.info("Unnumbered kegs sort last.")}
     {E.ttl("Recent history")}
-    {state.snapshot.history.length === 0 ? E.blank("No closed kegs yet.") : state.snapshot.history.map(tap => <div key={tap.id}>{E.row(`Tap ${tap.tap_number ?? "unnumbered"} · ${tapLabel(tap)}`, `${tap.close_reason} · ${fillLabel(CLOSING_FILLS, tap.closing_fill)} · closed ${formatDateTime(tap.closed_at, timeZone)} by ${actor(tap.closed_by_label)}`)}</div>)}
+    {recent.length > 0 && <ul aria-label="Recently tapped kegs">{recent.map((event, index) => <li key={index}>{E.row(event.title, event.detail)}</li>)}</ul>}
+    {state.snapshot.history.length === 0 ? E.polite("No closed kegs yet.") : <ul aria-label="Closed kegs">{state.snapshot.history.map(tap => <li key={tap.id}>{E.row(`Tap ${tap.tap_number ?? "unnumbered"} · ${tapLabel(tap)}`, `${tap.close_reason} · ${fillLabel(CLOSING_FILLS, tap.closing_fill)} · closed ${formatDateTime(tap.closed_at, timeZone)} by ${actor(tap.closed_by_label)}`)}</li>)}</ul>}
   </>;
 }

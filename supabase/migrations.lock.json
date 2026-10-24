@@ -181,5 +181,6 @@
   "20261023170000_sale_channel_delete_rules.sql": "1c3aab5433a8123b9b6a0c0f9ff1baa91ef2180259ffc4a8ed42b57d3ce484be",
   "20261023190000_water_profile_notes_alkalinity_ph.sql": "5e741030f0cadd0339046987c3aba008a91e91615fc2eba3565f84c053027714",
   "20261023200000_pending_invitations.sql": "373661f978753020b8e9d05f1259ecb2e53b618e2ffe93b5c52306e1c7e53ee1",
-  "20261023210000_staff_chat_installation.sql": "919d08ab3e3a9d5fa77abd8f384223dbbad30a2ae288ffd303ad0cd1b50b3404"
+  "20261023210000_staff_chat_installation.sql": "919d08ab3e3a9d5fa77abd8f384223dbbad30a2ae288ffd303ad0cd1b50b3404",
+  "20261024042745_tap_number_and_actor_labels.sql": "e24189f3dad3f4285965f56e39b551e416a9fb03580bc7a8512b2936a4e98ed9"
 }
