@@ -58,7 +58,7 @@ export function OrderForm({
   // A cold channel read is not an empty list; retain inputs but block submission until it resolves.
   const skuOptionsReady = channel === undefined || priced.data !== undefined;
   const availableSkuIds = skuOptions.map(sku => sku.id);
-  const skuFeedback = channel === undefined ? undefined : <QueryFeedback timeZone={timeZone}
+  const skuFeedback = channel === undefined ? undefined : <QueryFeedback timeZone={timeZone} showCheckedAt={false}
     error={priced.error} loading={!priced.data ? "Loading customer-priced SKUs" : undefined}
     paused={priced.isPaused} fetching={priced.isFetching} updatedAt={priced.dataUpdatedAt}
     retry={() => void priced.refetch()} />;
@@ -134,7 +134,7 @@ export function OrderForm({
           {readiness.hint} {readiness.goTo.map(part => typeof part === "string" ? part : <Link key={part.href} href={part.href} className="underline">{part.label}</Link>)}
         </p>}
         <CommandFormMessage error={form.error} />
-      </>} submitting={form.submitting} reason={readiness.reason} />
+      </>} submitting={form.submitting} disabled={!skuOptionsReady || !readiness.submittable} reason={readiness.hint ? null : readiness.reason} />
     </form>
   );
 }

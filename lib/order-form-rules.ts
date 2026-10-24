@@ -85,7 +85,7 @@ export function orderFormReadiness(i: OrderFormReadinessInput): OrderFormReadine
   if (i.kind === "wholesale") {
     if (!i.customerId) needs.push("a customer");
     else if (!i.shipToId) needs.push("a ship-to");
-  } else if (!i.toLocationId) needs.push("a To location");
+  } else if (!i.toLocationId) needs.push("a destination location");
   if (!i.fromLocationId) needs.push("a source location");
   if (!i.lines.some(isCompleteLine) || orderLineErrors(i.lines).length > 0) needs.push("a SKU with a quantity above zero on each line");
   const availableSkuIds = i.availableSkuIds;
