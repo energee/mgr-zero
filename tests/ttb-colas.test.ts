@@ -3,6 +3,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
+  getColaDetails,
+  getColaImage,
+  isColaImageUrl,
+  parseColaDetails,
+  parseColaImages,
   matchColas,
   parseColaPage,
   searchColasByPermit,
@@ -125,5 +130,133 @@ describe("searchColasByPermit", () => {
     await expect(
       searchColasByPermit("BR-PA-20553", async () => ({ status: 500, setCookie: [], body: "" })),
     ).rejects.toThrow(/500/);
+  });
+});
+
+const ttbId = "23023001000185";
+const imageUrl = "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Array.jpg&filetype=l";
+function detail(status = "APPROVED", permit = "BR-PA-20553"): string {
+  return `<table><tr><td><strong>TTB ID: </strong><a href="#"><img alt="help"></a>${ttbId}</td></tr>
+    <tr><td><strong>Status: </strong>&nbsp;${status}</td></tr>
+    <tr><td><strong>Approval Date:</strong>&nbsp;01/24/2023</td></tr></table>
+    <table><tr><td><strong>Plant Registry/Basic Permit/Brewers No (Principal Place of Business): </strong></td></tr>
+    <tr><td> </td></tr><tr><td>${permit}</td></tr><tr><td>Applicant</td></tr></table>`;
+}
+const printable = `<div class="label">TTB ID</div><div class="data">${ttbId}</div>
+  <img src="/colasonline/publicViewAttachment.do?filename=Array.jpg&filetype=l" alt="Label Image: Brand (front) or keg collar">`;
+
+describe("COLA detail parsing", () => {
+  it("reads the actual detail fields, including the principal permit, not other permits", () => {
+    expect(parseColaDetails(detail(), ttbId)).toEqual({
+      ttbId, permit: "BR-PA-20553", status: "APPROVED", approvedOn: "2023-01-24", images: [],
+    });
+  });
+
+  it("preserves revoked and unapproved status without offering images", () => {
+    for (const status of ["REVOKED", "SURRENDERED", "PENDING", "DISAPPROVED"]) {
+      expect(parseColaDetails(detail(status), ttbId)).toMatchObject({ status, images: [] });
+    }
+  });
+
+  it("rejects missing fields, a different record, and upstream errors", () => {
+    expect(() => parseColaDetails("<html>Error</html>", ttbId)).toThrow(/TTB ID/);
+    expect(() => parseColaDetails(detail(), "99999999999999")).toThrow(/TTB ID/);
+    expect(() => parseColaDetails(detail().replace("BR-PA-20553", ""), ttbId)).toThrow(/permit/i);
+  });
+
+  it("does not substitute applicant text or another permit when the principal permit cell is blank", () => {
+    const otherPermit = `<tr><td><strong>Plant Registry/Basic Permit/Brewers No (Other): </strong></td></tr>
+      <tr><td>BR-PA-99999</td></tr>`;
+    const missingPrincipal = detail("APPROVED", " &nbsp; ").replace(
+      "<tr><td>Applicant</td></tr>", `<tr><td>Applicant</td></tr>${otherPermit}`,
+    );
+    expect(() => parseColaDetails(missingPrincipal, ttbId)).toThrow(/principal permit/i);
+  });
+
+  it("normalizes official filenames, decodes labels, and excludes unsafe links and site furniture", () => {
+    const extra = `<img src="https://evil.test/label.jpg" alt="Label Image: evil">
+      <img src="/colasonline/publicViewAttachment.do?filename=..%2Fsecret.jpg&filetype=l" alt="Label Image: traversal">
+      <img src="/colasonline/publicViewAttachment.do?filename=evil.jpg&filetype=x" alt="Label Image: wrong type">
+      <img src="images/logo.gif" alt="TTB logo">
+      <img src="/colasonline/publicViewAttachment.do?filename=Dom1 Final.jpg&amp;filetype=l" alt="Label Image: Back &amp; side">`;
+    expect(parseColaImages(printable + extra, ttbId)).toEqual([
+      { url: imageUrl, label: "Brand (front) or keg collar" },
+      { url: "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Dom1%20Final.jpg&filetype=l", label: "Back & side" },
+    ]);
+    expect(() => parseColaImages(printable, "99999999999999")).toThrow(/TTB ID/);
+  });
+
+  it("only accepts constrained official attachment identifiers", () => {
+    expect(isColaImageUrl(imageUrl)).toBe(true);
+    for (const unsafe of [
+      imageUrl.replace("ttbonline.gov", "ttbonline.gov.evil.test"),
+      imageUrl.replace("https:", "http:"),
+      imageUrl.replace("Array.jpg", "..%2fArray.jpg"),
+      imageUrl.replace("Array.jpg", "%5cArray.jpg"),
+      imageUrl + "&url=https://evil.test",
+      imageUrl.replace("Array.jpg", "bad%zz.jpg"),
+    ]) expect(isColaImageUrl(unsafe), unsafe).toBe(false);
+  });
+});
+
+describe("COLA detail retrieval", () => {
+  it("opens the verified official print page with the detail session and discovers images", async () => {
+    const request = vi.fn(async (_url: string, init: { cookie?: string }) => ({
+      status: 200, setCookie: ["JSESSIONID=detail; Path=/colasonline"],
+      body: init.cookie ? printable : detail(),
+    }));
+    expect(await getColaDetails(ttbId, request)).toMatchObject({ permit: "BR-PA-20553", status: "APPROVED", images: [{ url: imageUrl, label: "Brand (front) or keg collar" }] });
+    expect(request.mock.calls[1][0]).toBe(`https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&ttbid=${ttbId}`);
+    expect(request.mock.calls[1][1].cookie).toBe("JSESSIONID=detail");
+  });
+
+  it("never fetches printable images for revoked or unapproved records", async () => {
+    for (const status of ["REVOKED", "DISAPPROVED", "PENDING"]) {
+      const request = vi.fn(async () => ({ status: 200, setCookie: [], body: detail(status) }));
+      expect(await getColaDetails(ttbId, request)).toMatchObject({ status, images: [] });
+      expect(request).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("rejects invalid IDs and upstream failures explicitly", async () => {
+    const request = vi.fn(async () => ({ status: 503, setCookie: [], body: "" }));
+    await expect(getColaDetails("../elsewhere", request)).rejects.toThrow(/TTB ID/);
+    expect(request).not.toHaveBeenCalled();
+    await expect(getColaDetails(ttbId, request)).rejects.toThrow(/503/);
+  });
+
+  it("fetches image bytes only after fresh approval, permit, and page-membership checks", async () => {
+    const request = vi.fn(async (url: string) => {
+      if (url === imageUrl) return {
+        status: 200, setCookie: [], body: "", image: { bytes: Buffer.from([0xff, 0xd8, 0xff, 0xd9]), contentType: "image/jpeg" },
+      };
+      return { status: 200, setCookie: ["JSESSIONID=fresh"], body: url.includes("publicFormDisplay") ? printable : detail() };
+    });
+    expect(await getColaImage(ttbId, imageUrl, "BR-PA-20553", request)).toEqual({ dataUrl: "data:image/jpeg;base64,/9j/2Q==" });
+    await expect(getColaImage(ttbId, imageUrl, "BR-PA-OTHER", request)).rejects.toThrow(/permit/i);
+    const nonmember = imageUrl.replace("Array.jpg", "Other.jpg");
+    await expect(getColaImage(ttbId, nonmember, "BR-PA-20553", request)).rejects.toThrow(/not.*label/i);
+    expect(request.mock.calls.some(([url]) => url === nonmember)).toBe(false);
+  });
+
+  it("rejects HTML masquerading as an image", async () => {
+    await expect(getColaImage(ttbId, imageUrl, "BR-PA-20553", async (url) => ({
+      status: 200, setCookie: [], body: url === imageUrl ? "<html>TTB error</html>" : url.includes("publicFormDisplay") ? printable : detail(),
+    }))).rejects.toThrow(/image/i);
+  });
+
+  it("rejects oversized bytes, unsupported MIME types, and mismatched image signatures", async () => {
+    const images = [
+      { bytes: Buffer.alloc(8 * 1024 * 1024 + 1), contentType: "image/jpeg" },
+      { bytes: Buffer.from("<svg></svg>"), contentType: "image/svg+xml" },
+      { bytes: Buffer.from("<html>error</html>"), contentType: "image/jpeg" },
+      { bytes: Buffer.from([0xff, 0xd8, 0xff]), contentType: "text/html" },
+    ];
+    for (const image of images) {
+      await expect(getColaImage(ttbId, imageUrl, "BR-PA-20553", async (url) => ({
+        status: 200, setCookie: [], body: url.includes("publicFormDisplay") ? printable : detail(),
+        ...(url === imageUrl ? { image } : {}),
+      }))).rejects.toThrow(/image/i);
+    }
   });
 });

@@ -2,13 +2,14 @@
 
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useCommandContext } from "@/lib/brewery-provider";
-import { ComposerDrawerView } from "@/components/mgr/views/composer-drawer";
+import { ComposerPanelView } from "@/components/mgr/views/composer-panel";
 import { OfflineOutboxView } from "@/components/mgr/views/composer";
 import { ComposerLoadBoundary, ComposerUnavailableView } from "@/components/mgr/composer-load-boundary";
 import { Button } from "@/components/ui/button";
 import { command } from "@/lib/commands/client";
 import { discardOutbox, dismissOutboxQuarantine, flushOutbox, outboxDiscardConfirmation, outboxQuarantineNotice, readOutbox, sendOutboxAttempt, visibleOutbox, type OutboxAttempt } from "@/lib/composer/outbox";
 import type { StaffRole } from "@/lib/commands/registry";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const ComposerConversation = lazy(() => import("@/components/mgr/composer-conversation"));
 
@@ -18,6 +19,7 @@ export const isComposerShortcut = (event: { key?: string; metaKey?: boolean; ctr
 export function Composer({ roles }: { roles: readonly StaffRole[] }) {
   const expectedContext = useCommandContext();
   const breweryId = expectedContext.breweryId ?? "";
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [hasOpened, setHasOpened] = useState(false);
   const [focusRequest, setFocusRequest] = useState(0);
@@ -28,7 +30,10 @@ export function Composer({ roles }: { roles: readonly StaffRole[] }) {
   const [outboxNotice, setOutboxNotice] = useState<string | null>(null);
 
   function changeOpen(nextOpen: boolean) {
-    if (nextOpen) setHasOpened(true);
+    if (nextOpen) {
+      setHasOpened(true);
+      if (!isMobile) setFocusRequest((request) => request + 1);
+    }
     setOpen(nextOpen);
   }
 
@@ -74,12 +79,12 @@ export function Composer({ roles }: { roles: readonly StaffRole[] }) {
 
   const outbox = outboxOpen && <><OfflineOutboxView notice={outboxNotice ?? undefined} onDismissNotice={() => { try { dismissOutboxQuarantine(localStorage); } finally { setOutboxNotice(null); } }} rows={outboxEntries.map((entry) => ({ id: entry.id, label: entry.label, status: entry.lastError ?? entry.state, retryable: entry.state === "queued" || entry.state === "uncertain" }))} busy={outboxBusy} onRetry={(id) => void retryOutbox(id)} onRetryAll={() => void retryOutbox()} onDiscard={(id) => discardEntries([id])} onDiscardAll={() => discardEntries(outboxEntries.map((entry) => entry.id))} /><Button type="button" variant="ghost" className="self-start" onClick={() => setOutboxOpen(false)}>Close outbox</Button></>;
 
-  return <ComposerDrawerView open={open} onOpenChange={changeOpen}>
-    {/* Keep a started conversation mounted when minimized: drafts and streams survive. */}
+  return <ComposerPanelView open={open} onOpenChange={changeOpen}>
+    {/* Keep a started conversation mounted when closed: drafts and streams survive. */}
     {hasOpened && <ComposerLoadBoundary fallback={<ComposerUnavailableView failed outboxCount={outboxEntries.length} onOutbox={() => setOutboxOpen(true)}>{outbox}</ComposerUnavailableView>}>
       <Suspense fallback={<ComposerUnavailableView outboxCount={outboxEntries.length} onOutbox={() => setOutboxOpen(true)}>{outbox}</ComposerUnavailableView>}>
         <ComposerConversation open={open} onOpenChange={changeOpen} focusRequest={focusRequest} outboxCount={outboxEntries.length} onOutbox={() => setOutboxOpen(true)}>{outbox}</ComposerConversation>
       </Suspense>
     </ComposerLoadBoundary>}
-  </ComposerDrawerView>;
+  </ComposerPanelView>;
 }

@@ -134,7 +134,7 @@ it("returns every open interval beyond 1000 and bounded closed history without p
   expect(await runCommand("list_tap_history", { locationId:f.location.id }, f.ctx)).toHaveLength(50);
   const stale = await f.ctx.db.rpc("kick_keg", close(f, rows[0].id));
   expect(stale.error).toMatchObject({ code: "MG409" });
-  expect(stale.error?.message).toMatch(/already closed.*@.* at /i);
+  expect(stale.error?.message).toMatch(/already closed by staff at /i);
   expect(stale.error?.message).not.toContain(f.ctx.userId);
   expect((await runCommand("list_open_taps", { locationId: f.location.id }, f.ctx) as unknown[])).toHaveLength(1002);
 });
@@ -215,4 +215,80 @@ it("tenant foreign keys reject foreign locations and SKUs even through fixture i
   const row={brewery_id:f.brewery.id,location_id:f.location.id,sku_id:f.cat.skuId,nominal_bbl:.5,opening_fill:1,not_in_inventory:true,opened_by:f.ctx.userId};
   for(const change of [{location_id:other.location.id},{sku_id:other.cat.skuId}])
     expect((await admin.from("tap_intervals").insert({...row,...change})).error?.code).toBe("23503");
+});
+
+it("rejects invalid new tap numbers at the RPC boundary without partial swap or request effects", async () => {
+  const f = await fixture(), outgoing = await open(f);
+  assert(outgoing !== null);
+  const before = state(f), effects = fingerprint(f);
+  for (const tapNumber of ["abc", "-3", "1.5", "1e2", "0", "000", " ", "+3", "9007199254740992", "99999999999999999999", "9".repeat(81)]) {
+    const tapped = await f.ctx.db.rpc("tap_keg", { ...input(f), p_tap_number: tapNumber });
+    expect(tapped.error?.code).toBe("P0001");
+    const swapped = await f.ctx.db.rpc("swap_keg", { ...swap(f, outgoing.id), p_tap_number: tapNumber });
+    expect(swapped.error?.code).toBe("P0001");
+    await expect(runCommand("tap_keg", { locationId: f.location.id, keg: { skuId: f.cat.skuId }, openingFill: 1, tapNumber }, f.ctx)).rejects.toMatchObject({ status: 400 });
+    await expect(runCommand("swap_keg", { openIntervalId: outgoing.id, closeFill: 0, reason: "Empty", incomingOpeningFill: 1, tapNumber }, f.ctx)).rejects.toMatchObject({ status: 400 });
+    expect(state(f)).toEqual(before);
+    expect(fingerprint(f)).toEqual(effects);
+    expect((await admin.from("tap_intervals").select("closed_at").eq("id", outgoing.id).single()).data?.closed_at).toBeNull();
+  }
+  for (const tapNumber of [null, "1", "1", "003", "9007199254740991", "0".repeat(79) + "1"]) {
+    const tapped = await f.ctx.db.rpc("tap_keg", { ...input(f), p_tap_number: tapNumber });
+    expect(tapped.error).toBeNull();
+    expect(tapped.data).toMatchObject({ tap_number: tapNumber });
+  }
+});
+
+it("keeps historical invalid tap labels readable, kickable, and command replays recoverable", async () => {
+  const f = await fixture(), request = input(f);
+  const legacy = sql(`begin;
+    set local session_replication_role = replica;
+    set local request.jwt.claim.sub = '${f.ctx.userId}';
+    select public.tap_keg('${request.p_brewery}','${request.p_location}','${request.p_sku}',null,null,'abc',1,'${request.p_request_id}')->>'id';
+    commit;`, true)[0];
+  expect((await f.ctx.db.rpc("tap_keg", { ...request, p_tap_number: "abc" })).data).toMatchObject({ id: legacy, tap_number: "abc" });
+  await expect(runCommand("tap_keg", { locationId: f.location.id, keg: { skuId: f.cat.skuId }, openingFill: 1, tapNumber: "abc" }, f.ctx,
+    { requestId: request.p_request_id, correlationId: crypto.randomUUID(), origin: "ui" })).resolves.toMatchObject({ id: legacy, tap_number: "abc" });
+  expect(await runCommand("list_open_taps", { locationId: f.location.id }, f.ctx)).toEqual(expect.arrayContaining([expect.objectContaining({ id: legacy, tap_number: "abc" })]));
+  expect((await f.ctx.db.rpc("kick_keg", close(f, legacy))).error).toBeNull();
+  expect(await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx)).toEqual(expect.arrayContaining([expect.objectContaining({ id: legacy, tap_number: "abc" })]));
+});
+
+it("replays a committed legacy swap through the command boundary without applying it twice", async () => {
+  const f = await fixture(), outgoing = await open(f), requestId = crypto.randomUUID();
+  assert(outgoing !== null);
+  sql(`begin;
+    set local session_replication_role = replica;
+    set local request.jwt.claim.sub = '${f.ctx.userId}';
+    select public.swap_keg('${f.brewery.id}','${outgoing.id}',0,'Empty',null,null,null,'abc',1,'${requestId}');
+    commit;`, true);
+  const original = await f.ctx.db.rpc("swap_keg", { ...swap(f, outgoing.id), p_tap_number: "abc", p_request_id: requestId });
+  expect(original.error).toBeNull();
+  const before = state(f), effects = fingerprint(f);
+  const commandInput = { openIntervalId: outgoing.id, closeFill: 0, reason: "Empty", incomingOpeningFill: 1, tapNumber: "abc" };
+  const execution = { requestId, correlationId: crypto.randomUUID(), origin: "ui" as const };
+  await expect(runCommand("swap_keg", commandInput, f.ctx, execution)).resolves.toEqual(original.data);
+  expect(state(f)).toEqual(before);
+  expect(fingerprint(f)).toEqual(effects);
+  const sales = await makeStaffCtx(f.brewery.id, "sales");
+  await expect(runCommand("swap_keg", commandInput, sales, execution)).rejects.toMatchObject({ status: 403 });
+  const other = await fixture();
+  await expect(runCommand("swap_keg", commandInput, other.ctx, execution)).rejects.toMatchObject({ status: 400 });
+  expect(state(f)).toEqual(before);
+});
+
+it("returns saved actor names or staff, never invented email handles or private profile fields", async () => {
+  const f = await fixture();
+  expect((await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: "  Dana Brewer  " } })).error).toBeNull();
+  const opened = await open(f);
+  assert(opened !== null);
+  expect(await runCommand("list_open_taps", { locationId: f.location.id }, f.ctx)).toEqual(expect.arrayContaining([expect.objectContaining({ opened_by_label: "Dana Brewer" })]));
+  expect((await f.ctx.db.rpc("kick_keg", close(f, opened.id))).error).toBeNull();
+  const history = await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx);
+  expect(history).toEqual(expect.arrayContaining([expect.objectContaining({ opened_by_label: "Dana Brewer", closed_by_label: "Dana Brewer" })]));
+  expect(JSON.stringify(history)).not.toMatch(/email|password|metadata|@test.local/);
+  const conflict = await f.ctx.db.rpc("kick_keg", close(f, opened.id));
+  expect(conflict.error?.message).toContain("already closed by Dana Brewer at");
+  expect((await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: " " } })).error).toBeNull();
+  expect(await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx)).toEqual(expect.arrayContaining([expect.objectContaining({ opened_by_label: "staff", closed_by_label: "staff" })]));
 });

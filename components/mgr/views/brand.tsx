@@ -3,7 +3,7 @@
 // through `controls`, bound to upsert_brand). Two columns from 48rem, stacked
 // below, as on Customer: the left is the form Save brand commits (identity,
 // selling, sell sheet); the right is what saves on its own (Sells as,
-// compliance sheets). Sells as is one switch per packaged format (on means the
+// compliance sheets and saved COLA labels). Sells as is one switch per packaged format (on means the
 // brand sells it: an active SKU), then the packages inside the switched-on
 // ones and the price group's pours, each with its prices; pours and prices
 // are edited on the price group, which the section links to. The header
@@ -57,6 +57,7 @@ export function BrandView({
   linkRows,
   pricingHref,
   actions = {},
+  images,
   addCompliance,
   categoryAction,
   onSellsAs,
@@ -78,6 +79,8 @@ export function BrandView({
   pricingHref?: string;
   /** Live: per-row Edit sheets keyed by compliance row; null suppresses the drawn verb. */
   actions?: Record<string, ReactNode>;
+  /** Live: resolved label images keyed by their approval row. */
+  images?: Record<string, ReactNode>;
   /** Live: the Add approval / Add registration sheets; null hides them. */
   addCompliance?: ReactNode;
   categoryAction?: ReactNode;
@@ -164,7 +167,10 @@ export function BrandView({
               {!model.sells.unpriced && linkRows !== false && E.nav("Edit on price group", "", "", undefined, linkRows ? model.sells.priceGroupHref : undefined)}
               {E.ttl("Compliance", "compliance")}
               {model.compliance.map((row) => (
-                <div key={row.key}>{E.row(row.title, row.detail, rowAction(row, actions), row.warning ? "w" : "")}</div>
+                <div key={row.key}>
+                  {E.row(row.title, row.detail, rowAction(row, actions), row.warning ? "w" : "")}
+                  {row.image && images?.[row.key] && <div className="py-2">{images[row.key]}</div>}
+                </div>
               ))}
               {addCompliance !== undefined ? addCompliance : E.btns([["Add approval", "g"], ["Add registration", "g"]])}
             </>

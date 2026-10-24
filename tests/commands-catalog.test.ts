@@ -136,7 +136,7 @@ describe("list_brands COLA facts", () => {
     await runCommand("upsert_brand_approval", { brandId: foreign.id, kind: "cola", ttbId: "99999999999999" }, other);
     for (const ctx of [brewer, own]) {
       const rows = await runCommand("list_brands", {}, ctx) as { id: string; colas: { ttb_id: string; approved_on: string | null }[] }[];
-      expect(rows.map((b) => [b.id, b.colas])).toEqual([[brand.id, [{ ttb_id: "00123456789012", approved_on: "2026-10-02" }]]]);
+      expect(rows.map((b) => [b.id, b.colas.map(({ ttb_id, approved_on }) => ({ ttb_id, approved_on }))])).toEqual([[brand.id, [{ ttb_id: "00123456789012", approved_on: "2026-10-02" }]]]);
     }
   });
 });

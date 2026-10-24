@@ -4,7 +4,7 @@ import type { CommandContextExpectation } from "./registry";
 
 export type QueryScope = CommandContextExpectation & { roles?: readonly string[] };
 // Only registered reads belong here. Never cache/retry a mutation as a query.
-type CachedQuery = "list_orders" | "list_customers" | "list_locations" | "list_skus" | "get_packaging_material_plan";
+type CachedQuery = "list_orders" | "list_customers" | "list_locations" | "list_skus" | "get_packaging_material_plan" | "get_cola_image";
 
 export function createQueryClient() {
   return new QueryClient({ defaultOptions: { queries: {
@@ -17,14 +17,15 @@ export function createQueryClient() {
 export function commandQueryOptions<T = unknown>(scope: QueryScope, name: CachedQuery, input: unknown) {
   const { roles, ...expectedContext } = scope;
   const refreshInterval = name === "list_orders" ? 5_000 : 30_000;
+  const labelImage = name === "get_cola_image";
   return queryOptions({
     queryKey: ["command", expectedContext, roles ? roles.toSorted().join(",") : null, name, input] as const,
     queryFn: ({ signal }) => command(scope.breweryId ?? "", name, input, undefined, expectedContext, undefined, signal) as Promise<T>,
-    staleTime: refreshInterval,
-    refetchInterval: refreshInterval,
+    staleTime: labelImage ? 5 * 60_000 : refreshInterval,
+    refetchInterval: labelImage ? false : refreshInterval,
     refetchIntervalInBackground: false,
-    refetchOnWindowFocus: "always",
-    refetchOnReconnect: "always",
+    refetchOnWindowFocus: labelImage ? false : "always",
+    refetchOnReconnect: labelImage ? false : "always",
   });
 }
 
