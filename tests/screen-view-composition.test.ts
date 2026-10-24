@@ -177,6 +177,14 @@ describe("screen/live component parity", () => {
     expect(bypasses).toEqual(KNOWN_VIEW_DEBT);
   });
 
+  it("shares the complete replenishment page instead of repeating single-SKU Pars screens", () => {
+    const screen = SCREENS.find(candidate => candidate.name === "Pars and allocation")!;
+    expect([...inventoryViews(screen.body)]).toEqual(["ReplenishmentView"]);
+    const mounted = mountedComponents(routes.get(screen.name)!);
+    expect(mounted).toContain("ReplenishmentView");
+    expect(mounted).not.toContain("ParsView");
+  });
+
   it("keeps mapped inventory screens out of inline E.* bodies", () => {
     const inline = mapped
       .filter((screen) => inventoryViews(screen.body).size === 0)

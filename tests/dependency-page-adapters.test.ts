@@ -42,7 +42,6 @@ import { NewOrderClient } from "@/app/(app)/orders/new/new-order-client";
 import NewOrderPage from "@/app/(app)/orders/new/page";
 import ReplenishmentPage from "@/app/(app)/replenishment/page";
 import ShopPage from "@/app/(portal)/portal/page";
-import { ScopePick } from "@/components/mgr/scope-pick";
 
 it("does not fetch customer options when Orders has no customer filter", async () => {
   state.calls = [];
@@ -90,41 +89,39 @@ it("slots the scoped recoverable Cart with the actual configured source or no so
   }
 });
 
-// A standing allocation may be held at any location — set_standing_allocation
-// asks for no particular use — so the shortfall card names the place it is held
-// even when that place is not a taproom. Reading only the taprooms showed a raw id.
 it("names the location a standing allocation is held at, taproom or not", async () => {
   state.roles = ["warehouse"]; state.calls = [];
   state.locations = [{ id: "tap", name: "Taproom", uses: ["taproom"] }, { id: "shed", name: "Overflow shed", uses: ["storage"] }];
   state.reservations = [{ id: "standing", source: "taproom_standing", ref: "shed", qty: 2 }];
   const page = await ReplenishmentPage({ searchParams: Promise.resolve({ sku: "active" }) });
-  const model = page.props.children[1][0].props.children.props.model;
-  expect(model.rows[0]).toMatchObject({ title: "Standing allocation · Overflow shed", detail: "2 keg reserved" });
+  expect(page.props.model.shortfalls[0].detail.rows[0]).toMatchObject({
+    title: "Standing allocation · Overflow shed", detail: "2 keg reserved",
+    href: "/replenishment?location=shed&sku=active#standing-allocations",
+  });
   state.locations = null; state.reservations = null;
 });
 
-it("renders the selected shortfall with actual package volume and competing order", async () => {
+it("keeps global shortfall facts separate from taproom scope and Warehouse readonly", async () => {
   state.roles = ["warehouse"]; state.calls = [];
   const page = await ReplenishmentPage({ searchParams: Promise.resolve({ sku: "active", location: "not-a-taproom" }) });
   expect(state.calls).toContainEqual(["get_shortfalls", { skuId: "active" }]);
   expect(state.calls).toContainEqual(["list_standing_allocations", { locationId: "tap" }]);
-  const section = page.props.children[1][0];
-  const model = section.props.children.props.model;
-  expect(model.atp).toContain("−2 kegs");
-  expect(model.atp).toContain("−1 bbl");
-  expect(model.atpDetail).toContain("across all locations");
-  expect(model.rows[0]).toMatchObject({ title: "Order 42", href: "/orders/order", detail: "3 keg reserved" });
-  const controls = page.props.children[4].props.children;
-  expect(controls[0]).toBe(false);
-  expect(controls[1].props.canCreate).toBe(false);
+  const model = page.props.model;
+  expect(model.locationId).toBe("tap");
+  expect(model.canEdit).toBe(false);
+  expect(model.shortfalls[0]).toMatchObject({ onHand: 1, allocated: 3, atp: -2 });
+  expect(model.shortfalls[0].detail.atp).toContain("−2 kegs");
+  expect(model.shortfalls[0].detail.atp).toContain("−1 bbl");
+  expect(model.shortfalls[0].detail.atpDetail).toContain("across all locations");
+  expect(model.shortfalls[0].detail.rows[0]).toMatchObject({ title: "Order 42", href: "/orders/order", detail: "3 keg reserved" });
 });
 
-it("#973 scopes Replenishment by a labeled Location select that keeps the SKU", async () => {
-  state.roles = ["warehouse"];
-  const page = await ReplenishmentPage({ searchParams: Promise.resolve({ sku: "active" }) });
-  const scope = page.props.children[3];
-  expect(scope.type).toBe(ScopePick);
-  expect(scope.props).toEqual({ label: "Location", value: "tap", options: [{ value: "tap", label: "Taproom", href: "/replenishment?location=tap&sku=active" }] });
+it("keeps the SKU when changing location and the location when clearing the SKU", async () => {
+  state.roles = ["sales"];
+  const page = await ReplenishmentPage({ searchParams: Promise.resolve({ sku: "active", location: "tap" }) });
+  expect(page.props.model.locations).toEqual([{ value: "tap", label: "Taproom", href: "/replenishment?location=tap&sku=active" }]);
+  expect(page.props.model.allShortfallsHref).toBe("/replenishment?location=tap#shortfalls");
+  expect(page.props.model.canEdit).toBe(true);
 });
 
 it.each(["warehouse", "admin", "sales"])("renders the actual Orders page with the permitted create control for %s", async role => {

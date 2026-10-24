@@ -1,14 +1,11 @@
-import { ParsView } from "@/components/mgr/views/pars";
 import { toParsViewProps } from "@/lib/mgr/pars-view";
-import { E } from "@/components/mgr/e";
-import { ScopePick } from "@/components/mgr/scope-pick";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { ReplenishForm } from "./replenish-form";
-import { QuantityForm, ReleaseAllocationForm } from "./quantity-form";
 import { navTitle } from "@/lib/mgr/nav";
+import type { ReplenishmentViewModel } from "@/lib/mgr/replenishment-view";
 
 export const metadata = { title: navTitle("/replenishment") };
 
@@ -42,34 +39,42 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
     runCommand("list_skus", {}, ctx) as Promise<{ id: string; name: string; formats: { name: string; package_type: string } | null; format_volume: { bbl_per_unit: number } | null }[]>,
   ]);
   const locationRows = [...taprooms, ...warehouses];
-  // A location can be both warehouse and taproom; it is never its own source (#454).
-  const canEdit = ctx.roles.includes("admin") || ctx.roles.includes("sales");
-  const parValues = Object.fromEntries(suggestions.map(s => [s.skuId, s.par]));
-  const standingValues = Object.fromEntries(allocations.map(a => [a.sku_id, Number(a.qty)]));
-  return (
-    <>
-      {E.back("Finished goods", "Pars and allocation", undefined, "/inventory")}
-      {shortfalls.map(shortfall => {
-        const item = skus.find(s => s.id === shortfall.skuId);
-        const unit = item?.formats?.name ?? "unit";
-        const model = toParsViewProps({ backHref: "/inventory", shortfall, unit, bblPerUnit: item?.format_volume?.bbl_per_unit == null ? null : Number(item.format_volume.bbl_per_unit), orderAllocations: [], standing: [], par: null });
-        model.atpDetail += " across all locations";
-        model.rows = shortfall.reservations.map(r => ({ key: r.id, title: r.source === "order_line" ? `Order ${r.orderNo ?? r.ref}` : `Standing allocation · ${locationRows.find(l => l.id === r.ref)?.name ?? r.ref}`, detail: `${r.qty} ${unit} reserved`, verb: "Review", tone: "primary", href: r.orderId ? `/orders/${r.orderId}` : r.source === "taproom_standing" ? `/replenishment?location=${r.ref}&sku=${shortfall.skuId}#standing-allocations` : undefined }));
-        return <section key={shortfall.skuId} aria-label={`${shortfall.skuName} shortfall`}><ParsView model={model} linkRows footer={null} /></section>;
-      })}
-      {sku && <div>{shortfalls.length === 0 && E.note("This SKU has no current shortfall.")}{E.btn("All shortfalls", "g", "/replenishment")}</div>}
-      {taprooms.length === 0
-        ? E.blank("No taprooms yet: add one under Locations")
-        : <ScopePick label="Location" value={toLocationId!} options={taprooms.map((t) => ({ value: t.id, label: t.name, href: `/replenishment?location=${t.id}${sku ? `&sku=${sku}` : ""}` }))} />}
-      {toLocationId && <>
-        {canEdit && <div className="flex flex-wrap gap-2">
-          <QuantityForm key={`par-${toLocationId}-${JSON.stringify(suggestions)}`} locationId={toLocationId} skus={skus} kind="par" values={parValues} />
-          <QuantityForm key={`standing-${toLocationId}-${JSON.stringify(allocations)}`} locationId={toLocationId} skus={skus} kind="standing" values={standingValues} />
-        </div>}
-        <ReplenishForm key={`${toLocationId}-${JSON.stringify(suggestions)}`} toLocationId={toLocationId} canCreate={canEdit} warehouses={warehouses.filter((w) => w.id !== toLocationId).map((w) => ({ id: w.id, name: w.name }))} suggestions={suggestions} />
-        <h2 id="standing-allocations" className="text-lg font-semibold">Standing allocations</h2>
-        {allocations.length ? allocations.map((a) => <div key={a.id}>{E.row(a.skus?.name ?? a.sku_id, `${a.qty} units reserved`, canEdit ? <ReleaseAllocationForm allocationId={a.id} sku={a.skus?.name ?? a.sku_id} qty={Number(a.qty)} /> : undefined)}</div>) : E.blank("No standing allocations for this taproom.")}
-      </>}
-    </>
-  );
+  const selectedLocation = taprooms.find(t => t.id === toLocationId);
+  const model: ReplenishmentViewModel = {
+    backHref: "/inventory",
+    locationId: toLocationId ?? null,
+    locationName: selectedLocation?.name ?? null,
+    locations: taprooms.map(t => ({
+      value: t.id,
+      label: t.name,
+      href: `/replenishment?location=${t.id}${sku ? `&sku=${sku}` : ""}`,
+    })),
+    locationsHref: "/locations",
+    warehouses: warehouses.filter(w => w.id !== toLocationId).map(w => ({ id: w.id, name: w.name })),
+    suggestions,
+    allocations: allocations.map(a => ({ id: a.id, skuId: a.sku_id, sku: a.skus?.name ?? a.sku_id, qty: Number(a.qty) })),
+    shortfalls: shortfalls.map(shortfall => {
+      const item = skus.find(s => s.id === shortfall.skuId);
+      const unit = item?.formats?.name ?? "unit";
+      const detail = toParsViewProps({
+        shortfall, unit,
+        bblPerUnit: item?.format_volume?.bbl_per_unit == null ? null : Number(item.format_volume.bbl_per_unit),
+        orderAllocations: [], standing: [], par: null,
+      });
+      detail.atpDetail += " across all locations";
+      detail.rows = shortfall.reservations.map(r => ({
+        key: r.id,
+        title: r.source === "order_line" ? `Order ${r.orderNo ?? r.ref}` : `Standing allocation · ${locationRows.find(l => l.id === r.ref)?.name ?? r.ref}`,
+        detail: `${r.qty} ${unit} reserved`,
+        verb: "Review",
+        tone: "primary",
+        href: r.orderId ? `/orders/${r.orderId}` : r.source === "taproom_standing" ? `/replenishment?location=${r.ref}&sku=${shortfall.skuId}#standing-allocations` : undefined,
+      }));
+      return { skuId: shortfall.skuId, onHand: shortfall.onHand, allocated: shortfall.allocated, atp: shortfall.atp, detail };
+    }),
+    canEdit: ctx.roles.includes("admin") || ctx.roles.includes("sales"),
+    skuFilter: sku,
+    allShortfallsHref: `/replenishment${location ? `?location=${location}` : ""}#shortfalls`,
+  };
+  return <ReplenishForm key={`${toLocationId}-${JSON.stringify(suggestions)}`} model={model} skus={skus} />;
 }

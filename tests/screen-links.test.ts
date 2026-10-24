@@ -156,14 +156,15 @@ describe("isInertOn", () => {
     expect(isInertOn(by("Today"), "Paid", "Invoice")).toBe(false);
   });
 
-  it("keeps the two Edit rows on Pars and allocation apart", () => {
-    // Both rows draw an act; only the par row has a screen to open. Bin is the
-    // par editor, so a bare "Edit" mapped screen-wide would send the standing
-    // allocation there too. The par row names its verb; standing acts in place.
-    const s = by("Pars and allocation");
-    expect(resolveTap(s, "Edit par")).toBe("Bin");
-    expect(isInertOn(s, "Edit")).toBe(true);
-    expect(isInertOn(s, "Taproom standing")).toBe(true);
+  it("keeps replenishment quantity edits and reservation reviews local instead of opening unrelated screens", () => {
+    const screen = by("Pars and allocation");
+    for (const label of ["Set taproom par", "Set standing allocation", "Release", "Review"]) {
+      expect(isInertOn(screen, label), label).toBe(true);
+      expect(screen.to?.[label], label).toBeUndefined();
+    }
+    expect(resolveTap(screen, "Create replenishment order")).toBe("Order");
+    expect(isInertOn(screen, "Review", "Order")).toBe(false);
+    expect(resolveTap(by("Finished goods"), "Shortfall", "/replenishment?sku=lantern-pils-case#shortfalls")).toBe("Pars and allocation");
   });
 
   it("suppresses no author-written mapping on any screen", () => {

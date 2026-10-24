@@ -34,7 +34,7 @@ describe("Finished goods view", () => {
   it("maps each SKU onto a register row with on hand, allocated, available and its links (#942)", () => {
     const row = (sku: { sku_id: string; name: string }, onHand: string, allocated: string, atp: string, short: boolean) => ({
       key: sku.sku_id, name: sku.name, onHand, allocated, atp, short,
-      href: `/inventory/${sku.sku_id}`, shortfallHref: `/replenishment?sku=${sku.sku_id}`,
+      href: `/inventory/${sku.sku_id}`, shortfallHref: `/replenishment?sku=${sku.sku_id}#shortfalls`,
     });
     expect(toFinishedGoodsViewProps(finishedGoodsList).rows).toEqual([
       row(SKU_HAZY, "15", "4", "11", false),
@@ -81,7 +81,7 @@ describe("Finished goods view", () => {
       linkRows: true,
     }));
     expect(html).toMatch(new RegExp(`href="/inventory/${SKU_HAZY.sku_id}"[^>]*>${SKU_HAZY.name}<`));
-    expect(html).toMatch(new RegExp(`href="/replenishment\\?sku=${SKU_PILS.sku_id}"[^>]*>Shortfall<`));
+    expect(html).toMatch(new RegExp(`href="/replenishment\\?sku=${SKU_PILS.sku_id}#shortfalls"[^>]*>Shortfall<`));
     expect(html).not.toMatch(new RegExp(`/replenishment\\?sku=${SKU_HAZY.sku_id}`));
     expect(html).not.toMatch(/>Review</);
   });

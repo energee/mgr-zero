@@ -757,17 +757,25 @@ Each pool row shows the kegs each bin holds per size, so 36 in the taproom and 4
 
 *Admin, Sales, and Warehouse can open Replenishment. Admin and Sales can set pars, reserve or release standing stock, and create replenishment orders.*
 
-1. Open **Replenishment** and choose a taproom. The first taproom is selected by default.
-2. Review each SKU's par, on-hand amount, and suggested quantity. Suggested quantity is the par shortfall, never less than zero.
+The page has three sections in order: **Taproom replenishment**, **Standing allocations**, and **Shortfalls across all locations**. **Location** is near the top, above the transfer table. It selects the taproom for replenishment and standing allocations, not the global shortfall figures.
+
+1. Open **Replenishment** and choose a taproom under **Location**. The first taproom is selected by default.
+2. Review each SKU's **Par**, **On hand**, and **Suggested** quantity. Suggested quantity is the par shortfall, never less than zero. Rows with zero suggested remain visible and editable.
 3. Choose **From warehouse**. The first warehouse is selected by default when one exists. The taproom you are replenishing is never listed, even when it is also a warehouse. With no other warehouse, the picker says no other location has the *Warehouse* use and links to **Locations**, where an admin sets a location's **Uses**.
 4. Edit **Transfer qty** as needed. Only positive lines are included; with every quantity at 0, **Create replenishment order** stays unavailable and says it needs a transfer quantity above zero.
 5. Select **Create replenishment order**. MGR creates it already confirmed, ready for warehouse picking.
+
+Select a column heading to sort. SKU names sort naturally, and quantities sort numerically, including the current **Transfer qty** draft. Tables initially sort by SKU name; your browser remembers a different sort you choose. Sorting keeps each entered quantity with its SKU and does not submit the form. Clearing a quantity leaves it blank rather than restoring the suggestion. Quantities are SKU units, so a case and a keg are not a volume comparison.
 
 Use **Set taproom par** to choose any SKU and set its target stock at the selected taproom, including a SKU with no existing par. With no SKUs yet, the sheet's **SKU** picker links to **Catalog**, and saving says it needs a SKU. A zero par removes its replenishment target. Suggestions refresh after saving.
 
 Use **Set standing allocation** to reserve a named quantity against available-to-promise without an order. Selecting an existing SKU loads its current reserved quantity. Zero releases the standing reservation. If saving leaves the SKU below zero ATP, the reservation still saves: the sheet says **Allocation saved.** and shows **ATP negative for …** until you select **Done**. Releasing never warns. Under **Standing allocations**, **Release** opens a confirmation showing the SKU and quantity; confirming returns that reservation to available-to-promise without moving stock or changing its par. Failures appear in the form and keep your inputs available to correct or retry.
 
-The page says **No taprooms yet: add one under Locations** when none exist, or **No pars set for this taproom.** when there are no suggestions. Admin and Sales can follow **Add SKU in Catalog** from Inventory to Catalog before setting quantities. **Shortfall** keeps the selected SKU and shows its global on-hand, reserved and ATP quantities. Each competing order links to its order; a standing allocation links to its taproom section. **All shortfalls** clears the SKU filter.
+The page says **No taprooms yet: add one under Locations** when none exist, or **No pars set for this taproom.** when there are no suggestions. Admin and Sales can follow **Add SKU in Catalog** from Inventory to Catalog before setting quantities.
+
+**Shortfalls across all locations** shows each SKU's global **On hand**, **Reserved**, and **ATP** quantities in one sortable table. Open a SKU's reservation details to see each named reservation's quantity and its unit and volume context. **Review** opens a competing order, or the correct taproom's **Standing allocations** section for a standing reservation.
+
+Selecting **Shortfall** in Finished goods opens this section filtered to that SKU, with its reservation details open. A filtered SKU with no current shortage says so. Changing **Location** keeps that SKU filter. **All shortfalls** clears only the SKU filter and keeps an explicitly selected location. The filter never narrows the taproom's replenishment rows.
 
 ## Recipes [#recipes]
 

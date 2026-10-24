@@ -85,7 +85,7 @@ export function toFinishedGoodsViewProps({ skus, backHref, value }: FinishedGood
         atp: short ? `−${Math.abs(s.atp)}` : String(s.atp),
         short,
         href: `/inventory/${s.id}`,
-        shortfallHref: `/replenishment?sku=${s.id}`,
+        shortfallHref: `/replenishment?sku=${s.id}#shortfalls`,
       };
     }),
   };
