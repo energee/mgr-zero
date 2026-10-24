@@ -8,6 +8,7 @@ import { OrdersView } from "@/components/mgr/views/orders-list";
 import { BatchesView } from "@/components/mgr/views/batches";
 import { CellarMapView } from "@/components/mgr/views/cellar-map";
 import { VesselDetailView } from "@/components/mgr/views/vessel-detail";
+import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
 import { ordersWorkList } from "@/lib/mgr/fixtures/orders";
 import { toOrdersListViewProps } from "@/lib/mgr/orders-list-view";
 import { E } from "@/components/mgr/e";
@@ -27,6 +28,10 @@ export function asPersona(screen: Screen, persona: Persona, refused?: string): S
   if (screen.name === "Receipt") {
     const body = screen.body as ReactElement<ComponentProps<typeof ReceiptFixture>>;
     return { ...screen, body: cloneElement(body, { roles: persona.roles }) };
+  }
+  if (screen.name === "Finished goods") {
+    const body = screen.body as ReactElement<ComponentProps<typeof FinishedGoodsView>>;
+    return { ...screen, body: cloneElement(body, { countHref: hasAnyRole(persona.roles, ["admin", "warehouse", "taproom"]) ? undefined : null }) };
   }
   if (screen.name === "Orders") {
     const canWrite = hasAnyRole(persona.roles, ["admin", "sales"]);
