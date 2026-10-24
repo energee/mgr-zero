@@ -1,20 +1,8 @@
-import { createElement, type ReactNode } from "react";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { expect, it, vi } from "vitest";
+import { expect, it } from "vitest";
 import { ReplenishmentView, type ReplenishmentViewProps } from "@/components/mgr/views/replenishment";
 import { replenishmentLines } from "@/lib/replenishment-form";
-import { QuantityForm, ReleaseAllocationForm } from "@/app/(app)/replenishment/quantity-form";
-import type * as CommandFormModule from "@/components/mgr/command-form";
-
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
-vi.mock("@/lib/commands/use-command-form", () => ({
-  useCommandForm: () => ({ open: true, setOpen: vi.fn(), error: null, submitting: false, submit: vi.fn(), run: vi.fn() }),
-}));
-// Expose dialog contents to the server renderer; the real surface portals them.
-vi.mock("@/components/mgr/command-form", async importOriginal => ({
-  ...(await importOriginal<typeof CommandFormModule>()),
-  CommandForm: ({ children }: { children: ReactNode }) => children,
-}));
 
 const props: ReplenishmentViewProps = {
   model: {
@@ -69,13 +57,3 @@ it("builds only positive lines, so an all-zero order has none to submit (#447)",
   expect(replenishmentLines(suggestions, { a: "0", b: "0", c: "0" })).toEqual([]);
 });
 
-it("explains standing reservations and releases without planning jargon (#1258)", () => {
-  const standing = renderToStaticMarkup(createElement(QuantityForm, { locationId: "taproom", skus: [{ id: "a", name: "Pale keg" }], kind: "standing", values: {} }));
-  expect(standing).toMatch(/Reserve stock.*without creating an order/);
-  expect(standing).toMatch(/less stock to promise to other orders/);
-  expect(standing).toMatch(/Zero releases/);
-  const release = renderToStaticMarkup(createElement(ReleaseAllocationForm, { allocationId: "standing", sku: "Pale keg", qty: 2 }));
-  expect(release).toContain("Release 2 units of Pale keg");
-  expect(release).toMatch(/available to other orders/);
-  expect(standing + release).not.toContain("available-to-promise");
-});

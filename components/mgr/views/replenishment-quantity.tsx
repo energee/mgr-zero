@@ -21,7 +21,7 @@ export const QUANTITY_KINDS = {
     command: "set_standing_allocation",
     qtyLabel: "Reserved quantity",
     qtyKey: "qty",
-    help: "Standing stock is reserved against available-to-promise without an order. Zero releases this taproom’s standing allocation.",
+    help: "Reserve stock for this taproom without creating an order. This leaves less stock to promise to other orders. Zero releases this taproom’s standing allocation.",
   },
 } as const;
 
