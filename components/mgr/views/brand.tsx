@@ -25,6 +25,7 @@ import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import type { SellsAsRow } from "@/lib/mgr/brand-sells-view";
 import type { BrandViewModel } from "@/lib/mgr/brand-view";
 import type { PriceGroupSuggestion } from "@/lib/mgr/price-group-suggestion";
+import { submitReason } from "@/lib/mgr/submit-reason";
 
 export type { BrandViewModel };
 
@@ -54,6 +55,7 @@ export function BrandView({
   messages,
   footer,
   linkRows,
+  pricingHref,
   actions = {},
   addCompliance,
   categoryAction,
@@ -61,6 +63,7 @@ export function BrandView({
   sellsDetails,
   sellsDisabled = false,
   sellsMessages,
+  busy = false,
 }: {
   model: BrandViewModel;
   controls?: BrandControls;
@@ -70,6 +73,8 @@ export function BrandView({
   footer?: ReactNode;
   /** Live: Edit on price group is a link. */
   linkRows?: boolean;
+  /** Brand editing and price-group setup both require Admin or Sales. */
+  pricingHref?: string;
   /** Live: per-row Edit sheets keyed by compliance row; null suppresses the drawn verb. */
   actions?: Record<string, ReactNode>;
   /** Live: the Add approval / Add registration sheets; null hides them. */
@@ -83,6 +88,7 @@ export function BrandView({
   sellsDisabled?: boolean;
   /** Live: a failed switch's error, under the switches. */
   sellsMessages?: ReactNode;
+  busy?: boolean;
 }) {
   const abvId = useId();
   const touched = useTouchedLines(!controls.abv || validationAttempted);
@@ -119,6 +125,7 @@ export function BrandView({
           </div>
           {E.ttl("Selling")}
           <RegistrySelect label="Price group" value={model.priceGroup} options={model.priceGroupOptions} onChange={controls.priceGroup} />
+          <FieldDescription>{model.priceGroupOptions.length === 1 && <>No price groups yet. </>}{E.link("Manage price groups", "Price groups", pricingHref)}. Leave No price group to keep this brand unpriced.</FieldDescription>
           {model.suggestion
             ? E.row(model.suggestion.title, model.suggestion.detail, suggestionAction(model.suggestion, controls.priceGroup), model.suggestion.kind === "unknown" ? "w" : "")
             : null}
@@ -126,7 +133,7 @@ export function BrandView({
           <RegistryInput label="Description" value={model.description} onChange={controls.description} />
           <RegistryInput label="Hops" value={model.hops} onChange={controls.hops} />
           {messages}
-          {footer !== undefined ? footer : E.btn("Save brand", !model.name.trim() || brandAbvError(model.abv) ? "p disabled" : "p")}
+          {footer !== undefined ? footer : E.submit("Save brand", { submitting: busy, reason: brandAbvError(model.abv) ?? submitReason(model.name.trim() ? [] : ["a brand name"]), className: "w-full md:w-fit md:self-end" })}
         </section>
         <section aria-label="Sells as and compliance" className="flex min-w-0 flex-col gap-3">
           {model.isNew ? E.info("Save the brand to add SKUs and compliance.") : (

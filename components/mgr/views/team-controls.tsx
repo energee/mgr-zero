@@ -67,9 +67,8 @@ export function TeamMemberView({ name, email, avatar, savedRoles, roles, onRoles
   const [draftRoles, setRoles] = useState(savedRoles), busy = saving || removing, value = roles ?? draftRoles;
   const unchanged = value.length === savedRoles.length && value.every(role => savedRoles.includes(role));
   const empty = value.length === 0;
-  const removeName = name.replace(/^@/, "");
   return <>
-    {E.row(name, email, "", "", E.face({ src: avatar, name: removeName }))}
+    {E.row(name, email, "", "", E.face({ src: avatar, name }))}
     <form onSubmit={event => { event.preventDefault(); if (!busy && !empty && !unchanged) onSubmit?.(event); }} className="flex flex-col gap-4">
       {E.picks("Roles", STAFF_ROLES.filter(role => value.includes(role)), ROLE_OPTIONS, {
         onChange: next => { const selected = STAFF_ROLES.filter(role => next.includes(role)); setRoles(selected); onRolesChange?.(selected); },
@@ -80,9 +79,9 @@ export function TeamMemberView({ name, email, avatar, savedRoles, roles, onRoles
       <CommandFormMessage error={error ?? (empty ? "Choose at least one role." : null)} />
       <CommandFormFooter><Button type="submit" disabled={busy || empty || unchanged}>{saving ? "Saving…" : "Save roles"}</Button></CommandFormFooter>
     </form>
-    {E.note(`Removing ${removeName} ends this brewery membership.`)}
-    <ConfirmDeleteControl title={`Remove ${removeName}`} busy={busy} error={error} onDelete={onRemove} busyLabel="Removing…"
-      name={<>Remove <strong>{removeName}</strong> from this brewery?</>}
+    {E.note(`Removing ${name} ends this brewery membership.`)}
+    <ConfirmDeleteControl title={`Remove ${name}`} busy={busy} error={error} onDelete={onRemove} busyLabel="Removing…"
+      name={<>Remove <strong>{name}</strong> from this brewery?</>}
       warning="They lose access right away. Their sign-in account remains, and only a new invitation restores access." />
   </>;
 }

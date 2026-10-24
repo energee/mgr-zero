@@ -12,6 +12,9 @@ export type ScheduleBatchViewModel = {
   plannedBbl: string;
   date: string;
   note: string;
+  recipesHref?: string;
+  /** null means this role cannot create a brand. */
+  brandsHref?: string | null;
 };
 
 /** Mirrors schedule_batch's positive numeric(10,3) barrel bounds. */

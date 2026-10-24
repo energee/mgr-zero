@@ -316,8 +316,13 @@ describe("Materials", () => {
     expect(html).not.toContain("L-0774");
   });
 
-  it("the Material inventory record is MaterialView", () => {
-    expect((screen("Material").body as { type: unknown }).type).toBe(MaterialView);
+  it("the material inventory records share MaterialView for create and edit", () => {
+    const edit = screen("Edit material").body;
+    const create = screen("Add material").body;
+    expect(isValidElement(edit) && edit.type).toBe(MaterialView);
+    if (!isValidElement<{ model: typeof materialCitra }>(create)) throw new Error("Add material must mount MaterialView");
+    expect(create.type).toBe(MaterialView);
+    expect(create.props.model).toMatchObject({ name: "", kind: "", baseUnits: "1", purchaseUnit: "lb", unit: "lb", lotTracked: false });
     const html = htmlOf(createElement(MaterialView, { model: materialCitra }));
     expect(html).toMatch(/>Save material</);
     expect(html).toMatch(/Default vendor/);
@@ -335,6 +340,47 @@ describe("Materials", () => {
     edit.mockRestore();
     expect(html).toContain("For hops bought in 44 lb boxes, set Base unit to lb, Purchase unit to each, and Base units per purchase unit to 44.");
     expect(html).not.toMatch(/schema/i);
+  });
+
+  it("offers a Kind placeholder and readable options without changing stored values", () => {
+    const pick = vi.spyOn(E, "pick");
+    try {
+      const units = ["lb", "kg", "oz", "g", "each", "l", "gal", "ml"];
+      const html = htmlOf(createElement(MaterialView, {
+        model: { ...materialCitra, kind: "", kindOptions: ["malt", "hop", "yeast", "adjunct", "chemical", "packaging", "other"], unitOptions: units, purchaseUnitOptions: units },
+      }));
+      expect(html).toContain("Select kind");
+      expect(pick).toHaveBeenCalledWith("Kind", "", [
+        { value: "malt", label: "Malt" }, { value: "hop", label: "Hop" },
+        { value: "yeast", label: "Yeast" }, { value: "adjunct", label: "Adjunct" },
+        { value: "chemical", label: "Chemical" }, { value: "packaging", label: "Packaging" },
+        { value: "other", label: "Other" },
+      ], expect.objectContaining({ placeholder: "Select kind" }));
+      const options = [
+        { value: "lb", label: "Pounds (lb)" }, { value: "kg", label: "Kilograms (kg)" },
+        { value: "oz", label: "Ounces (oz)" }, { value: "g", label: "Grams (g)" },
+        { value: "each", label: "Each" }, { value: "l", label: "Liters (L)" },
+        { value: "gal", label: "Gallons (gal)" }, { value: "ml", label: "Milliliters (mL)" },
+      ];
+      expect(pick).toHaveBeenCalledWith("Base unit", "lb", options, expect.anything());
+      expect(pick).toHaveBeenCalledWith("Purchase unit", "each", options, expect.anything());
+    } finally {
+      pick.mockRestore();
+    }
+  });
+
+  it("links the unfiltered empty list to Purchase orders and keeps inventory links inert", () => {
+    const model = toMaterialsOnHandViewProps({ rows: [], purchaseOrdersHref: "/purchase-orders" });
+    const html = htmlOf(createElement(MaterialsOnHandView, { model }));
+    expect(html).toMatch(/href="\/purchase-orders"[^>]*>Purchase orders</);
+    const inventory = htmlOf(createElement(MaterialsOnHandView, { model: toMaterialsOnHandViewProps({ rows: [] }) }));
+    expect(inventory).toMatch(/href="#"[^>]*>Purchase orders</);
+    const filtered = htmlOf(createElement(MaterialsOnHandView, { model: toMaterialsOnHandViewProps({ rows: [], filtered: true, purchaseOrdersHref: "/purchase-orders" }) }));
+    expect(filtered).not.toContain("Purchase orders");
+    const populated = htmlOf(createElement(MaterialsOnHandView, { model: toMaterialsOnHandViewProps(materialsOnHandList) }));
+    expect(populated).not.toContain("Purchase orders");
+    const denied = htmlOf(createElement(MaterialsOnHandView, { model: toMaterialsOnHandViewProps({ rows: [], purchaseOrdersHref: null }) }));
+    expect(denied).not.toContain("Purchase orders");
   });
 
   // #430: the potential recipe predictions read, asked only where it applies.

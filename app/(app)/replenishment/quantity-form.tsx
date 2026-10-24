@@ -17,6 +17,7 @@ import { AtpWarnings, atpWarnings, type AtpWarning } from "@/app/(app)/orders/[i
 
 type Sku = { id: string; name: string };
 
+
 export function QuantityForm({ locationId, skus, kind, values }: {
   locationId: string;
   skus: Sku[];
@@ -71,7 +72,7 @@ export function ReleaseAllocationForm({ allocationId, sku, qty }: { allocationId
   return <CommandForm open={form.open} onOpenChange={form.setOpen} title="Release standing allocation"
     trigger={<Button variant="destructive" size="sm" aria-label={`Release ${sku} allocation`}>Release</Button>}>
     <form onSubmit={form.submit} className="flex flex-col gap-4">
-      <p>Release {qty} units of {sku} back to available-to-promise? This does not move stock or change the taproom par.</p>
+      <p>Release {qty} units of {sku} and make it available to other orders? This does not move stock or change the taproom par.</p>
       <CommandFormMessage error={form.error} />
       <CommandFormFooter><Button type="submit" variant="destructive" disabled={form.submitting}>{form.submitting ? "Releasing…" : "Release allocation"}</Button></CommandFormFooter>
     </form>

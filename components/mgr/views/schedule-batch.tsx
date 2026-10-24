@@ -4,7 +4,7 @@
 "use client";
 import { useId, type ReactNode } from "react";
 import { DatePicker } from "@/components/mgr/date-picker";
-import { E } from "@/components/mgr/e";
+import { E, type PickEmpty } from "@/components/mgr/e";
 import { NONE } from "@/components/ui/select";
 import { plannedBarrelsError, type ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
@@ -14,12 +14,11 @@ export type { ScheduleBatchViewModel };
 
 type Controls = Partial<Record<"recipeId" | "brandId" | "plannedBbl" | "date" | "note", (value: string) => void>>;
 
-function OptionalPick({ label, value, options, onChange }: {
-  label: string; value?: string; options: { id: string; label: string }[]; onChange?: (value: string) => void;
+function OptionalPick({ label, value, options, onChange, empty }: {
+  label: string; value?: string; options: { id: string; label: string }[]; onChange?: (value: string) => void; empty: PickEmpty;
 }) {
-  const selected = value || NONE;
   return (
-    E.pick(label, selected, [{ value: NONE, label: "Not decided" }, ...(options.map(option => ({ value: option.id, label: option.label })))], { onChange })
+    E.pick(label, value || "", [{ value: "", label: "Not decided" }, ...(options.map(option => ({ value: option.id, label: option.label })))], { onChange, empty })
   );
 }
 
@@ -30,8 +29,10 @@ export function ScheduleBatchView({ model, controls = {}, messages, footer }: {
   const touched = useTouchedLines(!controls.plannedBbl);
   return (
     <>
-      <OptionalPick label="Recipe · optional" value={model.recipeId} options={model.recipeOptions} onChange={controls.recipeId} />
-      <OptionalPick label="Brand · optional" value={model.brandId} options={model.brandOptions} onChange={controls.brandId} />
+      <OptionalPick label="Recipe · optional" value={model.recipeId} options={model.recipeOptions} onChange={controls.recipeId} empty={{ text: "No recipe versions available. Add a recipe and save a version, or leave this undecided.", label: "Recipes", href: model.recipesHref, to: "Recipes" }} />
+      <OptionalPick label="Brand · optional" value={model.brandId} options={model.brandOptions} onChange={controls.brandId} empty={model.brandsHref === null
+        ? { text: "No brands yet. An admin or sales member adds them in Catalog. You can leave this undecided." }
+        : { text: "No brands yet. You can leave this undecided.", label: "Add a brand", href: model.brandsHref, to: "Catalog" }} />
       <div className="flex flex-col gap-2">
         {E.edit("Planned barrels", model.plannedBbl, "number", undefined, {
           onChange: controls.plannedBbl, onBlur: () => touched.touch(0),
