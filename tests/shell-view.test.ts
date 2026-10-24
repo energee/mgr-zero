@@ -211,7 +211,6 @@ describe("Beer view", () => {
       ["variance", "Variance by brand", "/taproom/variance"],
       ["cellar", "Cellar", "/cellar"],
       ["materials", "Materials", "/materials"],
-      ["shortages", "Shortages", "/planning"],
       ["kegs", "Kegs", "/kegs"],
     ]);
   });
