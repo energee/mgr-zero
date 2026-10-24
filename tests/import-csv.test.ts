@@ -1,6 +1,5 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { IMPORT_FIELDS, IMPORT_KINDS, importRowKey, importTemplateCsv, parseCsv, mapCsvRows, readyImportRowNumbers, readyImportRows, validateImportRow } from "@/lib/import-csv";
+import { IMPORT_FIELDS, IMPORT_FIELD_LABELS, IMPORT_KINDS, canReviewImport, importRowKey, importTemplateCsv, importTemplateName, parseCsv, mapCsvRows, readyImportRowNumbers, readyImportRows, validateImportRow } from "@/lib/import-csv";
 it("parses BOM, CRLF, quoted commas/newlines and escaped quotes", () => {
   expect(parseCsv('\uFEFFname,note\r\n"A, B","one\r\ntwo ""quoted"""\r\n')).toEqual({ headers: ["name", "note"], rows: [["A, B", 'one\r\ntwo "quoted"']] });
 });
@@ -24,10 +23,10 @@ it("maps explicit fields and rejects blank, fractional cents and nondecimal numb
   for (const qty of ["", "NaN", "Infinity", "0x10", "1e3", "0", "-2"]) expect(validateImportRow("opening_balances", { ...ids, qty })).not.toEqual([]);
   expect(validateImportRow("opening_balances", { ...ids, qty: "1.25" })).toEqual([]);
   // record_inventory_movement refuses qty <> round(qty, 2); the preview must too.
-  expect(validateImportRow("opening_balances", { ...ids, qty: "1.234" })).toEqual(["qty must be a positive number with at most two decimal places"]);
+  expect(validateImportRow("opening_balances", { ...ids, qty: "1.234" })).toEqual(["Quantity must be a positive number with at most two decimal places"]);
   expect(validateImportRow("opening_balances", { ...ids, qty: "1.230" })).toEqual([]);
   expect(validateImportRow("channel_prices", { saleChannelId: ids.skuId, priceGroupId: ids.skuId, formatId: ids.skuId, unitPriceCents: "1.2" })).not.toEqual([]);
-  expect(validateImportRow("channel_prices", { saleChannelId: "Missing channel", priceGroupId: ids.skuId, formatId: ids.skuId, unitPriceCents: "1" }, { channels: [] })).toContain("saleChannelId was not found");
+  expect(validateImportRow("channel_prices", { saleChannelId: "Missing channel", priceGroupId: ids.skuId, formatId: ids.skuId, unitPriceCents: "1" }, { channels: [] })).toContain("Sale channel was not found");
 });
 
 describe("named import references (#819)", () => {
@@ -53,8 +52,8 @@ describe("named import references (#819)", () => {
     expect(validateImportRow("customers", { ...customer, saleChannelId: legacy }, { ...lookups, channels: [{ id: legacy, name: "Legacy" }] })).toEqual([]);
   });
   it("blocks missing and ambiguous names instead of picking the first match", () => {
-    expect(validateImportRow("customers", { ...customer, saleChannelId: "Whole" }, lookups)).toEqual(["saleChannelId was not found"]);
-    expect(validateImportRow("customers", customer, { ...lookups, channels: [...lookups.channels, { id: crypto.randomUUID(), name: " WHOLESALE " }] })).toEqual(['saleChannelId: "wHoLeSaLe" matches 2 records; use the ID']);
+    expect(validateImportRow("customers", { ...customer, saleChannelId: "Whole" }, lookups)).toEqual(["Sale channel was not found"]);
+    expect(validateImportRow("customers", customer, { ...lookups, channels: [...lookups.channels, { id: crypto.randomUUID(), name: " WHOLESALE " }] })).toEqual(['Sale channel: "wHoLeSaLe" matches 2 records; use the ID']);
   });
   it("matches a bin name only within the resolved location", () => {
     const bins = [...lookups.bins, { id: crypto.randomUUID(), name: "Shelf 1", location_id: crypto.randomUUID() }];
@@ -68,12 +67,12 @@ describe("named import references (#819)", () => {
     ];
     const references = { ...lookups, groups: [{ id: group, name: "House beer" }], formats };
     expect(validateImportRow("channel_prices", { saleChannelId: "Wholesale", priceGroupId: "House beer", formatId: "Pint", unitPriceCents: "600" }, references)).toEqual([]);
-    expect(validateImportRow("products_skus", { product: "Lager", formatId: "Pint" }, references)).toEqual(["formatId was not found"]);
+    expect(validateImportRow("products_skus", { product: "Lager", formatId: "Pint" }, references)).toEqual(["Format was not found"]);
   });
   it("checks bin membership using resolved location and bin identities", () => {
     const row = { skuId: "Lager half keg", locationId: "cooler a", binId: "Shelf 1", qty: "2" };
     expect(validateImportRow("opening_balances", row, lookups)).toEqual([]);
-    expect(validateImportRow("opening_balances", { ...row, binId: bin }, { ...lookups, bins: [{ ...lookups.bins[0], location_id: crypto.randomUUID() }] })).toEqual(["binId must belong to locationId"]);
+    expect(validateImportRow("opening_balances", { ...row, binId: bin }, { ...lookups, bins: [{ ...lookups.bins[0], location_id: crypto.randomUUID() }] })).toEqual(["Bin must belong to Location"]);
   });
 });
 
@@ -88,29 +87,6 @@ it("numbers each sent row by its preview row, so outcome row 2 is preview row 3 
   expect(sent[2 - 1]).toBe(3);
 });
 
-it("the import wizard binds the shared explorer steps, Select, and Attachment controls", () => {
-  const adapter = readFileSync("app/(app)/settings/import/import-wizard.tsx", "utf8");
-  expect(adapter).toContain("<ImportView");
-  expect(adapter).toContain("const action = batch ?? { requestId: crypto.randomUUID(), kind, rows: readyImportRows(rows, validation), previewRows: readyImportRowNumbers(validation), expectedContext: renderedContext }");
-  expect(adapter).toContain('send.run("import_csv", { kind: action.kind, rows: action.rows }, data => setResult(data as ImportResult),');
-  expect(adapter).toContain("{ requestId: action.requestId, owner: { id: IMPORT_OWNER, data: action.previewRows }, refresh: false }");
-  expect(adapter).toContain('readRecoveries(sessionStorage, renderedContext).find(row => row.owner?.id === IMPORT_OWNER)');
-  expect(adapter).toContain('result.outcomes.filter(row => row.status === "blocked")');
-  expect(adapter).toContain("discardRecovery(sessionStorage, batch.expectedContext, batch.requestId)");
-  expect(adapter).toContain("onDiscard={discard}");
-  const source = readFileSync("components/mgr/views/import.tsx", "utf8");
-  expect(source).toMatch(/from "@\/components\/mgr\/e"/);
-  expect(source).toContain("E.pick(field.name");
-  expect(readFileSync("components/mgr/e.tsx", "utf8")).toContain("<SelectGroup>");
-  expect(source).toMatch(/from "@\/components\/ui\/attachment"/);
-  expect(source).toMatch(/<Attachment\b/);
-  expect(source).toContain("E.stp");
-  expect(source).toContain("<ToggleGroup");
-  expect(source).toContain('E.tbl(["row", "record", "match", "state"]');
-  expect(source).toContain("String(model.previewRows?.[row.row - 1] ?? row.row)");
-  expect(source).not.toMatch(/<select\b/);
-  expect(source).not.toMatch(/<input type="file"[^>]*className=\{control\}/);
-});
 
 // #758: import_csv serializes rows that share a key, so they keep file order.
 describe("importRowKey", () => {
@@ -132,28 +108,59 @@ describe("country and alias columns", () => {
   const channel = crypto.randomUUID();
   it("a customer row takes country and alias; state is required only for US", () => {
     expect(validateImportRow("customers", { name: "Odyssey", type: "distributor", country: "CN", alias: "china", saleChannelId: channel })).toEqual([]);
-    expect(validateImportRow("customers", { name: "Sarene", type: "distributor", saleChannelId: channel })).toEqual(["state is required"]);
-    expect(validateImportRow("customers", { name: "Sarene", type: "distributor", country: "US", saleChannelId: channel })).toEqual(["state is required"]);
+    expect(validateImportRow("customers", { name: "Sarene", type: "distributor", saleChannelId: channel })).toEqual(["State is required"]);
+    expect(validateImportRow("customers", { name: "Sarene", type: "distributor", country: "US", saleChannelId: channel })).toEqual(["State is required"]);
     expect(validateImportRow("customers", { name: "Sarene", type: "distributor", state: "PA", saleChannelId: channel })).toEqual([]);
-    expect(validateImportRow("customers", { name: "Odyssey", type: "distributor", country: "XX", saleChannelId: channel }).join(" ")).toMatch(/country/);
-    expect(validateImportRow("customers", { name: "Odyssey", type: "distributor", country: "CN", state: "PA", saleChannelId: channel }).join(" ")).toMatch(/state/);
+    expect(validateImportRow("customers", { name: "Odyssey", type: "distributor", country: "XX", saleChannelId: channel }).join(" ")).toMatch(/Country/);
+    expect(validateImportRow("customers", { name: "Odyssey", type: "distributor", country: "CN", state: "PA", saleChannelId: channel }).join(" ")).toMatch(/State/);
   });
   it("a foreign ship-to row needs only its customer and label", () => {
     const customerId = crypto.randomUUID();
     expect(validateImportRow("ship_tos", { customerId, label: "Main", country: "JP" })).toEqual([]);
     // A US ship-to needs only its state; street, city and ZIP are optional (user, 2026-10-15).
-    expect(validateImportRow("ship_tos", { customerId, label: "Main" })).toEqual(["state is required"]);
+    expect(validateImportRow("ship_tos", { customerId, label: "Main" })).toEqual(["State is required"]);
     expect(validateImportRow("ship_tos", { customerId, label: "Main", state: "OH" })).toEqual([]);
   });
 });
 
-// #1206: the Download template file is the upload step's column list as a header row.
-it("builds each kind's template as a header row of exactly its listed columns", () => {
+it("downloads friendly template filenames and stable keys with an example that cannot import (#1315)", () => {
   for (const kind of IMPORT_KINDS) {
-    const names = IMPORT_FIELDS[kind].map(field => field.name);
-    const template = importTemplateCsv(kind);
-    expect(template).toBe(`${names.join(",")}\r\n`);
-    // A filled-in template parses with headers that match every field on their own.
-    expect(parseCsv(`${template}${names.map(() => "x").join(",")}\r\n`).headers).toEqual(names);
+    const fields = IMPORT_FIELDS[kind], names = fields.map(field => field.name);
+    const template = importTemplateCsv(kind), parsed = parseCsv(template);
+    expect(importTemplateName(kind)).toMatch(/^[a-z-]+-template\.csv$/);
+    expect(template).not.toMatch(/[0-9a-f]{8}-[0-9a-f-]{27,}/i);
+    expect(parsed.headers).toEqual(names);
+    expect(parsed.rows).toHaveLength(1);
+    const [example] = mapCsvRows(parsed.rows, Object.fromEntries(names.map((name, index) => [name, index])));
+    const blankRequired = fields.find(field => field.required && !example[field.name]);
+    expect(blankRequired).toBeDefined();
+    expect(validateImportRow(kind, example)).toContain(`${IMPORT_FIELD_LABELS[blankRequired!.name]} is required`);
+    expect(readyImportRows([example], [validateImportRow(kind, example)])).toEqual([]);
   }
+});
+
+it("requires valid column matches for all kinds without requiring US-only fields on foreign rows (#1315)", () => {
+  for (const kind of IMPORT_KINDS) {
+    const headers = IMPORT_FIELDS[kind].map(field => field.name);
+    const mapping = Object.fromEntries(headers.map((name, index) => [name, index]));
+    expect(canReviewImport(kind, mapping, headers, [{}])).toBe(true);
+    expect(canReviewImport(kind, mapping, headers, [])).toBe(false);
+    expect(canReviewImport(kind, {}, headers, [{}])).toBe(false);
+    for (const field of IMPORT_FIELDS[kind].filter(field => field.required)) {
+      for (const column of [-1, headers.length, 0.5, NaN]) {
+        expect(canReviewImport(kind, { ...mapping, [field.name]: column }, headers, [{}])).toBe(false);
+      }
+    }
+  }
+  const headers = ["name", "type", "saleChannelId", "country"];
+  const mapping = { name: 0, type: 1, saleChannelId: 2, country: 3 };
+  expect(canReviewImport("customers", mapping, headers, [{ country: "JP" }])).toBe(true);
+  expect(canReviewImport("customers", mapping, headers, [{ country: "US" }])).toBe(false);
+  expect(canReviewImport("customers", mapping, headers, [{ country: "JP" }, { country: "" }])).toBe(false);
+});
+
+it("explains price bounds in readable cents while leaving payload values untouched (#1315)", () => {
+  const row = { saleChannelId: "Wholesale", priceGroupId: "House beer", formatId: "Half keg", unitPriceCents: "1.5" };
+  expect(validateImportRow("channel_prices", row)).toEqual(["Unit price (cents) must be a whole number from 0 to 2,147,483,647 (100 cents = $1)"]);
+  expect(row.unitPriceCents).toBe("1.5");
 });

@@ -262,7 +262,7 @@ export const INERT: (string | RegExp)[] = [
   "Found \u00b7 Al\u2019s Bar",
   "Hazy \u00b7 \u00bd bbl keg",
   "Import 2 customer rows",
-  /^Import \d+ rows$/,
+  /^Import \d+ rows?$/,
   "Increase",
   "Keg deposits held",
   "Last delivery",

@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import { E } from "../components/mgr/e";
 import { ImportView } from "../components/mgr/views/import";
-import { IMPORT_FIELDS } from "../lib/import-csv";
+import { IMPORT_FIELDS, IMPORT_FIELD_LABELS, IMPORT_KINDS } from "../lib/import-csv";
 import { importPreview } from "../lib/mgr/fixtures/import";
 
 it("keeps missing mappings and preview cells empty rather than undefined", () => {
@@ -100,5 +100,46 @@ it("names the buttons after the steps, offers the template only before upload, a
   const html = upload + match + review + results;
   for (const jargon of ["Map", "map ", "mapping", "Preview", "References accept", "case-insensitive", "Retry returns original results", "commits independently", "Committing", "need recovery", "unresolved"]) {
     expect(html.replace(/<[^>]*>/g, " "), jargon).not.toContain(jargon);
+  }
+});
+
+it("blocks Review until every required column is matched and uses the singular row label (#1315)", () => {
+  const model = { ...importPreview, step: 1, rows: [importPreview.rows[0]], validation: [[]], headers: ["name", "type", "state", "saleChannelId"] };
+  const render = (mapping: Record<string, number>) => renderToStaticMarkup(createElement(ImportView, { model: { ...model, mapping } }));
+  expect(render({})).toMatch(/<button[^>]* disabled=""[^>]*>Review 1 row<\/button>/);
+  const matched = render({ name: 0, type: 1, state: 2, saleChannelId: 3 }).match(/<button[^>]*>Review 1 row<\/button>/)?.[0];
+  expect(matched).toBeDefined();
+  expect(matched).not.toContain(' disabled=""');
+  expect(render({ name: 0, type: 1, state: 2, saleChannelId: 99 })).toMatch(/<button[^>]* disabled=""[^>]*>Review 1 row<\/button>/);
+});
+
+it("uses friendly field labels and a readable import-kind fallback (#1315)", () => {
+  const model = { ...importPreview, kind: "channel_prices" as const, step: 2, rows: [{ unitPriceCents: "1.5" }], validation: [["Unit price (cents) must be a whole number"]] };
+  const html = renderToStaticMarkup(createElement(ImportView, { model }));
+  expect(html).toContain("Sale channel");
+  expect(html).toContain("Price group");
+  expect(html).toContain("Unit price (cents)");
+  expect(html).toContain("Edit row 1 · Channel prices");
+  expect(html).not.toContain("saleChannelId");
+  expect(html).not.toContain("priceGroupId");
+  expect(html).not.toContain("unitPriceCents");
+});
+
+it("shares the canonical field labels across matching and review for all five kinds (#1315)", () => {
+  const pick = vi.spyOn(E, "pick"), edit = vi.spyOn(E, "edit");
+  try {
+    for (const kind of IMPORT_KINDS) {
+      pick.mockClear(); edit.mockClear();
+      const model = { ...importPreview, kind, rows: [{}], validation: [[]] };
+      renderToStaticMarkup(createElement(ImportView, { model: { ...model, step: 1 } }));
+      renderToStaticMarkup(createElement(ImportView, { model: { ...model, step: 2 } }));
+      for (const field of IMPORT_FIELDS[kind]) {
+        const label = IMPORT_FIELD_LABELS[field.name] + (field.required ? " *" : "");
+        expect(pick.mock.calls.map(call => call[0])).toContain(label);
+        expect(edit.mock.calls.map(call => call[0])).toContain(label);
+      }
+    }
+  } finally {
+    pick.mockRestore(); edit.mockRestore();
   }
 });
