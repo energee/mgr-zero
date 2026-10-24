@@ -25,7 +25,8 @@ defineQuery({
   name: "list_team_members", description: "Staff roster for the brewery: user id, name (email when no profile name is saved), email and roles",
   input: z.object({}), roles: ["admin", "sales", "warehouse"],
   handler: async (ctx): Promise<TeamMember[]> => {
-    const rows = await unwrap(ctx.db.rpc("list_team_members", { p_brewery: ctx.breweryId }));
+    // A table-returning RPC returns an array, including [] for an empty roster.
+    const rows = (await unwrap(ctx.db.rpc("list_team_members", { p_brewery: ctx.breweryId })))!;
     return rows.map((r) => ({ userId: r.user_id, email: r.email, name: r.name, roles: r.roles, createdAt: r.created_at }));
   },
 });
