@@ -95,6 +95,33 @@ describe("Orders list view loop", () => {
     expect(toOrdersListViewProps({ roles: ["sales"], status: "shipped", customer: "Ridgeline Tap Room", orders: [] }).empty?.title).toBe("No shipped orders for Ridgeline Tap Room");
   });
 
+  it("offers New order inside the true empty state only for a role allowed to create (#1129)", () => {
+    for (const role of ["admin", "sales", "warehouse"] as const) {
+      const list = OrdersClient({ roles: [role], timeZone: "UTC" });
+      const model = toOrdersListViewProps({ roles: [role], orders: [] });
+      const markup = renderToStaticMarkup(createElement(OrdersView, { ...list.props, model }));
+      const content = markup.match(/data-slot="empty-content"[^>]*>([\s\S]*?)<\/div>/)?.[1] ?? "";
+      if (role === "warehouse") expect(content).not.toContain("New order");
+      else expect(content).toContain('href="/orders/new"');
+    }
+  });
+
+  it("does not treat filtered, older, loading, or failed order lists as a true empty state (#1129)", () => {
+    const createAction = createElement("a", { href: "/orders/new" }, "New order");
+    const model = toOrdersListViewProps({ roles: ["sales"], orders: [] });
+    const cases = [
+      { model: { ...model, status: "shipped" } },
+      { model: { ...model, customer: { name: "Ridgeline" } } },
+      { model, pagination: { firstHref: "/orders" } },
+      { model, listStatus: createElement("p", null, "Loading orders") },
+      { model, listStatus: createElement("p", null, "Could not load orders") },
+    ];
+    for (const props of cases) {
+      const markup = renderToStaticMarkup(createElement(OrdersView, { ...props, createAction }));
+      expect(markup).not.toContain('data-slot="empty-content"');
+    }
+  });
+
   it("labels the customer filter with the customer's name even when no order matches (#768)", async () => {
     const page = await OrdersPage({ searchParams: Promise.resolve({ customerId: "c1" }) });
     expect(page.props.customerName).toBe("Ridgeline Tap Room");

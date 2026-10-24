@@ -86,6 +86,13 @@ describe("vessels are admin-managed", () => {
     expect(htmlOf(createElement(BatchesView, { model: toBatchesViewProps(batchesBrewer) }))).toContain("New vessel");
     expect(htmlOf(createElement(BatchesView, { model: toBatchesViewProps(batchesBrewer), newVesselHref: null }))).not.toContain("New vessel");
   });
+
+  it("keeps New batch primary and New vessel secondary within vessel setup (#1129)", () => {
+    const markup = htmlOf(createElement(BatchesView, { model: toBatchesViewProps(batchesBrewer), newVesselHref: "/cellar/vessels/new" }));
+    expect(markup).toMatch(/data-variant="default"[^>]*>New batch</);
+    expect(markup).toMatch(/data-variant="outline"[^>]*href="\/cellar\/vessels\/new"[^>]*>New vessel</);
+    expect(markup.indexOf(">Vessels<")).toBeLessThan(markup.indexOf(">New vessel<"));
+  });
 });
 
 it("vessel readings preserve optional measurements and do not invent actors", () => {

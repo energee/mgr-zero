@@ -67,9 +67,11 @@ export function OrdersView({
   listStatus?: ReactNode;
   feedback?: ReactNode;
 }) {
+  const newOrder = createAction !== undefined ? createAction : E.btn("New order");
+  const emptyAction = model.status === "all" && !model.customer && !pagination?.firstHref ? newOrder : undefined;
   return (
     <>
-      {E.hd("Orders", undefined, createAction !== undefined ? createAction : E.btn("New order"))}
+      {E.hd("Orders", undefined, newOrder)}
       <WorkKindTabs chips={WORK_CHIPS} current="orders" tabs={WORK_TABS} hrefs={workHrefs} />
       <div className="md:w-64">
         <ScopePick label="Status" value={model.status} options={model.statusOptions} />
@@ -82,7 +84,7 @@ export function OrdersView({
         </p>
       )}
       {feedback}
-      {listStatus ?? (model.empty ? E.blank(model.empty) : <Register rows={model.rows} />)}
+      {listStatus ?? (model.empty ? E.blank(model.empty, undefined, emptyAction) : <Register rows={model.rows} />)}
       <HistoryNavigation {...pagination} />
     </>
   );
