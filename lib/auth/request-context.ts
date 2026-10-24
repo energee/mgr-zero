@@ -58,6 +58,15 @@ export async function staffRolesAt(db: SupabaseClient<Database>, userId: string,
   return row?.roles ?? null;
 }
 
+/** Where a signed-in account belongs: staff on Today, a buyer in the portal.
+ *  Login and Save password land here; the password page uses it to keep a buyer on portal pages. */
+export async function homePath(auth: RequestAuthContext) {
+  if (!(await auth.getIdentity())) return "/login?error=1";
+  if ((await auth.getStaffMemberships()).length) return "/";
+  if ((await auth.getCustomerMemberships()).length) return "/portal";
+  return "/no-membership";
+}
+
 /**
  * Composes auth work for one non-RSC request, including route handlers.
  * Each resolver shares one client and one promise per lookup within this context.

@@ -15,7 +15,7 @@ vi.mock("@/components/mgr/command-form", async (original) => {
 import { NewBatchForm } from "@/app/(app)/batches/new-batch-form";
 
 it("names the dialog New batch once and labels its submit Schedule batch", () => {
-  const html = renderToStaticMarkup(createElement(NewBatchForm, { brands: [], recipeVersions: [] }));
+  const html = renderToStaticMarkup(createElement(NewBatchForm, { brands: [], recipeVersions: [], brandsHref: null }));
   expect(html).toContain("<h2>New batch</h2>");
   expect(html.split("New batch")).toHaveLength(2);
   expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Schedule batch<\/button>/);

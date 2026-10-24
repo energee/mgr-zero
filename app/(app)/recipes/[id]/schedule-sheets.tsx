@@ -13,7 +13,7 @@ import { FermentationScheduleView, FermentationStageView } from "@/components/mg
 import { IngredientView, type IngredientMaterial } from "@/components/mgr/views/ingredient";
 import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
 import { WaterAdditionView, WaterView } from "@/components/mgr/views/water";
-import { additionReady, lineReady, mashStepReady, moveItem, removeAt, stageReady, toAdditionFields, toMashStepFields, toStageFields, upsertAt, waterRowSummary, type FermentationStage, type IngredientLine, type MashStep, type SaltMaterial, type WaterAddition, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import { additionReady, mashStepReady, moveItem, removeAt, stageReady, toAdditionFields, toMashStepFields, toStageFields, upsertAt, waterRowSummary, type FermentationStage, type IngredientLine, type MashStep, type SaltMaterial, type WaterAddition, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 
 type Editing = { index?: number } | null;
 type ListProps<T> = { items: T[]; onEdit: (index: number) => void; onMove: (index: number, by: -1 | 1) => void; add: ReactNode; onAdd: () => void };
@@ -73,7 +73,7 @@ export function WaterSheet({ water, profiles, materials, onChange, trigger }: { 
     items={water.additions} onChange={(additions) => onChange({ ...water, additions })} toFields={toAdditionFields} ready={additionReady}
     toItem={(f) => ({ materialId: f.materialId, qty: Number(f.qty), unit: f.unit, stage: f.stage })}
     list={(p) => <WaterView water={{ ...water, additions: p.items }} profiles={profiles} materials={materials} profilesHref="/catalog/water-profiles" chemistryKnown={false /* until materials carry a salt identity (PR B) */} header={null} onChange={(patch) => onChange({ ...water, ...patch })} onEdit={p.onEdit} onMove={p.onMove} onAdd={p.onAdd} />}
-    item={(p) => <WaterAdditionView fields={p.fields} materials={materials} onChange={p.onChange} footer={p.footer} />} />;
+    item={(p) => <WaterAdditionView fields={p.fields} materials={materials} materialsHref="/materials" onChange={p.onChange} footer={p.footer} />} />;
 }
 
 const emptyLine = (): IngredientLine => ({ materialId: "", perBblQty: "", stage: "mash", timingMinutes: "" });
@@ -85,12 +85,10 @@ export function IngredientSheet({ line, materials, onSave, onDelete, trigger }: 
   const patch = (p: Partial<IngredientLine>) => setF((c) => ({ ...c, ...p }));
   return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (o) setF(line ?? emptyLine()); }} title={line ? "Edit ingredient" : "Add ingredient"} trigger={asTrigger(trigger)}>
     <div className="flex flex-col gap-4">
-      <IngredientView fields={f} materials={materials} onChange={patch} footer={
-        <CommandFormFooter>
-          {onDelete && <Button type="button" variant="outline" onClick={() => { onDelete(); setOpen(false); }}>Delete ingredient</Button>}
-          <Button type="button" disabled={!lineReady(f)} onClick={() => { onSave(f); setOpen(false); }}>Save ingredient</Button>
-        </CommandFormFooter>
-      } />
+      <IngredientView fields={f} materials={materials} onChange={patch}
+        onSave={() => { onSave(f); setOpen(false); }}
+        onDelete={onDelete ? () => { onDelete(); setOpen(false); } : null}
+      />
     </div>
   </CommandForm>;
 }

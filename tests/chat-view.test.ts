@@ -118,7 +118,7 @@ it("shows the brewery quiet hours read-only to every role", () => {
   for (const canSetQuietHours of [true, false]) {
     const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: quiet, canSetQuietHours }));
     expect(html).toContain("Brewery quiet hours");
-    expect(html).toContain("10:00 PM – 7:00 AM · 9 hours · America/Chicago");
+    expect(html).toContain("10:00 PM – 7:00 AM · 9 hours · Central Time (America/Chicago)");
   }
   const off = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { ...personalChatPreferences, breweryQuietHours: null } }));
   expect(off).toMatch(/Brewery quiet hours.*Off/);
@@ -163,4 +163,13 @@ it.each([
   const html = renderToStaticMarkup(createElement(ChatQuietHoursView, { ...quiet, timezone: "America/New_York" }));
   expect(html).toContain(message);
   expect(html).toMatch(/<button\b[^>]*\sdisabled=""[^>]*>Save brewery quiet hours<\/button>/);
+});
+
+it("offers a searchable timezone picker with the saved timezone and busy state", () => {
+  const preferences = { ...personalChatPreferences, timezone: "UTC" };
+  const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences }));
+  expect(html).toMatch(/<input[^>]*role="combobox"[^>]*>/);
+  expect(html).toContain('value="UTC"');
+  const busy = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences, busy: true }));
+  expect(busy).toMatch(/<input(?=[^>]*role="combobox")(?=[^>]*disabled)[^>]*>/);
 });
