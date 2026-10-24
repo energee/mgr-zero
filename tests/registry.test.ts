@@ -186,6 +186,13 @@ describe("unwrap maps RPC SQLSTATEs to command errors", () => {
     await expect(unwrap(failing("22003"))).rejects.toMatchObject({ status: 400, code: "bad_request", message: "A number is out of range." });
     log.mockRestore();
   });
+  it.each(["a customer name is required", "invalid argument for private.internal_function"])("22023 → 400 invalid_input without raw database text: %s", async message => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(unwrap(Promise.resolve({ data: null, error: { code: "22023", message } })))
+      .rejects.toMatchObject({ status: 400, code: "invalid_input", message: "An input value is invalid." });
+    expect(log).toHaveBeenCalledWith("database error 22023:", message);
+    log.mockRestore();
+  });
   it("any other database error → 500 db_error with a generic message; the original is logged", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(unwrap(failing("23514"))).rejects.toMatchObject({ status: 500, code: "db_error", message: "database error" });

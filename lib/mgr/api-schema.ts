@@ -158,6 +158,15 @@ export function sampleInput(schema: $ZodType): Record<string, unknown> {
     if (isOptional(node)) continue;
     sample[name] = sampleValue(node);
   }
+  // Paired nullable fields can require clearing together (quiet hours' start/end).
+  // Keep useful non-null examples whenever they already pass the full schema.
+  if (!core.safeParse(schema, sample).success) {
+    const cleared = { ...sample };
+    for (const [name, node] of Object.entries(shape)) {
+      if (!isOptional(node) && isNullable(node)) cleared[name] = null;
+    }
+    if (core.safeParse(schema, cleared).success) return cleared;
+  }
   // A refine over optional fields (one of a set required) rejects the
   // required-only sample. Add optional fields in order until it parses: a
   // schema with two such refines (record_fermentation_reading: a tank or

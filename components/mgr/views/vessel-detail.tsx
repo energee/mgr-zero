@@ -4,6 +4,7 @@ import { E } from "@/components/mgr/e";
 import { FieldGroup } from "@/components/ui/field";
 import { vesselCapacityError, type VesselDetailViewModel } from "@/lib/mgr/vessel-detail-view";
 import { ConfirmDeleteControl } from "./confirm-delete";
+import { VESSEL_CAPACITY_MIN, VESSEL_CAPACITY_MAX } from "@/lib/vessel-capacity";
 
 export type { VesselDetailViewModel };
 
@@ -34,13 +35,13 @@ export function VesselDetailView({ model, onName, onType, onCapacity, messages, 
       {E.ttl("Reading history")}
       {model.readings.history.length ? model.readings.history.map(row => <Fragment key={row.key}>{E.row(row.title, row.detail, row.who)}</Fragment>) : E.blank("No readings yet")}
     </>}
-    {E.ttl("Vessel facts")}
+    {E.group("Vessel facts")}
     {editable ? <>
       <FieldGroup>
         {E.edit("Name", model.name, "text", undefined, { onChange: onName, disabled: submitting, required: true })}
         {E.pick("Type", model.type, (model.typeOptions.map(type => ({ value: type, label: type }))), { onChange: onType, disabled: submitting })}
         {E.edit("Capacity (bbl)", model.capacity, "number", undefined, {
-          onChange: onCapacity, onBlur: () => setShowCapacityError(true), disabled: submitting, required: true, min: "0", step: "any",
+          onChange: onCapacity, onBlur: () => setShowCapacityError(true), disabled: submitting, required: true, min: String(VESSEL_CAPACITY_MIN), max: String(VESSEL_CAPACITY_MAX), step: String(VESSEL_CAPACITY_MIN),
           id: capacityId, error: showCapacityError ? vesselCapacityError(model.capacity) : undefined,
         })}
       </FieldGroup>

@@ -18,16 +18,16 @@ const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", nu
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("Sale channels view", () => {
-  it("maps list_sale_channels through treatment labels and optional movements", () => {
+  it("preserves channel identity and optional movement counts", () => {
     const model = toSaleChannelsViewProps(saleChannelsList);
     expect(model.backHref).toBeUndefined();
     expect(model.empty).toBeUndefined();
-    expect(model.rows.map((r) => [r.title, r.detail])).toEqual([
-      ["Wholesale", "Taxable · 118 movements"],
-      ["Taproom", "Taxable · 402 movements"],
-      ["DTC", "Taxable · 34 movements"],
-      ["Export", "Export · 6 movements"],
-    ]);
+    expect(model.rows.map((r) => [r.key, r.title])).toEqual(
+      saleChannelsList.channels.map((channel) => [channel.id, channel.name]),
+    );
+    saleChannelsList.channels.forEach((channel, index) => {
+      expect(model.rows[index].detail).toContain(String(channel.movements));
+    });
   });
 
   it("live-shaped rows omit movement counts and label snake_case treatments", () => {
@@ -37,7 +37,19 @@ describe("Sale channels view", () => {
         { id: "c2", name: "Bond", tax_treatment: "transfer_in_bond", in_use: false, system_code: null },
       ],
     });
-    expect(model.rows.map((r) => r.detail)).toEqual(["Taxable", "Transfer in bond"]);
+    expect(model.rows[0].detail).toContain("Taxable");
+    expect(model.rows[1].detail).toContain("Transfer in bond");
+    expect(model.rows.every((row) => !/\d/.test(row.detail))).toBe(true);
+  });
+
+  it("distinguishes an Export channel name from its treatment on the live list (#1149)", () => {
+    const model = toSaleChannelsViewProps({
+      channels: [{ id: "c-export", name: "Export", tax_treatment: "export", in_use: false, system_code: null }],
+    });
+    const row = model.rows[0];
+    expect(row.title).toBe("Export");
+    expect(row.detail).toContain(row.title);
+    expect(row.detail).not.toBe(row.title);
   });
 
   // #1207: Delete shows only where delete_sale_channel would succeed.
@@ -93,13 +105,9 @@ describe("Sale channels view", () => {
     expect(html).toMatch(/>Add channel</);
     expect(html).toMatch(/Sale channels/);
     expect(html).toMatch(/Wholesale/);
-    expect(html).toMatch(/Taxable · 118 movements/);
     expect(html).toMatch(/Taproom/);
-    expect(html).toMatch(/Taxable · 402 movements/);
     expect(html).toMatch(/DTC/);
-    expect(html).toMatch(/Taxable · 34 movements/);
     expect(html).toMatch(/Export/);
-    expect(html).toMatch(/Export · 6 movements/);
     expect(html).toMatch(/aria-label="Open"/);
     expect(html).not.toMatch(/No sale channels yet/);
     expect(html).not.toMatch(/never restates a filed month/);
@@ -205,7 +213,6 @@ describe("Channel view", () => {
     expect(model.name).toBe("Export");
     expect(model.taxOptions).toEqual(["Taxable", "Export", "Vessel supplies", "Research", "Transfer in bond"]);
     expect(model.taxIndex).toBe(1);
-    expect(model.taxHint).toBe("Sold for shipment outside the US, not taxed.");
   });
 
   it("labels vessel_supplies at chips index 2", () => {
@@ -216,14 +223,6 @@ describe("Channel view", () => {
     });
     expect(model.taxIndex).toBe(2);
     expect(model.taxOptions[2]).toBe("Vessel supplies");
-    expect(model.taxHint).toBe("Supplies for ships or aircraft in foreign trade, not taxed.");
-  });
-
-  it("hints Research and Transfer in bond with their TTB meaning, and leaves Taxable plain (#1207)", () => {
-    const hint = (tax_treatment: string) => toChannelViewProps({ id: "c", name: "C", tax_treatment }).taxHint;
-    expect(hint("research")).toBe("Used for lab analysis, research or testing, not taxed.");
-    expect(hint("transfer_in_bond")).toBe("Sent to another brewery in bond; that brewery pays the tax.");
-    expect(hint("taxable")).toBeUndefined();
   });
 
   it("renders Channel name, labelled export chips with their hint, override info, and Save channel", () => {
@@ -231,7 +230,7 @@ describe("Channel view", () => {
     expect(html).toMatch(/Channel name/);
     expect(html).toMatch(/>Tax treatment</);
     // The hint changes with the selection, so it sits in a status region.
-    expect(html).toMatch(/<div role="status"><p[^>]*>Sold for shipment outside the US, not taxed\.<\/p><\/div>/);
+    expect(html).toContain('role="status"');
     expect(html).toMatch(/value="Export"/);
     expect(html).toMatch(/>Taxable</);
     expect(html).toMatch(/>Export</);

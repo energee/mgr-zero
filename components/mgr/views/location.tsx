@@ -11,10 +11,6 @@ import type { LocationViewModel } from "@/lib/mgr/location-view";
 
 export type { LocationViewModel };
 
-// Each sentence names a real gate: list_locations({ use }) on the tap board,
-// weekly count, variance and Replenishment; taproom staff RLS on stock;
-// the From warehouse and Portal fulfillment warehouse pickers.
-const USES_HINT = "Choose one or more. One place can be all three. The tap board, weekly count, variance and Replenishment list only locations with Taproom. Taproom staff see stock only at those locations. From warehouse on Replenishment and the Portal fulfillment warehouse list only locations with Warehouse.";
 // create_location seeds these three bins; Location bins (admin, warehouse) edits them.
 const BINS_NOTE = "Bins are the rooms and racks inside a location where stock sits. Every new location starts with Cold, Dry and Walk-in. Admin and Warehouse add, rename or remove bins under Location bins.";
 
@@ -37,7 +33,11 @@ export function LocationFields({ name, uses, controls = {} }: {
         // The options are LOCATION_USES, so every picked value is a LocationUse.
         onChange: setUses ? (next) => setUses(next as LocationUse[]) : undefined,
         "aria-describedby": hintId,
-        description: <FieldDescription id={hintId}>{USES_HINT}</FieldDescription>,
+        description: <FieldDescription id={hintId} className="flex flex-col gap-1">
+          <span>Choose one or more. One place can be all three.</span>
+          <span>Warehouse: appears in From warehouse on Replenishment and Portal fulfillment warehouse.</span>
+          <span>Taproom: appears on the tap board, weekly count, variance and Replenishment. Taproom staff see stock only at these locations.</span>
+        </FieldDescription>,
       })}
       {E.info(BINS_NOTE)}
     </>

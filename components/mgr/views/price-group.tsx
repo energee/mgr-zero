@@ -6,10 +6,12 @@
 // Each pour row carries Edit pour (rename, resize) beside Remove.
 // Removing a pour and deleting the group confirm first; both surfaces draw the
 // same two controls below, live binding onDelete to the commands.
+"use client";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { FieldDescription } from "@/components/ui/field";
-import type { PriceGroupViewModel } from "@/lib/mgr/price-group-view";
+import { priceGroupFieldErrors, type PriceGroupViewModel } from "@/lib/mgr/price-group-view";
+import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import { ConfirmDeleteControl } from "./confirm-delete";
 
 export type { PriceGroupViewModel };
@@ -32,24 +34,26 @@ export function DeletePriceGroupControl({ group, ...rest }: ConfirmProps & { gro
 
 type Controls = Partial<Record<"name" | "position" | "costCeiling", (value: string) => void>>;
 
-export function PriceGroupView({ model, controls = {}, back, messages, footer, addPour, renderPour, renderBarcode }: {
-  model: PriceGroupViewModel; controls?: Controls; back?: ReactNode; messages?: ReactNode; footer?: ReactNode; addPour?: ReactNode;
+export function PriceGroupView({ model, controls = {}, validationAttempted = false, back, messages, footer, addPour, renderPour, renderBarcode }: {
+  model: PriceGroupViewModel; controls?: Controls; validationAttempted?: boolean; back?: ReactNode; messages?: ReactNode; footer?: ReactNode; addPour?: ReactNode;
   renderPour?: (pour: { id: string; name: string; ounces: string }) => ReactNode;
   /** Live: the row's edit control for one format's UPC. Inventory draws the code, or "none". */
   renderBarcode?: (barcode: { formatId: string; format: string; upc: string }) => ReactNode;
 }) {
+  const touched = useTouchedLines(validationAttempted);
+  const errors = priceGroupFieldErrors(model);
   return (
     <>
       {back !== undefined ? back : E.back("Price groups", model.name, undefined, model.backHref)}
       {E.edit("Group name", model.name, "text", undefined, { id: "price-group-name", onChange: controls.name, required: true })}
       {/* list_price_groups orders by position (gaps kept), and suggestPriceGroup reads ceilings in that order. */}
       <div className="flex min-w-0 flex-col gap-2">
-        {E.edit("Position", model.position, "number", undefined, { id: "price-group-position", onChange: controls.position, min: 1, step: 1, required: true, "aria-describedby": "price-group-position-help" })}
-        <FieldDescription id="price-group-position-help">This group’s row in the price grid: lower numbers sit higher, and the lowest is the top row. No two groups share a position.</FieldDescription>
+        {E.edit("Position", model.position, "number", undefined, { id: "price-group-position", onChange: controls.position, onBlur: () => touched.touch(0), error: (!controls.position || touched.shown(0)) ? errors.position : undefined, min: 1, step: 1, required: true, "aria-describedby": "price-group-position-help" })}
+        <FieldDescription id="price-group-position-help">This group’s row in the price grid: lower numbers sit higher, and the lowest is the top row. No two groups share a position. Position starts at 1; use whole numbers.</FieldDescription>
       </div>
       <div className="flex min-w-0 flex-col gap-2">
-        {E.edit("Cost ceiling ($/bbl) · optional", controls.costCeiling ? model.costCeilingInput : model.costCeiling, "number", undefined, { id: "price-group-ceiling", onChange: controls.costCeiling, min: 0, "aria-describedby": "price-group-ceiling-help" })}
-        <FieldDescription id="price-group-ceiling-help">Dollars per barrel of recipe cost. A brand’s page suggests the first group, from the top row down, whose ceiling is at or above the brand’s recipe cost. Groups with no ceiling are skipped. Saving never moves a brand or changes a price.</FieldDescription>
+        {E.edit("Cost ceiling ($/bbl) · optional", model.costCeilingInput, "number", undefined, { id: "price-group-ceiling", onChange: controls.costCeiling, onBlur: () => touched.touch(1), error: (!controls.costCeiling || touched.shown(1)) ? errors.costCeiling : undefined, min: 0, max: 21474836.47, step: "any", "aria-describedby": "price-group-ceiling-help" })}
+        <FieldDescription id="price-group-ceiling-help">Dollars per barrel of recipe cost. A brand’s page suggests the first group, from the top row down, whose ceiling is at or above the brand’s recipe cost. Groups with no ceiling are skipped. Saving never moves a brand or changes a price. Enter zero or more, up to $21,474,836.47; decimals are rounded to the nearest cent.</FieldDescription>
       </div>
       {model.previousCeilingLabel && model.previousCeiling
         ? E.fld(model.previousCeilingLabel, model.previousCeiling)

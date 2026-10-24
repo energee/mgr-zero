@@ -9,6 +9,8 @@ import { CommandForm } from "@/components/mgr/command-form"
 import { SessionExpiredView } from "@/components/mgr/views/session-expired"
 import { sessionExpiredModel } from "@/lib/mgr/session-expired-view"
 
+export const metadata = { title: "Sign in" };
+
 const ERRORS: Record<string, string> = {
   "1": "Incorrect email or password.",
   email: "Enter a valid email address.",
