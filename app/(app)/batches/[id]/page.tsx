@@ -9,11 +9,13 @@
 // sense to offer, but record_brew_day itself is the one place that refuses
 // an overlap, so every active vessel is offered here (list_vessels hides
 // retired ones, and the database refuses beer into them).
+import { cache } from "react";
+import { notFound } from "next/navigation";
 import { brewPlanActuals, currentBrewRecords, type BrewPlan, type BrewMaterialSource, type BrewPull, type BrewRecordView } from "@/lib/mgr/brew-day-view";
 import { brewIngredients, brewTargets, laterAdditions, openBrewTab } from "@/lib/mgr/brew-prep-view";
 import { getActiveBrewery } from "@/lib/brewery";
 import { formatDate } from "@/lib/date-format";
-import { buildContext } from "@/lib/commands/context";
+import { buildContext, isUuid } from "@/lib/commands/context";
 import { breweryToday } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
@@ -24,7 +26,11 @@ import { PrepForm } from "./prep-form";
 import { RecordBrewDayForm, RecordBrewTimelineForm } from "./record-brew-day-form";
 import { navTitle } from "@/lib/mgr/nav";
 
-export const metadata = { title: navTitle("/batches") };
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await getBatchPageData(id);
+  return { title: navTitle("/batches") };
+}
 
 type Batch = {
   id: string; batch_no: number | null; intended_brand_id: string | null; recipe_version_id: string | null;
@@ -34,17 +40,24 @@ type Occupancy = { id: string; vessel_id: string; initial_bbl: number; started_a
 type Vessel = { id: string; name: string; kind: string; capacity_bbl: number };
 type Plan = { batch: { planned_vessel_id: string | null }; plan: BrewPlan; sources: BrewMaterialSource[]; pulls: BrewPull[] };
 
-export default async function BatchPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
-  const [{ id }, { tab }] = await Promise.all([params, searchParams]);
+const getBatchPageData = cache(async function getBatchPageData(id: string) {
+  if (!isUuid(id)) notFound();
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [{ batch, occupancy }, vessels, today, plan, history] = (await Promise.all([
-    orNotFound(runCommand("get_brew_day", { batchId: id }, ctx)),
+  // Confirm the batch exists before its dependent RPCs can fail independently.
+  const { batch, occupancy } = await orNotFound(runCommand("get_brew_day", { batchId: id }, ctx)) as { batch: Batch; occupancy: Occupancy | null };
+  return { ctx, batch, occupancy };
+});
+
+export default async function BatchPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
+  const [{ id }, { tab }] = await Promise.all([params, searchParams]);
+  const { ctx, batch, occupancy } = await getBatchPageData(id);
+  const [vessels, today, plan, history] = (await Promise.all([
     runCommand("list_vessels", {}, ctx),
     breweryToday(ctx),
     runCommand("get_brew_day_plan", { batchId: id }, ctx),
     runCommand("get_brew_record", { batchId: id }, ctx),
-  ])) as [{ batch: Batch; occupancy: Occupancy | null }, Vessel[], string, Plan, { records: BrewRecordView[] }];
+  ])) as [Vessel[], string, Plan, { records: BrewRecordView[] }];
 
   const recorded = Boolean(batch.brewed_on || occupancy);
   const plannedBbl = Number(batch.planned_bbl), planned = plannedBbl + " bbl · " + formatDate(batch.planned_on);

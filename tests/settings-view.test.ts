@@ -124,6 +124,14 @@ describe("Settings sections (#1025)", () => {
   });
 });
 
+describe("Settings follow-up polish (#1147)", () => {
+  it("preserves the owner's read-only Deployment footer", () => {
+    const html = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo }));
+    expect(html).toContain("Deployment");
+    expect(html).toContain(settingsDemo.deployment);
+  });
+});
+
 describe("Wholesale fulfillment with no warehouse (#1147)", () => {
   const view = (props: { locations?: { id: string; name: string }[]; currentId?: string | null; locationsHref?: string } = {}) =>
     renderToStaticMarkup(createElement(PortalFulfillmentView, { locations: [], currentId: null, ...props }));

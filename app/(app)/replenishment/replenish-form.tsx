@@ -9,9 +9,10 @@ import { replenishmentLines, replenishReason } from "@/lib/replenishment-form";
 import type { ReplenishmentViewModel } from "@/lib/mgr/replenishment-view";
 import { QuantityForm, ReleaseAllocationForm } from "./quantity-form";
 
-export function ReplenishForm({ model, skus }: {
+export function ReplenishForm({ model, skus, workHrefs }: {
   model: ReplenishmentViewModel;
   skus: { id: string; name: string }[];
+  workHrefs: Record<string, string>;
 }) {
   const initialQtys = () => Object.fromEntries(model.suggestions.map(s => [s.skuId, String(s.suggested)]));
   const [fromLocationId, setFromLocationId] = useState(model.warehouses[0]?.id ?? "");
@@ -26,6 +27,7 @@ export function ReplenishForm({ model, skus }: {
 
   return <ReplenishmentView
     model={model}
+    workHrefs={workHrefs}
     fromLocationId={fromLocationId}
     qtys={qtys}
     onWarehouse={setFromLocationId}

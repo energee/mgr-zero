@@ -34,7 +34,7 @@ export function VesselDetailView({ model, onName, onType, onCapacity, messages, 
       {E.ttl("Reading history")}
       {model.readings.history.length ? model.readings.history.map(row => <Fragment key={row.key}>{E.row(row.title, row.detail, row.who)}</Fragment>) : E.blank("No readings yet")}
     </>}
-    {E.ttl("Vessel facts")}
+    {E.group("Vessel facts")}
     {editable ? <>
       <FieldGroup>
         {E.edit("Name", model.name, "text", undefined, { onChange: onName, disabled: submitting, required: true })}

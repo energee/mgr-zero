@@ -96,6 +96,21 @@ export function validateImportRow(kind: ImportKind, row: Record<string, string>,
   return errors;
 }
 
+/** Preview duplicates use the customer's existing server identity, not the coarser
+ * serialization keys of other kinds. Only otherwise-ready rows reserve a name. */
+export function validateImportRows(kind: ImportKind, rows: Record<string, string>[], lookups?: ImportLookups): string[][] {
+  const customers = new Map<string, number>();
+  return rows.map((row, index) => {
+    const errors = validateImportRow(kind, row, lookups);
+    if (kind !== "customers" || errors.length) return errors;
+    const key = importRowKey(kind, row, index);
+    const first = customers.get(key);
+    if (first !== undefined) return [`Duplicate of row ${first + 1}: customer name`];
+    customers.set(key, index);
+    return errors;
+  });
+}
+
 /** The rows the preview marked ready (no validation errors) — the only rows a batch sends. */
 export function readyImportRows(rows: Record<string, string>[], validation: string[][]): Record<string, string>[] {
   return rows.filter((_, index) => !validation[index]?.length);
