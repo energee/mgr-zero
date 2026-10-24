@@ -694,7 +694,7 @@ export const SCREENS: Screen[] = [
     reads: "supabase_auth_get_user · supabase_auth_get_claims [platform]",
     writes: "supabase_auth_sign_in_with_password · supabase_auth_update_user · supabase_auth_sign_out [platform]",
     states: DEFAULT_STATES,
-    spec: "Current-password changes retain access to Order. Verified recovery requires signing in again after Save.",
+    spec: "Current-password changes retain access to Order. Verified recovery signs in again on Portal sign in after Save. Need a reset link? opens Portal forgot password.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: <EntryView model={portalSetPassword} />,
   },

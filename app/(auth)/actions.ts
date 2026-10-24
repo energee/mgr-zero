@@ -11,21 +11,13 @@ import { runCommand, CommandError } from "@/lib/commands/registry";
 import { z } from "zod";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createRequestAuthContext } from "@/lib/auth/request-context";
+import { createRequestAuthContext, homePath } from "@/lib/auth/request-context";
 import { acceptInviteErrorPath, hasPendingInvitations, inviteAudience, inviteLanding } from "@/lib/auth/invite";
-import { hasRecentRecovery, passwordChangeErrors } from "@/lib/auth/password";
+import { hasRecentRecovery, PASSWORD_SAVED_COOKIE, passwordChangeErrors, signInPath } from "@/lib/auth/password";
 import { createServerClient, verifyCurrentPassword } from "@/lib/supabase/server";
 
 /** The brewery and customer selection cookies share these options. */
 const SELECTION_COOKIE = { path: "/", sameSite: "lax" } as const;
-
-/** Where a signed-in account belongs: staff on Today, a buyer in the portal. */
-async function home(auth: ReturnType<typeof createRequestAuthContext>) {
-  if (!(await auth.getIdentity())) return "/login?error=1";
-  if ((await auth.getStaffMemberships()).length) return "/";
-  if ((await auth.getCustomerMemberships()).length) return "/portal";
-  return "/no-membership";
-}
 
 export async function login(form: FormData) {
   const db = await createServerClient();
@@ -33,12 +25,12 @@ export async function login(form: FormData) {
     email: String(form.get("email")),
     password: String(form.get("password")),
   });
-  const back = form.get("portal") ? "/portal/login" : "/login";
+  const back = signInPath(Boolean(form.get("portal")));
   if (error) redirect(`${back}?error=1`);
   const auth = createRequestAuthContext(() => Promise.resolve(db));
   const identity = await auth.getIdentity();
   if (!identity) redirect(`${back}?error=1`);
-  const [pending, destination] = await Promise.all([hasPendingInvitations(db, identity.userId), home(auth)]);
+  const [pending, destination] = await Promise.all([hasPendingInvitations(db, identity.userId), homePath(auth)]);
   redirect(pending ? "/invitations" : destination);
 }
 
@@ -85,7 +77,8 @@ export async function savePassword(form: FormData) {
   const invalid = Object.keys(errors)[0];
   if (invalid) redirect(`/password?error=${invalid}`);
   if (!recovery) {
-    if (!user.email) redirect("/password?error=currentPassword");
+    // A password is checked against the account's email; without one there is nothing to check.
+    if (!user.email) redirect("/password?error=reauth_failed");
     // Use the server-verified account, never an email or recovery flag from the form.
     const reauthError = await verifyCurrentPassword(user.email, fields.currentPassword, user.id);
     if (reauthError) redirect(`/password?error=${reauthError === "invalid_credentials" ? "wrong_current" : "reauth_failed"}`);
@@ -95,25 +88,37 @@ export async function savePassword(form: FormData) {
     ...(!recovery ? { current_password: fields.currentPassword } : {}),
   });
   if (error) redirect(`/password?error=${encodeURIComponent(error.code ?? "1")}`);
+  // Read while the session still exists: a buyer signs in again on the portal's page.
+  const destination = await homePath(createRequestAuthContext(() => Promise.resolve(db)));
+  const portal = destination === "/portal";
+  // Only a real save opens Password saved: the page requires this cookie, so a crafted
+  // `?saved=1` link cannot claim a password changed. Auth sign-out does not clear it.
+  (await cookies()).set(PASSWORD_SAVED_COOKIE, "1", { path: "/password", maxAge: 600, httpOnly: true, sameSite: "lax" });
   const { error: revokeError } = await db.auth.signOut({ scope: "others" });
   // The password has already changed: never ask the user to resubmit it on a revocation failure.
-  if (revokeError) redirect("/password?saved=1&error=revoke_failed");
+  if (revokeError) redirect(savedPath(portal, "revoke_failed"));
   if (recovery) {
     const { error: signOutError } = await db.auth.signOut({ scope: "local" });
-    if (signOutError) redirect("/password?saved=1&error=signout_failed");
-    redirect("/login");
+    if (signOutError) redirect(savedPath(portal, "signout_failed"));
+    redirect(signInPath(portal));
   }
-  redirect(await home(createRequestAuthContext(() => Promise.resolve(db))));
+  redirect(destination);
 }
 
 /** Explicit recovery when password saved but session revocation failed. */
 export async function endPasswordSessions() {
   const db = await createServerClient();
   const { data: { user }, error: identityError } = await db.auth.getUser();
-  if (identityError || !user) redirect("/password?saved=1&error=revoke_failed");
+  if (identityError || !user) redirect(savedPath(false, "revoke_failed"));
+  const portal = (await homePath(createRequestAuthContext(() => Promise.resolve(db)))) === "/portal";
   const { error } = await db.auth.signOut({ scope: "global" });
-  if (error) redirect("/password?saved=1&error=revoke_failed");
-  redirect("/login");
+  if (error) redirect(savedPath(portal, "revoke_failed"));
+  redirect(signInPath(portal));
+}
+
+/** The Password saved outcome; `portal` only picks which sign-in page it links to. */
+function savedPath(portal: boolean, error: string) {
+  return `/password?saved=1${portal ? "&portal=1" : ""}&error=${error}`;
 }
 
 export async function acceptInvite(form: FormData) {

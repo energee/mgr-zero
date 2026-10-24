@@ -39,7 +39,9 @@ it("verified recovery shares confirmation but omits the current-password field",
 
 it("shows fixed text for a ?error= code, never the query string itself (#472)", () => {
   expect(toSetPasswordViewProps("a@example.com").error).toBeUndefined();
-  expect(toSetPasswordViewProps("a@example.com", "same_password").error).toBe("Choose a password different from your current one.");
+  // A field's own error is drawn beside it once, not repeated in the top alert.
+  expect(toSetPasswordViewProps("a@example.com", "wrong_current")).toMatchObject({ error: undefined, passwordErrors: { currentPassword: "Your current password is incorrect." } });
+  expect(toSetPasswordViewProps("a@example.com", "same_password").passwordErrors?.password).toBe("Choose a password different from your current one.");
   expect(toSetPasswordViewProps("a@example.com", "Call 555-0100 to verify your account").error).toBe("Your password was not saved. Try again.");
 });
 

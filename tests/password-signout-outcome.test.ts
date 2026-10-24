@@ -5,10 +5,15 @@ import { describe, expect, it, vi } from "vitest";
 
 const boundary = vi.hoisted(() => ({ db: undefined as SupabaseClient | undefined }));
 vi.mock("@/lib/supabase/server", () => ({ createServerClient: async () => boundary.db, verifyCurrentPassword: vi.fn() }));
+const savedCookies = vi.hoisted(() => new Set<string>());
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ set: (name: string) => savedCookies.add(name), has: (name: string) => savedCookies.has(name) }),
+}));
 vi.mock("next/navigation", () => ({ redirect: (path: string): never => { throw new Error(`redirect:${path}`); } }));
 
 import PasswordPage from "@/app/(auth)/password/page";
 import { endPasswordSessions, savePassword } from "@/app/(auth)/actions";
+import { PASSWORD_SAVED_COOKIE } from "@/lib/auth/password";
 
 /** Exercise the installed Auth and SSR cookie adapters, not a signOut stub.
  * All transport responses belong to this synthetic SDK boundary; no Auth user
@@ -31,6 +36,8 @@ async function signedInBoundary(failureScope: "local" | "global") {
         }
         return new Response(null, { status: 204 });
       }
+      // Membership reads: this synthetic account belongs to no brewery or customer.
+      if (url.pathname.startsWith("/rest/v1/")) return new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } });
       if (url.pathname.endsWith("/user")) return new Response(JSON.stringify(user), { status: 200, headers: { "Content-Type": "application/json" } });
       throw new Error(`Unexpected SDK endpoint ${url.pathname}`);
     } },
@@ -51,7 +58,9 @@ async function signedInBoundary(failureScope: "local" | "global") {
 
 describe("saved password outcome after installed SDK cookie clearing", () => {
   it.each(["local", "global"] as const)("keeps saved result reachable after failed %s logout clears the session", async (scope) => {
+    savedCookies.clear();
     const { db, removed } = await signedInBoundary(scope);
+    if (scope === "global") savedCookies.add(PASSWORD_SAVED_COOKIE);
     if (scope === "local") {
       const form = new FormData();
       form.set("password", "synthetic-new-password");
@@ -71,5 +80,19 @@ describe("saved password outcome after installed SDK cookie clearing", () => {
     expect(html).not.toContain("Reset link expired");
     expect(html).toContain(scope === "local" ? "Other sessions were signed out" : "could not confirm that other sessions were signed out");
     await expect(endPasswordSessions()).rejects.toThrow("redirect:/password?saved=1&error=revoke_failed");
+  });
+
+  it("ignores a crafted saved link that no save produced", async () => {
+    savedCookies.clear();
+    boundary.db = createSSR("https://password-outcome.supabase.co", "synthetic-publishable-key", { cookies: { getAll: () => [], setAll: () => {} } });
+    await expect(PasswordPage({ searchParams: Promise.resolve({ saved: "1" }) })).rejects.toThrow(new Error("redirect:/reset?expired=1"));
+  });
+
+  it("sends a buyer's saved outcome to the portal sign-in", async () => {
+    savedCookies.clear();
+    savedCookies.add(PASSWORD_SAVED_COOKIE);
+    boundary.db = createSSR("https://password-outcome.supabase.co", "synthetic-publishable-key", { cookies: { getAll: () => [], setAll: () => {} } });
+    const html = renderToStaticMarkup(await PasswordPage({ searchParams: Promise.resolve({ saved: "1", portal: "1", error: "signout_failed" }) }));
+    expect(html).toContain('href="/portal/login"');
   });
 });

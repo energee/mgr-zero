@@ -50,7 +50,7 @@ export const expiredResetModel: EntryViewModel = {
   title: "Reset link expired", inputs: [],
   note: "This reset link is no longer valid.", primary: "Request a new link",
 };
-/** Supabase Auth error codes savePassword passes back as `?error=`. */
+/** `?error=` codes savePassword passes back: Supabase Auth codes, field names, and its own reauthentication codes. */
 const SET_PASSWORD_ERRORS: Record<string, string> = {
   same_password: "Choose a password different from your current one.",
   weak_password: "Choose a stronger password.",
@@ -77,7 +77,8 @@ export function toSetPasswordViewProps(account: string, error?: string, recovery
     field: { label: "Account", value: account }, primary: "Save password",
     note: recovery ? "Your reset link verified this account. Choose and confirm your new password." : undefined,
     link: { label: "Need a reset link?", to: "Reset password" },
-    error: message, passwordErrors,
+    // A field's error is drawn beside that field; only the rest go in the top alert.
+    error: Object.keys(passwordErrors).length ? undefined : message, passwordErrors,
   };
 }
 

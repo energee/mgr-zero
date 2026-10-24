@@ -53,7 +53,8 @@ export function EntryView({
   function submit(event: FormEvent<HTMLFormElement>) {
     if (passwordChange) {
       const errors = validatePasswordForm(event.currentTarget);
-      setLocalErrors(errors);
+      // Every field is now checked locally, so a fixed field drops the server's error too.
+      setLocalErrors({ currentPassword: undefined, password: undefined, confirmPassword: undefined, ...errors });
       if (Object.keys(errors).length) {
         event.preventDefault();
         const first = event.currentTarget.elements.namedItem(Object.keys(errors)[0]);
@@ -65,7 +66,8 @@ export function EntryView({
   const fields = model.inputs.map(label => {
     const password = label.toLowerCase().includes("password");
     const name = INPUT_NAMES[label] ?? "password";
-    const fieldError = localErrors[name as keyof PasswordErrors] ?? model.passwordErrors?.[name as keyof PasswordErrors];
+    // Once a field is checked here (blur or submit), its own result replaces the server's error.
+    const fieldError = name in localErrors ? localErrors[name as keyof PasswordErrors] : model.passwordErrors?.[name as keyof PasswordErrors];
     return (
       <Fragment key={label}>{E.edit(label, String((defaults[name]) ?? ""), password ? "password" : label === "Email" ? "email" : "text", undefined, {
         id: passwordChange ? `password-${name}` : undefined,

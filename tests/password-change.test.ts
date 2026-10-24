@@ -19,12 +19,14 @@ describe("password change validation", () => {
     expect(passwordChangeErrors(form("new-password", "new-password", ""), true)).toEqual({});
     const now = 10000;
     expect(hasRecentRecovery({ sub: "owner", amr: [{ method: "recovery", timestamp: now - 30 }] }, "owner", now)).toBe(true);
+    // Auth's clock may run ahead of this server's: a just-issued grant is still fresh.
+    expect(hasRecentRecovery({ sub: "owner", amr: [{ method: "recovery", timestamp: now + 30 }] }, "owner", now)).toBe(true);
     for (const claims of [
       { sub: "other", amr: [{ method: "recovery", timestamp: now }] },
       { sub: "owner", amr: [{ method: "magiclink", timestamp: now }] },
       { sub: "owner", amr: [{ method: "otp", timestamp: now }] },
       { sub: "owner", amr: [{ method: "recovery", timestamp: now - 3601 }] },
-      { sub: "owner", amr: [{ method: "recovery", timestamp: now + 1 }] },
+      { sub: "owner", amr: [{ method: "recovery", timestamp: now + 61 }] },
       { sub: "owner", user_metadata: { recovery: true } },
       null,
     ]) expect(hasRecentRecovery(claims, "owner", now)).toBe(false);
