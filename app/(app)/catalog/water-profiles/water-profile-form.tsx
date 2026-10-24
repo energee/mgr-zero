@@ -13,17 +13,22 @@ import { useCommandForm } from "@/lib/commands/use-command-form";
 export function WaterProfileForm({ profile }: { profile?: WaterProfile }) {
   const formId = useId();
   const [fields, setFields] = useState(() => toWaterProfileFields(profile));
+  const [validationAttempted, setValidationAttempted] = useState(false);
   const reason = waterProfileSaveReason(fields);
   const form = useCommandForm("upsert_water_profile", {
     build: () => ({ profileId: profile?.id, ...toWaterProfileInput(fields) }),
-    reset: () => setFields(toWaterProfileFields(profile)),
+    reset: () => { setFields(toWaterProfileFields(profile)); setValidationAttempted(false); },
   });
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title={profile ? "Edit water profile" : "Add water profile"}
       trigger={sheetTrigger(Boolean(profile), "Add water profile", profile?.name)}
       footer={<CommandFormFooter>{E.submit("Save water profile", { form: formId, reason, submitting: form.submitting })}</CommandFormFooter>}>
-      <form id={formId} onSubmit={form.submit} className="flex flex-col gap-3">
-        <WaterProfileView fields={fields} onChange={(patch) => setFields((f) => ({ ...f, ...patch }))} submitting={form.submitting} footer={null} messages={<CommandFormMessage error={form.error} />} />
+      <form id={formId} noValidate onSubmit={event => {
+        setValidationAttempted(true);
+        if (form.busy || reason) { event.preventDefault(); event.stopPropagation(); return; }
+        void form.submit(event);
+      }} className="flex flex-col gap-3">
+        <WaterProfileView fields={fields} onChange={(patch) => setFields((f) => ({ ...f, ...patch }))} validationAttempted={validationAttempted} submitting={form.submitting} footer={null} messages={<CommandFormMessage error={form.error} />} />
       </form>
     </CommandForm>
   );

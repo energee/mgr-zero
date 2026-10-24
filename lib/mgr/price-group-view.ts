@@ -5,7 +5,7 @@
 // same row before it exists (the create form): blank name, next position,
 // under the last group's ceiling, no Prices line. priceGroupReason says what
 // the sheet's Save still needs.
-import { dollarsInput, money } from "./money";
+import { dollarsInput, money, toCents } from "./money";
 import { plural } from "./plural";
 import { submitReason } from "./submit-reason";
 import { barcodeOf, byPosition, formatLabel, type PriceGroupRow, type PriceGroupsSnapshot } from "./price-groups-view";
@@ -14,7 +14,6 @@ export type PriceGroupViewModel = {
   backHref?: string;
   name: string;
   position: string;
-  costCeiling: string;
   costCeilingInput: string;
   previousCeilingLabel?: string;
   previousCeiling?: string;
@@ -54,7 +53,6 @@ export function toPriceGroupViewProps(snapshot: PriceGroupSnapshot): PriceGroupV
     // Past the highest position, not count + 1: a removed group leaves a gap,
     // and positions are unique per brewery.
     position: String(group?.position ?? (ordered.at(-1)?.position ?? 0) + 1),
-    costCeiling: group?.cost_ceiling_cents == null ? "" : money(group.cost_ceiling_cents),
     costCeilingInput: dollarsInput(group?.cost_ceiling_cents),
     previousCeilingLabel: previous && `Cost ceiling · group ${previous.name}`,
     previousCeiling: previous && (previous.cost_ceiling_cents == null ? "none" : money(previous.cost_ceiling_cents)),
@@ -72,7 +70,30 @@ export function toPriceGroupViewProps(snapshot: PriceGroupSnapshot): PriceGroupV
   };
 }
 
-/** What Save price group still needs. Only the name needs a reason here:
- *  Position is enforced by its own required, min 1 input, and Cost ceiling is
- *  optional, so a blank ceiling is valid. */
-export const priceGroupReason = ({ name }: { name: string }) => submitReason(name.trim() ? [] : ["a group name"]);
+/** Match upsert_price_group: a positive integer position and nonnegative int cents. */
+export function priceGroupFieldErrors(fields: Pick<PriceGroupViewModel, "position" | "costCeilingInput">): { position?: string; costCeiling?: string } {
+  const position = Number(fields.position);
+  const cost = Number(fields.costCeilingInput);
+  let costCeiling: string | undefined;
+  if (fields.costCeilingInput !== "") {
+    if (/[eE]/.test(fields.costCeilingInput)) costCeiling = "Enter a decimal number without exponent notation.";
+    else if (!Number.isFinite(cost) || cost < 0) costCeiling = "Enter a cost of zero or more.";
+    else if (toCents(fields.costCeilingInput)! > 2_147_483_647) costCeiling = "Enter a cost no greater than $21,474,836.47.";
+  }
+  let positionError: string | undefined;
+  if (/[eE]/.test(fields.position)) positionError = "Enter a decimal number without exponent notation.";
+  else if (!Number.isInteger(position) || position < 1) positionError = "Enter a whole-number position of 1 or more.";
+  return {
+    ...(positionError ? { position: positionError } : {}),
+    ...(costCeiling && { costCeiling }),
+  };
+}
+
+export function priceGroupReason(fields: Pick<PriceGroupViewModel, "name" | "position" | "costCeilingInput">): string | null {
+  const errors = priceGroupFieldErrors(fields);
+  return submitReason([
+    ...(!fields.name.trim() ? ["a group name"] : []),
+    ...(errors.position ? ["a whole-number position of 1 or more"] : []),
+    ...(errors.costCeiling ? ["a valid cost ceiling"] : []),
+  ]);
+}

@@ -1,10 +1,14 @@
 // components/mgr/views/schedule-batch.tsx — shared New batch sheet body; its
 // one verb is Schedule batch. It draws no title: the sheet it opens in
 // (CommandForm live, ScreenSheet in the inventory) already names it (#1120).
-import type { ReactNode } from "react";
+"use client";
+import { useId, type ReactNode } from "react";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { E, type PickEmpty } from "@/components/mgr/e";
-import type { ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
+import { NONE } from "@/components/ui/select";
+import { plannedBarrelsError, type ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
+import { useTouchedLines } from "@/lib/mgr/touched-lines";
+import { FieldDescription } from "@/components/ui/field";
 
 export type { ScheduleBatchViewModel };
 
@@ -21,13 +25,23 @@ function OptionalPick({ label, value, options, onChange, empty }: {
 export function ScheduleBatchView({ model, controls = {}, messages, footer }: {
   model: ScheduleBatchViewModel; controls?: Controls; messages?: ReactNode; footer?: ReactNode;
 }) {
+  const id = useId();
+  const touched = useTouchedLines(!controls.plannedBbl);
   return (
     <>
       <OptionalPick label="Recipe · optional" value={model.recipeId} options={model.recipeOptions} onChange={controls.recipeId} empty={{ text: "No recipe versions available. Add a recipe and save a version, or leave this undecided.", label: "Recipes", href: model.recipesHref, to: "Recipes" }} />
       <OptionalPick label="Brand · optional" value={model.brandId} options={model.brandOptions} onChange={controls.brandId} empty={model.brandsHref === null
         ? { text: "No brands yet. An admin or sales member adds them in Catalog. You can leave this undecided." }
         : { text: "No brands yet. You can leave this undecided.", label: "Add a brand", href: model.brandsHref, to: "Catalog" }} />
-      {E.edit("Planned barrels", model.plannedBbl, "number", undefined, { onChange: controls.plannedBbl, required: Boolean(controls.plannedBbl), min: 0, step: "any", inputMode: "decimal" })}
+      <div className="flex flex-col gap-2">
+        {E.edit("Planned barrels", model.plannedBbl, "number", undefined, {
+          onChange: controls.plannedBbl, onBlur: () => touched.touch(0),
+          id: `${id}-barrels`, "aria-describedby": `${id}-precision`,
+          error: touched.shown(0) ? plannedBarrelsError(model.plannedBbl) : undefined,
+          required: Boolean(controls.plannedBbl), min: 0, max: 9_999_999.999, step: "any", inputMode: "decimal",
+        })}
+        <FieldDescription id={`${id}-precision`}>Fractional barrels are allowed; stored to three decimal places.</FieldDescription>
+      </div>
       {controls.date
         ? <DatePicker label="Date" value={model.date} onChange={controls.date} />
         : <DatePicker label="Date" defaultValue={model.date} />}

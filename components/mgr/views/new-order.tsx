@@ -1,8 +1,7 @@
 // components/mgr/views/new-order.tsx — shared New order sheet body, and the
 // order line controls (SKU picker, quantity, Pickup, a line's errors) other
 // order views reuse. A started line that cannot be saved marks its SKU or its
-// quantity, with the message under the row, once the user leaves the
-// quantity (#1121); Save draft names what is still needed (#1122).
+// quantity, with the message under that field after blur (#1121).
 "use client";
 
 import { useId, type FocusEventHandler, type ReactNode } from "react";
@@ -41,27 +40,20 @@ export function OrderSkuPicker({ options, catalogHref, emptyMessage = catalogHre
   return SearchPick({ ...props, emptyMessage, options: options.map(option => ({ value: option.id, label: option.label })), title: "Select SKU", placeholder: "Select SKU", searchPlaceholder: "Search SKUs", noMatchMessage: "No matching SKUs" });
 }
 
-/** `invalid` marks the quantity; `errorId` names the message that says why,
- *  drawn by the caller under the row (LineErrorMessages), since a row's
- *  quantity cell is too narrow for a sentence. */
-export function OrderQuantity({ value, label, onChange, onBlur, contextualLabels = false, max, step = "any", required = false, invalid = false, errorId }: { value: string | number; label: string; onChange?: (value: string) => void; onBlur?: FocusEventHandler<HTMLInputElement>; contextualLabels?: boolean; max?: number; step?: string; required?: boolean; invalid?: boolean; errorId?: string }) {
-  return E.edit(label, String(value), "number", undefined, { onChange, onBlur, min: 0, max, step, required, "aria-invalid": invalid || undefined, "aria-describedby": errorId, contextualLabels, hideLabel: true });
+/** A quantity owns its corrective message, so it stays under the input even
+ *  when the parent row has a separate SKU picker. */
+export function OrderQuantity({ value, label, onChange, onBlur, contextualLabels = false, max, step = "any", required = false, invalid = false, id, error }: { value: string | number; label: string; onChange?: (value: string) => void; onBlur?: FocusEventHandler<HTMLInputElement>; contextualLabels?: boolean; max?: number; step?: string; required?: boolean; invalid?: boolean; id?: string; error?: string }) {
+  return E.edit(label, String(value), "number", undefined, { onChange, onBlur, min: 0, max, step, required, id, error, "aria-invalid": invalid || undefined, contextualLabels, hideLabel: true });
 }
 
-/** The ids a line's controls point at: `${id}-sku-error` and `${id}-qty-error`. */
+/** The SKU picker describes its correction below the row. Quantity errors
+ *  belong inside OrderQuantity, directly under that control. */
 export const lineErrorIds = (id: string, errors: LineErrors) => ({
   sku: errors.sku ? `${id}-sku-error` : undefined,
-  qty: errors.qty ? `${id}-qty-error` : undefined,
 });
 
-/** A line's messages, full width under its row; each is the FieldError its own
- *  control describes itself by (lineErrorIds). Shared by order, PO and transfer lines. */
-export function LineErrorMessages({ id, errors }: { id: string; errors: LineErrors }) {
-  const ids = lineErrorIds(id, errors);
-  return <>
-    {errors.sku && <FieldError id={ids.sku}>{errors.sku}</FieldError>}
-    {errors.qty && <FieldError id={ids.qty}>{errors.qty}</FieldError>}
-  </>;
+export function LineErrorMessages({ id, errors }: { id: string; errors: Pick<LineErrors, "sku"> }) {
+  return errors.sku ? <FieldError id={lineErrorIds(id, errors).sku}>{errors.sku}</FieldError> : null;
 }
 
 /** A wholesale order the customer collects; it is never put on a route. Shared by New order and Edit draft. */
@@ -103,7 +95,7 @@ export function NewOrderView({ model, controls = {}, messages, feedback, skuFeed
       {E.row(
         <OrderSkuPicker label={`Line ${index + 1} SKU`} value={line.skuId ?? line.name} options={skus} catalogHref={model.catalogHref ?? "#"} selectedLabel={line.name} feedback={skuFeedback} optionsReady={skuOptionsReady} emptyMessage={skuEmptyMessage} errorId={describedBy(unavailableId, ids.sku)} invalid={Boolean(errors.sku)} onChange={controls.lineSku && (value => controls.lineSku?.(index, value))} />,
         line.atp == null ? "" : `ATP ${line.atp} at ${sourceLabel}`,
-        <OrderQuantity contextualLabels label={`Line ${index + 1} quantity`} value={line.qty} invalid={Boolean(errors.qty)} errorId={ids.qty} onBlur={() => touched.touch(index)} onChange={controls.lineQty && (value => controls.lineQty?.(index, value))} />,
+        <OrderQuantity contextualLabels label={`Line ${index + 1} quantity`} value={line.qty} id={`${errorPrefix}-line-${index}-qty`} error={errors.qty} onBlur={() => touched.touch(index)} onChange={controls.lineQty && (value => controls.lineQty?.(index, value))} />,
         line.warning ? "w" : "",
       )}
       <LineErrorMessages id={`${errorPrefix}-line-${index}`} errors={errors} />
@@ -111,6 +103,7 @@ export function NewOrderView({ model, controls = {}, messages, feedback, skuFeed
       {model.lines.length > 1 && <Button type="button" variant="ghost" size="sm" onClick={() => { controls.removeLine?.(index); touched.remove(index); }}>Remove</Button>}
     </div>;
     })}
+    {E.info("Fractional quantities are allowed; stored to two decimal places.")}
     <Button type="button" variant="ghost" className="w-fit" onClick={controls.addLine}>Add line</Button>
     {E.info("Order number is assigned when you save the draft.")}
     {messages}

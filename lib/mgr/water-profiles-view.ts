@@ -67,8 +67,8 @@ export function waterProfileSaveReason(fields: WaterProfileFields): string | nul
   if (!fields.name.trim()) missing.push("a profile name");
   if (!IONS.every(([key]) => fields[key] !== "" && Number(fields[key]) >= 0)) missing.push("all six ions in ppm, zero or more");
   if (fields.alkalinity_ppm !== "" && !(Number(fields.alkalinity_ppm) >= 0)) missing.push("alkalinity as CaCO3 of zero or more");
-  const ph = Number(fields.water_ph);
-  if (fields.water_ph !== "" && !(ph >= 0 && ph <= 14)) missing.push("water pH from 0 to 14");
+  const phError = waterPhError(fields.water_ph);
+  if (phError) missing.push(phError);
   return submitReason(missing);
 }
 
@@ -80,4 +80,12 @@ export function toWaterProfileInput(f: WaterProfileFields) {
     ...Object.fromEntries(IONS.map(([key, , input]) => [input, Number(f[key])])),
     alkalinityPpm: optionalNumber(f.alkalinity_ppm), waterPh: optionalNumber(f.water_ph), note: f.note,
   };
+}
+
+/** Water pH is optional and accepts fractional values throughout the 0–14 range. */
+export function waterPhError(value: string): string | undefined {
+  if (value === "") return undefined;
+  if (/[eE]/.test(value)) return "Enter a decimal number without exponent notation.";
+  const ph = Number(value);
+  return Number.isFinite(ph) && ph >= 0 && ph <= 14 ? undefined : "Enter a water pH from 0 to 14.";
 }
