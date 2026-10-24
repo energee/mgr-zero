@@ -8,7 +8,7 @@ vi.mock("@/lib/brewery-provider", () => ({
   useBrewery: () => renderedContext.breweryId,
   useCommandContext: () => renderedContext,
 }));
-import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
+import { useCommandAction, useCommandForm, type CommandAction } from "@/lib/commands/use-command-form";
 import { CommandRecovery } from "@/components/mgr/command-recovery";
 import { beginRecovery, inFlightRequests, readRecoveries } from "@/lib/commands/recovery";
 import { useExactCommand } from "@/components/mgr/views/pos-controls";
@@ -320,3 +320,72 @@ it("scopes existing-row edit sheets and row actions to their row; creates stay u
   const pos = readFileSync("components/mgr/views/pos-controls.tsx", "utf8");
   expect(pos).toContain("`${posLocationId}:${brandId}`");
 });
+
+it.each([[400, "validation_error"], [422, "invite_email_invalid"], [429, "rate_limited"], [429, "invite_rate_limited"], [503, "admission_unavailable"]] as const)(
+  "releases a first known pre-effect refusal %s/%s so corrected input can save",
+  async (status, code) => {
+    const requests: { requestId: string; input: unknown }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+      requests.push(JSON.parse(init.body));
+      return requests.length === 1
+        ? { status, json: async () => ({ ok: false, error: { code, message: "Refused before execution" } }) }
+        : { status: 200, json: async () => ({ ok: true, data: { id: "saved" } }) };
+    }));
+    let action!: CommandAction;
+    function Harness() { action = useCommandAction(); return null; }
+    renderToStaticMarkup(createElement(Harness));
+    expect(await action.run("upsert_vessel", { capacityBbl: 0.0001 })).toBe(false);
+    expect(readRecoveries(sessionStorage, renderedContext)).toEqual([]);
+    expect(await action.run("upsert_vessel", { capacityBbl: 0.001 })).toBe(true);
+    expect(requests[1].requestId).not.toBe(requests[0].requestId);
+  },
+);
+
+it.each([[500, "db_error"], [500, "internal_error"], [502, "invite_failed"], [503, "gateway_unavailable"]] as const)(
+  "preserves an ambiguous %s/%s response body and the exact original request across reload",
+  async (status, code) => {
+    const requests: { requestId: string; input: unknown }[] = [];
+    let recovered = false;
+    vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+      requests.push(JSON.parse(init.body));
+      return recovered
+        ? { status: 200, json: async () => ({ ok: true, data: { id: "original" } }) }
+        : { status, json: async () => ({ ok: false, error: { code, message: "Response after possible commit" } }) };
+    }));
+    let action!: CommandAction;
+    function Harness() { action = useCommandAction(); return null; }
+    renderToStaticMarkup(createElement(Harness));
+    await action.run("upsert_vessel", { capacityBbl: 1 });
+    const [original] = readRecoveries(sessionStorage, renderedContext);
+    expect(original.requestId).toBe(requests[0].requestId);
+    renderToStaticMarkup(createElement(Harness));
+    expect(await action.run("upsert_vessel", { capacityBbl: 2 })).toBe(false);
+    expect(requests).toHaveLength(1);
+    recovered = true;
+    expect(await action.run("upsert_vessel", { capacityBbl: 1 })).toBe(true);
+    expect(requests[1]).toEqual(requests[0]);
+    expect(readRecoveries(sessionStorage, renderedContext)).toEqual([]);
+  },
+);
+
+it.each([[400, "validation_error"], [422, "invite_email_invalid"], [429, "rate_limited"], [429, "invite_rate_limited"], [503, "admission_unavailable"]] as const)(
+  "does not let a later %s/%s refusal erase a prior possibly committed send",
+  async (status, code) => {
+    const ids: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+      ids.push(JSON.parse(init.body).requestId);
+      if (ids.length === 1) throw new Error("committed response lost");
+      return { status, json: async () => ({ ok: false, error: { code, message: "Current attempt refused" } }) };
+    }));
+    let action!: CommandAction;
+    function Harness() { action = useCommandAction(); return null; }
+    renderToStaticMarkup(createElement(Harness));
+    await action.run("upsert_vessel", { capacityBbl: 1 });
+    renderToStaticMarkup(createElement(Harness));
+    await action.run("upsert_vessel", { capacityBbl: 1 });
+    expect(ids[1]).toBe(ids[0]);
+    expect(readRecoveries(sessionStorage, renderedContext).map(row => row.requestId)).toEqual([ids[0]]);
+    expect(await action.run("upsert_vessel", { capacityBbl: 2 })).toBe(false);
+    expect(ids).toHaveLength(2);
+  },
+);
