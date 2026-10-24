@@ -49,6 +49,6 @@ export default async function PackagingPage({ searchParams }: { searchParams: Pr
   return <PackagingRunsView
     model={toPackagingRunsViewProps(runs, brewery.timeZone, (id) => `/packaging/${id}`)}
     workHrefs={workHrefsFor(brewery.roles)}
-    actions={<div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skus} />{canRepack ? <RepackForm autoOpen={repack === "1"} locations={locations} bins={bins} parents={parents} formatsHref={canRun(ctx, "create_composed_format") ? "/catalog" : null} /> : null}</div>}
+    actions={<div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skus} catalogHref={canRun(ctx, "upsert_brand") ? "/catalog" : null} />{canRepack ? <RepackForm autoOpen={repack === "1"} locations={locations} bins={bins} parents={parents} formatsHref={canRun(ctx, "create_composed_format") ? "/catalog" : null} /> : null}</div>}
   />;
 }
