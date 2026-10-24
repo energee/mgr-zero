@@ -71,12 +71,15 @@ describe("packaging views", () => {
     expect(toPackagingRunsViewProps(packagingRuns, DEMO_TIME_ZONE).empty).toBeUndefined();
   });
 
-  it("prints an upcoming run's planned day in the one date format (#991)", () => {
+  it("separates planned facts and preserves zero without inventing a package unit", () => {
     const [upcoming] = toPackagingRunsViewProps([{
       id: "u", run_no: 8, planned_on: "2026-09-05", started_at: null, closed_at: null, cancelled_at: null,
-      brand_name: "Pils", vessel_name: "FV1", qty_planned: 10,
+      brand_name: "Pils", vessel_name: null, qty_planned: 0,
     }], DEMO_TIME_ZONE).upcoming;
-    expect(upcoming.detail).toMatch(/^Sep 5, 2026 · FV1/);
+    expect(upcoming).toMatchObject({ runNo: "RUN-0008", brand: "Pils", date: "Sep 5, 2026", source: null, quantity: "0", verb: "Pick source" });
+    expect(upcoming.output).toBeUndefined();
+    expect(upcoming.yieldPercent).toBeUndefined();
+    expect(upcoming.lossBbl).toBeUndefined();
   });
 
   it("a finished run is a row link with no Open verb, so it never reads as reopen (#996)", () => {
@@ -92,13 +95,35 @@ describe("packaging views", () => {
     expect(markup).not.toMatch(/>Open</);
   });
 
-  it("dates a closed run by when it closed, not when it was planned (#439)", () => {
-    const [recent] = toPackagingRunsViewProps([{
-      id: "r", run_no: 7, planned_on: "2026-09-01", started_at: "2026-09-03T15:00:00Z", closed_at: "2026-09-04T18:30:00Z", cancelled_at: null,
-      brand_name: "Pils", vessel_name: "FV1", qty_planned: 10,
-    }], DEMO_TIME_ZONE).recent;
-    expect(recent.detail).toMatch(/^closed Sep 4, 2026/);
-    expect(recent.detail).not.toContain("2026-09-01");
+  it("dates finished runs by the brewery-local close or cancellation day", () => {
+    const base = { planned_on: "2026-09-01", started_at: null, brand_name: "Pils", vessel_name: "FV1", qty_planned: 10 };
+    const model = toPackagingRunsViewProps([
+      { ...base, id: "closed", run_no: 7, closed_at: "2026-09-05T01:30:00Z", cancelled_at: null },
+      { ...base, id: "cancelled", run_no: 8, closed_at: null, cancelled_at: "2026-09-05T01:30:00Z" },
+    ], "America/Los_Angeles");
+    expect(model.recent.map(row => [row.status, row.date])).toEqual([["Closed", "Sep 4, 2026"], ["Cancelled", "Sep 4, 2026"]]);
+  });
+
+  it("keeps shortage precedence over physical work and preserves recorded zero yield and loss", () => {
+    const base = { id: "r", run_no: 1, planned_on: "2026-09-05", started_at: null, closed_at: null, cancelled_at: null, brand_name: "Pils", vessel_name: "FV1", qty_planned: 10, planned_unit: "kegs" };
+    for (const started_at of [null, "2026-09-05"]) {
+      const model = toPackagingRunsViewProps([{ ...base, started_at, material_shortfall: "12 ends short" }], "UTC");
+      expect(model.upcoming[0]).toMatchObject({ quantity: "10 kegs", shortfall: "12 ends short", verb: "Resolve", tone: "attention" });
+    }
+    const model = toPackagingRunsViewProps([{ ...base, closed_at: "2026-09-05", output_summary: "0 kegs", yield_percent: 0, loss_bbl: 0 }], "UTC");
+    expect(model.recent[0]).toMatchObject({ output: "0 kegs", yieldPercent: 0, lossBbl: 0 });
+  });
+
+  it("does not present a plan as actual output and renders recorded zeroes instead of blanks", () => {
+    const run = { id: "r", run_no: 1, planned_on: "2026-09-05", started_at: null, closed_at: "2026-09-06", cancelled_at: null, brand_name: "Pils", vessel_name: null, qty_planned: 20 };
+    const planned = htmlOf(createElement(PackagingRunsView, { model: toPackagingRunsViewProps([run], "UTC") }));
+    expect(planned).toContain("Planned quantity");
+    expect(planned).not.toMatch(/>Output<|>Yield<|>Loss \(bbl\)</);
+    const model = toPackagingRunsViewProps([{ ...run, output_summary: "0 kegs", yield_percent: 0, loss_bbl: 0 }, { ...run, id: "missing", run_no: 2 }], "UTC");
+    const recorded = htmlOf(createElement(PackagingRunsView, { model })).match(/<table\b[\s\S]*?<\/table>/)![0];
+    const cells = [...recorded.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g)].map(match => match[1].replace(/<[^>]*>/g, ""));
+    expect(cells.slice(5, 8)).toEqual(["0 kegs", "0%", "0"]);
+    expect(cells.slice(13, 16)).toEqual(["", "", ""]);
   });
 
   it("builds the live Schedule run model from the page's reads, gating what they cannot say", () => {

@@ -23,11 +23,19 @@ export type PackagingRunSnapshot = {
 
 export type PackagingRunRowView = {
   key: string;
-  title: string;
-  detail: string;
+  runNo: string;
+  brand: string | null;
+  date: string;
+  source: string | null;
+  quantity: string;
+  status?: "Closed" | "Cancelled";
+  shortfall?: string;
+  lot?: string;
+  output?: string;
+  yieldPercent?: number;
+  lossBbl?: number;
   verb?: string;
   tone?: "info" | "attention";
-  warning?: boolean;
   href?: string;
 };
 
@@ -41,23 +49,33 @@ export type PackagingRunsViewModel = {
 };
 
 function row(run: PackagingRunSnapshot, timeZone: string, href?: string): PackagingRunRowView {
-  const title = `${runNo(run.run_no)} · ${run.brand_name ?? "no brand"}`;
-  // A finished run has no next action; its row is a plain link, because
-  // "Open" on a closed run reads as reopen (#996).
-  if (run.cancelled_at) return { key: run.id, title, detail: `Cancelled · ${formatDate(run.cancelled_at, timeZone)}`, href };
-  if (run.closed_at) {
-    const detail = [
-      `closed ${formatDate(run.closed_at, timeZone)}`,
-      run.lot_code,
-      run.output_summary ?? `${run.qty_planned} planned`,
-      run.yield_percent === undefined ? undefined : `${run.yield_percent}% yield`,
-      run.loss_bbl ? `${run.loss_bbl} bbl loss` : undefined,
-    ].filter(Boolean).join(" · ");
-    return { key: run.id, title, detail, warning: Boolean(run.loss_bbl), href };
-  }
+  const common = {
+    key: run.id,
+    runNo: runNo(run.run_no),
+    brand: run.brand_name,
+    source: run.vessel_name,
+    quantity: [run.qty_planned, run.planned_unit].filter(value => value !== undefined).join(" "),
+    href,
+  };
+  // Finished runs open their record without suggesting they can be reopened.
+  if (run.cancelled_at) return { ...common, status: "Cancelled", date: formatDate(run.cancelled_at, timeZone) };
+  if (run.closed_at) return {
+    ...common,
+    status: "Closed",
+    date: formatDate(run.closed_at, timeZone),
+    lot: run.lot_code,
+    output: run.output_summary,
+    yieldPercent: run.yield_percent,
+    lossBbl: run.loss_bbl,
+  };
   const verb = run.material_shortfall ? "Resolve" : run.started_at ? "Close" : run.vessel_name ? "Start" : "Pick source";
-  const detail = [formatDate(run.planned_on), run.vessel_name ?? "no source yet", run.qty_planned ? `${run.qty_planned} ${run.planned_unit ?? "units"} planned` : undefined, run.material_shortfall].filter(Boolean).join(" · ");
-  return { key: run.id, title, detail, verb, tone: run.material_shortfall || run.started_at ? "attention" : "info", warning: Boolean(run.material_shortfall), href };
+  return {
+    ...common,
+    date: formatDate(run.planned_on),
+    shortfall: run.material_shortfall,
+    verb,
+    tone: run.material_shortfall || run.started_at ? "attention" : "info",
+  };
 }
 
 /** `timeZone` is breweries.timezone: a closed run is dated by the brewery's day, not closed_at's UTC prefix (#442). */
