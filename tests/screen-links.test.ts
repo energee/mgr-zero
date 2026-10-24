@@ -117,7 +117,7 @@ describe("reported explorer flows", () => {
     ["Disconnect Square", "Disconnect Square", "Connect Square"],
     ["Connect QuickBooks", "Connect QuickBooks", "Accounting"],
     ["Connect Square", "Connect Square", "Square locations"],
-    ["Point of sale", "Taproom sales in QuickBooksSquare’s own connector, separate from MGR", "Taproom sales in QuickBooks"],
+    ["Point of sale", "Taproom sales in QuickBooksAbout Square’s optional connector", "Taproom sales in QuickBooks"],
     ["Taproom sales in QuickBooks", "Open Accounting", "Accounting"],
   ])("%s: %s → %s", (screen, tap, target) => {
     expect(resolveTap(by(screen), tap)).toBe(target);

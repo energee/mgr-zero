@@ -90,7 +90,7 @@ export function AccountingView({ model, connection, defaults, messages, sync }: 
     {sync !== undefined ? sync : <QboSyncView status={model.syncStatus} disabled={!model.connected} />}
     {E.ttl("Push defaults")}
     {defaults !== undefined ? defaults : model.defaults ? <QboDefaultsView {...model.defaults} disabled={!model.connected} /> : E.gated("Bank transfer (ACH) and card", "Connect QuickBooks to read and save the company's payment options.")}
-    {E.row("Customers missing a portal login email", missingEmailsDetail(model.missingEmails), E.act("Review", "primary", model.customersHref), model.missingEmails ? "w" : "")}
+    {E.row("Customers missing a portal login email", missingEmailsDetail(model.missingEmails), model.missingEmails !== 0 && E.act("Review", "primary", model.customersHref), model.missingEmails ? "w" : "")}
     {model.remoteRevocationUnresolved && E.note("Local access is disconnected. QuickBooks could not confirm remote revocation; reconnect to continue.", "alert")}
     {E.info("QuickBooks remains the accounting record. Connecting does not push existing invoices, and MGR never displays credentials.")}
   </>;
