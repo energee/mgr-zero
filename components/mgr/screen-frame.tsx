@@ -29,7 +29,7 @@ export function ScreenSheet({ screen: s, container, onClose }: { screen: Screen;
   }
   const { rest, pin } = splitPinned(s.body);
   return (
-    <CommandForm open onOpenChange={onClose && ((open) => !open && onClose())} container={container} title={s.name} footer={pin.length ? pin : undefined}>
+    <CommandForm open onOpenChange={onClose && ((open) => !open && onClose())} container={container} title={s.sheetTitle ?? s.name} footer={pin.length ? pin : undefined}>
       <div className="flex flex-col gap-2">{rest}</div>
     </CommandForm>
   );

@@ -55,7 +55,7 @@ export function CatalogView({
         />}
       {navRow("Price groups", model.priceGroups, links && (links.priceGroups ? model.priceGroupsHref : null))}
       {navRow("Water profiles", "Source and target profiles", links && (links.waterProfiles ? model.waterProfilesHref : null))}
-      {formats && <FormatsView model={formats} header={E.hd("Formats", "", formatAction !== undefined ? formatAction : E.btn("New format"))} />}
+      {formats && <FormatsView model={formats} header={<div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">{E.group("Formats")}{formatAction !== undefined ? formatAction : E.btn("New format")}</div>} />}
     </>
   );
 }
