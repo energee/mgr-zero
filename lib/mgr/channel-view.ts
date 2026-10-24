@@ -8,10 +8,10 @@ import { TAX_TREATMENTS, type TaxTreatment } from "./tax-treatments";
  *  chip order and the treatment list can never drift apart. */
 export const CHANNEL_TAX_TREATMENTS = TAX_TREATMENTS.map(sentenceCase);
 
-/** What a treatment means, shown under the chips while it is selected. The
- *  four tax-free removals carry their TTB meaning (#1149, #1207); Taxable,
- *  the ordinary case, has none. */
-const TAX_TREATMENT_HINTS: Partial<Record<TaxTreatment, string>> = {
+/** What a treatment means, shown under the chips while it is selected.
+ *  The four tax-free removals keep their approved TTB meaning (#1149, #1207). */
+const TAX_TREATMENT_HINTS: Record<TaxTreatment, string> = {
+  taxable: "Beer removed with federal excise tax due.",
   export: "Sold for shipment outside the US, not taxed.",
   vessel_supplies: "Supplies for ships or aircraft in foreign trade, not taxed.",
   research: "Used for lab analysis, research or testing, not taxed.",

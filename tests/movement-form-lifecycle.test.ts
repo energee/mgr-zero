@@ -70,18 +70,20 @@ it.each(["/", "/inventory?recordMovement=1&movementHandoff=new", "/inventory?pag
   expect(router.replace).not.toHaveBeenCalled();
 });
 
-it("clears its own deep link synchronously before newer navigation and preserves pagination", () => {
-  navigate("/inventory?recordMovement=1&skuId=s1&page=3");
+it("clears only movement parameters synchronously and preserves pagination, unrelated queries, and the fragment", () => {
+  navigate("/inventory?recordMovement=1&movementHandoff=old&skuId=s1&locationId=l1&binId=b1&lotId=lot1&qty=2&type=depletion&saleChannelId=c1&destState=PA&note=sample&page=3&filter=available&filter=allocated#stock");
   render()[0].props.onOpenChange(false);
-  expect(url.pathname + url.search).toBe("/inventory?page=3");
+  expect(url.pathname + url.search + url.hash).toBe("/inventory?page=3&filter=available&filter=allocated#stock");
   navigate("/inventory?recordMovement=1");
   expect(render()[0].props.open).toBe(true);
   expect(router.replace).not.toHaveBeenCalled();
 });
 
 it("the inventory trigger opens via URL state and browser Back closes it", () => {
+  navigate("/inventory?page=2&filter=available#stock");
   render()[0].props.onOpenChange(true);
   expect(url.searchParams.get("recordMovement")).toBe("1");
+  expect(url.pathname + url.search + url.hash).toBe("/inventory?page=2&filter=available&recordMovement=1#stock");
   expect(render()[0].props.open).toBe(true);
   navigate("/inventory");
   expect(render()[0].props.open).toBe(false);

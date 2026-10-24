@@ -36,7 +36,7 @@ const render = (props: Partial<Parameters<typeof MovementForm>[0]> = {}) => {
 };
 // The form reads window.location; useCommandForm reads the bare global.
 const setUrl = (search: string) => {
-  const location = { pathname: "/inventory", search };
+  const location = { pathname: "/inventory", search, hash: "" };
   vi.stubGlobal("location", location);
   vi.stubGlobal("window", Object.assign(new EventTarget(), { location, history: { replaceState: vi.fn(), pushState: vi.fn() } }));
 };
@@ -53,18 +53,29 @@ afterEach(() => vi.unstubAllGlobals());
 it("starts with no movement type picked and keeps Record movement disabled until one is", () => {
   const html = render({ initial: filled });
   expect(html).not.toContain('data-state="on"');
-  expect(html).toContain("Select kind");
+  expect(html).toContain("Select movement type");
   expect(submitDisabled(html)).toBe(true);
-  expect(html).toContain("Still needed: a kind.");
+  expect(html).toContain("Still needed: movement type.");
   expect(html).not.toContain("Preview:");
 });
 
-it("names every missing field beside the withheld button, and previews once nothing is (#1113)", () => {
-  const empty = render();
-  expect(empty).toMatch(/<p id="([^"]+-reason)"[^>]*>Still needed: a kind, a SKU, a location, a bin, and a quantity above zero with at most two decimals\.<\/p><button[^>]*type="submit"[^>]*aria-describedby="\1"/);
+it("previews a complete movement beside the enabled button (#1113)", () => {
   const ready = render({ initial: { ...filled, type: "production_in" } });
   expect(ready).not.toContain("Still needed");
   expect(ready).toContain("Preview: +2 SKU units");
+  expect(submitDisabled(ready)).toBe(false);
+});
+
+it("explains the disabled Bin and names untracked stock without migration jargon (#1252)", () => {
+  const empty = render();
+  expect(empty).toContain("Choose a location first");
+  expect(empty).toContain("No lot (untracked)");
+  expect(empty).not.toContain("legacy stock");
+  const located = render({ initial: filled });
+  expect(located).not.toContain("Choose a location first");
+  expect(located).toContain("Cold");
+  const noBins = render({ initial: { locationId: "l1" }, bins: [] });
+  expect(noBins).toContain("No bins at this location");
 });
 
 it("Record movement carries the irreversible fill, as its inventory frame draws it: a movement is append-only (#1113)", () => {

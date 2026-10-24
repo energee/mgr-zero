@@ -33,7 +33,10 @@ export function RouteView({ model, controls, busy = false, error, onSave, onDepa
       {E.edit("Vehicle", value.vehicle ?? "", "text", undefined, { onChange: (nextValue: string) => change({ vehicle: nextValue }), id: id + "-vehicle", disabled: busy })}
       {E.edit("Route name", value.name ?? "", "text", undefined, { onChange: (nextValue: string) => change({ name: nextValue }), id: id + "-name", disabled: busy, placeholder: "Route A" })}
       {E.ttl("Stops")}
-      {!model.stops?.length && E.blank("Nothing shipped is waiting for a route.")}
+      {!model.stops?.length && E.blank({
+        title: "No stops ready for a route",
+        description: "In Orders, confirm an order, pick its stock, then ship it. Shipped delivery orders appear here until assigned to a route. Pickup orders do not appear. Picked stock transfers also appear here.",
+      }, undefined, E.act("Open Orders", "primary", model.ordersHref))}
       {(model.stops ?? []).map(row => {
         const selected = row.key in value.selection;
         return <div key={row.key}>{E.row(

@@ -2,6 +2,7 @@
 // the Fermentation reading sheet. The latest row supplies reference values;
 // reading history remains on Vessel detail. The sheet names the tank and,
 // when known, its batch (#716).
+import { cache } from "react";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
@@ -12,20 +13,30 @@ import { readingIdentity } from "@/components/mgr/views/fermentation-reading";
 import { ReadingForm } from "./reading-form";
 import { navTitle } from "@/lib/mgr/nav";
 
-export const metadata = { title: navTitle("/cellar") };
+export async function generateMetadata({ params }: { params: Promise<{ occupancyId: string }> }) {
+  const { occupancyId } = await params;
+  await getOccupancyReadingPageData(occupancyId);
+  return { title: navTitle("/cellar") };
+}
 
 type Occupancy = { occupancy_id: string; vessel_id: string; vessel_name: string | null; batch_no: number | null; brand_name: string | null; bbl: number };
 type Reading = { temp_f: number | null; gravity_plato: number | null; ph: number | null };
 
-export default async function OccupancyReadingPage({ params }: { params: Promise<{ occupancyId: string }> }) {
-  const { occupancyId } = await params;
+const getOccupancyReadingPageData = cache(async function getOccupancyReadingPageData(occupancyId: string) {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [occupancies, readings, gravityUnit] = (await Promise.all([
-    runCommand("list_occupancies", {}, ctx), runCommand("list_fermentation_readings", { occupancyId }, ctx),
-    runCommand("get_gravity_unit", {}, ctx),
-  ])) as [Occupancy[], Reading[], { effective: GravityUnit }];
+  const occupancies = await runCommand("list_occupancies", {}, ctx) as Occupancy[];
   const occupancy = occupancies.find((o) => o.occupancy_id === occupancyId) ?? notFound();
+  return { brewery, ctx, occupancy };
+});
+
+export default async function OccupancyReadingPage({ params }: { params: Promise<{ occupancyId: string }> }) {
+  const { occupancyId } = await params;
+  const { brewery, ctx, occupancy } = await getOccupancyReadingPageData(occupancyId);
+  const [readings, gravityUnit] = await Promise.all([
+    runCommand("list_fermentation_readings", { occupancyId }, ctx),
+    runCommand("get_gravity_unit", {}, ctx),
+  ]) as [Reading[], { effective: GravityUnit }];
 
   return (
     <ReadingForm

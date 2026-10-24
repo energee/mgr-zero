@@ -5,10 +5,12 @@ import { sentenceCase } from "./labels";
 import { bblExact, bblFixed } from "@/lib/volume";
 import { formatDate } from "@/lib/date-format";
 import type { EmptyState } from "./empty-state";
+import { periodStatus, type PeriodStatus } from "@/lib/compliance-period";
 
 export type MonthlyComplianceSnapshot = {
   monthLabel: string;
   timeZone: string;
+  today: string;
   report: Report;
   filing?: Filing;
   losses: LossReview[];
@@ -18,6 +20,8 @@ export type MonthlyComplianceSnapshot = {
 export type MonthlyComplianceViewModel = ComplianceFiguresViewModel & {
   title: string;
   timeZone: string;
+  periodStatus: PeriodStatus;
+  periodStart: string;
   backHref?: string;
   filingDate?: string;
   amendments?: { id: string; oldBasis: string; newBasis: string; actor: string; at: string; reason: string; invalidPeriod: boolean; figures: ComplianceFiguresViewModel }[];
@@ -86,6 +90,8 @@ export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot
     ...toComplianceFigures(figures),
     title: snapshot.monthLabel,
     timeZone: snapshot.timeZone,
+    periodStatus: periodStatus(figures, snapshot.today),
+    periodStart: formatDate(figures.periodStart),
     backHref: snapshot.backHref,
     filingDate: snapshot.filing?.filed_at ? formatDate(snapshot.filing.filed_at, snapshot.timeZone) : undefined,
     amendments: snapshot.filing?.basis_amendments?.map(row => ({

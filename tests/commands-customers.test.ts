@@ -64,6 +64,42 @@ describe("customer CRUD", () => {
     expect(got.customer.name).toBe("New Name");
   });
 
+  it("saves trimmed names and refuses blank new writes after the request lookup (#1306)", async () => {
+    const input = { name: " \tNamed account\n ", alias: "Staff alias", type: "retailer", state: "PA", saleChannelId: wholesale, paymentTerms: "net15", taxTreatment: "export" };
+    const saved = await runCommand("upsert_customer", input, ctx) as { id: string; name: string; alias: string; payment_terms: string; tax_treatment: string };
+    expect(saved).toMatchObject({ name: "Named account", alias: "Staff alias", payment_terms: "net15", tax_treatment: "export" });
+    for (const name of ["", "   ", "\t\n", "\u00a0\u2003"]) {
+      await expect(runCommand("upsert_customer", { ...input, name }, ctx)).rejects.toMatchObject({ status: 400, code: "invalid_input" });
+      await expect(runCommand("upsert_customer", { ...input, id: saved.id, name }, ctx)).rejects.toMatchObject({ status: 400, code: "invalid_input" });
+    }
+    const current = await runCommand("get_customer", { customerId: saved.id }, ctx) as { customer: { name: string } };
+    expect(current.customer.name).toBe("Named account");
+  });
+
+  it.each(["padded", "whitespace"])("replays a historical %s customer name through the command boundary (#1306)", async kind => {
+    const requestId = crypto.randomUUID();
+    const name = kind === "padded" ? ` Legacy account ${requestId} ` : "   ";
+    const payload = JSON.stringify({
+      brewery: b.id, id: null, name, type: "retailer", state: "PA", sale_channel: wholesale,
+      license_no: null, payment_terms: null, tax_treatment: null,
+    }).replaceAll("'", "''");
+    // Reproduce the old RPC's committed row and raw request identity. The new
+    // write guard must not prevent recovering either historical result.
+    const committed = JSON.parse(sql(`
+      select private.claim_command_request_for('${ctx.userId}', '${b.id}', 'upsert_customer', '${requestId}', '${payload}'::jsonb);
+      insert into public.customers(brewery_id, name, type, state, sale_channel_id)
+        values ('${b.id}', '${name}', 'retailer', 'PA', '${wholesale}');
+      select private.complete_command_request_for('${ctx.userId}', '${requestId}',
+        (select to_jsonb(c) from public.customers c where c.brewery_id = '${b.id}' and c.name = '${name}'));
+    `, true).at(-1)!);
+    const replay = await runCommand("upsert_customer", { name, type: "retailer", state: "PA", saleChannelId: wholesale }, ctx, {
+      requestId, correlationId: crypto.randomUUID(),
+    });
+    expect(replay).toEqual(committed);
+    const count = await ctx.db.from("customers").select("id", { count: "exact", head: true }).eq("brewery_id", b.id).eq("name", name);
+    expect(count.count).toBe(1);
+  });
+
   it("omitted paymentTerms preserves the create default and an existing payment term", async () => {
     const created = await runCommand("upsert_customer", {
       name: "Default payment terms", type: "retailer", state: "PA", saleChannelId: wholesale,

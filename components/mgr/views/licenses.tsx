@@ -24,7 +24,7 @@ export function LicensesView({
           {E.row(row.title, row.detail, rowAction(row, actions))}
         </Fragment>
       ))}
-      {model.licenses.length === 0 && E.blank("No licenses yet")}
+      {model.licenses.length === 0 && E.blank("No licenses yet. Record your state licenses here so their numbers and expiry dates are in one place.")}
       {addLicenses !== undefined ? addLicenses : E.btn("Add license", "g")}
     </>
   );
