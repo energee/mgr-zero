@@ -20,6 +20,7 @@ export type NewOrderViewModel = {
   backHref?: string;
   /** Where customers are made, on a live page; the inventory leaves it inert. */
   customersHref?: string;
+  catalogHref?: string;
 };
 
 export type NewOrderSnapshot = {

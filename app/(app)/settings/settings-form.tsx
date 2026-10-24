@@ -3,19 +3,20 @@
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { toast } from "sonner";
-import { booksOpenedChange, oneWayKegFeeChange, toBrewerySettingsValues, breweryOperatingDefaultsCommand, type BrewerySettings } from "@/lib/mgr/settings-view";
+import { booksOpenedChange, oneWayKegFeeChange, toBrewerySettingsValues, breweryOperatingDefaultsCommand, brewerySettingsReason, type BrewerySettings } from "@/lib/mgr/settings-view";
 
 export type { BrewerySettings } from "@/lib/mgr/settings-view";
 
 export function SettingsForm({ brewery, hasFiledReports = false }: { brewery: BrewerySettings; hasFiledReports?: boolean }) {
   const action = useCommandAction();
+  const initial = toBrewerySettingsValues(brewery);
   return <BrewerySettingsFormView
     basisLocked={hasFiledReports}
-    initial={toBrewerySettingsValues(brewery)}
+    initial={initial}
     busy={action.busy} error={action.error}
     onSave={(v) => {
+      if (action.busy || brewerySettingsReason(v, initial)) return;
       const defaults = breweryOperatingDefaultsCommand(v);
-      if (!defaults.valid) return;
       // The books-opened date (frozen after any filed snapshot) and the one-way keg fee
       // each have their own command, so each runs only when changed, after the basics save.
       const books = booksOpenedChange(brewery.books_opened_on ?? "", v.booksOpenedOn);

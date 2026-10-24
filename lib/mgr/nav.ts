@@ -19,7 +19,7 @@ import { hasAnyRole } from "./roles";
 
 /** The areas More's entries are filed under, in the order they are drawn
  * (#1159). The More page and the rail's More group both head each area. */
-const NAV_GROUPS = ["Sales", "Production", "Setup", "Integrations"] as const;
+const NAV_GROUPS = ["Sales", "Production", "Setup", "Menu and chat"] as const;
 export type NavGroup = (typeof NAV_GROUPS)[number];
 
 export type NavItem = {
@@ -86,7 +86,7 @@ export const STAFF_NAV: readonly NavItem[] = [
     children: [
       { label: "Invoices", href: "/invoices", roles: ["sales"], group: "Sales", about: "See what customers owe and open an invoice" },
       { label: "Catalog", href: "/catalog", roles: ["sales"], group: "Sales", about: "Define brands, formats and SKUs" },
-      { label: "Menu", href: "/menu", roles: ["warehouse"], group: "Integrations", about: "Choose what Square sells, where and for how much" },
+      { label: "Menu", href: "/menu", roles: ["warehouse"], group: "Menu and chat", about: "Choose what Square sells, where and for how much" },
       { label: "Customers", href: "/customers", roles: ["sales"], group: "Sales", about: "Manage accounts, ship-tos and portal users" },
       { label: "Price groups", href: "/pricing", roles: ["sales"], group: "Sales", about: "Set prices by group for each sale channel" },
       { label: "Recipes", href: "/recipes", roles: ["brewer"], group: "Production", about: "Write recipes and their versions" },
@@ -95,7 +95,7 @@ export const STAFF_NAV: readonly NavItem[] = [
       { label: "Planning", href: "/planning", roles: ["brewer", "warehouse"], group: "Production", about: "See what planned work is short of" },
       { label: "Import", href: "/settings/import", roles: ["admin"], group: "Setup", about: "Bring in customers, ship-tos, SKUs, prices and opening stock from CSV" },
       { label: "Settings", href: "/settings", roles: ["admin"], group: "Setup", about: "Edit brewery details and connect integrations" },
-      { label: "Chat", href: "/settings/chat", group: "Integrations", about: "Link Slack and set your notifications" },
+      { label: "Chat", href: "/settings/chat", group: "Menu and chat", about: "Link Slack and set your notifications" },
       { label: "Sale channels", href: "/settings/channels", roles: ["admin"], group: "Setup", about: "Name how you sell and how each is taxed" },
       { label: "Locations", href: "/locations", roles: ["admin"], group: "Setup", about: "Manage warehouses, taprooms and their bins" },
       { label: "Units", href: "/settings/units", group: "Setup", about: "Choose how gravity is shown" },
@@ -192,18 +192,29 @@ export function canOpen(roles: readonly StaffRole[], path: string): boolean {
   return !best || allowed(best, roles);
 }
 
-/**
- * The browser-tab title of the staff page at `path` (#1109): the label of the
- * deepest STAFF_NAV entry covering it. /routes reads "Deliveries";
- * /settings/team has no entry and follows Settings. Each page exports
- * `metadata = { title: navTitle("<its route>") }`; a record page passes its
- * static parent, so /orders/[id] reads "Orders" (#1230). The root layout's
- * template appends " · MGR". Throws for a path no STAFF_NAV entry covers, so
- * a page outside the nav fails at build. tests/page-titles.test.ts catches a
- * page that passes a route other than its own static route, such as a moved
- * page.
- */
+/** Subpages with their own headings but no sidebar entry (#1255).
+ * Exact matches keep a creation page's title from leaking into record pages. */
+const SUBPAGE_TITLES: Readonly<Record<string, string>> = {
+  "/kegs/report": "Keg report",
+  "/kegs/history": "Keg history",
+  "/cellar/vessels/new": "New vessel",
+  "/catalog/water-profiles": "Water profiles",
+  "/catalog/brands/new": "New brand",
+  "/recipes/new": "New recipe",
+  "/compliance/licenses": "Licenses",
+  "/settings/accounting": "Accounting",
+  "/settings/pos": "Point of sale",
+  "/settings/pos/connect": "Connect Square",
+  "/settings/pos/connector": "Taproom sales in QuickBooks",
+  "/settings/team": "Team",
+};
+
+/** Browser-tab title without the root layout's " · MGR" suffix.
+ * Named subpages use their heading; other pages use their navigation section.
+ * Record pages with a data-dependent heading export generateMetadata instead. */
 export function navTitle(path: string): string {
+  const title = SUBPAGE_TITLES[path];
+  if (title) return title;
   const entry = coveringEntry(path);
   if (!entry) throw new Error(`No STAFF_NAV entry covers ${path}`);
   return entry.label;

@@ -15,8 +15,22 @@ import "@/lib/commands/all";
 import { money } from "@/lib/mgr/money";
 import { SIZE_LABEL } from "@/lib/mgr/keg-labels";
 import { navTitle } from "@/lib/mgr/nav";
+import { cache } from "react";
 
-export const metadata = { title: navTitle("/kegs/customers") };
+const getCustomerData = cache(async function getCustomerData(customerId: string) {
+  if (!isUuid(customerId)) notFound();
+  const brewery = await getActiveBrewery();
+  const ctx = await buildContext(brewery.id);
+  const customer = ((await runCommand("list_customers", {}, ctx)) as { id: string; name: string }[]).find((c) => c.id === customerId);
+  if (!customer) notFound();
+  return { ctx, customer };
+});
+
+export async function generateMetadata({ params }: { params: Promise<{ customerId: string }> }) {
+  const { customerId } = await params;
+  await getCustomerData(customerId);
+  return { title: navTitle("/kegs/customers") };
+}
 
 type Balance = {
   rows: { pool_id: string; pool_name: string; keg_size: string; kegs_out: number; kegs_on_deposit: number; deposit_cents: number; mismatch: boolean }[];
@@ -25,11 +39,7 @@ type Balance = {
 
 export default async function CustomerKegBalancePage({ params }: { params: Promise<{ customerId: string }> }) {
   const { customerId } = await params;
-  if (!isUuid(customerId)) notFound();
-  const brewery = await getActiveBrewery();
-  const ctx = await buildContext(brewery.id);
-  const customer = ((await runCommand("list_customers", {}, ctx)) as { id: string; name: string }[]).find((c) => c.id === customerId);
-  if (!customer) notFound();
+  const { ctx, customer } = await getCustomerData(customerId);
   const balance = (await runCommand("get_customer_keg_balance", { customerId }, ctx)) as Balance;
   return (
     <KegBalanceView
