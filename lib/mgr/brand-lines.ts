@@ -19,3 +19,17 @@ export function byBrand<T extends { skus: BrandedSku }>(lines: T[]): T[] {
   const key = (l: T) => [l.skus?.brands?.name ?? "", brandLabel(l.skus).name];
   return lines.toSorted((a, b) => { const [ab, af] = key(a), [bb, bf] = key(b); return ab.localeCompare(bb) || af.localeCompare(bf); });
 }
+
+/** Pick sheets name the format once, then list its brands with their staff aliases. */
+export function formatLabel(sku: BrandedSku): { group?: string; name: string } {
+  const label = brandLabel(sku);
+  return label.group ? { group: label.name, name: label.group } : label;
+}
+
+/** Formats together across brands, then brands in name order within each format. */
+export function byFormat<T extends { skus: BrandedSku }>(lines: T[]): T[] {
+  return lines.toSorted((a, b) => {
+    const al = formatLabel(a.skus), bl = formatLabel(b.skus);
+    return (al.group ?? "").localeCompare(bl.group ?? "") || al.name.localeCompare(bl.name);
+  });
+}
