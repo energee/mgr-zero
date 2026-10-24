@@ -11,7 +11,9 @@ vi.mock("react", async importOriginal => ({ ...await importOriginal<typeof impor
   return [harness.values.shift(), vi.fn()];
 } }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: () => ({ data: [] }) }));
+vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: () => ({ data: [
+  { id: "sku-1", name: "One", brands: null }, { id: "sku-2", name: "Two", brands: null },
+] }) }));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandForm: (_name: string, opts: { build: () => unknown }) => {
   return { submit: () => { harness.sent.push(opts.build()); }, submitting: false, error: null };
 } }));
@@ -19,11 +21,15 @@ import { OrderForm } from "@/app/(app)/orders/order-form";
 
 beforeEach(() => { harness.values = []; harness.sent = []; });
 const complete = { skuId: "sku-1", qty: "12" };
-function render(lines: { skuId: string; qty: string }[]) {
-  harness.values = ["wholesale", "customer", "dock", "source", "", "", "", false, lines];
+function render(lines: { skuId: string; qty: string }[], kind: "wholesale" | "taproom_transfer" = "wholesale", emptyCatalog = false) {
+  harness.values = [kind, "customer", "dock", "source", "", "", "", false, lines];
   harness.renderingOrder = true;
   // Selected SKUs must be offered options, or #714's unavailable-SKU gate blocks the save instead.
-  try { return OrderForm({ timeZone: "America/Los_Angeles", customers: [], locations: [], skus: [{ id: "sku-1", label: "One" }, { id: "sku-2", label: "Two" }] }); }
+  try { return OrderForm({ timeZone: "America/Los_Angeles",
+    customers: emptyCatalog ? [] : [{ id: "customer", name: "Buyer", sale_channel_id: "channel", shipTos: [{ id: "dock", label: "Dock" }] }],
+    locations: [{ id: "source", name: "Warehouse", kind: "warehouse" }],
+    skus: emptyCatalog ? [] : [{ id: "sku-1", label: "One" }, { id: "sku-2", label: "Two" }],
+  }); }
   finally { harness.renderingOrder = false; }
 }
 
@@ -62,4 +68,25 @@ it("sends every valid line and ignores only wholly blank spare rows", () => {
   const form = render([complete, { skuId: "", qty: "" }, { skuId: "sku-2", qty: "2.5" }]);
   form.props.onSubmit({ preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as FormEvent);
   expect(harness.sent).toEqual([expect.objectContaining({ lines: [{ skuId: "sku-1", qty: 12 }, { skuId: "sku-2", qty: 2.5 }] })]);
+});
+
+it.each(["wholesale", "taproom_transfer"] as const)("keeps untouched blank lines quiet for %s", kind => {
+  const html = renderToStaticMarkup(render([{ skuId: "", qty: "" }], kind).props.children);
+  expect(html).not.toMatch(/Line 1:|aria-invalid="true"/);
+});
+
+it("shows one setup message and keeps saving disabled on an empty catalog", () => {
+  const form = render([{ skuId: "", qty: "" }], "wholesale", true);
+  const html = renderToStaticMarkup(form);
+  expect(html).toContain("Before creating an order, add a customer and a SKU.");
+  expect(html).not.toContain("Still needed:");
+  expect(html).toMatch(/type="submit"[^>]*disabled=""/);
+  expect(html).toContain('href="/customers"');
+  expect(html).toContain('href="/catalog"');
+  form.props.onSubmit({ preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as FormEvent);
+  expect(harness.sent).toEqual([]);
+});
+
+it("asks for a destination location in sentence case", () => {
+  expect(render([complete], "taproom_transfer").props.children.props.reason).toBe("Still needed: a destination location.");
 });

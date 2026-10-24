@@ -5,6 +5,7 @@
 import { brandLabel } from "./brand-view";
 import { batNo } from "@/lib/mgr/doc-no";
 import { formatVolume } from "@/lib/volume";
+import { submitReason } from "./submit-reason";
 
 type Option = { value: string; label: string };
 
@@ -46,6 +47,14 @@ export const plannedQty = (value: string | undefined) => {
   const qty = Number(value);
   return value?.trim() && Number.isFinite(qty) && qty > 0 ? qty : 0;
 };
+
+export function scheduleRunReason(model: Pick<SchedulePackagingRunViewModel, "brandId" | "plannedOn" | "outputs">): string | null {
+  const missing: string[] = [];
+  if (!model.brandId) missing.push("a brand");
+  if (!model.plannedOn) missing.push("a planned date");
+  if (!model.outputs.some((output) => plannedQty(output.qty) > 0)) missing.push("a positive planned output quantity");
+  return submitReason(missing);
+}
 
 export function toSchedulePackagingRunView(data: ScheduleRunData, draft: ScheduleRunDraft): SchedulePackagingRunViewModel {
   const skus = data.skus.filter((sku) => sku.brand_id === draft.brandId);

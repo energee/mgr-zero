@@ -37,6 +37,7 @@ async function query(name: string, input?: { basis?: string; missingPortalEmail?
     case "get_bin_move_stock": return [{ bin_id: "bin", skuId: "sku", qty: 4 }];
     // #994: the searched lists record their input and find nothing, so the no-match copy shows.
     case "list_recipes": case "list_vendors_and_contracts": case "list_materials": state.inputs[name] = input; return [];
+    case "list_packaging_runs": case "list_occupancies": case "list_repack_parents": return [];
     case "list_vendors": case "get_material_on_hand": return [];
     case "list_routes": return { routes: [
       { id: "planned", name: "North loop", delivery_date: "2026-09-11", driver_user_id: "driver-1", driver_email: "sam@example.test", vehicle: null, note: null, departed_at: null, returned_at: null, stops: [] },
@@ -66,6 +67,10 @@ import { CustomersView } from "@/components/mgr/views/customers";
 import { CustomerDetailForm } from "@/app/(app)/customers/customer-detail-form";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
+import PackagingPage from "@/app/(app)/packaging/page";
+import { ScheduleRunForm } from "@/app/(app)/packaging/schedule-run-form";
+import { SchedulePackagingRunView } from "@/components/mgr/views/schedule-packaging-run";
+import { toSchedulePackagingRunView } from "@/lib/mgr/schedule-packaging-run-view";
 beforeEach(() => { state.roles = ["admin"]; state.calls = []; });
 it("assembles shared Catalog with the brand link and the shared format list", async () => {
   const page = await CatalogPage();
@@ -76,6 +81,19 @@ it("assembles shared Catalog with the brand link and the shared format list", as
   for (const text of ["/catalog/brands/brand", "/catalog/formats/keg"]) expect(html).toContain(text);
   for (const text of ["Edit brand", "Edit SKU", "UPC 123456", "New pour", "Edit pour"]) expect(html).not.toContain(text);
   expect(html).not.toContain("/catalog/formats/pour");
+});
+it.each([
+  ["admin", true], ["sales", true], ["brewer", false], ["warehouse", false],
+] as const)("Schedule run gives %s a brand creation link only with permission (#1256)", async (role, canCreate) => {
+  state.roles = [role];
+  const page = await PackagingPage({ searchParams: Promise.resolve({}) });
+  const form = page.props.actions.props.children[0];
+  expect(form.type).toBe(ScheduleRunForm);
+  expect(form.props.catalogHref).toBe(canCreate ? "/catalog" : null);
+  const model = toSchedulePackagingRunView({ brands: [], occupancies: [], skus: [] }, { brandId: "", occupancyId: "", plannedOn: "", qty: {} });
+  const markup = render(createElement(SchedulePackagingRunView, { model, catalogHref: form.props.catalogHref }));
+  expect(markup.includes('href="/catalog"')).toBe(canCreate);
+  if (!canCreate) expect(markup).toContain("An admin or sales member can add a brand in Catalog.");
 });
 // #1062: Catalog links a brand, Price groups and Water profiles only for a role
 // that page lets in (upsert_brand, the /pricing reads, list_water_profiles).

@@ -8,6 +8,7 @@ import { SCREENS } from "../components/mgr/screens";
 import { BACK, INERT, isInertOn, PORTAL, resolveTap, TAPS, ROUTES } from "../lib/mgr/screen-links";
 import { deniedFor, needsFor, PERSONAS } from "../lib/mgr/demo-personas";
 import { pageUnder } from "../lib/mgr/screen-explorer";
+import { WORK_FILTER_CHIPS } from "../lib/mgr/work-view";
 
 const by = (name: string) => SCREENS.find((s) => s.name === name)!;
 const names = new Set(SCREENS.map((s) => s.name));
@@ -90,9 +91,10 @@ describe("Work chips", () => {
     const { createElement } = await import("react");
     const { WORK_TABS } = await import("../components/mgr/screens");
     for (const name of Object.values(WORK_TABS)) expect(by(name), name).toBeDefined();
-    for (const name of ["Work", "Orders", "Transfers", "Batches", "Packaging runs", "Purchase orders", "Routes"]) {
+    for (const name of ["Work", "Orders", "Transfers", "Batches", "Packaging runs", "Purchase orders", "Routes", "Pick sheet", "Pars and allocation"]) {
       const html = renderToStaticMarkup(createElement("div", null, by(name).body));
-      for (const to of Object.values(WORK_TABS)) expect(html, `${name} → ${to}`).toContain(`data-to="${to}"`);
+      const destinations = name === "Work" ? WORK_FILTER_CHIPS.map(chip => WORK_TABS[chip]) : Object.values(WORK_TABS);
+      for (const to of destinations) expect(html, `${name} → ${to}`).toContain(`data-to="${to}"`);
     }
   });
 });
@@ -109,6 +111,9 @@ describe("reported explorer flows", () => {
     ["Invoice history", "INV-1037", "Paid invoice"],
     ["Portal Me", "Change password", "Portal set password"],
     ["Set new password", "Save password", "Today"],
+    ["Set new password", "Back to MGR", BACK],
+    ["Portal set password", "Back to MGR", BACK],
+    ["Page not found", "Back to Today", "Today"],
     ["Create brewery", "Create brewery", "First-run checklist"],
     ["Accounting", "Review", "Customers missing email"],
     ["Mapping conflict", "Save mapping", "Accounting"],
