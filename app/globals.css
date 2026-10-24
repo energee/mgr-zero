@@ -7,10 +7,9 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Product chrome: composer below phone tabs (40), both below modal surfaces (50).
-   Target its viewport, not the popup: the viewport owns the stacking context. */
-[data-slot="drawer-portal"] > div:has(> [data-mgr-composer]) {
-  z-index: 30;
+/* The chat workspace overlays navigation but stays below command forms. */
+[data-mgr-composer] {
+  z-index: 45;
 }
 
 @theme inline {

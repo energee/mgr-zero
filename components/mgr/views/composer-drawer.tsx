@@ -1,15 +1,12 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Dialog } from "@base-ui/react/dialog";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerPortal, DrawerTitle } from "@/components/ui/drawer";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { cn } from "@/lib/utils";
 
-const MINIMIZED = "44px";
-const COMPACT = "480px";
-const EXPANDED = 1;
-
+/** Shared staff-shell entry point and overlay; live and inventory supply the conversation. */
 export function ComposerDrawerView({ children, open, onOpenChange, container }: {
   children: ReactNode;
   open?: boolean;
@@ -18,61 +15,55 @@ export function ComposerDrawerView({ children, open, onOpenChange, container }: 
 }) {
   const isMobile = useIsMobile();
   const [internalOpen, setInternalOpen] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const [interacted, setInteracted] = useState(false);
   const chatOpen = open ?? internalOpen;
-  const minimized = isMobile ? "92px" : MINIMIZED;
-  const snapPoint = !chatOpen ? minimized : expanded ? EXPANDED : COMPACT;
-  const setSnapPoint = (point: string | number | null) => {
-    const nextOpen = point !== minimized;
-    setExpanded(point === EXPANDED);
+  const panelId = useId();
+  const navigateRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  function changeOpen(nextOpen: boolean) {
     if (open === undefined) setInternalOpen(nextOpen);
     onOpenChange?.(nextOpen);
-  };
-  const nextSnapPoint = snapPoint === minimized ? COMPACT : snapPoint === COMPACT ? EXPANDED : minimized;
-  const handleLabel = snapPoint === minimized ? "Open Ask MGR" : snapPoint === COMPACT ? "Expand Ask MGR" : "Minimize Ask MGR";
+  }
+
+  useEffect(() => {
+    if (!chatOpen || !isMobile) return;
+    const frame = requestAnimationFrame(() => {
+      const panel = panelRef.current;
+      if (panel && !panel.contains(panel.ownerDocument.activeElement)) panel.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [chatOpen, isMobile]);
 
   return (
-    <Drawer
-      open
-      modal={false}
-      disablePointerDismissal
-      snapToSequentialPoints
-      snapPoints={[minimized, COMPACT, EXPANDED]}
-      snapPoint={snapPoint}
-      onSnapPointChange={setSnapPoint}
-    >
-      {/* Nested portals inherit this container, preserving DrawerContent's shared viewport and popup. */}
-      <DrawerPortal container={container}>
-      <DrawerContent
-        // app/globals.css uses this marker to layer the owning viewport below Tabs.
-        data-mgr-composer=""
-        // Keep the initial peek stationary while Base UI measures its portal.
-        className={cn("max-h-none! border-t [--composer-peek:44px] max-md:[--composer-peek:92px]", container ? "h-full!" : "h-dvh!", !interacted && !chatOpen && "transform-[translate3d(0,calc(100%-var(--composer-peek)),0)]! transition-none!")}
-        initialFocus={false}
-        handle={<div
-          className="group h-11 w-full shrink-0 cursor-grab touch-pan-x active:cursor-grabbing"
-          onPointerDown={(event) => {
-            setInteracted(true);
-            const startY = event.clientY;
-            addEventListener("pointerup", ({ clientY }) => {
-              if (Math.abs(clientY - startY) < 8) setSnapPoint(nextSnapPoint);
-            }, { once: true });
-          }}
+    <Dialog.Root open={chatOpen} onOpenChange={(nextOpen, details) => {
+      // Radix foreground forms handle Escape before this Base UI panel.
+      if (details.reason === "escape-key" && details.event.defaultPrevented) {
+        details.cancel();
+        return;
+      }
+      changeOpen(nextOpen);
+    }} modal={isMobile} disablePointerDismissal>
+      <ToggleGroup type="single" value={chatOpen ? "chat" : "navigate"} onValueChange={(value) => { if (value) changeOpen(value === "chat"); }} variant="outline" size="sm" spacing={0} aria-label="Workspace mode">
+        <ToggleGroupItem ref={navigateRef} value="navigate">Navigate</ToggleGroupItem>
+        <ToggleGroupItem value="chat" aria-controls={panelId} aria-expanded={chatOpen} aria-keyshortcuts="Meta+K Control+K" title="Ask MGR (⌘K / Ctrl+K)">Ask MGR</ToggleGroupItem>
+      </ToggleGroup>
+      <Dialog.Portal container={container} keepMounted>
+        <Dialog.Popup
+          id={panelId}
+          ref={panelRef}
+          data-mgr-composer=""
+          initialFocus={panelRef}
+          finalFocus={navigateRef}
+          className="fixed inset-y-0 right-0 flex w-full min-h-0 flex-col overflow-hidden border-l bg-popover text-sm text-popover-foreground shadow-lg outline-none data-closed:hidden md:top-12 md:w-[min(32rem,calc(100vw-12rem))]"
         >
-          {/* Base UI ignores mouse drags on buttons. The handle owns pointer gestures; the button owns keyboard activation. */}
-          <Button type="button" variant="ghost" aria-label={handleLabel} aria-expanded={snapPoint === EXPANDED} className="pointer-events-none h-11 w-full rounded-none" onClick={(event) => { if (event.detail === 0) setSnapPoint(nextSnapPoint); }}>
-            <span aria-hidden="true" className="h-1 w-12 rounded-full bg-muted-foreground/25 motion-safe:transition-[width,background-color] group-hover:w-16 group-hover:bg-muted-foreground/45" />
-          </Button>
-        </div>}
-      >
-        <DrawerHeader className="sr-only">
-          <DrawerTitle>Ask MGR</DrawerTitle>
-          <DrawerDescription>Chat with your brewery data and complete work in MGR.</DrawerDescription>
-        </DrawerHeader>
-        <div className={`flex min-h-0 w-full flex-col gap-3 overflow-y-auto px-4 pt-2 ${snapPoint === minimized ? "h-0 overflow-hidden p-0" : snapPoint === EXPANDED ? "flex-1 pb-4 max-md:pb-[calc(4rem+env(safe-area-inset-bottom))]" : "h-[calc(30rem-2.75rem)] pb-4 max-md:h-[calc(27rem-2.75rem)]"}`}>{children}</div>
-      </DrawerContent>
-      </DrawerPortal>
-    </Drawer>
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-2">
+            <Dialog.Title className="font-semibold">Ask MGR</Dialog.Title>
+            <Button type="button" variant="ghost" size="sm" data-preview-action onClick={() => changeOpen(false)}>Back to page</Button>
+          </div>
+          <Dialog.Description className="sr-only">Chat with your brewery data. Closing keeps your conversation and unsent message.</Dialog.Description>
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))]">{children}</div>
+        </Dialog.Popup>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

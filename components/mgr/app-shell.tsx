@@ -28,7 +28,7 @@ export type AppShellProps = {
   items: readonly NavItem[];
   /** Header controls (Search, Me, Sign out). Owned by the layout, not the shell. */
   headerRight?: React.ReactNode;
-  /** Chat composer above the tab bar. */
+  /** Header workspace switch and its conversation overlay. */
   composer?: React.ReactNode;
   /** Force the active tab (the inventory renders screens off their real route). */
   active?: string;
@@ -91,17 +91,16 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
         </SidebarContent>
       </Sidebar>
       <SidebarInset className="h-full min-h-0 min-w-0 overflow-hidden print:h-auto print:overflow-visible">
-        <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-2">
-          <span className="flex min-w-0 items-center gap-1 text-sm font-medium">
+        <header className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b px-2 py-2 md:h-12 md:py-0">
+          <div className="flex min-w-0 flex-col items-start gap-1 text-sm font-medium md:flex-row md:items-center">
+            {composer && <span className="max-w-48 truncate text-xs text-muted-foreground md:hidden">{brandMark}</span>}
             <SidebarTrigger className="hidden md:inline-flex" />
-            <span className="md:hidden">{brandMark}</span>
-          </span>
+            {composer ?? <span className="md:hidden">{brandMark}</span>}
+          </div>
           {headerRight && <span className="flex shrink-0 items-center gap-1">{headerRight}</span>}
         </header>
-        {/* Keep page scrolling above the reserved composer and Tabs, rather than behind their portals.
-            SidebarInset is already the <main> landmark. */}
+        {/* SidebarInset is already the <main> landmark; only page content scrolls. */}
         <div data-mgr-page-scroll="" className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4 md:px-8 md:py-6 print:overflow-visible">{children}</div>
-        {composer && <div className="h-11 shrink-0">{composer}</div>}
         <TabBar items={items} active={current} className="md:hidden" />
       </SidebarInset>
     </SidebarProvider>
@@ -109,7 +108,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
   );
 }
 
-/** Phone tab bar: above the composer (30), below modal and picker surfaces (50). */
+/** Phone navigation stays below chat (45) and modal forms (50). */
 export function TabBar({ items, active, className }: { items: readonly NavItem[]; active?: string; className?: string }) {
   return (
     <nav

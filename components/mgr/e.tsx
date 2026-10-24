@@ -17,8 +17,7 @@ import { SortTable } from "@/components/mgr/sort-table";
 import { SubmitButton, type SubmitButtonProps } from "@/components/mgr/submit-button";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
 import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
-import { ComposerDrawerView } from "@/components/mgr/views/composer-drawer";
-import { ComposerStripView } from "@/components/mgr/views/composer-strip";
+import { ComposerDemo } from "@/components/mgr/composer-demo";
 import { VolumeField } from "@/components/mgr/volume-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -579,7 +578,7 @@ export const E = {
    *  every call site writing the hole. */
   line: (t: React.ReactNode, s: React.ReactNode, n: React.ReactNode, cls: RowClass, fields: React.ReactNode) => E.row(t, s, n, cls, undefined, fields),
   sp: () => <div className="flex-1" />,
-  comp: (roles: readonly StaffRole[] = ["admin"], container?: HTMLElement | null) => <ComposerDrawerView container={container}><ComposerStripView disabled={!roles.length} actions={[{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }]} /></ComposerDrawerView>,
+  comp: (roles: readonly StaffRole[] = ["admin"], container?: HTMLElement | null) => <ComposerDemo disabled={!roles.length} container={container} />,
 };
 
 function isPin(n: ReactNode) {
