@@ -15,7 +15,7 @@ const ComposerConversation = lazy(() => import("@/components/mgr/composer-conver
 export const isComposerShortcut = (event: { key?: string; metaKey?: boolean; ctrlKey?: boolean }) =>
   event.key?.toLowerCase() === "k" && Boolean(event.metaKey || event.ctrlKey);
 
-export function Composer({ roles }: { roles: readonly StaffRole[] }) {
+export function Composer({ roles, chatConfigured }: { roles: readonly StaffRole[]; chatConfigured: boolean }) {
   const expectedContext = useCommandContext();
   const breweryId = expectedContext.breweryId ?? "";
   const [open, setOpen] = useState(false);
@@ -78,7 +78,7 @@ export function Composer({ roles }: { roles: readonly StaffRole[] }) {
     {/* Keep a started conversation mounted when minimized: drafts and streams survive. */}
     {hasOpened && <ComposerLoadBoundary fallback={<ComposerUnavailableView failed outboxCount={outboxEntries.length} onOutbox={() => setOutboxOpen(true)}>{outbox}</ComposerUnavailableView>}>
       <Suspense fallback={<ComposerUnavailableView outboxCount={outboxEntries.length} onOutbox={() => setOutboxOpen(true)}>{outbox}</ComposerUnavailableView>}>
-        <ComposerConversation open={open} onOpenChange={changeOpen} focusRequest={focusRequest} outboxCount={outboxEntries.length} onOutbox={() => setOutboxOpen(true)}>{outbox}</ComposerConversation>
+        <ComposerConversation chatConfigured={chatConfigured} open={open} onOpenChange={changeOpen} focusRequest={focusRequest} outboxCount={outboxEntries.length} onOutbox={() => setOutboxOpen(true)}>{outbox}</ComposerConversation>
       </Suspense>
     </ComposerLoadBoundary>}
   </ComposerDrawerView>;
