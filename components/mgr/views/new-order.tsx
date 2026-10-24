@@ -37,8 +37,8 @@ function OrderPick({ label, value, options, onChange, empty }: { label: string; 
 // The adapter supplies options and request feedback. SearchPick keeps pending
 // reads from looking empty and retained unavailable selections labelled.
 // Called as a function so it still returns SearchPick's CommandForm element.
-export function OrderSkuPicker({ options, ...props }: { value: string; label: string; options: { id: string; label: string }[]; onChange?: (id: string) => void; selectedLabel?: string; feedback?: ReactNode; optionsReady?: boolean; emptyMessage?: string; errorId?: string; invalid?: boolean }) {
-  return SearchPick({ ...props, options: options.map(option => ({ value: option.id, label: option.label })), title: "Select SKU", placeholder: "Select SKU", searchPlaceholder: "Search SKUs", noMatchMessage: "No matching SKUs" });
+export function OrderSkuPicker({ options, catalogHref, emptyMessage = catalogHref ? <>No active SKUs yet. {E.link("Add a SKU", "Catalog", catalogHref)}</> : "No SKUs available for this order.", ...props }: { value: string; label: string; options: { id: string; label: string }[]; onChange?: (id: string) => void; selectedLabel?: string; feedback?: ReactNode; optionsReady?: boolean; emptyMessage?: ReactNode; catalogHref?: string; errorId?: string; invalid?: boolean }) {
+  return SearchPick({ ...props, emptyMessage, options: options.map(option => ({ value: option.id, label: option.label })), title: "Select SKU", placeholder: "Select SKU", searchPlaceholder: "Search SKUs", noMatchMessage: "No matching SKUs" });
 }
 
 /** `invalid` marks the quantity; `errorId` names the message that says why,
@@ -101,7 +101,7 @@ export function NewOrderView({ model, controls = {}, messages, feedback, skuFeed
       const unavailableId = line.skuError ? `${errorPrefix}-sku-${index}` : undefined;
       return <div key={index}>
       {E.row(
-        <OrderSkuPicker label={`Line ${index + 1} SKU`} value={line.skuId ?? line.name} options={skus} selectedLabel={line.name} feedback={skuFeedback} optionsReady={skuOptionsReady} emptyMessage={skuEmptyMessage} errorId={describedBy(unavailableId, ids.sku)} invalid={Boolean(errors.sku)} onChange={controls.lineSku && (value => controls.lineSku?.(index, value))} />,
+        <OrderSkuPicker label={`Line ${index + 1} SKU`} value={line.skuId ?? line.name} options={skus} catalogHref={model.catalogHref ?? "#"} selectedLabel={line.name} feedback={skuFeedback} optionsReady={skuOptionsReady} emptyMessage={skuEmptyMessage} errorId={describedBy(unavailableId, ids.sku)} invalid={Boolean(errors.sku)} onChange={controls.lineSku && (value => controls.lineSku?.(index, value))} />,
         line.atp == null ? "" : `ATP ${line.atp} at ${sourceLabel}`,
         <OrderQuantity contextualLabels label={`Line ${index + 1} quantity`} value={line.qty} invalid={Boolean(errors.qty)} errorId={ids.qty} onBlur={() => touched.touch(index)} onChange={controls.lineQty && (value => controls.lineQty?.(index, value))} />,
         line.warning ? "w" : "",

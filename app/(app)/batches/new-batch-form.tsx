@@ -10,13 +10,12 @@ import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { ScheduleBatchView } from "@/components/mgr/views/schedule-batch";
-import { NONE } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { scheduleBatchReason } from "@/lib/mgr/schedule-batch-view";
 type Brand = { id: string; name: string; alias?: string | null };
 type RecipeVersion = { id: string; label: string };
 
-export function NewBatchForm({ brands, recipeVersions }: { brands: Brand[]; recipeVersions: RecipeVersion[] }) {
+export function NewBatchForm({ brands, recipeVersions, brandsHref }: { brands: Brand[]; recipeVersions: RecipeVersion[]; brandsHref: string | null }) {
   const [intendedBrandId, setIntendedBrandId] = useState("");
   const [recipeVersionId, setRecipeVersionId] = useState("");
   const [plannedOn, setPlannedOn] = useState("");
@@ -40,11 +39,12 @@ export function NewBatchForm({ brands, recipeVersions }: { brands: Brand[]; reci
     plannedBbl,
     date: plannedOn,
     note,
+    recipesHref: "/recipes",
+    brandsHref,
   };
-  const optional = (set: (value: string) => void) => (value: string) => set(value === NONE ? "" : value);
   const controls = {
-    recipeId: optional(setRecipeVersionId),
-    brandId: optional(setIntendedBrandId),
+    recipeId: setRecipeVersionId,
+    brandId: setIntendedBrandId,
     plannedBbl: setPlannedBbl,
     date: setPlannedOn,
     note: setNote,

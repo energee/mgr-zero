@@ -14,7 +14,7 @@ const skus = [{ id: "sku", label: "Fixture Beer Keg" }, { id: "other", label: "O
 let customer = "a";
 let kind = "wholesale";
 const setCustomer = (value: string) => { customer = value; };
-function form() {
+function form(catalog = skus) {
   // Exactly nine OrderForm state hooks (pickup is the eighth); fail fast if its state contract changes.
   state.useState.mockReset();
   state.useState.mockReturnValueOnce([kind, vi.fn()]).mockReturnValueOnce([customer, setCustomer])
@@ -22,7 +22,7 @@ function form() {
     .mockReturnValueOnce(["", vi.fn()]).mockReturnValueOnce(["", vi.fn()]).mockReturnValueOnce(["", vi.fn()])
     .mockReturnValueOnce([false, vi.fn()])
     .mockReturnValueOnce([[{ skuId: "sku", qty: "3" }], vi.fn()]);
-  const rendered = OrderForm({ timeZone: "America/Los_Angeles", customers, locations: [{ id: "source", name: "Source", kind: "warehouse" }], skus });
+  const rendered = OrderForm({ timeZone: "America/Los_Angeles", customers, locations: [{ id: "source", name: "Source", kind: "warehouse" }], skus: catalog });
   expect(state.useState).toHaveBeenCalledTimes(9);
   return rendered;
 }
@@ -41,6 +41,12 @@ it("distinguishes cold loading, offline, failure and genuine empty pricing", () 
   state.error = null; state.data = [];
   expect(view().skuOptionsReady).toBe(true);
   expect(view().skuEmptyMessage).toBe("No active SKUs are priced for this customer. Check Price groups or choose another customer.");
+});
+it("offers catalog recovery rather than pricing advice when no active catalog exists", () => {
+  state.data = [];
+  const props = form([]).props.children.props as Parameters<typeof NewOrderView>[0];
+  expect(props.skuEmptyMessage).toBeUndefined();
+  expect(props.model.catalogHref).toBe("/catalog");
 });
 it("keeps cached eligible choices on failed refetch with recovery feedback", () => {
   state.data = [{ id: "sku", name: "Keg", brands: null }]; state.error = new Error("Refresh failed");

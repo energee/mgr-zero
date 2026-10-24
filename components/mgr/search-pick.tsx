@@ -32,7 +32,7 @@ export function SearchPick({ value, label, options, onChange, title, placeholder
   /** Shown when options exist but none match the search. */
   noMatchMessage: string;
   /** Shown when there are no options at all. */
-  emptyMessage?: string;
+  emptyMessage?: ReactNode;
   selectedLabel?: string;
   feedback?: ReactNode;
   optionsReady?: boolean;

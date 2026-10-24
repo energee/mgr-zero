@@ -52,6 +52,7 @@ export function BrandView({
   messages,
   footer,
   linkRows,
+  pricingHref,
   actions = {},
   addCompliance,
   categoryAction,
@@ -68,6 +69,8 @@ export function BrandView({
   footer?: ReactNode;
   /** Live: Edit on price group is a link. */
   linkRows?: boolean;
+  /** Brand editing and price-group setup both require Admin or Sales. */
+  pricingHref?: string;
   /** Live: per-row Edit sheets keyed by compliance row; null suppresses the drawn verb. */
   actions?: Record<string, ReactNode>;
   /** Live: the Add approval / Add registration sheets; null hides them. */
@@ -113,6 +116,7 @@ export function BrandView({
           </div>
           {E.ttl("Selling")}
           <RegistrySelect label="Price group" value={model.priceGroup} options={model.priceGroupOptions} onChange={controls.priceGroup} />
+          <FieldDescription>{model.priceGroupOptions.length === 1 && <>No price groups yet. </>}{E.link("Manage price groups", "Price groups", pricingHref)}. Leave No price group to keep this brand unpriced.</FieldDescription>
           {model.suggestion
             ? E.row(model.suggestion.title, model.suggestion.detail, suggestionAction(model.suggestion, controls.priceGroup), model.suggestion.kind === "unknown" ? "w" : "")
             : null}

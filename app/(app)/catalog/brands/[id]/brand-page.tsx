@@ -105,6 +105,7 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
           }, { target: name })}
         />}
         linkRows
+        pricingHref="/pricing"
         messages={<CommandFormMessage error={error} />}
         busy={busy}
         actions={actions ?? undefined}
