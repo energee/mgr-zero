@@ -6,6 +6,7 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { startsGroup } from "@/lib/mgr/brand-lines";
 import type { PickSheetViewModel } from "@/lib/mgr/pick-sheet-view";
+import { plural } from "@/lib/mgr/plural";
 
 export type { PickSheetViewModel };
 
@@ -29,22 +30,43 @@ export function PickSheetView({
   return (
     <>
       {E.back("Work", "Pick sheet", printAction, backHref)}
+      <p className="text-sm text-muted-foreground">
+        Stage beer by ship date, then open an order to record its pick.
+      </p>
       {filters !== undefined ? filters : E.chips(DATE_CHIPS, 1)}
       {model.empty
         ? E.blank(model.empty)
         : model.groups.map((group) => (
-          <Fragment key={group.key}>
-            {E.group(group.title)}
-            {group.rows.map((row) => (
-              <Fragment key={row.key}>
-                {row.verb
-                  ? E.row(row.title, row.detail, <>{row.changedAfterPick ? E.status("changed after pick", "w") : null}{E.act(row.verb, "primary", linkRows ? row.href : undefined)}</>)
-                  : E.nav(row.title, row.detail, "", undefined, linkRows ? row.href : undefined)}
-              </Fragment>
-            ))}
-            {E.ttl("Totals")}
-            {E.tbl(["Format", "Product", "Qty"], group.totals.map((t, i) => [startsGroup(group.totals, i) ? E.brand(t.group) : "", t.name, t.qty]), ["l", "l", "r"], { sortable: false, dense: true })}
-          </Fragment>
+          <section key={group.key} aria-label={group.title} className="mt-4 space-y-4 border-t pt-4 first-of-type:mt-0 first-of-type:border-t-0">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              {E.group(group.title)}
+              <span className="text-sm text-muted-foreground">{plural(group.rows.length, "order")}</span>
+            </div>
+            <div className="grid gap-6 lg:grid-cols-2 print:grid-cols-1">
+              <div className="min-w-0">
+                <h3 className="text-sm font-medium">Orders</h3>
+                {group.rows.map((row) => (
+                  <Fragment key={row.key}>
+                    {row.verb
+                      ? E.row(
+                        row.title,
+                        row.detail,
+                        E.act(row.verb, "primary", linkRows ? row.href : undefined),
+                        row.changedAfterPick ? "w" : "",
+                        undefined,
+                        row.changedAfterPick ? <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">{E.status("changed after pick", "w")}Count only the added or raised lines.</div> : undefined,
+                      )
+                      : E.nav(row.title, row.detail, "", undefined, linkRows ? row.href : undefined)}
+                  </Fragment>
+                ))}
+              </div>
+              <div className="min-w-0 self-start rounded-lg bg-muted/30 p-4 print:bg-transparent print:p-0">
+                <h3 className="text-sm font-medium">Totals</h3>
+                <p className="mb-3 mt-1 text-xs text-muted-foreground">All ordered quantities, including picked orders. Not quantities left to pick.</p>
+                {E.tbl(["Format", "Product", "Qty"], group.totals.map((t, i) => [startsGroup(group.totals, i) ? E.brand(t.group) : "", t.name, t.qty]), ["l", "l", "r"], { sortable: false, dense: true })}
+              </div>
+            </div>
+          </section>
         ))}
     </>
   );
