@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const auth = vi.hoisted(() => ({ signInWithOtp: vi.fn(), updateUser: vi.fn() }));
+const auth = vi.hoisted(() => ({ signInWithOtp: vi.fn(), signInWithPassword: vi.fn(), updateUser: vi.fn() }));
 const redirect = vi.hoisted(() => vi.fn((path: string): never => { throw new Error(`redirect:${path}`); }));
 
 vi.mock("@/lib/supabase/server", () => ({ createServerClient: async () => ({ auth }) }));
@@ -10,7 +10,7 @@ vi.mock("next/headers", () => ({
 }));
 vi.mock("next/navigation", () => ({ redirect }));
 
-import { emailLogin } from "@/app/(auth)/actions";
+import { emailLogin, login } from "@/app/(auth)/actions";
 
 describe("passwordless sign-in", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -44,5 +44,18 @@ describe("set new password", () => {
     const form = new FormData();
     form.set("password", "hunter2hunter2");
     await expect(savePassword(form)).rejects.toThrow("redirect:/password?error=same_password");
+  });
+});
+
+describe("password sign-in failure (#1320)", () => {
+  it.each([false, true])("keeps the email and original sign-in surface (portal=%s)", async (portal) => {
+    auth.signInWithPassword.mockResolvedValue({ error: { code: "invalid_credentials" } });
+    const form = new FormData();
+    form.set("email", "qa+buyer@example.com");
+    form.set("password", "never-put-password-in-url");
+    if (portal) form.set("portal", "1");
+    const surface = portal ? "/portal/login" : "/login";
+    await expect(login(form)).rejects.toThrow(`redirect:${surface}?error=1&email=qa%2Bbuyer%40example.com`);
+    expect(auth.signInWithPassword).toHaveBeenCalledWith({ email: "qa+buyer@example.com", password: "never-put-password-in-url" });
   });
 });

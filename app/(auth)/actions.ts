@@ -11,34 +11,27 @@ import { runCommand, CommandError } from "@/lib/commands/registry";
 import { z } from "zod";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createRequestAuthContext } from "@/lib/auth/request-context";
-import { acceptInviteErrorPath, hasPendingInvitations, inviteAudience, inviteLanding } from "@/lib/auth/invite";
+import { authHome, createRequestAuthContext } from "@/lib/auth/request-context";
+import { acceptInviteErrorPath, inviteAudience, inviteLanding, signInDestination } from "@/lib/auth/invite";
 import { createServerClient } from "@/lib/supabase/server";
 
 /** The brewery and customer selection cookies share these options. */
 const SELECTION_COOKIE = { path: "/", sameSite: "lax" } as const;
 
-/** Where a signed-in account belongs: staff on Today, a buyer in the portal. */
-async function home(auth: ReturnType<typeof createRequestAuthContext>) {
-  if (!(await auth.getIdentity())) return "/login?error=1";
-  if ((await auth.getStaffMemberships()).length) return "/";
-  if ((await auth.getCustomerMemberships()).length) return "/portal";
-  return "/no-membership";
-}
-
 export async function login(form: FormData) {
+  const email = String(form.get("email") ?? "");
+  const back = form.get("portal") ? "/portal/login" : "/login";
+  const failure = `${back}?error=1&email=${encodeURIComponent(email)}`;
   const db = await createServerClient();
   const { error } = await db.auth.signInWithPassword({
-    email: String(form.get("email")),
+    email,
     password: String(form.get("password")),
   });
-  const back = form.get("portal") ? "/portal/login" : "/login";
-  if (error) redirect(`${back}?error=1`);
+  if (error) redirect(failure);
   const auth = createRequestAuthContext(() => Promise.resolve(db));
   const identity = await auth.getIdentity();
-  if (!identity) redirect(`${back}?error=1`);
-  const [pending, destination] = await Promise.all([hasPendingInvitations(db, identity.userId), home(auth)]);
-  redirect(pending ? "/invitations" : destination);
+  if (!identity) redirect(failure);
+  redirect(await signInDestination(auth));
 }
 
 /** Passwordless sign-in validates email even when browser validation is unavailable. */
@@ -74,7 +67,7 @@ export async function savePassword(form: FormData) {
   const { error } = await db.auth.updateUser({ password: String(form.get("password")) });
   // The code, never the message: the page maps it to fixed text (toSetPasswordViewProps).
   if (error) redirect(`/password?error=${encodeURIComponent(error.code ?? "1")}`);
-  redirect(await home(createRequestAuthContext(() => Promise.resolve(db))));
+  redirect(await authHome(createRequestAuthContext(() => Promise.resolve(db))));
 }
 
 export async function acceptInvite(form: FormData) {
