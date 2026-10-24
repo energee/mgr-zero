@@ -87,16 +87,20 @@ export function BatchesView({ model, createAction, workHrefs, newVesselHref }: {
     {E.hd(model.title, "", createAction !== undefined ? createAction : E.btn("New batch"))}
     <WorkKindTabs chips={model.workChips} current={model.workChips[model.workChipIndex]} tabs={model.workTabs} hrefs={workHrefs} />
     {model.empty ? E.blank(model.empty) : <>
-      {([["Planned", model.planned], ["Active", model.active], ["Completed", model.completed ?? []], ["Cancelled", model.cancelled ?? []]] as const).map(([title, rows]) => {
+      {([["Planned", model.planned], ["Active", model.active], ["Completed", model.completed ?? []]] as const).map(([title, rows]) => {
         return rows.length ? <Fragment key={title}>
           {E.ttl(title)}
           <GroupTable rows={rows} />
         </Fragment> : null;
       })}
+      {!!model.cancelled?.length && <details className="rounded border p-3">
+        <summary className="cursor-pointer text-sm font-medium">Cancelled ({model.cancelled.length})</summary>
+        <div className="mt-3"><GroupTable rows={model.cancelled} /></div>
+      </details>}
     </>}
     {model.vessels !== undefined && <>
       {E.ttl("Vessels")}
-      {newVesselHref !== null && <div className="self-start">{E.btn("New vessel", "p", newVesselHref)}</div>}
+      {newVesselHref !== null && <div className="self-start">{E.btn("New vessel", "g", newVesselHref)}</div>}
       {!model.vessels.length ? E.blank("No vessels yet") : <VesselTable vessels={model.vessels} />}
     </>}
   </>;
