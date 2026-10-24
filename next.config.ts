@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
   // would cache /docs/anything.html onto a 404.
   redirects: async () => [
     { source: "/packaging/repack", destination: "/packaging?repack=1", permanent: false },
+    { source: "/transfers/new", destination: "/transfers?newTransfer=1", permanent: false },
     { source: "/catalog/skus", destination: "/catalog", permanent: false },
     { source: "/catalog/skus/new", destination: "/catalog", permanent: false },
     { source: "/docs/user-guide{.html}?", destination: "/docs", permanent: true },

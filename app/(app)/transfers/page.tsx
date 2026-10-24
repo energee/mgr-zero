@@ -20,7 +20,8 @@ type Location = { id: string; name: string; uses: string[] };
 type Bin = { id: string; location_id: string; name: string };
 type Sku = { id: string; name: string; brands: { name: string } | null };
 
-export default async function TransfersPage() {
+export default async function TransfersPage({ searchParams }: { searchParams: Promise<{ newTransfer?: string }> }) {
+  const { newTransfer } = await searchParams;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [transfers, locations, bins, skus] = (await Promise.all([
@@ -40,7 +41,7 @@ export default async function TransfersPage() {
           line_count: t.stock_transfer_lines.length,
         })),
       })}
-      createAction={<NewTransferForm locations={locations} bins={bins} skus={skus.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }))} skusHref={canRun(ctx, "create_sku") ? "/catalog" : null} />}
+      createAction={canRun(ctx, "create_stock_transfer") ? <NewTransferForm autoOpen={newTransfer === "1"} locations={locations} bins={bins} skus={skus.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }))} skusHref={canRun(ctx, "create_sku") ? "/catalog" : null} /> : null}
       workHrefs={workHrefsFor(brewery.roles)}
       linkRows
     />

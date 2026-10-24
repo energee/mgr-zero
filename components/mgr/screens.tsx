@@ -40,7 +40,7 @@ import { importPreview } from "@/lib/mgr/fixtures/import";
 import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView } from "@/components/mgr/views/chat";
 import { linkedChatPeople, chatLinkIntent, chatRecovery, chatDisconnected, chatConnected, personalChatPreferences } from "@/lib/mgr/fixtures/chat";
 import { CHAT_PREVIEW_FIXTURES } from "@/lib/chat/preview-fixtures";
-import { NOTIFICATION_REASON_LABEL } from "@/lib/chat/contracts";
+import { NOTIFICATION_REASON_LABEL, PERSONAL_NOTIFICATION_REASONS } from "@/lib/chat/contracts";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { ShipmentSourcesView } from "@/components/mgr/views/shipment-sources";
 import { shipmentSources } from "@/lib/mgr/fixtures/order-sheets";
@@ -329,6 +329,8 @@ export type Screen = {
   /** Default page; other surfaces use the same entry, form, or chat wrapper as live. */
   surface?: "page" | "sheet" | "entry" | "composer";
   name: string;
+  /** Action-specific sheet title when the inventory record describes both New and Edit. */
+  sheetTitle?: string;
   job: ReactNode;
   reads: ReactNode;
   writes: ReactNode;
@@ -348,7 +350,7 @@ export type Screen = {
    * (`Adjust` on Order opens Short pick); the global rules in
    * lib/mgr/screen-links.ts cover labels that always mean the same screen. */
   to?: Record<string, string>;
-  /** Entry-screen header (mark + product name); sheets take their title from `name`. */
+  /** Entry-screen header (mark + product name); sheets use `sheetTitle` or `name`. */
   hd?: ReactNode;
   body: ReactNode;
 };
@@ -793,12 +795,12 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Beer",
     name: "Finished goods",
-    to: { "Add SKU in Catalog": "Catalog" },
+    to: { "Add SKU in Catalog": "Catalog", "Record taproom count": "Weekly count" },
     job: "See sellable beer by SKU and act on shortages",
     reads: "get_on_hand · get_atp · get_inventory_value",
     writes: "none [SKU creation happens on its own surface]",
-    states: [["uncosted", "units without receipt cost are counted but not valued"], ["permission", "value total shows only for Admin and Sales"], ["short", "a negative Available says Shortfall and links to the competing orders"], ["empty", "no finished goods yet: the header actions are the only ones"]],
-    spec: "The Beer landing's Finished goods row opens this list. On hand, allocated and available sit in aligned columns on the desk and as labeled values on the phone; the SKU name opens SKU detail, and Shortfall under a negative Available opens the shortfall. The header holds the page actions. Record movement is for Admin and Warehouse. Add SKU in Catalog is for Admin and Sales and opens Catalog, where SKUs are made. Inventory value uses frozen packaging-close cost and separately counts units without cost.",
+    states: [["uncosted", "units without receipt cost are counted but not valued"], ["permission", "value total shows only for Admin and Sales"], ["short", "a negative Available says Shortfall and links to the competing orders"], ["empty", "no finished goods yet: header actions and the taproom count pointer remain"]],
+    spec: "The Beer landing's Finished goods row opens this list. On hand, allocated and available sit in aligned columns on the desk and as labeled values on the phone; the SKU name opens SKU detail, and Shortfall under a negative Available opens the shortfall. The header holds the page actions. Record movement is for Admin and Warehouse. Record taproom count points to the existing Weekly count for taproom stock, not a general finished-goods count. Add SKU in Catalog is for Admin and Sales and opens Catalog, where SKUs are made. Inventory value uses frozen packaging-close cost and separately counts units without cost.",
     body: <FinishedGoodsView model={toFinishedGoodsViewProps(finishedGoodsList)} />,
   },
   {
@@ -933,8 +935,8 @@ export const SCREENS: Screen[] = [
     job: "Questions use named registered queries",
     reads: "get_atp · get_shortfalls",
     writes: "none",
-    states: [["loading", "answer skeleton"], ["error", "Could not refresh ATP · Retry", 1], ["offline", "cached value + timestamp"]],
-    spec: "Navigate / Ask MGR in the header opens a right-side overlay on desktop and full-screen chat on phones. Navigate, Back to page, or Escape closes it without discarding drafts, messages, or an active response. The page keeps its width and scroll position. Phone focus stays in chat; opening by touch does not open the keyboard.",
+    states: [["loading", "answer skeleton"], ["not configured", "message box disabled; contact administrator", 1], ["provider access denied", "check provider access and credits; no retry", 1], ["rate limited", "wait, then Try again", 1], ["provider unavailable", "temporary outage; Try again", 1], ["offline", "check connection; chat messages are not queued", 1], ["unknown failure", "safe guidance; no blind retry", 1]],
+    spec: "Navigate / Ask MGR in the header opens a right-side overlay on desktop and full-screen chat on phones. Navigate, Back to page, or Escape closes it without discarding drafts, messages, or an active response. The page keeps its width and scroll position. Phone focus stays in chat; opening by touch does not open the keyboard. HTTP and stream failures use the same safe error codes. Only transient failures offer Try again; provider-access denials do not. Ordinary forms and saved readings remain available when AI fails.",
     body: <><ComposerConversationView messages={[
       { id: "answer-user", role: "user", content: "How much Hazy is available to promise?" },
       { id: "answer-assistant", role: "assistant", content: "11 × ½ bbl plus 40 cases are currently available to promise. Observed Sep 10, 2026, 10:00 AM." },
@@ -1319,6 +1321,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Ship-to form",
+    sheetTitle: "Edit ship-to",
     job: "Create or edit one delivery address for a customer",
     reads: "get_customer",
     writes: "upsert_ship_to",
@@ -1529,8 +1532,8 @@ export const SCREENS: Screen[] = [
     job: "Sellable brand facts and compliance, including selected COLA label images",
     reads: "list_brands [incl. the staff-only alias, SKUs and pours] · list_catalog_categories · list_formats [packaged, with contents] · list_channel_prices · list_sale_channels · list_keg_pools · get_compliance_registry [this brand’s approvals and registrations] · get_brand_recipe_cost [recipe cost per barrel and any uncosted ingredient] · get_cola_image",
     writes: "upsert_brand · save_catalog_category · delete_catalog_category · update_sku · create_sku · upsert_brand_approval · upsert_state_registration",
-    states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["sells as", "one switch per packaged Format · on creates the SKU or turns it back on"], ["switched off", "the SKU turns inactive, never deleted: hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"], ["COLA pending", "no approval on file: the brand is flagged until one is added", 1], ["suggested group", "the recipe cost lands in a ceiling band · Use fills the select, Save brand commits"], ["cost unknown", "an ingredient has no receipt cost yet: the sum is not shown as a cost", 1], ["saved first", "SKUs and compliance wait until the brand is saved; the first save moves to its page"], ["badges", "COLA pending jumps to Compliance; price group or Unpriced, category, active SKU count"]],
-    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. Sells as lists every packaged Format with a switch: on means the brand sells it, which is an active SKU, and Edit SKU opens that SKU's sheet (UPC, keg pool, batch share). Under the switches, each switched-on Format's contents read as lines (Four Pack · 6 per Case), then the price group's pours. A pour is a serving from the tap, not a SKU: the menu publishes brand × pour to Square, and a sale depletes the keg SKU. Every line shows its price per sale channel; prices and pours are edited on the price group. No container source editor here. Compliance is the brand’s: its COLA or formula approvals and its state registrations list under the sell sheet, each row opening its sheet, with Add approval and Add registration; a brand with no COLA is flagged pending. Manage categories opens beside Category: Admin and Sales can add, rename across all brands, and confirm deletion of unused categories. Uncategorized clears a brand’s assignment when saved. The brewery’s own licenses are the Licenses page under Compliance, never a brand row. Under the price group, the brand’s recipe cost per barrel (its last brewed version, else its newest) is read against the groups’ ceilings and names the band it falls in; Use only fills the select. A recipe with an ingredient that has never been received has no trustworthy cost, so the row says which ingredient instead of a number. No recipe, no row.",
+    states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["sells as", "one switch per packaged Format · on creates the SKU or turns it back on"], ["switched off", "the SKU turns inactive, never deleted: hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"], ["COLA · None on file", "no recorded COLA; no application status inferred"], ["suggested group", "the recipe cost lands in a ceiling band · Use fills the select, Save brand commits"], ["cost unknown", "an ingredient has no receipt cost yet: the sum is not shown as a cost", 1], ["saved first", "SKUs and compliance wait until the brand is saved; the first save moves to its page"], ["badges", "missing COLA jumps to Compliance; price group or Unpriced, category, active SKU count"]],
+    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. Sells as lists every packaged Format with a switch: on means the brand sells it, which is an active SKU, and Edit SKU opens that SKU's sheet (UPC, keg pool, batch share). Under the switches, each switched-on Format's contents read as lines (Four Pack · 6 per Case), then the price group's pours. A pour is a serving from the tap, not a SKU: the menu publishes brand × pour to Square, and a sale depletes the keg SKU. Every line shows its price per sale channel; prices and pours are edited on the price group. No container source editor here. Compliance is the brand’s: its COLA or formula approvals and its state registrations list under the sell sheet, each row opening its sheet, with Add approval and Add registration; a brand with no recorded COLA says None on file, as Catalog does. Manage categories opens beside Category: Admin and Sales can add, rename across all brands, and confirm deletion of unused categories. Uncategorized clears a brand’s assignment when saved. The brewery’s own licenses are the Licenses page under Compliance, never a brand row. Under the price group, the brand’s recipe cost per barrel (its last brewed version, else its newest) is read against the groups’ ceilings and names the band it falls in; Use only fills the select. A recipe with an ingredient that has never been received has no trustworthy cost, so the row says which ingredient instead of a number. No recipe, no row.",
     body: <BrandView model={toBrandViewProps(brandHazy)} images={{ cola: <ColaLabelImageView label="Hazy IPA · COLA 25318001000034" src="/mock/cola-label.svg" /> }} categoryAction={<CatalogCategoriesFixture categories={toBrandViewProps(brandHazy).categoryOptions} />} />,
   },
   {
@@ -2114,11 +2117,12 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Vendor",
+    sheetTitle: "Edit vendor",
     to: { "Save vendor": "Vendors" },
     job: "Create or edit one supplier and its purchase terms",
     reads: "list_vendors_and_contracts",
     writes: "upsert_vendor",
-    states: [["permission", "warehouse or brewer required", 1], ["new", "name required"], ["active", "available for purchase orders"]],
+    states: [["permission", "admin, warehouse or brewer required", 1], ["new", "name required · status controls appear after saving"], ["active", "available for new purchase orders"], ["inactive", "not a New purchase order choice · existing links remain"], ["change status", "Deactivate vendor or Reactivate vendor confirms before saving form changes"]],
     spec: "Contracts remain separate records because a vendor may supply many materials. Lead time lives here rather than on the material: every observation of it is an ordered-to-received span keyed by the vendor, so the estimate sits where the evidence is. Planning reads it to date the buy-by of the slowest supplier a bill of materials resolves to.",
     body: <VendorView model={vendorYch} />,
   },
@@ -2141,6 +2145,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Contract",
+    sheetTitle: "Edit contract",
     to: { Vendor: "Entity picker", Material: "Entity picker", "Save contract": "Contracts" },
     job: "Create or edit one material purchasing commitment",
     reads: "list_materials · list_vendors_and_contracts",
@@ -2412,6 +2417,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "License",
+    sheetTitle: "Edit license",
     to: { "Save license": "Licenses" },
     job: "Record one brewery state license",
     reads: "get_compliance_registry",
@@ -2495,7 +2501,7 @@ export const SCREENS: Screen[] = [
     states: [["swap", "one act, one record · never kick-then-tap"], ["already swapped", "second attempt fails · safe closer and time shown", 1], ["not in taproom stock", "server-derived flag · expected shares excluded", 1], ["guest or event keg", "explicit label and nominal size · no numeric yield", 1], ["no number", "sorts last · a number is never required"], ["duplicate number", "shown as entered · nothing downstream reads it"], ["kicked", "interval closed with a reason · the tap goes empty"], ["no POS", "no usable numerator · no bar", 1], ["not ready", "submit withheld · the line beside it names what is missing"], ["no keg SKUs", "no keg SKU with a keg volume · the picker says so and points to Catalog · guest keg still works", 1]],
     redrawn: true,
     spec: <>A row offers Swap and Kick. Swap closes one interval and opens the replacement atomically; an own replacement defaults to the outgoing SKU, while a guest replacement requires its own label and positive nominal BBL. Tap numbers are optional and may repeat, and unnumbered rows sort last. Opening and closing fill chips are coarse observations and never inventory quantities. A 30-second poll updates only the board and recent history, preserving dirty and uncertain sheets. Exact retries keep the original request. Own package size and inventory exclusion come from the server. Guest labels never match POS facts, so guest rows show no numeric yield. No usable numerator means no bar. Every action here writes zero finished-goods movements; weekly count owns depletion.</>,
-    body: <TapBoardView state={tapBoard} skus={tapBoardSkus} timeZone={DEMO_TIME_ZONE} navigation={{ locations: [{ value: "taproom", label: "Taproom" }, { value: "downtown", label: "Downtown" }], location: "taproom" }} recentEvents={[{ title: "Recent · Kolsch tapped", detail: "Dana · Tue 4:10pm" }, { title: "Recent · Saison swapped in", detail: "Ali · Thu 11:20am" }]} />,
+    body: <TapBoardView state={tapBoard} skus={tapBoardSkus} timeZone={DEMO_TIME_ZONE} navigation={{ locations: [{ value: "taproom", label: "Taproom" }, { value: "downtown", label: "Downtown" }], location: "taproom" }} recentEvents={[{ title: "Kolsch tapped", detail: "Dana · Tue 4:10pm" }, { title: "Saison swapped in", detail: "Ali · Thu 11:20am" }]} />,
   },
   {
     step: 7,
@@ -3289,10 +3295,7 @@ export const SCREENS: Screen[] = [
     states: [["saved", "update App Home and close"], ["invalid hours", "name the correction", 1], ["unsupported provider", "open authenticated MGR fallback", 1]],
     spec: "Snooze and mute affect personal delivery only. App Home and MGR Today still show current work.",
     body: (<>
-      {S.toggle(NOTIFICATION_REASON_LABEL.submitted_order)}
-      {S.toggle(NOTIFICATION_REASON_LABEL.pick_due)}
-      {S.toggle(NOTIFICATION_REASON_LABEL.delivery_next)}
-      {S.toggle(NOTIFICATION_REASON_LABEL.fermentation_reading_overdue)}
+      {PERSONAL_NOTIFICATION_REASONS.map(reason => <div key={reason}>{S.toggle(NOTIFICATION_REASON_LABEL[reason])}</div>)}
       {S.select("Sample quiet hours", "9:00 PM–6:00 AM")}
       {S.ctx("Snooze and mute affect personal delivery only. MGR still shows the work as due.")}
     </>),

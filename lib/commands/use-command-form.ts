@@ -19,6 +19,7 @@ import { canRetireCommandFailure } from "./failure";
 export type CommandRunOptions = { requestId?: string; refresh?: boolean; target?: string; durable?: boolean; owner?: RecoveryAttempt["owner"]; onSent?: (requestId: string) => void };
 export type CommandAction = {
   busy: boolean;
+  succeeded: string | null;
   error: string | null;
   failure: CommandFailureDetail | null;
   setError: Dispatch<SetStateAction<string | null>>;
@@ -34,6 +35,7 @@ export function useCommandAction(actionTarget?: string): CommandAction {
   const [error, setError] = useState<string | null>(null);
   const [failure, setFailure] = useState<CommandFailureDetail | null>(null);
   const [busy, setBusy] = useState(false);
+  const [succeeded, setSucceeded] = useState<string | null>(null);
   // Targeted irreversible actions share one lock across competing commands.
   // Undefined means storage has not been checked yet: fields stay frozen.
   const [recovery, setRecovery] = useState<{ context: typeof expectedContext; target: string; attempt: RecoveryAttempt | null }>();
@@ -75,6 +77,7 @@ export function useCommandAction(actionTarget?: string): CommandAction {
     setBusy(true);
     setError(null);
     setFailure(null);
+    setSucceeded(null);
     let saved: ReturnType<typeof beginRecovery> | undefined;
     try {
       if (durable) saved = beginRecovery(sessionStorage, expectedContext, location.pathname, name, input, { requestId, target, owner, exclusiveTarget: actionTarget !== undefined });
@@ -87,6 +90,7 @@ export function useCommandAction(actionTarget?: string): CommandAction {
       if (saved) finishRecovery(sessionStorage, saved.attempt);
       onSuccess?.(data);
       if (refresh) router.refresh();
+      setSucceeded(sent.name);
       return true;
     } catch (err) {
       const detail = classifyCommandFailure(err);
@@ -101,7 +105,7 @@ export function useCommandAction(actionTarget?: string): CommandAction {
     }
   }
 
-  return { busy, error, failure, setError, run, pending, blocked };
+  return { busy, succeeded, error, failure, setError, run, pending, blocked };
 }
 
 /** One state object per sheet: initial values come from the row being edited (or blanks); reset restores them; patch sets several fields at once. */

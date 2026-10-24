@@ -6,6 +6,7 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { startsGroup } from "@/lib/mgr/brand-lines";
 import type { PickSheetViewModel } from "@/lib/mgr/pick-sheet-view";
+import { navTitle } from "@/lib/mgr/nav";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
 import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 import { plural } from "@/lib/mgr/plural";
@@ -33,7 +34,7 @@ export function PickSheetView({
 }) {
   return (
     <>
-      {E.back("Work", "Pick", printAction, backHref)}
+      {E.back("Work", navTitle("/pick"), printAction, backHref)}
       <WorkKindTabs chips={WORK_CHIPS} current="pick" tabs={WORK_TABS} hrefs={workHrefs} />
       <p className="text-sm text-muted-foreground">
         Stage beer by ship date, then open an order to record its pick.

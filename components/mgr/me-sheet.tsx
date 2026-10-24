@@ -45,7 +45,7 @@ export function MeSheetActions({ guide }: { guide: "/docs/staff-guide" | "/docs/
   const pathname = usePathname();
   return (
     <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
-      <Button variant="outline" className="w-full md:w-fit md:self-end" asChild><Link href={guide}>Guide</Link></Button>
+      <Button variant="outline" className="w-full md:w-fit md:self-end" asChild><Link href={guide} target="_blank" rel="noopener noreferrer">Guide<span className="sr-only"> (opens in a new tab)</span></Link></Button>
       <Button variant="outline" className="w-full md:w-fit md:self-end" asChild><Link href={`/password?next=${encodeURIComponent(pathname)}`}>Change password</Link></Button>
       <form action={logout}>
         <Button type="submit" variant="destructive" className="w-full md:w-fit md:self-end">Sign out</Button>
