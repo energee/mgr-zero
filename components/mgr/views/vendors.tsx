@@ -30,7 +30,7 @@ export function VendorsView({
         ? E.blank(model.empty)
         : model.rows.map((row) => (
           <Fragment key={row.key}>
-            {E.row(row.title, row.detail, rowTrailing ? rowTrailing(row) : E.act(row.verb), row.disabled ? "dis" : "")}
+            {E.row(row.title, `${row.disabled ? "Inactive" : "Active"} · ${row.detail}`, rowTrailing ? rowTrailing(row) : E.act(row.verb), row.disabled ? "dis" : "")}
           </Fragment>
         ))}
       {footer ?? (
