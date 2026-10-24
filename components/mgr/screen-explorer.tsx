@@ -31,7 +31,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const ALL = "all";
-const SURFACES: Surface[] = ["page", "sheet", "entry"];
+const SURFACES: Surface[] = ["page", "sheet", "entry", "composer"];
 const DENIED = "Permission denied";
 // The landings the persona switch swaps for the new role's own; Driver and
 // Taproom stay put for a role that may open them.

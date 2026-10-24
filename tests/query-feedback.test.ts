@@ -41,4 +41,14 @@ describe("query freshness", () => {
     expect(html).toContain("Loading orders");
     expect(html).not.toContain("Last checked");
   });
+
+  it("can omit timestamps on unsaved forms without hiding refresh or cached-data feedback", () => {
+    expect(render({ showCheckedAt: false })).toBe("");
+    expect(render({ showCheckedAt: false, fetching: true })).toContain("Updating");
+    for (const props of [{ paused: true }, { error: new Error("Refresh failed") }]) {
+      const html = render({ ...props, showCheckedAt: false });
+      expect(html).toContain("Showing last-known data");
+      expect(html).not.toContain("Last checked");
+    }
+  });
 });
