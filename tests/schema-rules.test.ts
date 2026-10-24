@@ -191,7 +191,7 @@ describe("schema rules", () => {
         ('authenticated'::name, 'usage'), ('authenticated'::name, 'create'),
         ('service_role'::name, 'create')
       ) checks(role, privilege)
-      -- service_role holds USAGE on private only for the new_uuid() column default.
+      -- service_role holds USAGE for the UUID default and pure channel-name index expression.
       where has_schema_privilege(role, 'private', privilege)
       union all
       select 'table:' || role || ':' || privilege
