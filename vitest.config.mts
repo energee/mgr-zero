@@ -27,6 +27,7 @@ const pureTests = [
   "tests/brand-sells-view.test.ts",
   "tests/catalog-view.test.ts",
   "tests/cola-review.test.ts",
+  "tests/ttb-colas.test.ts",
   "tests/pour-sku-catalog.test.ts",
   "tests/app-screen-parity.test.ts",
   "tests/field-number-notation.test.ts",
