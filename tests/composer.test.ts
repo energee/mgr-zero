@@ -138,7 +138,7 @@ describe("AI composer", () => {
 
   // /inventory keys MovementForm on ?movementHandoff. Without a per-proposal
   // id, Open as form on /inventory soft-navigates into the mounted "manual"
-  // form, which reads its open state and prefill only on mount (#1166).
+  // form, which seeds its proposed field values only on mount (#1166).
   it("keys Open as form by the proposal's preview token so the form remounts (#1166)", () => {
     const token = (n: number) => `9999999${n}-9999-4999-8999-999999999999`;
     // The key page.tsx gives the form for the link Open as form builds; the
