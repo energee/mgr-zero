@@ -88,6 +88,7 @@ describe("Pick sheet view loop", () => {
     expect(model.groups[1]?.rows[0]?.title).toMatch(/^Al’s Bar ·/);
   });
 
+
   it("hides the weekday chips when filters is null and links rows when asked", () => {
     const markup = html(toPickSheetViewProps(pickSheet), { filters: null, linkRows: true });
     expect(markup).not.toMatch(/Thu 9\/3/);
