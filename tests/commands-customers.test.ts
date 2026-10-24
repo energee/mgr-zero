@@ -64,6 +64,18 @@ describe("customer CRUD", () => {
     expect(got.customer.name).toBe("New Name");
   });
 
+  it("trims names at the command boundary and refuses blank creates or edits (#1306)", async () => {
+    const input = { name: " \tNamed account\n ", alias: "Staff alias", type: "retailer", state: "PA", saleChannelId: wholesale, paymentTerms: "net15", taxTreatment: "export" };
+    const saved = await runCommand("upsert_customer", input, ctx) as { id: string; name: string; alias: string; payment_terms: string; tax_treatment: string };
+    expect(saved).toMatchObject({ name: "Named account", alias: "Staff alias", payment_terms: "net15", tax_treatment: "export" });
+    for (const name of ["", "   ", "\t\n", "\u00a0\u2003"]) {
+      await expect(runCommand("upsert_customer", { ...input, name }, ctx)).rejects.toThrow();
+      await expect(runCommand("upsert_customer", { ...input, id: saved.id, name }, ctx)).rejects.toThrow();
+    }
+    const current = await runCommand("get_customer", { customerId: saved.id }, ctx) as { customer: { name: string } };
+    expect(current.customer.name).toBe("Named account");
+  });
+
   it("omitted paymentTerms preserves the create default and an existing payment term", async () => {
     const created = await runCommand("upsert_customer", {
       name: "Default payment terms", type: "retailer", state: "PA", saleChannelId: wholesale,

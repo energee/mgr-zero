@@ -70,8 +70,9 @@ export function CustomerView({
               </div>
               {E.pick("Type", values.type, CUSTOMER_TYPE_OPTIONS, controls("type"))}
               {E.pick("Country", values.country, COUNTRY_OPTIONS, { ...controls("country"), required: true })}
-              {/* Only a US customer has a state; another country has none. */}
-              {values.country === "US" && E.edit("State", values.state, "text", undefined, { ...controls("state"), required: true, maxLength: 2, minLength: 2 })}
+              {E.edit(values.country === "US" ? "State (required)" : "State", values.country === "US" ? values.state : "Not applicable", "text", undefined, {
+                ...controls("state"), required: values.country === "US", disabled: !canWrite || busy || values.country !== "US", maxLength: 2, minLength: 2,
+              })}
               {E.edit("License number", values.licenseNumber, "text", undefined, controls("licenseNumber"))}
             </div>
           </section>
