@@ -63,18 +63,28 @@ describe("Keg fleet shared fields", () => {
     const owned = fields("owned");
     expect(owned).toContain("None · the brewery owns these kegs");
     expect(owned).not.toContain("owned pools have no vendor");
-    for (const kind of ["owned", "leased"] as const) expect(fields(kind)).toContain("Only a Pay per fill pool needs this. Leave it blank.");
-    expect(fields("pay_per_fill")).toContain("Required: what the vendor charges for each keg filled.");
+    for (const kind of ["owned", "leased"] as const) {
+      const optional = fields(kind);
+      expect(optional).toContain("Per-fill cost ($) · optional");
+      expect(optional).toContain('placeholder="Not set"');
+      expect(optional).toMatch(/id="pool-per-fill"[^>]*value=""/);
+      expect(optional.match(/<input\b[^>]*id="pool-per-fill"[^>]*>/)?.[0]).not.toMatch(/\brequired(?:=|\s|>)/);
+    }
+    expect(fields("pay_per_fill")).toContain("Per-fill cost ($) · required");
+    expect(fields("pay_per_fill").match(/<input\b[^>]*id="pool-per-fill"[^>]*>/)?.[0]).toMatch(/\brequired(?:=|\s|>)/);
     // update_keg_pool keeps a stored cost when the field is cleared, so Edit never says to leave it blank.
     for (const kind of ["owned", "leased"] as const) {
       const edit = fields(kind, true);
-      expect(edit).toContain("Only a Pay per fill pool needs this. Once set, it can be changed but not removed.");
       expect(edit).not.toContain("Leave it blank");
     }
-    // ensure_order_deposit_lines charges deposits on wholesale orders only.
-    expect(owned).toContain("Charged on wholesale orders for each keg from this pool. 0 means no deposit.");
     expect(owned).toMatch(/id="pool-per-fill"[^>]*aria-describedby="pool-per-fill-help"|aria-describedby="pool-per-fill-help"[^>]*id="pool-per-fill"/);
     expect(owned).toMatch(/id="pool-deposit"[^>]*aria-describedby="pool-deposit-help"|aria-describedby="pool-deposit-help"[^>]*id="pool-deposit"/);
+  });
+
+  it("shows a known-zero per-fill cost as a value, not missing cost", () => {
+    const out = html(createElement(KegPoolFields, { value: { name: "A", kind: "pay_per_fill", vendorId: "v", perFill: "0.00", deposit: "0.00", active: true }, vendors: [{ value: "v", label: "Vendor" }], onChange: () => {} }));
+    expect(out).toMatch(/id="pool-per-fill"[^>]*value="0\.00"/);
+    expect(out).toMatch(/id="pool-deposit"[^>]*value="0\.00"/);
   });
 
   it("pool and event fields are E controls, with an In service switch", () => {

@@ -1,5 +1,5 @@
 // Exercises the shared entry form's submit-button validation without invoking Auth.
-import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
+import { createElement, isValidElement, type ComponentProps, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { EntryView } from "../components/mgr/views/entry";
@@ -12,6 +12,17 @@ function descendants(node: ReactNode): ReactElement<NodeProps>[] {
   return [node, ...descendants(node.props.children)];
 }
 
+/** Capture the real form during React rendering so its hooks run in a component. */
+function renderEntry(props: ComponentProps<typeof EntryView>): ReactNode {
+  let view: ReactNode;
+  function Capture() {
+    view = EntryView(props);
+    return view;
+  }
+  renderToStaticMarkup(createElement(Capture));
+  return view;
+}
+
 describe("email-link form boundary (#708)", () => {
   it("renders a non-network fixture action before hydration", () => {
     const html = renderToStaticMarkup(createElement(EntryView, { model: signIn }));
@@ -19,14 +30,14 @@ describe("email-link form boundary (#708)", () => {
   });
 
   it("keeps email-only validation when display wording changes", () => {
-    const view = EntryView({ model: { ...signIn, secondary: "Send sign-in link" }, action: vi.fn(), secondaryAction: vi.fn() });
+    const view = renderEntry({ model: { ...signIn, secondary: "Send sign-in link" }, action: vi.fn(), secondaryAction: vi.fn() });
     const button = descendants(view).find(node => node.props.children === "Send sign-in link")!;
     expect(button.props.formNoValidate).toBe(true);
     expect(button.props.onClick).toBeTypeOf("function");
   });
 
   it.each([false, true])("checks only email before the secondary action (live=%s)", (live) => {
-    const view = EntryView({ model: signIn, ...(live ? { action: vi.fn(), secondaryAction: vi.fn() } : {}) });
+    const view = renderEntry({ model: signIn, ...(live ? { action: vi.fn(), secondaryAction: vi.fn() } : {}) });
     const nodes = descendants(view);
     const form = nodes.find(node => node.type === "form");
     expect(form).toBeDefined();

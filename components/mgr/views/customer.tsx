@@ -8,7 +8,7 @@ import { CommandFormMessage } from "@/components/mgr/command-form";
 import { PAYMENT_TERMS } from "@/lib/mgr/enums";
 import { COUNTRY_OPTIONS, CUSTOMER_TYPE_OPTIONS, PAYMENT_TERM_LABEL, sentenceCase } from "@/lib/mgr/labels";
 import { TAX_TREATMENTS } from "@/lib/mgr/tax-treatments";
-import { E } from "@/components/mgr/e";
+import { E, type FieldControls } from "@/components/mgr/e";
 import { FieldDescription } from "@/components/ui/field";
 import { CUSTOMER_ALIAS_HELP, type CustomerEditValues, type CustomerViewModel } from "@/lib/mgr/customer-view";
 import { DeleteCustomerControl } from "./delete-customer";
@@ -18,6 +18,26 @@ export type { CustomerEditValues, CustomerViewModel };
 
 const TERMS_OPTIONS = PAYMENT_TERMS.map(value => ({ value, label: PAYMENT_TERM_LABEL[value] }));
 const TAX_OPTIONS = [{ value: "", label: "Inherit sale channel" }, ...TAX_TREATMENTS.map(value => ({ value, label: sentenceCase(value) }))];
+
+/** Shared by the new-customer dialog and inline customer detail. */
+export function CustomerSaleChannelField({ value, channels, controls }: { value: string; channels: { id: string; name: string }[]; controls: FieldControls }): ReactNode {
+  const helpId = controls.id ? `${controls.id}-help` : undefined;
+  return E.pick("Sale channel", value, channels.map(channel => ({ value: channel.id, label: channel.name === "DTC" ? "Direct to consumer (DTC)" : channel.name })), {
+    ...controls,
+    required: true,
+    "aria-describedby": helpId,
+    description: <FieldDescription id={helpId}>The sale channel sets prices and the default tax treatment. An Export channel does not override a customer’s tax treatment.</FieldDescription>,
+  });
+}
+
+export function CustomerTaxTreatmentField({ value, controls }: { value: string; controls: FieldControls }): ReactNode {
+  const helpId = controls.id ? `${controls.id}-help` : undefined;
+  return E.pick("Tax treatment", value, TAX_OPTIONS, {
+    ...controls,
+    "aria-describedby": helpId,
+    description: <FieldDescription id={helpId}>Inherit the channel default or override it for this customer. Export tax treatment means shipment outside the US without payment of tax.</FieldDescription>,
+  });
+}
 
 export type CustomerDetailSlot = {
   shipTos?: { key: string; title: string; detail: string; action?: ReactNode }[];
@@ -110,9 +130,9 @@ export function CustomerView({
           <section aria-label="Trading terms" className="py-5">
             <h2 className="mb-3 font-heading text-xl font-semibold">Trading terms</h2>
             <div className="flex flex-col gap-4">
-              {E.pick("Sale channel", values.saleChannelId, model.channelOptions.map(channel => ({ value: channel.id, label: channel.name })), { ...controls("saleChannelId"), required: true })}
+              <CustomerSaleChannelField value={values.saleChannelId} channels={model.channelOptions} controls={controls("saleChannelId")} />
               {E.pick("Terms", values.paymentTerms, TERMS_OPTIONS, controls("paymentTerms"))}
-              {E.pick("Tax treatment", values.taxTreatment, TAX_OPTIONS, controls("taxTreatment"))}
+              <CustomerTaxTreatmentField value={values.taxTreatment} controls={controls("taxTreatment")} />
             </div>
           </section>
           <section aria-label="Customer activity" className="flex flex-col gap-3">

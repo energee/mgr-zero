@@ -21,7 +21,7 @@ it("positive movement entry derives direction, requires sample state, and discar
 });
 
 it("Record movement marks a quantity the database refuses and a bad destination state on their own fields; two decimals stay allowed (#1113)", () => {
-  const qty = "Enter a quantity above zero, with at most two decimal places. The kind, or Direction for an adjustment, decides whether stock is added or removed.";
+  const qty = "Enter a quantity above zero, with at most two decimal places. The movement type, or Direction for an adjustment, decides whether stock is added or removed.";
   // record_inventory_movement refuses p_qty <> round(p_qty, 2), so a third decimal is marked here, not by the server.
   for (const value of ["-3", "0", "", "abc", "Infinity", "2.555", "0.004"]) expect(movementFieldErrors("loss", value, "")).toEqual({ qty });
   // The command's schema caps the quantity (numeric(12,2)).
@@ -36,8 +36,8 @@ it("Record movement marks a quantity the database refuses and a bad destination 
 it("Record movement names everything it still needs, channel and state only for the kinds that carry them (#1113)", () => {
   const ready = { type: "depletion", skuId: "s", locationId: "l", binId: "b", saleChannelId: "c", qty: "2.5", destState: "" };
   expect(movementReason(ready)).toBeNull();
-  expect(movementReason({ ...ready, type: "", skuId: "", locationId: "", binId: "", qty: "-3" })).toBe("Still needed: a kind, a SKU, a location, a bin, and a quantity above zero with at most two decimals.");
-  expect(movementReason({ ...ready, qty: "2.555" })).toBe("Still needed: a quantity above zero with at most two decimals.");
+  expect(movementReason({ ...ready, type: "", skuId: "", locationId: "", binId: "", qty: "-3" })).toBe("Still needed: movement type, SKU, location, bin, and a quantity above zero (up to two decimals).");
+  expect(movementReason({ ...ready, qty: "2.555" })).toBe("Still needed: a quantity above zero (up to two decimals).");
   expect(movementReason({ ...ready, qty: "10000000000" })).toBe("Still needed: a smaller quantity.");
   expect(movementReason({ ...ready, saleChannelId: "" })).toBe("Still needed: a channel.");
   expect(movementReason({ ...ready, type: "loss", saleChannelId: "" })).toBeNull();

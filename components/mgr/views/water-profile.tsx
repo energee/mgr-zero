@@ -6,7 +6,7 @@
 "use client";
 import { E } from "@/components/mgr/e";
 import { FieldDescription } from "@/components/ui/field";
-import { IONS, type WaterProfileFields } from "@/lib/mgr/water-profiles-view";
+import { IONS, waterProfileSaveReason, type WaterProfileFields } from "@/lib/mgr/water-profiles-view";
 import type { ReactNode } from "react";
 import { Fragment, useId } from "react";
 
@@ -37,6 +37,6 @@ export function WaterProfileView({ fields, onChange, messages, footer, submittin
       {E.edit("Notes", fields.note, "text", undefined, { onChange: set("note"), maxLength: 2000, "aria-describedby": optionalHelpId })}
     </fieldset>
     {messages}
-    {footer !== undefined ? footer : E.btn("Save water profile")}
+    {footer !== undefined ? footer : E.submit("Save water profile", { reason: waterProfileSaveReason(fields), submitting })}
   </>;
 }

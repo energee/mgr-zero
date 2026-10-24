@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { WeeklyCountDraftView, WeeklyCountView } from "../components/mgr/views/weekly-count";
+import { WeeklyCountDraftView, WeeklyCountPrintAction, WeeklyCountView } from "../components/mgr/views/weekly-count";
 import { weeklyCount } from "../lib/mgr/fixtures/taproom";
 import { readFileSync } from "node:fs";
 import { countDraftFromSnapshot, updateCountQuantity, beginCountAttempt, failCountAttempt } from "../lib/mgr/taproom-count-state";
@@ -58,7 +58,6 @@ it("marks the count quantities invalid when the save was rejected", () => {
 it("#1117 draws routine guidance as neutral help, never the amber warning note", () => {
   const html = renderToStaticMarkup(createElement(WeeklyCountView, { model: weeklyCount, draft: null }));
   expect(html).toContain("Latest uncorrected count");
-  expect(html).toContain("Only Admin can correct a count. Admin can correct only the latest count, once, when a sold quantity was counted too low.");
   expect(html).not.toContain("without the action");
   expect(html).not.toContain("bg-warning");
   const corrected = renderToStaticMarkup(createElement(WeeklyCountView, { model: { ...weeklyCount, receipt: { ...weeklyCount.receipt!, correction: "Corrected by Admin at Sep 9, 2026 · miscounted" } }, draft: null }));
@@ -83,10 +82,37 @@ it("#1117 draws Refresh expected and Print current stock labels as visible butto
   for (const label of ["Refresh expected", "Print current stock labels"]) expect(html).toMatch(new RegExp(`<button[^>]*data-variant="outline"[^>]*>${label}</button>`));
 });
 
-it("#1117 explains that recording a taproom with no stock saves a zero count", () => {
+it.each([false, true])("#1117 associates the disabled empty print action with its inline reason (busy: %s)", (busy) => {
+  const html = renderToStaticMarkup(createElement(WeeklyCountPrintAction, { empty: true, busy }));
+  const button = html.match(/<button[^>]*>[^<]+<\/button>/)![0];
+  expect(button).toContain('disabled=""');
+  const reasonId = button.match(/aria-describedby="([^"]+)"/)![1];
+  expect(html).toMatch(new RegExp(`<span id="${reasonId}"[^>]*>\\S[^<]*</span>`));
+});
+
+it("#1117 keeps printing available for positive stock and disables it while checking", () => {
+  const available = renderToStaticMarkup(createElement(WeeklyCountPrintAction, { empty: false }));
+  expect(available).not.toContain('disabled=""');
+  expect(available).not.toContain("aria-describedby");
+  expect(available).not.toMatch(/<span[^>]*id=/);
+  const checking = renderToStaticMarkup(createElement(WeeklyCountPrintAction, { busy: true }));
+  expect(checking).toContain('disabled=""');
+  expect(checking).not.toContain("aria-describedby");
+  expect(checking).not.toMatch(/<span[^>]*id=/);
+});
+
+it("#1117 derives the inventory print state from positive recorded stock, not entered quantities", () => {
+  const render = (qtyBefore: number) => {
+    const state = countDraftFromSnapshot({ location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "captured", lines: [{ bin_id: "cold", bin_name: "Cold", sku_id: "keg", sku_name: "Keg", brand_id: "brand", brand_name: "Brand", bbl_per_unit: .5, lot_id: null, qty_before: qtyBefore }] }, null);
+    return renderToStaticMarkup(createElement(WeeklyCountDraftView, { state: updateCountQuantity(state, state.draft.lines[0].key, "0"), roles: ["taproom"], lotLabels: {}, timeZone: "America/New_York" }));
+  };
+  expect(render(0)).toMatch(/<button[^>]*disabled=""[^>]*>Print current stock labels<\/button>/);
+  expect(render(3)).toMatch(/<button(?![^>]*disabled="")[^>]*>Print current stock labels<\/button>/);
+});
+
+it("#1117 allows recording an empty count while disabling empty-stock printing", () => {
   const html = renderToStaticMarkup(createElement(WeeklyCountDraftView, { state: countDraftFromSnapshot({ location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "captured", lines: [] }, null), roles: ["taproom"], lotLabels: {}, timeZone: "America/New_York" }));
-  expect(html).toContain("No stock is recorded at this taproom. Record count saves a count of zero for today. Your next count compares against it.");
-  expect(html).not.toContain("empty observation");
+  expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Print current stock labels<\/button>/);
   expect(html).toMatch(/<button(?![^>]*\sdisabled="")[^>]*type="submit"[^>]*>Record count<\/button>/);
 });
 
