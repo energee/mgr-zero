@@ -204,6 +204,8 @@ const SUBPAGE_TITLES: Readonly<Record<string, string>> = {
   "/compliance/licenses": "Licenses",
   "/settings/accounting": "Accounting",
   "/settings/pos": "Point of sale",
+  "/settings/pos/connect": "Connect Square",
+  "/settings/pos/connector": "Taproom sales in QuickBooks",
   "/settings/team": "Team",
 };
 
