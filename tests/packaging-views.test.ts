@@ -10,7 +10,7 @@ import { SchedulePackagingRunView } from "../components/mgr/views/schedule-packa
 import { packagingRuns, repackCase, schedulePackagingRun } from "../lib/mgr/fixtures/packaging";
 import { DEMO_TIME_ZONE } from "../lib/mgr/fixtures/settings";
 import { toPackagingRunsViewProps } from "../lib/mgr/packaging-runs-view";
-import { toSchedulePackagingRunView } from "../lib/mgr/schedule-packaging-run-view";
+import { scheduleRunReason, toSchedulePackagingRunView } from "../lib/mgr/schedule-packaging-run-view";
 const screen = (name: string) => SCREENS.find((entry) => entry.name === name)!;
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 
@@ -124,6 +124,43 @@ describe("packaging views", () => {
     const cells = [...recorded.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g)].map(match => match[1].replace(/<[^>]*>/g, ""));
     expect(cells.slice(5, 8)).toEqual(["0 kegs", "0%", "0"]);
     expect(cells.slice(13, 16)).toEqual(["", "", ""]);
+  });
+
+  it("explains every missing scheduling requirement without requiring a source tank (#1256)", () => {
+    const model = toSchedulePackagingRunView({ brands: [], occupancies: [], skus: [] }, { brandId: "", occupancyId: "", plannedOn: "", qty: {} });
+    expect(scheduleRunReason(model)).toBe("Still needed: a brand, a planned date, and a positive planned output quantity.");
+    const dated = { ...model, brandId: "b1", plannedOn: "2026-10-23" };
+    expect(scheduleRunReason(dated)).toBe("Still needed: a positive planned output quantity.");
+    for (const qty of ["", "0", "-1", "not a quantity"]) {
+      expect(scheduleRunReason({ ...dated, outputs: [{ key: "s1", title: "Keg", detail: "", qty }] })).not.toBeNull();
+    }
+    const ready = { ...dated, outputs: [{ key: "s1", title: "Keg", detail: "", qty: "2" }] };
+    expect(scheduleRunReason(ready)).toBeNull();
+    expect(scheduleRunReason({ ...ready, brandId: "" })).toBe("Still needed: a brand.");
+    expect(scheduleRunReason({ ...ready, plannedOn: "" })).toBe("Still needed: a planned date.");
+    const readyHtml = htmlOf(createElement(SchedulePackagingRunView, { model: ready }));
+    expect(readyHtml).not.toContain("Still needed:");
+    expect(readyHtml.match(/<button[^>]*>Save run plan/)?.[0]).not.toContain(' disabled=""');
+    const html = htmlOf(createElement(SchedulePackagingRunView, { model }));
+    expect(html).toContain("Still needed:");
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Save run plan/);
+  });
+
+  it("explains empty brands and open tanks beside real pickers (#1256)", () => {
+    const model = toSchedulePackagingRunView({ brands: [], occupancies: [], skus: [] }, { brandId: "", occupancyId: "", plannedOn: "", qty: {} });
+    const html = htmlOf(createElement(SchedulePackagingRunView, { model, catalogHref: "/catalog" }));
+    expect(html).toContain("No brands yet.");
+    expect(html).toMatch(/href="\/catalog"[^>]*>Add a brand in Catalog/);
+    expect(html).toContain("No occupied tanks yet. Leave the source blank and pick it before starting the run.");
+    expect(html).toMatch(/<button[^>]*role="combobox"[^>]*aria-label="Source tank · optional"/);
+    expect(html).not.toMatch(/<input[^>]*placeholder="No source yet"/);
+    expect(htmlOf(createElement(SchedulePackagingRunView, { model }))).not.toContain('href="/catalog"');
+    const nonCreator = htmlOf(createElement(SchedulePackagingRunView, { model, catalogHref: null }));
+    expect(nonCreator).toContain("An admin or sales member can add a brand in Catalog.");
+    expect(nonCreator).not.toMatch(/<a [^>]*>Add a brand in Catalog/);
+    const populated = htmlOf(createElement(SchedulePackagingRunView, { model: schedulePackagingRun }));
+    expect(populated).not.toContain("No brands yet.");
+    expect(populated).not.toContain("No occupied tanks yet.");
   });
 
   it("builds the live Schedule run model from the page's reads, gating what they cannot say", () => {

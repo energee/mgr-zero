@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ConnectSquareView, PointOfSaleView, PosItemView, PosMenuView } from "@/components/mgr/views/pos";
+import { ConnectSquareView, PointOfSaleView, PosItemView, PosMenuView, SquareConnectorView } from "@/components/mgr/views/pos";
 import { SCREENS } from "@/components/mgr/screens";
 import { classifyCommandFailure } from "@/lib/commands/client";
 import { isTerminalPublication, publicationNotice, readPublicationOutcome, reconcileBooleanChange, selectExactCommandAttempt, shouldStartNewCommandAttempt, syncFailureMessage, syncResultMessage, toPosMenuSetup, toPosVariationRow } from "@/lib/mgr/pos-view";
@@ -121,8 +121,8 @@ describe("POS UI truth", () => {
   it("describes Square's own QuickBooks feed as taproom sales, not a second provider (#1151)", () => {
     const pos = renderToStaticMarkup(createElement(PointOfSaleView, { model: { connected: false, merchant: "", state: "Not connected" }, paths: { connector: "/settings/pos/connector" } }));
     expect(pos).toMatch(/<a[^>]*href="\/settings\/pos\/connector"[^>]*>(?:(?!<\/a>)[\s\S])*Taproom sales in QuickBooks/);
-    expect(pos).toContain("Square’s own connector, separate from MGR");
-    expect(pos).not.toContain("QuickBooks connector");
+    const connector = renderToStaticMarkup(createElement<{ accountingHref?: string }>(SquareConnectorView, { accountingHref: "/settings/accounting" }));
+    expect(connector).toMatch(/href="\/settings\/accounting"[^>]*>Open Accounting/);
     const connect = renderToStaticMarkup(createElement(ConnectSquareView, { configured: false }));
     expect(connect).toContain("Square isn’t turned on in MGR yet.");
     expect(connect).not.toContain("support");

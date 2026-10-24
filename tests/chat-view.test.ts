@@ -132,3 +132,12 @@ it("omits fixture wording and the dev-only state picker from Chat settings", () 
   expect(html).not.toMatch(/fixture|server setup|All preview states/i);
   expect(html).not.toContain(">Chat notifications<");
 });
+
+it("offers a searchable timezone picker with the saved timezone and busy state", () => {
+  const preferences = { ...personalChatPreferences, timezone: "UTC" };
+  const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences }));
+  expect(html).toMatch(/<input[^>]*role="combobox"[^>]*>/);
+  expect(html).toContain('value="UTC"');
+  const busy = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences, busy: true }));
+  expect(busy).toMatch(/<input(?=[^>]*role="combobox")(?=[^>]*disabled)[^>]*>/);
+});

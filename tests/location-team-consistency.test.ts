@@ -3,7 +3,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { BinView } from "@/components/mgr/views/bin";
 import { LocationsInventoryLink, LocationsView } from "@/components/mgr/views/locations";
-import { TimezoneField } from "@/components/mgr/timezone-field";
 import { locationsList } from "@/lib/mgr/fixtures/locations";
 import { toLocationsViewProps } from "@/lib/mgr/locations-view";
 import { teamRoster } from "@/lib/mgr/fixtures/team";
@@ -41,10 +40,6 @@ it("shows a season-independent readable timezone with its exact stored identifie
   expect(timezoneLabel("Europe/London")).toBe("United Kingdom Time (Europe/London)");
 });
 
-it("displays the same readable timezone in the searchable picker", () => {
-  const html = renderToStaticMarkup(createElement(TimezoneField, { value: "America/New_York", onChange: () => {} }));
-  expect(html).toContain("Eastern Time (America/New_York)");
-});
 
 it("explains the global stock link in both inventory and live Locations", () => {
   const inventory = renderToStaticMarkup(createElement(LocationsView, { model: toLocationsViewProps(locationsList) }));

@@ -85,7 +85,7 @@ export function orderFormReadiness(i: OrderFormReadinessInput): OrderFormReadine
   if (i.kind === "wholesale") {
     if (!i.customerId) needs.push("a customer");
     else if (!i.shipToId) needs.push("a ship-to");
-  } else if (!i.toLocationId) needs.push("a To location");
+  } else if (!i.toLocationId) needs.push("a destination location");
   if (!i.fromLocationId) needs.push("a source location");
   if (!i.lines.some(isCompleteLine) || orderLineErrors(i.lines).length > 0) needs.push("a SKU with a quantity above zero on each line");
   const availableSkuIds = i.availableSkuIds;
@@ -104,7 +104,8 @@ export function orderFormReadiness(i: OrderFormReadinessInput): OrderFormReadine
   const links = missing.flatMap(m => m.link ? [m.link] : []);
   const goTo = links.length === 0 ? [] : ["Go to ", ...links.flatMap((link, k) => k === 0 ? [link] : [" or ", link]), "."];
 
-  return { submittable: needs.length === 0, reason: submitReason(needs), hint, goTo };
+  // The setup hint replaces Still needed until the missing setup exists.
+  return { submittable: needs.length === 0, reason: hint ? null : submitReason(needs), hint, goTo };
 }
 
 /** Initial destination only; a caller's explicit draft selection stays authoritative. */
