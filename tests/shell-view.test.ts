@@ -320,7 +320,7 @@ describe("Work view", () => {
 describe("More view", () => {
   it("maps the designed More list under every area, each card in one", () => {
     const model = toMoreViewProps(moreNavs);
-    expect(model.groups.map((g) => g.group)).toEqual(["Sales", "Production", "Setup", "Integrations"]);
+    expect(model.groups.map((g) => g.group)).toEqual(["Sales", "Production", "Setup", "Menu and chat"]);
     expect(model.groups[0]?.items[0]?.title).toBe("Invoices");
     expect(model.groups.flatMap((g) => g.items)).toHaveLength(moreNavs.length);
   });
@@ -328,10 +328,10 @@ describe("More view", () => {
   it("hides an area heading when the role has no card under it (#1159)", () => {
     // The live page's mapping, for a role whose More is Chat and Units.
     const model = toMoreViewProps([
-      { key: "/settings/chat", title: "Chat", group: "Integrations" },
+      { key: "/settings/chat", title: "Chat", group: "Menu and chat" },
       { key: "/settings/units", title: "Units", group: "Setup" },
     ]);
-    expect(model.groups.map((g) => [g.group, g.items.map((r) => r.title)])).toEqual([["Setup", ["Units"]], ["Integrations", ["Chat"]]]);
+    expect(model.groups.map((g) => [g.group, g.items.map((r) => r.title)])).toEqual([["Setup", ["Units"]], ["Menu and chat", ["Chat"]]]);
     const html = renderToStaticMarkup(createElement(MoreView, { model }));
     expect(html).toContain(">Setup</h2>");
     expect(html).not.toContain(">Sales</h2>");
