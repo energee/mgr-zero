@@ -66,7 +66,13 @@ export const locationUsesLabel = (uses: readonly string[]) => uses.map(sentenceC
 
 /** The generic name stays readable year-round; the IANA identifier stays exact. */
 export function timezoneLabel(timezone: string): string {
-  const name = new Intl.DateTimeFormat("en-US", { timeZone: timezone, timeZoneName: "longGeneric" })
-    .formatToParts(new Date("2026-01-01T12:00:00Z")).find((part) => part.type === "timeZoneName")!.value;
-  return `${name} (${timezone})`;
+  try {
+    const name = new Intl.DateTimeFormat("en-US", { timeZone: timezone, timeZoneName: "longGeneric" })
+      .formatToParts(new Date("2026-01-01T12:00:00Z")).find((part) => part.type === "timeZoneName")!.value;
+    return `${name} (${timezone})`;
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    // Keep an invalid value visible for correction; validation still blocks saving it.
+    return `${timezone} (invalid timezone)`;
+  }
 }
