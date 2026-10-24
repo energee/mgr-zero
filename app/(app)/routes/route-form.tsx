@@ -34,6 +34,7 @@ export function RouteForm({ route, candidates, drivers, today }: { route: Route 
   }
   return <RouteView model={{
     title: route ? (route.name ?? "Route") + " · " + formatDate(route.delivery_date) : "New route", backHref: "/routes",
+    ordersHref: "/orders",
     date: deliveryDate, driverId: driverUserId, vehicle, name, selection: stops, saved: Boolean(route), savedDriverId: route?.driver_user_id,
     driverOptions: driverOptions(drivers, route),
     stops: candidates.map(candidate => ({ key: candidate.id, title: candidate.label, detail: "shipped · no route", locked: delivered.has(candidate.id), warning: !(candidate.id in stops) })),

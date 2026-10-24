@@ -102,7 +102,7 @@ export type OrderSnapshot = {
   atp: { sku_id: string; qty: number }[];
   /** get_order_cogs, passed only for roles that may run it. */
   cogs?: OrderCogs;
-  /** Display name by user id: staff @handles (list_team_members) and the
+  /** Display name by user id: staff names (list_team_members) and the
    *  customer's portal emails (list_customer_users). An actor in neither, such
    *  as revoked staff, reads "a user not on the team". */
   actorNames?: Record<string, string>;

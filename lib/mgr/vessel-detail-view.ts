@@ -3,6 +3,7 @@
 import { formatGravity, type GravityUnit } from "./gravity-unit";
 import { formatDateTime } from "@/lib/date-format";
 import { submitReason } from "@/lib/mgr/submit-reason";
+import { vesselCapacity } from "@/lib/vessel-capacity";
 
 export type VesselReading = { id: string; at: string; temp_f: number | null; gravity_plato: number | null; ph: number | null; note: string | null };
 export const VESSEL_TYPES = ["Fermenter", "Brite", "Barrel", "Kettle", "Other"];
@@ -31,21 +32,21 @@ export type VesselDetailViewModel = {
   retired?: boolean;
 };
 
-function hasCapacity(capacity: string): boolean {
-  const bbl = Number(capacity);
-  return Number.isFinite(bbl) && bbl > 0;
-}
-
 /** A typed capacity the vessel cannot take, shown under the field. A blank
  *  one is not an error: the capacity is then missing (vesselReason). */
 export function vesselCapacityError(capacity: string): string | undefined {
-  return capacity.trim() !== "" && !hasCapacity(capacity) ? "Enter a capacity above zero." : undefined;
+  if (capacity.trim() === "") return undefined;
+  if (/[eE]/.test(capacity)) return "Enter a decimal number, not exponent notation (for example, 1000 instead of 1e3).";
+  const value = Number(capacity);
+  if (!Number.isFinite(value)) return "Enter a valid capacity in bbl.";
+  const parsed = vesselCapacity.safeParse(value);
+  return parsed.success ? undefined : parsed.error.issues[0].message;
 }
 
-/** What Save vessel waits for: a name and a capacity above zero. */
+/** What Save vessel waits for: a name and an exactly representable capacity. */
 export function vesselReason({ name, capacity }: { name: string; capacity: string }): string | null {
   const missing: string[] = [];
   if (!name.trim()) missing.push("a name");
-  if (!hasCapacity(capacity)) missing.push("a capacity above zero");
+  if (capacity.trim() === "" || vesselCapacityError(capacity)) missing.push("a valid capacity");
   return submitReason(missing);
 }

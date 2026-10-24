@@ -26,15 +26,15 @@ describe("Order view loop", () => {
     expect(edit).toContain("SAVE");
   });
 
-  it("names who made each history entry: staff by @handle, a portal buyer by email", () => {
+  it("names who made each history entry: staff by name, a portal buyer by email", () => {
     const events = [
       { id: "e1", event: "submitted", actor: "buyer-id", payload: {}, created_at: "2026-10-16T13:02:00.000Z" },
       { id: "e2", event: "lines_adjusted", actor: "staff-id", payload: { before: {}, lines: [], reason: "call" }, created_at: "2026-10-16T13:04:00.000Z" },
       { id: "e3", event: "confirmed", actor: "gone-id", payload: {}, created_at: "2026-10-16T13:05:00.000Z" },
     ];
-    const model = toOrderViewProps({ ...orderPickedRestock, events, actorNames: { "buyer-id": "buyer@bar.com", "staff-id": "@ted" } });
-    expect(model.events.map((e) => e.by)).toEqual(["buyer@bar.com", "@ted", "a user not on the team"]);
-    expect(renderToStaticMarkup(createElement(OrderView, { model }))).toContain("Lines adjusted by @ted");
+    const model = toOrderViewProps({ ...orderPickedRestock, events, actorNames: { "buyer-id": "buyer@bar.com", "staff-id": "Ted Brewer" } });
+    expect(model.events.map((e) => e.by)).toEqual(["buyer@bar.com", "Ted Brewer", "a user not on the team"]);
+    expect(renderToStaticMarkup(createElement(OrderView, { model }))).toContain("Lines adjusted by Ted Brewer");
   });
 
   it("maps the shared fixture through the adapter", () => {

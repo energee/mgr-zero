@@ -3,26 +3,26 @@
 // landing back on the recipe when it saves. The draft starts as a copy of the
 // current version (versionToDraft), or blank before the first one; an unsaved
 // draft kept in this tab replaces it on arrival. Mirrors /recipes/new.
-import { getActiveBrewery } from "@/lib/brewery";
-import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toRecipeMaterial, toWaterProfileOption, type RecipeMaterial, type WaterProfileRow } from "@/lib/mgr/recipe-process-view";
 import "@/lib/commands/all";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
-import { orNotFound } from "@/lib/mgr/not-found";
-import { versionToDraft, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
+import { versionToDraft } from "@/lib/mgr/recipe-view";
 import { RecipeEditor } from "../recipe-version-form";
-import { navTitle } from "@/lib/mgr/nav";
+import { getRecipePageData } from "../../recipe-data";
 
-export const metadata = { title: navTitle("/recipes") };
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { snapshot } = await getRecipePageData(id);
+  return { title: `${snapshot.recipe.name} · new version` };
+}
 
 export default async function NewVersionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const brewery = await getActiveBrewery();
-  const ctx = await buildContext(brewery.id);
-  const [snapshot, materials, gravityUnit, profiles] = (await Promise.all([
-    orNotFound(runCommand("get_recipe", { recipeId: id }, ctx)), runCommand("list_materials", {}, ctx), runCommand("get_gravity_unit", {}, ctx), runCommand("list_water_profiles", {}, ctx),
-  ])) as [RecipeSnapshot, RecipeMaterial[], { effective: GravityUnit }, WaterProfileRow[]];
+  const { ctx, snapshot } = await getRecipePageData(id);
+  const [materials, gravityUnit, profiles] = (await Promise.all([
+    runCommand("list_materials", {}, ctx), runCommand("get_gravity_unit", {}, ctx), runCommand("list_water_profiles", {}, ctx),
+  ])) as [RecipeMaterial[], { effective: GravityUnit }, WaterProfileRow[]];
   const { recipe, version } = snapshot;
   return (
     <RecipeEditor

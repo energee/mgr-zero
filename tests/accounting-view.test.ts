@@ -59,6 +59,20 @@ it("reports portal-email presence without claiming delivery or blocking push", (
   expect(markup).not.toContain("cannot be pushed");
 });
 
+it("offers portal-email Review only when the count is positive or unavailable (#1151)", () => {
+  const base = toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null }, "America/New_York");
+  const render = (missingEmails?: number) => renderToStaticMarkup(createElement(AccountingView, {
+    model: { ...base, missingEmails, customersHref: "/customers?missingEmail=1" }, connection: null, defaults: null, sync: null,
+  }));
+  expect(render(0)).toContain("All customers have a portal login email");
+  expect(render(0)).not.toContain(">Review<");
+  expect(render(0)).not.toContain('href="/customers?missingEmail=1"');
+  for (const count of [1, 2, undefined]) {
+    expect(render(count)).toContain(">Review<");
+    expect(render(count)).toContain('href="/customers?missingEmail=1"');
+  }
+});
+
 it("names the connected company, keeps its id as a separate fact, and labels the QuickBooks environment", () => {
   const model = toAccountingViewProps({ connected: true, state: "connected", connectionId: "c1", realmLabel: "Test Company", realmId: "4620816365342151800", lastError: null }, "America/New_York", undefined, "sandbox");
   expect(model.company).toBe("Test Company");

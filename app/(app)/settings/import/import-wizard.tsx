@@ -7,7 +7,7 @@ import { discardRecovery, readRecoveries } from "@/lib/commands/recovery";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { useCommandContext } from "@/lib/brewery-provider";
 import type { CommandContextExpectation } from "@/lib/commands/registry";
-import { IMPORT_KINDS, IMPORT_FIELDS, mapCsvRows, parseCsv, readyImportRowNumbers, readyImportRows, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
+import { IMPORT_KINDS, IMPORT_FIELDS, mapCsvRows, parseCsv, readyImportRowNumbers, readyImportRows, validateImportRows, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 
 /** Marks the import batch's saved request: this wizard recovers it (with its preview row numbers), not the shared panel. */
 const IMPORT_OWNER = "import";
@@ -44,7 +44,7 @@ function ImportSession({ lookups }: { lookups: ImportLookups }) {
   const router = useRouter();
   const fields = IMPORT_FIELDS[kind];
   const rows = useMemo(() => csv ? mapCsvRows(csv.rows, mapping) : [], [csv, mapping]);
-  const validation = useMemo(() => rows.map(row => validateImportRow(kind, row, lookups)), [rows, kind, lookups]);
+  const validation = useMemo(() => validateImportRows(kind, rows, lookups), [rows, kind, lookups]);
 
   function stage(next: ReturnType<typeof parseCsv>) {
     setCsv(next); setMapping(Object.fromEntries(fields.map(f => [f.name, next.headers.indexOf(f.name)]))); setError(null);
