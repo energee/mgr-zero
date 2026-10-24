@@ -33,14 +33,11 @@ export function MonthlyComplianceView({ model, lossAction, fileAction }: {
   /** The live Save (FileButton). Absent in the inventory, which draws the inert form; null draws none. */
   fileAction?: ReactNode;
 }) {
-  let record: ReactNode;
-  if (model.filingDate) {
-    record = E.status(`Snapshot saved ${model.filingDate}`, "ok");
-  } else if (model.periodStatus !== "Past") {
-    record = E.status(`You can record the filing after ${model.title} ends`, "w");
-  } else {
-    record = fileAction !== undefined ? fileAction : <FileSnapshotForm reason={model.fileReason} />;
-  }
+  // Step 3, one case at a time: already filed, not yet ended, the live Save, or the inventory's.
+  const record = model.filingDate ? E.status(`Snapshot saved ${model.filingDate}`, "ok")
+    : model.periodStatus !== "Past" ? E.status(`You can record the filing after ${model.title} ends`, "w")
+    : fileAction !== undefined ? fileAction
+    : <FileSnapshotForm reason={model.fileReason} />;
   return <>
     {E.back("Compliance", model.title, E.status(model.periodStatus, model.periodStatus === "Current" ? "ok" : ""), model.backHref)}
     {model.periodStatus === "Upcoming" ? E.info(`This period has not started. It starts on ${model.periodStart}. You can record the filing only after it ends.`) : null}
