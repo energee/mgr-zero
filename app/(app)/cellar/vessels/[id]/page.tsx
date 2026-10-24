@@ -12,7 +12,10 @@ import { formatDateTime } from "@/lib/date-format";
 import "@/lib/commands/all";
 import { navTitle } from "@/lib/mgr/nav";
 
-export const metadata = { title: navTitle("/cellar/vessels") };
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return { title: navTitle(id === "new" ? "/cellar/vessels/new" : "/cellar/vessels") };
+}
 
 type Vessel = { id: string; name: string; kind: string; capacity_bbl: number; active: boolean };
 type Occupancy = { occupancy_id: string; vessel_id: string; batch_id: string; batch_no: number | null; brand_name: string | null; bbl: number };

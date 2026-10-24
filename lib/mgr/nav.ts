@@ -192,18 +192,27 @@ export function canOpen(roles: readonly StaffRole[], path: string): boolean {
   return !best || allowed(best, roles);
 }
 
-/**
- * The browser-tab title of the staff page at `path` (#1109): the label of the
- * deepest STAFF_NAV entry covering it. /routes reads "Deliveries";
- * /settings/team has no entry and follows Settings. Each page exports
- * `metadata = { title: navTitle("<its route>") }`; a record page passes its
- * static parent, so /orders/[id] reads "Orders" (#1230). The root layout's
- * template appends " · MGR". Throws for a path no STAFF_NAV entry covers, so
- * a page outside the nav fails at build. tests/page-titles.test.ts catches a
- * page that passes a route other than its own static route, such as a moved
- * page.
- */
+/** Subpages with their own headings but no sidebar entry (#1255).
+ * Exact matches keep a creation page's title from leaking into record pages. */
+const SUBPAGE_TITLES: Readonly<Record<string, string>> = {
+  "/kegs/report": "Keg report",
+  "/kegs/history": "Keg history",
+  "/cellar/vessels/new": "New vessel",
+  "/catalog/water-profiles": "Water profiles",
+  "/catalog/brands/new": "New brand",
+  "/recipes/new": "New recipe",
+  "/compliance/licenses": "Licenses",
+  "/settings/accounting": "Accounting",
+  "/settings/pos": "Point of sale",
+  "/settings/team": "Team",
+};
+
+/** Browser-tab title without the root layout's " · MGR" suffix.
+ * Named subpages use their heading; other pages use their navigation section.
+ * Record pages with a data-dependent heading export generateMetadata instead. */
 export function navTitle(path: string): string {
+  const title = SUBPAGE_TITLES[path];
+  if (title) return title;
   const entry = coveringEntry(path);
   if (!entry) throw new Error(`No STAFF_NAV entry covers ${path}`);
   return entry.label;

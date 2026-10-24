@@ -22,7 +22,10 @@ import type { KegPoolOption } from "@/lib/mgr/sku-view";
 import { BrandPage, type BrandRow, type SellsReads } from "./brand-page";
 import { navTitle } from "@/lib/mgr/nav";
 
-export const metadata = { title: navTitle("/catalog/brands") };
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return { title: navTitle(id === "new" ? "/catalog/brands/new" : "/catalog/brands") };
+}
 
 export default async function BrandDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
