@@ -1713,8 +1713,8 @@ export const SCREENS: Screen[] = [
     job: "Add a vessel: its name, type and capacity",
     reads: "none",
     writes: "upsert_vessel",
-    states: [["permission", "admin only", 1], ["new", "only the vessel facts; occupancy and readings appear on Vessel detail once it is saved"], ["incomplete", "Save vessel says what is still needed; a capacity of 0 or less is marked at its field", 1]],
-    spec: "Add vessel on Cellar and New vessel on Batches open this page: Vessel detail before the vessel exists. A vessel not saved yet has no occupancy or readings, so only its facts are drawn. Save vessel stays withheld until it has a name and a capacity above zero, and the sentence beside it names what is missing. A typed capacity of 0 or less is marked under the field once it is left. Save vessel returns to Cellar.",
+    states: [["permission", "admin only", 1], ["new", "only the vessel facts; occupancy and readings appear on Vessel detail once it is saved"], ["incomplete", "Save vessel says what is still needed; a capacity outside the stored range or precision is marked at its field", 1]],
+    spec: "Add vessel on Cellar and New vessel on Batches open this page: Vessel detail before the vessel exists. A vessel not saved yet has no occupancy or readings, so only its facts are drawn. Save vessel stays withheld until it has a name and a capacity from 0.001 to 9,999,999.999 bbl, with up to three decimal places, and the sentence beside it names what is missing. A typed capacity outside that range or precision is marked under the field once it is left. Save vessel returns to Cellar.",
     body: <VesselDetailView model={vesselNew} reason={vesselReason(vesselNew)} />,
   },
   {
