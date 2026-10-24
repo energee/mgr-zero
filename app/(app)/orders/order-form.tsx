@@ -66,6 +66,7 @@ export function OrderForm({
     kind, customerId, shipToId, fromLocationId, toLocationId, lines, availableSkuIds,
     catalog: { customers: customers.length, locations: locations.length, skus: skus.length },
   });
+  const blocked = !skuOptionsReady || !readiness.submittable;
 
   function reset() {
     setKind("wholesale");
@@ -110,7 +111,7 @@ export function OrderForm({
   return (
     <form onSubmit={event => {
       // Guard keyboard/programmatic submits too; a disabled button alone is not the boundary.
-      if (!skuOptionsReady || !readiness.submittable) { event.preventDefault(); event.stopPropagation(); return; }
+      if (blocked) { event.preventDefault(); event.stopPropagation(); return; }
       void form.submit(event);
     }} className="contents" aria-describedby={readiness.hint ? "order-form-hint" : undefined}>
       <NewOrderView feedback={feedback} skuFeedback={skuFeedback} skuOptionsReady={skuOptionsReady}
@@ -134,7 +135,7 @@ export function OrderForm({
           {readiness.hint} {readiness.goTo.map(part => typeof part === "string" ? part : <Link key={part.href} href={part.href} className="underline">{part.label}</Link>)}
         </p>}
         <CommandFormMessage error={form.error} />
-      </>} submitting={form.submitting} disabled={!skuOptionsReady || !readiness.submittable} reason={readiness.hint ? null : readiness.reason} />
+      </>} submitting={form.submitting} disabled={blocked} reason={readiness.reason} />
     </form>
   );
 }

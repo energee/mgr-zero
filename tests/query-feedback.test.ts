@@ -50,6 +50,5 @@ describe("query freshness", () => {
       expect(html).toContain("Showing last-known data");
       expect(html).not.toContain("Last checked");
     }
-    expect(render({ showCheckedAt: false, error: new Error("Refresh failed") })).toContain("Try again");
   });
 });

@@ -15,5 +15,5 @@ export function QueryFeedback({ timeZone, error, loading, retry, fetching, pause
   if (paused) return <p role="status" className="text-sm text-muted-foreground">Waiting for connection. {checkedAt && "Showing last-known data. "}{checked}</p>;
   if (loading) return <p role="status" className="text-sm text-muted-foreground">{loading}…</p>;
   // Successful polling must not announce a changing timestamp every five seconds.
-  return checked || (fetching && checkedAt) ? <p className="min-h-5 text-xs text-muted-foreground">{fetching && "Updating… "}{checked}</p> : null;
+  return checkedAt && (showCheckedAt || fetching) ? <p className="min-h-5 text-xs text-muted-foreground">{fetching && "Updating… "}{checked}</p> : null;
 }
