@@ -53,6 +53,9 @@ import { BrewTimelineView } from "@/components/mgr/views/brew-timeline";
 import { BrandApprovalView } from "@/components/mgr/views/brand-approval";
 import { BrandView } from "@/components/mgr/views/brand";
 import { CatalogView } from "@/components/mgr/views/catalog";
+import { ColaReviewView } from "@/components/mgr/views/cola-review";
+import { ColaLabelImageView } from "@/components/mgr/views/cola-label-image";
+import { colaReviewBrands, colaReviewRecord, colaReviewDetails } from "@/lib/mgr/fixtures/cola-review";
 import { ListControls } from "@/components/mgr/list-controls";
 import { ChannelView } from "@/components/mgr/views/channel";
 import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
@@ -781,8 +784,8 @@ export const SCREENS: Screen[] = [
     job: "Upload, match columns, review and import valid rows, each on its own",
     reads: "list_skus · list_locations · list_bins · list_customers · list_formats · list_price_groups · list_sale_channels",
     writes: "import_csv",
-    states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Import disabled · fix column matches", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "same requestId returns original committed and blocked results"], ["permission", "Import requires admin", 1], ["upload", "kind chosen · its columns listed as required, optional, or required for a US address · reference columns take a name or ID · Download template saves a header-only CSV of those columns"]],
-    spec: "The steps are Upload, Match columns, Review and Import. Before upload, the screen lists the chosen kind's columns from the import field contract and marks each one required, optional, or required for a US address. Download template saves a CSV whose only row is those column names, built in the browser from the same list. One logical row is atomic; siblings commit independently. Reference ID cells accept a UUID or trimmed, case-insensitive exact name; missing or ambiguous names block the row. Bin names are scoped to the location, and pour formats to the price group. Product imports use packaged formats. Review is editable on phone and desk. All-invalid batches cannot be imported. Same-batch retry preserves raw cells and returns original results; correction starts only blocked rows with a new identity. Reloading the same tab restores an unresolved batch; Discard saved request drops it after a confirming step and sends nothing.",
+    states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Import disabled · fix column matches", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "same requestId returns original committed and blocked results"], ["permission", "Import requires admin", 1], ["upload", "kind chosen · friendly labels beside stable CSV keys · required, optional, or required for a US address · Download template includes one incomplete example row"]],
+    spec: "The steps are Upload, Match columns, Review and Import. Before upload, the screen lists friendly field labels beside stable CSV keys and marks each one required, optional, or required for a US address. Download template uses a friendly filename and includes one incomplete example row with a mandatory cell blank, so it cannot import as downloaded. Review requires every mandatory column to be matched, including State for US addresses. One logical row is atomic; siblings commit independently. Reference ID cells accept a UUID or trimmed, case-insensitive exact name; missing or ambiguous names block the row. Bin names are scoped to the location, and pour formats to the price group. Product imports use packaged formats. Review is editable on phone and desk. All-invalid batches cannot be imported. Routine guidance is informational, including the retained explanation that importing opening stock in a new batch counts it twice. Same-batch retry preserves raw cells and returns original results; correction starts only blocked rows with a new identity. Reloading the same tab restores an unresolved batch; Discard saved request drops it after a confirming step and sends nothing.",
     body: <ImportView model={importPreview} />,
   },
   {
@@ -893,7 +896,7 @@ export const SCREENS: Screen[] = [
     group: "Global",
     name: "Composer setup",
     surface: "composer",
-    to: { "Retry setup": "Composer setup", Minimize: "Today" },
+    to: { "Retry setup": "Composer setup", "Back to page": "Today" },
     job: "Open your latest conversation, or start your first, before you can type",
     reads: "list_chat_conversations · get_chat_history",
     writes: "create_chat_conversation [first open only; one request id across retries]",
@@ -908,7 +911,7 @@ export const SCREENS: Screen[] = [
     group: "Global",
     name: "Composer question",
     surface: "composer",
-    to: { "New chat": "Composer question", Minimize: "Today" },
+    to: { "New chat": "Composer question", "Back to page": "Today" },
     job: "Ask one exact follow-up in the conversation; no Commit until every required field is known",
     reads: "list_skus · list_locations · list_bins · list_sale_channels · get_bin_move_stock",
     writes: "none",
@@ -926,12 +929,12 @@ export const SCREENS: Screen[] = [
     group: "Global",
     name: "Composer answer",
     surface: "composer",
-    to: { "Shortfall detail": "Pars and allocation", Review: "Pars and allocation", "New chat": "Composer answer", Minimize: "Today" },
+    to: { "Shortfall detail": "Pars and allocation", Review: "Pars and allocation", "New chat": "Composer answer", "Back to page": "Today" },
     job: "Questions use named registered queries",
     reads: "get_atp · get_shortfalls",
     writes: "none",
     states: [["loading", "answer skeleton"], ["error", "Could not refresh ATP · Retry", 1], ["offline", "cached value + timestamp"]],
-    spec: "The drawer handle is a visible button (Open, Expand, Minimize Ask MGR); no swipe-only interaction.",
+    spec: "Navigate / Ask MGR in the header opens a right-side overlay on desktop and full-screen chat on phones. Navigate, Back to page, or Escape closes it without discarding drafts, messages, or an active response. The page keeps its width and scroll position. Phone focus stays in chat; opening by touch does not open the keyboard.",
     body: <><ComposerConversationView messages={[
       { id: "answer-user", role: "user", content: "How much Hazy is available to promise?" },
       { id: "answer-assistant", role: "assistant", content: "11 × ½ bbl plus 40 cases are currently available to promise. Observed Sep 10, 2026, 10:00 AM." },
@@ -1496,9 +1499,9 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Catalog",
-    to: { "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand", "New format": "Format", "16 oz can": "Format", "four-pack": "Format", "case · 24×16oz": "Format", "½ bbl keg": "Format" },
+    to: { "Bulk process COLAs": "Bulk process COLAs", "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand", "New format": "Format", "16 oz can": "Format", "four-pack": "Format", "case · 24×16oz": "Format", "½ bbl keg": "Format" },
     job: "Define brands, their sellable formats and prices without ledger writes",
-    reads: "list_brands [incl. recorded COLA approvals] · list_skus · list_catalog_categories",
+    reads: "list_brands [incl. recorded COLA approvals and selected images] · list_skus · list_catalog_categories · get_cola_image",
     writes: "upsert_brand · create_sku · update_sku",
     states: DEFAULT_STATES,
     spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix.",
@@ -1523,12 +1526,12 @@ export const SCREENS: Screen[] = [
     tab: "More",
     name: "Brand",
     to: { Edit: "Brand approval", "COLA TTB ID 25318001000034": "Brand approval", "OH registration": "State registration", "Add approval": "Brand approval", "Add registration": "State registration", Use: "Brand", "Suggested group 2": "Brand", "Edit SKU": "SKU", "Four Pack · 6 per Case": "Format", Glass: "Price group", "Edit on price group": "Price group", "Manage formats": "Catalog" },
-    job: "Sellable facts without ledger writes, including the TTB fields",
-    reads: "list_brands [incl. the staff-only alias, SKUs and pours] · list_catalog_categories · list_formats [packaged, with contents] · list_channel_prices · list_sale_channels · list_keg_pools · get_compliance_registry [this brand’s approvals and registrations] · get_brand_recipe_cost [recipe cost per barrel and any uncosted ingredient]",
+    job: "Sellable brand facts and compliance, including selected COLA label images",
+    reads: "list_brands [incl. the staff-only alias, SKUs and pours] · list_catalog_categories · list_formats [packaged, with contents] · list_channel_prices · list_sale_channels · list_keg_pools · get_compliance_registry [this brand’s approvals and registrations] · get_brand_recipe_cost [recipe cost per barrel and any uncosted ingredient] · get_cola_image",
     writes: "upsert_brand · save_catalog_category · delete_catalog_category · update_sku · create_sku · upsert_brand_approval · upsert_state_registration",
     states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["sells as", "one switch per packaged Format · on creates the SKU or turns it back on"], ["switched off", "the SKU turns inactive, never deleted: hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"], ["COLA pending", "no approval on file: the brand is flagged until one is added", 1], ["suggested group", "the recipe cost lands in a ceiling band · Use fills the select, Save brand commits"], ["cost unknown", "an ingredient has no receipt cost yet: the sum is not shown as a cost", 1], ["saved first", "SKUs and compliance wait until the brand is saved; the first save moves to its page"], ["badges", "COLA pending jumps to Compliance; price group or Unpriced, category, active SKU count"]],
     spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. Sells as lists every packaged Format with a switch: on means the brand sells it, which is an active SKU, and Edit SKU opens that SKU's sheet (UPC, keg pool, batch share). Under the switches, each switched-on Format's contents read as lines (Four Pack · 6 per Case), then the price group's pours. A pour is a serving from the tap, not a SKU: the menu publishes brand × pour to Square, and a sale depletes the keg SKU. Every line shows its price per sale channel; prices and pours are edited on the price group. No container source editor here. Compliance is the brand’s: its COLA or formula approvals and its state registrations list under the sell sheet, each row opening its sheet, with Add approval and Add registration; a brand with no COLA is flagged pending. Manage categories opens beside Category: Admin and Sales can add, rename across all brands, and confirm deletion of unused categories. Uncategorized clears a brand’s assignment when saved. The brewery’s own licenses are the Licenses page under Compliance, never a brand row. Under the price group, the brand’s recipe cost per barrel (its last brewed version, else its newest) is read against the groups’ ceilings and names the band it falls in; Use only fills the select. A recipe with an ingredient that has never been received has no trustworthy cost, so the row says which ingredient instead of a number. No recipe, no row.",
-    body: <BrandView model={toBrandViewProps(brandHazy)} categoryAction={<CatalogCategoriesFixture categories={toBrandViewProps(brandHazy).categoryOptions} />} />,
+    body: <BrandView model={toBrandViewProps(brandHazy)} images={{ cola: <ColaLabelImageView label="Hazy IPA · COLA 25318001000034" src="/mock/cola-label.svg" /> }} categoryAction={<CatalogCategoriesFixture categories={toBrandViewProps(brandHazy).categoryOptions} />} />,
   },
   {
     step: 5,
@@ -2369,13 +2372,26 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Brand approval",
-    to: { "Save approval": "Brand", "Find COLA on TTB": "Brand approval", Use: "Brand approval", STOUT: "Brand approval", "OATMEAL STOUT": "Brand approval" },
+    to: { "Save approval": "Brand", "Find COLA on TTB": "Brand approval", "Load COLA by TTB ID": "Brand approval", Use: "Brand approval", STOUT: "Brand approval", "OATMEAL STOUT": "Brand approval" },
     job: "Record one brand’s federal approval status",
-    reads: "get_compliance_registry · search_colas",
+    reads: "get_compliance_registry · search_colas · get_cola_details · get_cola_image",
     writes: "upsert_brand_approval",
-    states: [["approved", "orders may proceed"], ["from a brand", "the subject is stated, not picked: the sheet is only ever opened from one brand"], ["duplicate", "the same number on the same brand is one record · conflict", 1], ["COLA search", "lists the brewery’s TTB COLAs matching the brand; Use fills TTB ID, serial and date approved"], ["no registry number", "Settings has no TTB registry number: the search says to add it", 1], ["no match", "no COLA under the permit matches the brand name"], ["TTB down", "TTB did not answer: an error, never an empty list", 1]],
-    spec: "A COLA has two identifiers: the TTB ID that TTB assigns (25318001000034), which is required, and the applicant’s own serial number (260135), which is optional; both are text, so leading zeros stay. Open COLA links TTB’s public COLA page built from the TTB ID alone, never the serial; with no TTB ID the sheet says to enter one, and the link does not verify approval or promise the page is reachable. A COLA never expires: the sheet asks for the two identifiers and the date TTB approved it, and offers no expiry; the expiry column is never written. A formula keeps its TTB formula number. The brand is stated rather than picked, because the sheet is reached from a brand. Find COLA searches TTB’s public COLA registry under the brewery’s TTB registry number from Settings, over the last 15 years, and lists the COLAs whose fanciful or brand name contains the brand’s name, newest first. Use fills the TTB ID, serial and date approved from TTB’s completed date; nothing is saved until Save approval.",
+    states: [["approved", "orders may proceed"], ["from a brand", "the subject is stated, not picked"], ["saved ID", "entering a COLA already on this brand updates its approval instead of adding a duplicate"], ["COLA search", "Use copies the identifiers and loads approved label choices"], ["direct TTB ID", "load an approved COLA by ID without matching the brand name"], ["label images", "choose a label; fields and image save together"], ["no registry number", "Settings has no TTB registry number: add it before loading labels", 1], ["no match", "enter a known TTB ID directly"], ["TTB down", "show a retrieval error, never an empty answer", 1]],
+    spec: "A COLA has a required TTB ID and an optional applicant serial number. Both identifiers preserve leading zeros. A formula keeps its formula number. A COLA does not expire. Find COLA searches the brewery's permit by brand name; Use loads that approval's label images. Load COLA by TTB ID accepts a known 14-digit ID directly, regardless of the label's name. Only an approved, dated COLA under the brewery's permit supplies images. A saved ID updates its existing approval when added again. Changing the ID or approval kind clears draft image choices. Save approval stores the fields and selected image together.",
     body: <BrandApprovalView model={brandApprovalStout} />,
+  },
+  {
+    step: 7,
+    slice: 6,
+    tab: "More",
+    surface: "sheet",
+    name: "Bulk process COLAs",
+    to: { "Open COLA on TTB": "Bulk process COLAs", "Choose Brand (front) or keg collar": "Bulk process COLAs", Skip: "Bulk process COLAs", "Save and next": "Bulk process COLAs" },
+    job: "Review the brewery’s approved labels and select a catalog image for each brand",
+    reads: "search_colas · get_cola_details · get_cola_image",
+    writes: "upsert_brand_approval",
+    states: [["selection", "choose from the brands currently shown in Catalog"], ["review", "choose a COLA and one label image; save or skip each brand"], ["no match", "show all labels under the permit or skip"], ["not approved", "TTB must report APPROVED before images can be selected", 1], ["complete", "saved choices stay; skipped brands are unchanged"]],
+    body: <ColaReviewView brands={colaReviewBrands} selected={colaReviewBrands.map(brand => brand.id)} queue={colaReviewBrands} index={0} saved={0} candidates={[colaReviewRecord]} ttbId={colaReviewRecord.ttbId} details={colaReviewDetails} imageUrl="" showAll={false} images={Object.fromEntries(colaReviewDetails.images.map(image => [image.url, <ColaLabelImageView key={image.url} label={image.label} src="/mock/cola-label.svg" />]))} />,
   },
   {
     step: 7,
@@ -2957,7 +2973,7 @@ export const SCREENS: Screen[] = [
     reads: "list_sale_channels · list_price_groups · list_formats · list_channel_prices",
     writes: "set_channel_price · clear_channel_price · upsert_price_group · delete_price_group",
     states: [["permission", "sales or admin required", 1], ["empty cell", "unpriced · an order for a SKU on that group and format is refused on that channel", 1], ["empty", "no price groups yet: New price group is the only action"], ["in use", "a group a brand sits on, or a cell prices, cannot be removed", 1]],
-    spec: "Reached from More and from Catalog; back returns to More. The brewery's price sheet is one grid: rows are price groups, columns are packaged formats plus pours owned by a group (one column per pour name). One tab per sale channel; the grid shows the selected channel, the first by default, and the address keeps the tab. A beer sits on one group (Catalog → Brand → Price group) and a customer sits on one channel, so the price of any SKU for any customer is the single cell where the two meet. Every cell is a dollars field edited in place: Enter or leaving the cell saves, and Tab walks the row. An unpriced cell is empty with a dash. Emptying a priced cell saves nothing and shows Clear, which confirms before those SKUs become unpriced on that channel. A group with no pour of a column's name shows + add, which opens Add pour on that group with the name filled in. A group's name opens Price group, where its position, cost ceiling, and pours live.",
+    spec: "Reached from More and from Catalog; back returns to More. The brewery's price sheet is one grid: rows are price groups, columns are packaged formats plus pours owned by a group (one column per pour name). One tab per sale channel; the grid shows the selected channel, the first by default, and the address keeps the tab. A beer sits on one group (Catalog → Brand → Price group) and a customer sits on one channel, so the price of any SKU for any customer is the single cell where the two meet. Every cell is a dollars field edited in place: Enter or leaving the whole cell saves. Tab passes through Clear when a price exists, then commits on leaving the cell. Saving and Saved appear inline; invalid, negative, exponent, or extra-precision amounts are refused without rounding. Zero is valid. An unpriced cell is empty with a dash. Blanking a priced cell and leaving it restores the persisted price with an explanation; only Clear followed by confirmation removes it. A group with no pour of a column's name shows + add, which opens Add pour on that group with the name filled in. A group's name opens Price group, where its position, cost ceiling, and pours live.",
     body: <PriceGroupsView model={toPriceGroupsViewProps(pricingGrid)} />,
   },
   {
