@@ -5,7 +5,7 @@
 import type { ModelMessage } from "ai";
 
 /** Most recent stored messages sent to the model; keeps a long-lived conversation inside the context window (#460).
- *  Ask MGR's drawer restores the same number of text turns when it opens (lib/composer/setup.ts, #1169). */
+ *  Ask MGR's panel restores the same number of text turns when it opens (lib/composer/setup.ts, #1169). */
 export const MAX_HISTORY_MESSAGES = 40;
 
 /** One row of `get_chat_history.messages`; a user row's `request_id` is the client message id it was appended under. */
