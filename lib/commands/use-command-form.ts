@@ -20,6 +20,7 @@ import { inputErrorPresentation, type FieldErrors } from "./field-errors";
 export type CommandRunOptions = { requestId?: string; refresh?: boolean; target?: string; durable?: boolean; owner?: RecoveryAttempt["owner"]; onSent?: (requestId: string) => void };
 export type CommandAction = {
   busy: boolean;
+  succeeded: string | null;
   error: string | null;
   failure: CommandFailureDetail | null;
   fieldErrors: FieldErrors;
@@ -37,6 +38,7 @@ export function useCommandAction(actionTarget?: string, validationFields: readon
   const [failure, setFailure] = useState<CommandFailureDetail | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [busy, setBusy] = useState(false);
+  const [succeeded, setSucceeded] = useState<string | null>(null);
   const clearFailure: Dispatch<SetStateAction<string | null>> = useCallback(next => {
     setError(next);
     setFailure(null);
@@ -84,6 +86,7 @@ export function useCommandAction(actionTarget?: string, validationFields: readon
     setError(null);
     setFailure(null);
     setFieldErrors({});
+    setSucceeded(null);
     let saved: ReturnType<typeof beginRecovery> | undefined;
     try {
       if (durable) saved = beginRecovery(sessionStorage, expectedContext, location.pathname, name, input, { requestId, target, owner, exclusiveTarget: actionTarget !== undefined });
@@ -96,6 +99,7 @@ export function useCommandAction(actionTarget?: string, validationFields: readon
       if (saved) finishRecovery(sessionStorage, saved.attempt);
       onSuccess?.(data);
       if (refresh) router.refresh();
+      setSucceeded(sent.name);
       return true;
     } catch (err) {
       const detail = classifyCommandFailure(err);
@@ -112,7 +116,7 @@ export function useCommandAction(actionTarget?: string, validationFields: readon
     }
   }
 
-  return { busy, error, failure, fieldErrors, setError: clearFailure, run, pending, blocked };
+  return { busy, succeeded, error, failure, fieldErrors, setError: clearFailure, run, pending, blocked };
 }
 
 /** One state object per sheet: initial values come from the row being edited (or blanks); reset restores them; patch sets several fields at once. */

@@ -20,10 +20,18 @@ export type ColaRecord = {
   className: string;
 };
 
+export type ColaDetails = {
+  ttbId: string;
+  permit: string;
+  status: string;
+  approvedOn: string | null;
+  images: { url: string; label: string }[];
+};
+
 type ColaRequest = (
   url: string,
-  init: { method: "GET" | "POST"; body?: string; cookie?: string },
-) => Promise<{ status: number; body: string; setCookie: string[] }>;
+  init: { method: "GET" | "POST"; body?: string; cookie?: string; responseType?: "image" },
+) => Promise<{ status: number; body: string; setCookie: string[]; image?: { bytes: Buffer; contentType: string } }>;
 
 const BASE = "https://ttbonline.gov/colasonline";
 const SEARCH_URL = `${BASE}/publicSearchColasAdvancedProcess.do?action=search`;
@@ -31,6 +39,14 @@ const NEXT_URL = `${BASE}/publicPageAdvancedCola.do?action=page&pgfcn=nextset`;
 // Caps an absurd reported total; the empty-page check stops a stuck pager.
 const MAX_PAGES = 100;
 const TIMEOUT_MS = 20_000;
+const MAX_HTML_BYTES = 4 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+/** Official attachment identifiers; these require a fresh TTB print-page session to render. */
+export function isColaImageUrl(value: string): boolean {
+  return /^https:\/\/ttbonline\.gov\/colasonline\/publicViewAttachment\.do\?filename=([A-Za-z0-9_().~-]|%[0-9A-Fa-f]{2})+&filetype=l$/.test(value)
+    && !/%(?:2f|5c)/i.test(value);
+}
 
 // Entrust OV TLS Issuing RSA CA 2, the intermediate ttbonline.gov omits; public
 // (crt.sectigo.com/EntrustOVTLSIssuingRSACA2.crt), expires 2027-12-10. Inline so
@@ -127,6 +143,112 @@ export function parseColaPage(html: string): { total: number; rows: ColaRecord[]
   return { total, rows, hasNext: html.includes("pgfcn=nextset") };
 }
 
+/** Reads the public detail page, not the print page's different form layout. */
+export function parseColaDetails(html: string, expectedId: string): ColaDetails {
+  function field(label: string): string {
+    const match = new RegExp(`<strong>\\s*${label}:\\s*</strong>([\\s\\S]*?)</td>`, "i").exec(html);
+    if (!match) throw new Error(`TTB COLA detail page is missing ${label}`);
+    return cellText(match[1]);
+  }
+  const ttbId = field("TTB ID");
+  if (ttbId !== expectedId) throw new Error(`TTB COLA detail page returned TTB ID "${ttbId}", expected "${expectedId}"`);
+  const status = field("Status");
+  if (!status) throw new Error("TTB COLA detail page is missing status");
+  const permitSection = /<strong>\s*Plant Registry\/Basic Permit\/Brewers No \(Principal Place of Business\):\s*<\/strong>[\s\S]*?<\/tr>([\s\S]*?)<\/table>/i.exec(html);
+  const permitCells = permitSection ? [...permitSection[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)] : [];
+  // TTB puts one empty spacer row before the principal permit's own cell.
+  // Do not scan later cells: those contain the applicant and other permits.
+  const spacer = permitCells[0] && cellText(permitCells[0][1]);
+  const permit = permitCells[1] && cellText(permitCells[1][1]);
+  if (spacer !== "" || !permit) throw new Error("TTB COLA detail page is missing the principal permit");
+  const approved = field("Approval Date");
+  return { ttbId, permit, status, approvedOn: approved ? isoFromUs(approved) : null, images: [] };
+}
+
+/** Only label attachments in this record's print page; never site images or arbitrary URLs. */
+export function parseColaImages(html: string, expectedId: string): ColaDetails["images"] {
+  const id = /<div class="label">\s*TTB ID\s*<\/div>\s*<div class="data">\s*(\d+)\s*<\/div>/i.exec(html);
+  if (id?.[1] !== expectedId) throw new Error("TTB COLA printable page returned a different or missing TTB ID");
+  const images: ColaDetails["images"] = [];
+  for (const match of html.matchAll(/<img\b[^>]*>/gi)) {
+    const src = /\bsrc=["']([^"']+)["']/i.exec(match[0]);
+    const alt = /\balt=["']([^"']+)["']/i.exec(match[0]);
+    if (!src || !alt) continue;
+    const label = cellText(alt[1]);
+    if (!label.startsWith("Label Image:")) continue;
+    const sourceText = cellText(src[1]);
+    if (!URL.canParse(sourceText, `${BASE}/`)) continue;
+    const source = new URL(sourceText, `${BASE}/`);
+    if (source.origin !== "https://ttbonline.gov" || source.pathname !== "/colasonline/publicViewAttachment.do") continue;
+    if (source.searchParams.get("filetype") !== "l" || source.searchParams.size !== 2) continue;
+    const filename = source.searchParams.get("filename");
+    if (!filename) continue;
+    const encoded = encodeURIComponent(filename).replace(/[!'*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+    const url = `${BASE}/publicViewAttachment.do?filename=${encoded}&filetype=l`;
+    if (isColaImageUrl(url) && !images.some((image) => image.url === url)) {
+      images.push({ url, label: label.slice("Label Image:".length).trim() || "Label image" });
+    }
+  }
+  return images;
+}
+
+function keepCookies(cookies: Map<string, string>, headers: string[]): string {
+  for (const header of headers) {
+    const pair = header.split(";")[0];
+    const equals = pair.indexOf("=");
+    if (equals > 0) cookies.set(pair.slice(0, equals).trim(), pair.slice(equals + 1).trim());
+  }
+  return [...cookies].map(([key, value]) => `${key}=${value}`).join("; ");
+}
+
+async function colaDetailSession(ttbId: string, request: ColaRequest, expectedPermit?: string) {
+  if (!/^\d{14}$/.test(ttbId)) throw new Error("TTB ID must contain exactly 14 digits");
+  const result = await request(`${BASE}/viewColaDetails.do?action=publicDisplaySearchAdvanced&ttbid=${ttbId}`, { method: "GET" });
+  if (result.status !== 200) throw new Error(`TTB COLA details returned HTTP ${result.status}`);
+  const details = parseColaDetails(result.body, ttbId);
+  if (expectedPermit !== undefined && details.permit !== expectedPermit) throw new Error("TTB COLA does not belong to the brewery's permit");
+  const cookies = new Map<string, string>();
+  let cookie = keepCookies(cookies, result.setCookie);
+  if (details.status === "APPROVED") {
+    const printable = await request(`${BASE}/viewColaDetails.do?action=publicFormDisplay&ttbid=${ttbId}`, { method: "GET", cookie });
+    if (printable.status !== 200) throw new Error(`TTB COLA printable page returned HTTP ${printable.status}`);
+    cookie = keepCookies(cookies, printable.setCookie);
+    details.images = parseColaImages(printable.body, ttbId);
+  }
+  return { details, cookie };
+}
+
+export async function getColaDetails(ttbId: string, request: ColaRequest = ttbHttpsRequest): Promise<ColaDetails> {
+  return (await colaDetailSession(ttbId, request)).details;
+}
+
+/** Resolves a saved official identifier using a fresh, permit-checked TTB session. */
+export async function getColaImage(
+  ttbId: string,
+  url: string,
+  permit: string,
+  request: ColaRequest = ttbHttpsRequest,
+): Promise<{ dataUrl: string }> {
+  if (!isColaImageUrl(url)) throw new Error("Not an official TTB label image URL");
+  const { details, cookie } = await colaDetailSession(ttbId, request, permit);
+  if (details.status !== "APPROVED") throw new Error(`TTB COLA is ${details.status}, not APPROVED`);
+  if (!details.images.some((image) => image.url === url)) throw new Error("Requested image is not a label on this COLA");
+  const result = await request(url, { method: "GET", cookie, responseType: "image" });
+  if (result.status !== 200) throw new Error(`TTB COLA image returned HTTP ${result.status}`);
+  const image = result.image;
+  if (!image || !validImage(image.bytes, image.contentType)) throw new Error("TTB COLA attachment is not a supported label image");
+  return { dataUrl: `data:${image.contentType};base64,${image.bytes.toString("base64")}` };
+}
+
+function validImage(bytes: Buffer, contentType: string): boolean {
+  if (bytes.length === 0 || bytes.length > MAX_IMAGE_BYTES) return false;
+  if (contentType === "image/jpeg") return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (contentType === "image/png") return bytes.length >= 8 && bytes.readUInt32BE(0) === 0x89504e47 && bytes.readUInt32BE(4) === 0x0d0a1a0a;
+  if (contentType === "image/gif") return /^GIF8[79]a$/.test(bytes.subarray(0, 6).toString("ascii"));
+  if (contentType === "image/webp") return bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP";
+  return false;
+}
+
 /** Rows whose fanciful or brand name contains `name`, ignoring case; a blank name keeps all. */
 export function matchColas(rows: ColaRecord[], name?: string): ColaRecord[] {
   const needle = name?.trim().toLowerCase();
@@ -161,16 +283,13 @@ export async function searchColasByPermit(
     "searchCriteria.productNameSearchType": "E",
   });
   const cookies = new Map<string, string>();
+  let cookie = "";
 
   // Fetches one page and keeps any session cookie TTB sets; Next needs it.
   async function fetchPageKeepingCookies(url: string, init: Parameters<ColaRequest>[1]) {
     const res = await request(url, init);
     if (res.status !== 200) throw new Error(`TTB COLA search returned HTTP ${res.status}`);
-    for (const header of res.setCookie) {
-      const pair = header.split(";")[0];
-      const eq = pair.indexOf("=");
-      if (eq > 0) cookies.set(pair.slice(0, eq).trim(), pair.slice(eq + 1).trim());
-    }
+    cookie = keepCookies(cookies, res.setCookie);
     return parseColaPage(res.body);
   }
 
@@ -179,7 +298,6 @@ export async function searchColasByPermit(
   for (let pages = 1; all.length < page.total; pages++) {
     if (pages >= MAX_PAGES) throw new Error(`TTB COLA search exceeded ${MAX_PAGES} pages`);
     if (!page.hasNext) throw new Error(`TTB COLA search stopped at ${all.length} of ${page.total} records`);
-    const cookie = [...cookies].map(([k, v]) => `${k}=${v}`).join("; ");
     page = await fetchPageKeepingCookies(NEXT_URL, { method: "GET", cookie });
     if (page.rows.length === 0) throw new Error(`TTB COLA page returned no rows at ${all.length} of ${page.total}`);
     all.push(...page.rows);
@@ -207,14 +325,26 @@ const ttbHttpsRequest: ColaRequest = (url, init) => {
   return new Promise((resolve, reject) => {
     const req = httpsRequest(url, { method: init.method, headers, agent: ttbAgent() }, (res) => {
       const chunks: Buffer[] = [];
-      res.on("data", (c: Buffer) => chunks.push(c));
-      res.on("end", () =>
+      let size = 0;
+      res.on("data", (chunk: Buffer) => {
+        size += chunk.length;
+        const limit = init.responseType === "image" ? MAX_IMAGE_BYTES : MAX_HTML_BYTES;
+        if (size > limit) {
+          res.destroy(new Error(`TTB COLA response exceeds ${limit} bytes`));
+          return;
+        }
+        chunks.push(chunk);
+      });
+      res.on("end", () => {
+        const bytes = Buffer.concat(chunks);
+        const contentType = res.headers["content-type"]?.split(";")[0].trim().toLowerCase() ?? "";
         resolve({
           status: res.statusCode ?? 0,
-          body: Buffer.concat(chunks).toString("utf8"),
+          body: init.responseType === "image" ? "" : bytes.toString("utf8"),
           setCookie: res.headers["set-cookie"] ?? [],
-        }),
-      );
+          ...(init.responseType === "image" ? { image: { bytes, contentType } } : {}),
+        });
+      });
       res.on("error", reject);
     });
     req.setTimeout(TIMEOUT_MS, () => req.destroy(new Error(`TTB COLA request timed out after ${TIMEOUT_MS} ms`)));

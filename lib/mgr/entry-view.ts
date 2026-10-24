@@ -6,6 +6,7 @@ export type EntryViewModel = {
   inputs: string[];
   field?: { label: string; value: string };
   primary: string;
+  pendingLabel?: string;
   secondary?: string;
   /** The secondary sign-in action requires only the email field. */
   secondaryEmailOnly?: boolean;
@@ -16,6 +17,24 @@ export type EntryViewModel = {
   passwordRules?: string;
   passwordErrors?: PasswordErrors;
   extraPrimary?: string;
+};
+
+export const signInModel: EntryViewModel = {
+  title: "Sign in",
+  inputs: ["Email", "Password"],
+  primary: "Sign in",
+  pendingLabel: "Signing in…",
+  secondary: "Email me a link",
+  secondaryEmailOnly: true,
+  link: { label: "Forgot password?", to: "Reset password" },
+};
+
+export const portalSignInModel: EntryViewModel = {
+  title: "Sign in to your account",
+  inputs: ["Email", "Password"],
+  primary: "Sign in",
+  pendingLabel: "Signing in…",
+  link: { label: "Forgot password?", to: "Portal forgot password" },
 };
 
 export function toAcceptInviteViewProps(breweryName: string, roles: readonly string[]): EntryViewModel {

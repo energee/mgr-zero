@@ -28,7 +28,7 @@ export default async function PasswordPage({ searchParams }: { searchParams: Pro
   if (saved === "1" && cookieStore.has(PASSWORD_SAVED_COOKIE)) {
     return <EntrySurface>
       {E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>)}
-      <EntryView model={toPasswordSavedViewProps(error, !!user)} primaryHref={signInPath(portal === "1")} extraAction={user ? endPasswordSessions : undefined} />
+      <EntryView model={toPasswordSavedViewProps(error, !!user)} primaryHref={user ? null : signInPath(portal === "1")} extraAction={user ? endPasswordSessions : undefined} />
     </EntrySurface>;
   }
   if (!user) redirect("/reset?expired=1");

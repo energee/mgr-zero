@@ -72,7 +72,7 @@ describe("brewery settings (Program 10 task 4)", () => {
   });
 
   it("stores one brewery-wide AI model and exposes it to staff", async () => {
-    expect(await runCommand("get_brewery_ai_model", {}, brewerCtx)).toEqual({ model: "anthropic/claude-sonnet-4.5" });
+    expect(await runCommand("get_brewery_ai_model", {}, brewerCtx)).toEqual({ model: "minimax/minimax-m3.1-flash" });
     await expect(runCommand("set_brewery_ai_model", { model: "openai/gpt-5.4" }, brewerCtx)).rejects.toThrow(/permission denied/);
     await runCommand("set_brewery_ai_model", { model: "openai/gpt-5.4" }, adminCtx);
     expect(await runCommand("get_brewery_ai_model", {}, brewerCtx)).toEqual({ model: "openai/gpt-5.4" });
