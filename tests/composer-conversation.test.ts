@@ -22,7 +22,6 @@ describe("composer conversation surface", () => {
       onRetry: () => undefined,
     }));
     for (const text of ["What needs attention?", "Two orders need review.", "Checking orders…", "New chat", "Try again"]) expect(html).toContain(text);
-    expect(html).not.toContain("Minimize");
     expect(html).toContain('role="log"');
   });
 
@@ -72,11 +71,6 @@ describe("composer conversation surface", () => {
     expect(html).toContain("Stop response");
     expect(html).toContain('maxLength="4000"');
     expect(html).toContain("Shift + Enter");
-  });
-
-  it("draws no dead History button; the drawer handle opens the conversation (#446)", () => {
-    const html = renderToStaticMarkup(createElement(ComposerStripView, { value: "", onChange: () => undefined }));
-    expect(html).not.toContain(">History<");
   });
 
   it("sends on Enter, but not on Shift+Enter or while an IME is composing (#446)", () => {

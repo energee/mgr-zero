@@ -1,6 +1,6 @@
 import { gateway } from "ai";
 
-export const DEFAULT_CHAT_MODEL = "anthropic/claude-sonnet-4.5";
+export const DEFAULT_CHAT_MODEL = "minimax/minimax-m3.1-flash";
 /** Gateway model ids are `provider/model`; the same shape the database check enforces. */
 export const MODEL_ID = /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/i;
 

@@ -50,7 +50,7 @@ describe("scoped composer history and provenance", () => {
     expect(sql(`select count(*) from private.chat_messages where conversation_id='${conversation.id}'`)).toEqual(["1"]);
   });
 
-  it("drawer setup restores only the newest text turns of a long conversation, oldest first (#1169)", async () => {
+  it("conversation setup restores only the newest text turns of a long conversation, oldest first (#1169)", async () => {
     const author = await makeStaffCtx(breweryId, "admin");
     const conversation = await runCommand("create_chat_conversation", { title: "Long" }, author) as { id: string };
     // One text turn per second; every fifth second also stores a result row.

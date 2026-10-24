@@ -1,11 +1,11 @@
-// lib/composer/state.ts — the record_movement proposal the Composer drawer
-// renders, and the form link it hands off to. The drawer parses every streamed
+// lib/composer/state.ts — the record_movement proposal the Composer panel
+// renders, and the form link it hands off to. The panel parses every streamed
 // proposal against composerProposal (lib/chat/messages.ts), so a malformed or
 // non-movement proposal never reaches the commit button.
 import { z } from "zod";
 import { movementInput, type MovementInput } from "@/lib/commands/movement-input";
 
-/** One line of preview_inventory_movement's `effects`; the drawer reads only
+/** One line of preview_inventory_movement's `effects`; the panel reads only
  *  these keys. The RPC builds them with jsonb_build_object, which writes a null
  *  operand as JSON null (bbl is null while a format has no bbl_per_unit), so
  *  every display figure is nullish; the view omits a missing one. */
@@ -20,7 +20,7 @@ const composerEffect = z.object({
 });
 export type ComposerEffect = z.infer<typeof composerEffect>;
 
-/** The agent may propose any AI-exposed command (lib/chat/agent.ts); the drawer
+/** The agent may propose any AI-exposed command (lib/chat/agent.ts); the panel
  *  renders and commits only this one, so anything else must fail the parse. */
 export const composerProposal = z.object({
   name: z.literal("record_movement"),
