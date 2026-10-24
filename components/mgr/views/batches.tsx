@@ -100,7 +100,7 @@ export function BatchesView({ model, createAction, workHrefs, newVesselHref }: {
     </>}
     {model.vessels !== undefined && <>
       {E.ttl("Vessels")}
-      {newVesselHref !== null && <div className="self-start">{E.btn("New vessel", "p", newVesselHref)}</div>}
+      {newVesselHref !== null && <div className="self-start">{E.btn("New vessel", "g", newVesselHref)}</div>}
       {!model.vessels.length ? E.blank("No vessels yet") : <VesselTable vessels={model.vessels} />}
     </>}
   </>;

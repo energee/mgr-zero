@@ -6,6 +6,7 @@ import "@/lib/commands/all";
 import { ReplenishForm } from "./replenish-form";
 import { navTitle } from "@/lib/mgr/nav";
 import type { ReplenishmentViewModel } from "@/lib/mgr/replenishment-view";
+import { workHrefsFor } from "@/components/mgr/work-tabs";
 
 export const metadata = { title: navTitle("/replenishment") };
 
@@ -41,7 +42,7 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
   const locationRows = [...taprooms, ...warehouses];
   const selectedLocation = taprooms.find(t => t.id === toLocationId);
   const model: ReplenishmentViewModel = {
-    backHref: "/inventory",
+    backHref: "/work",
     locationId: toLocationId ?? null,
     locationName: selectedLocation?.name ?? null,
     locations: taprooms.map(t => ({
@@ -76,5 +77,5 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
     skuFilter: sku,
     allShortfallsHref: `/replenishment${location ? `?location=${location}` : ""}#shortfalls`,
   };
-  return <ReplenishForm key={`${toLocationId}-${JSON.stringify(suggestions)}`} model={model} skus={skus} />;
+  return <ReplenishForm key={`${toLocationId}-${JSON.stringify(suggestions)}`} model={model} skus={skus} workHrefs={workHrefsFor(brewery.roles)} />;
 }

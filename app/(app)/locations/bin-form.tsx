@@ -10,23 +10,27 @@ import { BinView, RemoveBinControl } from "@/components/mgr/views/bin";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { toBinViewProps } from "@/lib/mgr/bin-view";
 
-export function BinForm({ locationId, bin }: { locationId: string; bin?: { id: string; name: string } }) {
+export function BinForm({ locationId, bins, bin }: { locationId: string; bins: readonly { id: string; name: string }[]; bin?: { id: string; name: string } }) {
   const [name, setName] = useState(bin?.name ?? "");
   const form = useCommandForm(bin ? "update_bin" : "create_bin", {
-    build: () => (bin ? { binId: bin.id, name } : { locationId, name }),
+    build: () => (bin ? { binId: bin.id, name: name.trim() } : { locationId, name: name.trim() }),
     reset: () => setName(bin?.name ?? ""),
     target: bin?.id,
   });
+  const model = toBinViewProps({ name, bins, binId: bin?.id, tapBoardHref: "/taproom/board" });
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title={bin ? `Edit bin · ${bin.name}` : "Add bin"}
       trigger={<Button size="sm" variant={bin ? "outline" : "default"} aria-label={bin ? `Edit ${bin.name}` : undefined}>{bin ? "Edit" : "Add bin"}</Button>}>
-      <form onSubmit={form.submit} className="flex flex-col gap-4">
+      <form onSubmit={(event) => {
+        if (model.nameError || !name.trim()) { event.preventDefault(); event.stopPropagation(); return; }
+        void form.submit(event);
+      }} className="flex flex-col gap-4">
         <BinView
-          model={toBinViewProps({ name, tapBoardHref: "/taproom/board" })}
+          model={model}
           controls={{ name: setName }}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter>
-            <Button type="submit" disabled={form.busy || !name.trim()}>{form.submitting ? "Saving…" : bin ? "Save bin" : "Add bin"}</Button>
+            <Button type="submit" disabled={form.busy || !name.trim() || Boolean(model.nameError)}>{form.submitting ? "Saving…" : bin ? "Save bin" : "Add bin"}</Button>
           </CommandFormFooter>}
           remove={bin ? <RemoveBinControl bin={bin.name} busy={form.busy} error={form.error}
             onDelete={() => form.run("delete_bin", { binId: bin.id }, () => form.setOpen(false), { target: bin.id })} /> : null}

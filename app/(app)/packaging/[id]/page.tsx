@@ -2,6 +2,7 @@
 // its planned outputs, with the one next action for its state (run-actions.tsx):
 // pick a tank, start, or close; before it starts, reschedule or cancel the
 // plan (plan-actions.tsx). get_packaging_run is the read.
+import { cache } from "react";
 import type { PackagingSourceOccupancy as Occupancy } from "@/components/mgr/views/plan-actions";
 import { ChangePlan } from "../../plan-actions";
 import type { PackagingClosePlan, PackagingMaterialRecord } from "@/lib/mgr/packaging-actuals";
@@ -20,7 +21,11 @@ import { MaterialCorrection } from "./material-correction";
 import { PickTankForm, StartRunButton, CloseRunForm } from "./run-actions";
 import { navTitle } from "@/lib/mgr/nav";
 
-export const metadata = { title: navTitle("/packaging") };
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await getPackagingRunPageData(id);
+  return { title: navTitle("/packaging") };
+}
 
 type Run = {
   id: string; run_no: number; brand_id: string; occupancy_id: string | null; planned_on: string;
@@ -31,11 +36,17 @@ type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: num
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 
-export default async function PackagingRunPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+const getPackagingRunPageData = cache(async function getPackagingRunPageData(id: string) {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const { run, outputs, lot } = (await orNotFound(runCommand("get_packaging_run", { runId: id }, ctx))) as { run: Run; outputs: Output[]; lot: RunClosedViewModel["lot"] };
+  const data = await orNotFound(runCommand("get_packaging_run", { runId: id }, ctx)) as { run: Run; outputs: Output[]; lot: RunClosedViewModel["lot"] };
+  return { brewery, ctx, data };
+});
+
+export default async function PackagingRunPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { brewery, ctx, data } = await getPackagingRunPageData(id);
+  const { run, outputs, lot } = data;
   const picking = !run.cancelled_at && !run.closed_at && !run.occupancy_id;
   const closing = !run.closed_at && !!run.started_at;
   const needsMaterials = closing || !!run.closed_at;

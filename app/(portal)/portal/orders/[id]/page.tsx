@@ -9,13 +9,22 @@ import { runCommand } from "@/lib/commands/registry";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { toPortalOrderViewProps, type PortalOrderSnapshot } from "@/lib/mgr/portal-order-view";
 import "@/lib/commands/all";
+import { cache } from "react";
+
+const getOrderData = cache(async function getOrderData(id: string) {
+  const { ctx } = await getPortalContext();
+  return orNotFound(runCommand("portal_order", { orderId: id }, ctx) as Promise<PortalOrderSnapshot>);
+});
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await getOrderData(id);
+  return {};
+}
 
 export default async function PortalOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { customer, ctx } = await getPortalContext();
-  const snapshot = await orNotFound(
-    runCommand("portal_order", { orderId: id }, ctx) as Promise<PortalOrderSnapshot>,
-  );
+  const snapshot = await getOrderData(id);
   return (
     <PortalOrderView
       model={toPortalOrderViewProps({ ...snapshot, backHref: "/portal/orders" })}

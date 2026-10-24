@@ -4,27 +4,20 @@
 // /locations/[id]/bins.
 import { LocationView } from "@/components/mgr/views/location";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
-import { getActiveBrewery } from "@/lib/brewery";
-import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
-import { isUuid } from "@/lib/commands/context";
-import type { LocationUse } from "@/lib/mgr/enums";
-import { notFound } from "next/navigation";
 import { LocationForm } from "../location-form";
-import { navTitle } from "@/lib/mgr/nav";
+import { getLocationPageData } from "../location-data";
 
-export const metadata = { title: navTitle("/locations") };
-
-type LocationRow = { id: string; name: string; uses: LocationUse[] };
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { location } = await getLocationPageData(id);
+  return { title: location.name };
+}
 
 export default async function LocationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (!isUuid(id)) notFound();
-  const brewery = await getActiveBrewery();
-  const ctx = await buildContext(brewery.id);
-  const location = ((await runCommand("list_locations", {}, ctx)) as LocationRow[]).find((l) => l.id === id);
-  if (!location) notFound();
+  const { brewery, ctx, location } = await getLocationPageData(id);
   const bins = (await runCommand("list_bins", { locationId: id }, ctx)) as { name: string }[];
   return <LocationView
     model={toLocationViewProps({ location, bins, timezone: brewery.timeZone, backHref: "/locations" })}
