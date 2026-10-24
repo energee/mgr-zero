@@ -1,13 +1,10 @@
-// components/mgr/views/new-po.tsx — shared New PO page body. A typed quantity
-// or unit cost the PO cannot take is marked at its field (poLineErrors) once
-// the user leaves either one, an empty vendor or material list says where to
-// add one, and Save draft names what it still needs (`reason`, from newPoReason).
+// Shared full-page purchase-order draft for the live app and screen inventory.
 "use client";
-import { Fragment, useId, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/mgr/date-picker";
-import { LineErrorMessages, lineErrorIds, OrderQuantity } from "./new-order";
+import { FieldGroup } from "@/components/ui/field";
 import { poLineErrors, type NewPoViewModel } from "@/lib/mgr/new-po-view";
 import { noMaterialsPick } from "@/lib/mgr/materials-view";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
@@ -25,35 +22,71 @@ export function NewPoView({ model, controls = {}, messages, footer, submitting =
   submitting?: boolean; reason?: string | null;
 }) {
   const id = useId();
+  // Without live quantity callbacks, inventory snapshots show their errors immediately.
   const touched = useTouchedLines(!controls.quantity);
+  // Inventory snapshots may omit option lists; their displayed value remains selectable.
+  const vendors = model.vendors ?? [{ id: model.vendor, name: model.vendor }];
+  const vendorOptions = [{ value: "", label: "Select vendor" }, ...vendors.map(vendor => ({ value: vendor.id, label: vendor.name }))];
   return <>
     {E.back("Purchase orders", "New PO", undefined, model.backHref)}
-    <fieldset disabled={submitting} className="flex flex-col gap-3">
-      {E.pick("Vendor", model.vendor, [{ value: "", label: "Select vendor" }, ...((model.vendors ?? [{ id: model.vendor, name: model.vendor }]).map(vendor => ({ value: vendor.id, label: vendor.name })))], { onChange: controls.vendor, required: true, id: `${id}-vendor`, empty: { text: "No vendors yet.", label: "Add a vendor", href: model.vendorsHref, to: "Vendors" } })}
-      <DatePicker label="Expected" value={controls.expected ? model.expected : undefined} defaultValue={model.expected} onChange={controls.expected} />
-      {model.lines.map((line, index) => {
-        // Inventory fixtures carry a display cost ("$4.20"); a number input can't hold the "$".
-        const cost = controls.cost ? line.cost : line.cost.replace(/^\$/, "");
-        const errors = touched.shown(index) ? poLineErrors({ qty: line.qty, cost }) : {};
-        const qtyErrorId = lineErrorIds(`${id}-${index}`, errors).qty;
-        return <Fragment key={line.key}>
-        {E.line(
-          E.pick(`Line ${index + 1} material`, controls.material ? line.materialId ?? "" : line.materialId ?? line.key, [{ value: "", label: "Select material" }, ...((model.materials ?? [{ id: line.key, name: line.title, purchase_uom: "", lot_tracked: line.lot !== undefined }]).map(material => ({ value: material.id, label: material.name + (material.purchase_uom ? ` · ${material.purchase_uom}` : "") })))], { onChange: controls.material ? (nextValue: string) => controls.material?.(index, nextValue) : undefined, required: true, hideLabel: true, id: `${id}-material-${index}`, empty: noMaterialsPick(model.materialsHref) }),
-          line.detail,
-          <OrderQuantity label={`Line ${index + 1} quantity`} required invalid={Boolean(errors.qty)} errorId={qtyErrorId} onBlur={() => touched.touch(index)} value={line.qty} onChange={controls.quantity && (value => controls.quantity?.(index, value))} />,
-          "", <>
-            <LineErrorMessages id={`${id}-${index}`} errors={{ qty: errors.qty }} />
-            {E.edit("Unit cost", cost, "number", undefined, { onChange: controls.cost ? (nextValue: string) => controls.cost?.(index, nextValue) : undefined, onBlur: () => touched.touch(index), min: "0", step: "0.01", placeholder: "Unit cost ($)", "aria-label": `Line ${index + 1} unit cost`, id: `${id}-cost-${index}`, error: errors.cost })}
-            {line.lot !== undefined && E.edit("Expected lot", line.lot, "text", undefined, { onChange: controls.lot ? (nextValue: string) => controls.lot?.(index, nextValue) : undefined, "aria-label": `Line ${index + 1} expected lot` })}
-          </>
-        )}
-        {model.lines.length > 1 && <Button type="button" variant="ghost" size="sm" className="w-fit" onClick={() => { controls.remove?.(index); touched.remove(index); }}>Remove</Button>}
-      </Fragment>;
-      })}
-      <Button type="button" variant="ghost" className="w-fit" onClick={controls.add}>Add line</Button>
+    <fieldset disabled={submitting} className="flex min-w-0 flex-col gap-6">
+      <FieldGroup className="grid gap-4 md:grid-cols-[2fr_1fr]">
+        {E.pick("Vendor", model.vendor, vendorOptions, {
+          onChange: controls.vendor, required: true, id: `${id}-vendor`,
+          empty: { text: "No vendors yet.", label: "Add a vendor", href: model.vendorsHref, to: "Vendors" },
+        })}
+        <DatePicker label="Expected · optional" value={controls.expected ? model.expected : undefined} defaultValue={model.expected} onChange={controls.expected} />
+      </FieldGroup>
+      <div className="flex min-w-0 flex-col gap-6">
+        {model.lines.map((line, index) => {
+          // Inventory snapshots format money; editable numeric fields use dollars only.
+          const cost = controls.cost ? line.cost : line.cost.replace(/^\$/, "");
+          const errors = touched.shown(index) ? poLineErrors({ qty: line.qty, cost }) : {};
+          const materials = model.materials ?? [{ id: line.key, name: line.title, purchase_uom: "" }];
+          const materialOptions = [{ value: "", label: "Select material" }, ...materials.map(material => ({
+            value: material.id,
+            label: material.name + (material.purchase_uom ? ` · ${material.purchase_uom}` : ""),
+          }))];
+          const selectedMaterial = controls.material ? line.materialId ?? "" : line.materialId ?? line.key;
+          return <section key={line.key} aria-label={`Line ${index + 1}`} className="min-w-0">
+            <FieldGroup className="grid min-w-0 grid-cols-1 gap-4 min-[390px]:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+              <div className="min-w-0 min-[390px]:col-span-2 lg:col-span-1">
+                {E.pick("Material", selectedMaterial, materialOptions, {
+                  onChange: controls.material ? value => controls.material?.(index, value) : undefined,
+                  required: true, "aria-label": `Line ${index + 1} material`, id: `${id}-material-${index}`,
+                  empty: noMaterialsPick(model.materialsHref),
+                })}
+              </div>
+              {E.edit("Quantity", String(line.qty), "number", undefined, {
+                required: true, min: 0, step: "any", id: `${id}-qty-${index}`, "aria-label": `Line ${index + 1} quantity`,
+                onBlur: () => touched.touch(index),
+                onChange: controls.quantity ? value => controls.quantity?.(index, value) : undefined,
+                error: errors.qty,
+              })}
+              {E.edit("Unit cost ($)", cost, "number", undefined, {
+                onChange: controls.cost ? value => controls.cost?.(index, value) : undefined,
+                onBlur: () => touched.touch(index),
+                min: "0", step: "0.01", placeholder: "Optional", id: `${id}-cost-${index}`, "aria-label": `Line ${index + 1} unit cost`,
+                error: errors.cost,
+              })}
+            </FieldGroup>
+            {line.lot !== undefined && <div className="mt-4">
+              {E.edit("Expected lot · optional", line.lot, "text", undefined, {
+                onChange: controls.lot ? value => controls.lot?.(index, value) : undefined,
+                id: `${id}-lot-${index}`, "aria-label": `Line ${index + 1} expected lot`,
+                placeholder: "Lot named by the vendor",
+              })}
+            </div>}
+            {model.lines.length > 1 && <Button type="button" variant="ghost" size="sm" className="mt-2" aria-label={`Remove line ${index + 1}`} data-to="New PO" onClick={() => {
+              controls.remove?.(index);
+              touched.remove(index);
+            }}>Remove</Button>}
+          </section>;
+        })}
+        <Button type="button" variant="ghost" className="w-fit" onClick={controls.add}>Add line</Button>
+      </div>
     </fieldset>
     {messages}
-    {E.sp()}
     {footer !== undefined ? footer : E.pin(E.submit("Save draft", { submitting, reason }))}
   </>;
 }

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 650" fill="none" style="color:var(--fg, currentColor);font:14px system-ui">
+  <g stroke="currentColor" opacity=".35">
+    <rect x="16" y="48" width="620" height="570" rx="8"/>
+    <rect x="660" y="48" width="324" height="570" rx="8"/>
+    <rect x="40" y="164" width="360" height="40" rx="5"/>
+    <rect x="416" y="164" width="196" height="40" rx="5"/>
+    <rect x="40" y="264" width="280" height="40" rx="5"/>
+    <rect x="336" y="264" width="130" height="40" rx="5"/>
+    <rect x="482" y="264" width="130" height="40" rx="5"/>
+    <rect x="40" y="350" width="572" height="40" rx="5"/>
+    <rect x="496" y="478" width="116" height="40" rx="5"/>
+    <rect x="676" y="164" width="292" height="40" rx="5"/>
+    <rect x="676" y="244" width="292" height="40" rx="5"/>
+    <rect x="676" y="344" width="292" height="40" rx="5"/>
+    <rect x="676" y="424" width="138" height="40" rx="5"/>
+    <rect x="830" y="424" width="138" height="40" rx="5"/>
+    <rect x="676" y="554" width="292" height="40" rx="5"/>
+  </g>
+  <g fill="currentColor">
+    <text x="16" y="28" font-weight="600">Desktop · flat form</text>
+    <text x="660" y="28" font-weight="600">Phone · same fields</text>
+    <text x="40" y="83" opacity=".65">← Purchase orders</text>
+    <text x="40" y="116" font-size="22" font-weight="600">New PO</text>
+    <text x="40" y="154">Vendor</text>
+    <text x="416" y="154">Expected · optional</text>
+    <text x="54" y="189" opacity=".65">Select vendor</text>
+    <text x="430" y="189" opacity=".65">Pick a date</text>
+    <text x="40" y="254">Material</text>
+    <text x="336" y="254">Quantity</text>
+    <text x="482" y="254">Unit cost ($)</text>
+    <text x="54" y="289">2-row · bag</text>
+    <text x="350" y="289">−    40    +</text>
+    <text x="496" y="289">28.50</text>
+    <text x="40" y="340">Expected lot · optional</text>
+    <text x="54" y="375">CM-26-4410</text>
+    <text x="40" y="436">Add line</text>
+    <text x="518" y="503" font-weight="600">Save draft</text>
+    <text x="676" y="83" opacity=".65">← Purchase orders</text>
+    <text x="676" y="116" font-size="22" font-weight="600">New PO</text>
+    <text x="676" y="154">Vendor</text>
+    <text x="690" y="189" opacity=".65">Select vendor</text>
+    <text x="676" y="234">Expected · optional</text>
+    <text x="690" y="269" opacity=".65">Pick a date</text>
+    <text x="676" y="334">Material</text>
+    <text x="690" y="369" opacity=".65">Select material</text>
+    <text x="676" y="414">Quantity</text>
+    <text x="830" y="414">Unit cost ($)</text>
+    <text x="690" y="449">−             +</text>
+    <text x="676" y="510">Add line</text>
+    <text x="788" y="579" font-weight="600">Save draft</text>
+  </g>
+</svg>
