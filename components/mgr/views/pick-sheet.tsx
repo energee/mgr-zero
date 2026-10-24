@@ -6,6 +6,7 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { startsGroup } from "@/lib/mgr/brand-lines";
 import type { PickSheetViewModel } from "@/lib/mgr/pick-sheet-view";
+import { navTitle } from "@/lib/mgr/nav";
 
 export type { PickSheetViewModel };
 
@@ -28,7 +29,7 @@ export function PickSheetView({
 }) {
   return (
     <>
-      {E.back("Work", "Pick sheet", printAction, backHref)}
+      {E.back("Work", navTitle("/pick"), printAction, backHref)}
       {filters !== undefined ? filters : E.chips(DATE_CHIPS, 1)}
       {model.empty
         ? E.blank(model.empty)

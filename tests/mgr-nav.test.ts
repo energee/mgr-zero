@@ -9,7 +9,7 @@ import { workHrefsFor } from "../components/mgr/work-tabs";
 describe("navFor", () => {
   it("admin sees every item", () => {
     const labels = navFor(STAFF_NAV, ["admin"]).flatMap((t) => (t.children ?? []).map((c) => c.label));
-    for (const label of ["Taproom", "Taps", "Cellar", "Materials", "Kegs", "Batches", "Packaging", "Purchase orders", "Deliveries", "Recipes", "Compliance", "Planning", "Import", "Settings"]) {
+    for (const label of ["Weekly count", "Tap board", "Cellar", "Materials on hand", "Keg fleet", "Batches", "Packaging", "Purchase orders", "Deliveries", "Recipes", "Compliance", "Planning", "Import", "Settings"]) {
       expect.soft(labels).toContain(label);
     }
   });
@@ -27,7 +27,7 @@ describe("navFor", () => {
     // Units is shipped and open to every staff role, since a gravity display
     // unit is a personal preference rather than a permission
     // (set_my_gravity_unit admits all four roles).
-    expect(warehouse.find((t) => t.label === "Beer")!.children!.map((c) => c.label)).toContain("Taproom");
+    expect(warehouse.find((t) => t.label === "Beer")!.children!.map((c) => c.label)).toContain("Weekly count");
     expect(warehouse.find((t) => t.label === "More")!.children!.map((c) => c.label)).toEqual(["Menu", "Vendors", "Planning", "Chat", "Units"]);
   });
 });
@@ -70,8 +70,8 @@ describe("activeChild", () => {
   const beer = STAFF_NAV.find((t) => t.label === "Beer")!;
   const more = STAFF_NAV.find((t) => t.label === "More")!;
   it("picks only the longest matching child, never its parent path too (#446)", () => {
-    expect(activeChild(beer, "/taproom/board")?.label).toBe("Taps");
-    expect(activeChild(beer, "/taproom")?.label).toBe("Taproom");
+    expect(activeChild(beer, "/taproom/board")?.label).toBe("Tap board");
+    expect(activeChild(beer, "/taproom")?.label).toBe("Weekly count");
     expect(activeChild(more, "/settings/units")?.label).toBe("Units");
     expect(activeChild(more, "/settings")?.label).toBe("Settings");
     expect(activeChild(more, "/settings/team")?.label).toBe("Settings");
@@ -86,8 +86,8 @@ it("taproom has Beer and own settings without forbidden Work", () => {
   expect(nav.map(t => t.label)).toEqual(["Today", "Beer", "More"]);
   expect(nav.find(t => t.label === "More")!.children!.map(t => t.label)).toEqual(["Chat", "Units"]);
   expect(nav.find(t => t.label === "Beer")!.children).toMatchObject([
-    { label: "Taproom", href: "/taproom", roles: ["warehouse", "taproom"] },
-    { label: "Taps", href: "/taproom/board", roles: ["warehouse", "taproom"] },
+    { label: "Weekly count", href: "/taproom", roles: ["warehouse", "taproom"] },
+    { label: "Tap board", href: "/taproom/board", roles: ["warehouse", "taproom"] },
     { label: "Variance by brand", href: "/taproom/variance", roles: ["warehouse", "taproom"] },
   ]);
 });
@@ -110,7 +110,7 @@ describe("navTitle", () => {
     expect(navTitle("/")).toBe("Today");
     expect(navTitle("/orders")).toBe("Orders");
     expect(navTitle("/routes")).toBe("Deliveries");
-    expect(navTitle("/taproom/board")).toBe("Taps");
+    expect(navTitle("/taproom/board")).toBe("Tap board");
     expect(navTitle("/settings/units")).toBe("Units");
     // A page with no entry of its own follows the section it sits in.
     expect(navTitle("/settings/team")).toBe("Settings");

@@ -33,6 +33,34 @@ const DESK = 1024;
  *  `preview` makes the frame inert — the explorer's phone view is a look, not a walk. */
 export function ScreenIframe({ index, title, mode, persona, preview }: { index: number; title: string; mode: Mode; persona?: string; preview?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(780);
+  useEffect(() => {
+    const iframe = frame.current;
+    if (!iframe) return;
+    let observer: ResizeObserver | undefined;
+    function sizeEntry() {
+      observer?.disconnect();
+      const card = iframe?.contentDocument?.querySelector<HTMLElement>('[data-slot="entry-card"]');
+      const surface = card?.parentElement;
+      if (!card || !surface) {
+        setHeight(780);
+        return;
+      }
+      const padding = iframe?.contentWindow?.getComputedStyle(surface);
+      if (!padding) return;
+      // Measure the card, not the viewport-height surface, so shrinking the
+      // frame removes the empty space without changing the shared entry layout.
+      observer = new ResizeObserver(() => setHeight(Math.ceil(card.getBoundingClientRect().height + parseFloat(padding.paddingTop) + parseFloat(padding.paddingBottom))));
+      observer.observe(card);
+    }
+    iframe.addEventListener("load", sizeEntry);
+    sizeEntry();
+    return () => {
+      iframe.removeEventListener("load", sizeEntry);
+      observer?.disconnect();
+    };
+  }, [index]);
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const el = box.current;
@@ -42,10 +70,10 @@ export function ScreenIframe({ index, title, mode, persona, preview }: { index: 
     return () => ro.disconnect();
   }, [mode]);
   const desk = mode === "desk";
-  const height = 780;
   return (
     <div ref={box} style={{ height: desk ? height * scale : height }} className={cn("max-w-full overflow-hidden", preview && "pointer-events-none select-none")}>
       <iframe
+        ref={frame}
         src={`/screens/frame/${index}${persona ? `#p=${persona}` : ""}`}
         title={`${title} · ${mode}`}
         height={height}

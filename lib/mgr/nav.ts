@@ -53,13 +53,13 @@ export const STAFF_NAV: readonly NavItem[] = [
     icon: BeerIcon,
     about: "See beer and supplies on hand",
     children: [
-      { label: "Inventory", href: "/inventory", roles: ["sales", "warehouse"], about: "See finished goods on hand and available" },
-      { label: "Taproom", href: "/taproom", roles: ["warehouse", "taproom"], about: "Record the weekly taproom count" },
-      { label: "Taps", href: "/taproom/board", roles: ["warehouse", "taproom"], about: "See what is pouring and swap kegs" },
+      { label: "Finished goods", href: "/inventory", roles: ["sales", "warehouse"], about: "See finished goods on hand and available" },
+      { label: "Weekly count", href: "/taproom", roles: ["warehouse", "taproom"], about: "Record the weekly taproom count" },
+      { label: "Tap board", href: "/taproom/board", roles: ["warehouse", "taproom"], about: "See what is pouring and swap kegs" },
       { label: "Variance by brand", href: "/taproom/variance", roles: ["warehouse", "taproom"], about: "Compare what sold with what was counted" },
       { label: "Cellar", href: "/cellar", roles: ["brewer"], about: "Track tanks, readings and additions" },
-      { label: "Materials", href: "/materials", roles: ["brewer", "warehouse"], about: "Count ingredients and packaging on hand" },
-      { label: "Kegs", href: "/kegs", roles: ["warehouse"], about: "Track keg pools, events and customer balances" },
+      { label: "Materials on hand", href: "/materials", roles: ["brewer", "warehouse"], about: "Count ingredients and packaging on hand" },
+      { label: "Keg fleet", href: "/kegs", roles: ["warehouse"], about: "Track keg pools, events and customer balances" },
     ],
   },
   {
