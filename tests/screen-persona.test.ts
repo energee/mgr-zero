@@ -18,6 +18,12 @@ import { sentenceCase } from "../lib/mgr/labels";
 const by = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("persona", () => {
+  it.each(["admin", "warehouse", "sales", "brewer"] as const)("shows Inventory's taproom count pointer only to permitted %s staff", role => {
+    const screen = asPersona(by("Finished goods"), personaFor(role));
+    const html = renderToStaticMarkup(createElement("div", null, screen.body));
+    expect(html.includes("Record taproom count")).toBe(role === "admin" || role === "warehouse");
+    expect(html).not.toContain('href="/taproom"');
+  });
   it("keeps personal Slack quiet hours unavailable to Taproom", () => {
     const screen = asPersona(by("My notification preferences"), { id: "taproom", roles: ["taproom"], name: "Taproom staff", handle: "@taproom" });
     const html = renderToStaticMarkup(createElement("div", null, screen.body));
