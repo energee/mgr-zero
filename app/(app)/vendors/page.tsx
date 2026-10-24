@@ -59,6 +59,7 @@ export default async function VendorsPage({ searchParams }: { searchParams?: Pro
   return (
     <VendorsView
       model={toVendorsViewProps({
+        backHref: "/more",
         rows: vendors.map((v) => ({
           key: v.id,
           title: v.name,
@@ -68,7 +69,7 @@ export default async function VendorsPage({ searchParams }: { searchParams?: Pro
         })),
         filtered: Boolean(params.q),
       })}
-      header={E.hd("Vendors", "", <VendorForm />)}
+      createAction={<VendorForm />}
       controls={vendors.length || params.q ? <ListControls search={{ label: "Search vendors", value: params.q, keep: {} }} /> : undefined}
       rowTrailing={(row) => {
         const v = vendors.find((x) => x.id === row.key)!;
@@ -87,7 +88,7 @@ export default async function VendorsPage({ searchParams }: { searchParams?: Pro
             })),
             filtered: Boolean(params.q),
           })}
-          header={E.hd("Contracts", "", <ContractForm vendors={options} materials={materials} />)}
+          header={<div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">{E.group("Contracts")}<ContractForm vendors={options} materials={materials} /></div>}
           rowTrailing={(row) => {
             const contract = contracts.find((c) => c.id === row.key)!;
             return <ContractForm contract={contract} vendors={options} materials={materials} />;

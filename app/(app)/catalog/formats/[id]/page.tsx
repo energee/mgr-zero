@@ -70,12 +70,13 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
     /> : undefined, "/catalog")}
     <p className="text-sm text-muted-foreground">Shared format · {volume == null ? "No beer volume yet — add package contents" : `${formatVolume(volume)} of beer per package`}</p>
     {composable || components.length > 0 ? <section className="flex flex-col gap-3 border-t pt-5">
-      {E.hd("Package contents", "Smaller packages inside this one, such as six four-packs in a case · managed in Edit format")}
+      {E.group("Package contents")}
+      <p className="text-xs text-muted-foreground">Smaller packages inside this one, such as six four-packs in a case · managed in Edit format</p>
       {components.length ? E.tbl(["Package", "Quantity"], components.map((c) => [data.formats.find((f) => f.id === c.id)?.name ?? c.id, c.qty]), ["l", "r"]) : E.blank("Add the packages inside to calculate the total volume")}
     </section> : null}
     <PackageBomView
       model={bomModel}
-      createAction={E.hd("Packaging materials", "Optional · managed in Edit format")}
+      createAction={<>{E.group("Packaging materials")}<p className="text-xs text-muted-foreground">Optional · managed in Edit format</p></>}
       footer={null}
     />
     {!writable ? E.info("Admin or Sales can replace components and packaging materials.") : null}

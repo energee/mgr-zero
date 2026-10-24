@@ -159,6 +159,10 @@ describe("unwrap maps RPC SQLSTATEs to command errors", () => {
   it("MG409 (request-id reuse) → 409 conflict", async () => {
     await expect(unwrap(failing("MG409"))).rejects.toMatchObject({ status: 409, code: "conflict" });
   });
+  it("MGC01 maps a duplicate channel name separately from request-id reuse", async () => {
+    await expect(unwrap(Promise.resolve({ data: null, error: { code: "MGC01", message: "A channel named DTC already exists." } })))
+      .rejects.toMatchObject({ status: 409, code: "duplicate_channel_name", message: "A channel named DTC already exists." });
+  });
   it("MG404 (a scoped RPC hides an absent or other-tenant identity) → 404 not_found with its message", async () => {
     await expect(unwrap(failing("MG404"))).rejects.toMatchObject({ status: 404, code: "not_found", message: "boom" });
   });

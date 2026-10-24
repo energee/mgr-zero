@@ -24,8 +24,8 @@ describe("Customers list", () => {
   it("maps list_customers through portal-user and remit copy", () => {
     const model = toCustomersViewProps(customersList);
     expect(model.rows.map((r) => r.title)).toEqual([RIDGELINE.name, ALS.name]);
-    expect(model.rows[0]?.detail).toBe("retailer · PA · 2 portal users");
-    expect(model.rows[1]?.detail).toBe("retailer · OH · brewery remits");
+    expect(model.rows[0]?.detail).toBe("Retailer · PA · 2 portal users");
+    expect(model.rows[1]?.detail).toBe("Retailer · OH · brewery remits");
     expect(model.rows[1]?.warning).toBe(true);
   });
 
@@ -133,12 +133,10 @@ describe("Customer detail", () => {
 describe("Ship-to form", () => {
   it("maps a ship-to snapshot onto Main as default", () => {
     const model = toShipToViewProps(shipToMain);
-    expect(model.title).toBe("Main ship-to");
+    expect(model.label).toBe("Main");
     expect(model.city).toBe("Phoenixville");
     expect(model.isDefault).toBe(true);
     expect(toShipToViewProps({ ...shipToMain, address2: "Dock 2" }).address2).toBe("Dock 2");
-    // A new ship-to has no label yet; the heading must not read " ship-to".
-    expect(toShipToViewProps({ ...shipToMain, label: "" }).title).toBe("New ship-to");
   });
 
   it("the Ship-to form inventory record is ShipToView", () => {
@@ -186,8 +184,8 @@ describe("country and alias", () => {
       { ...customersList.customers[1], country: "JP", state: null },
     ] });
     expect(model.rows[0]?.title).toBe(`${RIDGELINE.name} · Nano Wine`);
-    expect(model.rows[0]?.detail).toBe("retailer · PA · 2 portal users");
-    expect(model.rows[1]?.detail).toBe("retailer · Japan · brewery remits");
+    expect(model.rows[0]?.detail).toBe("Retailer · PA · 2 portal users");
+    expect(model.rows[1]?.detail).toBe("Retailer · Japan · brewery remits");
   });
 
   it("customer detail keeps State in place, required only for a US customer (#1306)", () => {

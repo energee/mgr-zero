@@ -4,7 +4,7 @@
 // An empty SKU list says where SKUs are made, or who makes them (noSkus).
 "use client";
 import { useId, type ReactNode } from "react";
-import { E } from "@/components/mgr/e";
+import { BRIGHT_ON, E } from "@/components/mgr/e";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { RecordMovementViewModel } from "@/lib/mgr/record-movement-view";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
@@ -46,7 +46,7 @@ export function RecordMovementView({
   return (
     <>
       <div className="md:hidden"><Pick label="Movement type" value={model.kind} options={model.kindOptions} onChange={controls.kind} /></div>
-      <div className="hidden md:block"><ToggleGroup aria-label="Movement type" type="single" value={controls.kind ? model.kind : undefined} defaultValue={controls.kind ? undefined : model.kind} onValueChange={controls.kind} variant="outline" size="sm" className="flex-wrap justify-start">{model.kindOptions.map(option => <ToggleGroupItem key={option} value={option}>{option}</ToggleGroupItem>)}</ToggleGroup></div>
+      <div className="hidden md:block"><ToggleGroup aria-label="Movement type" type="single" value={controls.kind ? model.kind : undefined} defaultValue={controls.kind ? undefined : model.kind} onValueChange={controls.kind} variant="outline" size="sm" className="flex-wrap justify-start">{model.kindOptions.map(option => <ToggleGroupItem key={option} value={option} className={BRIGHT_ON}>{option}</ToggleGroupItem>)}</ToggleGroup></div>
       {E.pick("SKU / package", model.skuId ?? model.sku, model.skuOptions, { id: `${id}-sku`, onChange: controls.sku, forward: true, placeholder: "Select SKU or package", displayValue: model.sku || undefined, empty: noSkus(model.skusHref) })}
       <Pick label="Location" value={model.location} options={model.locationOptions} onChange={controls.location} />
       <Pick label="Bin" value={model.bin} options={model.binOptions} onChange={controls.bin} disabled={model.binOptions.length === 0} placeholder={binPlaceholder} />

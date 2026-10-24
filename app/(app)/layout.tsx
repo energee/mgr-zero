@@ -19,6 +19,7 @@ import { Composer } from "@/components/mgr/composer";
 import { CommandQueryProvider } from "@/components/mgr/query-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { onlyRoles } from "@/lib/mgr/roles";
+import { isChatConfigured } from "@/lib/env/server-parser";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [brewery, sidebarOpen, identity, memberships] = await Promise.all([getActiveBrewery(), sidebarOpenFromCookie(), getRequestIdentity(), getStaffMemberships()]);
@@ -31,7 +32,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           brand={brewery.name}
           items={navFor(shippedNav(STAFF_NAV), brewery.roles)}
           sidebarOpen={sidebarOpen}
-          composer={<Composer key={`${identity!.userId}:${brewery.id}:${roleScope}`} roles={brewery.roles} />}
+          composer={<Composer key={`${identity!.userId}:${brewery.id}:${roleScope}`} roles={brewery.roles} chatConfigured={isChatConfigured()} />}
           headerRight={
             <>
               {!onlyRoles(brewery.roles, ["taproom"]) && <SearchSheet roles={brewery.roles} />}

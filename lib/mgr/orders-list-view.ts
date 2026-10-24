@@ -67,7 +67,7 @@ export function toOrdersListViewProps({ roles, status, customer, customerId, lin
   const title = customer ? `No ${what} for ${customer}` : status ? `No ${what}` : "No orders yet";
   const link = (href: string) => (linked ? href : undefined);
   return {
-    empty: orders.length === 0 ? { title, description: "Orders appear here once they are placed." } : undefined,
+    empty: orders.length === 0 ? { title, description: status === "draft" ? "Drafts you save appear here." : "Orders appear here once they are placed." } : undefined,
     status: status ?? "all",
     statusOptions: [
       { value: "all", label: "All states", href: link(ordersHref(customerId, undefined)) },

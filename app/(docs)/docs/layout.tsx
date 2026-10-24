@@ -13,7 +13,7 @@ import { source } from "@/lib/source";
 const brand = (
   <span className="flex items-center gap-2 font-medium">
     <MgrIcon size={16} className="shrink-0" />
-    MGR
+    Back to MGR
   </span>
 );
 
@@ -26,7 +26,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           their own 900px article cap, so they do not stretch. */}
       <DocsLayout
         tree={source.getPageTree()}
-        nav={{ title: brand }}
+        nav={{ title: brand, url: "/" }}
         themeSwitch={{ enabled: false }}
         containerProps={{ style: { "--fd-layout-width": "100vw" } as React.CSSProperties }}
       >

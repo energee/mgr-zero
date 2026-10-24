@@ -33,6 +33,7 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
   return (
     <ComplianceMonthsView
       model={{
+        backHref: "/more",
         cadences: CADENCES.map(([, name]) => name),
         cadence: on,
         months: months.map((m) => ({ ...periodRow(m, filed.get(m), today, brewery.timeZone, activePeriods.includes(m)), href: `/compliance/${m}` })),

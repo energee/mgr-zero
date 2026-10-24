@@ -335,13 +335,12 @@ describe("line errors in the views", () => {
     expect(markup).toMatch(/<a [^>]*>Open Locations<\/a>/);
   });
 
-  it("Repack Break links Catalog for a user who can set a format's contents, and names the role otherwise; the note is tied to the picker", () => {
+  it("Repack explains missing packages and links Catalog only for a user who can set format contents", () => {
     const model = { ...repackCase, parents: [], locations: [], parentSkuId: "", locationId: "", binId: "" };
     const own = html(createElement(RepackView, { model: { ...model, formatsHref: "/catalog" } }));
     expect(own).toMatch(/<a [^>]*href="\/catalog"[^>]*>Open Catalog<\/a>/);
-    const emptyId = own.match(/<p[^>]*id="([^"]+-empty)"[^>]*>No SKU can be broken yet/)?.[1];
-    expect(emptyId).toBeTruthy();
-    expect(own).toMatch(new RegExp(`aria-describedby="${emptyId}"`));
+    expect(own).toContain("No SKU can be broken yet");
+    expect(own).not.toMatch(/<input\b|role="combobox"|Confirm repack/);
     const other = html(createElement(RepackView, { model: { ...model, formatsHref: null } }));
     expect(other).toContain("An admin or sales member sets a format&#x27;s contents in Catalog.");
     expect(other).not.toContain("Open Catalog");

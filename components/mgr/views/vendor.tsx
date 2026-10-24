@@ -5,6 +5,7 @@ import { vendorFieldErrors, type VendorViewModel } from "@/lib/mgr/vendor-view";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import type { ReactNode } from "react";
 import { Fragment, useId } from "react";
+import { ConfirmDeleteControl } from "./confirm-delete";
 
 export type { VendorViewModel };
 
@@ -15,6 +16,9 @@ export function VendorView({
   messages,
   footer,
   errors = {},
+  busy,
+  error,
+  onSetActive,
 }: {
   model: VendorViewModel;
   controls?: {
@@ -28,6 +32,9 @@ export function VendorView({
   validationAttempted?: boolean;
   footer?: ReactNode;
   errors?: Partial<Record<"name" | "email" | "phone" | "leadDays", string>>;
+  busy?: boolean;
+  error?: string | null;
+  onSetActive?: (active: boolean) => Promise<boolean>;
 }) {
   const id = useId();
   const controlled = (key: keyof typeof controls) => Boolean(controls[key]);
@@ -47,6 +54,21 @@ export function VendorView({
       {E.info("When Planning lists a material short and it resolves to this vendor, its buy-by date is the needed-by date less this lead time. Received orders show a separate observed average.")}
       {messages}
       {footer !== undefined ? footer : E.btn("Save vendor", !model.name.trim() || localErrors.email || localErrors.leadDays ? "p disabled" : "p")}
+      {model.active !== null && <>
+        {E.ttl("Vendor status")}
+        {E.fld("Status", model.active ? "Active" : "Inactive")}
+        {E.info("Vendors cannot currently be deleted. Deactivation removes this vendor from New purchase order choices. Existing materials, contracts and orders remain linked.")}
+        <ConfirmDeleteControl
+          title={model.active ? "Deactivate vendor" : "Reactivate vendor"}
+          name={<>{model.active ? "Deactivate" : "Reactivate"} <strong>{model.name}</strong>?</>}
+          warning="This also saves changes in this form. It does not delete the vendor or change its existing materials, contracts or orders. You can change the status again later."
+          busy={busy}
+          busyLabel="Saving…"
+          error={error}
+          reason={!model.name.trim() ? "Enter a vendor name." : localErrors.email ?? localErrors.leadDays}
+          onDelete={onSetActive ? () => onSetActive(!model.active) : undefined}
+        />
+      </>}
     </>
   );
 }

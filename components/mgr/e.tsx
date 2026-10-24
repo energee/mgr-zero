@@ -247,7 +247,7 @@ export const E = {
       tone === "info" && "bg-info text-info-foreground hover:bg-info/80 hover:text-info-foreground dark:hover:bg-info/80",
     )}>{href ? <Link href={href}>{t}</Link> : t}</Button>
   ),
-  /** A status word. Not a button; `href` makes it a jump to where the status is fixed (COLA pending → Compliance). */
+  /** A status word. Not a button; `href` makes it a jump to the section that explains it. */
   status: (t: React.ReactNode, tone: "ok" | "w" | "" = "", href?: string) => {
     const body = <>{tone === "ok" ? <Dot cls="ok" /> : null}{t}</>;
     return (

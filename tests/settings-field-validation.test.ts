@@ -54,7 +54,7 @@ describe("Oct 23 settings field validation (#1121)", () => {
     expect(vendorFieldErrors({ email: "", leadDays: "" })).toEqual({});
     expect(vendorFieldErrors({ email: "buyer@example.com", leadDays: "0" })).toEqual({});
     for (const leadDays of ["-3", "2.5", "Infinity", "NaN"]) expect(vendorFieldErrors({ email: "", leadDays }).leadDays).toBeTruthy();
-    const html = renderToStaticMarkup(createElement(VendorView, { model: { name: "Supplier", email: "notanemail", phone: "", terms: "Net 30", termsOptions: ["Net 30"], leadDays: "2.5" } }));
+    const html = renderToStaticMarkup(createElement(VendorView, { model: { name: "Supplier", email: "notanemail", phone: "", terms: "Net 30", termsOptions: ["Net 30"], leadDays: "2.5", active: null } }));
     expectAssociatedError(html, "Email", "Enter a valid email address, such as name@example.com.");
     expectAssociatedError(html, "Lead time (days)", "Enter a whole number of days, zero or more.");
   });
@@ -81,7 +81,7 @@ describe("Oct 23 settings field validation (#1121)", () => {
   });
 
   it("keeps controlled fields quiet until blur or attempted submit, with blur handlers on the actual controls", () => {
-    const model = { name: "Supplier", email: "notanemail", phone: "", terms: "Net 30", termsOptions: ["Net 30"], leadDays: "-3" };
+    const model = { name: "Supplier", email: "notanemail", phone: "", terms: "Net 30", termsOptions: ["Net 30"], leadDays: "-3", active: null };
     const controls = { email: vi.fn(), leadDays: vi.fn() };
     let tree: ReactNode;
     function Harness() { return tree = VendorView({ model, controls }); }

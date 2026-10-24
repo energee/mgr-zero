@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useCommandContext } from "@/lib/brewery-provider";
@@ -9,19 +9,29 @@ import { ComposerProposalView } from "@/components/mgr/views/composer";
 import { ComposerStripView } from "@/components/mgr/views/composer-strip";
 import { command } from "@/lib/commands/client";
 import { composerMessageText, latestComposerProposal } from "@/lib/chat/messages";
+import { CHAT_FAILURES, readChatFailure } from "@/lib/chat/failure";
 import { COMPOSER_SETUP_ACTIVITY, loadComposerSetup } from "@/lib/composer/setup";
 import { movementFormHref } from "@/lib/composer/state";
 
-export default function ComposerConversation({ open, onOpenChange, focusRequest, outboxCount, onOutbox, children }: {
+function subscribeConnection(changed: () => void) {
+  addEventListener("online", changed); addEventListener("offline", changed);
+  return () => { removeEventListener("online", changed); removeEventListener("offline", changed); };
+}
+const connectionSnapshot = () => navigator.onLine;
+const serverConnectionSnapshot = () => true;
+
+export default function ComposerConversation({ chatConfigured, open, onOpenChange, focusRequest, outboxCount, onOutbox, children }: {
+  chatConfigured: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   focusRequest: number;
   outboxCount: number;
   onOutbox: () => void;
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   const expectedContext = useCommandContext();
   const breweryId = expectedContext.breweryId ?? "";
+  const online = useSyncExternalStore(subscribeConnection, connectionSnapshot, serverConnectionSnapshot);
   const [conversationId, setConversationId] = useState<string>();
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
   const [prompt, setPrompt] = useState("");
@@ -83,16 +93,16 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
 
   function retry() {
     if (failure) { failure.retry(); return; }
-    clearError(); void regenerate();
+    if (error && readChatFailure(error, online).retryable && online) { clearError(); void regenerate(); }
   }
 
   useEffect(() => {
-    if (!open || latestSetup.current) return;
+    if (!chatConfigured || !open || latestSetup.current) return;
     reloadSetup();
     // One restore per mount, only when the panel is needed. The app layout
     // keys Composer by actor/brewery/roles, so a new scope remounts it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, breweryId, expectedContext.actorId]);
+  }, [open, breweryId, expectedContext.actorId, chatConfigured]);
 
   useEffect(() => {
     // The shortcut may precede both the lazy chunk and the enabled input.
@@ -110,6 +120,12 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
   const { proposal, error: proposalError } = latestComposerProposal(messages);
   const transcript = messages.map((message) => ({ id: message.id, role: message.role === "user" ? "user" as const : "assistant" as const, content: composerMessageText(message) })).filter((message) => message.content);
   const streaming = status === "submitted" || status === "streaming";
+  const requestFailure = error ? readChatFailure(error) : undefined;
+  let chatFailure: { message: string; retryable: boolean } | undefined = requestFailure;
+  if (!online) chatFailure = CHAT_FAILURES.offline;
+  if (!chatConfigured) chatFailure = CHAT_FAILURES.not_configured;
+  const chatBlocked = !chatConfigured || !online || requestFailure?.code === "not_configured" || requestFailure?.code === "provider_access";
+  const errorMessage = !chatConfigured || !online ? chatFailure?.message : failure?.message ?? chatFailure?.message;
 
   async function commitProposal() {
     if (!proposal || committing || !conversationId) return;
@@ -122,11 +138,11 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
   }
 
   return <>
-    <ComposerConversationView messages={transcript} onSetupRetry={!conversationId ? reloadSetup : undefined} activity={!conversationId && !failure ? COMPOSER_SETUP_ACTIVITY : status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={failure?.message ?? error?.message} onRetry={retry} onNewChat={() => void newChat()} />
+    <ComposerConversationView messages={transcript} onSetupRetry={chatConfigured && !conversationId ? reloadSetup : undefined} activity={chatConfigured && !conversationId && !failure && online ? COMPOSER_SETUP_ACTIVITY : status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={errorMessage} onRetry={chatConfigured && online && (failure || error && chatFailure?.retryable) ? retry : undefined} onNewChat={chatConfigured ? () => void newChat() : undefined} />
     {proposalError && <p role="alert" className="rounded-md border border-destructive/40 bg-card p-3 text-sm">{proposalError}</p>}
     {proposal && !receipt && <ComposerProposalView effects={proposal.effects} warnings={proposal.warnings} openHref={movementFormHref(proposal.input, proposal.previewToken)} onOpen={() => onOpenChange(false)} onCommit={() => void commitProposal()} committing={committing} />}
     {receipt && <p role="status" className="rounded-md border bg-card p-3 text-sm font-medium">{receipt}</p>}
     {children}
-    <ComposerStripView actions={[{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }]} onAction={(value) => setPrompt(value === "attention" ? "What needs my attention today?" : value === "inventory" ? "What inventory is available?" : "Help me record an inventory movement.")} onOutbox={onOutbox} outboxCount={outboxCount} promptRef={promptRef} value={prompt} onChange={setPrompt} onSubmit={(text) => { if (!conversationId) return; setPrompt(""); setReceipt(undefined); void sendMessage({ text }); }} disabled={!conversationId || streaming || committing} streaming={streaming} onStop={stop} />
+    <ComposerStripView actions={[{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }]} onAction={(value) => setPrompt(value === "attention" ? "What needs my attention today?" : value === "inventory" ? "What inventory is available?" : "Help me record an inventory movement.")} onOutbox={onOutbox} outboxCount={outboxCount} promptRef={promptRef} value={prompt} onChange={setPrompt} onSubmit={(text) => { if (!conversationId || chatBlocked) return; setPrompt(""); setReceipt(undefined); void sendMessage({ text }); }} disabled={!conversationId || chatBlocked || streaming || committing} streaming={streaming} onStop={stop} />
   </>;
 }
