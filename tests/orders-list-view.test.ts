@@ -9,16 +9,18 @@ vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery"
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ roles: ["sales"] }) }));
 vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/lib/mgr/page-query", () => ({ requirePagePermission: vi.fn(), optionalPageQuery: async () => ({ customer: { name: "Ridgeline Tap Room" } }) }));
-vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: () => ({ data: { rows: ordersWorkList.orders, nextCursor: null }, error: null, dataUpdatedAt: 1, refetch: vi.fn() }) }));
+vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: vi.fn(() => ({ data: { rows: ordersWorkList.orders, nextCursor: null }, error: null, dataUpdatedAt: 1, refetch: vi.fn() })) }));
 import OrdersPage from "@/app/(app)/orders/page";
 import { OrdersClient } from "@/app/(app)/orders/orders-client";
 import { QueryFeedback } from "@/components/mgr/query-feedback";
+import { useCommandQuery } from "@/components/mgr/query-provider";
 import { SCREENS } from "../components/mgr/screens";
 import { NewOrderView } from "../components/mgr/views/new-order";
 import { OrdersView } from "../components/mgr/views/orders-list";
 import { newOrderDraft, ordersWorkList } from "../lib/mgr/fixtures/orders";
 import { toNewOrderViewProps } from "../lib/mgr/new-order-view";
 import { toOrdersListViewProps } from "../lib/mgr/orders-list-view";
+import { ORDER_STATUSES, parseOrderStatus } from "../lib/mgr/order-status";
 
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const html = (name: string) => renderToStaticMarkup(createElement("div", null, screen(name).body));
@@ -77,6 +79,57 @@ describe("Orders list view loop", () => {
     // Clear removes only the customer scope.
     expect(model.customer).toEqual({ name: "Ridgeline Tap Room", clearHref: "/orders?status=picked" });
     expect(toOrdersListViewProps({ roles: ["sales"], linked: true, orders: [] })).toMatchObject({ status: "all", customer: undefined });
+  });
+
+  it("builds routable status choices from the live page while preserving and encoding its customer", async () => {
+    const page = await OrdersPage({ searchParams: Promise.resolve({ status: "picked", customerId: "customer & partner", cursor: "older-page" }) });
+    const list = OrdersClient(page.props);
+    expect(list.props.model.statusOptions).toEqual([
+      { value: "all", label: "All states", href: "/orders?customerId=customer+%26+partner" },
+      ...ORDER_STATUSES.map((status) => ({
+        value: status,
+        label: status[0].toUpperCase() + status.slice(1),
+        href: `/orders?customerId=customer+%26+partner&status=${status}`,
+      })),
+    ]);
+    const unscopedPage = await OrdersPage({ searchParams: Promise.resolve({ status: "picked" }) });
+    expect(OrdersClient(unscopedPage.props).props.model.statusOptions).toEqual([
+      { value: "all", label: "All states", href: "/orders" },
+      ...ORDER_STATUSES.map((status) => ({
+        value: status,
+        label: status[0].toUpperCase() + status.slice(1),
+        href: `/orders?status=${status}`,
+      })),
+    ]);
+  });
+
+  it.each(ORDER_STATUSES)("takes the %s deep-link status through to list_orders and the controlled pick", async (status) => {
+    const page = await OrdersPage({ searchParams: Promise.resolve({ status }) });
+    expect(page.props.status).toBe(status);
+    const list = OrdersClient(page.props);
+    expect(useCommandQuery).toHaveBeenLastCalledWith("list_orders", { status, customerId: undefined, cursor: undefined });
+    expect(list.props.model.status).toBe(status);
+    expect(parseOrderStatus(status)).toBe(status);
+  });
+
+  it.each([
+    undefined,
+    "",
+    "all",
+    "bogus",
+    "PICKED",
+    ["picked"],
+    ["picked", "shipped"],
+    ["bogus", "picked"],
+  ].map((status) => ({ status })))("ignores an invalid or repeated query status: $status", async ({ status }) => {
+    expect(parseOrderStatus(status)).toBeUndefined();
+    const page = await OrdersPage({ searchParams: Promise.resolve({ status, customerId: "c1" }) });
+    expect(page.props.status).toBeUndefined();
+    const list = OrdersClient(page.props);
+    expect(useCommandQuery).toHaveBeenLastCalledWith("list_orders", { status: undefined, customerId: "c1", cursor: undefined });
+    expect(list.props.model.status).toBe("all");
+    expect(list.props.model.customer?.clearHref).toBe("/orders");
+    expect(list.props.model.statusOptions[0]?.href).toBe("/orders?customerId=c1");
   });
 
   it("prints the ship date in the one date format, never ISO (#991)", () => {

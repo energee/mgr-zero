@@ -8,12 +8,13 @@
 // clears (#447). Forms own only their fields and how to build the command input.
 "use client";
 
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { useRouter } from "next/navigation";
 import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
 import { beginRecovery, finishRecovery, inFlightRequests, readRecoveries, RECOVERY_CHANGED, type RecoveryAttempt } from "./recovery";
 import { classifyCommandFailure, command, type CommandFailureDetail } from "./client";
 import { canRetireCommandFailure } from "./failure";
+import { inputErrorPresentation, type FieldErrors } from "./field-errors";
 
 /** Options for useCommandAction's run; see the comment on run. */
 export type CommandRunOptions = { requestId?: string; refresh?: boolean; target?: string; durable?: boolean; owner?: RecoveryAttempt["owner"]; onSent?: (requestId: string) => void };
@@ -21,19 +22,26 @@ export type CommandAction = {
   busy: boolean;
   error: string | null;
   failure: CommandFailureDetail | null;
+  fieldErrors: FieldErrors;
   setError: Dispatch<SetStateAction<string | null>>;
   run: (name: string, input: unknown, onSuccess?: (data: unknown) => void, options?: CommandRunOptions) => Promise<boolean>;
   pending: RecoveryAttempt | null | undefined;
   blocked: boolean;
 };
 
-export function useCommandAction(actionTarget?: string): CommandAction {
+export function useCommandAction(actionTarget?: string, validationFields: readonly string[] = []): CommandAction {
   const breweryId = useBrewery();
   const expectedContext = useCommandContext();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [failure, setFailure] = useState<CommandFailureDetail | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [busy, setBusy] = useState(false);
+  const clearFailure: Dispatch<SetStateAction<string | null>> = useCallback(next => {
+    setError(next);
+    setFailure(null);
+    setFieldErrors({});
+  }, []);
   // Targeted irreversible actions share one lock across competing commands.
   // Undefined means storage has not been checked yet: fields stay frozen.
   const [recovery, setRecovery] = useState<{ context: typeof expectedContext; target: string; attempt: RecoveryAttempt | null }>();
@@ -75,6 +83,7 @@ export function useCommandAction(actionTarget?: string): CommandAction {
     setBusy(true);
     setError(null);
     setFailure(null);
+    setFieldErrors({});
     let saved: ReturnType<typeof beginRecovery> | undefined;
     try {
       if (durable) saved = beginRecovery(sessionStorage, expectedContext, location.pathname, name, input, { requestId, target, owner, exclusiveTarget: actionTarget !== undefined });
@@ -94,14 +103,16 @@ export function useCommandAction(actionTarget?: string): CommandAction {
       if (saved && canRetireCommandFailure(detail.status ?? 0, saved.resumed, detail.code)) finishRecovery(sessionStorage, saved.attempt);
       else if (saved && typeof window !== "undefined") window.dispatchEvent(new Event(RECOVERY_CHANGED)); // finishRecovery already notifies.
       setFailure(detail);
-      setError(detail.message);
+      const presentation = inputErrorPresentation(detail, validationFields);
+      setFieldErrors(presentation.fieldErrors);
+      setError(presentation.error);
       return false;
     } finally {
       setBusy(false);
     }
   }
 
-  return { busy, error, failure, setError, run, pending, blocked };
+  return { busy, error, failure, fieldErrors, setError: clearFailure, run, pending, blocked };
 }
 
 /** One state object per sheet: initial values come from the row being edited (or blanks); reset restores them; patch sets several fields at once. */
@@ -123,8 +134,8 @@ export const orUndef = (s: string) => s || undefined;
  * values the fields' useState starts from. defaultOpen opens on mount without
  * a reset, for a sheet prefilled from outside (a chat handoff, a deep link).
  */
-export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void; onSuccess?: (data: unknown) => void; defaultOpen?: boolean; target?: string }) {
-  const { error, setError, run: runAction } = useCommandAction();
+export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void; onSuccess?: (data: unknown) => void; defaultOpen?: boolean; target?: string; validationFields?: readonly string[] }) {
+  const { error, failure, fieldErrors, setError, run: runAction } = useCommandAction(undefined, opts.validationFields);
   const [open, setOpenState] = useState(opts.defaultOpen ?? false);
   // The command in flight: `submitting` is the form's own verb, `busy` any.
   const [running, setRunning] = useState<string | null>(null);
@@ -149,5 +160,5 @@ export function useCommandForm(name: string, opts: { build: () => unknown; reset
     await run(name, opts.build(), data => { opts.onSuccess?.(data); setOpen(false); }, { target: opts.target });
   }
 
-  return { open, setOpen, error, submitting: running === name, busy: running !== null, submit, run };
+  return { open, setOpen, error, failure, fieldErrors, submitting: running === name, busy: running !== null, submit, run };
 }

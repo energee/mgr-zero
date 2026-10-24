@@ -59,6 +59,40 @@ describe("POST /api/command bearer auth", () => {
     });
   });
 
+  it("returns schema field paths separately from its customer-facing summary", async () => {
+    const res = await POST(commandReq({ breweryId, name: "search_entities", input: { q: "x".repeat(81) } }, adminToken));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      ok: false,
+      error: {
+        code: "invalid_input",
+        message: expect.stringContaining("80"),
+        issues: [{ path: ["q"], code: "too_big", message: expect.any(String) }],
+      },
+      correlationId: expect.any(String),
+    });
+  });
+
+  it("retains an unmapped public filing reason over the real API without filing or claiming a request", async () => {
+    const requestId = randomUUID();
+    const before = sql(`select count(*) from report_filings where brewery_id='${breweryId}'`);
+    const res = await POST(commandReq({
+      breweryId, name: "file_compliance_report", requestId,
+      input: { jurisdiction: "TTB", periodStart: "2025-09-15", periodEnd: "2025-10-15" },
+    }, adminToken));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      ok: false, requestId,
+      error: {
+        code: "invalid_input",
+        message: expect.stringMatching(/one calendar month, quarter, or year/),
+        issues: [{ path: ["periodEnd"], code: "custom", message: expect.stringMatching(/one calendar month, quarter, or year/) }],
+      },
+    });
+    expect(sql(`select count(*) from report_filings where brewery_id='${breweryId}'`)).toEqual(before);
+    expect(sql(`select count(*) from private.command_requests where request_id='${requestId}'`)).toEqual(["0"]);
+  });
+
   it("serializes one UUID request id for a browser command action", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       json: async () => ({ ok: true, data: { created: true }, requestId: randomUUID(), correlationId: randomUUID() }),

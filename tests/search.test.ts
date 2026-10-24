@@ -29,6 +29,16 @@ beforeAll(async () => {
 const search = (q: string, ctx: CommandCtx = adminCtx, kinds?: string[]) => runCommand("search_entities", { q, kinds }, ctx) as Promise<SearchHit[]>;
 
 describe("search_entities", () => {
+  it("accepts 80-character terms and rejects longer terms before database reads (#1296)", async () => {
+    await expect(search("a".repeat(80), salesCtx, ["customer"])).resolves.toEqual([]);
+    const fetch = vi.spyOn(globalThis, "fetch");
+    try {
+      await expect(search("a".repeat(81), salesCtx, ["customer"])).rejects.toMatchObject({ status: 400, code: "invalid_input" });
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      fetch.mockRestore();
+    }
+  });
   it("a document number matches exactly and sorts first", async () => {
     const hits = await search("ORD-0001");
     expect(hits[0]).toMatchObject({ kind: "order", id: orderId, href: `/orders/${orderId}` });

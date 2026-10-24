@@ -12,7 +12,7 @@ vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery"
 // answers each role the way it does live.
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ breweryId: "brewery", roles: state.roles }), isUuid: () => true }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }), notFound() { throw new Error("not found"); } }));
-vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => ({ busy: false, error: "", run() {} }), useCommandForm: () => ({ open: false, setOpen() {}, busy: false, error: "", submit() {} }) }));
+vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => ({ busy: false, error: "", fieldErrors: {}, run() {} }), useCommandForm: () => ({ open: false, setOpen() {}, busy: false, error: "", fieldErrors: {}, submit() {} }) }));
 vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query }));
 const brand = { id: "brand", name: "Hazy", abv: 6.8, description: "Juicy", category: "Core", price_group_id: "group", hops: "Citra", styles: { name: "IPA" }, skus: [{ id: "sku", name: "Hazy keg", format_id: "keg", active: false, upc: "123456" }] };
 const customer = { id: "buyer", name: "Buyer", type: "retailer", state: "PA", sale_channel_id: "channel", license_no: "license", payment_terms: "net30", tax_treatment: "research", sale_channels: { name: "Wholesale" } };

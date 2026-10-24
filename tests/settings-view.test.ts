@@ -5,7 +5,7 @@
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { booksOpenedChange, oneWayKegFeeChange, toBrewerySettingsValues, breweryOperatingDefaultsCommand } from "@/lib/mgr/settings-view";
+import { booksOpenedChange, oneWayKegFeeChange, oneWayKegFeeError, toBrewerySettingsValues, breweryOperatingDefaultsCommand } from "@/lib/mgr/settings-view";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
 import { SettingsView } from "@/components/mgr/views/settings";
 import { PortalFulfillmentView } from "@/components/mgr/views/portal-fulfillment";
@@ -14,7 +14,7 @@ import { SettingsForm } from "@/app/(app)/settings/settings-form";
 import { getCommandDefinition } from "@/lib/commands/registry";
 import "@/lib/commands/settings";
 
-const action = vi.hoisted(() => ({ busy: false, error: null, run: vi.fn() }));
+const action = vi.hoisted(() => ({ busy: false, error: null, fieldErrors: {}, run: vi.fn() }));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => action }));
 
 const brewery = {
@@ -93,6 +93,15 @@ describe("oneWayKegFeeChange", () => {
   it("sends the new fee in cents, and a cleared field as no fee", () => {
     expect(oneWayKegFeeChange(1000, "12.50")).toEqual({ feeCents: 1250 });
     expect(oneWayKegFeeChange(1000, "")).toEqual({ feeCents: 0 });
+  });
+});
+
+describe("one-way fee readiness before sequential settings writes", () => {
+  it.each(["1.234", "-1", "1e2", "1E2", "Infinity", "NaN", "0x10", "21474836.48"])("refuses %s without silently rounding or converting notation", value => {
+    expect(oneWayKegFeeError(value)).toEqual(expect.any(String));
+  });
+  it.each(["", "0", "0.00", "1.23", "1.2300", ".50", "21474836.47"])("accepts the existing whole-cent value %s", value => {
+    expect(oneWayKegFeeError(value)).toBeUndefined();
   });
 });
 
