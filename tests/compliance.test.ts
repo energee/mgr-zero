@@ -200,8 +200,8 @@ describe("approval label images", () => {
 
 describe("registry", () => {
   it("keeps the recreated pre-image overload private until the forward migration retires it", () => {
-    const identifier = readFileSync(new URL("../supabase/migrations/20261024050002_cola_identifier_format.sql", import.meta.url), "utf8");
-    const reconciliation = readFileSync(new URL("../supabase/migrations/20261024193522_cola_identifier_image_reconciliation.sql", import.meta.url), "utf8");
+    const identifier = readFileSync(new URL("../supabase/migrations/20261024213409_cola_identifier_format.sql", import.meta.url), "utf8");
+    const reconciliation = readFileSync(new URL("../supabase/migrations/20261024213414_cola_identifier_image_reconciliation.sql", import.meta.url), "utf8");
     const oldSignature = "public.upsert_brand_approval(uuid,uuid,uuid,public.approval_kind,text,date,date,text,uuid,text[],text)";
     const currentSignature = "public.upsert_brand_approval(uuid,uuid,uuid,public.approval_kind,text,date,date,text,uuid,text[],text,text)";
     expect(sql(`begin;
