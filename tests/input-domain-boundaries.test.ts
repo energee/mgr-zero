@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { isNumber, numberNotationError } from "@/lib/mgr/quantity-input";
 import { isCompleteLine, orderLineError, draftLineErrors } from "@/lib/order-form-rules";
 import { movementFieldErrors, movementFields } from "@/lib/movement-form";
-import { waterPpmError, toWaterProfileFields } from "@/lib/mgr/water-profiles-view";
+import { IONS, waterPpmError, toWaterProfileFields, waterProfileSaveReason } from "@/lib/mgr/water-profiles-view";
 import { pastPlanWarning } from "@/lib/mgr/schedule-batch-view";
 import { breweryDate } from "@/lib/date-format";
 import { WaterProfileView } from "@/components/mgr/views/water-profile";
@@ -48,6 +48,31 @@ describe("water storage guidance", () => {
     expect(waterPpmError("-1")).toBeDefined();
     expect(waterPpmError("")).toBeDefined();
     expect(waterPpmError("", true)).toBeUndefined();
+  });
+
+  it("uses the same water bounds for Save as for field errors", () => {
+    const complete = { ...toWaterProfileFields(), name: "Source water" };
+    for (const [key] of IONS) complete[key] = "0";
+    expect(waterProfileSaveReason(complete)).toBeNull();
+    for (const key of [...IONS.map(([key]) => key), "alkalinity_ppm"] as const) {
+      for (const value of ["1e3", "1000000", "-1", "Infinity"]) {
+        expect(waterProfileSaveReason({ ...complete, [key]: value })).not.toBeNull();
+      }
+      expect(waterProfileSaveReason({ ...complete, [key]: "999999.129" })).toBeNull();
+    }
+  });
+
+  it("associates attempted ion, alkalinity and pH errors with their controls", () => {
+    const fields = { ...toWaterProfileFields(), name: "Source water", alkalinity_ppm: "1000000", water_ph: "20" };
+    for (const [key] of IONS) fields[key] = "0";
+    fields.calcium_ppm = "1e3";
+    const html = renderToStaticMarkup(createElement(WaterProfileView, { fields, onChange: () => {}, validationAttempted: true }));
+    for (const label of ["Calcium (ppm)", "Alkalinity as CaCO3 (ppm)", "Water pH"]) {
+      const input = [...html.matchAll(/<input\b[^>]*>/g)].find(([tag]) => tag.includes(`aria-label="${label}"`))?.[0];
+      expect(input).toContain('aria-invalid="true"');
+      const descriptions = input?.match(/aria-describedby="([^"]+)"/)?.[1].split(" ") ?? [];
+      expect(descriptions.some(id => id.endsWith("-error") && html.includes(`id="${id}"`))).toBe(true);
+    }
   });
 
   it("keeps the actual input bounds and counts notes only near their existing limit", () => {

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 export type { TeamViewModel };
 
 export function TeamRosterRowView({ row }: { row: TeamRowView }) {
-  const avatar = E.face({ src: row.src, name: row.title.replace(/^@/, "") });
+  const avatar = E.face({ src: row.src, name: row.title });
   return row.you ? E.row(row.title, row.detail, "you", "", avatar) : E.nav(row.title, row.detail, "", avatar);
 }
 

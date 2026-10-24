@@ -42,7 +42,7 @@ export function PosRouteSheet({ title, backHref, children }: { title: string; ba
 
 export function SquareConnectControl({ configured, reconnect = false }: { configured: boolean; reconnect?: boolean }) {
   const action = useCommandAction();
-  return <ConnectSquareView configured={configured} busy={action.busy} error={action.error} backHref="/settings/pos" onConnect={() => void action.run("connect_square", { reconnect }, data => location.assign((data as { authorizeUrl: string }).authorizeUrl))} />;
+  return <ConnectSquareView configured={configured} reconnect={reconnect} busy={action.busy} error={action.error} backHref="/settings/pos" onConnect={() => void action.run("connect_square", { reconnect }, data => location.assign((data as { authorizeUrl: string }).authorizeUrl))} />;
 }
 
 /** Runs disconnect_square; on an "unresolved" connection the same command retries revocation by merchant id (#640).

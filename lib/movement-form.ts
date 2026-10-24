@@ -34,7 +34,7 @@ export const requiresDestState = (type: string) => type === "sample" || type ===
  *  the size (movementInput). */
 export type MovementFieldErrors = { qty?: string; destState?: string };
 
-const QTY_ENTER = "Enter a quantity above zero, with at most two decimal places. The kind, or Direction for an adjustment, decides whether stock is added or removed.";
+const QTY_ENTER = "Enter a quantity above zero, with at most two decimal places. The movement type, or Direction for an adjustment, decides whether stock is added or removed.";
 const QTY_TOO_LARGE = "Enter a quantity of at most 9,999,999,999.99.";
 
 function qtyError(qty: number): string | undefined {
@@ -56,12 +56,12 @@ export function movementFieldErrors(type: string, quantity: string, state: strin
 export function movementReason(i: { type: string; skuId: string; locationId: string; binId: string; saleChannelId: string; qty: string; destState: string }): string | null {
   const errors = movementFieldErrors(i.type, i.qty, i.destState);
   const missing: string[] = [];
-  if (!i.type) missing.push("a kind");
-  if (!i.skuId) missing.push("a SKU");
-  if (!i.locationId) missing.push("a location");
-  if (!i.binId) missing.push("a bin");
+  if (!i.type) missing.push("movement type");
+  if (!i.skuId) missing.push("SKU");
+  if (!i.locationId) missing.push("location");
+  if (!i.binId) missing.push("bin");
   if (requiresChannel(i.type) && !i.saleChannelId) missing.push("a channel");
-  if (errors.qty) missing.push(errors.qty === QTY_TOO_LARGE ? "a smaller quantity" : "a quantity above zero with at most two decimals");
+  if (errors.qty) missing.push(errors.qty === QTY_TOO_LARGE ? "a smaller quantity" : "a quantity above zero (up to two decimals)");
   if (errors.destState) missing.push("a two-letter destination state");
   return submitReason(missing);
 }

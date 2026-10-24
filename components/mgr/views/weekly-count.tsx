@@ -17,7 +17,12 @@ import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
 const bbl = (value: number | null) => value === null ? "unavailable" : varianceBbl(value);
 
 export function WeeklyCountPrintAction({ busy = false, empty = false, error, onPrint }: { busy?: boolean; empty?: boolean; error?: string | null; onPrint?: () => void }) {
-  return <div className="flex flex-wrap items-center gap-3 print:hidden"><Button type="button" variant="outline" disabled={busy} onClick={onPrint}>{busy ? "Checking stock…" : "Print current stock labels"}</Button>{empty && <span className="text-sm text-muted-foreground">No current positive stock to print.</span>}<CommandFormMessage error={error} /></div>;
+  const emptyReasonId = useId();
+  return <div className="flex flex-wrap items-center gap-3 print:hidden">
+    <Button type="button" variant="outline" disabled={busy || empty} aria-describedby={empty ? emptyReasonId : undefined} onClick={onPrint}>{busy ? "Checking stock…" : "Print current stock labels"}</Button>
+    {empty && <span id={emptyReasonId} className="text-sm text-muted-foreground">No current positive stock to print.</span>}
+    <CommandFormMessage error={error} />
+  </div>;
 }
 
 export type WeeklyCountViewModel = {
@@ -51,7 +56,7 @@ export function WeeklyCountView({ model, draft, correction }: { model: WeeklyCou
         {E.ttl("Recent saved counts")}
         <p className="text-sm text-muted-foreground">Newest 50 at this taproom.</p>
         {model.history.length === 0 ? E.blank("No saved counts yet") : model.history.map(count => <div key={count.key}>{E.nav(`Weekly count · ${count.date}`, count.detail, "", undefined, count.href)}</div>)}
-        {E.info("Only Admin can correct a count. Admin can correct only the latest count, once, when a sold quantity was counted too low. Everyone else sees the correction in the history. The original count stays in the audit trail.")}
+        {E.info("Admin only: correct the latest count once, for sold quantities counted too low. Corrections appear in history; the original stays in the audit trail.")}
       </div>
     </>}
   </>;
@@ -91,7 +96,7 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
       {E.ttl("Count every stock bucket")}
       {E.info(`Count whole packages for ${formatDate(state.draft.countedOn)}; a partly full keg counts as one. Enter 0 for none.`)}
       </div>
-      {print !== undefined ? print : <WeeklyCountPrintAction />}
+      {print !== undefined ? print : <WeeklyCountPrintAction empty={!state.draft.lines.some(line => line.qtyBefore > 0)} />}
       <div className="contents print:hidden">
       {state.draft.lines.some(line => line.lotId !== null) && onlyRoles(roles, ["taproom"]) && E.note("Tracked lots use the full worksheet row numbers shown here. Use Print current stock labels before counting; do not guess a lot.")}
       {state.draft.lines.length === 0 && E.blank("No stock is recorded at this taproom. Record count saves a count of zero for today. Your next count compares against it.")}

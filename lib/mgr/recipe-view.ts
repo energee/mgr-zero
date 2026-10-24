@@ -197,6 +197,11 @@ const NO_VERSION: EmptyState = {
   description: "A version records this recipe's ingredients, mash and fermentation schedules, water and process targets, and never changes once saved. Select New recipe version to write the first one.",
 };
 
+/** The same saved-version heading for the screen and its browser tab. */
+export function recipePageTitle({ recipe, version }: Pick<RecipeSnapshot, "recipe" | "version">): string {
+  return version ? `${recipe.name} v${version.version}` : recipe.name;
+}
+
 /** The read page's selected saved version, or the empty state before the first version. */
 export function toRecipePageModel(
   s: RecipeSnapshot,
@@ -205,7 +210,7 @@ export function toRecipePageModel(
   const { recipe, version: v, ingredients, waterAdditions } = s;
   const material = materialLookup(ctx.materials);
   const profileName = (pid: string | null) => (pid && ctx.profiles.find((p) => p.id === pid)?.name) || null;
-  const base = { title: recipe.name, backHref: "/recipes", createHref: `/recipes/${recipe.id}/new`, recipeNote: recipe.note ?? undefined };
+  const base = { title: recipePageTitle(s), backHref: "/recipes", createHref: `/recipes/${recipe.id}/new`, recipeNote: recipe.note ?? undefined };
   if (!v) return { ...base, empty: NO_VERSION };
 
   // The water rows leave out the process scalars processReadout also returns; the numbers grid shows those.
@@ -218,7 +223,6 @@ export function toRecipePageModel(
       ?? noMashText(ingredients.map((i) => i.stage)) ?? undefined;
   return {
     ...base,
-    title: `${recipe.name} v${v.version}`,
     saved: formatDate(v.created_at, ctx.timeZone),
     historical: v.version !== s.versions[0],
     versions: s.versions.map((number) => ({ number, href: `?v=${number}`, selected: number === v.version, latest: number === s.versions[0] })),

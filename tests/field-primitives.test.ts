@@ -17,7 +17,6 @@ const allowlist: { file: string; match: string; reason: string }[] = [
 {"file":"question-invoice.tsx","match":"<Textarea aria-label=\"What’s wrong with this invoice?\" maxLength={MAX_BODY} required value={onBody ? body : undefined} defaultValue={onBody ? undefined : body} onChange={event => onBody?.(event.target.value)} />","reason":"Multiline free-text invoice question."},
 {"file":"weekly-count.tsx","match":"<Textarea id={`correction-reason-${state.countId}`} value={state.reason} disabled={locked} onChange={event => { const value = event.target.value; if (onReason) onReason(value); else setInternalState(current => updateCorrectionReason(current, value)); }} required />","reason":"Multiline free-text correction reason."},
 {"file":"ai-model-settings.tsx","match":"<ComboboxInput id=\"brewery-ai-model\" placeholder=\"Search models…\" aria-invalid={Boolean(error) || undefined}>","reason":"Searchable model picker includes provider and price descriptions."},
-{"file":"brewery-settings-form.tsx","match":"<ComboboxInput id={`${id}-timezone`} placeholder=\"Search timezones…\" required />","reason":"Searchable timezone combobox preserves its full timezone list."},
 ];
 
 const appDebt = [
