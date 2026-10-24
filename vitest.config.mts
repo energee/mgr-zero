@@ -30,6 +30,7 @@ const pureTests = [
   "tests/menu-item-not-found.test.ts",
   "tests/app-screen-parity.test.ts",
   "tests/screen-view-composition.test.ts",
+  "tests/production-view.test.ts",
 ];
 
 export default defineConfig({

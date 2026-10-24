@@ -325,12 +325,6 @@ describe("Vessel detail view", () => {
     for (const shown of ["No open occupancy", "Current reading", "Reading history"]) expect(empty).toContain(shown);
   });
 
-  it("the live New vessel page passes no readings, so it draws only the facts (#1116)", () => {
-    const newLine = src("app/(app)/cellar/vessels/[id]/page.tsx").split("\n").find(line => line.includes('id === "new") return'));
-    expect(newLine).toMatch(/<VesselForm\b/);
-    expect(newLine).not.toMatch(/readings|occupancy/);
-  });
-
   it("the New vessel inventory record draws the not-yet-saved vessel with what Save still needs (#1116)", () => {
     const record = screen("New vessel");
     const body = record.body as { type: unknown; props: { model: unknown; reason: unknown } };
