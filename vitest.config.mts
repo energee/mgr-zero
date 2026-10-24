@@ -22,6 +22,7 @@ const pureTests = [
   "tests/invoices-view.test.ts",
   "tests/accounting-view.test.ts",
   "tests/pos-ui.test.ts",
+  "tests/e-hint-roles.test.ts",
   "tests/migrations-applied.test.ts",
   "tests/test-db-schema-guard.test.ts",
   "tests/test-db-selection.test.ts",
