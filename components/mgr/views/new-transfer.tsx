@@ -30,7 +30,7 @@ export type NewTransferControls = {
 
 function Pick({ label, value, options, onChange, disabled, empty }: { label: string; value: string; options: string[]; onChange?: (value: string) => void; disabled?: boolean; empty?: PickEmpty }) {
   const id = useId();
-  return E.pick(label, value, options, { id, onChange, disabled, placeholder: label, displayValue: value || undefined, empty });
+  return E.pick(label, value, options, { id, onChange, disabled, placeholder: disabled ? "Choose a location first" : label, displayValue: value || undefined, empty });
 }
 
 /** A chosen location with no bins. Bins are added on Locations, by the same

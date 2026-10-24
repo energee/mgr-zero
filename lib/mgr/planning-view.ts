@@ -61,9 +61,9 @@ const NOTHING_SHORT: EmptyState = {
 /** Where the demand Planning counts is set up, under their nav labels; the
  *  empty state links to them. */
 const SETUP_LINKS = [
-  { title: "Batches", detail: "plan a batch so its recipe's ingredients count", href: "/batches" },
-  { title: "Packaging", detail: "schedule a run so its formats' materials count", href: "/packaging" },
-  { title: "Materials", detail: "give each material a default vendor so a gap can draft", href: "/materials" },
+  { title: "Batches", detail: "Plan a batch so its recipe's ingredients are counted.", href: "/batches" },
+  { title: "Packaging", detail: "Schedule a run so its formats' materials are counted.", href: "/packaging" },
+  { title: "Materials", detail: "Give each material a default vendor so its shortage can be drafted into a purchase order.", href: "/materials" },
 ];
 
 const fmt = (value: number) => value.toLocaleString("en-US", { maximumFractionDigits: 1 });

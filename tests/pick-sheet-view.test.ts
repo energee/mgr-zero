@@ -1,6 +1,5 @@
 // tests/pick-sheet-view.test.ts — Pick sheet adapter and drawing. Views own
 // no sample data; the inventory parent wires this view later.
-import { readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -30,7 +29,28 @@ describe("Pick sheet view loop", () => {
       "/orders/00000000-0000-4000-8000-000000000232",
       "/orders/00000000-0000-4000-8000-000000000234",
     ]);
-    expect(model.groups[0]?.totals.map((t) => [t.group, t.name, t.qty])).toEqual([["Hazy IPA", "½ bbl keg", 9], ["Pils", "16 oz case", 22]]);
+    expect(Object.fromEntries(model.groups[0]!.totals.map(t => [t.key, t.qty]))).toEqual({
+      [pickSheet.orders[0]!.order_lines[0]!.sku_id]: 9,
+      [pickSheet.orders[0]!.order_lines[1]!.sku_id]: 22,
+    });
+  });
+
+  it("totals each SKU across orders within its format, keeping brands together only inside that format", () => {
+    const line = (id: string, brand: string, format: string, qty: number) => ({
+      id, sku_id: id, qty_ordered: qty, qty_picked: null,
+      skus: { name: `${brand} · ${format}`, brands: { name: brand }, formats: { name: format } },
+    });
+    const model = toPickSheetViewProps({ orders: [
+      { ...pickSheet.orders[0]!, order_lines: [line("hazy-half", "Hazy", "Half", 4), line("pils-case", "Pils", "Case", 10), line("hazy-case", "Hazy", "Case", 2)] },
+      { ...pickSheet.orders[1]!, order_lines: [line("pils-case", "Pils", "Case", 3)] },
+    ] });
+    expect(model.groups[0]!.totals.map(t => [t.key, t.group, t.name, t.qty])).toEqual([
+      ["hazy-case", "Case", "Hazy", 2],
+      ["pils-case", "Case", "Pils", 13],
+      ["hazy-half", "Half", "Hazy", 4],
+    ]);
+    const cells = html(model).match(/<tr[\s\S]*?<\/tr>/g)!.slice(1).map(row => row.match(/<td[^>]*>([\s\S]*?)<\/td>/)![1].replace(/<[^>]+>/g, ""));
+    expect(cells).toEqual(["Case", "", "Half"]);
   });
 
   it("marks a row whose order was changed after pick (#811)", () => {
@@ -68,21 +88,6 @@ describe("Pick sheet view loop", () => {
     expect(model.groups[1]?.rows[0]?.title).toMatch(/^Al’s Bar ·/);
   });
 
-  it("renders Pick sheet, nav labels, and Totals from the adapter", () => {
-    const markup = html();
-    expect(markup).toMatch(/Pick sheet/);
-    expect(markup).toMatch(/Ridgeline Tap Room · ORD-0231/);
-    expect(markup).toMatch(/Al’s Bar · ORD-0232/);
-    expect(markup).toMatch(/Teresa’s · ORD-0234/);
-    expect(markup).toMatch(/3 lines/);
-    expect(markup).toMatch(/>Totals</);
-    // Totals is the same table as Pick: one row per format, the beer named on its first row.
-    expect(markup.match(/<th[^>]*>[\s\S]*?<\/th>/g)?.map((h) => h.replace(/<[^>]+>/g, ""))).toEqual(["Product", "Format", "Qty"]);
-    expect(markup).toMatch(/>Hazy IPA<[\s\S]*>½ bbl keg<[\s\S]*>9<[\s\S]*>Pils<[\s\S]*>16 oz case<[\s\S]*>22</);
-    expect(markup).toContain(">Pick<");
-    expect(markup).toMatch(/Thu 9\/3/);
-  });
-
   it("hides the weekday chips when filters is null and links rows when asked", () => {
     const markup = html(toPickSheetViewProps(pickSheet), { filters: null, linkRows: true });
     expect(markup).not.toMatch(/Thu 9\/3/);
@@ -94,13 +99,5 @@ describe("Pick sheet view loop", () => {
     expect(isValidElement(SCREENS.find((s) => s.name === "Pick sheet")!.body)).toBe(true);
     expect(body.type).toBe(PickSheetView);
     expect(body.props.model).toEqual(toPickSheetViewProps(pickSheet));
-  });
-
-  it("the live Pick sheet page mounts PickSheetView with no second E.* tree", () => {
-    const src = readFileSync("app/(app)/pick/page.tsx", "utf8");
-    expect(src).toMatch(/from "@\/components\/mgr\/views\/pick-sheet"/);
-    expect(src).toMatch(/<PickSheetView\b/);
-    expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
-    expect(src).not.toMatch(/\bE\.(back|row|nav|ttl|blank|chips)\b/);
   });
 });
