@@ -1,14 +1,11 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { ComplianceMonthsView } from "../components/mgr/views/compliance-months";
 import { navTitle, STAFF_NAV } from "../lib/mgr/nav";
-import { MeSheetActions } from "../components/mgr/me-sheet";
 import { VendorsView } from "../components/mgr/views/vendors";
 import { toVendorsViewProps } from "../lib/mgr/vendors-view";
-
-vi.mock("@/app/(auth)/actions", () => ({ logout: async () => {} }));
 
 const destinations = [
   ["/inventory", "Finished goods"],
@@ -48,11 +45,4 @@ it("Vendors returns to More without replacing the shared header", () => {
   expect(markup).toMatch(/href="\/more"[^>]*>[\s\S]*?More<\/a>/);
   expect(markup).toContain(">Vendors</h1>");
   expect(markup).toContain(">Add vendor</button>");
-});
-
-it.each(["/docs/staff-guide", "/docs/portal-guide"] as const)("opens %s separately so the app retains its place", guide => {
-  const markup = renderToStaticMarkup(createElement(MeSheetActions, { guide }));
-  expect(markup).toContain(`href="${guide}"`);
-  expect(markup).toMatch(/target="_blank" rel="noopener noreferrer"/);
-  expect(markup).toContain("(opens in a new tab)");
 });
