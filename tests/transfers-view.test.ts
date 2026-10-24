@@ -124,6 +124,17 @@ describe("New transfer view", () => {
     expect(html).not.toMatch(/<h1\b|<a\b/);
   });
 
+  it("explains that each disabled bin needs its location first (#1258)", () => {
+    const model = { ...toNewTransferViewProps(newTransferDraft), from: "", to: "", fromBin: "", toBin: "", fromBinOptions: [], toBinOptions: [] };
+    const html = htmlOf(createElement(NewTransferView, { model }));
+    for (const label of ["From bin", "To bin"]) {
+      const button = html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g)?.find(tag => tag.includes(`aria-label="${label}"`));
+      expect(button).toMatch(/<button[^>]*\sdisabled(?:=|\s|>)/);
+      expect(button).toContain("Choose a location first");
+    }
+    expect(htmlOf(createElement(NewTransferView, { model: toNewTransferViewProps(newTransferDraft) }))).not.toContain("Choose a location first");
+  });
+
   it("the New transfer inventory record is NewTransferView", () => {
     const body = screen("New transfer").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(NewTransferView);
