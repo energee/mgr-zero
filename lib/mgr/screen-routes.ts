@@ -134,6 +134,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Water", file: "app/(app)/recipes/[id]/schedule-sheets.tsx" },
   { name: "Water addition", file: "app/(app)/recipes/[id]/schedule-sheets.tsx" },
   { name: "Water profiles", file: "app/(app)/catalog/water-profiles/page.tsx" },
+  { name: "Water profiles empty", file: "app/(app)/catalog/water-profiles/page.tsx" },
   { name: "Water profile", file: "app/(app)/catalog/water-profiles/water-profile-form.tsx" },
   { name: "SKU list", file: "app/(app)/catalog/brands/[id]/skus/page.tsx" },
   { name: "Shop", file: "app/(portal)/portal/page.tsx" },

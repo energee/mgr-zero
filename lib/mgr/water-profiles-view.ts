@@ -8,6 +8,7 @@ import type { EmptyState } from "./empty-state";
 import { IONS as CHEMISTRY_IONS, ION_LABELS, type Ions } from "@/lib/water-chemistry";
 import { optionalNumber } from "./recipe-process-view";
 import { hasAnyRole } from "./roles";
+import { submitReason } from "./submit-reason";
 
 export type Ion = `${keyof Ions}_ppm`;
 
@@ -36,9 +37,9 @@ function profileLine(p: WaterProfile): string {
   return parts.join(" · ");
 }
 
-/** Catalog requires a role permitted to list price groups. A brewer without
- *  one returns to Recipes even when they also hold Taproom. */
-export function waterProfilesBack(roles: readonly string[]): { label: string; href: string } {
+/** Preserve the Settings entry for Admin; otherwise use a role-accessible default. */
+export function waterProfilesBack(roles: readonly string[], from?: string | string[]): { label: string; href: string } {
+  if (from === "settings" && roles.includes("admin")) return { label: "Settings", href: "/settings" };
   return hasAnyRole(roles, ["admin", "sales", "warehouse"]) ? { label: "Catalog", href: "/catalog" } : { label: "Recipes", href: "/recipes" };
 }
 
@@ -47,7 +48,7 @@ export function toWaterProfilesViewProps(s: { profiles: WaterProfile[]; back?: {
     backLabel: s.back?.label,
     backHref: s.back?.href,
     rows: s.profiles.map((p) => ({ key: p.id, title: p.name, detail: profileLine(p) })),
-    empty: s.profiles.length ? undefined : { title: "No water profiles yet", description: "Add your source water or a target for a style. A recipe version can pick its source and its target from this list." },
+    empty: s.profiles.length ? undefined : { title: "No water profiles yet", description: "Add a water profile with its mineral measurements. Profiles are not classified as source or target here; choose either role on a recipe’s Water sheet." },
   };
 }
 
@@ -58,6 +59,17 @@ export function toWaterProfileFields(p?: WaterProfile): WaterProfileFields {
   };
   if (p) for (const [key] of IONS) fields[key] = String(p[key]);
   return fields;
+}
+
+/** The existing Save requirements, expressed as an actionable adjacent hint. */
+export function waterProfileSaveReason(fields: WaterProfileFields): string | null {
+  const missing: string[] = [];
+  if (!fields.name.trim()) missing.push("a profile name");
+  if (!IONS.every(([key]) => fields[key] !== "" && Number(fields[key]) >= 0)) missing.push("all six ions in ppm, zero or more");
+  if (fields.alkalinity_ppm !== "" && !(Number(fields.alkalinity_ppm) >= 0)) missing.push("alkalinity as CaCO3 of zero or more");
+  const ph = Number(fields.water_ph);
+  if (fields.water_ph !== "" && !(ph >= 0 && ph <= 14)) missing.push("water pH from 0 to 14");
+  return submitReason(missing);
 }
 
 /** The sheet's fields as upsert_water_profile input (without profileId). A
