@@ -22,6 +22,7 @@ type FooterProps = { formId?: string; submitting?: boolean; reason?: string | nu
 /** The pinned commit: gated when the picked parent has no single composition
  *  row; otherwise Confirm repack, withheld while `reason` names what is missing. */
 export function repackFooter(model: RepackViewModel, props: FooterProps = {}) {
+  if (model.parents?.length === 0) return null;
   return E.pin(model.unavailable ? E.gated("Confirm repack", model.unavailable) : <IrreversibleSubmit label="Confirm repack" busy="Recording…" {...props} />);
 }
 
@@ -43,8 +44,12 @@ export function RepackView({ model, footer, messages, onParent, onLocation, onBi
     ? { text: `${BREAKS} An admin or sales member sets a format's contents in Catalog.` }
     : { text: BREAKS, label: "Open Catalog", href: model.formatsHref, to: "Catalog" };
   return <>
-    <fieldset disabled={submitting} className="flex flex-col gap-3">
+    {model.parents?.length === 0
+      ? E.blank({ title: "No packages to repack", description: noBreaks.text }, undefined,
+        noBreaks.label ? <span data-to="Catalog">{E.btn(noBreaks.label, "g", noBreaks.href)}</span> : undefined)
+      : <fieldset disabled={submitting} className="flex flex-col gap-3">
       {model.parents ? pick(`${id}-break`, "Package to break down", model.parentSkuId, model.parents, onParent, false, noBreaks) : E.fld("Package to break down", model.parent)}
+      {(!model.parents || model.parentSkuId) && <>
       {model.locations
         ? <div className="grid grid-cols-2 gap-2">{pick(`${id}-location`, "Location", model.locationId, model.locations, onLocation)}{pick(`${id}-bin`, "Bin", model.binId, model.bins ?? [], onBin, !model.locationId, model.locationId ? NO_BINS : undefined)}</div>
         : E.fld("Location · bin", model.location)}
@@ -54,7 +59,8 @@ export function RepackView({ model, footer, messages, onParent, onLocation, onBi
       {E.tape(model.tape)}
       {E.info(model.preview)}
       <FieldDescription>Repack doesn’t record damage. The count it adds comes from the package’s composition.</FieldDescription>
-    </fieldset>
+      </>}
+    </fieldset>}
     {messages}
     {footer !== undefined ? footer : repackFooter(model, { submitting, reason })}
   </>;

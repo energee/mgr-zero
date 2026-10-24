@@ -21,7 +21,7 @@ type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 type Line = { skuId: string; qty: string };
 
-export function NewTransferForm({ locations, bins, skus, skusHref }: { locations: Location[]; bins: Bin[]; skus: { id: string; label: string }[]; skusHref: string | null }) {
+export function NewTransferForm({ locations, bins, skus, skusHref, autoOpen = false }: { locations: Location[]; bins: Bin[]; skus: { id: string; label: string }[]; skusHref: string | null; autoOpen?: boolean }) {
   const router = useRouter();
   const [fromId, setFromId] = useState("");
   const [toId, setToId] = useState("");
@@ -30,6 +30,7 @@ export function NewTransferForm({ locations, bins, skus, skusHref }: { locations
   const [lines, setLines] = useState<Line[]>([{ skuId: "", qty: "" }]);
   const firstBin = (loc: string) => bins.filter((b) => b.location_id === loc)[0]?.id ?? "";
   const form = useCommandForm("create_stock_transfer", {
+    defaultOpen: autoOpen,
     build: () => ({
       fromLocationId: fromId, toLocationId: toId,
       lines: transferPayloadLines(lines, fromBin, toBin),
@@ -54,7 +55,7 @@ export function NewTransferForm({ locations, bins, skus, skusHref }: { locations
     lines: lines.map(line => ({ sku: line.skuId, title: skus.find(sku => sku.id === line.skuId)?.label ?? "", qty: line.qty })),
   };
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="New transfer" trigger={<Button size="sm">New transfer</Button>}>
+    <CommandForm open={form.open} onOpenChange={open => { form.setOpen(open); router.replace(open ? "/transfers?newTransfer=1" : "/transfers", { scroll: false }); }} title="New transfer" trigger={<Button size="sm">New transfer</Button>}>
       <form onSubmit={event => { if (reason) { event.preventDefault(); return; } void form.submit(event); }} className="flex flex-col gap-4">
         <NewTransferView
           model={model}
