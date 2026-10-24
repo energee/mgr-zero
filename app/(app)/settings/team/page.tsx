@@ -6,8 +6,7 @@ import type { PendingInvitation, TeamMember } from "@/lib/commands/invites";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { getRequestIdentity } from "@/lib/auth/request-context";
 import { deniedHref } from "@/lib/mgr/denied";
-import { staffRolesLabel } from "@/lib/mgr/labels";
-import { toPendingInvitationRows } from "@/lib/mgr/team-view";
+import { toPendingInvitationRows, toTeamMemberRow } from "@/lib/mgr/team-view";
 import "@/lib/commands/all";
 import { InviteForm } from "./invite-form";
 import { InvitationActions } from "./invitation-actions";
@@ -28,12 +27,7 @@ export default async function TeamPage() {
     <TeamView
       model={{
         backHref: "/settings",
-        rows: members.map((m) => ({
-          key: m.userId,
-          title: m.handle,
-          detail: `${m.email} · ${staffRolesLabel(m.roles)}`,
-          you: m.userId === identity?.userId,
-        })),
+        rows: members.map((member) => toTeamMemberRow(member, identity?.userId)),
         invitations: toPendingInvitationRows(invitations, brewery.timeZone),
       }}
       memberActions={Object.fromEntries(members.filter(m => m.userId !== identity?.userId).map(m => [m.userId, <MemberForm key={m.userId} member={m} />]))}

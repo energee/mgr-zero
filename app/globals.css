@@ -249,6 +249,10 @@
     animation: scroll-cue linear both;
     animation-timeline: scroll(self inline);
   }
+  /* This is a sideways strip, not a second vertical scroller. Native
+     scrollbar gutters can otherwise leave room for tiny up/down arrows. */
+  overflow-y: hidden;
+  scrollbar-width: none;
 }
 @keyframes scroll-cue {
   0% { mask-image: linear-gradient(to right, #000 calc(100% - 2rem), transparent); }
