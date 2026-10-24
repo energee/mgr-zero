@@ -5,7 +5,7 @@ import { expect, it } from "vitest";
 import { NOTIFICATION_REASON_LABEL } from "../lib/chat/contracts";
 import { personalChatPreferences } from "../lib/mgr/fixtures/chat";
 import { CHAT_PREVIEW_FIXTURES } from "../lib/chat/preview-fixtures";
-import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView } from "../components/mgr/views/chat";
+import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView, ChatQuietHoursView } from "../components/mgr/views/chat";
 import { SCREENS } from "../components/mgr/screens";
 
 it("keeps reading cadence restricted to whole hours", () => {
@@ -131,6 +131,38 @@ it("omits fixture wording and the dev-only state picker from Chat settings", () 
   expect(html).toContain("Sample data");
   expect(html).not.toMatch(/fixture|server setup|All preview states/i);
   expect(html).not.toContain(">Chat notifications<");
+});
+
+it.each([
+  { quietStart: "22:00", quietEnd: null, timezone: "America/New_York", message: "Choose an end time" },
+  { quietStart: null, quietEnd: "06:00", timezone: "America/New_York", message: "Choose a start time" },
+  { quietStart: "22:00", quietEnd: "22:00", timezone: "America/New_York", message: "End must differ from start" },
+  { quietStart: "22:00", quietEnd: "06:00", timezone: "Mars/Phobos", message: "Choose a valid timezone" },
+])("explains invalid personal quiet hours: $message", ({ message, ...quiet }) => {
+  const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { ...personalChatPreferences, ...quiet } }));
+  expect(html).toContain(message);
+  expect(html).toMatch(/<button\b[^>]*\sdisabled=""[^>]*>Save my quiet hours<\/button>/);
+  if (quiet.timezone !== "Mars/Phobos") expect(html).toContain('aria-invalid="true"');
+});
+
+it.each([
+  { quietStart: "22:00", quietEnd: "06:00" },
+  { quietStart: null, quietEnd: null },
+])("allows overnight personal quiet hours and following the brewery window", quiet => {
+  const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { ...personalChatPreferences, ...quiet } }));
+  const button = html.match(/<button\b[^>]*>Save my quiet hours<\/button>/)?.[0];
+  expect(button).toBeDefined();
+  expect(button).not.toContain('disabled=""');
+});
+
+it.each([
+  { start: "22:00", end: "", message: "Choose an end time" },
+  { start: "", end: "06:00", message: "Choose a start time" },
+  { start: "22:00", end: "22:00", message: "End must differ from start" },
+])("explains invalid brewery quiet hours: $message", ({ message, ...quiet }) => {
+  const html = renderToStaticMarkup(createElement(ChatQuietHoursView, { ...quiet, timezone: "America/New_York" }));
+  expect(html).toContain(message);
+  expect(html).toMatch(/<button\b[^>]*\sdisabled=""[^>]*>Save brewery quiet hours<\/button>/);
 });
 
 it("offers a searchable timezone picker with the saved timezone and busy state", () => {
