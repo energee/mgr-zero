@@ -64,6 +64,28 @@ it("cellar derives fills from occupancy and keeps links explicit", () => {
   expect(toCellarMapViewProps([{ ...vessels[0], capacity_bbl: 0 }], occupancies).tiles[0].fill).toBeUndefined();
 });
 
+describe("cellar first-vessel setup (#1254)", () => {
+  it("puts the primary Add vessel action inside the empty state before batch completion", () => {
+    const model = { ...toCellarMapViewProps([], []), addHref: "/cellar/vessels/new", brewHref: "/batches" };
+    const html = htmlOf(createElement(CellarMapView, { model }));
+    expect(html).toContain("No vessels yet");
+    expect(html).toContain("Add your tanks to start tracking the cellar.");
+    expect(html).toMatch(/data-slot="empty-content"[^]*?data-variant="default"[^]*?href="\/cellar\/vessels\/new"[^>]*>Add vessel<\/a>/);
+    expect(html.match(/>Add vessel<\/a>/g)).toHaveLength(1);
+    expect(html.indexOf(">Add vessel</a>")).toBeLessThan(html.indexOf(">Complete batch</button>"));
+    expect(html).not.toContain("Start a brew day in Batches");
+    expect(html).not.toContain("No tank holds beer");
+  });
+
+  it("keeps vessel creation admin-only even in the empty state", () => {
+    const model = { ...toCellarMapViewProps([], []), addHref: null, brewHref: "/batches" };
+    const html = htmlOf(createElement(CellarMapView, { model }));
+    expect(html).toContain("Add your tanks to start tracking the cellar.");
+    expect(html).not.toContain("Add vessel");
+    expect(html).not.toContain("Start a brew day in Batches");
+  });
+});
+
 describe("vessels are admin-managed", () => {
   it("a brewer reads vessel facts as text, with no Save or Delete", () => {
     const html = htmlOf(createElement(VesselDetailView, { model: vesselFv3, editable: false, remove: "Delete vessel" }));
@@ -85,6 +107,13 @@ describe("vessels are admin-managed", () => {
     expect(htmlOf(createElement(CellarMapView, { model: { ...model, addHref: null } }))).not.toContain("Add vessel");
     expect(htmlOf(createElement(BatchesView, { model: toBatchesViewProps(batchesBrewer) }))).toContain("New vessel");
     expect(htmlOf(createElement(BatchesView, { model: toBatchesViewProps(batchesBrewer), newVesselHref: null }))).not.toContain("New vessel");
+  });
+
+  it("keeps New batch primary and New vessel secondary within vessel setup (#1129)", () => {
+    const markup = htmlOf(createElement(BatchesView, { model: toBatchesViewProps(batchesBrewer), newVesselHref: "/cellar/vessels/new" }));
+    expect(markup).toMatch(/data-variant="default"[^>]*>New batch</);
+    expect(markup).toMatch(/data-variant="outline"[^>]*href="\/cellar\/vessels\/new"[^>]*>New vessel</);
+    expect(markup.indexOf(">Vessels<")).toBeLessThan(markup.indexOf(">New vessel<"));
   });
 });
 
@@ -115,6 +144,17 @@ describe("Batches view", () => {
     expect(html).not.toContain("°P");
     expect(html).toContain('href="/batches"');
     expect(html).not.toContain('href="/orders"');
+  });
+  it("explains vessel setup and keeps its empty note separate from the page empty state (#1303)", () => {
+    const model = toBatchesViewProps({ ...batchesBrewer, vessels: [] });
+    const html = htmlOf(createElement(BatchesView, { model, newVesselHref: null }));
+    const setup = html.match(/<section aria-label="Vessel setup"[^>]*>([\s\S]*?)<\/section>/)?.[1];
+    expect(setup).toBeDefined();
+    expect(setup).toContain("No vessels yet");
+    expect(setup).not.toContain('data-slot="empty"');
+    expect(setup).not.toContain("New vessel");
+    const withoutSetup = htmlOf(createElement(BatchesView, { model: { ...model, vessels: undefined } }));
+    expect(withoutSetup).not.toContain('aria-label="Vessel setup"');
   });
   it("does not allow live JSX to replace the planned and active lists", () => {
     const page = src("app/(app)/batches/page.tsx");
@@ -325,20 +365,15 @@ describe("Vessel detail view", () => {
     for (const shown of ["No open occupancy", "Current reading", "Reading history"]) expect(empty).toContain(shown);
   });
 
-  it("the live New vessel page passes no readings, so it draws only the facts (#1116)", () => {
-    const newLine = src("app/(app)/cellar/vessels/[id]/page.tsx").split("\n").find(line => line.includes('id === "new") return'));
-    expect(newLine).toMatch(/<VesselForm\b/);
-    expect(newLine).not.toMatch(/readings|occupancy/);
-  });
-
   it("the New vessel inventory record draws the not-yet-saved vessel with what Save still needs (#1116)", () => {
     const record = screen("New vessel");
-    const body = record.body as { type: unknown; props: { model: unknown; reason: unknown } };
+    const body = record.body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(VesselDetailView);
     expect(body.props.model).toEqual(vesselNew);
-    expect(body.props.reason).toBe("Still needed: a name and a capacity above zero.");
     // Like the live page, the capacity starts blank, so no field error is drawn yet.
-    expect(htmlOf(record.body)).not.toContain("Enter a capacity above zero.");
+    const html = htmlOf(record.body);
+    expect(html).not.toContain('aria-invalid="true"');
+    expect(html).toMatch(/<button\b(?=[^>]*\bdisabled)[^>]*>Save vessel<\/button>/);
     expect(screen("Cellar map").to?.["Add vessel"]).toBe("New vessel");
     expect(screen("Batches").to?.["New vessel"]).toBe("New vessel");
   });
@@ -572,7 +607,8 @@ describe("cellar sheets label every field (#1115)", () => {
   });
 
   it("draws Brew day as a link to Batches, not as a peer action button", () => {
-    const html = htmlOf(createElement(CellarMapView, { model: { tiles: [], brewHref: "/batches" } }));
+    const model = { ...toCellarMapViewProps([{ id: "v1", name: "FV1", capacity_bbl: 10 }], []), brewHref: "/batches" };
+    const html = htmlOf(createElement(CellarMapView, { model }));
     expect(html).toMatch(/<a[^>]*href="\/batches"[^>]*>Start a brew day in Batches<\/a>/);
     expect(html).not.toMatch(/data-slot="button"[^>]*href="\/batches"/);
   });

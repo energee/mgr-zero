@@ -13,7 +13,7 @@ import { listRow, type ListRowProps } from "./mash-schedule";
 export function FermentationScheduleView({ title = "Fermentation schedule", stages, dryHopDay, header, ...verbs }: { title?: string; stages: readonly FermentationStage[]; dryHopDay?: number; header?: ReactNode } & ListRowProps) {
   return <>
     {header !== undefined ? header : E.back("Recipe", title, E.btn("Add stage"))}
-    {stages.length === 0 ? E.blank({ title: "No stages yet", description: "Add stage is the only action." })
+    {stages.length === 0 ? E.blank({ title: "No stages yet", description: "Add a stage to plan temperatures and timing." })
       : stages.map((s, i) => <Fragment key={`${i}-${s.name}`}>{listRow(s.name, `${s.tempF} °F · ${s.days} days`, i, stages.length, verbs)}</Fragment>)}
     {stages.length > 0 && E.info(fermentationSummary(stages, dryHopDay))}
   </>;

@@ -5,10 +5,59 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { MonthlyComplianceView, PeriodBeforeBooksView } from "../components/mgr/views/monthly-compliance";
+import { DestinationStateExport } from "../components/mgr/views/destination-state-export";
 import { monthlyComplianceAmended, monthlyComplianceAugust, monthlyComplianceUnbalanced } from "../lib/mgr/fixtures/monthly-compliance";
 import { beforeBooksState, toMonthlyComplianceViewProps } from "../lib/mgr/monthly-compliance-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
+
+describe("compliance period status (#1310)", () => {
+  it.each([
+    ["2026-08-01", "2026-08-31", "Past"],
+    ["2026-09-01", "2026-09-30", "Current"],
+    ["2026-10-01", "2026-10-31", "Upcoming"],
+    ["2026-07-01", "2026-09-30", "Current"],
+    ["2025-01-01", "2025-12-31", "Past"],
+    ["2030-01-01", "2030-12-31", "Upcoming"],
+  ])("labels %s through %s as %s independently of report balance", (periodStart, periodEnd, status) => {
+    const report = { figures: { ...monthlyComplianceAugust.report.figures, periodStart, periodEnd }, warnings: [] };
+    const model = toMonthlyComplianceViewProps({ ...monthlyComplianceAugust, today: "2026-09-30", report });
+    expect(model.periodStatus).toBe(status);
+    const html = htmlOf(createElement(MonthlyComplianceView, { model }));
+    expect(html).toContain(`>${status}</span>`);
+    expect(html).toContain("Live figures");
+    expect(html).toContain("not a saved filing");
+    if (status !== "Past") expect(html).not.toContain("Save filed snapshot");
+    if (status === "Upcoming") expect(html).toContain("This period has not started");
+  });
+
+  it("does not relabel an unbalanced past report as current or replace a filed snapshot", () => {
+    const model = toMonthlyComplianceViewProps(monthlyComplianceUnbalanced);
+    expect(model.periodStatus).toBe("Past");
+    const html = htmlOf(createElement(MonthlyComplianceView, { model }));
+    expect(html).toContain(">Past</span>");
+    expect(html).toContain("Does not balance");
+    const filed = htmlOf(createElement(MonthlyComplianceView, { model: toMonthlyComplianceViewProps(monthlyComplianceAmended) }));
+    expect(filed).toContain("Filed Sep 2, 2026");
+    expect(filed).not.toContain("Live figures are generated");
+    expect(filed).not.toContain("Save filed snapshot");
+  });
+
+  it("explains an empty state export and disables its download", () => {
+    const report = { figures: { ...monthlyComplianceAugust.report.figures, stateTransactions: [] }, warnings: [] };
+    const model = toMonthlyComplianceViewProps({ ...monthlyComplianceAugust, report });
+    const html = htmlOf(createElement(MonthlyComplianceView, { model }));
+    expect(html).toContain("No transactions in this period. Nothing to export.");
+    expect(html.match(/<button[^>]*>Export state transactions<\/button>/)?.[0]).toContain('disabled=""');
+    const exportButton = DestinationStateExport(model.stateExport!).props.children[1];
+    expect(exportButton.props.disabled).toBe(true);
+    expect(exportButton.props.onClick).toBeUndefined();
+    const populated = toMonthlyComplianceViewProps(monthlyComplianceAugust);
+    const populatedButton = DestinationStateExport(populated.stateExport!).props.children[1];
+    expect(populatedButton.props.disabled).toBe(false);
+    expect(populatedButton.props.onClick).toBeTypeOf("function");
+  });
+});
 
 describe("Monthly compliance view", () => {
   it("explains a period that starts before the books opened instead of failing (#987)", () => {
@@ -45,9 +94,9 @@ describe("Monthly compliance view", () => {
   });
 
   it("draws the period in progress: reviewable, a when-to-record line replaces Save (#579, #1143)", () => {
-    const body = SCREENS.find((screen) => screen.name === "Period in progress")!.body as { type: unknown; props: { monthOpen?: boolean } };
+    const body = SCREENS.find((screen) => screen.name === "Period in progress")!.body as { type: unknown; props: { model: { periodStatus: string } } };
     expect(body.type).toBe(MonthlyComplianceView);
-    expect(body.props.monthOpen).toBe(true);
+    expect(body.props.model.periodStatus).toBe("Current");
     const html = htmlOf(body as ReactNode);
     expect(html).toMatch(/September 2026/);
     expect(html).toMatch(/You can record the filing after September 2026 ends/);

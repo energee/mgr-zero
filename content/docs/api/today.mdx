@@ -429,7 +429,7 @@ Override personal chat quiet hours for every reason; null clears the override
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_personal_quiet_hours", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "start": "12:00", "end": "12:00" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_personal_quiet_hours", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "start": null, "end": null } }'
 ```
 
 ## snooze_notification [#snooze_notification]

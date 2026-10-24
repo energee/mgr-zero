@@ -8,6 +8,7 @@ import { MaterialsOnHandView } from "@/components/mgr/views/materials-on-hand";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
+import { canRun } from "@/lib/commands/registry";
 import { toMaterialsOnHandViewProps } from "@/lib/mgr/materials-on-hand-view";
 import "@/lib/commands/all";
 import { MaterialForm, type Material } from "./material-form";
@@ -42,6 +43,7 @@ export default async function MaterialsPage({ searchParams }: { searchParams: Pr
     <MaterialsOnHandView
       model={toMaterialsOnHandViewProps({
         backHref: "/beer",
+        purchaseOrdersHref: canRun(ctx, "list_purchase_orders") ? "/purchase-orders" : null,
         rows: materials.map((m) => ({
           key: m.id,
           title: m.name,

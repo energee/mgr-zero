@@ -20,7 +20,7 @@ export type CatalogBrandView = {
   style: string;
   /** "6.8%", a real "0%", or "Not set". */
   abv: string;
-  /** Packaged SKUs plus the pours its price group owns, active or not: "4". */
+  /** Saved packaged SKUs, active or not; eligible formats and pours are not SKUs. */
   skus: string;
   /** Recorded COLA approvals: "None", one's TTB ID and approval date, or "2 on file". */
   cola: string;
@@ -31,6 +31,7 @@ export type CatalogViewModel = {
   backHref?: string;
   brands: CatalogBrandView[];
   empty?: EmptyState;
+  showControls: boolean;
   priceGroups: string;
   priceGroupsHref: string;
   waterProfilesHref: string;
@@ -79,18 +80,19 @@ export function toCatalogViewProps({
     backHref,
     empty: brands.length > 0 ? undefined
       : filtered ? { title: "No brands match", description: "Clear the search or category to see every brand." }
-      : { title: "No brands yet", description: "Add a brand to start building the catalog." },
+      : { title: "No brands yet", description: "Add a brand, then add its SKUs (the sizes and packages you sell)." },
+    showControls: brands.length > 0 || Boolean(filtered),
     brands: brands.map((b) => ({
       key: b.id,
       name: b.name,
       alias: b.alias || undefined,
       style: b.styles?.name ?? NOT_SET,
       abv: b.abv == null || b.abv === "" ? NOT_SET : `${Number(b.abv)}%`,
-      skus: String(b.skus.length + (b.pours?.length ?? 0)),
+      skus: String(b.skus.length),
       cola: colaFact(b.colas),
       href: `/catalog/brands/${b.id}`,
     })),
-    priceGroups: plural(priceGroups.length, "group"),
+    priceGroups: priceGroups.length === 0 ? "0 groups · Create one to price your brands" : plural(priceGroups.length, "group"),
     priceGroupsHref: "/pricing",
     waterProfilesHref: "/catalog/water-profiles",
   };

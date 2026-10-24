@@ -28,7 +28,7 @@ export type AppShellProps = {
   items: readonly NavItem[];
   /** Header controls (Search, Me, Sign out). Owned by the layout, not the shell. */
   headerRight?: React.ReactNode;
-  /** Chat composer above the tab bar. */
+  /** Chat composer: beside phone tabs when collapsed, above the page edge on desktop. */
   composer?: React.ReactNode;
   /** Force the active tab (the inventory renders screens off their real route). */
   active?: string;
@@ -101,8 +101,10 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
         {/* Keep page scrolling above the reserved composer and Tabs, rather than behind their portals.
             SidebarInset is already the <main> landmark. */}
         <div data-mgr-page-scroll="" className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4 md:px-8 md:py-6 print:overflow-visible">{children}</div>
-        {composer && <div className="h-11 shrink-0">{composer}</div>}
-        <TabBar items={items} active={current} className="md:hidden" />
+        <div className="flex shrink-0 md:block">
+          {composer && <div className="order-2 h-12 w-16 shrink-0 md:order-none md:h-11 md:w-full">{composer}</div>}
+          <TabBar items={items} active={current} className="min-w-0 flex-1 md:hidden" />
+        </div>
       </SidebarInset>
     </SidebarProvider>
     </TooltipProvider>

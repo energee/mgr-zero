@@ -4,8 +4,7 @@
 // are the brand's: app/(app)/catalog/brands/[id]/compliance-forms.tsx.
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { CommandForm, CommandFormFooter, CommandFormMessage, sheetTrigger } from "@/components/mgr/command-form";
+import { CommandForm, CommandFormMessage, sheetTrigger } from "@/components/mgr/command-form";
 import { LicenseView } from "@/components/mgr/views/license";
 import type { License } from "@/lib/commands/compliance";
 import { licenseInput } from "@/lib/mgr/license-view";
@@ -33,7 +32,8 @@ export function LicenseForm({ license }: { license?: License }) {
           controls={controls}
           locked={Boolean(license)}
           messages={<CommandFormMessage error={form.error} />}
-          footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !/^[A-Za-z]{2}$/.test(v.state) || !v.kind.trim()}>{form.submitting ? "Saving…" : "Save license"}</Button></CommandFormFooter>}
+          submitting={form.submitting}
+          onCancel={() => form.setOpen(false)}
         />
       </form>
     </CommandForm>

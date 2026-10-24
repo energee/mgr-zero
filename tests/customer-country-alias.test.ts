@@ -74,6 +74,54 @@ describe("customer country and state", () => {
   });
 });
 
+describe("customer name direct RPC boundary (#1306)", () => {
+  it.each([null, "", "   ", "\t\r\n", "\u00a0\u2003"])("refuses blank creates and edits with name %j", async name => {
+    const visibleName = `Visible customer ${R()}`;
+    const created = await upsertCustomer({ p_state: "PA", p_name: visibleName });
+    expect(created.error).toBeNull();
+    const saved = created.data as Customer;
+    const before = await owner.db.from("customers").select("id", { count: "exact", head: true }).eq("brewery_id", breweryId);
+    for (const id of [null, saved.id]) {
+      const result = await upsertCustomer({ p_id: id, p_state: "PA", p_name: name });
+      expect(result.error?.message).toBe("a customer name is required");
+    }
+    const after = await owner.db.from("customers").select("id", { count: "exact", head: true }).eq("brewery_id", breweryId);
+    expect(after.count).toBe(before.count);
+    const unchanged = await owner.db.from("customers").select("name").eq("id", saved.id).single();
+    expect(unchanged.data?.name).toBe(visibleName);
+  });
+
+  it("trims creates and edits, preserves alias/country/terms, and replays the original raw payload", async () => {
+    const args = customerArgs({ p_country: "JP", p_name: " \tGreen Bar\u00a0", p_alias: "Local account", p_payment_terms: "net15", p_tax_treatment: "export" });
+    const created = await rawDatabase(owner.db).rpc("upsert_customer", args);
+    expect(created.error).toBeNull();
+    expect(created.data).toMatchObject({ name: "Green Bar", alias: "Local account", country: "JP", state: null, payment_terms: "net15", tax_treatment: "export" });
+    const saved = created.data as Customer;
+    const edited = await upsertCustomer({ p_id: saved.id, p_country: "JP", p_name: "\u2003New name\n", p_alias: saved.alias });
+    expect(edited.error).toBeNull();
+    expect(edited.data).toMatchObject({ id: saved.id, name: "New name", alias: saved.alias, payment_terms: "net15" });
+    const replay = await rawDatabase(owner.db).rpc("upsert_customer", args);
+    expect(replay.error).toBeNull();
+    expect(replay.data).toEqual(created.data);
+    const changedPayload = await rawDatabase(owner.db).rpc("upsert_customer", { ...args, p_name: "Green Bar" });
+    expect(changedPayload.error).not.toBeNull();
+    const current = await owner.db.from("customers").select("name").eq("id", saved.id).single();
+    expect(current.data?.name).toBe("New name");
+  });
+
+  it("keeps the direct RPC tenant boundary while normalizing names", async () => {
+    const created = await upsertCustomer({ p_state: "PA", p_name: `Tenant name ${R()}` });
+    expect(created.error).toBeNull();
+    const saved = created.data as Customer;
+    const otherBrewery = await makeBrewery();
+    const outsider = await makeStaffCtx(otherBrewery.id, "admin");
+    const denied = await rawDatabase(outsider.db).rpc("upsert_customer", customerArgs({ p_id: saved.id, p_state: "PA", p_name: " Replaced name " }));
+    expect(denied.error?.code).toBe("42501");
+    const unchanged = await owner.db.from("customers").select("name").eq("id", saved.id).single();
+    expect(unchanged.data?.name).toBe(saved.name);
+  });
+});
+
 describe("customer alias", () => {
   it("saves, clears when an edit omits it, and refuses a blank", async () => {
     const { data, error } = await upsertCustomer({ p_state: "WA", p_alias: "Nano Wine 'N Beer" });
