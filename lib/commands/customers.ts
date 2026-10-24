@@ -28,7 +28,9 @@ defineCommand({
   name: "upsert_customer", description: "Create or update a customer account: its sale channel decides its prices and where its removals post; tax treatment may override the channel default",
   roles: [...roles],
   input: z.object({
-    id: z.string().uuid().optional(), name: z.string().min(1),
+    // Keep the historical raw name through request lookup; SQL trims and
+    // rejects blank names only after returning any completed replay.
+    id: z.string().uuid().optional(), name: z.string().min(1, "a customer name is required"),
     // Staff only, like a brand alias; an edit without it clears it.
     alias: z.string().trim().min(1).optional(),
     type: z.enum(CUSTOMER_TYPES),

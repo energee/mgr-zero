@@ -51,14 +51,14 @@ describe("field shapes are validated (#491)", () => {
   it("CSV import lists the payment terms and rejects any other", () => {
     expect(IMPORT_FIELDS.customers.find((f) => f.name === "paymentTerms")?.values).toEqual(["due_on_receipt", "net15", "net30"]);
     const row = { name: "Bar", type: "retailer", state: "PA", saleChannelId: crypto.randomUUID() };
-    expect(validateImportRow("customers", { ...row, paymentTerms: "Net 30" }).join(" ")).toMatch(/paymentTerms/);
-    expect(validateImportRow("customers", { ...row, paymentTerms: "net15" })).toEqual([]);
+    for (const paymentTerms of ["Net 30", "net45"]) expect(validateImportRow("customers", { ...row, paymentTerms })).toHaveLength(1);
+    for (const paymentTerms of ["due_on_receipt", "net15", "net30"]) expect(validateImportRow("customers", { ...row, paymentTerms })).toEqual([]);
     expect(validateImportRow("customers", { ...row, paymentTerms: "" })).toEqual([]);
   });
 
   it("CSV import rejects a state that is not a US state code", () => {
     const row = { name: "Bar", type: "retailer", state: "ZZ", saleChannelId: crypto.randomUUID() };
-    expect(validateImportRow("customers", row).join(" ")).toMatch(/state/);
+    expect(validateImportRow("customers", row)).toHaveLength(1);
     expect(validateImportRow("customers", { ...row, state: "OR" })).toEqual([]);
   });
 });

@@ -5,32 +5,37 @@
 // recipe-version-form.tsx makes every field live for create_recipe_version.
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { RecipeBrandPicker } from "./recipe-brand-picker";
-import { getActiveBrewery } from "@/lib/brewery";
-import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
-import { orNotFound } from "@/lib/mgr/not-found";
 import type { RecipeMaterial } from "@/lib/mgr/recipe-process-view";
-import { toRecipePageModel, type RecipeSnapshot } from "@/lib/mgr/recipe-view";
-import { navTitle } from "@/lib/mgr/nav";
+import { recipePageTitle, toRecipePageModel } from "@/lib/mgr/recipe-view";
+import { getRecipePageData } from "../recipe-data";
 
-export const metadata = { title: navTitle("/recipes") };
-
-export default async function RecipePage({ params, searchParams }: {
+type Props = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ v?: string | string[] }>;
-}) {
+};
+
+function selectedVersion(v: string | string[] | undefined): number | undefined {
+  return v === undefined ? undefined : typeof v === "string" ? Number(v) : NaN;
+}
+
+export async function generateMetadata({ params, searchParams }: Props) {
   const [{ id }, { v }] = await Promise.all([params, searchParams]);
-  const brewery = await getActiveBrewery();
-  const ctx = await buildContext(brewery.id);
-  const [snapshot, materials, gravityUnit, profiles, brands] = (await Promise.all([
-    orNotFound(runCommand("get_recipe", { recipeId: id, version: v === undefined ? undefined : typeof v === "string" ? Number(v) : NaN }, ctx)),
+  const { snapshot } = await getRecipePageData(id, selectedVersion(v));
+  return { title: recipePageTitle(snapshot) };
+}
+
+export default async function RecipePage({ params, searchParams }: Props) {
+  const [{ id }, { v }] = await Promise.all([params, searchParams]);
+  const { brewery, ctx, snapshot } = await getRecipePageData(id, selectedVersion(v));
+  const [materials, gravityUnit, profiles, brands] = (await Promise.all([
     runCommand("list_materials", {}, ctx),
     runCommand("get_gravity_unit", {}, ctx),
     runCommand("list_water_profiles", {}, ctx),
     runCommand("list_brands", {}, ctx),
-  ])) as [RecipeSnapshot, RecipeMaterial[], { effective: GravityUnit }, { id: string; name: string }[], { id: string; name: string; alias: string | null }[]];
+  ])) as [RecipeMaterial[], { effective: GravityUnit }, { id: string; name: string }[], { id: string; name: string; alias: string | null }[]];
   const { recipe } = snapshot;
   return (
     <RecipeView

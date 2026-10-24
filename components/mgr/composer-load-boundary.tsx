@@ -26,12 +26,11 @@ export function ComposerUnavailableView({ failed = false, outboxCount, onOutbox,
 }) {
   return <>
     <section aria-label="MGR conversation" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <header className="px-1 py-2"><h2 className="font-semibold">Ask MGR</h2></header>
       <div className="min-h-40 flex-1 px-1 py-3">
         {failed ? <Alert><AlertDescription>
-          <p>Ask MGR could not load. Reconnect, then reload this page. Your offline outbox is still available.</p>
+          <p>Ask MGR could not load. Reconnect, then reload this page. Pending readings are still available.</p>
           <Button type="button" size="sm" variant="outline" onClick={() => window.location.reload()}>Reload page</Button>
-        </AlertDescription></Alert> : <div role="status"><ComposerActivity>Opening your conversation… Your offline outbox is available while Ask MGR loads.</ComposerActivity></div>}
+        </AlertDescription></Alert> : <div role="status"><ComposerActivity>Opening your conversation… Pending readings are available while Ask MGR loads.</ComposerActivity></div>}
       </div>
     </section>
     {children}

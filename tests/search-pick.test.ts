@@ -18,9 +18,9 @@ function elements(node: ReactNode): ReactElement<Record<string, unknown>>[] {
 }
 
 it("shows the picked label, the placeholder when empty, and a retained value's label", () => {
-  expect(SearchPick({ ...copy, value: "pale", options }).props.trigger.props.children).toBe("Pale malt");
-  expect(SearchPick({ ...copy, value: "", options }).props.trigger.props.children).toBe("Choose a material");
-  expect(SearchPick({ ...copy, value: "gone", options, selectedLabel: "Old malt" }).props.trigger.props.children).toBe("Old malt");
+  expect(renderToStaticMarkup(SearchPick({ ...copy, value: "pale", options }).props.trigger)).toContain("Pale malt");
+  expect(renderToStaticMarkup(SearchPick({ ...copy, value: "", options }).props.trigger)).toContain("Choose a material");
+  expect(renderToStaticMarkup(SearchPick({ ...copy, value: "gone", options, selectedLabel: "Old malt" }).props.trigger)).toContain("Old malt");
 });
 
 it("gives every option its label as a search keyword", () => {
@@ -40,4 +40,10 @@ it("E.searchPick labels the field and shows its placeholder", () => {
   expect(html).toContain(">Material</label>");
   expect(html).toContain("Choose a material");
   expect(renderToStaticMarkup(E.searchPick("Material", "cascade", options))).toContain("Cascade");
+});
+
+it("makes the searchable filter visibly selectable like the adjacent select (#1255)", () => {
+  const trigger = SearchPick({ ...copy, value: "pale", options, outlined: true }).props.trigger;
+  expect(trigger.props.variant).toBe("outline");
+  expect(renderToStaticMarkup(trigger)).toContain("<svg");
 });

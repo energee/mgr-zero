@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import { E } from "../components/mgr/e";
 import { ImportView } from "../components/mgr/views/import";
-import { IMPORT_FIELDS } from "../lib/import-csv";
+import { IMPORT_FIELDS, validateImportRows } from "../lib/import-csv";
 import { importPreview } from "../lib/mgr/fixtures/import";
 
 it("keeps missing mappings and preview cells empty rather than undefined", () => {
@@ -31,6 +31,15 @@ it("shares an editable mixed preview and prevents all-invalid batches from commi
   expect(html).not.toContain('href="/');
   const blocked = renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, validation: importPreview.rows.map(() => ["Invalid row"]) } }));
   expect(blocked).toMatch(/<button[^>]*disabled[^>]*>Import 0 rows/);
+});
+
+it("shows duplicate customer rows as blocked before committing (#1314)", () => {
+  const rows = [importPreview.rows[0], { ...importPreview.rows[0] }, { ...importPreview.rows[0], name: "  " }];
+  const html = renderToStaticMarkup(createElement(ImportView, { model: {
+    ...importPreview, rows, validation: validateImportRows("customers", rows, importPreview.lookups),
+  } }));
+  expect(html).toContain("1 ready · 2 blocked");
+  expect(html).toContain("Duplicate of row 1: customer name");
 });
 
 it("shows only usable packaged format references when mapping product imports (#819)", () => {
@@ -102,3 +111,26 @@ it("names the buttons after the steps, offers the template only before upload, a
     expect(html.replace(/<[^>]*>/g, " "), jargon).not.toContain(jargon);
   }
 });
+
+it("blocks Review until every required column is matched and uses the singular row label (#1315)", () => {
+  const model = { ...importPreview, step: 1, rows: [importPreview.rows[0]], validation: [[]], headers: ["name", "type", "state", "saleChannelId"] };
+  const render = (mapping: Record<string, number>) => renderToStaticMarkup(createElement(ImportView, { model: { ...model, mapping } }));
+  expect(render({})).toMatch(/<button[^>]* disabled=""[^>]*>Review 1 row<\/button>/);
+  const matched = render({ name: 0, type: 1, state: 2, saleChannelId: 3 }).match(/<button[^>]*>Review 1 row<\/button>/)?.[0];
+  expect(matched).toBeDefined();
+  expect(matched).not.toContain(' disabled=""');
+  expect(render({ name: 0, type: 1, state: 2, saleChannelId: 99 })).toMatch(/<button[^>]* disabled=""[^>]*>Review 1 row<\/button>/);
+});
+
+it("uses friendly field labels and a readable import-kind fallback (#1315)", () => {
+  const model = { ...importPreview, kind: "channel_prices" as const, step: 2, rows: [{ unitPriceCents: "1.5" }], validation: [["Unit price (cents) must be a whole number"]] };
+  const html = renderToStaticMarkup(createElement(ImportView, { model }));
+  expect(html).toContain("Sale channel");
+  expect(html).toContain("Price group");
+  expect(html).toContain("Unit price (cents)");
+  expect(html).toContain("Edit row 1 · Channel prices");
+  expect(html).not.toContain("saleChannelId");
+  expect(html).not.toContain("priceGroupId");
+  expect(html).not.toContain("unitPriceCents");
+});
+

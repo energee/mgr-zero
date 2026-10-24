@@ -6,6 +6,7 @@ import { CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import type { DisconnectStatus } from "@/lib/mgr/integration-disconnect";
+import { integrationUnavailableReason } from "@/lib/mgr/integration-availability";
 import { reconcileBooleanChange, type PosLocationRow, type PosMenuModel, type PosSaleRow, type PosVariationRow } from "@/lib/mgr/pos-view";
 
 const SelectField = ({ id, label, value, options, onChange }: {
@@ -26,7 +27,7 @@ export function PosSyncActions({ catalogBusy = false, salesBusy = false, catalog
 }
 
 export function PointOfSaleView({ model, sales = [], coverage = [], syncAction, paths }: {
-  model: { connected: boolean; canDisconnect?: boolean; merchant: string; state: string; locations?: string; lastSync?: string; error?: string | null; oauthFailed?: boolean };
+  model: { connected: boolean; configured?: boolean; canDisconnect?: boolean; merchant: string; state: string; locations?: string; lastSync?: string; error?: string | null; oauthFailed?: boolean };
   sales?: PosSaleRow[]; coverage?: string[];
   syncAction?: ReactNode; paths?: { back?: string; connect?: string; disconnect?: string; locations?: string; menu?: string; connector?: string };
 }) {
@@ -35,8 +36,9 @@ export function PointOfSaleView({ model, sales = [], coverage = [], syncAction, 
     {E.info("Publish what the taproom can sell, and read Square sales as expected consumption. One provider is connected at a time.")}
     {model.connected
       ? E.row(`Square · ${model.merchant}`, model.state, E.act("Disconnect", "destructive", paths?.disconnect), "ok", SquareMark)
-      : E.row("Square", model.state, <>{model.canDisconnect && E.act("Disconnect", "destructive", paths?.disconnect)}{E.act("Connect", "primary", paths?.connect)}</>, "w", SquareMark)}
-    {model.oauthFailed && <>{E.note("Square authorization was cancelled or could not finish. The existing connection was not replaced.", "alert")}{model.connected && E.btn("Try connecting again", "g", paths?.connect)}</>}
+      : E.row("Square", model.state, <>{model.canDisconnect && E.act("Disconnect", "destructive", paths?.disconnect)}{E.act("Connect", "primary", model.configured === false ? undefined : paths?.connect, undefined, model.configured === false)}</>, "w", SquareMark)}
+    {!model.connected && model.configured === false && <p className="text-sm text-muted-foreground">{integrationUnavailableReason.square}</p>}
+    {model.oauthFailed && <>{E.note("Square authorization was cancelled or could not finish. The existing connection was not replaced.", "alert")}{model.connected && E.btn("Try connecting again", model.configured === false ? "g disabled" : "g", model.configured === false ? undefined : paths?.connect)}</>}
     {model.error && E.note(`Last connection error: ${model.error}`, "alert")}
     {model.connected && <>
       {E.nav("Square locations", model.locations, "", undefined, paths?.locations)}
@@ -48,20 +50,21 @@ export function PointOfSaleView({ model, sales = [], coverage = [], syncAction, 
       {E.ttl("Recent Square facts")}
       {sales.length ? sales.map(sale => <div key={sale.id}>{sale.href || sale.openable ? E.nav(sale.label, sale.detail, sale.status === "mapped" ? "ok" : "w", undefined, sale.href) : E.row(sale.label, sale.detail, sale.amount, sale.status === "mapped" ? "ok" : "w")}</div>) : E.blank("No Square sale facts yet")}
     </>}
-    {/* Square's own QuickBooks connector is a Square seller setting, so its note lives with Square, not under Accounting. */}
-    {E.nav("Taproom sales in QuickBooks", "Square’s own connector, separate from MGR", "w", SquareMark, paths?.connector)}
+    {E.ttl("Separate accounting feed")}
+    {E.info("QuickBooks is not a POS provider. Square can send taproom sales to QuickBooks through its own optional connector. MGR sends wholesale invoices separately through Accounting.")}
+    {E.nav("Taproom sales in QuickBooks", "About Square’s optional connector", "", SquareMark, paths?.connector)}
   </>;
 }
 
-export function ConnectSquareView({ configured = true, busy = false, error, onConnect, backHref }: {
-  configured?: boolean; busy?: boolean; error?: string | null; onConnect?: () => void; backHref?: string;
+export function ConnectSquareView({ configured = true, reconnect = false, busy = false, error, onConnect, backHref }: {
+  configured?: boolean; reconnect?: boolean; busy?: boolean; error?: string | null; onConnect?: () => void; backHref?: string;
 }) {
   return <>
     {E.back("Point of sale", "Connect Square", undefined, backHref)}
     {E.info("MGR publishes owned catalog items to Square and reads completed sales as expected consumption.")}
     {E.note("Connecting does not publish a menu, import old sales, or change inventory.")}
-    <Button disabled={!configured || busy} onClick={onConnect}>{busy ? "Opening Square…" : "Connect Square"}</Button>
-    {!configured && <p className="text-sm text-muted-foreground">Square isn’t turned on in MGR yet.</p>}
+    <Button disabled={!configured || busy} onClick={onConnect}>{busy ? "Opening Square…" : reconnect ? "Reconnect Square" : "Connect Square"}</Button>
+    {!configured && <p className="text-sm text-muted-foreground">{integrationUnavailableReason.square}</p>}
     <CommandFormMessage error={error ?? null} />
   </>;
 }
@@ -93,7 +96,7 @@ export function SquareLocationsView({ rows, locations, busy, error, onSave }: {
 export function SquareConnectorView({ accountingHref }: { accountingHref?: string } = {}) {
   return <>
     {E.note("Square may already post taproom sales to QuickBooks Online as sales receipts.")}
-    {E.info("MGR pushes wholesale invoices only. Confirm with your accountant that the two revenue streams stay separate; MGR does not configure or synchronize this Square connector.")}
+    {E.info("MGR pushes wholesale invoices only. Confirm with your accountant that the two revenue streams stay separate; MGR does not detect, configure, or synchronize this Square connector.")}
     {E.btn("Open Accounting", "g", accountingHref)}
   </>;
 }

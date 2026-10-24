@@ -7,7 +7,7 @@ import { DriverRouteView } from "@/components/mgr/views/driver-route";
 import { ReturnRouteView } from "@/components/mgr/views/return-route";
 import { getActiveBrewery } from "@/lib/brewery";
 import { formatDate } from "@/lib/date-format";
-import { buildContext } from "@/lib/commands/context";
+import { buildContext, isUuid } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { notFound } from "next/navigation";
@@ -16,16 +16,28 @@ import { driverLabel, type RouteList } from "../labels";
 import { RouteForm } from "../route-form";
 import { ReturnRoute } from "../route-run";
 import { navTitle } from "@/lib/mgr/nav";
+import { cache } from "react";
+import { orNotFound } from "@/lib/mgr/not-found";
 
-export const metadata = { title: navTitle("/routes") };
+const getRouteData = cache(async function getRouteData(id: string) {
+  if (!isUuid(id)) notFound();
+  const brewery = await getActiveBrewery();
+  const ctx = await buildContext(brewery.id);
+  const list = await orNotFound(runCommand("list_routes", { id }, ctx)) as RouteList;
+  const route = list.routes[0];
+  if (!route) notFound();
+  return { brewery, list, route };
+});
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await getRouteData(id);
+  return { title: navTitle("/routes") };
+}
 
 export default async function RoutePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const brewery = await getActiveBrewery();
-  const ctx = await buildContext(brewery.id);
-  const list = (await runCommand("list_routes", { id }, ctx)) as RouteList;
-  const route = list.routes[0];
-  if (!route) notFound();
+  const { brewery, list, route } = await getRouteData(id);
   const title = `${route.name ?? "Route"} · ${formatDate(route.delivery_date)}`;
   if (!route.departed_at) {
     const candidates = [

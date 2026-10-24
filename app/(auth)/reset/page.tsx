@@ -9,6 +9,8 @@ import { expiredResetModel, portalForgotPasswordModel, resetPasswordModel } from
 import { MgrIcon } from "@/components/mgr-icon";
 import { sendReset } from "../actions";
 
+export const metadata = { title: "Reset password" };
+
 export default async function ResetPage({ searchParams }: { searchParams: Promise<{ sent?: string; expired?: string; portal?: string }> }) {
   const { sent, expired, portal } = await searchParams;
   const state = expired ? expiredResetModel : portal ? portalForgotPasswordModel : resetPasswordModel;

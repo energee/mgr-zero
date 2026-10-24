@@ -1,4 +1,4 @@
-// tests/team.test.ts — Program 10 task 5: Team roster with @handles, one
+// tests/team.test.ts — Team roster with profile names and email fallback, one
 // member's roles changed in one write, a membership ended in one write. The
 // brewery never loses its last admin; nobody removes themselves; only admins
 // write; the Auth user survives a revoke (re-invite is the compensation).
@@ -8,7 +8,7 @@ import { runCommand, type StaffRole } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
-type Member = { userId: string; email: string; handle: string; roles: StaffRole[] };
+type Member = { userId: string; email: string; name: string; roles: StaffRole[] };
 let b: { id: string }, adminCtx: Ctx, sales: Ctx;
 
 beforeAll(async () => {
@@ -20,12 +20,39 @@ beforeAll(async () => {
 const roster = async (ctx: Ctx = adminCtx) => runCommand("list_team_members", {}, ctx) as Promise<Member[]>;
 
 describe("team", () => {
-  it("lists members with email and @handle", async () => {
+  it("lists members with their email as fallback when no profile name is saved", async () => {
     const me = (await roster()).find((m) => m.userId === adminCtx.userId)!;
     expect(me.roles).toEqual(["admin"]);
     expect(me.email).toContain("@");
-    expect(me.handle).toBe(`@${me.email.split("@")[0]}`);
+    expect(me.name).toBe(me.email);
     await expect(roster(sales)).resolves.toBeTruthy();
+  });
+
+  it("returns the saved full name, falling back to email only when no name is saved", async () => {
+    const member = await makeStaff(b.id, "warehouse");
+    const update = await admin.auth.admin.updateUserById(member.id, { user_metadata: { full_name: "  Morgan Brewer  " } });
+    expect(update.error).toBeNull();
+    const named = (await roster()).find((row) => row.userId === member.id);
+    expect(named).toMatchObject({ name: "Morgan Brewer", email: member.email });
+    const direct = await adminCtx.db.rpc("list_team_members", { p_brewery: b.id });
+    expect(direct.error).toBeNull();
+    expect(direct.data?.find((row) => row.user_id === member.id)).toMatchObject({ name: "Morgan Brewer", email: member.email });
+    for (const fullName of [null, "", "   "]) {
+      expect((await admin.auth.admin.updateUserById(member.id, { user_metadata: { full_name: fullName } })).error).toBeNull();
+      expect((await roster()).find((row) => row.userId === member.id)).toMatchObject({ name: member.email, email: member.email });
+    }
+  });
+
+  it("does not expose another brewery's names or let profile metadata authorize roster access", async () => {
+    const other = await makeBrewery();
+    const outsider = await makeStaffCtx(other.id, "admin");
+    const otherMember = await makeStaff(other.id, "warehouse");
+    expect((await admin.auth.admin.updateUserById(otherMember.id, { user_metadata: { full_name: "Other brewery member" } })).error).toBeNull();
+    expect((await roster()).some((row) => row.userId === otherMember.id)).toBe(false);
+    expect((await outsider.db.rpc("list_team_members", { p_brewery: b.id })).data).toEqual([]);
+    const brewer = await makeStaffCtx(b.id, "brewer");
+    expect((await admin.auth.admin.updateUserById(brewer.userId, { user_metadata: { full_name: "Admin", role: "admin" } })).error).toBeNull();
+    expect((await brewer.db.rpc("list_team_members", { p_brewery: b.id })).data).toEqual([]);
   });
 
   it("does not hand staff emails to a role the registered query refuses", async () => {
