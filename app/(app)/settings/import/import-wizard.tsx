@@ -88,7 +88,7 @@ function ImportSession({ lookups }: { lookups: ImportLookups }) {
     }}
     onEdit={(rowIndex, field, value) => {
       // Editing works for unmapped fields too: materialize the current map.
-      const headers = fields.map(field => field.name), values = rows.map(row => headers.map(header => row[header] ?? ""));
+      const headers: string[] = fields.map(field => field.name), values = rows.map(row => headers.map(header => row[header] ?? ""));
       values[rowIndex][headers.indexOf(field)] = value;
       stage({ headers, rows: values });
     }}
