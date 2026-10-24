@@ -124,8 +124,10 @@ export type CellCommit = { kind: "none" } | { kind: "clear" } | { kind: "save"; 
 export function cellCommit(initial: string, dollars: string): CellCommit {
   const text = dollars.trim().replace(/^\$/, "");
   if (text === "") return initial === "" ? { kind: "none" } : { kind: "clear" };
+  // Validate the text before toCents: it deliberately rounds for other callers.
+  if (!/^(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(text)) return { kind: "invalid" };
   const cents = toCents(text);
-  if (cents === undefined || !Number.isFinite(cents) || cents < 0) return { kind: "invalid" };
+  if (cents === undefined || !Number.isSafeInteger(cents)) return { kind: "invalid" };
   // "7" over a saved "7.00" is the same price: nothing to save.
   return cents === toCents(initial) ? { kind: "none" } : { kind: "save", cents };
 }

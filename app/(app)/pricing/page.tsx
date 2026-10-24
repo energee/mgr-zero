@@ -5,8 +5,8 @@
 // list_price_group_barcodes; Catalog's Price groups link checks the same reads
 // (PRICING_READS in app/(app)/catalog/page.tsx). PriceGroupsView draws the
 // tabs and table; this page fills its slots: every cell edits in place through set_channel_price /
-// clear_channel_price (PriceCellForm, keyed on its value so a save or clear
-// remounts it), a pour column on a group without that pour opens PourForm
+// clear_channel_price (PriceCellForm keeps its feedback across a refresh),
+// a pour column on a group without that pour opens PourForm
 // with the name filled in, and each group name opens GroupForm, which also
 // creates.
 import { PriceGroupsView, addPourTrigger } from "@/components/mgr/views/price-groups";
@@ -43,7 +43,7 @@ export default async function PricingPage({ searchParams }: { searchParams?: Pro
       createAction={<GroupForm model={toPriceGroupViewProps(snapshot)} />}
       renderGroup={(row) => <GroupForm groupId={row.id} model={groupModel.get(row.id)!} />}
       // PriceGroupsView asks for a cell only where the row has a format.
-      renderCell={(channel, row, col, value) => <PriceCellForm key={value ?? "empty"} saleChannelId={channel.id} priceGroupId={row.id} formatId={row.formatIds[col]!} value={value} groupName={row.name} formatName={model.formats[col]!} channelName={channel.name} />}
+      renderCell={(channel, row, col, value) => <PriceCellForm key={`${channel.id}:${row.id}:${row.formatIds[col]}`} saleChannelId={channel.id} priceGroupId={row.id} formatId={row.formatIds[col]!} value={value} groupName={row.name} formatName={model.formats[col]!} channelName={channel.name} />}
       renderAddPour={(row, pour) => <PourForm priceGroupId={row.id} groupName={row.name} name={pour} trigger={addPourTrigger(pour, row.name)} />}
     />
   );

@@ -1,6 +1,6 @@
 import "@/lib/commands/all";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { RequestAuthContext } from "@/lib/auth/request-context";
+import { homePath, type RequestAuthContext } from "@/lib/auth/request-context";
 import { runCommand } from "@/lib/commands/registry";
 import type { Database } from "@/lib/supabase/database";
 
@@ -46,4 +46,16 @@ export async function inviteLanding(auth: RequestAuthContext, audience: InviteAu
 export async function hasPendingInvitations(db: SupabaseClient<Database>, userId: string) {
   const pending = await runCommand("list_my_invitations", {}, { db, userId, breweryId: null, roles: [] }) as unknown[];
   return pending.length > 0;
+}
+
+/** Password entry and already-authenticated sign-in pages share consent-first routing. */
+export async function signInDestination(auth: RequestAuthContext): Promise<string> {
+  const identity = await auth.getIdentity();
+  if (!identity) return homePath(auth);
+  const db = await auth.getSupabaseClient();
+  const [pending, home] = await Promise.all([
+    hasPendingInvitations(db, identity.userId),
+    homePath(auth),
+  ]);
+  return pending ? "/invitations" : home;
 }

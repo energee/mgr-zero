@@ -8,6 +8,8 @@ export type VendorViewModel = {
   terms: string;
   termsOptions: string[];
   leadDays: string;
+  /** Null until the vendor has been saved. */
+  active: boolean | null;
 };
 
 export function vendorFieldErrors(fields: Pick<VendorViewModel, "email" | "leadDays">): { email?: string; leadDays?: string } {

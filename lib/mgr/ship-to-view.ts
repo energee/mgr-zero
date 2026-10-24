@@ -4,7 +4,6 @@
 import { countryName } from "./labels";
 
 export type ShipToViewModel = {
-  title: string;
   label: string;
   /** ISO code; the form draws State only for "US". */
   country: string;
@@ -29,7 +28,6 @@ export type ShipToSnapshot = {
 
 export function toShipToViewProps(s: ShipToSnapshot): ShipToViewModel {
   return {
-    title: `${s.label || "New"} ship-to`,
     label: s.label,
     country: s.country,
     address: s.address1 ?? "",

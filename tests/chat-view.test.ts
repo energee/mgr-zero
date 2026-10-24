@@ -5,6 +5,7 @@ import { expect, it } from "vitest";
 import { NOTIFICATION_REASON_LABEL } from "../lib/chat/contracts";
 import { personalChatPreferences } from "../lib/mgr/fixtures/chat";
 import { CHAT_PREVIEW_FIXTURES } from "../lib/chat/preview-fixtures";
+import { chatSettingIsSaved, type ChatSettingSave } from "../lib/mgr/chat-save-feedback";
 import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView, ChatQuietHoursView } from "../components/mgr/views/chat";
 import { SCREENS } from "../components/mgr/screens";
 
@@ -21,6 +22,50 @@ it("preserves personal notification reasons before linking and gates taproom qui
   expect(html).toContain("Link MGR account");
   expect(html).not.toContain("Save my quiet hours");
   expect(html).not.toContain("Unlink my Slack");
+});
+
+it("announces Saved only after success and preserves saving and error feedback", () => {
+  const props = { preferences: personalChatPreferences, saved: true };
+  const saved = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, props));
+  expect(saved).toMatch(/role="status"[^>]*aria-live="polite"[^>]*>Saved</);
+  const initial = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: personalChatPreferences }));
+  expect(initial).not.toContain(">Saved<");
+  const pending = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { ...props, busy: true }));
+  expect(pending).toContain("Saving…");
+  expect(pending).not.toContain(">Saved<");
+  const failed = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { ...props, error: "The result is uncertain. Check your saved request." }));
+  expect(failed).not.toContain(">Saved<");
+  expect(failed).toContain("The result is uncertain. Check your saved request.");
+});
+
+it.each([
+  [{ name: "set_notification_destination", channel: "private-a" }, { name: "set_notification_destination", channel: "private-b" }],
+  [{ name: "set_brewery_operating_defaults", hours: "24" }, { name: "set_brewery_operating_defaults", hours: "36" }],
+  [{ name: "set_brewery_quiet_hours", start: "21:00", end: "06:00" }, { name: "set_brewery_quiet_hours", start: "22:00", end: "06:00" }],
+  [{ name: "set_personal_quiet_hours", start: "21:00", end: "06:00", timezone: "America/New_York" }, { name: "set_personal_quiet_hours", start: "21:00", end: "06:00", timezone: "America/Chicago" }],
+] satisfies [ChatSettingSave, ChatSettingSave][])("confirms only matching saved values for $0.name", (saved, edited) => {
+  expect(chatSettingIsSaved(saved, saved)).toBe(true);
+  expect(chatSettingIsSaved(saved, edited)).toBe(false);
+  expect(chatSettingIsSaved(saved, { ...saved })).toBe(true);
+  expect(chatSettingIsSaved(null, saved)).toBe(false);
+  const unrelated: ChatSettingSave = saved.name === "set_brewery_operating_defaults"
+    ? { name: "set_notification_destination", channel: "private-a" }
+    : { name: "set_brewery_operating_defaults", hours: "24" };
+  expect(chatSettingIsSaved(unrelated, saved)).toBe(false);
+});
+
+it("never lets a reminder save confirm an unsaved personal quiet-hours draft", () => {
+  const preferences = { ...personalChatPreferences, quietStart: "22:00", quietEnd: "07:00" };
+  const reminderSaved = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences, saved: true }));
+  expect(reminderSaved).toContain(">Saved<");
+  expect(reminderSaved.match(/<form\b[\s\S]*?<\/form>/)?.[0]).not.toContain(">Saved<");
+
+  const savedQuiet: ChatSettingSave = { name: "set_personal_quiet_hours", start: "22:00", end: "07:00", timezone: preferences.timezone };
+  const renderQuiet = (quietStart: string, error?: string) => renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { ...preferences, quietStart }, savedQuiet, error }));
+  expect(renderQuiet("22:00").match(/<form\b[\s\S]*?<\/form>/)?.[0]).toContain(">Saved<");
+  expect(renderQuiet("23:00")).not.toContain(">Saved<");
+  expect(renderQuiet("22:00", "The result is uncertain.")).not.toContain(">Saved<");
+  expect(renderQuiet("22:00")).toContain(">Saved<");
 });
 
 it("shares disconnected settings without inventing connection data or allowing unconfigured OAuth", () => {
