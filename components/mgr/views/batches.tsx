@@ -94,10 +94,11 @@ export function BatchesView({ model, createAction, workHrefs, newVesselHref }: {
         </Fragment> : null;
       })}
     </>}
-    {model.vessels !== undefined && <>
+    {model.vessels !== undefined && <section aria-label="Vessel setup" className="flex min-w-0 flex-col gap-3">
       {E.ttl("Vessels")}
+      <p className="text-sm text-muted-foreground">Set up the tanks and other vessels used for brewing and cellar work.</p>
       {newVesselHref !== null && <div className="self-start">{E.btn("New vessel", "p", newVesselHref)}</div>}
-      {!model.vessels.length ? E.blank("No vessels yet") : <VesselTable vessels={model.vessels} />}
-    </>}
+      {!model.vessels.length ? <p className="text-sm text-muted-foreground">No vessels yet</p> : <VesselTable vessels={model.vessels} />}
+    </section>}
   </>;
 }

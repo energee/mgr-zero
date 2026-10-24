@@ -116,6 +116,17 @@ describe("Batches view", () => {
     expect(html).toContain('href="/batches"');
     expect(html).not.toContain('href="/orders"');
   });
+  it("explains vessel setup and keeps its empty note separate from the page empty state (#1303)", () => {
+    const model = toBatchesViewProps({ ...batchesBrewer, vessels: [] });
+    const html = htmlOf(createElement(BatchesView, { model, newVesselHref: null }));
+    const setup = html.match(/<section aria-label="Vessel setup"[^>]*>([\s\S]*?)<\/section>/)?.[1];
+    expect(setup).toBeDefined();
+    expect(setup).toContain("No vessels yet");
+    expect(setup).not.toContain('data-slot="empty"');
+    expect(setup).not.toContain("New vessel");
+    const withoutSetup = htmlOf(createElement(BatchesView, { model: { ...model, vessels: undefined } }));
+    expect(withoutSetup).not.toContain('aria-label="Vessel setup"');
+  });
   it("does not allow live JSX to replace the planned and active lists", () => {
     const page = src("app/(app)/batches/page.tsx");
     expect(page).not.toMatch(/\blist=|\bfooter=|tabs=\{null\}/);
