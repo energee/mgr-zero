@@ -6,10 +6,16 @@ import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup } from "@/components/ui/field";
 import type { EntryViewModel } from "@/lib/mgr/entry-view";
+import { passwordChangeErrors, type PasswordErrors } from "@/lib/auth/password";
 import type { ReactNode } from "react";
-import { Fragment, useId, useState } from "react";
+import { Fragment, useId, useState, type FormEvent } from "react";
 
 export type { EntryViewModel };
+
+const INPUT_NAMES: Record<string, string> = {
+  Email: "email", "Your name": "name",
+  "Current password": "currentPassword", "Confirm new password": "confirmPassword",
+};
 
 export function EntryView({
   model,
@@ -35,18 +41,54 @@ export function EntryView({
   const [showPassword, setShowPassword] = useState(false);
   const passwordRulesId = useId();
   const emailLink = model.secondaryEmailOnly;
+  const passwordChange = model.inputs.includes("Confirm new password");
+  const recovery = !model.inputs.includes("Current password");
+  const [localErrors, setLocalErrors] = useState<PasswordErrors>({});
+  function validatePasswordForm(form: HTMLFormElement): PasswordErrors {
+    const data = new FormData(form);
+    return passwordChangeErrors({
+      currentPassword: String(data.get("currentPassword") ?? ""),
+      password: String(data.get("password") ?? ""),
+      confirmPassword: String(data.get("confirmPassword") ?? ""),
+    }, recovery);
+  }
+  function submit(event: FormEvent<HTMLFormElement>) {
+    if (passwordChange) {
+      const errors = validatePasswordForm(event.currentTarget);
+      // Every field is now checked locally, so a fixed field drops the server's error too.
+      setLocalErrors({ currentPassword: undefined, password: undefined, confirmPassword: undefined, ...errors });
+      if (Object.keys(errors).length) {
+        event.preventDefault();
+        const first = event.currentTarget.elements.namedItem(Object.keys(errors)[0]);
+        if (first instanceof HTMLElement) first.focus();
+      }
+    }
+    if (!action) event.preventDefault();
+  }
   const fields = model.inputs.map(label => {
     const password = label.toLowerCase().includes("password");
-    const name = label === "Email" ? "email" : label === "Your name" ? "name" : "password";
+    const name = INPUT_NAMES[label] ?? "password";
     let type = label === "Email" ? "email" : "text";
     if (password && !showPassword) type = "password";
+    // Once a field is checked here (blur or submit), its own result replaces the server's error.
+    const fieldError = name in localErrors ? localErrors[name as keyof PasswordErrors] : model.passwordErrors?.[name as keyof PasswordErrors];
     return (
-      <Fragment key={label}>{E.edit(label, String((defaults[name]) ?? ""), type, undefined, { name, required: true, minLength: label === "Choose a password" ? 8 : undefined, autoComplete: label === "Email" ? "email" : label === "Your name" ? "name" : label === "Password" ? "current-password" : "new-password", "aria-label": label, "aria-describedby": password && model.passwordRules ? passwordRulesId : undefined })}</Fragment>
+      <Fragment key={label}>{E.edit(label, String((defaults[name]) ?? ""), type, undefined, {
+        id: passwordChange ? `password-${name}` : undefined,
+        name, required: true, minLength: label === "Choose a password" ? 8 : undefined,
+        autoComplete: label === "Email" ? "email" : label === "Your name" ? "name" : label === "Password" || label === "Current password" ? "current-password" : "new-password",
+        "aria-label": label, "aria-describedby": password && model.passwordRules ? passwordRulesId : undefined, error: fieldError,
+        onBlur: passwordChange ? (event) => {
+          if (!event.currentTarget.form) return;
+          const errors = validatePasswordForm(event.currentTarget.form);
+          setLocalErrors(previous => ({ ...previous, [name]: errors[name as keyof PasswordErrors] }));
+        } : undefined,
+      })}</Fragment>
     );
   });
   const primary = primaryHref === null ? null : primaryHref ? (
     <Button asChild><Link href={primaryHref}>{model.primary}</Link></Button>
-  ) : <Button type={action || emailLink ? "submit" : "button"}>{model.primary}</Button>;
+  ) : <Button type={action || emailLink || passwordChange ? "submit" : "button"}>{model.primary}</Button>;
   const controls = (
     <FieldGroup>
       {hidden}
@@ -76,7 +118,7 @@ export function EntryView({
       {model.error ? E.note(model.error, "alert") : null}
       {model.field ? E.fld(model.field.label, model.field.value) : null}
       {/* A local fixture action prevents native GET submission before hydration too. */}
-      {action || emailLink ? <form action={action ?? (() => {})} onSubmit={action ? undefined : (event) => event.preventDefault()}>{controls}</form> : controls}
+      {action || emailLink || passwordChange ? <form action={action ?? (() => {})} noValidate={passwordChange} onSubmit={submit}>{controls}</form> : controls}
       {model.extraPrimary ? extraAction ? <form action={extraAction}><Button type="submit" variant="outline">{model.extraPrimary}</Button></form> : E.btn(model.extraPrimary, "g") : null}
       {model.link ? linkHref
         ? <Link href={linkHref} className="text-sm underline">{model.link.label}</Link>

@@ -26,6 +26,8 @@ describe("WaterView", () => {
     const out = html({ chemistryKnown: false });
     expect(out.match(/data-gated/g)).toHaveLength(2);
     expect(out).not.toMatch(/Against target/);
+    expect(out.match(/Salt suggestions aren&#x27;t available yet\./g)).toHaveLength(2);
+    expect(out).not.toContain("not part of this release");
   });
   it("draws only the verb gated when no salt is known and no target is picked either", () => {
     const out = html({ chemistryKnown: false, water: { ...draft, targetProfileId: "" } });
