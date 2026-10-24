@@ -1324,7 +1324,7 @@ Admin opens **Settings → Import** or **Import CSV** on the setup checklist. Un
 
 The complete API request is limited to 8 MiB. Most 5,000-row files fit; files with unusually large notes or other cells may need to be split into smaller batches.
 
-The lookup lists show each existing record's label and ID. Match these exact fields (optional fields follow the semicolon):
+The lookup lists show each existing record's label and ID. Match these exact CSV column keys (optional fields follow the semicolon). The page shows a friendlier label for each, such as **Brand** for `product`, **Customer type** for `type`, **Unit price (cents)** for `unitPriceCents` and **Quantity** for `qty`, and its messages use those labels:
 
 | Kind | Fields |
 | --- | --- |
