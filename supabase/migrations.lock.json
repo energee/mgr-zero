@@ -187,5 +187,6 @@
   "20261024042813_customer_name_nonblank.sql": "98be2ea8bbe161abaf703b3f7e487fb4f4188ca5f6812563f22674f606df80b5",
   "20261024044830_brand_approval_label_image.sql": "e8618f3a5bdaa693d8d425d2ab302a3eadd0f81374bdd25cb4de69d94ea20611",
   "20261024045921_saved_cola_image_permit.sql": "8a7c1a1938bddf34fa1fe989e6d9816bf03ae74df38c6935dbcb496b938151ee",
-  "20261024050001_tap_number_and_actor_labels.sql": "e24189f3dad3f4285965f56e39b551e416a9fb03580bc7a8512b2936a4e98ed9"
+  "20261024050001_tap_number_and_actor_labels.sql": "e24189f3dad3f4285965f56e39b551e416a9fb03580bc7a8512b2936a4e98ed9",
+  "20261024203451_sale_channel_name_uniqueness.sql": "b21c3dc38ee67deccade1f6c19b0a8eece2a268cb48c3703fcf7733ee322dc91"
 }

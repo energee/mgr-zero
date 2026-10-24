@@ -188,6 +188,7 @@ function rpcError(error: { message: string; code?: string }): CommandError {
     // Scoped reads raise MG404 for both absent and other-tenant identities.
     case "MG404": return new CommandError(error.message, 404, "not_found");
     case "MG409": return new CommandError(error.message, 409, "conflict");
+    case "MGC01": return new CommandError(error.message, 409, "duplicate_channel_name");
     // A reviewed plan (packaging close) changed underneath the form: nothing
     // was written, so the client may drop its retained request.
     case "MG412": return new CommandError(error.message, 409, "stale_plan");
