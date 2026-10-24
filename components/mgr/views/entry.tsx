@@ -4,11 +4,11 @@
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup } from "@/components/ui/field";
 import type { EntryViewModel } from "@/lib/mgr/entry-view";
 import { passwordChangeErrors, type PasswordErrors } from "@/lib/auth/password";
 import type { ReactNode } from "react";
-import { Fragment, useState, type FormEvent } from "react";
+import { Fragment, useId, useState, type FormEvent } from "react";
 
 export type { EntryViewModel };
 
@@ -38,6 +38,8 @@ export function EntryView({
   hidden?: ReactNode;
   defaults?: Record<string, string | undefined>;
 }) {
+  const [showPassword, setShowPassword] = useState(false);
+  const passwordRulesId = useId();
   const emailLink = model.secondaryEmailOnly;
   const passwordChange = model.inputs.includes("Confirm new password");
   const recovery = !model.inputs.includes("Current password");
@@ -66,14 +68,16 @@ export function EntryView({
   const fields = model.inputs.map(label => {
     const password = label.toLowerCase().includes("password");
     const name = INPUT_NAMES[label] ?? "password";
+    let type = label === "Email" ? "email" : "text";
+    if (password && !showPassword) type = "password";
     // Once a field is checked here (blur or submit), its own result replaces the server's error.
     const fieldError = name in localErrors ? localErrors[name as keyof PasswordErrors] : model.passwordErrors?.[name as keyof PasswordErrors];
     return (
-      <Fragment key={label}>{E.edit(label, String((defaults[name]) ?? ""), password ? "password" : label === "Email" ? "email" : "text", undefined, {
+      <Fragment key={label}>{E.edit(label, String((defaults[name]) ?? ""), type, undefined, {
         id: passwordChange ? `password-${name}` : undefined,
         name, required: true, minLength: label === "Choose a password" ? 8 : undefined,
         autoComplete: label === "Email" ? "email" : label === "Your name" ? "name" : label === "Password" || label === "Current password" ? "current-password" : "new-password",
-        "aria-label": label, error: fieldError,
+        "aria-label": label, "aria-describedby": password && model.passwordRules ? passwordRulesId : undefined, error: fieldError,
         onBlur: passwordChange ? (event) => {
           if (!event.currentTarget.form) return;
           const errors = validatePasswordForm(event.currentTarget.form);
@@ -88,7 +92,9 @@ export function EntryView({
   const controls = (
     <FieldGroup>
       {hidden}
+      {model.passwordRules && <FieldDescription id={passwordRulesId}>{model.passwordRules}</FieldDescription>}
       {fields}
+      {model.passwordRules && <Button type="button" variant="outline" aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? "Hide password" : "Show password"}</Button>}
       {primary ? <Field>{primary}</Field> : null}
       {model.secondary ? (
         <Field>
