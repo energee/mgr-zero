@@ -1,71 +1,52 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 820" fill="none" style="color:var(--fg, currentColor);font:14px system-ui">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 650" fill="none" style="color:var(--fg, currentColor);font:14px system-ui">
   <g stroke="currentColor" opacity=".35">
-    <rect x="16" y="48" width="620" height="740" rx="12"/>
-    <rect x="660" y="48" width="324" height="740" rx="12"/>
-    <rect x="40" y="170" width="572" height="130" rx="8"/>
-    <rect x="56" y="226" width="330" height="40" rx="5"/>
-    <rect x="402" y="226" width="194" height="40" rx="5"/>
-    <rect x="40" y="380" width="572" height="218" rx="8"/>
-    <rect x="56" y="443" width="250" height="40" rx="5"/>
-    <rect x="322" y="443" width="120" height="40" rx="5"/>
-    <rect x="458" y="443" width="138" height="40" rx="5"/>
-    <rect x="56" y="529" width="540" height="40" rx="5"/>
-    <rect x="40" y="620" width="572" height="40" rx="5"/>
-    <path d="M40 694H612"/>
-    <rect x="496" y="720" width="116" height="40" rx="5"/>
-    <rect x="676" y="170" width="292" height="188" rx="8"/>
-    <rect x="692" y="226" width="260" height="40" rx="5"/>
-    <rect x="692" y="298" width="260" height="40" rx="5"/>
-    <rect x="676" y="422" width="292" height="244" rx="8"/>
-    <rect x="692" y="482" width="260" height="40" rx="5"/>
-    <rect x="692" y="556" width="122" height="40" rx="5"/>
-    <rect x="830" y="556" width="122" height="40" rx="5"/>
-    <rect x="676" y="682" width="292" height="36" rx="5"/>
-    <rect x="676" y="736" width="292" height="36" rx="5"/>
+    <rect x="16" y="48" width="620" height="570" rx="8"/>
+    <rect x="660" y="48" width="324" height="570" rx="8"/>
+    <rect x="40" y="164" width="360" height="40" rx="5"/>
+    <rect x="416" y="164" width="196" height="40" rx="5"/>
+    <rect x="40" y="264" width="280" height="40" rx="5"/>
+    <rect x="336" y="264" width="130" height="40" rx="5"/>
+    <rect x="482" y="264" width="130" height="40" rx="5"/>
+    <rect x="40" y="350" width="572" height="40" rx="5"/>
+    <rect x="496" y="478" width="116" height="40" rx="5"/>
+    <rect x="676" y="164" width="292" height="40" rx="5"/>
+    <rect x="676" y="244" width="292" height="40" rx="5"/>
+    <rect x="676" y="344" width="292" height="40" rx="5"/>
+    <rect x="676" y="424" width="138" height="40" rx="5"/>
+    <rect x="830" y="424" width="138" height="40" rx="5"/>
+    <rect x="676" y="554" width="292" height="40" rx="5"/>
   </g>
   <g fill="currentColor">
-    <text x="16" y="28" font-weight="600">Desktop · grouped order details and material lines</text>
-    <text x="660" y="28" font-weight="600">Phone · stacked, same controls</text>
+    <text x="16" y="28" font-weight="600">Desktop · flat form</text>
+    <text x="660" y="28" font-weight="600">Phone · same fields</text>
     <text x="40" y="83" opacity=".65">← Purchase orders</text>
     <text x="40" y="116" font-size="22" font-weight="600">New PO</text>
-    <text x="40" y="143" opacity=".65">Build a vendor order. Save a draft before sending.</text>
-    <text x="56" y="198" font-weight="600">Order details</text>
-    <text x="56" y="219" font-size="12">Vendor *</text>
-    <text x="402" y="219" font-size="12">Expected · optional</text>
-    <text x="70" y="251" opacity=".65">Select vendor</text>
-    <text x="416" y="251" opacity=".65">Pick a date</text>
-    <text x="40" y="336" font-weight="600">Materials</text>
-    <text x="40" y="360" opacity=".65">Order in purchase units. Cost and expected lot are optional.</text>
-    <text x="56" y="408" font-weight="600">Line 1</text>
-    <text x="56" y="436" font-size="12">Material *</text>
-    <text x="322" y="436" font-size="12">Quantity *</text>
-    <text x="458" y="436" font-size="12">Unit cost ($)</text>
-    <text x="70" y="468">2-row · bag</text>
-    <text x="336" y="468">−    40    +</text>
-    <text x="472" y="468">28.50</text>
-    <text x="56" y="510" opacity=".65">bag · lot-tracked</text>
-    <text x="56" y="522" font-size="12">Expected lot · optional</text>
-    <text x="70" y="554">CM-26-4410</text>
-    <text x="282" y="645">Add line</text>
-    <text x="40" y="744" opacity=".65">Saving a draft does not send the order or add stock.</text>
-    <text x="518" y="745" font-weight="600">Save draft</text>
+    <text x="40" y="154">Vendor</text>
+    <text x="416" y="154">Expected · optional</text>
+    <text x="54" y="189" opacity=".65">Select vendor</text>
+    <text x="430" y="189" opacity=".65">Pick a date</text>
+    <text x="40" y="254">Material</text>
+    <text x="336" y="254">Quantity</text>
+    <text x="482" y="254">Unit cost ($)</text>
+    <text x="54" y="289">2-row · bag</text>
+    <text x="350" y="289">−    40    +</text>
+    <text x="496" y="289">28.50</text>
+    <text x="40" y="340">Expected lot · optional</text>
+    <text x="54" y="375">CM-26-4410</text>
+    <text x="40" y="436">Add line</text>
+    <text x="518" y="503" font-weight="600">Save draft</text>
     <text x="676" y="83" opacity=".65">← Purchase orders</text>
     <text x="676" y="116" font-size="22" font-weight="600">New PO</text>
-    <text x="676" y="143" opacity=".65">Build a vendor order.</text>
-    <text x="692" y="198" font-weight="600">Order details</text>
-    <text x="692" y="219" font-size="12">Vendor *</text>
-    <text x="706" y="251" opacity=".65">Select vendor</text>
-    <text x="692" y="290" font-size="12">Expected · optional</text>
-    <text x="706" y="323" opacity=".65">Pick a date</text>
-    <text x="676" y="392" font-weight="600">Materials</text>
-    <text x="692" y="450" font-weight="600">Line 1</text>
-    <text x="692" y="474" font-size="12">Material *</text>
-    <text x="706" y="507" opacity=".65">Select material</text>
-    <text x="692" y="548" font-size="12">Quantity *</text>
-    <text x="830" y="548" font-size="12">Unit cost ($)</text>
-    <text x="706" y="581">−             +</text>
-    <text x="692" y="634" opacity=".65">Expected lot on tracked materials</text>
-    <text x="794" y="705">Add line</text>
-    <text x="788" y="759" font-weight="600">Save draft</text>
+    <text x="676" y="154">Vendor</text>
+    <text x="690" y="189" opacity=".65">Select vendor</text>
+    <text x="676" y="234">Expected · optional</text>
+    <text x="690" y="269" opacity=".65">Pick a date</text>
+    <text x="676" y="334">Material</text>
+    <text x="690" y="369" opacity=".65">Select material</text>
+    <text x="676" y="414">Quantity</text>
+    <text x="830" y="414">Unit cost ($)</text>
+    <text x="690" y="449">−             +</text>
+    <text x="676" y="510">Add line</text>
+    <text x="788" y="579" font-weight="600">Save draft</text>
   </g>
 </svg>
