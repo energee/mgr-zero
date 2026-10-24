@@ -9,6 +9,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { SquareSyncControls } from "@/components/mgr/views/pos-controls";
 import { navTitle } from "@/lib/mgr/nav";
+import { isSquareConfigured } from "@/lib/pos";
 
 export const metadata = { title: navTitle("/settings/pos") };
 
@@ -37,7 +38,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
   );
   const mapped = locations.filter(location => location.mgrLocationId).length;
   return <PointOfSaleView sales={sales} coverage={coverage} model={{
-    connected: health.connected, canDisconnect: disconnectStatus(health) === "available", merchant: health.merchantLabel ?? "Square seller", state: connectionStateLabel(health.state),
+    connected: health.connected, configured: isSquareConfigured(), canDisconnect: disconnectStatus(health) === "available", merchant: health.merchantLabel ?? "Square seller", state: connectionStateLabel(health.state),
     locations: locations.length ? `${mapped} mapped · ${locations.length - mapped} need mapping` : "No locations synced",
     lastSync: health.salesSyncedThrough ? formatDateTime(health.salesSyncedThrough, brewery.timeZone) : "No complete sales coverage yet",
     error: health.lastError, oauthFailed,

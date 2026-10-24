@@ -223,7 +223,7 @@ it("#1030 starts the Accounting cell at the left edge its header uses", () => {
 
 it("#1135 shows the sync only while QuickBooks is connected, and writes the email note for staff", () => {
   const draw = (connected: boolean, canConnect = true) => renderToStaticMarkup(createElement(InvoicesView, {
-    rows: [], connection: { connected, detail: "QuickBooks status", canConnect, connectHref: "/settings/accounting/connect" },
+    rows: [], connection: { connected, reconnect: true, detail: "QuickBooks status", canConnect, connectHref: "/settings/accounting/connect" },
     sync: createElement("span", null, "live sync"),
   }));
   expect(draw(true)).toContain("live sync");
@@ -246,4 +246,13 @@ it("#1135 falls back to the shared sync view only while connected", () => {
   }));
   expect(draw(true)).toContain("Sync QuickBooks");
   expect(draw(false)).not.toContain("Sync QuickBooks");
+});
+
+it("explains where invoices come from without requiring QuickBooks (#1261)", () => {
+  const html = renderToStaticMarkup(createElement(InvoicesView, { rows: [] }));
+  expect(html).toContain("No invoices yet");
+  expect(html).toMatch(/Invoices show here after you ship an order/);
+  expect(html).toMatch(/push them to QuickBooks or record payments in MGR/);
+  expect(html).toContain("MGR can’t tell whether QuickBooks emailed an invoice.");
+  expect(html).toContain(">Unavailable<");
 });

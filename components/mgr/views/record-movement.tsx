@@ -22,8 +22,8 @@ export type RecordMovementControls = Partial<Record<
 const QTY = 0;
 const DEST_STATE = 1;
 
-function Pick({ label, value, options, onChange, disabled, forward }: { label: string; value: string; options: string[]; onChange?: (value: string) => void; disabled?: boolean; forward?: boolean }) {
-  return E.pick(label, value, options, { onChange, disabled, forward, placeholder: `Select ${label.toLowerCase()}`, displayValue: value || undefined });
+function Pick({ label, value, options, onChange, disabled, forward, placeholder = `Select ${label.toLowerCase()}` }: { label: string; value: string; options: string[]; onChange?: (value: string) => void; disabled?: boolean; forward?: boolean; placeholder?: string }) {
+  return E.pick(label, value, options, { onChange, disabled, forward, placeholder, displayValue: value || undefined });
 }
 
 export function RecordMovementView({
@@ -41,13 +41,15 @@ export function RecordMovementView({
   const touched = useTouchedLines(!controls.qty);
   const qtyError = touched.shown(QTY) ? model.errors?.qty : undefined;
   const destStateError = touched.shown(DEST_STATE) ? model.errors?.destState : undefined;
+  let binPlaceholder = "Choose a location first";
+  if (model.location) binPlaceholder = model.binOptions.length ? "Select bin" : "No bins at this location";
   return (
     <>
-      <div className="md:hidden"><Pick label="Kind" value={model.kind} options={model.kindOptions} onChange={controls.kind} /></div>
-      <div className="hidden md:block"><ToggleGroup type="single" value={controls.kind ? model.kind : undefined} defaultValue={controls.kind ? undefined : model.kind} onValueChange={controls.kind} variant="outline" size="sm" className="flex-wrap justify-start">{model.kindOptions.map(option => <ToggleGroupItem key={option} value={option}>{option}</ToggleGroupItem>)}</ToggleGroup></div>
+      <div className="md:hidden"><Pick label="Movement type" value={model.kind} options={model.kindOptions} onChange={controls.kind} /></div>
+      <div className="hidden md:block"><ToggleGroup aria-label="Movement type" type="single" value={controls.kind ? model.kind : undefined} defaultValue={controls.kind ? undefined : model.kind} onValueChange={controls.kind} variant="outline" size="sm" className="flex-wrap justify-start">{model.kindOptions.map(option => <ToggleGroupItem key={option} value={option}>{option}</ToggleGroupItem>)}</ToggleGroup></div>
       {E.pick("SKU / package", model.skuId ?? model.sku, model.skuOptions, { id: `${id}-sku`, onChange: controls.sku, forward: true, placeholder: "Select SKU or package", displayValue: model.sku || undefined, empty: noSkus(model.skusHref) })}
       <Pick label="Location" value={model.location} options={model.locationOptions} onChange={controls.location} />
-      <Pick label="Bin" value={model.bin} options={model.binOptions} onChange={controls.bin} disabled={model.binOptions.length === 0} />
+      <Pick label="Bin" value={model.bin} options={model.binOptions} onChange={controls.bin} disabled={model.binOptions.length === 0} placeholder={binPlaceholder} />
       {model.channelOptions.length ? <Pick label="Channel" value={model.channel} options={model.channelOptions} onChange={controls.channel} /> : null}
       {model.destStateInput ? E.edit("Destination state", model.destState, "text", undefined, { id: `${id}-state`, onChange: controls.destState, onBlur: () => touched.touch(DEST_STATE), error: destStateError, required: true, maxLength: 2, pattern: "[A-Za-z]{2}", placeholder: "PA" })
         : model.destStateOptions.length ? <Pick label="Destination state" value={model.destState} options={model.destStateOptions} onChange={controls.destState} /> : null}

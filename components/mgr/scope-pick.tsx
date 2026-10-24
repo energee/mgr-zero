@@ -41,6 +41,6 @@ function Pick({ label, value, options, search, open }: ScopePickProps & { open?:
     if (href) open?.(href);
   };
   return search
-    ? E.searchPick(label, value, options, { id, onChange: pick, previewAction: !options.some((option) => option.href) })
+    ? E.searchPick(label, value, options, { id, onChange: pick, outlined: true, previewAction: !options.some((option) => option.href) })
     : E.pick(label, value, options, { id, onChange: pick });
 }

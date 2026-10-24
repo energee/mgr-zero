@@ -6,6 +6,7 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QuickBooksMark } from "@/components/mgr/brand-icons";
 import type { InvoiceListRow } from "@/lib/mgr/invoices-view";
+import { integrationUnavailableReason } from "@/lib/mgr/integration-availability";
 import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 import { QboSyncView } from "./accounting";
 import { RecordTable } from "./record-table";
@@ -55,15 +56,25 @@ function Register({ rows }: { rows: InvoiceListRow[] }) {
 /** The staff Invoices register. `sync` is the manual sync control: the live
  *  page passes its QboSyncButton, the inventory a QboSyncView with fixture
  *  status; omitted, a static QboSyncView is drawn. */
-export function InvoicesView({ rows, backHref, connection, sync, pagination }: { pagination?: HistoryNavigationProps; rows: InvoiceListRow[]; backHref?: string; connection?: { connected: boolean; detail: string; connectHref?: string; canConnect: boolean }; sync?: ReactNode }) {
+export function InvoicesView({ rows, backHref, connection, sync, pagination }: { pagination?: HistoryNavigationProps; rows: InvoiceListRow[]; backHref?: string; connection?: { connected: boolean; configured?: boolean; reconnect?: boolean; detail: string; connectHref?: string; canConnect: boolean }; sync?: ReactNode }) {
+  let connectAction: ReactNode = null;
+  if (connection && !connection.connected) {
+    if (connection.configured === false) connectAction = E.act("Connect", "attention", undefined, undefined, true);
+    else if (connection.canConnect) connectAction = E.act("Connect", "attention", connection.connectHref);
+    else connectAction = "Admin must connect";
+  }
   return <>
     {E.back("More", "Invoices", undefined, backHref)}
-    {connection ? E.row("QuickBooks", connection.detail, connection.connected ? "" : connection.canConnect ? E.act("Connect", "attention", connection.connectHref) : "Admin must connect", connection.connected ? "ok" : "w", QuickBooksMark) : E.fld("QuickBooks", "Financial actions require Admin or Sales")}
+    {connection ? E.row("QuickBooks", connection.detail, connectAction, connection.connected ? "ok" : "w", QuickBooksMark) : E.fld("QuickBooks", "Financial actions require Admin or Sales")}
+    {connection && !connection.connected && connection.configured === false && <p className="text-sm text-muted-foreground">{integrationUnavailableReason.quickbooks}</p>}
     {/* Sync needs a live connection; while disconnected the QuickBooks row above carries the only next step. */}
     {connection?.connected && (sync !== undefined ? sync : <QboSyncView />)}
-    {connection && !connection.connected && E.info("Payment status may be stale until QuickBooks is reconnected and synced.")}
-    {rows.length ? <Register rows={rows} /> : E.blank("No invoices yet")}
+    {connection && !connection.connected && connection.reconnect && E.info("Payment status may be stale until QuickBooks is reconnected and synced.")}
+    {rows.length ? <Register rows={rows} /> : E.blank({ title: "No invoices yet", description: "Invoices show here after you ship an order. You can then push them to QuickBooks or record payments in MGR." })}
     <HistoryNavigation {...pagination} />
-    {E.gated("Email delivery status", "MGR can’t tell whether QuickBooks emailed an invoice.")}
+    <div>
+      {E.gated("Email delivery status", "Unavailable")}
+      {E.polite("MGR can’t tell whether QuickBooks emailed an invoice.")}
+    </div>
   </>;
 }

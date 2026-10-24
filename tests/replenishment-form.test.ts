@@ -56,3 +56,4 @@ it("builds only positive lines, so an all-zero order has none to submit (#447)",
   expect(replenishmentLines(suggestions, { a: "0", b: "", c: "3" })).toEqual([{ skuId: "c", qty: 3 }]);
   expect(replenishmentLines(suggestions, { a: "0", b: "0", c: "0" })).toEqual([]);
 });
+
