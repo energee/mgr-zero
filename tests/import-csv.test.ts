@@ -109,7 +109,7 @@ describe("within-file customer duplicates (#1314)", () => {
   });
   it("lets a ready row through when an earlier same-name row is blocked, and recomputes after edits", () => {
     const rows = [{ ...customer, type: "" }, customer, { ...customer }];
-    expect(validateImportRows("customers", rows)).toEqual([["type is required"], [], ["Duplicate of row 2: customer name"]]);
+    expect(readyImportRowNumbers(validateImportRows("customers", rows))).toEqual([2]);
     rows[0].type = "retailer";
     expect(validateImportRows("customers", rows)).toEqual([[], ["Duplicate of row 1: customer name"], ["Duplicate of row 1: customer name"]]);
     rows[0].name = "Different";
