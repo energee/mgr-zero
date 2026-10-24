@@ -163,6 +163,43 @@ describe("Channel view", () => {
     expect(source).not.toMatch(/components\/ui\/(input|label|select)/);
   });
 
+  it.each(["", " \t\n\u00a0\ufeff"])("withholds Save for a blank channel name %j", name => {
+    const html = htmlOf(createElement(ChannelView, { model: toChannelViewProps({ ...channelExport, name }) }));
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Save channel<\/button>/);
+    expect(html).toContain("Still needed: a channel name.");
+  });
+
+  it("enables Save for a trimmed nonblank name", () => {
+    const html = htmlOf(createElement(ChannelView, { model: toChannelViewProps({ ...channelExport, name: " DTC " }) }));
+    expect(html).toMatch(/<button(?![^>]*disabled=)[^>]*>Save channel<\/button>/);
+  });
+
+  it("links a duplicate-name error to the name input", () => {
+    const html = htmlOf(createElement(ChannelView, {
+      model: toChannelViewProps(channelExport),
+      nameError: "A channel named DTC already exists.",
+    }));
+    expect(html).toMatch(/<input[^>]*aria-invalid="true"/);
+    const errorId = /<input[^>]*aria-describedby="([^"]+)"/.exec(html)?.[1];
+    expect(errorId).toBeDefined();
+    expect(html).toContain(`id="${errorId}"`);
+    expect(html).toContain("A channel named DTC already exists.");
+  });
+
+  it("keeps the same withheld submit when the live surface wraps the footer", () => {
+    const html = htmlOf(createElement(ChannelView, {
+      model: toChannelViewProps({ ...channelExport, name: " " }),
+      footer: save => createElement("footer", null, save),
+    }));
+    expect(html).toMatch(/<footer>.*Still needed: a channel name\..*<button[^>]*disabled=""[^>]*>Save channel<\/button><\/footer>/);
+  });
+
+  it("disables Save during submission and honors an explicitly suppressed footer", () => {
+    const model = toChannelViewProps(channelExport);
+    expect(htmlOf(createElement(ChannelView, { model, submitting: true }))).toMatch(/<button[^>]*disabled=""[^>]*>Saving…<\/button>/);
+    expect(htmlOf(createElement(ChannelView, { model, footer: null }))).not.toContain("Save channel");
+  });
+
   it("maps Export onto chips index 1", () => {
     const model = toChannelViewProps(channelExport);
     expect(model.name).toBe("Export");
