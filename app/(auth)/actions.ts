@@ -13,6 +13,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createRequestAuthContext, homePath } from "@/lib/auth/request-context";
 import { acceptInviteErrorPath, hasPendingInvitations, inviteAudience, inviteLanding } from "@/lib/auth/invite";
+import { passwordReturnHref } from "@/lib/mgr/entry-view";
 import { hasRecentRecovery, PASSWORD_SAVED_COOKIE, passwordChangeErrors, signInPath } from "@/lib/auth/password";
 import { createServerClient, verifyCurrentPassword } from "@/lib/supabase/server";
 
@@ -64,6 +65,8 @@ export async function sendReset(form: FormData) {
 /** Changing a password requires current credentials or an Auth-verified recovery grant. */
 export async function savePassword(form: FormData) {
   const db = await createServerClient();
+  const next = form.get("next");
+  const returnQuery = typeof next === "string" ? `&${new URLSearchParams({ next: passwordReturnHref(next) })}` : "";
   const { data: { user }, error: identityError } = await db.auth.getUser();
   if (identityError || !user) redirect("/reset?expired=1");
   const { data: verified, error: claimsError } = await db.auth.getClaims();
@@ -75,19 +78,19 @@ export async function savePassword(form: FormData) {
   };
   const errors = passwordChangeErrors(fields, recovery);
   const invalid = Object.keys(errors)[0];
-  if (invalid) redirect(`/password?error=${invalid}`);
+  if (invalid) redirect(`/password?error=${invalid}${returnQuery}`);
   if (!recovery) {
     // A password is checked against the account's email; without one there is nothing to check.
-    if (!user.email) redirect("/password?error=reauth_failed");
+    if (!user.email) redirect(`/password?error=reauth_failed${returnQuery}`);
     // Use the server-verified account, never an email or recovery flag from the form.
     const reauthError = await verifyCurrentPassword(user.email, fields.currentPassword, user.id);
-    if (reauthError) redirect(`/password?error=${reauthError === "invalid_credentials" ? "wrong_current" : "reauth_failed"}`);
+    if (reauthError) redirect(`/password?error=${reauthError === "invalid_credentials" ? "wrong_current" : "reauth_failed"}${returnQuery}`);
   }
   const { error } = await db.auth.updateUser({
     password: fields.password,
     ...(!recovery ? { current_password: fields.currentPassword } : {}),
   });
-  if (error) redirect(`/password?error=${encodeURIComponent(error.code ?? "1")}`);
+  if (error) redirect(`/password?error=${encodeURIComponent(error.code ?? "1")}${returnQuery}`);
   // Read while the session still exists: a buyer signs in again on the portal's page.
   const destination = await homePath(createRequestAuthContext(() => Promise.resolve(db)));
   const portal = destination === "/portal";
@@ -96,10 +99,10 @@ export async function savePassword(form: FormData) {
   (await cookies()).set(PASSWORD_SAVED_COOKIE, "1", { path: "/password", maxAge: 600, httpOnly: true, sameSite: "lax" });
   const { error: revokeError } = await db.auth.signOut({ scope: "others" });
   // The password has already changed: never ask the user to resubmit it on a revocation failure.
-  if (revokeError) redirect(savedPath(portal, "revoke_failed"));
+  if (revokeError) redirect(`${savedPath(portal, "revoke_failed")}${returnQuery}`);
   if (recovery) {
     const { error: signOutError } = await db.auth.signOut({ scope: "local" });
-    if (signOutError) redirect(savedPath(portal, "signout_failed"));
+    if (signOutError) redirect(`${savedPath(portal, "signout_failed")}${returnQuery}`);
     redirect(signInPath(portal));
   }
   redirect(destination);

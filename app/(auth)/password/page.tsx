@@ -9,16 +9,18 @@ import { redirect } from "next/navigation";
 import { E } from "@/components/mgr/e";
 import { EntrySurface } from "@/components/mgr/entry-surface";
 import { EntryView } from "@/components/mgr/views/entry";
-import { toPasswordSavedViewProps, toSetPasswordViewProps } from "@/lib/mgr/entry-view";
+import { passwordReturnHref, toPasswordSavedViewProps, toSetPasswordViewProps } from "@/lib/mgr/entry-view";
 import { MgrIcon } from "@/components/mgr-icon";
 import { hasRecentRecovery, PASSWORD_SAVED_COOKIE, signInPath } from "@/lib/auth/password";
 import { createRequestAuthContext, homePath } from "@/lib/auth/request-context";
 import { createServerClient } from "@/lib/supabase/server";
 import { endPasswordSessions, savePassword } from "../actions";
 
-export default async function PasswordPage({ searchParams }: { searchParams: Promise<{ error?: string; saved?: string; portal?: string }> }) {
+export const metadata = { title: "Change password" };
+
+export default async function PasswordPage({ searchParams }: { searchParams: Promise<{ error?: string; next?: string; saved?: string; portal?: string }> }) {
   const db = await createServerClient();
-  const [{ error, saved, portal }, { data: { user } }, { data: verified, error: claimsError }, cookieStore] = await Promise.all([
+  const [{ error, next, saved, portal }, { data: { user } }, { data: verified, error: claimsError }, cookieStore] = await Promise.all([
     searchParams, db.auth.getUser(), db.auth.getClaims(), cookies(),
   ]);
   // Local/global signOut clears cookies even on some provider failures. The
@@ -33,8 +35,9 @@ export default async function PasswordPage({ searchParams }: { searchParams: Pro
   const recovery = !claimsError && hasRecentRecovery(verified?.claims ?? null, user.id);
   const buyer = (await homePath(createRequestAuthContext(() => Promise.resolve(db)))) === "/portal";
   const model = toSetPasswordViewProps(user.email ?? "signed in", error, recovery);
+  const backHref = passwordReturnHref(next ?? (buyer ? "/portal" : "/"));
   return <EntrySurface>
     {E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>)}
-    <EntryView model={model} action={savePassword} linkHref={buyer ? "/reset?portal=1" : "/reset"} />
+    <EntryView model={model} action={savePassword} linkHref={buyer ? "/reset?portal=1" : "/reset"} secondaryHref={backHref} hidden={<input type="hidden" name="next" value={backHref} />} />
   </EntrySurface>;
 }

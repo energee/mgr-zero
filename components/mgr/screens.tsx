@@ -236,7 +236,7 @@ import { toConfirmOrderViewProps } from "@/lib/mgr/confirm-order-view";
 import { toLicensesViewProps } from "@/lib/mgr/licenses-view";
 import { toCustomerViewProps } from "@/lib/mgr/customer-view";
 import { toCustomersViewProps } from "@/lib/mgr/customers-view";
-import { toAcceptInviteViewProps } from "@/lib/mgr/entry-view";
+import { pageNotFoundModel, toAcceptInviteViewProps } from "@/lib/mgr/entry-view";
 import { toFinishedGoodsViewProps } from "@/lib/mgr/finished-goods-view";
 import { toFormatViewProps } from "@/lib/mgr/format-view";
 import { toFormatsViewProps } from "@/lib/mgr/formats-view";
@@ -548,6 +548,15 @@ export const SCREENS: Screen[] = [
     states: [["bookmarked", "direct URL · denied, not empty rows", 1], ["revoked mid-session", "the next command is refused; the shell stays usable", 1]],
     spec: "Plan §3: navigation and Today hide inapplicable actions while the registry and RLS still deny direct URLs and commands, so this frame exists for the URL, not for a link. It names the refusal and the role that would satisfy it, never a blank table, a spinner, or the shape of data the caller may not read.",
     body: <DeniedView model={deniedInvoices} />,
+  },
+  {
+    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Page not found",
+    job: "Leave an unknown address and return to Today",
+    reads: "none", writes: "none",
+    states: [["unknown route", "the link is wrong or out of date"]],
+    to: { "Back to Today": "Today" },
+    hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
+    body: <EntryView model={pageNotFoundModel} />,
   },
   {
     step: 2, slice: 1, group: "Entry", surface: "entry", name: "No membership",

@@ -13,6 +13,7 @@ export type EntryViewModel = {
   info?: string;
   note?: string;
   error?: string;
+  passwordRules?: string;
   passwordErrors?: PasswordErrors;
   extraPrimary?: string;
 };
@@ -50,6 +51,11 @@ export const expiredResetModel: EntryViewModel = {
   title: "Reset link expired", inputs: [],
   note: "This reset link is no longer valid.", primary: "Request a new link",
 };
+
+export const pageNotFoundModel: EntryViewModel = {
+  title: "Not found", inputs: [], primary: "Back to Today",
+  note: "There is no page at this address. The link may be wrong or out of date.",
+};
 /** `?error=` codes savePassword passes back: Supabase Auth codes, field names, and its own reauthentication codes. */
 const SET_PASSWORD_ERRORS: Record<string, string> = {
   same_password: "Choose a password different from your current one.",
@@ -74,12 +80,21 @@ export function toSetPasswordViewProps(account: string, error?: string, recovery
   return {
     title: "Change password",
     inputs: [...(recovery ? [] : ["Current password"]), "Choose a password", "Confirm new password"],
-    field: { label: "Account", value: account }, primary: "Save password",
+    field: { label: "Account", value: account }, primary: "Save password", secondary: "Back to MGR",
+    passwordRules: "Use at least 8 characters and choose a password different from your current one.",
     note: recovery ? "Your reset link verified this account. Choose and confirm your new password." : undefined,
     link: { label: "Need a reset link?", to: "Reset password" },
     // A field's error is drawn beside that field; only the rest go in the top alert.
     error: Object.keys(passwordErrors).length ? undefined : message, passwordErrors,
   };
+}
+
+/** Only local destinations may leave the password card; direct/recovery visits return to Today. */
+export function passwordReturnHref(next?: string): string {
+  if (!next || !/^\/(?!\/)[^\s\\]*$/.test(next)) return "/";
+  const destination = new URL(next, "https://mgr.invalid");
+  if (destination.pathname === "/password" || destination.pathname.startsWith("//")) return "/";
+  return `${destination.pathname}${destination.search}${destination.hash}`;
 }
 
 /** This outcome must remain readable after Auth clears cookies on a failed sign-out. */
