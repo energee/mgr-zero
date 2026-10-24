@@ -14,6 +14,7 @@ import { redirect } from "next/navigation";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
 import { acceptInviteErrorPath, hasPendingInvitations, inviteAudience, inviteLanding } from "@/lib/auth/invite";
 import { createServerClient } from "@/lib/supabase/server";
+import { passwordReturnHref } from "@/lib/mgr/entry-view";
 
 /** The brewery and customer selection cookies share these options. */
 const SELECTION_COOKIE = { path: "/", sameSite: "lax" } as const;
@@ -73,7 +74,12 @@ export async function savePassword(form: FormData) {
   const db = await createServerClient();
   const { error } = await db.auth.updateUser({ password: String(form.get("password")) });
   // The code, never the message: the page maps it to fixed text (toSetPasswordViewProps).
-  if (error) redirect(`/password?error=${encodeURIComponent(error.code ?? "1")}`);
+  if (error) {
+    const query = new URLSearchParams({ error: error.code ?? "1" });
+    const next = form.get("next");
+    if (typeof next === "string") query.set("next", passwordReturnHref(next));
+    redirect(`/password?${query}`);
+  }
   redirect(await home(createRequestAuthContext(() => Promise.resolve(db))));
 }
 

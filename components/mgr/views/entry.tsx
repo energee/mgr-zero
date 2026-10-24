@@ -4,10 +4,10 @@
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup } from "@/components/ui/field";
 import type { EntryViewModel } from "@/lib/mgr/entry-view";
 import type { ReactNode } from "react";
-import { Fragment } from "react";
+import { Fragment, useId, useState } from "react";
 
 export type { EntryViewModel };
 
@@ -32,12 +32,16 @@ export function EntryView({
   hidden?: ReactNode;
   defaults?: Record<string, string | undefined>;
 }) {
+  const [showPassword, setShowPassword] = useState(false);
+  const passwordRulesId = useId();
   const emailLink = model.secondaryEmailOnly;
   const fields = model.inputs.map(label => {
     const password = label.toLowerCase().includes("password");
     const name = label === "Email" ? "email" : label === "Your name" ? "name" : "password";
+    let type = label === "Email" ? "email" : "text";
+    if (password && !showPassword) type = "password";
     return (
-      <Fragment key={label}>{E.edit(label, String((defaults[name]) ?? ""), password ? "password" : label === "Email" ? "email" : "text", undefined, { name, required: true, minLength: label === "Choose a password" ? 8 : undefined, autoComplete: label === "Email" ? "email" : label === "Your name" ? "name" : label === "Password" ? "current-password" : "new-password", "aria-label": label })}</Fragment>
+      <Fragment key={label}>{E.edit(label, String((defaults[name]) ?? ""), type, undefined, { name, required: true, minLength: label === "Choose a password" ? 8 : undefined, autoComplete: label === "Email" ? "email" : label === "Your name" ? "name" : label === "Password" ? "current-password" : "new-password", "aria-label": label, "aria-describedby": password && model.passwordRules ? passwordRulesId : undefined })}</Fragment>
     );
   });
   const primary = primaryHref === null ? null : primaryHref ? (
@@ -46,7 +50,9 @@ export function EntryView({
   const controls = (
     <FieldGroup>
       {hidden}
+      {model.passwordRules && <FieldDescription id={passwordRulesId}>{model.passwordRules}</FieldDescription>}
       {fields}
+      {model.passwordRules && <Button type="button" variant="outline" aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? "Hide password" : "Show password"}</Button>}
       {primary ? <Field>{primary}</Field> : null}
       {model.secondary ? (
         <Field>

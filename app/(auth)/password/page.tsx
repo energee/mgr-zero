@@ -6,17 +6,21 @@ import { redirect } from "next/navigation";
 import { E } from "@/components/mgr/e";
 import { EntrySurface } from "@/components/mgr/entry-surface";
 import { EntryView } from "@/components/mgr/views/entry";
-import { toSetPasswordViewProps } from "@/lib/mgr/entry-view";
+import { passwordReturnHref, toSetPasswordViewProps } from "@/lib/mgr/entry-view";
 import { MgrIcon } from "@/components/mgr-icon";
-import { getRequestIdentity } from "@/lib/auth/request-context";
+import { getCustomerMemberships, getRequestIdentity, getStaffMemberships } from "@/lib/auth/request-context";
 import { savePassword } from "../actions";
 
-export default async function PasswordPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const [{ error }, identity] = await Promise.all([searchParams, getRequestIdentity()]);
+export const metadata = { title: "Change password" };
+
+export default async function PasswordPage({ searchParams }: { searchParams: Promise<{ error?: string; next?: string }> }) {
+  const [{ error, next }, identity] = await Promise.all([searchParams, getRequestIdentity()]);
   if (!identity) redirect("/reset?expired=1");
   const model = toSetPasswordViewProps(identity.email ?? "signed in", error);
+  let backHref = passwordReturnHref(next);
+  if (!next && !(await getStaffMemberships()).length && (await getCustomerMemberships()).length) backHref = "/portal";
   return <EntrySurface>
     {E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>)}
-    <EntryView model={model} action={savePassword} />
+    <EntryView model={model} action={savePassword} secondaryHref={backHref} hidden={next ? <input type="hidden" name="next" value={backHref} /> : undefined} />
   </EntrySurface>;
 }

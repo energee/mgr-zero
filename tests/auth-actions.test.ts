@@ -10,7 +10,7 @@ vi.mock("next/headers", () => ({
 }));
 vi.mock("next/navigation", () => ({ redirect }));
 
-import { emailLogin } from "@/app/(auth)/actions";
+import { emailLogin, savePassword } from "@/app/(auth)/actions";
 
 describe("passwordless sign-in", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -39,10 +39,17 @@ describe("passwordless sign-in", () => {
 
 describe("set new password", () => {
   it("redirects with the Supabase error code, never its message (#472)", async () => {
-    const { savePassword } = await import("@/app/(auth)/actions");
     auth.updateUser.mockResolvedValue({ error: { code: "same_password", message: "New password should be different from the old password." } });
     const form = new FormData();
     form.set("password", "hunter2hunter2");
     await expect(savePassword(form)).rejects.toThrow("redirect:/password?error=same_password");
+  });
+
+  it("preserves the local exit after a refused password (#1250)", async () => {
+    auth.updateUser.mockResolvedValue({ error: { code: "same_password" } });
+    const form = new FormData();
+    form.set("password", "dev-password-1");
+    form.set("next", "/orders");
+    await expect(savePassword(form)).rejects.toThrow("redirect:/password?error=same_password&next=%2Forders");
   });
 });

@@ -12,6 +12,7 @@ export type EntryViewModel = {
   info?: string;
   note?: string;
   error?: string;
+  passwordRules?: string;
   extraPrimary?: string;
 };
 
@@ -48,6 +49,11 @@ export const expiredResetModel: EntryViewModel = {
   title: "Reset link expired", inputs: [],
   note: "This reset link is no longer valid.", primary: "Request a new link",
 };
+
+export const pageNotFoundModel: EntryViewModel = {
+  title: "Not found", inputs: [], primary: "Back to Today",
+  note: "There is no page at this address. The link may be wrong or out of date.",
+};
 /** Supabase Auth error codes savePassword passes back as `?error=`. */
 const SET_PASSWORD_ERRORS: Record<string, string> = {
   same_password: "Choose a password different from your current one.",
@@ -60,5 +66,13 @@ const SET_PASSWORD_ERRORS: Record<string, string> = {
  */
 export function toSetPasswordViewProps(account: string, error?: string): EntryViewModel {
   const message = error ? SET_PASSWORD_ERRORS[error] ?? "Your password was not saved. Try again." : undefined;
-  return { title: "Change password", inputs: ["Choose a password"], field: { label: "Account", value: account }, primary: "Save password", error: message };
+  return { title: "Change password", inputs: ["Choose a password"], field: { label: "Account", value: account }, primary: "Save password", secondary: "Back to MGR", passwordRules: "Use at least 8 characters and choose a password different from your current one.", error: message };
+}
+
+/** Only local destinations may leave the password card; direct/recovery visits return to Today. */
+export function passwordReturnHref(next?: string): string {
+  if (!next || !/^\/(?!\/)[^\s\\]*$/.test(next)) return "/";
+  const destination = new URL(next, "https://mgr.invalid");
+  if (destination.pathname === "/password" || destination.pathname.startsWith("//")) return "/";
+  return `${destination.pathname}${destination.search}${destination.hash}`;
 }

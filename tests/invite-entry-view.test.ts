@@ -4,8 +4,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { AccountInvitationsView } from "../components/mgr/views/account-invitations";
 import { EntryView } from "../components/mgr/views/entry";
-import { toAcceptInviteViewProps, toSetPasswordViewProps } from "../lib/mgr/entry-view";
+import { passwordReturnHref, toAcceptInviteViewProps, toSetPasswordViewProps } from "../lib/mgr/entry-view";
 import { expiredInvite } from "../lib/mgr/fixtures/entry";
+import NotFound, { metadata as notFoundMetadata } from "../app/not-found";
 
 it("keeps fixture dependencies out of live password and account entry pages", () => {
   for (const page of ["password", "reset", "no-membership"]) {
@@ -28,6 +29,32 @@ it("shows fixed text for a ?error= code, never the query string itself (#472)", 
 
 it("heads the password page Change password, like the Me link that opens it (#1108)", () => {
   expect(toSetPasswordViewProps("a@example.com").title).toBe("Change password");
+});
+
+it("shows password rules and a reveal control before saving, with an explicit exit (#1250)", () => {
+  const model = toSetPasswordViewProps("actual@example.com");
+  const html = renderToStaticMarkup(createElement(EntryView, { model, secondaryHref: "/orders" }));
+  expect(html).toContain("at least 8 characters");
+  expect(html.indexOf("at least 8 characters")).toBeLessThan(html.indexOf('name="password"'));
+  expect(html).toContain("Show password");
+  expect(html).toContain('aria-pressed="false"');
+  expect(html).toContain('href="/orders"');
+  expect(html).toContain("Back to MGR");
+});
+
+it("gives unmatched routes a link to Today (#1250)", () => {
+  const html = renderToStaticMarkup(createElement(NotFound));
+  expect(html).toContain('href="/"');
+  expect(html).toContain("Back to Today");
+  expect(notFoundMetadata.title).toBe("Not found");
+});
+
+it("keeps password exits local and usable even for a crafted return link (#1250)", () => {
+  expect(passwordReturnHref("/orders?status=draft#latest")).toBe("/orders?status=draft#latest");
+  expect(passwordReturnHref("/portal/account")).toBe("/portal/account");
+  for (const next of [undefined, "//evil.example", "/\\evil.example", "/\t/evil.example", "https://evil.example", "/password", "/.//evil.example"]) {
+    expect(passwordReturnHref(next)).toBe("/");
+  }
 });
 
 it("binds verified invitation display data and keeps password validation", () => {
