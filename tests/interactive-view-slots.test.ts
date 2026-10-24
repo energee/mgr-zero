@@ -13,7 +13,6 @@ it.each([
   ["Confirm order", "footer", "Cancel order"],
   ["Complete transfer", "footer", "Complete transfer"],
   ["Put back", "footer", "Put back 3"],
-  ["Pars and allocation", "footer", "Adjust selected"],
   ["Order detail", "footer", "Reorder"],
 ])("%s retains omitted fixture controls but suppresses an explicit null %s", (name, slot, label) => {
   const body = SCREENS.find(screen => screen.name === name)!.body as ReactElement<Record<string, unknown>>;
@@ -23,6 +22,18 @@ it.each([
   expect(omitted).toMatch(button);
   expect(suppressed).not.toMatch(button);
   if (name === "Order") expect(suppressed).not.toContain("Cancel asks you to confirm");
+});
+
+it.each([
+  ["quantityActions", "Set taproom par"],
+  ["submitAction", "Create replenishment order"],
+])("Replenishment retains omitted fixture actions and suppresses null %s", (slot, label) => {
+  const demo = SCREENS.find(screen => screen.name === "Pars and allocation")!.body as ReactElement<{ children: ReactElement<Record<string, unknown>> }>;
+  const view = demo.props.children;
+  const omitted = renderToStaticMarkup(cloneElement(view, { [slot]: undefined }));
+  const suppressed = renderToStaticMarkup(cloneElement(view, { [slot]: null }));
+  expect(omitted).toContain(label);
+  expect(suppressed).not.toContain(label);
 });
 
 it("explicit null invoice question and QBO slots suppress their fixture actions", () => {

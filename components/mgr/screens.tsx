@@ -117,7 +117,8 @@ import { OrderView } from "@/components/mgr/views/order";
 import { OrdersView } from "@/components/mgr/views/orders-list";
 import { PackageBomView } from "@/components/mgr/views/package-bom";
 import { PackagingRunsView } from "@/components/mgr/views/packaging-runs";
-import { ParsView } from "@/components/mgr/views/pars";
+import { ReplenishmentDemo } from "@/components/mgr/replenishment-demo";
+import { ReplenishmentView } from "@/components/mgr/views/replenishment";
 import { PickView } from "@/components/mgr/views/pick";
 import { PickSheetView } from "@/components/mgr/views/pick-sheet";
 import { PlanningView } from "@/components/mgr/views/planning";
@@ -194,7 +195,7 @@ import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, re
 import { binCold, locationBinsTaproom, locationTaproom, locationsList } from "@/lib/mgr/fixtures/locations";
 import { newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
-import { parsPils } from "@/lib/mgr/fixtures/pars";
+import { replenishmentDemo } from "@/lib/mgr/fixtures/replenishment";
 import {
   batchesBrewer, brewDayTurnsHazy, brewPrepMineral, brewTimelineMineral, closePackagingRunHazy, FERM_STAGES, MASH_STEPS, recipeBrandOptions, recipeHazyV4, recipesList, WATER_HAZY,
   runClosedHazy, scheduleBatchHazy, vesselFv3, vesselNew,
@@ -260,7 +261,6 @@ import { toNewTransferViewProps } from "@/lib/mgr/new-transfer-view";
 import { toOrderViewProps } from "@/lib/mgr/order-view";
 import { toOrdersListViewProps } from "@/lib/mgr/orders-list-view";
 import { toPackageBomViewProps } from "@/lib/mgr/package-bom-view";
-import { toParsViewProps } from "@/lib/mgr/pars-view";
 import { toPickViewProps } from "@/lib/mgr/pick-view";
 import { toPickSheetViewProps } from "@/lib/mgr/pick-sheet-view";
 import { toPortalAccountViewProps } from "@/lib/mgr/portal-account-view";
@@ -1202,15 +1202,15 @@ export const SCREENS: Screen[] = [
   {
     step: 5,
     slice: 1,
-    tab: "Beer",
+    tab: "Work",
     name: "Pars and allocation",
-    to: { Release: "Order", Adjust: "Order", "Edit par": "Bin", "Taproom par": "Bin" },
-    job: "Change named quantities; never invent priority",
-    reads: "get_shortfalls · list_standing_allocations",
-    writes: "adjust_order_lines · release_allocation · set_taproom_par · set_standing_allocation",
-    states: [...DEFAULT_STATES, ["ATP negative", "a standing allocation saved past ATP: Allocation saved · ATP negative for … · Done"]],
-    spec: "There is no ranking command or priority column; every change is a named quantity edit. Taproom par sets the selected taproom's target for a SKU; standing allocation reserves a named SKU quantity without an order. Releasing a standing allocation returns its quantity to ATP without moving stock.",
-    body: <ParsView model={toParsViewProps(parsPils)} />,
+    to: { "Create replenishment order": "Order" },
+    job: "Replenish a taproom and review reservations across all locations",
+    reads: "list_locations · list_skus · replenishment_suggestions · get_shortfalls · list_standing_allocations",
+    writes: "create_replenishment_order · release_allocation · set_taproom_par · set_standing_allocation",
+    states: [...DEFAULT_STATES, ["no taprooms", "add a taproom under Locations"], ["no pars", "no suggestions for this taproom"], ["no shortfalls", "no current global shortfalls"], ["no standing allocations", "none reserved for this taproom"], ["missing source", "no other Warehouse location; creation remains unavailable"], ["filtered SKU", "only global shortfalls are filtered; its reservation detail starts open"], ["read-only", "Warehouse sees quantities but no mutation controls"], ["ATP negative", "a standing allocation saved past ATP: Allocation saved · ATP negative for … · Done"]],
+    spec: "Replenishment has one page title and three sections: Taproom replenishment, Standing allocations, and Shortfalls across all locations. Location and From warehouse precede the editable SKU table. Numeric and SKU-name sorting retains the browser's last choice; draft quantities stay with their SKU. Shortfall reservation details expand only when reviewed, and a Finished goods SKU filter does not narrow the taproom's suggestions. Par and standing-allocation edits remain named quantity changes, never priorities; release changes ATP without moving stock.",
+    body: <ReplenishmentDemo><ReplenishmentView model={replenishmentDemo} fromLocationId="" qtys={{}} /></ReplenishmentDemo>,
   },
   {
     step: 5,

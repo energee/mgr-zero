@@ -1,84 +1,50 @@
-// app/(app)/replenishment/replenish-form.tsx — source-warehouse select plus
-// an editable par/on-hand/suggested table; submits create_replenishment_order
-// (fromLocationId, toLocationId, lines), which creates a confirmed taproom
-// transfer order in one step. With no other warehouse, From warehouse says how
-// a location becomes one; the create button names what it still needs
-// (replenishReason).
 "use client";
 
 import { useState } from "react";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
+import { ReplenishmentView } from "@/components/mgr/views/replenishment";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { replenishmentLines, replenishReason } from "@/lib/replenishment-form";
+import type { ReplenishmentViewModel } from "@/lib/mgr/replenishment-view";
+import { QuantityForm, ReleaseAllocationForm } from "./quantity-form";
 
-type Suggestion = { skuId: string; sku: string; par: number; onHand: number; suggested: number };
-type Location = { id: string; name: string };
-
-function initialQtys(suggestions: Suggestion[]) {
-  return Object.fromEntries(suggestions.map((s) => [s.skuId, String(s.suggested)]));
-}
-
-export function ReplenishForm({
-  toLocationId,
-  canCreate,
-  warehouses,
-  suggestions,
-}: {
-  toLocationId: string;
-  canCreate: boolean;
-  warehouses: Location[];
-  suggestions: Suggestion[];
+export function ReplenishForm({ model, skus }: {
+  model: ReplenishmentViewModel;
+  skus: { id: string; name: string }[];
 }) {
-  const [fromLocationId, setFromLocationId] = useState(warehouses[0]?.id ?? "");
-  const [qtys, setQtys] = useState<Record<string, string>>(() => initialQtys(suggestions));
-
-  const lines = replenishmentLines(suggestions, qtys);
+  const initialQtys = () => Object.fromEntries(model.suggestions.map(s => [s.skuId, String(s.suggested)]));
+  const [fromLocationId, setFromLocationId] = useState(model.warehouses[0]?.id ?? "");
+  const [qtys, setQtys] = useState<Record<string, string>>(initialQtys);
+  const lines = replenishmentLines(model.suggestions, qtys);
   const form = useCommandForm("create_replenishment_order", {
-    build: () => ({ fromLocationId, toLocationId, lines }),
-    reset: () => setQtys(initialQtys(suggestions)),
+    build: () => ({ fromLocationId, toLocationId: model.locationId, lines }),
+    reset: () => setQtys(initialQtys()),
   });
+  const parValues = Object.fromEntries(model.suggestions.map(s => [s.skuId, s.par]));
+  const standingValues = Object.fromEntries(model.allocations.map(a => [a.skuId, a.qty]));
 
-  return (
-    <form onSubmit={(e) => {
-      if (!canCreate) { e.preventDefault(); return; }
-      void form.submit(e);
-    }} className="flex flex-col gap-4">
-      {E.pick("From warehouse", fromLocationId, warehouses.map((w) => ({ value: w.id, label: w.name })), { id: "replen-from", placeholder: "Select warehouse", disabled: !canCreate, onChange: setFromLocationId, empty: { text: "No other location has the Warehouse use. An admin sets a location's Uses in Locations.", label: "Open Locations", href: "/locations" } })}
-
-      {suggestions.length ? (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-muted-foreground">
-              <th className="py-1 font-normal">SKU</th>
-              <th className="py-1 font-normal">Par</th>
-              <th className="py-1 font-normal">On hand</th>
-              <th className="py-1 font-normal">Suggested</th>
-              <th className="py-1 font-normal">Transfer qty</th>
-            </tr>
-          </thead>
-          <tbody>
-            {suggestions.map((s) => (
-              <tr key={s.skuId} className="border-t">
-                <td className="py-1">{s.sku}</td>
-                <td className="py-1">{s.par}</td>
-                <td className="py-1">{s.onHand}</td>
-                <td className="py-1">{s.suggested}</td>
-                <td className="py-1">
-                  {E.edit(`${s.sku} transfer quantity`, qtys[s.skuId] ?? "", "number", undefined, { hideLabel: true, disabled: !canCreate, min: 0, step: "any", onChange: qty => setQtys(prev => ({ ...prev, [s.skuId]: qty })) })}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p className="text-sm text-muted-foreground">No pars set for this taproom.</p>
-      )}
-
-      <CommandFormMessage error={form.error} />
-      {canCreate && <div className="flex flex-col gap-2">
-        {E.submit("Create replenishment order", { submitting: form.submitting, reason: replenishReason(fromLocationId, lines), busy: "Creating…", className: "w-fit" })}
-      </div>}
-    </form>
-  );
+  return <ReplenishmentView
+    model={model}
+    fromLocationId={fromLocationId}
+    qtys={qtys}
+    onWarehouse={setFromLocationId}
+    onQuantity={(skuId, qty) => setQtys(prev => ({ ...prev, [skuId]: qty }))}
+    onSubmit={event => {
+      if (!model.canEdit) { event.preventDefault(); return; }
+      void form.submit(event);
+    }}
+    quantityActions={model.canEdit && model.locationId ? <>
+      <QuantityForm key={`par-${JSON.stringify(parValues)}`} locationId={model.locationId} skus={skus} kind="par" values={parValues} />
+      <QuantityForm key={`standing-${JSON.stringify(standingValues)}`} locationId={model.locationId} skus={skus} kind="standing" values={standingValues} />
+    </> : null}
+    releaseAction={allocation => model.canEdit ? <ReleaseAllocationForm allocationId={allocation.id} sku={allocation.sku} qty={allocation.qty} /> : null}
+    feedback={<CommandFormMessage error={form.error} />}
+    submitAction={model.canEdit ? E.submit("Create replenishment order", {
+      submitting: form.submitting,
+      reason: replenishReason(fromLocationId, lines),
+      busy: "Creating…",
+      className: "w-fit",
+    }) : null}
+  />;
 }

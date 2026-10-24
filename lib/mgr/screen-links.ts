@@ -407,7 +407,11 @@ export const isInertOn = (screen: Screen, label: string, to?: string | null) => 
   const draftSku = screen.name === "Edit draft" && (/^Line \d+ SKU$/.test(l) || l === "Pils - case" || l === "Stout - case");
   // The Ingredient sheet's material picker opens its own search; elsewhere "Material" walks to the Material screen.
   const ingredientMaterial = screen.name === "Ingredient" && l === "Material";
-  return !authored(screen, l, to) && (localMapping || draftSku || ingredientMaterial || INERT.some((k) => matches(k, l)));
+  const replenishmentAction = screen.name === "Pars and allocation" && (
+    ["Set taproom par", "Set standing allocation", "Review", "All shortfalls"].includes(l)
+    || /^(Order \d+ · |Standing allocation · )/.test(l)
+  );
+  return !authored(screen, l, to) && (localMapping || draftSku || ingredientMaterial || replenishmentAction || INERT.some((k) => matches(k, l)));
 };
 const isPortalSide = (name: string) => {
   const s = screenByName(name)?.[1];

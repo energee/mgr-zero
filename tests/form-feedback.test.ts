@@ -358,6 +358,9 @@ describe("live forms withhold their submit with the reason", () => {
   });
 
   it("Create replenishment order, with no warehouse and no lines", () => {
-    withheld(html(createElement(ReplenishForm, { toLocationId: "t", canCreate: true, warehouses: [], suggestions: [] })), "Still needed: a warehouse to send from and a transfer quantity above zero.");
+    withheld(html(createElement(ReplenishForm, {
+      model: { locationId: "t", locationName: "Taproom", locations: [{ value: "t", label: "Taproom" }], warehouses: [], suggestions: [], allocations: [], shortfalls: [], canEdit: true },
+      skus: [],
+    })), "Still needed: a warehouse to send from and a transfer quantity above zero.");
   });
 });
