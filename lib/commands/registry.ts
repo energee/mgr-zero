@@ -20,7 +20,7 @@ export type CommandRisk = "mutable" | "append_only" | "immutable" | "filed" | "e
 export type CommandIdempotency = "dedupe" | "online_only";
 export type CommandAtomicity = "single_row" | "rpc" | "atomic_exempt_csv" | "external_intent";
 // `effects` is typed loosely here; lib/composer/state.ts (composerEffect) is the full
-// shape of record_movement's effects that the Composer drawer validates and renders.
+// shape of record_movement's effects that the Composer panel validates and renders.
 export type CommandPreview = { effects: { label: string; qty?: string }[]; warnings: string[]; version: unknown; previewToken?: string };
 
 /** Correlates one write request with its transport and downstream work. */
@@ -188,6 +188,7 @@ function rpcError(error: { message: string; code?: string }): CommandError {
     // Scoped reads raise MG404 for both absent and other-tenant identities.
     case "MG404": return new CommandError(error.message, 404, "not_found");
     case "MG409": return new CommandError(error.message, 409, "conflict");
+    case "MGC01": return new CommandError(error.message, 409, "duplicate_channel_name");
     // A reviewed plan (packaging close) changed underneath the form: nothing
     // was written, so the client may drop its retained request.
     case "MG412": return new CommandError(error.message, 409, "stale_plan");

@@ -1,5 +1,6 @@
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 import { submitReason } from "@/lib/mgr/submit-reason";
+import { tapNumberSchema, TAP_NUMBER_NEED } from "@/lib/tap-number";
 
 export type TapInterval = {
   id: string;
@@ -124,7 +125,7 @@ export function pollErrorAfterTapBoardSave(current: string | null, result: TapBo
   return result.refreshError === null ? current : "Tap action saved. Board refresh failed; reload when the connection returns.";
 }
 
-type TapSheetNeeds = Partial<Record<"reason" | "skuId" | "guestLabel" | "guestNominalBbl", string>>;
+type TapSheetNeeds = Partial<Record<"reason" | "skuId" | "guestLabel" | "guestNominalBbl" | "tapNumber", string>>;
 
 /** What the sheet's fields still lack, keyed by field, each phrased as a need
  *  ("a guest keg label"). The one rule set: the withheld submit names these
@@ -139,8 +140,9 @@ export function tapSheetNeeds(sheet: TapBoardSheet): TapSheetNeeds {
   if (fields.identity === "guest") {
     const nominalBbl = Number(fields.guestNominalBbl);
     if (!fields.guestLabel.trim()) needs.guestLabel = "a guest keg label";
-    if (!(Number.isFinite(nominalBbl) && nominalBbl > 0)) needs.guestNominalBbl = "a guest nominal BBL above zero";
+    if (!(Number.isFinite(nominalBbl) && nominalBbl > 0)) needs.guestNominalBbl = "a guest nominal bbl above zero";
   }
+  if (fields.tapNumber !== "" && !tapNumberSchema.safeParse(fields.tapNumber).success) needs.tapNumber = TAP_NUMBER_NEED;
   return needs;
 }
 

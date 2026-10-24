@@ -87,6 +87,12 @@ It checks out `.agents/worktrees/<branch>`, symlinks the gitignored
 `bun install`. A plain `git worktree add` has neither, so Supabase calls fail
 with `supabaseKey is required`.
 
+To repair a PR conflict before its review workflow can run, use
+`scripts/land-pr.sh <pr> --sync-only` from its clean worktree. It synchronizes
+`origin/main` and regenerates the migration lock and API reference. Non-lock
+conflicts remain in progress for manual resolution. This mode does not run
+proof, push, or merge the PR; normal landing still requires review and CI.
+
 Browser setup is explicit in each worktree: after the frozen install, run
 `bunx agent-browser install`, then follow the
 [browse skill](.agents/skills/browse/SKILL.md). The native CLI is bundled in the

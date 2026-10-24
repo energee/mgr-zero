@@ -1,6 +1,6 @@
 // lib/mgr/customers-view.ts — view-model for the Customers list.
 import type { EmptyState } from "./empty-state";
-import { countryName, nameWithAlias, paymentTermLabel } from "./labels";
+import { countryName, nameWithAlias, paymentTermLabel, sentenceCase } from "./labels";
 export type CustomersRowView = {
   key: string;
   title: string;
@@ -39,7 +39,7 @@ export type CustomersSnapshot = {
 
 function detail(c: CustomersSnapshot["customers"][number]): string {
   // A US customer reads its state; any other its country.
-  const head = `${c.type} · ${c.country === "US" ? c.state : countryName(c.country)}`;
+  const head = `${sentenceCase(c.type)} · ${c.country === "US" ? c.state : countryName(c.country)}`;
   if (c.portal_user_count != null) return `${head} · ${c.portal_user_count} portal users`;
   if (c.remit) return `${head} · ${c.remit}`;
   const channel = c.sale_channels?.name;

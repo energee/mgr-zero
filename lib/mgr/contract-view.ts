@@ -14,6 +14,12 @@ export type ContractViewModel = {
   contractNo: string;
 };
 
+/** Keep an existing contract's vendor; a new contract can choose the sole available vendor. */
+export function initialContractVendor(contract: { vendor_id: string } | undefined, vendors: readonly { id: string }[]): string {
+  if (contract) return contract.vendor_id;
+  return vendors.length === 1 ? vendors[0]!.id : "";
+}
+
 /**
  * The read-only balance fields on the Contract sheet. `contract_balances`
  * returns received / on order / available in PURCHASE units (like

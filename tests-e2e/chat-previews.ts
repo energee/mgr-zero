@@ -75,6 +75,7 @@ function traversePreviewsByKeyboard() {
     assert.equal(ab("eval", "document.activeElement?.matches(':focus-visible')").result, true, `${fixture.title} lost visible keyboard focus`);
     // The gallery draws one preview at a time, so the first rendered section is the selected fixture.
     assert.equal(ab("eval", "document.querySelector('[data-chat-preview] section[aria-labelledby] h3')?.textContent").result, fixture.title);
+    assert.equal(ab("eval", "[...document.querySelectorAll('button[data-preview-action]')].every(button => button.disabled && button.textContent.includes('Preview'))").result, true, `${fixture.title} has an interactive sample action`);
     if (index < CHAT_PREVIEW_FIXTURES.length - 1) ab("press", "ArrowRight");
   }
 }
@@ -100,10 +101,10 @@ async function main() {
 
     assert.equal(ab("eval", "document.querySelector('[role=dialog]') === null").result, true, "preview gallery unexpectedly opened a real modal");
     ab("focus", 'input[value="fermentation-gated"]'); ab("press", "Space");
-    assert.equal(ab("eval", "document.querySelector('button[aria-disabled=true]')?.textContent").result, "Record reading");
+    assert.equal(ab("eval", "document.querySelector('button[aria-disabled=true]')?.firstChild?.textContent").result, "Record reading");
     assert((ab("get", "text", "body").text ?? "").includes("Open this reading in MGR for now"));
     ab("focus", 'input[value="order-confirm-gated"]'); ab("press", "Space");
-    assert.equal(ab("eval", "document.querySelector('button[aria-disabled=true]')?.textContent").result, "Confirm order");
+    assert.equal(ab("eval", "document.querySelector('button[aria-disabled=true]')?.firstChild?.textContent").result, "Confirm order");
     assert((ab("get", "text", "body").text ?? "").includes("This order needs the full MGR review"));
     assertNoOverflow();
     ab("screenshot", join(SHOTS, "chat-settings-phone.png"), "--full");

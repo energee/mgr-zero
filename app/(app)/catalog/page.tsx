@@ -22,6 +22,8 @@ import { ListControls } from "@/components/mgr/list-controls";
 import { listParams } from "@/lib/mgr/list-params";
 import { BRAND_SORTS } from "@/lib/mgr/enums";
 import { navTitle } from "@/lib/mgr/nav";
+import { ColaReview } from "./cola-review";
+import { ColaImage } from "./cola-image";
 
 export const metadata = { title: navTitle("/catalog") };
 
@@ -55,9 +57,12 @@ export default async function CatalogPage({ searchParams }: { searchParams?: Pro
   // The search form resubmits only q, so it carries every other non-default param along.
   const keep = Object.fromEntries(queryWith({ q: "" }));
   const controls = <ListControls search={{ label: "Search brands or aliases", value: params.q, keep }} scopes={scopes} />;
+  const model = toCatalogViewProps({ brands, priceGroups: groups, backHref: "/more", filtered: Boolean(params.q || params.category) });
   return (
     <CatalogView
-      model={toCatalogViewProps({ brands, priceGroups: groups, backHref: "/more", filtered: Boolean(params.q || params.category) })}
+      model={model}
+      colaAction={canWrite ? <ColaReview brands={brands} /> : null}
+      images={Object.fromEntries(model.brands.flatMap(brand => brand.image ? [[brand.key, <ColaImage key={`${brand.key}:${brand.image.url}`} ttbId={brand.image.ttbId} url={brand.image.url} label={`${brand.name} · COLA ${brand.image.ttbId}`} compact />]] : []))}
       controls={controls}
       createAction={canWrite ? E.btn("New brand", "p", "/catalog/brands/new") : null}
       links={{
