@@ -461,7 +461,7 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 1, slice: "all", tab: "Beer", name: "Beer", job: "Inventory, cellar, materials and kegs",
-    to: { Taproom: "Weekly count", Materials: "Materials on hand", Shortages: "Planning" },
+    to: { Taproom: "Weekly count", Materials: "Materials on hand", "Variance by brand": "Variance by brand" },
     reads: "get_beer_overview", writes: "none",
     states: DEFAULT_STATES,
     body: <BeerView model={toBeerViewProps(beerOverview)} />,
