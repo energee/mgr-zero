@@ -71,8 +71,8 @@ export function toRecordMovementViewProps(s: RecordMovementSnapshot): RecordMove
     destStateOptions: s.destStateOptions,
     qty: String(s.qty),
     preview: `Preview: ${sign}${s.qty} SKU unit · ${formatVolume(s.bbl)} · ${kind} · ${s.destState.split(" · ")[0]} · amounts are entered positive`,
-    lot: "Untracked / legacy stock",
-    lotOptions: ["Untracked / legacy stock"],
+    lot: "No lot (untracked)",
+    lotOptions: ["No lot (untracked)"],
     note: "",
   };
 }
