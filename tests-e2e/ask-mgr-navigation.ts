@@ -48,12 +48,31 @@ try {
   wait(`${panel}.contains(document.activeElement)`);
   assert.equal(evaluate("document.activeElement.tagName"), "DIV", "Entering phone chat should focus the panel, not summon the keyboard");
   assert.equal(browser("get", "value", prompt).value, "Keep this draft while I use the page", "Responsive mode changes must not remount the conversation");
+  browser("press", "Tab");
+  assert.equal(evaluate("document.activeElement.textContent"), "Back to page", "Phone chat must restore reachable tab stops after desktop focus leaves the panel");
   browser("press", "Shift+Tab");
   assert.equal(evaluate(`${panel}.contains(document.activeElement)`), true, "Phone chat must contain keyboard focus");
   assert.equal(evaluate("document.documentElement.scrollWidth > innerWidth"), false, "Phone chat must fit the viewport");
   browser("find", "role", "button", "click", "--name", "Back to page", "--exact");
   wait(`getComputedStyle(${panel}).display === "none"`);
   assert.equal(evaluate("document.activeElement.textContent"), "Navigate");
+
+  // A foreground form keeps accessibility and focus ownership across a breakpoint change.
+  browser("set", "viewport", "1280", "800");
+  browser("find", "role", "radio", "click", "--name", "Ask MGR", "--exact");
+  browser("find", "role", "button", "click", "--name", "Me", "--exact");
+  wait('document.querySelector("[data-slot=dialog-content]")');
+  browser("set", "viewport", "390", "844");
+  assert.equal(evaluate('document.querySelector("[data-slot=dialog-content]").closest("[aria-hidden=true]") === null'), true, "Foreground Me must remain exposed to assistive technology");
+  assert.equal(evaluate('document.querySelector("[data-slot=dialog-content]").contains(document.activeElement)'), true, "Foreground Me must retain focus");
+  browser("press", "Escape");
+  wait('!document.querySelector("[data-slot=dialog-content]")');
+  wait(`${panel}.contains(document.activeElement)`);
+  browser("press", "Tab");
+  assert.equal(evaluate("document.activeElement.textContent"), "Back to page", "Closing the foreground form must restore usable phone chat");
+  assert.equal(browser("get", "value", prompt).value, "Keep this draft while I use the page", "Foreground forms and responsive transitions must retain the draft");
+  browser("find", "role", "button", "click", "--name", "Back to page", "--exact");
+  wait(`getComputedStyle(${panel}).display === "none"`);
 
   // The explorer intercepts record-navigation labels during capture; chat controls must act locally.
   browser("set", "viewport", "1280", "900");
@@ -63,11 +82,14 @@ try {
   wait('document.querySelector("[aria-label=Screens] [aria-selected=true]")?.textContent.trim() === "Composer answer"');
   browser("find", "role", "radio", "click", "--name", "Ask MGR", "--exact");
   browser("fill", prompt, "Keep this explorer draft");
+  browser("set", "viewport", "1024", "800");
+  assert.equal(evaluate(`(() => { const box = document.querySelector(".screen-box").getBoundingClientRect(); const chat = ${panel}.getBoundingClientRect(); return chat.left >= box.left && chat.right <= box.right; })()`), true, "Chat must fit the explorer's containing block, not only the outer viewport");
+  browser("set", "viewport", "1280", "900");
   browser("find", "role", "button", "click", "--name", "Back to page", "--exact");
   assert.equal(evaluate('document.querySelector("[aria-label=Screens] [aria-selected=true]")?.textContent.trim()'), "Composer answer", "Closing chat must not navigate the explorer to another record");
   browser("find", "role", "radio", "click", "--name", "Ask MGR", "--exact");
   assert.equal(browser("get", "value", prompt).value, "Keep this explorer draft", "Closing chat must not remount the explorer frame");
-  console.log("Ask MGR navigation smoke passed: draft retention, stable page width, foreground Escape, responsive focus, mobile focus containment, return focus, and explorer state preservation.");
+  console.log("Ask MGR navigation smoke passed: draft retention, stable page width, foreground modal ownership, responsive tab navigation, mobile focus containment, return focus, and embedded panel containment.");
 } finally {
   browser("close");
 }

@@ -1,10 +1,26 @@
 "use client";
 
 import { Dialog } from "@base-ui/react/dialog";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
+
+function subscribeToForegroundDialogs(onChange: () => void) {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.body, { childList: true, subtree: true });
+  return () => observer.disconnect();
+}
+
+function hasForegroundDialog() {
+  // Closing Radix surfaces still own focus until their exit animation unmounts them.
+  return document.querySelector('[data-slot="dialog-content"], [data-slot="sheet-content"], [role="alertdialog"][data-state]') !== null;
+}
+
+function subscribeToFocus(onChange: () => void) {
+  document.addEventListener("focusin", onChange);
+  return () => document.removeEventListener("focusin", onChange);
+}
 
 /** Shared staff-shell entry point and overlay; live and inventory supply the conversation. */
 export function ComposerPanelView({ children, open, onOpenChange, container }: {
@@ -14,11 +30,15 @@ export function ComposerPanelView({ children, open, onOpenChange, container }: {
   container?: HTMLElement | null;
 }) {
   const isMobile = useIsMobile();
+  // Radix forms own focus and accessibility while layered above this Base UI panel.
+  const foregroundDialogOpen = useSyncExternalStore(subscribeToForegroundDialogs, hasForegroundDialog, () => false);
   const [internalOpen, setInternalOpen] = useState(false);
   const chatOpen = open ?? internalOpen;
   const panelId = useId();
   const navigateRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  // Enter the portal while non-modal so Base UI restores its tab stops before trapping focus.
+  const panelHasFocus = useSyncExternalStore(subscribeToFocus, () => panelRef.current?.contains(document.activeElement) ?? false, () => false);
 
   function changeOpen(nextOpen: boolean) {
     if (open === undefined) setInternalOpen(nextOpen);
@@ -26,23 +46,20 @@ export function ComposerPanelView({ children, open, onOpenChange, container }: {
   }
 
   useEffect(() => {
-    if (!chatOpen || !isMobile) return;
-    const frame = requestAnimationFrame(() => {
-      const panel = panelRef.current;
-      if (panel && !panel.contains(panel.ownerDocument.activeElement)) panel.focus();
-    });
+    if (!chatOpen || !isMobile || foregroundDialogOpen || panelHasFocus) return;
+    const frame = requestAnimationFrame(() => panelRef.current?.focus());
     return () => cancelAnimationFrame(frame);
-  }, [chatOpen, isMobile]);
+  }, [chatOpen, isMobile, foregroundDialogOpen, panelHasFocus]);
 
   return (
     <Dialog.Root open={chatOpen} onOpenChange={(nextOpen, details) => {
       // Radix foreground forms handle Escape before this Base UI panel.
-      if (details.reason === "escape-key" && details.event.defaultPrevented) {
+      if (details.reason === "escape-key" && (foregroundDialogOpen || details.event.defaultPrevented)) {
         details.cancel();
         return;
       }
       changeOpen(nextOpen);
-    }} modal={isMobile} disablePointerDismissal>
+    }} modal={isMobile && !foregroundDialogOpen && panelHasFocus} disablePointerDismissal>
       <ToggleGroup type="single" value={chatOpen ? "chat" : "navigate"} onValueChange={(value) => { if (value) changeOpen(value === "chat"); }} variant="outline" size="sm" spacing={0} aria-label="Workspace mode">
         <ToggleGroupItem ref={navigateRef} value="navigate">Navigate</ToggleGroupItem>
         <ToggleGroupItem value="chat" aria-controls={panelId} aria-expanded={chatOpen} aria-keyshortcuts="Meta+K Control+K" title="Ask MGR (⌘K / Ctrl+K)">Ask MGR</ToggleGroupItem>
@@ -52,9 +69,9 @@ export function ComposerPanelView({ children, open, onOpenChange, container }: {
           id={panelId}
           ref={panelRef}
           data-mgr-composer=""
-          initialFocus={panelRef}
-          finalFocus={navigateRef}
-          className="fixed inset-y-0 right-0 flex w-full min-h-0 flex-col overflow-hidden border-l bg-popover text-sm text-popover-foreground shadow-lg outline-none data-closed:hidden md:top-12 md:w-[min(32rem,calc(100vw-12rem))]"
+          initialFocus={foregroundDialogOpen ? false : panelRef}
+          finalFocus={foregroundDialogOpen ? false : navigateRef}
+          className="fixed inset-y-0 right-0 flex w-full max-w-full min-h-0 flex-col overflow-hidden border-l bg-popover text-sm text-popover-foreground shadow-lg outline-none data-closed:hidden md:top-12 md:w-[min(32rem,calc(100vw-12rem))]"
         >
           <div className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-2">
             <Dialog.Title className="font-semibold">Ask MGR</Dialog.Title>
