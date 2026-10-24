@@ -12,6 +12,9 @@ export type ScheduleBatchViewModel = {
   plannedBbl: string;
   date: string;
   note: string;
+  recipesHref?: string;
+  /** null means this role cannot create a brand. */
+  brandsHref?: string | null;
 };
 
 /** Only the date and planned barrels commit the slot; brand and recipe are optional intent. */

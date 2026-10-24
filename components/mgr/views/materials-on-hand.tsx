@@ -29,7 +29,7 @@ export function MaterialsOnHandView({
       {header ?? E.back("Beer", "Materials on hand", createAction !== undefined ? createAction : E.btn("Add material"), model.backHref)}
       {controls}
       {model.empty
-        ? E.blank(model.empty)
+        ? E.blank(model.empty, undefined, model.purchaseOrdersHref ? E.act("Purchase orders", "primary", model.purchaseOrdersHref) : undefined)
         : model.rows.map((row) => (
           <Fragment key={row.key}>
             {E.row(

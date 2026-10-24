@@ -28,8 +28,8 @@ export function OfflineOutboxView({ rows, busy = false, notice, onDismissNotice,
 }) {
   const retryable = rows.filter((row) => row.retryable);
   return (
-    <section aria-label="Offline outbox" className="rounded-md border bg-card p-3 shadow-sm">
-      <h2 className="font-medium">Offline outbox</h2>
+    <section aria-label="Pending readings" className="rounded-md border bg-card p-3 shadow-sm">
+      <h2 className="font-medium">Pending readings</h2>
       <p className="mt-1 text-xs text-muted-foreground">Only exact fermentation readings can wait here. Inventory movements, picks, and transfers require a live connection.</p>
       {notice && <div role="alert" className="mt-3">{E.note(<>{notice} {onDismissNotice && <Button type="button" size="sm" variant="ghost" onClick={onDismissNotice}>Dismiss</Button>}</>)}</div>}
       {rows.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No queued readings.</p> : (

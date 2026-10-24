@@ -51,7 +51,7 @@ export type SaleChannelsSnapshot = {
 };
 
 function detail(c: SaleChannelsSnapshot["channels"][number]): string {
-  const label = sentenceCase(c.tax_treatment);
+  const label = `Tax treatment: ${sentenceCase(c.tax_treatment)}`;
   return c.movements != null ? `${label} · ${plural(c.movements, "movement")}` : label;
 }
 

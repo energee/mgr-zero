@@ -15,6 +15,11 @@ import { MgrIcon } from "@/components/mgr-icon";
 import { getCustomerMemberships, getRequestIdentity, getStaffMemberships } from "@/lib/auth/request-context";
 import { logout } from "../actions";
 
+export async function generateMetadata() {
+  const staff = (await getStaffMemberships()).length > 0;
+  return { title: staff ? portalStaffOnlyModel.title : noMembershipModel.title };
+}
+
 export default async function NoMembershipPage() {
   if (!(await getRequestIdentity())) redirect("/login");
   const createBreweryHref = getServerEnv().dedicated ? null : "/create-brewery";

@@ -222,6 +222,16 @@ describe("country and alias", () => {
     expect(form).toContain("CUSTOMER_TYPE_OPTIONS");
   });
 
+  it("explains the channel abbreviation and separates export pricing from export tax (#1261)", () => {
+    const model = toCustomerViewProps(customerRidgeline);
+    model.editValues.saleChannelId = model.channelOptions.find(channel => channel.name === "DTC")!.id;
+    const markup = html(createElement(CustomerView, { model }));
+    expect(markup).toContain("Direct to consumer (DTC)");
+    expect(markup).toMatch(/sale channel sets prices and the default tax treatment/);
+    expect(markup).toMatch(/Export channel does not override a customer’s tax treatment/);
+    expect(markup).toMatch(/Export tax treatment means shipment outside the US without payment of tax/);
+  });
+
   it("the New customer dialog explains the alias and says where ship-tos are added (#1131)", () => {
     const form = readFileSync("app/(app)/customers/customer-form.tsx", "utf8");
     expect(form).not.toContain("Staff only");
