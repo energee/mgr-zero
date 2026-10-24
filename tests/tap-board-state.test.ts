@@ -30,8 +30,8 @@ describe("what a tap sheet still needs (#1114)", () => {
   });
 
   it("names each guest field on its own, and refuses a size that is not above zero", () => {
-    expect(tapSheetReason(fields({ identity: "guest" }))).toBe("Still needed: a guest keg label and a guest nominal BBL above zero.");
-    expect(tapSheetNeeds(fields({ identity: "guest", guestLabel: "  ", guestNominalBbl: "-1" }))).toEqual({ guestLabel: "a guest keg label", guestNominalBbl: "a guest nominal BBL above zero" });
+    expect(tapSheetReason(fields({ identity: "guest" }))).toBe("Still needed: a guest keg label and a guest nominal bbl above zero.");
+    expect(tapSheetNeeds(fields({ identity: "guest", guestLabel: "  ", guestNominalBbl: "-1" }))).toEqual({ guestLabel: "a guest keg label", guestNominalBbl: "a guest nominal bbl above zero" });
     expect(tapSheetReason(fields({ identity: "guest", guestLabel: "Dry cider", guestNominalBbl: "0.25" }))).toBeNull();
   });
 
@@ -93,7 +93,7 @@ describe("tap board controlled state", () => {
     const guest = { id, location_id: id, sku_id: null, label: "Cider", nominal_bbl: .5, tap_number: "7", opening_fill: 1, not_in_inventory: true, opened_at: "2026-09-08T12:00:00Z", opened_by: id, opened_by_label: "dana", brand_id: null, brand_name: null, sku_name: null };
     const state = openTapBoardSheet({ open: [guest], history: [] }, "swap", guest);
     expect(state.sheet?.fields.identity).toBe("guest");
-    expect(() => beginTapBoardAttempt(state, nextId)).toThrow("Still needed: a guest keg label and a guest nominal BBL above zero.");
+    expect(() => beginTapBoardAttempt(state, nextId)).toThrow("Still needed: a guest keg label and a guest nominal bbl above zero.");
   });
 
   it("freezes an uncertain payload and request through polls and every retry failure", () => {
@@ -114,7 +114,7 @@ describe("tap board controlled state", () => {
   it("retires only a definitive first client refusal", () => {
     let state = openTapBoardSheet(snapshot, "tap", null);
     state = editTapBoardSheet(state, { identity: "guest", guestLabel: "Dry cider", guestNominalBbl: "0" });
-    expect(() => beginTapBoardAttempt(state, id)).toThrow("Still needed: a guest nominal BBL above zero.");
+    expect(() => beginTapBoardAttempt(state, id)).toThrow("Still needed: a guest nominal bbl above zero.");
     state = editTapBoardSheet(state, { guestNominalBbl: "0.25" });
     state = beginTapBoardAttempt(state, id);
     state = failTapBoardAttempt(state, 400, "invalid", false);

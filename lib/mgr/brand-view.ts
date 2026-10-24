@@ -7,7 +7,7 @@ import { formatDate } from "@/lib/date-format";
 import type { BrandRecipeCost } from "@/lib/commands/catalog";
 import type { RegistryBrand } from "@/lib/commands/compliance";
 import { toBrandSellsModel, type BrandSellsModel, type BrandSellsSnapshot } from "./brand-sells-view";
-import { nameWithAlias } from "./labels";
+import { COLA_NOT_ON_FILE, nameWithAlias } from "./labels";
 import { plural } from "./plural";
 import { suggestPriceGroup, type PriceGroupSuggestion } from "./price-group-suggestion";
 import type { PriceGroupRow } from "./price-groups-view";
@@ -16,8 +16,10 @@ import { expires, type RegistryRowView } from "./registry-rows";
 /** A brand as staff see it: its name, then its staff-only alias when it has one ("Appaloosa · Animal #14"). */
 export const brandLabel = nameWithAlias;
 
-/** A header badge: "w" is a warning; href makes it a jump link (COLA pending → Compliance). */
+/** A header badge: "w" is a warning; href makes it a jump link to its section. */
 export type BrandBadge = { key: string; label: string; tone: "" | "w"; href?: string };
+
+type BrandComplianceRow = RegistryRowView & { image?: { ttbId: string; url: string } };
 
 export type BrandViewModel = {
   backHref?: string;
@@ -25,7 +27,7 @@ export type BrandViewModel = {
   title: string;
   /** Unsaved: no SKUs or compliance can hang off it yet. */
   isNew: boolean;
-  /** COLA pending, price group (or Unpriced), category, active SKU count; none on a new brand. */
+  /** Missing COLA, price group (or Unpriced), category, active SKU count; none on a new brand. */
   badges: BrandBadge[];
   name: string;
   /** Staff-only informal name; "" when none. */
@@ -45,7 +47,7 @@ export type BrandViewModel = {
   /** One switch per packaged format, the packages inside the switched-on ones, and the group's pours. */
   sells: BrandSellsModel;
   /** The brand's own compliance: its COLA/formula approvals and state registrations; a pending row when no COLA is on file. */
-  compliance: RegistryRowView[];
+  compliance: BrandComplianceRow[];
 };
 
 /** The select value for "no price group": the Select kit's own sentinel, never a name a real group could carry. */
@@ -86,14 +88,16 @@ export function approvalDate(approvedOn: string | null): string {
   return approvedOn ? `approved ${formatDate(approvedOn)}` : "approval date unknown";
 }
 
-/** A COLA is listed by its TTB ID (with its serial when known) and never expires; a formula keeps its TTB number; registrations do expire. */
-export function brandComplianceRows({ approvals, registrations }: NonNullable<BrandSnapshot["compliance"]>): RegistryRowView[] {
-  const rows: RegistryRowView[] = [
+/** COLAs keep their identifiers and optional dated label image; only registrations expire. */
+export function brandComplianceRows({ approvals, registrations }: NonNullable<BrandSnapshot["compliance"]>): BrandComplianceRow[] {
+  const rows: BrandComplianceRow[] = [
     ...approvals.map((approval) => ({
       key: approval.id,
       title: approval.kind === "cola" ? `COLA TTB ID ${approval.ttb_id}` : `Formula ${approval.ttb_id}`,
       detail: [approvalDate(approval.approved_on), approval.serial_number && `serial ${approval.serial_number}`].filter(Boolean).join(" · "),
       verb: "Edit",
+      ...(approval.kind === "cola" && approval.approved_on && approval.image_url
+        ? { image: { ttbId: approval.ttb_id, url: approval.image_url } } : {}),
     })),
     ...registrations.map((registration) => ({
       key: registration.id,
@@ -102,7 +106,7 @@ export function brandComplianceRows({ approvals, registrations }: NonNullable<Br
       verb: "Edit",
     })),
   ];
-  if (!approvals.some((approval) => approval.kind === "cola")) rows.unshift({ key: "cola-pending", title: "COLA", detail: "pending", warning: true });
+  if (!approvals.some((approval) => approval.kind === "cola")) rows.unshift({ key: "cola-missing", title: "COLA", detail: COLA_NOT_ON_FILE });
   return rows;
 }
 
@@ -126,7 +130,7 @@ export function toBrandViewProps({
   const skuList = `${plural(active, "active package")}${brand.pours?.length ? ` · ${plural(brand.pours.length, "pour")}` : ""}`;
   const group = priceGroups.find((g) => g.id === saved.price_group_id);
   const rows = brandComplianceRows(compliance);
-  const cola: BrandBadge[] = rows.some((row) => row.key === "cola-pending") ? [{ key: "cola", label: "COLA pending", tone: "w", href: "#compliance" }] : [];
+  const cola: BrandBadge[] = rows.some((row) => row.key === "cola-missing") ? [{ key: "cola", label: `COLA · ${COLA_NOT_ON_FILE}`, tone: "", href: "#compliance" }] : [];
   const category: BrandBadge[] = saved.category ? [{ key: "category", label: saved.category, tone: "" }] : [];
   // A brand with nothing to sell yet needs no count; the SKUs section says so.
   const skus: BrandBadge[] = active || brand.pours?.length ? [{ key: "skus", label: skuList, tone: "" }] : [];

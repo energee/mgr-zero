@@ -17,9 +17,7 @@ import { SortTable } from "@/components/mgr/sort-table";
 import { SubmitButton, type SubmitButtonProps } from "@/components/mgr/submit-button";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
 import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
-import { ComposerConversationView } from "@/components/mgr/views/composer-conversation";
-import { ComposerDrawerView } from "@/components/mgr/views/composer-drawer";
-import { ComposerStripView } from "@/components/mgr/views/composer-strip";
+import { ComposerDemo } from "@/components/mgr/composer-demo";
 import { VolumeField } from "@/components/mgr/volume-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -249,7 +247,7 @@ export const E = {
       tone === "info" && "bg-info text-info-foreground hover:bg-info/80 hover:text-info-foreground dark:hover:bg-info/80",
     )}>{href ? <Link href={href}>{t}</Link> : t}</Button>
   ),
-  /** A status word. Not a button; `href` makes it a jump to where the status is fixed (COLA pending → Compliance). */
+  /** A status word. Not a button; `href` makes it a jump to the section that explains it. */
   status: (t: React.ReactNode, tone: "ok" | "w" | "" = "", href?: string) => {
     const body = <>{tone === "ok" ? <Dot cls="ok" /> : null}{t}</>;
     return (
@@ -581,12 +579,7 @@ export const E = {
    *  every call site writing the hole. */
   line: (t: React.ReactNode, s: React.ReactNode, n: React.ReactNode, cls: RowClass, fields: React.ReactNode) => E.row(t, s, n, cls, undefined, fields),
   sp: () => <div className="flex-1" />,
-  comp: (roles: readonly StaffRole[] = ["admin"], container?: HTMLElement | null) => (
-    <ComposerDrawerView container={container}>
-      <ComposerConversationView messages={[]} />
-      <ComposerStripView disabled={!roles.length} />
-    </ComposerDrawerView>
-  ),
+  comp: (roles: readonly StaffRole[] = ["admin"], container?: HTMLElement | null) => <ComposerDemo disabled={!roles.length} container={container} />,
 };
 
 function isPin(n: ReactNode) {
