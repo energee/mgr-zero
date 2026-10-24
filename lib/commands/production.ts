@@ -243,6 +243,8 @@ defineCommand({
     id: z.string().uuid().optional(),
     name: z.string().trim().min(1),
     kind: z.enum(VESSEL_KINDS),
+    // Keep historical raw payloads replayable; the RPC enforces new-write
+    // precision only after checking the durable request identity.
     capacityBbl: bbl,
   }),
   roles: ["admin"],

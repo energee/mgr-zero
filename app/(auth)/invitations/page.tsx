@@ -8,6 +8,8 @@ import { runCommand } from "@/lib/commands/registry";
 import type { AccountInvitation } from "@/lib/mgr/account-invitations";
 import { acceptAccountInvitation } from "../actions";
 
+export const metadata = { title: "Invitations" };
+
 export default async function InvitationsPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   if (!(await getRequestIdentity())) redirect("/login");
   const { error } = await searchParams;

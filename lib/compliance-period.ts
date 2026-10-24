@@ -42,6 +42,15 @@ export const cadenceOf = (key: string): Cadence => (key.includes("Q") ? "quarter
 /** A period can be filed only once it is over in the brewery's calendar (#429). */
 export const periodOver = (key: string, today: string) => (periodRange(key)?.periodEnd ?? "") < today;
 
+export type PeriodStatus = "Past" | "Current" | "Upcoming";
+
+/** Calendar position in the brewery's day, independent of live figures or a filed snapshot. */
+export function periodStatus(range: { periodStart: string; periodEnd: string }, today: string): PeriodStatus {
+  if (range.periodStart > today) return "Upcoming";
+  if (range.periodEnd < today) return "Past";
+  return "Current";
+}
+
 export function periodLabel(key: string): string {
   const c = cadenceOf(key);
   if (c === "year") return key;
