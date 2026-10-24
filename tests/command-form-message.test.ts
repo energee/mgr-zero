@@ -14,6 +14,8 @@ describe("CommandFormMessage", () => {
     expect(source).toContain('type="button"');
     expect(source).toContain("onClick={() => onClose?.(false)}");
     expect(source.match(/onClose={onOpenChange}/g)).toHaveLength(3);
+    expect(source).toContain('variant="ghost" size="icon-sm"');
+    expect(source).not.toContain('variant="destructive"');
   });
 
   it("renders an error as role=alert", () => {

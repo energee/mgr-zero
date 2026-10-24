@@ -5,6 +5,7 @@ import { QuickBooksMark } from "@/components/mgr/brand-icons";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { CommandFormMessage } from "@/components/mgr/command-form";
+import { SubmitButton } from "@/components/mgr/submit-button";
 import { plural } from "@/lib/mgr/plural";
 import type { AccountingViewModel, QboSyncStatus } from "@/lib/mgr/accounting-view";
 import type { QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
@@ -31,7 +32,7 @@ export function QboSyncView({ busy = false, disabled = false, error, onSync, sta
         <p className="text-sm text-muted-foreground">Payment status may be stale until you complete a manual sync.</p>
       </div>
       <div className="flex flex-col md:shrink-0">
-        {E.btn(busy ? "Syncing…" : status?.retryRequestId ? "Retry saved sync" : "Sync QuickBooks", busy || disabled ? "g disabled" : "g", undefined, onSync)}
+        {E.submit(status?.retryRequestId ? "Retry saved sync" : "Sync QuickBooks", { type: "button", variant: "outline", submitting: busy, busy: "Syncing…", reason: disabled ? "Connect or reconnect QuickBooks before syncing payments." : null, onClick: onSync })}
       </div>
     </div>
     {latest && E.fld("Latest sync activity", `${latest.at} · ${latest.operator} · ${latest.superseded ? "superseded · no payment changes applied" : "not completed"}`)}
@@ -44,8 +45,7 @@ export function QboSyncView({ busy = false, disabled = false, error, onSync, sta
 
 export function QboConnectionView({ configured = true, reconnect = false, busy = false, error, onConnect }: { configured?: boolean; reconnect?: boolean; busy?: boolean; error?: string | null; onConnect?: () => void }) {
   return <div className="flex flex-col gap-2">
-    <Button type="button" data-variant="irreversible" className="bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" disabled={!configured || busy} onClick={onConnect}>{busy ? "Opening QuickBooks…" : reconnect ? "Reconnect QuickBooks" : "Connect QuickBooks"}</Button>
-    {!configured && <p className="text-sm text-muted-foreground">QuickBooks isn’t turned on in MGR yet.</p>}
+    <SubmitButton label={reconnect ? "Reconnect QuickBooks" : "Connect QuickBooks"} type="button" data-variant="irreversible" className="bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" submitting={busy} busy="Opening QuickBooks…" reason={configured ? null : "QuickBooks isn’t turned on in MGR yet."} onClick={onConnect} />
     <CommandFormMessage error={error} />
   </div>;
 }
@@ -57,7 +57,7 @@ export function QboDefaultsView({ allowAch, allowCard, busy = false, disabled = 
     {E.row("Bank transfer (ACH)", `${ach ? "on" : "off"} · lowest fee`, <Switch aria-label="Bank transfer payments" checked={ach} onCheckedChange={setAch} disabled={busy || disabled} />, ach ? "ok" : "")}
     {E.row("Card", `${card ? "on" : "off"} · percentage fee applies`, <Switch aria-label="Card payments" checked={card} onCheckedChange={setCard} disabled={busy || disabled} />, card ? "ok" : "")}
     <p className="text-sm text-muted-foreground">These choices apply to the next push, never retroactively.</p>
-    <Button disabled={busy || disabled}>{busy ? "Saving…" : "Save push defaults"}</Button>
+    {E.submit("Save push defaults", { submitting: busy, reason: disabled ? "Connect or reconnect QuickBooks before saving payment options." : null })}
     <CommandFormMessage error={error} />
   </form>;
 }
@@ -90,7 +90,7 @@ export function AccountingView({ model, connection, defaults, messages, sync }: 
     {sync !== undefined ? sync : <QboSyncView status={model.syncStatus} disabled={!model.connected} />}
     {E.ttl("Push defaults")}
     {defaults !== undefined ? defaults : model.defaults ? <QboDefaultsView {...model.defaults} disabled={!model.connected} /> : E.gated("Bank transfer (ACH) and card", "Connect QuickBooks to read and save the company's payment options.")}
-    {E.row("Customers missing a portal login email", missingEmailsDetail(model.missingEmails), E.act("Review", "primary", model.customersHref), model.missingEmails ? "w" : "")}
+    {E.row("Customers missing a portal login email", missingEmailsDetail(model.missingEmails), model.missingEmails !== 0 && E.act("Review", "primary", model.customersHref), model.missingEmails ? "w" : "")}
     {model.remoteRevocationUnresolved && E.note("Local access is disconnected. QuickBooks could not confirm remote revocation; reconnect to continue.", "alert")}
     {E.info("QuickBooks remains the accounting record. Connecting does not push existing invoices, and MGR never displays credentials.")}
   </>;

@@ -109,7 +109,7 @@ describe("per-form reasons", () => {
     expect(orderFormReadiness({ ...base, customerId: "", shipToId: "", fromLocationId: "", lines: [{ skuId: "", qty: "" }] }).reason)
       .toBe("Still needed: a customer, a source location, and a SKU with a quantity above zero on each line.");
     expect(orderFormReadiness({ ...base, shipToId: "" }).reason).toBe("Still needed: a ship-to.");
-    expect(orderFormReadiness({ ...base, kind: "taproom_transfer" }).reason).toBe("Still needed: a To location.");
+    expect(orderFormReadiness({ ...base, kind: "taproom_transfer" }).reason).toBe("Still needed: a destination location.");
     expect(orderFormReadiness({ ...base, lines: [{ skuId: "gone", qty: "2" }] })).toMatchObject({ submittable: false, reason: "Still needed: an available SKU on each line." });
   });
 
@@ -293,6 +293,12 @@ describe("line errors in the views", () => {
     expect(markup).not.toContain('aria-invalid="true"');
   });
 
+  it.each(["wholesale", "taproom_transfer"] as const)("a live %s order waits for line interaction before marking either field", kind => {
+    const model = { ...toNewOrderViewProps(newOrderDraft), kind, lines: [{ name: "", skuId: "", qty: "-2", warning: false }] };
+    const markup = html(createElement(NewOrderView, { model, controls: { lineQty: () => {} } }));
+    expect(markup).not.toMatch(/Line 1:|aria-invalid="true"/);
+  });
+
   it("a drawn vessel capacity of 0 is marked at the field; a live one waits for the user to leave it (#1116)", () => {
     const drawn = html(createElement(VesselDetailView, { model: { ...vesselFv3, capacity: "0" } }));
     const errorId = drawn.match(/id="([^"]+-error)"[^>]*>Capacity must be at least 0\.001 bbl\.</)?.[1];
@@ -362,6 +368,7 @@ describe("live forms withhold their submit with the reason", () => {
     withheld(html(createElement(ReplenishForm, {
       model: { locationId: "t", locationName: "Taproom", locations: [{ value: "t", label: "Taproom" }], warehouses: [], suggestions: [], allocations: [], shortfalls: [], canEdit: true },
       skus: [],
+      workHrefs: {},
     })), "Still needed: a warehouse to send from and a transfer quantity above zero.");
   });
 });

@@ -181,9 +181,9 @@ describe("Price group view", () => {
   const inputTag = (html: string, id: string) => html.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))?.[0] ?? "";
 
   it("Save price group names a missing group name instead of submitting (#1133)", () => {
-    expect(priceGroupReason({ name: "" })).toBe("Still needed: a group name.");
-    expect(priceGroupReason({ name: "  " })).toBe("Still needed: a group name.");
-    expect(priceGroupReason({ name: "Core" })).toBeNull();
+    expect(priceGroupReason({ name: "", position: "1", costCeilingInput: "" })).toBe("Still needed: a group name.");
+    expect(priceGroupReason({ name: "  ", position: "1", costCeilingInput: "" })).toBe("Still needed: a group name.");
+    expect(priceGroupReason({ name: "Core", position: "1", costCeilingInput: "" })).toBeNull();
     const form = readFileSync("app/(app)/pricing/group-form.tsx", "utf8");
     expect(form).toContain("reason: priceGroupReason(draft)");
   });
@@ -204,7 +204,7 @@ describe("Price group view", () => {
     const model = toPriceGroupViewProps(priceGroupTwo);
     expect(model.name).toBe("2");
     expect(model.position).toBe("2");
-    expect(model.costCeiling).toBe(money(6500));
+    expect(model.costCeilingInput).toBe("65.00");
     expect(model.previousCeilingLabel).toBe("Cost ceiling · group 1");
     expect(model.previousCeiling).toBe("none");
     expect(model.prices).toBe(`${money(15000)} on Wholesale · ½ bbl keg, and 4 more cells`);
@@ -245,7 +245,7 @@ describe("Price group view", () => {
     expect(html).toMatch(/Group name/);
     expect(html).toMatch(/Position/);
     expect(html).toMatch(/Cost ceiling/);
-    expect(html).toContain(money(6500));
+    expect(inputTag(html, "price-group-ceiling")).toContain('value="65.00"');
     expect(html).toMatch(/Cost ceiling · group 1/);
     expect(html).toMatch(/none/);
     expect(html).toContain(`${money(15000)} on Wholesale · ½ bbl keg, and 4 more cells`);
