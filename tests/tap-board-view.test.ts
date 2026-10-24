@@ -154,7 +154,7 @@ describe("Tap board polish (#1302)", () => {
     expect(html).toContain("abc");
     expect(html).toContain("Dana Brewer");
     expect(html).not.toContain("@Dana Brewer");
-    expect(html).not.toMatch(/<[^>]*data-slot="empty"[^>]*>.*No closed kegs yet/s);
+    expect(html).not.toMatch(/<[^>]*data-slot="empty"[^>]*>[\s\S]*No closed kegs yet/);
     expect(html).toContain("No closed kegs yet.");
   });
 
