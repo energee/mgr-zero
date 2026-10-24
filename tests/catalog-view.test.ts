@@ -5,6 +5,7 @@ import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
+import { E } from "../components/mgr/e";
 import { BrandView } from "../components/mgr/views/brand";
 import { CatalogView } from "../components/mgr/views/catalog";
 import { FormatView } from "../components/mgr/views/format";
@@ -190,6 +191,40 @@ describe("Catalog view", () => {
     expect(toCatalogViewProps({ ...catalogBrands, brands: [] }).empty?.title).toBe("No brands yet");
   });
 
+  it("guides first setup without empty-list filters and keeps New brand primary", () => {
+    const model = toCatalogViewProps({ brands: [], priceGroups: [] });
+    const html = htmlOf(createElement(CatalogView, {
+      model,
+      controls: createElement("form", { role: "search" }),
+      createAction: E.btn("New brand", "p", "/catalog/brands/new"),
+      links: { brands: true, priceGroups: true, waterProfiles: true },
+    }));
+    expect(html).not.toContain('role="search"');
+    expect(html.match(/href="\/catalog\/brands\/new"/g)).toHaveLength(1);
+    expect(html).toMatch(/data-slot="empty-content"[\s\S]*data-variant="default"[^>]*href="\/catalog\/brands\/new"/);
+    expect(html).toContain('href="/pricing"');
+  });
+
+  it("keeps filters available to recover from a search with no matches", () => {
+    const model = toCatalogViewProps({ brands: [], priceGroups: [], filtered: true });
+    const html = htmlOf(createElement(CatalogView, {
+      model,
+      controls: createElement("form", { role: "search" }),
+    }));
+    expect(html).toContain('role="search"');
+    expect(html).toContain("No brands match");
+  });
+
+  it("does not offer a brand mutation to a read-only viewer during first setup", () => {
+    const html = htmlOf(createElement(CatalogView, {
+      model: toCatalogViewProps({ brands: [], priceGroups: [] }),
+      createAction: null,
+      links: { brands: false, priceGroups: false, waterProfiles: false },
+    }));
+    expect(html).not.toContain("New brand");
+    expect(html).not.toContain('href="/pricing"');
+  });
+
   it("draws the controls slot above the brand rows", () => {
     const html = htmlOf(createElement(CatalogView, { model: toCatalogViewProps(catalogBrands), controls: createElement("form", { role: "search" }) }));
     expect(html.indexOf('role="search"')).toBeGreaterThan(-1);
@@ -257,8 +292,6 @@ describe("Catalog view", () => {
       model: toCatalogViewProps({ brands: [], priceGroups: catalogBrands.priceGroups }),
     }));
     expect(html).toMatch(/No brands yet/);
-    // The blank carries a title plus a sentence saying what to do next.
-    expect(html).toMatch(/Add a brand to start building the catalog/);
     expect(html).not.toMatch(/POUR SLOT/);
   });
 
