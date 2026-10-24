@@ -3,11 +3,16 @@
 // the global label and route rules, then an exact screen-name match. The
 // main flows must chain end to end so the explorer is a walkable prototype.
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { MeSheetActions } from "../components/mgr/me-sheet";
 import { SCREENS } from "../components/mgr/screens";
 import { BACK, INERT, isInertOn, PORTAL, resolveTap, TAPS, ROUTES } from "../lib/mgr/screen-links";
 import { deniedFor, needsFor, PERSONAS } from "../lib/mgr/demo-personas";
 import { pageUnder } from "../lib/mgr/screen-explorer";
+
+vi.mock("@/app/(auth)/actions", () => ({ logout: async () => {} }));
 
 const by = (name: string) => SCREENS.find((s) => s.name === name)!;
 const names = new Set(SCREENS.map((s) => s.name));
@@ -191,7 +196,12 @@ describe("Me guide link (#718)", () => {
   const read = (p: string) => readFileSync(p, "utf8");
   it("each live Me sheet links its audience's guide", () => {
     expect(read("app/(app)/layout.tsx")).toMatch(/<MeSheetActions guide="\/docs\/staff-guide" \/>/);
-    expect(read("components/mgr/me-sheet.tsx")).toMatch(/<Link href=\{guide\}>Guide<\/Link>/);
+    for (const guide of ["/docs/staff-guide", "/docs/portal-guide"] as const) {
+      const markup = renderToStaticMarkup(createElement(MeSheetActions, { guide }));
+      expect(markup).toContain(`href="${guide}"`);
+      expect(markup).toMatch(/target="_blank" rel="noopener noreferrer"/);
+      expect(markup).toContain("(opens in a new tab)");
+    }
   });
   it("shows Guide in both inventory Me sheets as a link out", () => {
     for (const name of ["Me", "Portal Me"]) expect(isInertOn(by(name), "Guide"), name).toBe(true);
