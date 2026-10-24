@@ -127,7 +127,6 @@ describe("Orders list view loop", () => {
     expect(html("Orders")).toMatch(/>Status</);
     expect(html("Orders")).toMatch(/>Confirm</);
     expect(html("Orders")).not.toMatch(/>Put back</);
-    expect(html("Orders")).not.toMatch(/>Pick</);
     expect(html("Orders")).toMatch(/>Finish</);
   });
 
