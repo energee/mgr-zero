@@ -35,6 +35,7 @@ export function toBeerViewProps(s: BeerSnapshot): BeerViewModel {
     navs.push(
       { key: "taproom", title: "Taproom", detail: `${plural(o.taproomBelowPar, "SKU")} below par · weekly count`, href: "/taproom" },
       { key: "taps", title: "Taps", detail: `${plural(o.openTaps, "keg")} on tap`, href: "/taproom/board" },
+      { key: "variance", title: "Variance by brand", detail: "Compare completed count periods", href: "/taproom/variance" },
     );
   }
   navs.push(

@@ -53,6 +53,7 @@ import {
 import { workWarehouse } from "../lib/mgr/fixtures/work";
 import { taproomBeerView, toBeerViewProps } from "../lib/mgr/beer-view";
 import { toMoreViewProps } from "../lib/mgr/more-view";
+import { STAFF_NAV } from "../lib/mgr/nav";
 import { searchEmptyMessage } from "../lib/mgr/search-palette-state";
 import { toTodayViewProps } from "../lib/mgr/today-view";
 import { filterWorkRows, toWorkViewProps, workFromQuery } from "../lib/mgr/work-view";
@@ -207,6 +208,7 @@ describe("Beer view", () => {
       ["fg", "Finished goods", "/inventory"],
       ["taproom", "Taproom", "/taproom"],
       ["taps", "Taps", "/taproom/board"],
+      ["variance", "Variance by brand", "/taproom/variance"],
       ["cellar", "Cellar", "/cellar"],
       ["materials", "Materials", "/materials"],
       ["shortages", "Shortages", "/planning"],
@@ -214,14 +216,25 @@ describe("Beer view", () => {
     ]);
   });
 
-  it("keeps Materials on hand reachable and sends the shortage count to Planning, which lists those rows (#989)", () => {
+  it("keeps shortages on Finished goods without a cross-section Planning card (#1253)", () => {
     const model = toBeerViewProps({ overview: { fgShortages: 0, taproomBelowPar: 0, openTaps: 0, openOccupancies: 0, materialShortages: 55, kegsOut: 0 } });
     expect(model.navs.find((r) => r.key === "materials")?.href).toBe("/materials");
-    expect(model.navs.find((r) => r.key === "shortages")).toMatchObject({ title: "Shortages", detail: "55 shortages", href: "/planning" });
-    expect(screen("Beer").to).toMatchObject({ Materials: "Materials on hand", Shortages: "Planning" });
+    expect(model.navs.filter((r) => r.detail.includes("shortage"))).toEqual([
+      { key: "fg", title: "Finished goods", detail: "0 shortages · ATP by SKU", href: "/inventory" },
+    ]);
+    expect(model.navs.some((r) => r.href === "/planning")).toBe(false);
+    expect(screen("Beer").to).toMatchObject({ Materials: "Materials on hand", "Variance by brand": "Variance by brand" });
+    expect(screen("Beer").to).not.toHaveProperty("Shortages");
   });
 
-  it("omits Taproom and Taps when showTaproom is false", () => {
+  it("offers every Beer sidebar destination and no More destination (#1253)", () => {
+    const model = toBeerViewProps(beerOverview);
+    const sidebarHrefs = STAFF_NAV.find((tab) => tab.href === "/beer")!.children!.map((row) => row.href);
+    expect(model.navs.map((row) => row.href)).toEqual(sidebarHrefs);
+    expect(model.navs.find((row) => row.key === "variance")).toMatchObject({ title: "Variance by brand", href: "/taproom/variance" });
+  });
+
+  it("omits Taproom, Taps, and Variance by brand when showTaproom is false", () => {
     const model = toBeerViewProps({
       overview: {
         fgShortages: 0,
@@ -233,7 +246,7 @@ describe("Beer view", () => {
       },
       showTaproom: false,
     });
-    expect(model.navs.map((r) => r.title)).toEqual(["Finished goods", "Cellar", "Materials", "Shortages", "Kegs"]);
+    expect(model.navs.map((r) => r.title)).toEqual(["Finished goods", "Cellar", "Materials", "Kegs"]);
   });
 
   it("the inventory drawing still offers Finished goods and does not leak live hrefs", () => {
@@ -312,7 +325,7 @@ describe("Work view", () => {
 describe("More view", () => {
   it("maps the designed More list under every area, each card in one", () => {
     const model = toMoreViewProps(moreNavs);
-    expect(model.groups.map((g) => g.group)).toEqual(["Sales", "Production", "Setup", "Integrations"]);
+    expect(model.groups.map((g) => g.group)).toEqual(["Sales", "Production", "Setup", "Menu and chat"]);
     expect(model.groups[0]?.items[0]?.title).toBe("Invoices");
     expect(model.groups.flatMap((g) => g.items)).toHaveLength(moreNavs.length);
   });
@@ -320,10 +333,10 @@ describe("More view", () => {
   it("hides an area heading when the role has no card under it (#1159)", () => {
     // The live page's mapping, for a role whose More is Chat and Units.
     const model = toMoreViewProps([
-      { key: "/settings/chat", title: "Chat", group: "Integrations" },
+      { key: "/settings/chat", title: "Chat", group: "Menu and chat" },
       { key: "/settings/units", title: "Units", group: "Setup" },
     ]);
-    expect(model.groups.map((g) => [g.group, g.items.map((r) => r.title)])).toEqual([["Setup", ["Units"]], ["Integrations", ["Chat"]]]);
+    expect(model.groups.map((g) => [g.group, g.items.map((r) => r.title)])).toEqual([["Setup", ["Units"]], ["Menu and chat", ["Chat"]]]);
     const html = renderToStaticMarkup(createElement(MoreView, { model }));
     expect(html).toContain(">Setup</h2>");
     expect(html).not.toContain(">Sales</h2>");

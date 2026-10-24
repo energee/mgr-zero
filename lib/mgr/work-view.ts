@@ -4,12 +4,14 @@ import type { WorkKind, WorkRow } from "@/lib/commands/landings";
 import type { EmptyState } from "@/lib/mgr/empty-state";
 import { STAFF_NAV } from "@/lib/mgr/nav";
 
-/** The page each Work chip opens. A key is the chip's identity: "all" or a
- *  WorkKind, the value filters, hrefs and the remembered mgr-work-filter use. */
-export const WORK_HREFS: Record<"all" | WorkKind, string> = {
+/** Work landing filters, separate from standalone task-page navigation. */
+const WORK_FILTER_HREFS: Record<"all" | WorkKind, string> = {
   all: "/work", orders: "/orders", transfers: "/transfers", batches: "/batches",
   runs: "/packaging", POs: "/purchase-orders", routes: "/routes",
 };
+/** Every Work page has navigation, including tasks without a list_work kind. */
+export const WORK_HREFS = { ...WORK_FILTER_HREFS, pick: "/pick", replenishment: "/replenishment" };
+export const WORK_FILTER_CHIPS = Object.keys(WORK_FILTER_HREFS);
 export const WORK_CHIPS = Object.keys(WORK_HREFS);
 
 /** What each chip shows: "All", then the sidebar's name for the page the chip
@@ -31,6 +33,7 @@ export const WORK_LABELS: Record<string, string> = Object.fromEntries(
 export const WORK_TABS: Record<string, string> = {
   all: "Work", orders: "Orders", transfers: "Transfers", batches: "Batches",
   runs: "Packaging runs", POs: "Purchase orders", routes: "Routes",
+  pick: "Pick sheet", replenishment: "Pars and allocation",
 };
 
 /** list_work never returns stock transfers or packaging runs, so those two
@@ -70,7 +73,7 @@ export type WorkViewModel = {
 export type WorkSnapshot = { rows: WorkRowView[] };
 
 export function toWorkViewProps({ rows }: WorkSnapshot): WorkViewModel {
-  return { rows, workChips: WORK_CHIPS, workChipIndex: 0, workTabs: WORK_TABS };
+  return { rows, workChips: WORK_FILTER_CHIPS, workChipIndex: 0, workTabs: WORK_TABS };
 }
 
 export function workFromQuery(rows: WorkRow[], defaults: WorkKind[]): WorkViewModel {
