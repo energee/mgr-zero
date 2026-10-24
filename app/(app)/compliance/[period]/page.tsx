@@ -39,11 +39,10 @@ export default async function PeriodPage({ params }: { params: Promise<{ period:
     return <PeriodBeforeBooksView title={periodLabel(period)} state={beforeBooksState(periodLabel(period), booksOpenedOn, hasAnyRole(brewery.roles, ["admin"]))} backHref="/compliance" />;
   }
   const report: Report = filing ? { figures: filing.figures, warnings: [] } : (await runCommand("generate_compliance_report", { jurisdiction: JURISDICTION, ...range }, ctx)) as Report;
-  const model = toMonthlyComplianceViewProps({ monthLabel: periodLabel(period), timeZone: brewery.timeZone, report, filing, losses, backHref: "/compliance" });
+  const model = toMonthlyComplianceViewProps({ monthLabel: periodLabel(period), today, timeZone: brewery.timeZone, report, filing, losses, backHref: "/compliance" });
   return <MonthlyComplianceView
     model={model}
     lossAction={(loss) => <LossReviewForm loss={loss} />}
-    monthOpen={!filing && !periodOver(period, today)}
     fileAction={filing ? undefined : <FileButton jurisdiction={JURISDICTION} {...range} reason={model.fileReason} />}
   />;
 }
