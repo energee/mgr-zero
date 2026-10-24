@@ -6,4 +6,6 @@ export type VendorViewModel = {
   terms: string;
   termsOptions: string[];
   leadDays: string;
+  /** Null until the vendor has been saved. */
+  active: boolean | null;
 };

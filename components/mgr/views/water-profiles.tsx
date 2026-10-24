@@ -11,6 +11,7 @@ export function WaterProfilesView({ model, createAction, profileActions }: { mod
   return (
     <>
       {E.back(model.backLabel ?? "Catalog", "Water profiles", createAction !== undefined ? createAction : E.btn("Add water profile"), model.backHref)}
+      {E.info("Water profiles cannot currently be deleted or archived. Edit a mistaken profile instead.")}
       {model.empty ? E.blank(model.empty) : model.rows.map((row) => <div key={row.key}>{E.row(row.title, row.detail, profileActions ? profileActions[row.key] : E.act("Edit"))}</div>)}
     </>
   );

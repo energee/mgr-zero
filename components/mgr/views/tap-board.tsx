@@ -122,6 +122,7 @@ export function TapBoardView({ state: controlledState, skus, timeZone, navigatio
     {E.info("Unnumbered kegs sort last.")}
     {recent.map((event, index) => <div key={index}>{E.row(event.title, event.detail)}</div>)}
     {E.ttl("Recent history")}
+    {E.info("Closed tap entries cannot be edited or deleted. They preserve who opened and closed each keg and when, and support historical variance calculations.")}
     {state.snapshot.history.length === 0 ? E.blank("No closed kegs yet.") : state.snapshot.history.map(tap => <div key={tap.id}>{E.row(`Tap ${tap.tap_number ?? "unnumbered"} · ${tapLabel(tap)}`, `${tap.close_reason} · ${fillLabel(CLOSING_FILLS, tap.closing_fill)} · closed ${formatDateTime(tap.closed_at, timeZone)} by ${actor(tap.closed_by_label)}`)}</div>)}
   </>;
 }

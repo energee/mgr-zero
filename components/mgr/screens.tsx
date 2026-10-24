@@ -2056,7 +2056,7 @@ export const SCREENS: Screen[] = [
     job: "Create or edit one supplier and its purchase terms",
     reads: "list_vendors_and_contracts",
     writes: "upsert_vendor",
-    states: [["permission", "warehouse or brewer required", 1], ["new", "name required"], ["active", "available for purchase orders"]],
+    states: [["permission", "admin, warehouse or brewer required", 1], ["new", "name required · status controls appear after saving"], ["active", "available for new purchase orders"], ["inactive", "not a New purchase order choice · existing links remain"], ["change status", "Deactivate vendor or Reactivate vendor confirms before saving form changes"]],
     spec: "Contracts remain separate records because a vendor may supply many materials. Lead time lives here rather than on the material: every observation of it is an ordered-to-received span keyed by the vendor, so the estimate sits where the evidence is. Planning reads it to date the buy-by of the slowest supplier a bill of materials resolves to.",
     body: <VendorView model={vendorYch} />,
   },

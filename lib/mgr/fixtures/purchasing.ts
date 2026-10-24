@@ -170,6 +170,7 @@ export const vendorYch: VendorViewModel = {
   terms: "Net 30",
   termsOptions: ["Due on receipt", "Net 15", "Net 30"],
   leadDays: "7",
+  active: true,
 };
 
 export const contractsList: ContractsSnapshot = {

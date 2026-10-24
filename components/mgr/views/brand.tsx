@@ -118,6 +118,7 @@ export function BrandView({
           <RegistryInput label="Hops" value={model.hops} onChange={controls.hops} />
           {messages}
           {footer !== undefined ? footer : E.btn("Save brand")}
+          {!model.isNew && E.info("Brands cannot currently be deleted or archived. Edit a mistaken brand instead. To stop selling a packaged format, switch it off under Sells as; its inventory and history remain.")}
         </section>
         <section aria-label="Sells as and compliance" className="flex min-w-0 flex-col gap-3">
           {model.isNew ? E.info("Save the brand to add SKUs and compliance.") : (
