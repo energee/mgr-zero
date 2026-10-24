@@ -74,18 +74,18 @@ git merge --no-edit -q "origin/$b" >/dev/null 2>&1 || { echo "CONFLICT with orig
 if ! git merge --no-edit -q origin/main >/dev/null 2>&1; then
   if [ "$(git diff --name-only --diff-filter=U)" = "supabase/migrations.lock.json" ]; then
     git checkout --theirs supabase/migrations.lock.json && bun run migrations:lock >/dev/null \
-      && git add supabase/migrations.lock.json && git commit -q --no-edit
+      && git add supabase/migrations.lock.json && git commit -q --no-edit || exit 3
   else
     echo "CONFLICT:"; git diff --name-only --diff-filter=U; exit 2
   fi
 fi
-bun run migrations:lock >/dev/null 2>&1 || exit 3
-bun run docs:api >/dev/null 2>&1 || exit 3
+bun run migrations:lock || exit 3
+bun run docs:api || exit 3
 if [ -n "$(git status --porcelain)" ]; then
-  git add -A supabase/migrations.lock.json content/docs
+  git add -A supabase/migrations.lock.json content/docs || exit 3
   git commit -q -m "chore: regenerate migration lock and API reference after syncing main${CLAUDE_SESSION_URL:+
 
-Claude-Session: $CLAUDE_SESSION_URL}"
+Claude-Session: $CLAUDE_SESSION_URL}" || exit 3
 fi
 
 bun scripts/check-migration-order.ts origin/main || exit 3

@@ -1,5 +1,5 @@
 // lib/commands/movement-input.ts — the input schema of the record_movement
-// command. It registers no command, so the Composer drawer (a client bundle)
+// command. It registers no command, so the Composer panel (a client bundle)
 // can validate a proposal against it without pulling in the inventory
 // commands (tests/boundary.test.ts). inventory.ts and preview.ts use it too.
 import { z } from "zod";

@@ -15,18 +15,19 @@ import { MgrIcon } from "@/components/mgr-icon"
 import { E } from "@/components/mgr/e"
 import { EntrySurface } from "@/components/mgr/entry-surface"
 import { EntryView } from "@/components/mgr/views/entry"
-import { portalSignIn, signIn } from "@/lib/mgr/fixtures/entry"
+import { portalSignInModel, signInModel } from "@/lib/mgr/entry-view"
 
 export function LoginForm({
   className,
   error,
   sent,
   portal,
+  email,
   ...props
-}: React.ComponentProps<"div"> & { error?: string; sent?: boolean; portal?: boolean }) {
-  const fixture = portal ? portalSignIn : signIn;
+}: React.ComponentProps<"div"> & { error?: string; sent?: boolean; portal?: boolean; email?: string }) {
+  const baseModel = portal ? portalSignInModel : signInModel;
   const model = {
-    ...fixture,
+    ...baseModel,
     error,
     info: sent ? "Check your email for a sign-in link." : undefined,
   };
@@ -38,6 +39,7 @@ export function LoginForm({
           model={model}
           action={login}
           secondaryAction={portal ? undefined : emailLogin}
+          defaults={{ email }}
           hidden={portal ? <input type="hidden" name="portal" value="1" /> : null}
           linkHref={portal ? "/reset?portal=1" : "/reset"}
         />
