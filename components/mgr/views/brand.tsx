@@ -63,6 +63,7 @@ export function BrandView({
   sellsDetails,
   sellsDisabled = false,
   sellsMessages,
+  formatAction,
   busy = false,
 }: {
   model: BrandViewModel;
@@ -71,7 +72,7 @@ export function BrandView({
   validationAttempted?: boolean;
   messages?: ReactNode;
   footer?: ReactNode;
-  /** Live: Edit on price group is a link. */
+  /** Live: true links to pricing; false hides the action for a denied role. */
   linkRows?: boolean;
   /** Brand editing and price-group setup both require Admin or Sales. */
   pricingHref?: string;
@@ -88,6 +89,8 @@ export function BrandView({
   sellsDisabled?: boolean;
   /** Live: a failed switch's error, under the switches. */
   sellsMessages?: ReactNode;
+  /** Live: permitted link to Catalog's format setup; null hides the action. */
+  formatAction?: ReactNode;
   busy?: boolean;
 }) {
   const abvId = useId();
@@ -139,6 +142,10 @@ export function BrandView({
           {model.isNew ? E.info("Save the brand to add SKUs and compliance.") : (
             <>
               {E.ttl("Sells as", "sells-as")}
+              {model.sells.packages.length
+                ? E.info("Switch on a packaged format to create a SKU for this brand. A format alone is not a SKU.")
+                : E.info("Add a packaged format in Catalog, then return here and switch it on to create this brand’s SKU.")}
+              {formatAction !== undefined ? formatAction : E.btn("Manage formats", "g")}
               {model.sells.packages.map((row) => (
                 <div key={row.formatId}>{E.row(row.name, row.prices, (
                   <span className="flex items-center gap-2">
@@ -151,7 +158,10 @@ export function BrandView({
               {model.sells.contents.map((line) => <div key={line.key}>{E.row(line.label, line.prices)}</div>)}
               {E.ttl("Pours")}
               {model.sells.pours.map((pour) => <div key={pour.key}>{E.row(pour.name, `${pour.size} · ${pour.prices}`)}</div>)}
-              {E.nav("Edit on price group", "", "", undefined, linkRows ? model.sells.priceGroupHref : undefined)}
+              {model.sells.pours.length === 0 && E.info(model.sells.unpriced
+                ? "Choose a price group and save the brand before adding pours or setting prices."
+                : "No pours on this price group. Add a pour on Price groups; pours are servings, not SKUs.")}
+              {!model.sells.unpriced && linkRows !== false && E.nav("Edit on price group", "", "", undefined, linkRows ? model.sells.priceGroupHref : undefined)}
               {E.ttl("Compliance", "compliance")}
               {model.compliance.map((row) => (
                 <div key={row.key}>{E.row(row.title, row.detail, rowAction(row, actions), row.warning ? "w" : "")}</div>

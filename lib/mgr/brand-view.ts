@@ -149,7 +149,7 @@ export function toBrandViewProps({
     suggestion: cost ? suggestPriceGroup({ ...cost, groups: priceGroups }) : null,
     description: brand.description ?? "",
     hops: brand.hops ?? "",
-    sells: toBrandSellsModel({ brand: { ...brand, pours: brand.pours ?? [] }, ...sells }),
+    sells: toBrandSellsModel({ brand: { ...brand, price_group_id: saved.price_group_id, pours: brand.pours ?? [] }, ...sells }),
     compliance: rows,
   };
 }
