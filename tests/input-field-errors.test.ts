@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { z } from "zod";
-import { defineQuery, runCommand, type Ctx } from "@/lib/commands/registry";
+import { CommandError, defineQuery, runCommand, type Ctx } from "@/lib/commands/registry";
 import { inputErrorPresentation } from "@/lib/commands/field-errors";
 import { classifyCommandFailure, CommandResponseError } from "@/lib/commands/client";
 
@@ -27,6 +27,7 @@ it("keeps every public schema correction actionable for unmapped callers without
   });
   const ctx: Ctx = { db: null as unknown as Ctx["db"], userId: "u", breweryId: "b", roles: ["admin"] };
   const failure = await runCommand("unmapped_field_error_regression", { first: "", second: "" }, ctx).catch(error => error);
+  if (!(failure instanceof CommandError)) throw new Error("Expected a structured schema rejection.");
   expect(failure).toMatchObject({
     status: 400, code: "invalid_input",
     message: "Enter the first value.; Enter the second value.",
