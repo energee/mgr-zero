@@ -20,6 +20,7 @@ import {
   brandApprovalStout, complianceMonthsDemo, licensesDemo, licensePaBrewery, lotTraceHazy, materialLotTraceCitra, stateRegistrationHazy,
 } from "../lib/mgr/fixtures/compliance";
 import { toLicensesViewProps } from "../lib/mgr/licenses-view";
+import { licenseSubmitReason } from "../lib/mgr/license-view";
 import { toBrandViewProps } from "../lib/mgr/brand-view";
 import { colaChoice, colaUrl } from "../lib/mgr/brand-approval-view";
 import { brandHazy } from "../lib/mgr/fixtures/catalog";
@@ -85,6 +86,27 @@ describe("Compliance months", () => {
 });
 
 describe("Licenses", () => {
+  it("names missing or invalid license identity without requiring optional details (#1262)", () => {
+    expect(licenseSubmitReason({ state: "", kind: "brewery" })).toBe("Still needed: a state.");
+    for (const state of ["123", "P", "PAA", "ZZ"]) {
+      expect(licenseSubmitReason({ state, kind: "brewery" })).toBe("Still needed: a state.");
+    }
+    expect(licenseSubmitReason({ state: "PA", kind: "" })).toBe("Still needed: a kind.");
+    expect(licenseSubmitReason({ state: "PA", kind: "brewery" })).toBeNull();
+  });
+
+  it("guides empty licenses and shares neutral help, state picker, and Cancel (#1262)", () => {
+    const empty = htmlOf(createElement(LicensesView, { model: { licenses: [] } }));
+    expect(empty).toContain("No licenses yet. Record your state licenses here so their numbers and expiry dates are in one place.");
+    const form = htmlOf(createElement(LicenseView, { model: { state: "", kind: "brewery" } }));
+    expect(form).toContain('role="combobox"');
+    expect(form).not.toContain("State (two letters)");
+    expect(form).toContain("bg-info");
+    expect(form).not.toContain("bg-warning");
+    expect(form).toContain("Cancel");
+    expect(form).toContain("Still needed: a state.");
+  });
+
   it("the Licenses inventory record is LicensesView: the brewery's licenses, no brand tab", () => {
     const body = screen("Licenses").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(LicensesView);

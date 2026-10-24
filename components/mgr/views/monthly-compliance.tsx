@@ -14,7 +14,7 @@ function ComplianceFigures({ model, inProcessDetail, warnings = [] }: { model: C
     {E.info("Every package class balances: Begin + In − Out = End, in barrels. Cellar removals are included once in the removal totals below. Zeros print 0.00.")}
     {warnings.map((warning) => <Fragment key={warning}>{E.note(warning)}</Fragment>)}
     {E.row("Beer in process", inProcessDetail, model.inProcess)}
-    {E.row("Packaged", "production into finished goods", model.packaged)}
+    {E.row("Packaged", "Shows production added to finished goods.", model.packaged)}
     {model.removals.map((row) => <Fragment key={row.key}>{row.key === "loss" ? E.fld(row.title, row.bbl) : E.row(row.title, "", row.bbl)}</Fragment>)}
     {model.cellarRemovals.length ? <>{E.info("Cellar removals breakdown is explanatory and is already included once in the filing removal totals above. Do not add it again.")}{model.cellarRemovals.map((row) => <Fragment key={row.key}>{E.fld(`${row.title} · already counted above`, row.bbl)}</Fragment>)}</> : null}
     {E.ttl("Destination-state totals")}
@@ -23,7 +23,7 @@ function ComplianceFigures({ model, inProcessDetail, warnings = [] }: { model: C
       {E.info("Beer moves and beer sales count on their own dates. Net (bbl) is Removed less Returned, plus signed Adjustments. Net sales is Sales less Credits; keg deposits are excluded. The Unassigned row holds transactions with no recorded destination: shipments, returns, adjustments, invoices, or credits. These totals match the exported transactions. State taxes and state filing forms are done outside MGR.")}
       <DestinationStateExport {...model.stateExport} />
     </> : E.info("This snapshot was saved without the transactions behind its destination-state totals.")}
-    {model.byState.map((row) => <Fragment key={row.key}>{E.row(row.title, "gross taxable shipments · before returns", row.bbl)}</Fragment>)}
+    {model.byState.map((row) => <Fragment key={row.key}>{E.row(row.title, "Shows gross taxable shipments before returns.", row.bbl)}</Fragment>)}
   </>;
 }
 
@@ -51,7 +51,7 @@ export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen
         <p className="break-words text-sm text-muted-foreground"><time dateTime={amendment.at}>{formatDateTime(amendment.at, model.timeZone)}</time> · Actor {amendment.actor}</p>
         {amendment.invalidPeriod ? E.note("This period starts before the corrected books-opened date. Resolve its external filing with your compliance owner; it cannot be generated under this basis.") : null}
         {!amendment.figures.balances ? E.note("The corrected figures do not balance. Resolve the source records before preparing an amended filing.") : null}
-        <ComplianceFigures model={amendment.figures} inProcessDetail="tanks at correction, not at period end" />
+        <ComplianceFigures model={amendment.figures} inProcessDetail="Shows what was in tanks at correction, not at the end of the period." />
       </div>)}
     </section> : null}
     {E.row("1 · Review cellar losses", "Losses recorded when a batch completed or a transfer came up short. Reattribute part of one to samples, the taproom, or destruction; the original stays in history.")}
@@ -61,7 +61,7 @@ export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen
     </section>)}
     {model.losses.length ? E.info("A reattribution counts in the period you save it. Earlier filed snapshots stay unchanged.") : null}
     {E.row(model.filingDate ? "2 · Review original filed figures" : "2 · Review generated figures", "", E.status(model.filingDate ? `Filed ${model.filingDate}` : model.balances ? "Current" : "Does not balance", model.filingDate || model.balances ? "ok" : "w"))}
-    <ComplianceFigures model={model} warnings={model.warnings} inProcessDetail={model.filingDate ? "tanks at filing, not at period end" : "tanks now, not at period end"} />
+    <ComplianceFigures model={model} warnings={model.warnings} inProcessDetail={model.filingDate ? "Shows what was in tanks at filing, not at the end of the period." : "Shows what's in tanks now, not at the end of the period."} />
     {E.row("3 · Record the filing", "", model.filingDate ? E.status("Done", "ok") : "")}
     {E.info(model.filingDate
       ? "MGR does not file with TTB or the state. This snapshot records the figures as filed."

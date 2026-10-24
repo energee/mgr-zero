@@ -42,7 +42,7 @@ export function WorkKindTabs({ chips, current, tabs, hrefs }: {
     strip.scrollLeft += nearestScroll(strip.getBoundingClientRect(), tab.getBoundingClientRect(), pad);
   }, [current]);
   return (
-    <div ref={box} className="contents">
+    <div ref={box} className="contents print:hidden">
       <TabBar names={names} on={names.indexOf(current)} cls="w-full overflow-x-auto justify-start scroll-cue" to={tabs} hrefs={hrefs} labels={WORK_LABELS} />
     </div>
   );

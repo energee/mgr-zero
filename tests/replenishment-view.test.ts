@@ -37,7 +37,7 @@ it("draws one page heading and separates taproom records, standing allocations, 
   const out = view().render();
   expect(out.match(/<h1\b/g)).toHaveLength(1);
   expect(out).toMatch(/<h1\b[^>]*>Replenishment<\/h1>/);
-  expect(out.match(/>Finished goods<\/a>/g)).toHaveLength(1);
+  expect(out.match(/>Work<\/a>/g)).toHaveLength(1);
   expect(out.indexOf('aria-label="Location"')).toBeLessThan(out.indexOf("Taproom replenishment"));
   expect(out.indexOf("Taproom replenishment")).toBeLessThan(out.indexOf('id="standing-allocations"'));
   expect(out.indexOf('id="standing-allocations"')).toBeLessThan(out.indexOf("Shortfalls across all locations"));
