@@ -120,7 +120,7 @@ export async function POST(req: Request) {
     if (e instanceof CommandError) {
       const response: CommandFailure = {
         ok: false,
-        error: { code: e.code, message: e.message },
+        error: { code: e.code, message: e.message, ...(e.issues ? { issues: e.issues } : {}) },
         ...(requestId === undefined ? {} : { requestId }),
         correlationId,
       };

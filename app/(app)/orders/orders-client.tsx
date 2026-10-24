@@ -8,11 +8,11 @@ import { useCommandQuery } from "@/components/mgr/query-provider";
 import { QueryFeedback } from "@/components/mgr/query-feedback";
 import type { StaffRole } from "@/lib/commands/registry";
 import { toOrdersListViewProps, type OrdersListSnapshot } from "@/lib/mgr/orders-list-view";
-import { salesRoles } from "@/lib/mgr/order-status";
+import { salesRoles, type OrderStatus } from "@/lib/mgr/order-status";
 import { hasAnyRole } from "@/lib/mgr/roles";
 import { historyPage, type HistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
 
-export function OrdersClient({ roles, timeZone, status, customerId, customerName, cursor }: { roles: readonly StaffRole[]; timeZone: string; status?: string; customerId?: string; customerName?: string; cursor?: string }) {
+export function OrdersClient({ roles, timeZone, status, customerId, customerName, cursor }: { roles: readonly StaffRole[]; timeZone: string; status?: OrderStatus; customerId?: string; customerName?: string; cursor?: string }) {
   const result = useCommandQuery<HistoryPage<OrdersListSnapshot["orders"][number] & HistoryRow>>("list_orders", { status, customerId, cursor });
   const page = historyPage(result.data ?? { rows: [], nextCursor: null }, "/orders", cursor, { status, customerId });
   // get_customer can fail (a stale or malformed link); say so rather than invent a name.

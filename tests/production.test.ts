@@ -164,8 +164,8 @@ describe("recipes and immutable versions", () => {
       recipeId: recipe.id, mashSchedule: [{ name: "Saccharification", kind: "infusion", tempF: 152, minutes: 60 }], brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
       ingredients: [{ materialId: malt, perBblQty: 60, stage: "mash" }], ...v,
     }, ctx);
-    await expect(bad({ brewhouseEfficiency: 75 })).rejects.toThrow(/validation failed/);
-    await expect(bad({ yeastAttenuation: 0 })).rejects.toThrow(/validation failed/);
+    await expect(bad({ brewhouseEfficiency: 75 })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(bad({ yeastAttenuation: 0 })).rejects.toMatchObject({ code: "invalid_input" });
   });
 
   it("keeps targets off recipe_versions: gravity is predicted, never stored", () => {

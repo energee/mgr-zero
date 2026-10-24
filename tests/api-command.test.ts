@@ -59,6 +59,20 @@ describe("POST /api/command bearer auth", () => {
     });
   });
 
+  it("returns schema field paths separately from its customer-facing summary", async () => {
+    const res = await POST(commandReq({ breweryId, name: "search_entities", input: { q: "x".repeat(81) } }, adminToken));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      ok: false,
+      error: {
+        code: "invalid_input",
+        message: "Check the submitted values and try again.",
+        issues: [{ path: ["q"], code: "too_big", message: expect.any(String) }],
+      },
+      correlationId: expect.any(String),
+    });
+  });
+
   it("serializes one UUID request id for a browser command action", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       json: async () => ({ ok: true, data: { created: true }, requestId: randomUUID(), correlationId: randomUUID() }),

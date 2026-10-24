@@ -19,6 +19,7 @@ export function VendorForm({ vendor }: { vendor?: Vendor }) {
   const [terms, setTerms] = useState(vendor?.payment_terms ?? "net30");
   const [lead, setLead] = useState(vendor?.lead_time_days?.toString() ?? "");
   const form = useCommandForm("upsert_vendor", {
+    validationFields: ["name", "email", "phone", "leadTimeDays"],
     build: () => ({
       id: vendor?.id, name, email: email || undefined, phone: phone || undefined, paymentTerms: terms,
       leadTimeDays: lead === "" ? undefined : Number(lead),
@@ -28,9 +29,14 @@ export function VendorForm({ vendor }: { vendor?: Vendor }) {
   const trigger = vendor ? <Button variant="ghost" size="sm">Edit</Button> : <Button size="sm">Add vendor</Button>;
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Vendor" trigger={trigger}>
-      <form onSubmit={form.submit} className="flex flex-col gap-4">
+      <form noValidate onSubmit={event => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.currentTarget.checkValidity()) void form.submit(event);
+      }} className="flex flex-col gap-4">
         <VendorView
           model={{ name, email, phone, terms: paymentTermLabel(terms), termsOptions: PAYMENT_TERMS.map(term => PAYMENT_TERM_LABEL[term]), leadDays: lead }}
+          errors={{ ...form.fieldErrors, leadDays: form.fieldErrors.leadTimeDays }}
           controls={{ name: setName, email: setEmail, phone: setPhone, terms: (label) => setTerms(PAYMENT_TERMS.find(term => PAYMENT_TERM_LABEL[term] === label) ?? "net30"), leadDays: setLead }}
           messages={<CommandFormMessage error={form.error} />}
           footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !name.trim()}>{form.submitting ? "Saving…" : "Save vendor"}</Button></CommandFormFooter>}

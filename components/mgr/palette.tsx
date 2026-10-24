@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { SEARCH_QUERY_MAX_LENGTH } from "@/lib/mgr/search-view";
 
 export type PaletteGroup = { heading: string; items: [label: string, detail: string, to?: string][] };
 
@@ -17,7 +18,13 @@ export function Palette({ placeholder, groups, value, onValueChange, onSelect, e
       event.stopPropagation();
       event.currentTarget.querySelector<HTMLElement>('[cmdk-item][aria-selected="true"]')?.click();
     }}>
-      <CommandInput placeholder={placeholder} aria-label={placeholder} value={value} onValueChange={onValueChange} />
+      <CommandInput
+        placeholder={placeholder}
+        aria-label={placeholder}
+        maxLength={SEARCH_QUERY_MAX_LENGTH}
+        value={value?.slice(0, SEARCH_QUERY_MAX_LENGTH)}
+        onValueChange={onValueChange ? next => onValueChange(next.slice(0, SEARCH_QUERY_MAX_LENGTH)) : undefined}
+      />
       <CommandList>
         {before}
         {emptyMessage && <CommandEmpty>{emptyMessage}</CommandEmpty>}

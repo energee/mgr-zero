@@ -15,6 +15,7 @@ export function ShipToForm({ customerId, customerCountry, shipTo }: { customerId
   const [fields, setFields] = useState(initial);
   const set = <K extends keyof typeof initial>(key: K) => (value: typeof initial[K]) => setFields(prev => ({ ...prev, [key]: value }));
   const form = useCommandForm("upsert_ship_to", {
+    validationFields: ["label", "country", "address1", "address2", "city", "state", "zip"],
     // Blanks are omitted (an address outside the US may have none); only a US address has a state.
     build: () => ({
       id: shipTo?.id, customerId, label: fields.label, country: fields.country, isDefault: fields.isDefault,
@@ -27,8 +28,9 @@ export function ShipToForm({ customerId, customerCountry, shipTo }: { customerId
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Ship-to form"
       trigger={<Button variant="outline" size="sm">{shipTo ? "Edit" : "New ship-to"}</Button>}>
-      <form onSubmit={form.submit} className="flex flex-col gap-2">
+      <form noValidate onSubmit={form.submit} className="flex flex-col gap-2">
         <ShipToView model={toShipToViewProps(fields)}
+          errors={{ ...form.fieldErrors, address: form.fieldErrors.address1 }}
           controls={{ label: set("label"), country: set("country"), address: set("address1"), address2: set("address2"), city: set("city"), state: set("state"), zip: set("zip"), isDefault: set("isDefault") }}
           messages={<CommandFormMessage error={form.error} />}
           submitting={form.submitting} />

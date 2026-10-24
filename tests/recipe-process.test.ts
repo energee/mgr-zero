@@ -53,8 +53,8 @@ describe("recipe process spec", () => {
     }, ctx)) as { mash_temp_f: number | null; fermentation_schedule: unknown[] };
     expect(v.mash_temp_f).toBeNull();
     expect(v.fermentation_schedule).toEqual([]);
-    await expect(runCommand("create_recipe_version", { recipeId, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78, mashSchedule: [], ingredients: [{ materialId: malt, perBblQty: 60, stage: "mash" }] }, ctx)).rejects.toThrow(/validation/);
-    await expect(runCommand("create_recipe_version", { recipeId, mashTempF: 152, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78, ingredients: [{ materialId: malt, perBblQty: 60, stage: "mash" }] }, ctx)).rejects.toThrow(/validation/);
+    await expect(runCommand("create_recipe_version", { recipeId, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78, mashSchedule: [], ingredients: [{ materialId: malt, perBblQty: 60, stage: "mash" }] }, ctx)).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(runCommand("create_recipe_version", { recipeId, mashTempF: 152, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78, ingredients: [{ materialId: malt, perBblQty: 60, stage: "mash" }] }, ctx)).rejects.toMatchObject({ code: "invalid_input" });
   });
 
   it("keeps a version immutable: the additions table has no update path", () => {

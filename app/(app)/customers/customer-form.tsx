@@ -8,9 +8,7 @@ import { useState } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
 import { FieldDescription } from "@/components/ui/field";
-import { Label } from "@/components/ui/label";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { PAYMENT_TERMS, type CustomerType, type PaymentTerm } from "@/lib/mgr/enums";
 import { CUSTOMER_ALIAS_HELP, type CustomerEditValues } from "@/lib/mgr/customer-view";
@@ -72,6 +70,7 @@ export function CustomerForm({
   const [paymentTerms, setPaymentTerms] = useState(customer?.paymentTerms ?? "net30");
   const [taxTreatment, setTaxTreatment] = useState<TaxTreatment | "">(customer?.taxTreatment ?? "");
   const form = useCommandForm("upsert_customer", {
+    validationFields: ["name", "alias", "country", "state", "saleChannelId", "licenseNumber"],
     build: () => upsertCustomerInput({ name, alias, type, country, state, saleChannelId, licenseNumber, paymentTerms, taxTreatment }, customer?.id),
     reset: () => {
       setName(customer?.name ?? "");
@@ -90,33 +89,20 @@ export function CustomerForm({
     <CommandForm open={form.open} onOpenChange={form.setOpen} title={isEdit ? "Edit customer" : "New customer"} trigger={<Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"}>
           {isEdit ? "Edit" : "New customer"}
         </Button>}>
-        <form onSubmit={form.submit} className="flex flex-col gap-4">
+        <form noValidate onSubmit={form.submit} className="flex flex-col gap-4">
+          {E.edit("Name", name, "text", undefined, { id: "customer-name", onChange: setName, required: true, error: form.fieldErrors.name })}
           <div className="flex flex-col gap-2">
-            <Label htmlFor="customer-name">Name</Label>
-            <Input id="customer-name" value={name} onChange={(e) => setName(e.target.value)} required />
-          </div>
-          <div className="flex flex-col gap-2">
-            {E.edit("Alias", alias, "text", undefined, { id: "customer-alias", onChange: setAlias, "aria-describedby": "customer-alias-help" })}
+            {E.edit("Alias", alias, "text", undefined, { id: "customer-alias", onChange: setAlias, error: form.fieldErrors.alias, "aria-describedby": "customer-alias-help" })}
             <FieldDescription id="customer-alias-help">{CUSTOMER_ALIAS_HELP}</FieldDescription>
           </div>
           {E.pick("Type", type, CUSTOMER_TYPE_OPTIONS, { id: "customer-type", onChange: (value) => setType(value as CustomerType) })}
-          {E.pick("Country", country, COUNTRY_OPTIONS, { id: "customer-country", onChange: setCountry, required: true })}
+          {E.pick("Country", country, COUNTRY_OPTIONS, { id: "customer-country", onChange: setCountry, required: true, error: form.fieldErrors.country })}
           {country === "US" && <div className="flex flex-col gap-2">
-            <Label htmlFor="customer-state">State</Label>
-            <Input
-              id="customer-state"
-              value={state}
-              onChange={(e) => setState(e.target.value.toUpperCase())}
-              maxLength={2}
-              placeholder="NY"
-              required
-            />
+            {E.edit("State", state, "text", undefined, { id: "customer-state", onChange: value => setState(value.toUpperCase()), maxLength: 2, placeholder: "PA", required: true, error: form.fieldErrors.state, "aria-describedby": "customer-state-help" })}
+            <FieldDescription id="customer-state-help">Use a two-letter US state code, such as PA.</FieldDescription>
           </div>}
-          {E.pick("Sale channel", saleChannelId, channels.map((c) => ({ value: c.id, label: c.name })), { id: "customer-sale-channel", onChange: setSaleChannelId, required: true })}
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="customer-license">License number</Label>
-            <Input id="customer-license" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} />
-          </div>
+          {E.pick("Sale channel", saleChannelId, channels.map((c) => ({ value: c.id, label: c.name })), { id: "customer-sale-channel", onChange: setSaleChannelId, required: true, error: form.fieldErrors.saleChannelId })}
+          {E.edit("License number", licenseNumber, "text", undefined, { id: "customer-license", onChange: setLicenseNumber, error: form.fieldErrors.licenseNumber })}
           {E.pick("Payment terms", paymentTerms, PAYMENT_TERMS.map(t => ({ value: t, label: PAYMENT_TERM_LABEL[t] })), { id: "customer-terms", onChange: setPaymentTerms, displayValue: paymentTermLabel(paymentTerms) })}
           {E.pick("Tax treatment", taxTreatment, [{ value: "", label: "Inherit sale channel" }, ...TAX_TREATMENTS.map(t => ({ value: t, label: sentenceCase(t) }))], { id: "customer-tax", onChange: value => setTaxTreatment(value as TaxTreatment | ""), displayValue: taxTreatment ? sentenceCase(taxTreatment) : "Inherit sale channel" })}
           {/* upsert_customer takes no ship-to; ship-tos are upsert_ship_to on Customer detail. Create only: edit already has that page. */}

@@ -7,28 +7,30 @@ import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, 
 import { FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
 import { CommandFormMessage } from "@/components/mgr/command-form";
-import { breweryOperatingDefaultsCommand, type BrewerySettingsValues } from "@/lib/mgr/settings-view";
+import { breweryOperatingDefaultsCommand, oneWayKegFeeError, type BrewerySettingsValues } from "@/lib/mgr/settings-view";
 import { timezoneLabel } from "@/lib/mgr/labels";
 
 const TIMEZONES = Intl.supportedValuesOf("timeZone");
 
 /** The Brewery details section of Settings: its own form, named by its legend, saved only by Save brewery. */
-export function BrewerySettingsFormView({ initial, onSave, busy = false, error = null, basisLocked = false }: {
+export function BrewerySettingsFormView({ initial, onSave, busy = false, error = null, basisLocked = false, fieldErrors = {} }: {
   initial: BrewerySettingsValues;
   onSave?: (values: BrewerySettingsValues) => void;
   busy?: boolean;
   error?: string | null;
   basisLocked?: boolean;
+  fieldErrors?: Partial<Record<keyof BrewerySettingsValues, string>>;
 }) {
   const [values, setValues] = useState(initial);
   const { anchor: timezoneAnchor, props: timezoneSearch } = useComboboxSearch(timezoneLabel(values.timezone));
   const id = useId();
   const change = (key: keyof BrewerySettingsValues, value: string) => setValues((current) => ({ ...current, [key]: value }));
+  const feeError = oneWayKegFeeError(values.oneWayKegFee);
   const defaults = breweryOperatingDefaultsCommand(values);
   const field = (key: keyof BrewerySettingsValues, label: string, type = "text", required = false) => (
-    E.edit(label, values[key], type, undefined, { onChange: (nextValue: string) => change(key, nextValue), id: `${id}-${key}`, required })
+    E.edit(label, values[key], type, undefined, { onChange: (nextValue: string) => change(key, nextValue), id: `${id}-${key}`, required, error: fieldErrors[key], placeholder: key === "phone" ? "(503) 555-0142" : undefined })
   );
-  return <form onSubmit={(event) => { event.preventDefault(); if (defaults.valid) onSave?.(values); }}>
+  return <form noValidate onSubmit={(event) => { event.preventDefault(); if (defaults.valid && !feeError && event.currentTarget.checkValidity()) onSave?.(values); }}>
     <FieldSet className="min-w-0">
       <FieldLegend><h2 className="font-heading text-xl font-semibold">Brewery details</h2></FieldLegend>
       <div className="grid gap-4 @min-[24rem]:grid-cols-2">
@@ -60,7 +62,7 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
           <FieldDescription id={`${id}-booksOpenedOn-help`}>{basisLocked ? "Filed reporting basis. Use Correct reporting basis below to record a correction and flag affected periods." : "Set or clear before your first filed snapshot. Later changes require a recorded admin correction."}</FieldDescription>
         </div>
         <div className="flex min-w-0 flex-col gap-2">
-          {E.edit("One-way keg fee ($)", values.oneWayKegFee, "number", undefined, { onChange: (nextValue: string) => change("oneWayKegFee", nextValue), id: `${id}-oneWayKegFee`, min: 0, step: 0.01, "aria-describedby": `${id}-oneWayKegFee-help` })}
+          {E.edit("One-way keg fee ($)", values.oneWayKegFee, "number", undefined, { onChange: (nextValue: string) => change("oneWayKegFee", nextValue), id: `${id}-oneWayKegFee`, min: 0, max: 21474836.47, step: 0.01, error: feeError, "aria-describedby": `${id}-oneWayKegFee-help` })}
           <FieldDescription id={`${id}-oneWayKegFee-help`}>Charged for each one-way keg shipped. Blank or 0 means no fee.</FieldDescription>
         </div>
         <div className="flex min-w-0 flex-col gap-2 [&>[data-slot=button-group]]:w-full">
@@ -74,7 +76,7 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
         </div>
       </div>
       <CommandFormMessage error={error} />
-      <Button type="submit" className="w-full @min-[24rem]:w-auto @min-[24rem]:self-end" disabled={busy || !values.name.trim() || !values.timezone.trim() || !defaults.valid}>{busy ? "Saving…" : "Save brewery"}</Button>
+      <Button type="submit" className="w-full @min-[24rem]:w-auto @min-[24rem]:self-end" disabled={busy || !values.name.trim() || !values.timezone.trim() || !defaults.valid || Boolean(feeError)}>{busy ? "Saving…" : "Save brewery"}</Button>
     </FieldSet>
   </form>;
 }
