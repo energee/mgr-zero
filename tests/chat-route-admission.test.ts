@@ -16,7 +16,6 @@ vi.mock("next/headers", () => ({
 }));
 
 import { POST } from "@/app/api/chat/route";
-import { publicEnv } from "@/lib/env/public";
 
 afterEach(() => {
   request.db = undefined;
@@ -48,7 +47,7 @@ describe("POST /api/chat admission", () => {
       const res = await POST(chatReq(brewery.id, crypto.randomUUID()));
       expect(res.status).toBe(429);
       expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
-      await expect(res.json()).resolves.toMatchObject({ error: expect.stringMatching(/too many requests/i) });
+      await expect(res.text()).resolves.toBe("mgr-chat:rate_limited");
     } finally {
       sql(`delete from private.command_admissions where user_id='${staff.id}'`);
     }

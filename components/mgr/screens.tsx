@@ -935,8 +935,8 @@ export const SCREENS: Screen[] = [
     job: "Questions use named registered queries",
     reads: "get_atp · get_shortfalls",
     writes: "none",
-    states: [["loading", "answer skeleton"], ["error", "Could not refresh ATP · Retry", 1], ["offline", "cached value + timestamp"]],
-    spec: "Navigate / Ask MGR in the header opens a right-side overlay on desktop and full-screen chat on phones. Navigate, Back to page, or Escape closes it without discarding drafts, messages, or an active response. The page keeps its width and scroll position. Phone focus stays in chat; opening by touch does not open the keyboard.",
+    states: [["loading", "answer skeleton"], ["not configured", "message box disabled; contact administrator", 1], ["provider access denied", "check provider access and credits; no retry", 1], ["rate limited", "wait, then Try again", 1], ["provider unavailable", "temporary outage; Try again", 1], ["offline", "check connection; chat messages are not queued", 1], ["unknown failure", "safe guidance; no blind retry", 1]],
+    spec: "Navigate / Ask MGR in the header opens a right-side overlay on desktop and full-screen chat on phones. Navigate, Back to page, or Escape closes it without discarding drafts, messages, or an active response. The page keeps its width and scroll position. Phone focus stays in chat; opening by touch does not open the keyboard. HTTP and stream failures use the same safe error codes. Only transient failures offer Try again; provider-access denials do not. Ordinary forms and saved readings remain available when AI fails.",
     body: <><ComposerConversationView messages={[
       { id: "answer-user", role: "user", content: "How much Hazy is available to promise?" },
       { id: "answer-assistant", role: "assistant", content: "11 × ½ bbl plus 40 cases are currently available to promise. Observed Sep 10, 2026, 10:00 AM." },
