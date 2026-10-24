@@ -44,6 +44,9 @@ export const connectionStateLabel = (state: string) => CONNECTION_STATE_LABEL[st
 /** Catalog's Sort options, in BRAND_SORTS order (lib/mgr/enums.ts). */
 export const BRAND_SORT_LABEL: Record<BrandSort, string> = { name: "Name", abv: "ABV", newest: "Newest" };
 
+/** No saved COLA is evidence only of what is on file, not an approval application or requirement. */
+export const COLA_NOT_ON_FILE = "None on file";
+
 /** A record as staff see it: its name, then its staff-only alias when it has one
  *  ("Appaloosa · Animal #14", "Tavour · Nano Wine 'N Beer"). Brands and customers. */
 export const nameWithAlias = (r: { name: string; alias?: string | null }) => (r.alias ? `${r.name} · ${r.alias}` : r.name);

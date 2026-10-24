@@ -25,7 +25,7 @@ export function ShipToForm({ customerId, customerCountry, shipTo }: { customerId
     target: shipTo?.id,
   });
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Ship-to form"
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title={shipTo ? "Edit ship-to" : "New ship-to"}
       trigger={<Button variant="outline" size="sm">{shipTo ? "Edit" : "New ship-to"}</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-2">
         <ShipToView model={toShipToViewProps(fields)}

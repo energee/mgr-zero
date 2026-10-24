@@ -7,7 +7,7 @@ import { approvalDate } from "./brand-view";
 import type { EmptyState } from "./empty-state";
 import type { BrandSort } from "./enums";
 import { BRAND_SORTS } from "./enums";
-import { BRAND_SORT_LABEL } from "./labels";
+import { BRAND_SORT_LABEL, COLA_NOT_ON_FILE } from "./labels";
 import { plural } from "./plural";
 
 /** One brand row's facts, each drawn in its own column. */
@@ -22,7 +22,7 @@ export type CatalogBrandView = {
   abv: string;
   /** Packaged SKUs plus the pours its price group owns, active or not: "4". */
   skus: string;
-  /** Recorded COLA approvals: "None", one's TTB ID and approval date, or "2 on file". */
+  /** Recorded COLA approvals: "None on file", one's TTB ID and approval date, or "2 on file". */
   cola: string;
   href: string;
 };
@@ -60,10 +60,10 @@ export type CatalogSnapshot = {
 /** A brand's missing style or ABV; Catalog sorts it as empty (last). */
 export const NOT_SET = "Not set";
 
-/** Shows only saved COLAs: "None", one COLA's TTB ID and date, or a count when
+/** Shows only saved COLAs: "None on file", one COLA's TTB ID and date, or a count when
  *  there are several (the brand page lists each). */
 function colaFact(colas: CatalogBrandRow["colas"]): string {
-  if (colas.length === 0) return "None";
+  if (colas.length === 0) return COLA_NOT_ON_FILE;
   if (colas.length > 1) return `${colas.length} on file`;
   const { ttb_id, approved_on } = colas[0]!;
   return `TTB ID ${ttb_id} · ${approvalDate(approved_on)}`;

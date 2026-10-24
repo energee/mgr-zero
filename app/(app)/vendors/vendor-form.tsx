@@ -27,7 +27,7 @@ export function VendorForm({ vendor }: { vendor?: Vendor }) {
   });
   const trigger = vendor ? <Button variant="ghost" size="sm">Edit</Button> : <Button size="sm">Add vendor</Button>;
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Vendor" trigger={trigger}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title={vendor ? "Edit vendor" : "New vendor"} trigger={trigger}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <VendorView
           model={{ name, email, phone, terms: paymentTermLabel(terms), termsOptions: PAYMENT_TERMS.map(term => PAYMENT_TERM_LABEL[term]), leadDays: lead }}
