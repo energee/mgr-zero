@@ -8,6 +8,9 @@ import { LoginForm } from "@/components/login-form"
 import { CommandForm } from "@/components/mgr/command-form"
 import { SessionExpiredView } from "@/components/mgr/views/session-expired"
 import { sessionExpiredModel } from "@/lib/mgr/session-expired-view"
+import { redirect } from "next/navigation"
+import { getRequestAuthContext } from "@/lib/auth/request-context"
+import { signInDestination } from "@/lib/auth/invite"
 
 const ERRORS: Record<string, string> = {
   "1": "Incorrect email or password.",
@@ -17,14 +20,16 @@ const ERRORS: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; sent?: string }>
+  searchParams: Promise<{ error?: string; sent?: string; email?: string }>
 }) {
-  const { error, sent } = await searchParams
+  const auth = getRequestAuthContext()
+  if (await auth.getIdentity()) redirect(await signInDestination(auth))
+  const { error, sent, email } = await searchParams
   if (error === "expired") return <>
     <CommandForm open title="Session expired">
       <SessionExpiredView model={sessionExpiredModel} signInHref="/login" />
     </CommandForm>
     <noscript><LoginForm error="Your session expired. Sign in again." /></noscript>
   </>
-  return <LoginForm error={error ? ERRORS[error] ?? "Sign-in failed." : undefined} sent={Boolean(sent)} />
+  return <LoginForm email={email} error={error ? ERRORS[error] ?? "Sign-in failed." : undefined} sent={Boolean(sent)} />
 }

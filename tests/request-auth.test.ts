@@ -4,7 +4,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { admin, makeBrewery, makeStaff, sql } from "./helpers";
+import { admin, makeBrewery, makeCustomerUser, makeStaff, makeStaffCtx, seedCustomer, sql } from "./helpers";
 
 const request = vi.hoisted(() => ({ db: undefined as SupabaseClient<Database> | undefined }));
 const navigation = vi.hoisted(() => ({
@@ -26,6 +26,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { buildContext } from "@/lib/commands/context";
+import { runCommand } from "@/lib/commands/registry";
 import { POST } from "@/app/api/command/route";
 import { publicEnv } from "@/lib/env/public";
 import { acceptInvite, login } from "@/app/(auth)/actions";
@@ -145,16 +146,72 @@ describe("request authentication", () => {
   it.each([false, true])("announces an actual rejected password sign-in as an alert (portal=%s)", async portal => {
     request.db = requestClient(globalThis.fetch);
     const form = new FormData();
-    form.set("email", `missing-${crypto.randomUUID()}@mgr.test`);
+    const email = `missing+${crypto.randomUUID()}@mgr.test`;
+    form.set("email", email);
     form.set("password", "incorrect-password-1");
     if (portal) form.set("portal", "1");
 
-    await expect(login(form)).rejects.toThrow(`redirect:${portal ? "/portal" : ""}/login?error=1`);
+    await expect(login(form)).rejects.toThrow(`redirect:${portal ? "/portal" : ""}/login?error=1&email=${encodeURIComponent(email)}`);
     const target = new URL(navigation.redirect.mock.lastCall![0], "https://mgr.test");
     const page = portal ? PortalLoginPage : LoginPage;
     const html = renderToStaticMarkup(await page({ searchParams: Promise.resolve(Object.fromEntries(target.searchParams)) }));
     expect(html).toMatch(/role="alert"[^>]*>[\s\S]*?data-slot="alert-description"[^>]*>Incorrect email or password\./);
+    expect(html.match(/<input[^>]*name="email"[^>]*>/)?.[0]).toContain(`value="${email}"`);
+    expect(html.match(/<input[^>]*type="password"[^>]*>/)?.[0]).toContain('value=""');
+    expect(html.includes("Email me a link")).toBe(!portal);
+    expect(html.includes('name="portal"')).toBe(portal);
     expect(renderToStaticMarkup(createElement(LoginForm, { portal }))).not.toContain('role="alert"');
+  });
+
+  it.each(["staff", "customer", "both", "none"] as const)("redirects an authenticated %s account away from either sign-in form (#1320)", async (kind) => {
+    const brewery = await makeBrewery();
+    let user;
+    if (kind === "customer") {
+      const customer = await seedCustomer(brewery.id);
+      user = await makeCustomerUser(customer.customerId);
+    } else {
+      user = await makeStaff(brewery.id);
+      if (kind === "none") sql(`delete from brewery_users where user_id='${user.id}'`);
+      if (kind === "both") {
+        const customer = await seedCustomer(brewery.id);
+        const { error } = await admin.from("customer_users").insert({ user_id: user.id, customer_id: customer.customerId });
+        if (error) throw error;
+      }
+    }
+    request.db = await signInAs(user.email, globalThis.fetch);
+    let destination = "/";
+    if (kind === "customer") destination = "/portal";
+    if (kind === "none") destination = "/no-membership";
+    for (const page of [LoginPage, PortalLoginPage]) {
+      await expect(page({ searchParams: Promise.resolve({}) })).rejects.toThrow(`redirect:${destination}`);
+    }
+    // A valid session also bypasses the expired-session dialog.
+    await expect(LoginPage({ searchParams: Promise.resolve({ error: "expired" }) })).rejects.toThrow(`redirect:${destination}`);
+  });
+
+  it.each(["staff", "customer"] as const)("keeps pending %s consent ahead of home on both sign-in pages (#1320)", async (kind) => {
+    const inviter = await makeStaffCtx((await makeBrewery()).id);
+    const existingBrewery = await makeBrewery();
+    const existingCustomer = await seedCustomer(existingBrewery.id);
+    const recipient = kind === "staff"
+      ? await makeStaff(existingBrewery.id)
+      : await makeCustomerUser(existingCustomer.customerId);
+    const customer = await seedCustomer(inviter.breweryId);
+    const input = kind === "staff"
+      ? { email: recipient.email, role: "sales" }
+      : { email: recipient.email, customerId: customer.customerId };
+    const invitation = await runCommand(kind === "staff" ? "invite_staff" : "invite_customer_user", input, inviter) as { state: string };
+    expect(invitation.state).toBe("pending_consent");
+    request.db = await signInAs(recipient.email, globalThis.fetch);
+    for (const membership of ["existing", "none"]) {
+      if (membership === "none") {
+        const table = kind === "staff" ? "brewery_users" : "customer_users";
+        sql(`delete from ${table} where user_id='${recipient.id}'`);
+      }
+      for (const page of [LoginPage, PortalLoginPage]) {
+        await expect(page({ searchParams: Promise.resolve({}) })).rejects.toThrow("redirect:/invitations");
+      }
+    }
   });
 
   it.each([false, true])("keeps generic and expired-session sign-in failures assertive (portal=%s)", portal => {

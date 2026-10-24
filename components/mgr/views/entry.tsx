@@ -8,8 +8,14 @@ import { Field, FieldGroup } from "@/components/ui/field";
 import type { EntryViewModel } from "@/lib/mgr/entry-view";
 import type { ReactNode } from "react";
 import { Fragment } from "react";
+import { useFormStatus } from "react-dom";
 
 export type { EntryViewModel };
+
+function EntrySubmit({ label, pendingLabel }: { label: string; pendingLabel: string }) {
+  const { pending } = useFormStatus();
+  return E.submit(label, { busy: pendingLabel, submitting: pending, "aria-busy": pending });
+}
 
 export function EntryView({
   model,
@@ -40,9 +46,14 @@ export function EntryView({
       <Fragment key={label}>{E.edit(label, String((defaults[name]) ?? ""), password ? "password" : label === "Email" ? "email" : "text", undefined, { name, required: true, minLength: label === "Choose a password" ? 8 : undefined, autoComplete: label === "Email" ? "email" : label === "Your name" ? "name" : label === "Password" ? "current-password" : "new-password", "aria-label": label })}</Fragment>
     );
   });
-  const primary = primaryHref === null ? null : primaryHref ? (
-    <Button asChild><Link href={primaryHref}>{model.primary}</Link></Button>
-  ) : <Button type={action || emailLink ? "submit" : "button"}>{model.primary}</Button>;
+  let primary: ReactNode = null;
+  if (primaryHref) {
+    primary = <Button asChild><Link href={primaryHref}>{model.primary}</Link></Button>;
+  } else if (primaryHref !== null) {
+    primary = model.pendingLabel
+      ? <EntrySubmit label={model.primary} pendingLabel={model.pendingLabel} />
+      : <Button type={action || emailLink ? "submit" : "button"}>{model.primary}</Button>;
+  }
   const controls = (
     <FieldGroup>
       {hidden}
