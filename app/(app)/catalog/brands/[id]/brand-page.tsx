@@ -13,6 +13,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CommandFormMessage } from "@/components/mgr/command-form";
+import { E } from "@/components/mgr/e";
 import { BrandView } from "@/components/mgr/views/brand";
 import { CatalogCategoriesControl } from "@/components/mgr/views/catalog-categories";
 import { useCommandAction, useFields } from "@/lib/commands/use-command-form";
