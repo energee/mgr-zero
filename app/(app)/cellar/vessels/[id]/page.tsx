@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -14,24 +15,32 @@ import { navTitle } from "@/lib/mgr/nav";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  await getVesselPageData(id);
   return { title: navTitle(id === "new" ? "/cellar/vessels/new" : "/cellar/vessels") };
 }
 
 type Vessel = { id: string; name: string; kind: string; capacity_bbl: number; active: boolean };
 type Occupancy = { occupancy_id: string; vessel_id: string; batch_id: string; batch_no: number | null; brand_name: string | null; bbl: number };
 
-export default async function VesselPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+const getVesselPageData = cache(async function getVesselPageData(id: string) {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   // Brewers read a vessel; adding and editing one is admin work.
   requirePagePermission(ctx, id === "new" ? "upsert_vessel" : "list_vessels", id === "new" ? "New vessel" : "Vessel detail");
-  if (id === "new") return <VesselForm model={{ title: "New vessel", backHref: "/cellar", name: "", type: "Fermenter", typeOptions: VESSEL_TYPES, capacity: "" }} />;
-  const [vessels, occupancies, unit] = await Promise.all([
-    runPageQuery("list_vessels", { retired: true }, ctx), runPageQuery("list_occupancies", {}, ctx), runPageQuery("get_gravity_unit", {}, ctx),
-  ]) as [Vessel[], Occupancy[], { effective: GravityUnit }];
+  if (id === "new") return { brewery, ctx, vessel: null };
+  const vessels = await runPageQuery("list_vessels", { retired: true }, ctx) as Vessel[];
   const vessel = vessels.find(vessel => vessel.id === id);
   if (!vessel) notFound();
+  return { brewery, ctx, vessel };
+});
+
+export default async function VesselPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { brewery, ctx, vessel } = await getVesselPageData(id);
+  if (!vessel) return <VesselForm model={{ title: "New vessel", backHref: "/cellar", name: "", type: "Fermenter", typeOptions: VESSEL_TYPES, capacity: "" }} />;
+  const [occupancies, unit] = await Promise.all([
+    runPageQuery("list_occupancies", {}, ctx), runPageQuery("get_gravity_unit", {}, ctx),
+  ]) as [Occupancy[], { effective: GravityUnit }];
   const occupancy = occupancies.find(occupancy => occupancy.vessel_id === id);
   const readings = occupancy ? await runPageQuery("list_fermentation_readings", { occupancyId: occupancy.occupancy_id }, ctx) as VesselReading[] : [];
   const model = {

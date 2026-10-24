@@ -10,6 +10,7 @@
 // binds the shared BrandView to upsert_brand, the Sells as switches to
 // create_sku / update_sku (only for a role that may run create_sku), and
 // slots the compliance and SKU sheets.
+import { cache } from "react";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { canRun } from "@/lib/commands/registry";
@@ -24,11 +25,11 @@ import { navTitle } from "@/lib/mgr/nav";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  await getBrandPageData(id);
   return { title: navTitle(id === "new" ? "/catalog/brands/new" : "/catalog/brands") };
 }
 
-export default async function BrandDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+const getBrandPageData = cache(async function getBrandPageData(id: string) {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   // The page edits; whoever may not save a brand is sent to No access, not shown a read-only form.
@@ -50,6 +51,12 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
   ]);
   const brand = id === "new" ? null : brands.find((b) => b.id === id) ?? notFound();
   const own = brand ? registry.brands.find((b) => b.id === brand.id) : undefined;
+  return { ctx, brands, groups, cost, categories, sells, brand, own };
+});
+
+export default async function BrandDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const { ctx, brands, groups, cost, categories, sells, brand, own } = await getBrandPageData(id);
   return (
     <BrandPage
       brand={brand}

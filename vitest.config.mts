@@ -21,6 +21,15 @@ const pureTests = [
   "tests/migrations-applied.test.ts",
   "tests/test-db-schema-guard.test.ts",
   "tests/test-db-selection.test.ts",
+  "tests/record-page-titles.test.ts",
+  "tests/detail-not-found-pages.test.ts",
+  "tests/page-titles.test.ts",
+  "tests/priced-sku-feedback.test.ts",
+  "tests/order-pick-pages.test.ts",
+  "tests/edit-draft-page.test.ts",
+  "tests/menu-item-not-found.test.ts",
+  "tests/app-screen-parity.test.ts",
+  "tests/screen-view-composition.test.ts",
 ];
 
 export default defineConfig({

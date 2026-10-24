@@ -72,7 +72,13 @@ describe("staff page titles", () => {
         expect.soft(source, route).toContain(`return { title: ${dynamicTitle} };`);
         expect.soft(source, route).not.toContain("export const metadata");
       } else {
-        expect.soft(source, route).toContain(`export const metadata = { title: navTitle("${staticParent(route)}") };`);
+        const title = `title: navTitle("${staticParent(route)}")`;
+        if (source.includes("export async function generateMetadata(")) {
+          expect.soft(source, route).toContain(`return { ${title} };`);
+          expect.soft(source, route).not.toContain("export const metadata");
+        } else {
+          expect.soft(source, route).toContain(`export const metadata = { ${title} };`);
+        }
       }
     }
   });
@@ -105,7 +111,7 @@ describe("creation-route metadata functions", () => {
     ["cellar/vessels/[id]", "New vessel", "Cellar"],
     ["catalog/brands/[id]", "New brand", "Catalog"],
   ])("titles new and existing records at %s using the route parameter", async (route, title, section) => {
-    const metadata = metadataFunction(route, { navTitle });
+    const metadata = metadataFunction(route, { navTitle, getVesselPageData: async () => ({}), getBrandPageData: async () => ({}) });
     expect(await metadata({ params: Promise.resolve({ id: "new" }) })).toEqual({ title });
     expect(await metadata({ params: Promise.resolve({ id: "record-id" }) })).toEqual({ title: section });
   });
