@@ -98,8 +98,10 @@ type VolumeUnit = "oz" | "gal" | "bbl" | "mL" | "L";
 /** A row is a tap target when its trailing slot declares `data-tap`: the Open
  *  chevron (E.nav) or a verb (E.act). A switch or a stepper there is its own
  *  control, so the row around it keeps the plain cursor. Read by CSS on the
- *  row, never by inspecting the child. */
-const TAP_ROW = "has-[[data-tap]]:cursor-pointer has-[[data-tap]]:select-none has-[[data-tap]]:hover:bg-accent/50";
+ *  row, never by inspecting the child. Its hover fill is padded past the
+ *  text, and the matching negative margin keeps the text on the column edge
+ *  (w-auto replaces Item's w-full so both margins widen the row). */
+const TAP_ROW = "has-[[data-tap]]:cursor-pointer has-[[data-tap]]:select-none has-[[data-tap]]:hover:bg-accent/50 has-[[data-tap]]:-mx-3 has-[[data-tap]]:w-auto has-[[data-tap]]:px-3";
 
 /** Keys the fields itself, so callers pass bare elements. The index is the
  *  identity because a field group is a fixed, ordered list — never reordered,
