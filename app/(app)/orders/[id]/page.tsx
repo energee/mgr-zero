@@ -16,18 +16,20 @@
 import { canRun } from "@/lib/commands/registry";
 import type { OrderCogs } from "@/lib/commands/orders";
 import type { PortalUser, TeamMember } from "@/lib/commands/invites";
-import { getActiveBrewery } from "@/lib/brewery";
-import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toOrderViewProps, type OrderSnapshot } from "@/lib/mgr/order-view";
 import type { OrderStatus } from "@/lib/mgr/order-status";
 import "@/lib/commands/all";
-import { orNotFound } from "@/lib/mgr/not-found";
+import { getOrderPageData } from "../order-data";
 import { CancelOrderAction, LifecycleButtons, OrderActionScope } from "./lifecycle-buttons";
 import { OrderLinesForm } from "./order-lines-form";
 import { navTitle } from "@/lib/mgr/nav";
 
-export const metadata = { title: navTitle("/orders") };
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await getOrderPageData(id);
+  return { title: navTitle("/orders") };
+}
 
 type Order = { id: string; order_no: number | null; customer_id: string | null; kind: "wholesale" | "taproom_transfer"; status: OrderStatus; po_number: string | null; requested_ship_date: string | null; note: string | null; needs_restock: boolean; pickup: boolean; repick_since: string | null; from_location_id?: string; customers: { name: string } | null; ship_tos: { label: string; country: string; city: string | null; state: string | null } | null };
 type OrderLine = { id: string; sku_id: string; qty_ordered: number; qty_picked: number | null; qty_shipped: number | null; unit_price_cents: number; one_way_fee_cents: number | null; short_reason: string | null; skus: { name: string } | null };
@@ -36,11 +38,9 @@ type Atp = { sku_id: string; qty: number };
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const brewery = await getActiveBrewery();
-  const ctx = await buildContext(brewery.id);
-  const [{ order, lines, events, atp, deposits }, locations] = (await Promise.all([
-    orNotFound(runCommand("get_order", { orderId: id }, ctx)), runCommand("list_locations", {}, ctx),
-  ])) as [{ order: Order; lines: OrderLine[]; events: OrderEvent[]; atp: Atp[]; deposits: OrderSnapshot["deposits"] }, { id: string; name: string }[]];
+  const { brewery, ctx, snapshot } = await getOrderPageData(id);
+  const { order, lines, events, atp, deposits } = snapshot as { order: Order; lines: OrderLine[]; events: OrderEvent[]; atp: Atp[]; deposits: OrderSnapshot["deposits"] };
+  const locations = await runCommand("list_locations", {}, ctx) as { id: string; name: string }[];
   const canSell = canRun(ctx, "confirm_order"), canFulfill = canRun(ctx, "record_pick");
   const [cogs, team, buyers]: [OrderCogs | undefined, TeamMember[], PortalUser[]] = await Promise.all([
     // Cost and margin are for Admin and Sales (#810); only a shipped order has any.

@@ -6,6 +6,19 @@ import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { Cart, type CatalogItem, type ShipToOption } from "./cart";
 import { shipToAddress } from "@/lib/mgr/ship-to-view";
+import { cache } from "react";
+
+const getSavedOrder = cache(async function getSavedOrder(id: string) {
+  const { ctx } = await getPortalContext();
+  return orNotFound(runCommand("portal_order", { orderId: id }, ctx) as Promise<PortalSavedOrder>);
+});
+
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ draft?: string; reorder?: string }> }) {
+  const query = await searchParams;
+  const sourceId = query.draft ?? query.reorder;
+  if (sourceId) await getSavedOrder(sourceId);
+  return {};
+}
 
 type ShipToRow = { id: string; label: string; country: string; city: string | null; state: string | null; is_default: boolean };
 
@@ -21,7 +34,7 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
   ]);
   const shipToOptions: ShipToOption[] = account.shipTos.map((s) => ({ id: s.id, is_default: s.is_default, country: s.country, label: shipToOptionLabel(s) }));
   const sourceId = query.draft ?? query.reorder;
-  const saved = sourceId ? await orNotFound(runCommand("portal_order", { orderId: sourceId }, ctx) as Promise<PortalSavedOrder>) : null;
+  const saved = sourceId ? await getSavedOrder(sourceId) : null;
   if (saved && query.draft && saved.order.status !== "draft") redirect(`/portal/orders/${saved.order.id}`);
   const initial = saved ? reconcilePortalOrder(saved, items, shipToOptions, !query.draft) : undefined;
   return (

@@ -7,15 +7,27 @@ import { canOpen, navTitle } from "@/lib/mgr/nav";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
+import { cache } from "react";
 
-export const metadata = { title: navTitle("/settings/pos/sales") };
+const getSaleData = cache(async function getSaleData(id: string) {
+  const brewery = await getActiveBrewery();
+  const ctx = await buildContext(brewery.id);
+  const data = await orNotFound(runCommand("get_pos_sale", { saleId: id }, ctx)) as SaleDetail;
+  return { brewery, data };
+});
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await getSaleData(id);
+  return { title: navTitle("/settings/pos/sales") };
+}
 
 type Sale = { id: string; factKind: "sale" | "return"; externalOrderId: string; externalLineId: string; itemName: string; variationName: string; factStatus: string; mappingLabel: string | null; mappingStatus: "mapped" | "queued" | "ignored" | "unsupported" | "removed"; grossCents: number | null; locationName: string; soldAt: string; quantity: string | null; expectedBbl: number | null; servingOunces: number | null; sourceOrderId: string | null; sourceLineId: string | null; sourceVersion: string; current: boolean };
 type SaleDetail = { sale: Sale; revisions: Sale[] };
 
 export default async function PosSalePage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params, brewery = await getActiveBrewery(), ctx = await buildContext(brewery.id);
-  const data = await orNotFound(runCommand("get_pos_sale", { saleId: id }, ctx)) as SaleDetail;
+  const { id } = await params;
+  const { brewery, data } = await getSaleData(id);
   const sale = data.sale;
   // Point of sale is admin-only; Warehouse can read a sale, so its back link goes to Menu (#444).
   const back = canOpen(brewery.roles, "/settings/pos") ? { href: "/settings/pos", label: "Point of sale" } : { href: "/menu", label: "Menu" };

@@ -465,13 +465,13 @@ export const E = {
    *  nothing is picked; `selectedLabel` names a retained value missing from `options`.
    *  With no options the open list says "No … to choose yet", never "No matching …";
    *  `empty` adds the note and link under the trigger. */
-  searchPick: (label: string, value: string, options: SearchPickOption[], controls?: Pick<FieldControls, "id" | "disabled" | "placeholder" | "hideLabel" | "onChange" | "aria-describedby"> & { selectedLabel?: string; previewAction?: boolean; empty?: PickEmpty }) => {
+  searchPick: (label: string, value: string, options: SearchPickOption[], controls?: Pick<FieldControls, "id" | "disabled" | "placeholder" | "hideLabel" | "onChange" | "aria-describedby"> & { selectedLabel?: string; previewAction?: boolean; outlined?: boolean; empty?: PickEmpty }) => {
     const empty = options.length ? undefined : controls?.empty;
     const emptyId = empty && controls?.id ? `${controls.id}-empty` : undefined;
     return (
     <Field data-disabled={controls?.disabled}>
       {!controls?.hideLabel && <FieldLabel htmlFor={controls?.id}>{label}</FieldLabel>}
-      <SearchPick label={label} value={value} options={options} onChange={controls?.onChange} id={controls?.id} disabled={controls?.disabled} errorId={describedBy(controls?.["aria-describedby"], emptyId)} selectedLabel={controls?.selectedLabel} previewAction={controls?.previewAction}
+      <SearchPick label={label} value={value} options={options} onChange={controls?.onChange} id={controls?.id} disabled={controls?.disabled} errorId={describedBy(controls?.["aria-describedby"], emptyId)} selectedLabel={controls?.selectedLabel} previewAction={controls?.previewAction} outlined={controls?.outlined}
         title={label} placeholder={controls?.placeholder ?? `Select ${label.toLowerCase()}`} searchPlaceholder={`Search ${label.toLowerCase()}`} noMatchMessage={`No matching ${label.toLowerCase()}`} emptyMessage={controls?.empty?.text ?? `No ${label.toLowerCase()} to choose yet`} />
       {empty && emptyNote(empty, emptyId)}
     </Field>
