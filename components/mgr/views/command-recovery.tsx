@@ -28,10 +28,14 @@ export function CommandRecoveryView({ rows, busy, error, onRetry, onDiscard }: {
     <CommandFormMessage error={error} />
     {rows.map(row => <div key={row.requestId} className="space-y-2">
       <p>{sentenceCase(row.name.replace(/^upsert_/, "save_"))} · {row.path}</p>
-      <details><summary>Saved request</summary><dl className="space-y-1 text-sm">{Object.entries(row.input && typeof row.input === "object" ? row.input : { input: row.input }).map(([key, value]) => <div key={key}>
-        <dt className="font-medium">{sentenceCase(key.replace(/([a-z])([A-Z])/g, "$1 $2"))}</dt>
-        <dd className="whitespace-pre-wrap break-words">{typeof value === "object" ? JSON.stringify(value) : String(value ?? "")}</dd>
-      </div>)}</dl></details>
+      <details><summary>Saved request</summary><dl className="space-y-1 text-sm">{Object.entries(row.input && typeof row.input === "object" ? row.input : { input: row.input }).map(([key, value]) => {
+        let displayValue: unknown = value;
+        if (key === "role" && typeof value === "string") displayValue = sentenceCase(value);
+        return <div key={key}>
+          <dt className="font-medium">{sentenceCase(key.replace(/([a-z])([A-Z])/g, "$1 $2"))}</dt>
+          <dd className="whitespace-pre-wrap break-words">{typeof displayValue === "object" ? JSON.stringify(displayValue) : String(displayValue ?? "")}</dd>
+        </div>;
+      })}</dl></details>
       <ConfirmDiscard busy={busy} onDiscard={() => onDiscard?.(row.requestId)}
         note="MGR will stop offering this retry and will not send it. Check the result first: open the record and confirm whether the change was saved."
         retry={E.btn("Retry saved request", busy ? "p disabled" : "p", undefined, () => onRetry?.(row.requestId))} />
