@@ -27,21 +27,23 @@ function ComplianceFigures({ model, inProcessDetail, warnings = [] }: { model: C
   </>;
 }
 
-export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen = false }: {
+export function MonthlyComplianceView({ model, lossAction, fileAction }: {
   model: MonthlyComplianceViewModel;
   lossAction?: (loss: LossReview) => ReactNode;
   /** The live Save (FileButton). Absent in the inventory, which draws the inert form; null draws none. */
   fileAction?: ReactNode;
-  /** The period (month, quarter, or year) has not ended: it can be reviewed, not filed (#429). */
-  monthOpen?: boolean;
 }) {
-  // Step 3, one case at a time: still running, already filed, the live Save, or the inventory's.
-  const record = monthOpen ? E.status(`You can record the filing after ${model.title} ends`, "w")
-    : model.filingDate ? E.status(`Snapshot saved ${model.filingDate}`, "ok")
-    : fileAction !== undefined ? fileAction
-    : <FileSnapshotForm reason={model.fileReason} />;
+  let record: ReactNode;
+  if (model.filingDate) {
+    record = E.status(`Snapshot saved ${model.filingDate}`, "ok");
+  } else if (model.periodStatus !== "Past") {
+    record = E.status(`You can record the filing after ${model.title} ends`, "w");
+  } else {
+    record = fileAction !== undefined ? fileAction : <FileSnapshotForm reason={model.fileReason} />;
+  }
   return <>
-    {E.back("Compliance", model.title, undefined, model.backHref)}
+    {E.back("Compliance", model.title, E.status(model.periodStatus, model.periodStatus === "Current" ? "ok" : ""), model.backHref)}
+    {model.periodStatus === "Upcoming" ? E.info(`This period has not started. It starts on ${model.periodStart}. You can record the filing only after it ends.`) : null}
     {model.amendments?.length ? <section className="grid gap-3 rounded-xl border p-4">
       {E.status("Needs amendment", "w")}
       {E.info("An admin corrected the reporting basis. The original filed snapshot below remains unchanged. Review the recorded corrected figures and file any amended report outside MGR. MGR does not send it or clear this history flag.")}
@@ -60,7 +62,8 @@ export function MonthlyComplianceView({ model, lossAction, fileAction, monthOpen
       {loss.allocations.length ? <div className="mt-3 grid gap-2">{loss.allocations.map((allocation) => <Fragment key={allocation.key}>{E.fld(`${allocation.title} · ${allocation.detail}`, allocation.bbl)}</Fragment>)}</div> : null}
     </section>)}
     {model.losses.length ? E.info("A reattribution counts in the period you save it. Earlier filed snapshots stay unchanged.") : null}
-    {E.row(model.filingDate ? "2 · Review original filed figures" : "2 · Review generated figures", "", E.status(model.filingDate ? `Filed ${model.filingDate}` : model.balances ? "Current" : "Does not balance", model.filingDate || model.balances ? "ok" : "w"))}
+    {E.row(model.filingDate ? "2 · Review original filed figures" : "2 · Review generated figures", "", E.status(model.filingDate ? `Filed ${model.filingDate}` : model.balances ? "Live figures" : "Does not balance", model.balances ? "" : "w"))}
+    {!model.filingDate ? E.info("Live figures are generated from the ledger now, not a saved filing. Past periods can change when transactions are recorded or corrected; a filed snapshot stays unchanged.") : null}
     <ComplianceFigures model={model} warnings={model.warnings} inProcessDetail={model.filingDate ? "tanks at filing, not at period end" : "tanks now, not at period end"} />
     {E.row("3 · Record the filing", "", model.filingDate ? E.status("Done", "ok") : "")}
     {E.info(model.filingDate

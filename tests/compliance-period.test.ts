@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { getCommandDefinition } from "@/lib/commands/registry";
 import "@/lib/commands/compliance";
-import { firstPeriodFrom, periodKey, periodLabel, periodOver, periodRange, recentPeriods, startsBeforeBooks } from "@/lib/compliance-period";
+import { firstPeriodFrom, periodKey, periodLabel, periodOver, periodRange, periodStatus, recentPeriods, startsBeforeBooks } from "@/lib/compliance-period";
 
 const file = (periodStart: string, periodEnd: string, jurisdiction = "TTB") =>
   getCommandDefinition("file_compliance_report")!.input.safeParse({ jurisdiction, periodStart, periodEnd });
@@ -62,6 +62,18 @@ describe("compliance period keys", () => {
     expect(periodOver("2025-Q3", "2025-10-01")).toBe(true);
     expect(periodOver("2025", "2025-12-31")).toBe(false);
     expect(periodOver("2025", "2026-01-01")).toBe(true);
+  });
+
+  it("classifies each calendar boundary without arbitrary historical limits (#1310)", () => {
+    expect(periodStatus(periodRange("2026-09")!, "2026-09-01")).toBe("Current");
+    expect(periodStatus(periodRange("2026-09")!, "2026-09-30")).toBe("Current");
+    expect(periodStatus(periodRange("2026-Q3")!, "2026-10-01")).toBe("Past");
+    expect(periodStatus(periodRange("2025")!, "2026-10-24")).toBe("Past");
+    expect(periodStatus(periodRange("2030-01")!, "2026-10-24")).toBe("Upcoming");
+    expect(periodStatus(periodRange("1999-01")!, "2026-10-24")).toBe("Past");
+    expect(startsBeforeBooks("1999-01", null)).toBe(false);
+    expect(startsBeforeBooks("1999-01", "1998-01-01")).toBe(false);
+    expect(startsBeforeBooks("1999-01", "2026-01-01")).toBe(true);
   });
 
   it("lists the recent periods of each cadence, newest first", () => {

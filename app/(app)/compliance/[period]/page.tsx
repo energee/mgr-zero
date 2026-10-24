@@ -16,7 +16,7 @@ import "@/lib/commands/all";
 import { notFound } from "next/navigation";
 import { FileButton } from "./file-button";
 import { LossReviewForm } from "./loss-review-form";
-import { JURISDICTION, periodLabel, periodOver, periodRange, startsBeforeBooks } from "@/lib/compliance-period";
+import { JURISDICTION, periodLabel, periodRange, startsBeforeBooks } from "@/lib/compliance-period";
 import { navTitle } from "@/lib/mgr/nav";
 
 export const metadata = { title: navTitle("/compliance") };
@@ -36,11 +36,10 @@ export default async function PeriodPage({ params }: { params: Promise<{ period:
     return <PeriodBeforeBooksView title={periodLabel(period)} state={beforeBooksState(periodLabel(period), booksOpenedOn, hasAnyRole(brewery.roles, ["admin"]))} backHref="/compliance" />;
   }
   const report: Report = filing ? { figures: filing.figures, warnings: [] } : (await runCommand("generate_compliance_report", { jurisdiction: JURISDICTION, ...range }, ctx)) as Report;
-  const model = toMonthlyComplianceViewProps({ monthLabel: periodLabel(period), timeZone: brewery.timeZone, report, filing, losses, backHref: "/compliance" });
+  const model = toMonthlyComplianceViewProps({ monthLabel: periodLabel(period), today, timeZone: brewery.timeZone, report, filing, losses, backHref: "/compliance" });
   return <MonthlyComplianceView
     model={model}
     lossAction={(loss) => <LossReviewForm loss={loss} />}
-    monthOpen={!filing && !periodOver(period, today)}
     fileAction={filing ? undefined : <FileButton jurisdiction={JURISDICTION} {...range} reason={model.fileReason} />}
   />;
 }
