@@ -2,7 +2,9 @@
 // docs/plans/sale-channels-customizable.md) that replaced the `sale_channel`
 // enum, plus the tax treatment frozen onto every classified removal (§16.3).
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, ins, makeBrewery, makeStaff, makeStaffCtx, asUser, seedCatalog, seedLocation, seedCustomer, priceSku, sql, channelId } from "./helpers";
+import { z } from "zod";
+import { Client } from "pg";
+import { admin, ins, makeBrewery, makeStaff, makeStaffCtx, asUser, seedCatalog, seedLocation, seedCustomer, priceSku, sql, channelId, DB } from "./helpers";
 
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
@@ -27,6 +29,31 @@ describe("sale_channels", () => {
     const b = await makeBrewery();
     const { error } = await admin.from("sale_channels").insert({ brewery_id: b.id, name: "Taproom" });
     expect(error?.code).toBe("23505");
+  });
+
+  it("rejects case and JavaScript-trim-equivalent names on inserts and updates", async () => {
+    const b = await makeBrewery();
+    for (const name of ["dtc", " DTC ", "\tDtc\u00a0\ufeff"]) {
+      const inserted = await admin.from("sale_channels").insert({ brewery_id: b.id, name });
+      expect(inserted.error?.code, name).toBe("23505");
+      const updated = await admin.from("sale_channels").update({ name }).eq("brewery_id", b.id).eq("name", "Export");
+      expect(updated.error?.code, name).toBe("23505");
+    }
+    const rows = await admin.from("sale_channels").select("name").eq("brewery_id", b.id);
+    expect(rows.data!.map(row => row.name).sort()).toEqual(["DTC", "Export", "Taproom", "Wholesale"]);
+  });
+
+  it("allows the same normalized channel name in different breweries", async () => {
+    const a = await makeBrewery(), b = await makeBrewery();
+    for (const [brewery_id, name] of [[a.id, "Festival"], [b.id, " festival "]]) {
+      expect((await admin.from("sale_channels").insert({ brewery_id, name })).error).toBeNull();
+    }
+  });
+
+  it("lets only the service role evaluate the pure name-index helper directly", () => {
+    expect(sql(`select rolname || ':' || has_function_privilege(rolname, 'private.js_btrim(text)', 'execute')
+      from pg_roles where rolname in ('anon','authenticated','service_role') order by rolname`, true))
+      .toEqual(["anon:false", "authenticated:false", "service_role:true"]);
   });
 
   it("staff of one brewery cannot read another brewery's channels", async () => {
@@ -148,6 +175,74 @@ describe("sale channel commands", () => {
     const festival = (await runCommand("upsert_sale_channel", { name: "Festival", taxTreatment: "taxable" }, ctx)) as { id: string };
     await expect(runCommand("upsert_sale_channel", { id: festival.id, name: "Taproom", taxTreatment: "taxable" }, ctx))
       .rejects.toMatchObject({ message: expect.stringMatching(/already exists/) });
+  });
+
+  it("returns a typed conflict for case-insensitive creates and renames without changing the saved row", async () => {
+    const b = await makeBrewery(), c = await makeStaffCtx(b.id, "admin");
+    const exportId = await channelId(b.id, "Export");
+    for (const input of [{ name: " dtc ", taxTreatment: "research" }, { id: exportId, name: "\tDtC\u00a0", taxTreatment: "research" }]) {
+      await expect(runCommand("upsert_sale_channel", input, c)).rejects.toMatchObject({
+        status: 409, code: "duplicate_channel_name", message: "A channel named DTC already exists.",
+      });
+    }
+    const saved = await admin.from("sale_channels").select("name,tax_treatment").eq("id", exportId).single();
+    expect(saved.data).toEqual({ name: "Export", tax_treatment: "export" });
+  });
+
+  it("trims direct RPC names, allows a case-only rename of the same row, and replays the exact request", async () => {
+    const b = await makeBrewery(), c = await makeStaffCtx(b.id, "admin");
+    const input = { p_brewery: b.id, p_id: null, p_name: "\tFestival\u00a0\ufeff", p_tax_treatment: "taxable" as const, p_request_id: crypto.randomUUID() };
+    const created = await c.db.rpc("upsert_sale_channel", input);
+    expect(created.error).toBeNull();
+    expect(created.data).toMatchObject({ name: "Festival" });
+    const { id } = z.object({ id: z.string().uuid() }).parse(created.data);
+    await expect(runCommand("upsert_sale_channel", { id, name: " festival ", taxTreatment: "research" }, c)).resolves.toMatchObject({ id, name: "festival", tax_treatment: "research" });
+    const replay = await c.db.rpc("upsert_sale_channel", input);
+    expect(replay.error).toBeNull();
+    expect(replay.data).toEqual(created.data);
+    const saved = await admin.from("sale_channels").select("name,tax_treatment").eq("id", id).single();
+    expect(saved.data).toEqual({ name: "festival", tax_treatment: "research" });
+  });
+
+  it("rejects blank names through both the command and direct RPC", async () => {
+    for (const name of ["", " \t\n\u00a0\ufeff"]) {
+      await expect(runCommand("upsert_sale_channel", { name, taxTreatment: "taxable" }, ctx)).rejects.toMatchObject({ code: "invalid_input" });
+      const result = await ctx.db.rpc("upsert_sale_channel", {
+        p_brewery: breweryId, p_id: null, p_name: name, p_tax_treatment: "taxable", p_request_id: crypto.randomUUID(),
+      });
+      expect(result.error?.message).toBe("Enter a channel name.");
+      expect(result.error?.code).toBe("P0001");
+    }
+  });
+
+  it("serializes real PostgreSQL contenders for case variants so exactly one channel is created", async () => {
+    const brewery = await makeBrewery(), ctx = await makeStaffCtx(brewery.id, "admin");
+    const first = new Client({ connectionString: DB }), second = new Client({ connectionString: DB });
+    await Promise.all([first.connect(), second.connect()]);
+    let pending: Promise<unknown> | undefined;
+    const query = "select public.upsert_sale_channel($1,null,$2,'taxable',$3)";
+    try {
+      for (const client of [first, second]) {
+        await client.query("begin");
+        await client.query("select set_config('request.jwt.claim.sub',$1,true)", [ctx.userId]);
+        await client.query("set local role authenticated");
+      }
+      await first.query(query, [brewery.id, "Night market", crypto.randomUUID()]);
+      await first.query("reset role");
+      const { pid } = (await second.query<{ pid: number }>("select pg_backend_pid() as pid")).rows[0];
+      pending = second.query(query, [brewery.id, " NIGHT MARKET ", crypto.randomUUID()]);
+      await expect.poll(async () => (await first.query("select wait_event_type from pg_stat_activity where pid=$1", [pid])).rows[0]?.wait_event_type)
+        .toBe("Lock");
+      await first.query("commit");
+      await expect(pending).rejects.toMatchObject({ code: "MGC01" });
+      const rows = await admin.from("sale_channels").select("name").eq("brewery_id", brewery.id);
+      expect(rows.data!.filter(row => row.name.toLowerCase() === "night market")).toEqual([{ name: "Night market" }]);
+    } finally {
+      await first.query("rollback").catch(() => undefined);
+      await second.query("rollback").catch(() => undefined);
+      await Promise.all([first.end(), second.end()]);
+      if (pending) await pending.catch(() => undefined);
+    }
   });
 
   it("delete_sale_channel removes an unused channel", async () => {

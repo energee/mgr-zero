@@ -1159,6 +1159,8 @@ A sale channel is a named way your brewery sells beer. Every brewery starts with
 2. To rename a channel or change its treatment, select **Edit** on its row. The sheet is titled with the channel's name, for example **Edit channel · DTC**. Change the fields and select **Save channel**.
 3. To remove a channel, select **Delete** on its row and confirm. **Delete** appears only on a channel that can be removed.
 
+**Save channel** stays disabled until the name contains something other than whitespace. Names are saved without surrounding whitespace and must be unique within your brewery, ignoring case: **dtc** cannot be added beside **DTC**. A duplicate appears as an error under **Channel name**; change the name and save again. Renaming a channel only to change its capitalization is allowed.
+
 The tax treatment (**Taxable**, **Export**, **Vessel supplies**, **Research**, or **Transfer in bond**) is the default for removals recorded on that channel. Each treatment other than **Taxable** is a TTB removal without payment of tax, and the sheet explains the one selected:
 
 - **Export**: sold for shipment outside the US, not taxed.
