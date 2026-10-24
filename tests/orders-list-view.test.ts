@@ -92,7 +92,6 @@ describe("Orders list view loop", () => {
         href: `/orders?customerId=customer+%26+partner&status=${status}`,
       })),
     ]);
-    expect(list.props.model.statusOptions.every((option) => !option.href?.includes("cursor"))).toBe(true);
     const unscopedPage = await OrdersPage({ searchParams: Promise.resolve({ status: "picked" }) });
     expect(OrdersClient(unscopedPage.props).props.model.statusOptions).toEqual([
       { value: "all", label: "All states", href: "/orders" },
