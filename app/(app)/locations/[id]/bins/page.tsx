@@ -27,8 +27,8 @@ export default async function LocationBinsPage({ params }: { params: Promise<{ i
   const stock = canWrite ? await runCommand("get_bin_move_stock", { locationId: id }, ctx) as BinMoveStock[] : undefined;
   return <LocationBinsView
     model={toLocationBinsViewProps({ location, bins, stock, backHref: `/locations/${id}`, inventoryHref: `/inventory?recordMovement=1&locationId=${id}` })}
-    createAction={canWrite ? <BinForm locationId={id} /> : null}
-    rowActions={Object.fromEntries(bins.map(b => [b.id, canWrite ? <BinForm locationId={id} bin={b} /> : null]))}
+    createAction={canWrite ? <BinForm locationId={id} bins={bins} /> : null}
+    rowActions={Object.fromEntries(bins.map(b => [b.id, canWrite ? <BinForm locationId={id} bins={bins} bin={b} /> : null]))}
     // An empty stock list still passes the form: belowRows draws the empty
     // state (or the two-bin gate) ahead of the footer.
     footer={stock ? <MoveStockForm bins={bins} stock={stock} /> : null}

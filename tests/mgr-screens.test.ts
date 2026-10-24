@@ -477,13 +477,14 @@ describe("SCREENS", () => {
     expect(renderToStaticMarkup(VenueFrame({ venue: slack.venue!, children: slack.body }))).toContain('class="slk modal"');
   });
 
-  it("writes a person as @handle, never a domain-elided address", () => {
+  it("identifies Team members by name and full email, never a domain-elided address", () => {
     for (const s of SCREENS) {
       const html = renderToStaticMarkup(createElement("div", null, s.body));
-      // "maria@ · warehouse" reads as truncated data; a handle is "@maria".
+      // "maria@ · warehouse" reads as truncated data.
       expect.soft(html, `${s.name}: elided address`).not.toMatch(/[a-z0-9]@(?![a-z0-9.])/i);
     }
-    expect(body("Team")).toContain("@maria");
+    expect(body("Team")).toContain("Maria Alvarez");
+    expect(body("Team")).toContain("maria@demobrewing.com");
     // Pending acceptance is not exposed by the live roster.
     expect(body("Team")).not.toContain("pending");
   });
@@ -536,7 +537,7 @@ describe("SCREENS", () => {
     // The gallery shell signs in as admin (screen-frame.tsx) so every surface is
     // reachable, so the person the screens name has to be that admin.
     expect(body("Me")).toMatch(/Maria Alvarez[\s\S]*admin/);
-    expect(body("Team")).toMatch(/Maria Alvarez[\s\S]*@maria · Admin[\s\S]*you/);
+    expect(body("Team")).toMatch(/Maria Alvarez[\s\S]*maria@demobrewing\.com · Admin[\s\S]*you/);
     // Team member acts on someone else; removing yourself is the self state.
     expect(body("Team member")).not.toMatch(/Maria|@maria/);
 

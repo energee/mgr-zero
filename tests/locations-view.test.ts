@@ -111,7 +111,7 @@ describe("Location detail", () => {
     expect(model.name).toBe(LOC_TAPROOM.name);
     expect(model.uses).toEqual(["storage", "taproom", "warehouse"]);
     expect(model.usesLabel).toBe("Storage · Taproom · Warehouse");
-    expect(model.timezone).toBe("Brewery default · America / New York");
+    expect(model.timezone).toBe("Brewery default · Eastern Time (America/New_York)");
     expect(model.bins).toBe("Walk-in · Cold · Dry");
     expect(model.binsHref).toBe(`/locations/${LOC_TAPROOM.id}/bins`);
     expect(model.backHref).toBeUndefined();
@@ -131,7 +131,7 @@ describe("Location detail", () => {
     expect(html).toMatch(/Storage/);
     expect(html).toMatch(/Warehouse/);
     expect(html).toMatch(/Timezone/);
-    expect(html).toMatch(/Brewery default · America \/ New York/);
+    expect(html).toContain("Brewery default · Eastern Time (America/New_York)");
     expect(html).toMatch(/Location bins/);
     expect(html).toMatch(/Walk-in · Cold · Dry/);
     expect(html).not.toMatch(/>Open</);
@@ -381,7 +381,7 @@ describe("Bin sheet", () => {
     expect(src).toMatch(/controls=\{\{ name: setName \}\}/);
     expect(src).not.toMatch(/<Label\b|<Input\b/);
     expect(src).toMatch(/title=\{bin \? `Edit bin · \$\{bin\.name\}` : "Add bin"\}/);
-    expect(src).toMatch(/tapBoardHref: "\/taproom\/board"/);
+    expect(src).toContain('tapBoardHref: "/taproom/board"');
     expect(src).toMatch(/remove=\{bin \? <RemoveBinControl/);
   });
 
