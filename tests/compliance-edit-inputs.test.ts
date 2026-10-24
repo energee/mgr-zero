@@ -24,6 +24,22 @@ describe("compliance sheets omit the fields they do not show and null the ones l
       .toEqual({ id: undefined, brandId: "b1", kind: "formula", ttbId: "F9", approvedOn: null });
   });
 
+  it("saves a selected approved label image and drops it when switching to a formula or clearing the date", () => {
+    const fields = { kind: "cola", ttbId: "00123456789012", serialNumber: "007", approvedOn: "2026-01-02", imageUrl: "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Label.jpg&filetype=l" };
+    expect(approvalInput("b1", fields)).toMatchObject({ ttbId: fields.ttbId, imageUrl: fields.imageUrl });
+    expect(approvalInput("b1", { ...fields, kind: "formula" })).not.toHaveProperty("imageUrl");
+    expect(approvalInput("b1", { ...fields, approvedOn: "" })).not.toHaveProperty("imageUrl");
+    expect(approvalInput("b1", { ...fields, imageUrl: "" })).not.toHaveProperty("imageUrl");
+  });
+
+  it("binds a TTB ID already on this brand to its saved approval instead of inserting a duplicate", () => {
+    const fields = { kind: "cola", ttbId: " 00123456789012 ", serialNumber: "007", approvedOn: "2026-01-02" };
+    const approvals = [{ id: "saved-cola", kind: "cola", ttb_id: "00123456789012" }, { id: "saved-formula", kind: "formula", ttb_id: "00123456789012" }];
+    expect(approvalInput("b1", fields, undefined, approvals)).toMatchObject({ id: "saved-cola", ttbId: "00123456789012" });
+    expect(approvalInput("b1", { ...fields, kind: "formula" }, undefined, approvals)).toMatchObject({ id: "saved-formula" });
+    expect(approvalInput("b1", fields, { id: "edited" }, approvals)).toMatchObject({ id: "edited" });
+  });
+
   it("State registration", () => {
     expect(registrationInput("b1", { state: "oh", registrationNo: "R-7", expiresOn: "" }))
       .toEqual({ brandId: "b1", state: "OH", registrationNo: "R-7", expiresOn: null });

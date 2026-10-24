@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # scripts/land-pr.sh — land one PR: sync it with origin/main in its worktree,
 # prove it locally, push, wait for CI (rerunning infra-only failures), and with
-# --merge merge it. --sync-only only synchronizes main and generated files, so
-# conflicts can be repaired before GitHub can run the review workflow.
+# --merge merge it. One PR per call; chain calls to land a queue in order:
+#   for n in 562 570 560; do scripts/land-pr.sh $n --merge || break; done
+# --sync-only repairs branch conflicts without review, proof, push, or PR merge.
+# Run local proof and push the repaired branch before requesting review again.
 #
 # Local proof: tsc, lint, the PR's own test files, every test file that names a
 # SQL function the PR's migrations define (CI runs the whole suite, so an old
@@ -86,12 +88,11 @@ if [ -n "$(git status --porcelain)" ]; then
 Claude-Session: $CLAUDE_SESSION_URL}" || exit 3
 fi
 
+bun scripts/check-migration-order.ts origin/main || exit 3
 if [ "$do_merge" = --sync-only ]; then
-  echo "synced #$n with origin/main; no proof, push, or merge performed"
+  echo "synced #$n; local proof, push, and review still required"
   exit 0
 fi
-
-bun scripts/check-migration-order.ts origin/main || exit 3
 migs=$(git diff --name-only origin/main...HEAD -- 'supabase/migrations/*.sql')
 tests=$(git diff --name-only --diff-filter=d origin/main...HEAD -- 'tests/*.test.ts')
 for fn in $(cat $migs /dev/null | grep -oiE "create (or replace )?function [a-z_.]+" | awk '{print $NF}' | sed 's/.*\.//' | sort -u); do
