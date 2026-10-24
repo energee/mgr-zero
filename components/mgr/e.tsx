@@ -101,7 +101,7 @@ type VolumeUnit = "oz" | "gal" | "bbl" | "mL" | "L";
  *  row, never by inspecting the child. Its hover fill is padded past the
  *  text, and the matching negative margin keeps the text on the column edge
  *  (w-auto replaces Item's w-full so both margins widen the row). */
-const TAP_ROW = "has-[[data-tap]]:cursor-pointer has-[[data-tap]]:select-none has-[[data-tap]]:hover:bg-accent/50 has-[[data-tap]]:-mx-3 has-[[data-tap]]:w-auto has-[[data-tap]]:px-3";
+const TAP_ROW = "has-[[data-tap]]:cursor-pointer has-[[data-tap]]:select-none has-[[data-tap]]:hover:bg-accent/50 has-[[data-tap]]:-mx-4 has-[[data-tap]]:w-auto has-[[data-tap]]:px-4";
 
 /** Keys the fields itself, so callers pass bare elements. The index is the
  *  identity because a field group is a fixed, ordered list — never reordered,
