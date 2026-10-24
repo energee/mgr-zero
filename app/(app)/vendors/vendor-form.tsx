@@ -31,7 +31,7 @@ export function VendorForm({ vendor }: { vendor?: Vendor }) {
   });
   const trigger = vendor ? <Button variant="ghost" size="sm">Edit</Button> : <Button size="sm">Add vendor</Button>;
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Vendor" trigger={trigger}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title={vendor ? "Edit vendor" : "New vendor"} trigger={trigger}>
       <form noValidate onSubmit={event => {
         setValidationAttempted(true);
         if (form.busy || !ready) { event.preventDefault(); event.stopPropagation(); return; }

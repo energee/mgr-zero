@@ -23,6 +23,7 @@ export function ListControls({ search, scopes = [] }: {
         <form method="get" role="search" className="basis-full md:basis-0 md:grow">
           {Object.entries(search.keep).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
           {E.search(search.label, { name: "q", defaultValue: search.value })}
+          <p className="mt-1 text-xs text-muted-foreground">Press Enter to search</p>
         </form>
         {/* On a phone a pick is as wide as its chosen label (at least 9rem), so a
             long category wraps onto its own row instead of clipping beside Sort. */}

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { ContractView } from "@/components/mgr/views/contract";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { contractBalanceFields } from "@/lib/mgr/contract-view";
+import { contractBalanceFields, initialContractVendor } from "@/lib/mgr/contract-view";
 import { dollarsInput, toCents } from "@/lib/mgr/money";
 export type Contract = {
   id: string; vendor_id: string; material_id: string; contract_no: string | null; unit_cost_cents: number | null;
@@ -20,7 +20,8 @@ type Option = { id: string; name: string };
 
 export function ContractForm({ contract, vendors, materials }: { contract?: Contract; vendors: Option[]; materials: Option[] }) {
   const initialCost = dollarsInput(contract?.unit_cost_cents);
-  const [vendorId, setVendorId] = useState(contract?.vendor_id ?? "");
+  const initialVendorId = initialContractVendor(contract, vendors);
+  const [vendorId, setVendorId] = useState(initialVendorId);
   const [materialId, setMaterialId] = useState(contract?.material_id ?? "");
   const [qty, setQty] = useState(contract?.qty_committed?.toString() ?? "");
   const [cost, setCost] = useState(initialCost);
@@ -33,7 +34,7 @@ export function ContractForm({ contract, vendors, materials }: { contract?: Cont
       unitCostCents: toCents(cost),
       startsOn: startsOn || undefined, endsOn: endsOn || undefined, contractNo: contractNo || undefined,
     }),
-    reset: () => { setVendorId(contract?.vendor_id ?? ""); setMaterialId(contract?.material_id ?? ""); setQty(contract?.qty_committed?.toString() ?? ""); setCost(initialCost); setStartsOn(contract?.starts_on ?? ""); setEndsOn(contract?.ends_on ?? ""); setContractNo(contract?.contract_no ?? ""); },
+    reset: () => { setVendorId(initialVendorId); setMaterialId(contract?.material_id ?? ""); setQty(contract?.qty_committed?.toString() ?? ""); setCost(initialCost); setStartsOn(contract?.starts_on ?? ""); setEndsOn(contract?.ends_on ?? ""); setContractNo(contract?.contract_no ?? ""); },
     target: contract?.id,
   });
   const ready = vendorId && materialId && Number(qty) > 0;
@@ -61,7 +62,7 @@ export function ContractForm({ contract, vendors, materials }: { contract?: Cont
   };
 
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title={contract ? "Contract" : "New contract"} trigger={trigger}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title={contract ? "Edit contract" : "New contract"} trigger={trigger}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <ContractView
           model={model}

@@ -3,7 +3,7 @@
 // the material's purchase unit, never its base unit.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { contractBalanceFields } from "../lib/mgr/contract-view";
+import { contractBalanceFields, initialContractVendor } from "../lib/mgr/contract-view";
 
 describe("contract balance labels (#465)", () => {
   it("labels received / on order / available with the purchase unit", () => {
@@ -25,5 +25,18 @@ describe("contract balance labels (#465)", () => {
     const page = readFileSync("app/(app)/vendors/page.tsx", "utf8");
     expect(page).toMatch(/purchase_uom:\s*materials\.find\(/);
     expect(page).not.toMatch(/base_uom:\s*materials\.find\(/);
+  });
+});
+
+describe("contract vendor default", () => {
+  it("selects a vendor only when a new contract has exactly one choice", () => {
+    expect(initialContractVendor(undefined, [])).toBe("");
+    expect(initialContractVendor(undefined, [{ id: "only" }])).toBe("only");
+    expect(initialContractVendor(undefined, [{ id: "first" }, { id: "second" }])).toBe("");
+  });
+
+  it("keeps an edited contract's vendor even when the available options differ", () => {
+    expect(initialContractVendor({ vendor_id: "saved" }, [{ id: "other" }])).toBe("saved");
+    expect(initialContractVendor({ vendor_id: "saved" }, [])).toBe("saved");
   });
 });
