@@ -163,6 +163,6 @@ describe("New order view loop", () => {
     expect(html("New order")).toContain('data-slot="popover-trigger"');
     expect(html("New order")).toMatch(/>Save draft</);
     expect(html("New order")).toMatch(/>Add line</);
-    expect(html("New order")).toContain("Last checked");
+    expect(html("New order")).not.toContain("Last checked");
   });
 });

@@ -12,6 +12,7 @@ export type RouteStopView = {
 
 export type RouteViewModel = {
   backHref?: string;
+  ordersHref?: string;
   title: string;
   date?: string;
   driverId?: string;
