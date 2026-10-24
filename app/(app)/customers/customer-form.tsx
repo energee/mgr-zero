@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import { E } from "@/components/mgr/e";
+import { CustomerSaleChannelField, CustomerTaxTreatmentField } from "@/components/mgr/views/customer";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
@@ -14,8 +15,8 @@ import { Label } from "@/components/ui/label";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { PAYMENT_TERMS, type CustomerType, type PaymentTerm } from "@/lib/mgr/enums";
 import { CUSTOMER_ALIAS_HELP, type CustomerEditValues } from "@/lib/mgr/customer-view";
-import { COUNTRY_OPTIONS, CUSTOMER_TYPE_OPTIONS, PAYMENT_TERM_LABEL, paymentTermLabel, sentenceCase } from "@/lib/mgr/labels";
-import { TAX_TREATMENTS, type TaxTreatment } from "@/lib/mgr/tax-treatments";
+import { COUNTRY_OPTIONS, CUSTOMER_TYPE_OPTIONS, PAYMENT_TERM_LABEL, paymentTermLabel } from "@/lib/mgr/labels";
+import type { TaxTreatment } from "@/lib/mgr/tax-treatments";
 
 export type { TaxTreatment };
 
@@ -112,13 +113,13 @@ export function CustomerForm({
               required
             />
           </div>}
-          {E.pick("Sale channel", saleChannelId, channels.map((c) => ({ value: c.id, label: c.name })), { id: "customer-sale-channel", onChange: setSaleChannelId, required: true })}
+          <CustomerSaleChannelField value={saleChannelId} channels={channels} controls={{ id: "customer-sale-channel", onChange: setSaleChannelId }} />
           <div className="flex flex-col gap-2">
             <Label htmlFor="customer-license">License number</Label>
             <Input id="customer-license" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} />
           </div>
           {E.pick("Payment terms", paymentTerms, PAYMENT_TERMS.map(t => ({ value: t, label: PAYMENT_TERM_LABEL[t] })), { id: "customer-terms", onChange: setPaymentTerms, displayValue: paymentTermLabel(paymentTerms) })}
-          {E.pick("Tax treatment", taxTreatment, [{ value: "", label: "Inherit sale channel" }, ...TAX_TREATMENTS.map(t => ({ value: t, label: sentenceCase(t) }))], { id: "customer-tax", onChange: value => setTaxTreatment(value as TaxTreatment | ""), displayValue: taxTreatment ? sentenceCase(taxTreatment) : "Inherit sale channel" })}
+          <CustomerTaxTreatmentField value={taxTreatment} controls={{ id: "customer-tax", onChange: value => setTaxTreatment(value as TaxTreatment | "") }} />
           {/* upsert_customer takes no ship-to; ship-tos are upsert_ship_to on Customer detail. Create only: edit already has that page. */}
           {!isEdit && E.info("Add ship-to addresses on the customer’s page after you create the customer.")}
           <CommandFormMessage error={form.error} />

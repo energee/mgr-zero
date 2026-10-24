@@ -62,8 +62,11 @@ export function InvoicesView({ rows, backHref, connection, sync, pagination }: {
     {/* Sync needs a live connection; while disconnected the QuickBooks row above carries the only next step. */}
     {connection?.connected && (sync !== undefined ? sync : <QboSyncView />)}
     {connection && !connection.connected && E.info("Payment status may be stale until QuickBooks is reconnected and synced.")}
-    {rows.length ? <Register rows={rows} /> : E.blank("No invoices yet")}
+    {rows.length ? <Register rows={rows} /> : E.blank({ title: "No invoices yet", description: "Invoices show here after you ship an order. You can then push them to QuickBooks or record payments in MGR." })}
     <HistoryNavigation {...pagination} />
-    {E.gated("Email delivery status", "MGR can’t tell whether QuickBooks emailed an invoice.")}
+    <div>
+      {E.gated("Email delivery status", "Unavailable")}
+      {E.polite("MGR can’t tell whether QuickBooks emailed an invoice.")}
+    </div>
   </>;
 }
