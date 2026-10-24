@@ -185,5 +185,5 @@
   "20261024034413_team_member_display_name.sql": "c664e3a8b14447e52dff4d9abd476e39fbece4686f0b30f70f023e31ded8e403",
   "20261024042812_vessel_capacity_precision.sql": "20f5d70bd57ddbcaf485e285ac0dc06fbb726db285a0c328dd036fa506421629",
   "20261024042813_customer_name_nonblank.sql": "98be2ea8bbe161abaf703b3f7e487fb4f4188ca5f6812563f22674f606df80b5",
-  "20261024050003_sale_channel_name_uniqueness.sql": "b21c3dc38ee67deccade1f6c19b0a8eece2a268cb48c3703fcf7733ee322dc91"
+  "20261024203451_sale_channel_name_uniqueness.sql": "b21c3dc38ee67deccade1f6c19b0a8eece2a268cb48c3703fcf7733ee322dc91"
 }
