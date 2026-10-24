@@ -8,6 +8,8 @@ import { RecordTable } from "@/components/mgr/views/record-table";
 import type { ReplenishmentAllocation, ReplenishmentViewModel } from "@/lib/mgr/replenishment-view";
 import { compareSortValues } from "@/lib/mgr/table-sort";
 import { replenishmentLines, replenishReason } from "@/lib/replenishment-form";
+import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
+import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 
 export type ReplenishmentViewProps = {
   model: ReplenishmentViewModel;
@@ -20,6 +22,7 @@ export type ReplenishmentViewProps = {
   releaseAction?: (allocation: ReplenishmentAllocation) => ReactNode;
   feedback?: ReactNode;
   submitAction?: ReactNode;
+  workHrefs?: Record<string, string>;
 };
 
 function TransferQuantity({ skuId, sku, value, canEdit, onQuantity }: {
@@ -51,6 +54,7 @@ export function ReplenishmentView({
   releaseAction,
   feedback,
   submitAction,
+  workHrefs,
 }: ReplenishmentViewProps) {
   const sourceId = useId();
   const suggestions = useMemo(() => [...model.suggestions].sort((a, b) => compareSortValues(a.sku, b.sku)), [model.suggestions]);
@@ -58,7 +62,8 @@ export function ReplenishmentView({
   const shortfalls = useMemo(() => [...model.shortfalls].sort((a, b) => compareSortValues(a.detail.title, b.detail.title)), [model.shortfalls]);
 
   return <>
-    {E.back("Finished goods", "Replenishment", undefined, model.backHref)}
+    {E.back("Work", "Replenishment", undefined, model.backHref)}
+    <WorkKindTabs chips={WORK_CHIPS} current="replenishment" tabs={WORK_TABS} hrefs={workHrefs} />
     <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
       <div className="md:w-64"><ScopePick label="Location" value={model.locationId ?? ""} options={model.locations} /></div>
       {model.locationId && model.canEdit && <div className="flex flex-wrap gap-2">

@@ -9,13 +9,16 @@ import { useState, type ReactNode } from "react";
 import { CommandForm } from "@/components/mgr/command-form";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/mgr/icon";
+import { cn } from "@/lib/utils";
 
 export type SearchPickOption = { value: string; label: string };
 
 /** The caller supplies options and request feedback. While `optionsReady` is
  *  false nothing says "no match", so a pending read never looks empty; a
  *  retained value missing from `options` still shows `selectedLabel`. */
-export function SearchPick({ value, label, options, onChange, title, placeholder, searchPlaceholder, noMatchMessage, emptyMessage = noMatchMessage, selectedLabel, feedback, optionsReady = true, errorId, invalid, id, disabled, previewAction }: {
+export function SearchPick({ value, label, options, onChange, title, placeholder, searchPlaceholder, noMatchMessage, emptyMessage = noMatchMessage, selectedLabel, feedback, optionsReady = true, errorId, invalid, id, disabled, previewAction, outlined }: {
   value: string;
   /** The trigger's accessible name. */
   label: string;
@@ -29,7 +32,7 @@ export function SearchPick({ value, label, options, onChange, title, placeholder
   /** Shown when options exist but none match the search. */
   noMatchMessage: string;
   /** Shown when there are no options at all. */
-  emptyMessage?: string;
+  emptyMessage?: ReactNode;
   selectedLabel?: string;
   feedback?: ReactNode;
   optionsReady?: boolean;
@@ -41,10 +44,21 @@ export function SearchPick({ value, label, options, onChange, title, placeholder
   disabled?: boolean;
   /** Lets an inventory preview keep this picker interaction local. */
   previewAction?: boolean;
+  /** A select-like trigger for page filters, rather than an inline picked value. */
+  outlined?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return <CommandForm title={title} open={open} onOpenChange={setOpen} previewAction={previewAction}
-    trigger={<Button type="button" id={id} disabled={disabled} variant="ghost" className="h-auto min-h-11 max-w-full justify-start whitespace-normal text-left" aria-label={label} aria-describedby={errorId} aria-invalid={invalid || undefined} data-preview-action={previewAction || undefined}>{options.find(option => option.value === value)?.label ?? (value && selectedLabel ? selectedLabel : placeholder)}</Button>}>
+    trigger={
+      <Button type="button" id={id} disabled={disabled} variant={outlined ? "outline" : "ghost"}
+        className={cn("max-w-full whitespace-normal text-left", outlined
+          ? "h-8 w-fit justify-between gap-1.5 border-input bg-transparent py-2 pr-2 pl-2.5 font-normal shadow-none dark:bg-input/30 dark:hover:bg-input/50"
+          : "h-auto min-h-11 justify-start")}
+        aria-label={label} aria-describedby={errorId} aria-invalid={invalid || undefined} data-preview-action={previewAction || undefined}>
+        {options.find(option => option.value === value)?.label ?? (value && selectedLabel ? selectedLabel : placeholder)}
+        {outlined && <Icon icon={ArrowDown01Icon} className="shrink-0 text-muted-foreground" />}
+      </Button>
+    }>
     {feedback}
     <Command><CommandInput placeholder={searchPlaceholder} /><CommandList>{optionsReady && <CommandEmpty>{options.length ? noMatchMessage : emptyMessage}</CommandEmpty>}
       {options.map(option => <CommandItem key={option.value} value={option.value} keywords={[option.label]} onSelect={() => { onChange?.(option.value); setOpen(false); }}>{option.label}</CommandItem>)}

@@ -247,3 +247,12 @@ it("#1135 falls back to the shared sync view only while connected", () => {
   expect(draw(true)).toContain("Sync QuickBooks");
   expect(draw(false)).not.toContain("Sync QuickBooks");
 });
+
+it("explains where invoices come from without requiring QuickBooks (#1261)", () => {
+  const html = renderToStaticMarkup(createElement(InvoicesView, { rows: [] }));
+  expect(html).toContain("No invoices yet");
+  expect(html).toMatch(/Invoices show here after you ship an order/);
+  expect(html).toMatch(/push them to QuickBooks or record payments in MGR/);
+  expect(html).toContain("MGR can’t tell whether QuickBooks emailed an invoice.");
+  expect(html).toContain(">Unavailable<");
+});
