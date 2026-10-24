@@ -19,14 +19,14 @@ function expectFieldError(html: string, message: string) {
 
 it("renders vendor server phone corrections at an accessible highlighted field", () => {
   const html = renderToStaticMarkup(createElement(VendorView, {
-    model: { name: "Supplier", email: "", phone: "abc", terms: "Net 30", termsOptions: ["Net 30"], leadDays: "" },
+    model: { name: "Supplier", email: "", phone: "abc", terms: "Net 30", termsOptions: ["Net 30"], leadDays: "", active: null },
     errors: { phone: "Use a phone number, such as (503) 555-0142." },
   }));
   expectFieldError(html, "Use a phone number, such as (503) 555-0142.");
 });
 
 it("shows controlled vendor server errors without losing local attempted-state diagnostics", () => {
-  const model = { name: "Supplier", email: "not-an-email", phone: "", terms: "Net 30", termsOptions: ["Net 30"], leadDays: "-1" };
+  const model = { name: "Supplier", email: "not-an-email", phone: "", terms: "Net 30", termsOptions: ["Net 30"], leadDays: "-1", active: null };
   const controls = { email: vi.fn(), leadDays: vi.fn() };
   const serverError = "Check this supplier email.";
   const html = renderToStaticMarkup(createElement(VendorView, { model, controls, errors: { email: serverError } }));
