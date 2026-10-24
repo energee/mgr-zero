@@ -1,9 +1,8 @@
 // app/(app)/locations/page.tsx — Locations (screen record Locations): the
 // brewery's locations from list_locations, each opening its detail. Adding
 // a location is location-form.tsx → create_location. Admin only in nav.
-import { LocationsView } from "@/components/mgr/views/locations";
+import { LocationsInventoryLink, LocationsView } from "@/components/mgr/views/locations";
 import { toLocationsViewProps } from "@/lib/mgr/locations-view";
-import Link from "next/link";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
@@ -26,6 +25,6 @@ export default async function LocationsPage() {
     rowActionLabel={brewery.roles.includes("admin") ? "Edit" : "Review"}
     createAction={brewery.roles.includes("admin") ? <LocationForm /> : null}
     linkRows
-    footer={canRun(ctx, "get_atp") ? <Link href="/inventory" className="text-xs text-muted-foreground underline underline-offset-2">All finished goods inventory</Link> : null}
+    footer={canRun(ctx, "get_atp") ? <LocationsInventoryLink href="/inventory" /> : null}
   />;
 }

@@ -24,6 +24,13 @@ function confirmation(node: ReactNode): Parameters<typeof ConfirmDeleteControl>[
   }
 }
 
+function vendorConfirmation(props: Parameters<typeof VendorView>[0]) {
+  let tree: ReactNode;
+  function Harness() { return tree = VendorView(props); }
+  renderToStaticMarkup(createElement(Harness));
+  return confirmation(tree!);
+}
+
 describe("record lifecycle availability (#1311)", () => {
   it.each([...STAFF_ROLES, "customer"] as const)("keeps vendor status changes behind the existing %s role boundary", role => {
     const ctx: Ctx = { db: null as unknown as Ctx["db"], userId: "staff", breweryId: "brewery", roles: [role] };
@@ -50,8 +57,7 @@ describe("record lifecycle availability (#1311)", () => {
 
   it.each([true, false])("an %s-active vendor uses the shared confirmation before requesting the opposite status", async active => {
     const onSetActive = vi.fn().mockResolvedValue(true);
-    const tree = VendorView({ model: { ...vendorYch, active }, onSetActive });
-    const control = confirmation(tree);
+    const control = vendorConfirmation({ model: { ...vendorYch, active }, onSetActive });
     expect(control).toBeDefined();
     expect(control?.title).toBe(active ? "Deactivate vendor" : "Reactivate vendor");
     expect(onSetActive).not.toHaveBeenCalled();
@@ -72,12 +78,18 @@ describe("record lifecycle availability (#1311)", () => {
     expect(html.match(/>Edit</g)).toHaveLength(2);
   });
 
-  it("holds status confirmation closed when a required name is missing", () => {
-    const control = confirmation(VendorView({ model: { ...vendorYch, name: " ", active: true } }));
+  it.each([
+    { name: " " },
+    { email: "not-an-email" },
+    { leadDays: "-1" },
+    { leadDays: "2.5" },
+    { leadDays: "1e3" },
+  ])("holds status confirmation closed for invalid form fields %j", fields => {
+    const control = vendorConfirmation({ model: { ...vendorYch, ...fields, active: true } });
     expect(control?.reason).toBeTruthy();
   });
 
   it("does not offer a lifecycle action before a vendor has been saved", () => {
-    expect(confirmation(VendorView({ model: { ...vendorYch, active: null } }))).toBeUndefined();
+    expect(vendorConfirmation({ model: { ...vendorYch, active: null } })).toBeUndefined();
   });
 });

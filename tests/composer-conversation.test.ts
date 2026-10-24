@@ -26,6 +26,25 @@ describe("composer conversation surface", () => {
     expect(html).toContain('role="log"');
   });
 
+  it("welcomes a ready empty conversation, but not a transcript, setup, or error (#1251)", () => {
+    const welcome = "Ask about inventory, orders, or production.";
+    const render = (props: Parameters<typeof ComposerConversationView>[0]) =>
+      renderToStaticMarkup(createElement(ComposerConversationView, props));
+    expect(render({ messages: [] })).toContain(welcome);
+    expect(render({ messages: [] })).toContain("Review and confirm any proposed work before MGR records it.");
+    expect(render({ messages: [{ id: "user", role: "user", content: "Hello" }] })).not.toContain(welcome);
+    expect(render({ messages: [], activity: "Opening your conversation…" })).not.toContain(welcome);
+    expect(render({ messages: [], error: "Setup failed" })).not.toContain(welcome);
+  });
+
+  it.each([0, 2])("explains pending readings even when the queue has %s entries (#1251)", (outboxCount) => {
+    const html = renderToStaticMarkup(createElement(ComposerStripView, { outboxCount }));
+    expect(html).toContain(`Pending readings (${outboxCount})`);
+    expect(html).toContain("Saved fermentation readings to retry or review.");
+    expect(html).not.toContain(">Outbox");
+  });
+
+
   it.each([
     "![stock](https://images.example.invalid/pixel?brewery=private)",
     '<img src="https://images.example.invalid/pixel?brewery=private" alt="stock" />',
@@ -78,7 +97,7 @@ describe("composer conversation surface", () => {
     expect(html).toContain("Tank 2 · saved reading");
     expect(html).toContain("Retry exact reading");
     expect(html).toContain("Discard");
-    expect(html).toMatch(/<button(?![^>]*\sdisabled(?:\s|=|>))[^>]*>Outbox \(1\)<\/button>/);
+    expect(html).toMatch(/<button(?![^>]*\sdisabled(?:\s|=|>))[^>]*>Pending readings \(1\)<\/button>/);
     expect(html).toMatch(/<textarea[^>]*\sdisabled=""/);
     if (failed) {
       expect(html).toContain('role="alert"');
