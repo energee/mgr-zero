@@ -12,6 +12,7 @@ import { MeSheet } from "@/components/mgr/me-sheet";
 import { MeView } from "@/components/mgr/views/me";
 import { PortalMeView } from "@/components/mgr/views/portal-me";
 import { UserAvatar } from "@/components/mgr/user-avatar";
+import { ComposerDemo } from "@/components/mgr/composer-demo";
 import type { Screen } from "@/components/mgr/screens";
 import { VenueFrame } from "@/components/mgr/venue";
 import "@/components/mgr/venue.css";
@@ -71,10 +72,10 @@ export function ScreenFrame({ screen: s, persona = PERSONAS[0], container }: { s
       brand="Demo Brewing"
       items={navFor(STAFF_NAV, persona.roles)}
       headerRight={<><Button variant="ghost" size="sm"><Icon icon={Search01Icon} />Search</Button>{me}</>}
-      composer={E.comp(persona.roles, container)}
+      composer={s.surface === "composer" ? <ComposerDemo initialOpen disabled={!persona.roles.length} container={container}>{s.body}</ComposerDemo> : E.comp(persona.roles, container)}
       active={s.tab}
     >
-      {body}
+      {s.surface === "composer" ? null : body}
     </AppShell>
   );
 }

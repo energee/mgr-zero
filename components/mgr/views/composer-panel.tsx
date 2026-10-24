@@ -7,7 +7,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 /** Shared staff-shell entry point and overlay; live and inventory supply the conversation. */
-export function ComposerDrawerView({ children, open, onOpenChange, container }: {
+export function ComposerPanelView({ children, open, onOpenChange, container }: {
   children: ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;

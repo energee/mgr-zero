@@ -51,7 +51,7 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
   }), [breweryId, expectedContext.actorId]);
   const { messages, setMessages, sendMessage, regenerate, stop, status, error, clearError } = useChat({ id: conversationId, messages: initialMessages, generateId: () => crypto.randomUUID(), transport });
 
-  // New chat: a separate private conversation, opened in the drawer.
+  // New chat: a separate private conversation, opened in the panel.
   async function newChat() {
     clearError(); setFailure(undefined); setReceipt(undefined);
     try {
@@ -89,7 +89,7 @@ export default function ComposerConversation({ open, onOpenChange, focusRequest,
   useEffect(() => {
     if (!open || latestSetup.current) return;
     reloadSetup();
-    // One restore per mount, only when the drawer is needed. The app layout
+    // One restore per mount, only when the panel is needed. The app layout
     // keys Composer by actor/brewery/roles, so a new scope remounts it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, breweryId, expectedContext.actorId]);

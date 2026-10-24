@@ -193,7 +193,7 @@ describe("screen/live component parity", () => {
   });
 
   it("mounts the same named surface as the inventory frame", () => {
-    const expectedSurface = { sheet: "CommandForm", entry: "EntrySurface" } as const;
+    const expectedSurface = { sheet: "CommandForm", entry: "EntrySurface", composer: "ComposerPanelView" } as const;
     const bypasses = mapped.flatMap((screen) => {
       const surface = screen.name === "Me" || screen.name === "Portal Me"
         ? "MeSheet"

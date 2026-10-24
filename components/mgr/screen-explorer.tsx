@@ -31,7 +31,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const ALL = "all";
-const SURFACES: Surface[] = ["page", "sheet", "entry"];
+const SURFACES: Surface[] = ["page", "sheet", "entry", "composer"];
 const DENIED = "Permission denied";
 // The landings the persona switch swaps for the new role's own; Driver and
 // Taproom stay put for a role that may open them.
@@ -144,7 +144,6 @@ export function ScreenExplorer() {
     // happens to put its rows above the field; this keeps it that way.
     if (el.closest("[data-slot=input-group-addon]")) return;
     if (el.closest("[data-gated]")) return e.preventDefault();
-    if (el.matches("[data-slot=drawer-trigger]")) return;
     const link = el.closest("a");
     if (link?.matches('[href^="https://"]')) return;
     const label = el.getAttribute("aria-label") ?? (el.matches("[data-slot=item]") ? el.querySelector("[data-slot=item-title]")?.textContent : null) ?? el.textContent ?? "";

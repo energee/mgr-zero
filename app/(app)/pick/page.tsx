@@ -10,6 +10,7 @@ import { pickSheetPrintReason, toPickSheetViewProps } from "@/lib/mgr/pick-sheet
 import "@/lib/commands/all";
 import { PrintButton } from "./print-button";
 import { navTitle } from "@/lib/mgr/nav";
+import { workHrefsFor } from "@/components/mgr/work-tabs";
 
 export const metadata = { title: navTitle("/pick") };
 
@@ -29,6 +30,7 @@ export default async function PickSheetPage({ searchParams }: { searchParams: Pr
       filters={null}
       linkRows
       backHref="/work"
+      workHrefs={workHrefsFor(brewery.roles)}
     />
   );
 }

@@ -60,7 +60,6 @@ export function ComposerStripView({
               {actions.map((action) => <Button key={action.value} type="button" variant="ghost" size="sm" disabled={disabled} onClick={onAction ? () => onAction(action.value) : undefined}>{action.label}</Button>)}
             </span>
             <span className="flex flex-wrap items-center justify-end gap-1">
-              <Button type="button" variant="ghost" size="sm" className="mr-auto" onClick={onOutbox}>Outbox{outboxCount ? ` (${outboxCount})` : ""}</Button>
               <span className="hidden text-xs text-muted-foreground md:inline">Enter to send · Shift + Enter for a new line</span>
               {streaming
                 ? <Button type="button" size="sm" variant="outline" onClick={onStop}>Stop response</Button>
@@ -68,6 +67,10 @@ export function ComposerStripView({
             </span>
           </InputGroupAddon>
         </InputGroup>
+        <div className="flex flex-wrap items-center gap-x-1 px-1 pt-1">
+          <Button type="button" variant="ghost" size="sm" onClick={onOutbox}>Pending readings ({outboxCount})</Button>
+          <span className="text-xs text-muted-foreground">Saved fermentation readings to retry or review.</span>
+        </div>
       </form>
   );
 }

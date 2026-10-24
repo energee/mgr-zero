@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import { Streamdown } from "streamdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 
 const DISALLOWED_ELEMENTS = ["img"];
 
@@ -30,7 +30,14 @@ export function ComposerConversationView({ messages, activity, error, onRetry, o
         <Button type="button" size="sm" variant="ghost" onClick={onSetupRetry ?? onNewChat}>{onSetupRetry ? "Retry setup" : "New chat"}</Button>
       </header>
       <div role="log" aria-live="polite" className="flex min-h-40 flex-1 flex-col gap-4 overflow-y-auto px-1 py-3">
-        {messages.length === 0 && !activity && !error && <Empty><EmptyHeader><EmptyTitle>What can MGR help with?</EmptyTitle><EmptyDescription>Ask about inventory, orders, or production. Proposed movements need your confirmation before anything is recorded.</EmptyDescription></EmptyHeader></Empty>}
+        {messages.length === 0 && !activity && !error && <Empty className="p-3">
+          <EmptyHeader>
+            <EmptyDescription className="flex flex-col gap-2">
+              <p>Ask about inventory, orders, or production.</p>
+              <p>Review and confirm any proposed work before MGR records it.</p>
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>}
         {messages.map((message) => <div key={message.id} className={message.role === "user" ? "ml-auto w-fit max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground" : "max-w-[90%] text-sm"}><span className="sr-only">{message.role === "user" ? "You" : "MGR"}: </span>{message.role === "assistant" ? <Streamdown disallowedElements={DISALLOWED_ELEMENTS}>{message.content}</Streamdown> : message.content}</div>)}
         {activity && <ComposerActivity>{activity}</ComposerActivity>}
         {error && <Alert><AlertDescription className="flex items-center justify-between gap-3"><span>{error}</span><Button type="button" size="sm" variant="outline" onClick={onRetry}>Try again</Button></AlertDescription></Alert>}
