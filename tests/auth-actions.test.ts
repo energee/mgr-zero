@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const auth = vi.hoisted(() => ({ signInWithOtp: vi.fn(), updateUser: vi.fn(), getUser: vi.fn(), getClaims: vi.fn(), signOut: vi.fn() }));
+const auth = vi.hoisted(() => ({ signInWithOtp: vi.fn(), signInWithPassword: vi.fn(), updateUser: vi.fn(), getUser: vi.fn(), getClaims: vi.fn(), signOut: vi.fn() }));
 const redirect = vi.hoisted(() => vi.fn((path: string): never => { throw new Error(`redirect:${path}`); }));
 const verifyCurrentPassword = vi.hoisted(() => vi.fn());
 const memberships = vi.hoisted(() => ({ staff: [{}] as unknown[], customer: [] as unknown[] }));
@@ -17,7 +17,7 @@ vi.mock("next/headers", () => ({
 }));
 vi.mock("next/navigation", () => ({ redirect }));
 
-import { emailLogin, savePassword } from "@/app/(auth)/actions";
+import { emailLogin, login, savePassword } from "@/app/(auth)/actions";
 import { PASSWORD_SAVED_COOKIE } from "@/lib/auth/password";
 
 describe("passwordless sign-in", () => {
@@ -163,5 +163,18 @@ describe("set new password", () => {
   it.each(["https://attacker.example", "//attacker.example", "/password"])("does not preserve unsafe or looping next %s", async (next) => {
     auth.updateUser.mockResolvedValue({ error: { code: "same_password" } });
     await expect(savePassword(changeForm({ next }))).rejects.toThrow("redirect:/password?error=same_password&next=%2F");
+  });
+});
+
+describe("password sign-in failure (#1320)", () => {
+  it.each([false, true])("keeps the email and original sign-in surface (portal=%s)", async (portal) => {
+    auth.signInWithPassword.mockResolvedValue({ error: { code: "invalid_credentials" } });
+    const form = new FormData();
+    form.set("email", "qa+buyer@example.com");
+    form.set("password", "never-put-password-in-url");
+    if (portal) form.set("portal", "1");
+    const surface = portal ? "/portal/login" : "/login";
+    await expect(login(form)).rejects.toThrow(`redirect:${surface}?error=1&email=qa%2Bbuyer%40example.com`);
+    expect(auth.signInWithPassword).toHaveBeenCalledWith({ email: "qa+buyer@example.com", password: "never-put-password-in-url" });
   });
 });

@@ -88,7 +88,7 @@ export default async function VendorsPage({ searchParams }: { searchParams?: Pro
             })),
             filtered: Boolean(params.q),
           })}
-          header={E.hd("Contracts", "", <ContractForm vendors={options} materials={materials} />)}
+          header={<div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">{E.group("Contracts")}<ContractForm vendors={options} materials={materials} /></div>}
           rowTrailing={(row) => {
             const contract = contracts.find((c) => c.id === row.key)!;
             return <ContractForm contract={contract} vendors={options} materials={materials} />;

@@ -38,6 +38,9 @@ export const NOTIFICATION_REASON_LABEL: Record<NotificationReason, string> = {
   fermentation_reading_overdue: "Fermentation reading overdue", invoice_question: "Invoice question", operations_digest: "Operations digest",
 };
 
+/** Personal reminders exclude the channel-only operations digest. */
+export const PERSONAL_NOTIFICATION_REASONS = notificationReasonSchema.options.filter(reason => reason !== "operations_digest");
+
 export type PortableAction = z.infer<typeof portableActionSchema>;
 export type PortableNotification = Omit<z.infer<typeof portableNotificationSchema>, "actions"> & {
   actions: readonly PortableAction[];

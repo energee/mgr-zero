@@ -1,5 +1,5 @@
 // Provides committed, non-sensitive fixtures for provider-neutral chat previews.
-import { NOTIFICATION_REASON_LABEL, type ChatPreviewFixture, type PortableAction, type PortableNotification } from "./contracts";
+import { NOTIFICATION_REASON_LABEL, PERSONAL_NOTIFICATION_REASONS, type ChatPreviewFixture, type PortableAction, type PortableNotification } from "./contracts";
 
 const openMgr = (label: string): PortableAction => ({ id: "open_mgr", label, enabled: true });
 const notification = (value: PortableNotification): PortableNotification => value;
@@ -86,10 +86,7 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
     surface: "modal",
     title: "Notification preferences",
     fields: [
-      { label: NOTIFICATION_REASON_LABEL.submitted_order, value: "On" },
-      { label: NOTIFICATION_REASON_LABEL.pick_due, value: "On" },
-      { label: NOTIFICATION_REASON_LABEL.delivery_next, value: "On" },
-      { label: NOTIFICATION_REASON_LABEL.fermentation_reading_overdue, value: "On" },
+      ...PERSONAL_NOTIFICATION_REASONS.map(reason => ({ label: NOTIFICATION_REASON_LABEL[reason], value: "On" })),
       { label: "Sample quiet hours", value: "9:00 PM–6:00 AM" },
     ],
     items: [],

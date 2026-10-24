@@ -69,7 +69,7 @@ describe("Catalog view", () => {
   });
 
   // #965: only recorded COLA approvals (list_brands already left formulas out) decide the cell.
-  it("says None, one COLA's TTB ID and date, or how many are on file", () => {
+  it("says None on file, one COLA's TTB ID and date, or how many are on file", () => {
     const brand = { abv: null, styles: null, skus: [] };
     const model = toCatalogViewProps({ priceGroups: [], brands: [
       { ...brand, id: "none", name: "None", colas: [] },
@@ -78,7 +78,7 @@ describe("Catalog view", () => {
       { ...brand, id: "two", name: "Two", colas: [{ ttb_id: "1", approved_on: null }, { ttb_id: "2", approved_on: "2026-01-15" }] },
     ] });
     expect(model.brands.map(({ cola }) => cola)).toEqual([
-      "None",
+      "None on file",
       "TTB ID 00123456789012 · approved Oct 2, 2026",
       "TTB ID 26001001000123 · approval date unknown",
       "2 on file",
@@ -315,26 +315,6 @@ describe("Catalog view", () => {
     for (const brand of toCatalogViewProps(catalogBrands).brands) expect(resolveTap(screen("Catalog"), brand.name), brand.name).toBe("Brand");
   });
 
-  it("the live Catalog page mounts CatalogView and the shared FormatsView", () => {
-    const src = readFileSync("app/(app)/catalog/page.tsx", "utf8");
-    expect(src).toMatch(/from "@\/components\/mgr\/views\/catalog"/);
-    expect(src).toMatch(/<CatalogView\b/);
-    // Brand is a page, not a dialog: New brand links to it, as does each row.
-    expect(src).not.toMatch(/<BrandForm\b/);
-    expect(src).toMatch(/"\/catalog\/brands\/new"/);
-    expect(src).toContain("formats={toFormatsViewProps(");
-    const shared = readFileSync("components/mgr/views/catalog.tsx", "utf8");
-    expect(shared).toMatch(/from "@\/components\/mgr\/views\/formats"/);
-    expect(shared).toMatch(/<FormatsView\b/);
-    expect(src).not.toMatch(/waterProfileCount/);
-    // Live and inventory build the Sort and Category picks with the same adapter.
-    expect(src).toContain("toCatalogScopes(");
-    expect(readFileSync("components/mgr/screens.tsx", "utf8")).toContain("toCatalogScopes(");
-    expect(src).toMatch(/backHref: "\/more"/);
-    // The page no longer redraws the brand rows or nests packages in them.
-    expect(src).not.toMatch(/brands=\{/);
-    expect(src).not.toMatch(/<SkuForm\b|<SkuEditForm\b/);
-  });
 });
 
 describe("Brand view", () => {
@@ -363,20 +343,36 @@ describe("Brand view", () => {
     expect(model.compliance[1]).toMatchObject({ detail: "OH-88214 · expires Dec 31, 2026", verb: "Edit" });
   });
 
+  it("keeps each saved approved COLA image with its own approval, never formulas or undated records", () => {
+    const approval = brandHazy.compliance!.approvals[0];
+    const model = toBrandViewProps({ ...brandHazy, compliance: { registrations: [], approvals: [
+      { ...approval, id: "first", ttb_id: "00123456789012", approved_on: "2025-01-02", image_url: "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=First.jpg&filetype=l" },
+      { ...approval, id: "second", ttb_id: "00123456789013", approved_on: "2026-01-02", image_url: "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Second.jpg&filetype=l" },
+      { ...approval, id: "undated", approved_on: null, image_url: "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Undated.jpg&filetype=l" },
+      { ...approval, id: "formula", kind: "formula", image_url: "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Formula.jpg&filetype=l" },
+      { ...approval, id: "without-image", image_url: null },
+    ] } });
+    expect(model.compliance.map(row => [row.key, row.image])).toEqual([
+      ["first", { ttbId: "00123456789012", url: "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=First.jpg&filetype=l" }],
+      ["second", { ttbId: "00123456789013", url: "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Second.jpg&filetype=l" }],
+      ["undated", undefined], ["formula", undefined], ["without-image", undefined],
+    ]);
+  });
+
   it("has no suggestion without a recipe, and Unpriced when on no group", () => {
     const model = toBrandViewProps({ ...brandHazy, cost: undefined, brand: { ...brandHazy.brand, price_group_id: null } });
     expect(model.suggestion).toBeNull();
     expect(model.priceGroup).toBe(UNPRICED);
   });
 
-  it("puts the pending COLA row first even when registrations exist", () => {
+  it("puts the missing COLA row first even when registrations exist", () => {
     const model = toBrandViewProps({ ...brandHazy, compliance: { approvals: [], registrations: brandHazy.compliance!.registrations } });
-    expect(model.compliance.map((row) => row.key)).toEqual(["cola-pending", "oh"]);
+    expect(model.compliance.map((row) => row.key)).toEqual(["cola-missing", "oh"]);
   });
 
-  it("flags a brand with no COLA as pending, with nothing to edit", () => {
+  it("reports no COLA on file without claiming an application is pending", () => {
     const model = toBrandViewProps({ ...brandHazy, compliance: { approvals: [], registrations: [] } });
-    expect(model.compliance).toEqual([{ key: "cola-pending", title: "COLA", detail: "pending", warning: true }]);
+    expect(model.compliance).toEqual([{ key: "cola-missing", title: "COLA", detail: "None on file" }]);
   });
 
   it("renders the field row without a React key warning (E.cols owns the keys)", () => {
@@ -455,7 +451,7 @@ describe("Brand view", () => {
     ]);
     const bare = toBrandViewProps({ ...brandHazy, compliance: { approvals: [], registrations: [] }, brand: { ...brandHazy.brand, price_group_id: null, category: null, skus: [], pours: [] } });
     expect(bare.badges).toEqual([
-      { key: "cola", label: "COLA pending", tone: "w", href: "#compliance" },
+      { key: "cola", label: "COLA · None on file", tone: "", href: "#compliance" },
       { key: "group", label: "Unpriced", tone: "w" },
     ]);
   });

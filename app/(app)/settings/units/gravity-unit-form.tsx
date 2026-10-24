@@ -5,6 +5,7 @@ import { useState } from "react";
 import { GravityUnitControls } from "@/components/mgr/views/units";
 import { toUnitsViewProps } from "@/lib/mgr/units-view";
 import { CommandFormMessage } from "@/components/mgr/command-form";
+import { SettingsSaveStatus } from "@/components/mgr/settings-save-status";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 
@@ -15,7 +16,7 @@ export function GravityUnitForm({
   mine: GravityUnit | null;
   canSetBrewery: boolean;
 }) {
-  const { busy, error, run } = useCommandAction();
+  const { busy, succeeded, error, run } = useCommandAction();
   const [breweryChoice, setBreweryChoice] = useState<GravityUnit>(brewery);
   const [mineChoice, setMineChoice] = useState<GravityUnit | null>(mine);
 
@@ -35,6 +36,7 @@ export function GravityUnitForm({
     <GravityUnitControls model={toUnitsViewProps({ brewery: breweryChoice, mine: mineChoice, effective: mineChoice ?? breweryChoice })} canSetBrewery={canSetBrewery} busy={busy}
       onBrewery={unit => { setBreweryChoice(unit); run("set_brewery_gravity_unit", { unit }).then(ok => { if (!ok) setBreweryChoice(brewery); }); }}
       onMine={unit => { setMineChoice(unit); run("set_my_gravity_unit", { unit }).then(ok => { if (!ok) setMineChoice(mine); }); }} />
+    <SettingsSaveStatus busy={busy} saved={succeeded !== null} error={error} />
     <CommandFormMessage error={error} />
   </div>;
 }
