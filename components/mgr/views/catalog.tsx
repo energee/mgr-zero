@@ -10,6 +10,7 @@ import { E } from "@/components/mgr/e";
 import { NOT_SET, type CatalogViewModel } from "@/lib/mgr/catalog-view";
 import { FormatsView, type FormatsViewModel } from "@/components/mgr/views/formats";
 import { RecordTable } from "@/components/mgr/views/record-table";
+import { ColaLabelImageView } from "@/components/mgr/views/cola-label-image";
 
 export type { CatalogViewModel };
 
@@ -20,6 +21,8 @@ const navRow = (title: string, subtitle: ReactNode, href: string | null | undefi
 export function CatalogView({
   model,
   createAction,
+  colaAction,
+  images,
   links,
   formats,
   formatAction,
@@ -29,6 +32,8 @@ export function CatalogView({
   /** The search, Sort and Category strip (components/mgr/list-controls.tsx). */
   controls?: ReactNode;
   createAction?: ReactNode;
+  colaAction?: ReactNode;
+  images?: Record<string, ReactNode>;
   /** Live: which rows are links, each only for a role its page lets in; the rest draw plain. Inventory leaves them all inert taps. */
   links?: { brands: boolean; priceGroups: boolean; waterProfiles: boolean };
   formats?: FormatsViewModel;
@@ -37,7 +42,7 @@ export function CatalogView({
   // Each `links && (...)` below gives undefined (no links: the inventory's inert tap) or, live, the path or null (denied: drawn plain).
   return (
     <>
-      {E.back("More", "Catalog", createAction !== undefined ? createAction : E.btn("New brand"), model.backHref)}
+      {E.back("More", "Catalog", <div className="flex flex-wrap gap-2">{colaAction !== undefined ? colaAction : E.btn("Bulk process COLAs", "g")}{createAction !== undefined ? createAction : E.btn("New brand")}</div>, model.backHref)}
       {controls}
       {model.empty
         ? E.blank(model.empty)
@@ -46,7 +51,7 @@ export function CatalogView({
           align={["l", "l", "r", "r", "l"]}
           rows={model.brands.map((brand) => ({
             key: brand.key,
-            cells: [brand.name, brand.style, brand.abv, brand.skus, brand.cola],
+            cells: [brand.name, brand.style, brand.abv, brand.skus, <div key="cola" className="flex flex-col gap-2">{brand.cola}{brand.image && (images?.[brand.key] ?? <ColaLabelImageView label={`${brand.name} · COLA ${brand.image.ttbId}`} compact />)}</div>],
             // A style or ABV that is not set sorts last, not as the words.
             sort: [brand.name, brand.style === NOT_SET ? null : brand.style, brand.abv === NOT_SET ? null : brand.abv, brand.skus, brand.cola],
             note: brand.alias,
