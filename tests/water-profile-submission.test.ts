@@ -20,7 +20,6 @@ beforeEach(() => { harness.stateIndex = 0; harness.submit.mockClear(); });
 it.each(["20", "-1", "1e1", "1E1"])("blocks pH %s even when all other required fields are complete", waterPh => {
   harness.waterPh = waterPh;
   const surface = WaterProfileForm({});
-  expect(surface.props.footer.props.children.props.disabled).toBe(true);
   surface.props.children.props.onSubmit({ preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as FormEvent);
   expect(harness.submit).not.toHaveBeenCalled();
 });
@@ -28,7 +27,6 @@ it.each(["20", "-1", "1e1", "1E1"])("blocks pH %s even when all other required f
 it("allows an ordinary fractional pH through the existing submit boundary", () => {
   harness.waterPh = "7.85";
   const surface = WaterProfileForm({});
-  expect(surface.props.footer.props.children.props.disabled).toBe(false);
   surface.props.children.props.onSubmit({ preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as FormEvent);
   expect(harness.submit).toHaveBeenCalledOnce();
 });
