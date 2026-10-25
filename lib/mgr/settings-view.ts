@@ -103,6 +103,17 @@ export function booksOpenedChange(before: string, after: string): { booksOpenedO
   return { booksOpenedOn: after || null };
 }
 
+/** Match the fee's nonnegative integer-cent storage without rounding typed fractions. */
+export function oneWayKegFeeError(value: string): string | undefined {
+  if (value === "") return undefined;
+  if (!/^\+?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value)
+    || (value.split(".")[1]?.replace(/0+$/, "").length ?? 0) > 2) {
+    return "Enter zero or a positive dollar amount with at most two decimal places.";
+  }
+  if ((toCents(value) ?? 0) > 2_147_483_647) return "Enter a fee of $21,474,836.47 or less.";
+  return undefined;
+}
+
 /**
  * The set_one_way_keg_fee input for a form save, or undefined when the fee did
  * not change. A cleared field reads as no fee (0 cents).

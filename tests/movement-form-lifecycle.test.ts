@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({ cursor: 0, values: [] as unknown[] }));
 vi.mock("react", async original => ({
   ...await original<typeof React>(),
   useEffect: () => {},
+  useCallback: (callback: unknown) => callback,
   useState: (initial: unknown) => {
     const index = state.cursor++;
     if (!(index in state.values)) state.values[index] = typeof initial === "function" ? initial() : initial;

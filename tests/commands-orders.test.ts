@@ -65,7 +65,7 @@ describe("order commands", () => {
   it("rejects empty lines", async () => {
     await expect(runCommand("create_order", {
       kind: "wholesale", customerId, shipToId, fromLocationId: whId, lines: [],
-    }, adminCtx)).rejects.toThrow(/validation failed/);
+    }, adminCtx)).rejects.toMatchObject({ code: "invalid_input" });
   });
   it("list_orders filters by status", async () => {
     const { rows } = await runCommand("list_orders", { status: "confirmed" }, adminCtx) as { rows: { status: string }[] };

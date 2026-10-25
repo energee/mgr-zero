@@ -178,10 +178,16 @@ describe("completion loss review", () => {
       });
       expect(result.error?.message).toMatch(/positive, finite|eight fractional/i);
     }
-    await expect(reattribute(completed.adjustmentId, "0.01", "sample")).rejects.toThrow(/destination state/i);
+    await expect(reattribute(completed.adjustmentId, "0.01", "sample")).rejects.toMatchObject({
+      status: 400, code: "invalid_input", message: expect.stringMatching(/destination state/i),
+      issues: [{ path: ["destinationState"], code: "custom", message: expect.stringMatching(/destination state/i) }],
+    });
     await expect(runCommand("reattribute_loss", {
       adjustmentId: completed.adjustmentId, bbl: 0.01, classification: "taproom", destinationState: "PA",
-    }, adminCtx)).rejects.toThrow(/destination state/i);
+    }, adminCtx)).rejects.toMatchObject({
+      status: 400, code: "invalid_input", message: expect.stringMatching(/destination state/i),
+      issues: [{ path: ["destinationState"], code: "custom", message: expect.stringMatching(/destination state/i) }],
+    });
     await expect(runCommand("reattribute_loss", {
       adjustmentId: completed.adjustmentId, bbl: 0.01, classification: "loss",
     }, adminCtx)).rejects.toMatchObject({ status: 400 });

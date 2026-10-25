@@ -35,7 +35,7 @@ describe("command registry", () => {
     // Output is unknown until the caller narrows it; there is no type parameter to assert through.
     // @ts-expect-error runCommand has no output type parameter
     await expect(runCommand<{ echoed: string }>("echo", { msg: "hi" }, ctx)).resolves.toEqual({ echoed: "hi" });
-    await expect(runCommand("echo", { msg: 5 }, ctx)).rejects.toThrow(/validation/i);
+    await expect(runCommand("echo", { msg: 5 }, ctx)).rejects.toMatchObject({ code: "invalid_input", issues: [{ path: ["msg"], code: "invalid_type", message: expect.any(String) }] });
   });
 
   it("retains command and query metadata without executing a definition lookup", async () => {

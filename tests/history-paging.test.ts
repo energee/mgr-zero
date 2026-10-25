@@ -41,7 +41,7 @@ for (const name of ["list_orders", "list_invoices", "portal_orders", "portal_inv
     expect(next.nextCursor).toBeNull();
     expect([...first.rows, ...next.rows].every(row => row.customer_id === customerId)).toBe(true);
     for (const invalid of [{ cursor: "bad),customer_id.not.is.null" }, { limit: 0 }, { limit: 201 }]) {
-      await expect(runCommand(name, { ...input, ...invalid }, ctx)).rejects.toThrow(/validation/);
+      await expect(runCommand(name, { ...input, ...invalid }, ctx)).rejects.toMatchObject({ code: "invalid_input" });
     }
   });
 }
