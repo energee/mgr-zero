@@ -32,6 +32,11 @@ with an integer `unitPriceCents`, and every SKU of that group and format sells
 at it on that channel. `clear_channel_price` empties the cell, which unprices
 those SKUs on that channel. There is no per-SKU exception.
 
+A sale channel's name is unique within its brewery. Names are compared after
+trimming whitespace and ignoring case, so `dtc` cannot be added beside `DTC`.
+`upsert_sale_channel` returns `409 duplicate_channel_name` for a clash and
+changes nothing.
+
 {/* ops:catalog */}
 
 ## clear_channel_price [#clear_channel_price]
