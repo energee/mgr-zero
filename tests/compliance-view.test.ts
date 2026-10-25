@@ -201,9 +201,10 @@ describe("registry sheets", () => {
     expect(html).not.toMatch(/Serial number|Open COLA|TTB ID/);
   });
 
-  it("links Open COLA from the TTB ID alone, encoded, on the official origin", () => {
+  it("links Open COLA only for a 14-digit TTB ID on the official origin", () => {
     expect(colaUrl("25318001000034")).toBe("https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&ttbid=25318001000034");
-    expect(colaUrl(" 0012&x=1 ")).toBe("https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&ttbid=0012%26x%3D1");
+    expect(colaUrl(" 00123456789012 ")).toBe("https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&ttbid=00123456789012");
+    expect(colaUrl("0012&x=1")).toBeNull();
     expect(colaUrl("  ")).toBeNull();
     const html = htmlOf(createElement(BrandApprovalView, { model: brandApprovalStout }));
     expect(html).toContain('href="https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&amp;ttbid=25318001000034"');
@@ -235,7 +236,7 @@ describe("registry sheets", () => {
   it("explains the missing link when a COLA has no TTB ID", () => {
     const html = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, number: "" } }));
     expect(html).not.toMatch(/ttbonline\.gov/);
-    expect(html).toMatch(/Enter the TTB ID to open the COLA/);
+    expect(html).toContain('pattern="[0-9]{14}"');
   });
 
   it("states a known brand instead of picking one", () => {

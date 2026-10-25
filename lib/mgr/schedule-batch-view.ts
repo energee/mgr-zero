@@ -11,6 +11,7 @@ export type ScheduleBatchViewModel = {
   brandOptions: { id: string; label: string }[];
   plannedBbl: string;
   date: string;
+  today?: string;
   note: string;
   recipesHref?: string;
   /** null means this role cannot create a brand. */
@@ -31,4 +32,10 @@ export function scheduleBatchReason({ date, plannedBbl }: { date: string; planne
   if (!date) missing.push("a date");
   if (plannedBarrelsError(plannedBbl)) missing.push("planned barrels above zero");
   return submitReason(missing);
+}
+
+/** Planning in the past is legal; distinguish intent from a recorded brew day. */
+export function pastPlanWarning(date: string, today?: string): string | undefined {
+  if (!today || !/^\d{4}-\d{2}-\d{2}$/.test(date) || date >= today) return undefined;
+  return "This planned date is in the past for your brewery. You can save this plan; it does not record a brew day or change Brewed on.";
 }

@@ -8,6 +8,8 @@ Join through an invitation, then sign in with your email and the password you ch
 
 Number fields use shared **− / +** controls; you can also type an exact value, including decimals where the field permits them. Required fields and minimum or maximum amounts still apply. Optional amounts can remain blank.
 
+Type ordinary decimal numbers, such as `1000` rather than exponent notation such as `1e3`. An exponent entry is marked beside the field and cannot be submitted. Fractions remain valid wherever the field allows them; they are not restricted to whole barrels or whole packages.
+
 ## Sign in and sign out [#sign-in]
 
 <Screen name="Sign in" />
@@ -265,6 +267,8 @@ Brands cannot currently be deleted or archived. Edit a mistaken brand instead. S
 
 **State registrations.** **Add registration** takes the two-letter state and an optional number and expiry. One record exists per brand and state, so saving again updates it; **Edit** keeps the state fixed. The brewery's own state licenses live under [Compliance → Licenses](#compliance), not on the brand.
 
+A COLA’s **TTB ID** must contain exactly 14 digits, including any leading zeros, as described by [TTB’s public-registry instructions](https://www.ttb.gov/system/files/images/pdfs/labeling_colas-docs/display-cola-detail-through-public-cola-registry.pdf). MGR explains this format beside the field and withholds **Save approval** and the public-registry link for a malformed ID. Formula numbers and applicant serial numbers are different identifiers and do not use this 14-digit rule. **Find COLA on TTB** searches by the brand and brewery permit, so you can use it to find the correct ID without already knowing it.
+
 ### Create a format
 
 <Screen name="Formats" />
@@ -295,6 +299,8 @@ Admins can open a packaged format, select **Edit format → Delete format**, and
 <Screen name="Water profile" />
 
 Brewer and Admin use **Water profiles**. Admin opens it from Catalog or Settings. Admin and Brewer also open it from the **Water profiles** row under the Recipes list. The **Water profiles** row on a recipe’s Water sheet opens it in a new tab, so the unsaved version stays put. When Admin arrives from **Settings → Source water**, the back arrow returns to Settings. Other entries return to Catalog for Admin and to Recipes for Brewer. **Water profiles** keeps the water you start from and the waters you aim at: a name and six ions in parts per million (ppm, the same as mg/L): calcium, magnesium, sodium, sulfate, chloride and bicarbonate. **Add water profile** and **Edit** open the same sheet, and **Save water profile** saves it. When Save is disabled, **Still needed** beside it names the missing or out-of-range values. Every ion is required and cannot be negative, and two profiles cannot share a name. Three fields below the ions are optional, as the line above them says. **Alkalinity as CaCO3 (ppm)** is the total alkalinity from a water report; it cannot be negative, and bicarbonate does not stand in for it. **Water pH** is the water’s own pH, from 0 to 14. It is not mash pH: a recipe’s target mash pH is set on the recipe’s Water sheet. **Notes** holds up to 2000 characters, such as where a report came from. A row on the list shows alkalinity and water pH after the ions when the profile has them. To remove an optional value, clear it and save. A profile is not classified as a source or a target here, as the empty list explains. A recipe version’s Water sheet can pick its source and its target from this list, so one profile can serve either role. Nothing is calculated here: the page records a water report or a target. You enter the salt additions yourself.
+
+Ion amounts and alkalinity accept 0 to 999,999.9 ppm and are stored rounded to one decimal place: for example, 999999.129 becomes 999999.1. Enter ordinary decimal numbers, not exponent notation. Invalid ion amounts, alkalinity or water pH keep Save unavailable; leaving the field shows its correction beside the measurement. Water pH is stored rounded to two decimal places. These are storage limits, not recommended water targets. Notes show a character counter when you approach their existing 2000-character limit.
 
 Water profiles cannot currently be deleted or archived. Use **Edit** to correct a mistaken profile.
 
@@ -507,6 +513,8 @@ On a wide screen the list is a table with **Order**, **Customer**, **Requested s
 An order can become `cancelled` any time before shipping. The Orders screen lists newest first and can filter by any status.
 
 Orders list actions follow your role. Sales and Admin see **Finish** on drafts and **Confirm** on submitted orders. Warehouse and Admin see **Pick**, **Ship**, and **Put back**, which opens the restock page. An order with no action for your role, and every shipped or cancelled order, has no button: select its order number to open it.
+
+Order-line quantities must be above zero and no greater than 9,999,999,999.99; editing a draft requires at least 0.01. Fractions are allowed, and saved quantities are rounded to two decimal places.
 
 ### Create an order
 
@@ -963,6 +971,8 @@ Open **Batches** from the **Work** navigation to see the **Planned**, **Active**
 With no recipe versions available, **New batch** links to **Recipes** and explains that a recipe needs a saved version before it can be selected. With no brands, Admin or Sales can follow **Add a brand** to **Catalog**; Brewer is told which role can add one instead. Both fields can stay **Not decided**. Neither a missing recipe nor a missing brand prevents scheduling.
 
 Select a planned batch to pull its ingredients on [Prep](#prep) and record it on [Brew day](#brew-day). A brewed batch's page shows its record, turns and corrections ([After the brew](#after-the-brew)).
+
+**New batch** warns when the planned date is before the brewery’s current calendar day. You may still save a historical plan. Scheduling a plan does not record a brew day or change **Brewed on**.
 
 Batches brought over from another system appear under **Completed** with their brew date, close date and knockout barrels, but no vessel. Only history closed before the brewery's **Books opened on** date (see [Settings](#settings)) can be recorded this way, so these batches never appear on the Cellar map, on Today, or in a report. They carry their knockout, no loss written off at completion, and their packaging as closed runs and lots with the quantities filled. That packaging put no stock on hand: these lots appear in **Packaging** history and in a lot trace, which names the batch, but never in inventory, on an order, or in a report. They cannot be corrected with **Correct turn**; fix them by importing again.
 

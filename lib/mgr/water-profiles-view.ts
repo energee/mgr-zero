@@ -8,6 +8,7 @@ import type { EmptyState } from "./empty-state";
 import { IONS as CHEMISTRY_IONS, ION_LABELS, type Ions } from "@/lib/water-chemistry";
 import { optionalNumber } from "./recipe-process-view";
 import { hasAnyRole } from "./roles";
+import { isNumber, numberNotationError } from "./quantity-input";
 import { submitReason } from "./submit-reason";
 
 export type Ion = `${keyof Ions}_ppm`;
@@ -26,6 +27,13 @@ export type WaterProfilesViewModel = {
 };
 /** The sheet's fields as typed: strings, so a half-typed "1." survives a render. */
 export type WaterProfileFields = { name: string; alkalinity_ppm: string; water_ph: string; note: string } & Record<Ion, string>;
+
+/** The ion and alkalinity columns are numeric(7,1), not whole-ppm counts. */
+export function waterPpmError(value: string, optional = false): string | undefined {
+  if (optional && value === "") return undefined;
+  if (isNumber(value) && Number(value) >= 0 && Number(value) <= 999_999.9) return undefined;
+  return numberNotationError(value) ?? "Enter a value from 0 to 999,999.9 ppm. Stored values are rounded to one decimal place.";
+}
 
 export const ionLine = (p: Record<Ion, number>) => IONS.map(([key, label]) => `${label} ${p[key]}`).join(" · ");
 
@@ -65,8 +73,8 @@ export function toWaterProfileFields(p?: WaterProfile): WaterProfileFields {
 export function waterProfileSaveReason(fields: WaterProfileFields): string | null {
   const missing: string[] = [];
   if (!fields.name.trim()) missing.push("a profile name");
-  if (!IONS.every(([key]) => fields[key] !== "" && Number(fields[key]) >= 0)) missing.push("all six ions in ppm, zero or more");
-  if (fields.alkalinity_ppm !== "" && !(Number(fields.alkalinity_ppm) >= 0)) missing.push("alkalinity as CaCO3 of zero or more");
+  if (IONS.some(([key]) => waterPpmError(fields[key]))) missing.push("all six ions in ppm from 0 to 999,999.9");
+  if (waterPpmError(fields.alkalinity_ppm, true)) missing.push("alkalinity as CaCO3 from 0 to 999,999.9 ppm");
   const phError = waterPhError(fields.water_ph);
   if (phError) missing.push(phError);
   return submitReason(missing);

@@ -10,6 +10,7 @@ import { workHrefsFor } from "@/components/mgr/work-tabs";
 import "@/lib/commands/all";
 import { NewBatchForm } from "./new-batch-form";
 import { navTitle } from "@/lib/mgr/nav";
+import { breweryDate } from "@/lib/date-format";
 
 export const metadata = { title: navTitle("/batches") };
 
@@ -26,7 +27,7 @@ export default async function BatchesPage() {
   const recipeVersions = recipes.flatMap(recipe =>
     recipe.latest_version_id ? [{ id: recipe.latest_version_id, label: recipe.name + " v" + recipe.latest_version }] : []);
   return <BatchesView model={toBatchesViewProps(batchesFromQuery(batches, vessels, { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}`, reading: id => `/cellar/${id}/reading` }, { unit: gravity.effective, timeZone: brewery.timeZone }))}
-    createAction={<NewBatchForm brands={brands} recipeVersions={recipeVersions} brandsHref={canRun(ctx, "upsert_brand") ? "/catalog" : null} />}
+    createAction={<NewBatchForm brands={brands} recipeVersions={recipeVersions} today={breweryDate(brewery.timeZone)} brandsHref={canRun(ctx, "upsert_brand") ? "/catalog" : null} />}
     workHrefs={workHrefsFor(brewery.roles)}
     newVesselHref={canRun(ctx, "upsert_vessel") ? "/cellar/vessels/new" : null}
   />;
