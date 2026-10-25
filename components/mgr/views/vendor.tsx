@@ -44,7 +44,7 @@ export function VendorView({
     <>
       {E.edit("Vendor name", model.name, "text", undefined, { id: `${id}-name`, error: errors.name, onChange: controlled("name") ? (nextValue: string) => controls.name?.(nextValue) : undefined, required: controlled("name") })}
       {E.edit("Email", model.email, "email", undefined, { id: `${id}-email`, onChange: controls.email, onBlur: () => touched.touch(0), error: errors.email ?? ((!controls.email || touched.shown(0)) ? localErrors.email : undefined) })}
-      {E.edit("Phone", model.phone, "tel", undefined, { id: `${id}-phone`, error: errors.phone, placeholder: "(503) 555-0142", onChange: controlled("phone") ? (nextValue: string) => controls.phone?.(nextValue) : undefined })}
+      {E.edit("Phone", model.phone, "tel", undefined, { id: `${id}-phone`, onBlur: () => touched.touch(2), error: errors.phone ?? ((!controls.phone || touched.shown(2)) ? localErrors.phone : undefined), placeholder: "(503) 555-0142", onChange: controls.phone })}
       {E.inline(
         <Fragment key={"terms"}>{E.pick("Terms", model.terms, (model.termsOptions.map(option => (
                 { value: option, label: option }
@@ -53,7 +53,7 @@ export function VendorView({
       )}
       {E.info("When Planning lists a material short and it resolves to this vendor, its buy-by date is the needed-by date less this lead time. Received orders show a separate observed average.")}
       {messages}
-      {footer !== undefined ? footer : E.btn("Save vendor", !model.name.trim() || localErrors.email || localErrors.leadDays ? "p disabled" : "p")}
+      {footer !== undefined ? footer : E.btn("Save vendor", !model.name.trim() || localErrors.email || localErrors.phone || localErrors.leadDays ? "p disabled" : "p")}
       {model.active !== null && <>
         {E.ttl("Vendor status")}
         {E.fld("Status", model.active ? "Active" : "Inactive")}
@@ -65,7 +65,7 @@ export function VendorView({
           busy={busy}
           busyLabel="Saving…"
           error={error}
-          reason={!model.name.trim() ? "Enter a vendor name." : localErrors.email ?? localErrors.leadDays}
+          reason={!model.name.trim() ? "Enter a vendor name." : localErrors.email ?? localErrors.phone ?? localErrors.leadDays}
           onDelete={onSetActive ? () => onSetActive(!model.active) : undefined}
         />
       </>}

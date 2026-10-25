@@ -1,6 +1,13 @@
 // lib/mgr/customer-view.ts — view-model for Customer detail (get_customer).
 import { money } from "./money";
 import { paymentTermLabel, sentenceCase } from "./labels";
+import { US_STATE_CODES } from "./enums";
+import { submitReason } from "./submit-reason";
+
+/** State is required for US customers and is not supplied for other countries. */
+export function customerStateReason(values: Pick<CustomerEditValues, "country" | "state">): string | null {
+  return submitReason(values.country !== "US" || US_STATE_CODES.some(state => state === values.state) ? [] : ["a state"]);
+}
 
 /** The stored values the shared Customer detail form edits and saves. state is
  *  "" outside the US (the form draws it for a US customer only); alias "" is none. */

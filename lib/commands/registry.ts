@@ -6,6 +6,7 @@ import { COUNTRY_CODES, STAFF_ROLES, US_STATE_CODES } from "@/lib/mgr/enums";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { breweryDate } from "@/lib/date-format";
 import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
+import { phoneError } from "@/lib/mgr/phone";
 import type { InputIssue } from "./field-errors";
 
 export type StaffRole = (typeof STAFF_ROLES)[number];
@@ -170,7 +171,7 @@ export const countryCode = z.string().refine((s) => (COUNTRY_CODES as readonly s
 
 /** A phone number: 7 to 15 digits once spaces, dots, dashes and parentheses are dropped, with an optional leading +. "" means none. */
 export const phone = z.string().trim().refine(
-  (s) => s === "" || /^\+?\d{7,15}$/.test(s.replace(/[\s().-]/g, "")), "a phone number, such as (503) 555-0142",
+  (s) => !phoneError(s), "a phone number, such as (503) 555-0142",
 );
 
 // Maps a Supabase/PostgREST error to the public CommandError envelope. P0001 is

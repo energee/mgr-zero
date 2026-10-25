@@ -15,7 +15,7 @@ import { StateRegistrationView } from "@/components/mgr/views/state-registration
 import type { Approval, ColaSearch, Registration } from "@/lib/commands/compliance";
 import { useCommandAction, useCommandForm, useFields } from "@/lib/commands/use-command-form";
 import { APPROVAL_KINDS, approvalInput, approvalNumberError, colaChoice } from "@/lib/mgr/brand-approval-view";
-import { registrationInput } from "@/lib/mgr/state-registration-view";
+import { registrationInput, registrationSubmitReason } from "@/lib/mgr/state-registration-view";
 import { E } from "@/components/mgr/e";
 import { defaultColaImage } from "@/lib/mgr/cola-review";
 import type { ColaDetails } from "@/lib/ttb/colas";
@@ -108,6 +108,7 @@ export function RegistrationForm({ brand, registration }: { brand: Brand; regist
   // approved_on is not shown; registrationInput omits it, so the upsert keeps it (#438, #522).
   const { v, set, reset } = useFields({ state: registration?.state ?? "", registrationNo: registration?.registration_no ?? "", expiresOn: registration?.expires_on ?? "" });
   const form = useCommandForm("upsert_state_registration", {
+    validationFields: ["state"],
     build: () => registrationInput(brand.id, v),
     reset,
   });
@@ -116,15 +117,21 @@ export function RegistrationForm({ brand, registration }: { brand: Brand; regist
     state: v.state, registrationNo: v.registrationNo, expiresOn: v.expiresOn,
   };
   const controls = { state: set("state"), registrationNo: set("registrationNo"), expiresOn: set("expiresOn") };
+  const reason = registrationSubmitReason(model);
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="State registration" trigger={sheetTrigger(!!registration, "Add registration", registration && `${registration.state} registration`)}>
-      <form onSubmit={form.submit} className="flex flex-col gap-4">
+      <form noValidate onSubmit={event => {
+        if (form.busy || reason) { event.preventDefault(); event.stopPropagation(); return; }
+        void form.submit(event);
+      }} className="flex flex-col gap-4">
         <StateRegistrationView
           model={model}
           controls={controls}
           locked={Boolean(registration)}
           messages={<CommandFormMessage error={form.error} />}
-          footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !/^[A-Za-z]{2}$/.test(v.state)}>{form.submitting ? "Saving…" : "Save registration"}</Button></CommandFormFooter>}
+          stateError={form.fieldErrors.state}
+          submitting={form.submitting}
+          onCancel={() => form.setOpen(false)}
         />
       </form>
     </CommandForm>

@@ -7,12 +7,13 @@
 import { useState } from "react";
 import { E } from "@/components/mgr/e";
 import { CustomerSaleChannelField, CustomerTaxTreatmentField } from "@/components/mgr/views/customer";
+import { UsStateField } from "@/components/mgr/us-state-field";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { FieldDescription } from "@/components/ui/field";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { PAYMENT_TERMS, type CustomerType, type PaymentTerm } from "@/lib/mgr/enums";
-import { CUSTOMER_ALIAS_HELP, type CustomerEditValues } from "@/lib/mgr/customer-view";
+import { CUSTOMER_ALIAS_HELP, customerStateReason, type CustomerEditValues } from "@/lib/mgr/customer-view";
 import { COUNTRY_OPTIONS, CUSTOMER_TYPE_OPTIONS, PAYMENT_TERM_LABEL, paymentTermLabel } from "@/lib/mgr/labels";
 import type { TaxTreatment } from "@/lib/mgr/tax-treatments";
 import { submitReason } from "@/lib/mgr/submit-reason";
@@ -87,11 +88,15 @@ export function CustomerForm({
     },
   });
 
+  const stateReason = customerStateReason({ country, state });
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title={isEdit ? "Edit customer" : "New customer"} trigger={<Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"}>
           {isEdit ? "Edit" : "New customer"}
         </Button>}>
-        <form noValidate onSubmit={form.submit} className="flex flex-col gap-4">
+        <form noValidate onSubmit={event => {
+          if (stateReason) { event.preventDefault(); event.stopPropagation(); return; }
+          void form.submit(event);
+        }} className="flex flex-col gap-4">
           {E.edit("Name", name, "text", undefined, { id: "customer-name", onChange: setName, required: true, error: form.fieldErrors.name })}
           <div className="flex flex-col gap-2">
             {E.edit("Alias", alias, "text", undefined, { id: "customer-alias", onChange: setAlias, error: form.fieldErrors.alias, "aria-describedby": "customer-alias-help" })}
@@ -99,19 +104,9 @@ export function CustomerForm({
           </div>
           {E.pick("Type", type, CUSTOMER_TYPE_OPTIONS, { id: "customer-type", onChange: (value) => setType(value as CustomerType) })}
           {E.pick("Country", country, COUNTRY_OPTIONS, { id: "customer-country", onChange: setCountry, required: true, error: form.fieldErrors.country })}
-          <div className="flex flex-col gap-2">
-            {E.edit(country === "US" ? "State (required)" : "State", country === "US" ? state : "Not applicable", "text", undefined, {
-              id: "customer-state",
-              onChange: value => setState(value.toUpperCase()),
-              maxLength: 2,
-              placeholder: "PA",
-              required: country === "US",
-              disabled: country !== "US",
-              error: country === "US" ? form.fieldErrors.state : undefined,
-              "aria-describedby": country === "US" ? "customer-state-help" : undefined,
-            })}
-            {country === "US" && <FieldDescription id="customer-state-help">Use a two-letter US state code, such as PA.</FieldDescription>}
-          </div>
+          {country === "US"
+            ? <UsStateField value={state} label="State (required)" controls={{ id: "customer-state", onChange: setState, required: true, error: form.fieldErrors.state }} />
+            : E.edit("State", "Not applicable", "text", undefined, { id: "customer-state", disabled: true })}
           <CustomerSaleChannelField value={saleChannelId} channels={channels} controls={{ id: "customer-sale-channel", onChange: setSaleChannelId, error: form.fieldErrors.saleChannelId }} />
           {E.edit("License number", licenseNumber, "text", undefined, { id: "customer-license", onChange: setLicenseNumber, error: form.fieldErrors.licenseNumber })}
           {E.pick("Payment terms", paymentTerms, PAYMENT_TERMS.map(t => ({ value: t, label: PAYMENT_TERM_LABEL[t] })), { id: "customer-terms", onChange: setPaymentTerms, displayValue: paymentTermLabel(paymentTerms) })}
@@ -123,7 +118,7 @@ export function CustomerForm({
             {E.submit(isEdit ? "Save" : "Create", {
               submitting: form.submitting,
               busy: isEdit ? "Saving…" : "Creating…",
-              reason: submitReason(name.trim() ? [] : ["a name"]),
+              reason: submitReason([...(name.trim() ? [] : ["a name"]), ...(stateReason ? ["a state"] : [])]),
             })}
           </CommandFormFooter>
         </form>

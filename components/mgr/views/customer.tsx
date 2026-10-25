@@ -3,14 +3,14 @@
 // Customer detail shares inline account and trading-term edits. Live supplies
 // persisted values, permission, command callbacks, and authorized activity slots.
 import { useState, useId, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { PAYMENT_TERMS } from "@/lib/mgr/enums";
 import { COUNTRY_OPTIONS, CUSTOMER_TYPE_OPTIONS, PAYMENT_TERM_LABEL, sentenceCase } from "@/lib/mgr/labels";
 import { TAX_TREATMENTS } from "@/lib/mgr/tax-treatments";
 import { E, type FieldControls } from "@/components/mgr/e";
 import { FieldDescription } from "@/components/ui/field";
-import { CUSTOMER_ALIAS_HELP, type CustomerEditValues, type CustomerViewModel } from "@/lib/mgr/customer-view";
+import { UsStateField } from "@/components/mgr/us-state-field";
+import { CUSTOMER_ALIAS_HELP, customerStateReason, type CustomerEditValues, type CustomerViewModel } from "@/lib/mgr/customer-view";
 import { DeleteCustomerControl } from "./delete-customer";
 import { RevokePortalUserControl } from "./revoke-portal-user";
 
@@ -73,6 +73,7 @@ export function CustomerView({
   const [values, setValues] = useState(model.editValues);
   const controls = (key: keyof CustomerEditValues) => ({ id: `${formId}-${key}`, form: formId, disabled: !canWrite || busy, onChange: (value: string) => setValues(current => ({ ...current, [key]: value })) });
   const removal = deleteAction !== undefined ? deleteAction : <DeleteCustomerControl name={model.name} />;
+  const stateReason = customerStateReason(values);
   return (
     <div className="@container flex min-w-0 flex-col gap-6">
       <header className="[&_h1]:font-heading [&_h1]:text-2xl [&_h1]:tracking-tight @min-[48rem]:[&_h1]:text-3xl">
@@ -90,9 +91,9 @@ export function CustomerView({
               </div>
               {E.pick("Type", values.type, CUSTOMER_TYPE_OPTIONS, controls("type"))}
               {E.pick("Country", values.country, COUNTRY_OPTIONS, { ...controls("country"), required: true })}
-              {E.edit(values.country === "US" ? "State (required)" : "State", values.country === "US" ? values.state : "Not applicable", "text", undefined, {
-                ...controls("state"), required: values.country === "US", disabled: !canWrite || busy || values.country !== "US", maxLength: 2, minLength: 2,
-              })}
+              {values.country === "US"
+                ? <UsStateField value={values.state} label="State (required)" controls={{ ...controls("state"), required: true }} />
+                : E.edit("State", "Not applicable", "text", undefined, { ...controls("state"), disabled: true })}
               {E.edit("License number", values.licenseNumber, "text", undefined, controls("licenseNumber"))}
             </div>
           </section>
@@ -143,9 +144,9 @@ export function CustomerView({
           </section>
         </div>
       </div>
-      <form id={formId} onSubmit={event => { event.preventDefault(); onSave?.(values); }}>
+      <form id={formId} onSubmit={event => { event.preventDefault(); if (!stateReason) onSave?.(values); }}>
         <CommandFormMessage error={error} />
-        {footer !== undefined ? footer : canWrite ? <div className="flex justify-end"><Button disabled={busy}>{busy ? "Saving…" : "Save customer"}</Button></div> : null}
+        {footer !== undefined ? footer : canWrite ? <div className="flex justify-end">{E.submit("Save customer", { submitting: busy, reason: stateReason })}</div> : null}
       </form>
       {removal && <section aria-label="Delete customer" className="mt-2 flex flex-col gap-4 border-t pt-5 @min-[48rem]:flex-row @min-[48rem]:items-center @min-[48rem]:justify-between">
         <div>
