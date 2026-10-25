@@ -30,3 +30,24 @@ Local Auth configs allow password-recovery callbacks on localhost and 127.0.0.1,
 ports 3000 and 3002, under `/auth/confirm`. Restart the relevant local Supabase
 stack after changing its redirect allowlist. Hosted Auth needs its own approved
 origin and invitation template when deployment is configured.
+
+## Invitation delivery diagnostics
+
+Auth invitation sending uses the hosted Supabase project's SMTP settings, not
+the app's buyer-confirmation transport. An Auth `email_address_invalid`
+refusal can reject example/test domains; `email_address_not_authorized` means
+the default SMTP service restricts recipients and a custom SMTP provider is
+needed. Email/request rate limits require waiting, not repeated submissions.
+Check the invitation request's durable ledger and bounded Auth `/invite` logs
+before assuming an email was sent. Never log provider response bodies, email
+addresses, invitation tokens, SMTP passwords, or service credentials.
+
+Read-only Production inspection for [#1318](https://github.com/energee/mgr-zero/issues/1318)
+on 2026-10-24 found the reported request in `failed` with no bound Auth identity.
+The corresponding 03:53:05Z and 03:53:20Z Auth events refused `/invite` with
+`email_address_invalid` (400). Current SMTP host, sender, and password were
+unset, and the email-send limit was 2. These observations establish the
+reported test-domain refusal and the remaining configuration gate; they do not
+prove actual delivery. The sending domain, custom SMTP, and approved real-inbox
+acceptance remain owner work under [#311](https://github.com/energee/mgr-zero/issues/311).
+No provider send or hosted setting change was performed for this inspection.
