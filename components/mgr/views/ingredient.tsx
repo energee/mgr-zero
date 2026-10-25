@@ -32,7 +32,7 @@ export function IngredientView({ fields, materials, onChange, onSave, onDelete, 
   const unit = materials.find((m) => m.id === fields.materialId)?.unit;
   const qtyLabel = unit ? `Quantity per bbl (${unit})` : "Quantity per bbl";
   return <>
-    {E.searchPick("Material", fields.materialId, materials.map((m) => ({ value: m.id, label: m.category ? `${m.name} · ${m.category}` : m.name })), { id: `${id}-material`, placeholder: "Choose a material", empty: { ...noMaterialsPick(onChange ? "/materials" : undefined), label: "Add a material (opens in a new tab)", target: onChange ? "_blank" : undefined }, ...bind("materialId") })}
+    {E.searchPick("Material", fields.materialId, materials.map((m) => ({ value: m.id, label: m.category ? `${m.name} · ${m.category}` : m.name })), { id: `${id}-material`, placeholder: "Choose a material", empty: onChange ? { ...noMaterialsPick("/materials"), label: "Add a material (opens in a new tab)", target: "_blank" } : noMaterialsPick(), ...bind("materialId") })}
     {E.pick("Stage", fields.stage, INGREDIENT_STAGE_OPTIONS, bind("stage"))}
     {E.inline(
       E.edit(qtyLabel, fields.perBblQty, "number", undefined, { id: `${id}-qty`, ...bind("perBblQty") }),
