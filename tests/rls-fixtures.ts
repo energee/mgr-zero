@@ -22,7 +22,7 @@ export const matrix = {
   material_counts: "deny", material_count_lines: "deny", orders: "deny", order_lines: "deny", order_deposit_lines: "deny", order_events: "deny",
   shipments: "deny", invoices: "deny", invoice_questions: "deny", invoice_lines: "deny", invoice_payments: "deny", invoice_payment_voids: "deny", keg_events: "deny",
   stock_transfers: "deny", stock_transfer_lines: "deny", qbo_connections: "deny", qbo_pushes: "deny", qbo_customer_snapshots: "deny", qbo_customer_decisions: "deny", pos_connections: "deny",
-  pos_locations: "tenant", pos_item_mappings: "tenant", pos_catalog_variations: "deny", pos_catalog_items: "deny", pos_catalog_ownership: "deny", pos_menus: "deny", pos_menu_lines: "deny", pos_sales: "deny", pos_sale_expectations: "deny", pos_sales_coverage: "deny", brand_approvals: "cola",
+  pos_locations: "tenant", pos_item_mappings: "tenant", pos_catalog_variations: "deny", pos_catalog_items: "deny", pos_catalog_ownership: "deny", pos_menus: "deny", pos_menu_lines: "deny", pos_sales: "deny", pos_sale_expectations: "deny", pos_sales_coverage: "deny", brand_approvals: "cola", cola_label_images: "deny",
   state_registrations: "deny", brewery_state_licenses: "deny", report_filings: "deny", routes: "deny",
   reporting_basis_corrections: "deny", report_basis_amendments: "deny",
   deliveries: "deny", chat_installations: "deny", chat_user_links: "self", notification_destinations: "self",
@@ -43,16 +43,18 @@ const compositeKeys: Partial<Record<Table, string[]>> = {
   catalog_categories: ["brewery_id", "name"],
   qbo_customer_snapshots: ["realm_id", "qbo_customer_id"],
   report_basis_amendments: ["filing_id", "correction_id"],
+  cola_label_images: ["ttb_id", "image_url"],
 };
 export const keys = (table: Table, rows: Row[]) => rows.map(row => JSON.stringify((compositeKeys[table] ?? ["id"]).map(k => row[k]))).sort();
 // These tables intentionally have no authenticated SELECT privilege, in addition to RLS.
-const serviceOnly = new Set<Table>(["brewery_counters", "volume_adjustment_reclassifications", "notification_occurrences", "notification_deliveries", "chat_callback_receipts", "chat_action_intents"]);
+const serviceOnly = new Set<Table>(["brewery_counters", "volume_adjustment_reclassifications", "notification_occurrences", "notification_deliveries", "chat_callback_receipts", "chat_action_intents", "cola_label_images"]);
 // These tables grant service_role no SELECT either (writes arrive only through future definer RPCs), so the
 // service positive control reads them with privileged SQL instead of widening the grant for the harness.
 const privilegedRead: Partial<Record<Table, true>> = {
   qbo_customer_snapshots: true, qbo_customer_decisions: true,
   reporting_basis_corrections: true, report_basis_amendments: true,
   invoice_payments: true, invoice_payment_voids: true,
+  cola_label_images: true,
 };
 export const day = "2026-09-08";
 export const now = "2026-09-08T12:00:00Z";
@@ -161,6 +163,9 @@ export async function fixtures() {
   await put("pos_sales_coverage", { connection_id: pos.id, external_location_id: "L1", location_id: taps[0].id, starts_at: "2026-09-01T00:00:00Z", ends_at: now, complete: true });
   await put("brand_approvals", { brand_id: cat.brandId, kind: "cola", ttb_id: "26001001000999" });
   await put("brand_approvals", { brand_id: cat.brandId, kind: "formula", ttb_id: "PRIVATE-FORMULA" });
+  // Written only by store_cola_label_image, which no role here can reach for this unsaved label.
+  sql(`insert into public.cola_label_images(brewery_id,ttb_id,image_url,content_type,bytes)
+    values ('${brewery.id}','26001001000999','https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Private.jpg&filetype=l','image/jpeg','\\xffd8ffd9')`);
   await put("state_registrations", { brand_id: cat.brandId, state: "PA" });
   await put("brewery_state_licenses", { state: "PA", kind: "brewery" });
   const filing = await put("report_filings", { jurisdiction: "TTB", period_start: day, period_end: day, figures: { private: true } });

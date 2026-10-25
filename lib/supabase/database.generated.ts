@@ -611,6 +611,26 @@ isOneToOne: false
       referencedColumns: ["id","brewery_id","provider"]
     }
                   ]
+                },"cola_label_images": {
+                  Row: {
+                    "brewery_id": string,"bytes": string,"content_type": string,"image_url": string,"stored_at": string,"ttb_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "brewery_id": string,"bytes": string,"content_type": string,"image_url": string,"stored_at"?: string,"ttb_id": string
+                  }
+                  Update: {
+                    "brewery_id"?: string,"bytes"?: string,"content_type"?: string,"image_url"?: string,"stored_at"?: string,"ttb_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "cola_label_images_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"customer_users": {
                   Row: {
                     "created_at": string,"customer_id": string,"user_id": string
@@ -5167,6 +5187,9 @@ isOneToOne: false
 "get_staff_chat_installation":
 { Args: { "p_brewery": string }; Returns: Json
                            },
+"get_stored_cola_label_image":
+{ Args: { "p_brewery": string,"p_image_url": string,"p_ttb_id": string }; Returns: string
+                           },
 "get_taproom_count":
 { Args: { "p_brewery": string,"p_count": string }; Returns: Json
                            },
@@ -5685,6 +5708,9 @@ isOneToOne: false
                            },
 "start_qbo_receipt_bill":
 { Args: { "p_brewery": string,"p_new_attempt_reason"?: string,"p_receipt": string,"p_request_id": string }; Returns: Json
+                           },
+"store_cola_label_image":
+{ Args: { "p_brewery": string,"p_data_url": string,"p_image_url": string,"p_ttb_id": string }; Returns: undefined
                            },
 "store_integration_tokens":
 { Args: { "p_access_token": string,"p_actor": string,"p_brewery": string,"p_connection": string,"p_provider": string,"p_refresh_token": string }; Returns: boolean

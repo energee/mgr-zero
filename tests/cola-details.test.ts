@@ -106,6 +106,36 @@ describe("get_cola_image", () => {
     expect(getColaImage).not.toHaveBeenCalled();
   });
 
+  it("keeps a copy of a saved label, so later views by any staff role skip TTB", async () => {
+    const brewery = await breweryWithPermit();
+    const { brandId } = await seedCatalog(brewery.id, { product: "Kept label", sku: "Kept label case" });
+    const sales = await makeStaffCtx(brewery.id, "sales");
+    await runCommand("upsert_brand_approval", { brandId, kind: "cola", ttbId, approvedOn: details.approvedOn, imageUrl: url }, sales);
+    vi.mocked(getColaImage).mockResolvedValueOnce({ dataUrl: "data:image/jpeg;base64,/9j/2Q==" });
+    expect(await runCommand("get_cola_image", { ttbId, url }, await makeStaffCtx(brewery.id, "taproom"))).toEqual({ dataUrl: "data:image/jpeg;base64,/9j/2Q==" });
+    for (const ctx of [sales, await makeStaffCtx(brewery.id, "warehouse")]) {
+      expect(await runCommand("get_cola_image", { ttbId, url }, ctx)).toEqual({ dataUrl: "data:image/jpeg;base64,/9j/2Q==" });
+    }
+    expect(getColaImage).toHaveBeenCalledTimes(1);
+    const other = await breweryWithPermit();
+    await expect(runCommand("get_cola_image", { ttbId, url }, await makeStaffCtx(other.id, "taproom"))).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("keeps no copy of an unsaved preview, and stops serving a copy once the label is removed", async () => {
+    const brewery = await breweryWithPermit();
+    const sales = await makeStaffCtx(brewery.id, "sales");
+    vi.mocked(getColaImage).mockResolvedValue({ dataUrl: "data:image/jpeg;base64,/9j/2Q==" });
+    await runCommand("get_cola_image", { ttbId, url }, sales);
+    await runCommand("get_cola_image", { ttbId, url }, sales);
+    expect(getColaImage).toHaveBeenCalledTimes(2);
+    const { brandId } = await seedCatalog(brewery.id, { product: "Dropped label", sku: "Dropped label case" });
+    const approval = await runCommand("upsert_brand_approval", { brandId, kind: "cola", ttbId, approvedOn: details.approvedOn, imageUrl: url }, sales) as { id: string };
+    const taproom = await makeStaffCtx(brewery.id, "taproom");
+    await runCommand("get_cola_image", { ttbId, url }, taproom);
+    await runCommand("upsert_brand_approval", { id: approval.id, brandId, kind: "cola", ttbId, imageUrl: null }, sales);
+    await expect(runCommand("get_cola_image", { ttbId, url }, taproom)).rejects.toMatchObject({ status: 404 });
+  });
+
   it("refuses a saved image when the brewery registry number has been cleared", async () => {
     const brewery = await breweryWithPermit();
     const { brandId } = await seedCatalog(brewery.id, { product: "Missing permit", sku: "Missing permit case" });

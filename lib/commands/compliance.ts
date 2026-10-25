@@ -132,7 +132,7 @@ defineQuery({
 
 defineQuery({
   name: "get_cola_image",
-  description: "Render one official approved COLA label as a bounded image data URL using a fresh TTB session; admin/sales may preview brewery-owned labels, other staff may view only an approved image saved on a brand",
+  description: "Render one official approved COLA label as a bounded image data URL; a label saved on a brand is fetched from TTB once with a fresh session and served from MGR's copy afterwards; admin/sales may preview brewery-owned labels, other staff may view only an approved image saved on a brand",
   roles: STAFF_ROLES,
   input: z.object({ ttbId: colaId, url: z.string().refine(isColaImageUrl, "Use an official TTB label image URL") }),
   handler: async (ctx, i): Promise<{ dataUrl: string }> => {
@@ -146,7 +146,12 @@ defineQuery({
       permit = savedPermit?.trim() ?? "";
       if (!permit) throw new CommandError("Set the brewery's TTB registry number on Settings to retrieve COLA labels.", 400, "bad_request");
     }
-    return getColaImage(i.ttbId, i.url, permit).catch(colaUpstreamError);
+    const label = { p_brewery: ctx.breweryId, p_ttb_id: i.ttbId, p_image_url: i.url };
+    const stored = await unwrap(ctx.db.rpc("get_stored_cola_label_image", label));
+    if (stored) return { dataUrl: stored };
+    const image = await getColaImage(i.ttbId, i.url, permit).catch(colaUpstreamError);
+    await (await import("@/lib/supabase/cola-label-images")).storeColaLabelImage(ctx.breweryId, i.ttbId, i.url, image.dataUrl);
+    return image;
   },
 });
 

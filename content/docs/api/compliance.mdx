@@ -118,7 +118,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer, taproom
 
-Render one official approved COLA label as a bounded image data URL using a fresh TTB session; admin/sales may preview brewery-owned labels, other staff may view only an approved image saved on a brand
+Render one official approved COLA label as a bounded image data URL; a label saved on a brand is fetched from TTB once with a fresh session and served from MGR's copy afterwards; admin/sales may preview brewery-owned labels, other staff may view only an approved image saved on a brand
 
 | Field | Type | Required |
 | --- | --- | --- |

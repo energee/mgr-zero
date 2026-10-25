@@ -8,6 +8,7 @@ const AUTHENTICATED_RPCS = [
   "consume_command_admission()",
   "get_beer_overview_aggregates(uuid)",
   "get_saved_cola_image_permit(uuid,text,text)",
+  "get_stored_cola_label_image(uuid,text,text)",
   "trace_lot_sources(uuid,uuid)",
   "trace_lot_ingredients(uuid,uuid)",
   "trace_material_lot(uuid,uuid)",
