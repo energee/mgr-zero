@@ -13,7 +13,7 @@ import { MOVEMENT_KIND_LABELS, MOVEMENT_TYPES, movementFieldErrors, movementFiel
 import { sentenceCase } from "@/lib/mgr/labels";
 import { formatVolume } from "@/lib/volume";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
@@ -27,7 +27,6 @@ import type { MovementInput } from "@/lib/commands/movement-input";
 type MovementReceipt = { id: string; created_at: string; sku_id: string; location_id: string; bin_id: string; qty: number; bbl: number; type: string; dest_state: string | null; sale_channel_id: string | null; lot_id: string | null; ref: string | null; note: string | null };
 
 export function MovementForm({
-  autoOpen = false,
   initial,
   skus,
   locations,
@@ -36,10 +35,6 @@ export function MovementForm({
   timeZone,
   skusHref,
 }: {
-  /** True when the page URL carries ?recordMovement=1 (Today's shortcut or
-   *  Ask MGR's Open as form): the form starts open, and closing it clears that
-   *  deep link from the URL (#1107). */
-  autoOpen?: boolean;
   initial?: Partial<MovementInput>;
   skus: { id: string; label: string; bblPerUnit: number | null }[];
   locations: { id: string; name: string; uses: string[] }[];
@@ -51,7 +46,10 @@ export function MovementForm({
   skusHref: string | null;
 }) {
   const breweryId = useBrewery();
-  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const search = searchParams.toString();
+  const movementOpen = pathname === "/inventory" && searchParams.get("recordMovement") === "1";
   const [receipt, setReceipt] = useState<MovementReceipt | null>(null);
   const [stock, setStock] = useState<BinMoveStock[]>([]);
   const [lotId, setLotId] = useState(initial?.lotId ?? "");
@@ -69,18 +67,17 @@ export function MovementForm({
   const [saleChannelId, setSaleChannelId] = useState(initial?.saleChannelId ?? defaultChannelId);
   const [note, setNote] = useState(initial?.note ?? "");
   const form = useCommandForm("record_movement", {
-    defaultOpen: autoOpen,
     onSuccess: data => setReceipt(data as MovementReceipt),
     build: () => ({ skuId, locationId, binId, lotId: lotId || undefined, ...movementFields(type, qty, direction, destState, saleChannelId), type, note: note || undefined }),
     reset: () => { setStockError(null); setLotId(""); setStock([]); setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType(""); setSaleChannelId(defaultChannelId); setNote(""); setDestState(""); setDirection("add"); },
   });
 
   useEffect(() => {
-    if (!locationId || !form.open) return;
+    if (!locationId || !movementOpen || receipt) return;
     let live = true;
     command(breweryId, "get_bin_move_stock", { locationId }).then(data => { if (live) { setStock(data as BinMoveStock[]); setStockError(null); } }).catch(err => { if (live) setStockError(String(err)); });
     return () => { live = false; };
-  }, [breweryId, locationId, form.open]);
+  }, [breweryId, locationId, movementOpen, receipt]);
   const reason = movementReason({ type, skuId, locationId, binId, saleChannelId, qty, destState });
   const fields = reason ? null : movementFields(type, qty, direction, destState, saleChannelId);
   const unitVolume = skus.find(s => s.id === skuId)?.bblPerUnit;
@@ -130,27 +127,46 @@ export function MovementForm({
     setType(next);
   }
 
-  // When a deep link opened this form, replace the URL so a reload or Back
-  // does not reopen it (#1107). The new URL keeps only ?page, so the prefill
-  // values (skuId, type, qty and the rest) leave the URL too.
-  // A successful record closes the form through useCommandForm, not here.
-  // The URL stays until the receipt is dismissed, because page.tsx keys this
-  // form on ?movementHandoff: dropping it early would remount the form and
-  // lose the receipt.
+  // A closing dialog owns only the URL it rendered, never a newer navigation.
+  function ownsCurrentUrl() {
+    return pathname === "/inventory" && window.location.pathname === pathname
+      && new URLSearchParams(window.location.search).toString() === search;
+  }
+
+  // Native history updates Next's URL hooks synchronously without queuing an
+  // RSC navigation that could overwrite a subsequent Today/Ask MGR handoff.
+  // Keep the handoff until its receipt closes so its key and receipt survive.
   function clearDeepLinkUrl() {
-    if (!autoOpen) return;
-    const page = new URLSearchParams(window.location.search).get("page");
-    router.replace(page ? `/inventory?${new URLSearchParams({ page })}` : "/inventory", { scroll: false });
+    if (!movementOpen || !ownsCurrentUrl()) return;
+    const params = new URLSearchParams(search);
+    for (const key of ["recordMovement", "movementHandoff", "skuId", "locationId", "binId", "lotId", "qty", "type", "saleChannelId", "destState", "note"]) {
+      params.delete(key);
+    }
+    const query = params.toString();
+    window.history.replaceState(null, "", `/inventory${query ? `?${query}` : ""}${window.location.hash}`);
+  }
+
+  function changeOpen(open: boolean) {
+    if (!ownsCurrentUrl()) return;
+    form.setOpen(open);
+    if (!open) {
+      clearDeepLinkUrl();
+      return;
+    }
+    const params = new URLSearchParams(search);
+    params.set("recordMovement", "1");
+    window.history.pushState(null, "", `/inventory?${params}${window.location.hash}`);
   }
 
   function dismissReceiptAndClearDeepLink() {
+    if (!ownsCurrentUrl()) return;
     setReceipt(null);
     clearDeepLinkUrl();
   }
 
   return (
     <>
-    <CommandForm open={form.open} onOpenChange={open => { form.setOpen(open); if (!open) clearDeepLinkUrl(); }} title="Record movement" trigger={<Button>Record movement</Button>}>
+    <CommandForm open={movementOpen && receipt === null} onOpenChange={changeOpen} title="Record movement" trigger={<Button>Record movement</Button>}>
         <form onSubmit={e => { if (!fields) { e.preventDefault(); return; } void form.submit(e); }} className="flex flex-col gap-4">
           <RecordMovementView
             model={movementModel}
