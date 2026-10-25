@@ -14,7 +14,7 @@
 import { Fragment, isValidElement, type ReactNode } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@/components/ui/item";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from "@/components/ui/item";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { SortHead, useSortedRows } from "@/components/mgr/sort-head";
 import { cellSortValue, PRINTED_DATE, unwrapLazy, type SortValue } from "@/lib/mgr/table-sort";
@@ -31,6 +31,8 @@ export type RecordTableRow = {
   cells: ReactNode[];
   /** A secondary line under the name, such as a brand's staff-only alias. */
   note?: ReactNode;
+  /** A fixed-size thumbnail before the name, such as a brand's COLA label. */
+  media?: ReactNode;
   /** Where the name links on a live page; the inventory leaves it out (an
    *  inert tap). null: the live viewer may not open it, so the name is plain text. */
   href?: string | null;
@@ -100,10 +102,16 @@ export function RecordTable({ headers, align, rows: given, sortable = true }: {
           </TableHeader>
           <TableBody>
             {rows.map((row) => (
-              <TableRow key={row.key} className="relative [&>td]:align-baseline">
+              // A thumbnail has no text baseline, so a row with one centers its cells.
+              <TableRow key={row.key} className={cn("relative", row.media ? "[&>td]:align-middle" : "[&>td]:align-baseline")}>
                 <TableCell className={cn("whitespace-normal", alignClass(align[0]))}>
-                  {name(row)}
-                  {row.note && <p className="text-muted-foreground">{row.note}</p>}
+                  <div className="flex items-center gap-3">
+                    {row.media}
+                    <div className="min-w-0">
+                      {name(row)}
+                      {row.note && <p className="text-muted-foreground">{row.note}</p>}
+                    </div>
+                  </div>
                 </TableCell>
                 {row.cells.slice(1).map((cell, index) => (
                   <TableCell key={index} className={cn(ABOVE_COVER, cellClass(align[index + 1], cell))}>{cell}</TableCell>
@@ -118,6 +126,7 @@ export function RecordTable({ headers, align, rows: given, sortable = true }: {
           <Fragment key={row.key}>
             {index > 0 && <ItemSeparator className="my-0" />}
             <Item role="listitem" className="relative px-0">
+              {row.media && <ItemMedia className="self-start">{row.media}</ItemMedia>}
               <ItemContent className="min-w-0">
                 <ItemTitle className="min-w-0 max-w-full line-clamp-none wrap-anywhere">{name(row)}</ItemTitle>
                 {row.note && <ItemDescription className="break-words">{row.note}</ItemDescription>}

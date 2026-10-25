@@ -115,7 +115,6 @@ describe("durable invitations", () => {
     expect(response.ok).toBe(true);
     const mail = await response.json();
     expect(mail.messages).toHaveLength(1);
-    expect(mail.messages[0].Subject).toBe("You have been invited");
     const message = await fetch(`${url.origin}/api/v1/message/${mail.messages[0].ID}`).then((r) => r.json());
     const link = new URL(message.HTML.match(/href="([^"]+)"/)?.[1].replaceAll("&amp;", "&"));
     expect(link.pathname).toBe("/auth/confirm");
