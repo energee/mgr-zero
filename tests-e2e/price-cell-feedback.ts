@@ -25,7 +25,7 @@ function loadCell() {
   ab("open", pricingUrl);
   ab("wait", "--fn", `Boolean(${inputExpression} && !${inputExpression}.disabled)`);
 }
-function leaveThroughClear(text: string) {
+function leaveCell(text: string, departure: "Tab" | "click") {
   if (text === "") {
     // Use the real deletion keys: fill("") does not notify React in this CLI.
     ab("focus", field);
@@ -35,9 +35,8 @@ function leaveThroughClear(text: string) {
   } else {
     ab("fill", field, text);
   }
-  ab("press", "Tab");
-  assert.equal(ab("eval", `${cellExpression}.contains(document.activeElement) && document.activeElement.tagName === 'BUTTON'`).result, true, "First Tab must reach this cell's Clear button");
-  ab("press", "Tab");
+  if (departure === "Tab") ab("press", "Tab");
+  else ab("find", "role", "heading", "click", "--name", "Price groups", "--exact");
 }
 function waitStatus(text: string) {
   ab("wait", "--fn", `${cellExpression}?.querySelector('[role=status]')?.textContent === ${JSON.stringify(text)}`);
@@ -49,27 +48,30 @@ function openClear() {
 loadCell();
 const original = readValue();
 assert(original !== "", "Use an owned cell with a persisted price and a Clear button");
-const changed = original === "8.25" ? "9.25" : "8.25";
+let changed = original === "7.00" ? "8.00" : "7.00";
 try {
-  leaveThroughClear(changed);
-  waitStatus("Saved");
-  loadCell();
-  assert.equal(readValue(), changed, "Tab through Clear must persist the edited price");
-
-  leaveThroughClear("");
-  waitStatus("Price unchanged. Use Clear and confirm to remove it.");
-  assert.equal(readValue(), changed, "Blank keyboard departure must restore the persisted price");
-  assert.equal(ab("eval", `(() => { const feedback = ${cellExpression}.querySelector('[role=status]'); return feedback.scrollWidth <= feedback.clientWidth; })()`).result, true, "Restoration feedback must wrap inside its cell");
-  loadCell();
-  assert.equal(readValue(), changed);
-
-  for (const invalid of ["-5", "abc", "1e3", "1.001"]) {
-    leaveThroughClear(invalid);
-    ab("wait", "--fn", `${inputExpression}?.getAttribute('aria-invalid') === 'true' && Boolean(${cellExpression}?.querySelector('[role=alert]'))`);
-    assert.equal(readValue(), invalid, "Invalid draft must remain available to correct");
-    assert.equal(ab("eval", `(() => { const feedback = ${cellExpression}.querySelector('[role=alert]'); return feedback.scrollWidth <= feedback.clientWidth; })()`).result, true, "Validation must wrap inside its cell");
+  for (const departure of ["Tab", "click"] as const) {
+    leaveCell(changed, departure);
+    waitStatus("Saved");
     loadCell();
-    assert.equal(readValue(), changed, "Invalid draft must not replace the saved price");
+    assert.equal(readValue(), changed, `${departure} must persist the edited price`);
+
+    leaveCell("", departure);
+    waitStatus("Price unchanged. Use Clear and confirm to remove it.");
+    assert.equal(readValue(), changed, "Blank departure must restore the persisted price");
+    assert.equal(ab("eval", `(() => { const feedback = ${cellExpression}.querySelector('[role=status]'); return feedback.scrollWidth <= feedback.clientWidth; })()`).result, true, "Restoration feedback must wrap inside its cell");
+    loadCell();
+    assert.equal(readValue(), changed);
+
+    for (const invalid of ["-5", "abc", "1e3", "12.345"]) {
+      leaveCell(invalid, departure);
+      ab("wait", "--fn", `${inputExpression}?.getAttribute('aria-invalid') === 'true' && Boolean(${cellExpression}?.querySelector('[role=alert]'))`);
+      assert.equal(readValue(), invalid, "Invalid draft must remain available to correct");
+      assert.equal(ab("eval", `(() => { const feedback = ${cellExpression}.querySelector('[role=alert]'); return feedback.scrollWidth <= feedback.clientWidth; })()`).result, true, "Validation must wrap inside its cell");
+      loadCell();
+      assert.equal(readValue(), changed, "Invalid draft must not replace the saved price");
+    }
+    if (departure === "Tab") changed = "8.50";
   }
 
   // Opening and cancelling Clear must not save the edit that was in the input.
@@ -79,14 +81,16 @@ try {
   loadCell();
   assert.equal(readValue(), changed, "Clicking Clear must not first save the edited price");
 
-  // Keyboard activation must also open the confirmation without saving a draft.
-  ab("fill", field, "12.25");
-  ab("press", "Tab");
+  // Tab saves the edit before Clear; keyboard activation still only opens confirmation.
+  changed = "12.25";
+  leaveCell(changed, "Tab");
+  waitStatus("Saved");
+  assert.equal(ab("eval", `document.activeElement === ${cellExpression}.querySelector('button[aria-label="Clear price"]')`).result, true, "Clear must retain the actual Tab destination through saving");
   ab("press", "Enter");
   ab("wait", "--fn", "Boolean(document.querySelector('[role=dialog][data-state=open]'))");
-  ab("find", "role", "button", "click", "--name", "Cancel", "--exact");
+  ab("press", "Escape");
   loadCell();
-  assert.equal(readValue(), changed, "Keyboard Clear activation must not save the edited price");
+  assert.equal(readValue(), changed, "Cancelling keyboard Clear must keep the blurred, saved price");
 
   openClear();
   ab("click", '[role="dialog"][data-state="open"] button[type="submit"]');
