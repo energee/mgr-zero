@@ -3,8 +3,8 @@
 // upsert_brand_approval and upsert_state_registration. Add approval reuses a
 // saved record when its kind and TTB ID match. The brand is fixed: the sheet is
 // opened from one brand. Search results and direct TTB-ID entry both load
-// approved label choices. Fields and the selected image save together only
-// when Save approval is pressed.
+// approved label choices, keeping the saved or only label chosen. Fields and
+// the selected image save together only when Save approval is pressed.
 "use client";
 
 import { useState } from "react";
@@ -16,6 +16,7 @@ import type { Approval, ColaSearch, Registration } from "@/lib/commands/complian
 import { useCommandAction, useCommandForm, useFields } from "@/lib/commands/use-command-form";
 import { APPROVAL_KINDS, approvalInput, colaChoice } from "@/lib/mgr/brand-approval-view";
 import { registrationInput } from "@/lib/mgr/state-registration-view";
+import { defaultColaImage } from "@/lib/mgr/cola-review";
 import type { ColaDetails } from "@/lib/ttb/colas";
 import { ColaImage } from "../../cola-image";
 type Brand = { id: string; name: string };
@@ -46,9 +47,8 @@ export function ApprovalForm({ brand, approval, approvals = [] }: { brand: Brand
       await search.run("get_cola_details", { ttbId: id }, data => {
         const found = data as ColaDetails;
         const saved = approval?.ttb_id === id ? approval : approvals.find(row => row.kind === "cola" && row.ttb_id === id);
-        const imageUrl = found.images.find(image => image.url === saved?.image_url)?.url ?? "";
         setDetails(found);
-        patch({ approvedOn: found.approvedOn ?? "", imageUrl });
+        patch({ approvedOn: found.approvedOn ?? "", imageUrl: defaultColaImage(found, saved?.image_url) });
       }, { refresh: false, durable: false });
     } finally {
       setLoadingCola(false);

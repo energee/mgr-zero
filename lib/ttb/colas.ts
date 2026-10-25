@@ -222,7 +222,15 @@ export async function getColaDetails(ttbId: string, request: ColaRequest = ttbHt
   return (await colaDetailSession(ttbId, request)).details;
 }
 
-/** Resolves a saved official identifier using a fresh, permit-checked TTB session. */
+// TTB drops sockets and returns error pages when a Catalog page opens many
+// image sessions at once (measured: 10 of 20 in parallel failed, 0 of 40 at
+// four). ponytail: per-process queue; a shared limiter if several instances
+// burst TTB together.
+const IMAGE_SESSIONS = 4;
+let imageSessions = 0;
+const waitingForSession: (() => void)[] = [];
+
+/** Resolves a saved official identifier using a fresh, permit-checked TTB session, at most IMAGE_SESSIONS at once. */
 export async function getColaImage(
   ttbId: string,
   url: string,
@@ -230,6 +238,19 @@ export async function getColaImage(
   request: ColaRequest = ttbHttpsRequest,
 ): Promise<{ dataUrl: string }> {
   if (!isColaImageUrl(url)) throw new Error("Not an official TTB label image URL");
+  if (imageSessions >= IMAGE_SESSIONS) await new Promise<void>((resolve) => waitingForSession.push(resolve));
+  else imageSessions++;
+  try {
+    return await fetchColaImage(ttbId, url, permit, request);
+  } finally {
+    // Hand the slot straight to the next waiter, so the count never dips and a newcomer can't jump the queue.
+    const next = waitingForSession.shift();
+    if (next) next();
+    else imageSessions--;
+  }
+}
+
+async function fetchColaImage(ttbId: string, url: string, permit: string, request: ColaRequest): Promise<{ dataUrl: string }> {
   const { details, cookie } = await colaDetailSession(ttbId, request, permit);
   if (details.status !== "APPROVED") throw new Error(`TTB COLA is ${details.status}, not APPROVED`);
   if (!details.images.some((image) => image.url === url)) throw new Error("Requested image is not a label on this COLA");

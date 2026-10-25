@@ -1,6 +1,7 @@
 // Catalog draws one row per brand in the shared RecordTable: live, the name
 // links to the brand for a role that may open it, with its alias under it, and
-// the COLA column reads its recorded approvals. What a brand sells (packages
+// the COLA column reads its recorded approvals; the latest approved label
+// leads the row as a thumbnail. What a brand sells (packages
 // and pours) lives under its Sells as.
 // Price groups and Water profiles rows follow; inventory and live draw both.
 // Live, a row the viewer may not open is plain (no tap, no Open); the
@@ -10,7 +11,7 @@ import { E } from "@/components/mgr/e";
 import { NOT_SET, type CatalogViewModel } from "@/lib/mgr/catalog-view";
 import { FormatsView, type FormatsViewModel } from "@/components/mgr/views/formats";
 import { RecordTable } from "@/components/mgr/views/record-table";
-import { ColaLabelImageView } from "@/components/mgr/views/cola-label-image";
+import { COLA_SLOT, ColaLabelImageView } from "@/components/mgr/views/cola-label-image";
 
 export type { CatalogViewModel };
 
@@ -57,7 +58,9 @@ export function CatalogView({
           align={["l", "l", "r", "r", "l"]}
           rows={model.brands.map((brand) => ({
             key: brand.key,
-            cells: [brand.name, brand.style, brand.abv, brand.skus, <div key="cola" className="flex flex-col gap-2">{brand.cola}{brand.image && (images?.[brand.key] ?? <ColaLabelImageView label={`${brand.name} · COLA ${brand.image.ttbId}`} compact />)}</div>],
+            cells: [brand.name, brand.style, brand.abv, brand.skus, brand.cola],
+            // Every row leads with the same slot, so names line up; a brand without a label leaves it blank.
+            media: brand.image ? images?.[brand.key] ?? <ColaLabelImageView label={`${brand.name} · COLA ${brand.image.ttbId}`} compact /> : <div className={COLA_SLOT} aria-hidden />,
             // A style or ABV that is not set sorts last, not as the words.
             sort: [brand.name, brand.style === NOT_SET ? null : brand.style, brand.abv === NOT_SET ? null : brand.abv, brand.skus, brand.cola],
             note: brand.alias,
