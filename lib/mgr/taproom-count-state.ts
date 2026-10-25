@@ -1,5 +1,6 @@
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 import { bblExact } from "@/lib/volume";
+import { submitReason } from "@/lib/mgr/submit-reason";
 import type { TaproomLineMovementType } from "@/lib/supabase/rpc-results";
 
 export type TaproomCountSnapshotLine = {
@@ -167,6 +168,19 @@ export function isShortage(line: Pick<CountDraftLine, "quantity" | "qtyBefore">)
   return /^\d+$/.test(line.quantity) && Number.isSafeInteger(Number(line.quantity)) && Number(line.quantity) < line.qtyBefore;
 }
 
+export function countQuantityError(line: Pick<CountDraftLine, "quantity" | "qtyBefore">): string | undefined {
+  if (line.quantity === "") return "Count every displayed bucket explicitly, including zero.";
+  if (!/^\d+$/.test(line.quantity) || !Number.isSafeInteger(Number(line.quantity))) return "Count remaining whole packaged units; a partial keg counts as one until gone.";
+  if (Number(line.quantity) > line.qtyBefore) return "Count exceeds recorded stock; ask Warehouse to investigate.";
+}
+
+export function countSubmitReason(state: TaproomCountState): string | null {
+  if (state.attempt.kind === "unknown") return null;
+  if (state.attempt.kind === "submitting") return submitReason(["the current count to finish recording"]);
+  if (state.attempt.kind === "stale" || !projectionMatchesCountDraft(state)) return submitReason(["a fresh recount"]);
+  return submitReason(state.draft.lines.some(line => countQuantityError(line)) ? ["a whole-package count within recorded stock for every bucket, including zero"] : []);
+}
+
 export function updateCountQuantity(state: TaproomCountState, key: string, quantity: string): TaproomCountState {
   if (countLocked(state)) return state;
   return { ...state, attempt: { kind: "idle" }, draft: { ...state.draft, lines: state.draft.lines.map((line) => line.key === key ? { ...line, quantity, disposition: isShortage({ quantity, qtyBefore: line.qtyBefore }) ? line.disposition : "sold" } : line) } };
@@ -222,7 +236,7 @@ export function countBrandComparison(state: TaproomCountState): CountBrandCompar
   const grouped = new Map<string, { brandName: string; actualBbl: number; complete: boolean }>();
   for (const line of state.draft.lines) {
     const group = grouped.get(line.brandId) ?? { brandName: line.brandName, actualBbl: 0, complete: true };
-    const valid = /^\d+$/.test(line.quantity) && Number.isSafeInteger(Number(line.quantity)) && Number(line.quantity) <= line.qtyBefore;
+    const valid = !countQuantityError(line);
     group.complete &&= valid;
     if (valid && line.disposition !== "destroyed") group.actualBbl += (line.qtyBefore - Number(line.quantity)) * line.bblPerUnit;
     grouped.set(line.brandId, group);
@@ -251,19 +265,19 @@ export function replaceCountSnapshot(state: TaproomCountState, snapshot: Taproom
 }
 
 function payload(state: TaproomCountState): TaproomCountInput {
-  if (state.draft.lines.some((line) => line.quantity === "")) throw new Error("Count every displayed bucket explicitly, including zero.");
   const lines = state.draft.lines.map((line) => {
-    if (!/^\d+$/.test(line.quantity)) throw new Error("Count remaining whole packaged units; a partial keg counts as one until gone.");
+    const error = countQuantityError(line);
+    if (error) throw new Error(error);
     const qtyCounted = Number(line.quantity);
-    if (!Number.isSafeInteger(qtyCounted)) throw new Error("Count remaining whole packaged units; a partial keg counts as one until gone.");
-    if (qtyCounted > line.qtyBefore) throw new Error("Count exceeds recorded stock; ask Warehouse to investigate.");
     return { binId: line.binId, skuId: line.skuId, lotId: line.lotId, qtyCounted, ...(line.disposition === "destroyed" ? { disposition: "destroyed" as const } : {}) };
   });
   return { locationId: state.draft.locationId, countedOn: state.draft.countedOn, revision: state.draft.revision, lines };
 }
 
 export function beginCountAttempt(state: TaproomCountState, requestId: string): TaproomCountState {
+  if (state.attempt.kind === "submitting" || state.attempt.kind === "stale") return state;
   if (state.attempt.kind === "unknown") return { ...state, attempt: { ...state.attempt, kind: "submitting", message: undefined } };
+  if (!projectionMatchesCountDraft(state)) throw new Error(baselineChangedMessage);
   return { ...state, attempt: { kind: "submitting", requestId, payload: payload(state) } };
 }
 
