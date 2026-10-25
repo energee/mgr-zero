@@ -136,7 +136,7 @@ describe("request authentication", () => {
     form.set("email", staff.email);
     form.set("password", "test-password-1");
 
-    await expect(login(form)).rejects.toThrow("redirect:/");
+    await expect(login({}, form)).rejects.toThrow("redirect:/");
 
     expect(createServerClient).toHaveBeenCalledTimes(1);
     expect(getClaims).toHaveBeenCalledTimes(1);
@@ -151,10 +151,10 @@ describe("request authentication", () => {
     form.set("password", "incorrect-password-1");
     if (portal) form.set("portal", "1");
 
-    await expect(login(form)).rejects.toThrow(`redirect:${portal ? "/portal" : ""}/login?error=1&email=${encodeURIComponent(email)}`);
-    const target = new URL(navigation.redirect.mock.lastCall![0], "https://mgr.test");
-    const page = portal ? PortalLoginPage : LoginPage;
-    const html = renderToStaticMarkup(await page({ searchParams: Promise.resolve(Object.fromEntries(target.searchParams)) }));
+    const state = await login({}, form);
+    expect(state).toEqual({ email, error: "Incorrect email or password." });
+    expect(navigation.redirect).not.toHaveBeenCalled();
+    const html = renderToStaticMarkup(createElement(LoginForm, { portal, ...state }));
     expect(html).toMatch(/role="alert"[^>]*>[\s\S]*?data-slot="alert-description"[^>]*>Incorrect email or password\./);
     expect(html.match(/<input[^>]*name="email"[^>]*>/)?.[0]).toContain(`value="${email}"`);
     expect(html.match(/<input[^>]*type="password"[^>]*>/)?.[0]).toContain('value=""');

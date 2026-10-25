@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const auth = vi.hoisted(() => ({ signInWithOtp: vi.fn(), signInWithPassword: vi.fn(), updateUser: vi.fn(), getUser: vi.fn(), getClaims: vi.fn(), signOut: vi.fn() }));
+const auth = vi.hoisted(() => ({ signInWithOtp: vi.fn(), signInWithPassword: vi.fn(), resetPasswordForEmail: vi.fn(), updateUser: vi.fn(), getUser: vi.fn(), getClaims: vi.fn(), signOut: vi.fn() }));
 const redirect = vi.hoisted(() => vi.fn((path: string): never => { throw new Error(`redirect:${path}`); }));
 const verifyCurrentPassword = vi.hoisted(() => vi.fn());
 const memberships = vi.hoisted(() => ({ staff: [{}] as unknown[], customer: [] as unknown[] }));
@@ -17,7 +17,7 @@ vi.mock("next/headers", () => ({
 }));
 vi.mock("next/navigation", () => ({ redirect }));
 
-import { emailLogin, login, savePassword } from "@/app/(auth)/actions";
+import { emailLogin, login, savePassword, sendReset } from "@/app/(auth)/actions";
 import { PASSWORD_SAVED_COOKIE } from "@/lib/auth/password";
 
 describe("passwordless sign-in", () => {
@@ -166,15 +166,38 @@ describe("set new password", () => {
   });
 });
 
-describe("password sign-in failure (#1320)", () => {
-  it.each([false, true])("keeps the email and original sign-in surface (portal=%s)", async (portal) => {
-    auth.signInWithPassword.mockResolvedValue({ error: { code: "invalid_credentials" } });
+describe("password sign-in failure (#1398)", () => {
+  it.each([false, true])("returns useful state without redirecting or retaining the password (portal=%s)", async (portal) => {
+    redirect.mockClear();
+    auth.signInWithPassword.mockResolvedValue({ error: { code: "invalid_credentials", message: "Private provider detail" } });
     const form = new FormData();
     form.set("email", "qa+buyer@example.com");
     form.set("password", "never-put-password-in-url");
     if (portal) form.set("portal", "1");
-    const surface = portal ? "/portal/login" : "/login";
-    await expect(login(form)).rejects.toThrow(`redirect:${surface}?error=1&email=qa%2Bbuyer%40example.com`);
+    await expect(login({}, form)).resolves.toEqual({ email: "qa+buyer@example.com", error: "Incorrect email or password." });
+    expect(redirect).not.toHaveBeenCalled();
     expect(auth.signInWithPassword).toHaveBeenCalledWith({ email: "qa+buyer@example.com", password: "never-put-password-in-url" });
+  });
+});
+
+describe("reset submission outcome (#1398)", () => {
+  it.each([false, true])("confirms only a successful Auth request (portal=%s)", async (portal) => {
+    auth.resetPasswordForEmail.mockResolvedValue({ error: null });
+    const form = new FormData();
+    form.set("email", "buyer@example.com");
+    if (portal) form.set("portal", "1");
+    await expect(sendReset({}, form)).resolves.toEqual({ email: "buyer@example.com", sent: true });
+    expect(auth.resetPasswordForEmail).toHaveBeenLastCalledWith("buyer@example.com", {
+      redirectTo: `https://mgr.example/auth/confirm?next=${encodeURIComponent(portal ? "/password?portal=1" : "/password")}`,
+    });
+  });
+
+  it("replaces a previous success with a safe failure when Auth refuses the request", async () => {
+    auth.resetPasswordForEmail.mockResolvedValue({ error: { message: "Private provider detail" } });
+    const form = new FormData();
+    form.set("email", "buyer@example.com");
+    await expect(sendReset({ sent: true }, form)).resolves.toEqual({
+      email: "buyer@example.com", error: "The reset link could not be requested. Try again.",
+    });
   });
 });
