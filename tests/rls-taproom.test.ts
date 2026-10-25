@@ -269,6 +269,8 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   readNames.push("get_staff_chat_installation");
   // Saved COLA images expose only their brewery permit to staff, including Taproom.
   readNames.push("get_saved_cola_image_permit");
+  // Every staff role reads its brewery's copies of saved COLA labels; store_cola_label_image is service-only.
+  readNames.push("get_stored_cola_label_image");
   // Existing-account consent is authenticated own-identity work, covered by existing-account-invites.test.ts.
   const ownNames = ["accept_account_invitation","set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_personal_notification_destination","create_chat_conversation","append_chat_message"];
   const existing = [...readFileSync(new URL("./rls-command-boundary.test.ts", import.meta.url), "utf8").matchAll(/rpc: "(\w+)"/g)].map(m => m[1]);
@@ -286,6 +288,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   readSignatures.push("list_pending_invitations(uuid)");
   readSignatures.push("get_staff_chat_installation(uuid)");
   readSignatures.push("get_saved_cola_image_permit(uuid,text,text)");
+  readSignatures.push("get_stored_cola_label_image(uuid,text,text)");
   const ownSignatures = ["accept_account_invitation(uuid,uuid)","set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_personal_notification_destination(uuid,text,uuid,uuid)","create_chat_conversation(uuid,text,uuid)","append_chat_message(uuid,uuid,text,text,uuid)"];
   expect(catalog.filter(c => readNames.includes(c.name)).map(c => c.signature).sort()).toEqual(readSignatures.sort());
   expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures].sort());
@@ -357,7 +360,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     set_notification_destination: [B,I,"shared",R(),f.owner.id,now], get_chat_settings_installation: [B,I,f.owner.id],
     chat_credential_has_canonical_owner: [B], has_active_canonical_chat_installation: [B], get_chat_installation_lifecycle: [I], prune_chat_integration_logs: ["90 days"],
     chat_settings_request_completed: [B,f.taproom.id,importRequest],
-    get_published_pos_menu: [R()],
+    get_published_pos_menu: [R()], store_cola_label_image: [B,"26001001000999","https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Forged.jpg&filetype=l","data:image/jpeg;base64,/9j/2Q=="],
     provision_brewery: [f.taproom.id,"Fixture","America/New_York",null,R()],
     close_brewery: [B], prune_command_requests: [],
   };
