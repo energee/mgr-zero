@@ -39,13 +39,14 @@ export function PriceCellInput({ label, value, onChange, onCommit, disabled, err
           <InputGroupInput aria-label={label} inputMode="decimal" placeholder="—" autoComplete="off" disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={error || status ? feedbackId : undefined}
             className="text-right tabular-nums"
             onBlur={onCommit ? event => {
-              // Clear opens a portal without committing the draft underneath it.
-              if (event.relatedTarget instanceof HTMLElement && event.relatedTarget.closest('[role="dialog"]')) return;
+              const dialog = event.relatedTarget instanceof HTMLElement ? event.relatedTarget.closest('[role="dialog"]') : null;
+              // Only this cell's Clear dialog holds its draft; another cell's dialog is a departure.
+              if (dialog && event.currentTarget.form?.querySelector('[aria-haspopup="dialog"]')?.getAttribute("aria-controls") === dialog.id) return;
               void onCommit();
             } : undefined}
             {...(onChange ? { value, onChange: (event) => onChange(event.target.value) } : { defaultValue: value })} />
         </InputGroup>
-        {/* Keep a direct Clear click on its confirmation path, not the input's blur-save path. */}
+        {/* Keep the trigger under the pointer while opening; blur handles the dialog's owning cell. */}
         {children && <div onMouseDown={event => event.preventDefault()}>{children}</div>}
       </div>
       {error ? <p id={feedbackId} role="alert" className="max-w-40 whitespace-normal text-right text-xs text-destructive">{error}</p>
