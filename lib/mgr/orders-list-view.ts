@@ -30,7 +30,7 @@ export type OrdersListViewModel = {
   rows: OrdersListRowView[];
   empty?: EmptyState;
   /** The Status pick: "all" or one OrderStatus. */
-  status: string;
+  status: OrderStatus | "all";
   statusOptions: ScopeOption[];
   /** The customer scope line; clearHref drops the customer and keeps the status. */
   customer?: { name: string; clearHref?: string };
@@ -38,7 +38,7 @@ export type OrdersListViewModel = {
 
 export type OrdersListSnapshot = {
   roles: readonly string[];
-  status?: string;
+  status?: OrderStatus;
   /** The filtered customer's name; an empty list then names it instead of saying "No orders yet". */
   customer?: string;
   customerId?: string;
@@ -55,7 +55,7 @@ export type OrdersListSnapshot = {
 };
 
 /** /orders with this customer and status; a filter change starts at the newest page, so no cursor. */
-function ordersHref(customerId: string | undefined, status: string | undefined) {
+function ordersHref(customerId: string | undefined, status: OrderStatus | undefined) {
   const query = new URLSearchParams();
   if (customerId) query.set("customerId", customerId);
   if (status) query.set("status", status);

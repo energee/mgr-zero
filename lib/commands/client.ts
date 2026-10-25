@@ -2,6 +2,7 @@
 // Callers may retain a request ID for an unchanged failed submission; ordinary
 // three-argument calls still generate one UUID per invocation.
 import type { CommandContextExpectation, CommandOrigin } from "./registry";
+import type { InputIssue } from "./field-errors";
 import { canRetireCommandFailure } from "./failure";
 
 export const COMMAND_DATA_CHANGED = "mgr-command-data-changed";
@@ -10,7 +11,7 @@ function notifyDataChanged(breweryId: string) {
 }
 
 export class CommandResponseError extends Error {
-  constructor(message: string, readonly status: number, readonly code?: string) { super(message); }
+  constructor(message: string, readonly status: number, readonly code?: string, readonly issues?: InputIssue[]) { super(message); }
 }
 
 export type CommandFailureDetail = {
@@ -18,6 +19,7 @@ export type CommandFailureDetail = {
   kind: "definitive" | "unknown";
   status?: number;
   code?: string;
+  issues?: InputIssue[];
 };
 
 export function classifyCommandFailure(error: unknown): CommandFailureDetail {
@@ -28,7 +30,7 @@ export function classifyCommandFailure(error: unknown): CommandFailureDetail {
   // safe text of its own; show customer copy, never the internal command name (#762).
   const message = error instanceof Error ? error.message : "The request did not finish. Try again.";
   const definitive = canRetireCommandFailure(status ?? 0, false, code);
-  return { message, kind: definitive ? "definitive" : "unknown", ...(status === undefined ? {} : { status }), ...(code ? { code } : {}) };
+  return { message, kind: definitive ? "definitive" : "unknown", ...(status === undefined ? {} : { status }), ...(code ? { code } : {}), ...(error instanceof CommandResponseError && error.issues ? { issues: error.issues } : {}) };
 }
 
 export type CommandProvenance = { origin: Exclude<CommandOrigin, "chat"> }
@@ -44,7 +46,7 @@ export async function command(breweryId: string, name: string, input: unknown, r
     if (!signal) notifyDataChanged(breweryId);
     throw error;
   });
-  const json = await res.json().catch(() => null) as { ok?: boolean; data?: unknown; requestId?: string; error?: { message?: string; code?: string } } | null;
+  const json = await res.json().catch(() => null) as { ok?: boolean; data?: unknown; requestId?: string; error?: { message?: string; code?: string; issues?: InputIssue[] } } | null;
   // Successful query envelopes omit requestId. Unknown outcomes may have
   // committed, so invalidate on failures too; never automatically retry writes.
   if ((!signal && !json?.ok) || (json?.ok && json.requestId)) notifyDataChanged(breweryId);
@@ -58,6 +60,6 @@ export async function command(breweryId: string, name: string, input: unknown, r
     throw new CommandResponseError("session expired", 401);
   }
   if (typeof json?.ok !== "boolean") throw new Error(`malformed response (${res.status})`);
-  if (!json.ok) throw new CommandResponseError(json.error?.message ?? `request failed (${res.status})`, res.status, json.error?.code);
+  if (!json.ok) throw new CommandResponseError(json.error?.message ?? `request failed (${res.status})`, res.status, json.error?.code, json.error?.issues);
   return json.data;
 }

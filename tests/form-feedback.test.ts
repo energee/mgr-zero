@@ -36,8 +36,8 @@ import { contractYchCitra } from "@/lib/mgr/fixtures/purchasing";
 // The live forms render without a router or a command round trip.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {} }) }));
 vi.mock("@/lib/commands/use-command-form", () => ({
-  useCommandAction: () => ({ busy: false, error: null, run: () => {} }),
-  useCommandForm: () => ({ open: true, setOpen: () => {}, submit: () => {}, submitting: false, error: null }),
+  useCommandAction: () => ({ busy: false, error: null, fieldErrors: {}, run: () => {} }),
+  useCommandForm: () => ({ open: true, setOpen: () => {}, submit: () => {}, submitting: false, error: null, fieldErrors: {} }),
 }));
 
 const html = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
