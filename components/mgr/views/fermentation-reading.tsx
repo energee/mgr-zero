@@ -32,6 +32,7 @@ export function FermentationReadingView({
   values,
   identity,
   unit,
+  timeZone,
   prior,
   locked = false,
   busy = false,
@@ -45,6 +46,7 @@ export function FermentationReadingView({
   formId: string;
   identity: FermentationReadingIdentity;
   unit: GravityUnit;
+  timeZone: string;
   prior?: Partial<Pick<FermentationReadingValues, "tempF" | "gravity" | "ph">>;
   locked?: boolean;
   busy?: boolean;
@@ -66,7 +68,7 @@ export function FermentationReadingView({
       </p>
       <fieldset disabled={locked || busy} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          {E.edit("Observed at", values.observedAt, "datetime-local", undefined, { ...field("observedAt"), id: "fr-observed", step: "1", required: true })}
+          {E.edit(`Observed at (${timeZone})`, values.observedAt, "datetime-local", undefined, { ...field("observedAt"), id: "fr-observed", step: "1", required: true })}
         </div>
         <div className="flex flex-col gap-2">
           {E.edit("Temperature (°F)", values.tempF, "number", undefined, { ...field("tempF"), id: "fr-temp", required: true, ...READING_BOUNDS.tempF })}

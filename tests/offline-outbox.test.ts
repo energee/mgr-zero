@@ -7,6 +7,7 @@ import { getCommandDefinition } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { SCREENS } from "@/components/mgr/screens";
 import { FermentationReadingActionsView, FermentationReadingView } from "@/components/mgr/views/fermentation-reading";
+import { dateTimeInput, dateTimeInputInstant } from "@/lib/date-format";
 import {
   createReadingAttempt,
   discardOutbox,
@@ -64,6 +65,27 @@ function attempt(requestId = ids.request, currentScope = scope) {
 }
 
 describe("action-specific offline outbox", () => {
+  it("preserves offset and fractional-second instants through brewery-time recovery (#1379)", () => {
+    const storage = new MemoryStorage();
+    const historical = { ...input, at: "2026-11-01T01:30:00.987-05:00" };
+    const original = createReadingAttempt(scope, historical, "FV3 historical observation");
+    storeOutboxAttempt(storage, original);
+    const recovered = readOutboxAttempt(storage, original.id)!;
+    const wall = dateTimeInput(recovered.input.at, "America/New_York");
+    expect(wall).toBe("2026-11-01T01:30:00");
+    const reviewed = createReadingAttempt(scope, {
+      ...recovered.input,
+      at: dateTimeInputInstant(wall, "America/New_York", recovered.input.at),
+    }, "FV3 reviewed observation");
+    storeOutboxAttempt(storage, reviewed);
+    expect(readOutboxAttempt(storage, original.id)?.input).toEqual(historical);
+    expect(readOutboxAttempt(storage, reviewed.id)?.input).toEqual(historical);
+    expect(reviewed.requestId).not.toBe(original.requestId);
+    // A later brewery-zone display does not reinterpret either stored ISO payload.
+    expect(dateTimeInput(recovered.input.at, "America/Los_Angeles")).toBe("2026-10-31T23:30:00");
+    expect(readOutbox(storage).map(entry => entry.input.at)).toEqual([historical.at, historical.at]);
+  });
+
   it("freezes and persists the exact eligible reading before transport", async () => {
     const storage = new MemoryStorage();
     const frozen = attempt();
@@ -430,7 +452,7 @@ describe("action-specific offline outbox", () => {
     const form = readFileSync("app/(app)/cellar/[occupancyId]/reading/reading-form.tsx", "utf8");
     expect(form.indexOf("storeOutboxAttempt(localStorage, next)")).toBeLessThan(form.indexOf("await deliver(next)"));
     const values = { observedAt: "2026-09-10T08:10:00", tempF: "68", gravity: "4.2", ph: "4.1", note: "steady" };
-    const editing = renderToStaticMarkup(createElement(FermentationReadingView, { formId: "reading", values, identity: { vessel: "FV3" }, unit: "plato" }));
+    const editing = renderToStaticMarkup(createElement(FermentationReadingView, { formId: "reading", values, identity: { vessel: "FV3" }, unit: "plato", timeZone: "America/New_York" }));
     const recovery = renderToStaticMarkup(createElement(FermentationReadingActionsView, { formId: "reading", values, recovery: { state: "uncertain", discardLabel: "FV3 reading" } }));
     expect(editing).toContain('type="datetime-local"');
     expect(renderToStaticMarkup(createElement(FermentationReadingActionsView, { formId: "reading", values }))).toContain("Save reading");
