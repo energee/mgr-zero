@@ -69,7 +69,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   return (
     <FinishedGoodsView
       model={toFinishedGoodsViewProps(assembleFinishedGoods(skus, onHand, atp, value))}
-      createAction={canMove ? <MovementForm key={movementFormInstanceKey(handoffId)} timeZone={brewery.timeZone} autoOpen={recordMovement === "1"} initial={initial} skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} skusHref={skusHref} /> : null}
+      createAction={canMove ? <MovementForm key={movementFormInstanceKey(handoffId)} timeZone={brewery.timeZone} initial={initial} skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} skusHref={skusHref} /> : null}
       addSkuHref={skusHref}
       countHref={canRun(ctx, "record_taproom_count") ? "/taproom" : null}
       linkRows

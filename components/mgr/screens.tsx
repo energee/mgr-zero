@@ -56,6 +56,7 @@ import { CatalogView } from "@/components/mgr/views/catalog";
 import { ColaReviewView } from "@/components/mgr/views/cola-review";
 import { ColaLabelImageView } from "@/components/mgr/views/cola-label-image";
 import { colaReviewBrands, colaReviewRecord, colaReviewDetails } from "@/lib/mgr/fixtures/cola-review";
+import { missingColaIds } from "@/lib/mgr/cola-review";
 import { ListControls } from "@/components/mgr/list-controls";
 import { ChannelView } from "@/components/mgr/views/channel";
 import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
@@ -1508,7 +1509,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_brand · create_sku · update_sku",
     states: DEFAULT_STATES,
     spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix.",
-    body: <CatalogView model={toCatalogViewProps(catalogBrands)} controls={<ListControls search={{ label: "Search brands or aliases", value: "", keep: {} }} scopes={toCatalogScopes({ sort: "name", category: "", categories: ["Core", "Seasonal"] })} />} formats={toFormatsViewProps({ ...formatsInventory, formats: formatsInventory.formats.filter(format => format.basis === "packaged") })} />,
+    body: <CatalogView model={toCatalogViewProps(catalogBrands)} images={Object.fromEntries(toCatalogViewProps(catalogBrands).brands.flatMap(brand => brand.image ? [[brand.key, <ColaLabelImageView key={brand.key} label={`${brand.name} · COLA ${brand.image.ttbId}`} src="/mock/cola-label.svg" compact />]] : []))} controls={<ListControls search={{ label: "Search brands or aliases", value: "", keep: {} }} scopes={toCatalogScopes({ sort: "name", category: "", categories: ["Core", "Seasonal"] })} />} formats={toFormatsViewProps({ ...formatsInventory, formats: formatsInventory.formats.filter(format => format.basis === "packaged") })} />,
   },
   {
     step: 5,
@@ -2391,12 +2392,12 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Bulk process COLAs",
-    to: { "Open COLA on TTB": "Bulk process COLAs", "Choose Brand (front) or keg collar": "Bulk process COLAs", Skip: "Bulk process COLAs", "Save and next": "Bulk process COLAs" },
+    to: { "Open COLA on TTB": "Bulk process COLAs", "Selected: Brand (front) or keg collar": "Bulk process COLAs", Skip: "Bulk process COLAs", "Save and next": "Bulk process COLAs" },
     job: "Review the brewery’s approved labels and select a catalog image for each brand",
     reads: "search_colas · get_cola_details · get_cola_image",
     writes: "upsert_brand_approval",
-    states: [["selection", "choose from the brands currently shown in Catalog"], ["review", "choose a COLA and one label image; save or skip each brand"], ["no match", "show all labels under the permit or skip"], ["not approved", "TTB must report APPROVED before images can be selected", 1], ["complete", "saved choices stay; skipped brands are unchanged"]],
-    body: <ColaReviewView brands={colaReviewBrands} selected={colaReviewBrands.map(brand => brand.id)} queue={colaReviewBrands} index={0} saved={0} candidates={[colaReviewRecord]} ttbId={colaReviewRecord.ttbId} details={colaReviewDetails} imageUrl="" showAll={false} images={Object.fromEntries(colaReviewDetails.images.map(image => [image.url, <ColaLabelImageView key={image.url} label={image.label} src="/mock/cola-label.svg" />]))} />,
+    states: [["selection", "brands with no COLA on file start selected; select all or any shown brand"], ["review", "the only matching COLA and its only label image start chosen; save or skip each brand"], ["no match", "show all labels under the permit or skip"], ["not approved", "TTB must report APPROVED before images can be selected", 1], ["complete", "saved choices stay; skipped brands are unchanged"]],
+    body: <ColaReviewView brands={colaReviewBrands} selected={colaReviewBrands.map(brand => brand.id)} missing={missingColaIds(colaReviewBrands)} queue={colaReviewBrands} index={0} saved={0} candidates={[colaReviewRecord]} ttbId={colaReviewRecord.ttbId} details={colaReviewDetails} imageUrl={colaReviewDetails.images[0]!.url} showAll={false} images={Object.fromEntries(colaReviewDetails.images.map(image => [image.url, <ColaLabelImageView key={image.url} label={image.label} src="/mock/cola-label.svg" />]))} />,
   },
   {
     step: 7,
