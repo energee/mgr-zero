@@ -75,7 +75,7 @@ describe("Catalog view", () => {
       { ...brand, id: "none", name: "None", colas: [] },
       { ...brand, id: "one", name: "One", colas: [{ ttb_id: "00123456789012", approved_on: "2026-10-02" }] },
       { ...brand, id: "undated", name: "Undated", colas: [{ ttb_id: "26001001000123", approved_on: null }] },
-      { ...brand, id: "two", name: "Two", colas: [{ ttb_id: "1", approved_on: null }, { ttb_id: "2", approved_on: "2026-01-15" }] },
+      { ...brand, id: "two", name: "Two", colas: [{ ttb_id: "26001001000124", approved_on: null }, { ttb_id: "26001001000125", approved_on: "2026-01-15" }] },
     ] });
     expect(model.brands.map(({ cola }) => cola)).toEqual([
       "None on file",

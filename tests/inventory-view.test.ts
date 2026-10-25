@@ -156,13 +156,6 @@ describe("Finished goods view", () => {
     expect(form).toMatch(/skuOptions: skus\.map\(item => \(\{ value: item\.id, label: item\.label \}\)\)/);
   });
 
-  it("opens the deep-linked movement form once instead of reopening after Close", () => {
-    const form = readFileSync("app/(app)/inventory/movement-form.tsx", "utf8");
-    // Opened by initial state, never by an effect, so Close stays closed (#441).
-    // Closing it also clears ?recordMovement and its prefill from the URL (#1107, tests/movement-form.test.ts).
-    expect(form).toMatch(/defaultOpen: autoOpen/);
-    expect(form).not.toMatch(/setOpen\(true\)/);
-  });
 });
 
 describe("Record movement view", () => {

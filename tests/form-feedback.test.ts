@@ -36,8 +36,8 @@ import { contractYchCitra } from "@/lib/mgr/fixtures/purchasing";
 // The live forms render without a router or a command round trip.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {} }) }));
 vi.mock("@/lib/commands/use-command-form", () => ({
-  useCommandAction: () => ({ busy: false, error: null, run: () => {} }),
-  useCommandForm: () => ({ open: true, setOpen: () => {}, submit: () => {}, submitting: false, error: null }),
+  useCommandAction: () => ({ busy: false, error: null, fieldErrors: {}, run: () => {} }),
+  useCommandForm: () => ({ open: true, setOpen: () => {}, submit: () => {}, submitting: false, error: null, fieldErrors: {} }),
 }));
 
 const html = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -97,10 +97,14 @@ describe("per-form reasons", () => {
   it("each order or transfer line marks the field that is wrong: the SKU, the quantity, or both", () => {
     expect(orderLineError({ skuId: "s", qty: "2" }, 0, 3)).toEqual({});
     expect(orderLineError({ skuId: "", qty: "" }, 2, 3)).toEqual({});
-    expect(orderLineError({ skuId: "s", qty: "" }, 1, 3)).toEqual({ qty: "Line 2: enter a quantity greater than zero, or remove the line." });
-    expect(orderLineError({ skuId: "", qty: "2" }, 1, 3)).toEqual({ sku: "Line 2: select a SKU, or remove the line." });
-    expect(orderLineError({ skuId: "", qty: "-2" }, 0, 1)).toEqual({ sku: "Line 1: select a SKU.", qty: "Line 1: enter a quantity greater than zero." });
-    expect(orderLineErrors([{ skuId: "s", qty: "2" }, { skuId: "", qty: "-2" }])).toEqual(["Line 2: select a SKU, or remove the line.", "Line 2: enter a quantity greater than zero, or remove the line."]);
+    for (const qty of ["", "0", "-2", "not a number", "1e3", "99999999999"]) {
+      expect(orderLineError({ skuId: "s", qty }, 1, 3)).toEqual({ qty: expect.any(String) });
+    }
+    expect(orderLineError({ skuId: "", qty: "2" }, 1, 3)).toEqual({ sku: expect.any(String) });
+    expect(orderLineError({ skuId: "", qty: "-2" }, 0, 1)).toEqual({ sku: expect.any(String), qty: expect.any(String) });
+    expect(orderLineErrors([{ skuId: "s", qty: "2" }, { skuId: "", qty: "" }])).toEqual([]);
+    expect(orderLineErrors([{ skuId: "s", qty: "2" }, { skuId: "t", qty: "-2" }])).toHaveLength(1);
+    expect(orderLineErrors([{ skuId: "s", qty: "2" }, { skuId: "", qty: "-2" }])).toHaveLength(2);
   });
 
   it("New order names what Save draft still needs", () => {
@@ -114,10 +118,16 @@ describe("per-form reasons", () => {
   });
 
   it("Edit draft marks the SKU or the quantity of each line it cannot save", () => {
-    expect(draftLineErrors([{ skuId: "a", qty: "2" }], ["a"])).toEqual([{}]);
-    expect(draftLineErrors([{ skuId: "gone", qty: "0" }], ["a"])).toEqual([{ sku: "Line 1: choose an available SKU.", qty: "Line 1: enter a quantity of at least 0.01." }]);
-    expect(draftLineErrors([{ skuId: "a", qty: "2" }, { skuId: "a", qty: "3" }], ["a"])[1])
-      .toEqual({ sku: "Line 2: this SKU is already on another line. Combine its quantities or remove this line." });
+    for (const qty of ["0.01", "1.5", "9999999999.99"]) {
+      expect(draftLineErrors([{ skuId: "a", qty }], ["a"])).toEqual([{}]);
+    }
+    for (const qty of ["", "0", "0.001", "-2", "not a number", "1e3", "99999999999"]) {
+      expect(draftLineErrors([{ skuId: "a", qty }], ["a"])).toEqual([{ qty: expect.any(String) }]);
+    }
+    expect(draftLineErrors([{ skuId: "gone", qty: "2" }], ["a"])).toEqual([{ sku: expect.any(String) }]);
+    expect(draftLineErrors([{ skuId: "gone", qty: "0" }], ["a"])).toEqual([{ sku: expect.any(String), qty: expect.any(String) }]);
+    expect(draftLineErrors([{ skuId: "a", qty: "2" }, { skuId: "a", qty: "3" }], ["a"]))
+      .toEqual([{}, { sku: expect.any(String) }]);
   });
 
   it("a removed line takes its touched mark with it, and later lines move up", () => {
@@ -274,10 +284,18 @@ describe("line errors in the views", () => {
   it("a drawn order line marks both its SKU picker and its quantity, each linked to its own message", () => {
     const model = { ...toNewOrderViewProps(newOrderDraft), lines: [{ name: "", skuId: "", qty: "-2", warning: false }] };
     const markup = html(createElement(NewOrderView, { model }));
-    expect(markup).toMatch(/aria-label="Line 1 SKU"[^>]*aria-describedby="[^"]*-line-0-sku-error"[^>]*aria-invalid="true"/);
-    expect(markup).toMatch(/aria-label="Line 1 quantity"[^>]*aria-invalid="true"[^>]*aria-describedby="[^"]*-line-0-qty-error"/);
-    expect(markup).toMatch(/id="[^"]*-line-0-sku-error"[^>]*>Line 1: select a SKU\.</);
-    expect(markup).toMatch(/id="[^"]*-line-0-qty-error"[^>]*>Line 1: enter a quantity greater than zero\.</);
+    const skuControl = markup.match(/<[^>]*aria-label="Line 1 SKU"[^>]*>/)?.[0];
+    const quantityControl = markup.match(/<[^>]*aria-label="Line 1 quantity"[^>]*>/)?.[0];
+    const messageIds = [...markup.matchAll(/<[^>]*data-slot="field-error"[^>]*>/g)]
+      .map(([tag]) => tag.match(/\bid="([^"]+)"/)?.[1]);
+    const skuErrorId = messageIds.find(id => id?.endsWith("-line-0-sku-error"));
+    const quantityErrorId = messageIds.find(id => id?.endsWith("-line-0-qty-error"));
+    expect(skuControl).toContain('aria-invalid="true"');
+    expect(quantityControl).toContain('aria-invalid="true"');
+    expect(skuErrorId).toBeDefined();
+    expect(quantityErrorId).toBeDefined();
+    expect(skuControl?.match(/\baria-describedby="([^"]+)"/)?.[1].split(/\s+/)).toContain(skuErrorId);
+    expect(quantityControl?.match(/\baria-describedby="([^"]+)"/)?.[1].split(/\s+/)).toContain(quantityErrorId);
   });
 
   it("the Customer picker's empty note is tied to it", () => {
@@ -335,13 +353,12 @@ describe("line errors in the views", () => {
     expect(markup).toMatch(/<a [^>]*>Open Locations<\/a>/);
   });
 
-  it("Repack Break links Catalog for a user who can set a format's contents, and names the role otherwise; the note is tied to the picker", () => {
+  it("Repack explains missing packages and links Catalog only for a user who can set format contents", () => {
     const model = { ...repackCase, parents: [], locations: [], parentSkuId: "", locationId: "", binId: "" };
     const own = html(createElement(RepackView, { model: { ...model, formatsHref: "/catalog" } }));
     expect(own).toMatch(/<a [^>]*href="\/catalog"[^>]*>Open Catalog<\/a>/);
-    const emptyId = own.match(/<p[^>]*id="([^"]+-empty)"[^>]*>No SKU can be broken yet/)?.[1];
-    expect(emptyId).toBeTruthy();
-    expect(own).toMatch(new RegExp(`aria-describedby="${emptyId}"`));
+    expect(own).toContain("No SKU can be broken yet");
+    expect(own).not.toMatch(/<input\b|role="combobox"|Confirm repack/);
     const other = html(createElement(RepackView, { model: { ...model, formatsHref: null } }));
     expect(other).toContain("An admin or sales member sets a format&#x27;s contents in Catalog.");
     expect(other).not.toContain("Open Catalog");

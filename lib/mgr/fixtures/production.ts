@@ -69,6 +69,7 @@ export const scheduleBatchHazy: ScheduleBatchViewModel = {
   brandOptions: [{ id: "hazy", label: "Hazy IPA" }, { id: "pils", label: "Pils" }, { id: "stout", label: "Stout" }],
   plannedBbl: "15",
   date: "2026-09-04",
+  today: "2026-09-03",
   note: "Dry hop on day 4",
 };
 

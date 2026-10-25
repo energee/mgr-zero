@@ -56,6 +56,7 @@ import { CatalogView } from "@/components/mgr/views/catalog";
 import { ColaReviewView } from "@/components/mgr/views/cola-review";
 import { ColaLabelImageView } from "@/components/mgr/views/cola-label-image";
 import { colaReviewBrands, colaReviewRecord, colaReviewDetails } from "@/lib/mgr/fixtures/cola-review";
+import { missingColaIds } from "@/lib/mgr/cola-review";
 import { ListControls } from "@/components/mgr/list-controls";
 import { ChannelView } from "@/components/mgr/views/channel";
 import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
@@ -795,12 +796,12 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Beer",
     name: "Finished goods",
-    to: { "Add SKU in Catalog": "Catalog" },
+    to: { "Add SKU in Catalog": "Catalog", "Record taproom count": "Weekly count" },
     job: "See sellable beer by SKU and act on shortages",
     reads: "get_on_hand · get_atp · get_inventory_value",
     writes: "none [SKU creation happens on its own surface]",
-    states: [["uncosted", "units without receipt cost are counted but not valued"], ["permission", "value total shows only for Admin and Sales"], ["short", "a negative Available says Shortfall and links to the competing orders"], ["empty", "no finished goods yet: the header actions are the only ones"]],
-    spec: "The Beer landing's Finished goods row opens this list. On hand, allocated and available sit in aligned columns on the desk and as labeled values on the phone; the SKU name opens SKU detail, and Shortfall under a negative Available opens the shortfall. The header holds the page actions. Record movement is for Admin and Warehouse. Add SKU in Catalog is for Admin and Sales and opens Catalog, where SKUs are made. Inventory value uses frozen packaging-close cost and separately counts units without cost.",
+    states: [["uncosted", "units without receipt cost are counted but not valued"], ["permission", "value total shows only for Admin and Sales"], ["short", "a negative Available says Shortfall and links to the competing orders"], ["empty", "no finished goods yet: header actions and the taproom count pointer remain"]],
+    spec: "The Beer landing's Finished goods row opens this list. On hand, allocated and available sit in aligned columns on the desk and as labeled values on the phone; the SKU name opens SKU detail, and Shortfall under a negative Available opens the shortfall. The header holds the page actions. Record movement is for Admin and Warehouse. Record taproom count points to the existing Weekly count for taproom stock, not a general finished-goods count. Add SKU in Catalog is for Admin and Sales and opens Catalog, where SKUs are made. Inventory value uses frozen packaging-close cost and separately counts units without cost.",
     body: <FinishedGoodsView model={toFinishedGoodsViewProps(finishedGoodsList)} />,
   },
   {
@@ -935,8 +936,8 @@ export const SCREENS: Screen[] = [
     job: "Questions use named registered queries",
     reads: "get_atp · get_shortfalls",
     writes: "none",
-    states: [["loading", "answer skeleton"], ["error", "Could not refresh ATP · Retry", 1], ["offline", "cached value + timestamp"]],
-    spec: "Navigate / Ask MGR in the header opens a right-side overlay on desktop and full-screen chat on phones. Navigate, Back to page, or Escape closes it without discarding drafts, messages, or an active response. The page keeps its width and scroll position. Phone focus stays in chat; opening by touch does not open the keyboard.",
+    states: [["loading", "answer skeleton"], ["not configured", "message box disabled; contact administrator", 1], ["provider access denied", "check provider access and credits; no retry", 1], ["rate limited", "wait, then Try again", 1], ["provider unavailable", "temporary outage; Try again", 1], ["offline", "check connection; chat messages are not queued", 1], ["unknown failure", "safe guidance; no blind retry", 1]],
+    spec: "Navigate / Ask MGR in the header opens a right-side overlay on desktop and full-screen chat on phones. Navigate, Back to page, or Escape closes it without discarding drafts, messages, or an active response. The page keeps its width and scroll position. Phone focus stays in chat; opening by touch does not open the keyboard. HTTP and stream failures use the same safe error codes. Only transient failures offer Try again; provider-access denials do not. Ordinary forms and saved readings remain available when AI fails.",
     body: <><ComposerConversationView messages={[
       { id: "answer-user", role: "user", content: "How much Hazy is available to promise?" },
       { id: "answer-assistant", role: "assistant", content: "11 × ½ bbl plus 40 cases are currently available to promise. Observed Sep 10, 2026, 10:00 AM." },
@@ -1508,7 +1509,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_brand · create_sku · update_sku",
     states: DEFAULT_STATES,
     spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix.",
-    body: <CatalogView model={toCatalogViewProps(catalogBrands)} controls={<ListControls search={{ label: "Search brands or aliases", value: "", keep: {} }} scopes={toCatalogScopes({ sort: "name", category: "", categories: ["Core", "Seasonal"] })} />} formats={toFormatsViewProps({ ...formatsInventory, formats: formatsInventory.formats.filter(format => format.basis === "packaged") })} />,
+    body: <CatalogView model={toCatalogViewProps(catalogBrands)} images={Object.fromEntries(toCatalogViewProps(catalogBrands).brands.flatMap(brand => brand.image ? [[brand.key, <ColaLabelImageView key={brand.key} label={`${brand.name} · COLA ${brand.image.ttbId}`} src="/mock/cola-label.svg" compact />]] : []))} controls={<ListControls search={{ label: "Search brands or aliases", value: "", keep: {} }} scopes={toCatalogScopes({ sort: "name", category: "", categories: ["Core", "Seasonal"] })} />} formats={toFormatsViewProps({ ...formatsInventory, formats: formatsInventory.formats.filter(format => format.basis === "packaged") })} />,
   },
   {
     step: 5,
@@ -2382,7 +2383,7 @@ export const SCREENS: Screen[] = [
     reads: "get_compliance_registry · search_colas · get_cola_details · get_cola_image",
     writes: "upsert_brand_approval",
     states: [["approved", "orders may proceed"], ["from a brand", "the subject is stated, not picked"], ["saved ID", "entering a COLA already on this brand updates its approval instead of adding a duplicate"], ["COLA search", "Use copies the identifiers and loads approved label choices"], ["direct TTB ID", "load an approved COLA by ID without matching the brand name"], ["label images", "choose a label; fields and image save together"], ["no registry number", "Settings has no TTB registry number: add it before loading labels", 1], ["no match", "enter a known TTB ID directly"], ["TTB down", "show a retrieval error, never an empty answer", 1]],
-    spec: "A COLA has a required TTB ID and an optional applicant serial number. Both identifiers preserve leading zeros. A formula keeps its formula number. A COLA does not expire. Find COLA searches the brewery's permit by brand name; Use loads that approval's label images. Load COLA by TTB ID accepts a known 14-digit ID directly, regardless of the label's name. Only an approved, dated COLA under the brewery's permit supplies images. A saved ID updates its existing approval when added again. Changing the ID or approval kind clears draft image choices. Save approval stores the fields and selected image together.",
+    spec: "A COLA has a required 14-digit TTB ID and an optional applicant serial number. Both identifiers preserve leading zeros. Save approval and Open COLA require the 14-digit ID; the sheet states the format and counts digits near its limit. The registry link uses the TTB ID, never the serial, and does not itself verify approval. A formula keeps its formula number without the COLA-only format. A COLA does not expire. Find COLA searches the brewery's permit by brand name without requiring an entered ID; Use loads that approval's label images. Load COLA by TTB ID accepts a known 14-digit ID directly, regardless of the label's name. Only an approved, dated COLA under the brewery's permit supplies images. A saved ID updates its existing approval when added again. Changing the ID or approval kind clears draft image choices. Save approval stores the fields and selected image together.",
     body: <BrandApprovalView model={brandApprovalStout} />,
   },
   {
@@ -2391,12 +2392,12 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Bulk process COLAs",
-    to: { "Open COLA on TTB": "Bulk process COLAs", "Choose Brand (front) or keg collar": "Bulk process COLAs", Skip: "Bulk process COLAs", "Save and next": "Bulk process COLAs" },
+    to: { "Open COLA on TTB": "Bulk process COLAs", "Selected: Brand (front) or keg collar": "Bulk process COLAs", Skip: "Bulk process COLAs", "Save and next": "Bulk process COLAs" },
     job: "Review the brewery’s approved labels and select a catalog image for each brand",
     reads: "search_colas · get_cola_details · get_cola_image",
     writes: "upsert_brand_approval",
-    states: [["selection", "choose from the brands currently shown in Catalog"], ["review", "choose a COLA and one label image; save or skip each brand"], ["no match", "show all labels under the permit or skip"], ["not approved", "TTB must report APPROVED before images can be selected", 1], ["complete", "saved choices stay; skipped brands are unchanged"]],
-    body: <ColaReviewView brands={colaReviewBrands} selected={colaReviewBrands.map(brand => brand.id)} queue={colaReviewBrands} index={0} saved={0} candidates={[colaReviewRecord]} ttbId={colaReviewRecord.ttbId} details={colaReviewDetails} imageUrl="" showAll={false} images={Object.fromEntries(colaReviewDetails.images.map(image => [image.url, <ColaLabelImageView key={image.url} label={image.label} src="/mock/cola-label.svg" />]))} />,
+    states: [["selection", "brands with no COLA on file start selected; select all or any shown brand"], ["review", "the only matching COLA and its only label image start chosen; save or skip each brand"], ["no match", "show all labels under the permit or skip"], ["not approved", "TTB must report APPROVED before images can be selected", 1], ["complete", "saved choices stay; skipped brands are unchanged"]],
+    body: <ColaReviewView brands={colaReviewBrands} selected={colaReviewBrands.map(brand => brand.id)} missing={missingColaIds(colaReviewBrands)} queue={colaReviewBrands} index={0} saved={0} candidates={[colaReviewRecord]} ttbId={colaReviewRecord.ttbId} details={colaReviewDetails} imageUrl={colaReviewDetails.images[0]!.url} showAll={false} images={Object.fromEntries(colaReviewDetails.images.map(image => [image.url, <ColaLabelImageView key={image.url} label={image.label} src="/mock/cola-label.svg" />]))} />,
   },
   {
     step: 7,

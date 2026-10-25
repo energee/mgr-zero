@@ -12,6 +12,7 @@ import { canRun, defineQuery, unwrap, type Ctx } from "./registry";
 import { formatDate } from "@/lib/date-format";
 import { docNo, poNo, batNo } from "@/lib/mgr/doc-no";
 import { escapeRegex } from "@/lib/escape-regex";
+import { SEARCH_QUERY_MAX_LENGTH } from "@/lib/mgr/search-view";
 
 export const SEARCH_KINDS = ["sku", "order", "invoice", "lot", "customer", "po", "batch", "material_lot"] as const;
 export type SearchKind = (typeof SEARCH_KINDS)[number];
@@ -98,7 +99,7 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
 defineQuery({
   name: "search_entities",
   description: "Search SKUs, orders, invoices, lots, material lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows, kinds only narrow, and kinds whose page the caller's role cannot open are skipped",
-  input: z.object({ q: z.string().trim().min(1).max(80), kinds: z.array(z.enum(SEARCH_KINDS)).max(SEARCH_KINDS.length).optional() }),
+  input: z.object({ q: z.string().trim().min(1).max(SEARCH_QUERY_MAX_LENGTH), kinds: z.array(z.enum(SEARCH_KINDS)).max(SEARCH_KINDS.length).optional() }),
   roles: ["admin", "sales", "warehouse", "brewer"],
   aiExposed: true,
   handler: async (ctx, i): Promise<SearchHit[]> => {

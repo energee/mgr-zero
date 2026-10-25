@@ -12,6 +12,11 @@ export const ORDER_STATUSES = ["draft", "submitted", "confirmed", "picked", "shi
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 export type ActionTone = "primary" | "success" | "info" | "attention";
 
+/** Unknown or repeated URL statuses mean All states, never an invalid list_orders filter. */
+export function parseOrderStatus(value: string | string[] | undefined): OrderStatus | undefined {
+  return ORDER_STATUSES.find((status) => status === value);
+}
+
 /** verb, tone, and the path under the order that finishes it. */
 const ACTION: Record<OrderStatus, [string, ActionTone, string]> = {
   draft: ["Finish", "primary", ""], submitted: ["Confirm", "success", "/confirm"],

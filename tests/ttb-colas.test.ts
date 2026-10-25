@@ -239,6 +239,19 @@ describe("COLA detail retrieval", () => {
     expect(request.mock.calls.some(([url]) => url === nonmember)).toBe(false);
   });
 
+  it("runs at most four image sessions at once, because TTB drops a burst of them", async () => {
+    let open = 0, most = 0;
+    const request = async (url: string) => {
+      if (!url.includes("publicFormDisplay") && url !== imageUrl) { open++; most = Math.max(most, open); }
+      await new Promise(resolve => setTimeout(resolve, 5));
+      if (url !== imageUrl) return { status: 200, setCookie: [], body: url.includes("publicFormDisplay") ? printable : detail() };
+      open--;
+      return { status: 200, setCookie: [], body: "", image: { bytes: Buffer.from([0xff, 0xd8, 0xff, 0xd9]), contentType: "image/jpeg" } };
+    };
+    await Promise.all(Array.from({ length: 12 }, () => getColaImage(ttbId, imageUrl, "BR-PA-20553", request)));
+    expect(most).toBe(4);
+  });
+
   it("rejects HTML masquerading as an image", async () => {
     await expect(getColaImage(ttbId, imageUrl, "BR-PA-20553", async (url) => ({
       status: 200, setCookie: [], body: url === imageUrl ? "<html>TTB error</html>" : url.includes("publicFormDisplay") ? printable : detail(),

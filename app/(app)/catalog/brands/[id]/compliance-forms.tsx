@@ -3,8 +3,8 @@
 // upsert_brand_approval and upsert_state_registration. Add approval reuses a
 // saved record when its kind and TTB ID match. The brand is fixed: the sheet is
 // opened from one brand. Search results and direct TTB-ID entry both load
-// approved label choices. Fields and the selected image save together only
-// when Save approval is pressed.
+// approved label choices, keeping the saved or only label chosen. Fields and
+// the selected image save together only when Save approval is pressed.
 "use client";
 
 import { useState } from "react";
@@ -14,8 +14,10 @@ import { BrandApprovalView } from "@/components/mgr/views/brand-approval";
 import { StateRegistrationView } from "@/components/mgr/views/state-registration";
 import type { Approval, ColaSearch, Registration } from "@/lib/commands/compliance";
 import { useCommandAction, useCommandForm, useFields } from "@/lib/commands/use-command-form";
-import { APPROVAL_KINDS, approvalInput, colaChoice } from "@/lib/mgr/brand-approval-view";
+import { APPROVAL_KINDS, approvalInput, approvalNumberError, colaChoice } from "@/lib/mgr/brand-approval-view";
 import { registrationInput } from "@/lib/mgr/state-registration-view";
+import { E } from "@/components/mgr/e";
+import { defaultColaImage } from "@/lib/mgr/cola-review";
 import type { ColaDetails } from "@/lib/ttb/colas";
 import { ColaImage } from "../../cola-image";
 type Brand = { id: string; name: string };
@@ -46,9 +48,8 @@ export function ApprovalForm({ brand, approval, approvals = [] }: { brand: Brand
       await search.run("get_cola_details", { ttbId: id }, data => {
         const found = data as ColaDetails;
         const saved = approval?.ttb_id === id ? approval : approvals.find(row => row.kind === "cola" && row.ttb_id === id);
-        const imageUrl = found.images.find(image => image.url === saved?.image_url)?.url ?? "";
         setDetails(found);
-        patch({ approvedOn: found.approvedOn ?? "", imageUrl });
+        patch({ approvedOn: found.approvedOn ?? "", imageUrl: defaultColaImage(found, saved?.image_url) });
       }, { refresh: false, durable: false });
     } finally {
       setLoadingCola(false);
@@ -83,15 +84,19 @@ export function ApprovalForm({ brand, approval, approvals = [] }: { brand: Brand
     loadCola: () => { void loadCola(v.ttbId); },
     chooseImage: set("imageUrl"),
   };
+  const reason = approvalNumberError(v.kind, v.ttbId) ?? (details?.images.length && !v.imageUrl ? "Choose a label image." : undefined);
   return (
     <CommandForm open={form.open} onOpenChange={open => { if (!busy) form.setOpen(open); }} title="Brand approval" trigger={sheetTrigger(!!approval, "Add approval", approval && `${approval.kind.toUpperCase()} ${approval.ttb_id}`)}>
-      <form onSubmit={form.submit} className="flex flex-col gap-4">
+      <form onSubmit={event => {
+        if (busy || reason) { event.preventDefault(); event.stopPropagation(); return; }
+        void form.submit(event);
+      }} className="flex flex-col gap-4">
         <BrandApprovalView
           model={model}
           controls={controls}
           images={Object.fromEntries(imageOptions.map(image => [image.url, <ColaImage key={`${v.ttbId}:${image.url}`} ttbId={v.ttbId.trim()} url={image.url} label={image.label} />]))}
           messages={<><CommandFormMessage error={search.error} /><CommandFormMessage error={form.error} /></>}
-          footer={<CommandFormFooter><Button type="submit" disabled={busy || !v.ttbId.trim() || Boolean(details?.images.length && !v.imageUrl)}>{form.submitting ? "Saving…" : "Save approval"}</Button></CommandFormFooter>}
+          footer={<CommandFormFooter>{E.submit("Save approval", { submitting: busy, reason })}</CommandFormFooter>}
         />
       </form>
     </CommandForm>

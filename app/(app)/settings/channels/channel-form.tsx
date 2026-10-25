@@ -4,11 +4,11 @@
 // treatment, the title names the saved channel, and the input carries `id`).
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { ChannelView } from "@/components/mgr/views/channel";
-import { useCommandForm } from "@/lib/commands/use-command-form";
+import { useCommandAction } from "@/lib/commands/use-command-form";
 import { toChannelViewProps } from "@/lib/mgr/channel-view";
 
 export type SaleChannelEditData = { id: string; name: string; taxTreatment: string };
@@ -17,16 +17,30 @@ export function ChannelForm({ channel }: { channel?: SaleChannelEditData }) {
   const isEdit = !!channel;
   const [name, setName] = useState(channel?.name ?? "");
   const [taxTreatment, setTaxTreatment] = useState<string>(channel?.taxTreatment ?? "taxable");
-  const form = useCommandForm("upsert_sale_channel", {
-    build: () => ({ ...(isEdit ? { id: channel.id } : {}), name, taxTreatment }),
-    reset: () => { setName(channel?.name ?? ""); setTaxTreatment(channel?.taxTreatment ?? "taxable"); },
-    target: channel?.id,
-  });
+  const [open, setOpenState] = useState(false);
+  const action = useCommandAction();
+  const nameError = action.error && action.failure?.code === "duplicate_channel_name" ? action.error : null;
+
+  function setOpen(next: boolean) {
+    setOpenState(next);
+    setName(channel?.name ?? "");
+    setTaxTreatment(channel?.taxTreatment ?? "taxable");
+    action.setError(null);
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (action.busy || !name.trim()) return;
+    await action.run("upsert_sale_channel", {
+      ...(isEdit ? { id: channel.id } : {}), name: name.trim(), taxTreatment,
+    }, () => setOpen(false), { target: channel?.id });
+  }
 
   return (
     <CommandForm
-      open={form.open}
-      onOpenChange={form.setOpen}
+      open={open}
+      onOpenChange={setOpen}
       title={isEdit ? `Edit channel · ${channel.name}` : "Add channel"}
       trigger={
         <Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"} aria-label={isEdit ? `Edit ${channel.name}` : undefined}>
@@ -34,19 +48,17 @@ export function ChannelForm({ channel }: { channel?: SaleChannelEditData }) {
         </Button>
       }
     >
-      <form onSubmit={form.submit} className="flex flex-col gap-4">
+      <form onSubmit={submit} className="flex flex-col gap-4">
         <ChannelView
           model={toChannelViewProps({ id: channel?.id ?? "", name, tax_treatment: taxTreatment })}
+          nameError={nameError}
+          submitting={action.busy}
           controls={{
-            name: setName,
+            name: value => { setName(value); action.setError(null); },
             taxTreatment: setTaxTreatment,
           }}
-          messages={<CommandFormMessage error={form.error} />}
-          footer={<CommandFormFooter>
-            <Button type="submit" disabled={form.submitting}>
-              {form.submitting ? "Saving…" : "Save channel"}
-            </Button>
-          </CommandFormFooter>}
+          messages={<CommandFormMessage error={nameError ? null : action.error} />}
+          footer={save => <CommandFormFooter>{save}</CommandFormFooter>}
         />
       </form>
     </CommandForm>

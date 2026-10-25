@@ -805,7 +805,7 @@ describe("registered staff mutation role × RPC matrix", () => {
       command: "upsert_brand_approval", rpc: "upsert_brand_approval", allowed: ["admin", "sales"],
       input: async role => {
         const { data: brand } = await admin.from("skus").select("brand_id").eq("id", skuId).single();
-        const ttbId = unique("cola", role);
+        const ttbId = `2600100100012${["admin", "sales", "warehouse", "brewer", "taproom"].indexOf(role)}`;
         return {
           command: { brandId: brand!.brand_id, kind: "cola", ttbId },
           rpc: { p_brewery: brewery.id, p_id: null, p_brand: brand!.brand_id, p_kind: "cola", p_ttb_id: ttbId, p_approved_on: null, p_expires_on: null, p_note: null },

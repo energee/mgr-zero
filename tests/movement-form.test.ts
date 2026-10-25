@@ -9,7 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const router = { replace: vi.fn(), refresh: vi.fn(), push: vi.fn() };
-vi.mock("next/navigation", () => ({ useRouter: () => router }));
+vi.mock("next/navigation", () => ({ useRouter: () => router, usePathname: () => location.pathname, useSearchParams: () => new URLSearchParams(location.search) }));
 vi.mock("@/lib/brewery-provider", () => ({ useBrewery: () => "brewery-a", useCommandContext: () => ({ actorId: "actor-a", breweryId: "brewery-a" }) }));
 vi.mock("@/lib/commands/client", async (original) => ({ ...(await original<typeof import("@/lib/commands/client")>()), command: vi.fn(async () => receipt) }));
 type FormProps = { open: boolean; onOpenChange: (open: boolean) => void; children: ReactElement<{ onSubmit: (e: unknown) => void }> };
@@ -32,13 +32,13 @@ const lists = {
 const filled = { skuId: "s1", locationId: "l1", binId: "b1", qty: 2 };
 const render = (props: Partial<Parameters<typeof MovementForm>[0]> = {}) => {
   forms = [];
-  return renderToStaticMarkup(createElement(MovementForm, { ...lists, autoOpen: true, ...props }));
+  return renderToStaticMarkup(createElement(MovementForm, { ...lists, ...props }));
 };
 // The form reads window.location; useCommandForm reads the bare global.
 const setUrl = (search: string) => {
-  const location = { pathname: "/inventory", search };
+  const location = { pathname: "/inventory", search, hash: "" };
   vi.stubGlobal("location", location);
-  vi.stubGlobal("window", Object.assign(new EventTarget(), { location }));
+  vi.stubGlobal("window", Object.assign(new EventTarget(), { location, history: { replaceState: vi.fn(), pushState: vi.fn() } }));
 };
 const submitDisabled = (html: string) => / disabled=""/.test(html.match(/<button[^>]*type="submit"[^>]*>/)?.[0] ?? "");
 
@@ -59,12 +59,11 @@ it("starts with no movement type picked and keeps Record movement disabled until
   expect(html).not.toContain("Preview:");
 });
 
-it("names every missing field beside the withheld button, and previews once nothing is (#1113)", () => {
-  const empty = render({ autoOpen: true });
-  expect(empty).toMatch(/<p id="([^"]+-reason)"[^>]*>Still needed: movement type, SKU, location, bin, and a quantity above zero \(up to two decimals\)\.<\/p><button[^>]*type="submit"[^>]*aria-describedby="\1"/);
+it("previews a complete movement beside the enabled button (#1113)", () => {
   const ready = render({ initial: { ...filled, type: "production_in" } });
   expect(ready).not.toContain("Still needed");
   expect(ready).toContain("Preview: +2 SKU units");
+  expect(submitDisabled(ready)).toBe(false);
 });
 
 it("explains the disabled Bin and names untracked stock without migration jargon (#1252)", () => {
@@ -99,25 +98,25 @@ it("preselects the type a deep link passes (the Ask MGR handoff)", () => {
 it("closing a deep-linked form replaces the URL with the bare inventory page, keeping ?page", () => {
   render();
   forms[0].onOpenChange(false);
-  expect(router.replace).toHaveBeenCalledWith("/inventory?page=3", { scroll: false });
+  expect(window.history.replaceState).toHaveBeenCalledWith(null, "", "/inventory?page=3");
   setUrl("?recordMovement=1");
-  router.replace.mockClear();
   render();
   forms[0].onOpenChange(false);
-  expect(router.replace).toHaveBeenCalledWith("/inventory", { scroll: false });
+  expect(window.history.replaceState).toHaveBeenCalledWith(null, "", "/inventory");
 });
 
-it("closing a form the trigger opened leaves the URL alone", () => {
-  render({ autoOpen: false });
+it("closing an already-closed form leaves the URL alone", () => {
+  setUrl("");
+  render();
   forms[0].onOpenChange(false);
-  expect(router.replace).not.toHaveBeenCalled();
+  expect(window.history.replaceState).not.toHaveBeenCalled();
 });
 
 it("a successful record does not replace the URL; closing its receipt dialog does", async () => {
   render({ initial: { ...filled, type: "production_in" } });
   await forms[0].children.props.onSubmit({ preventDefault() {}, stopPropagation() {} });
   await vi.waitFor(() => expect(router.refresh).toHaveBeenCalled());
-  expect(router.replace).not.toHaveBeenCalled();
+  expect(window.history.replaceState).not.toHaveBeenCalled();
   forms[1].onOpenChange(false);
-  expect(router.replace).toHaveBeenCalledWith("/inventory?page=3", { scroll: false });
+  expect(window.history.replaceState).toHaveBeenCalledWith(null, "", "/inventory?page=3");
 });

@@ -15,6 +15,7 @@ export function VendorView({
   validationAttempted = false,
   messages,
   footer,
+  errors = {},
   busy,
   error,
   onSetActive,
@@ -30,28 +31,29 @@ export function VendorView({
   messages?: ReactNode;
   validationAttempted?: boolean;
   footer?: ReactNode;
+  errors?: Partial<Record<"name" | "email" | "phone" | "leadDays", string>>;
   busy?: boolean;
   error?: string | null;
   onSetActive?: (active: boolean) => Promise<boolean>;
 }) {
-  const controlled = (key: keyof typeof controls) => Boolean(controls[key]);
   const id = useId();
+  const controlled = (key: keyof typeof controls) => Boolean(controls[key]);
   const touched = useTouchedLines(validationAttempted);
-  const errors = vendorFieldErrors(model);
+  const localErrors = vendorFieldErrors(model);
   return (
     <>
-      {E.edit("Vendor name", model.name, "text", undefined, { onChange: controlled("name") ? (nextValue: string) => controls.name?.(nextValue) : undefined, required: controlled("name") })}
-      {E.edit("Email", model.email, "email", undefined, { id: `${id}-email`, onChange: controls.email, onBlur: () => touched.touch(0), error: (!controls.email || touched.shown(0)) ? errors.email : undefined })}
-      {E.edit("Phone", model.phone, "tel", undefined, { onChange: controlled("phone") ? (nextValue: string) => controls.phone?.(nextValue) : undefined })}
+      {E.edit("Vendor name", model.name, "text", undefined, { id: `${id}-name`, error: errors.name, onChange: controlled("name") ? (nextValue: string) => controls.name?.(nextValue) : undefined, required: controlled("name") })}
+      {E.edit("Email", model.email, "email", undefined, { id: `${id}-email`, onChange: controls.email, onBlur: () => touched.touch(0), error: errors.email ?? ((!controls.email || touched.shown(0)) ? localErrors.email : undefined) })}
+      {E.edit("Phone", model.phone, "tel", undefined, { id: `${id}-phone`, error: errors.phone, placeholder: "(503) 555-0142", onChange: controlled("phone") ? (nextValue: string) => controls.phone?.(nextValue) : undefined })}
       {E.inline(
         <Fragment key={"terms"}>{E.pick("Terms", model.terms, (model.termsOptions.map(option => (
                 { value: option, label: option }
               ))), { onChange: controlled("terms") ? value => controls.terms?.(value) : undefined })}</Fragment>,
-        <Fragment key={"lead"}>{E.edit("Lead time (days)", model.leadDays, "number", undefined, { id: `${id}-lead`, onChange: controls.leadDays, onBlur: () => touched.touch(1), error: (!controls.leadDays || touched.shown(1)) ? errors.leadDays : undefined, min: 0, step: 1, inputMode: "numeric" })}</Fragment>,
+        <Fragment key={"lead"}>{E.edit("Lead time (days)", model.leadDays, "number", undefined, { id: `${id}-lead`, onChange: controls.leadDays, onBlur: () => touched.touch(1), error: errors.leadDays ?? ((!controls.leadDays || touched.shown(1)) ? localErrors.leadDays : undefined), min: 0, step: 1, inputMode: "numeric" })}</Fragment>,
       )}
       {E.info("When Planning lists a material short and it resolves to this vendor, its buy-by date is the needed-by date less this lead time. Received orders show a separate observed average.")}
       {messages}
-      {footer !== undefined ? footer : E.btn("Save vendor", !model.name.trim() || errors.email || errors.leadDays ? "p disabled" : "p")}
+      {footer !== undefined ? footer : E.btn("Save vendor", !model.name.trim() || localErrors.email || localErrors.leadDays ? "p disabled" : "p")}
       {model.active !== null && <>
         {E.ttl("Vendor status")}
         {E.fld("Status", model.active ? "Active" : "Inactive")}
@@ -63,7 +65,7 @@ export function VendorView({
           busy={busy}
           busyLabel="Saving…"
           error={error}
-          reason={!model.name.trim() ? "Enter a vendor name." : errors.email ?? errors.leadDays}
+          reason={!model.name.trim() ? "Enter a vendor name." : localErrors.email ?? localErrors.leadDays}
           onDelete={onSetActive ? () => onSetActive(!model.active) : undefined}
         />
       </>}

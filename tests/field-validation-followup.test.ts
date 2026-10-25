@@ -25,13 +25,21 @@ describe("Oct 23 field corrections", () => {
   it("keeps an order quantity correction inside its quantity field, not under the SKU", () => {
     const model = { ...toNewOrderViewProps(newOrderDraft), lines: [{ name: "SKU", skuId: "s", qty: "-3", warning: false }] };
     const markup = renderToStaticMarkup(createElement(NewOrderView, { model }));
-    expect(fieldContaining(markup, "Line 1 quantity")).toContain("Line 1: enter a quantity greater than zero.");
+    const field = fieldContaining(markup, "Line 1 quantity");
+    expect(field).toContain('aria-invalid="true"');
+    const errorId = field?.match(/aria-describedby="([^"]+)"/)?.[1].split(" ").find(id => id.endsWith("-error"));
+    expect(errorId).toBeDefined();
+    expect(field).toContain(`id="${errorId}"`);
   });
 
   it("keeps transfer corrections below the actual quantity", () => {
     const model = { from: "", fromOptions: [], fromBin: "", fromBinOptions: [], to: "", toOptions: [], toBin: "", toBinOptions: [], skuOptions: [], lines: [{ sku: "s", title: "SKU", qty: "-2" }] };
     const markup = renderToStaticMarkup(createElement(NewTransferView, { model }));
-    expect(fieldContaining(markup, "Line 1 qty")).toContain("Line 1: enter a quantity greater than zero.");
+    const field = fieldContaining(markup, "Line 1 qty");
+    expect(field).toContain('aria-invalid="true"');
+    const errorId = field?.match(/aria-describedby="([^"]+)"/)?.[1].split(" ").find(id => id.endsWith("-error"));
+    expect(errorId).toBeDefined();
+    expect(field).toContain(`id="${errorId}"`);
   });
 
   it("marks invalid planned barrels inline while retaining valid fractions", () => {

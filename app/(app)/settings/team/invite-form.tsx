@@ -9,7 +9,7 @@ import { useCommandAction } from "@/lib/commands/use-command-form";
 
 /** Team and first-run share staff invitations; customer detail fixes buyer membership. */
 export function InviteForm({ customerId }: { customerId?: string }) {
-  const action = useCommandAction();
+  const action = useCommandAction(undefined, ["email"]);
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("warehouse");
@@ -30,7 +30,7 @@ export function InviteForm({ customerId }: { customerId?: string }) {
   return <>
     <div role="status">{E.polite(sent)}</div>
     <CommandForm open={open} onOpenChange={next => { if (!action.busy) { setOpen(next); if (next) setSent(null); if (!next) action.setError(null); } }} title={title} trigger={<Button variant="outline">{title}</Button>}>
-      <InviteView buyer={Boolean(customerId)} email={email} role={role} onEmailChange={setEmail} onRoleChange={setRole} onSubmit={submit} busy={action.busy} error={action.error} />
+      <InviteView buyer={Boolean(customerId)} email={email} role={role} onEmailChange={setEmail} onRoleChange={setRole} onSubmit={submit} busy={action.busy} error={action.error} emailError={action.fieldErrors.email} />
     </CommandForm>
   </>;
 }

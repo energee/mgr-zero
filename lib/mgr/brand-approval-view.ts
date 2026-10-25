@@ -29,6 +29,12 @@ export type BrandApprovalViewModel = {
 
 export const APPROVAL_KINDS = [{ value: "cola", label: "COLA" }, { value: "formula", label: "Formula" }];
 
+/** TTB assigns exactly 14 digits to a COLA; a formula number is a different identifier. */
+export function approvalNumberError(kind: string, value: string): string | undefined {
+  if (kind === "cola") return /^\d{14}$/.test(value) ? undefined : "Enter the 14-digit TTB ID, including any leading zeros.";
+  return value.trim() ? undefined : "Enter a formula number.";
+}
+
 /** A COLA is keyed by the TTB ID that TTB assigns; a formula by its formula number. */
 export function approvalNumberLabel(kind: string): string {
   return kind === "formula" ? "Formula number" : "TTB ID";
@@ -39,7 +45,7 @@ export function approvalNumberLabel(kind: string): string {
  *  of approval, and the applicant serial is never used. */
 export function colaUrl(ttbId: string): string | null {
   const id = ttbId.trim();
-  return id ? `https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&ttbid=${encodeURIComponent(id)}` : null;
+  return !approvalNumberError("cola", id) ? `https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&ttbid=${id}` : null;
 }
 
 /** Keeps an explicit edit's identity; Add reuses the brand's matching approval.

@@ -2,11 +2,10 @@
 // one verb is Schedule batch. It draws no title: the sheet it opens in
 // (CommandForm live, ScreenSheet in the inventory) already names it (#1120).
 "use client";
-import { useId, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { E, type PickEmpty } from "@/components/mgr/e";
-import { NONE } from "@/components/ui/select";
-import { plannedBarrelsError, type ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
+import { pastPlanWarning, plannedBarrelsError, type ScheduleBatchViewModel } from "@/lib/mgr/schedule-batch-view";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import { FieldDescription } from "@/components/ui/field";
 
@@ -27,6 +26,9 @@ export function ScheduleBatchView({ model, controls = {}, messages, footer }: {
 }) {
   const id = useId();
   const touched = useTouchedLines(!controls.plannedBbl);
+  const [internalDate, setInternalDate] = useState(model.date);
+  const date = controls.date ? model.date : internalDate;
+  const warning = pastPlanWarning(date, model.today);
   return (
     <>
       <OptionalPick label="Recipe · optional" value={model.recipeId} options={model.recipeOptions} onChange={controls.recipeId} empty={{ text: "No recipe versions available. Add a recipe and save a version, or leave this undecided.", label: "Recipes", href: model.recipesHref, to: "Recipes" }} />
@@ -42,9 +44,8 @@ export function ScheduleBatchView({ model, controls = {}, messages, footer }: {
         })}
         <FieldDescription id={`${id}-precision`}>Fractional barrels are allowed; stored to three decimal places.</FieldDescription>
       </div>
-      {controls.date
-        ? <DatePicker label="Date" value={model.date} onChange={controls.date} />
-        : <DatePicker label="Date" defaultValue={model.date} />}
+      <DatePicker label="Date" value={date} onChange={controls.date ?? setInternalDate} />
+      {warning && E.note(warning)}
       {E.edit("Note · optional", model.note, "text", undefined, { onChange: controls.note })}
       {E.sp()}
       {messages}

@@ -6,6 +6,7 @@ import { COUNTRY_CODES, STAFF_ROLES, US_STATE_CODES } from "@/lib/mgr/enums";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { breweryDate } from "@/lib/date-format";
 import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
+import type { InputIssue } from "./field-errors";
 
 export type StaffRole = (typeof STAFF_ROLES)[number];
 export { STAFF_ROLES } from "@/lib/mgr/enums";
@@ -35,6 +36,7 @@ export type CommandExecution = {
 export type PublicError = {
   code: string;
   message: string;
+  issues?: InputIssue[];
 };
 
 export type CommandSuccess<T> = {
@@ -70,7 +72,7 @@ export type CommandContextExpectation = {
 };
 
 export class CommandError extends Error {
-  constructor(message: string, readonly status = 400, readonly code = "bad_request") {
+  constructor(message: string, readonly status = 400, readonly code = "bad_request", readonly issues?: InputIssue[]) {
     super(message);
     this.name = "CommandError";
   }
@@ -188,6 +190,7 @@ function rpcError(error: { message: string; code?: string }): CommandError {
     // Scoped reads raise MG404 for both absent and other-tenant identities.
     case "MG404": return new CommandError(error.message, 404, "not_found");
     case "MG409": return new CommandError(error.message, 409, "conflict");
+    case "MGC01": return new CommandError(error.message, 409, "duplicate_channel_name");
     // A reviewed plan (packaging close) changed underneath the form: nothing
     // was written, so the client may drop its retained request.
     case "MG412": return new CommandError(error.message, 409, "stale_plan");
@@ -400,10 +403,10 @@ export async function runCommand(name: string, rawInput: unknown, ctx: Operation
   const allowed = canRun(ctx, name);
   if (!allowed) throw new CommandError(`permission denied: ${name} requires ${JSON.stringify(def.roles)}`, 403, "permission_denied");
   const parsed = def.input.safeParse(rawInput);
-  // prettifyError gives one readable line per issue ("✖ Invalid UUID → at
-  // customerId") for forms, the portal cart and HTTP API callers alike, instead
-  // of the serialized issue array zod puts in error.message.
-  if (!parsed.success) throw new CommandError(`validation failed: ${z.prettifyError(parsed.error)}`, 400, "invalid_input");
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map(issue => ({ path: issue.path.map(part => typeof part === "number" ? part : String(part)), code: issue.code, message: issue.message }));
+    throw new CommandError(issues.map(issue => issue.message).join("; "), 400, "invalid_input", issues);
+  }
   const commandExecution = def.kind === "command" ? execution ?? createExecution() : undefined;
   if (commandExecution?.origin === "chat" && (!def.aiExposed || !def.preview || !def.requiresConfirmation
     || !commandExecution.previewToken || !commandExecution.conversationId)) {

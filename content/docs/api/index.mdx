@@ -657,7 +657,7 @@ one value that ties what your client saw to what the server recorded.
 | 400 | `bad_request` | A domain rule refused the write, such as shipping an order that was never picked, or a number was out of range for its field. | Read the message: it is the rule, written for a person. Change the state or the input. |
 | 400 | `duplicate_command` | Two operations tried to register the same name. A server fault, not a caller one. | Report it; no request will succeed until it is fixed. |
 | 400 | `invalid_command_metadata` | A registered operation declared an unsafe or contradictory execution policy. A server fault, not a caller one. | Report it; the operation registration must be corrected before the server can start. |
-| 400 | `invalid_input` | The `input` failed the operation's schema. The message names each offending field. | Fix the fields the message names. The operation's field table lists types and which are required. |
+| 400 | `invalid_input` | The `input` failed the operation's schema. Structured `error.issues` name the offending fields. | Fix the fields at each issue's `path`. The operation's field table lists types and which are required. |
 | 400 | `invalid_request` | The body was not JSON, required envelope fields were missing, or the brewery did not match the operation scope. | Send `name` and `input`; include `breweryId` for tenant operations and omit it for `provision_brewery`. |
 | 400 | `invalid_request_id` | A command arrived without a `requestId`, or with one that is not an RFC 9562/4122 UUID. | Generate a UUID per write and send it; queries may omit it. |
 | 400 | `preview_required` | A chat-origin command arrived without a confirmed preview bound to its conversation. | Call `preview_command`, show its effects for confirmation, then send its `previewToken` with the same input and `conversationId`. |
@@ -668,8 +668,13 @@ one value that ties what your client saw to what the server recorded.
 | 404 | `unknown_command` | No operation is registered under that `name`. | Check the spelling. An operation marked designed is not registered yet and answers this. |
 | 409 | `conflict` | A `requestId` was reused with a different payload, a confirmed preview changed before its first commit, the write would duplicate a record that must be unique (such as a second location with the same name), or a long list read saw rows added or removed between its pages (message: "… changed while loading. Reload and try again."). | Reuse a requestId only to retry the identical write. Preview current data again after a stale refusal; generate a new requestId for the newly confirmed proposal. For a duplicate, change the name or value, or edit the existing record. For a list that changed while loading, repeat the read. |
 | 409 | `context_changed` | The authenticated account, brewery, or customer no longer matches the optional rendered-context expectation. | Return to the original signed-in context to retry the unchanged action; otherwise review the current state before starting a new request. |
+| 409 | `duplicate_channel_name` | A sale channel in this brewery already has that name after trimming whitespace and ignoring case. No channel was created or changed. | Choose a different channel name, or edit the existing channel. Send the corrected input with a new requestId. |
 | 409 | `stale_plan` | The packaging material plan changed after `get_packaging_close_plan`; `close_packaging_run` wrote nothing. | Call `get_packaging_close_plan` again, review the actuals, and close with the new `planRevision` and a new requestId. |
 | 413 | `request_too_large` | The JSON request body exceeded the 8 MiB transport limit. | Send a smaller batch. CSV imports still allow up to 5,000 rows, but unusually large string cells may require splitting the file. |
+| 422 | `invite_email_disabled` | Auth has email invitations disabled. | Ask the deployment owner to enable email invitations in Auth settings. |
+| 422 | `invite_email_invalid` | Auth refused the invitation address, including unsupported example or test domains. | Use a real, deliverable address. An earlier uncertain attempt must still be recovered before changing its saved input. |
+| 422 | `invite_email_not_authorized` | Auth's default email service does not allow sending to this address. | Ask the deployment owner to configure custom SMTP. Do not repeatedly retry the unchanged configuration. |
+| 429 | `invite_rate_limited` | Auth's email or request rate limit refused the invitation attempt. | Wait before retrying. Ask the deployment owner to check Auth email limits if it persists; preserve an earlier uncertain attempt's requestId. |
 | 429 | `rate_limited` | This authenticated account exceeded 120 command or chat requests in the current 60-second window. | Wait for the number of seconds in the `Retry-After` response header, then retry. An unchanged write keeps its original `requestId`. |
 | 500 | `db_error` | The database refused the write for a reason not mapped to a public code. Logged server-side. | Retry once with the same `requestId`. If it persists, quote the `correlationId` from the response. |
 | 500 | `internal_error` | A handler threw something the endpoint could not map to a public code. A server fault, and the only code whose message carries no detail. | Retry once with the same `requestId`; a write may or may not have landed, so read the record back before retrying with a new one. Report it with the `correlationId`. |
@@ -681,15 +686,26 @@ one value that ties what your client saw to what the server recorded.
 
 ### Validation failures name their fields [#validation]
 
-`invalid_input` messages are generated from the operation's schema, one line per
-problem:
+`invalid_input` preserves the public schema reasons in `error.message`, joined
+with semicolons, alongside structured `error.issues`. Each issue has a `path`
+(field names and array indexes), a schema `code`, and a `message`. Use the path
+to associate a correction with the matching field:
 
-```
-validation failed: ✖ Invalid UUID → at customerId
+```json
+{
+  "code": "invalid_input",
+  "message": "Invalid UUID",
+  "issues": [
+    { "path": ["customerId"], "code": "invalid_format", "message": "Invalid UUID" }
+  ]
+}
 ```
 
-So a 400 is usually actionable without reading anything else. Each operation's
-field table lists the same types the validator enforces.
+Do not parse the message as a field identifier. Forms show plain corrections
+under supported fields and retain the public reasons for issues that do not
+match a visible field. Direct API and chat callers can also use these reasons
+without losing actionable domain validation. Each operation's field table
+lists the enforced types.
 
 ## Conventions [#conventions]
 

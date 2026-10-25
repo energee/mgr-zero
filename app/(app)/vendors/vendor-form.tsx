@@ -27,6 +27,7 @@ export function VendorForm({ vendor }: { vendor?: Vendor }) {
     leadTimeDays: lead === "" ? undefined : Number(lead),
   });
   const form = useCommandForm("upsert_vendor", {
+    validationFields: ["name", "email", "phone", "leadTimeDays"],
     build,
     reset: () => { setName(vendor?.name ?? ""); setEmail(vendor?.email ?? ""); setPhone(vendor?.phone ?? ""); setTerms(vendor?.payment_terms ?? "net30"); setLead(vendor?.lead_time_days?.toString() ?? ""); setValidationAttempted(false); },
   });
@@ -34,12 +35,14 @@ export function VendorForm({ vendor }: { vendor?: Vendor }) {
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title={vendor ? "Edit vendor" : "New vendor"} trigger={trigger}>
       <form noValidate onSubmit={event => {
+        event.preventDefault();
+        event.stopPropagation();
         setValidationAttempted(true);
-        if (form.busy || !ready) { event.preventDefault(); event.stopPropagation(); return; }
-        void form.submit(event);
+        if (!form.busy && ready && event.currentTarget.checkValidity()) void form.submit(event);
       }} className="flex flex-col gap-4">
         <VendorView
           model={{ name, email, phone, terms: paymentTermLabel(terms), termsOptions: PAYMENT_TERMS.map(term => PAYMENT_TERM_LABEL[term]), leadDays: lead, active: vendor?.active ?? null }}
+          errors={{ ...form.fieldErrors, leadDays: form.fieldErrors.leadTimeDays }}
           controls={{ name: setName, email: setEmail, phone: setPhone, terms: (label) => setTerms(PAYMENT_TERMS.find(term => PAYMENT_TERM_LABEL[term] === label) ?? "net30"), leadDays: setLead }}
           validationAttempted={validationAttempted}
           messages={<CommandFormMessage error={form.error} />}
