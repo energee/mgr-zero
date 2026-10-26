@@ -4,6 +4,7 @@ import { useId, type ReactNode } from "react";
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import type { BinViewModel } from "@/lib/mgr/bin-view";
+import { submitReason } from "@/lib/mgr/submit-reason";
 import { ConfirmDeleteControl } from "./confirm-delete";
 
 export type { BinViewModel };
@@ -42,7 +43,7 @@ export function BinView({
       {E.edit("Bin name", model.name, "text", undefined, { id: `${id}-name`, onChange: controls.name, required: Boolean(controls.name), error: model.nameError })}
       {E.info(<>Don’t add a bin for each tap. Taps are managed on the <Link href={model.tapBoardHref ?? "#"}>Tap board</Link>.</>)}
       {messages}
-      {!model.name.trim() && <p className="text-sm text-muted-foreground">Still needed: Enter a bin name.</p>}
+      {!model.name.trim() && <p className="text-sm text-muted-foreground">{submitReason(["a bin name"])}</p>}
       {footer !== undefined ? footer : E.btn("Save bin", !model.name.trim() || model.nameError ? "p disabled" : "p")}
       {removal ? <section aria-label="Remove bin" className="mt-2 flex flex-col gap-4 border-t pt-5 @min-[48rem]:flex-row @min-[48rem]:items-center @min-[48rem]:justify-between">
         <div>

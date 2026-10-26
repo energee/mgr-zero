@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { OrderQuantity } from "./new-order";
 import { CLOSURE_FORM_ID, receiveMode, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
+import { submitReason } from "@/lib/mgr/submit-reason";
 
 export type { ReceivePoViewModel };
 export type ReceivePoControls = {
@@ -61,7 +62,7 @@ export function ReceivePoView({ model, controls = {}, messages, submitting = fal
       {E.ttl(model.closure === "cancel" ? "Cancel purchase order" : "Close remaining quantity")}
       {E.edit("Closure reason", model.closureReason ?? "", "text", undefined, { onChange: controls.closureReason, form: CLOSURE_FORM_ID })}
       {E.info("Only the unreceived remainder is released. Posted receipts and stock stay in history.")}
-      {E.pin(<Button type="submit" form={CLOSURE_FORM_ID} variant="destructive" disabled={submitting || !model.closureReason?.trim()}>{model.closure === "cancel" ? "Cancel purchase order" : "Close short"}</Button>)}
+      {E.pin(E.submit(model.closure === "cancel" ? "Cancel purchase order" : "Close short", { form: CLOSURE_FORM_ID, variant: "destructive", disabled: submitting, reason: submitReason(model.closureReason?.trim() ? [] : ["a closure reason"]) }))}
     </fieldset>}
     {messages}
     {E.sp()}

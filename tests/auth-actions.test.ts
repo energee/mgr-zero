@@ -1,15 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as Registry from "@/lib/commands/registry";
 
 const auth = vi.hoisted(() => ({ signInWithOtp: vi.fn(), signInWithPassword: vi.fn(), resetPasswordForEmail: vi.fn(), updateUser: vi.fn(), getUser: vi.fn(), getClaims: vi.fn(), signOut: vi.fn() }));
 const redirect = vi.hoisted(() => vi.fn((path: string): never => { throw new Error(`redirect:${path}`); }));
 const verifyCurrentPassword = vi.hoisted(() => vi.fn());
 const memberships = vi.hoisted(() => ({ staff: [{}] as unknown[], customer: [] as unknown[] }));
 const cookieStore = vi.hoisted(() => ({ set: vi.fn() }));
+const pendingInvitations = vi.hoisted(() => vi.fn(async () => [] as unknown[]));
+vi.mock("@/lib/commands/registry", async (original) => ({
+  ...await original<typeof Registry>(),
+  runCommand: pendingInvitations,
+}));
 
 vi.mock("@/lib/supabase/server", () => ({ createServerClient: async () => ({ auth }), verifyCurrentPassword }));
 vi.mock("@/lib/auth/request-context", async (original) => ({
   ...await original<typeof import("@/lib/auth/request-context")>(),
-  createRequestAuthContext: () => ({ getIdentity: async () => ({ userId: "owner" }), getStaffMemberships: async () => memberships.staff, getCustomerMemberships: async () => memberships.customer }),
+  createRequestAuthContext: () => ({ getIdentity: async () => ({ userId: "owner" }), getSupabaseClient: async () => ({ auth }), getStaffMemberships: async () => memberships.staff, getCustomerMemberships: async () => memberships.customer }),
 }));
 vi.mock("next/headers", () => ({
   cookies: async () => cookieStore,
@@ -39,9 +45,27 @@ describe("passwordless sign-in", () => {
       email: "maria@example.com",
       options: {
         shouldCreateUser: false,
-        emailRedirectTo: "https://mgr.example/auth/confirm?next=/",
+        emailRedirectTo: "https://mgr.example/auth/confirm?next=%2F",
       },
     });
+  });
+
+  it("keeps the deep link in the email callback and sent page", async () => {
+    const form = new FormData();
+    form.set("email", "maria@example.com");
+    form.set("next", "/settings/team?tab=invites");
+    await expect(emailLogin(form)).rejects.toThrow("redirect:/login?sent=1&next=%2Fsettings%2Fteam%3Ftab%3Dinvites");
+    expect(auth.signInWithOtp).toHaveBeenCalledWith({
+      email: "maria@example.com",
+      options: { shouldCreateUser: false, emailRedirectTo: "https://mgr.example/auth/confirm?next=%2Fsettings%2Fteam%3Ftab%3Dinvites" },
+    });
+  });
+
+  it("keeps the deep link when an email address is invalid", async () => {
+    const form = new FormData();
+    form.set("email", "invalid");
+    form.set("next", "/settings/team");
+    await expect(emailLogin(form)).rejects.toThrow("redirect:/login?error=email&next=%2Fsettings%2Fteam");
   });
 });
 
@@ -177,6 +201,45 @@ describe("password sign-in failure (#1398)", () => {
     await expect(login({}, form)).resolves.toEqual({ email: "qa+buyer@example.com", error: "Incorrect email or password." });
     expect(redirect).not.toHaveBeenCalled();
     expect(auth.signInWithPassword).toHaveBeenCalledWith({ email: "qa+buyer@example.com", password: "never-put-password-in-url" });
+  });
+});
+
+describe("staff sign-in return target (#1399)", () => {
+  beforeEach(() => {
+    auth.signInWithPassword.mockResolvedValue({ error: null });
+    pendingInvitations.mockResolvedValue([]);
+    memberships.staff = [{}];
+    memberships.customer = [];
+  });
+
+  it.each([
+    ["/settings/team?tab=invites", "/settings/team?tab=invites"],
+    ["//evil.example", "/"],
+    ["https://evil.example", "/"],
+    ["/\\evil.example", "/"],
+    ["/password", "/"],
+    ["", "/"],
+  ])("routes next=%s to %s", async (next, destination) => {
+    const form = new FormData();
+    form.set("email", "maria@example.com");
+    form.set("password", "password");
+    form.set("next", next);
+    await expect(login({}, form)).rejects.toThrow(`redirect:${destination}`);
+  });
+
+  it("keeps pending invitations ahead of a return target", async () => {
+    pendingInvitations.mockResolvedValue([{}]);
+    const form = new FormData();
+    form.set("next", "/settings/team");
+    await expect(login({}, form)).rejects.toThrow("redirect:/invitations");
+  });
+
+  it("falls back to the account home for unsafe next", async () => {
+    memberships.staff = [];
+    memberships.customer = [{}];
+    const form = new FormData();
+    form.set("next", "//evil.example");
+    await expect(login({}, form)).rejects.toThrow("redirect:/portal");
   });
 });
 

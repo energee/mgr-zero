@@ -9,6 +9,6 @@
 import { EntrySurface } from "@/components/mgr/entry-surface";
 import { RouteError } from "@/components/mgr/route-error";
 
-export default function RootError({ retry }: { retry: () => void }) {
-  return <EntrySurface><RouteError retry={retry} /></EntrySurface>;
+export default function RootError({ error, retry }: { error: unknown; retry: () => void }) {
+  return <EntrySurface><RouteError error={error} retry={retry} /></EntrySurface>;
 }

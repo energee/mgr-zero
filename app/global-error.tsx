@@ -9,7 +9,7 @@ import { ThemeBoot } from "@/components/mgr/theme-boot";
 import RootError from "./error";
 import "./globals.css";
 
-export default function GlobalError({ retry }: { retry: () => void }) {
+export default function GlobalError({ error, retry }: { error: unknown; retry: () => void }) {
   return (
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <head>
@@ -17,7 +17,7 @@ export default function GlobalError({ retry }: { retry: () => void }) {
         <title>MGR</title>
       </head>
       <body className="min-h-full flex flex-col">
-        <RootError retry={retry} />
+        <RootError error={error} retry={retry} />
       </body>
     </html>
   );

@@ -124,18 +124,30 @@ export function processReadout(v: ProcessColumns, profileName: (id: string | nul
   return rows.filter((r): r is [string, string] => r[1] !== null);
 }
 
-// Sheet field shapes (strings, as typed) and their readiness checks. Pure, so a
+// Sheet field shapes (strings, as typed) and why each Save is withheld (null when
+// ready; ingredientReason's pattern), named beside the button. Pure, so a
 // server component (the inventory frame) can call them: a "use client" module
 // cannot export a function the server invokes.
 export type MashStepFields = { name: string; kind: string; tempF: string; minutes: string };
 export const toMashStepFields = (s?: MashStep): MashStepFields => ({ name: s?.name ?? "", kind: s?.kind ?? "infusion", tempF: s ? String(s.tempF) : "", minutes: s ? String(s.minutes) : "" });
-export const mashStepReady = (f: MashStepFields) => f.name.trim() !== "" && isNumber(f.tempF) && isPositive(f.minutes);
+export const mashStepReason = (f: MashStepFields) => submitReason([
+  ...(f.name.trim() ? [] : ["a step name"]),
+  ...(isNumber(f.tempF) ? [] : ["a temperature"]),
+  ...(isPositive(f.minutes) ? [] : ["a duration above zero"]),
+]);
 export type FermentationStageFields = { name: string; kind: string; tempF: string; days: string };
 export const toStageFields = (s?: FermentationStage): FermentationStageFields => ({ name: s?.name ?? "", kind: s?.kind ?? "primary", tempF: s ? String(s.tempF) : "", days: s ? String(s.days) : "" });
-export const stageReady = (f: FermentationStageFields) => f.name.trim() !== "" && isNumber(f.tempF) && isPositive(f.days);
+export const stageReason = (f: FermentationStageFields) => submitReason([
+  ...(f.name.trim() ? [] : ["a stage name"]),
+  ...(isNumber(f.tempF) ? [] : ["a temperature"]),
+  ...(isPositive(f.days) ? [] : ["a duration above zero"]),
+]);
 export type WaterAdditionFields = { materialId: string; qty: string; unit: string; stage: string };
 export const toAdditionFields = (a?: WaterAddition): WaterAdditionFields => ({ materialId: a?.materialId ?? "", qty: a ? String(a.qty) : "", unit: a?.unit ?? "g", stage: a?.stage ?? "mash" });
-export const additionReady = (f: WaterAdditionFields) => f.materialId !== "" && isPositive(f.qty);
+export const additionReason = (f: WaterAdditionFields) => submitReason([
+  ...(f.materialId ? [] : ["a material"]),
+  ...(isPositive(f.qty) ? [] : ["an amount above zero"]),
+]);
 
 /** A profile option the Water screen can compute from. */
 export type WaterProfileIons = { id: string; name: string; ions: Ions };

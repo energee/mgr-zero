@@ -28,7 +28,7 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
   const feeError = oneWayKegFeeError(values.oneWayKegFee);
   const reason = feeError ?? brewerySettingsReason(values, initial);
   const field = (key: keyof BrewerySettingsValues, label: string, type = "text", required = false) => (
-    E.edit(label, values[key], type, undefined, { onChange: (nextValue: string) => change(key, nextValue), id: `${id}-${key}`, required, error: fieldErrors[key], placeholder: key === "phone" ? "(503) 555-0142" : undefined })
+    E.edit(label, values[key], type, undefined, { onChange: (nextValue: string) => change(key, nextValue), id: `${id}-${key}`, required, error: fieldErrors[key] })
   );
   return <form noValidate onSubmit={(event) => { event.preventDefault(); if (!busy && !reason && event.currentTarget.checkValidity()) onSave?.(values); }}>
     <FieldSet className="min-w-0" disabled={busy}>
@@ -38,7 +38,10 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
         <TimezonePicker id={`${id}-timezone`} label="Timezone" value={values.timezone} onChange={(timezone) => change("timezone", timezone)} />
         {field("ttb", "TTB registry number")}
         {field("pa", "PA license")}
-        {field("phone", "Customer-facing phone", "tel")}
+        <div className="flex min-w-0 flex-col gap-2">
+          {E.edit("Customer-facing phone", values.phone, "tel", undefined, { onChange: (nextValue: string) => change("phone", nextValue), id: `${id}-phone`, placeholder: "(503) 555-0142", error: fieldErrors.phone, "aria-describedby": `${id}-phone-help` })}
+          <FieldDescription id={`${id}-phone-help`}>Printed on the portal when online payment is unavailable. Leave empty for none.</FieldDescription>
+        </div>
         <div className="flex min-w-0 flex-col gap-2">
           {E.edit("One-way keg fee ($)", values.oneWayKegFee, "number", undefined, { onChange: (nextValue: string) => change("oneWayKegFee", nextValue), id: `${id}-oneWayKegFee`, min: 0, max: 21474836.47, step: 0.01, error: feeError, "aria-describedby": `${id}-oneWayKegFee-help` })}
           <FieldDescription id={`${id}-oneWayKegFee-help`}>Charged for each one-way keg shipped. Blank or 0 means no fee.</FieldDescription>

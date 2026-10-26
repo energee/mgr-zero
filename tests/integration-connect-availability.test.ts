@@ -6,8 +6,10 @@ import { AccountingView, QboConnectionView } from "@/components/mgr/views/accoun
 import { PointOfSaleView, ConnectSquareView } from "@/components/mgr/views/pos";
 import { toAccountingViewProps } from "@/lib/mgr/accounting-view";
 import { toPosMenuSetup } from "@/lib/mgr/pos-view";
+import { BreweryProvider } from "@/lib/brewery-provider";
 
 const state = vi.hoisted(() => ({ configured: false, connectionId: undefined as string | undefined }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/lib/commands/all", () => ({}));
 vi.mock("@/lib/brewery", () => {
   const brewery = { id: "brewery", roles: ["admin"], timeZone: "UTC" };
@@ -22,11 +24,14 @@ vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: async (name: string) => {
   };
   if (name === "get_qbo_sync_status") return { latest: null, lastSuccess: null, latestFailure: null, retryRequestId: null };
   if (name === "list_invoices") return { rows: [], nextCursor: null };
+  if (["list_pos_locations", "list_sale_channels", "list_pos_variations"].includes(name)) return [];
+  if (name === "get_square_connected") return { connected: false };
   throw new Error(name);
 } }));
 import InvoicesPage from "@/app/(app)/invoices/page";
 import PosPage from "@/app/(app)/settings/pos/page";
 import SquareConnectorPage from "@/app/(app)/settings/pos/connector/page";
+import MenuPage from "@/app/(app)/menu/page";
 
 beforeEach(() => { state.configured = false; state.connectionId = undefined; });
 
@@ -51,6 +56,19 @@ it("gates Square navigation before the connect page", async () => {
   expect(renderToStaticMarkup(await PosPage({ searchParams: Promise.resolve({}) }))).toContain('href="/settings/pos/connect"');
 });
 
+it("passes deployment availability through Menu before offering Square setup (#1397)", async () => {
+  // The staff layout supplies the command context around this page.
+  const renderMenu = async () => renderToStaticMarkup(createElement(BreweryProvider, { id: "brewery", actorId: "staff" },
+    await MenuPage({ searchParams: Promise.resolve({}) })));
+  const html = await renderMenu();
+  expect(html).toContain("Square isn’t turned on in MGR yet.");
+  expect(html).not.toContain('href="/settings/pos"');
+  expect(html).not.toContain("Set up Square");
+  state.configured = true;
+  expect(await renderMenu())
+    .toContain('href="/settings/pos"');
+});
+
 it("uses the same unavailable reasons at both entry and final Connect controls", () => {
   const qbo = renderToStaticMarkup(createElement(QboConnectionView, { configured: false }));
   const square = renderToStaticMarkup(createElement(ConnectSquareView, { configured: false }));
@@ -72,7 +90,7 @@ it("warns about stale QuickBooks payments only with an actual previous connectio
 });
 
 it("does not describe a never-connected Square seller as a reconnect", () => {
-  expect(toPosMenuSetup({ admin: false, connected: false, observed: 0 }).description).toBe("Ask an admin to connect Square.");
+  expect(toPosMenuSetup({ admin: false, connected: false, configured: true, observed: 0 }).description).toBe("Ask an admin to connect Square.");
   expect(renderToStaticMarkup(createElement(ConnectSquareView))).not.toContain("Reconnect Square");
   expect(renderToStaticMarkup(createElement(ConnectSquareView, { reconnect: true }))).toContain("Reconnect Square");
 });
