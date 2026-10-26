@@ -214,8 +214,8 @@ describe("country and alias", () => {
     expect(usMarkup).toContain(">Country<");
     expect(usMarkup).toContain(">United States<");
     expect(usMarkup).toContain(">State (required)<");
-    const usState = usMarkup.match(/<input[^>]*aria-label="State \(required\)"[^>]*>/)?.[0];
-    expect(usState).toContain('required=""');
+    const usState = usMarkup.match(/<button[^>]*aria-label="State \(required\)"[^>]*>/)?.[0];
+    expect(usState).toContain('aria-required="true"');
     expect(usState).not.toContain('disabled=""');
     // The alias says what it is in a note that stays while typing, not a placeholder (#1131).
     expect(usMarkup).not.toContain('placeholder="Staff only"');

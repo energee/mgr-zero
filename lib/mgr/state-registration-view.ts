@@ -1,5 +1,12 @@
 // lib/mgr/state-registration-view.ts — view-model for State registration
 // sheet. Opened from one brand, so the brand is stated, not picked.
+import { US_STATE_CODES } from "@/lib/mgr/enums";
+import { submitReason } from "@/lib/mgr/submit-reason";
+
+export function registrationSubmitReason(fields: Pick<StateRegistrationViewModel, "state">): string | null {
+  return submitReason(US_STATE_CODES.some(state => state === fields.state) ? [] : ["a state"]);
+}
+
 export type StateRegistrationViewModel = {
   brand: string;
   state: string;

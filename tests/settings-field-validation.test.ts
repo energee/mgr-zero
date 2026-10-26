@@ -51,9 +51,9 @@ describe("Oct 23 settings field validation (#1121)", () => {
   });
 
   it("accepts optional vendor email and whole nonnegative lead days, but rejects the reported values", () => {
-    expect(vendorFieldErrors({ email: "", leadDays: "" })).toEqual({});
-    expect(vendorFieldErrors({ email: "buyer@example.com", leadDays: "0" })).toEqual({});
-    for (const leadDays of ["-3", "2.5", "Infinity", "NaN"]) expect(vendorFieldErrors({ email: "", leadDays }).leadDays).toBeTruthy();
+    expect(vendorFieldErrors({ email: "", phone: "", leadDays: "" })).toEqual({});
+    expect(vendorFieldErrors({ email: "buyer@example.com", phone: "", leadDays: "0" })).toEqual({});
+    for (const leadDays of ["-3", "2.5", "Infinity", "NaN"]) expect(vendorFieldErrors({ email: "", phone: "", leadDays }).leadDays).toBeTruthy();
     const html = renderToStaticMarkup(createElement(VendorView, { model: { name: "Supplier", email: "notanemail", phone: "", terms: "Net 30", termsOptions: ["Net 30"], leadDays: "2.5", active: null } }));
     expectAssociatedError(html, "Email", "Enter a valid email address, such as name@example.com.");
     expectAssociatedError(html, "Lead time (days)", "Enter a whole number of days, zero or more.");

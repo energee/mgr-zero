@@ -1,27 +1,34 @@
 // components/mgr/views/state-registration.tsx — shared State registration body.
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { RegistryDate, RegistryInput } from "@/components/mgr/views/registry-fields";
-import type { StateRegistrationViewModel } from "@/lib/mgr/state-registration-view";
+import { registrationSubmitReason, type StateRegistrationViewModel } from "@/lib/mgr/state-registration-view";
+import { UsStateField } from "@/components/mgr/us-state-field";
+import { Button } from "@/components/ui/button";
 
 export type { StateRegistrationViewModel };
 
 type Controls = Partial<Record<"state" | "registrationNo" | "expiresOn", (value: string) => void>>;
 
-export function StateRegistrationView({ model, controls = {}, locked = false, messages, footer }: {
+export function StateRegistrationView({ model, controls = {}, locked = false, messages, footer, submitting = false, onCancel, stateError }: {
   model: StateRegistrationViewModel; controls?: Controls; locked?: boolean; messages?: ReactNode; footer?: ReactNode;
+  submitting?: boolean; onCancel?: () => void; stateError?: string;
 }) {
+  const id = useId();
   return (
     <>
       {E.fld("Brand", model.brand)}
       {E.cols(
-        <RegistryInput label="State (two letters)" value={model.state} onChange={controls.state} disabled={locked} required />,
+        <UsStateField value={model.state} controls={{ id: `${id}-state`, onChange: controls.state, disabled: locked, required: true, error: stateError }} />,
         <RegistryInput label="Registration number · optional" value={model.registrationNo ?? ""} onChange={controls.registrationNo} />,
       )}
       <RegistryDate label="Expires · optional" value={model.expiresOn ?? ""} onChange={controls.expiresOn} />
-      {E.note("One record per brand and state: saving again replaces it.")}
+      {E.info("One record per brand and state: saving again replaces it.")}
       {messages}
-      {footer !== undefined ? footer : E.btn("Save registration")}
+      {footer !== undefined ? footer : E.pin(<>
+        <Button type="button" variant="outline" disabled={submitting} onClick={onCancel}>Cancel</Button>
+        {E.submit("Save registration", { submitting, reason: registrationSubmitReason(model) })}
+      </>)}
     </>
   );
 }

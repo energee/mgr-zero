@@ -20,8 +20,8 @@ export function VendorForm({ vendor }: { vendor?: Vendor }) {
   const [terms, setTerms] = useState(vendor?.payment_terms ?? "net30");
   const [lead, setLead] = useState(vendor?.lead_time_days?.toString() ?? "");
   const [validationAttempted, setValidationAttempted] = useState(false);
-  const fieldErrors = vendorFieldErrors({ email, leadDays: lead });
-  const ready = Boolean(name.trim()) && !fieldErrors.email && !fieldErrors.leadDays;
+  const fieldErrors = vendorFieldErrors({ email, phone, leadDays: lead });
+  const ready = Boolean(name.trim()) && !fieldErrors.email && !fieldErrors.phone && !fieldErrors.leadDays;
   const build = () => ({
     id: vendor?.id, name, email: email || undefined, phone: phone || undefined, paymentTerms: terms,
     leadTimeDays: lead === "" ? undefined : Number(lead),

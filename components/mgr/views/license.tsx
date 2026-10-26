@@ -3,15 +3,13 @@ import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { ConfirmDeleteControl } from "./confirm-delete";
 import { Button } from "@/components/ui/button";
-import { US_STATE_CODES } from "@/lib/mgr/enums";
+import { UsStateField } from "@/components/mgr/us-state-field";
 import { licenseSubmitReason, type LicenseViewModel } from "@/lib/mgr/license-view";
 import { RegistryDate, RegistryInput, RegistrySelect } from "@/components/mgr/views/registry-fields";
 
 export type { LicenseViewModel };
 
 type Controls = Partial<Record<"state" | "kind" | "licenseNo" | "expiresOn", (value: string) => void>>;
-
-const stateOptions = US_STATE_CODES.map((state) => ({ value: state, label: state }));
 
 export function LicenseView({ model, controls = {}, locked = false, messages, footer, submitting = false, onCancel, remove }: {
   model: LicenseViewModel; controls?: Controls; locked?: boolean; messages?: ReactNode; footer?: ReactNode;
@@ -27,7 +25,7 @@ export function LicenseView({ model, controls = {}, locked = false, messages, fo
   return (
     <>
       {E.cols(
-        <RegistrySelect label="State" value={model.state} onChange={controls.state} disabled={locked} options={stateOptions} placeholder="Choose a state" />,
+        <UsStateField value={model.state} controls={{ onChange: controls.state, disabled: locked }} />,
         <RegistrySelect label="Kind" value={model.kind} onChange={controls.kind} disabled={locked} options={[
           { value: "brewery", label: "Brewery" },
           { value: "supplier", label: "Supplier" },

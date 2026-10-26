@@ -14,7 +14,7 @@ it.each(["1e1", "1E1", "1e+1", "1e-1"])("rejects exponent entry %s at each field
   expect(repackQuantityError(value)).toBeTruthy();
   expect(brandAbvError(value)).toBeTruthy();
   expect(priceGroupFieldErrors({ position: value, costCeilingInput: value })).toEqual({ position: expect.any(String), costCeiling: expect.any(String) });
-  expect(vendorFieldErrors({ email: "", leadDays: value }).leadDays).toBeTruthy();
+  expect(vendorFieldErrors({ email: "", phone: "", leadDays: value }).leadDays).toBeTruthy();
   expect(waterPhError(value)).toBeTruthy();
 });
 
@@ -27,6 +27,6 @@ it("retains ordinary decimal and whole-number entries", () => {
     expect(priceGroupFieldErrors({ position: "1", costCeilingInput: value })).toEqual({});
     expect(waterPhError(value)).toBeUndefined();
   }
-  expect(vendorFieldErrors({ email: "", leadDays: "10" })).toEqual({});
+  expect(vendorFieldErrors({ email: "", phone: "", leadDays: "10" })).toEqual({});
   expect(priceGroupFieldErrors({ position: "10", costCeilingInput: "0" })).toEqual({});
 });
