@@ -4,6 +4,7 @@
 import { SIZE_LABEL } from "./keg-labels";
 import type { EmptyState } from "./empty-state";
 import type { KEG_EVENT_REASONS, KEG_POOL_KINDS, KEG_SIZES } from "./enums";
+import { isNumber, numberNotationError } from "./quantity-input";
 import { submitReason } from "./submit-reason";
 
 export type KegFleetBinRow = { key: string; title: string; detail: string; qty: string };
@@ -64,19 +65,51 @@ export const mayHaveKegCustomer = (r: KegEventReason) => needsKegCustomer(r) || 
 export const withLocationBin = (prev: KegEventValue, next: KegEventValue, firstBin: (locationId: string) => string): KegEventValue =>
   next.locationId !== prev.locationId ? { ...next, binId: firstBin(next.locationId) } : next;
 
-/** Why Record keg event is withheld, or null when it can submit: a pool, a location and bin, a positive count, and a
- *  customer when the reason needs one. */
-export const kegEventReason = (v: KegEventValue) => submitReason([
-  ...(v.poolId ? [] : ["a keg pool"]),
-  ...(v.locationId ? [] : ["a location"]),
-  ...(v.binId ? [] : ["a bin"]),
-  ...(Number(v.qty) > 0 ? [] : ["a keg count above zero"]),
-  ...(needsKegCustomer(v.reason) && !v.customerId ? ["a customer"] : []),
-]);
+/** Field errors also own readiness, so invalid typed values never enable submit. */
+export function kegEventFieldErrors(v: KegEventValue): Partial<Record<keyof KegEventValue, string>> {
+  const errors: Partial<Record<keyof KegEventValue, string>> = {};
+  if (!v.poolId) errors.poolId = "Choose a keg pool.";
+  if (!v.locationId) errors.locationId = "Choose a location.";
+  if (!v.binId) errors.binId = "Choose a bin.";
+  if (needsKegCustomer(v.reason) && !v.customerId) errors.customerId = "Choose a customer.";
+  const notation = numberNotationError(v.qty);
+  if (notation) errors.qty = notation;
+  else if (!/^\d+$/.test(v.qty) || !Number.isSafeInteger(Number(v.qty)) || Number(v.qty) <= 0) {
+    errors.qty = "Enter a whole number of kegs, at least 1.";
+  }
+  return errors;
+}
 
-/** Whether Add/Save keg pool can submit: a name, a vendor unless owned, and a per-fill cost for pay per fill. */
-export const kegPoolReady = (v: KegPoolValue) =>
-  Boolean(v.name.trim() && (v.kind === "owned" || v.vendorId) && (v.kind !== "pay_per_fill" || v.perFill !== ""));
+/** The same field errors also name what Record keg event still needs. */
+export function kegEventReason(v: KegEventValue): string | null {
+  const errors = kegEventFieldErrors(v);
+  return submitReason([
+    errors.poolId && "a keg pool", errors.locationId && "a location", errors.binId && "a bin",
+    errors.qty && "a whole keg count of at least 1 (no exponent notation)", errors.customerId && "a customer",
+  ].filter((need): need is string => Boolean(need)));
+}
+
+/** Optional money stays optional, but a filled value must be dollars and cents. */
+function kegMoneyError(value: string): string | undefined {
+  if (value === "") return undefined;
+  const notation = numberNotationError(value);
+  if (notation) return notation;
+  if (!isNumber(value) || Number(value) < 0) return "Enter an amount of zero or more.";
+  if ((value.trim().split(".")[1]?.length ?? 0) > 2) return "Enter dollars and cents, with at most two decimal places.";
+}
+
+/** Add and Edit use the same money rules, including optional blank deposits. */
+export function kegPoolFieldErrors(v: KegPoolValue): Partial<Record<keyof KegPoolValue, string>> {
+  const errors: Partial<Record<keyof KegPoolValue, string>> = {};
+  if (!v.name.trim()) errors.name = "Enter a pool name.";
+  if (v.kind !== "owned" && !v.vendorId) errors.vendorId = "Choose a vendor.";
+  const perFill = kegMoneyError(v.perFill);
+  const deposit = kegMoneyError(v.deposit);
+  if (perFill) errors.perFill = perFill;
+  else if (v.kind === "pay_per_fill" && v.perFill === "") errors.perFill = "Enter the per-fill cost.";
+  if (deposit) errors.deposit = deposit;
+  return errors;
+}
 
 /** Why Record keg event is not offered, or null when it is: an event needs a pool in service and a location. */
 export function kegEventUnavailable({ activePools, locations }: { activePools: number; locations: number }): string | null {
