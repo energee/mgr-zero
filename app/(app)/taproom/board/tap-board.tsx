@@ -6,6 +6,7 @@ import { command, CommandResponseError } from "@/lib/commands/client";
 import { useCommandContext } from "@/lib/brewery-provider";
 import {
   beginTapBoardAttempt,
+  beginTapBoardRefresh,
   completeTapBoardAttempt,
   createTapBoardRefreshGuard,
   editTapBoardSheet,
@@ -86,6 +87,7 @@ export function TapBoard({ breweryId, locationId, initial, skus, timeZone, navig
     const result = await submitAndRefreshTapBoard(
       () => command(breweryId, tapBoardCommand(submitted), attempt.payload, attempt.requestId, expectedContext.current),
       loadLatest,
+      () => setState(current => beginTapBoardRefresh(current)),
     );
     if (result.kind === "write_failed") {
       const error = result.error;

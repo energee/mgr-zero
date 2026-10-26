@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   beginTapBoardAttempt,
+  beginTapBoardRefresh,
   completeTapBoardAttempt,
   createTapBoardRefreshGuard,
   editTapBoardSheet,
@@ -136,13 +137,46 @@ describe("tap board controlled state", () => {
     expect(conflict.sheet?.attempt).toEqual({ kind: "error", message: "already closed" });
   });
 
+  it("closes the saved sheet and marks the board busy before the refresh returns", async () => {
+    let state = beginTapBoardAttempt(openTapBoardSheet(snapshot, "tap", null, id, id), nextId);
+    const refresh = Promise.withResolvers<TapBoardSnapshot>();
+    const refreshed: TapBoardSnapshot = { open: [{
+      id, location_id: id, sku_id: null, label: "Dry cider", nominal_bbl: .25,
+      tap_number: "7", opening_fill: 1, not_in_inventory: true,
+      opened_at: "2026-09-08T12:00:00Z", opened_by: id, opened_by_label: "dana",
+      brand_id: null, brand_name: null, sku_name: null,
+    }], history: [] };
+    const saving = submitAndRefreshTapBoard(
+      async () => ({ id }),
+      () => refresh.promise,
+      () => { state = beginTapBoardRefresh(state); },
+    );
+    await vi.waitFor(() => expect(state).toMatchObject({ sheet: null, refreshing: true }));
+    expect(state.snapshot).toBe(snapshot);
+    refresh.resolve(refreshed);
+    const result = await saving;
+    if (result.kind !== "saved") throw result.error;
+    state = completeTapBoardAttempt(state, result.snapshot);
+    expect(state).toMatchObject({ snapshot: refreshed, sheet: null, refreshing: false });
+  });
+
+  it("does not announce a saved action or refresh after the write fails", async () => {
+    const onSaved = vi.fn();
+    const refresh = vi.fn();
+    const error = new Error("write refused");
+    expect(await submitAndRefreshTapBoard(async () => { throw error; }, refresh, onSaved))
+      .toEqual({ kind: "write_failed", error });
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
   it("retires a successful write even when the following refresh is definitively rejected", async () => {
     let state = openTapBoardSheet(snapshot, "tap", null);
     state = editTapBoardSheet(state, { identity: "guest", guestLabel: "Dry cider", guestNominalBbl: "0.25" });
     state = beginTapBoardAttempt(state, id);
     const write = vi.fn().mockResolvedValue({ id });
     const refreshRejection = Object.assign(new Error("forbidden"), { status: 403 });
-    const result = await submitAndRefreshTapBoard(write, vi.fn().mockRejectedValue(refreshRejection));
+    const result = await submitAndRefreshTapBoard(write, vi.fn().mockRejectedValue(refreshRejection), () => { state = beginTapBoardRefresh(state); });
 
     expect(result).toEqual({ kind: "saved", snapshot: null, refreshError: refreshRejection });
     if (result.kind === "saved") {
@@ -151,7 +185,7 @@ describe("tap board controlled state", () => {
     }
     expect(write).toHaveBeenCalledOnce();
     state = completeTapBoardAttempt(state, result.kind === "saved" ? result.snapshot : null);
-    expect(state).toEqual({ snapshot, sheet: null });
+    expect(state).toEqual({ snapshot, sheet: null, refreshing: false });
   });
 
   it("preserves a newer poll failure when an older post-write refresh is superseded", async () => {
@@ -164,6 +198,7 @@ describe("tap board controlled state", () => {
         postWriteStarted = true;
         resolvePostWrite = resolve;
       })),
+      vi.fn(),
     );
     await vi.waitFor(() => expect(postWriteStarted).toBe(true));
     const automaticWarning = "Automatic refresh failed. Reload when the connection returns.";

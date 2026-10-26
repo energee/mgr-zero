@@ -58,7 +58,7 @@ export type TapBoardSheet = {
   attempt: Attempt;
 };
 
-export type TapBoardState = { snapshot: TapBoardSnapshot; sheet: TapBoardSheet | null };
+export type TapBoardState = { snapshot: TapBoardSnapshot; sheet: TapBoardSheet | null; refreshing?: boolean };
 export const TAP_BOARD_POLL_MS = 30_000;
 
 /** `firstSkuId` is the keg SKU a new tap starts on (the first in the picker),
@@ -88,8 +88,12 @@ export function replaceTapBoardSnapshot(state: TapBoardState, snapshot: TapBoard
   return { ...state, snapshot };
 }
 
+export function beginTapBoardRefresh(state: TapBoardState): TapBoardState {
+  return { snapshot: state.snapshot, sheet: null, refreshing: true };
+}
+
 export function completeTapBoardAttempt(state: TapBoardState, snapshot: TapBoardSnapshot | null): TapBoardState {
-  return { snapshot: snapshot ?? state.snapshot, sheet: null };
+  return { snapshot: snapshot ?? state.snapshot, sheet: null, refreshing: false };
 }
 
 export function createTapBoardRefreshGuard() {
@@ -113,9 +117,11 @@ export type TapBoardSaveResult = { kind: "saved"; snapshot: TapBoardSnapshot | n
 export async function submitAndRefreshTapBoard(
   write: () => Promise<unknown>,
   refresh: () => Promise<TapBoardSnapshot | null>,
+  onSaved: () => void,
 ): Promise<{ kind: "write_failed"; error: unknown } | TapBoardSaveResult> {
   try { await write(); }
   catch (error) { return { kind: "write_failed", error }; }
+  onSaved();
   try { return { kind: "saved", snapshot: await refresh(), refreshError: null }; }
   catch (refreshError) { return { kind: "saved", snapshot: null, refreshError }; }
 }
