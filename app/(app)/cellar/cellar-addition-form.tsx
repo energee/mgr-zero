@@ -17,13 +17,17 @@ export function CellarAdditionForm({ occupancies, materials, lotsByMaterial, dis
   const formId = useId();
   const [fields, setFields] = useState(EMPTY);
   const model = { ...fields, occupancies, materials, lotsByMaterial };
-  const ready = additionPreview(model).valid;
+  const preview = additionPreview(model);
+  const reason = preview.valid ? null : preview.reason;
   const form = useCommandForm("record_batch_addition", {
-    build: () => ({ occupancyId: fields.occupancyId, materialId: fields.materialId, stage: fields.stage, qty: Number(fields.qty), lotId: fields.lotId || undefined }),
+    build: () => {
+      if (!preview.valid) throw new Error(preview.reason);
+      return { occupancyId: fields.occupancyId, materialId: fields.materialId, stage: fields.stage, qty: preview.qty, lotId: fields.lotId || undefined };
+    },
     reset: () => setFields(EMPTY),
   });
-  return <CommandForm open={form.open} onOpenChange={form.setOpen} title="Cellar addition" trigger={E.btn("Addition", disabled ? "g disabled" : "g")} footer={E.pin(<CellarAdditionFooter formId={formId} submitting={form.submitting} disabled={!ready} />)}>
-    <form id={formId} onSubmit={(event) => { if (!ready || form.submitting) { event.preventDefault(); return; } void form.submit(event); }} className="flex flex-col gap-3">
+  return <CommandForm open={form.open} onOpenChange={form.setOpen} title="Cellar addition" trigger={E.btn("Addition", disabled ? "g disabled" : "g")} footer={E.pin(<CellarAdditionFooter formId={formId} submitting={form.submitting} reason={reason} />)}>
+    <form id={formId} onSubmit={(event) => { if (reason || form.submitting) { event.preventDefault(); return; } void form.submit(event); }} className="flex flex-col gap-3">
       <CellarAdditionView model={model} onChange={(patch) => setFields((current) => ({ ...current, ...patch }))} submitting={form.submitting} footer={null} messages={<CommandFormMessage error={form.error} />} />
     </form>
   </CommandForm>;

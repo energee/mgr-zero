@@ -6,17 +6,15 @@ import { BeerView } from "@/components/mgr/views/beer";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { taproomBeerView, toBeerViewProps } from "@/lib/mgr/beer-view";
+import { taproomBeerView, toBeerViewProps, type BeerOverview } from "@/lib/mgr/beer-view";
 import "@/lib/commands/all";
 import { navTitle } from "@/lib/mgr/nav";
 
 export const metadata = { title: navTitle("/beer") };
 
-type Overview = { fgShortages: number; taproomBelowPar: number; openTaps: number; openOccupancies: number; materialShortages: number; kegsOut: number };
-
 export default async function BeerPage() {
   const brewery = await getActiveBrewery();
-  const o = (await runCommand("get_beer_overview", {}, await buildContext(brewery.id))) as Overview | { taproomStock: { skuId: string; locationId: string; sku: string; location: string; qty: number }[] };
+  const o = (await runCommand("get_beer_overview", {}, await buildContext(brewery.id))) as BeerOverview | { taproomStock: { skuId: string; locationId: string; sku: string; location: string; qty: number }[] };
   if ("taproomStock" in o) {
     return <BeerView model={taproomBeerView(o.taproomStock)} linkRows />;
   }

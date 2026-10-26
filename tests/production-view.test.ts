@@ -74,7 +74,8 @@ describe("cellar first-vessel setup (#1254)", () => {
     expect(html.match(/>Add vessel<\/a>/g)).toHaveLength(1);
     expect(html.indexOf(">Add vessel</a>")).toBeLessThan(html.indexOf(">Complete batch</button>"));
     expect(html).not.toContain("Start a brew day in Batches");
-    expect(html).not.toContain("No tank holds beer");
+    // The disabled Reading, Transfer and Addition still say why (#1122).
+    expect(html).toContain("No tank holds beer");
   });
 
   it("keeps vessel creation admin-only even in the empty state", () => {
