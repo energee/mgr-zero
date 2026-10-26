@@ -7,7 +7,8 @@ import { publicEnv } from "@/lib/env/public";
 // render. Both the request and response receive refreshed cookies so the current
 // request uses the new token and the browser persists it.
 export async function proxy(req: NextRequest) {
-  let res = NextResponse.next({ request: req });
+  req.headers.set("x-mgr-path", req.nextUrl.pathname + req.nextUrl.search);
+  let res = NextResponse.next({ request: { headers: req.headers } });
   const supabase = createServerClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
     cookies: {
       getAll: () => req.cookies.getAll(),
@@ -15,7 +16,7 @@ export async function proxy(req: NextRequest) {
         cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value));
 
         const existingHeaders = new Headers(res.headers);
-        res = NextResponse.next({ request: req });
+        res = NextResponse.next({ request: { headers: req.headers } });
         existingHeaders.forEach((value, name) => {
           if (!name.startsWith("x-middleware-")) res.headers.set(name, value);
         });
