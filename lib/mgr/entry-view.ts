@@ -51,7 +51,7 @@ export const resetPasswordModel: EntryViewModel = {
   title: "Reset password", inputs: ["Email"], primary: "Send reset link",
 };
 export const portalForgotPasswordModel: EntryViewModel = {
-  ...resetPasswordModel, info: "If that email is on an account, a reset link is on its way.",
+  ...resetPasswordModel,
 };
 export const noMembershipModel: EntryViewModel = {
   title: "No brewery yet", inputs: [],
@@ -108,11 +108,11 @@ export function toSetPasswordViewProps(account: string, error?: string, recovery
   };
 }
 
-/** Only local destinations may leave the password card; direct/recovery visits return to Today. */
-export function passwordReturnHref(next?: string): string {
-  if (!next || !/^\/(?!\/)[^\s\\]*$/.test(next)) return "/";
+/** Only local destinations may leave an entry card; unsafe or looping paths use its fallback. */
+export function passwordReturnHref(next?: string, fallback = "/"): string {
+  if (!next || !/^\/(?!\/)[^\s\\]*$/.test(next)) return fallback;
   const destination = new URL(next, "https://mgr.invalid");
-  if (destination.pathname === "/password" || destination.pathname.startsWith("//")) return "/";
+  if (destination.pathname === "/password" || destination.pathname.startsWith("//")) return fallback;
   return `${destination.pathname}${destination.search}${destination.hash}`;
 }
 

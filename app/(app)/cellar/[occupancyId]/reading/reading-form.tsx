@@ -9,7 +9,7 @@
 // reading that silently has none.
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCommandContext } from "@/lib/brewery-provider";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,8 @@ import {
   visibleOutbox,
   type OutboxAttempt,
 } from "@/lib/composer/outbox";
-import { formatGravity, INVALID_GRAVITY, parseGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
+import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
+import { readingValidation } from "@/lib/mgr/fermentation-reading-view";
 import type { StaffRole } from "@/lib/commands/registry";
 import { dateTimeInput, dateTimeInputInstant } from "@/lib/date-format";
 
@@ -57,10 +58,8 @@ export function ReadingForm({ occupancyId, identity, unit, timeZone, roles, prio
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  // Parsed once per keystroke: the same answer drives the error line, the
-  // Save button and the value that is sent.
-  const parsedGravity = useMemo(() => parseGravity(gravity, unit), [gravity, unit]);
-  const gravityInvalid = parsedGravity === INVALID_GRAVITY;
+  const values = { observedAt, tempF, gravity, ph, note };
+  const validation = readingValidation(values, unit);
   const initializeObservation = useCallback(() => {
     const instant = new Date().toISOString();
     setObservedAt(dateTimeInput(instant, timeZone));
@@ -152,14 +151,13 @@ export function ReadingForm({ occupancyId, identity, unit, timeZone, roles, prio
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (attempt) { await deliver(attempt); return; }
+    if (!validation.measurements || submitting) return;
     setError(null); setNotice(null);
     try {
       const next = createReadingAttempt(scope, {
         occupancyId,
         at: dateTimeInputInstant(observedAt, timeZone, observationInstant),
-        tempF: Number(tempF),
-        gravityPlato: typeof parsedGravity === "number" ? parsedGravity : undefined,
-        ph: ph ? Number(ph) : undefined,
+        ...validation.measurements,
         note: note || undefined,
       }, `Record fermentation reading · ${identity.vessel}`);
       // Persistence is the gate: fetch is unreachable if this throws.
@@ -184,7 +182,6 @@ export function ReadingForm({ occupancyId, identity, unit, timeZone, roles, prio
     catch (cause) { setError(cause instanceof Error ? cause.message : "The queued reading was not discarded."); }
   }
 
-  const values = { observedAt, tempF, gravity, ph, note };
   const recovery = attempt ? { state: attempt.state, discardLabel: `${identity.vessel} reading` } : undefined;
   const formId = "fermentation-reading-form";
   return (
@@ -193,7 +190,7 @@ export function ReadingForm({ occupancyId, identity, unit, timeZone, roles, prio
       onOpenChange={setOpen}
       title="Reading"
       trigger={<Button size="sm">Reading</Button>}
-      footer={<FermentationReadingActionsView formId={formId} values={values} recovery={recovery} busy={submitting} gravityInvalid={gravityInvalid} onFix={startFix} onDiscard={discardAttempt} />}
+      footer={<FermentationReadingActionsView formId={formId} values={values} unit={unit} recovery={recovery} busy={submitting} onFix={startFix} onDiscard={discardAttempt} />}
     >
       <FermentationReadingView
         formId={formId}
@@ -204,7 +201,6 @@ export function ReadingForm({ occupancyId, identity, unit, timeZone, roles, prio
         prior={prior}
         locked={attempt !== null}
         busy={submitting}
-        gravityInvalid={gravityInvalid}
         error={error}
         notice={notice}
         onChange={(field, value) => {

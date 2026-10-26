@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { expect, it } from "vitest";
-import { breweryDate, formatDate, formatDateTime, formatDayHeader, formatWeekday, dateTimeInput, dateTimeInputInstant } from "@/lib/date-format";
+import { breweryDate, formatDate, formatDateTime, formatDayHeader, dateTimeInput, dateTimeInputInstant } from "@/lib/date-format";
 import { formatTime } from "@/lib/time-window";
 
 it("uses consistent user-facing date formats without timestamp seconds", () => {
@@ -27,7 +27,6 @@ it("formats a timestamp's wall clock in the brewery's zone, not the host's (#442
   expect(formatDateTime(evening, "UTC")).toBe("Sep 14, 2026, 1:30 AM");
   expect(formatTime(evening, chicago)).toBe("8:30 PM");
   expect(formatTime(null, chicago)).toBe("");
-  expect(formatWeekday(evening, chicago)).toBe("Sun");
   expect(formatDayHeader(new Date(evening), chicago)).toBe("Sun, Sep 13");
 });
 

@@ -21,7 +21,6 @@ const MONTH_DAY: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" }
 const DAY_HEADER: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric" };
 const DATE_TIME: Intl.DateTimeFormatOptions = { ...DATE, hour: "numeric", minute: "2-digit" };
 const TIME: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit", hour12: true };
-const WEEKDAY: Intl.DateTimeFormatOptions = { weekday: "short" };
 
 /** "Sep 14" for a date-only ISO string; the week a batch is planned, the day a lot is due. */
 export const formatMonthDay = (value: string) => zoned(MONTH_DAY, "UTC").format(new Date(`${value.slice(0, 10)}T00:00:00Z`));
@@ -38,8 +37,6 @@ export const formatDayHeader = (value: string | Date, timeZone: string) => zoned
 export const formatDateTime = (value: string | Date, timeZone: string) => zoned(DATE_TIME, timeZone).format(new Date(value));
 /** "8:30 PM" in the brewery's zone. */
 export const formatTimeOfDay = (value: string | Date, timeZone: string) => zoned(TIME, timeZone).format(new Date(value));
-/** "Sun" in the brewery's zone. */
-export const formatWeekday = (value: string | Date, timeZone: string) => zoned(WEEKDAY, timeZone).format(new Date(value));
 /** The calendar day (YYYY-MM-DD) `at` falls on in `timeZone`. A date field's
  *  default is the brewery's day, not the UTC day `toISOString()` names — which
  *  is already tomorrow on a US evening (#437). breweryToday(ctx) is the caller. */

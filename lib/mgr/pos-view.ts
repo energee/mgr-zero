@@ -1,5 +1,6 @@
 import type { CommandFailureDetail } from "@/lib/commands/client";
 import { money } from "@/lib/mgr/money";
+import { integrationUnavailableReason } from "@/lib/mgr/integration-availability";
 
 export type PublicationStatus = "requested" | "needs_snapshot" | "prepared" | "publishing" | "succeeded" | "rejected" | "superseded";
 
@@ -156,19 +157,17 @@ export type PosMenuModel = {
   setup?: PosMenuSetup;
 };
 
-/** The Menu's empty state. `action` is absent for roles that cannot open Point of sale settings. */
+/** The Menu's empty state. No action for unavailable, disconnected Square or roles that cannot open settings. */
 export type PosMenuSetup = { title: string; description: string; action?: { label: string; href?: string } };
 
 /**
- * The Menu's empty state when no Square location is mapped (#997), from
- * whether Square is connected (#1039, readable by every Menu role since #1083)
- * and how many Square locations MGR has seen. Not connected means connect
- * Square, since locations outlive a disconnect; connected with none seen means
- * none has synced yet; otherwise only the mapping is missing. Point of sale
- * settings are admin-only, so an admin gets the link and anyone else is told
- * what to ask an admin for.
+ * Names the missing setup step when no Square location is mapped.
+ * A disconnected, unavailable Square has no action for any role. Otherwise,
+ * disconnected means connect, connected with no observed locations means sync,
+ * and connected with observed locations means map. Only admins get settings links.
  */
-export function toPosMenuSetup({ admin, connected, observed }: { admin: boolean; connected: boolean; observed: number }): PosMenuSetup {
+export function toPosMenuSetup({ admin, connected, configured, observed }: { admin: boolean; connected: boolean; configured: boolean; observed: number }): PosMenuSetup {
+  if (!connected && !configured) return { title: "Square isn’t connected", description: integrationUnavailableReason.square };
   if (!connected) return admin
     ? { title: "Square isn’t connected", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" } }
     : { title: "Square isn’t connected", description: "Ask an admin to connect Square." };

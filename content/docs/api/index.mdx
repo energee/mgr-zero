@@ -39,7 +39,7 @@ operations and must be omitted for the authenticated pre-tenant operations
 every command and optional for queries. See [idempotency](#idempotency) for why
 it exists and what reusing one does.
 
-`expectedContext` is optional for explicit bearer-token clients. The browser app
+`expectedContext` is optional for every caller. The browser app
 includes it from the verified context that rendered an action and keeps it with
 an uncertain retry. It is a restriction, not identity proof: authentication and
 membership checks still decide what the caller may do. When supplied, its actor,

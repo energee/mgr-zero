@@ -165,6 +165,8 @@ the rendered page (step 4), and:
    A test failing on a missing column or relation usually means a stale
    test schema: run `MGR_TEST_DB_RESET=1 scripts/test-db.sh` before changing
    code (without the variable it resets only when the migrations changed).
+   Any edit after the proof, review fixes included, voids it; re-run before
+   pushing. (A late change pushed a red pure test.)
 5. Run `/simplify` on every code change before committing (see the tool
    table), then re-run step 4's checks: simplify passes have broken tests.
    Then give only the simplify diff to one read-only agent and ask what
