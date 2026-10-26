@@ -30,16 +30,13 @@ import {
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { readingValidation } from "@/lib/mgr/fermentation-reading-view";
 import type { StaffRole } from "@/lib/commands/registry";
+import { dateTimeInput, dateTimeInputInstant } from "@/lib/date-format";
 
-function localObservationValue(iso = new Date().toISOString()) {
-  const date = new Date(iso);
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 19);
-}
-
-export function ReadingForm({ occupancyId, identity, unit, roles, prior, openByDefault = false, returnHref }: {
+export function ReadingForm({ occupancyId, identity, unit, timeZone, roles, prior, openByDefault = false, returnHref }: {
   occupancyId: string;
   identity: FermentationReadingIdentity;
   unit: GravityUnit;
+  timeZone: string;
   roles: readonly StaffRole[];
   prior?: Partial<Pick<FermentationReadingValues, "tempF" | "gravity" | "ph">>;
   openByDefault?: boolean;
@@ -56,16 +53,22 @@ export function ReadingForm({ occupancyId, identity, unit, roles, prior, openByD
   const [ph, setPh] = useState("");
   const [note, setNote] = useState("");
   const [observedAt, setObservedAt] = useState("");
+  const [observationInstant, setObservationInstant] = useState<string>();
   const [attempt, setAttempt] = useState<OutboxAttempt | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const values = { observedAt, tempF, gravity, ph, note };
   const validation = readingValidation(values, unit);
+  const initializeObservation = useCallback(() => {
+    const instant = new Date().toISOString();
+    setObservedAt(dateTimeInput(instant, timeZone));
+    setObservationInstant(instant);
+  }, [timeZone]);
 
   useEffect(() => {
-    if (openByDefault && !observedAt) queueMicrotask(() => setObservedAt(localObservationValue()));
-  }, [openByDefault, observedAt]);
+    if (openByDefault && !observedAt) queueMicrotask(() => initializeObservation());
+  }, [openByDefault, observedAt, initializeObservation]);
 
   useEffect(() => {
     const fixId = new URLSearchParams(location.search).get("fixReading");
@@ -78,7 +81,8 @@ export function ReadingForm({ occupancyId, identity, unit, roles, prior, openByD
         setGravity(original.input.gravityPlato == null ? "" : formatGravity(original.input.gravityPlato, unit));
         setPh(original.input.ph == null ? "" : String(original.input.ph));
         setNote(original.input.note ?? "");
-        setObservedAt(localObservationValue(original.input.at));
+        setObservedAt(dateTimeInput(original.input.at, timeZone));
+        setObservationInstant(original.input.at);
         setNotice("Review this fresh draft before saving. The original uncertain reading stays in the outbox until you explicitly discard it.");
         setOpenState(true);
       });
@@ -88,16 +92,17 @@ export function ReadingForm({ occupancyId, identity, unit, roles, prior, openByD
     }
   // The page is keyed to this signed-in scope; role changes remount it through the server layout.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [occupancyId, expectedContext.actorId, expectedContext.breweryId, rolesKey]);
+  }, [occupancyId, expectedContext.actorId, expectedContext.breweryId, rolesKey, timeZone]);
 
   const reset = useCallback(() => {
     setTempF(""); setGravity(""); setPh(""); setNote(""); setObservedAt("");
+    setObservationInstant(undefined);
     setAttempt(null); setError(null); setNotice(null);
   }, []);
 
   function setOpen(next: boolean) {
     setOpenState(next);
-    if (next && !observedAt) setObservedAt(localObservationValue());
+    if (next && !observedAt) initializeObservation();
     if (!next) {
       reset();
       if (returnHref) router.push(returnHref);
@@ -151,7 +156,7 @@ export function ReadingForm({ occupancyId, identity, unit, roles, prior, openByD
     try {
       const next = createReadingAttempt(scope, {
         occupancyId,
-        at: new Date(observedAt).toISOString(),
+        at: dateTimeInputInstant(observedAt, timeZone, observationInstant),
         ...validation.measurements,
         note: note || undefined,
       }, `Record fermentation reading · ${identity.vessel}`);
@@ -192,6 +197,7 @@ export function ReadingForm({ occupancyId, identity, unit, roles, prior, openByD
         values={values}
         identity={identity}
         unit={unit}
+        timeZone={timeZone}
         prior={prior}
         locked={attempt !== null}
         busy={submitting}

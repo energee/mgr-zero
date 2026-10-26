@@ -1,4 +1,8 @@
 // lib/mgr/contract-view.ts — view-model for Contract (inventory sheet).
+import { poLineErrors } from "@/lib/mgr/new-po-view";
+import { numberNotationError } from "@/lib/mgr/quantity-input";
+import { submitReason } from "@/lib/mgr/submit-reason";
+
 export type ContractViewModel = {
   vendorId: string;
   vendorOptions: { id: string; label: string }[];
@@ -35,4 +39,20 @@ export function contractBalanceFields(
     onOrder: contract?.qty_on_order == null ? "" : `${contract.qty_on_order}${unit} · read-only`,
     available: contract?.qty_available == null ? "" : `${contract.qty_available}${unit}`,
   };
+}
+
+/** Why Save contract remains unavailable: the required links and quantity must
+ * exist, numeric fields must obey the PO rules, and typed exponent notation is
+ * never converted silently before the command sees it. */
+export function contractSubmitReason(fields: Pick<ContractViewModel, "vendorId" | "materialId" | "quantity" | "unitCost">): string | null {
+  const errors = poLineErrors({ qty: fields.quantity, cost: fields.unitCost });
+  const missing: string[] = [];
+  if (!fields.vendorId) missing.push("a vendor");
+  if (!fields.materialId) missing.push("a material");
+  if (!fields.quantity.trim()) missing.push("a quantity");
+  else if (numberNotationError(fields.quantity)) missing.push("a decimal quantity");
+  else if (errors.qty) missing.push("a quantity above zero");
+  if (numberNotationError(fields.unitCost)) missing.push("a decimal unit cost");
+  else if (errors.cost) missing.push("a unit cost of zero or more");
+  return submitReason(missing);
 }

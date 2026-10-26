@@ -163,6 +163,7 @@ export function mapCsvRows(rows: string[][], mapping: Record<string, number>): R
 }
 
 export function parseCsv(input: string): { headers: string[]; rows: string[][] } {
+  if (input.includes("\0")) throw new Error("This file is not a CSV. In Excel or Google Sheets, save it as CSV and choose it again.");
   // Excel writes a "sep=," first line; spreadsheets end files with blank lines.
   const text = input.replace(/^\uFEFF/, "").replace(/^sep=,\r?\n/i, "");
   const records: string[][] = []; let row: string[] = [], value = "", quoted = false, closed = false;
@@ -181,6 +182,7 @@ export function parseCsv(input: string): { headers: string[]; rows: string[][] }
   }
   if (quoted) throw new Error("Unclosed CSV quote");
   if (value || closed || row.length) record();
+  if (!records.length) throw new Error("This file is empty. Add a header row and at least one data row.");
   const headers = records.shift()?.map(h => h.trim()) ?? [];
   if (!headers.length || headers.some(h => !h) || new Set(headers).size !== headers.length) throw new Error("CSV needs unique, nonempty column headers");
   if (!records.length) throw new Error("CSV has no data rows");

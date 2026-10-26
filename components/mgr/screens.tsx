@@ -477,7 +477,7 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", tab: "Work", name: "Work", job: "Everything currently in motion, ordered by next due action",
     reads: "list_work", writes: "none",
     states: DEFAULT_STATES,
-    spec: "Warehouse default rows shown; the chips are the kinds the role may open (a brewer has no Purchase orders or Deliveries), each kind chip labeled with its sidebar name, and an explicit chip choice is remembered. Rows sort by urgency/due time, not newest activity.",
+    spec: "Warehouse default rows shown; filter chips are the kinds the role may open (a brewer has no Purchase orders or Deliveries), each labeled with its sidebar name, and an explicit filter choice is remembered. Pick and Replenishment follow as navigation-only chips for roles with access. Rows sort by urgency/due time, not newest activity.",
     body: <WorkView model={toWorkViewProps(workWarehouse)} />,
   },
   {
@@ -1045,7 +1045,7 @@ export const SCREENS: Screen[] = [
     job: "Replace the lines on a confirmed or picked order and say why",
     reads: "get_order · list_skus",
     writes: "adjust_order_lines [picked: an added or raised line sends the order back to confirmed for a re-pick; staged excess sets needs_restock]",
-    states: [["permission", "sales or admin required", 1], ["picked", "qty below picked stages the rest for Put back; an added or raised line sends the order back to confirmed · Pick again"], ["ATP negative", "the lines saved, but a SKU on the order is below zero ATP: Lines saved · ATP negative for … · Back to order"], ["stale", "another user changed a line · refresh", 1]],
+    states: [["permission", "sales or admin required", 1], ["picked", "qty below picked stages the rest for Put back; an added or raised line sends the order back to confirmed · Pick again"], ["Available below zero", "the lines saved, but a SKU on the order is below zero available: Lines saved · Available is below zero for … · Back to order"], ["stale", "another user changed a line · refresh", 1]],
     spec: "Opens from Order · Adjust. This is a line edit, not a short pick: Short pick is pick-time shortage from the Pick frame. Reason is required. Saving replaces the full line set in one RPC. On a picked order an added or raised line is unpicked work: the order returns to confirmed with that line uncounted and a changed-after-pick marker, and Ship stays hidden until Pick counts it.",
     body: <AdjustLinesView model={toAdjustLinesViewProps(orderAdjustLines)} reason="customer cut" />,
   },
@@ -1227,7 +1227,7 @@ export const SCREENS: Screen[] = [
     job: "Replenish a taproom and review reservations across all locations",
     reads: "list_locations · list_skus · replenishment_suggestions · get_shortfalls · list_standing_allocations",
     writes: "create_replenishment_order · release_allocation · set_taproom_par · set_standing_allocation",
-    states: [...DEFAULT_STATES, ["no taprooms", "add a taproom under Locations"], ["no pars", "no suggestions for this taproom"], ["no shortfalls", "no current global shortfalls"], ["no standing allocations", "none reserved for this taproom"], ["missing source", "no other Warehouse location; creation remains unavailable"], ["filtered SKU", "only global shortfalls are filtered; its reservation detail starts open"], ["read-only", "Warehouse sees quantities but no mutation controls"], ["ATP negative", "a standing allocation saved past ATP: Allocation saved · ATP negative for … · Done"]],
+    states: [...DEFAULT_STATES, ["no taprooms", "add a taproom under Locations"], ["no pars", "no suggestions for this taproom"], ["no shortfalls", "no current global shortfalls"], ["no standing allocations", "none reserved for this taproom"], ["missing source", "no other Warehouse location; creation remains unavailable"], ["filtered SKU", "only global shortfalls are filtered; its reservation detail starts open"], ["read-only", "Warehouse sees quantities but no mutation controls"], ["Available below zero", "a standing allocation saved past availability: Allocation saved · Available is below zero for … · Done"]],
     spec: "Replenishment has one page title and three sections: Taproom replenishment, Standing allocations, and Shortfalls across all locations. Location and From warehouse precede the editable SKU table. Numeric and SKU-name sorting retains the browser's last choice; draft quantities stay with their SKU. Shortfall reservation details expand only when reviewed, and a Finished goods SKU filter does not narrow the taproom's suggestions. Par and standing-allocation edits remain named quantity changes, never priorities; release changes ATP without moving stock.",
     body: <ReplenishmentDemo><ReplenishmentView model={replenishmentDemo} fromLocationId="" qtys={{}} /></ReplenishmentDemo>,
   },
@@ -1768,12 +1768,12 @@ export const SCREENS: Screen[] = [
     reads: "list_occupancies · list_fermentation_readings · get_gravity_unit",
     writes: "record_fermentation_reading [one immutable reading row]",
     states: [...permitted("brewer or admin required"), ["offline or response lost", "Retry exact reading · Fix as new reading · Discard FV3 reading", 1]],
-    spec: "The sheet names the receiving vessel and, when the occupancy has one, its batch. Observed at and Temperature are required. Gravity, pH and Note are optional; blanks remain absent, and prior values are reference only, never silently copied. Saving freezes every parsed field and the observation time before transport. Exact retry preserves that request; Fix starts a reviewed fresh request while the uncertain original remains queued; named discard removes only the selected attempt. The gravity field uses the reader's standing unit preference and stores degrees Plato.",
+    spec: "The sheet names the receiving vessel and, when the occupancy has one, its batch. Its deep link opens over the existing vessel detail. Observed at defaults to now in the labeled brewery time zone, matching history; edited nonexistent or repeated DST times are refused rather than guessed. Observed at and Temperature are required. Gravity, pH and Note are optional; blanks remain absent, and prior values are reference only, never silently copied. Saving freezes every parsed field and the observation time before transport. Exact retry preserves that request; Fix starts a reviewed fresh request while the uncertain original remains queued; named discard removes only the selected attempt. The gravity field uses the reader's standing unit preference and stores degrees Plato.",
     body: (() => {
       const formId = "fermentation-reading-form";
       const values = { observedAt: "2026-09-10T08:10:00", tempF: "68.2", gravity: "1.019", ph: "", note: "" };
       return <>
-        <FermentationReadingView formId={formId} values={values} identity={{ vessel: "FV3", batch: "Batch 416 · Hazy IPA" }} unit="sg" prior={{ tempF: "67.8", gravity: "1.021", ph: "4.21" }} />
+        <FermentationReadingView formId={formId} values={values} identity={{ vessel: "FV3", batch: "Batch 416 · Hazy IPA" }} unit="sg" timeZone="America/New_York" prior={{ tempF: "67.8", gravity: "1.021", ph: "4.21" }} />
         {E.pin(<FermentationReadingActionsView formId={formId} values={values} unit="sg" />)}
       </>;
     })(),
@@ -1883,7 +1883,7 @@ export const SCREENS: Screen[] = [
     writes: "cancel_packaging_run · reschedule_packaging_run · update_packaging_run",
     states: [["permission", "brewer, warehouse or admin required", 1], ["unstarted", "change the date or cancel before physical work"], ["cancelled", "retained history; no demand or stock movement"]],
     spec: "Retain the plan and outputs when cancelled. Cancellation removes demand and completion blockers without moving stock. Reschedule changes only the planned date before physical work.",
-    body: <ClosePackagingRunView model={{ title: "RUN-0033", backTo: "Packaging", brand: "Hazy IPA", plannedOn: "2026-09-28", source: "no source yet", plannedOutputs: [["Hazy case", 120, "Not recorded"]], showCloseReview: false }} planActions={<PlanActions plannedOn="2026-09-28" />} action={<PackagingSourcePicker occupancies={[{ occupancy_id: "fv3-hazy", vessel_name: "FV3", brand_name: "Hazy IPA", bbl: 15 }]} />} />,
+    body: <ClosePackagingRunView model={{ title: "RUN-0033", backTo: "Packaging", brand: "Hazy IPA", plannedOn: "2026-09-28", source: "No source yet", plannedOutputs: [["Hazy case", 120, "Not recorded"]], showCloseReview: false }} planActions={<PlanActions plannedOn="2026-09-28" />} action={<PackagingSourcePicker occupancies={[{ occupancy_id: "fv3-hazy", vessel_name: "FV3", brand_name: "Hazy IPA", bbl: 15 }]} />} />,
   },
   {
     step: 7,
@@ -2150,9 +2150,9 @@ export const SCREENS: Screen[] = [
     to: { Vendor: "Entity picker", Material: "Entity picker", "Save contract": "Contracts" },
     job: "Create or edit one material purchasing commitment",
     reads: "list_materials · list_vendors_and_contracts",
-    writes: "upsert_material_contract",
-    states: [["permission", "warehouse or brewer required", 1], ["new", "vendor, material and quantity required"], ["received", "received and on-order quantities are read-only"]],
-    spec: "This sheet owns the commitment and nothing else. Receipts and open releases both update progress, and neither is editable here: a quantity a buyer could type over would stop being evidence. Available is the commitment less what has arrived and less what is already ordered, which is the only one of the four numbers worth acting on.",
+    writes: "upsert_material_contract · delete_material_contract",
+    states: [["permission", "warehouse or brewer required", 1], ["new", "vendor, material and quantity required"], ["received", "received and on-order quantities are read-only"], ["on purchase orders", "Delete is refused; set an end date instead", 1]],
+    spec: "This sheet owns the commitment and nothing else. Receipts and open releases both update progress, and neither is editable here: a quantity a buyer could type over would stop being evidence. Available is the commitment less what has arrived and less what is already ordered, which is the only one of the four numbers worth acting on. Delete confirms first and is refused once a purchase order uses the contract; set an end date instead.",
     body: <ContractView model={contractYchCitra} />,
   },
   {
@@ -2367,9 +2367,9 @@ export const SCREENS: Screen[] = [
     to: { Edit: "License" },
     job: "Maintain the brewery’s own state licenses",
     reads: "get_compliance_registry",
-    writes: "upsert_brewery_state_license",
-    states: [["current", "orders may proceed"], ["empty", "no licenses yet: Add license is the only action"], ["permission", "sales or admin required", 1]],
-    spec: "The brewery’s licenses, not any brand’s: one row per state and kind (brewery, supplier, direct to consumer), so no brand tab and no toggle. A brand’s COLA, formula approvals and state registrations live on that Brand. Order confirmation is meant to read all three and warn on an unlicensed or unregistered destination; that read is not built yet (drift: order warning).",
+    writes: "upsert_brewery_state_license · delete_brewery_state_license",
+    states: [["current", "expiry is today or later, or not recorded"], ["expired", "expiry before today in the brewery timezone · warning and expired mark", 1], ["empty", "no licenses yet: Add license is the only action"], ["permission", "sales or admin required", 1]],
+    spec: "The brewery’s licenses, not any brand’s: one row per state and kind (brewery, supplier, direct to consumer), so no brand tab and no toggle. A brand’s COLA, formula approvals and state registrations live on that Brand. Order confirmation is meant to read all three and warn on an unlicensed or unregistered destination; that read is not built yet (drift: order warning). Delete confirms before permanently removing a license added by mistake.",
     body: <LicensesView model={toLicensesViewProps(licensesDemo)} />,
   },
   {
@@ -2422,9 +2422,9 @@ export const SCREENS: Screen[] = [
     to: { "Save license": "Licenses" },
     job: "Record one brewery state license",
     reads: "get_compliance_registry",
-    writes: "upsert_brewery_state_license",
-    states: [["current", "orders may proceed"], ["expired", "order confirmation warns", 1], ["saved again", "one record per state and kind: saving replaces it"]],
-    body: <LicenseView model={licensePaBrewery} />,
+    writes: "upsert_brewery_state_license · delete_brewery_state_license",
+    states: [["current", "expiry is today or later, or not recorded"], ["expired", "the Licenses list marks expiry before today with a warning", 1], ["saved again", "one record per state and kind: saving replaces it"], ["delete", "Delete confirms before permanently removing a mistaken license"]],
+    body: <LicenseView model={licensePaBrewery} locked />,
   },
   {
     step: 7,
@@ -2575,11 +2575,11 @@ export const SCREENS: Screen[] = [
     slice: 10,
     tab: "Work",
     name: "Driver route",
-    to: { Resume: "Confirm delivery" },
+    to: { Deliver: "Confirm delivery" },
     job: "The route as the driver sees it: every stop, the load, Return",
     reads: "list_routes",
     writes: "return_route",
-    states: [["permission", "the assigned driver or an admin", 1], ["departed", "Return is the one verb, disabled while a stop is open"], ["next stop", "Resume opens Confirm delivery"]],
+    states: [["permission", "the assigned driver or an admin", 1], ["departed", "Return is the one verb, disabled while a stop is open"], ["next stop", "Deliver opens Confirm delivery"]],
     spec: "The departed route as the driver runs it, reached from Deliveries (Resume) or the stop's Back. Route is for building; this is for running. Only the lowest undelivered stop is next; Today shows the same stop.",
     body: <DriverRouteView model={driverRouteA} />,
   },

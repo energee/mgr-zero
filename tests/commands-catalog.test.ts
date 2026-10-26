@@ -19,6 +19,13 @@ beforeAll(async () => {
 });
 
 describe("catalog commands", () => {
+  it("validates price-group Position before Postgres integer conversion (#1385)", async () => {
+    await expect(runCommand("upsert_price_group", { name: "Out of range", position: 99999999999 }, salesCtx))
+      .rejects.toMatchObject({ code: "invalid_input", status: 400 });
+    await expect(runCommand("upsert_price_group", { name: "Last position", position: 2_147_483_647 }, salesCtx))
+      .resolves.toMatchObject({ position: 2_147_483_647 });
+  });
+
   it("creates catalog records through RPC-backed commands: brand, format, sku = brand × format", async () => {
     const brand = await runCommand("upsert_brand", { name: "Command Lager", style: "Lager", abv: 5.1, priceGroupId: await seedPriceGroup(salesCtx.breweryId, "Standard", 1) }, salesCtx) as { id: string; style_id: string };
     const fmt = await runCommand("upsert_format", { name: "16 oz can", basis: "packaged", packageType: "can", bblPerUnit: 0.004 }, salesCtx) as { id: string };

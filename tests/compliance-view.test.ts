@@ -86,6 +86,36 @@ describe("Compliance months", () => {
 });
 
 describe("Licenses", () => {
+  it("flags only licenses expired before the brewery's calendar day (#1394)", () => {
+    const license = licensesDemo.licenses[0];
+    for (const expiresOn of ["2026-10-10", "2026-10-26", "2026-10-27", null]) {
+      const model = toLicensesViewProps({
+        today: "2026-10-26",
+        licenses: [{ ...license, expires_on: expiresOn }],
+      });
+      const expired = expiresOn === "2026-10-10";
+      expect(Boolean(model.licenses[0].warning)).toBe(expired);
+      expect(model.licenses[0].detail.includes(" · expired")).toBe(expired);
+      const html = htmlOf(createElement(LicensesView, { model }));
+      expect(html.includes('aria-label="Needs attention"')).toBe(expired);
+    }
+  });
+
+  it("offers a confirmed delete for an existing license but not a new one", () => {
+    const existing = htmlOf(createElement(LicenseView, { model: licensePaBrewery }));
+    expect(existing).toContain("Delete license");
+    expect(existing).toContain('aria-haspopup="dialog"');
+    const creating = htmlOf(createElement(LicenseView, { model: licensePaBrewery, remove: null }));
+    expect(creating).not.toContain("Delete license");
+  });
+
+  it("keeps an existing license's state and kind fixed in the edit inventory", () => {
+    const html = htmlOf(screen("License").body);
+    const pickers = html.match(/<button\b[^>]*role="combobox"[^>]*>/g) ?? [];
+    expect(pickers).toHaveLength(2);
+    for (const picker of pickers) expect(picker).toContain("disabled");
+  });
+
   it("names missing or invalid license identity without requiring optional details (#1262)", () => {
     expect(licenseSubmitReason({ state: "", kind: "brewery" })).toBe("Still needed: a state.");
     for (const state of ["123", "P", "PAA", "ZZ"]) {
@@ -389,7 +419,7 @@ describe("Material lot trace (#817)", () => {
   it("prints received, used and packaged days in the one date format (#991)", () => {
     const model = toMaterialLotTraceViewProps({ ...materialLotTraceCitra, used: [{ ...materialLotTraceCitra.used[0], at: "2026-08-10T02:00:00Z" }] }, DEMO_TIME_ZONE);
     expect(model.detail).toBe("Citra hops · Fictional Hop Supply · received Aug 1, 2026");
-    expect(model.uses[0].detail).toBe("4 lb · boil · Aug 9, 2026 · No current vessel");
+    expect(model.uses[0].detail).toBe("4 lb · Boil · Aug 9, 2026 · No current vessel");
     expect(model.lots[0].detail).toBe("packaged Aug 31, 2026");
   });
   it("does not offer an Open action for untracked ingredient facts", () => {

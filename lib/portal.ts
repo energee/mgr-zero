@@ -2,10 +2,11 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCustomerMemberships, getRequestIdentity, type CustomerMembership } from "@/lib/auth/request-context";
+import { signInPath } from "@/lib/auth/password";
 import { buildContext } from "@/lib/commands/context";
 
 export async function getActiveCustomer() {
-  if (!(await getRequestIdentity())) redirect("/login");
+  if (!(await getRequestIdentity())) redirect(signInPath(true));
 
   const memberships = await getCustomerMemberships();
   if (!memberships.length) redirect("/no-membership");
