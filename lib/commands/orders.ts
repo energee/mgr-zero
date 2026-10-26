@@ -71,6 +71,7 @@ defineCommand({
 defineCommand({
   name: "adjust_order_lines", description: "Replace lines on a submitted/confirmed/picked order; a submitted order holds no allocations until confirm, otherwise re-syncs allocations and returnable-keg deposits; on a picked order, an added or raised line sends it back to confirmed for a re-pick, and staged excess flags a restock; returns ATP soft warnings",
   roles: [...salesRoles], requiresConfirmation: true,
+  // Keep raw reasons replayable; the RPC trims and validates new writes after its request lookup.
   input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1), lines }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("adjust_order_lines", { p_order: i.orderId, p_lines: toLines(i.lines), p_reason: i.reason, p_request_id: execution.requestId })),
 });

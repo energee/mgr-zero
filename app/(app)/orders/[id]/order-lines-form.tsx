@@ -32,9 +32,12 @@ export function useLineQuantities(orderId: string, lines: Line[]) {
       // through the React tree; only this form's own submit saves lines.
       if (event.target !== event.currentTarget) return;
       event.preventDefault();
+      if (!changed || action.busy) return;
+      const trimmedReason = reason.trim();
+      if (!trimmedReason) { action.setError("Reason required"); return; }
       // A blank quantity is sent and refused, never dropped: adjust_order_lines
       // replaces every line, so dropping it would remove the SKU (#433).
-      if (changed && !action.busy) void action.run("adjust_order_lines", { orderId, reason, lines: lines.map((l) => ({ skuId: l.sku_id, qty: Number(qtys[l.id]) })) });
+      void action.run("adjust_order_lines", { orderId, reason: trimmedReason, lines: lines.map((l) => ({ skuId: l.sku_id, qty: Number(qtys[l.id]) })) });
     },
   };
 }

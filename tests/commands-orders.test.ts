@@ -1,6 +1,6 @@
 // tests/commands-orders.test.ts — registry wiring for order commands: roles, validation, rpc passthrough.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
+import { admin, ins, sql, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -70,6 +70,83 @@ describe("order commands", () => {
   it("list_orders filters by status", async () => {
     const { rows } = await runCommand("list_orders", { status: "confirmed" }, adminCtx) as { rows: { status: string }[] };
     expect(rows.every(r => r.status === "confirmed")).toBe(true);
+  });
+});
+
+describe("adjustment reasons", () => {
+  async function orderAt(status: "submitted" | "confirmed" | "picked") {
+    const { order_id: orderId } = await runCommand("create_order", {
+      kind: "wholesale", customerId, shipToId, fromLocationId: whId, lines: [{ skuId, qty: 5 }],
+    }, adminCtx) as { order_id: string };
+    await runCommand("submit_order", { orderId }, adminCtx);
+    if (status !== "submitted") await runCommand("confirm_order", { orderId }, adminCtx);
+    if (status === "picked") {
+      const lineId = sql(`select id from public.order_lines where order_id='${orderId}'`)[0];
+      await runCommand("record_pick", { orderId, picks: [{ lineId, qty: 5 }] }, adminCtx);
+    }
+    return orderId;
+  }
+
+  function snapshot(orderId: string) {
+    return sql(`select jsonb_build_object(
+      'order', (select to_jsonb(o) from public.orders o where id='${orderId}'),
+      'lines', (select jsonb_agg(to_jsonb(l) order by id) from public.order_lines l where order_id='${orderId}'),
+      'allocations', (select jsonb_agg(to_jsonb(a) order by id) from public.allocations a where ref in (select id from public.order_lines where order_id='${orderId}')),
+      'events', (select jsonb_agg(to_jsonb(e) order by id) from public.order_events e where order_id='${orderId}'),
+      'deposits', (select jsonb_agg(to_jsonb(d) order by id) from public.order_deposit_lines d where order_id='${orderId}')
+    )::text`);
+  }
+
+  it.each(["submitted", "confirmed", "picked"] as const)("refuses blank reasons atomically on a %s order through commands and RPC", async status => {
+    const orderId = await orderAt(status);
+    const before = snapshot(orderId);
+    for (const reason of ["", "   ", "\t\r\n", "\u00a0\u2003", "\ufeff\u3000"]) {
+      const requestId = crypto.randomUUID();
+      await expect(runCommand("adjust_order_lines", { orderId, reason, lines: [{ skuId, qty: 2 }] }, adminCtx, { requestId, correlationId: requestId }))
+        .rejects.toMatchObject({ code: "invalid_input" });
+      expect(sql(`select count(*) from private.command_requests where request_id='${requestId}'`)).toEqual(["0"]);
+      const rpc = await adminCtx.db.rpc("adjust_order_lines", {
+        p_order: orderId, p_lines: [{ sku_id: skuId, qty: 2 }], p_reason: reason, p_request_id: requestId,
+      });
+      expect(rpc.error).toMatchObject({ code: "22023", message: "a reason is required" });
+      expect(sql(`select count(*) from private.command_requests where request_id='${requestId}'`)).toEqual(["0"]);
+      expect(snapshot(orderId)).toEqual(before);
+    }
+    expect(() => sql(`set local role authenticated; set local request.jwt.claim.sub='${adminCtx.userId}';
+      select public.adjust_order_lines('${orderId}', '[{"sku_id":"${skuId}","qty":2}]', null, '${crypto.randomUUID()}')`, true))
+      .toThrow(/a reason is required/);
+    expect(snapshot(orderId)).toEqual(before);
+  });
+
+  it.each(["command", "rpc"] as const)("stores trimmed valid reasons through %s and replays the original payload", async path => {
+    const orderId = await orderAt("confirmed");
+    const reason = " \t\u00a0Customer cut\u2003\n ";
+    const requestId = crypto.randomUUID();
+    const input = { orderId, reason, lines: [{ skuId, qty: 2 }] };
+    const invoke = () => path === "command"
+      ? runCommand("adjust_order_lines", input, adminCtx, { requestId, correlationId: requestId })
+      : adminCtx.db.rpc("adjust_order_lines", { p_order: orderId, p_lines: [{ sku_id: skuId, qty: 2 }], p_reason: reason, p_request_id: requestId }).then(result => { expect(result.error).toBeNull(); return result.data; });
+    const saved = await invoke();
+    expect(await invoke()).toEqual(saved);
+    expect(sql(`select payload->>'reason' from public.order_events where order_id='${orderId}' and event='lines_adjusted'`)).toEqual(["Customer cut"]);
+    expect(sql(`select qty_ordered from public.order_lines where order_id='${orderId}'`)).toEqual(["2.00"]);
+    await expect(runCommand("adjust_order_lines", { ...input, reason: "Customer cut" }, adminCtx, { requestId, correlationId: requestId })).rejects.toMatchObject({ code: "conflict" });
+  });
+
+  it.each(["   ", " \tOriginal reason\n "])("replays historical raw reason %j before new-write validation", async reason => {
+    const orderId = await orderAt("submitted");
+    const requestId = crypto.randomUUID();
+    const payload = { order: orderId, lines: [{ sku_id: skuId, qty: 2 }], reason };
+    const result = { order_id: orderId, warnings: [], historical: true };
+    sql(`insert into private.command_requests(actor_id,brewery_id,request_id,command_name,payload_hash,result)
+      values('${adminCtx.userId}','${b.id}','${requestId}','adjust_order_lines',
+        extensions.digest('${JSON.stringify(payload)}'::jsonb::text,'sha256'),'${JSON.stringify(result)}'::jsonb)`);
+    const before = snapshot(orderId);
+    expect(await runCommand("adjust_order_lines", { orderId, reason, lines: [{ skuId, qty: 2 }] }, adminCtx, { requestId, correlationId: requestId })).toEqual(result);
+    const rpc = await adminCtx.db.rpc("adjust_order_lines", { p_order: orderId, p_lines: payload.lines, p_reason: reason, p_request_id: requestId });
+    expect(rpc.error).toBeNull();
+    expect(rpc.data).toEqual(result);
+    expect(snapshot(orderId)).toEqual(before);
   });
 });
 
