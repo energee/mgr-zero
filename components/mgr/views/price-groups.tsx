@@ -102,7 +102,7 @@ export function PriceGroupsView({
           {model.tabHrefs
             ? <LinkTabs items={model.tabHrefs} current={channel.name} className="w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none] md:w-fit" />
             : E.tabs(model.tabs, model.tab, "w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none] md:w-fit")}
-          <div className="min-w-0 overflow-x-auto">
+          <div className="min-w-0 shrink-0 overflow-x-auto">
             {E.tbl(
               ["Group", ...model.formats],
               channel.rows.map((row) => [
