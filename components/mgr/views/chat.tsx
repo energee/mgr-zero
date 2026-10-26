@@ -16,7 +16,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChatPreview, ChatPreviewPicker } from "@/lib/chat/preview-web";
 import { NOTIFICATION_REASON_LABEL, type ChatPreviewFixture, type ChatPreviewId } from "@/lib/chat/contracts";
 import { chatSettingIsSaved, type ChatSettingSave } from "@/lib/mgr/chat-save-feedback";
-import { personalQuietHoursSchema, quietHoursWindowSchema } from "@/lib/chat/quiet-hours";
+import { personalQuietHoursSchema, quietHoursWindowSchema, personalQuietHoursReason, breweryQuietHoursReason } from "@/lib/chat/quiet-hours";
+import { readingCadenceReason } from "@/lib/mgr/settings-view";
 
 const PREVIEW_TABS: [ChatPreviewId, string][] = [["app-home", "App Home"], ["personal-dm", "Personal DM"], ["team-digest", "Team digest"], ["preferences", "Sample preferences"]];
 
@@ -56,7 +57,7 @@ export function ChatSettingsView({ health, timezone, readingDueHours, configured
     {connected && <>
       {health.destinations.map(destination => <div key={destination.id}>{E.row(`Operations channel · ${destination.channelId}`, `${destination.privacy.replaceAll("_", " ")} · ${destination.state}${destination.reason ? ` · ${destination.reason.replaceAll("_", " ")}` : ""}`)}</div>)}
       {!health.destinations.length && E.note("No operations channel selected. Eligible personal reminders can still be delivered.", "alert")}
-      {fields !== undefined ? fields : <ChatSettingsFieldsView installation={installation} timezone={timezone} hours={String(readingDueHours)} start={installation.quietStart?.slice(0, 5) ?? ""} end={installation.quietEnd?.slice(0, 5) ?? ""} channels={channels} channel={channel} configured={configured} delivery={null} />}
+      {fields !== undefined ? fields : <ChatSettingsFieldsView installation={installation} timezone={timezone} hours={String(readingDueHours)} initialHours={readingDueHours} start={installation.quietStart?.slice(0, 5) ?? ""} end={installation.quietEnd?.slice(0, 5) ?? ""} channels={channels} channel={channel} configured={configured} delivery={null} />}
       {E.nav("Health", `${health.queue.retrying ?? "unavailable"} retrying · ${health.queue.queued ?? "unavailable"} queued`, "", undefined, healthHref)}
       {E.nav("Linked people", `${health.linkedCount} linked`, "", undefined, peopleHref)}
     </>}
@@ -80,6 +81,9 @@ export function ChatPersonalPreferencesView({ preferences, canSetQuietHours = tr
   const breweryQuiet = preferences.breweryQuietHours;
   const quiet = personalQuietHoursSchema.safeParse({ start: start || null, end: end || null, timezone });
   const quietError = (field: string) => quiet.error?.issues.find(issue => issue.path[0] === field)?.message;
+  const quietReason = personalQuietHoursReason({ start, end, timezone }, {
+    start: preferences.quietStart?.slice(0, 5) ?? "", end: preferences.quietEnd?.slice(0, 5) ?? "", timezone: preferences.timezone,
+  });
   return <>
     {E.back(back, "My notification preferences", undefined, backHref)}
     {preferences.link ? E.row(`Slack user ${preferences.link.external_user_id}`, "Linked to your MGR account", <Button variant="outline" disabled={busy} onClick={onUnlink}>Unlink my Slack</Button>) : howToLink}
@@ -95,24 +99,26 @@ export function ChatPersonalPreferencesView({ preferences, canSetQuietHours = tr
       </div>;
     })}
     {E.fld("Brewery quiet hours", breweryQuiet ? `${formatWindow(parseClock(breweryQuiet.start), parseClock(breweryQuiet.end))} · ${timezoneLabel(breweryQuiet.timezone)}` : "Off")}
-    {canSetQuietHours && <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && quiet.success) onSaveQuiet?.(start, end, timezone); }}>
+    {canSetQuietHours && <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && quiet.success && !quietReason) onSaveQuiet?.(start, end, timezone); }}>
       {E.edit("My quiet hours start", start, "time", undefined, { onChange: (nextValue: string) => setStart(nextValue), id: `${id}-start`, disabled: busy, error: quietError("start") })}
       {E.edit("My quiet hours end", end, "time", undefined, { onChange: (nextValue: string) => setEnd(nextValue), id: `${id}-end`, disabled: busy, error: quietError("end") })}
       <TimezonePicker id={`${id}-timezone`} label="My timezone" value={timezone} onChange={setTimezone} disabled={busy} />
       <CommandFormMessage error={quietError("timezone")} />
-      <p className="text-sm text-muted-foreground">Clear both times to follow the brewery quiet hours. For a custom window, choose different start and end times; it can run overnight.</p><Button disabled={busy || !quiet.success}>Save my quiet hours</Button>
+      <p className="text-sm text-muted-foreground">Clear both times to follow the brewery quiet hours. For a custom window, choose different start and end times; it can run overnight.</p>
+      {E.submit("Save my quiet hours", { submitting: busy, disabled: !quiet.success, reason: quietReason })}
       <SettingsSaveStatus saved={!busy && chatSettingIsSaved(savedQuiet, { name: "set_personal_quiet_hours", start, end, timezone })} error={error} />
     </form>}
     <CommandFormMessage error={error} />
   </>;
 }
 
-export function ChatQuietHoursView({ start, end, timezone, busy = false, saved, error, onChange, onSave }: { start: string; end: string; timezone: string; busy?: boolean; saved?: ChatSettingSave | null; error?: string | null; onChange?: (start: string, end: string) => void; onSave?: (start: string, end: string) => void }) {
+export function ChatQuietHoursView({ start, end, initial = { start, end }, timezone, busy = false, saved, error, onChange, onSave }: { start: string; end: string; initial?: { start: string; end: string }; timezone: string; busy?: boolean; saved?: ChatSettingSave | null; error?: string | null; onChange?: (start: string, end: string) => void; onSave?: (start: string, end: string) => void }) {
   const id = useId(), [draft, setDraft] = useState({ start, end }), [version, setVersion] = useState(0);
   const value = onChange ? { start, end } : draft;
   const change = (start: string, end: string) => { setDraft({ start, end }); onChange?.(start, end); };
   const quiet = quietHoursWindowSchema.safeParse({ start: value.start || null, end: value.end || null });
-  return <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && quiet.success) onSave?.(value.start, value.end); }}>
+  const reason = breweryQuietHoursReason(value, initial);
+  return <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && quiet.success && !reason) onSave?.(value.start, value.end); }}>
     {value.start && value.end ? <TimeWindowField key={version} label="Quiet hours" start={value.start} end={value.end} step={1} disabled={busy} onChange={change} /> : E.fld("Quiet hours", value.start || value.end ? "Set both times" : "Off")}
     <details><summary>Exact times · {timezoneLabel(timezone)}</summary><div className="flex flex-col gap-3 pt-3">
       {E.edit("Brewery quiet hours start", value.start, "time", undefined, { onChange: (nextValue: string) => { change(nextValue, value.end); setVersion(version + 1); }, id: `${id}-start`, disabled: busy, error: quiet.error?.issues.find(issue => issue.path[0] === "start")?.message })}
@@ -120,18 +126,19 @@ export function ChatQuietHoursView({ start, end, timezone, busy = false, saved, 
       <p className="text-sm text-muted-foreground">Clear both times to turn off brewery quiet hours.</p>
     </div></details>
     <CommandFormMessage error={quiet.error?.issues[0]?.message} />
-    <Button disabled={busy || !quiet.success}>Save brewery quiet hours</Button>
+    {E.submit("Save brewery quiet hours", { submitting: busy, disabled: !quiet.success, reason })}
     <SettingsSaveStatus saved={!busy && chatSettingIsSaved(saved, { name: "set_brewery_quiet_hours", ...value })} error={error} />
   </form>;
 }
 
-export function ChatSettingsFieldsView({ installation, timezone, hours, start, end, channels, channel, configured = true, busy = false, saved, error, delivery, onLoadChannels, onChannel, onSaveChannel, onQuietChange, onSaveQuiet, onHours, onSaveHours }: {
-  installation: NonNullable<ChatHealth["installation"]>; timezone: string; hours: string; start: string; end: string;
+export function ChatSettingsFieldsView({ installation, timezone, hours, initialHours, start, end, channels, channel, configured = true, busy = false, saved, error, delivery, onLoadChannels, onChannel, onSaveChannel, onQuietChange, onSaveQuiet, onHours, onSaveHours }: {
+  installation: NonNullable<ChatHealth["installation"]>; timezone: string; hours: string; initialHours: number; start: string; end: string;
   channels: { id: string; name: string }[] | null; channel: string; configured?: boolean; busy?: boolean; saved?: ChatSettingSave | null; error?: string | null; delivery?: ReactNode;
   onLoadChannels?: () => void; onChannel?: (value: string) => void; onSaveChannel?: () => void;
   onQuietChange?: (start: string, end: string) => void; onSaveQuiet?: (start: string, end: string) => void; onHours?: (value: string) => void; onSaveHours?: () => void;
 }) {
   const id = useId();
+  const hoursReason = readingCadenceReason(hours, initialHours);
   return <div className="flex flex-col gap-4">
     {installation.state === "active" && <section className="flex flex-col gap-3" aria-label="Operations channel">
       <Button variant="outline" disabled={busy || !configured} onClick={onLoadChannels}>Load private channels</Button>
@@ -142,10 +149,11 @@ export function ChatSettingsFieldsView({ installation, timezone, hours, start, e
       </form> : E.note("No eligible private channels. Add MGR to a private channel with sharing turned off, then load again."))}
       {E.note("Only active private channels with MGR added and sharing turned off are eligible. MGR checks again when you save and before delivery.")}
     </section>}
-    <ChatQuietHoursView start={start} end={end} timezone={timezone} busy={busy} saved={saved} error={error} onChange={onQuietChange} onSave={onSaveQuiet} />
-    <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy) onSaveHours?.(); }}>
+    <ChatQuietHoursView start={start} end={end} initial={{ start: installation.quietStart?.slice(0, 5) ?? "", end: installation.quietEnd?.slice(0, 5) ?? "" }} timezone={timezone} busy={busy} saved={saved} error={error} onChange={onQuietChange} onSave={onSaveQuiet} />
+    <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && !hoursReason) onSaveHours?.(); }}>
       {E.edit("Reading overdue after (hours)", hours, "number", undefined, { onChange: onHours, id: `${id}-hours`, disabled: busy, required: true, min: 1, max: 168, step: 1 })}
-      <p className="text-sm text-muted-foreground">Default: 24 hours. This changes when a reading becomes overdue in MGR Today and Slack.</p><Button disabled={busy}>Save reading cadence</Button>
+      <p className="text-sm text-muted-foreground">Default: 24 hours. This changes when a reading becomes overdue in MGR Today and Slack.</p>
+      {E.submit("Save reading cadence", { submitting: busy, reason: hoursReason })}
       <SettingsSaveStatus saved={!busy && chatSettingIsSaved(saved, { name: "set_brewery_operating_defaults", hours })} error={error} />
     </form>
     {delivery !== undefined ? delivery : <ChatDeliveryView enabled={installation.state === "active"} />}

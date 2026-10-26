@@ -18,6 +18,8 @@ const pureTests = [
   "tests/design-docs.test.ts",
   "tests/docs.test.ts",
   "tests/chat-failure.test.ts",
+  "tests/chat-view.test.ts",
+  "tests/settings-view.test.ts",
   "tests/monthly-compliance-view.test.ts",
   "tests/compliance-period.test.ts",
   "tests/reporting-basis-view.test.ts",
