@@ -4,6 +4,9 @@ import * as login from "@/app/(auth)/login/page";
 import * as portalLogin from "@/app/(auth)/portal/login/page";
 import * as reset from "@/app/(auth)/reset/page";
 import * as invitations from "@/app/(auth)/invitations/page";
+import * as inviteExpired from "@/app/(auth)/invite-expired/page";
+import * as createBrewery from "@/app/(auth)/create-brewery/page";
+import * as chatLink from "@/app/(auth)/settings/chat/link/page";
 
 describe("auth route metadata (#1322)", () => {
   it.each([
@@ -11,6 +14,9 @@ describe("auth route metadata (#1322)", () => {
     ["/portal/login", portalLogin, "Portal sign in"],
     ["/reset", reset, "Reset password"],
     ["/invitations", invitations, "Invitations"],
+    ["/invite-expired", inviteExpired, "Invite expired"],
+    ["/create-brewery", createBrewery, "Create brewery"],
+    ["/settings/chat/link", chatLink, "Link your Slack"],
   ])("names %s without duplicating the root title suffix", (_route, page, title) => {
     expect(page).toHaveProperty("metadata.title", title);
   });
