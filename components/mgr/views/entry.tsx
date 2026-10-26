@@ -3,6 +3,9 @@
 
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
+import { Icon } from "@/components/mgr/icon";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup } from "@/components/ui/field";
 import type { EntryViewModel } from "@/lib/mgr/entry-view";
@@ -126,7 +129,10 @@ export function EntryView({
       {E.sp()}
       {E.ttl(model.title)}
       {model.note ? E.note(model.note) : null}
-      {model.error ? E.note(model.error, "alert") : null}
+      {model.error ? <Alert variant="destructive" role="alert">
+        <Icon icon={Alert02Icon} />
+        <AlertDescription>{model.error}</AlertDescription>
+      </Alert> : null}
       {model.field ? E.fld(model.field.label, model.field.value) : null}
       {/* A local fixture action prevents native GET submission before hydration too. */}
       {action || emailLink || passwordChange ? <form action={action ?? (() => {})} noValidate={passwordChange} onSubmit={submit}>{controls}</form> : controls}

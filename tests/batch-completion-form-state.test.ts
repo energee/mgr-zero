@@ -1,8 +1,26 @@
+import { isValidElement, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { BatchCompletionView, type BatchCompletionPreview } from "@/components/mgr/views/batch-completion";
 import { canCloseBatchCompletion, isCurrentBatchCompletionReview, batchCompletionAcknowledgement } from "@/lib/mgr/batch-completion-state";
 
 describe("batch completion form attempt ownership", () => {
+  it("#1401 announces a saved completion neutrally", () => {
+    const view = BatchCompletionView({
+      batches: [], open: true, onOpenChange: () => {}, batchId: "", preview: null, phase: "saved", error: null,
+      confirmInTank: false, onConfirmInTank: () => {}, onReview: () => {}, onSubmit: () => {},
+    });
+    function status(node: ReactNode): ReactNode {
+      if (Array.isArray(node)) return node.map(status);
+      if (!isValidElement<{ role?: string; children?: ReactNode }>(node)) return null;
+      return node.props.role === "status" ? node : status(node.props.children);
+    }
+    const html = renderToStaticMarkup(status(view));
+    expect(html).toContain('role="status"');
+    expect(html).toContain("Batch completed and saved.");
+    expect(html).not.toContain("text-warning-foreground");
+  });
+
   it("renders a recovered pre-upgrade receipt without asking to acknowledge saved tank metadata", () => {
     const legacyReceipt = {
       batchId: "batch", closedAt: "2026-10-12T00:00:00Z", baselineBbl: 10,

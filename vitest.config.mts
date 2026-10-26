@@ -45,6 +45,7 @@ const pureTests = [
   "tests/entry-email-link.test.ts",
   "tests/invite-entry-view.test.ts",
   "tests/password-page.test.ts",
+  "tests/password-signout-outcome.test.ts",
   "tests/auth-actions.test.ts",
   "tests/register-cell-keys.test.ts",
   "tests/invite-errors.test.ts",
@@ -72,6 +73,9 @@ const pureTests = [
   "tests/app-screen-parity.test.ts",
   "tests/screen-view-composition.test.ts",
   "tests/production-view.test.ts",
+  "tests/kegs-view.test.ts",
+  "tests/batch-completion-form-state.test.ts",
+  "tests/compliance-view.test.ts",
 ];
 
 export default defineConfig({

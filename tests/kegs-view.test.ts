@@ -111,6 +111,13 @@ describe("Customer keg balance", () => {
 });
 
 describe("Record keg event", () => {
+  it("#1401 renders the empty-keg helper as information, not a warning", () => {
+    const html = htmlOf(createElement(KegEventFields, { value: kegFleetMicrostar.eventForm!, options: kegFleetMicrostar.eventOptions! }));
+    const notice = html.match(/<div[^>]*role="note"[^>]*>.*?Empty kegs only\..*?<\/div><\/div>/)?.[0];
+    expect(notice).toContain("bg-info");
+    expect(notice).not.toContain("bg-warning");
+  });
+
   it("#1025 resets the bin when the location changes, in live and inventory alike", () => {
     const value = kegFleetMicrostar.eventForm!;
     expect(withLocationBin(value, { ...value, locationId: "cold" }, () => "")).toMatchObject({ locationId: "cold", binId: "" });
