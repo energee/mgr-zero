@@ -118,7 +118,7 @@ export function TapBoardView({ state: controlledState, skus, timeZone, navigatio
     <CommandFormMessage tone="warning">{pollError}</CommandFormMessage>
     <div role="status">{state.refreshing && E.polite("Updating the board…")}</div>
     <div aria-busy={Boolean(state.refreshing)}>
-      {navigation.locations.length === 0 ? E.blank("No taproom locations yet. Ask Admin to add one under Locations.") : state.snapshot.open.length === 0 ? E.blank("No kegs are on tap.") :
+      {navigation.locations.length === 0 ? E.blank("No taproom locations yet. Ask Admin to add one under Locations.") : state.snapshot.open.length === 0 ? E.polite("No kegs are on tap.") :
         E.tiles(state.snapshot.open.map(tap => [tap.tap_number ?? "unnumbered", `${tapLabel(tap)}${tap.sku_id ? "" : " · keg"}`, <>{volume(tap.nominal_bbl)} · on <time dateTime={tap.opened_at} title={formatDateTime(tap.opened_at, timeZone)}>{formatDayHeader(tap.opened_at, timeZone)}</time> by {actor(tap.opened_by_label)} · {opened(tap)}{tap.not_in_inventory ? " · not in taproom stock · excluded from variance" : ""}{!tap.sku_id && " · no guest yield"}</>, tap.not_in_inventory ? 1 : 0, undefined, undefined, actions(tap)]))}
     </div>
     {state.snapshot.open.some(tap => tap.tap_number === null) && E.info("Unnumbered kegs sort last.")}
