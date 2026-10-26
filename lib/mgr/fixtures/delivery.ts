@@ -40,9 +40,9 @@ export const returnRouteA: ReturnRouteViewModel = {
   driverVehicle: "sam@example.test · Box truck 2",
   departed: "8:10 AM",
   stops: [
-    { key: "s1", title: "Stop 1 · ORD-0231 · Ridgeline · Tap Room", detail: "delivered 8:42 AM" },
-    { key: "s2", title: "Stop 2 · ORD-0233 · Al’s Bar · Dock", detail: "partial 9:15 AM", outstanding: 2 },
-    { key: "s3", title: "Stop 3 · TRF-0004 · Storage", detail: "delivered 10:03 AM" },
+    { key: "s1", title: "Stop 1 · ORD-0231 · Ridgeline · Tap Room", detail: "Delivered 8:42 AM" },
+    { key: "s2", title: "Stop 2 · ORD-0233 · Al’s Bar · Dock", detail: "Partial 9:15 AM", outstanding: 2 },
+    { key: "s3", title: "Stop 3 · TRF-0004 · Storage", detail: "Delivered 10:03 AM" },
   ],
 };
 
@@ -51,9 +51,9 @@ export const driverRouteA: DriverRouteViewModel = {
   driverVehicle: "sam@example.test · Box truck 2",
   departed: "8:10 AM",
   stops: [
-    { key: "s1", title: "Stop 1 · ORD-0231 · Ridgeline · Tap Room", detail: "next", verb: "Resume", warning: true },
-    { key: "s2", title: "Stop 2 · ORD-0233 · Al’s Bar · Dock", detail: "later" },
-    { key: "s3", title: "Stop 3 · TRF-0004 · Storage", detail: "later" },
+    { key: "s1", title: "Stop 1 · ORD-0231 · Ridgeline · Tap Room", detail: "Next", verb: "Deliver", warning: true },
+    { key: "s2", title: "Stop 2 · ORD-0233 · Al’s Bar · Dock", detail: "Later" },
+    { key: "s3", title: "Stop 3 · TRF-0004 · Storage", detail: "Later" },
   ],
 };
 
