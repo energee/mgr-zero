@@ -22,16 +22,16 @@ const ERRORS: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; sent?: string }>
+  searchParams: Promise<{ error?: string; sent?: string; next?: string }>
 }) {
   const auth = getRequestAuthContext()
-  if (await auth.getIdentity()) redirect(await signInDestination(auth))
-  const { error, sent } = await searchParams
+  const { error, sent, next } = await searchParams
+  if (await auth.getIdentity()) redirect(await signInDestination(auth, next))
   if (error === "expired") return <>
     <CommandForm open title="Session expired">
       <SessionExpiredView model={sessionExpiredModel} signInHref="/login" />
     </CommandForm>
     <noscript><LoginForm error="Your session expired. Sign in again." /></noscript>
   </>
-  return <LoginForm error={error ? ERRORS[error] ?? "Sign-in failed." : undefined} sent={Boolean(sent)} />
+  return <LoginForm error={error ? ERRORS[error] ?? "Sign-in failed." : undefined} sent={Boolean(sent)} next={next} />
 }

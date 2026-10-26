@@ -13,6 +13,7 @@ import { toShipViewProps, type ShipSnapshot } from "@/lib/mgr/ship-view";
 import { toShipmentDoneViewProps, type ShipmentDoneViewModel } from "@/lib/mgr/shipment-done-view";
 import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
 import type { KegShortage } from "@/lib/mgr/keg-fleet-view";
+import { submitReason } from "@/lib/mgr/submit-reason";
 
 export type ShippingSnapshot = ShipSnapshot & { order: ShipSnapshot["order"] & { kind: string; to_location_id: string | null } };
 
@@ -27,6 +28,12 @@ export function buildShipLines(lines: ShippingSnapshot["lines"], qtys: Record<st
       return { binId: source?.bin_id, lotId: source?.lot_id ?? null, qty: Number(row.qty), toBinId: row.toBinId || undefined };
     }),
   }));
+}
+
+/** Why Ship order or Complete transfer is withheld: each line shipping a quantity needs a source; null when all have one. */
+export function shipReason(lines: ShippingSnapshot["lines"], qtys: Record<string, string>, allocations: ShipmentAllocations) {
+  return submitReason(lines.filter(line => Number(qtys[line.id]) > 0 && !allocations[line.id]?.length)
+    .map(line => `a source for ${line.skus?.name ?? "Line"}`));
 }
 
 /** Match ship_order: save a submitted shortage reason, otherwise keep the
@@ -56,13 +63,13 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
       label: `${available.bins.find(bin => bin.id === stock.bin_id)?.name ?? stock.bin_id} · ${stock.lot_code ?? "Untracked / legacy stock"} · ${stock.qty} available`,
     })),
   }))} allocations={allocations} onChange={setAllocations} destinationBins={available.destinationBins} disabled={busy} />;
-  const disabled = snapshot.lines.some(line => Number(qtys[line.id]) > 0 && !allocations[line.id]?.length);
+  const reason = shipReason(snapshot.lines, qtys, allocations);
   const onQuantity = (id: string, value: string) => setQtys(prev => ({ ...prev, [id]: value }));
   const messages = <CommandFormMessage error={error} />;
   if (result) return <ShipmentDoneView model={result} />;
   return <form className="contents" onSubmit={event => {
     event.preventDefault();
-    if (busy || disabled) return;
+    if (busy || reason) return;
     const ship = buildShipLines(snapshot.lines, qtys, allocations, available, reasons);
     void run("ship_order", {
       orderId: snapshot.order.id, carrier: carrier || undefined, tracking: tracking || undefined, invoiceTiming: model.invoiceTiming, ship,
@@ -73,9 +80,9 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
     });
   }}>
     {transfer
-      ? <CompleteTransferView model={toCompleteTransferViewProps(proposed)} quantities={qtys} onQuantity={onQuantity} sources={sources} messages={messages} submitting={busy} disabled={disabled} />
+      ? <CompleteTransferView model={toCompleteTransferViewProps(proposed)} quantities={qtys} onQuantity={onQuantity} sources={sources} messages={messages} submitting={busy} reason={reason} />
       : <ShipView model={model} quantities={qtys} onQuantity={onQuantity}
           reasons={reasons} onReason={(id, value) => setReasons(prev => ({ ...prev, [id]: value }))} carrier={carrier} tracking={tracking}
-          onCarrier={setCarrier} onTracking={setTracking} onInvoiceTiming={setInvoiceTiming} sources={sources} messages={messages} submitting={busy} disabled={disabled} />}
+          onCarrier={setCarrier} onTracking={setTracking} onInvoiceTiming={setInvoiceTiming} sources={sources} messages={messages} submitting={busy} reason={reason} />}
   </form>;
 }

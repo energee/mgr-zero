@@ -69,7 +69,7 @@ it("app/global-error.tsx renders its own themed document", () => {
   expect(globalError).toMatch(/^"use client";/m);
   expect(globalError).toContain('import "./globals.css";');
   expect(globalError).toMatch(/<html[^>]*suppressHydrationWarning[\s\S]*<head>\s*<ThemeBoot \/>[\s\S]*<body/);
-  expect(globalError).toContain("<RootError retry={retry} />");
+  expect(globalError).toContain("<RootError error={error} retry={retry} />");
 });
 
 // A notFound() or a throw before the shell flushes makes Next send its bare

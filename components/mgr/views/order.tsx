@@ -5,9 +5,9 @@
 // charges, cost, history, and a quiet Cancel at the bottom. Inventory and the
 // live page both pass toOrderViewProps(get_order-shaped data); sample orders
 // live in lib/mgr/fixtures/orders.ts. Verbs come in through `actions` and
-// `footer`: fixtures pass inert E buttons and leave `footer` out (an inert
-// Cancel order row draws); the live page passes its LifecycleButtons and
-// CancelOrderAction (app/(app)/orders/[id]/lifecycle-buttons.tsx), and
+// `footer`: fixtures pass inert E buttons and leave `footer` out (the shared
+// Cancel order dialog simulates locally); the live page passes LifecycleButtons
+// and CancelOrderAction (app/(app)/orders/[id]/lifecycle-buttons.tsx), and
 // footer={null} draws no bottom row. With onQuantity, Ordered is the shared
 // number field and a required Reason with `lineActions` (Save lines) follows
 // the lines: the live page adjusts quantities in place (order-lines-form.tsx).
@@ -16,6 +16,7 @@ import { OrderQuantity } from "./new-order";
 import { E } from "@/components/mgr/e";
 import { FactsGrid } from "@/components/mgr/views/facts-grid";
 import { PriceSummary } from "@/components/mgr/views/price-summary";
+import { CancelOrderControl } from "./cancel-order";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { OrderLineView, OrderViewModel } from "@/lib/mgr/order-view";
@@ -29,7 +30,7 @@ const NUMBER_COLUMNS = [["Ordered", "ordered"], ["Picked", "picked"], ["Shipped"
 
 /** The quiet destructive Cancel order button; the live page makes it the CancelOrderDialog trigger. */
 export const CancelOrderButton = (props: ComponentProps<typeof Button>) => (
-  <Button variant="ghost" size="sm" type="button" className="-mr-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive" {...props}>Cancel order</Button>
+  <Button variant="ghost" size="sm" type="button" data-preview-action className="-mr-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive" {...props}>Cancel order</Button>
 );
 
 /** The bottom row: why Cancel asks twice, beside the Cancel button (or the dialog opened from it). */
@@ -68,7 +69,7 @@ export function OrderView({
   model: OrderViewModel;
   /** The state's verbs, primary first; drawn in the header after Put back when beer is staged. */
   actions?: ReactNode;
-  /** The bottom row. Omitted: the inventory's inert Cancel order row; null: none. */
+  /** The bottom row. Omitted: the shared fixture cancellation dialog; null: none. */
   footer?: ReactNode;
   adjustLines?: boolean;
   showAddLine?: boolean;
@@ -223,7 +224,7 @@ export function OrderView({
         )}
       </section>
 
-      {footer === undefined ? <OrderCancelRow><CancelOrderButton /></OrderCancelRow> : footer}
+      {footer === undefined ? <OrderCancelRow><CancelOrderControl trigger={<CancelOrderButton />} /></OrderCancelRow> : footer}
     </div>
   );
 }

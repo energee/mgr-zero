@@ -7,13 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
+import { E } from "@/components/mgr/e";
 import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
 import { command, CommandResponseError } from "@/lib/commands/client";
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 import type { LossReview } from "@/lib/commands/compliance";
 import { bblExact } from "@/lib/volume";
 import { lossReviewReason } from "@/lib/mgr/monthly-compliance-view";
-import { SubmitButton } from "@/components/mgr/submit-button";
 
 type Target = "sample" | "taproom" | "destruction";
 type Payload = { adjustmentId: string; bbl: string; classification: Target; destinationState?: string };
@@ -32,14 +32,13 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
   const requestId = useRef<string | null>(null);
   const payload = useRef<Payload | null>(null);
   const locked = phase === "submitting" || phase === "unknown" || phase === "saved";
-  const reason = phase === "unknown" ? null : lossReviewReason(amount, loss.remaining_bbl, target, state);
-  const valid = reason === null;
+  const reason = lossReviewReason(amount, loss.remaining_bbl, target, state);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     const retrying = phase === "unknown";
     if (!retrying) {
-      if (!valid) return;
+      if (reason) return;
       requestId.current = crypto.randomUUID();
       payload.current = { adjustmentId: loss.adjustment_id, bbl: amount, classification: target, ...(target === "sample" ? { destinationState: state } : {}) };
     }
@@ -87,7 +86,9 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
       {phase === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The amount, target, state, and request ID are frozen. Retry unchanged to recover the saved result.</CommandFormMessage>}
       {phase === "saved" && <CommandFormMessage tone="warning">Loss reattribution saved.</CommandFormMessage>}
       <CommandFormMessage error={error} />
-      <CommandFormFooter><SubmitButton reason={phase === "idle" ? reason : null} submitting={phase === "submitting"} disabled={phase === "saved"} label={phase === "unknown" ? "Retry unchanged reattribution" : phase === "saved" ? "Saved" : "Save reattribution"} /></CommandFormFooter>
+      <CommandFormFooter>{E.submit(phase === "unknown" ? "Retry unchanged reattribution" : phase === "saved" ? "Saved" : "Save reattribution", {
+        reason: phase === "idle" ? reason : null, submitting: phase === "submitting", disabled: phase === "saved",
+      })}</CommandFormFooter>
     </form>
   </CommandForm>;
 }

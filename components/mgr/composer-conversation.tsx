@@ -43,6 +43,7 @@ export default function ComposerConversation({ chatConfigured, open, onOpenChang
     setFailure({ message: cause instanceof Error ? cause.message : fallback, retry });
   const [committing, setCommitting] = useState(false);
   const [receipt, setReceipt] = useState<string>();
+  const [dismissedPreviewToken, setDismissedPreviewToken] = useState<string>();
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const focusedRequest = useRef(0);
   // The latest setup load's controller. Starting another (Retry setup, Try
@@ -140,7 +141,7 @@ export default function ComposerConversation({ chatConfigured, open, onOpenChang
   return <>
     <ComposerConversationView messages={transcript} onSetupRetry={chatConfigured && !conversationId ? reloadSetup : undefined} activity={chatConfigured && !conversationId && !failure && online ? COMPOSER_SETUP_ACTIVITY : status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={errorMessage} onRetry={chatConfigured && online && (failure || error && chatFailure?.retryable) ? retry : undefined} onNewChat={chatConfigured ? () => void newChat() : undefined} />
     {proposalError && <p role="alert" className="rounded-md border border-destructive/40 bg-card p-3 text-sm">{proposalError}</p>}
-    {proposal && !receipt && <ComposerProposalView effects={proposal.effects} warnings={proposal.warnings} openHref={movementFormHref(proposal.input, proposal.previewToken)} onOpen={() => onOpenChange(false)} onCommit={() => void commitProposal()} committing={committing} />}
+    {proposal && !receipt && proposal.previewToken !== dismissedPreviewToken && <ComposerProposalView effects={proposal.effects} warnings={proposal.warnings} openHref={movementFormHref(proposal.input, proposal.previewToken)} onOpen={() => onOpenChange(false)} onDismiss={() => setDismissedPreviewToken(proposal.previewToken)} onCommit={() => void commitProposal()} committing={committing} />}
     {receipt && <p role="status" className="rounded-md border bg-card p-3 text-sm font-medium">{receipt}</p>}
     {children}
     <ComposerStripView actions={[{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }]} onAction={(value) => setPrompt(value === "attention" ? "What needs my attention today?" : value === "inventory" ? "What inventory is available?" : "Help me record an inventory movement.")} onOutbox={onOutbox} outboxCount={outboxCount} promptRef={promptRef} value={prompt} onChange={setPrompt} onSubmit={(text) => { if (!conversationId || chatBlocked) return; setPrompt(""); setReceipt(undefined); void sendMessage({ text }); }} disabled={!conversationId || chatBlocked || streaming || committing} streaming={streaming} onStop={stop} />

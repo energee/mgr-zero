@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { E } from "@/components/mgr/e";
 import { CommandFormMessage } from "@/components/mgr/command-form";
+import { submitReason } from "@/lib/mgr/submit-reason";
 import { ConfirmDeleteControl } from "./confirm-delete";
 
 /** The one notice a cancelled batch or packaging plan shows in place of its actions. */
@@ -21,7 +22,8 @@ export function PlanActions({ plannedOn, busy = false, error, onReschedule, onCa
     <CommandFormMessage error={error} />
     {/* Cancel plan stays small beside Reschedule: a destructive verb is never the page's biggest control (#995). */}
     <div className="flex flex-wrap items-center gap-2">
-      {E.act("Reschedule", "primary", undefined, () => onReschedule?.(date), busy || !date || date === plannedOn)}
+      {E.submit("Reschedule", { type: "button", size: "sm", disabled: busy, onClick: () => onReschedule?.(date),
+        reason: submitReason(date && date !== plannedOn ? [] : ["a different planned date"]) })}
       <ConfirmDeleteControl title="Cancel plan" name="Cancel this plan? The record stays in history."
         warning="No stock or beer is moved. Plans with recorded physical work cannot be cancelled."
         busy={busy} error={error} onDelete={onCancel} dismissLabel="Keep plan" busyLabel="Cancelling…" size="sm" />
@@ -40,6 +42,6 @@ export function PackagingSourcePicker({ occupancies, busy = false, error, onPick
   return <div className="flex flex-col gap-3">
     {E.pick("Source tank", occupancyId, occupancies.map(occupancy => ({ value: occupancy.occupancy_id, label: `${occupancy.vessel_name ?? "—"} · ${occupancy.brand_name ?? "no brand"} · ${Number(occupancy.bbl)} bbl` })), { onChange: setOccupancyId, disabled: busy, required: true, placeholder: "Choose tank" })}
     <CommandFormMessage error={error} />
-    {E.act("Pick source", "primary", undefined, () => onPick?.(occupancyId), busy || !occupancyId)}
+    {E.submit("Pick source", { type: "button", size: "sm", className: "w-fit", disabled: busy, onClick: () => onPick?.(occupancyId), reason: submitReason(occupancyId ? [] : ["a source tank"]) })}
   </div>;
 }

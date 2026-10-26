@@ -12,14 +12,18 @@ const base: CellarAdditionViewModel = {
 describe("additionPreview", () => {
   it("a lot-tracked material needs a lot before the verb is live", () => {
     expect(additionPreview(base)).toMatchObject({ valid: false, reason: "Choose a lot · Citra is lot-tracked" });
-    expect(additionPreview({ ...base, lotId: "l1" })).toEqual({ valid: true, text: "Preview: −18 lb Citra · L-0790 · consumption · Dry hop · Hazy IPA · B-0416" });
+    expect(additionPreview({ ...base, lotId: "l1" })).toEqual({ valid: true, qty: 18, text: "Preview: −18 lb Citra · L-0790 · consumption · Dry hop · Hazy IPA · B-0416" });
   });
   it("a tank, a material and a positive quantity are each required", () => {
     expect(additionPreview({ ...base, occupancyId: "" })).toMatchObject({ valid: false, reason: "Choose a tank" });
-    expect(additionPreview({ ...base, materialId: "m2", stage: "other", qty: "0" })).toMatchObject({ valid: false, reason: "Enter a quantity" });
-    expect(additionPreview({ ...base, materialId: "m2", stage: "other", qty: "4" })).toEqual({ valid: true, text: "Preview: −4 g Gypsum · consumption · Other · Hazy IPA · B-0416" });
+    expect(additionPreview({ ...base, materialId: "m2", stage: "other", qty: "0" })).toMatchObject({ valid: false, reason: "Enter a quantity above zero" });
+    expect(additionPreview({ ...base, materialId: "m2", stage: "other", qty: "4" })).toEqual({ valid: true, qty: 4, text: "Preview: −4 g Gypsum · consumption · Other · Hazy IPA · B-0416" });
   });
   it("more than the lot holds is refused up front", () => {
     expect(additionPreview({ ...base, lotId: "l1", qty: "41" })).toMatchObject({ valid: false, reason: "Only 40 lb of L-0790 on hand" });
+  });
+  it("refuses exponent notation before readiness or payload construction", () => {
+    expect(additionPreview({ ...base, lotId: "l1", qty: "1e1" }).valid).toBe(false);
+    expect(additionPreview({ ...base, lotId: "l1", qty: "1E1" }).valid).toBe(false);
   });
 });
