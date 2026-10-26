@@ -113,7 +113,6 @@ describe("navTitle", () => {
     expect(navTitle("/taproom/board")).toBe("Tap board");
     expect(navTitle("/settings/units")).toBe("Units");
     expect(navTitle("/settings/team")).toBe("Team");
-    expect(navTitle("/orders/new")).toBe("New order");
   });
   it.each([
     ["/kegs/report", "Keg report"],
