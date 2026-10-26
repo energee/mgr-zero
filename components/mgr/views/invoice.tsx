@@ -28,7 +28,7 @@ export type { InvoiceViewModel };
 const H2 = "text-base font-semibold";
 const LEGEND = "text-xs text-muted-foreground";
 const NUMBER_COLUMNS = [["Quantity", "qty"], ["Unit price", "unitPrice"]] as const;
-const METHOD_OPTIONS = [{ value: "", label: "Select a method" }, ...PAYMENT_METHODS.map((value) => ({ value, label: PAYMENT_METHOD_LABEL[value] }))];
+const METHOD_OPTIONS = [{ value: "", label: "Select a method", disabled: true }, ...PAYMENT_METHODS.map((value) => ({ value, label: PAYMENT_METHOD_LABEL[value] }))];
 
 /** The Record payment sheet's body, fields like KegPoolFields: amount capped at
  *  the balance, received day capped at the brewery's today, method,

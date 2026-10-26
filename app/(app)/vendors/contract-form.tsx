@@ -5,11 +5,13 @@
 "use client";
 
 import { useState } from "react";
+import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
+import { ConfirmDeleteControl } from "@/components/mgr/views/confirm-delete";
 import { ContractView } from "@/components/mgr/views/contract";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { contractBalanceFields, initialContractVendor } from "@/lib/mgr/contract-view";
+import { contractBalanceFields, contractSubmitReason, initialContractVendor } from "@/lib/mgr/contract-view";
 import { dollarsInput, toCents } from "@/lib/mgr/money";
 export type Contract = {
   id: string; vendor_id: string; material_id: string; contract_no: string | null; unit_cost_cents: number | null;
@@ -37,7 +39,6 @@ export function ContractForm({ contract, vendors, materials }: { contract?: Cont
     reset: () => { setVendorId(initialVendorId); setMaterialId(contract?.material_id ?? ""); setQty(contract?.qty_committed?.toString() ?? ""); setCost(initialCost); setStartsOn(contract?.starts_on ?? ""); setEndsOn(contract?.ends_on ?? ""); setContractNo(contract?.contract_no ?? ""); },
     target: contract?.id,
   });
-  const ready = vendorId && materialId && Number(qty) > 0;
   const trigger = contract ? <Button variant="ghost" size="sm">Edit</Button> : <Button size="sm" variant="outline">Add contract</Button>;
   const model = {
     vendorId,
@@ -51,6 +52,7 @@ export function ContractForm({ contract, vendors, materials }: { contract?: Cont
     unitCost: cost,
     contractNo,
   };
+  const reason = contractSubmitReason(model);
   const controls = {
     vendorId: setVendorId,
     materialId: setMaterialId,
@@ -70,9 +72,14 @@ export function ContractForm({ contract, vendors, materials }: { contract?: Cont
           messages={<CommandFormMessage error={form.error} />}
           footer={
             <CommandFormFooter>
-              <Button type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Save contract"}</Button>
+              {E.submit("Save contract", { submitting: form.submitting, reason })}
             </CommandFormFooter>
           }
+          remove={contract ? <ConfirmDeleteControl title="Delete contract" busyLabel="Deleting…"
+            name="Delete this contract?"
+            warning="A contract on a purchase order cannot be deleted. Set an end date instead."
+            busy={form.busy} error={form.error}
+            onDelete={() => form.run("delete_material_contract", { contractId: contract.id }, () => form.setOpen(false), { target: contract.id })} /> : null}
         />
       </form>
     </CommandForm>

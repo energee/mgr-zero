@@ -12,6 +12,8 @@ Your login starts with an invitation from the brewery. Open the email, enter **Y
 
 Browser tabs identify **Portal sign in**, **Reset password**, and **Invitations**, followed by **· MGR**.
 
+Opening a portal page or an invoice payment link while signed out takes you to **Sign in to your account**, the portal sign-in page. **Forgot password?** keeps you in the portal's password-reset flow.
+
 Enter your **Email** and the **Password** you chose, then select **Sign in**. A customer-only account opens **Shop**, or **Invitations** first if a pending invitation is waiting for you; see below. **Forgot password?** opens **Reset password** with an empty email field and no sent confirmation. Enter your email and select **Send reset link**. Only after the request succeeds does the page say **If that email is on an account, a reset link is on its way.** This does not reveal whether an account exists. If the request fails, the page asks you to try again instead of claiming a link was sent. The link opens **Set new password**. A reset link that was used or has timed out opens **Reset link expired**; select **Request a new link** to go back to the email form.
 
 While sign-in is being checked, the button says **Signing in…** and cannot be submitted again. Wrong credentials show **Incorrect email or password.** here in the portal, keeping your email in the form and leaving the password blank. The email is not added to the page address or browser history. Opening either sign-in page while already signed in sends you to Shop for a customer-only account, Today for a staff account, or **No brewery yet** if your account has no membership.
@@ -53,7 +55,7 @@ The brewery's public taproom menu is a separate read-only website feed. Publishi
 
 <Screen name="Review order" />
 
-New carts select your default ship-to, or the first address if none is designated. You can choose another address; saving the cart keeps your explicit choice. Contact brewery staff to change the account default.
+New carts select your default ship-to, or the first address if none is designated. You can choose another address; saving the cart keeps your explicit choice. **Select a ship-to** is a prompt, not an address you can choose. Contact brewery staff to change the account default.
 
 **Unsaved cart:** this browser keeps a new cart's quantities and delivery details while you move around the portal, reload, or come back later. It is kept for your login and this customer account only; another login or account on the same browser starts its own cart. It is cleared when you select **Save draft** or place the order, and dropped after 7 days without an edit. If a package left the catalog since then, Shop removes it and names it in a message; a ship-to that no longer exists returns to your default. Drafts, reorders, and a pending order request are not part of this cart. Nothing is sent to the brewery until you save or place the order. If the browser blocks storage, the cart lasts only until you leave Shop; use **Save draft** to keep it.
 
@@ -143,7 +145,9 @@ If the signed-in buyer account changes while an order or invoice question is pen
 
 **A page fails to load.** Select **Try again** once. If it still fails, give the brewery your customer name, page, approximate time, and the action you tried. When a **Reference** appears under the error, include it.
 
-**A page says "Not found".** The order or invoice at that address does not exist for your account, or the link is wrong. The browser tab reads **Not found · MGR**, including a Shop link to a missing draft or reorder source. Open **Orders** or **Invoices** and pick the record from the list.
+**A page says "Not found".** A mistyped or unknown portal address, or a link to an order or invoice that does not exist for your account, shows Not found inside portal navigation with **Back to Orders**. The browser tab reads **Not found · MGR**, including a Shop link to a missing draft or reorder source. Check the address, or open **Orders** or **Invoices** and pick the record from the list.
+
+<Screen name="Portal page not found" />
 
 **A product, order, or invoice seems missing.** Confirm the customer account name shown in navigation. Shop includes only SKUs (a brand in one package format) the brewery has designated for wholesale and priced for that account's sale channel. Orders and Invoices include only that account's records.
 

@@ -71,6 +71,31 @@ describe("Order view loop", () => {
     expect(model.events.at(-1)).toMatchObject({ event: "Lines adjusted", detail: "Pils · 16 oz case 10 to Pils · 16 oz case 7 (customer cut)" });
   });
 
+  it.each(["", "   ", "\t\r\n", "\u00a0\u2003"])("omits empty parentheses for historical adjustment reason %j", reason => {
+    const events = orderPickedRestock.events.map(event => event.event === "lines_adjusted"
+      ? { ...event, payload: { ...event.payload, reason } } : event);
+    expect(toOrderViewProps({ ...orderPickedRestock, events }).events.at(-1)?.detail)
+      .toBe("Pils · 16 oz case 10 to Pils · 16 oz case 7");
+  });
+
+  it("trims historical padded adjustment reasons for display", () => {
+    const events = orderPickedRestock.events.map(event => event.event === "lines_adjusted"
+      ? { ...event, payload: { ...event.payload, reason: " \tcustomer cut\n " } } : event);
+    expect(toOrderViewProps({ ...orderPickedRestock, events }).events.at(-1)?.detail)
+      .toBe("Pils · 16 oz case 10 to Pils · 16 oz case 7 (customer cut)");
+  });
+
+  it("describes negative available stock without ATP jargon", () => {
+    const line = orderConfirmedWholesale.lines[0];
+    const model = toOrderViewProps({
+      ...orderConfirmedWholesale,
+      lines: [line],
+      atp: [{ sku_id: line.sku_id, qty: -2 }],
+    });
+    expect(model.lines[0].warning).toBe("Available is below zero");
+    expect(renderToStaticMarkup(createElement(OrderView, { model }))).toContain("Available is below zero");
+  });
+
   it("prints the requested ship date in the one date format (#991)", () => {
     const model = toOrderViewProps({ ...orderPickedRestock, order: { ...orderPickedRestock.order, requested_ship_date: "2026-09-14" } });
     expect(model.facts).toContainEqual({ label: "Requested ship date", value: "Sep 14, 2026" });
@@ -313,7 +338,9 @@ describe("Order view loop", () => {
 
     it("draws a desktop table and labeled phone records from the same lines", () => {
       const out = html(orderConfirmedWholesale);
-      for (const header of ["SKU", "Ordered", "Picked", "Shipped", "Brewery ATP", "Unit price", "Line amount"]) expect(out).toContain(`>${header}<`);
+      for (const header of ["SKU", "Ordered", "Picked", "Shipped", "Available (all locations)", "Unit price", "Line amount"]) expect(out).toContain(`>${header}<`);
+      expect(out).toContain("Available counts every location, not only the fulfillment source. Not supplied does not mean zero.");
+      expect(out).not.toContain("Brewery ATP");
       expect(out).toMatch(/<dt[^>]*>Line amount<\/dt>/);
       expect(out).toContain("Price summary");
       expect(out).toContain("3 lines");

@@ -30,8 +30,8 @@ export function ReceivePoView({ model, controls = {}, messages, submitting = fal
       {correcting && E.edit("Correction reason", model.correctionReason ?? "", "text", undefined, { onChange: controls.reason, required: true })}
       {mode === "receive" && model.locations && <>
         <div className="grid grid-cols-2 gap-2">
-          {E.pick("Received into", String(model.locationId ?? ""), [{ value: "", label: "Select location" }, ...(model.locations.map(location => ({ value: location.id, label: location.name })))], { onChange: controls.location, required: true })}
-          {E.pick("Bin", String(model.binId ?? ""), [{ value: "", label: "Select bin" }, ...(model.bins?.map(bin => ({ value: bin.id, label: bin.name })) ?? [])], { onChange: controls.bin, required: true })}
+          {E.pick("Received into", String(model.locationId ?? ""), [{ value: "", label: "Select location", disabled: true }, ...(model.locations.map(location => ({ value: location.id, label: location.name })))], { onChange: controls.location, required: true })}
+          {E.pick("Bin", String(model.binId ?? ""), [{ value: "", label: "Select bin", disabled: true }, ...(model.bins?.map(bin => ({ value: bin.id, label: bin.name })) ?? [])], { onChange: controls.bin, required: true })}
         </div>
         <DatePicker label="Received on" value={controls.receivedOn ? model.receivedOn ?? "" : undefined} defaultValue={model.receivedOn} onChange={controls.receivedOn} />
       </>}
@@ -62,10 +62,10 @@ export function ReceivePoView({ model, controls = {}, messages, submitting = fal
       {E.ttl(model.closure === "cancel" ? "Cancel purchase order" : "Close remaining quantity")}
       {E.edit("Closure reason", model.closureReason ?? "", "text", undefined, { onChange: controls.closureReason, form: CLOSURE_FORM_ID })}
       {E.info("Only the unreceived remainder is released. Posted receipts and stock stay in history.")}
-      {E.submit(model.closure === "cancel" ? "Cancel purchase order" : "Close short", { form: CLOSURE_FORM_ID, variant: "destructive", disabled: submitting, reason: submitReason(model.closureReason?.trim() ? [] : ["a closure reason"]) })}
+      {E.pin(E.submit(model.closure === "cancel" ? "Cancel purchase order" : "Close short", { form: CLOSURE_FORM_ID, variant: "destructive", disabled: submitting, reason: submitReason(model.closureReason?.trim() ? [] : ["a closure reason"]) }))}
     </fieldset>}
     {messages}
     {E.sp()}
-    {footer !== undefined ? footer : (receiving || mode === "draft") && <Button type="submit" data-variant={receiving ? "irreversible" : undefined} className={receiving ? "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" : ""} disabled={submitting || disabled}>{submitting ? "Saving…" : { draft: "Mark sent", correct: "Correct receipt", receive: "Receive purchase order", view: "" }[mode]}</Button>}
+    {footer !== undefined ? footer : (receiving || mode === "draft") && E.pin(<Button type="submit" data-variant={receiving ? "irreversible" : undefined} className={receiving ? "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" : ""} disabled={submitting || disabled}>{submitting ? "Saving…" : { draft: "Mark sent", correct: "Correct receipt", receive: "Receive purchase order", view: "" }[mode]}</Button>)}
   </>;
 }

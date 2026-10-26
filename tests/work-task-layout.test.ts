@@ -48,7 +48,20 @@ describe("Work task layout (#1259)", () => {
     const html = renderToStaticMarkup(createElement(WorkList, {
       rows: [], defaults: ["orders"], createAction: null, chips: Object.keys(workHrefsFor(["warehouse"])),
     }));
-    expect(html).not.toContain(">Pick<");
-    expect(html).not.toContain(">Replenishment<");
+    expect(html).toContain('href="/pick"');
+    expect(html).toContain('href="/replenishment"');
+    const sales = renderToStaticMarkup(createElement(WorkList, {
+      rows: [], defaults: ["orders"], createAction: null, chips: Object.keys(workHrefsFor(["sales"])),
+    }));
+    expect(sales).not.toContain('href="/pick"');
+    expect(sales).toContain('href="/replenishment"');
+  });
+
+  it("draws the inventory Work navigation in the shared filter bar without live destinations", () => {
+    const html = renderToStaticMarkup(createElement("div", null, SCREENS.find(screen => screen.name === "Work")!.body));
+    expect(html.match(/role="tablist"/g)).toHaveLength(1);
+    expect(html).toMatch(/<a\b[^>]*href="#"[^>]*>Pick<\/a>/);
+    expect(html).toMatch(/<a\b[^>]*href="#"[^>]*>Replenishment<\/a>/);
+    expect(html).not.toMatch(/href="\/(?:pick|replenishment)"/);
   });
 });

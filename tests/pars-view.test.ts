@@ -15,7 +15,7 @@ describe("Pars view", () => {
     const model = toParsViewProps(parsPils);
     expect(model.title).toBe("Pils · 16 oz case");
     expect(model.atp).toBe("−6 cases · −18 gal");
-    expect(model.atpDetail).toBe("ATP · 22 cases on hand · 28 allocated");
+    expect(model.atpDetail).toBe("Available · 22 cases on hand · 28 allocated");
     expect(model.rows.map((r) => r.verb)).toEqual(["Adjust", "Release", "Edit", "Edit par"]);
     expect(model.rows[0]?.title).toMatch(/^ORD-0231 · Ridgeline/);
     expect(model.rows[0]?.tone).toBe("attention");

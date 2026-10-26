@@ -2,6 +2,7 @@
 import type { EmptyState } from "./empty-state";
 import { plural } from "./plural";
 import { trfNo } from "./doc-no";
+import { sentenceCase } from "./labels";
 import { WORK_CHIPS, WORK_TABS } from "./work-view";
 
 // A transfer's next action by status. Received and cancelled transfers have
@@ -58,7 +59,7 @@ export function toTransfersViewProps({ transfers }: TransfersSnapshot): Transfer
       return {
         key: t.id,
         title: trfNo(t.transfer_no),
-        detail: `${t.from_name} to ${t.to_name} · ${plural(t.line_count, "line")} · ${t.status.replaceAll("_", " ")}`,
+        detail: `${t.from_name} to ${t.to_name} · ${plural(t.line_count, "line")} · ${sentenceCase(t.status)}`,
         href: `/transfers/${t.id}`,
         verb: verb?.label,
         tone: verb?.tone,

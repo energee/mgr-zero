@@ -28,6 +28,7 @@ import { toMaterialsOnHandViewProps } from "../lib/mgr/materials-on-hand-view";
 import { purchaseOrderNext, toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
 import { receiptBillPresentation, receiptBillRequest, toPostedReceiptViewProps, type ReceiptSnapshot } from "../lib/mgr/receipt-view";
 import { toVendorsViewProps } from "../lib/mgr/vendors-view";
+import { contractSubmitReason } from "../lib/mgr/contract-view";
 import { newPoReason } from "../lib/mgr/new-po-view";
 import { CLOSURE_FORM_ID } from "../lib/mgr/receive-po-view";
 import { beginRecovery, discardRecovery } from "../lib/commands/recovery";
@@ -37,6 +38,20 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
 
 describe("Purchase orders", () => {
+  it("Vendor, Material, Received into and Bin prompts are unavailable choices (#1388)", () => {
+    const pick = vi.spyOn(E, "pick");
+    htmlOf(createElement(NewPoView, { model: newPoCountryMalt }));
+    htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }));
+    const calls = [...pick.mock.calls];
+    pick.mockRestore();
+    for (const label of ["Vendor", "Material", "Received into", "Bin"]) {
+      const options = calls.find(([name]) => name === label)?.[2];
+      expect(options, label).toEqual(expect.arrayContaining([
+        expect.objectContaining({ value: "", disabled: true }),
+      ]));
+    }
+  });
+
   it("a closed order with no next action is a row link, not an Open verb (#996)", () => {
     const model = toPurchaseOrdersViewProps({ title: "Purchase orders", subtitle: "every order", rows: [
       { key: "po", title: "PO-0012 · Hop Co", detail: "received", href: "/purchase-orders/po" },
@@ -48,7 +63,7 @@ describe("Purchase orders", () => {
   });
 
   it("each order status names its next action; received and cancelled have none (#996)", () => {
-    expect(purchaseOrderNext("draft")).toEqual({ verb: "Mark sent", tone: "info" });
+    expect(purchaseOrderNext("draft")).toEqual({ verb: "Send", tone: "info" });
     expect(purchaseOrderNext("sent")).toEqual({ verb: "Receive", tone: "info" });
     expect(purchaseOrderNext("partially_received")).toEqual({ verb: "Receive", tone: "attention" });
     expect(purchaseOrderNext("received")).toBeUndefined();
@@ -160,7 +175,9 @@ it("posted receipt uses counted quantities, captured lot references and current 
     receipts: [{ id: "receipt-id", received_on: "2026-09-12", receipt_lines: [{ po_line_id: "line-id", qty_counted: 3, variance: -1, lot_id: "actual-lot-id", material_name: "Actual material", purchase_uom: "box", purchase_uom_factor: 10, base_uom: "kg" }] }],
   };
   const model = toPostedReceiptViewProps(snapshot, "receipt-id")!;
-  expect(model.title).toBe("PO-0042 · received");
+  expect(model.title).toContain("PO-0042");
+  expect(model.title).toContain("Sep 12, 2026");
+  expect(model.status).toBe("partially received");
   expect(model.stillOwed).toBe("1 box Actual material");
   expect(model.tape[0][0]).toBe("+30 kg Actual material · receipt");
   expect(model.tape[0][1]).toContain("short 1 box");
@@ -440,6 +457,37 @@ describe("Vendors", () => {
     const html = htmlOf(createElement(ContractView, { model: contractYchCitra }));
     expect(html).toMatch(/>Save contract</);
     expect(html).toMatch(/Contract number/);
+    expect(html).toContain('aria-haspopup="dialog"');
+    expect(html).toContain("Delete contract");
+    const creating = htmlOf(createElement(ContractView, { model: contractYchCitra, remove: null }));
+    expect(creating).not.toContain("Delete contract");
+  });
+
+  it("holds Save contract for missing, invalid, or exponent-notation values", () => {
+    expect(contractSubmitReason({ vendorId: "", materialId: "", quantity: "", unitCost: "" })).toBeTruthy();
+    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1", unitCost: "-1" })).toBeTruthy();
+    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1e3", unitCost: "" })).toBeTruthy();
+    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1.5", unitCost: "0" })).toBeNull();
+  });
+
+  it("waits to show contract errors in live controlled fields", () => {
+    const negativeModel = { ...contractYchCitra, unitCost: "-1" };
+    const controlled = htmlOf(createElement(ContractView, { model: negativeModel, controls: { quantity: () => {}, unitCost: () => {} } }));
+    const controlledCost = /<input\b[^>]*id="[^"]+-cost"[^>]*>/.exec(controlled)?.[0];
+    expect(controlledCost).toBeDefined();
+    expect(controlledCost).not.toContain('aria-invalid="true"');
+    const negativeCost = htmlOf(createElement(ContractView, { model: negativeModel }));
+    const cost = /<input\b[^>]*id="[^"]+-cost"[^>]*>/.exec(negativeCost)?.[0];
+    expect(cost).toContain('aria-invalid="true"');
+    const errorId = /\bid="([^"]+-error)"/.exec(negativeCost)?.[1];
+    expect(errorId).toBeDefined();
+    const descriptions = /aria-describedby="([^"]+)"/.exec(cost!)?.[1].split(/\s+/);
+    expect(descriptions).toContain(errorId);
+    expect(negativeCost).toMatch(/<button[^>]*disabled[^>]*>Save contract<\/button>/);
+    const exponentQuantity = htmlOf(createElement(ContractView, { model: { ...contractYchCitra, quantity: "1e3" } }));
+    const quantity = /<input\b[^>]*id="[^"]+-quantity"[^>]*>/.exec(exponentQuantity)?.[0];
+    expect(quantity).toContain('aria-invalid="true"');
+    expect(exponentQuantity).toMatch(/<button[^>]*disabled[^>]*>Save contract<\/button>/);
   });
 
   it("the contract's inline field pairs render without a React key warning (E.inline owns the keys)", () => {

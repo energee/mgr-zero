@@ -5,16 +5,35 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { PackagingRunsView } from "../components/mgr/views/packaging-runs";
+import { ClosePackagingRunView } from "../components/mgr/views/close-packaging-run";
 import { RepackView } from "../components/mgr/views/repack";
 import { SchedulePackagingRunView } from "../components/mgr/views/schedule-packaging-run";
 import { packagingRuns, repackCase, schedulePackagingRun } from "../lib/mgr/fixtures/packaging";
 import { DEMO_TIME_ZONE } from "../lib/mgr/fixtures/settings";
 import { toPackagingRunsViewProps } from "../lib/mgr/packaging-runs-view";
 import { scheduleRunReason, toSchedulePackagingRunView } from "../lib/mgr/schedule-packaging-run-view";
+import { breweryDate } from "../lib/date-format";
 const screen = (name: string) => SCREENS.find((entry) => entry.name === name)!;
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 
 describe("packaging views", () => {
+  it("labels planned and actual unit counts and unsourced runs", () => {
+    const html = htmlOf(createElement(ClosePackagingRunView, { model: {
+      title: "RUN-0001", plannedOn: "2026-10-25", plannedOutputs: [["Case", 4, "Not recorded"]], showCloseReview: false,
+    } }));
+    expect(html).toContain("Planned units");
+    expect(html).toContain("Actual units");
+    expect(html).toContain("No source yet");
+  });
+
+  it("marks a cancelled plan in its date field without a second status field", () => {
+    const html = htmlOf(createElement(ClosePackagingRunView, { model: {
+      title: "RUN-0001", plannedOn: "2026-10-25", cancelled: true,
+    } }));
+    expect(html).toMatch(/>Cancelled</);
+    expect(html).not.toMatch(/>Planned<|>Status</);
+  });
+
   it("mounts shared views for all three inventory records", () => {
     const runs = screen("Packaging runs").body as { type: unknown; props: { model: unknown } };
     const schedule = screen("Schedule packaging run").body as { type: unknown; props: { model: unknown } };
@@ -102,6 +121,9 @@ describe("packaging views", () => {
       { ...base, id: "cancelled", run_no: 8, closed_at: null, cancelled_at: "2026-09-05T01:30:00Z" },
     ], "America/Los_Angeles");
     expect(model.recent.map(row => [row.status, row.date])).toEqual([["Closed", "Sep 4, 2026"], ["Cancelled", "Sep 4, 2026"]]);
+    const html = htmlOf(createElement(PackagingRunsView, { model }));
+    expect(html).toContain("Closed or cancelled");
+    expect(html).not.toContain("Finished date");
   });
 
   it("keeps shortage precedence over physical work and preserves recorded zero yield and loss", () => {
@@ -192,6 +214,64 @@ describe("packaging views", () => {
     expect(model).toMatchObject({ leftLabel: "Left in FV1", leftInSource: "15 bbl" });
     // A planned SKU with no known barrels per unit leaves the remainder unknown, not guessed.
     expect(toSchedulePackagingRunView(data, { brandId: "b1", occupancyId: "o1", plannedOn: "", qty: { s2: "3" } }).leftInSource).toBeUndefined();
+  });
+
+  it("requires whole planned kegs without rejecting fractional non-keg packages or dropping an invalid spare line (#1380)", () => {
+    const data = {
+      brands: [{ id: "b", name: "Fictional Pils" }], occupancies: [],
+      skus: [
+        { id: "keg", name: "Draft package", brand_id: "b", formats: { package_type: "keg" }, format_volume: { bbl_per_unit: 0.5 } },
+        { id: "case", name: "Keg-named case", brand_id: "b", formats: { package_type: "can" }, format_volume: { bbl_per_unit: 0.1 } },
+      ],
+    };
+    const draft = { brandId: "b", occupancyId: "", plannedOn: "2026-10-25", qty: { keg: "1.5", case: "2" } };
+    expect(scheduleRunReason(toSchedulePackagingRunView(data, draft))).not.toBeNull();
+    expect(scheduleRunReason(toSchedulePackagingRunView(data, { ...draft, qty: { keg: "2", case: "1.5" } }))).toBeNull();
+    for (const keg of ["1e1", "-1", "NaN"]) {
+      expect(scheduleRunReason(toSchedulePackagingRunView(data, { ...draft, qty: { keg, case: "2" } }))).not.toBeNull();
+    }
+  });
+
+  it("warns about a selected tank shortage but permits that plan and a legitimate no-source plan (#1380)", () => {
+    const data = {
+      brands: [{ id: "b", name: "Fictional Pils" }],
+      occupancies: [{ occupancy_id: "o", vessel_name: "Fictional brite", brand_name: "Fictional Pils", batch_no: 1, bbl: 5 }],
+      skus: [{ id: "keg", name: "Draft package", brand_id: "b", formats: { package_type: "keg" }, format_volume: { bbl_per_unit: 0.5 } }],
+    };
+    const draft = { brandId: "b", occupancyId: "o", plannedOn: "2026-10-25", qty: { keg: "11" } };
+    const model = toSchedulePackagingRunView(data, draft);
+    expect(model.sourceWarning).toContain("more beer");
+    expect(scheduleRunReason(model)).toBeNull();
+    const noSource = toSchedulePackagingRunView(data, { ...draft, occupancyId: "" });
+    expect(noSource.sourceWarning).toBeUndefined();
+    expect(noSource.leftInSource).toBeUndefined();
+    expect(scheduleRunReason(noSource)).toBeNull();
+  });
+
+  it("warns only before brewery-local today and visibly marks only active overdue plans (#1380)", () => {
+    const at = new Date("2026-10-26T01:00:00Z");
+    const today = breweryDate("America/Los_Angeles", at);
+    const draft = { brandId: "", occupancyId: "", plannedOn: "2026-10-24", qty: {} };
+    const data = { brands: [], occupancies: [], skus: [] };
+    expect(toSchedulePackagingRunView(data, draft, today).dateWarning).toContain("past");
+    expect(toSchedulePackagingRunView(data, { ...draft, plannedOn: today }, today).dateWarning).toBeUndefined();
+    const base = { run_no: 1, planned_on: "2026-10-24", started_at: null, closed_at: null, cancelled_at: null, brand_name: "Fictional Pils", vessel_name: null, qty_planned: 2 };
+    const model = toPackagingRunsViewProps([
+      { ...base, id: "old" }, { ...base, id: "today", planned_on: today },
+      { ...base, id: "closed", closed_at: at.toISOString() }, { ...base, id: "cancelled", cancelled_at: at.toISOString() },
+    ], "America/Los_Angeles", undefined, at);
+    expect(model.upcoming.map(row => row.overdue)).toEqual([true, false]);
+    expect(model.recent.every(row => !row.overdue)).toBe(true);
+    expect(htmlOf(createElement(PackagingRunsView, { model }))).toContain("Overdue");
+  });
+
+  it("offers empty-package recovery only to catalog creators and keeps inventory destinations inert (#1380)", () => {
+    const model = toSchedulePackagingRunView({ brands: [{ id: "b", name: "Fictional Pils" }], occupancies: [], skus: [] }, { brandId: "b", occupancyId: "", plannedOn: "", qty: {} });
+    expect(htmlOf(createElement(SchedulePackagingRunView, { model, catalogHref: "/catalog" }))).toMatch(/href="\/catalog"[^>]*>Add a package in Catalog/);
+    const denied = htmlOf(createElement(SchedulePackagingRunView, { model, catalogHref: null }));
+    expect(denied).toContain("An admin or sales member can add a package in Catalog.");
+    expect(denied).not.toContain('href="/catalog"');
+    expect(htmlOf(createElement(SchedulePackagingRunView, { model }))).not.toContain('href="/catalog"');
   });
 
   // #1125: copy and labels only; repack has no damage input.

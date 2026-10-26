@@ -49,6 +49,12 @@ An invoice QuickBooks never received takes payments recorded in MGR (`record_inv
 
 An Admin can write off such an invoice with `write_off_invoice` before it is fully paid, for its remaining balance. Its payments stay, and it takes no new payment.
 
+`adjust_order_lines` requires a reason containing more than whitespace. New
+adjustments store the reason with surrounding whitespace removed; blank reasons
+return `invalid_input` without changing lines or reservations. Retry a saved
+request with its original input and request ID, including the original reason
+spacing. Completed historical requests replay before this new-write validation.
+
 {/* ops:orders */}
 
 ## adjust_order_lines [#adjust_order_lines]

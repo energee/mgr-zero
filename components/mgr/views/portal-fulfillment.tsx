@@ -26,12 +26,16 @@ export function PortalFulfillmentView({ locations, currentId, onSave, busy = fal
 }) {
   const [locationId, setLocationId] = useState(locations.find(location => location.id === currentId)?.id ?? "");
   const empty: PickEmpty = { text: "No location has Warehouse in its Uses. Add Warehouse to a location's Uses, then choose it here.", label: "Edit locations", href: locationsHref, to: "Locations" };
-  return <form onSubmit={event => { event.preventDefault(); onSave?.(locationId); }}>
+  const missing: string[] = [];
+  if (!locationId) missing.push("a warehouse");
+  else if (locationId === currentId) missing.push("a change to the warehouse");
+  const reason = submitReason(missing);
+  return <form onSubmit={event => { event.preventDefault(); if (!busy && !reason) onSave?.(locationId); }}>
     <FieldSet className="min-w-0">
       <FieldLegend><h2 className="font-heading text-xl font-semibold">Wholesale fulfillment</h2></FieldLegend>
       {E.pick("Portal fulfillment warehouse", locationId, [{ value: "", label: "Choose warehouse", disabled: true }, ...locations.map(location => ({ value: location.id, label: location.name }))], { id: "portal-warehouse", required: true, disabled: busy || !locations.length, onChange: setLocationId, empty })}
       <CommandFormMessage error={error} />
-      <CommandFormFooter className="@min-[24rem]:flex-row @min-[24rem]:items-center @min-[24rem]:justify-end">{E.submit("Save warehouse", { submitting: busy, reason: submitReason(locationId ? [] : ["a warehouse"]) })}</CommandFormFooter>
+      <CommandFormFooter className="@min-[24rem]:flex-row @min-[24rem]:items-center @min-[24rem]:justify-end">{E.submit("Save warehouse", { submitting: busy, reason })}</CommandFormFooter>
     </FieldSet>
   </form>;
 }

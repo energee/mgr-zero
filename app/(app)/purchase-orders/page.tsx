@@ -1,6 +1,6 @@
 // app/(app)/purchase-orders/page.tsx — Work › POs: open purchase orders
 // (list_purchase_orders; ?all=1 adds received and cancelled), each row naming
-// its next action — Mark sent on a draft, Receive on a sent one — and opening
+// its next action — Send on a draft, Receive on a sent one — and opening
 // its own page. New PO is new-po-form.tsx → create_purchase_order.
 import Link from "next/link";
 import { Button } from "@/components/ui/button";

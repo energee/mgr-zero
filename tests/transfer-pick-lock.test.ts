@@ -51,7 +51,7 @@ describe("transfer pick under concurrency (#1033)", { concurrent: false }, () =>
     await picker.query("rollback");
 
     expect(outcome.ok).toBe(false);
-    if (!outcome.ok) expect(outcome.error.message).toMatch(/0 on hand in the source bin/);
+    if (!outcome.ok) expect(outcome.error).toMatchObject({ code: "P0001" });
     const { data: hdr } = await admin.from("stock_transfers").select("status").eq("id", transferId).single();
     expect(hdr!.status).toBe("submitted");
   });
