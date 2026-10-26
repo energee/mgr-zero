@@ -98,6 +98,8 @@ const pureTests = [
   "tests/tap-board-view.test.ts",
   "tests/compliance-view.test.ts",
   "tests/purchasing-view.test.ts",
+  "tests/delivery-view.test.ts",
+  "tests/transfers-view.test.ts",
   "tests/shipment-parity.test.ts",
   "tests/order-sheets-view.test.ts"
 ];

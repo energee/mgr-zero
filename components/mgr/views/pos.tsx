@@ -11,7 +11,7 @@ import { reconcileBooleanChange, type PosLocationRow, type PosMenuModel, type Po
 
 const SelectField = ({ id, label, value, options, onChange }: {
   id: string; label: string; value: string; options: { value: string; label: string }[]; onChange: (value: string) => void;
-}) => E.pick(label, value, [{ value: "", label: "Select " + (label.toLowerCase()) }, ...(options.map(option => ({ value: option.value, label: option.label })))], { onChange: (nextValue: string) => onChange(nextValue), id });
+}) => E.pick(label, value, [{ value: "", label: "Select " + (label.toLowerCase()), disabled: true }, ...(options.map(option => ({ value: option.value, label: option.label })))], { onChange: (nextValue: string) => onChange(nextValue), id });
 
 export function PosSyncActions({ catalogBusy = false, salesBusy = false, catalogLabel = "Sync Square catalog", salesLabel = "Sync Square sales", feedback, onCatalog, onSales }: {
   catalogBusy?: boolean; salesBusy?: boolean; catalogLabel?: string; salesLabel?: string; feedback?: ReactNode;

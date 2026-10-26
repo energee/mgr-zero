@@ -28,7 +28,7 @@ export function repackFooter(model: RepackViewModel, props: FooterProps = {}) {
 
 /** `id` ties the label, and an empty note, to the picker. */
 const pick = (id: string, label: string, value: string | undefined, options: RepackOption[], onChange?: (id: string) => void, disabled = false, empty?: PickEmpty) => (
-  E.pick(label, String(value ?? ""), [{ value: "", label: "Select " + (label.toLowerCase()) }, ...(options.map((o) => ({ value: o.id, label: o.name })))], { id, onChange, disabled, required: true, "aria-label": label, empty })
+  E.pick(label, String(value ?? ""), [{ value: "", label: "Select " + (label.toLowerCase()), disabled: true }, ...(options.map((o) => ({ value: o.id, label: o.name })))], { id, onChange, disabled, required: true, "aria-label": label, empty })
 );
 
 const BREAKS = "No SKU can be broken yet: a SKU breaks when its format is made of another format.";
