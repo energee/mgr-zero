@@ -4,7 +4,7 @@ import { E } from "@/components/mgr/e";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Attachment, AttachmentContent, AttachmentDescription, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { IMPORT_FIELDS, IMPORT_FIELD_LABELS, IMPORT_KINDS, IMPORT_ROW_CAP_LABEL, canReviewImport, importTemplateCsv, importTemplateName, readyImportRows, validateImportRows, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 import { downloadCsv } from "@/lib/download-csv";
 import { importKindLabel } from "@/lib/mgr/labels";
@@ -44,6 +44,9 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
   };
   const fields = IMPORT_FIELDS[kind], ready = readyImportRows(rows, validation).length;
   const canReview = canReviewImport(kind, mapping, model.headers ?? [], rows);
+  const fileRejected = step === 0 && !!model.fileName && !!model.error && !model.headers;
+  let fileState: "idle" | "done" | "error" = model.headers ? "done" : "idle";
+  if (fileRejected) fileState = "error";
   return <>
     {E.back("Settings", "Import", undefined, model.backHref)}
     {E.stp(["Upload", "Match columns", "Review", "Import"], step)}
@@ -53,17 +56,17 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
         {IMPORT_KINDS.map(value => <ToggleGroupItem key={value} value={value}>{importKindLabel(value)}</ToggleGroupItem>)}
       </ToggleGroup>
     </FieldSet>
-    {model.error && <p role="alert" className="text-destructive">{model.error}</p>}
+    {model.error && !fileRejected && <p role="alert" className="text-destructive">{model.error}</p>}
     {step === 0 && <>
       <p>Save your spreadsheet as a CSV file with one record per row, up to {IMPORT_ROW_CAP_LABEL} rows. Name the first row’s columns exactly as listed below, with the same capitals, and MGR matches them for you. You can match columns with other names in the next step.</p>
       {E.ttl(`${importKindLabel(kind)} columns`)}
       <ul className="space-y-1 text-sm">{fields.map(field => <li key={field.name}>{IMPORT_FIELD_LABELS[field.name]} · <code>{field.name}</code> · {columnRequirementLabel(field)}{field.lookup && " · name or ID"}</li>)}</ul>
       {E.btn("Download template", "g", undefined, () => downloadCsv(importTemplateName(kind), importTemplateCsv(kind)))}
       <p className="text-sm text-muted-foreground">The template includes one incomplete example row, with a required cell left blank so it cannot be imported as downloaded. Delete the example and add your own records. Reference cells need your existing record names or IDs.</p>
-      <Field><FieldLabel>CSV file</FieldLabel><Attachment state={model.headers ? "done" : "idle"} className="w-full">
+      <Field data-invalid={fileRejected || undefined}><FieldLabel>CSV file</FieldLabel><Attachment state={fileState} className="w-full">
         <AttachmentContent><AttachmentTitle>{model.fileName ?? "Choose a CSV file"}</AttachmentTitle><AttachmentDescription>{model.headers ? `${model.csvRowCount} ${model.csvRowCount === 1 ? "row" : "rows"} ready` : `.csv · up to ${IMPORT_ROW_CAP_LABEL} rows`}</AttachmentDescription></AttachmentContent>
-        <AttachmentTrigger asChild aria-label="Choose CSV file"><label className="cursor-pointer"><input type="file" accept=".csv,text/csv" className="sr-only" onChange={event => onFile?.(event.target.files?.[0])} /></label></AttachmentTrigger>
-      </Attachment></Field>
+        <AttachmentTrigger asChild aria-label="Choose CSV file"><label className="cursor-pointer"><input type="file" accept=".csv,text/csv" className="sr-only" aria-invalid={fileRejected || undefined} onChange={event => onFile?.(event.target.files?.[0])} /></label></AttachmentTrigger>
+      </Attachment>{fileRejected && <FieldError>{model.error}</FieldError>}</Field>
       {model.headers && <Button onClick={() => onStep?.(1)}>Match columns</Button>}
     </>}
     {step === 1 && <>

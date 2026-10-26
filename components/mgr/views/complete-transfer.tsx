@@ -25,7 +25,7 @@ export function CompleteTransferView({
   tape?: [ReactNode, ReactNode?][];
   quantities?: Record<string, string>;
   onQuantity?: (key: string, value: string) => void;
-  /** Why Complete transfer is withheld (shipReason), printed beside it; absent when ready. */
+  /** Why Complete transfer is withheld, printed beside it; absent when ready. */
   messages?: ReactNode; submitting?: boolean; reason?: string | null;
 }) {
   return (

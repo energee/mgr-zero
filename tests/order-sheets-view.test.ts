@@ -11,6 +11,9 @@ import { ReturnCreditView, ReturnSourcesView } from "../components/mgr/views/ret
 import { ShipView } from "../components/mgr/views/ship";
 import { ShipmentDoneView } from "../components/mgr/views/shipment-done";
 import { ShortPickView } from "../components/mgr/views/short-pick";
+import { CompleteTransferView } from "../components/mgr/views/complete-transfer";
+import { orderTransferComplete } from "../lib/mgr/fixtures/orders";
+import { toCompleteTransferViewProps } from "../lib/mgr/complete-transfer-view";
 import {
   orderAdjustLines,
   orderPick,
@@ -172,6 +175,22 @@ describe("Ship view", () => {
     expect(markup).toMatch(/0\.87 bbl/);
     expect(markup).toMatch(/>Ship order</);
     expect(markup).toContain('data-variant="irreversible"');
+  });
+
+  it("shows why Ship order and Complete transfer are disabled (#1385)", () => {
+    const reason = "Still needed: a source bin and lot for Hazy IPA.";
+    for (const node of [
+      createElement(ShipView, { model: toShipViewProps(orderShipOnDelivery), reason }),
+      createElement(CompleteTransferView, { model: toCompleteTransferViewProps(orderTransferComplete), reason }),
+    ]) {
+      const markup = html(node);
+      expect(markup).toContain(reason);
+      expect(markup).toMatch(/<button[^>]*disabled=""/);
+      expect(markup).toContain('data-variant="irreversible"');
+      const description = markup.match(/<button[^>]*aria-describedby="([^"]+)"/)?.[1];
+      expect(description).toBeTruthy();
+      expect(markup).toContain(`id="${description}"`);
+    }
   });
 
   it("asks each short line for its reason, prefilled from the stored one (#624)", () => {
