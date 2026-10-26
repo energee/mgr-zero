@@ -163,8 +163,11 @@ describe("Order view loop", () => {
       expect(html).toContain("$1,500.00 · margin 58.3%");
     });
 
-    it("withholds the margin and names the gap while any unit has no cost", () => {
-      expect(costLine({ cost_cents: 1000, revenue_cents: 24000, uncosted_qty: 2, margin_pct: null })).toBe("$10.00 · 2 units without cost, margin withheld");
+    it.each([[1, "1 unit"], [2, "2 units"], [1.5, "1.5 units"]] as const)("withholds the margin and names %s uncosted units (#1382)", (uncosted_qty, label) => {
+      const line = costLine({ cost_cents: 1000, revenue_cents: 24000, uncosted_qty, margin_pct: null });
+      expect(line).toContain("$10.00");
+      expect(line).toMatch(new RegExp(`\\b${label.replace(".", "\\.")}\\b`));
+      expect(line).toMatch(/margin.*withheld/i);
     });
 
     it("draws nothing without get_order_cogs data or before the order ships", () => {

@@ -19,6 +19,7 @@ vi.mock("@/components/mgr/command-form", async (original) => {
   return { ...real, CommandForm: (props: FormProps) => { forms.push(props); return createElement("div", { "data-dialog": true }, props.children); } };
 });
 import { MovementForm } from "@/app/(app)/inventory/movement-form";
+import { command } from "@/lib/commands/client";
 
 const receipt = { id: "m1", created_at: "2026-10-22T12:00:00Z", sku_id: "s1", location_id: "l1", bin_id: "b1", qty: 2, bbl: 0.6, type: "production_in", dest_state: null, sale_channel_id: null, lot_id: null, ref: null, note: null };
 const lists = {
@@ -64,6 +65,36 @@ it("previews a complete movement beside the enabled button (#1113)", () => {
   expect(ready).not.toContain("Still needed");
   expect(ready).toContain("Preview: +2 SKU units");
   expect(submitDisabled(ready)).toBe(false);
+});
+
+it("waits for a prefilled lot's stock label before allowing its receipt to be recorded (#1382)", () => {
+  const html = render({ initial: { ...filled, type: "loss", lotId: "53e1d7c9-e862-4de1-908c-5f1134c729ab" } });
+  expect(submitDisabled(html)).toBe(true);
+  const button = html.match(/<button[^>]*type="submit"[^>]*>/)![0];
+  const reasonId = button.match(/aria-describedby="([^"]+)"/)![1];
+  expect(html).toMatch(new RegExp(`<p id="${reasonId}"[^>]*>[^<]*lot[^<]*</p>`));
+  expect(html).not.toContain("Preview:");
+});
+
+it.each(["adjustment", "return_in"] as const)("keeps an existing depleted lot for a prefilled positive %s (#1382)", async type => {
+  const lotId = "53e1d7c9-e862-4de1-908c-5f1134c729ab";
+  vi.mocked(command).mockClear();
+  const html = render({ initial: { ...filled, qty: 1, type, lotId }, initialLot: { id: lotId, code: "DEPLETED-LOT" } });
+  expect(submitDisabled(html)).toBe(false);
+  expect(html).toContain("DEPLETED-LOT");
+  expect(html).toContain("Preview: +1");
+  await forms[0].children.props.onSubmit({ preventDefault() {}, stopPropagation() {} });
+  expect(command).toHaveBeenCalledWith("brewery-a", "record_movement", expect.objectContaining({ lotId, qty: 1, type }), expect.any(String), expect.any(Object));
+});
+
+it("uses the persisted lot identity when a valid deep-link UUID differs only by case (#1382)", async () => {
+  const lotId = "53e1d7c9-e862-4de1-908c-5f1134c729ab";
+  vi.mocked(command).mockClear();
+  const html = render({ initial: { ...filled, qty: 1, type: "adjustment", lotId: lotId.toUpperCase() }, initialLot: { id: lotId, code: "DEPLETED-LOT" } });
+  expect(submitDisabled(html)).toBe(false);
+  expect(html).toContain("DEPLETED-LOT");
+  await forms[0].children.props.onSubmit({ preventDefault() {}, stopPropagation() {} });
+  expect(command).toHaveBeenCalledWith("brewery-a", "record_movement", expect.objectContaining({ lotId }), expect.any(String), expect.any(Object));
 });
 
 it("explains the disabled Bin and names untracked stock without migration jargon (#1252)", () => {

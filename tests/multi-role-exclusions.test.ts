@@ -55,7 +55,7 @@ vi.mock("@/lib/mgr/page-query", async importOriginal => ({
       case "list_taproom_counts": return [];
       case "get_taproom_count": return {
         id: "count", root_id: "count", location_id: "tap", counted_on: "2026-10-16", counted_by: "actor", created_at: "2026-10-16T12:00:00Z", correction_eligible: false,
-        lines: [{ id: "line", bin_id: "bin", sku_id: "sku", lot_id: "lot", qty_before: 3, qty_counted: 3, movement_id: null, bbl: null }],
+        lines: [{ id: "line", bin_id: "bin", sku_id: "sku", lot_id: "lot", lot_code: "LOT-797", qty_before: 3, qty_counted: 3, movement_id: null, bbl: null }],
       };
       case "get_invoice": return {
         invoice: { id: "invoice", kind: "invoice", invoice_no: 797, issued_on: "2026-10-16", due_on: null, paid_at: null, qbo_sync_status: "pending", qbo_remote_state: "live", customers: null },

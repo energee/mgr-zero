@@ -31,6 +31,14 @@ describe("Finished goods view", () => {
     expect(htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps({ skus: [] }) }))).not.toContain("Inventory value");
   });
 
+  it.each([[1, "1 unit"], [2, "2 units"], [1.5, "1.5 units"]] as const)("names %s uncosted units with the correct plural (#1382)", (uncostedUnits, label) => {
+    const model = toFinishedGoodsViewProps({ skus: [], value: { cents: 2000, uncostedUnits } });
+    const unitLabel = new RegExp(`\\b${label.replace(".", "\\.")}\\b`);
+    expect(model.valueLine).toContain("$20.00");
+    expect(model.valueLine).toMatch(unitLabel);
+    expect(htmlOf(createElement(FinishedGoodsView, { model }))).toMatch(unitLabel);
+  });
+
   it("maps each SKU onto a register row with on hand, allocated, available and its links (#942)", () => {
     const row = (sku: { sku_id: string; name: string }, onHand: string, allocated: string, atp: string, short: boolean) => ({
       key: sku.sku_id, name: sku.name, onHand, allocated, atp, short,
@@ -166,7 +174,7 @@ describe("Record movement view", () => {
     expect(model.bin).toBe("Cold");
     expect(model.channel).toBe("Taproom");
     expect(model.lot).toBe("No lot (untracked)");
-    expect(model.lotOptions).toEqual(["No lot (untracked)"]);
+    expect(model.lotOptions?.map(option => option.value)).toEqual([""]);
     expect(model.preview).toBe(`Preview: −1 SKU unit · ${formatVolume("0.50000000")} · Festival removal · PA · amounts are entered positive`);
   });
 

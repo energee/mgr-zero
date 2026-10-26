@@ -35,7 +35,8 @@ export type RecordMovementViewModel = {
   direction?: string;
   directionOptions?: string[];
   lot?: string;
-  lotOptions?: string[];
+  lotId?: string;
+  lotOptions?: { value: string; label: string }[];
   note?: string;
 };
 
@@ -72,7 +73,8 @@ export function toRecordMovementViewProps(s: RecordMovementSnapshot): RecordMove
     qty: String(s.qty),
     preview: `Preview: ${sign}${s.qty} SKU unit · ${formatVolume(s.bbl)} · ${kind} · ${s.destState.split(" · ")[0]} · amounts are entered positive`,
     lot: "No lot (untracked)",
-    lotOptions: ["No lot (untracked)"],
+    lotId: "",
+    lotOptions: [{ value: "", label: "No lot (untracked)" }],
     note: "",
   };
 }

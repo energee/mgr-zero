@@ -62,6 +62,7 @@ export type TaproomCorrectionLine = {
   sku_name: string | null;
   bin_name: string | null;
   lot_id: string | null;
+  lot_code: string | null;
   qty_before: number;
   qty_counted: number;
   movement_type?: TaproomLineMovementType;

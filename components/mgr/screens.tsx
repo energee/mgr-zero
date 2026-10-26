@@ -86,7 +86,7 @@ import { CustomersView } from "@/components/mgr/views/customers";
 import { DeniedView } from "@/components/mgr/views/denied";
 import { EntryView } from "@/components/mgr/views/entry";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
-import { FermentationReadingActionsView, FermentationReadingView } from "@/components/mgr/views/fermentation-reading";
+import { FermentationReadingActionsView, FermentationReadingView, readingIdentity } from "@/components/mgr/views/fermentation-reading";
 import { FirstRunView } from "@/components/mgr/views/first-run";
 import { CatalogCategoriesFixture, FormatFixture, ReceiptFixture, WeeklyCountFixture } from "@/components/mgr/fixture-adapters";
 import { FormatView } from "@/components/mgr/views/format";
@@ -835,7 +835,7 @@ export const SCREENS: Screen[] = [
     name: "Record movement",
     to: { "Record movement": "Movement recorded" },
     job: "Enter a positive amount; the form derives direction and the server calculates barrels",
-    reads: "list_skus · list_locations · list_bins · get_atp",
+    reads: "list_skus · list_locations · list_bins · get_atp · get_inventory_lot [prefilled lot code, including depleted lots]",
     writes: "record_movement [existing; one append-only inventory movement]",
     states: [["no movement type", "No movement type preselected · Still needed: movement type, beside the withheld Record movement", 1], ["incomplete", "Still needed names each missing field; the preview appears once nothing is missing", 1], ["invalid quantity", "Zero or less, or a third decimal place, is marked under Quantity once the field is left · the movement type signs it; two decimals are allowed", 1], ["no SKUs", "No SKUs yet · Add a SKU opens Catalog for Admin · Warehouse is told who adds them", 1], ["offline", "Wait for a connection; movements are never queued"], ["stale", "ATP changed · preview again", 1], ["permission", "admin or warehouse required · sales reads Beer only", 1], ["echo", "Committed row · eligible standalone adjustment/loss correction opens inventory SKU detail"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
     spec: "The form derives the signed API quantity from the movement kind (adjustments ask Add or Remove); the server derives 0.50000000 bbl and never accepts client-supplied barrels. It requires a live connection and is never put in the offline outbox. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. This frame carries Hazy IPA into PA, which is registered, so the warning is a state rather than drawn copy. Channel stays.",
@@ -854,7 +854,7 @@ export const SCREENS: Screen[] = [
     reads: "list_movements",
     writes: "none",
     states: [["echo", "the tape is the record"], ["correction", `Record inventory correction ${MOVEMENT_CORRECTION_GATE}`]],
-    spec: "Post-commit of Record movement. A tape means recorded: show the committed movement reference, bin, frozen barrel volume, destination state/channel and timestamp from the RPC result. An uncertain response never shows this receipt. The ledger has Older/Newer paging. The named correction is Record inventory correction, not Undo.",
+    spec: "Post-commit of Record movement. A tape means recorded: show the committed quantity, lot code when tracked, bin, frozen barrel volume, destination state/channel and timestamp. A manual entry has no source document. An uncertain response never shows this receipt. The ledger has Older/Newer paging and names related runs, orders, transfers, credit memos, refused deliveries or count dates. The named correction is Record inventory correction, not Undo.",
     body: <MovementRecordedView model={toMovementRecordedViewProps(movementRecordedFestival)} />,
   },
   {
@@ -1774,7 +1774,7 @@ export const SCREENS: Screen[] = [
       const formId = "fermentation-reading-form";
       const values = { observedAt: "2026-09-10T08:10:00", tempF: "68.2", gravity: "1.019", ph: "", note: "" };
       return <>
-        <FermentationReadingView formId={formId} values={values} identity={{ vessel: "FV3", batch: "Batch 416 · Hazy IPA" }} unit="sg" timeZone="America/New_York" prior={{ tempF: "67.8", gravity: "1.021", ph: "4.21" }} />
+        <FermentationReadingView formId={formId} values={values} identity={readingIdentity({ vessel_name: "FV3", batch_no: 416, brand_name: "Hazy IPA" })} unit="sg" timeZone="America/New_York" prior={{ tempF: "67.8", gravity: "1.021", ph: "4.21" }} />
         {E.pin(<FermentationReadingActionsView formId={formId} values={values} unit="sg" />)}
       </>;
     })(),

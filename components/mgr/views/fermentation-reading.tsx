@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { gravityPlaceholder, gravityUnitShort, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { E } from "@/components/mgr/e";
 import { READING_BOUNDS } from "@/lib/composer/offline-policy";
+import { batNo } from "@/lib/mgr/doc-no";
 import { readingValidation } from "@/lib/mgr/fermentation-reading-view";
 import { SubmitButton } from "@/components/mgr/submit-button";
 
@@ -20,7 +21,7 @@ export type FermentationReadingIdentity = { vessel: string; batch?: string };
 
 /** Names the tank and batch from list_occupancies facts; absent facts stay absent. */
 export function readingIdentity(o: { vessel_name: string | null; batch_no: number | null; brand_name: string | null }): FermentationReadingIdentity {
-  const batch = [o.batch_no == null ? null : `Batch ${o.batch_no}`, o.brand_name].filter(Boolean).join(" · ");
+  const batch = [o.batch_no == null ? null : batNo(o.batch_no), o.brand_name].filter(Boolean).join(" · ");
   return { vessel: o.vessel_name ?? "unknown vessel", ...(batch ? { batch } : {}) };
 }
 

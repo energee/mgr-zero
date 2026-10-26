@@ -2,6 +2,7 @@
 import type { EmptyState } from "./empty-state";
 import { money } from "./money";
 import type { InventoryValue } from "@/lib/commands/inventory";
+import { plural } from "./plural";
 /** One SKU in the register. Counts are display text in package units; `atp`
  *  (shown as Available) uses a true minus sign when negative, and `short` says so. */
 export type FinishedGoodsRowView = {
@@ -73,7 +74,7 @@ export const skuLabel = (sku: { name: string; brands?: { name: string } | null }
 export function toFinishedGoodsViewProps({ skus, backHref, value }: FinishedGoodsSnapshot): FinishedGoodsViewModel {
   return {
     backHref: backHref ?? "/beer",
-    valueLine: value ? `${money(value.cents)}${value.uncostedUnits ? ` · ${value.uncostedUnits} units without cost` : ""}` : undefined,
+    valueLine: value ? `${money(value.cents)}${value.uncostedUnits ? ` · ${plural(value.uncostedUnits, "unit")} without cost` : ""}` : undefined,
     empty: skus.length === 0 ? { title: "No finished goods yet", description: "Packaged stock appears here once a packaging run is recorded." } : undefined,
     rows: skus.map((s) => {
       const short = s.atp < 0;

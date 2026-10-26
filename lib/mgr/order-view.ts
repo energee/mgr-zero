@@ -10,6 +10,7 @@ import { formatDate, formatDateTime } from "@/lib/date-format";
 import { stagedQty } from "./put-back-view";
 import type { OrderCogs } from "@/lib/commands/orders";
 import type { PriceSummaryModel } from "@/components/mgr/views/price-summary";
+import { plural } from "./plural";
 
 export type OrderLineView = {
   key: string;
@@ -193,7 +194,7 @@ function restockNoteFor(order: OrderSnapshot["order"], lines: OrderSnapshot["lin
 /** Cost, then margin; with uncosted units the margin is withheld and the gap named, so a partial cost never reads as a full one. */
 function costLineFor(order: OrderSnapshot["order"], cogs?: OrderCogs): string | undefined {
   if (!cogs || order.status !== "shipped") return undefined;
-  if (cogs.uncosted_qty > 0) return `${money(cogs.cost_cents)} · ${cogs.uncosted_qty} units without cost, margin withheld`;
+  if (cogs.uncosted_qty > 0) return `${money(cogs.cost_cents)} · ${plural(cogs.uncosted_qty, "unit")} without cost, margin withheld`;
   return cogs.margin_pct === null ? money(cogs.cost_cents) : `${money(cogs.cost_cents)} · margin ${cogs.margin_pct}%`;
 }
 

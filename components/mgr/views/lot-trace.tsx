@@ -45,8 +45,8 @@ export function LotTraceView({
         {E.ttl("Movements")}
         {model.movements.map((movement) => <div key={movement.id} id={`movement-${movement.id}`} className="border-b py-3">
           {E.row(movement.title, movement.detail, movement.trailing)}
-          {movement.sourceMovementId && (movement.sourceHref ? <Link className="underline" href={movement.sourceHref}>Source movement {movement.sourceMovementId}</Link> : <p>Source movement {movement.sourceMovementId}</p>)}
-          {movement.reference && <p>{movement.creditMemo ? (movement.referenceHref ? <Link className="underline" href={movement.referenceHref}>Credit memo {movement.reference}</Link> : `Credit memo ${movement.reference}`) : `Reference ${movement.reference}`}</p>}
+          {movement.sourceHref && <Link className="underline" href={movement.sourceHref}>Source movement</Link>}
+          {movement.reference && <p>{movement.referenceHref ? <Link className="underline" href={movement.referenceHref}>{movement.reference}</Link> : movement.reference}</p>}
         </div>)}
       </> : null)}
       {E.info(model.note)}

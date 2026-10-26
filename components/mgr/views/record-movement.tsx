@@ -54,7 +54,7 @@ export function RecordMovementView({
       {model.destStateInput ? E.edit("Destination state", model.destState, "text", undefined, { id: `${id}-state`, onChange: controls.destState, onBlur: () => touched.touch(DEST_STATE), error: destStateError, required: true, maxLength: 2, pattern: "[A-Za-z]{2}", placeholder: "PA" })
         : model.destStateOptions.length ? <Pick label="Destination state" value={model.destState} options={model.destStateOptions} onChange={controls.destState} /> : null}
       {model.directionOptions ? <Pick label="Direction" value={model.direction ?? ""} options={model.directionOptions} onChange={controls.direction} /> : null}
-      {model.lotOptions ? <Pick label="Lot" value={model.lot ?? ""} options={model.lotOptions} onChange={controls.lot} /> : null}
+      {model.lotOptions ? E.pick("Lot", model.lotId ?? "", model.lotOptions, { id: `${id}-lot`, onChange: controls.lot, displayValue: model.lot || undefined }) : null}
       {E.edit("Quantity", model.qty, "number", undefined, { id: `${id}-qty`, onChange: controls.qty, onBlur: () => touched.touch(QTY), error: qtyError, required: Boolean(controls.qty), min: "0.01", step: "0.01" })}
       {model.note !== undefined ? E.edit("Note", model.note, "text", undefined, { onChange: controls.note }) : null}
       {model.preview ? E.info(model.preview) : null}
