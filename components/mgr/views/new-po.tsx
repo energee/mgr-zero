@@ -26,7 +26,7 @@ export function NewPoView({ model, controls = {}, messages, footer, submitting =
   const touched = useTouchedLines(!controls.quantity);
   // Inventory snapshots may omit option lists; their displayed value remains selectable.
   const vendors = model.vendors ?? [{ id: model.vendor, name: model.vendor }];
-  const vendorOptions = [{ value: "", label: "Select vendor" }, ...vendors.map(vendor => ({ value: vendor.id, label: vendor.name }))];
+  const vendorOptions = [{ value: "", label: "Select vendor", disabled: true }, ...vendors.map(vendor => ({ value: vendor.id, label: vendor.name }))];
   return <>
     {E.back("Purchase orders", "New PO", undefined, model.backHref)}
     <fieldset disabled={submitting} className="flex min-w-0 flex-col gap-6">
@@ -43,7 +43,7 @@ export function NewPoView({ model, controls = {}, messages, footer, submitting =
           const cost = controls.cost ? line.cost : line.cost.replace(/^\$/, "");
           const errors = touched.shown(index) ? poLineErrors({ qty: line.qty, cost }) : {};
           const materials = model.materials ?? [{ id: line.key, name: line.title, purchase_uom: "" }];
-          const materialOptions = [{ value: "", label: "Select material" }, ...materials.map(material => ({
+          const materialOptions = [{ value: "", label: "Select material", disabled: true }, ...materials.map(material => ({
             value: material.id,
             label: material.name + (material.purchase_uom ? ` · ${material.purchase_uom}` : ""),
           }))];

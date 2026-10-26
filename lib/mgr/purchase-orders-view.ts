@@ -36,7 +36,7 @@ export type PurchaseOrdersSnapshot = {
  *  cancelled order has none: its row is a plain link, because "Open" on a
  *  closed order reads as reopen (#996). */
 export function purchaseOrderNext(status: string): { verb: string; tone: "info" | "attention" } | undefined {
-  if (status === "draft") return { verb: "Mark sent", tone: "info" };
+  if (status === "draft") return { verb: "Send", tone: "info" };
   if (status === "received" || status === "cancelled") return undefined;
   return { verb: "Receive", tone: status === "partially_received" ? "attention" : "info" };
 }

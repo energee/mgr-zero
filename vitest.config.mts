@@ -50,6 +50,7 @@ const pureTests = [
   "tests/form-feedback.test.ts",
   "tests/quantity-field-blur.test.ts",
   "tests/quantity-form-submission.test.ts",
+  "tests/adjust-lines-submission.test.ts",
   "tests/water-profile-submission.test.ts",
   "tests/water-profiles-view.test.ts",
   "tests/location-team-consistency.test.ts",
@@ -97,6 +98,8 @@ const pureTests = [
   "tests/inventory-view.test.ts",
   "tests/inventory-detail-view.test.ts",
   "tests/order-view.test.ts",
+  "tests/tap-number.test.ts",
+  "tests/tap-board-view.test.ts",
   "tests/compliance-view.test.ts",
   "tests/fermentation-reading-identity.test.ts",
   "tests/taproom-count-state.test.ts",
@@ -104,8 +107,10 @@ const pureTests = [
   "tests/movement-form.test.ts",
   "tests/movement-receipt-labels.test.ts",
   "tests/purchasing-view.test.ts",
+  "tests/delivery-view.test.ts",
+  "tests/transfers-view.test.ts",
   "tests/shipment-parity.test.ts",
-  "tests/order-sheets-view.test.ts",
+  "tests/order-sheets-view.test.ts"
 ];
 
 export default defineConfig({

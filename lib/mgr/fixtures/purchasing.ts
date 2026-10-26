@@ -69,7 +69,7 @@ export const receivePoCountryMalt: ReceivePoViewModel = {
 export const receiptPoCountryMalt: ReceiptViewModel = {
   correction: {},
   bill: { receiptId: "receipt-country-malt", status: "not_posted", action: "post" },
-  title: "PO-0142 · received",
+  title: "PO-0142 · receipt Sep 10, 2026",
   status: "partially received",
   stillOwed: "1 Citra box · 44 lb",
   tape: [
