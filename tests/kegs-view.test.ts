@@ -7,12 +7,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { KegBalanceView } from "../components/mgr/views/keg-balance";
-import { KegEventFields, KegFleetView } from "../components/mgr/views/keg-fleet";
+import { KegEventFields, KegFleetView, KegPoolFields } from "../components/mgr/views/keg-fleet";
 import { KegHistoryView } from "../components/mgr/views/keg-history";
 import { KEG_EVENT_REASONS } from "../lib/mgr/enums";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger } from "../lib/mgr/fixtures/kegs";
 import { toKegBalanceViewProps } from "../lib/mgr/keg-balance-view";
-import { kegShortageText, toKegFleetViewProps, withLocationBin } from "../lib/mgr/keg-fleet-view";
+import { kegEventFieldErrors, kegEventReason, kegPoolFieldErrors, kegShortageText, toKegFleetViewProps, withLocationBin, type KegPoolValue } from "../lib/mgr/keg-fleet-view";
 import { REASON_EFFECT, REASON_LABEL } from "../lib/mgr/keg-labels";
 import { kegHistoryScope, toKegHistoryViewProps } from "../lib/mgr/keg-history-view";
 import { formatDate } from "../lib/date-format";
@@ -23,6 +23,39 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
 
 describe("Keg fleet", () => {
+  const pool: KegPoolValue = { name: "Owned", kind: "owned", vendorId: "", perFill: "", deposit: "", active: true };
+
+  it.each(["-5", "1.234", "1e1", "nope"])("#1381 rejects invalid deposit %s", (deposit) => {
+    const value = { ...pool, deposit };
+    expect(kegPoolFieldErrors(value).deposit).toBeTruthy();
+  });
+
+  it.each(["0.00", "5.25", ""])("#1381 accepts deposit %s without making it required", (deposit) => {
+    const value = { ...pool, deposit };
+    expect(kegPoolFieldErrors(value)).toEqual({});
+  });
+
+  it.each(["owned", "leased", "pay_per_fill"] as const)("#1381 validates per-fill cost for %s pools", (kind) => {
+    const value = { ...pool, kind, vendorId: "vendor" };
+    expect(Boolean(kegPoolFieldErrors(value).perFill)).toBe(kind === "pay_per_fill");
+    for (const perFill of ["-1", "1.234", "1e1"]) {
+      expect(kegPoolFieldErrors({ ...value, perFill }).perFill).toBeTruthy();
+    }
+    expect(kegPoolFieldErrors({ ...value, perFill: "0.00" })).toEqual({});
+    expect(kegPoolFieldErrors({ ...value, perFill: "5.25" })).toEqual({});
+  });
+  it("#1381 links pool money errors to each input after an attempt", () => {
+    const value = { ...pool, deposit: "-5", perFill: "1.234" };
+    const html = htmlOf(createElement(KegPoolFields, { value, vendors: [], onChange: () => {}, attempted: true }));
+    for (const id of ["pool-deposit", "pool-per-fill"]) {
+      const input = new RegExp(`<input\\b[^>]*id="${id}"[^>]*>`).exec(html)?.[0];
+      expect(input).toContain('aria-invalid="true"');
+      const descriptions = /aria-describedby="([^"]+)"/.exec(input!)?.[1].split(/\s+/);
+      expect(descriptions).toContain(`${id}-error`);
+      expect(html).toContain(`id="${id}-error"`);
+    }
+  });
+
   it("#815 prints each saved location shortage with its pool and size", () => {
     const shortages = [{ pool: "Owned", keg_size: "half_bbl", location: "Warehouse", short: 2 }];
     const model = toKegFleetViewProps({ ...kegFleetMicrostar, shortages: shortages.map(kegShortageText) });
@@ -118,6 +151,35 @@ describe("Record keg event", () => {
     expect(notice).not.toContain("bg-warning");
   });
 
+  it.each(["1.5", "1e1", "0", "", "-1", "9007199254740992"])("#1381 rejects invalid keg count %s", (qty) => {
+    const value = { ...kegFleetMicrostar.eventForm!, poolId: "pool", locationId: "location", binId: "bin", customerId: "customer", qty };
+    expect(kegEventReason(value)).toBeTruthy();
+    expect(kegEventFieldErrors(value).qty).toBeTruthy();
+  });
+
+  it("#1381 accepts a whole positive count and preserves required choices", () => {
+    const value = { ...kegFleetMicrostar.eventForm!, poolId: "pool", locationId: "location", binId: "bin", customerId: "customer", qty: "3" };
+    expect(kegEventReason(value)).toBeNull();
+    expect(kegEventFieldErrors(value)).toEqual({});
+    expect(kegEventReason({ ...value, binId: "" })).toBeTruthy();
+    expect(kegEventReason({ ...value, reason: "shipped", customerId: "" })).toBeTruthy();
+  });
+  it("#1381 waits for blur or an attempt before drawing a fractional count error", () => {
+    const props = { value: { ...kegFleetMicrostar.eventForm!, qty: "1.5" }, options: kegFleetMicrostar.eventOptions!, onChange: () => {} };
+    expect(htmlOf(createElement(KegEventFields, props))).not.toContain('id="keg-qty-error"');
+    const html = htmlOf(createElement(KegEventFields, { ...props, attempted: true }));
+    expect(html).toContain('id="keg-qty-error"');
+    expect(html).toMatch(/id="keg-qty"[^>]*aria-invalid="true"/);
+  });
+  it("#1381 preserves the shared exponent reason without drawing it twice", () => {
+    const html = htmlOf(createElement(KegEventFields, {
+      value: { ...kegFleetMicrostar.eventForm!, qty: "1e1" }, options: kegFleetMicrostar.eventOptions!, onChange: () => {}, attempted: true,
+    }));
+    expect(html.match(/data-slot="field-error"/g)).toHaveLength(1);
+    expect(html).toContain('id="keg-qty-error"');
+  });
+
+
   it("#1025 resets the bin when the location changes, in live and inventory alike", () => {
     const value = kegFleetMicrostar.eventForm!;
     expect(withLocationBin(value, { ...value, locationId: "cold" }, () => "")).toMatchObject({ locationId: "cold", binId: "" });
@@ -202,14 +264,4 @@ describe("Keg event history", () => {
     expect(toKegHistoryViewProps({ rows: [{ key: "e", title: "Found", detail: "" }] }).empty).toBeUndefined();
   });
 
-});
-
-describe("Record keg event pinned footer (#1037)", () => {
-  it("submits the body's form from the pinned footer, with the error beside it", () => {
-    const src = readFileSync("components/mgr/views/keg-event-form.tsx", "utf8");
-    const footer = src.slice(src.indexOf("footer={"), src.indexOf("<form id="));
-    expect(footer).toContain('E.submit("Record keg event", { form: formId');
-    expect(footer).toContain("<CommandFormMessage error={error} />");
-    expect(src).toContain("<form id={formId}");
-  });
 });

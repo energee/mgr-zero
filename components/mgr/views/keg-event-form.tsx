@@ -9,16 +9,19 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { E } from "@/components/mgr/e";
 import { KEG_EVENT_REASONS, KEG_SIZES } from "@/lib/mgr/enums";
 import { REASON_EFFECT, REASON_LABEL, SIZE_LABEL } from "@/lib/mgr/keg-labels";
-import { kegEventReason, mayHaveKegCustomer, needsKegCustomer, withLocationBin, type KegEventOptions, type KegEventValue } from "@/lib/mgr/keg-fleet-view";
+import { kegEventFieldErrors, kegEventReason, mayHaveKegCustomer, needsKegCustomer, withLocationBin, type KegEventOptions, type KegEventValue } from "@/lib/mgr/keg-fleet-view";
+import { useTouchedLines } from "@/lib/mgr/touched-lines";
 
 const SIZE_OPTIONS = KEG_SIZES.map((value) => ({ value, label: SIZE_LABEL[value] }));
 const REASON_OPTIONS = KEG_EVENT_REASONS.map((value) => ({ value, label: REASON_LABEL[value] }));
 
 /** Record keg event's fields and their dependent customer/location choices. */
-export function KegEventFields({ value, options, onChange }: {
-  value: KegEventValue; options: KegEventOptions; onChange?: (next: KegEventValue) => void;
+export function KegEventFields({ value, options, onChange, attempted = false }: {
+  value: KegEventValue; options: KegEventOptions; onChange?: (next: KegEventValue) => void; attempted?: boolean;
 }) {
   const set = <K extends keyof KegEventValue>(key: K) => onChange ? (next: KegEventValue[K]) => onChange({ ...value, [key]: next }) : undefined;
+  const touched = useTouchedLines(!onChange);
+  const qtyError = attempted || touched.shown(0) ? kegEventFieldErrors(value).qty : undefined;
   return (
     <>
       {E.pick("Keg pool", value.poolId, options.pools, { id: "keg-pool", onChange: set("poolId"), placeholder: "Select a pool" })}
@@ -34,7 +37,7 @@ export function KegEventFields({ value, options, onChange }: {
       {E.pick("Bin", value.binId, options.bins, { id: "keg-bin", onChange: set("binId"), disabled: !value.locationId, placeholder: "Select a bin" })}
       {mayHaveKegCustomer(value.reason) && E.pick(needsKegCustomer(value.reason) ? "Customer" : "Customer (optional)", value.customerId, options.customers,
         { id: "keg-customer", onChange: set("customerId"), placeholder: "Select a customer" })}
-      {E.edit("Kegs", value.qty, "number", undefined, { id: "keg-qty", min: 1, step: 1, onChange: set("qty"), required: true })}
+      {E.edit("Kegs", value.qty, "number", undefined, { id: "keg-qty", min: 1, step: 1, onChange: set("qty"), onBlur: () => touched.touch(0), error: qtyError, required: true })}
       {E.edit("Note", value.note, "text", undefined, { id: "keg-note", onChange: set("note") })}
       {E.info("Empty kegs only. Beer coming back with a keg, and its credit, is Return shipment. A deposit refund is a separate credit memo.")}
     </>
@@ -57,16 +60,22 @@ export function KegEventPresentation({ open, onOpenChange, trigger, value, optio
   submitting?: boolean;
 }) {
   const formId = useId();
+  const [attempted, setAttempted] = useState(false);
+  const reason = kegEventReason(value);
   return (
-    <CommandForm open={open} onOpenChange={onOpenChange} title="Record keg event" trigger={trigger}
+    <CommandForm open={open} onOpenChange={(next) => { setAttempted(false); onOpenChange?.(next); }} title="Record keg event" trigger={trigger}
       footer={<>
         <CommandFormMessage error={error} />
         <CommandFormFooter>
-          {E.submit("Record keg event", { form: formId, reason: kegEventReason(value), submitting, busy: "Recording…" })}
+          {E.submit("Record keg event", { form: formId, reason, submitting, busy: "Recording…" })}
         </CommandFormFooter>
       </>}>
-      <form id={formId} data-preview-action onSubmit={onSubmit} className="flex flex-col gap-4">
-        <KegEventFields value={value} options={options} onChange={onChange} />
+      <form id={formId} data-preview-action onInvalidCapture={() => setAttempted(true)} onSubmit={(event) => {
+        setAttempted(true);
+        if (reason) { event.preventDefault(); event.stopPropagation(); }
+        else onSubmit(event);
+      }} className="flex flex-col gap-4">
+        <KegEventFields value={value} options={options} onChange={onChange} attempted={attempted} />
       </form>
     </CommandForm>
   );

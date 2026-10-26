@@ -20,6 +20,7 @@ export const complianceMonthsDemo: ComplianceMonthsViewModel = {
 };
 
 export const licensesDemo: LicensesSnapshot = {
+  today: "2026-10-26",
   licenses: [
     { id: "pa", state: "PA", kind: "brewery", license_no: "G-21884", expires_on: "2027-06-30", note: null },
   ],

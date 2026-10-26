@@ -21,7 +21,7 @@ export function LicensesView({
       {E.back("Compliance", "Licenses", undefined, model.backHref)}
       {model.licenses.map((row) => (
         <Fragment key={row.key}>
-          {E.row(row.title, row.detail, rowAction(row, actions))}
+          {E.row(row.title, row.detail, rowAction(row, actions), row.warning ? "w" : "")}
         </Fragment>
       ))}
       {model.licenses.length === 0 && E.blank("No licenses yet. Record your state licenses here so their numbers and expiry dates are in one place.")}

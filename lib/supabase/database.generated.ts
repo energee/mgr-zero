@@ -5038,6 +5038,9 @@ isOneToOne: false
 "delete_bin":
 { Args: { "p_bin": string,"p_brewery": string,"p_request_id": string }; Returns: Json
                            },
+"delete_brewery_state_license":
+{ Args: { "p_brewery": string,"p_id": string,"p_request_id": string }; Returns: Json
+                           },
 "delete_catalog_category":
 { Args: { "p_brewery": string,"p_name": string,"p_request_id": string }; Returns: Json
                            },
@@ -5045,6 +5048,9 @@ isOneToOne: false
 { Args: { "p_brewery": string,"p_id": string,"p_request_id": string }; Returns: Json
                            },
 "delete_format":
+{ Args: { "p_brewery": string,"p_id": string,"p_request_id": string }; Returns: Json
+                           },
+"delete_material_contract":
 { Args: { "p_brewery": string,"p_id": string,"p_request_id": string }; Returns: Json
                            },
 "delete_price_group":
