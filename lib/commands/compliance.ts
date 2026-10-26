@@ -62,6 +62,15 @@ defineCommand({
   })),
 });
 
+defineCommand({
+  name: "delete_brewery_state_license", description: "Delete a brewery state license",
+  roles: [...ROLES],
+  input: z.object({ licenseId: z.string().uuid() }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_brewery_state_license", {
+    p_brewery: ctx.breweryId, p_id: i.licenseId, p_request_id: execution.requestId,
+  })),
+});
+
 export type Approval = { id: string; brand_id: string; kind: "cola" | "formula"; ttb_id: string; serial_number: string | null; approved_on: string | null; expires_on: string | null; note: string | null; image_url?: string | null };
 export type Registration = { id: string; brand_id: string; state: string; registration_no: string | null; approved_on: string | null; expires_on: string | null };
 export type License = { id: string; state: string; kind: string; license_no: string | null; expires_on: string | null; note: string | null };
