@@ -11,16 +11,13 @@ import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
 import { command, CommandResponseError } from "@/lib/commands/client";
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 import type { LossReview } from "@/lib/commands/compliance";
+import { bblExact } from "@/lib/volume";
+import { lossReviewReason } from "@/lib/mgr/monthly-compliance-view";
+import { SubmitButton } from "@/components/mgr/submit-button";
 
 type Target = "sample" | "taproom" | "destruction";
 type Payload = { adjustmentId: string; bbl: string; classification: Target; destinationState?: string };
 type Phase = "idle" | "submitting" | "unknown" | "saved";
-
-function bblUnits(value: string) {
-  if (!/^(?:\d+(?:\.\d{0,8})?|\.\d{1,8})$/.test(value) || !/[1-9]/.test(value)) return null;
-  const [whole = "0", fraction = ""] = value.split(".");
-  return BigInt(whole || "0") * BigInt(100_000_000) + BigInt(fraction.padEnd(8, "0") || "0");
-}
 
 export function LossReviewForm({ loss }: { loss: LossReview }) {
   const breweryId = useBrewery();
@@ -35,9 +32,8 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
   const requestId = useRef<string | null>(null);
   const payload = useRef<Payload | null>(null);
   const locked = phase === "submitting" || phase === "unknown" || phase === "saved";
-  const amountUnits = bblUnits(amount);
-  const remainingUnits = bblUnits(loss.remaining_bbl);
-  const valid = amountUnits !== null && remainingUnits !== null && amountUnits <= remainingUnits && (target !== "sample" || /^[A-Z]{2}$/.test(state));
+  const reason = phase === "unknown" ? null : lossReviewReason(amount, loss.remaining_bbl, target, state);
+  const valid = reason === null;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -71,7 +67,7 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
 
   return <CommandForm title="Reattribute loss" trigger={<Button size="sm" variant="outline" disabled={Number(loss.remaining_bbl) === 0}>Reattribute loss</Button>} open={open} onOpenChange={changeOpen}>
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <p className="text-sm">Batch {loss.batch_no} · original {loss.original_bbl} bbl · remaining {loss.remaining_bbl} bbl</p>
+      <p className="text-sm">Batch {loss.batch_no} · original {bblExact(Number(loss.original_bbl), 8)} · remaining {bblExact(Number(loss.remaining_bbl), 8)}</p>
       <div className="flex flex-col gap-1">
         <Label htmlFor={`loss-bbl-${loss.adjustment_id}`}>BBL to reattribute</Label>
         <Input id={`loss-bbl-${loss.adjustment_id}`} type="text" inputMode="decimal" aria-describedby={`loss-bbl-help-${loss.adjustment_id}`} value={amount} disabled={locked} onChange={(event) => setAmount(event.target.value)} required />
@@ -91,7 +87,7 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
       {phase === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The amount, target, state, and request ID are frozen. Retry unchanged to recover the saved result.</CommandFormMessage>}
       {phase === "saved" && <CommandFormMessage tone="warning">Loss reattribution saved.</CommandFormMessage>}
       <CommandFormMessage error={error} />
-      <CommandFormFooter><Button type="submit" disabled={phase === "submitting" || phase === "saved" || (!valid && phase !== "unknown")}>{phase === "unknown" ? "Retry unchanged reattribution" : phase === "submitting" ? "Saving…" : phase === "saved" ? "Saved" : "Save reattribution"}</Button></CommandFormFooter>
+      <CommandFormFooter><SubmitButton reason={phase === "idle" ? reason : null} submitting={phase === "submitting"} disabled={phase === "saved"} label={phase === "unknown" ? "Retry unchanged reattribution" : phase === "saved" ? "Saved" : "Save reattribution"} /></CommandFormFooter>
     </form>
   </CommandForm>;
 }
