@@ -202,13 +202,18 @@ describe("Tap board polish (#1302)", () => {
     expect(html).toContain("No closed kegs yet.");
   });
 
-  it("uses a numeric keypad without rounding a long identifier, and names invalid input", () => {
+  it("uses a numeric keypad and withholds submit for an invalid tap number", () => {
     const state = openTapBoardSheet({ open: [], history: [] }, "tap", null, "taproom", tapBoardSkus[0].id);
     const sheet = { ...state.sheet!, fields: { ...state.sheet!.fields, tapNumber: "abc" } };
     const html = renderToStaticMarkup(createElement(TapKegView, { sheet, skus: tapBoardSkus, timeZone: "America/New_York" }));
     expect(html).toMatch(/inputMode="numeric"/i);
     expect(html).toMatch(/maxLength="80"/i);
-    expect(html).toContain("a positive whole tap number up to 9007199254740991, or no number");
+    const submit = /<button\b[^>]*type="submit"[^>]*>/.exec(html)?.[0];
+    expect(submit).toContain('disabled=""');
+    const reasonId = /aria-describedby="([^"]+)"/.exec(submit!)?.[1];
+    expect(reasonId).toBeDefined();
+    expect(html).toContain(`<p id="${reasonId}"`);
+    expect(html).not.toContain("9007199254740991");
     const swap = renderToStaticMarkup(createElement(TapKegView, { sheet: swapKeg, skus: tapBoardSkus, timeZone: "America/New_York" }));
     expect(swap).toContain("Swap closes this keg and opens its replacement together.");
     expect(swap).not.toContain("atomic swap");
