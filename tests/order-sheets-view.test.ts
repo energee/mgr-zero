@@ -140,6 +140,15 @@ describe("Ship view", () => {
     const model = toShipViewProps({ ...orderShipOnDelivery, lines: [{ ...orderShipOnDelivery.lines[0], skus: { name: "Hazy special can" }, bbl_per_unit: undefined }] });
     expect(model.tape[0][0]).toContain("−4 Hazy special can");
     expect(model.tape[0][0]).not.toContain("bbl");
+    expect(model.tape[0][1]).toBe("");
+  });
+  it("does not invent a destination code for an empty ship-to state", () => {
+    const model = toShipViewProps({
+      ...orderShipOnDelivery,
+      order: { ...orderShipOnDelivery.order, ship_tos: { state: "" } },
+      lines: [{ ...orderShipOnDelivery.lines[0], skus: { name: "Sample keg" } }],
+    });
+    expect(model.tape[0][0]).not.toMatch(/\b[A-Z]{2}\b/);
   });
   it("names every held-back line on the restock preview", () => {
     const model = toShipViewProps({ ...orderShipInvoice, lines: orderShipInvoice.lines.map(line => ({ ...line, qty_shipped: 0 })) });
@@ -258,9 +267,10 @@ describe("Shipment done view", () => {
     const model = toShipmentDoneViewProps({
       ...orderShipmentDone,
       order: { ...orderShipmentDone.order, ship_tos: null },
-      lines: [{ ...orderShipmentDone.lines[0], short_reason: "one keg dented" }],
+      lines: [{ ...orderShipmentDone.lines[0], skus: { name: "Sample keg" }, short_reason: "one keg dented" }],
     });
     expect(model.tape[0][0]).toContain("one keg dented");
+    expect(model.tape[0][0]).not.toMatch(/\b[A-Z]{2}\b/);
   });
   it("#815 shows saved shell shortages without inventing warnings on legacy receipts", () => {
     // Two short pools at one location must read differently: pool and size are named.

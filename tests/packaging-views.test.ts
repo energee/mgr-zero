@@ -5,7 +5,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { PackagingRunsView } from "../components/mgr/views/packaging-runs";
-import { ClosePackagingRunView } from "../components/mgr/views/close-packaging-run";
 import { RepackView } from "../components/mgr/views/repack";
 import { SchedulePackagingRunView } from "../components/mgr/views/schedule-packaging-run";
 import { packagingRuns, repackCase, schedulePackagingRun } from "../lib/mgr/fixtures/packaging";

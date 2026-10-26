@@ -159,12 +159,13 @@ describe("Transfer detail view", () => {
 
 
   it("an unreceived transfer also offers Cancel transfer; a cancelled one shows its reason and no verb (#578)", () => {
-    expect(htmlOf(createElement(TransferDetailView, { model: toTransferDetailViewProps(transferDetailSubmitted) }))).toMatch(/>Cancel transfer</);
+    const submitted = htmlOf(createElement(TransferDetailView, { model: toTransferDetailViewProps(transferDetailSubmitted) }));
+    expect(submitted.match(/<button\b/g)).toHaveLength(2);
     const cancelled = toTransferDetailViewProps({ ...transferDetailSubmitted, transfer: { ...transferDetailSubmitted.transfer, status: "cancelled", cancel_reason: "over-picked" } });
     expect(cancelled.nextVerb).toBeUndefined();
     const html = htmlOf(createElement(TransferDetailView, { model: cancelled }));
     expect(html).toMatch(/over-picked/);
-    expect(html).not.toMatch(/>Cancel transfer<|>Record pick</);
+    expect(html).not.toMatch(/<button\b/);
   });
 
   it("keeps each line's unit and explains picked quantities", () => {

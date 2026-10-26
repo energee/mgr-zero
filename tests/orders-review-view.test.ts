@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { createElement, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { AtpWarnings } from "../app/(app)/orders/[id]/atp-warnings";
 import { SCREENS } from "../components/mgr/screens";
 import { CompleteTransferView } from "../components/mgr/views/complete-transfer";
 import { ConfirmOrderView } from "../components/mgr/views/confirm-order";
@@ -26,6 +27,19 @@ const noSecondTree = (file: string) => {
 };
 
 describe("Confirm order view loop", () => {
+  it("resolves warning SKU identities and separately announces a saved write", () => {
+    const props = {
+      warnings: [{ sku_id: "hazy-id", atp: -2 }],
+      skuNames: new Map([["other-id", "Unrelated beer"], ["hazy-id", "Hazy IPA"]]),
+    };
+    const saved = renderToStaticMarkup(createElement(AtpWarnings, { ...props, saved: "Fixture save" }));
+    expect(saved).toContain("Hazy IPA");
+    expect(saved).not.toContain("Unrelated beer");
+    expect(saved).not.toContain("hazy-id");
+    expect(saved.match(/role="status"/g)).toHaveLength(2);
+    const unsaved = renderToStaticMarkup(createElement(AtpWarnings, props));
+    expect(unsaved.match(/role="status"/g)).toHaveLength(1);
+  });
 
   it("preserves source identity and shortage arithmetic", () => {
     const line = { ...orderSubmittedRidgeline.lines[0], qty_ordered: 5 };

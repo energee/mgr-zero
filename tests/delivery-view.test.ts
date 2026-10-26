@@ -192,9 +192,14 @@ describe("Driver route", () => {
     expect(body.props.model).toEqual(driverRouteA);
   });
 
-  it("does not leak live delivery hrefs into the inventory fixture", () => {
-    const html = htmlOf(createElement(DriverRouteView, { model: driverRouteA }));
-    expect(html).not.toMatch(/href="\/work\/deliveries/);
+  it("keeps stop actions as inventory buttons and makes them links on live routes", () => {
+    const model = { ...driverRouteA, stops: [{ ...driverRouteA.stops[0], href: "/work/deliveries/stop-1" }] };
+    const inventory = htmlOf(createElement(DriverRouteView, { model }));
+    expect(inventory).not.toMatch(/href="\/work\/deliveries/);
+    expect(inventory.match(/<button\b/g)).toHaveLength(2);
+    const live = htmlOf(createElement(DriverRouteView, { model, linkRows: true }));
+    expect(live).toMatch(/<a\b[^>]*href="\/work\/deliveries\/stop-1"/);
+    expect(live.match(/<button\b/g)).toHaveLength(1);
   });
 
   it("the live route page mounts DriverRouteView for an open departed run", () => {
