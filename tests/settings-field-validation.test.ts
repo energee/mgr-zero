@@ -63,6 +63,7 @@ describe("Oct 23 settings field validation (#1121)", () => {
     expect(emailError("")).toBeTruthy();
     expect(emailError("not-an-email")).toBeTruthy();
     expect(emailError("person@example.com")).toBeUndefined();
+    expect(emailError(`${"a".repeat(300)}@example.org`)).toBe("Use at most 64 characters before the @ and 254 in total.");
     let tree: ReactNode;
     const onSubmit = vi.fn();
     function Harness() { return tree = InviteView({ buyer: false, defaultEmail: "not-an-email", onSubmit }); }

@@ -431,9 +431,9 @@ describe("action-specific offline outbox", () => {
     expect(form.indexOf("storeOutboxAttempt(localStorage, next)")).toBeLessThan(form.indexOf("await deliver(next)"));
     const values = { observedAt: "2026-09-10T08:10:00", tempF: "68", gravity: "4.2", ph: "4.1", note: "steady" };
     const editing = renderToStaticMarkup(createElement(FermentationReadingView, { formId: "reading", values, identity: { vessel: "FV3" }, unit: "plato" }));
-    const recovery = renderToStaticMarkup(createElement(FermentationReadingActionsView, { formId: "reading", values, recovery: { state: "uncertain", discardLabel: "FV3 reading" } }));
+    const recovery = renderToStaticMarkup(createElement(FermentationReadingActionsView, { formId: "reading", values, unit: "plato", recovery: { state: "uncertain", discardLabel: "FV3 reading" } }));
     expect(editing).toContain('type="datetime-local"');
-    expect(renderToStaticMarkup(createElement(FermentationReadingActionsView, { formId: "reading", values }))).toContain("Save reading");
+    expect(renderToStaticMarkup(createElement(FermentationReadingActionsView, { formId: "reading", values, unit: "plato" }))).toContain("Save reading");
     expect(recovery).toContain("Retry exact reading");
     expect(recovery).toContain("Fix as new reading");
     expect(recovery).toContain("Discard FV3 reading");

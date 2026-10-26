@@ -3,6 +3,7 @@
 // adjunct against an open occupancy. Inventory renders a fixture, live renders
 // list_occupancies + list_materials + list_material_lots through the same view.
 import { occupancyIdentity, type TransferOccupancy } from "./cellar-transfer-view";
+import { isNumber, numberNotationError } from "./quantity-input";
 
 export type AdditionMaterial = { id: string; name: string; category: string; base_uom: string; lot_tracked: boolean };
 export type AdditionLot = { lot_id: string; lot_code: string; qty: number; received_on: string | null };
@@ -22,9 +23,9 @@ export function additionPreview(m: CellarAdditionViewModel) {
   const qty = Number(m.qty);
   if (!occupancy) return { valid: false as const, reason: "Choose a tank" };
   if (!material) return { valid: false as const, reason: "Choose a material" };
-  if (!Number.isFinite(qty) || qty <= 0) return { valid: false as const, reason: "Enter a quantity" };
+  if (!isNumber(m.qty) || qty <= 0) return { valid: false as const, reason: numberNotationError(m.qty) ?? "Enter a quantity above zero" };
   const lot = (m.lotsByMaterial[m.materialId] ?? []).find((l) => l.lot_id === m.lotId);
   if (material.lot_tracked && !lot) return { valid: false as const, reason: `Choose a lot · ${material.name} is lot-tracked` };
   if (lot && qty > lot.qty) return { valid: false as const, error: true as const, reason: `Only ${lot.qty} ${material.base_uom} of ${lot.lot_code} on hand` };
-  return { valid: true as const, text: `Preview: −${qty} ${material.base_uom} ${material.name}${lot ? ` · ${lot.lot_code}` : ""} · consumption · ${ADDITION_STAGES[m.stage]} · ${occupancyIdentity(occupancy)}` };
+  return { valid: true as const, qty, text: `Preview: −${qty} ${material.base_uom} ${material.name}${lot ? ` · ${lot.lot_code}` : ""} · consumption · ${ADDITION_STAGES[m.stage]} · ${occupancyIdentity(occupancy)}` };
 }
