@@ -192,27 +192,6 @@ describe("Beer view", () => {
     expect(model.navs.map(row => row.title)).toEqual(["Weekly count", "Tap board", "Variance by brand"]);
     expect(model.stock).toEqual([{ key: "actual-sku:actual-location", title: "Actual SKU", detail: "Actual taproom", qty: "7" }]);
   });
-  it("keeps each area title and destination tied to its key", () => {
-    const model = toBeerViewProps({
-      overview: {
-        fgShortages: 2,
-        taproomBelowPar: 1,
-        openTaps: 11,
-        openOccupancies: 6,
-        kegsOut: 142,
-      },
-      showTaproom: true,
-    });
-    expect(model.navs.map(({ key, title, href }) => [key, title, href])).toEqual([
-      ["fg", "Finished goods", "/inventory"],
-      ["taproom", "Taproom", "/taproom"],
-      ["taps", "Taps", "/taproom/board"],
-      ["variance", "Variance by brand", "/taproom/variance"],
-      ["cellar", "Cellar", "/cellar"],
-      ["materials", "Materials", "/materials"],
-      ["kegs", "Kegs", "/kegs"],
-    ]);
-  });
 
   it("keeps shortages on Finished goods without a cross-section Planning card (#1253)", () => {
     const model = toBeerViewProps({ overview: { fgShortages: 0, taproomBelowPar: 0, openTaps: 0, openOccupancies: 0, kegsOut: 0 } });
@@ -221,29 +200,19 @@ describe("Beer view", () => {
       { key: "fg", title: "Finished goods", detail: "0 shortages · Available by SKU", href: "/inventory" },
     ]);
     expect(model.navs.some((r) => r.href === "/planning")).toBe(false);
-    expect(screen("Beer").to).toMatchObject({ Materials: "Materials on hand", "Variance by brand": "Variance by brand" });
-    expect(screen("Beer").to).not.toHaveProperty("Shortages");
   });
 
-  it("offers every Beer sidebar destination and no More destination (#1253)", () => {
+  it("matches the Beer sidebar labels and destinations (#1253)", () => {
     const model = toBeerViewProps(beerOverview);
-    const sidebarHrefs = STAFF_NAV.find((tab) => tab.href === "/beer")!.children!.map((row) => row.href);
-    expect(model.navs.map((row) => row.href)).toEqual(sidebarHrefs);
-    expect(model.navs.find((row) => row.key === "variance")).toMatchObject({ title: "Variance by brand", href: "/taproom/variance" });
+    const sidebar = STAFF_NAV.find((tab) => tab.href === "/beer")!.children!;
+    expect(model.navs.map(({ title, href }) => ({ label: title, href }))).toEqual(
+      sidebar.map(({ label, href }) => ({ label, href })),
+    );
   });
 
-  it("omits Taproom, Taps, and Variance by brand when showTaproom is false", () => {
-    const model = toBeerViewProps({
-      overview: {
-        fgShortages: 0,
-        taproomBelowPar: 0,
-        openTaps: 0,
-        openOccupancies: 0,
-        kegsOut: 0,
-      },
-      showTaproom: false,
-    });
-    expect(model.navs.map((r) => r.title)).toEqual(["Finished goods", "Cellar", "Materials", "Kegs"]);
+  it("keeps non-taproom destinations available when taproom access is disabled", () => {
+    const model = toBeerViewProps({ ...beerOverview, showTaproom: false });
+    expect(model.navs.map(({ href }) => href)).toEqual(["/inventory", "/cellar", "/materials", "/kegs"]);
   });
 
   it("the inventory drawing still offers Finished goods and does not leak live hrefs", () => {

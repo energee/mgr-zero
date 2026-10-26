@@ -420,7 +420,7 @@ export const SCREENS: Screen[] = [
     job: "Role-filtered work that opens ready to finish · full-size exemplar at ship scale",
     reads: "get_today [delivery rows require assigned warehouse member or admin]", writes: "none",
     states: [["empty", "one button: the role's first verb"], ["loading", "row-shaped skeletons"], ["error", "Today did not load · Retry", 1], ["offline", "cached rows · writes queue"], ["role hidden", "only relevant permitted work · no blank gaps"]],
-    spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3; the row verb is the action. A row standing for one order opens that order's Pick. This row stands for three, so Pick lands on the day's Pick sheet and each order opens its own Pick from there; the verb never becomes a noun to explain itself. The restock row appears while the order's restock flag is set and opens the order. Warehouse reaches the live Weekly count from Beer → Taproom, so Today draws no count footer.",
+    spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3; the row verb is the action. A row standing for one order opens that order's Pick. This row stands for three, so Pick lands on the day's Pick sheet and each order opens its own Pick from there; the verb never becomes a noun to explain itself. The restock row appears while the order's restock flag is set and opens the order. Warehouse reaches the live Weekly count from Beer → Weekly count, so Today draws no count footer.",
     body: <TodayView model={toTodayViewProps(todayWarehouse)} />,
   },
   {
@@ -469,7 +469,7 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 1, slice: "all", tab: "Beer", name: "Beer", job: "Inventory, cellar, materials and kegs",
-    to: { Taproom: "Weekly count", Materials: "Materials on hand", "Variance by brand": "Variance by brand" },
+    to: { "Variance by brand": "Variance by brand" },
     reads: "get_beer_overview", writes: "none",
     states: DEFAULT_STATES,
     body: <BeerView model={toBeerViewProps(beerOverview)} />,
@@ -2043,7 +2043,7 @@ export const SCREENS: Screen[] = [
     reads: "list_materials · get_material_on_hand",
     writes: "none [edits happen in Edit material, counts in Cycle count]",
     states: [["expiring", "the earliest best-by date needs attention"], ["empty", "add a material, then open Purchase orders to receive stock"]],
-    spec: "The Beer landing's Materials row opens this list. Edit opens Edit material for that material's definition; Count opens Cycle count for its stock; Add material opens a blank definition. One list serves both, so there is no separate definitions list.",
+    spec: "The Beer landing's Materials on hand row opens this list. Edit opens Edit material for that material's definition; Count opens Cycle count for its stock; Add material opens a blank definition. One list serves both, so there is no separate definitions list.",
     body: <MaterialsOnHandView model={toMaterialsOnHandViewProps(materialsOnHandList)} controls={<ListControls search={{ label: "Search materials", value: "", keep: {} }} />} />,
   },
   {
