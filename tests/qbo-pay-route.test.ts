@@ -206,11 +206,14 @@ describe("portal invoice Pay route", () => {
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
   });
 
-  it("rejects unauthenticated requests before admission or provider access", async () => {
+  it("sends signed-out buyers to portal sign-in before admission or provider access (#1416)", async () => {
     state.signedIn = false;
     const response = await pay();
     expect(response.status).toBe(303);
-    expect(response.headers.get("location")).toBe("https://mgr.test/login");
+    expect(response.headers.get("location")).toBe("https://mgr.test/portal/login");
+    expect(response.headers.get("cache-control")).toBe("private, no-cache, no-store, must-revalidate, max-age=0");
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(await response.text()).toBe("");
     expect(state.admission).not.toHaveBeenCalled();
     expect(state.transport).not.toHaveBeenCalled();
   });
