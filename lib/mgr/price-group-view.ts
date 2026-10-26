@@ -83,6 +83,7 @@ export function priceGroupFieldErrors(fields: Pick<PriceGroupViewModel, "positio
   let positionError: string | undefined;
   if (/[eE]/.test(fields.position)) positionError = "Enter a decimal number without exponent notation.";
   else if (!Number.isInteger(position) || position < 1) positionError = "Enter a whole-number position of 1 or more.";
+  else if (position > 2_147_483_647) positionError = "Enter a position no greater than 2,147,483,647.";
   return {
     ...(positionError ? { position: positionError } : {}),
     ...(costCeiling && { costCeiling }),
@@ -93,7 +94,7 @@ export function priceGroupReason(fields: Pick<PriceGroupViewModel, "name" | "pos
   const errors = priceGroupFieldErrors(fields);
   return submitReason([
     ...(!fields.name.trim() ? ["a group name"] : []),
-    ...(errors.position ? ["a whole-number position of 1 or more"] : []),
+    ...(errors.position ? ["a whole-number position from 1 to 2,147,483,647"] : []),
     ...(errors.costCeiling ? ["a valid cost ceiling"] : []),
   ]);
 }

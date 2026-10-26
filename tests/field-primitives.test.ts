@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import ts from "typescript";
 import { E } from "@/components/mgr/e";
 
 // Exact control exceptions, never a whole-file exemption.
@@ -10,7 +11,6 @@ const allowlist: { file: string; match: string; reason: string }[] = [
 {"file":"me.tsx","match":"<input type=\"hidden\" name=\"breweryId\" value={brewery.id} />","reason":"Hidden brewery identity submitted by the switch form."},
 {"file":"create-brewery.tsx","match":"<input type=\"hidden\" name=\"requestId\" value={requestId} />","reason":"Hidden actor/request identity submitted by the creation form."},
 {"file":"create-brewery.tsx","match":"<input type=\"hidden\" name=\"actorId\" value={actorId} />","reason":"Hidden actor/request identity submitted by the creation form."},
-{"file":"import.tsx","match":"<input type=\"file\" accept=\".csv,text/csv\" className=\"sr-only\" onChange={event => onFile?.(event.target.files?.[0])} />","reason":"File upload supplies a File, not a string value."},
 {"file":"route.tsx","match":"<input type=\"checkbox\" className=\"size-4 shrink-0 accent-primary\" aria-label={row.title} checked={selected} disabled={busy || row.locked} onChange={event => change({ selection: toggleRouteStop(value.selection, row.key, event.target.checked) })} />","reason":"Checkbox selects a route stop; E.edit and E.pick edit string values."},
 {"file":"pos.tsx","match":"<input type=\"checkbox\" className=\"size-5\" checked={website} onChange={event => { if (onWebsite) void reconcileBooleanChange(website, event.target.checked, onWebsite, setWebsite); }} disabled={!onWebsite || busy || !item.available} />","reason":"Checkbox publishes a website item through an asynchronous boolean action."},
 {"file":"question-invoice.tsx","match":"<Textarea aria-label=\"What’s wrong with this invoice?\" maxLength={MAX_BODY} required value={onBody ? body : undefined} defaultValue={onBody ? undefined : body} onChange={event => onBody?.(event.target.value)} />","reason":"Multiline free-text invoice question."},
@@ -42,11 +42,25 @@ it("shared views draw fields with E primitives", () => {
       expect(source, `stale exception: ${file}: ${entry.reason}`).toContain(entry.match);
       source = source.replace(entry.match, "");
     }
-    // Native <select> and type="number" are banned by eslint.config.mjs
-    // (tests/ui-control-policy.test.ts); this scan covers the other raw inputs.
-    for (const match of source.matchAll(/<Input\b|<input\b/g)) {
-      violations.push(`${file}:${source.slice(0, match.index).split("\n").length}: ${match[0]}`);
+    // Native selects and numeric inputs are also banned by eslint.config.mjs.
+    const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    let fileUploads = 0;
+    function visit(node: ts.Node) {
+      if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+        const tag = node.tagName.getText(parsed);
+        if (tag === "input" || tag === "Input") {
+          const isFileUpload = file === "import.tsx" && tag === "input" && node.attributes.properties.some(attribute =>
+            ts.isJsxAttribute(attribute) && attribute.name.getText(parsed) === "type" &&
+            attribute.initializer && ts.isStringLiteral(attribute.initializer) && attribute.initializer.text === "file");
+          // File uploads supply a File, not the string value E.edit accepts.
+          if (isFileUpload) fileUploads++;
+          else violations.push(`${file}:${parsed.getLineAndCharacterOfPosition(node.getStart(parsed)).line + 1}: ${tag}`);
+        }
+      }
+      ts.forEachChild(node, visit);
     }
+    visit(parsed);
+    if (file === "import.tsx") expect(fileUploads).toBe(1);
   }
   expect(violations).toEqual([]);
 });

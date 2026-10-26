@@ -39,11 +39,13 @@ describe("price groups", () => {
     expect(renamed.data).toMatchObject({ id, name: "2A", cost_ceiling_cents: 4200 });
 
     const dupName = await group_rpc({ p_name: "1", p_position: 7 });
-    expect(dupName.error?.message).toBe("a price group with that name or position already exists");
+    expect(dupName.error).toMatchObject({ code: "P0001" });
     const dupPos = await group_rpc({ p_name: "7", p_position: 1 });
-    expect(dupPos.error?.message).toBe("a price group with that name or position already exists");
+    expect(dupPos.error).toMatchObject({ code: "P0001" });
+    expect(dupPos.error?.message).not.toBe(dupName.error?.message);
     const dupOnUpdate = await group_rpc({ p_id: id, p_name: "1", p_position: 2 });
-    expect(dupOnUpdate.error?.message).toBe("a price group with that name or position already exists");
+    expect(dupOnUpdate.error).toMatchObject({ code: "P0001" });
+    expect(dupOnUpdate.error?.message).toBe(dupName.error?.message);
   });
   it("upsert_price_group and delete_price_group refuse an unknown id", async () => {
     const unknown = crypto.randomUUID();
@@ -162,12 +164,12 @@ describe("pricing commands", () => {
     await seedPriceGroup(cb.id, "1", 1);
   });
 
-  it("upsert_price_group creates and renames; a duplicate position is refused with copy", async () => {
+  it("upsert_price_group creates and renames; a duplicate position is refused without changing groups", async () => {
     const t = await runCommand("upsert_price_group", { name: "2", position: 2 }, cctx) as { id: string; name: string };
     expect(t.name).toBe("2");
     const renamed = await runCommand("upsert_price_group", { id: t.id, name: "two", position: 2, costCeilingCents: 900 }, cctx) as { name: string; cost_ceiling_cents: number };
     expect(renamed).toMatchObject({ name: "two", cost_ceiling_cents: 900 });
-    await expect(runCommand("upsert_price_group", { name: "three", position: 1 }, cctx)).rejects.toThrow(/already exists/);
+    await expect(runCommand("upsert_price_group", { name: "three", position: 1 }, cctx)).rejects.toMatchObject({ code: "bad_request", status: 400 });
     const groups = await runCommand("list_price_groups", {}, cctx) as { name: string }[];
     expect(groups.map((x) => x.name)).toEqual(["1", "two"]);
   });
