@@ -30,7 +30,8 @@ The route resolves the model per brewery, in this order:
 1. The brewery's saved model, `breweries.settings.ai_model`.
    An admin sets it in **Settings → AI model** (`set_brewery_ai_model`).
 2. The `AI_GATEWAY_MODEL` environment variable.
-3. `DEFAULT_CHAT_MODEL` in `lib/chat/models.ts`: `anthropic/claude-sonnet-4.5`.
+3. `DEFAULT_CHAT_MODEL` in `lib/chat/models.ts`. Read its value at the deployed
+   SHA rather than assuming the historical model in the findings table.
 
 `get_brewery_ai_model` in `lib/commands/settings.ts` applies this order.
 `app/api/chat/route.ts` passes the result to `gateway(model)`.
@@ -46,7 +47,8 @@ Record the choice in the results table.
 
 **A. Add AI Gateway credits.**
 In the Vercel dashboard, open the team that owns the MGR project, then
-**AI Gateway → Credits**. Add credits. Keep the default model.
+**AI Gateway → Credits**. Add credits. Keep the effective model selected by
+the precedence above; confirm that the team can call it.
 
 **B. Pick a model the team can already call.**
 Sign in to the hosted app as an admin of the test brewery.
@@ -71,7 +73,7 @@ Fill these before testing.
 | Environment | Preview or Production. Preview is Supabase `ugzhwxzictzvrzlacjmv`; Production is `uogrvqmrbmolvtftotsf` |
 | URL | The deployment URL opened in the browser |
 | Deployed SHA | Vercel dashboard → Deployments → the deployment's commit, or `vercel inspect <url>` |
-| Model | The name shown in the Ask MGR header after the drawer opens |
+| Model | The effective model, resolved by the order above at the deployed SHA. The chat header does not show it |
 | Account | A synthetic staff user and its role; never a real customer |
 | Brewery | A synthetic test brewery with at least one SKU, location and on-hand stock |
 
@@ -81,13 +83,13 @@ Run every row in order. Take a screenshot at each **Evidence** cell.
 
 | # | Action | Expected | Evidence |
 | --- | --- | --- | --- |
-| J1 | Sign in, open any staff page, select the Ask MGR handle (or Command-K) | Drawer opens. Header shows **Retry setup** while setup loads, then **New chat** and the model name | Drawer with model name |
-| J2 | If the composer stays disabled, select **Retry setup** once | Setup finishes and the message box enables. If setup takes over 15 seconds, the drawer shows "Ask MGR could not start. Check your connection, then try again." with **Try again**; selecting it once opens the same conversation, not a new one. Record how many retries it took and whether the timeout appeared | Enabled box, or the timeout error |
+| J1 | Sign in, open any staff page, select **Ask MGR** beside **Navigate** in the header (or ⌘K / Ctrl+K) | The chat panel opens over the right side on desktop, or fills the screen on a phone. Its conversation header shows **Retry setup** while setup loads, then **New chat**; no model name appears | Open panel and header |
+| J2 | If the composer stays disabled, select **Retry setup** once | Setup finishes and the message box enables. If setup takes over 15 seconds, the panel shows "Ask MGR could not start. Check your connection, then try again." with **Try again**; selecting it once opens the same conversation, not a new one. Record how many retries it took and whether the timeout appeared | Enabled box, or the timeout error |
 | J3 | Send `What inventory is available?` | Text streams in. It names real SKUs from the test brewery, with an observation time. **Stop response** shows while streaming | Finished answer |
 | J4 | Note the SKU's on-hand, then send `Record an adjustment of +1 <a real SKU> at <a real location>, bin <a real bin>` | MGR asks one focused question if a field is missing. Then a **Composer proposal** card shows the server preview, with **Open as form**, **Dismiss**, and **Commit movement** | Proposal card |
 | J5 | Before committing, check the SKU's on-hand in another tab. Then select **Dismiss** | On-hand is unchanged: a proposal records nothing. Record whether the card closes | On-hand, and the card after Dismiss |
 | J6 | Select **Commit movement** once on the proposal (ask again if the card closed) | A status line reads `Recorded · <id>`. On-hand rises by exactly 1, and the movement appears once in inventory history | Receipt and history row |
-| J7 | Reload the page and reopen the drawer | The same conversation and history load; on-hand has not changed again | Restored drawer |
+| J7 | Type an unsent draft, select **Back to page** (or **Navigate** / Escape), reopen **Ask MGR**, then reload and reopen it | Closing preserves the conversation and unsent draft. Reloading restores saved conversation history; on-hand has not changed again | Restored panel |
 
 J4 to J6 use `record_movement`, the only AI-exposed write today.
 Only `admin` and `warehouse` roles may run it, so use one of those accounts.
@@ -105,14 +107,22 @@ Per the current source (not yet re-observed on hosted):
 
 | Where | Expected |
 | --- | --- |
-| Drawer | An alert reading `An error occurred.` with **Try again**. The AI SDK hides provider details from the browser by default |
-| Vercel function logs for `/api/chat` | The provider error, for example `GatewayInternalServerError` and the access message |
-| Message box | Enables again; the app's ordinary forms still work |
+| Chat panel | `Ask MGR cannot access its AI provider or model. Ask your administrator to check provider access and credits; ordinary MGR forms are still available.` No **Try again** is offered for `provider_access` |
+| Vercel function logs for `/api/chat` | `chat stream failed { code: "provider_access" }`, or `chat request failed { code: "provider_access" }` if the request failed before streaming |
+| Message box | Disabled for a provider-access failure; the app's ordinary forms still work |
 
-A `Chat is not configured.` error means the configuration guard failed.
-On Vercel that should not happen after #412; record it as a new finding.
-If any error shows raw JSON such as `{"error":"…"}`, record it.
-The 2026-09-20 retest saw this for a 503; it has not been re-checked since.
+The messages and retry decisions come from `CHAT_FAILURES` in
+`lib/chat/failure.ts`. Provider text is not sent to the browser or logged by
+these route handlers; only the classified code is recorded, to avoid exposing
+request data or secrets. Do not expect the historical provider exception text.
+
+`Ask MGR is not configured. Contact your administrator; ordinary MGR forms are still available.`
+means the configuration guard failed (`not_configured`). The message box stays
+disabled and there is no **Try again** for that failure. On Vercel this should
+not happen after #412; record it as a new finding.
+Rate limits, temporary outages, and connection failures offer **Try again**;
+an unknown failure does not. If any error shows raw JSON such as `{"error":"…"}`,
+record it as a finding rather than an expected response.
 
 ## Results table
 
@@ -129,20 +139,20 @@ out of screenshots, and remove secrets from any function-log line.
 | URL | |
 | Deployed SHA | |
 | Access path (A credits / B brewery model / C env default) | |
-| Model shown in header | |
+| Effective model and source (brewery / env / deployed default) | |
 | Account role | |
 | Operator | |
 
 | # | Check | Result (pass/fail) | Observed | Screenshot |
 | --- | --- | --- | --- | --- |
-| J1 | Drawer opens, model shown | | | |
+| J1 | Header toggle opens panel; Retry setup becomes New chat | | | |
 | J2 | Composer enables (retries needed: _) | | | |
 | J3 | Real prompt streams a grounded answer | | | |
 | J4 | Proposal card with server preview | | | |
 | J5 | Proposal and Dismiss record nothing (card closed: yes/no) | | | |
 | J6 | Commit movement records exactly once (+1 on-hand) | | | |
-| J7 | Reload restores conversation, no second effect | | | |
-| F1 | Failure message, if any (drawer text + log line) | | | |
+| J7 | Close/reopen preserves draft; reload restores history, no second effect | | | |
+| F1 | Failure message and retry availability, if any (panel text + classified log code) | | | |
 
 Verdict: <pass / fail>. Follow-up issues: <links or none>.
 ```
