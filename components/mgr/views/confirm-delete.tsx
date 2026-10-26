@@ -11,7 +11,7 @@ import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { IRREVERSIBLE, IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { SubmitButton } from "@/components/mgr/submit-button";
 
-export function ConfirmDeleteControl({ title, triggerLabel, name, warning, busy = false, reason, error, onDelete, size, tone = "destructive", dismissLabel = "Cancel", busyLabel = "Deleting…" }: {
+export function ConfirmDeleteControl({ title, triggerLabel, name, warning, busy = false, retainTriggerFocus = false, reason, error, onDelete, size, tone = "destructive", dismissLabel = "Cancel", busyLabel = "Deleting…" }: {
   /** Sheet title, confirm label, and the trigger's accessible name, e.g. "Delete customer". */
   title: string;
   /** Shorter visible trigger text for a row verb ("Delete"); `title` then names the row for assistive tech. */
@@ -21,6 +21,8 @@ export function ConfirmDeleteControl({ title, triggerLabel, name, warning, busy 
   /** Muted second line: what blocks or follows the action. */
   warning: string;
   busy?: boolean;
+  /** A blur-save may start as focus reaches this trigger; keep it focusable but inert until it finishes. */
+  retainTriggerFocus?: boolean;
   /** Why the trigger is held closed, e.g. the blocking report warnings from toMonthlyComplianceViewProps' fileReason; null or absent when it may open. */
   reason?: string | null;
   error?: string | null;
@@ -40,7 +42,7 @@ export function ConfirmDeleteControl({ title, triggerLabel, name, warning, busy 
   const toggle = (next: boolean) => { if (!busy) { setOpen(next); setFailed(false); } };
   const irreversible = tone === "irreversible";
   return <CommandForm open={open} onOpenChange={toggle} title={title}
-    trigger={<SubmitButton type="button" data-preview-action variant={irreversible ? "default" : "destructive"} size={size} disabled={busy} reason={reason}
+    trigger={<SubmitButton type="button" data-preview-action variant={irreversible ? "default" : "destructive"} size={size} disabled={busy && !retainTriggerFocus} aria-disabled={busy || undefined} reason={reason}
       aria-label={triggerLabel ? title : undefined} {...(irreversible ? { "data-variant": "irreversible", className: `w-full md:w-fit md:self-end ${IRREVERSIBLE}` } : {})} label={triggerLabel ?? title} />}>
     <form data-preview-action className="flex flex-col gap-4" onSubmit={async event => {
       event.preventDefault();
