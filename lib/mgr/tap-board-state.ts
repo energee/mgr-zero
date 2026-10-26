@@ -93,7 +93,7 @@ export function beginTapBoardRefresh(state: TapBoardState): TapBoardState {
 }
 
 export function completeTapBoardAttempt(state: TapBoardState, snapshot: TapBoardSnapshot | null, refreshError: unknown | null): TapBoardState {
-  return { snapshot: snapshot ?? state.snapshot, sheet: null, refreshing: snapshot !== null || refreshError !== null ? false : state.refreshing };
+  return { ...state, snapshot: snapshot ?? state.snapshot, refreshing: snapshot !== null || refreshError !== null ? false : state.refreshing };
 }
 
 export function createTapBoardRefreshGuard() {

@@ -216,6 +216,35 @@ describe("tap board controlled state", () => {
     expect(state).toMatchObject({ snapshot: refreshed, sheet: null, refreshing: false });
   });
 
+  it.each(["draft", "submitting", "unknown"] as const)("preserves a newer %s sheet when a superseded post-write refresh finishes", async kind => {
+    let state = beginTapBoardRefresh({ snapshot, sheet: null });
+    const guard = createTapBoardRefreshGuard();
+    const oldRead = Promise.withResolvers<TapBoardSnapshot>();
+    const latestRead = Promise.withResolvers<TapBoardSnapshot>();
+    const oldRefresh = guard.run(() => oldRead.promise);
+    const poll = guard.run(() => latestRead.promise);
+    const latest: TapBoardSnapshot = { open: [], history: [] };
+    latestRead.resolve(latest);
+    const accepted = await poll;
+    if (!accepted) throw new Error("The latest poll must be accepted.");
+    state = replaceTapBoardSnapshot(state, accepted);
+    expect(state.refreshing).toBe(false);
+    state = editTapBoardSheet(openTapBoardSheet(state.snapshot, "tap", null, id), {
+      identity: "guest", guestLabel: "Next draft", guestNominalBbl: "0.25",
+    });
+    if (kind !== "draft") state = beginTapBoardAttempt(state, nextId);
+    if (kind === "unknown") state = failTapBoardAttempt(state, null, "response lost", false);
+    const nextSheet = state.sheet;
+    oldRead.resolve(snapshot);
+    const superseded = await oldRefresh;
+    expect(superseded).toBeNull();
+    state = completeTapBoardAttempt(state, superseded, null);
+    expect(state.sheet).toBe(nextSheet);
+    expect(state.sheet?.fields.guestLabel).toBe("Next draft");
+    expect(state.sheet?.attempt.kind).toBe(kind === "draft" ? "idle" : kind);
+    expect(state.snapshot).toBe(latest);
+  });
+
   it("clears a saved action's busy state when its latest refresh fails", () => {
     const state = beginTapBoardRefresh({ snapshot, sheet: null });
     expect(completeTapBoardAttempt(state, null, new Error("refresh failed"))).toEqual({ snapshot, sheet: null, refreshing: false });
