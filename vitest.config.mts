@@ -58,6 +58,7 @@ const pureTests = [
   "tests/import-csv.test.ts",
   "tests/import-view.test.ts",
   "tests/composer.test.ts",
+  "tests/composer-proposal-dismiss.test.ts",
   "tests/orders-list-view.test.ts",
   "tests/field-primitives.test.ts",
   "tests/migrations-applied.test.ts",
