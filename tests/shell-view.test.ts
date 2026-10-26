@@ -219,7 +219,7 @@ describe("Beer view", () => {
     const model = toBeerViewProps({ overview: { fgShortages: 0, taproomBelowPar: 0, openTaps: 0, openOccupancies: 0, materialShortages: 55, kegsOut: 0 } });
     expect(model.navs.find((r) => r.key === "materials")?.href).toBe("/materials");
     expect(model.navs.filter((r) => r.detail.includes("shortage"))).toEqual([
-      { key: "fg", title: "Finished goods", detail: "0 shortages · ATP by SKU", href: "/inventory" },
+      { key: "fg", title: "Finished goods", detail: "0 shortages · Available by SKU", href: "/inventory" },
     ]);
     expect(model.navs.some((r) => r.href === "/planning")).toBe(false);
     expect(screen("Beer").to).toMatchObject({ Materials: "Materials on hand", "Variance by brand": "Variance by brand" });
@@ -251,7 +251,7 @@ describe("Beer view", () => {
   it("the inventory drawing still offers Finished goods and does not leak live hrefs", () => {
     const html = htmlOf(createElement(BeerView, { model: toBeerViewProps(beerOverview) }));
     expect(html).toMatch(/Finished goods/);
-    expect(html).toMatch(/ATP by SKU/);
+    expect(html).toMatch(/Available by SKU/);
     expect(html).not.toMatch(/href="\/inventory"/);
   });
 

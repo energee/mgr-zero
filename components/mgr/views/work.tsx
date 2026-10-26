@@ -1,4 +1,4 @@
-// Shared Work filters and rows; the live adapter owns device persistence.
+// Shared Work filters, standalone-task navigation, and rows; the live adapter owns device persistence.
 "use client";
 import { Fragment, useState, type ReactNode } from "react";
 import { DeliveryTruck01Icon, Package01Icon, Route01Icon, ThermometerIcon } from "@hugeicons/core-free-icons";
@@ -27,6 +27,11 @@ export function WorkView({
   const wanted = chip ?? localChip;
   const selected = model.workChips.includes(wanted) ? wanted : model.workChips[0];
   const rows = filterWorkRows(model, selected);
+  const names = [...model.workChips, ...Object.keys(model.workHrefs)];
+  function changeChip(value: string) {
+    if (!model.workChips.includes(value)) return;
+    (onChip ?? setLocalChip)(value);
+  }
   const newOrder = createAction !== undefined ? createAction : E.btn("New order", "g");
   const emptyAction = model.rows.length === 0 && (selected === "all" || selected === "orders") ? newOrder : undefined;
   const list = rows.length === 0 ? E.blank(workEmpty(selected), undefined, emptyAction) : rows.map(row => <Fragment key={row.key}>
@@ -35,11 +40,10 @@ export function WorkView({
   return (
     <>
       {E.hd("Work", undefined, newOrder)}
-      {/* The rows are the selected tab's panel: see TabBar's `panel` (#727).
-          This strip filters the list in place, so it is not WorkKindTabs, which
-          navigates; both draw the same full-width TabBar (#992). */}
+      {/* Only filter chips control row panels; standalone task chips navigate
+          through the same TabBar without changing the selected filter. */}
       <div data-work-filter className="flex flex-1 flex-col">
-        <TabBar names={model.workChips} on={model.workChips.indexOf(selected)} cls="w-full overflow-x-auto justify-start scroll-cue" to={model.workTabs} labels={WORK_LABELS} onChange={onChip ?? setLocalChip} label="Filter work" panel={list} />
+        <TabBar names={names} on={model.workChips.indexOf(selected)} cls="w-full overflow-x-auto justify-start scroll-cue" to={model.workTabs} hrefs={model.workHrefs} labels={WORK_LABELS} onChange={changeChip} label="Filter work" panel={list} />
       </div>
     </>
   );

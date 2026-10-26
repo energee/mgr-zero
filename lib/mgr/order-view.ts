@@ -120,7 +120,7 @@ function lineChange(entries: unknown, skuNames: Map<string, string>): string {
 
 function lineWarning(picked: number | null, ordered: number, atp?: number): string | undefined {
   if (picked !== null && picked > ordered) return `Picked ${picked}, more than ordered`;
-  if (atp !== undefined && atp < 0) return "Brewery ATP is below zero";
+  if (atp !== undefined && atp < 0) return "Available is below zero";
   return undefined;
 }
 

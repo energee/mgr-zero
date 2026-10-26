@@ -25,7 +25,7 @@ export type { OrderViewModel };
 
 const H2 = "text-base font-semibold";
 const LEGEND = "text-xs text-muted-foreground";
-const NUMBER_COLUMNS = [["Ordered", "ordered"], ["Picked", "picked"], ["Shipped", "shipped"], ["Brewery ATP", "atp"], ["Unit price", "unitPrice"]] as const;
+const NUMBER_COLUMNS = [["Ordered", "ordered"], ["Picked", "picked"], ["Shipped", "shipped"], ["Available (all locations)", "atp"], ["Unit price", "unitPrice"]] as const;
 
 /** The quiet destructive Cancel order button; the live page makes it the CancelOrderDialog trigger. */
 export const CancelOrderButton = (props: ComponentProps<typeof Button>) => (
@@ -166,7 +166,7 @@ export function OrderView({
               <p className="text-sm font-semibold">{line.name}</p>
               <LineNotes line={line} />
               <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3">
-                {([["Ordered", line.ordered], ["Brewery ATP", line.atp], ["Picked", line.picked], ["Shipped", line.shipped], ["Unit price", line.unitPrice], ["Line amount", line.amount]] as const).map(([label, value]) => (
+                {([["Ordered", line.ordered], ["Available (all locations)", line.atp], ["Picked", line.picked], ["Shipped", line.shipped], ["Unit price", line.unitPrice], ["Line amount", line.amount]] as const).map(([label, value]) => (
                   <div key={label}>
                     <dt className="text-xs text-muted-foreground">{label}</dt>
                     <dd className="mt-0.5 text-sm font-medium tabular-nums">{label === "Ordered" ? orderedField(line) : value}</dd>
@@ -177,7 +177,7 @@ export function OrderView({
             </li>
           ))}
         </ul>
-        <p className={cn(LEGEND, "mt-2")}>Brewery ATP is not stock at the fulfillment source. Missing ATP is not zero.</p>
+        <p className={cn(LEGEND, "mt-2")}>Available counts every location, not only the fulfillment source. Not supplied does not mean zero.</p>
         {showAddLine ? <div className="mt-3">{E.btn("Add line", "g")}</div> : null}
         {onReason ? <div className="mt-3 flex flex-col gap-2">{E.edit("Reason", reason ?? "", "text", undefined, { onChange: onReason, required: true })}{lineActions}</div> : null}
       </section>

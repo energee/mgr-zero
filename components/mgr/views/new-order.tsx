@@ -94,7 +94,7 @@ export function NewOrderView({ model, controls = {}, messages, feedback, skuFeed
       return <div key={index}>
       {E.row(
         <OrderSkuPicker label={`Line ${index + 1} SKU`} value={line.skuId ?? line.name} options={skus} catalogHref={model.catalogHref ?? "#"} selectedLabel={line.name} feedback={skuFeedback} optionsReady={skuOptionsReady} emptyMessage={skuEmptyMessage} errorId={describedBy(unavailableId, ids.sku)} invalid={Boolean(errors.sku)} onChange={controls.lineSku && (value => controls.lineSku?.(index, value))} />,
-        line.atp == null ? "" : `ATP ${line.atp} at ${sourceLabel}`,
+        line.atp == null ? "" : `${line.atp} available at ${sourceLabel}`,
         <OrderQuantity contextualLabels label={`Line ${index + 1} quantity`} value={line.qty} id={`${errorPrefix}-line-${index}-qty`} error={errors.qty} onBlur={() => touched.touch(index)} onChange={controls.lineQty && (value => controls.lineQty?.(index, value))} />,
         line.warning ? "w" : "",
       )}
