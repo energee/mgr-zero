@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
 import { Children, isValidElement, type ReactNode } from "react";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
@@ -86,6 +86,7 @@ function mountedComponents(entry: string, bodyOverrides = new Set<string>()): Se
     const file = sourceFile(path);
     const imports = new Map<string, { imported: string; path?: string }>();
     let lazyImportName: string | undefined;
+    let notFoundName: string | undefined;
 
     for (const statement of file.statements) {
       if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
@@ -96,6 +97,7 @@ function mountedComponents(entry: string, bodyOverrides = new Set<string>()): Se
       if (bindings && ts.isNamedImports(bindings)) {
         for (const element of bindings.elements) {
           if (statement.moduleSpecifier.text === "react" && (element.propertyName?.text ?? element.name.text) === "lazy") lazyImportName = element.name.text;
+          if (statement.moduleSpecifier.text === "next/navigation" && (element.propertyName?.text ?? element.name.text) === "notFound") notFoundName = element.name.text;
           imports.set(element.name.text, { imported: element.propertyName?.text ?? element.name.text, path: target });
         }
       }
@@ -122,6 +124,21 @@ function mountedComponents(entry: string, bodyOverrides = new Set<string>()): Se
     }
 
     function walk(node: ts.Node) {
+      // Next renders the nearest not-found boundary when a mounted page throws
+      // notFound(); the page itself intentionally has no JSX.
+      if (notFoundName && ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+        && node.expression.text === notFoundName) {
+        let directory = dirname(path);
+        const app = resolve("app");
+        while (directory === app || directory.startsWith(`${app}/`)) {
+          const boundary = join(directory, "not-found.tsx");
+          if (existsSync(boundary)) {
+            visit(boundary, "default");
+            break;
+          }
+          directory = dirname(directory);
+        }
+      }
       if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
         const tag = node.tagName.getText(file).split(".")[0];
         const imported = imports.get(tag);

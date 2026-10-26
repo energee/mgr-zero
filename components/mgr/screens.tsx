@@ -1,3 +1,4 @@
+import { NotFoundView } from "@/components/mgr/views/not-found";
 import { BatchCompletionFixture } from "@/components/mgr/fixtures/batch-completion";
 import { AccountInvitationsView } from "@/components/mgr/views/account-invitations";
 import { CommandRecoveryView } from "@/components/mgr/views/command-recovery";
@@ -2150,9 +2151,9 @@ export const SCREENS: Screen[] = [
     to: { Vendor: "Entity picker", Material: "Entity picker", "Save contract": "Contracts" },
     job: "Create or edit one material purchasing commitment",
     reads: "list_materials · list_vendors_and_contracts",
-    writes: "upsert_material_contract",
-    states: [["permission", "warehouse or brewer required", 1], ["new", "vendor, material and quantity required"], ["received", "received and on-order quantities are read-only"]],
-    spec: "This sheet owns the commitment and nothing else. Receipts and open releases both update progress, and neither is editable here: a quantity a buyer could type over would stop being evidence. Available is the commitment less what has arrived and less what is already ordered, which is the only one of the four numbers worth acting on.",
+    writes: "upsert_material_contract · delete_material_contract",
+    states: [["permission", "warehouse or brewer required", 1], ["new", "vendor, material and quantity required"], ["received", "received and on-order quantities are read-only"], ["on purchase orders", "Delete is refused; set an end date instead", 1]],
+    spec: "This sheet owns the commitment and nothing else. Receipts and open releases both update progress, and neither is editable here: a quantity a buyer could type over would stop being evidence. Available is the commitment less what has arrived and less what is already ordered, which is the only one of the four numbers worth acting on. Delete confirms first and is refused once a purchase order uses the contract; set an end date instead.",
     body: <ContractView model={contractYchCitra} />,
   },
   {
@@ -2367,9 +2368,9 @@ export const SCREENS: Screen[] = [
     to: { Edit: "License" },
     job: "Maintain the brewery’s own state licenses",
     reads: "get_compliance_registry",
-    writes: "upsert_brewery_state_license",
-    states: [["current", "orders may proceed"], ["empty", "no licenses yet: Add license is the only action"], ["permission", "sales or admin required", 1]],
-    spec: "The brewery’s licenses, not any brand’s: one row per state and kind (brewery, supplier, direct to consumer), so no brand tab and no toggle. A brand’s COLA, formula approvals and state registrations live on that Brand. Order confirmation is meant to read all three and warn on an unlicensed or unregistered destination; that read is not built yet (drift: order warning).",
+    writes: "upsert_brewery_state_license · delete_brewery_state_license",
+    states: [["current", "expiry is today or later, or not recorded"], ["expired", "expiry before today in the brewery timezone · warning and expired mark", 1], ["empty", "no licenses yet: Add license is the only action"], ["permission", "sales or admin required", 1]],
+    spec: "The brewery’s licenses, not any brand’s: one row per state and kind (brewery, supplier, direct to consumer), so no brand tab and no toggle. A brand’s COLA, formula approvals and state registrations live on that Brand. Order confirmation is meant to read all three and warn on an unlicensed or unregistered destination; that read is not built yet (drift: order warning). Delete confirms before permanently removing a license added by mistake.",
     body: <LicensesView model={toLicensesViewProps(licensesDemo)} />,
   },
   {
@@ -2422,9 +2423,9 @@ export const SCREENS: Screen[] = [
     to: { "Save license": "Licenses" },
     job: "Record one brewery state license",
     reads: "get_compliance_registry",
-    writes: "upsert_brewery_state_license",
-    states: [["current", "orders may proceed"], ["expired", "order confirmation warns", 1], ["saved again", "one record per state and kind: saving replaces it"]],
-    body: <LicenseView model={licensePaBrewery} />,
+    writes: "upsert_brewery_state_license · delete_brewery_state_license",
+    states: [["current", "expiry is today or later, or not recorded"], ["expired", "the Licenses list marks expiry before today with a warning", 1], ["saved again", "one record per state and kind: saving replaces it"], ["delete", "Delete confirms before permanently removing a mistaken license"]],
+    body: <LicenseView model={licensePaBrewery} locked />,
   },
   {
     step: 7,
@@ -3338,5 +3339,19 @@ export const SCREENS: Screen[] = [
     states: [["empty", "no saved profiles · Add water profile"]],
     spec: "The empty list uses the same water-profile catalog view as the populated list. Profiles have no source or target classification; those choices belong on a recipe’s Water sheet.",
     body: <WaterProfilesView model={toWaterProfilesViewProps({ profiles: [] })} />,
+  },
+  {
+    step: 2, slice: 1, tab: "Beer", name: "Staff page not found",
+    job: "Leave an unknown staff address without losing the staff shell",
+    reads: "none", writes: "none",
+    states: [["unknown route", "/kegs/missing · the link is wrong or out of date"]],
+    body: <NotFoundView message="There is nothing at this address in this brewery. It may have been removed, or the link may be wrong." backLabel="Back to Today" backTo="Today" />,
+  },
+  {
+    step: 2, slice: 1, portal: "Order", name: "Portal page not found",
+    job: "Leave an unknown customer address without losing the portal shell",
+    reads: "none", writes: "none",
+    states: [["unknown route", "/portal/missing · the link is wrong or out of date"]],
+    body: <NotFoundView message="There is nothing at this address for your account. It may have been removed, or the link may be wrong." backLabel="Back to Orders" backTo="Order history" />,
   },
 ];

@@ -39,7 +39,7 @@ function leadLine(v: VendorRow) {
 
 const vendorsParams = z.object({ q: z.string().trim().max(100).catch("") });
 
-export default async function VendorsPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> } = {}) {
+export default async function VendorsPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const { params } = listParams(vendorsParams, (await searchParams) ?? {});
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);

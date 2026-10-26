@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { submitReason } from "@/lib/mgr/submit-reason";
 
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Choose a time in HH:MM format");
 
@@ -21,3 +22,15 @@ export const quietHoursWindowSchema = z.object({ start: hhmm.nullable(), end: hh
 
 export const personalQuietHoursSchema = quietHoursWindowSchema.safeExtend({ timezone: timezone.nullable().optional() });
 export const notificationQuietHoursSchema = personalQuietHoursSchema.safeExtend({ start: hhmm, end: hhmm, timezone: timezone.optional() });
+
+type QuietHoursValues = { start: string; end: string };
+
+export function breweryQuietHoursReason(values: QuietHoursValues, initial: QuietHoursValues): string | null {
+  const unchanged = values.start === initial.start && values.end === initial.end;
+  return submitReason(unchanged ? ["a change to brewery quiet hours"] : []);
+}
+
+export function personalQuietHoursReason(values: QuietHoursValues & { timezone: string }, initial: QuietHoursValues & { timezone: string }): string | null {
+  const unchanged = values.start === initial.start && values.end === initial.end && values.timezone === initial.timezone;
+  return submitReason(unchanged ? ["a change to your quiet hours"] : []);
+}

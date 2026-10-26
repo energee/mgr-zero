@@ -337,6 +337,28 @@ describe("registry", () => {
     expect((await admin.from("state_registrations").select("id").eq("brand_id", brandId)).data!.length).toBe(1);
   });
 
+  it("deletes a license only from its own brewery", async () => {
+    const brewery = await makeBrewery();
+    const owner = await makeStaffCtx(brewery.id, "sales");
+    const license = await runCommand("upsert_brewery_state_license", {
+      state: "PA", kind: "brewery", licenseNo: "Delete me",
+    }, owner) as { id: string };
+
+    await runCommand("delete_brewery_state_license", { licenseId: license.id }, owner);
+    expect((await admin.from("brewery_state_licenses").select("id").eq("id", license.id)).data).toEqual([]);
+
+    const retained = await runCommand("upsert_brewery_state_license", {
+      state: "OH", kind: "brewery", licenseNo: "Keep me",
+    }, owner) as { id: string };
+    const foreign = await makeStaffCtx((await makeBrewery()).id, "sales");
+    await expect(runCommand("delete_brewery_state_license", { licenseId: retained.id }, foreign))
+      .rejects.toThrow("license not found");
+    await expect(runCommand("delete_brewery_state_license", { licenseId: crypto.randomUUID() }, owner))
+      .rejects.toThrow("license not found");
+    expect((await admin.from("brewery_state_licenses").select("id").eq("id", retained.id)).data)
+      .toEqual([{ id: retained.id }]);
+  });
+
   it("an upsert keeps a field the caller omits and clears one sent as null (#522)", async () => {
     const { brandId: brand } = await seedCatalog(b.id, { product: "Keep Porter", sku: "Keep Porter case" });
     const approval = await runCommand("upsert_brand_approval", { brandId: brand, kind: "cola", ttbId: "26002001000123", approvedOn: "2026-01-02", expiresOn: "2030-01-02", note: "label v2" }, sales) as { id: string };

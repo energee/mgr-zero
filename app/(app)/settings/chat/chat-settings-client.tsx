@@ -23,7 +23,7 @@ export function ChatSettingsControls({ installation, readingDueHours, timezone, 
   const [start, setStart] = useState(installation.quietStart?.slice(0, 5) ?? "");
   const [end, setEnd] = useState(installation.quietEnd?.slice(0, 5) ?? "");
   const [saved, setSaved] = useState<ChatSettingSave | null>(null);
-  return <ChatSettingsFieldsView installation={installation} timezone={timezone} hours={hours} start={start} end={end} channels={channels} channel={channel} configured={configured} busy={action.busy} saved={action.succeeded === saved?.name ? saved : null} error={action.error}
+  return <ChatSettingsFieldsView installation={installation} timezone={timezone} hours={hours} initialHours={readingDueHours} start={start} end={end} channels={channels} channel={channel} configured={configured} busy={action.busy} saved={action.succeeded === saved?.name ? saved : null} error={action.error}
     onLoadChannels={() => void action.run("list_chat_channels", { installationId: installation.id }, data => { setChannels(data as { id: string; name: string }[]); setChannel(""); }, { durable: false })}
     onChannel={setChannel} onSaveChannel={() => void action.run("set_notification_destination", { installationId: installation.id, externalDestinationId: channel }, () => setSaved({ name: "set_notification_destination", channel }))}
     onQuietChange={(start, end) => { setStart(start); setEnd(end); }}
