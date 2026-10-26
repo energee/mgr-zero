@@ -353,7 +353,7 @@ describe("SCREENS", () => {
     const verbs = new Set([
       "Correct receipt", "Add brew turn", "Correct turn 1", "Correct turn 2",
       "Add", "Add stop", "Add to route", "Adjust", "Assign", "Brew", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose lot", "Choose who gets it", "Close", "Confirm", "Confirm all", "Connect", "Count", "Create",
-      "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Edit SKU", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open format",
+      "Deliver", "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Edit SKU", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",
       "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
       "Unlink", "Use", "Write off", "Fix registration", "Forgot password?", "Import CSV", "Invite staff", "Invite portal user",
@@ -1102,12 +1102,11 @@ describe("Confirm order shortage message (#990)", () => {
     // The per-line marker stays on every short line.
     expect(model.lines.map((l) => l.tone)).toEqual(["w", "w", "w"]);
     expect(model.shortageNote).toBe(
-      `Short at Warehouse: ${hazy.skus!.name}, ${pils.skus!.name}. Replenish Warehouse before picking, or confirm knowing Warehouse cannot pick the full quantity. ` +
-      "Confirming oversells ATP for Extra stout · case; that stays your call.",
+      `Short at Warehouse: ${hazy.skus!.name}, ${pils.skus!.name}. Replenish Warehouse before picking, or confirm knowing the full quantity cannot be picked there. ` +
+      "Confirming promises more than is available for Extra stout · case; that stays your call.",
     );
     const html = renderToStaticMarkup(createElement(ConfirmOrderView, { model }));
     expect(html.match(/Replenish Warehouse/g)).toHaveLength(1);
-    expect(html.match(/Confirming oversells/g)).toHaveLength(1);
   });
 
   it("shows no shortage message when every line is covered", async () => {

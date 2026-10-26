@@ -406,6 +406,8 @@ describe("source bin stock (#451)", () => {
     ];
     for (const line of lines) {
       const { transferId } = await runCommand("create_stock_transfer", { fromLocationId: s.from.id, toLocationId: s.to.id, lines: [line] }, s.ctx) as { transferId: string };
+      const detail = await runCommand("get_stock_transfer", { transferId }, s.ctx) as { lines: { materials: { name: string; base_uom: string } | null }[] };
+      if ("materialId" in line) expect(detail.lines[0].materials).toEqual({ name: "Salt", base_uom: "lb" });
       const { data: stored } = await admin.from("stock_transfer_lines").select("id").eq("transfer_id", transferId).single();
       await runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: stored!.id, qty: 2 }] }, s.ctx);
       // after the pick, half the stock leaves the source bin

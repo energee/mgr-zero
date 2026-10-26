@@ -27,8 +27,8 @@ describe("Transfers list", () => {
     expect(model.workChips).toBe(WORK_CHIPS);
     expect(model.workTabs).toBe(WORK_TABS);
     expect(model.rows.map((r) => [r.title, r.detail, r.verb])).toEqual([
-      ["TRF-0007", `${LOC_WAREHOUSE.name} to ${LOC_TAPROOM.name} · 2 lines · submitted`, "Pick"],
-      ["TRF-0006", `${LOC_WAREHOUSE.name} to Storage · 1 line · picked`, "Receive"],
+      ["TRF-0007", `${LOC_WAREHOUSE.name} to ${LOC_TAPROOM.name} · 2 lines · Submitted`, "Pick"],
+      ["TRF-0006", `${LOC_WAREHOUSE.name} to Storage · 1 line · Picked`, "Receive"],
     ]);
   });
 
@@ -148,12 +148,12 @@ describe("Transfer detail view", () => {
     expect(model.title).toBe("TRF-0007");
     expect(model.from).toBe(LOC_WAREHOUSE.name);
     expect(model.to).toBe(LOC_TAPROOM.name);
-    expect(model.status).toBe("submitted");
+    expect(model.status).toBe("Submitted");
     expect(model.nextVerb).toBe("Record pick");
     expect(model.received).toBe(false);
     expect(model.lines.map((l) => [l.title, l.detail, l.qty])).toEqual([
-      [SKU_HAZY.name, "Walk-in to Cold", "2"],
-      [SKU_PILS.name, "Walk-in to Cold", "4"],
+      [SKU_HAZY.name, "Walk-in to Cold", "2 units"],
+      [SKU_PILS.name, "Walk-in to Cold", "4 units"],
     ]);
   });
 
@@ -161,7 +161,9 @@ describe("Transfer detail view", () => {
     const html = htmlOf(createElement(TransferDetailView, { model: toTransferDetailViewProps(transferDetailSubmitted) }));
     expect(html).toMatch(/TRF-0007/);
     expect(html).toMatch(/Status/);
-    expect(html).toMatch(/submitted/);
+    expect(html).toMatch(/Submitted/);
+    expect(html).toMatch(/>From</);
+    expect(html).toMatch(/>To</);
     expect(html).toMatch(/>Record pick</);
     expect(html).not.toMatch(/→/);
   });
@@ -170,9 +172,22 @@ describe("Transfer detail view", () => {
     expect(htmlOf(createElement(TransferDetailView, { model: toTransferDetailViewProps(transferDetailSubmitted) }))).toMatch(/>Cancel transfer</);
     const cancelled = toTransferDetailViewProps({ ...transferDetailSubmitted, transfer: { ...transferDetailSubmitted.transfer, status: "cancelled", cancel_reason: "over-picked" } });
     expect(cancelled.nextVerb).toBeUndefined();
+    expect(cancelled.status).toBe("Cancelled");
     const html = htmlOf(createElement(TransferDetailView, { model: cancelled }));
     expect(html).toMatch(/over-picked/);
+    expect(html).toMatch(/>Cancel reason</);
+    expect(html.match(/>Cancelled</g)).toHaveLength(1);
     expect(html).not.toMatch(/>Cancel transfer<|>Record pick</);
+  });
+
+  it("keeps each line's unit and explains picked quantities", () => {
+    const line = transferDetailSubmitted.lines[0];
+    const model = toTransferDetailViewProps({ ...transferDetailSubmitted, lines: [
+      { ...line, id: "material", name: "Malt", qty: 2.5, unit: "kg" },
+      { ...line, id: "keg", name: "Pool", qty: 4, qty_picked: 3, unit: "kegs" },
+      { ...line, id: "zero", qty: 2, qty_picked: 0, unit: "units" },
+    ] });
+    expect(model.lines.map(row => row.qty)).toEqual(["2.5 kg", "3 of 4 kegs", "0 of 2 units"]);
   });
 
   it("the live footer can cancel with a reason", () => {

@@ -89,7 +89,7 @@ export function toLotTraceViewProps(s: LotTraceSnapshot, timeZone: string, backH
     drawn: s.run?.bbl_drawn != null ? bblFixed(s.run.bbl_drawn) : "—",
     memberBatches: s.batches.map(batch => ({ key: batch.id, title: batNo(batch.batch_no), detail: batch.brewed_on ? `brewed ${formatDate(batch.brewed_on)}` : "Brew date not recorded" })),
     sourceTransfers: s.transfers.map(transfer => ({ key: transfer.id, title: `${transfer.from_vessel} to ${transfer.to_vessel}`, detail: formatDate(transfer.at, timeZone), trailing: `${bblFixed(Number(transfer.bbl))} transferred` })),
-    ingredients: s.ingredients.map(row => ({ key: `${row.material_id}:${row.lot_id}:${row.source}`, title: row.material, tracked: row.lot_id !== null, detail: `${row.code ?? "Untracked"} · ${row.source} · ${Number(row.qty)} ${row.unit}`, href: backHref && row.lot_id ? `/compliance/material-lots/${row.lot_id}` : undefined })),
+    ingredients: s.ingredients.map(row => ({ key: `${row.material_id}:${row.lot_id}:${row.source}`, title: row.material, tracked: row.lot_id !== null, detail: `${row.code ?? "Untracked"} · ${sentenceCase(row.source)} · ${Number(row.qty)} ${row.unit}`, href: backHref && row.lot_id ? `/compliance/material-lots/${row.lot_id}` : undefined })),
     tape: s.movements.map((movement) => ({
       key: movement.id,
       label: `${movement.qty > 0 ? "+" : "−"}${Math.abs(movement.qty)} · ${sentenceCase(movement.type)} · ${ownedSku(s.lot.brand, movement.sku)} · ${movement.location}`,

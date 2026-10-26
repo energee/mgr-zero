@@ -96,7 +96,10 @@ describe("SKU picker", () => {
     expect(skuPickerChannel("taproom_transfer", { sale_channel_id: "wholesale" })).toBeUndefined();
   });
   it("labels a SKU with its brand when it has one", () => {
-    expect(toSkuOption({ id: "s", name: "½ bbl", brands: { name: "Hazy IPA" } })).toEqual({ id: "s", label: "Hazy IPA — ½ bbl" });
+    expect(toSkuOption({ id: "s", name: "½ bbl", brands: { name: "Hazy IPA" } })).toEqual({ id: "s", label: "Hazy IPA · ½ bbl" });
     expect(toSkuOption({ id: "s", name: "½ bbl", brands: null })).toEqual({ id: "s", label: "½ bbl" });
+  });
+  it("does not repeat a brand already at the start of the SKU name", () => {
+    expect(toSkuOption({ id: "s", name: "Hazy IPA · ½ bbl", brands: { name: "Hazy IPA" } })).toEqual({ id: "s", label: "Hazy IPA · ½ bbl" });
   });
 });

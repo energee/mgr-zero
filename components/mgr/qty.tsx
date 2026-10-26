@@ -138,10 +138,10 @@ export function Qty({
  *
  *  A11y: a filter that changes rows in place (Work) passes `panel`, the
  *  selected tab's content, with `label`, the tablist's name, and `onChange`,
- *  because the caller re-renders `panel` for the newly chosen tab. Every tab
- *  then gets a TabsContent: Radix mounts each tabpanel (empty and `hidden`
- *  unless selected), so every aria-controls resolves (#727). The panel is a
- *  gap-3 column like the page body it replaces (the bar grows to fill it,
+ *  because the caller re-renders `panel` for the newly chosen tab. Every filter
+ *  (a name without an href) gets a TabsContent: Radix mounts each tabpanel
+ *  (empty and `hidden` unless selected), so its aria-controls resolves (#727).
+ *  The panel is a gap-3 column like the page body it replaces (the bar grows to fill it,
  *  so an empty state can centre), and it is not a Tab stop
  *  (tabIndex -1) because its rows hold their own focusable actions.
  *  Without `panel` the body below is drawn outside the bar and aria-controls
@@ -176,7 +176,7 @@ export function TabBar({
           return <TabsTrigger key={n} value={String(i)} data-to={to?.[n]} className="h-full rounded-none px-3 first:rounded-l-[calc(var(--radius-xl)-1px)] last:rounded-r-[calc(var(--radius-xl)-1px)] data-active:shadow-none data-active:ring-1 data-active:ring-inset data-active:ring-foreground/40" asChild={Boolean(hrefs?.[n])}>{hrefs?.[n] ? <Link href={hrefs[n]}>{text}</Link> : text}</TabsTrigger>;
         })}
       </TabsList>
-      {panel === undefined ? null : names.map((n, i) => <TabsContent key={n} value={String(i)} tabIndex={-1} className="flex flex-col gap-3">{panel}</TabsContent>)}
+      {panel === undefined ? null : names.map((n, i) => hrefs?.[n] ? null : <TabsContent key={n} value={String(i)} tabIndex={-1} className="flex flex-col gap-3">{panel}</TabsContent>)}
     </Tabs>
   );
 }

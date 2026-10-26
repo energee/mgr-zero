@@ -1,5 +1,6 @@
 // lib/mgr/transfer-detail-view.ts — view-model for Transfer detail (get_stock_transfer).
 import { trfNo } from "./doc-no";
+import { sentenceCase } from "./labels";
 
 export type TransferDetailLineView = {
   key: string;
@@ -38,6 +39,7 @@ export type TransferDetailSnapshot = {
     from_bin: string;
     to_bin: string;
     qty: number;
+    unit: string;
     qty_picked?: number | null;
   }[];
   backHref?: string;
@@ -56,7 +58,7 @@ export function toTransferDetailViewProps({ transfer, lines, backHref }: Transfe
     title: trfNo(transfer.transfer_no),
     from: transfer.from_name,
     to: transfer.to_name,
-    status: transfer.status.replaceAll("_", " "),
+    status: sentenceCase(transfer.status),
     note: transfer.note ?? undefined,
     received,
     nextVerb: nextVerb(transfer.status),
@@ -65,7 +67,7 @@ export function toTransferDetailViewProps({ transfer, lines, backHref }: Transfe
       key: l.id,
       title: l.name,
       detail: `${l.from_bin} to ${l.to_bin}`,
-      qty: l.qty_picked == null ? String(l.qty) : `${l.qty_picked} / ${l.qty}`,
+      qty: l.qty_picked == null ? `${l.qty} ${l.unit}` : `${l.qty_picked} of ${l.qty} ${l.unit}`,
     })),
   };
 }

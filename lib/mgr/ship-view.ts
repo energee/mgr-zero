@@ -65,7 +65,7 @@ export function toShipViewProps({ order, lines, locations, invoiceTiming: asked 
     const qty = shipOf(l);
     if (qty <= 0) continue;
     const name = l.skus?.name ?? "Line";
-    tape.push([`−${qty} ${name} · sale removal · ${dest}`, saleVolume(qty, l.bbl_per_unit)]);
+    tape.push([`−${qty} ${name} · removed for sale${dest ? ` · ships to ${dest}` : ""}`, saleVolume(qty, l.bbl_per_unit)]);
   }
   for (const line of lines) {
     const released = pickedOf(line) - shipOf(line);

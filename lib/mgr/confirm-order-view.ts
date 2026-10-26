@@ -71,7 +71,7 @@ export function toConfirmOrderViewProps({ order, lines, atp, sourceOnHand, locat
       key: l.id,
       ...brandLabel(l.skus),
       qty: Number(l.qty_ordered),
-      detail: [sourceQty === undefined ? "" : `${sourceQty} at ${sourceName}`, qtyAtp === undefined ? "" : `${sourceQty === undefined ? "ATP" : "brewery ATP"} ${qtyAtp}`, oversold ? `leaves ${formatSigned(qtyAtp! - l.qty_ordered)}` : ""].filter(Boolean).join(" · "),
+      detail: [sourceQty === undefined ? "" : `${sourceQty} at ${sourceName}`, qtyAtp === undefined ? "" : `${qtyAtp} available`, oversold ? `leaves ${formatSigned(qtyAtp! - l.qty_ordered)}` : ""].filter(Boolean).join(" · "),
       tone: short || oversold ? "w" : "",
     })),
     shortageNote: shortageNote(judged, sourceName),
@@ -87,8 +87,8 @@ function shortageNote(judged: JudgedLine[], sourceName: string): string | null {
   const short = judged.filter((j) => j.short).map(name);
   const oversold = judged.filter((j) => !j.short && j.oversold).map(name);
   const parts = [
-    short.length ? `Short at ${sourceName}: ${short.join(", ")}. Replenish ${sourceName} before picking, or confirm knowing Warehouse cannot pick the full quantity.` : "",
-    oversold.length ? `Confirming oversells ATP for ${oversold.join(", ")}; that stays your call.` : "",
+    short.length ? `Short at ${sourceName}: ${short.join(", ")}. Replenish ${sourceName} before picking, or confirm knowing the full quantity cannot be picked there.` : "",
+    oversold.length ? `Confirming promises more than is available for ${oversold.join(", ")}; that stays your call.` : "",
   ].filter(Boolean);
   return parts.length ? parts.join(" ") : null;
 }

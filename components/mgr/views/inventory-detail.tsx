@@ -10,7 +10,7 @@ export function InventoryDetailView({ model, movementAction, footer }: {
   return <>
     {E.back("Finished goods", model.sku.name, undefined, model.backHref)}
     {!model.sku.active && E.fld("Status", "Inactive · history retained")}
-    {E.num(String(model.available), `ATP · ${model.onHandTotal} on hand · ${model.allocated} allocated`)}
+    {E.num(String(model.available), `Available · ${model.onHandTotal} on hand · ${model.allocated} allocated`)}
     {E.ttl("On hand by location")}
     {model.onHand.length ? model.onHand.map(row => <div key={row.location_id}>{E.row(row.locations?.name ?? row.location_id, "", String(row.qty))}</div>) : E.blank("No inventory recorded yet")}
     {E.ttl("Movement history")}
