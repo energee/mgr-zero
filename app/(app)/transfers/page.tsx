@@ -7,6 +7,7 @@ import { workHrefsFor } from "@/components/mgr/work-tabs";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { canRun } from "@/lib/commands/registry";
+import { skuLabel } from "@/lib/mgr/finished-goods-view";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toTransfersViewProps } from "@/lib/mgr/transfers-view";
 import "@/lib/commands/all";
@@ -41,7 +42,7 @@ export default async function TransfersPage({ searchParams }: { searchParams: Pr
           line_count: t.stock_transfer_lines.length,
         })),
       })}
-      createAction={canRun(ctx, "create_stock_transfer") ? <NewTransferForm autoOpen={newTransfer === "1"} locations={locations} bins={bins} skus={skus.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }))} skusHref={canRun(ctx, "create_sku") ? "/catalog" : null} /> : null}
+      createAction={canRun(ctx, "create_stock_transfer") ? <NewTransferForm autoOpen={newTransfer === "1"} locations={locations} bins={bins} skus={skus.map((s) => ({ id: s.id, label: skuLabel(s) }))} skusHref={canRun(ctx, "create_sku") ? "/catalog" : null} /> : null}
       workHrefs={workHrefsFor(brewery.roles)}
       linkRows
     />

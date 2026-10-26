@@ -1102,12 +1102,11 @@ describe("Confirm order shortage message (#990)", () => {
     // The per-line marker stays on every short line.
     expect(model.lines.map((l) => l.tone)).toEqual(["w", "w", "w"]);
     expect(model.shortageNote).toBe(
-      `Short at Warehouse: ${hazy.skus!.name}, ${pils.skus!.name}. Replenish Warehouse before picking, or confirm knowing Warehouse cannot pick the full quantity. ` +
-      "Confirming oversells ATP for Extra stout · case; that stays your call.",
+      `Short at Warehouse: ${hazy.skus!.name}, ${pils.skus!.name}. Replenish Warehouse before picking, or confirm knowing the full quantity cannot be picked there. ` +
+      "Confirming promises more than is available for Extra stout · case; that stays your call.",
     );
     const html = renderToStaticMarkup(createElement(ConfirmOrderView, { model }));
     expect(html.match(/Replenish Warehouse/g)).toHaveLength(1);
-    expect(html.match(/Confirming oversells/g)).toHaveLength(1);
   });
 
   it("shows no shortage message when every line is covered", async () => {

@@ -55,9 +55,13 @@ describe("repack parents", () => {
 
   it("shapes a parent whose format has one component row and a known volume", () => {
     expect(shapeRepackParents(components, [parent, child])).toEqual([{
-      id: "parent-sku", label: "Stout — Case", unit: "case", bblPerUnit: 0.2,
+      id: "parent-sku", label: "Stout · Case", unit: "case", bblPerUnit: 0.2,
       child: { skuId: "child-sku", unit: "can", quantity: 24 },
     }]);
+  });
+
+  it("does not repeat a brand already at the start of the parent SKU name", () => {
+    expect(shapeRepackParents(components, [{ ...parent, name: "Stout · Case" }, child])[0].label).toBe("Stout · Case");
   });
 
   it("withholds a parent SKU that has no format volume rather than calling it 0 bbl", () => {
