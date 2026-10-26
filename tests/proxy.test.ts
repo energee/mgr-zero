@@ -46,6 +46,9 @@ describe("Supabase proxy refresh", () => {
     expect(matches("/docs")).toBe(false);
     expect(matches("/docs/staff-guide")).toBe(false);
     expect(matches("/api/search")).toBe(false);
+    // #1403: the command route refreshes its own cookie session (buildRouteContext's
+    // getClaims), so the proxy would only add a second check and a second cold start.
+    expect(matches("/api/command")).toBe(false);
     // The screen frames the docs embed are public like the docs themselves.
     expect(matches("/screens/frame/0")).toBe(false);
     expect(matches("/inventory")).toBe(true);
@@ -58,7 +61,7 @@ describe("Supabase proxy refresh", () => {
       })
     );
 
-    expect(response.headers.get("x-middleware-override-headers")).toBe("cookie");
+    expect(response.headers.get("x-middleware-override-headers")?.split(",").map(value => value.trim())).toEqual(["cookie", "x-mgr-path"]);
     expect(response.headers.get("x-middleware-request-cookie")).toContain("sb-session=refreshed");
   });
 
@@ -71,6 +74,14 @@ describe("Supabase proxy refresh", () => {
     expect(response.headers.get("Expires")).toBe("0");
     expect(response.headers.get("Pragma")).toBe("no-cache");
     expect(response.cookies.get("sb-session")?.value).toBe("refreshed");
+  });
+
+  it.each([false, true])("forwards the original path and query, replacing client input (refresh=%s)", async (refresh) => {
+    if (!refresh) createServerClient.mockReturnValue({ auth: { getClaims: async () => ({ data: null, error: null }) } });
+    const response = await proxy(new NextRequest("http://localhost:3000/settings/team?tab=invites", {
+      headers: { "x-mgr-path": "//evil.example" },
+    }));
+    expect(response.headers.get("x-middleware-request-x-mgr-path")).toBe("/settings/team?tab=invites");
   });
 
   // getClaims refreshes an expired session like getUser, but verifies the JWT

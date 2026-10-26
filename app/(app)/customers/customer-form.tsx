@@ -13,10 +13,11 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { FieldDescription } from "@/components/ui/field";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { PAYMENT_TERMS, type CustomerType, type PaymentTerm } from "@/lib/mgr/enums";
-import { CUSTOMER_ALIAS_HELP, customerStateReason, type CustomerEditValues } from "@/lib/mgr/customer-view";
+import { CUSTOMER_ALIAS_HELP, customerNameError, customerStateReason, type CustomerEditValues } from "@/lib/mgr/customer-view";
 import { COUNTRY_OPTIONS, CUSTOMER_TYPE_OPTIONS, PAYMENT_TERM_LABEL, paymentTermLabel } from "@/lib/mgr/labels";
 import type { TaxTreatment } from "@/lib/mgr/tax-treatments";
 import { submitReason } from "@/lib/mgr/submit-reason";
+import { useTouchedLines } from "@/lib/mgr/touched-lines";
 
 export type { TaxTreatment };
 
@@ -72,6 +73,8 @@ export function CustomerForm({
   const [licenseNumber, setLicenseNumber] = useState(customer?.licenseNumber ?? "");
   const [paymentTerms, setPaymentTerms] = useState(customer?.paymentTerms ?? "net30");
   const [taxTreatment, setTaxTreatment] = useState<TaxTreatment | "">(customer?.taxTreatment ?? "");
+  const touched = useTouchedLines(false);
+  const nameError = customerNameError(name);
   const form = useCommandForm("upsert_customer", {
     validationFields: ["name", "alias", "country", "state", "saleChannelId", "licenseNumber"],
     build: () => upsertCustomerInput({ name, alias, type, country, state, saleChannelId, licenseNumber, paymentTerms, taxTreatment }, customer?.id),
@@ -94,10 +97,15 @@ export function CustomerForm({
           {isEdit ? "Edit" : "New customer"}
         </Button>}>
         <form noValidate onSubmit={event => {
-          if (stateReason) { event.preventDefault(); event.stopPropagation(); return; }
+          touched.touch(0);
+          if (nameError || stateReason) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
           void form.submit(event);
         }} className="flex flex-col gap-4">
-          {E.edit("Name", name, "text", undefined, { id: "customer-name", onChange: setName, required: true, error: form.fieldErrors.name })}
+          {E.edit("Name", name, "text", undefined, { id: "customer-name", onChange: setName, onBlur: () => touched.touch(0), required: true, error: (touched.shown(0) ? nameError : undefined) ?? form.fieldErrors.name })}
           <div className="flex flex-col gap-2">
             {E.edit("Alias", alias, "text", undefined, { id: "customer-alias", onChange: setAlias, error: form.fieldErrors.alias, "aria-describedby": "customer-alias-help" })}
             <FieldDescription id="customer-alias-help">{CUSTOMER_ALIAS_HELP}</FieldDescription>
@@ -118,7 +126,7 @@ export function CustomerForm({
             {E.submit(isEdit ? "Save" : "Create", {
               submitting: form.submitting,
               busy: isEdit ? "Saving…" : "Creating…",
-              reason: submitReason([...(name.trim() ? [] : ["a name"]), ...(stateReason ? ["a state"] : [])]),
+              reason: submitReason([...(nameError ? ["a name"] : []), ...(stateReason ? ["a state"] : [])]),
             })}
           </CommandFormFooter>
         </form>

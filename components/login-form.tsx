@@ -4,11 +4,14 @@
  * Adapted from the shadcn `login-03` block. The block's social-login buttons
  * and sign-up link were removed: MGR accounts are created by invitation (see
  * `invite_staff` / `invite_customer_user` commands) and no OAuth provider is
- * configured. Forgot password opens /reset. Submission goes to the `login`
- * server action, which redirects back with `?error=1` on failure. `portal`
- * draws the buyer's variant (screen record Portal sign in). Staff email-link
- * entry validates email only; password sign-in still requires both fields.
+ * configured. Forgot password opens /reset. The login server action returns
+ * failed credentials as form state, never a query string. `portal` draws the
+ * buyer's variant (screen record Portal sign in). Staff email-link entry
+ * validates email only; password sign-in still requires both fields.
  */
+"use client";
+
+import { useActionState } from "react"
 import { cn } from "@/lib/utils"
 import { emailLogin, login } from "@/app/(auth)/actions"
 import { MgrIcon } from "@/components/mgr-icon"
@@ -23,12 +26,14 @@ export function LoginForm({
   sent,
   portal,
   email,
+  next,
   ...props
-}: React.ComponentProps<"div"> & { error?: string; sent?: boolean; portal?: boolean; email?: string }) {
+}: React.ComponentProps<"div"> & { error?: string; sent?: boolean; portal?: boolean; email?: string; next?: string }) {
+  const [state, submit] = useActionState(login, { email, error });
   const baseModel = portal ? portalSignInModel : signInModel;
   const model = {
     ...baseModel,
-    error,
+    error: state.error,
     info: sent ? "Check your email for a sign-in link." : undefined,
   };
   return (
@@ -37,10 +42,13 @@ export function LoginForm({
         {E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>)}
         <EntryView
           model={model}
-          action={login}
+          action={submit}
           secondaryAction={portal ? undefined : emailLogin}
-          defaults={{ email }}
-          hidden={portal ? <input type="hidden" name="portal" value="1" /> : null}
+          defaults={{ email: state.email }}
+          hidden={<>
+            {portal ? <input type="hidden" name="portal" value="1" /> : null}
+            {next ? <input type="hidden" name="next" value={next} /> : null}
+          </>}
           linkHref={portal ? "/reset?portal=1" : "/reset"}
         />
       </EntrySurface>

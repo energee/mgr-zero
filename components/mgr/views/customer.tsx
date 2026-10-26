@@ -10,7 +10,9 @@ import { TAX_TREATMENTS } from "@/lib/mgr/tax-treatments";
 import { E, type FieldControls } from "@/components/mgr/e";
 import { FieldDescription } from "@/components/ui/field";
 import { UsStateField } from "@/components/mgr/us-state-field";
-import { CUSTOMER_ALIAS_HELP, customerStateReason, type CustomerEditValues, type CustomerViewModel } from "@/lib/mgr/customer-view";
+import { CUSTOMER_ALIAS_HELP, customerNameError, customerStateReason, type CustomerEditValues, type CustomerViewModel } from "@/lib/mgr/customer-view";
+import { submitReason } from "@/lib/mgr/submit-reason";
+import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import { DeleteCustomerControl } from "./delete-customer";
 import { RevokePortalUserControl } from "./revoke-portal-user";
 
@@ -71,12 +73,14 @@ export function CustomerView({
 }) {
   const formId = useId();
   const [values, setValues] = useState(model.editValues);
+  const touched = useTouchedLines(!onSave);
+  const nameError = customerNameError(values.name);
   const controls = (key: keyof CustomerEditValues) => ({ id: `${formId}-${key}`, form: formId, disabled: !canWrite || busy, onChange: (value: string) => setValues(current => ({ ...current, [key]: value })) });
   const removal = deleteAction !== undefined ? deleteAction : <DeleteCustomerControl name={model.name} />;
   const stateReason = customerStateReason(values);
   return (
     <div className="@container flex min-w-0 flex-col gap-6">
-      <header className="[&_h1]:font-heading [&_h1]:text-2xl [&_h1]:tracking-tight @min-[48rem]:[&_h1]:text-3xl">
+      <header className="min-w-0 [overflow-wrap:anywhere] [&_h1]:font-heading [&_h1]:text-2xl [&_h1]:tracking-tight @min-[48rem]:[&_h1]:text-3xl">
         {E.back("Customers", model.name, undefined, model.backHref)}
       </header>
       <div className="grid items-start gap-6 @min-[48rem]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
@@ -84,7 +88,7 @@ export function CustomerView({
           <section aria-label="Account details" className="py-5">
             <h2 className="mb-3 font-heading text-xl font-semibold">Account details</h2>
             <div className="flex flex-col gap-4">
-              {E.edit("Customer name", values.name, "text", undefined, { ...controls("name"), required: true })}
+              {E.edit("Customer name", values.name, "text", undefined, { ...controls("name"), required: true, onBlur: () => touched.touch(0), error: touched.shown(0) ? nameError : undefined })}
               <div className="flex min-w-0 flex-col gap-2">
                 {E.edit("Alias", values.alias, "text", undefined, { ...controls("alias"), "aria-describedby": `${formId}-alias-help` })}
                 <FieldDescription id={`${formId}-alias-help`}>{CUSTOMER_ALIAS_HELP}</FieldDescription>
@@ -144,9 +148,13 @@ export function CustomerView({
           </section>
         </div>
       </div>
-      <form id={formId} onSubmit={event => { event.preventDefault(); if (!stateReason) onSave?.(values); }}>
+      <form id={formId} onSubmit={event => {
+        event.preventDefault();
+        touched.touch(0);
+        if (canWrite && !busy && !nameError && !stateReason) onSave?.(values);
+      }}>
         <CommandFormMessage error={error} />
-        {footer !== undefined ? footer : canWrite ? <div className="flex justify-end">{E.submit("Save customer", { submitting: busy, reason: stateReason })}</div> : null}
+        {footer !== undefined ? footer : canWrite ? <div className="flex justify-end">{E.submit("Save customer", { submitting: busy, reason: submitReason([...(nameError ? ["a name"] : []), ...(stateReason ? ["a state"] : [])]) })}</div> : null}
       </form>
       {removal && <section aria-label="Delete customer" className="mt-2 flex flex-col gap-4 border-t pt-5 @min-[48rem]:flex-row @min-[48rem]:items-center @min-[48rem]:justify-between">
         <div>

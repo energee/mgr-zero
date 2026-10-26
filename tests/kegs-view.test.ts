@@ -201,7 +201,7 @@ describe("Record keg event pinned footer (#1037)", () => {
   it("submits the body's form from the pinned footer, with the error beside it", () => {
     const src = readFileSync("components/mgr/views/keg-event-form.tsx", "utf8");
     const footer = src.slice(src.indexOf("footer={"), src.indexOf("<form id="));
-    expect(footer).toContain('<Button type="submit" form={formId}');
+    expect(footer).toContain('E.submit("Record keg event", { form: formId');
     expect(footer).toContain("<CommandFormMessage error={error} />");
     expect(src).toContain("<form id={formId}");
   });

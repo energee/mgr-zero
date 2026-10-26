@@ -1,7 +1,7 @@
 <!-- Status record for the pilot release gate decided on #311 (2026-10-11): owner steps, read-only checks, evidence. -->
 # Pilot gate status
 
-Status: **all items open**. Owner: Ted. Tracks the release index
+Each row's **Status** column is the record. Owner: Ted. Tracks the release index
 [#311](https://github.com/energee/mgr-zero/issues/311).
 Source: the "Pilot gate decisions (2026-10-11)" comment on #311.
 
@@ -38,8 +38,8 @@ Production Supabase is `uogrvqmrbmolvtftotsf`; Preview is `ugzhwxzictzvrzlacjmv`
 | E4 | Staff invitation delivered (#580) | Invite a synthetic staff user; accept from that inbox | Owner reports receipt time and sender address. The invited account appears in the team list | | open |
 | E5 | Password recovery delivered | Request a reset for that user; complete it | Owner reports receipt and a successful sign-in with the new password | | open |
 | E6 | Buyer confirmation delivered (#625) | Confirm a wholesale order for a customer with a linked synthetic buyer | `get_order_email_status` for that order shows `accepted`. Owner confirms the inbox received it; `accepted` alone is not delivery | | open |
-| A1 | Public signup off | Turn on `disable_signup` in Production Auth | Auth config shows `disable_signup: true` | | open |
-| A2 | Leaked-password protection on | Turn it on in Production Auth | Auth config shows `password_hibp_enabled: true`; the `auth_leaked_password_protection` advisor no longer appears | | open |
+| A1 | Public signup off | Turn on `disable_signup` in Production Auth | Auth config shows `disable_signup: true` | 2026-10-26: Management API `GET /v1/projects/<ref>/config/auth` shows `disable_signup: true` | done |
+| A2 | Leaked-password protection on | Turn it on in Production Auth | Auth config shows `password_hibp_enabled: true`; the `auth_leaked_password_protection` advisor no longer appears | 2026-10-26: `PATCH` with `password_hibp_enabled: true` returned 402. The setting needs a paid Supabase plan, and the advisor still appears. The owner deferred it past the pilot as an accepted risk: signup is off and a password change needs the current password | deferred |
 | D1 | Production deploys from `main` only | Set the Vercel project's production branch to `main` | Owner screenshot of Settings → Git. Every Production deployment in `vercel ls --prod` comes from a `main` commit | | open |
 | B1 | Restore rehearsed | Restore one Production backup into a scratch Supabase project | Owner records backup ID, restore duration and operator. Row counts of `breweries`, `orders` and `inventory_movements` match the source at backup time | | open |
 | B2 | Pre-migration backup per release | Before each release migration, take an on-demand backup and record its ID here | The ID appears in `GET /v1/projects/<ref>/database/backups` with a time before the release deployment | | open |

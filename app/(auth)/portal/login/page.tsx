@@ -10,9 +10,9 @@ export const metadata = { title: "Portal sign in" };
 
 const ERRORS: Record<string, string> = { "1": "Incorrect email or password." };
 
-export default async function PortalLoginPage({ searchParams }: { searchParams: Promise<{ error?: string; email?: string }> }) {
+export default async function PortalLoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const auth = getRequestAuthContext();
   if (await auth.getIdentity()) redirect(await signInDestination(auth));
-  const { error, email } = await searchParams;
-  return <LoginForm portal email={email} error={error ? ERRORS[error] ?? "Sign-in failed." : undefined} />;
+  const { error } = await searchParams;
+  return <LoginForm portal error={error ? ERRORS[error] ?? "Sign-in failed." : undefined} />;
 }

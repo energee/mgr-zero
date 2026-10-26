@@ -17,36 +17,42 @@ import { passwordReturnHref } from "@/lib/mgr/entry-view";
 import { hasRecentRecovery, PASSWORD_SAVED_COOKIE, passwordChangeErrors, signInPath } from "@/lib/auth/password";
 import { createServerClient, verifyCurrentPassword } from "@/lib/supabase/server";
 
+export type LoginState = { email?: string; error?: string };
+export type ResetState = LoginState & { sent?: boolean };
+
 /** The brewery and customer selection cookies share these options. */
 const SELECTION_COOKIE = { path: "/", sameSite: "lax" } as const;
 
-export async function login(form: FormData) {
+export async function login(_previous: LoginState, form: FormData): Promise<LoginState> {
   const email = String(form.get("email") ?? "");
-  const back = signInPath(Boolean(form.get("portal")));
-  const failure = `${back}?error=1&email=${encodeURIComponent(email)}`;
+  const failure = { email, error: "Incorrect email or password." };
   const db = await createServerClient();
   const { error } = await db.auth.signInWithPassword({
     email,
     password: String(form.get("password")),
   });
-  if (error) redirect(failure);
+  if (error) return failure;
   const auth = createRequestAuthContext(() => Promise.resolve(db));
   const identity = await auth.getIdentity();
-  if (!identity) redirect(failure);
-  redirect(await signInDestination(auth));
+  if (!identity) return failure;
+  const next = form.get("next");
+  redirect(await signInDestination(auth, typeof next === "string" ? next : undefined));
 }
 
 /** Passwordless sign-in validates email even when browser validation is unavailable. */
 export async function emailLogin(form: FormData) {
+  const next = form.get("next");
+  const destination = passwordReturnHref(typeof next === "string" ? next : undefined);
+  const returnQuery = typeof next === "string" ? `&${new URLSearchParams({ next: destination })}` : "";
   const email = z.string().email().safeParse(form.get("email"));
-  if (!email.success) redirect("/login?error=email");
+  if (!email.success) redirect(`/login?error=email${returnQuery}`);
   const db = await createServerClient();
   const origin = (await headers()).get("origin") ?? "";
   await db.auth.signInWithOtp({
     email: email.data,
-    options: { shouldCreateUser: false, emailRedirectTo: `${origin}/auth/confirm?next=/` },
+    options: { shouldCreateUser: false, emailRedirectTo: `${origin}/auth/confirm?${new URLSearchParams({ next: destination })}` },
   });
-  redirect("/login?sent=1");
+  redirect(`/login?sent=1${returnQuery}`);
 }
 
 export async function logout() {
@@ -56,11 +62,14 @@ export async function logout() {
 }
 
 /** Reset password / Portal forgot password: never confirms whether the email exists. */
-export async function sendReset(form: FormData) {
+export async function sendReset(_previous: ResetState, form: FormData): Promise<ResetState> {
+  const email = String(form.get("email") ?? "");
   const db = await createServerClient();
   const origin = (await headers()).get("origin") ?? "";
-  await db.auth.resetPasswordForEmail(String(form.get("email")), { redirectTo: `${origin}/auth/confirm?next=/password` });
-  redirect(`/reset?sent=1${form.get("portal") ? "&portal=1" : ""}`);
+  const next = form.get("portal") ? "/password?portal=1" : "/password";
+  const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: `${origin}/auth/confirm?${new URLSearchParams({ next })}` });
+  if (error) return { email, error: "The reset link could not be requested. Try again." };
+  return { email, sent: true };
 }
 
 /** Changing a password requires current credentials or an Auth-verified recovery grant. */

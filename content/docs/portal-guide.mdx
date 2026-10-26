@@ -12,9 +12,9 @@ Your login starts with an invitation from the brewery. Open the email, enter **Y
 
 Browser tabs identify **Portal sign in**, **Reset password**, and **Invitations**, followed by **· MGR**.
 
-Enter your **Email** and the **Password** you chose, then select **Sign in**. A customer-only account opens **Shop**, or **Invitations** first if a pending invitation is waiting for you; see below. **Forgot password?** opens **Reset password**: enter your email and select **Send reset link**; the page says a link is on its way whenever that email is on an account, and the link opens **Set new password**. A reset link that was used or has timed out opens **Reset link expired**; select **Request a new link** to go back to the email form.
+Enter your **Email** and the **Password** you chose, then select **Sign in**. A customer-only account opens **Shop**, or **Invitations** first if a pending invitation is waiting for you; see below. **Forgot password?** opens **Reset password** with an empty email field and no sent confirmation. Enter your email and select **Send reset link**. Only after the request succeeds does the page say **If that email is on an account, a reset link is on its way.** This does not reveal whether an account exists. If the request fails, the page asks you to try again instead of claiming a link was sent. The link opens **Set new password**. A reset link that was used or has timed out opens **Reset link expired**; select **Request a new link** to go back to the email form.
 
-While sign-in is being checked, the button says **Signing in…** and cannot be submitted again. Wrong credentials show **Incorrect email or password.** here in the portal, keeping your email and leaving the password blank. Opening either sign-in page while already signed in sends you to Shop for a customer-only account, Today for a staff account, or **No brewery yet** if your account has no membership.
+While sign-in is being checked, the button says **Signing in…** and cannot be submitted again. Wrong credentials show **Incorrect email or password.** here in the portal, keeping your email in the form and leaving the password blank. The email is not added to the page address or browser history. Opening either sign-in page while already signed in sends you to Shop for a customer-only account, Today for a staff account, or **No brewery yet** if your account has no membership.
 Pending invitations take priority: either sign-in page opens **Invitations** first when consent is waiting.
 
 <Screen name="Portal forgot password" />
@@ -141,7 +141,7 @@ Screen readers can read the informational and warning hints as notes without int
 
 If the signed-in buyer account changes while an order or invoice question is pending, MGR refuses the action before writing. Return to the original account to retry an uncertain action unchanged, or check the saved order or question before starting again.
 
-**A page fails to load.** Select **Try again** once. If it still fails, give the brewery your customer name, page, approximate time, and the action you tried.
+**A page fails to load.** Select **Try again** once. If it still fails, give the brewery your customer name, page, approximate time, and the action you tried. When a **Reference** appears under the error, include it.
 
 **A page says "Not found".** The order or invoice at that address does not exist for your account, or the link is wrong. The browser tab reads **Not found · MGR**, including a Shop link to a missing draft or reorder source. Open **Orders** or **Invoices** and pick the record from the list.
 

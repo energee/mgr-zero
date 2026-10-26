@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { transferPreview } from "../lib/mgr/cellar-transfer-view";
+import { transferDestinations, transferPreview, transferReason } from "../lib/mgr/cellar-transfer-view";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CellarTransferView } from "../components/mgr/views/cellar-transfer";
@@ -25,5 +25,21 @@ describe("cellar transfer preview", () => {
     for (const [available, moving, loss] of [[undefined, "3", ""], [12, "", ""], [12, "Infinity", ""], [12, "3", "-1"], [12, "3", "10"], [12, "-3", ""]] as const) {
       expect(transferPreview(available, moving, loss).valid).toBe(false);
     }
+  });
+  it("excludes the source vessel and invalidates a stale same-vessel destination", () => {
+    const source = cellarTransferPils.occupancies.find(o => o.occupancy_id === cellarTransferPils.fromId)!;
+    expect(transferDestinations(cellarTransferPils).some(v => v.id === source.vessel_id)).toBe(false);
+    expect(transferReason({ ...cellarTransferPils, toId: source.vessel_id })).toContain("destination");
+    expect(transferReason(cellarTransferPils)).toBeNull();
+  });
+  it("names every blocked quantity, including exponent notation and over-source loss", () => {
+    for (const volume of ["0", "-1", "", "1e1"]) {
+      expect(transferReason({ ...cellarTransferPils, volume })).toContain("barrels moving above zero");
+      expect(transferPreview(12.8, volume, "").valid).toBe(false);
+    }
+    expect(transferReason({ ...cellarTransferPils, volume: "13" })).toContain("at most 12.8 bbl");
+    expect(transferReason({ ...cellarTransferPils, volume: "3", loss: "10" })).toContain("at most 12.8 bbl");
+    expect(transferReason({ ...cellarTransferPils, loss: "-1" })).toContain("loss of zero or more");
+    expect(transferReason({ ...cellarTransferPils, occupancies: [] })).toContain("source tank");
   });
 });
