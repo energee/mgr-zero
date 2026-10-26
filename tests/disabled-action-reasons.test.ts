@@ -17,7 +17,8 @@ import { CycleCountView } from "../components/mgr/views/cycle-count";
 import { CellarMapView } from "../components/mgr/views/cellar-map";
 import { InviteView } from "../components/mgr/views/team-controls";
 import { brewPrepMineral, brewTimelineMineral } from "../lib/mgr/fixtures/production";
-import { cycleCountCans } from "../lib/mgr/fixtures/purchasing";
+import { cycleCountCans, receivePoCountryMalt } from "../lib/mgr/fixtures/purchasing";
+import { ReceivePoView } from "../components/mgr/views/receive-po";
 import { toCellarMapViewProps } from "../lib/mgr/cellar-map-view";
 
 // ShipForm renders without a router or a command round trip.
@@ -144,6 +145,15 @@ describe("Oct 25 recheck: withheld actions say why (#1122)", () => {
 
   it("Preview count names the missing count", () => {
     describedButton(html(createElement(CycleCountView, { model: cycleCountCans, footer: null, previewReason: "Still needed: a counted quantity of zero or more." })), "Preview count", /counted quantity/);
+  });
+
+  it("Cancel purchase order waits for a closure reason that is not blank", () => {
+    for (const closureReason of ["", "   "]) {
+      describedButton(html(createElement(ReceivePoView, { model: { ...receivePoCountryMalt, closureReason } })), "Cancel purchase order", /^Still needed: a closure reason\.$/);
+    }
+    const ready = html(createElement(ReceivePoView, { model: receivePoCountryMalt })).match(/<button[^>]*>Cancel purchase order<\/button>/)?.[0];
+    expect(ready).toBeTruthy();
+    expect(ready).not.toContain('disabled=""');
   });
 
   it("the cellar with no vessels still says why Reading, Transfer and Addition are off", () => {
