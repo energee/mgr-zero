@@ -21,8 +21,8 @@ export const schedulePackagingRun: SchedulePackagingRunViewModel = {
   sourceDetail: "B-0416 · 42.0 bbl · gravity 2.1 · ready",
   outputs: [
     { key: "case", title: "Hazy · case · 24×16 oz", detail: "39.6 bbl · on the wholesale list", qty: "118", listed: true },
-    { key: "half", title: "Hazy · ½ bbl keg", detail: "2.0 bbl · on the wholesale list", qty: "4", listed: true },
-    { key: "sixth", title: "Hazy · ⅙ bbl keg", detail: "not listed this run", qty: "0", listed: false },
+    { key: "half", title: "Hazy · ½ bbl keg", detail: "2.0 bbl · on the wholesale list", qty: "4", whole: true, listed: true },
+    { key: "sixth", title: "Hazy · ⅙ bbl keg", detail: "not listed this run", qty: "0", whole: true, listed: false },
   ],
   leftInSource: "0.4 bbl · loss at close unless held",
   leftLabel: "Left in FV3",

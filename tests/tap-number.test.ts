@@ -30,13 +30,15 @@ for (const command of ["tap_keg", "swap_keg"]) describe(`${command} replay input
 
 describe("tap sheet number validation", () => {
   const initial = openTapBoardSheet({ open: [], history: [] }, "tap", null, id, id);
-  it.each(invalid)("withholds invalid number %s with a field-specific reason", tapNumber => {
+  it.each(invalid.filter(value => value.trim() !== ""))("withholds invalid number %s with a field-specific reason", tapNumber => {
     const state = editTapBoardSheet(initial, { tapNumber });
     expect(tapSheetNeeds(state.sheet!)).toHaveProperty("tapNumber");
     expect(() => beginTapBoardAttempt(state, id)).toThrow(/tap number/);
   });
-  it.each(["", ...valid.filter((value): value is string => value !== undefined)])("preserves valid optional number %s", tapNumber => {
-    const state = beginTapBoardAttempt(editTapBoardSheet(initial, { tapNumber }), id);
-    expect(state.sheet!.attempt).toMatchObject({ kind: "submitting", payload: { tapNumber: tapNumber || undefined } });
+  it.each(["", " ", "  ", "\t", ...valid.filter((value): value is string => value !== undefined)])("preserves valid optional number %s", tapNumber => {
+    const edited = editTapBoardSheet(initial, { tapNumber });
+    expect(tapSheetNeeds(edited.sheet!)).not.toHaveProperty("tapNumber");
+    const state = beginTapBoardAttempt(edited, id);
+    expect(state.sheet!.attempt).toMatchObject({ kind: "submitting", payload: { tapNumber: tapNumber.trim() || undefined } });
   });
 });

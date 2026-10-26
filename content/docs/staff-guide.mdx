@@ -152,7 +152,7 @@ Admin, Warehouse, and Taproom open **Tap board** from Beer, Taproom, or Taproom 
 
 Closed tap entries cannot be edited or deleted. **Recent history** keeps who opened and closed each keg and when, and those intervals support historical variance calculations. **Kick** closes an open keg; it does not erase its history.
 
-Opening fill is **25%**, **50%**, **60%**, or **Full**. The **Tap number** is optional and can repeat. Enter digits for a positive whole number up to 9007199254740991, or leave it empty. Letters, signs, decimals, exponents, zero, and larger numbers are refused. Two kegs can share a number, and a keg with no number sorts last. The sorting hint appears only when an open keg has no number. Existing historical tap labels remain unchanged. Kick closes an interval with a reason and estimated remaining fill: empty, about 25%, or about 50%. Swap closes and replaces it in one action; if either change cannot be saved, neither is saved. Omit the incoming keg to reuse the outgoing own SKU; a guest replacement always requires an explicit name and size. An omitted replacement number leaves the new interval unnumbered.
+Opening fill is **25%**, **50%**, **60%**, or **Full**. The **Tap number** is optional and can repeat. Enter digits for a positive whole number. Leave it blank or enter only spaces to keep the keg unnumbered. Letters, signs, decimals, exponents, zero, and very large numbers are refused. Two kegs can share a number, and a keg with no number sorts last. The sorting hint appears only when an open keg has no number. Existing historical tap labels remain unchanged. Kick closes an interval with a reason and estimated remaining fill: empty, about 25%, or about 50%. Swap closes and replaces it in one action; if either change cannot be saved, neither is saved. Omit the incoming keg to reuse the outgoing own SKU; a guest replacement always requires an explicit name and size. An omitted replacement number leaves the new interval unnumbered.
 
 Retry an unchanged action with the same request ID to recover its original result, even after another action. A new action against an already closed interval is refused and reports the closer's saved name, or **staff** when no name is available, plus the closing time. Open taps includes every interval, with unnumbered entries last; recent history returns the latest 50 closed intervals with saved actor names and times. These fill estimates do not change counts or inventory. No POS yield or remaining-volume bar is supplied.
 
@@ -842,7 +842,7 @@ Every affected filed period is marked **Needs amendment** in Compliance, includi
 
 Choose the **State** from the two-letter state picker. **Save license** explains any missing state or kind beside the button; number and expiry are optional. **Cancel** closes the dialog without saving. The empty list explains that license records keep state license numbers and expiry dates together. Record the brewery’s federal TTB registry number in **Settings**, not as a state license.
 
-A license whose expiry is before today in the brewery's timezone is marked **expired** with a warning. A license expiring today is not yet expired. In **Edit license**, **Delete license** asks you to confirm before removing a mistaken record.
+A license whose expiry is before today in the brewery's timezone is marked **expired** with a warning. A license expiring today is not yet expired. In **Edit license**, **Delete license** (Admin and Sales) asks you to confirm before removing a mistaken record.
 
 Each movement shows its actual bin and recorded barrels. Returns link to the original shipped movement and the credit memo; damaged losses link to their return movement.
 
@@ -1151,7 +1151,13 @@ Open **Packaging** from the **Work** navigation to see every run by planned date
 
 **Save run plan** names what is **Still needed**: a brand, a planned date, and at least one positive planned output quantity. An empty **Brand** picker says **No brands yet**. Admins and Sales can follow **Add a brand in Catalog**; Brewers and Warehouse are told that an admin or sales member can add one. **Source tank · optional** picks an existing occupied tank, not a typed name. With none available, it explains that you can leave the source blank and pick it before starting the run.
 
+Planned **keg** quantities must be whole numbers. Other packages may use fractional quantities. Invalid entered quantities must be corrected before saving, even when another output is valid; use ordinary decimal notation rather than exponents. If a selected tank holds less beer than the plan needs, MGR warns before saving but still allows the plan. No tank is required, and saving does not reserve beer or move inventory. A date before today in the brewery’s timezone also warns without blocking the plan.
+
+When the selected brand has no packages, **Add a package in Catalog** opens Catalog for Admin and Sales. Brewer and Warehouse instead see who can add the package.
+
 Packaging separates **Upcoming** and **Recent** runs into sortable tables on desktop and labeled lists on phones. Upcoming shows the run number, brand, planned date, source, planned quantity, and next action. Recent shows status and the **Closed or cancelled** date instead of a next action. Planned quantity is the total package count from the plan, not the actual output; when a package unit is not supplied, no unit is guessed. The detail's planned outputs table labels SKU counts **Planned units** and **Actual units**. An unsourced plan says **No source yet**; a cancelled plan labels its date **Cancelled** and retains the cancellation note. Lot, output, yield, and loss columns appear only when those facts are available. Select a run number or its row to open the record. Closed and cancelled dates follow the brewery’s timezone.
+
+An active, unstarted run whose planned date is before today in the brewery’s timezone is marked **Overdue** beside its planned date. Today’s plans are not overdue, and cancelled or closed runs never carry that cue.
 
 The scheduling material preview separates **Material**, **Planned**, **On hand**, and **Short**. Planned amounts include each material's base unit. A dash means unavailable, while zero means a known zero. Plan and close requirements also show **On order**; incoming stock is not on-hand stock.
 
@@ -1192,7 +1198,7 @@ Below the vendors, **Contracts** lists commitments: one vendor, one material, a 
 
 **Quantity** must be above zero, as a whole or decimal number without exponent notation. **Unit cost ($)** is optional and must be zero or more when entered. After you leave either field, invalid entries show **Enter a quantity above zero.** or **Enter a cost of zero or more.** beside it. **Save contract** stays unavailable while required fields are missing or either number is invalid, including exponent notation such as `1e3`.
 
-In **Edit contract**, **Delete contract** asks for confirmation and removes an unused contract. A contract linked to a purchase order cannot be deleted; MGR asks you to set an end date instead, so the purchase order keeps its contract history.
+In **Edit contract**, **Delete contract** (Admin, Warehouse, and Brewer) asks for confirmation and removes an unused contract. A contract linked to a purchase order cannot be deleted; MGR asks you to set an end date instead, so the purchase order keeps its contract history.
 
 ### Materials
 

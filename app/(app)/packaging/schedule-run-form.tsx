@@ -18,10 +18,10 @@ import { plannedQty, scheduleRunReason, toSchedulePackagingRunView, type Schedul
 
 const EMPTY: ScheduleRunDraft = { brandId: "", occupancyId: "", plannedOn: "", qty: {} };
 
-export function ScheduleRunForm({ catalogHref, ...data }: ScheduleRunData & { catalogHref: string | null }) {
+export function ScheduleRunForm({ catalogHref, today, ...data }: ScheduleRunData & { catalogHref: string | null; today: string }) {
   const [draft, setDraft] = useState(EMPTY);
   const change = (patch: Partial<ScheduleRunDraft>) => setDraft((prev) => ({ ...prev, ...patch }));
-  const model = toSchedulePackagingRunView(data, draft);
+  const model = toSchedulePackagingRunView(data, draft, today);
   const outputs = model.outputs
     .filter((output) => plannedQty(output.qty) > 0)
     .map((output) => ({ skuId: output.key, qtyPlanned: plannedQty(output.qty) }));
@@ -32,7 +32,7 @@ export function ScheduleRunForm({ catalogHref, ...data }: ScheduleRunData & { ca
   const materials = useCommandQuery<{ planned: PackagingRequirement[] }>("get_packaging_material_plan", { outputs }, form.open && outputs.length > 0);
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Schedule run" trigger={<Button size="sm">Schedule run</Button>}>
-      <form onSubmit={form.submit} className="flex flex-col gap-4">
+      <form onSubmit={(event) => { if (scheduleRunReason(model)) event.preventDefault(); else void form.submit(event); }} className="flex flex-col gap-4">
         <SchedulePackagingRunView
           catalogHref={catalogHref}
           model={{ ...model, materials: materials.data?.planned.map(row => [row.name, `${row.qty} ${row.unit}`, row.onHand ?? "—", row.short === undefined ? "—" : Math.max(0, row.short)]), materialsMessage: outputs.length ? "Loading material requirements…" : "Choose planned outputs to preview materials.", warning: materials.data?.planned.some(row => row.short !== undefined && row.short > 0) ? "Shortages do not prevent saving this plan. Closing requires enough stock for confirmed used plus lost quantities." : undefined }}
