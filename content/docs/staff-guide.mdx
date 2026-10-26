@@ -1275,11 +1275,13 @@ If the email service refuses an invitation, MGR explains whether the address is 
 
 <Screen name="Settings" />
 
-**Brewery details**, **Ask MGR** and **Wholesale fulfillment** are separate forms, each with its own Save button. Saving one never saves edits in the others, and pressing Enter in a field saves only that field's form. On desktop, Brewery details sits beside the other two. **Customer-facing phone** and **One-way keg fee ($)** sit together, with **Books opened on** and its explanation on a full-width row below the other brewery fields. **People and places** groups Team, Locations, Water profiles, and Import; **Connections** groups Accounting, Point of sale, and Chat. On phones these sections stack. Use the shared **− / +** count control or type a whole number from 1 to 168 for **Reading overdue after (hours)**, then **Save brewery**.
+**Brewery details**, **Ask MGR** and **Wholesale fulfillment** are separate forms, each with its own Save button. Saving one never saves edits in the others, and pressing Enter in a field saves only that field's form. On desktop, Brewery details sits beside the other two. **Customer-facing phone** and **One-way keg fee ($)** sit together, with **Books opened on** and its explanation on a full-width row below the other brewery fields. **People and places** groups Team, Locations, Water profiles, Sale channels, Units, and Import; **Connections** groups Accounting, Point of sale, and Chat. On phones these sections stack. Use the shared **− / +** count control or type a whole number from 1 to 168 for **Reading overdue after (hours)**, then **Save brewery**.
 
 The **Customer-facing phone** field explains that the portal prints this number when online payment is unavailable. Leave it empty if you do not want a phone number shown.
 
 **Save brewery** and **Save AI model** stay disabled until their own form has a valid change. The adjacent **Still needed** line explains an unchanged form, a missing brewery name or timezone, an out-of-range whole-number setting, or an unavailable AI model catalog. Reverting an edit disables Save again. Saving one form leaves edits in the others alone.
+
+**Save warehouse** stays disabled until you choose a different warehouse. Its **Still needed** line asks for a warehouse when none is chosen, or a change to the warehouse when the saved choice is unchanged.
 
 After filing, **Correct reporting basis** is another independently saved form. **Save brewery**, **Save AI model**, and **Save warehouse** never submit a reporting-basis correction or change its permanent history.
 
@@ -1403,6 +1405,8 @@ Every staff member can open **More → Chat** to set personal notification reaso
 
 Personal reminder switches save immediately; quiet hours save when you choose **Save my quiet hours**. The page announces **Saved** only after a successful save. While a request is pending it shows **Saving…**; failed or uncertain requests keep their error and saved-request recovery.
 
+**Save my quiet hours** stays disabled until the times or timezone differ from your saved preferences. The **Still needed** line asks for a change to your quiet hours; reverting an edit disables Save again.
+
 Each confirmation belongs to the setting you saved. Editing its draft hides **Saved** until the values match that successful save again; saving a reminder switch never saves a quiet-hours draft.
 
 For personal quiet hours, enter both a start and an end and choose your timezone. The end must differ from the start; an overnight window such as 22:00–06:00 is valid. If one time is missing, the form explains which one to add before you can save. Clear both times to follow the brewery window instead. The same two-time rule applies to brewery quiet hours; clearing both brewery times turns them off.
@@ -1420,6 +1424,8 @@ Linked eligible staff receive private Slack messages when assigned work first be
 The brewery digest goes only to one admin-approved private, non-shared Slack channel where MGR is already a member. Public, archived, and Slack Connect channels cannot be selected. It runs on the brewery's local morning and midday windows; the default fermentation reading cadence is 24 hours. Personal mutes, snoozes, and quiet hours affect Slack delivery only, not Today or the shared digest.
 
 In Chat settings, **Load private channels**, choose a channel, then **Save operations channel**. Adjust the brewery quiet-hours range or open **Exact times** for minute-precise entry; clear both times to turn quiet hours off, then save. Reading cadence accepts 1–168 hours. **Connection permissions** shows required and granted scopes. The four preview tabs show App Home, Personal DM, Team digest, and **Sample preferences**. Each is labelled **Sample data**: the orders and stops in it are made up, and a preview never sends a Slack message. **Sample quiet hours** illustrates a window, not your brewery's actual setting. The Sample preferences dialog's **Save preferences** is disabled; change your own reasons and see the actual brewery quiet hours under **My notification preferences**. If Slack is not available for your brewery yet, **Connect Slack** is disabled; ask MGR support to turn it on. Turning **Slack delivery** off disables the integration; use reauthorization to enable delivery again.
+
+**Save brewery quiet hours** and **Save reading cadence** stay disabled until their own saved values change. Each shows a **Still needed** line when unchanged, and reverting an edit disables Save again. Reading cadence must be a whole number from 1 to 168; its **Still needed** line explains that range for invalid values.
 
 All sample action buttons are disabled and marked **Preview**. Sample preferences use the same six personal reminder names as your real preferences; their quiet hours are sample values, not your brewery’s settings.
 

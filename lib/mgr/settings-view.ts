@@ -24,13 +24,23 @@ export function toBrewerySettingsValues(brewery: BrewerySettings): BrewerySettin
   };
 }
 
+export function readingDueHoursIsValid(hours: number): boolean {
+  return Number.isInteger(hours) && hours >= 1 && hours <= 168;
+}
+
+export function readingCadenceReason(hours: string, initial: number): string | null {
+  const value = Number(hours);
+  if (!readingDueHoursIsValid(value)) return submitReason(["reading overdue hours from 1 to 168 (whole numbers)"]);
+  return submitReason(value === initial ? ["a change to reading cadence"] : []);
+}
+
 export function breweryOperatingDefaultsCommand(values: Pick<BrewerySettingsValues, "hours" | "daysToPackage">) {
   const readingDueHours = Number(values.hours);
   const daysToPackage = Number(values.daysToPackage);
   return {
     name: "set_brewery_operating_defaults",
     input: { readingDueHours, daysToPackage },
-    valid: Number.isInteger(readingDueHours) && readingDueHours >= 1 && readingDueHours <= 168
+    valid: readingDueHoursIsValid(readingDueHours)
       && Number.isInteger(daysToPackage) && daysToPackage >= 1 && daysToPackage <= 120,
   };
 }
@@ -41,7 +51,7 @@ export function brewerySettingsReason(values: BrewerySettingsValues, initial: Br
   if (!values.name.trim()) missing.push("a brewery name");
   if (!values.timezone.trim()) missing.push("a timezone");
   const { readingDueHours, daysToPackage } = breweryOperatingDefaultsCommand(values).input;
-  if (!Number.isInteger(readingDueHours) || readingDueHours < 1 || readingDueHours > 168) missing.push("reading overdue hours from 1 to 168 (whole numbers)");
+  if (!readingDueHoursIsValid(readingDueHours)) missing.push("reading overdue hours from 1 to 168 (whole numbers)");
   if (!Number.isInteger(daysToPackage) || daysToPackage < 1 || daysToPackage > 120) missing.push("days to package from 1 to 120 (whole numbers)");
   if (missing.length) return submitReason(missing);
   const changed = (Object.keys(values) as (keyof BrewerySettingsValues)[]).some(key => {

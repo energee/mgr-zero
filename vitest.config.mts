@@ -21,6 +21,8 @@ const pureTests = [
   "tests/tap-board-view.test.ts",
   "tests/date-format.test.ts",
   "tests/chat-failure.test.ts",
+  "tests/chat-view.test.ts",
+  "tests/settings-view.test.ts",
   "tests/monthly-compliance-view.test.ts",
   "tests/compliance-more-copy.test.ts",
   "tests/compliance-view.test.ts",
