@@ -28,6 +28,7 @@ import { toMaterialsOnHandViewProps } from "../lib/mgr/materials-on-hand-view";
 import { purchaseOrderNext, toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
 import { receiptBillPresentation, receiptBillRequest, toPostedReceiptViewProps, type ReceiptSnapshot } from "../lib/mgr/receipt-view";
 import { toVendorsViewProps } from "../lib/mgr/vendors-view";
+import { contractSubmitReason } from "../lib/mgr/contract-view";
 import { newPoReason } from "../lib/mgr/new-po-view";
 import { CLOSURE_FORM_ID } from "../lib/mgr/receive-po-view";
 import { beginRecovery, discardRecovery } from "../lib/commands/recovery";
@@ -440,6 +441,31 @@ describe("Vendors", () => {
     const html = htmlOf(createElement(ContractView, { model: contractYchCitra }));
     expect(html).toMatch(/>Save contract</);
     expect(html).toMatch(/Contract number/);
+    expect(html).toContain('aria-haspopup="dialog"');
+    expect(html).toContain("Delete contract");
+    const creating = htmlOf(createElement(ContractView, { model: contractYchCitra, remove: null }));
+    expect(creating).not.toContain("Delete contract");
+  });
+
+  it("holds Save contract for missing, invalid, or exponent-notation values", () => {
+    expect(contractSubmitReason({ vendorId: "", materialId: "", quantity: "", unitCost: "" })).toBe("Still needed: a vendor, a material, and a quantity.");
+    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1", unitCost: "-1" })).toBe("Still needed: a unit cost of zero or more.");
+    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1e3", unitCost: "" })).toBe("Still needed: a decimal quantity.");
+    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1.5", unitCost: "0" })).toBeNull();
+  });
+
+  it("waits to show contract errors in live controlled fields", () => {
+    const negativeModel = { ...contractYchCitra, unitCost: "-1" };
+    const controlled = htmlOf(createElement(ContractView, { model: negativeModel, controls: { quantity: () => {}, unitCost: () => {} } }));
+    expect(controlled).not.toContain("Enter a cost of zero or more.");
+    const negativeCost = htmlOf(createElement(ContractView, { model: negativeModel }));
+    expect(negativeCost).toContain("Enter a cost of zero or more.");
+    expect(negativeCost).toContain('aria-invalid="true"');
+    expect(negativeCost).toMatch(/<button[^>]*disabled[^>]*>Save contract<\/button>/);
+    expect(negativeCost).toContain("Still needed: a unit cost of zero or more.");
+    const exponentQuantity = htmlOf(createElement(ContractView, { model: { ...contractYchCitra, quantity: "1e3" } }));
+    expect(exponentQuantity).toContain("Enter a decimal number, not exponent notation");
+    expect(exponentQuantity).toMatch(/<button[^>]*disabled[^>]*>Save contract<\/button>/);
   });
 
   it("the contract's inline field pairs render without a React key warning (E.inline owns the keys)", () => {

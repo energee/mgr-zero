@@ -89,6 +89,15 @@ defineCommand({
   })),
 });
 
+defineCommand({
+  name: "delete_material_contract", description: "Delete an unused material contract; contracts on purchase orders must be ended instead",
+  input: z.object({ contractId: z.string().uuid() }),
+  roles: [...PURCHASING],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_material_contract", {
+    p_brewery: ctx.breweryId, p_id: i.contractId, p_request_id: execution.requestId,
+  })),
+});
+
 // The picker's list: PO and material forms need a name, not the contract report.
 defineQuery({
   name: "list_vendors", description: "Vendors, alphabetical, with active flag and typed lead time",
