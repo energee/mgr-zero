@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
     { source: "/transfers/new", destination: "/transfers?newTransfer=1", permanent: false },
     { source: "/catalog/skus", destination: "/catalog", permanent: false },
     { source: "/catalog/skus/new", destination: "/catalog", permanent: false },
+    { source: "/guide", destination: "/docs", permanent: false },
     { source: "/docs/user-guide{.html}?", destination: "/docs", permanent: true },
     { source: "/docs/:guide(staff-guide|portal-guide).html", destination: "/docs/:guide", permanent: true },
     // #325 split the compliance registry: brewery licenses stand alone, brand

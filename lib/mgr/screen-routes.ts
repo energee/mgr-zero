@@ -52,7 +52,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Settings no warehouse", file: "app/(app)/settings/page.tsx" },
   { name: "Team", file: "app/(app)/settings/team/page.tsx" },
   { name: "Permission denied", file: "app/(app)/denied/page.tsx" },
-  { name: "Page not found", file: "app/not-found.tsx" },
+  { name: "Page not found", file: "app/not-found.tsx", additionalFiles: ["app/(app)/[...missing]/page.tsx", "app/(portal)/portal/[...missing]/page.tsx"] },
   { name: "No membership", file: "app/(auth)/no-membership/page.tsx" },
   { name: "Portal staff only", file: "app/(auth)/no-membership/page.tsx" },
   { name: "Session expired", file: "app/(auth)/login/page.tsx" },

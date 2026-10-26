@@ -69,7 +69,7 @@ describe("customer guides (MDX)", () => {
   // spaces) appears somewhere in its audience's guide, so a new area cannot ship unmentioned.
   it("names every staff and portal route in its guide", () => {
     const segments = (dir: string) =>
-      [...new Set(gitFiles(`${dir}/**/page.tsx`).map((p) => relative(dir, p).split("/")[0]))].filter((s) => s !== "page.tsx");
+      [...new Set(gitFiles(`${dir}/**/page.tsx`).map((p) => relative(dir, p).split("/")[0]))].filter((s) => s !== "page.tsx" && !s.startsWith("["));
     const missing = (guide: string, dir: string) => {
       const mdx = read(`content/docs/${guide}.mdx`).toLowerCase().replace(/-/g, " ");
       return segments(dir).filter((s) => !mdx.includes(s.replace(/-/g, " "))).map((s) => `${guide}: ${s}`);
