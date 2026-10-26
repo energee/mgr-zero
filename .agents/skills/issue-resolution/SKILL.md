@@ -86,9 +86,10 @@ server.
 
 Before committing, inspect `git status`, `git diff`, and `git diff --check`.
 Commit the implementation or conclude the merge. Immediately before pushing,
-re-read `gh pr view <n> --json state,mergedAt`: a PR can merge mid-work. If it
-merged, cherry-pick onto a new branch from `origin/main` and open a new PR.
-Otherwise push the PR head branch and query GitHub again. Completion requires the pushed revision to report
+re-read `gh pr view <n> --json state,mergedAt` (AGENTS.md Negative 18): a PR
+can merge mid-work. If it merged, cherry-pick onto a new branch from
+`origin/main` and open a new PR. Otherwise push the PR head branch and query
+GitHub again. Completion requires the pushed revision to report
 `mergeable: MERGEABLE`; report CI as pending, failing, or passing exactly as
 GitHub reports it. A cleared conflict with pending checks is mergeable, not ready
 to merge.
