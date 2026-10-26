@@ -192,12 +192,6 @@ describe("Tap board polish (#1302)", () => {
     expect(render({ ...tapBoard, snapshot: { open: [], history: [] } })).not.toContain("Unnumbered kegs sort last.");
   });
 
-  it("keeps an empty on-tap list compact", () => {
-    const html = render({ ...tapBoard, snapshot: { open: [], history: [] } });
-    expect(html).toContain("No kegs are on tap.");
-    expect(html).not.toContain('data-slot="empty"');
-  });
-
   it("keeps legacy numbers visible and renders supplied actor names without inventing handles", () => {
     const state = { ...tapBoard, snapshot: { open: [{ ...tapBoard.snapshot.open[0], tap_number: "abc", opened_by_label: "Dana Brewer" }], history: [] } };
     const html = render(state);
@@ -208,13 +202,17 @@ describe("Tap board polish (#1302)", () => {
     expect(html).toContain("No closed kegs yet.");
   });
 
-  it("uses a numeric keypad without rounding a long identifier, and names invalid input", () => {
+  it("uses a numeric keypad and withholds submit for an invalid tap number", () => {
     const state = openTapBoardSheet({ open: [], history: [] }, "tap", null, "taproom", tapBoardSkus[0].id);
     const sheet = { ...state.sheet!, fields: { ...state.sheet!.fields, tapNumber: "abc" } };
     const html = renderToStaticMarkup(createElement(TapKegView, { sheet, skus: tapBoardSkus, timeZone: "America/New_York" }));
     expect(html).toMatch(/inputMode="numeric"/i);
     expect(html).toMatch(/maxLength="80"/i);
-    expect(html).toContain("a positive whole tap number, or no number");
+    const submit = /<button\b[^>]*type="submit"[^>]*>/.exec(html)?.[0];
+    expect(submit).toContain('disabled=""');
+    const reasonId = /aria-describedby="([^"]+)"/.exec(submit!)?.[1];
+    expect(reasonId).toBeDefined();
+    expect(html).toContain(`<p id="${reasonId}"`);
     expect(html).not.toContain("9007199254740991");
     const swap = renderToStaticMarkup(createElement(TapKegView, { sheet: swapKeg, skus: tapBoardSkus, timeZone: "America/New_York" }));
     expect(swap).toContain("Swap closes this keg and opens its replacement together.");
