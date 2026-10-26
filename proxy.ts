@@ -35,6 +35,9 @@ export async function proxy(req: NextRequest) {
 // Skip static assets: a session refresh is a Supabase round-trip, and an SVG
 // from /public doesn't need one, and neither do the public customer guides at /docs
 // (the chooser itself included) or the search endpoint that backs their ⌘K dialog.
+// /api/command refreshes its own cookie session (buildRouteContext's getClaims sets
+// the cookies); running the proxy first only added a second check and, on a cold
+// request, a second function start of about 0.85 s (#1403).
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|docs(?:/|$)|screens/frame/|api/search|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|html)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|docs(?:/|$)|screens/frame/|api/search|api/command$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|html)$).*)"],
 };

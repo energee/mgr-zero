@@ -46,6 +46,9 @@ describe("Supabase proxy refresh", () => {
     expect(matches("/docs")).toBe(false);
     expect(matches("/docs/staff-guide")).toBe(false);
     expect(matches("/api/search")).toBe(false);
+    // #1403: the command route refreshes its own cookie session (buildRouteContext's
+    // getClaims), so the proxy would only add a second check and a second cold start.
+    expect(matches("/api/command")).toBe(false);
     // The screen frames the docs embed are public like the docs themselves.
     expect(matches("/screens/frame/0")).toBe(false);
     expect(matches("/inventory")).toBe(true);
