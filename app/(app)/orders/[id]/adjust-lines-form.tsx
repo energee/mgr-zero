@@ -29,16 +29,18 @@ export function AdjustLinesForm({ orderId, orderNo, currentLines, skus }: {
   const [lines, setLines] = useState<LineRow[]>(() => byBrand(currentLines).map(l => ({ skuId: l.sku_id, qty: String(Number(l.qty_ordered)) })));
   const [reason, setReason] = useState("");
   const [warnings, setWarnings] = useState<AtpWarning[]>([]);
-  const { busy, error, run } = useCommandAction();
+  const { busy, error, setError, run } = useCommandAction();
   function updateLine(index: number, patch: Partial<LineRow>) {
     setLines(prev => prev.map((line, i) => i === index ? { ...line, ...patch } : line));
   }
   return <form className="contents" onSubmit={event => {
     event.preventDefault();
     if (busy) return;
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) { setError("Reason required"); return; }
     // A blank quantity is sent and refused, never dropped: adjust_order_lines
     // replaces every line, so dropping it removed the SKU from the order (#433).
-    void run("adjust_order_lines", { orderId, reason, lines: lines.filter(l => l.skuId).map(l => ({ skuId: l.skuId, qty: Number(l.qty) })) },
+    void run("adjust_order_lines", { orderId, reason: trimmedReason, lines: lines.filter(l => l.skuId).map(l => ({ skuId: l.skuId, qty: Number(l.qty) })) },
       data => {
         const next = atpWarnings(data);
         if (next.length > 0) setWarnings(next);

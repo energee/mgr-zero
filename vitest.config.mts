@@ -50,6 +50,7 @@ const pureTests = [
   "tests/form-feedback.test.ts",
   "tests/quantity-field-blur.test.ts",
   "tests/quantity-form-submission.test.ts",
+  "tests/adjust-lines-submission.test.ts",
   "tests/water-profile-submission.test.ts",
   "tests/water-profiles-view.test.ts",
   "tests/location-team-consistency.test.ts",

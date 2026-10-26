@@ -259,7 +259,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
       event: titled(e.event.replace(/_/g, " ")),
       ...(actorNames ? { by: actorNames[e.actor] ?? "a user not on the team" } : {}),
       detail: e.event === "lines_adjusted"
-        ? `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${typeof e.payload.reason === "string" ? ` (${e.payload.reason})` : ""}`
+        ? `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${typeof e.payload.reason === "string" && e.payload.reason.trim() ? ` (${e.payload.reason.trim()})` : ""}`
         : typeof e.payload.reason === "string" ? e.payload.reason.trim() : "",
     })),
   };
