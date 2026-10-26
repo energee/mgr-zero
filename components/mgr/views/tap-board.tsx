@@ -8,7 +8,7 @@ import Link from "next/link";
 import { E, type PickEmpty } from "@/components/mgr/e";
 import { FieldDescription } from "@/components/ui/field";
 import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
-import { formatDateTime, formatWeekday } from "@/lib/date-format";
+import { formatDateTime, formatDayHeader } from "@/lib/date-format";
 import { bblExact } from "@/lib/volume";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
@@ -105,21 +105,22 @@ export function TapBoardView({ state: controlledState, skus, timeZone, navigatio
   const recent = recentEvents ?? [...state.snapshot.open].sort((a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime()).slice(0, 2).map(tap => ({ title: `${tapLabel(tap)} tapped`, detail: `${actor(tap.opened_by_label)} · ${formatDateTime(tap.opened_at, timeZone)}` }));
   const closed = sheet?.interval && state.snapshot.history.find(tap => tap.id === sheet.interval?.id);
   const locked = sheet?.attempt.kind === "submitting" || sheet?.attempt.kind === "unknown";
-  const actions = (tap: TapInterval) => <div className="mt-2 flex flex-wrap gap-1"><Button type="button" size="sm" variant="outline" onClick={() => open("swap", tap)}>Swap</Button><Button type="button" size="sm" variant="destructive" onClick={() => open("kick", tap)}>Kick</Button></div>;
+  const actions = (tap: TapInterval) => <div className="mt-2 flex flex-wrap gap-1"><Button type="button" size="sm" variant="outline" disabled={state.refreshing} onClick={() => open("swap", tap)}>Swap</Button><Button type="button" size="sm" variant="destructive" disabled={state.refreshing} onClick={() => open("kick", tap)}>Kick</Button></div>;
   return <>
     {E.back("Beer", "Tap board", undefined, navigation.backHref)}
     {(navigation.countHref || navigation.varianceHref) && <div className="flex flex-wrap gap-3 text-sm">{navigation.countHref && <Link className="underline" href={navigation.countHref}>Weekly count</Link>}{navigation.varianceHref && <Link className="underline" href={navigation.varianceHref}>Variance by brand</Link>}</div>}
     {/* Scope first, then the heading right above the list it names. */}
     {navigation.locations.length > 0 && <ScopePick label="Location" value={navigation.location} options={navigation.locations} />}
-    <div className="flex items-center justify-between gap-2">{E.ttl("On tap")}<Button type="button" size="sm" disabled={navigation.locations.length === 0} onClick={() => open("tap", null)}>Tap keg</Button></div>
+    <div className="flex items-center justify-between gap-2">{E.ttl("On tap")}<Button type="button" size="sm" disabled={navigation.locations.length === 0 || state.refreshing} onClick={() => open("tap", null)}>Tap keg</Button></div>
     <CommandForm open={Boolean(sheet)} onOpenChange={next => { if (!next && !locked) { if (onClose) onClose(); else setInternalState(current => ({ ...current, sheet: null })); } }} title={sheet?.kind === "kick" ? "Kick keg" : sheet?.kind === "swap" ? "Swap keg" : "Tap keg"}>
       {sheet && <form onSubmit={event => { event.preventDefault(); onSubmit?.(event); }} className="flex flex-col gap-3"><TapKegView key={sheet.interval?.id ?? "new-tap"} sheet={sheet} skus={skus} skusHref={navigation.skusHref} timeZone={timeZone} onEdit={edit} onReload={onReload} closedFact={closed ? `${tapLabel(closed)} was closed ${formatDateTime(closed.closed_at, timeZone)} by ${actor(closed.closed_by_label)}. Review the board before acting.` : null} /></form>}
     </CommandForm>
     <CommandFormMessage tone="warning">{pollError}</CommandFormMessage>
-    {navigation.locations.length === 0 ? E.blank("No taproom locations yet. Ask Admin to add one under Locations.") : state.snapshot.open.length === 0 ? E.blank("No kegs are on tap.") : <>
-      {E.tiles(state.snapshot.open.filter(tap => tap.sku_id).map(tap => [tap.tap_number ?? "unnumbered", tapLabel(tap), <>{volume(tap.nominal_bbl)} · on <time dateTime={tap.opened_at} title={formatDateTime(tap.opened_at, timeZone)}>{formatWeekday(tap.opened_at, timeZone)}</time> · {actor(tap.opened_by_label)} · {opened(tap)}{tap.not_in_inventory ? " · not in taproom stock · excluded from variance" : ""}</>, tap.not_in_inventory ? 1 : 0, undefined, undefined, actions(tap)]))}
-      {state.snapshot.open.filter(tap => !tap.sku_id).map(tap => <div key={tap.id}>{E.row(`${tap.tap_number ?? "unnumbered"} · ${tapLabel(tap)} · keg`, `nominal ${volume(tap.nominal_bbl)} · on ${formatDateTime(tap.opened_at, timeZone)} by ${actor(tap.opened_by_label)} · ${opened(tap)}${tap.not_in_inventory ? " · not in taproom stock · excluded from variance" : ""} · no guest yield`, actions(tap), "w")}</div>)}
-    </>}
+    <div role="status">{state.refreshing && E.polite("Updating the board…")}</div>
+    <div aria-busy={Boolean(state.refreshing)}>
+      {navigation.locations.length === 0 ? E.blank("No taproom locations yet. Ask Admin to add one under Locations.") : state.snapshot.open.length === 0 ? E.blank("No kegs are on tap.") :
+        E.tiles(state.snapshot.open.map(tap => [tap.tap_number ?? "unnumbered", `${tapLabel(tap)}${tap.sku_id ? "" : " · keg"}`, <>{volume(tap.nominal_bbl)} · on <time dateTime={tap.opened_at} title={formatDateTime(tap.opened_at, timeZone)}>{formatDayHeader(tap.opened_at, timeZone)}</time> by {actor(tap.opened_by_label)} · {opened(tap)}{tap.not_in_inventory ? " · not in taproom stock · excluded from variance" : ""}{!tap.sku_id && " · no guest yield"}</>, tap.not_in_inventory ? 1 : 0, undefined, undefined, actions(tap)]))}
+    </div>
     {state.snapshot.open.some(tap => tap.tap_number === null) && E.info("Unnumbered kegs sort last.")}
     {E.ttl("Recent history")}
     {E.info("Closed tap entries cannot be edited or deleted. They preserve who opened and closed each keg and when, and support historical variance calculations.")}

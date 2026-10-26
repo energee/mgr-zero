@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { homePath, type RequestAuthContext } from "@/lib/auth/request-context";
 import { runCommand } from "@/lib/commands/registry";
 import type { Database } from "@/lib/supabase/database";
+import { passwordReturnHref } from "@/lib/mgr/entry-view";
 
 export type InviteAudience = "staff" | "customer";
 
@@ -49,7 +50,7 @@ export async function hasPendingInvitations(db: SupabaseClient<Database>, userId
 }
 
 /** Password entry and already-authenticated sign-in pages share consent-first routing. */
-export async function signInDestination(auth: RequestAuthContext): Promise<string> {
+export async function signInDestination(auth: RequestAuthContext, next?: string): Promise<string> {
   const identity = await auth.getIdentity();
   if (!identity) return homePath(auth);
   const db = await auth.getSupabaseClient();
@@ -57,5 +58,5 @@ export async function signInDestination(auth: RequestAuthContext): Promise<strin
     hasPendingInvitations(db, identity.userId),
     homePath(auth),
   ]);
-  return pending ? "/invitations" : home;
+  return pending ? "/invitations" : passwordReturnHref(next, home);
 }

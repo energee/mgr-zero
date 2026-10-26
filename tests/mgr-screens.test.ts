@@ -18,6 +18,8 @@ import { BatchesView } from "../components/mgr/views/batches";
 import { BrewDayView } from "../components/mgr/views/brew-day";
 import { batchesFromQuery, toBatchesViewProps } from "../lib/mgr/batches-view";
 import type { BrewDayViewModel } from "../lib/mgr/brew-day-view";
+import { WeeklyCountView } from "../components/mgr/views/weekly-count";
+import { weeklyCount } from "../lib/mgr/fixtures/taproom";
 
 /** One screen's body as static markup, by name. Rendered once and kept: the
  *  suite asks for the same handful of screens across a dozen assertions. */
@@ -778,7 +780,7 @@ describe("SCREENS", () => {
     // count. Short pick and Ship and invoice preselected a reason.
     const qty = [
       "Pick", "Receive PO", "Return and credit", "New order",
-      "Weekly count", "Schedule packaging run",
+      "Schedule packaging run",
     ];
     for (const name of qty) {
       const s = SCREENS.find((x) => x.name === name);
@@ -794,6 +796,14 @@ describe("SCREENS", () => {
       expect(html, name).toMatch(/required/);
       expect(html, `${name}: no reason chips`).not.toMatch(/>damaged</);
     }
+  });
+
+  it("keeps weekly quantity steppers in the worksheet, not the selected saved receipt", () => {
+    expect(body("Weekly count")).toContain('aria-label="Saved count"');
+    expect(body("Weekly count")).not.toContain('aria-label="Decrease"');
+    const worksheet = renderToStaticMarkup(createElement(WeeklyCountView, { model: { ...weeklyCount, receipt: undefined } }));
+    expect(worksheet).toContain('aria-label="Decrease"');
+    expect(worksheet).toContain('aria-label="Count every stock bucket"');
   });
 
   it("edits a whole number with the same stepper Weekly count uses", () => {

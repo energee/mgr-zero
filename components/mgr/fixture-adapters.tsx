@@ -13,6 +13,16 @@ import type { ReceiptView } from "@/components/mgr/views/receipt";
 import type { StaffRole } from "@/lib/commands/registry";
 import { receiptPoBillPending, receiptPoBillPosted } from "@/lib/mgr/fixtures/purchasing";
 import { hasAnyRole } from "@/lib/mgr/roles";
+import type { WeeklyCountView } from "@/components/mgr/views/weekly-count";
+
+/** Keeps the selected receipt and its current worksheet as distinct inventory states. */
+export function WeeklyCountFixture({ children }: { children: ReactElement<ComponentProps<typeof WeeklyCountView>> }) {
+  const [worksheet, setWorksheet] = useState(false);
+  return cloneElement(children, {
+    model: worksheet ? { ...children.props.model, receipt: undefined } : children.props.model,
+    onWorksheet: () => setWorksheet(true),
+  });
+}
 
 /** Wraps the inventory `<FormatView>` as a child, so the drawn element stays FormatView
  *  (screen-view-composition finds it) while this adapter owns its state. */

@@ -44,7 +44,7 @@ vi.mock("@/lib/mgr/page-query", async importOriginal => ({
     pageState.calls.push(name);
     switch (name) {
       case "get_today": return [];
-      case "get_beer_overview": return { fgShortages: 0, taproomBelowPar: 0, openTaps: 0, openOccupancies: 0, materialShortages: 0, kegsOut: 0 };
+      case "get_beer_overview": return { fgShortages: 0, taproomBelowPar: 0, openTaps: 0, openOccupancies: 0, kegsOut: 0 };
       case "list_open_taps": return [];
       case "get_taproom_variance": return { as_of: "2026-10-16T12:00:00Z", reason: null, rows: [], periods: [] };
       case "list_locations": return [{ id: "tap", name: "Taproom", uses: ["taproom"] }];

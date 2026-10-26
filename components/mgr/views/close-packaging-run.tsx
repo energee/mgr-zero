@@ -8,8 +8,9 @@ import { E } from "@/components/mgr/e";
 import { formatDate } from "@/lib/date-format";
 import { PackagingMaterialActuals } from "./packaging-materials";
 import { Button } from "@/components/ui/button";
+import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { emptyPackagingActual, patchActual, removeActual, type PackagingActualDraft } from "@/lib/mgr/packaging-actuals";
-import { packagingCloseReady, type PackagingCloseFieldsModel, type ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
+import { packagingCloseReason, type PackagingCloseFieldsModel, type ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
 
 export type { ClosePackagingRunViewModel };
 
@@ -40,8 +41,10 @@ export function ClosePackagingRunView({
   );
 }
 
-export function PackagingCloseFields({ model, disabled, ready, retry, onField, onOutput, onActual, onAdd, onRemove, onSubmit, onRefresh, messages }: {
-  model: PackagingCloseFieldsModel; disabled?: boolean; ready?: boolean; retry?: boolean;
+/** Close packaging run's fields and verb. The verb says why it is withheld (packagingCloseReason); a retry of the
+ *  unchanged close needs no reason, since its saved request is resent as it was. */
+export function PackagingCloseFields({ model, disabled, retry, onField, onOutput, onActual, onAdd, onRemove, onSubmit, onRefresh, messages }: {
+  model: PackagingCloseFieldsModel; disabled?: boolean; retry?: boolean;
   onField?: (field: "bblDrawn" | "lotCode" | "packagedOn" | "bestBy" | "locationId" | "binId", value: string) => void;
   onOutput?: (id: string, value: string) => void; onActual?: (key: string, patch: Partial<PackagingActualDraft>) => void;
   onAdd?: () => void; onRemove?: (key: string) => void; onSubmit?: () => void; onRefresh?: () => void; messages?: ReactNode;
@@ -53,7 +56,7 @@ export function PackagingCloseFields({ model, disabled, ready, retry, onField, o
   const changeActual = onActual ?? ((key, patch) => setFixture(previous => ({ ...previous, actuals: patchActual(previous.actuals, key, patch) })));
   const addActual = onAdd ?? (() => setFixture(previous => ({ ...previous, actuals: [...previous.actuals, emptyPackagingActual()] })));
   const dropActual = onRemove ?? ((key) => setFixture(previous => ({ ...previous, actuals: removeActual(previous.actuals, key) })));
-  const maySubmit = ready ?? packagingCloseReady(view);
+  const reason = retry ? null : packagingCloseReason(view);
   return <div className="flex flex-col gap-3">
     {E.edit("Barrels drawn", view.bblDrawn, "number", undefined, { min: 0, step: "any", disabled, required: true, onChange: value => changeField("bblDrawn", value) })}
     {E.ttl("Actual outputs")}
@@ -61,11 +64,11 @@ export function PackagingCloseFields({ model, disabled, ready, retry, onField, o
     {E.edit("Lot code", view.lotCode, "text", undefined, { disabled, required: true, onChange: value => changeField("lotCode", value) })}
     {E.edit("Packaged on", view.packagedOn, "date", undefined, { disabled, required: true, onChange: value => changeField("packagedOn", value) })}
     {E.edit("Best by · optional", view.bestBy, "date", undefined, { disabled, onChange: value => changeField("bestBy", value) })}
-    {E.pick("Finished goods location", view.locationId, view.locations.map(row => ({ value: row.id, label: row.name })), { disabled, onChange: value => changeField("locationId", value) })}
-    {E.pick("Finished goods bin", view.binId, view.bins.filter(row => row.location_id === view.locationId).map(row => ({ value: row.id, label: row.name })), { disabled, onChange: value => changeField("binId", value) })}
+    {E.pick("Finished goods location", view.locationId, view.locations.map(row => ({ value: row.id, label: row.name })), { disabled, required: true, onChange: value => changeField("locationId", value) })}
+    {E.pick("Finished goods bin", view.binId, view.bins.filter(row => row.location_id === view.locationId).map(row => ({ value: row.id, label: row.name })), { disabled, required: true, onChange: value => changeField("binId", value) })}
     <PackagingMaterialActuals plan={view.plan} rows={view.actuals} locations={view.locations} bins={view.bins} disabled={disabled} onChange={changeActual} onAdd={addActual} onRemove={dropActual} />
     <Button type="button" variant="outline" disabled={disabled} onClick={onRefresh}>Review current material plan</Button>
     {messages}
-    <Button type="button" data-variant="irreversible" disabled={!maySubmit || (disabled && !retry)} onClick={onSubmit}>{retry ? "Retry unchanged close" : "Close packaging run"}</Button>
+    <IrreversibleSubmit label={retry ? "Retry unchanged close" : "Close packaging run"} type="button" reason={reason} disabled={disabled && !retry} onClick={onSubmit} />
   </div>;
 }
