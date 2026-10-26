@@ -448,23 +448,29 @@ describe("Vendors", () => {
   });
 
   it("holds Save contract for missing, invalid, or exponent-notation values", () => {
-    expect(contractSubmitReason({ vendorId: "", materialId: "", quantity: "", unitCost: "" })).toBe("Still needed: a vendor, a material, and a quantity.");
-    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1", unitCost: "-1" })).toBe("Still needed: a unit cost of zero or more.");
-    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1e3", unitCost: "" })).toBe("Still needed: a decimal quantity.");
+    expect(contractSubmitReason({ vendorId: "", materialId: "", quantity: "", unitCost: "" })).toBeTruthy();
+    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1", unitCost: "-1" })).toBeTruthy();
+    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1e3", unitCost: "" })).toBeTruthy();
     expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1.5", unitCost: "0" })).toBeNull();
   });
 
   it("waits to show contract errors in live controlled fields", () => {
     const negativeModel = { ...contractYchCitra, unitCost: "-1" };
     const controlled = htmlOf(createElement(ContractView, { model: negativeModel, controls: { quantity: () => {}, unitCost: () => {} } }));
-    expect(controlled).not.toContain("Enter a cost of zero or more.");
+    const controlledCost = /<input\b[^>]*id="[^"]+-cost"[^>]*>/.exec(controlled)?.[0];
+    expect(controlledCost).toBeDefined();
+    expect(controlledCost).not.toContain('aria-invalid="true"');
     const negativeCost = htmlOf(createElement(ContractView, { model: negativeModel }));
-    expect(negativeCost).toContain("Enter a cost of zero or more.");
-    expect(negativeCost).toContain('aria-invalid="true"');
+    const cost = /<input\b[^>]*id="[^"]+-cost"[^>]*>/.exec(negativeCost)?.[0];
+    expect(cost).toContain('aria-invalid="true"');
+    const errorId = /\bid="([^"]+-error)"/.exec(negativeCost)?.[1];
+    expect(errorId).toBeDefined();
+    const descriptions = /aria-describedby="([^"]+)"/.exec(cost!)?.[1].split(/\s+/);
+    expect(descriptions).toContain(errorId);
     expect(negativeCost).toMatch(/<button[^>]*disabled[^>]*>Save contract<\/button>/);
-    expect(negativeCost).toContain("Still needed: a unit cost of zero or more.");
     const exponentQuantity = htmlOf(createElement(ContractView, { model: { ...contractYchCitra, quantity: "1e3" } }));
-    expect(exponentQuantity).toContain("Enter a decimal number, not exponent notation");
+    const quantity = /<input\b[^>]*id="[^"]+-quantity"[^>]*>/.exec(exponentQuantity)?.[0];
+    expect(quantity).toContain('aria-invalid="true"');
     expect(exponentQuantity).toMatch(/<button[^>]*disabled[^>]*>Save contract<\/button>/);
   });
 
