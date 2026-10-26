@@ -103,7 +103,6 @@ export function NewOrderView({ model, controls = {}, messages, feedback, skuFeed
       {model.lines.length > 1 && <Button type="button" variant="ghost" size="sm" onClick={() => { controls.removeLine?.(index); touched.remove(index); }}>Remove</Button>}
     </div>;
     })}
-    {E.info("Fractional quantities are allowed; stored to two decimal places.")}
     <Button type="button" variant="ghost" className="w-fit" onClick={controls.addLine}>Add line</Button>
     {E.info("Enter quantities above zero and at most 9,999,999,999.99. Fractions are allowed; saved quantities are rounded to two decimal places. Order number is assigned when you save the draft.")}
     {messages}

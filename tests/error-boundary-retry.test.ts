@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 describe("error boundaries", () => {
   it("the shared body retries instead of resetting", () => {
     const source = readFileSync("components/mgr/route-error.tsx", "utf8");
-    expect(source).toMatch(/\{ retry \}: \{ retry: \(\) => void \}/);
+    expect(source).toMatch(/\{ error, retry \}: \{ error: unknown; retry: \(\) => void \}/);
     expect(source).toContain("onClick={() => retry()}");
     expect(source).not.toMatch(/\{ reset \}|onClick=\{reset\}/);
   });

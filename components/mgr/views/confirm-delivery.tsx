@@ -4,7 +4,8 @@
 
 import { Fragment, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import type { ConfirmDeliveryViewModel } from "@/lib/mgr/confirm-delivery-view";
+import { IRREVERSIBLE } from "@/components/mgr/irreversible-submit";
+import { deliveryOutcomeState, type ConfirmDeliveryViewModel } from "@/lib/mgr/confirm-delivery-view";
 import { REFUSAL_REASONS } from "@/lib/mgr/enums";
 import { shipToAddress } from "@/lib/mgr/ship-to-view";
 
@@ -47,24 +48,25 @@ export function DeliveryOutcomeForm({ lines, transfer = false, initialSignedBy =
   busy?: boolean; blocked?: boolean; error?: string | null; onLeave?: () => void; onSubmit?: (input: { signedBy: string; refused: { orderLineId: string; qty: number }[]; reason?: string; note: string; transferRefused: boolean }) => void;
 }) {
   const [signedBy, setSignedBy] = useState(initialSignedBy);
-  const [refused, setRefused] = useState<Record<string, number>>({});
+  const [refused, setRefused] = useState<Record<string, string>>({});
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [transferRefused, setTransferRefused] = useState(false);
+  const outcome = deliveryOutcomeState(lines, { signedBy, refused, reason, note, transferRefused }, transfer);
+  const { hasRefusal, fullRefusal } = outcome;
   function submit() {
-    onSubmit?.({ signedBy, reason: reason || undefined, note, transferRefused,
-      refused: Object.entries(refused).filter(([, qty]) => qty > 0).map(([orderLineId, qty]) => ({ orderLineId, qty })),
-    });
+    if (busy || blocked || outcome.reason) return;
+    onSubmit?.({ signedBy, reason: reason || undefined, note, transferRefused, refused: outcome.refused });
   }
-  const hasRefusal = transfer ? transferRefused : Object.values(refused).some((qty) => qty > 0);
-  const fullRefusal = transfer ? transferRefused : lines.length > 0 && lines.every((l) => (refused[l.key] ?? 0) === Number(l.qty));
-  const disabled = (!fullRefusal && !signedBy.trim()) || (hasRefusal && (!reason || (reason === "other" && !note.trim())));
   return <>
     {blocked && E.note("An earlier delivery action may have completed. Use Retry saved request before editing or choosing either action.")}
     <fieldset disabled={busy || blocked} className="flex min-w-0 flex-col gap-2">
-    {transfer ? E.row("Transfer refused", "Stock stays in transit", E.sw(transferRefused, "Transfer refused", setTransferRefused)) : lines.map((l) => <Fragment key={l.key}>
-      {E.edit(`${l.title} · refused`, String(refused[l.key] ?? 0), "number", undefined, { min: 0, max: Number(l.qty), step: 1, onChange: (value) => setRefused({ ...refused, [l.key]: Number(value) }) })}
-      {E.fld("Accepted", String(Number(l.qty) - (refused[l.key] ?? 0)))}
+    {transfer ? E.row("Transfer refused", "Stock stays in transit", E.sw(transferRefused, "Transfer refused", setTransferRefused)) : outcome.rows.map((line) => <Fragment key={line.key}>
+      {E.edit(`${line.title} · refused`, line.value, "number", undefined, {
+        id: `refused-${line.key}`, min: 0, max: Number(line.qty), step: 1, error: line.error,
+        onChange: (value) => setRefused({ ...refused, [line.key]: value }),
+      })}
+      {E.fld("Accepted", line.accepted === null ? "—" : String(line.accepted))}
     </Fragment>)}
     {hasRefusal && <>
       {E.pick("Refusal reason", reason, REFUSAL_REASONS.map((value) => ({ value, label: REFUSAL_LABEL[value] })), { onChange: setReason, required: true })}
@@ -75,7 +77,10 @@ export function DeliveryOutcomeForm({ lines, transfer = false, initialSignedBy =
     {/* Inventory keeps the same action inert; the live adapter supplies the command. */}
     {E.btn("Not delivered · leave for a later route", "g", undefined, onLeave ?? (() => {}))}
     {error && E.status(error, "w")}
-    {E.btn(busy ? "Saving…" : fullRefusal ? "Record refusal" : hasRefusal ? "Record partial delivery" : "Delivered", disabled ? "irr disabled" : "irr", undefined, submit)}
+    {E.submit(fullRefusal ? "Record refusal" : hasRefusal ? "Record partial delivery" : "Delivered", {
+      id: "confirm-delivery", type: "button", reason: outcome.reason, submitting: busy, onClick: submit,
+      className: IRREVERSIBLE,
+    })}
     </fieldset>
   </>;
 }

@@ -4,6 +4,7 @@ import { CommandError, type Ctx } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toPosMenuModel, toPosMenuSetup, toPosVariationRow, type PosMenuSnapshot } from "@/lib/mgr/pos-view";
 import { hasAnyRole } from "@/lib/mgr/roles";
+import { isSquareConfigured } from "@/lib/pos";
 import "@/lib/commands/all";
 import { PosMenuControl } from "@/components/mgr/views/pos-controls";
 import { navTitle } from "@/lib/mgr/nav";
@@ -58,7 +59,7 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
     // Locations outlive a disconnect, so only the connection says whether Square is connected (#1039);
     // get_square_connected answers that, and only that, for every Menu role (#1083).
     const { connected } = await runCommand("get_square_connected", {}, ctx) as { connected: boolean };
-    model.setup = toPosMenuSetup({ admin: hasAnyRole(brewery.roles, ["admin"]), connected, observed: observed.length });
+    model.setup = toPosMenuSetup({ admin: hasAnyRole(brewery.roles, ["admin"]), connected, configured: isSquareConfigured(), observed: observed.length });
   }
   model.externalItems = variations.map(toPosVariationRow);
   const targets = model.externalItems.length ? await mapTargets(ctx) : [];

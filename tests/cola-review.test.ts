@@ -1,5 +1,8 @@
 // COLA review preserves brand identity and saves only the explicitly chosen label.
 import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { ColaReviewView, type ColaReviewProps } from "../components/mgr/views/cola-review";
 import { colaApprovalInput, defaultColaImage, matchingBrandColas, missingColaIds, soleColaId } from "../lib/mgr/cola-review";
 import { toCatalogViewProps } from "../lib/mgr/catalog-view";
 import type { ColaRecord, ColaDetails } from "../lib/ttb/colas";
@@ -10,6 +13,24 @@ const imageUrl = "https://ttbonline.gov/colasonline/publicViewAttachment.do?file
 const details: ColaDetails = { ttbId: record.ttbId, permit: record.permit, status: "APPROVED", approvedOn: "2026-01-15", images: [{ url: imageUrl, label: "Front label" }] };
 
 describe("COLA bulk review", () => {
+  const review: ColaReviewProps = { brands: [brand], selected: [brand.id], missing: [], queue: [brand], index: 0, saved: 0, candidates: [record], ttbId: "", imageUrl: "", showAll: false };
+
+  it("uses a searchable dialog picker for all 149 permit records and a subordinate brand heading", () => {
+    const candidates = Array.from({ length: 149 }, (_, index) => ({ ...record, ttbId: String(25318001000000 + index) }));
+    const html = renderToStaticMarkup(createElement(ColaReviewView, { ...review, candidates, showAll: true }));
+    const trigger = html.match(/<button[^>]*aria-label="COLA"[^>]*>/)?.[0];
+    expect(trigger).toContain('aria-haspopup="dialog"');
+    expect(trigger).not.toContain('role="combobox"');
+    expect(html).not.toMatch(/<select\b|<h1\b/);
+    expect(html).toMatch(/<h3[^>]*>Silver IPA<\/h3>/);
+  });
+
+  it("keeps the selected record's full label and disables the picker while busy", () => {
+    const html = renderToStaticMarkup(createElement(ColaReviewView, { ...review, ttbId: record.ttbId, busy: true }));
+    expect(html).toContain(`${record.fancifulName} · ${record.ttbId} · ${record.completedOn}`);
+    expect(html.match(/<button[^>]*aria-label="COLA"[^>]*>/)?.[0]).toContain('disabled=""');
+  });
+
   it("matches a saved TTB ID even when the label name differs, and supports the brand alias", () => {
     const saved = { ...record, fancifulName: "Old name" };
     const alias = { ...record, ttbId: "25318001000035", fancifulName: "Series 1 amber" };
