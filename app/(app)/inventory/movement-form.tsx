@@ -6,7 +6,7 @@
 // when `skusHref` is set (#1113).
 "use client";
 
-import { command } from "@/lib/commands/client";
+import { classifyCommandFailure, command } from "@/lib/commands/client";
 import { useBrewery } from "@/lib/brewery-provider";
 import type { BinMoveStock } from "@/lib/commands/inventory";
 import { MOVEMENT_KIND_LABELS, MOVEMENT_TYPES, movementFieldErrors, movementFields, movementReason, requiresChannel, requiresDestState, type MovementType } from "@/lib/movement-form";
@@ -75,7 +75,7 @@ export function MovementForm({
   useEffect(() => {
     if (!locationId || !movementOpen || receipt) return;
     let live = true;
-    command(breweryId, "get_bin_move_stock", { locationId }).then(data => { if (live) { setStock(data as BinMoveStock[]); setStockError(null); } }).catch(err => { if (live) setStockError(String(err)); });
+    command(breweryId, "get_bin_move_stock", { locationId }).then(data => { if (live) { setStock(data as BinMoveStock[]); setStockError(null); } }).catch(err => { if (live) setStockError(classifyCommandFailure(err).message); });
     return () => { live = false; };
   }, [breweryId, locationId, movementOpen, receipt]);
   const reason = movementReason({ type, skuId, locationId, binId, saleChannelId, qty, destState });

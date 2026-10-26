@@ -11,6 +11,7 @@ import { materialSourceKey, type SourceIds } from "./material-source";
 import { fromPacks, splitPacks, withPacks } from "./pack-qty";
 import { toTicks } from "./quantity-input";
 import { totalMinutes } from "./recipe-schedule";
+import { submitReason } from "./submit-reason";
 
 export type BrewDayStage = (typeof BREW_DAY_STAGES)[number];
 
@@ -129,11 +130,16 @@ export const pulledQty = (row: BrewIngredient) => fromPacks(Number(row.packs) ||
 /** A typed packs or loose field is a number at or above zero; blank counts as zero. */
 const isPullAmount = (value: string) => Number.isFinite(Number(value)) && Number(value) >= 0;
 
-/** A line's amounts are valid and it has a source unless pulled to zero: brew_pulls and record_brew_day both need an exact source. */
-const pullReady = (row: BrewIngredient) => isPullAmount(row.packs) && isPullAmount(row.loose) && (row.source !== null || pulledQty(row) === 0);
+/** What a line still needs: valid amounts, then a source unless pulled to zero (brew_pulls and record_brew_day both need an
+ *  exact source). Empty when the line is ready. */
+function pullNeeds(row: BrewIngredient): string[] {
+  if (!isPullAmount(row.packs) || !isPullAmount(row.loose)) return [`pulled amounts of zero or more for ${row.name}`];
+  return row.source === null && pulledQty(row) !== 0 ? [`a source for ${row.name}`] : [];
+}
+const pullReady = (row: BrewIngredient) => pullNeeds(row).length === 0;
 
-/** Prep saves when every line is pullReady (a short line pulled to nothing needs no source). */
-export const canSavePrep = (model: BrewPrepViewModel) => model.ingredients.every(pullReady);
+/** Why Done pulling is withheld, or null when every line is pullReady (a short line pulled to nothing needs no source). */
+export const prepReason = (model: BrewPrepViewModel) => submitReason(model.ingredients.flatMap(pullNeeds));
 
 /** save_batch_pulls input: each sourced line at its pulled amount; a line with no source was pulled to zero and is left out. */
 export function brewPullsPayload(model: BrewPrepViewModel) {
@@ -184,9 +190,14 @@ export const confirmAll = (rows: BrewIngredient[]) => rows.map(row => ({ ...row,
 export const currentStage = (model: BrewTimelineViewModel): TimelineStage =>
   timelineStages(model).find(stage => stage.ingredients.some(row => !row.confirmed))?.stage ?? "knockout";
 
-/** Knockout has a listed vessel, positive barrels and a brew date: what record_brew_day requires, and when the loss-baseline tape shows. */
-export const knockoutReady = (model: BrewTimelineViewModel) =>
-  model.vessels.some(vessel => vessel.id === model.vesselId) && Number(model.initialBbl) > 0 && Number.isFinite(Number(model.initialBbl)) && Boolean(model.brewedOn);
+/** What knockout still needs: a listed vessel, positive barrels and a brew date, as record_brew_day requires. */
+const knockoutNeeds = (model: BrewTimelineViewModel) => [
+  ...(model.vessels.some(vessel => vessel.id === model.vesselId) ? [] : ["a knockout vessel"]),
+  ...(Number(model.initialBbl) > 0 && Number.isFinite(Number(model.initialBbl)) ? [] : ["knockout barrels above zero"]),
+  ...(model.brewedOn ? [] : ["a brew date"]),
+];
+/** Knockout is complete: when the loss-baseline tape shows. */
+export const knockoutReady = (model: BrewTimelineViewModel) => knockoutNeeds(model).length === 0;
 
 /** The stock each row pulled above zero from a source draws: fitsStock's lines. A row's source is camelCase SourceIds,
  *  so it keys with materialSourceKey, the same string brewSourceKey gives its stock row. */
@@ -201,13 +212,15 @@ export function timelineTone(row: BrewIngredient, sources?: BrewMaterialSource[]
   return isShort(row) || !fits ? "w" : "";
 }
 
-/** Record brew day is irreversible: every ingredient confirmed and pullReady, the pulls together within stock (canRecordBrewDay's
- *  rule), something pulled or confirmEmpty, and a valid knockout. */
-export const canRecordTimeline = (model: BrewTimelineViewModel) =>
-  model.ingredients.every(row => row.confirmed && pullReady(row))
-  && fitsStock(stockDraws(model.ingredients), model.sources)
-  && (anyPulled(model) || Boolean(model.confirmEmpty))
-  && knockoutReady(model);
+/** Why Record brew day (irreversible) is withheld, or null when it may record: every ingredient confirmed and pullReady, the
+ *  pulls together within stock (canRecordBrewDay's rule), something pulled or confirmEmpty, and a valid knockout. */
+export const timelineReason = (model: BrewTimelineViewModel) => submitReason([
+  ...(model.ingredients.every(row => row.confirmed) ? [] : ["every ingredient confirmed"]),
+  ...model.ingredients.flatMap(pullNeeds),
+  ...(fitsStock(stockDraws(model.ingredients), model.sources) ? [] : ["pulls within the stock on hand"]),
+  ...(anyPulled(model) || model.confirmEmpty ? [] : ["a pulled ingredient or Confirm no ingredients used"]),
+  ...knockoutNeeds(model),
+]);
 
 /** record_brew_day input: each line pulled above zero at its exact source; a pulled line with no source throws. */
 export function timelineRecordPayload(model: BrewTimelineViewModel, batchId: string): [string, Record<string, unknown>] {

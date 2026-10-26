@@ -43,6 +43,16 @@ describe("field shapes are validated (#491)", () => {
     expect(fieldRejects(command, field, "+1 503.555.0142")).toBe(false);
   });
 
+  // #1419: Auth refuses an over-long address, so the command refuses it first.
+  it.each(["invite_staff", "invite_customer_user", "upsert_vendor"])("%s caps an email at 64 characters before the @ and 254 in total", (command) => {
+    const at = (local: number, total: number) => `${"a".repeat(local)}@${"b".repeat(total - local - 5)}.com`;
+    expect(fieldRejects(command, "email", at(64, 100))).toBe(false);
+    expect(fieldRejects(command, "email", at(65, 100))).toBe(true);
+    expect(fieldRejects(command, "email", at(60, 254))).toBe(false);
+    expect(fieldRejects(command, "email", at(60, 255))).toBe(true);
+    expect(fieldRejects(command, "email", "not-an-email")).toBe(true);
+  });
+
   it.each(["upsert_customer", "upsert_vendor"])("%s takes payment terms from the one fixed list", (command) => {
     for (const bad of ["Net 30", "net45", ""]) expect(fieldRejects(command, "paymentTerms", bad)).toBe(true);
     for (const good of ["due_on_receipt", "net15", "net30"]) expect(fieldRejects(command, "paymentTerms", good)).toBe(false);

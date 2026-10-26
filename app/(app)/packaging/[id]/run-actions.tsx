@@ -14,7 +14,7 @@ import { emptyPackagingActual, packagingActualPayload, patchActual, removeActual
 import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
 import { command } from "@/lib/commands/client";
 import { useCommandAction } from "@/lib/commands/use-command-form";
-import { packagingCloseReady } from "@/lib/mgr/close-packaging-run-view";
+import { packagingCloseReason } from "@/lib/mgr/close-packaging-run-view";
 
 type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null };
 type Location = { id: string; name: string };
@@ -48,7 +48,6 @@ export function CloseRunForm({ runId, outputs, locations, bins, today, initialPl
   const [reviewing, setReviewing] = useState(false);
   const retry = pending?.name === "close_packaging_run" && !busy;
   const model = { ...fields, outputs: outputs.map(row => ({ id: row.sku_id, name: row.sku_name ?? row.sku_id, qty: quantities[row.sku_id] })), plan, actuals, locations, bins };
-  const ready = packagingCloseReady(model);
   async function refreshPlan() {
     if (busy || blocked || reviewing) return;
     setReviewing(true); setError(null);
@@ -57,7 +56,7 @@ export function CloseRunForm({ runId, outputs, locations, bins, today, initialPl
     finally { setReviewing(false); }
   }
   return <PackagingCloseFields model={model}
-    disabled={busy || blocked || reviewing} retry={retry} ready={retry || ready}
+    disabled={busy || blocked || reviewing} retry={retry}
     onField={(field, value) => setFields(previous => ({ ...previous, [field]: value, ...(field === "locationId" ? { binId: "" } : {}) }))}
     onOutput={(id, value) => setQuantities(previous => ({ ...previous, [id]: value }))}
     onActual={(key, patch) => setActuals(previous => patchActual(previous, key, patch))}
@@ -66,7 +65,7 @@ export function CloseRunForm({ runId, outputs, locations, bins, today, initialPl
     onSubmit={() => {
       if (busy || reviewing) return;
       if (retry) { void run(pending.name, pending.input, undefined, { requestId: pending.requestId }); return; }
-      if (blocked || !ready) return;
+      if (blocked || packagingCloseReason(model)) return;
       void run("close_packaging_run", {
         runId, ...fields, bblDrawn: Number(fields.bblDrawn), bestBy: fields.bestBy || undefined,
         outputs: outputs.map(row => ({ skuId: row.sku_id, qtyActual: Number(quantities[row.sku_id]) })),

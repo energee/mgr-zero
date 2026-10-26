@@ -17,7 +17,6 @@ export function CompleteTransferView({
   onQuantity,
   messages,
   submitting = false,
-  disabled = false,
   reason,
 }: {
   sources?: ReactNode;
@@ -26,7 +25,8 @@ export function CompleteTransferView({
   tape?: [ReactNode, ReactNode?][];
   quantities?: Record<string, string>;
   onQuantity?: (key: string, value: string) => void;
-  messages?: ReactNode; submitting?: boolean; disabled?: boolean; reason?: string | null;
+  /** Why Complete transfer is withheld, printed beside it; absent when ready. */
+  messages?: ReactNode; submitting?: boolean; reason?: string | null;
 }) {
   return (
     <>
@@ -40,7 +40,7 @@ export function CompleteTransferView({
       {sources}
       {messages}
       {E.sp()}
-      {footer !== undefined ? footer : <IrreversibleSubmit label="Complete transfer" busy="Completing…" submitting={submitting} disabled={disabled} reason={reason} />}
+      {footer !== undefined ? footer : <IrreversibleSubmit label="Complete transfer" reason={reason} submitting={submitting} busy="Completing…" className="w-full md:w-fit md:self-end" />}
     </>
   );
 }

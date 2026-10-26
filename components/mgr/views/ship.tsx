@@ -9,7 +9,7 @@ import type { ShipViewModel } from "@/lib/mgr/ship-view";
 
 export type { ShipViewModel };
 
-export function ShipView({ model, sources, footer, fulfillmentOptions, tape, invoiceTiming, quantities, onQuantity, reasons, onReason, carrier = "", tracking = "", onCarrier, onTracking, onInvoiceTiming, messages, submitting = false, disabled = false, reason }: {
+export function ShipView({ model, sources, footer, fulfillmentOptions, tape, invoiceTiming, quantities, onQuantity, reasons, onReason, carrier = "", tracking = "", onCarrier, onTracking, onInvoiceTiming, messages, submitting = false, reason }: {
   model: ShipViewModel; sources?: ReactNode; footer?: ReactNode;
   fulfillmentOptions?: string[]; tape?: [ReactNode, ReactNode?][]; invoiceTiming?: number;
   quantities?: Record<string, string>; onQuantity?: (key: string, value: string) => void;
@@ -17,7 +17,8 @@ export function ShipView({ model, sources, footer, fulfillmentOptions, tape, inv
   reasons?: Record<string, string>; onReason?: (key: string, value: string) => void;
   carrier?: string; tracking?: string; onCarrier?: (value: string) => void; onTracking?: (value: string) => void;
   onInvoiceTiming?: (timing: "now" | "on_delivery") => void;
-  messages?: ReactNode; submitting?: boolean; disabled?: boolean; reason?: string | null;
+  /** Why Ship order is withheld, printed beside it; absent when ready. */
+  messages?: ReactNode; submitting?: boolean; reason?: string | null;
 }) {
   const timing = model.pickup ? 0 : invoiceTiming ?? (model.invoiceTiming === "on_delivery" ? 1 : 0);
   return <>
@@ -41,6 +42,6 @@ export function ShipView({ model, sources, footer, fulfillmentOptions, tape, inv
     {sources}
     {messages}
     {E.sp()}
-    {footer !== undefined ? footer : <IrreversibleSubmit label="Ship order" busy="Shipping…" submitting={submitting} disabled={disabled} reason={reason} />}
+    {footer !== undefined ? footer : <IrreversibleSubmit label="Ship order" reason={reason} submitting={submitting} busy="Shipping…" className="w-full md:w-fit md:self-end" />}
   </>;
 }

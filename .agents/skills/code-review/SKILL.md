@@ -57,7 +57,7 @@ Assign confidence from 0 to 100 using these anchors:
 - `75`: important and likely to occur, with substantial supporting evidence.
 - `100`: directly demonstrated and expected to occur frequently or deterministically.
 
-Report only findings scoring at least 80. Discard style preferences, speculative hardening, generic test/documentation requests, intentional product changes, and issues that ordinary compilation, typing, formatting, or linting will reliably report. A missing test is reportable only when it leaves a concrete regression or unsafe behavior evidenced by the change.
+Findings scoring at least 80 are the review. List other verified defects after them under `Lower confidence`, so the user decides; never post those. Discard style preferences, speculative hardening, generic test/documentation requests, intentional product changes, and issues that ordinary compilation, typing, formatting, or linting will reliably report. A missing test is reportable only when it leaves a concrete regression or unsafe behavior evidenced by the change.
 
 ## Present the Review
 
