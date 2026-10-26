@@ -36,7 +36,7 @@ import { prepReason, timelineReason, type BrewIngredient, type BrewTimelineViewM
 import { packagingCloseReason } from "@/lib/mgr/close-packaging-run-view";
 import { kegEventReason } from "@/lib/mgr/keg-fleet-view";
 import { additionReason, mashStepReason, stageReason } from "@/lib/mgr/recipe-process-view";
-import { shipReason, type ShippingSnapshot } from "@/app/(app)/orders/[id]/ship-form";
+import { shipmentSourceNeeds, type ShippingSnapshot } from "@/app/(app)/orders/[id]/ship-form";
 
 // The live forms render without a router or a command round trip.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {} }) }));
@@ -238,8 +238,11 @@ describe("per-form reasons", () => {
       { id: "a", sku_id: "sku-a", qty_ordered: 3, qty_picked: 3, qty_shipped: null, skus: { name: "Hazy IPA case" } },
       { id: "b", sku_id: "sku-b", qty_ordered: 2, qty_picked: 2, qty_shipped: null, skus: { name: "Pils keg" } },
     ];
-    expect(shipReason(lines, { a: "3", b: "0" }, {})).toBe("Still needed: a source for Hazy IPA case.");
-    expect(shipReason(lines, { a: "3", b: "0" }, { a: [{ key: "bin:", qty: "3", toBinId: "" }] })).toBeNull();
+    const available = { bins: [], destinationBins: [], stock: [
+      { stock_id: "sku-a", bin_id: "bin", lot_id: null, kind: "sku" as const, keg_size: null, name: "Hazy IPA case", unit: "case", lot_code: null, qty: 3 },
+    ] };
+    expect(shipmentSourceNeeds(lines, { a: "3", b: "0" }, {}, available, false)).toHaveLength(1);
+    expect(submitReason(shipmentSourceNeeds(lines, { a: "3", b: "0" }, { a: [{ key: "bin:", qty: "3", toBinId: "" }] }, available, false))).toBeNull();
   });
 });
 
