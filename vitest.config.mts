@@ -41,6 +41,7 @@ const pureTests = [
   "tests/pricing-view.test.ts",
   "tests/auth-page-metadata.test.ts",
   "tests/shell-view.test.ts",
+  "tests/route-error.test.ts",
   // Entry rendering and Auth-boundary tests use fixtures or explicit Auth mocks, not a database.
   "tests/entry-email-link.test.ts",
   "tests/invite-entry-view.test.ts",
