@@ -3,7 +3,7 @@
 Status: approved by the owner 2026-10-22; Phase 2 built (tasks 1–12). Branch `feat/brew-day-revamp`, PR #1103 to `main`.
 
 As built, where it differs from the task text below:
-- The pack helper is `fromPacks(packs, loose, factor)` (not `packsToQty`); Prep and timeline logic live in `lib/mgr/brew-prep-view.ts` (`brewIngredients`, `laterAdditions`, `canSavePrep`, `brewPullsPayload`, `brewTargets`, `timelineRecordPayload`, `openBrewTab`), not `toBrewPrepModel` / `brewTimeline`.
+- The pack helper is `fromPacks(packs, loose, factor)` (not `packsToQty`); Prep and timeline logic live in `lib/mgr/brew-prep-view.ts` (`brewIngredients`, `laterAdditions`, `prepReason`, `brewPullsPayload`, `brewTargets`, `timelineReason`, `timelineRecordPayload`, `openBrewTab`), not `toBrewPrepModel` / `brewTimeline`.
 - `save_batch_pulls` takes a request id like every write RPC, and refuses a recipe line pulled twice.
 - Tabs are `?tab=prep` / `?tab=brew-day` links; a planned batch opens Brew day once pulls are saved, else Prep. Recorded and cancelled batches keep the old Brew day view (history, Correct turn, Add brew turn).
 - Recipes have no batch size, so the recipe page has a page-only **Show totals at (bbl)** field (blank by default, never saved) and offers rounding down and up, as the prototype does.

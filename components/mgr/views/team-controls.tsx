@@ -39,7 +39,7 @@ export function InviteView({ buyer, email, defaultEmail = "", role, onEmailChang
     {buyer ? E.fld("Role", "Buyer") : <StaffRoleField value={role ?? draftRole} onChange={value => { setRole(value); onRoleChange?.(value); }} disabled={busy} />}
     {E.info("New accounts get an email to set up their login. Existing accounts get no email. They see the invitation in Invitations the next time they sign in, or at /invitations. Access starts once they accept, within seven days.")}
     <CommandFormMessage error={error} />
-    <CommandFormFooter><Button type="submit" disabled={busy || Boolean(fieldError)}>{busy ? "Sending…" : "Send invite"}</Button></CommandFormFooter>
+    <CommandFormFooter><Button type="submit" disabled={busy}>{busy ? "Sending…" : "Send invite"}</Button></CommandFormFooter>
   </form>;
 }
 

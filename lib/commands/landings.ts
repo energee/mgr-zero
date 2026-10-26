@@ -57,7 +57,7 @@ export function labeledTaproomStock(
 
 defineQuery({
   name: "get_beer_overview",
-  description: "Counts behind the Beer landing: finished-goods shortages, taproom SKUs below par, kegs on tap, occupied tanks, material shortages and kegs out at customers",
+  description: "Counts behind the Beer landing: finished-goods shortages, taproom SKUs below par, kegs on tap, occupied tanks and kegs out at customers",
   input: z.object({}), roles: STAFF_ROLES,
   handler: async (ctx) => {
     const b = ctx.breweryId;
@@ -75,19 +75,17 @@ defineQuery({
       ]);
       return { taproomStock: labeledTaproomStock(stock, skuNames, locationNames) };
     }
-    const [fgShortages, aggregates, openTaps, openOccupancies, materialShortages] = await Promise.all([
+    const [fgShortages, aggregates, openTaps, openOccupancies] = await Promise.all([
       count(ctx.db.from("atp").select("sku_id", { count: "exact", head: true }).eq("brewery_id", b).lt("qty", 0)),
       unwrap(ctx.db.rpc("get_beer_overview_aggregates", { p_brewery: b }).single()),
       count(ctx.db.from("tap_intervals").select("id", { count: "exact", head: true }).eq("brewery_id", b).is("closed_at", null)),
       count(ctx.db.from("occupancy_volumes").select("occupancy_id", { count: "exact", head: true }).eq("brewery_id", b).is("ended_at", null)),
-      count(ctx.db.from("material_requirements").select("material_id", { count: "exact", head: true }).eq("brewery_id", b).gt("short", 0)),
     ]);
     return {
       fgShortages,
       taproomBelowPar: Number(aggregates!.taproom_below_par),
       openTaps,
       openOccupancies,
-      materialShortages,
       kegsOut: Number(aggregates!.kegs_out),
     };
   },

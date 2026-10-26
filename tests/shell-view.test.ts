@@ -194,7 +194,7 @@ describe("Beer view", () => {
   });
 
   it("keeps shortages on Finished goods without a cross-section Planning card (#1253)", () => {
-    const model = toBeerViewProps({ overview: { fgShortages: 0, taproomBelowPar: 0, openTaps: 0, openOccupancies: 0, materialShortages: 55, kegsOut: 0 } });
+    const model = toBeerViewProps({ overview: { fgShortages: 0, taproomBelowPar: 0, openTaps: 0, openOccupancies: 0, kegsOut: 0 } });
     expect(model.navs.find((r) => r.key === "materials")?.href).toBe("/materials");
     expect(model.navs.filter((r) => r.detail.includes("shortage"))).toEqual([
       { key: "fg", title: "Finished goods", detail: "0 shortages · ATP by SKU", href: "/inventory" },
@@ -232,7 +232,7 @@ describe("Beer view", () => {
     { openTaps: 0, openOccupancies: 0, kegsOut: 0 },
     { openTaps: 1, openOccupancies: 2, kegsOut: 3 },
   ])("preserves each count source without inventing a Materials total: %j", (counts) => {
-    const model = toBeerViewProps({ overview: { fgShortages: 0, taproomBelowPar: 0, materialShortages: 55, ...counts }, showTaproom: true });
+    const model = toBeerViewProps({ overview: { fgShortages: 0, taproomBelowPar: 0, ...counts }, showTaproom: true });
     for (const [key, count] of [["taps", counts.openTaps], ["cellar", counts.openOccupancies], ["kegs", counts.kegsOut]] as const) {
       expect(Number.parseInt(model.navs.find(row => row.key === key)!.detail, 10)).toBe(count);
     }

@@ -55,10 +55,13 @@ export function ColaReviewView({ brands, selected, missing, queue, index, saved,
       {E.info(`Review complete: ${saved} saved, ${queue.length - saved} skipped. Previously saved choices are kept.`)}
       <CommandFormFooter>{E.btn("Done", "p", undefined, controls?.close)}</CommandFormFooter>
     </> : <>
-      {E.hd(brand.name, `${index + 1} of ${queue.length} · ${saved} saved`)}
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="text-base font-semibold">{brand.name}</h3>
+        <span className="text-xs text-muted-foreground">{index + 1} of {queue.length} · {saved} saved</span>
+      </div>
       {brand.colas.some(cola => cola.image_url) && E.info("This brand already has a label image. Saving an existing COLA updates it; choosing a different COLA adds another approval. Other approvals stay on file.")}
       {E.row("Show all COLAs under this permit", "", E.sw(showAll, "Show all COLAs under this permit", controls?.showAll, busy))}
-      {candidates.length ? E.pick("COLA", ttbId, [{ value: "", label: "Choose a COLA" }, ...candidates.map(record => ({ value: record.ttbId, label: `${record.fancifulName || record.brandName} · ${record.ttbId} · ${record.completedOn}` }))], { onChange: controls?.chooseCola, disabled: busy })
+      {candidates.length ? E.searchPick("COLA", ttbId, candidates.map(record => ({ value: record.ttbId, label: `${record.fancifulName || record.brandName} · ${record.ttbId} · ${record.completedOn}` })), { placeholder: "Choose a COLA", onChange: controls?.chooseCola, disabled: busy })
         : E.info("No matching COLAs. Show all COLAs to choose a differently named label, or skip this brand.")}
       {ttbId && <>
         <a href={colaUrl(ttbId)!} target="_blank" rel="noopener noreferrer" className="text-sm underline">Open COLA on TTB</a>

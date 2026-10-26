@@ -245,6 +245,30 @@ describe("save_route and list_routes", () => {
 });
 
 describe("depart, confirm, and return a route", () => {
+  it("rejects invalid refused quantities without closing the stop, then records a valid refusal (#1386)", async () => {
+    const sh = await shipment(2, "on_delivery");
+    const { routeId } = await runCommand("save_route", { deliveryDate: "2026-10-25", stops: [{ shipmentId: sh, stopNo: 1 }] }, adminCtx) as { routeId: string };
+    await runCommand("depart_route", { routeId }, adminCtx);
+    const stop = (await admin.from("deliveries").select("id").eq("route_id", routeId).single()).data!;
+    const detail = await runCommand("get_delivery_stop", { deliveryId: stop.id }, adminCtx) as { lines: { id: string }[] };
+    const orderLineId = detail.lines[0].id;
+    for (const qty of [-1, 0, 0.5, 3]) {
+      await expect(runCommand("confirm_delivery", {
+        deliveryId: stop.id, signedBy: "Pat", reason: "customer_refused", refused: [{ orderLineId, qty }],
+      }, adminCtx)).rejects.toThrow();
+      expect((await admin.from("order_lines").select("qty_refused").eq("id", orderLineId).single()).data?.qty_refused).toBe(0);
+      expect((await admin.from("deliveries").select("outcome, delivered_at").eq("id", stop.id).single()).data).toEqual({ outcome: null, delivered_at: null });
+      expect((await admin.from("invoices").select("id").eq("shipment_id", sh)).data).toEqual([]);
+    }
+    await runCommand("confirm_delivery", {
+      deliveryId: stop.id, signedBy: "Pat", reason: "customer_refused", refused: [{ orderLineId, qty: 1 }],
+    }, adminCtx);
+    expect((await admin.from("order_lines").select("qty_refused").eq("id", orderLineId).single()).data?.qty_refused).toBe(1);
+    expect((await admin.from("deliveries").select("outcome").eq("id", stop.id).single()).data?.outcome).toBe("partial");
+    const invoice = (await admin.from("invoices").select("id").eq("shipment_id", sh).single()).data!;
+    expect((await admin.from("invoice_lines").select("qty").eq("invoice_id", invoice.id).eq("kind", "sku")).data).toEqual([{ qty: 1 }]);
+  });
+
   it("walks a mixed route: the driver departs, Today names the next stop, a transfer stop confirms without an invoice, return waits for the last stop", async () => {
     const driver = await makeStaffCtx(b.id, "warehouse");
     const other = await makeStaffCtx(b.id, "warehouse");

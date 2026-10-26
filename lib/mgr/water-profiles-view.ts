@@ -75,8 +75,7 @@ export function waterProfileSaveReason(fields: WaterProfileFields): string | nul
   if (!fields.name.trim()) missing.push("a profile name");
   if (IONS.some(([key]) => waterPpmError(fields[key]))) missing.push("all six ions in ppm from 0 to 999,999.9");
   if (waterPpmError(fields.alkalinity_ppm, true)) missing.push("alkalinity as CaCO3 from 0 to 999,999.9 ppm");
-  const phError = waterPhError(fields.water_ph);
-  if (phError) missing.push(phError);
+  if (waterPhError(fields.water_ph)) missing.push("a water pH from 0 to 14");
   return submitReason(missing);
 }
 

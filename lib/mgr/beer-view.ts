@@ -16,7 +16,6 @@ export type BeerOverview = {
   openTaps: number;
   /** Open vessel occupancies: one per tank holding beer. */
   openOccupancies: number;
-  materialShortages: number;
   kegsOut: number;
 };
 
