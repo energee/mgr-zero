@@ -56,7 +56,10 @@ export function TapBoard({ breweryId, locationId, initial, skus, timeZone, navig
       if (!snapshot) return;
       setState((current) => replaceTapBoardSnapshot(current, snapshot));
       setPollError(null);
-    } catch { setPollError("Automatic refresh failed. Reload when the connection returns."); }
+    } catch {
+      setState(current => ({ ...current, refreshing: false }));
+      setPollError("Automatic refresh failed. Reload when the connection returns.");
+    }
   }, [loadLatest]);
 
   useEffect(() => {
@@ -106,7 +109,7 @@ export function TapBoard({ breweryId, locationId, initial, skus, timeZone, navig
       setState((current) => failTapBoardAttempt(snapshot ? replaceTapBoardSnapshot(current, snapshot) : current, status, message, retrying, code));
       return;
     }
-    setState((current) => completeTapBoardAttempt(current, result.snapshot));
+    setState((current) => completeTapBoardAttempt(current, result.snapshot, result.refreshError));
     setPollError((current) => pollErrorAfterTapBoardSave(current, result));
   }
 

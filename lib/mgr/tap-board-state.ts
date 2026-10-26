@@ -85,15 +85,15 @@ export function editTapBoardSheet(state: TapBoardState, fields: Partial<TapSheet
 }
 
 export function replaceTapBoardSnapshot(state: TapBoardState, snapshot: TapBoardSnapshot): TapBoardState {
-  return { ...state, snapshot };
+  return { ...state, snapshot, refreshing: false };
 }
 
 export function beginTapBoardRefresh(state: TapBoardState): TapBoardState {
   return { snapshot: state.snapshot, sheet: null, refreshing: true };
 }
 
-export function completeTapBoardAttempt(state: TapBoardState, snapshot: TapBoardSnapshot | null): TapBoardState {
-  return { snapshot: snapshot ?? state.snapshot, sheet: null, refreshing: false };
+export function completeTapBoardAttempt(state: TapBoardState, snapshot: TapBoardSnapshot | null, refreshError: unknown | null): TapBoardState {
+  return { snapshot: snapshot ?? state.snapshot, sheet: null, refreshing: snapshot !== null || refreshError !== null ? false : state.refreshing };
 }
 
 export function createTapBoardRefreshGuard() {

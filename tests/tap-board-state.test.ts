@@ -156,7 +156,7 @@ describe("tap board controlled state", () => {
     refresh.resolve(refreshed);
     const result = await saving;
     if (result.kind !== "saved") throw result.error;
-    state = completeTapBoardAttempt(state, result.snapshot);
+    state = completeTapBoardAttempt(state, result.snapshot, result.refreshError);
     expect(state).toMatchObject({ snapshot: refreshed, sheet: null, refreshing: false });
   });
 
@@ -184,8 +184,41 @@ describe("tap board controlled state", () => {
         .toBe("Tap action saved. Board refresh failed; reload when the connection returns.");
     }
     expect(write).toHaveBeenCalledOnce();
-    state = completeTapBoardAttempt(state, result.kind === "saved" ? result.snapshot : null);
+    state = completeTapBoardAttempt(state, result.kind === "saved" ? result.snapshot : null, result.kind === "saved" ? result.refreshError : null);
     expect(state).toEqual({ snapshot, sheet: null, refreshing: false });
+  });
+
+  it("keeps the post-save update visible until a newer poll supplies the snapshot", async () => {
+    let state = beginTapBoardAttempt(openTapBoardSheet(snapshot, "tap", null, id, id), nextId);
+    const guard = createTapBoardRefreshGuard();
+    const postWrite = Promise.withResolvers<TapBoardSnapshot>();
+    const laterPoll = Promise.withResolvers<TapBoardSnapshot>();
+    const refreshed: TapBoardSnapshot = { open: [{
+      id, location_id: id, sku_id: id, label: null, nominal_bbl: .5,
+      tap_number: "7", opening_fill: 1, not_in_inventory: false,
+      opened_at: "2026-09-08T12:00:00Z", opened_by: id, opened_by_label: "dana",
+      brand_id: null, brand_name: null, sku_name: "Porter",
+    }], history: [] };
+    const saving = submitAndRefreshTapBoard(
+      async () => ({ id }),
+      () => guard.run(() => postWrite.promise),
+      () => { state = beginTapBoardRefresh(state); },
+    );
+    await vi.waitFor(() => expect(state).toMatchObject({ refreshing: true }));
+    const poll = guard.run(() => laterPoll.promise);
+    postWrite.resolve(snapshot);
+    const result = await saving;
+    if (result.kind !== "saved") throw result.error;
+    state = completeTapBoardAttempt(state, result.snapshot, result.refreshError);
+    expect(state).toMatchObject({ snapshot, sheet: null, refreshing: true });
+    laterPoll.resolve(refreshed);
+    state = replaceTapBoardSnapshot(state, await poll as TapBoardSnapshot);
+    expect(state).toMatchObject({ snapshot: refreshed, sheet: null, refreshing: false });
+  });
+
+  it("clears a saved action's busy state when its latest refresh fails", () => {
+    const state = beginTapBoardRefresh({ snapshot, sheet: null });
+    expect(completeTapBoardAttempt(state, null, new Error("refresh failed"))).toEqual({ snapshot, sheet: null, refreshing: false });
   });
 
   it("preserves a newer poll failure when an older post-write refresh is superseded", async () => {
