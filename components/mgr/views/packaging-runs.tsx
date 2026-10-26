@@ -16,7 +16,7 @@ function UpcomingTable({ rows }: { rows: PackagingRunRowView[] }) {
       cells: [
         row.runNo,
         row.brand ?? "No brand",
-        row.date,
+        <Fragment key="date">{row.date}{row.overdue ? <> {E.status("Overdue", "w")}</> : null}</Fragment>,
         row.source ?? "No source yet",
         row.quantity,
         <Fragment key="action">{E.act(row.verb, row.tone, row.href)}</Fragment>,

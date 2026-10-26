@@ -1151,7 +1151,13 @@ Open **Packaging** from the **Work** navigation to see every run by planned date
 
 **Save run plan** names what is **Still needed**: a brand, a planned date, and at least one positive planned output quantity. An empty **Brand** picker says **No brands yet**. Admins and Sales can follow **Add a brand in Catalog**; Brewers and Warehouse are told that an admin or sales member can add one. **Source tank · optional** picks an existing occupied tank, not a typed name. With none available, it explains that you can leave the source blank and pick it before starting the run.
 
+Planned **keg** quantities must be whole numbers. Other packages may use fractional quantities. Invalid entered quantities must be corrected before saving, even when another output is valid; use ordinary decimal notation rather than exponents. If a selected tank holds less beer than the plan needs, MGR warns before saving but still allows the plan. No tank is required, and saving does not reserve beer or move inventory. A date before today in the brewery’s timezone also warns without blocking the plan.
+
+When the selected brand has no packages, **Add a package in Catalog** opens Catalog for Admin and Sales. Brewer and Warehouse instead see who can add the package.
+
 Packaging separates **Upcoming** and **Recent** runs into sortable tables on desktop and labeled lists on phones. Upcoming shows the run number, brand, planned date, source, planned quantity, and next action. Recent shows status and the **Closed or cancelled** date instead of a next action. Planned quantity is the total package count from the plan, not the actual output; when a package unit is not supplied, no unit is guessed. The detail's planned outputs table labels SKU counts **Planned units** and **Actual units**. An unsourced plan says **No source yet**; a cancelled plan labels its date **Cancelled** and retains the cancellation note. Lot, output, yield, and loss columns appear only when those facts are available. Select a run number or its row to open the record. Closed and cancelled dates follow the brewery’s timezone.
+
+An active, unstarted run whose planned date is before today in the brewery’s timezone is marked **Overdue** beside its planned date. Today’s plans are not overdue, and cancelled or closed runs never carry that cue.
 
 The scheduling material preview separates **Material**, **Planned**, **On hand**, and **Short**. Planned amounts include each material's base unit. A dash means unavailable, while zero means a known zero. Plan and close requirements also show **On order**; incoming stock is not on-hand stock.
 
