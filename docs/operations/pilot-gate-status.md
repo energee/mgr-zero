@@ -1,7 +1,7 @@
 <!-- Status record for the pilot release gate decided on #311 (2026-10-11): owner steps, read-only checks, evidence. -->
 # Pilot gate status
 
-Status: **all items open**. Owner: Ted. Tracks the release index
+Each row's **Status** column is the record. Owner: Ted. Tracks the release index
 [#311](https://github.com/energee/mgr-zero/issues/311).
 Source: the "Pilot gate decisions (2026-10-11)" comment on #311.
 
