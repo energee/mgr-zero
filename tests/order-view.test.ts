@@ -37,6 +37,23 @@ describe("Order view loop", () => {
     expect(renderToStaticMarkup(createElement(OrderView, { model }))).toContain("Lines adjusted by Ted Brewer");
   });
 
+  it.each([null, "", "   ", "\t\n"])("names an absent Customer PO %j", po_number => {
+    const model = toOrderViewProps({ ...orderPickedRestock, order: { ...orderPickedRestock.order, po_number } });
+    expect(model.facts).toContainEqual({ label: "Customer PO", value: "Not specified" });
+  });
+
+  it.each(["", "   ", "\t\n", "\u00a0\u2003"])("omits the separator for a historical blank cancellation reason %j", reason => {
+    const model = toOrderViewProps({
+      ...orderPickedRestock,
+      events: [{ id: "cancelled", event: "cancelled", actor: "staff", payload: { reason }, created_at: "2026-10-25T12:00:00.000Z" }],
+      actorNames: { staff: "QA Staff" },
+    });
+    expect(model.events[0].detail).toBe("");
+    const markup = renderToStaticMarkup(createElement(OrderView, { model }));
+    expect(markup).toContain("Cancelled by QA Staff");
+    expect(markup).not.toContain(" · </span>");
+  });
+
   it("maps the shared fixture through the adapter", () => {
     const model = toOrderViewProps(orderPickedRestock);
     expect(model.title).toBe("ORD-0229");

@@ -9,6 +9,7 @@ import { CycleCountView, CycleCountFooter } from "@/components/mgr/views/cycle-c
 import { canRetireMaterialCountFailure, type MaterialCountPreview } from "@/lib/mgr/cycle-count-view";
 import { E } from "@/components/mgr/e";
 import { command, CommandResponseError } from "@/lib/commands/client";
+import { submitReason } from "@/lib/mgr/submit-reason";
 
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
@@ -32,14 +33,18 @@ export function CountForm({ materialId, materialName, uom, locations, bins, onHa
   const [error, setError] = useState<string | null>(null);
   const attempt = useRef<{ requestId: string; input: CountInput } | null>(null);
   const locked = phase === "previewing" || phase === "submitting" || phase === "unknown";
-  const invalid = !locationId || !binId || qty === "" || !Number.isFinite(Number(qty)) || Number(qty) < 0;
+  const previewReason = submitReason([
+    ...(locationId ? [] : ["a location"]),
+    ...(binId ? [] : ["a bin"]),
+    ...(qty !== "" && Number.isFinite(Number(qty)) && Number(qty) >= 0 ? [] : ["a counted quantity of zero or more"]),
+  ]);
   const line = plan?.lines[0];
   const system = line?.qty_expected ?? Number(onHand.find(row => row.location_id === locationId && row.bin_id === binId)?.qty ?? 0);
   const variance = qty === "" ? null : Number(qty) - system;
 
   function clearPreview() { setPlan(null); setPhase("idle"); setError(null); }
   async function preview() {
-    if (invalid || locked) return;
+    if (previewReason || locked) return;
     setPhase("previewing"); setError(null); setPlan(null);
     try {
       setPlan(await command(breweryId, "get_material_count_preview", { locationId, binId, lines: [{ materialId, qty: Number(qty) }] }, undefined, expectedContext.current) as MaterialCountPreview);
@@ -51,7 +56,7 @@ export function CountForm({ materialId, materialName, uom, locations, bins, onHa
     if (phase !== "ready" && phase !== "unknown") return;
     const retrying = phase === "unknown";
     if (!attempt.current) {
-      if (!plan || invalid) return;
+      if (!plan || previewReason) return;
       attempt.current = { requestId: crypto.randomUUID(), input: { locationId, binId, revision: plan.revision, lines: [{ materialId, qty: Number(qty) }] } };
     }
     const frozen = attempt.current;
@@ -75,7 +80,7 @@ export function CountForm({ materialId, materialName, uom, locations, bins, onHa
         adjustments: line?.adjustments.map(row => ({ key: row.lot_id ?? "untracked", lot: row.lot_code ?? "Untracked stock", expected: row.qty_expected, counted: row.qty_counted, delta: row.delta, unit: line.base_uom })),
       }} onQuantity={value => { setQty(value); clearPreview(); }} onBin={value => { setBinId(value); clearPreview(); }}
         onLocation={value => { setLocationId(value); setBinId(bins.find(bin => bin.location_id === value)?.id ?? ""); clearPreview(); }}
-        onPreview={() => { void preview(); }} previewing={phase === "previewing"} frozen={phase === "unknown"} submitting={phase === "submitting"} disabled={invalid}
+        onPreview={() => { void preview(); }} previewing={phase === "previewing"} frozen={phase === "unknown"} submitting={phase === "submitting"} previewReason={previewReason}
         messages={<CommandFormMessage error={error} />} />
     </form>
   </CommandForm>;

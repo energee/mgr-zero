@@ -5,6 +5,8 @@ import {
   countBrandComparison,
   countDraftFromSnapshot,
   countFailureKind,
+  countQuantityError,
+  countSubmitReason,
   completeCorrectionAttempt,
   correctionStateFromReceipt,
   failCorrectionAttempt,
@@ -236,6 +238,43 @@ describe("taproom count controlled state", () => {
     expect(state.attempt).toMatchObject({ kind: "stale" });
     expect(state.draft.priorCount).toEqual(snapshot.prior_count);
     expect(state.draft.lines[0].quantity).toBe("3");
+  });
+
+  it.each(["", "-1", "1.5", "1e1", "5", "9007199254740992"])("#1117 projects the existing payload boundary for %j into field and submit errors", (quantity) => {
+    let state = countDraftFromSnapshot(snapshot, null);
+    for (const line of state.draft.lines) state = updateCountQuantity(state, line.key, String(line.qtyBefore));
+    state = updateCountQuantity(state, state.draft.lines[0].key, quantity);
+    const error = countQuantityError(state.draft.lines[0]);
+    expect(error).toBeTypeOf("string");
+    expect(countSubmitReason(state)).not.toBeNull();
+    expect(() => beginCountAttempt(state, "request")).toThrow(error!);
+  });
+
+  it("#1117 permits explicit zero, the recorded bound, and the empty zero observation", () => {
+    let state = countDraftFromSnapshot(snapshot, null);
+    state = updateCountQuantity(state, state.draft.lines[0].key, "0");
+    state = updateCountQuantity(state, state.draft.lines[1].key, "2");
+    expect(state.draft.lines.map(countQuantityError)).toEqual([undefined, undefined]);
+    expect(countSubmitReason(state)).toBeNull();
+    expect(beginCountAttempt(state, "request").attempt).toMatchObject({ kind: "submitting", payload: { lines: [{ qtyCounted: 0 }, { qtyCounted: 2 }] } });
+    const empty = countDraftFromSnapshot({ ...snapshot, lines: [] }, null);
+    expect(countSubmitReason(empty)).toBeNull();
+    expect(beginCountAttempt(empty, "empty").attempt).toMatchObject({ payload: { lines: [] } });
+  });
+
+  it("#1117 gates stale and submitting drafts but never revalidates a frozen uncertain retry", () => {
+    let state = countDraftFromSnapshot(snapshot, null);
+    for (const line of state.draft.lines) state = updateCountQuantity(state, line.key, "0");
+    const submitting = beginCountAttempt(state, "original");
+    expect(beginCountAttempt(submitting, "duplicate")).toBe(submitting);
+    expect(countSubmitReason(submitting)).not.toBeNull();
+    const stale = failCountAttempt(submitting, "stale", "Stock changed");
+    expect(countSubmitReason(stale)).not.toBeNull();
+    expect(beginCountAttempt(stale, "stale")).toBe(stale);
+    const unknown = failCountAttempt(submitting, "unknown", "No response");
+    const mutated = { ...unknown, draft: { ...unknown.draft, lines: unknown.draft.lines.map(line => ({ ...line, quantity: "-1" })) } };
+    expect(countSubmitReason(mutated)).toBeNull();
+    expect(beginCountAttempt(mutated, "replacement").attempt).toEqual(submitting.attempt);
   });
 
   it("requires every bucket explicitly and refuses fractions and overcounts before a request exists", () => {

@@ -11,6 +11,11 @@ export type CustomerEditValues = { name: string; alias: string; type: string; co
  *  reads it. Global search matches customer names only. */
 export const CUSTOMER_ALIAS_HELP = "Another name staff know this customer by. Search customers finds the customer by it, and the customer list shows it beside the name. Buyers never see it.";
 
+/** Customer forms reject whitespace-only names; the RPC owns stored normalization. */
+export function customerNameError(name: string): string | undefined {
+  return name.trim() ? undefined : "Name required";
+}
+
 export type CustomerViewModel = {
   backHref?: string;
   name: string;

@@ -10,10 +10,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { OrderQuantity } from "@/components/mgr/views/new-order";
 import { ScopePick, type ScopeOption } from "@/components/mgr/scope-pick";
 import { varianceBbl, varianceReason } from "@/lib/mgr/taproom-variance-view";
-import { countBrandComparison, countLocked, isShortage, projectionExpectedText, projectionMatchesCountDraft, updateCountDisposition, updateCountQuantity, updateCorrectionQuantity, updateCorrectionReason, type TaproomCountState } from "@/lib/mgr/taproom-count-state";
+import { countBrandComparison, countLocked, countQuantityError, countSubmitReason, isShortage, projectionExpectedText, projectionMatchesCountDraft, updateCountDisposition, updateCountQuantity, updateCorrectionQuantity, updateCorrectionReason, type TaproomCountState } from "@/lib/mgr/taproom-count-state";
 import type { TaproomCorrectionState } from "@/lib/mgr/taproom-count-state";
 import type { StaffRole } from "@/lib/commands/registry";
 import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
+import { useTouchedLines } from "@/lib/mgr/touched-lines";
 const bbl = (value: number | null) => value === null ? "unavailable" : varianceBbl(value);
 
 export function WeeklyCountPrintAction({ busy = false, empty = false, error, onPrint }: { busy?: boolean; empty?: boolean; error?: string | null; onPrint?: () => void }) {
@@ -26,7 +27,7 @@ export function WeeklyCountPrintAction({ busy = false, empty = false, error, onP
 }
 
 export type WeeklyCountViewModel = {
-  backHref?: string; boardHref?: string; varianceHref?: string;
+  backHref?: string; boardHref?: string; varianceHref?: string; worksheetHref?: string;
   /** Taprooms; `location` is the selected option's value (a location id live). */
   locations: ScopeOption[]; location: string;
   draft?: TaproomCountState; roles: readonly StaffRole[]; lotLabels: Record<string, string>;
@@ -36,7 +37,7 @@ export type WeeklyCountViewModel = {
   timeZone: string;
 };
 
-export function WeeklyCountView({ model, draft, correction }: { model: WeeklyCountViewModel; draft?: ReactNode; correction?: ReactNode }) {
+export function WeeklyCountView({ model, draft, correction, onWorksheet }: { model: WeeklyCountViewModel; draft?: ReactNode; correction?: ReactNode; onWorksheet?: () => void }) {
   return <>
     <div className="contents print:hidden">
       {E.back("Beer", "Weekly count", undefined, model.backHref)}
@@ -44,7 +45,7 @@ export function WeeklyCountView({ model, draft, correction }: { model: WeeklyCou
       {model.locations.length > 0 && <ScopePick label="Location" value={model.location} options={model.locations} />}
     </div>
     {model.locations.length === 0 ? E.blank("No taproom locations yet. Ask Admin to add one under Locations.") : <>
-      {draft !== undefined ? draft : model.draft && <WeeklyCountDraftView state={model.draft} roles={model.roles} lotLabels={model.lotLabels} timeZone={model.timeZone} />}
+      {!model.receipt && (draft !== undefined ? draft : model.draft && <WeeklyCountDraftView state={model.draft} roles={model.roles} lotLabels={model.lotLabels} timeZone={model.timeZone} />)}
       <div className="contents print:hidden">
         {model.receipt && <section aria-label="Saved count" className="flex flex-col gap-3">
           {E.ttl(`Saved count · ${model.receipt.date}`)}
@@ -52,6 +53,7 @@ export function WeeklyCountView({ model, draft, correction }: { model: WeeklyCou
           {model.receipt.correction && <p className="text-sm text-muted-foreground">{model.receipt.correction}</p>}
           {model.receipt.lines.map(line => <div key={line.key}>{E.row(line.name, line.detail, <span className="break-all text-xs">{line.result}</span>)}</div>)}
           {hasAnyRole(model.roles, ["admin"]) && model.receipt.canCorrect && (correction !== undefined ? correction : model.receipt.correctionForm && <WeeklyCountCorrectionView state={model.receipt.correctionForm} />)}
+          <Button variant="outline" className="self-start" asChild><Link href={model.worksheetHref ?? "#"} data-to="Weekly count" onClick={onWorksheet ? event => { event.preventDefault(); event.stopPropagation(); onWorksheet(); } : undefined}>Count worksheet</Link></Button>
         </section>}
         {E.ttl("Recent saved counts")}
         <p className="text-sm text-muted-foreground">Newest 50 at this taproom.</p>
@@ -69,6 +71,8 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
   onQuantity?: (key: string, value: string) => void; onSubmit?: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   const [internalState, setInternalState] = useState(controlledState);
+  const formId = useId();
+  const touched = useTouchedLines(!onQuantity);
   const state = onQuantity ? controlledState : internalState;
   const changeQuantity = onQuantity ?? ((key: string, value: string) => setInternalState(current => updateCountQuantity(current, key, value)));
   const changeDisposition = onDisposition ?? ((key: string, value: "sold" | "destroyed") => setInternalState(current => updateCountDisposition(current, key, value)));
@@ -91,7 +95,7 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
     <Button type="button" variant="outline" className="md:self-start" disabled={projectionBusy || locked || !aligned} onClick={onRefreshExpected}>{projectionBusy ? "Refreshing…" : "Refresh expected"}</Button>
     <CommandFormMessage error={projectionError} />
     </div>
-    <form onSubmit={event => { event.preventDefault(); onSubmit?.(event); }} className="flex flex-col gap-3" aria-label="Count every stock bucket">
+    <form noValidate onSubmit={event => { event.preventDefault(); if (!countSubmitReason(state)) onSubmit?.(event); }} className="flex flex-col gap-3" aria-label="Count every stock bucket">
       <div className="contents print:hidden">
       {E.ttl("Count every stock bucket")}
       {E.info(`Count whole packages for ${formatDate(state.draft.countedOn)}; a partly full keg counts as one. Enter 0 for none.`)}
@@ -103,7 +107,17 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
       <fieldset disabled={locked} className="contents">
         {state.draft.lines.map((line, index) => {
           const lot = line.lotId ? (onlyRoles(roles, ["taproom"]) ? `Tracked worksheet row ${index + 1}` : `Lot ${lotLabels[line.key] ?? "label unavailable"} · worksheet row ${index + 1}`) : `Untracked stock · worksheet row ${index + 1}`;
-          return <div key={line.key}>{E.row(line.skuName, `${line.binName} · ${lot} · recorded ${line.qtyBefore}`, <OrderQuantity label={`Remaining units · ${line.skuName} · worksheet row ${index + 1}`} value={line.quantity} max={line.qtyBefore} step="1" required invalid={state.attempt.kind === "error"} onChange={value => changeQuantity(line.key, value)} />, line.quantity !== "" && Number(line.quantity) < line.qtyBefore ? "w" : "")}{isShortage(line) && E.pick(`Shortage disposition · worksheet row ${index + 1}`, line.disposition ?? "sold", [{ value: "sold", label: "Sold" }, { value: "destroyed", label: "Destroyed" }], { disabled: locked, onChange: value => changeDisposition(line.key, value as "sold" | "destroyed") })}</div>;
+          const error = touched.shown(index) ? countQuantityError(line) : undefined;
+          return <div key={line.key}>
+            {E.row(line.skuName, `${line.binName} · ${lot} · recorded ${line.qtyBefore}`, <OrderQuantity
+              id={`${formId}-${index}`} label={`Remaining units · ${line.skuName} · worksheet row ${index + 1}`}
+              value={line.quantity} max={line.qtyBefore} step="1" required
+              invalid={state.attempt.kind === "error"} error={error}
+              onBlur={() => touched.touch(index)}
+              onChange={value => changeQuantity(line.key, value)}
+            />, isShortage(line) ? "w" : "")}
+            {isShortage(line) && E.pick(`Shortage disposition · worksheet row ${index + 1}`, line.disposition ?? "sold", [{ value: "sold", label: "Sold" }, { value: "destroyed", label: "Destroyed" }], { disabled: locked, onChange: value => changeDisposition(line.key, value as "sold" | "destroyed") })}
+          </div>;
         })}
       </fieldset>
       {state.attempt.kind === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The request ID and every quantity are frozen. Retry this unchanged count to recover its original result.</CommandFormMessage>}
@@ -111,7 +125,7 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
       {state.attempt.kind === "error" && <CommandFormMessage error={state.attempt.message} />}
       <div className="flex flex-col gap-2 md:flex-row md:justify-end">
         {state.attempt.kind === "stale" && <Button type="button" variant="outline" onClick={onRefreshSnapshot}>Start fresh recount</Button>}
-        <Button type="submit" disabled={state.attempt.kind === "submitting" || state.attempt.kind === "stale"}>{state.attempt.kind === "unknown" ? "Retry unchanged count" : state.attempt.kind === "submitting" ? "Recording…" : "Record count"}</Button>
+        {E.submit(state.attempt.kind === "unknown" ? "Retry unchanged count" : state.attempt.kind === "submitting" ? "Recording…" : "Record count", { id: `${formId}-submit`, reason: countSubmitReason(state), submitting: state.attempt.kind === "submitting" })}
       </div>
       </div>
     </form>

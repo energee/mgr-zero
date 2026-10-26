@@ -46,7 +46,7 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
 
   const roles = brewery.roles;
   return <WeeklyCountView model={{
-    backHref: "/beer", boardHref: `/taproom/board?location=${location.id}`, varianceHref: `/taproom/variance?location=${location.id}`,
+    backHref: "/beer", boardHref: `/taproom/board?location=${location.id}`, varianceHref: `/taproom/variance?location=${location.id}`, worksheetHref: `/taproom?location=${location.id}`,
     locations: locations.map(item => ({ value: item.id, label: item.name, href: `/taproom?location=${item.id}` })), location: location.id, roles, lotLabels, timeZone: brewery.timeZone,
     receipt: shownReceipt ? {
       date: formatDate(shownReceipt.counted_on), canCorrect: shownReceipt.correction_eligible,

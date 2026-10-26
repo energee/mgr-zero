@@ -136,6 +136,34 @@ it("#1117 allows recording an empty count while disabling empty-stock printing",
   expect(html).toMatch(/<button(?![^>]*\sdisabled="")[^>]*type="submit"[^>]*>Record count<\/button>/);
 });
 
+it.each(["", "-1", "1.5", "1e1", "4"])("#1117 disables invalid draft submission and associates field errors for %j", (quantity) => {
+  const initial = countDraftFromSnapshot({ location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "captured", lines: [{ bin_id: "cold", bin_name: "Cold", sku_id: "keg", sku_name: "Keg", brand_id: "brand", brand_name: "Brand", bbl_per_unit: .5, lot_id: null, qty_before: 3 }] }, null);
+  const state = updateCountQuantity(initial, initial.draft.lines[0].key, quantity);
+  const html = renderToStaticMarkup(createElement(WeeklyCountDraftView, { state, roles: ["taproom"], lotLabels: {}, timeZone: "America/New_York" }));
+  expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Record count<\/button>/);
+  expect(html).toContain("Still needed:");
+  expect(html).toContain("noValidate");
+  if (quantity !== "") {
+    expect(html).toContain('aria-invalid="true"');
+    const input = html.match(/<input[^>]*aria-invalid="true"[^>]*>/)![0];
+    const errorId = input.match(/aria-describedby="([^"]+)"/)![1];
+    expect(html).toContain(`id="${errorId}"`);
+  }
+});
+
+it("#1117 replaces the draft, including an adapter slot, with the authoritative saved receipt", () => {
+  const model = { ...weeklyCount, draft: countDraftFromSnapshot({ location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "captured", lines: [] }, null) };
+  const draftHtml = renderToStaticMarkup(createElement(WeeklyCountView, { model: { ...model, receipt: undefined } }));
+  expect(draftHtml).toContain('aria-label="Count every stock bucket"');
+  for (const draft of [undefined, createElement(WeeklyCountDraftView, { state: model.draft, roles: model.roles, lotLabels: model.lotLabels, timeZone: model.timeZone })]) {
+    const saved = renderToStaticMarkup(createElement(WeeklyCountView, { model, draft }));
+    expect(saved).toContain('aria-label="Saved count"');
+    expect(saved).not.toContain('aria-label="Count every stock bucket"');
+    expect(saved).not.toContain("Enter all buckets");
+    expect(saved).not.toContain("draft actual");
+  }
+});
+
 it("#814 shows the shared shortage disposition picker and freezes it on uncertain retry", () => {
   let state = countDraftFromSnapshot({ location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "captured", lines: [{ bin_id: "cold", bin_name: "Cold", sku_id: "keg", sku_name: "Keg", brand_id: "brand", brand_name: "Brand", bbl_per_unit: .5, lot_id: null, qty_before: 3 }] }, null);
   state = updateCountQuantity(state, state.draft.lines[0].key, "2");

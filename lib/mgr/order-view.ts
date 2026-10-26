@@ -220,7 +220,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
       // A transfer has no ship-to; its destination is not on this read, so it is left out rather than guessed.
       ...(order.kind === "wholesale" || order.pickup ? [{ label: "Ship-to", value: shipTo ?? "Not specified" }] : []),
       { label: "Requested ship date", value: order.requested_ship_date ? formatDate(order.requested_ship_date) : "Not specified" },
-      ...(order.kind === "wholesale" ? [{ label: "Customer PO", value: order.po_number ?? "Not specified" }] : []),
+      ...(order.kind === "wholesale" ? [{ label: "Customer PO", value: order.po_number?.trim() || "Not specified" }] : []),
       ...(order.note ? [{ label: "Note", value: order.note, wide: true }] : []),
     ],
     summary: orderSummary(order, lines, deposits, events),
@@ -261,7 +261,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
       ...(actorNames ? { by: actorNames[e.actor] ?? "a user not on the team" } : {}),
       detail: e.event === "lines_adjusted"
         ? `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${typeof e.payload.reason === "string" ? ` (${e.payload.reason})` : ""}`
-        : typeof e.payload.reason === "string" ? e.payload.reason : "",
+        : typeof e.payload.reason === "string" ? e.payload.reason.trim() : "",
     })),
   };
 }

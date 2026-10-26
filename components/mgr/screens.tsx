@@ -87,7 +87,7 @@ import { EntryView } from "@/components/mgr/views/entry";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
 import { FermentationReadingActionsView, FermentationReadingView, readingIdentity } from "@/components/mgr/views/fermentation-reading";
 import { FirstRunView } from "@/components/mgr/views/first-run";
-import { CatalogCategoriesFixture, FormatFixture, ReceiptFixture } from "@/components/mgr/fixture-adapters";
+import { CatalogCategoriesFixture, FormatFixture, ReceiptFixture, WeeklyCountFixture } from "@/components/mgr/fixture-adapters";
 import { FormatView } from "@/components/mgr/views/format";
 import { DeleteFormatControl } from "@/components/mgr/views/delete-format";
 import { FormatsView } from "@/components/mgr/views/formats";
@@ -1197,13 +1197,13 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Beer",
     name: "Weekly count",
-    to: { "Hazy IPA": "SKU detail", Pils: "SKU detail", "Print current stock labels": "Weekly count", "Record count": "Weekly count", "Correct count": "Weekly count" },
+    to: { "Hazy IPA": "SKU detail", Pils: "SKU detail", "Print current stock labels": "Weekly count", "Record count": "Weekly count", "Correct count": "Weekly count", "Count worksheet": "Weekly count" },
     job: "Record every physical stock bucket and compare the draft with expected brand consumption",
     reads: "get_taproom_count_snapshot · get_taproom_print_labels · get_taproom_draft_projection · list_taproom_counts · get_taproom_count · list_locations",
     writes: "record_taproom_count · correct_taproom_count [Admin only; latest uncorrected root; increases only]",
     states: permitted("taproom, warehouse or admin required").concat([["unknown response", "timeouts and 5xx freeze every quantity and retry the same request", 1], ["stale", "changed stock or brewery date starts a fresh blank recount", 1], ["no POS", "expected stays blank; the physical count still records"], ["matching", "durable receipt with every observation and no movement"], ["corrected", "one logical history row shows the effective receipt and correction audit"], ["correction permission", "Admin only on the latest uncorrected root", 1]]),
     spec: "The physical count is the source of truth. Shortages default to Sold; Destroyed posts destruction with no channel or tax facts. Matching Sold is a no-op; matching Destroyed is refused. One choice applies to each bin/SKU/lot bucket and freezes with the request. Destroyed lines cannot be corrected; mixed counts retain their sold-line correction. Every bin/SKU/lot-or-untracked bucket is entered explicitly in whole packaged units; omitted zeros, fractions, inferred allocation and overcounts are refused. Taproom sees the full worksheet row number on every bucket instead of raw lot identifiers on screen; all three count roles can print the current positive-stock worksheet through one checked projection with lot codes, stable original row numbers, and no history. Print rechecks the captured revision and refuses stale stock without changing count entries or uncertain retries. The draft keeps and links the captured prior-count identity/date. Brand expectation refreshes independently and never replaces the captured stock revision; if its baseline changed, comparison and inputs lock until an explicit fresh recount. Draft actual groups explicit bucket depletion using captured package volumes; it and expected-minus-actual stay blank until every existing bucket for that brand is entered, while a projected brand with no physical bucket has zero actual. Both remain labeled as estimates until the authoritative receipt is saved. A timeout or 5xx response freezes request ID and payload for exact retry; a definitive first validation failure is editable. Changed stock or an expired brewery date offers a fresh blank recount. Saved receipts include safe bin/SKU labels for every observation beyond list-query caps, and the newest 50 logical root headers remain readable even when every line matched and no movement was posted. Admin can correct only the latest uncorrected root when at least one quantity was counted too low, up to the frozen quantity before that count. The replacement keeps every original bucket and observation time, appends signed ledger entries in the correction period, and leaves the original receipt immutable. History and the receipt show the effective count plus who corrected it, when, and why. Warehouse and Taproom can read that audit but never see the correction action. An uncertain response freezes the correction reason, quantities, request ID, and payload for exact retry.",
-    body: <WeeklyCountView model={weeklyCount} />,
+    body: <WeeklyCountFixture><WeeklyCountView model={weeklyCount} /></WeeklyCountFixture>,
   },
   {
     step: 5,
@@ -1774,7 +1774,7 @@ export const SCREENS: Screen[] = [
       const values = { observedAt: "2026-09-10T08:10:00", tempF: "68.2", gravity: "1.019", ph: "", note: "" };
       return <>
         <FermentationReadingView formId={formId} values={values} identity={readingIdentity({ vessel_name: "FV3", batch_no: 416, brand_name: "Hazy IPA" })} unit="sg" prior={{ tempF: "67.8", gravity: "1.021", ph: "4.21" }} />
-        {E.pin(<FermentationReadingActionsView formId={formId} values={values} />)}
+        {E.pin(<FermentationReadingActionsView formId={formId} values={values} unit="sg" />)}
       </>;
     })(),
   },
@@ -2392,7 +2392,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Bulk process COLAs",
-    to: { "Open COLA on TTB": "Bulk process COLAs", "Selected: Brand (front) or keg collar": "Bulk process COLAs", Skip: "Bulk process COLAs", "Save and next": "Bulk process COLAs" },
+    to: { COLA: "Bulk process COLAs", "Open COLA on TTB": "Bulk process COLAs", "Selected: Brand (front) or keg collar": "Bulk process COLAs", Skip: "Bulk process COLAs", "Save and next": "Bulk process COLAs" },
     job: "Review the brewery’s approved labels and select a catalog image for each brand",
     reads: "search_colas · get_cola_details · get_cola_image",
     writes: "upsert_brand_approval",
@@ -2495,13 +2495,13 @@ export const SCREENS: Screen[] = [
     slice: 7,
     tab: "Beer",
     name: "Tap board",
-    to: { "Stout · ⅙ bbl": "Swap keg", Taproom: "Tap board", "7 \u00b7 Guest cider \u00b7 keg": "Kick keg", "Amber \u00b7 \u00bd bbl": "Swap keg" },
+    to: { "Stout · ⅙ bbl": "Swap keg", Taproom: "Tap board", "Guest cider \u00b7 keg": "Kick keg", "Amber \u00b7 \u00bd bbl": "Swap keg" },
     job: "What is on, since when, and roughly how much is left",
     reads: "list_open_taps · list_tap_history · list_skus · list_locations",
     writes: "tap_keg · swap_keg · kick_keg",
     states: [["swap", "one act, one record · never kick-then-tap"], ["already swapped", "second attempt fails · safe closer and time shown", 1], ["not in taproom stock", "server-derived flag · expected shares excluded", 1], ["guest or event keg", "explicit label and nominal size · no numeric yield", 1], ["no number", "sorts last · a number is never required"], ["duplicate number", "shown as entered · nothing downstream reads it"], ["kicked", "interval closed with a reason · the tap goes empty"], ["no POS", "no usable numerator · no bar", 1], ["not ready", "submit withheld · the line beside it names what is missing"], ["no keg SKUs", "no keg SKU with a keg volume · the picker says so and points to Catalog · guest keg still works", 1]],
     redrawn: true,
-    spec: <>A row offers Swap and Kick. Swap closes one interval and opens the replacement atomically; an own replacement defaults to the outgoing SKU, while a guest replacement requires its own label and positive nominal BBL. Tap numbers are optional and may repeat, and unnumbered rows sort last. Opening and closing fill chips are coarse observations and never inventory quantities. A 30-second poll updates only the board and recent history, preserving dirty and uncertain sheets. Exact retries keep the original request. Own package size and inventory exclusion come from the server. Guest labels never match POS facts, so guest rows show no numeric yield. No usable numerator means no bar. Every action here writes zero finished-goods movements; weekly count owns depletion.</>,
+    spec: <>Each own or guest tile offers Swap and Kick and shows the same opening day, date, actor and fill. Swap closes one interval and opens the replacement atomically; an own replacement defaults to the outgoing SKU, while a guest replacement requires its own label and positive nominal BBL. Tap numbers are optional and may repeat, and unnumbered tiles sort last. Opening and closing fill chips are coarse observations and never inventory quantities. After an action saves, its sheet closes and the board announces Updating the board while its existing refetch runs. A 30-second poll updates only the board and recent history, preserving dirty and uncertain sheets. Exact retries keep the original request. Own package size and inventory exclusion come from the server. Guest labels never match POS facts, so guest tiles show no numeric yield. No usable numerator means no bar. Every action here writes zero finished-goods movements; weekly count owns depletion.</>,
     body: <TapBoardView state={tapBoard} skus={tapBoardSkus} timeZone={DEMO_TIME_ZONE} navigation={{ locations: [{ value: "taproom", label: "Taproom" }, { value: "downtown", label: "Downtown" }], location: "taproom" }} recentEvents={[{ title: "Kolsch tapped", detail: "Dana · Tue 4:10pm" }, { title: "Saison swapped in", detail: "Ali · Thu 11:20am" }]} />,
   },
   {
@@ -2837,8 +2837,8 @@ export const SCREENS: Screen[] = [
     job: "Say what Menu is missing when Square has no locations yet",
     reads: "list_pos_locations · get_square_connected",
     writes: "none",
-    states: [["admin", "Set up Square opens Point of sale"], ["connected, none synced", "Square is connected but no location has synced yet · Set up Square opens Point of sale to sync"], ["warehouse", "no link; says Square isn’t connected and asks an admin to connect Square, because Point of sale settings are admin-only", 1]],
-    spec: "Drawn as an admin. Square is not connected, never or since a disconnect (seen locations outlive one), so the title says Square isn’t connected, for Admin and Warehouse alike, and it has to be connected before any location can be mapped. If Square is connected but no location has synced yet, the same button says so instead. Every Menu role reads whether Square is connected, a yes or no and nothing else about the connection, so Warehouse is told the same state; only an admin can open Point of sale settings, so only an admin gets the button and Warehouse is asked to have an admin act instead of a link that would land on No access.",
+    states: [["not turned on", "no setup action; the same reason as Connect Square", 1], ["admin", "Set up Square opens Point of sale"], ["connected, none synced", "Square is connected but no location has synced yet · Set up Square opens Point of sale to sync"], ["warehouse", "no link; says Square isn’t connected and asks an admin to connect Square, because Point of sale settings are admin-only", 1]],
+    spec: "Drawn as an admin with Square turned on. When Square is not connected and isn’t turned on in MGR, every role sees the same unavailable reason as Connect Square, with no setup action. Otherwise a disconnected Square is titled Square isn’t connected for Admin and Warehouse alike, even when locations remain from before a disconnect. If Square is connected but no location has synced yet, the setup message says so. Every Menu role reads only whether Square is connected; only an admin gets the settings link, while Warehouse is asked to have an admin act.",
     body: <PosMenuView model={{ locations: [], selectedLocationId: "", locationName: "Square location", items: [], excluded: [], externalItems: [], setup: { title: "Square isn’t connected", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square" } } }} />,
   },
   {
@@ -2980,7 +2980,7 @@ export const SCREENS: Screen[] = [
     reads: "list_sale_channels · list_price_groups · list_formats · list_channel_prices",
     writes: "set_channel_price · clear_channel_price · upsert_price_group · delete_price_group",
     states: [["permission", "sales or admin required", 1], ["empty cell", "unpriced · an order for a SKU on that group and format is refused on that channel", 1], ["empty", "no price groups yet: New price group is the only action"], ["in use", "a group a brand sits on, or a cell prices, cannot be removed", 1]],
-    spec: "Reached from More and from Catalog; back returns to More. The brewery's price sheet is one grid: rows are price groups, columns are packaged formats plus pours owned by a group (one column per pour name). One tab per sale channel; the grid shows the selected channel, the first by default, and the address keeps the tab. A beer sits on one group (Catalog → Brand → Price group) and a customer sits on one channel, so the price of any SKU for any customer is the single cell where the two meet. Every cell is a dollars field edited in place: Enter or leaving the whole cell saves. Tab passes through Clear when a price exists, then commits on leaving the cell. Saving and Saved appear inline; invalid, negative, exponent, or extra-precision amounts are refused without rounding. Zero is valid. An unpriced cell is empty with a dash. Blanking a priced cell and leaving it restores the persisted price with an explanation; only Clear followed by confirmation removes it. A group with no pour of a column's name shows + add, which opens Add pour on that group with the name filled in. A group's name opens Price group, where its position, cost ceiling, and pours live.",
+    spec: "Reached from More and from Catalog; back returns to More. The brewery's price sheet is one grid: rows are price groups, columns are packaged formats plus pours owned by a group (one column per pour name). One tab per sale channel; the grid shows the selected channel, the first by default, and the address keeps the tab. A beer sits on one group (Catalog → Brand → Price group) and a customer sits on one channel, so the price of any SKU for any customer is the single cell where the two meet. Every cell is a dollars field edited in place: Enter or leaving the input saves. One Tab commits even when the next control is Clear; directly clicking Clear opens confirmation without saving a draft first. Saving and Saved appear inline; invalid, negative, exponent, or extra-precision amounts are refused without rounding. Zero is valid. An unpriced cell is empty with a dash. Blanking a priced cell and leaving it restores the persisted price with an explanation; only Clear followed by confirmation removes it. A group with no pour of a column's name shows + add, which opens Add pour on that group with the name filled in. A group's name opens Price group, where its position, cost ceiling, and pours live.",
     body: <PriceGroupsView model={toPriceGroupsViewProps(pricingGrid)} />,
   },
   {
@@ -3019,7 +3019,7 @@ export const SCREENS: Screen[] = [
     job: "Create or edit one physical subdivision of a location",
     reads: "list_bins",
     writes: "create_bin · update_bin · delete_bin",
-    states: [["permission", "warehouse or admin required", 1], ["missing name", "Still needed: Enter a bin name · submit blocked"], ["duplicate name", "A bin named Dry already exists here · inline error and submit blocked"], ["last bin", "rename it instead of removing it", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1], ["menu bin", "a POS menu uses it · point the menu at another bin first", 1], ["never used", "Remove asks to confirm first"]],
+    states: [["permission", "warehouse or admin required", 1], ["missing name", "Still needed: a bin name · submit blocked"], ["duplicate name", "A bin named Dry already exists here · inline error and submit blocked"], ["last bin", "rename it instead of removing it", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1], ["menu bin", "a POS menu uses it · point the menu at another bin first", 1], ["never used", "Remove asks to confirm first"]],
     spec: "Titled with the bin’s name (Edit bin · Cold), or Add bin. Remove sits in its own section below Save and opens a confirmation that states the rule. Taps are not bins; the note links the Tap board.",
     body: <BinView model={toBinViewProps(binCold)} />,
   },
