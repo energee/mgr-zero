@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { EntryView } from "../components/mgr/views/entry";
 import { signIn, portalSignIn } from "../lib/mgr/fixtures/entry";
+import { expiredInviteModel, expiredResetModel, noMembershipModel, pageNotFoundModel, portalStaffOnlyModel, toPasswordSavedViewProps, toSetPasswordViewProps } from "../lib/mgr/entry-view";
 
 type NodeProps = { children?: ReactNode; type?: string; action?: (form: FormData) => void; formNoValidate?: boolean; onClick?: (event: unknown) => void; onSubmit?: (event: unknown) => void };
 function descendants(node: ReactNode): ReactElement<NodeProps>[] {
@@ -67,5 +68,35 @@ describe("email-link form boundary (#708)", () => {
     expect(html.match(/<input[^>]*type="password"[^>]*>/)?.[0]).toContain('required=""');
     expect(html).not.toMatch(/<form[^>]*novalidate/);
     expect(html).toMatch(/<button[^>]*type="submit"[^>]*>Sign in<\/button>/);
+  });
+});
+
+describe("entry message tones (#1401)", () => {
+  it.each([signIn, portalSignIn])("renders sign-in errors as destructive alerts with a glyph", (model) => {
+    const html = renderToStaticMarkup(createElement(EntryView, { model: { ...model, error: "Incorrect email or password." } }));
+    const alert = html.match(/<div[^>]*role="alert"[^>]*>.*?Incorrect email or password\.<\/div><\/div>/)?.[0];
+    expect(alert).toContain("text-destructive");
+    expect(alert).toContain('data-slot="alert-description"');
+    expect(alert).toContain("<svg");
+    expect(alert).not.toContain("bg-warning");
+  });
+
+  it.each([
+    toSetPasswordViewProps("person@example.com", undefined, true),
+    toPasswordSavedViewProps("signout_failed", false),
+    toPasswordSavedViewProps("revoke_failed", true),
+  ])("keeps recovery and password-saved confirmations informational", (model) => {
+    const html = renderToStaticMarkup(createElement(EntryView, { model }));
+    expect(model.note).toBeUndefined();
+    expect(model.info).toMatch(/Your (reset link verified|password was saved)/);
+    expect(html).toMatch(/role="note"[^>]*class="[^"]*bg-info/);
+    expect(html).not.toContain("bg-warning");
+    if (model.error) expect(html).toMatch(/role="alert"[^>]*class="[^"]*text-destructive/);
+  });
+
+  it.each([expiredInviteModel, expiredResetModel, noMembershipModel, portalStaffOnlyModel, pageNotFoundModel])("preserves real entry warnings", (model) => {
+    const html = renderToStaticMarkup(createElement(EntryView, { model }));
+    expect(model.note).toBeTruthy();
+    expect(html).toMatch(/role="note"[^>]*class="[^"]*bg-warning/);
   });
 });

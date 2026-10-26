@@ -144,6 +144,13 @@ describe("Customer keg balance", () => {
 });
 
 describe("Record keg event", () => {
+  it("#1401 renders the empty-keg helper as information, not a warning", () => {
+    const html = htmlOf(createElement(KegEventFields, { value: kegFleetMicrostar.eventForm!, options: kegFleetMicrostar.eventOptions! }));
+    const notice = html.match(/<div[^>]*role="note"[^>]*>.*?Empty kegs only\..*?<\/div><\/div>/)?.[0];
+    expect(notice).toContain("bg-info");
+    expect(notice).not.toContain("bg-warning");
+  });
+
   it.each(["1.5", "1e1", "0", "", "-1", "9007199254740992"])("#1381 rejects invalid keg count %s", (qty) => {
     const value = { ...kegFleetMicrostar.eventForm!, poolId: "pool", locationId: "location", binId: "bin", customerId: "customer", qty };
     expect(kegEventReason(value)).toBeTruthy();

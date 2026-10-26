@@ -130,7 +130,6 @@ export function CommandFormFooter({ className, ...props }: React.ComponentProps<
  * children) render as `role="alert"` so screen readers interrupt with the
  * failure; soft warnings (`tone="warning"`, e.g. confirm_order's ATP list)
  * render as a polite `role="status"` region. Renders nothing when empty.
- * Login's inline error (components/login-form.tsx) is the same pattern.
  */
 export function CommandFormMessage({
   error,

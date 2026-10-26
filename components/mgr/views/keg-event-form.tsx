@@ -39,7 +39,7 @@ export function KegEventFields({ value, options, onChange, attempted = false }: 
         { id: "keg-customer", onChange: set("customerId"), placeholder: "Select a customer" })}
       {E.edit("Kegs", value.qty, "number", undefined, { id: "keg-qty", min: 1, step: 1, onChange: set("qty"), onBlur: () => touched.touch(0), error: qtyError, required: true })}
       {E.edit("Note", value.note, "text", undefined, { id: "keg-note", onChange: set("note") })}
-      {E.note("Empty kegs only. Beer coming back with a keg, and its credit, is Return shipment. A deposit refund is a separate credit memo.")}
+      {E.info("Empty kegs only. Beer coming back with a keg, and its credit, is Return shipment. A deposit refund is a separate credit memo.")}
     </>
   );
 }

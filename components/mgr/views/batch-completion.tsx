@@ -47,7 +47,7 @@ export function BatchCompletionView({ batches, open, onOpenChange, batchId, prev
       {preview && phase !== "saved" && <p className="text-xs text-muted-foreground">Completing closes every open occupancy. A residual at or above the threshold becomes one automatic loss reconciliation.</p>}
       {acknowledgement && <div className="flex items-center justify-between gap-3"><span>{acknowledgement}</span><fieldset disabled={frozen}>{E.sw(confirmInTank, acknowledgement, onConfirmInTank)}</fieldset></div>}
       {phase === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The batch and request are frozen; retry unchanged to recover the original result.</CommandFormMessage>}
-      {phase === "saved" && <CommandFormMessage tone="warning">Batch completed and saved.</CommandFormMessage>}
+      <div role="status">{E.polite(phase === "saved" ? "Batch completed and saved." : null)}</div>
       <CommandFormMessage error={error} />
       <CommandFormFooter><IrreversibleSubmit label={phase === "unknown" ? "Retry unchanged completion" : phase === "saved" ? "Batch completed" : "Complete batch"}
         reason={reason} submitting={phase === "submitting"} busy="Completing..." disabled={!preview || phase === "saved"} /></CommandFormFooter>

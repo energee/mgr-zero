@@ -84,7 +84,7 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
         <Input id={`loss-state-${loss.adjustment_id}`} value={state} maxLength={2} pattern="[A-Z]{2}" placeholder="PA" disabled={locked} onChange={(event) => setState(event.target.value.toUpperCase())} required />
       </div>}
       {phase === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The amount, target, state, and request ID are frozen. Retry unchanged to recover the saved result.</CommandFormMessage>}
-      {phase === "saved" && <CommandFormMessage tone="warning">Loss reattribution saved.</CommandFormMessage>}
+      <div role="status">{E.polite(phase === "saved" ? "Loss reattribution saved." : null)}</div>
       <CommandFormMessage error={error} />
       <CommandFormFooter>{E.submit(phase === "unknown" ? "Retry unchanged reattribution" : phase === "saved" ? "Saved" : "Save reattribution", {
         reason: phase === "idle" ? reason : null, submitting: phase === "submitting", disabled: phase === "saved",
