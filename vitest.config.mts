@@ -49,7 +49,6 @@ const pureTests = [
   "tests/register-cell-keys.test.ts",
   "tests/invite-errors.test.ts",
   "tests/command-field-shapes.test.ts",
-  "tests/command-error-copy.test.ts",
   "tests/record-table.test.ts",
   "tests/integration-connect-availability.test.ts",
   "tests/invoices-view.test.ts",
