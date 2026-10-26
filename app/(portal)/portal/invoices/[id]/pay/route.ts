@@ -1,5 +1,6 @@
 import { pickedCustomerId, selectCustomerMembership } from "@/lib/portal";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
+import { signInPath } from "@/lib/auth/password";
 import { CommandError, type Ctx } from "@/lib/commands/registry";
 import { QboOAuthClient, qboConfig, qboPaymentFailureCause, resolvePortalInvoicePayment } from "@/lib/qbo";
 
@@ -20,7 +21,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const auth = createRequestAuthContext();
   const identity = await auth.getIdentity();
-  if (!identity) return new Response(null, { status: 303, headers: { ...responseHeaders, Location: new URL("/login", request.url).href } });
+  if (!identity) return new Response(null, { status: 303, headers: { ...responseHeaders, Location: new URL(signInPath(true), request.url).href } });
   const membership = selectCustomerMembership(await auth.getCustomerMemberships(), await pickedCustomerId());
   if (!membership) return new Response(null, { status: 303, headers: { ...responseHeaders, Location: new URL("/no-membership", request.url).href } });
   const ctx: Ctx = {

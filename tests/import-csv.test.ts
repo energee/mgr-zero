@@ -14,6 +14,14 @@ it("skips blank lines, admits a bare quote inside a value, and drops Excel's sep
 it("rejects malformed CSV, ambiguous headers and mismatched widths", () => {
   for (const value of ['a\n"open', 'a\n"closed"oops', 'a,a\n1,2', 'a,b\n1']) expect(() => parseCsv(value)).toThrow();
 });
+it("explains how to fix empty and non-CSV files (#1395)", () => {
+  for (const input of ["", "\n\n", "\uFEFFsep=,\r\n\r\n"]) {
+    expect(() => parseCsv(input)).toThrow("This file is empty. Add a header row and at least one data row.");
+  }
+  for (const input of ["\0", "name\njunk\0", 'name\n"unclosed\0']) {
+    expect(() => parseCsv(input)).toThrow("This file is not a CSV. In Excel or Google Sheets, save it as CSV and choose it again.");
+  }
+});
 it("names the row cap the way the upload step writes it (#1150)", () => {
   expect(() => parseCsv(`a\n${"1\n".repeat(5001)}`)).toThrow("At most 5,000 rows per batch");
 });
