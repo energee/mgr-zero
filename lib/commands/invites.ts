@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { email } from "@/lib/mgr/email";
 import { definePreTenantCommand, definePreTenantQuery, defineCommand, defineQuery, unwrap, STAFF_ROLES, type StaffRole } from "./registry";
 
 // Metadata is also read by docs tooling; load the server-only Auth boundary only on execution.
@@ -6,7 +7,7 @@ import { definePreTenantCommand, definePreTenantQuery, defineCommand, defineQuer
 defineCommand({
   name: "invite_staff",
   description: "Invite staff",
-  input: z.object({ email: z.string().email(), role: z.enum(STAFF_ROLES) }),
+  input: z.object({ email, role: z.enum(STAFF_ROLES) }),
   roles: ["admin"],
   handler: async (ctx, input, execution) => (await import("@/lib/supabase/invites")).inviteStaff(ctx, input, execution),
 });
@@ -14,7 +15,7 @@ defineCommand({
 defineCommand({
   name: "invite_customer_user",
   description: "Invite a customer portal user",
-  input: z.object({ email: z.string().email(), customerId: z.string().uuid() }),
+  input: z.object({ email, customerId: z.string().uuid() }),
   roles: ["admin", "sales"],
   handler: async (ctx, input, execution) => (await import("@/lib/supabase/invites")).inviteCustomerUser(ctx, input, execution),
 });

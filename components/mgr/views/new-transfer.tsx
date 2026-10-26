@@ -68,7 +68,7 @@ export function NewTransferView({
         const errors = touched.shown(index) ? orderLineError({ skuId: line.sku ?? line.title, qty: String(line.qty) }, index, model.lines.length) : {};
         const ids = lineErrorIds(`${id}-${index}`, errors);
         return <div key={`${line.title}:${index}`} className="flex flex-col gap-1">
-          <div className="flex gap-2">
+          <div className="flex min-w-0 gap-2 [&>*]:min-w-0">
             {E.pick(`Line ${index + 1} SKU`, line.sku ?? line.title, model.skuOptions, { onChange: controls.lineSku ? value => controls.lineSku?.(index, value) : undefined, placeholder: "SKU", displayValue: line.title || undefined, hideLabel: true, id: `${id}-sku-${index}`, empty: noSkus(model.skusHref), "aria-invalid": errors.sku ? true : undefined, "aria-describedby": ids.sku })}
             {E.edit(`Line ${index + 1} qty`, String(line.qty), "number", undefined, { onChange: controls.lineQty ? (nextValue: string) => controls.lineQty?.(index, nextValue) : undefined, onBlur: () => touched.touch(index), min: "0", step: "any", hideLabel: true, id: `${id}-${index}-qty`, error: errors.qty })}
             {model.lines.length > 1 ? <Button type="button" variant="ghost" onClick={() => { controls.removeLine?.(index); touched.remove(index); }}>Remove</Button> : null}

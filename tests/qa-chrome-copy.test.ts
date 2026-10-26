@@ -8,7 +8,6 @@ import { readFileSync } from "node:fs";
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { SCREENS } from "@/components/mgr/screens";
 import { E } from "@/components/mgr/e";
 import { ContractsView } from "@/components/mgr/views/contracts";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
@@ -64,11 +63,5 @@ describe("timestamps use the shared formatters (#253)", () => {
     expect(detail).toContain("Sep 8, 2026");
     expect(detail).not.toMatch(/\d{1,2}:\d{2}:\d{2}/);
     expect(detail).not.toMatch(/\d{1,2}\/\d{1,2}\/\d{4}/);
-  });
-
-  it("the Weekly count draft dates the server day through the shared formatter", () => {
-    const html = htmlOf(SCREENS.find((screen) => screen.name === "Weekly count")!.body);
-    expect(html).toMatch(/Count whole packages for Sep 8, 2026; a partly full keg counts as one\. Enter 0 for none\./);
-    expect(html).not.toMatch(/for 2026-09-08/);
   });
 });

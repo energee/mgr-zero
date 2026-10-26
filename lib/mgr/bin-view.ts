@@ -15,7 +15,9 @@ export type BinSnapshot = {
 };
 
 export function toBinViewProps({ name, bins = [], binId, tapBoardHref }: BinSnapshot): BinViewModel {
-  const trimmedName = name.trim();
-  const duplicate = bins.find((bin) => bin.id !== binId && bin.name.trim() === trimmedName);
+  const ownBin = bins.find((bin) => bin.id === binId);
+  if (ownBin?.name === name) return { name, tapBoardHref };
+  const normalizedName = name.trim().toLowerCase();
+  const duplicate = bins.find((bin) => bin.id !== binId && bin.name.trim().toLowerCase() === normalizedName);
   return { name, tapBoardHref, nameError: duplicate ? `A bin named ${duplicate.name.trim()} already exists here` : undefined };
 }
