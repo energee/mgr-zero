@@ -10,7 +10,7 @@ import { toShipToViewProps } from "@/lib/mgr/ship-to-view";
 
 function expectFieldError(html: string, message: string) {
   expect(html).toContain('aria-invalid="true"');
-  const errorId = /aria-describedby="([^"]*-error)"/.exec(html)?.[1];
+  const errorId = [...html.matchAll(/aria-describedby="([^"]*)"/g)].flatMap(match => match[1].split(/\s+/)).find(id => id.endsWith("-error"));
   expect(errorId).toBeDefined();
   expect(html).toContain(`id="${errorId}"`);
   expect(html).toContain(message);
@@ -52,6 +52,25 @@ it("renders invite email corrections instead of native validation tooltips", () 
   const html = renderToStaticMarkup(createElement(InviteView, { buyer: false, email: "a@b", emailError: "Use a complete email address." }));
   expectFieldError(html, "Use a complete email address.");
   expect(html).toContain('noValidate=""');
+});
+
+it("explains where the brewery phone appears and associates that help with the field", () => {
+  const initial = toBrewerySettingsValues({ name: "Brewery", timezone: "America/New_York", ttb_registry_no: null, pa_license_no: null, customer_phone: "", fermentation_reading_due_hours: 24, books_opened_on: null, one_way_keg_fee_cents: 0, days_to_package: 14 });
+  for (const fieldErrors of [{}, { phone: "Use a phone number." }]) {
+    const html = renderToStaticMarkup(createElement(BrewerySettingsFormView, { initial, fieldErrors }));
+    const phone = /<input\b[^>]*type="tel"[^>]*>/.exec(html)?.[0];
+    expect(phone).toBeDefined();
+    const phoneId = /\bid="([^"]*)"/.exec(phone!)?.[1];
+    expect(phoneId).toBeDefined();
+    const descriptions = /aria-describedby="([^"]*)"/.exec(phone!)?.[1].split(/\s+/);
+    expect(descriptions).toContain(`${phoneId}-help`);
+    expect(html).toContain(`id="${phoneId}-help"`);
+    expect(html).toContain("Printed on the portal when online payment is unavailable. Leave empty for none.");
+    if (fieldErrors.phone) {
+      expect(descriptions).toContain(`${phoneId}-error`);
+      expectFieldError(html, fieldErrors.phone);
+    }
+  }
 });
 
 it("maps brewery customerPhone failures to the visible phone field", () => {

@@ -192,5 +192,7 @@
   "20261024213409_cola_identifier_format.sql": "ed01cbc73b0a3c16ec1a963603fcb3d7fe63a6479ac91acf261dd473003040c0",
   "20261024213414_cola_identifier_image_reconciliation.sql": "c4b87434d9458c673b71dfbb5665a2c3963944d0cbf6a9fc9586b29c748bcb0e",
   "20261025050000_cola_label_images.sql": "03aa70a9b53d0755b0fc5d5fab97812cc722767925c3c991d087b55ce41c7b95",
+  "20261025190336_cancel_order_required_reason.sql": "95eead7abe4a6ebc0f29b1dd7176748e3d50d4ec5ae5072efcc60e02949d1985",
+  "20261025195222_bin_case_insensitive_identity.sql": "49b3526d6d5a155c746ced4e50aabcc205600541906df9a2d3965343c38f99c9",
   "20261026061634_adjust_order_lines_required_reason.sql": "9e3374abd808fd486bfa9da753e7e0c568e4b5ab2ddc3f4142d39248cf58af04"
 }

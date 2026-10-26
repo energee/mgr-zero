@@ -15,7 +15,7 @@ export function CellarMapView({ model, transfer, addition, complete }: { model: 
       {transfer !== undefined ? transfer : E.btn("Transfer", model.actionsOff ? "g disabled" : "g")}
       {addition !== undefined ? addition : E.btn("Addition", model.actionsOff ? "g disabled" : "g")}
     </div>
-    {hasVessels && model.actionHint && E.info(model.actionHint)}
+    {model.actionHint && E.info(model.actionHint)}
     {hasVessels && E.link("Start a brew day in Batches", "Batches", model.brewHref)}
     {model.detail && E.nav(model.detail.title, model.detail.description, "", undefined, model.detail.href)}
     {hasVessels

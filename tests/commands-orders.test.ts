@@ -1,6 +1,6 @@
 // tests/commands-orders.test.ts — registry wiring for order commands: roles, validation, rpc passthrough.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, ins, sql, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
+import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, priceSku, sql } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -67,6 +67,49 @@ describe("order commands", () => {
       kind: "wholesale", customerId, shipToId, fromLocationId: whId, lines: [],
     }, adminCtx)).rejects.toMatchObject({ code: "invalid_input" });
   });
+  it("rejects blank cancellation reasons through commands and direct RPC without changing the draft", async () => {
+    const created = await runCommand("create_order", {
+      kind: "wholesale", customerId, shipToId, fromLocationId: whId, lines: [{ skuId, qty: 1 }],
+    }, adminCtx) as { order_id: string };
+    for (const reason of ["", "   ", "\t\r\n", "\u00a0\u2003"]) {
+      await expect(runCommand("cancel_order", { orderId: created.order_id, reason }, adminCtx)).rejects.toMatchObject({ code: "invalid_input" });
+      const result = await adminCtx.db.rpc("cancel_order", { p_order: created.order_id, p_reason: reason, p_request_id: crypto.randomUUID() });
+      expect(result.error?.code).toBe("22023");
+    }
+    const unchanged = await runCommand("get_order", { orderId: created.order_id }, adminCtx) as { order: { status: string }; events: { event: string }[] };
+    expect(unchanged.order.status).toBe("draft");
+    expect(unchanged.events.map(event => event.event)).toEqual(["created"]);
+  });
+
+  it("trims a new cancellation reason and preserves the raw request identity on replay", async () => {
+    const created = await runCommand("create_order", {
+      kind: "wholesale", customerId, shipToId, fromLocationId: whId, lines: [{ skuId, qty: 1 }],
+    }, adminCtx) as { order_id: string };
+    const input = { orderId: created.order_id, reason: " \tCustomer changed plans\n " };
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    const first = await runCommand("cancel_order", input, adminCtx, execution);
+    expect(await runCommand("cancel_order", input, adminCtx, execution)).toEqual(first);
+    await expect(runCommand("cancel_order", { ...input, reason: input.reason.trim() }, adminCtx, execution)).rejects.toThrow();
+    const saved = await runCommand("get_order", { orderId: created.order_id }, adminCtx) as { order: { status: string }; events: { event: string; payload: { reason?: string } }[] };
+    expect(saved.order.status).toBe("cancelled");
+    expect(saved.events.filter(event => event.event === "cancelled")).toEqual([expect.objectContaining({ payload: { reason: "Customer changed plans" } })]);
+  });
+
+  it.each(["   ", " \tHistorical reason\n "])("replays historical raw cancellation reason %j before new-write validation", async reason => {
+    const created = await runCommand("create_order", {
+      kind: "wholesale", customerId, shipToId, fromLocationId: whId, lines: [{ skuId, qty: 1 }],
+    }, adminCtx) as { order_id: string };
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    const payload = JSON.stringify({ order: created.order_id, reason }).replaceAll("'", "''");
+    const result = { order_id: created.order_id };
+    sql(`
+      select private.claim_command_request_for('${adminCtx.userId}', '${b.id}', 'cancel_order', '${execution.requestId}', '${payload}'::jsonb);
+      update public.orders set status = 'cancelled' where id = '${created.order_id}';
+      select private.complete_command_request_for('${adminCtx.userId}', '${execution.requestId}', '${JSON.stringify(result)}'::jsonb);
+    `, true);
+    expect(await runCommand("cancel_order", { orderId: created.order_id, reason }, adminCtx, execution)).toEqual(result);
+  });
+
   it("list_orders filters by status", async () => {
     const { rows } = await runCommand("list_orders", { status: "confirmed" }, adminCtx) as { rows: { status: string }[] };
     expect(rows.every(r => r.status === "confirmed")).toBe(true);

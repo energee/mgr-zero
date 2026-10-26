@@ -19,6 +19,7 @@ vi.mock("@/lib/commands/use-command-form", () => ({ useCommandForm: (_name: stri
 
 import { QuantityForm } from "@/app/(app)/replenishment/quantity-form";
 import { RepackForm } from "@/app/(app)/packaging/repack-form";
+import { BinForm } from "@/app/(app)/locations/bin-form";
 
 beforeEach(() => { harness.values = []; harness.sent = []; });
 
@@ -33,6 +34,25 @@ function submitRepack(qty: string): void {
   const surface = RepackForm({ locations: [{ id: "warehouse", name: "Warehouse" }], bins: [{ id: "bin", location_id: "warehouse", name: "Cold" }], parents: [{ id: "parent", label: "Lantern Pils · case", unit: "case", bblPerUnit: 0.096774, child: { skuId: "child", unit: "four-pack", quantity: 6 } }], formatsHref: "/catalog" });
   surface.props.children.props.onSubmit({ preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as FormEvent);
 }
+
+describe("bin form identity submissions", () => {
+  it("preserves an exact unchanged historical padded name", () => {
+    harness.values = [" dry "];
+    const surface = BinForm({ locationId: "warehouse", bins: [{ id: "own", name: " dry " }, { id: "other", name: "Dry" }], bin: { id: "own", name: " dry " } });
+    surface.props.children.props.onSubmit({ preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as FormEvent);
+    expect(harness.sent).toEqual([{ binId: "own", name: " dry " }]);
+  });
+
+  it("keeps trimming edited names and rejects a conflicting case variant on direct submission", () => {
+    const bins = [{ id: "own", name: " dry " }, { id: "other", name: "Cold" }];
+    for (const name of [" New rack ", " COLD "]) {
+      harness.values = [name];
+      const surface = BinForm({ locationId: "warehouse", bins, bin: bins[0] });
+      surface.props.children.props.onSubmit({ preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as FormEvent);
+    }
+    expect(harness.sent).toEqual([{ binId: "own", name: "New rack" }]);
+  });
+});
 
 describe("quantity form submit boundaries", () => {
   it.each(["par", "standing"] as const)("never sends invalid %s quantities", kind => {

@@ -12,7 +12,7 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { command } from "@/lib/commands/client";
+import { classifyCommandFailure, command } from "@/lib/commands/client";
 import type { BinMoveStock } from "@/lib/commands/inventory";
 import { useBrewery } from "@/lib/brewery-provider";
 import { Button } from "@/components/ui/button";
@@ -49,7 +49,7 @@ export function RepackForm({ locations, bins, parents, formatsHref, autoOpen = f
   useEffect(() => {
     if (!locationId || !form.open) return;
     let live = true;
-    command(breweryId, "get_bin_move_stock", { locationId }).then(data => { if (live) { setStock(data as BinMoveStock[]); setStockError(null); } }).catch(err => { if (live) setStockError(String(err)); });
+    command(breweryId, "get_bin_move_stock", { locationId }).then(data => { if (live) { setStock(data as BinMoveStock[]); setStockError(null); } }).catch(err => { if (live) setStockError(classifyCommandFailure(err).message); });
     return () => { live = false; };
   }, [breweryId, locationId, form.open]);
   const lots = stock.filter((s) => s.kind === "sku" && s.stock_id === parentSkuId && s.bin_id === binId && s.lot_id)

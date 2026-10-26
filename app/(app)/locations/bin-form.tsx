@@ -13,7 +13,10 @@ import { toBinViewProps } from "@/lib/mgr/bin-view";
 export function BinForm({ locationId, bins, bin }: { locationId: string; bins: readonly { id: string; name: string }[]; bin?: { id: string; name: string } }) {
   const [name, setName] = useState(bin?.name ?? "");
   const form = useCommandForm(bin ? "update_bin" : "create_bin", {
-    build: () => (bin ? { binId: bin.id, name: name.trim() } : { locationId, name: name.trim() }),
+    build: () => {
+      if (!bin) return { locationId, name: name.trim() };
+      return { binId: bin.id, name: name === bin.name ? name : name.trim() };
+    },
     reset: () => setName(bin?.name ?? ""),
     target: bin?.id,
   });
