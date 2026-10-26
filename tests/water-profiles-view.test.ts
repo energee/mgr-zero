@@ -74,9 +74,14 @@ describe("water profiles view", () => {
     expect(waterProfileSaveReason({ ...complete, water_ph: "14" })).toBeNull();
     expect(waterProfileSaveReason({ ...complete, sodium_ppm: "-1" })).toMatch(/ions.*ppm/);
     expect(waterProfileSaveReason({ ...complete, alkalinity_ppm: "-1" })).toMatch(/alkalinity.*CaCO3/);
-    for (const water_ph of ["-1", "20"]) {
-      expect(waterProfileSaveReason({ ...complete, water_ph })).toMatch(/water pH.*0.*14/);
+    for (const water_ph of ["-1", "20", "1e3"]) {
+      const reason = waterProfileSaveReason({ ...complete, water_ph });
+      expect(reason).toBe("Still needed: a water pH from 0 to 14.");
+      expect(reason).not.toMatch(/\.\.|Enter/);
     }
+    const combined = waterProfileSaveReason({ ...blank, water_ph: "20" });
+    expect(combined).toBe("Still needed: a profile name, all six ions in ppm from 0 to 999,999.9, and a water pH from 0 to 14.");
+    expect(combined).not.toMatch(/\.\.|Enter/);
   });
   it("links disabled Save to its reason and clears both when requirements are met", () => {
     const blank = renderToStaticMarkup(createElement(WaterProfileView, { fields: toWaterProfileFields() }));
