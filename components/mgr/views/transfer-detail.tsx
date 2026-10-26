@@ -17,10 +17,11 @@ export function TransferDetailView({
   return (
     <>
       {E.back("Transfers", model.title, undefined, model.backHref)}
-      {E.fld(<>From {E.arrow(null)} to</>, <>{model.from} {E.arrow()} {model.to}</>)}
+      {E.fld("From", model.from)}
+      {E.fld("To", model.to)}
       {E.fld("Status", model.status)}
       {model.note ? E.fld("Note", model.note) : null}
-      {model.cancelReason ? E.fld("Cancelled", model.cancelReason) : null}
+      {model.cancelReason ? E.fld("Cancel reason", model.cancelReason) : null}
       {model.lines.map((line) => (
         <div key={line.key}>{E.row(line.title, line.detail, line.qty, model.received ? "ok" : "")}</div>
       ))}
