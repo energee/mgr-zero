@@ -111,9 +111,6 @@ export function kegPoolFieldErrors(v: KegPoolValue): Partial<Record<keyof KegPoo
   return errors;
 }
 
-export const kegEventReady = (v: KegEventValue) => Object.keys(kegEventFieldErrors(v)).length === 0;
-export const kegPoolReady = (v: KegPoolValue) => Object.keys(kegPoolFieldErrors(v)).length === 0;
-
 /** Why Record keg event is not offered, or null when it is: an event needs a pool in service and a location. */
 export function kegEventUnavailable({ activePools, locations }: { activePools: number; locations: number }): string | null {
   const missing = [activePools ? null : "a keg pool in service", locations ? null : "a location"].filter(Boolean);

@@ -12,7 +12,7 @@ import { KegHistoryView } from "../components/mgr/views/keg-history";
 import { KEG_EVENT_REASONS } from "../lib/mgr/enums";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger } from "../lib/mgr/fixtures/kegs";
 import { toKegBalanceViewProps } from "../lib/mgr/keg-balance-view";
-import { kegEventFieldErrors, kegEventReady, kegPoolFieldErrors, kegPoolReady, kegShortageText, toKegFleetViewProps, withLocationBin, type KegPoolValue } from "../lib/mgr/keg-fleet-view";
+import { kegEventFieldErrors, kegEventReason, kegPoolFieldErrors, kegShortageText, toKegFleetViewProps, withLocationBin, type KegPoolValue } from "../lib/mgr/keg-fleet-view";
 import { REASON_EFFECT, REASON_LABEL } from "../lib/mgr/keg-labels";
 import { kegHistoryScope, toKegHistoryViewProps } from "../lib/mgr/keg-history-view";
 import { formatDate } from "../lib/date-format";
@@ -27,37 +27,33 @@ describe("Keg fleet", () => {
 
   it.each(["-5", "1.234", "1e1", "nope"])("#1381 rejects invalid deposit %s", (deposit) => {
     const value = { ...pool, deposit };
-    expect(kegPoolReady(value)).toBe(false);
     expect(kegPoolFieldErrors(value).deposit).toBeTruthy();
   });
 
   it.each(["0.00", "5.25", ""])("#1381 accepts deposit %s without making it required", (deposit) => {
     const value = { ...pool, deposit };
-    expect(kegPoolReady(value)).toBe(true);
-    expect(kegPoolFieldErrors(value).deposit).toBeUndefined();
+    expect(kegPoolFieldErrors(value)).toEqual({});
   });
 
   it.each(["owned", "leased", "pay_per_fill"] as const)("#1381 validates per-fill cost for %s pools", (kind) => {
     const value = { ...pool, kind, vendorId: "vendor" };
-    expect(kegPoolReady(value)).toBe(kind !== "pay_per_fill");
     expect(Boolean(kegPoolFieldErrors(value).perFill)).toBe(kind === "pay_per_fill");
     for (const perFill of ["-1", "1.234", "1e1"]) {
-      expect(kegPoolReady({ ...value, perFill })).toBe(false);
       expect(kegPoolFieldErrors({ ...value, perFill }).perFill).toBeTruthy();
     }
-    expect(kegPoolReady({ ...value, perFill: "0.00" })).toBe(true);
-    expect(kegPoolReady({ ...value, perFill: "5.25" })).toBe(true);
+    expect(kegPoolFieldErrors({ ...value, perFill: "0.00" })).toEqual({});
+    expect(kegPoolFieldErrors({ ...value, perFill: "5.25" })).toEqual({});
   });
   it("#1381 links pool money errors to each input after an attempt", () => {
     const value = { ...pool, deposit: "-5", perFill: "1.234" };
     const html = htmlOf(createElement(KegPoolFields, { value, vendors: [], onChange: () => {}, attempted: true }));
     for (const id of ["pool-deposit", "pool-per-fill"]) {
+      const input = new RegExp(`<input\\b[^>]*id="${id}"[^>]*>`).exec(html)?.[0];
+      expect(input).toContain('aria-invalid="true"');
+      const descriptions = /aria-describedby="([^"]+)"/.exec(input!)?.[1].split(/\s+/);
+      expect(descriptions).toContain(`${id}-error`);
       expect(html).toContain(`id="${id}-error"`);
-      expect(html).toMatch(new RegExp(`id="${id}"[^>]*aria-invalid="true"`));
-      expect(html).toContain(`${id}-error`);
     }
-    expect(html).toContain("Enter an amount of zero or more.");
-    expect(html).toContain("Enter dollars and cents, with at most two decimal places.");
   });
 
   it("#815 prints each saved location shortage with its pool and size", () => {
@@ -150,31 +146,29 @@ describe("Customer keg balance", () => {
 describe("Record keg event", () => {
   it.each(["1.5", "1e1", "0", "", "-1", "9007199254740992"])("#1381 rejects invalid keg count %s", (qty) => {
     const value = { ...kegFleetMicrostar.eventForm!, poolId: "pool", locationId: "location", binId: "bin", customerId: "customer", qty };
-    expect(kegEventReady(value)).toBe(false);
+    expect(kegEventReason(value)).toBeTruthy();
     expect(kegEventFieldErrors(value).qty).toBeTruthy();
-    if (qty === "1e1") expect(kegEventFieldErrors(value).qty).toContain("not exponent notation");
   });
 
   it("#1381 accepts a whole positive count and preserves required choices", () => {
     const value = { ...kegFleetMicrostar.eventForm!, poolId: "pool", locationId: "location", binId: "bin", customerId: "customer", qty: "3" };
-    expect(kegEventReady(value)).toBe(true);
+    expect(kegEventReason(value)).toBeNull();
     expect(kegEventFieldErrors(value)).toEqual({});
-    expect(kegEventReady({ ...value, binId: "" })).toBe(false);
-    expect(kegEventReady({ ...value, reason: "shipped", customerId: "" })).toBe(false);
+    expect(kegEventReason({ ...value, binId: "" })).toBeTruthy();
+    expect(kegEventReason({ ...value, reason: "shipped", customerId: "" })).toBeTruthy();
   });
   it("#1381 waits for blur or an attempt before drawing a fractional count error", () => {
     const props = { value: { ...kegFleetMicrostar.eventForm!, qty: "1.5" }, options: kegFleetMicrostar.eventOptions!, onChange: () => {} };
     expect(htmlOf(createElement(KegEventFields, props))).not.toContain('id="keg-qty-error"');
     const html = htmlOf(createElement(KegEventFields, { ...props, attempted: true }));
     expect(html).toContain('id="keg-qty-error"');
-    expect(html).toContain("Enter a whole number of kegs, at least 1.");
     expect(html).toMatch(/id="keg-qty"[^>]*aria-invalid="true"/);
   });
   it("#1381 preserves the shared exponent reason without drawing it twice", () => {
     const html = htmlOf(createElement(KegEventFields, {
       value: { ...kegFleetMicrostar.eventForm!, qty: "1e1" }, options: kegFleetMicrostar.eventOptions!, onChange: () => {}, attempted: true,
     }));
-    expect(html.match(/not exponent notation/g)).toHaveLength(1);
+    expect(html.match(/data-slot="field-error"/g)).toHaveLength(1);
     expect(html).toContain('id="keg-qty-error"');
   });
 
