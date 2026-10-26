@@ -69,7 +69,7 @@ export function PriceCellForm({
       disabled={action.busy || action.blocked} error={action.error} status={status}>
       {persisted !== "" && (
         <PriceCellClear groupName={groupName} formatName={formatName} channelName={channelName}
-          busy={action.busy} reason={action.blocked ? "Resolve the saved request before clearing this price." : null} error={action.error}
+          busy={action.busy} reason={action.blocked && !action.busy ? "Resolve the saved request before clearing this price." : null} error={action.error}
           onDelete={() => save("clear_channel_price", ids, "")} />
       )}
     </PriceCellInput>

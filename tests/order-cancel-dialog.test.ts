@@ -19,6 +19,33 @@ vi.mock("@/components/mgr/command-form", async (original) => {
 import { ConfirmOrderForm } from "@/app/(app)/orders/[id]/confirm/confirm-buttons";
 import { orderSubmittedRidgeline } from "@/lib/mgr/fixtures/orders";
 import { BatchCompletionForm } from "@/app/(app)/cellar/batch-completion-form";
+import { CancelOrderDialog } from "@/app/(app)/orders/[id]/cancel-order-dialog";
+import { CancelOrderControl } from "@/components/mgr/views/cancel-order";
+import { OrderView, OrderCancelRow, CancelOrderButton } from "@/components/mgr/views/order";
+import { ConfirmOrderView } from "@/components/mgr/views/confirm-order";
+import { SCREENS } from "@/components/mgr/screens";
+import type { ReactElement } from "react";
+import type { OrderViewModel } from "@/lib/mgr/order-view";
+import type { ConfirmOrderViewModel } from "@/lib/mgr/confirm-order-view";
+
+it("mounts the same cancellation control and CommandForm from the inventory and live adapters", () => {
+  const inventory = SCREENS.find(screen => screen.name === "Order draft")!.body as ReactElement<{ model: OrderViewModel }>;
+  expect(inventory.type).toBe(OrderView);
+  const view = OrderView(inventory.props);
+  const row = view.props.children.find((child: ReactElement) => child?.type === OrderCancelRow);
+  expect(row.props.children.type).toBe(CancelOrderControl);
+  expect(row.props.children.props.onCancel).toBeUndefined();
+  const confirmInventory = SCREENS.find(screen => screen.name === "Confirm order")!.body as ReactElement<{ model: ConfirmOrderViewModel }>;
+  expect(confirmInventory.type).toBe(ConfirmOrderView);
+  const confirm = ConfirmOrderView(confirmInventory.props);
+  const footer = confirm.props.children.at(-1) as ReactElement<{ children: ReactElement[] }>;
+  expect(footer.props.children[1].type).toBe(CancelOrderControl);
+  expect(CancelOrderButton({}).props["data-preview-action"]).toBe(true);
+  const live = CancelOrderDialog({ orderId: "order", action: action as never, trigger: null, onCancelled: vi.fn() });
+  expect(live.type).toBe(CancelOrderControl);
+  renderToStaticMarkup(createElement(CancelOrderControl, { trigger: null }));
+  expect((form.children as ReactElement).type).toBe("form");
+});
 
 beforeEach(() => { action.busy = false; action.error = null; action.setError.mockClear(); });
 
