@@ -840,6 +840,8 @@ Every affected filed period is marked **Needs amendment** in Compliance, includi
 
 Choose the **State** from the two-letter state picker. **Save license** explains any missing state or kind beside the button; number and expiry are optional. **Cancel** closes the dialog without saving. The empty list explains that license records keep state license numbers and expiry dates together. Record the brewery’s federal TTB registry number in **Settings**, not as a state license.
 
+A license whose expiry is before today in the brewery's timezone is marked **expired** with a warning. A license expiring today is not yet expired. In **Edit license**, **Delete license** asks you to confirm before removing a mistaken record.
+
 Each movement shows its actual bin and recorded barrels. Returns link to the original shipped movement and the credit memo; damaged losses link to their return movement.
 
 <Screen name="Lot trace" />
@@ -860,9 +862,13 @@ A lot is one closed packaging run. Its trace shows the brand and package, the ru
 
 A pool is one group of kegs you count together: **Owned**, **Leased**, or **Pay per fill**. **Add keg pool** takes the name, the kind, the vendor for a leased or pay-per-fill pool, the per-fill cost, and the deposit charged per keg. **Per-fill cost** is labeled **required** for a **Pay per fill** pool and **optional** for an **Owned** or **Leased** pool. An optional blank cost shows **Not set**: it is missing, not $0.00. Enter 0.00 only when the cost is known to be zero. **Deposit per keg** is charged on wholesale orders for each keg from the pool; it starts at 0.00, which means no deposit. **Edit** on a pool row changes its name, vendor, costs, or deposit, or turns **In service** off to take it out of service; a pool out of service accepts no more events. An owned pool has no vendor, so its Vendor row reads **None · the brewery owns these kegs**. The kind cannot change after creation, and a per-fill cost or vendor once set can be changed but not removed; on **Edit**, the per-fill help says so.
 
+Deposit and per-fill cost take zero or more, in dollars and cents with at most two decimal places; exponent notation is not accepted.
+
 ### Record a keg event
 
-**Record keg event** posts one line to the keg ledger. Its **Record keg event** button stays at the bottom of the form while the fields scroll. Choose the pool, the size, the reason (**Acquired**, **Retired**, **Shipped**, **Returned**, **Lost**, or **Found**), the location and bin the kegs are at (the first bin is preselected), and how many kegs. Until the form is complete, the line beside the button names what is still needed, such as *Still needed: a location, a bin, and a keg count above zero.* The **Reason** picker says under it what the chosen reason does to the kegs:
+**Kegs** must be a whole number, at least 1, without exponent notation; the button says what is still needed before you can record the event.
+
+**Record keg event** posts one line to the keg ledger. Its **Record keg event** button stays at the bottom of the form while the fields scroll. Choose the pool, the size, the reason (**Acquired**, **Retired**, **Shipped**, **Returned**, **Lost**, or **Found**), the location and bin the kegs are at (the first bin is preselected), and how many kegs. Until the form is complete, the line beside the button names what is still needed, such as *Still needed: a location and a bin.* The **Reason** picker says under it what the chosen reason does to the kegs:
 
 - **Acquired** and **Retired** add kegs to or remove them from the fleet at that bin. No customer.
 - **Shipped** and **Returned** move empty kegs to or from a customer; the customer is required. Shipped names the bin they left from, Returned the bin they came back into. The fleet total does not change.
@@ -1182,6 +1188,10 @@ Below the vendors, **Contracts** lists commitments: one vendor, one material, a 
 
 **Add contract** needs a vendor and a material to exist first. With no vendors yet, the form's **Vendor** picker says **No vendors yet. Close this form and choose Add vendor.** With no materials yet, its **Material** picker says **No materials yet.** with **Add a material**, which opens **Materials**.
 
+**Quantity** must be above zero, as a whole or decimal number without exponent notation. **Unit cost ($)** is optional and must be zero or more when entered. After you leave either field, invalid entries show **Enter a quantity above zero.** or **Enter a cost of zero or more.** beside it. **Save contract** stays unavailable while required fields are missing or either number is invalid, including exponent notation such as `1e3`.
+
+In **Edit contract**, **Delete contract** asks for confirmation and removes an unused contract. A contract linked to a purchase order cannot be deleted; MGR asks you to set an end date instead, so the purchase order keeps its contract history.
+
 ### Materials
 
 <Screen name="Materials on hand" />
@@ -1484,7 +1494,7 @@ Do not hunt for hidden controls for these:
 - recording a payment on an invoice QuickBooks received (record it in QuickBooks; see [Record a payment in MGR](#record-payment) for the invoices that take one here)
 - adding an ingredient on a planned batch's **Brew day** tab (record the brew, then use **Correct turn**), or changing a saved or prefilled source on **Prep** (use **Edit** on Brew day)
 - a printed lot trace packet
-- an order-confirmation warning from licenses and registrations, or deleting an approval, registration, or license
+- an order-confirmation warning from licenses and registrations, or deleting an approval or registration
 - filing a state or other non-TTB report, or a period other than a calendar month, quarter, or year, from the interface (the API accepts any non-TTB jurisdiction and range)
 
 Ask the person who configures your brewery when one of these is required.
