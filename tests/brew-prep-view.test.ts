@@ -1,7 +1,7 @@
 // tests/brew-prep-view.test.ts — the brew prep pull list and the brew-day
 // timeline's pure rules (lib/mgr/brew-prep-view.ts).
 import { describe, expect, it } from "vitest";
-import { anyPulled, brewIngredients, confirmAll, brewPullsPayload, brewTargets, canRecordTimeline, canSavePrep, currentStage, isShort, laterAdditions, openBrewTab, pullDetail, pullTone, sourceChoices, showsPacks, stageProgress, startAtPlan, timelineRecordPayload, timelineStages, timelineTone, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
+import { anyPulled, brewIngredients, confirmAll, brewPullsPayload, brewTargets, currentStage, isShort, laterAdditions, openBrewTab, prepReason, pullDetail, pullTone, sourceChoices, showsPacks, stageProgress, startAtPlan, timelineReason, timelineRecordPayload, timelineStages, timelineTone, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { BrewMaterialSource, BrewPlan, BrewPull } from "@/lib/mgr/brew-day-view";
 
 const chit: BrewIngredient = startAtPlan({ key: "chit", name: "Chit Malt", materialId: "chit", stage: "mash", plan: 220, unit: "lb", packSize: 50, source: null });
@@ -66,28 +66,28 @@ describe("timeline", () => {
     expect(currentStage({ ...timeline, ingredients: [{ ...chit, confirmed: true }, hops] })).toBe("whirlpool");
   });
   it("records only when every ingredient is confirmed and knockout is valid", () => {
-    expect(canRecordTimeline(sourced)).toBe(true);
-    expect(canRecordTimeline({ ...sourced, ingredients: [oats, { ...hops, confirmed: true }] })).toBe(false);
-    for (const patch of [{ initialBbl: "0" }, { initialBbl: "" }, { vesselId: "missing" }, { brewedOn: "" }]) expect(canRecordTimeline({ ...sourced, ...patch })).toBe(false);
+    expect(timelineReason(sourced)).toBeNull();
+    expect(timelineReason({ ...sourced, ingredients: [oats, { ...hops, confirmed: true }] })).not.toBeNull();
+    for (const patch of [{ initialBbl: "0" }, { initialBbl: "" }, { vesselId: "missing" }, { brewedOn: "" }]) expect(timelineReason({ ...sourced, ...patch })).not.toBeNull();
   });
   it("refuses a pulled ingredient without a source, but not one pulled to zero", () => {
-    expect(canRecordTimeline(timeline)).toBe(false);
-    expect(canRecordTimeline({ ...timeline, ingredients: [{ ...chit, packs: "0", loose: "", confirmed: true }, { ...hops, confirmed: true }] })).toBe(true);
+    expect(timelineReason(timeline)).not.toBeNull();
+    expect(timelineReason({ ...timeline, ingredients: [{ ...chit, packs: "0", loose: "", confirmed: true }, { ...hops, confirmed: true }] })).toBeNull();
   });
   it("refuses a negative or non-numeric pull", () => {
-    expect(canRecordTimeline({ ...sourced, ingredients: [{ ...hops, packs: "-1", confirmed: true }] })).toBe(false);
-    expect(canRecordTimeline({ ...sourced, ingredients: [{ ...hops, loose: "abc", confirmed: true }] })).toBe(false);
+    expect(timelineReason({ ...sourced, ingredients: [{ ...hops, packs: "-1", confirmed: true }] })).not.toBeNull();
+    expect(timelineReason({ ...sourced, ingredients: [{ ...hops, loose: "abc", confirmed: true }] })).not.toBeNull();
   });
   it("records nothing pulled only when the brewer confirms no ingredients were used", () => {
     const none = { ...sourced, ingredients: [{ ...hops, packs: "0", loose: "0", confirmed: true }] };
-    expect(canRecordTimeline(none)).toBe(false);
-    expect(canRecordTimeline({ ...none, confirmEmpty: true })).toBe(true);
-    expect(canRecordTimeline({ ...sourced, ingredients: [], confirmEmpty: true })).toBe(true);
+    expect(timelineReason(none)).not.toBeNull();
+    expect(timelineReason({ ...none, confirmEmpty: true })).toBeNull();
+    expect(timelineReason({ ...sourced, ingredients: [], confirmEmpty: true })).toBeNull();
   });
   it("refuses pulls that together exceed what their source holds, or a source no longer in stock", () => {
     const twice = { ...sourced, ingredients: [{ ...oats, confirmed: true }, { ...oats, key: "oats-2", confirmed: true }] };
-    expect(canRecordTimeline(twice)).toBe(false);
-    expect(canRecordTimeline({ ...sourced, sources: [onHand("ns", "freezer", "f1", "ns-1")] })).toBe(false);
+    expect(timelineReason(twice)).not.toBeNull();
+    expect(timelineReason({ ...sourced, sources: [onHand("ns", "freezer", "f1", "ns-1")] })).not.toBeNull();
   });
   it("turns a confirmed row green only when it has a source within stock", () => {
     expect(timelineTone({ ...hops, confirmed: true }, timeline.sources)).toBe("ok");
@@ -198,7 +198,7 @@ describe("sourceChoices", () => {
   it("gives the source a picked choice sets on the line", () => {
     const [, second] = sourceChoices(sources, "chit");
     expect(second.source).toEqual({ lot: "C-2", bin: "Malt room / A2", materialId: "chit", locationId: "malt-room", binId: "a2", lotId: "c-2" });
-    expect(canRecordTimeline({ ...timeline, sources: [...timeline.sources!, ...sources], ingredients: [{ ...chit, source: second.source, confirmed: true }, { ...hops, confirmed: true }] })).toBe(true);
+    expect(timelineReason({ ...timeline, sources: [...timeline.sources!, ...sources], ingredients: [{ ...chit, source: second.source, confirmed: true }, { ...hops, confirmed: true }] })).toBeNull();
   });
 });
 
@@ -214,17 +214,17 @@ describe("laterAdditions", () => {
 
 const prep: BrewPrepViewModel = { title: "BAT-1", vesselId: "fv1", vessels: [], ingredients: [hops, oats], later: "None" };
 
-describe("canSavePrep", () => {
+describe("prepReason", () => {
   it("saves when every line has a source", () => {
-    expect(canSavePrep(prep)).toBe(true);
+    expect(prepReason(prep)).toBeNull();
   });
   it("refuses an unsourced line unless it is pulled to zero", () => {
-    expect(canSavePrep({ ...prep, ingredients: [hops, chit] })).toBe(false);
-    expect(canSavePrep({ ...prep, ingredients: [hops, { ...chit, packs: "0", loose: "" }] })).toBe(true);
+    expect(prepReason({ ...prep, ingredients: [hops, chit] })).not.toBeNull();
+    expect(prepReason({ ...prep, ingredients: [hops, { ...chit, packs: "0", loose: "" }] })).toBeNull();
   });
   it("refuses negative or non-numeric amounts", () => {
-    expect(canSavePrep({ ...prep, ingredients: [{ ...hops, packs: "-1" }] })).toBe(false);
-    expect(canSavePrep({ ...prep, ingredients: [{ ...hops, loose: "abc" }] })).toBe(false);
+    expect(prepReason({ ...prep, ingredients: [{ ...hops, packs: "-1" }] })).not.toBeNull();
+    expect(prepReason({ ...prep, ingredients: [{ ...hops, loose: "abc" }] })).not.toBeNull();
   });
 });
 

@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
+import { E } from "@/components/mgr/e";
+import { submitReason } from "@/lib/mgr/submit-reason";
 import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
 import { command, CommandResponseError } from "@/lib/commands/client";
 import { canRetireCommandFailure } from "@/lib/commands/failure";
@@ -37,13 +39,18 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
   const locked = phase === "submitting" || phase === "unknown" || phase === "saved";
   const amountUnits = bblUnits(amount);
   const remainingUnits = bblUnits(loss.remaining_bbl);
-  const valid = amountUnits !== null && remainingUnits !== null && amountUnits <= remainingUnits && (target !== "sample" || /^[A-Z]{2}$/.test(state));
+  // What a new allocation still needs; a retry resends its frozen request, so only an idle form names one.
+  const reason = phase !== "idle" ? null : submitReason([
+    ...(amountUnits === null ? ["a BBL amount above zero with up to 8 decimal places"]
+      : remainingUnits === null || amountUnits > remainingUnits ? [`a BBL amount of at most ${loss.remaining_bbl}`] : []),
+    ...(target === "sample" && !/^[A-Z]{2}$/.test(state) ? ["a two-letter destination state"] : []),
+  ]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     const retrying = phase === "unknown";
     if (!retrying) {
-      if (!valid) return;
+      if (reason) return;
       requestId.current = crypto.randomUUID();
       payload.current = { adjustmentId: loss.adjustment_id, bbl: amount, classification: target, ...(target === "sample" ? { destinationState: state } : {}) };
     }
@@ -91,7 +98,9 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
       {phase === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The amount, target, state, and request ID are frozen. Retry unchanged to recover the saved result.</CommandFormMessage>}
       {phase === "saved" && <CommandFormMessage tone="warning">Loss reattribution saved.</CommandFormMessage>}
       <CommandFormMessage error={error} />
-      <CommandFormFooter><Button type="submit" disabled={phase === "submitting" || phase === "saved" || (!valid && phase !== "unknown")}>{phase === "unknown" ? "Retry unchanged reattribution" : phase === "submitting" ? "Saving…" : phase === "saved" ? "Saved" : "Save reattribution"}</Button></CommandFormFooter>
+      <CommandFormFooter>{E.submit(phase === "unknown" ? "Retry unchanged reattribution" : phase === "saved" ? "Saved" : "Save reattribution", {
+        reason, submitting: phase === "submitting", disabled: phase === "saved",
+      })}</CommandFormFooter>
     </form>
   </CommandForm>;
 }

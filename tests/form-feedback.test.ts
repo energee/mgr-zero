@@ -32,6 +32,11 @@ import { VesselForm } from "@/app/(app)/batches/vessel-form";
 import { vesselFv3 } from "@/lib/mgr/fixtures/production";
 import { ContractView } from "@/components/mgr/views/contract";
 import { contractYchCitra } from "@/lib/mgr/fixtures/purchasing";
+import { prepReason, timelineReason, type BrewIngredient, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
+import { packagingCloseReason } from "@/lib/mgr/close-packaging-run-view";
+import { kegEventReason } from "@/lib/mgr/keg-fleet-view";
+import { additionReason, mashStepReason, stageReason } from "@/lib/mgr/recipe-process-view";
+import { shipReason, type ShippingSnapshot } from "@/app/(app)/orders/[id]/ship-form";
 
 // The live forms render without a router or a command round trip.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {} }) }));
@@ -172,6 +177,69 @@ describe("per-form reasons", () => {
   it("Pick sheet print is withheld while the sheet is empty (#1128)", () => {
     expect(pickSheetPrintReason({ groups: [], empty: { title: "Nothing confirmed to pick", description: "" } })).toBe("Nothing to print yet.");
     expect(pickSheetPrintReason({ groups: [{ key: "d", title: "d", rows: [], totals: [] }] })).toBeNull();
+  });
+
+  const malt: BrewIngredient = { key: "m", name: "Pils malt", materialId: "malt", stage: "mash", plan: 100, unit: "lb", packSize: 1, source: null, packs: "100", loose: "0" };
+  const sourcedMalt: BrewIngredient = { ...malt, source: { materialId: "malt", locationId: "l", binId: "b", lotId: null, lot: null, bin: "Malt room / A1" } };
+  const maltStock = { material_id: "malt", material_name: "Pils malt", unit: "lb", location_id: "l", location_name: "Malt room", bin_id: "b", bin_name: "A1", lot_id: null, lot_code: null, qty: 300 };
+
+  it("Done pulling names the ingredient without a source or with a bad amount (#1122)", () => {
+    const prep = { title: "B1", vesselId: "", vessels: [], ingredients: [malt], later: "None" };
+    expect(prepReason(prep)).toBe("Still needed: a source for Pils malt.");
+    expect(prepReason({ ...prep, ingredients: [{ ...sourcedMalt, packs: "-1" }] })).toBe("Still needed: pulled amounts of zero or more for Pils malt.");
+    expect(prepReason({ ...prep, ingredients: [sourcedMalt] })).toBeNull();
+    expect(prepReason({ ...prep, ingredients: [{ ...malt, packs: "0" }] })).toBeNull();
+  });
+
+  it("Record brew day names unconfirmed and unsourced rows, the stock, the empty confirmation and the knockout fields (#1122)", () => {
+    const timeline: BrewTimelineViewModel = {
+      title: "B1", ingredients: [{ ...sourcedMalt, confirmed: true }], targets: {}, process: {}, sources: [maltStock],
+      vesselId: "fv1", vessels: [{ id: "fv1", name: "FV1", kind: "fermenter", capacity_bbl: 20 }], initialBbl: "10", brewedOn: "2026-10-25",
+    };
+    expect(timelineReason(timeline)).toBeNull();
+    expect(timelineReason({ ...timeline, ingredients: [{ ...malt, confirmed: true }] })).toBe("Still needed: a source for Pils malt.");
+    expect(timelineReason({ ...timeline, ingredients: [sourcedMalt] })).toBe("Still needed: every ingredient confirmed.");
+    expect(timelineReason({ ...timeline, sources: [{ ...maltStock, qty: 50 }] })).toBe("Still needed: pulls within the stock on hand.");
+    expect(timelineReason({ ...timeline, ingredients: [] })).toBe("Still needed: a pulled ingredient or Confirm no ingredients used.");
+    expect(timelineReason({ ...timeline, ingredients: [], confirmEmpty: true })).toBeNull();
+    expect(timelineReason({ ...timeline, vesselId: "", initialBbl: "0", brewedOn: "" }))
+      .toBe("Still needed: a knockout vessel, knockout barrels above zero, and a brew date.");
+  });
+
+  it("Close packaging run names every missing field and the material actuals (#1122)", () => {
+    const plan = { revision: "r", planned: [], sources: [], materials: [], lots: [] };
+    const filled = { bblDrawn: "3.5", outputs: [{ id: "a", name: "Hazy case", qty: "60" }], lotCode: "L1", packagedOn: "2026-10-25", bestBy: "", locationId: "loc", binId: "bin", locations: [], bins: [], plan, actuals: [] };
+    expect(packagingCloseReason(filled)).toBeNull();
+    expect(packagingCloseReason({ ...filled, bblDrawn: "", outputs: [{ id: "a", name: "Hazy case", qty: "" }], lotCode: " ", packagedOn: "", locationId: "", binId: "" }))
+      .toBe("Still needed: barrels drawn above zero, an actual count for every output, a lot code, a packaged-on date, a finished goods location, and a finished goods bin.");
+    const planned = { ...plan, planned: [{ materialId: "cans", name: "Cans", unit: "each", lotTracked: false, qty: 240 }], materials: [{ id: "cans", name: "Cans", unit: "each", lotTracked: false }] };
+    expect(packagingCloseReason({ ...filled, plan: planned })).toBe("Still needed: complete material actuals for every planned material.");
+  });
+
+  it("Record keg event names the pool, location, bin, count and a needed customer (#1122)", () => {
+    const value = { poolId: "p", kegSize: "half_bbl" as const, reason: "shipped" as const, locationId: "l", binId: "b", customerId: "c", qty: "2", note: "" };
+    expect(kegEventReason(value)).toBeNull();
+    expect(kegEventReason({ ...value, poolId: "", locationId: "", binId: "", customerId: "", qty: "0" }))
+      .toBe("Still needed: a keg pool, a location, a bin, a keg count above zero, and a customer.");
+    expect(kegEventReason({ ...value, reason: "found", customerId: "" })).toBeNull();
+  });
+
+  it("the recipe schedule sheets name a blank name, temperature, duration or amount (#1122)", () => {
+    expect(stageReason({ name: "", kind: "primary", tempF: "", days: "0" })).toBe("Still needed: a stage name, a temperature, and a duration above zero.");
+    expect(stageReason({ name: "Primary", kind: "primary", tempF: "66", days: "7" })).toBeNull();
+    expect(mashStepReason({ name: " ", kind: "infusion", tempF: "152", minutes: "" })).toBe("Still needed: a step name and a duration above zero.");
+    expect(mashStepReason({ name: "Sacch", kind: "infusion", tempF: "152", minutes: "60" })).toBeNull();
+    expect(additionReason({ materialId: "", qty: "", unit: "g", stage: "mash" })).toBe("Still needed: a material and an amount above zero.");
+    expect(additionReason({ materialId: "gypsum", qty: "5", unit: "g", stage: "mash" })).toBeNull();
+  });
+
+  it("Ship order names each line with a quantity and no source (#1122)", () => {
+    const lines: ShippingSnapshot["lines"] = [
+      { id: "a", sku_id: "sku-a", qty_ordered: 3, qty_picked: 3, qty_shipped: null, skus: { name: "Hazy IPA case" } },
+      { id: "b", sku_id: "sku-b", qty_ordered: 2, qty_picked: 2, qty_shipped: null, skus: { name: "Pils keg" } },
+    ];
+    expect(shipReason(lines, { a: "3", b: "0" }, {})).toBe("Still needed: a source for Hazy IPA case.");
+    expect(shipReason(lines, { a: "3", b: "0" }, { a: [{ key: "bin:", qty: "3", toBinId: "" }] })).toBeNull();
   });
 });
 

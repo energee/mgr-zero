@@ -59,7 +59,8 @@ describe("Oct 23 settings field validation (#1121)", () => {
     expectAssociatedError(html, "Lead time (days)", "Enter a whole number of days, zero or more.");
   });
 
-  it("disables invalid staff invitations and prevents their submit callback", () => {
+  // Send invite stays enabled so a click marks the email field (#1122); the submit still refuses the invalid email.
+  it("keeps Send invite enabled for an invalid staff invitation but prevents its submit callback", () => {
     expect(emailError("")).toBeTruthy();
     expect(emailError("not-an-email")).toBeTruthy();
     expect(emailError("person@example.com")).toBeUndefined();
@@ -68,7 +69,7 @@ describe("Oct 23 settings field validation (#1121)", () => {
     function Harness() { return tree = InviteView({ buyer: false, defaultEmail: "not-an-email", onSubmit }); }
     renderToStaticMarkup(createElement(Harness));
     const nodes = elements(tree!);
-    expect(nodes.find(node => node.props.type === "submit")?.props.disabled).toBe(true);
+    expect(nodes.find(node => node.props.type === "submit")?.props.disabled).toBe(false);
     (nodes.find(node => node.type === "form")!.props.onSubmit as (event: unknown) => void)({ preventDefault: vi.fn() });
     expect(onSubmit).not.toHaveBeenCalled();
   });
