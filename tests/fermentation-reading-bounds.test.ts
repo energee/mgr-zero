@@ -101,7 +101,7 @@ describe("fermentation reading bounds (#468)", () => {
     const values = { observedAt: "2026-10-25T10:00:00", tempF: "66", gravity: "1050", ph: "0", note: "" };
     expect(readingValidation(values, "sg").measurements).toEqual({ tempF: 66, gravityPlato: parseGravity("1050", "sg"), ph: 0 });
     const html = renderToStaticMarkup(createElement(FermentationReadingView, {
-      formId: "f", unit: "sg", identity: { vessel: "FV3" }, values: { ...values, ph: "15" },
+      formId: "f", unit: "sg", timeZone: "America/New_York", identity: { vessel: "FV3" }, values: { ...values, ph: "15" },
     }));
     const input = html.match(/<input[^>]*id="fr-ph"[^>]*>/)?.[0];
     expect(input).toContain('aria-invalid="true"');
