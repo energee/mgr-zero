@@ -253,7 +253,7 @@ Claude-Session: https://claude.ai/code/session_01W3iwFZVppJtk5cEvdUbnsF"
 ### Task 3: Draft helpers: profile ions, stage split, merge
 
 **Files:**
-- Modify: `lib/mgr/recipe-process-view.ts` (append after `additionReady`)
+- Modify: `lib/mgr/recipe-process-view.ts` (append after `additionReady`, renamed `additionReason` in #1122)
 - Test: `tests/recipe-process-view.test.ts` (append a `describe`)
 
 **Interfaces:**

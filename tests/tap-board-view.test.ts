@@ -33,6 +33,27 @@ it("retains both keg actions without nesting buttons or inventing yield bars", (
   expect(isInertOn(SCREENS.find(screen => screen.name === "Tap board")!, "Tap keg")).toBe(true);
 });
 
+it("shows own and guest kegs in server order with the same opening date (#1383)", () => {
+  const own = tapBoard.snapshot.open[0];
+  const guest = { ...tapBoard.snapshot.open.find(tap => !tap.sku_id)!, opened_at: own.opened_at };
+  const state = { ...tapBoard, snapshot: { open: [guest, own], history: [] } };
+  const html = renderToStaticMarkup(createElement(TapBoardView, { state, skus: tapBoardSkus, timeZone: "America/New_York", recentEvents: [], navigation: { locations: [{ value: "taproom", label: "Taproom" }], location: "taproom" } }));
+  expect(html.indexOf("Guest cider · keg")).toBeLessThan(html.indexOf(own.sku_name!));
+  const dates = [...html.matchAll(/<time[^>]*>([^<]+)<\/time>/g)].map(match => match[1]);
+  expect(dates).toHaveLength(2);
+  expect(dates[0]).toBe(dates[1]);
+  expect(dates[0]).toMatch(/\w{3}, \w{3} \d+/);
+  expect(html).toContain("no guest yield");
+});
+
+it("announces the post-save board refresh and marks the tap list busy (#1383)", () => {
+  const render = (refreshing: boolean) => renderToStaticMarkup(createElement(TapBoardView, { state: { ...tapBoard, refreshing }, skus: tapBoardSkus, timeZone: "America/New_York", navigation: { locations: [{ value: "taproom", label: "Taproom" }], location: "taproom" } }));
+  expect(render(true)).toMatch(/role="status"[^>]*>[\s\S]*?Updating the board…/);
+  expect(render(true)).toContain('aria-busy="true"');
+  expect(render(false)).toContain('role="status"');
+  expect(render(false)).not.toContain("Updating the board…");
+});
+
 it("keeps the outgoing captured SKU selectable for an atomic same-SKU swap", () => {
   const pick = vi.spyOn(E, "pick");
   const html = renderToStaticMarkup(createElement(TapKegView, { sheet: swapKeg, skus: [], timeZone: "America/New_York" }));

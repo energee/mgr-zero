@@ -9,20 +9,22 @@
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { asTrigger, CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
+import { E } from "@/components/mgr/e";
 import { FermentationScheduleView, FermentationStageView } from "@/components/mgr/views/fermentation-schedule";
 import { IngredientView, type IngredientMaterial } from "@/components/mgr/views/ingredient";
 import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
 import { WaterAdditionView, WaterView } from "@/components/mgr/views/water";
-import { additionReady, mashStepReady, moveItem, removeAt, stageReady, toAdditionFields, toMashStepFields, toStageFields, upsertAt, waterRowSummary, type FermentationStage, type IngredientLine, type MashStep, type SaltMaterial, type WaterAddition, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import { additionReason, mashStepReason, moveItem, removeAt, stageReason, toAdditionFields, toMashStepFields, toStageFields, upsertAt, waterRowSummary, type FermentationStage, type IngredientLine, type MashStep, type SaltMaterial, type WaterAddition, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 
 type Editing = { index?: number } | null;
 type ListProps<T> = { items: T[]; onEdit: (index: number) => void; onMove: (index: number, by: -1 | 1) => void; add: ReactNode; onAdd: () => void };
 type ItemProps<F> = { fields: F; onChange: (patch: Partial<F>) => void; footer: ReactNode };
 
-/** An ordered list edited in a sheet: the list until a row is picked or added, then that item's editor in place. */
-function ListSheet<T, F>({ sheetTitle, trigger, addLabel, saveLabel, items, onChange, toFields, ready, toItem, list, item }: {
+/** An ordered list edited in a sheet: the list until a row is picked or added, then that item's editor in place.
+ *  `reason` says why Save is withheld, or null when the fields are ready. */
+function ListSheet<T, F>({ sheetTitle, trigger, addLabel, saveLabel, items, onChange, toFields, reason, toItem, list, item }: {
   sheetTitle: string; trigger: ReactNode; addLabel: string; saveLabel: string; items: T[]; onChange: (items: T[]) => void;
-  toFields: (item?: T) => F; ready: (fields: F) => boolean; toItem: (fields: F) => T; list: (p: ListProps<T>) => ReactNode; item: (p: ItemProps<F>) => ReactNode;
+  toFields: (item?: T) => F; reason: (fields: F) => string | null; toItem: (fields: F) => T; list: (p: ListProps<T>) => ReactNode; item: (p: ItemProps<F>) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Editing>(null);
@@ -40,7 +42,7 @@ function ListSheet<T, F>({ sheetTitle, trigger, addLabel, saveLabel, items, onCh
   const begin = (index?: number) => { setFields(toFields(index === undefined ? undefined : items[index])); setEditing({ index }); };
   const footer = editing && <CommandFormFooter>
     {editing.index !== undefined && <Button type="button" variant="outline" onClick={() => { onChange(removeAt(items, editing.index!)); setEditing(null); }}>Delete</Button>}
-    <Button type="button" disabled={!ready(fields)} onClick={() => { onChange(upsertAt(items, editing.index, toItem(fields))); setEditing(null); }}>{saveLabel}</Button>
+    {E.submit(saveLabel, { type: "button", reason: reason(fields), onClick: () => { onChange(upsertAt(items, editing.index, toItem(fields))); setEditing(null); } })}
   </CommandFormFooter>;
   return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }} title={sheetTitle} trigger={typeof trigger === "string" ? <Button type="button" variant="outline" className="justify-start">{trigger}</Button> : asTrigger(trigger)}>
     <div ref={setBody} className="flex flex-col gap-4">
@@ -53,7 +55,7 @@ function ListSheet<T, F>({ sheetTitle, trigger, addLabel, saveLabel, items, onCh
 
 export function MashScheduleSheet({ steps, onChange, trigger }: { steps: MashStep[]; onChange: (steps: MashStep[]) => void; trigger?: ReactNode }) {
   return <ListSheet sheetTitle="Mash schedule" trigger={trigger ?? `Mash schedule · ${steps.length} steps`} addLabel="Add step" saveLabel="Save step"
-    items={steps} onChange={onChange} toFields={toMashStepFields} ready={mashStepReady}
+    items={steps} onChange={onChange} toFields={toMashStepFields} reason={mashStepReason}
     toItem={(f) => ({ name: f.name.trim(), kind: f.kind, tempF: Number(f.tempF), minutes: Number(f.minutes) })}
     list={(p) => <MashScheduleView steps={p.items} onEdit={p.onEdit} onMove={p.onMove} header={p.add} />}
     item={(p) => <MashStepView fields={p.fields} onChange={p.onChange} footer={p.footer} />} />;
@@ -61,7 +63,7 @@ export function MashScheduleSheet({ steps, onChange, trigger }: { steps: MashSte
 
 export function FermentationScheduleSheet({ stages, onChange, trigger }: { stages: FermentationStage[]; onChange: (stages: FermentationStage[]) => void; trigger?: ReactNode }) {
   return <ListSheet sheetTitle="Fermentation schedule" trigger={trigger ?? `Fermentation schedule · ${stages.length} stages`} addLabel="Add stage" saveLabel="Save stage"
-    items={stages} onChange={onChange} toFields={toStageFields} ready={stageReady}
+    items={stages} onChange={onChange} toFields={toStageFields} reason={stageReason}
     toItem={(f) => ({ name: f.name.trim(), kind: f.kind, tempF: Number(f.tempF), days: Number(f.days) })}
     list={(p) => <FermentationScheduleView stages={p.items} onEdit={p.onEdit} onMove={p.onMove} header={p.add} />}
     item={(p) => <FermentationStageView fields={p.fields} onChange={p.onChange} footer={p.footer} />} />;
@@ -70,7 +72,7 @@ export function FermentationScheduleSheet({ stages, onChange, trigger }: { stage
 export function WaterSheet({ water, profiles, materials, onChange, trigger }: { water: WaterDraft; profiles: WaterProfileIons[]; materials: SaltMaterial[]; onChange: (water: WaterDraft) => void; trigger?: ReactNode }) {
   const target = profiles.find((p) => p.id === water.targetProfileId)?.name;
   return <ListSheet<WaterAddition, ReturnType<typeof toAdditionFields>> sheetTitle="Water" trigger={trigger ?? `Water · ${waterRowSummary(target, water.additions.length)}`} addLabel="Add addition" saveLabel="Save addition"
-    items={water.additions} onChange={(additions) => onChange({ ...water, additions })} toFields={toAdditionFields} ready={additionReady}
+    items={water.additions} onChange={(additions) => onChange({ ...water, additions })} toFields={toAdditionFields} reason={additionReason}
     toItem={(f) => ({ materialId: f.materialId, qty: Number(f.qty), unit: f.unit, stage: f.stage })}
     list={(p) => <WaterView water={{ ...water, additions: p.items }} profiles={profiles} materials={materials} profilesHref="/catalog/water-profiles" chemistryKnown={false /* until materials carry a salt identity (PR B) */} header={null} onChange={(patch) => onChange({ ...water, ...patch })} onEdit={p.onEdit} onMove={p.onMove} onAdd={p.onAdd} />}
     item={(p) => <WaterAdditionView fields={p.fields} materials={materials} materialsHref="/materials" onChange={p.onChange} footer={p.footer} />} />;
