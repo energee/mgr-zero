@@ -10,6 +10,8 @@ import { EntrySurface } from "@/components/mgr/entry-surface";
 import { MgrIcon } from "@/components/mgr-icon";
 import { CreateBreweryForm, type CreateBreweryState } from "./form";
 
+export const metadata = { title: "Create brewery" };
+
 async function provision(_previous: CreateBreweryState, form: FormData): Promise<CreateBreweryState> {
   "use server";
   if (getServerEnv().dedicated) notFound();

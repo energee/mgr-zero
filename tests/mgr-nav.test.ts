@@ -113,7 +113,6 @@ describe("navTitle", () => {
     expect(navTitle("/taproom/board")).toBe("Tap board");
     expect(navTitle("/settings/units")).toBe("Units");
     expect(navTitle("/settings/team")).toBe("Team");
-    expect(navTitle("/orders/new")).toBe("Orders");
   });
   it.each([
     ["/kegs/report", "Keg report"],
@@ -122,8 +121,11 @@ describe("navTitle", () => {
     ["/catalog/water-profiles", "Water profiles"],
     ["/catalog/brands/new", "New brand"],
     ["/recipes/new", "New recipe"],
+    ["/orders/new", "New order"],
     ["/compliance/licenses", "Licenses"],
     ["/settings/accounting", "Accounting"],
+    ["/settings/accounting/connect", "Connect QuickBooks"],
+    ["/settings/chat/preferences", "My notification preferences"],
     ["/settings/pos", "Point of sale"],
   ])("names the subpage %s rather than its section (#1255)", (route, title) => {
     expect(navTitle(route)).toBe(title);

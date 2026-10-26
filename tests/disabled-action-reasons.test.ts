@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { BrandView } from "../components/mgr/views/brand";
 import { IngredientView } from "../components/mgr/views/ingredient";
 import { QboConnectionView, QboDefaultsView, QboSyncView } from "../components/mgr/views/accounting";
@@ -8,6 +8,24 @@ import { RecipeView } from "../components/mgr/views/recipe";
 import { toBrandViewProps } from "../lib/mgr/brand-view";
 import type { IngredientFields } from "../components/mgr/views/ingredient";
 import { ingredientReason, lineReady } from "../lib/mgr/recipe-process-view";
+import { ShipForm, type ShippingSnapshot } from "../app/(app)/orders/[id]/ship-form";
+import { BrewTimelineView } from "../components/mgr/views/brew-timeline";
+import { BrewPrepView } from "../components/mgr/views/brew-prep";
+import { PackagingCloseFields } from "../components/mgr/views/close-packaging-run";
+import { PackagingSourcePicker, PlanActions } from "../components/mgr/views/plan-actions";
+import { CycleCountView } from "../components/mgr/views/cycle-count";
+import { CellarMapView } from "../components/mgr/views/cellar-map";
+import { InviteView } from "../components/mgr/views/team-controls";
+import { brewPrepMineral, brewTimelineMineral } from "../lib/mgr/fixtures/production";
+import { cycleCountCans, receivePoCountryMalt } from "../lib/mgr/fixtures/purchasing";
+import { ReceivePoView } from "../components/mgr/views/receive-po";
+import { toCellarMapViewProps } from "../lib/mgr/cellar-map-view";
+
+// ShipForm renders without a router or a command round trip.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {} }) }));
+vi.mock("@/lib/commands/use-command-form", () => ({
+  useCommandAction: () => ({ busy: false, error: null, fieldErrors: {}, run: () => {} }),
+}));
 
 function describedButton(html: string, label: string, reason: RegExp) {
   const button = html.match(new RegExp(`<button[^>]*>${label}</button>`))?.[0];
@@ -78,5 +96,73 @@ describe("remaining named disabled-action reasons (#1122)", () => {
     expect(html).toContain("Syncing…");
     expect(html).not.toContain("before syncing payments");
     expect(html).not.toContain("Still needed:");
+  });
+});
+
+describe("Oct 25 recheck: withheld actions say why (#1122)", () => {
+  const html = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(createElement("div", null, node));
+
+  it("Ship order names the line still without a source", () => {
+    const snapshot = {
+      order: { id: "o", order_no: 7, kind: "wholesale", from_location_id: "w", to_location_id: null },
+      lines: [{ id: "a", sku_id: "sku-a", qty_ordered: 3, qty_picked: 3, qty_shipped: null, skus: { name: "Hazy IPA case" } }],
+      locations: [{ id: "w", name: "Warehouse" }],
+    } as ShippingSnapshot;
+    describedButton(html(createElement(ShipForm, { snapshot, available: { bins: [], destinationBins: [], stock: [] } })), "Ship order", /^Still needed: a source for Hazy IPA case\.$/);
+  });
+
+  it("Complete transfer carries the same reason", () => {
+    const snapshot = {
+      order: { id: "o", order_no: 8, kind: "taproom_transfer", from_location_id: "w", to_location_id: "t" },
+      lines: [{ id: "a", sku_id: "sku-a", qty_ordered: 3, qty_picked: 3, qty_shipped: null, skus: { name: "Pils keg" } }],
+      locations: [{ id: "w", name: "Warehouse" }, { id: "t", name: "Taproom" }],
+    } as ShippingSnapshot;
+    describedButton(html(createElement(ShipForm, { snapshot, available: { bins: [], destinationBins: [], stock: [] } })), "Complete transfer", /a source for Pils keg/);
+  });
+
+  it("Record brew day names what is still open, even after every row is confirmed", () => {
+    const confirmed = { ...brewTimelineMineral, ingredients: brewTimelineMineral.ingredients.map(row => ({ ...row, confirmed: true })) };
+    describedButton(html(createElement(BrewTimelineView, { model: confirmed })), "Record brew day", /^Still needed: a source for Chit Malt\.$/);
+  });
+
+  it("Done pulling names the ingredient without a source", () => {
+    describedButton(html(createElement(BrewPrepView, { model: brewPrepMineral })), "Done pulling", /^Still needed: a source for Chit Malt\.$/);
+  });
+
+  it("Choose lot with no stock says so in a plain sentence, not a Still needed line", () => {
+    describedButton(html(createElement(BrewPrepView, { model: { ...brewPrepMineral, sources: [] } })), "Choose lot", /^No Chit Malt in stock to choose from\.$/);
+  });
+
+  it("Close packaging run lists lot code, location and bin", () => {
+    const model = { bblDrawn: "3", outputs: [], lotCode: "", packagedOn: "2026-10-25", bestBy: "", locationId: "", binId: "", locations: [], bins: [], plan: { revision: "r", planned: [], sources: [], materials: [], lots: [] }, actuals: [] };
+    describedButton(html(createElement(PackagingCloseFields, { model })), "Close packaging run", /^Still needed: a lot code, a finished goods location, and a finished goods bin\.$/);
+  });
+
+  it("Reschedule and Pick source say what they wait for", () => {
+    describedButton(html(createElement(PlanActions, { plannedOn: "2026-10-22" })), "Reschedule", /^Still needed: a different planned date\.$/);
+    describedButton(html(createElement(PackagingSourcePicker, { occupancies: [] })), "Pick source", /^Still needed: a source tank\.$/);
+  });
+
+  it("Preview count names the missing count", () => {
+    describedButton(html(createElement(CycleCountView, { model: cycleCountCans, footer: null, previewReason: "Still needed: a counted quantity of zero or more." })), "Preview count", /counted quantity/);
+  });
+
+  it("Cancel purchase order waits for a closure reason that is not blank", () => {
+    for (const closureReason of ["", "   "]) {
+      describedButton(html(createElement(ReceivePoView, { model: { ...receivePoCountryMalt, closureReason } })), "Cancel purchase order", /^Still needed: a closure reason\.$/);
+    }
+    const ready = html(createElement(ReceivePoView, { model: receivePoCountryMalt })).match(/<button[^>]*>Cancel purchase order<\/button>/)?.[0];
+    expect(ready).toBeTruthy();
+    expect(ready).not.toContain('disabled=""');
+  });
+
+  it("the cellar with no vessels still says why Reading, Transfer and Addition are off", () => {
+    const model = toCellarMapViewProps([], []);
+    expect(html(createElement(CellarMapView, { model }))).toContain("No tank holds beer");
+  });
+
+  it("Send invite stays enabled so a click shows the email error", () => {
+    const button = html(createElement(InviteView, { buyer: false })).match(/<button[^>]*>Send invite<\/button>/)?.[0];
+    expect(button).not.toContain('disabled=""');
   });
 });

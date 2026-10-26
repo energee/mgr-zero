@@ -4,6 +4,7 @@
 import { SIZE_LABEL } from "./keg-labels";
 import type { EmptyState } from "./empty-state";
 import type { KEG_EVENT_REASONS, KEG_POOL_KINDS, KEG_SIZES } from "./enums";
+import { submitReason } from "./submit-reason";
 
 export type KegFleetBinRow = { key: string; title: string; detail: string; qty: string };
 export type KegFleetPoolRow = { key: string; title: string; detail: string; bins: KegFleetBinRow[] };
@@ -63,9 +64,15 @@ export const mayHaveKegCustomer = (r: KegEventReason) => needsKegCustomer(r) || 
 export const withLocationBin = (prev: KegEventValue, next: KegEventValue, firstBin: (locationId: string) => string): KegEventValue =>
   next.locationId !== prev.locationId ? { ...next, binId: firstBin(next.locationId) } : next;
 
-/** Whether Record keg event can submit: a pool, a bin, a positive count, and a customer when the reason needs one. */
-export const kegEventReady = (v: KegEventValue) =>
-  Boolean(v.poolId && v.locationId && v.binId && Number(v.qty) > 0 && (!needsKegCustomer(v.reason) || v.customerId));
+/** Why Record keg event is withheld, or null when it can submit: a pool, a location and bin, a positive count, and a
+ *  customer when the reason needs one. */
+export const kegEventReason = (v: KegEventValue) => submitReason([
+  ...(v.poolId ? [] : ["a keg pool"]),
+  ...(v.locationId ? [] : ["a location"]),
+  ...(v.binId ? [] : ["a bin"]),
+  ...(Number(v.qty) > 0 ? [] : ["a keg count above zero"]),
+  ...(needsKegCustomer(v.reason) && !v.customerId ? ["a customer"] : []),
+]);
 
 /** Whether Add/Save keg pool can submit: a name, a vendor unless owned, and a per-fill cost for pay per fill. */
 export const kegPoolReady = (v: KegPoolValue) =>

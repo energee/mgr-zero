@@ -70,7 +70,7 @@ export function CommandForm({
           onInteractOutside={(e) => e.preventDefault()}
           className={cn("fixed z-50 flex flex-col gap-4 overflow-hidden rounded-xl bg-popover p-4 text-sm text-popover-foreground shadow-lg ring-1 ring-foreground/10", mobile ? "inset-x-0 bottom-0 max-h-[calc(100%-1rem)]" : "top-1/2 left-1/2 max-h-[calc(100%-2rem)] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2")}
         >
-          <DialogHeader className="shrink-0"><DialogTitle>{title}</DialogTitle></DialogHeader>
+          <DialogHeader className="shrink-0"><DialogTitle className="min-w-0 pr-8 [overflow-wrap:anywhere]">{title}</DialogTitle></DialogHeader>
           {body("-mx-4")}
           {foot("-mx-4")}
           <FormClose className="absolute top-3 right-3" onClose={onOpenChange} previewAction={previewAction} />
@@ -84,7 +84,7 @@ export function CommandForm({
         {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
         <SheetContent showCloseButton={false} side="bottom" className="flex max-h-[90svh] flex-col overflow-hidden rounded-t-xl pb-[max(1rem,env(safe-area-inset-bottom))]" data-preview-action={previewAction || undefined}>
           <SheetHeader className="shrink-0 pb-0">
-            <SheetTitle>{title}</SheetTitle>
+            <SheetTitle className="min-w-0 pr-8 [overflow-wrap:anywhere]">{title}</SheetTitle>
           </SheetHeader>
           {body("")}
           {foot("")}
@@ -98,7 +98,7 @@ export function CommandForm({
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent showCloseButton={false} className="flex max-h-[90svh] flex-col overflow-hidden sm:max-w-md" data-preview-action={previewAction || undefined}>
         <DialogHeader className="shrink-0">
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle className="min-w-0 pr-8 [overflow-wrap:anywhere]">{title}</DialogTitle>
         </DialogHeader>
         {body("-mx-4")}
         {foot("-mx-4")}

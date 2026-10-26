@@ -5,6 +5,8 @@ import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { batchCompletionAcknowledgement, type BatchCompletionPhase } from "@/lib/mgr/batch-completion-state";
+import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
+import { submitReason } from "@/lib/mgr/submit-reason";
 import { bblExact } from "@/lib/volume";
 
 export type BatchCompletionPreview = {
@@ -25,6 +27,11 @@ export function BatchCompletionView({ batches, open, onOpenChange, batchId, prev
   const frozen = phase === "loading" || phase === "submitting" || phase === "unknown" || phase === "saved";
   // Saved pre-upgrade receipts deliberately retain their original shape without tank metadata.
   const acknowledgement = preview && phase !== "saved" && batchCompletionAcknowledgement(preview);
+  // A batch, then the write-off switch. Nothing while the preview loads: the loading line already says so.
+  const missing: string[] = [];
+  if (!batchId) missing.push("a batch");
+  else if (acknowledgement && !confirmInTank) missing.push(`the “${acknowledgement}” switch turned on`);
+  const reason = phase === "loading" ? null : submitReason(missing);
   return <div data-preview-action className="flex flex-col items-start gap-2"><CommandForm open={open} onOpenChange={onOpenChange} title="Complete batch"
     trigger={<Button variant="outline" disabled={none} aria-describedby={none ? "completion-none" : undefined}>Complete batch</Button>}>
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
@@ -42,10 +49,8 @@ export function BatchCompletionView({ batches, open, onOpenChange, batchId, prev
       {phase === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The batch and request are frozen; retry unchanged to recover the original result.</CommandFormMessage>}
       <div role="status">{E.polite(phase === "saved" ? "Batch completed and saved." : null)}</div>
       <CommandFormMessage error={error} />
-      <CommandFormFooter><Button data-variant="irreversible" type="submit" className="bg-irreversible text-irreversible-foreground hover:bg-irreversible/90"
-        disabled={!preview || phase === "submitting" || phase === "saved" || Boolean(acknowledgement && !confirmInTank)}>
-        {phase === "unknown" ? "Retry unchanged completion" : phase === "submitting" ? "Completing..." : phase === "saved" ? "Batch completed" : "Complete batch"}
-      </Button></CommandFormFooter>
+      <CommandFormFooter><IrreversibleSubmit label={phase === "unknown" ? "Retry unchanged completion" : phase === "saved" ? "Batch completed" : "Complete batch"}
+        reason={reason} submitting={phase === "submitting"} busy="Completing..." disabled={!preview || phase === "saved"} /></CommandFormFooter>
     </form>
   </CommandForm>{none && <p id="completion-none" className="text-xs text-muted-foreground">No brewed batch is open to complete.</p>}</div>;
 }

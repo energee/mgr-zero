@@ -15,6 +15,8 @@ import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 
+export const metadata = { title: "Link your Slack" };
+
 export default async function ChatLinkPage({ searchParams }: { searchParams: Promise<{ proof?: string }> }) {
   const { proof } = await searchParams;
   const [brewery, identity] = await Promise.all([getActiveBrewery(), getRequestIdentity()]);

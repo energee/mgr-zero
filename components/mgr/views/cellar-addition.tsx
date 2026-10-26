@@ -12,7 +12,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ADDITION_STAGES, additionPreview, type AdditionStage, type CellarAdditionViewModel } from "@/lib/mgr/cellar-addition-view";
 import { occupancyIdentity } from "@/lib/mgr/cellar-transfer-view";
 
-export function CellarAdditionFooter(props: { formId?: string; submitting?: boolean; disabled?: boolean }) {
+export function CellarAdditionFooter(props: { formId?: string; submitting?: boolean; disabled?: boolean; reason?: string | null }) {
   return <IrreversibleSubmit label="Record addition" {...props} />;
 }
 
@@ -44,6 +44,6 @@ export function CellarAdditionView({ model, onChange, messages, footer, submitti
       {preview.valid ? E.info(preview.text) : preview.error ? E.note(preview.reason, "alert") : E.info(preview.reason)}
     </fieldset>
     {messages}
-    {footer !== undefined ? footer : E.pin(<CellarAdditionFooter submitting={submitting} />)}
+    {footer !== undefined ? footer : E.pin(<CellarAdditionFooter submitting={submitting} reason={preview.valid ? null : preview.reason} />)}
   </>;
 }

@@ -69,6 +69,25 @@ describe("Customers list", () => {
 });
 
 describe("Customer detail", () => {
+  it.each(["", "   ", "\t\n", "\u00a0\u2003"])("holds Save and marks an empty customer name %j", name => {
+    const model = toCustomerViewProps(customerRidgeline);
+    model.editValues.name = name;
+    const markup = html(createElement(CustomerView, { model }));
+    expect(markup).toContain("Name required");
+    expect(markup.match(/<input[^>]*aria-label="Customer name"[^>]*>/)?.[0]).toContain('aria-invalid="true"');
+    expect(markup.match(/<button[^>]*>Save customer<\/button>/)?.[0]).toContain('disabled=""');
+  });
+
+  it("keeps padded and 250-character customer names available to save without a name cap", () => {
+    for (const name of [" \tValid account\n ", "N".repeat(250)]) {
+      const model = toCustomerViewProps(customerRidgeline);
+      model.editValues.name = name;
+      const markup = html(createElement(CustomerView, { model }));
+      expect(markup.match(/<button[^>]*>Save customer<\/button>/)?.[0]).not.toContain('disabled=""');
+      expect(markup.match(/<input[^>]*aria-label="Customer name"[^>]*>/)?.[0]).not.toContain("maxLength");
+    }
+  });
+
   it("associates distributed edit fields with one save form and disables read-only access", () => {
     const model = toCustomerViewProps(customerRidgeline);
     const editable = html(createElement(CustomerView, { model }));

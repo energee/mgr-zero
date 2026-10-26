@@ -21,6 +21,17 @@ it("blocks a duplicate bin name after trimming, but permits its own unchanged na
   expect(toBinViewProps({ name: "Rack", bins: [{ id: "rack", name: " Rack " }] }).nameError).toBe("A bin named Rack already exists here");
 });
 
+it("blocks case variants while preserving the existing display name in feedback", () => {
+  for (const name of ["dry", " DRY ", "dRy"]) {
+    expect(toBinViewProps({ name, bins }).nameError).toBe("A bin named Dry already exists here");
+    expect(toBinViewProps({ name, bins, binId: "cold" }).nameError).toBe("A bin named Dry already exists here");
+  }
+  expect(toBinViewProps({ name: "dry", bins, binId: "dry" }).nameError).toBeUndefined();
+  const historical = [...bins, { id: "legacy", name: "dry" }];
+  expect(toBinViewProps({ name: "Dry", bins: historical, binId: "dry" }).nameError).toBeUndefined();
+  expect(toBinViewProps({ name: "DRY", bins: historical, binId: "dry" }).nameError).toBe("A bin named dry already exists here");
+});
+
 it("marks the shared bin field invalid and explains why it cannot save", () => {
   const html = renderToStaticMarkup(createElement(BinView, { model: toBinViewProps({ name: "Dry", bins }), remove: null }));
   expect(html).toContain("A bin named Dry already exists here");
@@ -30,7 +41,7 @@ it("marks the shared bin field invalid and explains why it cannot save", () => {
 
 it("explains the empty bin name beside the unavailable save action", () => {
   const html = renderToStaticMarkup(createElement(BinView, { model: toBinViewProps({ name: " " }), remove: null }));
-  expect(html).toContain("Still needed: Enter a bin name.");
+  expect(html).toContain("Still needed: a bin name.");
   expect(html).toMatch(/<button[^>]*disabled[^>]*>Save bin/);
 });
 
