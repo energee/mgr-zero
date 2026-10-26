@@ -51,7 +51,7 @@ export const resetPasswordModel: EntryViewModel = {
   title: "Reset password", inputs: ["Email"], primary: "Send reset link",
 };
 export const portalForgotPasswordModel: EntryViewModel = {
-  ...resetPasswordModel, info: "If that email is on an account, a reset link is on its way.",
+  ...resetPasswordModel,
 };
 export const noMembershipModel: EntryViewModel = {
   title: "No brewery yet", inputs: [],

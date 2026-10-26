@@ -1,7 +1,7 @@
 /**
  * Sign-in page (screen records Sign in and Session expired). Renders the
- * shadcn-based LoginForm. Arrives with `?error=` from the login action (bad
- * credentials or invalid email) or from lib/commands/client.ts when a command answered 401
+ * shadcn-based LoginForm. Arrives with `?error=` for invalid passwordless email
+ * or from lib/commands/client.ts when a command answered 401
  * (the session ended mid-work).
  */
 import { LoginForm } from "@/components/login-form"
@@ -22,16 +22,16 @@ const ERRORS: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; sent?: string; email?: string }>
+  searchParams: Promise<{ error?: string; sent?: string }>
 }) {
   const auth = getRequestAuthContext()
   if (await auth.getIdentity()) redirect(await signInDestination(auth))
-  const { error, sent, email } = await searchParams
+  const { error, sent } = await searchParams
   if (error === "expired") return <>
     <CommandForm open title="Session expired">
       <SessionExpiredView model={sessionExpiredModel} signInHref="/login" />
     </CommandForm>
     <noscript><LoginForm error="Your session expired. Sign in again." /></noscript>
   </>
-  return <LoginForm email={email} error={error ? ERRORS[error] ?? "Sign-in failed." : undefined} sent={Boolean(sent)} />
+  return <LoginForm error={error ? ERRORS[error] ?? "Sign-in failed." : undefined} sent={Boolean(sent)} />
 }

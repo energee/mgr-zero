@@ -20,19 +20,19 @@ export function ListControls({ search, scopes = [] }: {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-end gap-2">
-        <form method="get" role="search" className="basis-full md:basis-0 md:grow">
+        <form method="get" role="search" className="basis-full lg:basis-0 lg:grow">
           {Object.entries(search.keep).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
           {E.search(search.label, { name: "q", defaultValue: search.value })}
-          <p className="mt-1 text-xs text-muted-foreground">Press Enter to search</p>
         </form>
         {/* On a phone a pick is as wide as its chosen label (at least 9rem), so a
             long category wraps onto its own row instead of clipping beside Sort. */}
         {scopes.map(scope => (
-          <div key={scope.label} className="min-w-36 max-w-full flex-auto md:w-48 md:flex-none">
+          <div key={scope.label} className="min-w-36 max-w-full flex-auto lg:w-48 lg:flex-none">
             <ScopePick label={scope.label} value={scope.value} options={scope.options} />
           </div>
         ))}
       </div>
+      <p className="text-xs text-muted-foreground">Press Enter to search</p>
       {/* The no-match copy says "Clear the search"; this is how. The other params stay. */}
       {search.value && <Link href={`?${new URLSearchParams(search.keep)}`} className="w-fit text-sm text-muted-foreground underline">Clear search</Link>}
     </div>
