@@ -28,7 +28,7 @@ export type BeerSnapshot = {
 export function toBeerViewProps(s: BeerSnapshot): BeerViewModel {
   const o = s.overview;
   const navs: BeerNavView[] = [
-    { key: "fg", title: "Finished goods", detail: `${plural(o.fgShortages, "shortage")} · ATP by SKU`, href: "/inventory" },
+    { key: "fg", title: "Finished goods", detail: `${plural(o.fgShortages, "shortage")} · Available by SKU`, href: "/inventory" },
   ];
   if (s.showTaproom) {
     navs.push(

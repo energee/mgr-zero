@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { createElement, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { AtpWarnings } from "../app/(app)/orders/[id]/atp-warnings";
 import { SCREENS } from "../components/mgr/screens";
 import { CompleteTransferView } from "../components/mgr/views/complete-transfer";
 import { ConfirmOrderView } from "../components/mgr/views/confirm-order";
@@ -26,6 +27,31 @@ const noSecondTree = (file: string) => {
 };
 
 describe("Confirm order view loop", () => {
+  it("uses plain availability warnings after confirmation or allocation saves", () => {
+    const out = renderToStaticMarkup(createElement(AtpWarnings, {
+      warnings: [{ sku_id: "hazy", atp: -2 }],
+      skuNames: new Map([["hazy", "Hazy IPA"]]),
+      saved: "Allocation saved.",
+    }));
+    expect(out).toContain("Allocation saved.");
+    expect(out).toContain("Available is below zero for Hazy IPA");
+    expect(out).not.toContain("ATP");
+  });
+
+  it("names the source, not a role, when five ordered units have only three available", () => {
+    const line = { ...orderSubmittedRidgeline.lines[0], qty_ordered: 5 };
+    const model = toConfirmOrderViewProps({
+      ...orderSubmittedRidgeline,
+      locations: [{ id: orderSubmittedRidgeline.order.from_location_id, name: "Lawrenceville" }],
+      lines: [line],
+      sourceOnHand: [{ sku_id: line.sku_id, qty: 3 }],
+      atp: [{ sku_id: line.sku_id, qty: 3 }],
+    });
+    expect(model.lines[0].detail).toBe("3 at Lawrenceville · 3 available · leaves −2");
+    expect(model.shortageNote).toBe(`Short at Lawrenceville: ${line.skus!.name}. Replenish Lawrenceville before picking, or confirm knowing the full quantity cannot be picked there.`);
+    expect(model.shortageNote).not.toContain("Warehouse");
+  });
+
   it("maps the shared fixture through the adapter", () => {
     const model = toConfirmOrderViewProps(orderSubmittedRidgeline);
     expect(model.title).toBe("ORD-0231");
@@ -68,9 +94,9 @@ describe("Confirm order view loop", () => {
       sourceOnHand: [{ sku_id: orderSubmittedRidgeline.lines[0].sku_id, qty: 0 }],
     });
     expect(model.lines[0].qty).toBe(4);
-    expect(model.lines[0].detail).toBe("0 at Warehouse · brewery ATP 5");
+    expect(model.lines[0].detail).toBe("0 at Warehouse · 5 available");
     expect(model.lines[0].tone).toBe("w");
-    expect(model.shortageNote).toMatch(/Replenish Warehouse.*Warehouse cannot pick/i);
+    expect(model.shortageNote).toMatch(/Replenish Warehouse.*the full quantity cannot be picked there/i);
     expect(model.shortageNote).not.toMatch(/another location/i);
   });
 
@@ -83,7 +109,7 @@ describe("Confirm order view loop", () => {
       sourceOnHand: [{ sku_id: sku.sku_id, qty: 3 }],
     });
     expect(model.lines[0].detail).toMatch(/3 at Warehouse/);
-    expect(model.shortageNote).toMatch(/Short at Warehouse: .*Replenish Warehouse.*Warehouse cannot pick/i);
+    expect(model.shortageNote).toMatch(/Short at Warehouse: .*Replenish Warehouse.*the full quantity cannot be picked there/i);
     expect(model.shortageNote).not.toMatch(/another location/i);
   });
 
@@ -98,8 +124,8 @@ describe("Confirm order view loop", () => {
       sourceOnHand: [{ sku_id: sku.sku_id, qty: 10 }],
     });
     expect(model.lines[0].tone).toBe("w");
-    expect(model.lines[0].detail).toMatch(/brewery ATP 5 · leaves −5$/);
-    expect(model.shortageNote).toMatch(/^Confirming oversells ATP for .*; that stays your call\.$/);
+    expect(model.lines[0].detail).toMatch(/5 available · leaves −5$/);
+    expect(model.shortageNote).toMatch(/^Confirming promises more than is available for .*; that stays your call\.$/);
   });
 
   it("does not warn when ATP covers this order exactly", () => {
@@ -122,7 +148,7 @@ describe("Confirm order view loop", () => {
       atp: [],
       sourceOnHand: [],
     });
-    expect(model.shortageNote).toMatch(/Short at Warehouse: .*Replenish Warehouse.*Warehouse cannot pick/i);
+    expect(model.shortageNote).toMatch(/Short at Warehouse: .*Replenish Warehouse.*the full quantity cannot be picked there/i);
     expect(model.shortageNote).not.toMatch(/another location/i);
   });
 

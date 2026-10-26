@@ -12,21 +12,21 @@ const groups = [
 describe("suggestPriceGroup", () => {
   it("picks the first group in position order whose ceiling covers the cost", () => {
     expect(suggestPriceGroup({ costCentsPerBbl: 4810, uncosted: [], groups })).toEqual({
-      kind: "group", groupId: "g2", title: "Suggested group 2", detail: "recipe cost $48.10/bbl · ceiling $65.00/bbl",
+      kind: "group", groupId: "g2", title: "Suggested group 2", detail: "Recipe cost $48.10/bbl · ceiling $65.00/bbl",
     });
     expect(suggestPriceGroup({ costCentsPerBbl: 4500, uncosted: [], groups })?.kind === "group" && suggestPriceGroup({ costCentsPerBbl: 4500, uncosted: [], groups })).toMatchObject({ groupId: "g1" });
   });
 
   it("says so when the cost clears every ceiling, naming the highest", () => {
     expect(suggestPriceGroup({ costCentsPerBbl: 9000, uncosted: [], groups })).toEqual({
-      kind: "above", title: "Above every ceiling", detail: "recipe cost $90.00/bbl · highest ceiling $65.00/bbl",
+      kind: "above", title: "Above every ceiling", detail: "Recipe cost $90.00/bbl · highest ceiling $65.00/bbl",
     });
   });
 
   it("shows the cost alone when no group has a ceiling", () => {
     const bare = groups.map((g) => ({ ...g, cost_ceiling_cents: null }));
     expect(suggestPriceGroup({ costCentsPerBbl: 4810, uncosted: [], groups: bare })).toEqual({
-      kind: "cost", title: "Recipe cost $48.10/bbl", detail: "no price group has a ceiling",
+      kind: "cost", title: "Recipe cost $48.10/bbl", detail: "No price group has a ceiling.",
     });
   });
 
@@ -56,7 +56,7 @@ describe("suggestPriceGroup", () => {
       { id: "g1", name: "1", position: 1, cost_ceiling_cents: 9000 },
       { id: "g2", name: "2", position: 2, cost_ceiling_cents: 5000 },
     ];
-    expect(suggestPriceGroup({ costCentsPerBbl: 9500, uncosted: [], groups: dipping })).toMatchObject({ kind: "above", detail: "recipe cost $95.00/bbl · highest ceiling $90.00/bbl" });
+    expect(suggestPriceGroup({ costCentsPerBbl: 9500, uncosted: [], groups: dipping })).toMatchObject({ kind: "above", detail: "Recipe cost $95.00/bbl · highest ceiling $90.00/bbl" });
   });
 
   it("is silent for a brand with no recipe", () => {

@@ -18,7 +18,7 @@ function view() {
       shortfalls: [{
         skuId: "ten", onHand: 2, allocated: 5, atp: -3,
         detail: {
-          title: "Beer 10 · keg", atp: "−3 kegs · −1.5 bbl", atpDetail: "ATP · 2 kegs on hand · 5 allocated",
+          title: "Beer 10 · keg", atp: "−3 kegs · −1.5 bbl", atpDetail: "Available · 2 kegs on hand · 5 allocated",
           rows: [
             { key: "order", title: "Order 231 · Orchard Lantern", detail: "2 kegs · 1 bbl", verb: "Review", tone: "primary", href: "/orders/order-id" },
             { key: "standing", title: "Lantern taproom standing", detail: "3 kegs · 1.5 bbl", verb: "Review", tone: "primary", href: "/replenishment?location=taproom#standing-allocations" },
@@ -46,7 +46,9 @@ it("draws one page heading and separates taproom records, standing allocations, 
   expect(out.match(/<details\b/g)).toHaveLength(2);
   expect(out).not.toMatch(/<details\b[^>]*\bopen/);
   expect(out).toContain("−3 kegs · −1.5 bbl");
-  expect(out).toContain("ATP · 2 kegs on hand · 5 allocated");
+  expect(out).toContain("Available · 2 kegs on hand · 5 allocated");
+  expect(out).toMatch(/<th\b[^>]*>[\s\S]*?Available[\s\S]*?<\/th>/);
+  expect(out).not.toMatch(/>ATP</);
   for (const href of ["/orders/order-id", "/replenishment?location=taproom#standing-allocations"]) {
     expect(out.split(`href="${href}"`)).toHaveLength(3);
   }
