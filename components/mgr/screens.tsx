@@ -1,3 +1,4 @@
+import { NotFoundView } from "@/components/mgr/views/not-found";
 import { BatchCompletionFixture } from "@/components/mgr/fixtures/batch-completion";
 import { AccountInvitationsView } from "@/components/mgr/views/account-invitations";
 import { CommandRecoveryView } from "@/components/mgr/views/command-recovery";
@@ -3338,5 +3339,19 @@ export const SCREENS: Screen[] = [
     states: [["empty", "no saved profiles · Add water profile"]],
     spec: "The empty list uses the same water-profile catalog view as the populated list. Profiles have no source or target classification; those choices belong on a recipe’s Water sheet.",
     body: <WaterProfilesView model={toWaterProfilesViewProps({ profiles: [] })} />,
+  },
+  {
+    step: 2, slice: 1, tab: "Beer", name: "Staff page not found",
+    job: "Leave an unknown staff address without losing the staff shell",
+    reads: "none", writes: "none",
+    states: [["unknown route", "/kegs/missing · the link is wrong or out of date"]],
+    body: <NotFoundView message="There is nothing at this address in this brewery. It may have been removed, or the link may be wrong." backLabel="Back to Today" backTo="Today" />,
+  },
+  {
+    step: 2, slice: 1, portal: "Order", name: "Portal page not found",
+    job: "Leave an unknown customer address without losing the portal shell",
+    reads: "none", writes: "none",
+    states: [["unknown route", "/portal/missing · the link is wrong or out of date"]],
+    body: <NotFoundView message="There is nothing at this address for your account. It may have been removed, or the link may be wrong." backLabel="Back to Orders" backTo="Order history" />,
   },
 ];
