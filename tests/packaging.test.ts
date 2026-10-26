@@ -735,7 +735,7 @@ describe("list_repack_parents", () => {
       child: { skuId: string; unit: string; quantity: number } | null;
     }[];
     expect(rows.map((r) => r.id)).toEqual([caseSkuId]);
-    expect(rows[0]).toMatchObject({ label: "Repack IPA — Repack IPA case", unit: "case of 6 4-packs" });
+    expect(rows[0]).toMatchObject({ label: "Repack IPA case", unit: "case of 6 4-packs" });
     expect(rows[0].bblPerUnit).toBeCloseTo(FOUR_PACK_BBL * PER_CASE, 6);
     expect(rows[0].child).toEqual({ skuId: fourPackSkuId, unit: "4-pack 16oz", quantity: PER_CASE });
   });

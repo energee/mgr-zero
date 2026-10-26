@@ -2,6 +2,7 @@
 import { formatDate } from "@/lib/date-format";
 import { batNo, runNo } from "./doc-no";
 import { toRecipientViews, type LotTraceRecipientView, type LotTraceSnapshot } from "./lot-trace-view";
+import { sentenceCase } from "./labels";
 
 export type MaterialLotTraceSnapshot = {
   lot: { id: string; code: string; material: string; unit: string; vendor: string | null; received_on: string; best_by: string | null };
@@ -32,7 +33,7 @@ export function toMaterialLotTraceViewProps(snapshot: MaterialLotTraceSnapshot, 
     uses: snapshot.used.map(use => ({
       id: use.id,
       title: use.batch_id ? batNo(batches.get(use.batch_id)!.batch_no) : use.run_id ? runNo(runs.get(use.run_id)!.run_no) : "Unlinked consumption",
-      detail: [ `${Number(use.qty)} ${snapshot.lot.unit}`, use.stage, formatDate(use.at, timeZone),
+      detail: [ `${Number(use.qty)} ${snapshot.lot.unit}`, sentenceCase(use.stage), formatDate(use.at, timeZone),
         use.batch_id ? batches.get(use.batch_id)!.in_vessel ?? (batches.get(use.batch_id)!.closed_at ? "Completed" : "No current vessel") : null,
       ].filter(Boolean).join(" · "),
     })),

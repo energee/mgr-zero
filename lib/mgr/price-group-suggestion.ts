@@ -29,9 +29,9 @@ const perBbl = (cents: number) => `${money(cents)}/bbl`;
 export function suggestPriceGroup({ costCentsPerBbl, uncosted, groups }: SuggestionInput): PriceGroupSuggestion | null {
   if (uncosted.length) return { kind: "unknown", title: "Recipe cost unknown", detail: `${plural(uncosted.length, "ingredient has", "ingredients have")} no receipt cost yet: ${namesUpTo3(uncosted)}` };
   if (costCentsPerBbl == null) return null;
-  const cost = `recipe cost ${perBbl(costCentsPerBbl)}`;
+  const cost = `Recipe cost ${perBbl(costCentsPerBbl)}`;
   const banded = [...groups].sort(byPosition).flatMap((g) => g.cost_ceiling_cents == null ? [] : [{ id: g.id, name: g.name, ceiling: g.cost_ceiling_cents }]);
-  if (!banded.length) return { kind: "cost", title: `Recipe cost ${perBbl(costCentsPerBbl)}`, detail: "no price group has a ceiling" };
+  if (!banded.length) return { kind: "cost", title: `Recipe cost ${perBbl(costCentsPerBbl)}`, detail: "No price group has a ceiling." };
   const hit = banded.find((g) => g.ceiling >= costCentsPerBbl);
   if (!hit) return { kind: "above", title: "Above every ceiling", detail: `${cost} · highest ceiling ${perBbl(Math.max(...banded.map((g) => g.ceiling)))}` };
   return { kind: "group", groupId: hit.id, title: `Suggested group ${hit.name}`, detail: `${cost} · ceiling ${perBbl(hit.ceiling)}` };

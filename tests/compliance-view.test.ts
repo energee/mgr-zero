@@ -419,7 +419,7 @@ describe("Material lot trace (#817)", () => {
   it("prints received, used and packaged days in the one date format (#991)", () => {
     const model = toMaterialLotTraceViewProps({ ...materialLotTraceCitra, used: [{ ...materialLotTraceCitra.used[0], at: "2026-08-10T02:00:00Z" }] }, DEMO_TIME_ZONE);
     expect(model.detail).toBe("Citra hops · Fictional Hop Supply · received Aug 1, 2026");
-    expect(model.uses[0].detail).toBe("4 lb · boil · Aug 9, 2026 · No current vessel");
+    expect(model.uses[0].detail).toBe("4 lb · Boil · Aug 9, 2026 · No current vessel");
     expect(model.lots[0].detail).toBe("packaged Aug 31, 2026");
   });
   it("does not offer an Open action for untracked ingredient facts", () => {

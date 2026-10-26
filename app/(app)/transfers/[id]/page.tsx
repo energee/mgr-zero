@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 type Detail = {
   transfer: { id: string; from_location_id: string; transfer_no: number | null; status: string; note: string | null; cancel_reason: string | null; received_at: string | null; from_location: { name: string } | null; to_location: { name: string } | null };
-  lines: { id: string; sku_id: string | null; material_id: string | null; qty: number; qty_picked: number | null; from_bin_id: string; to_bin_id: string; keg_size: string | null; skus: { name: string } | null; materials: { name: string } | null; keg_pools: { name: string } | null }[];
+  lines: { id: string; sku_id: string | null; material_id: string | null; qty: number; qty_picked: number | null; from_bin_id: string; to_bin_id: string; keg_size: string | null; skus: { name: string } | null; materials: { name: string; base_uom: string } | null; keg_pools: { name: string } | null }[];
   bins: { id: string; name: string }[];
 };
 
@@ -40,7 +40,11 @@ export default async function TransferPage({ params }: { params: Promise<{ id: s
   const stock = brewery.roles.includes("admin") || brewery.roles.includes("warehouse") ? await runCommand("get_bin_move_stock", { locationId: transfer.from_location_id }, ctx) as BinMoveStock[] : [];
   const binById = new Map(bins.map((b) => [b.id, b.name]));
   const bin = (id: string) => binById.get(id) ?? "—";
-  const what = (l: Detail["lines"][number]) => l.skus?.name ?? l.materials?.name ?? (l.keg_pools ? `${l.keg_pools.name} · ${l.keg_size?.replace("_", " ")}` : "Line");
+  const what = (line: Detail["lines"][number]) => {
+    if (line.skus) return { name: line.skus.name, unit: "units" };
+    if (line.materials) return { name: line.materials.name, unit: line.materials.base_uom };
+    return { name: line.keg_pools ? `${line.keg_pools.name} · ${line.keg_size?.replace("_", " ")}` : "Line", unit: "kegs" };
+  };
   const done = transfer.status === "received" || transfer.status === "cancelled";
   return (
     <TransferDetailView
@@ -56,7 +60,7 @@ export default async function TransferPage({ params }: { params: Promise<{ id: s
         },
         lines: lines.map((l) => ({
           id: l.id,
-          name: what(l),
+          ...what(l),
           from_bin: bin(l.from_bin_id),
           to_bin: bin(l.to_bin_id),
           qty: Number(l.qty),

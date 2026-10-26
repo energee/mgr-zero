@@ -115,7 +115,7 @@ export function toParsViewProps({
     title: shortfall.skuName,
     backHref,
     atp: signedQtyVolume(Number(shortfall.atp), bblPerUnit, unit),
-    atpDetail: `ATP · ${plural(Number(shortfall.onHand), unit)} on hand · ${Number(shortfall.allocated)} allocated`,
+    atpDetail: `Available · ${plural(Number(shortfall.onHand), unit)} on hand · ${Number(shortfall.allocated)} allocated`,
     rows,
   };
 }
