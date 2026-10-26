@@ -26,8 +26,9 @@ export function LoginForm({
   sent,
   portal,
   email,
+  next,
   ...props
-}: React.ComponentProps<"div"> & { error?: string; sent?: boolean; portal?: boolean; email?: string }) {
+}: React.ComponentProps<"div"> & { error?: string; sent?: boolean; portal?: boolean; email?: string; next?: string }) {
   const [state, submit] = useActionState(login, { email, error });
   const baseModel = portal ? portalSignInModel : signInModel;
   const model = {
@@ -44,7 +45,10 @@ export function LoginForm({
           action={submit}
           secondaryAction={portal ? undefined : emailLogin}
           defaults={{ email: state.email }}
-          hidden={portal ? <input type="hidden" name="portal" value="1" /> : null}
+          hidden={<>
+            {portal ? <input type="hidden" name="portal" value="1" /> : null}
+            {next ? <input type="hidden" name="next" value={next} /> : null}
+          </>}
           linkHref={portal ? "/reset?portal=1" : "/reset"}
         />
       </EntrySurface>

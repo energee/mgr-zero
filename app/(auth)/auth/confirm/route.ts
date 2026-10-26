@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     const { db, redirect } = authClient(req);
     const { data, error } = await db.auth.exchangeCodeForSession(code);
     if (!error) {
-      if (new URL(next).pathname === "/" && await hasPendingInvitations(db, data.user.id)) return redirect("/invitations");
+      if (await hasPendingInvitations(db, data.user.id)) return redirect("/invitations");
       return redirect(next);
     }
     return redirect("/reset?expired=1");

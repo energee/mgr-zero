@@ -35,20 +35,24 @@ export async function login(_previous: LoginState, form: FormData): Promise<Logi
   const auth = createRequestAuthContext(() => Promise.resolve(db));
   const identity = await auth.getIdentity();
   if (!identity) return failure;
-  redirect(await signInDestination(auth));
+  const next = form.get("next");
+  redirect(await signInDestination(auth, typeof next === "string" ? next : undefined));
 }
 
 /** Passwordless sign-in validates email even when browser validation is unavailable. */
 export async function emailLogin(form: FormData) {
+  const next = form.get("next");
+  const destination = passwordReturnHref(typeof next === "string" ? next : undefined);
+  const returnQuery = typeof next === "string" ? `&${new URLSearchParams({ next: destination })}` : "";
   const email = z.string().email().safeParse(form.get("email"));
-  if (!email.success) redirect("/login?error=email");
+  if (!email.success) redirect(`/login?error=email${returnQuery}`);
   const db = await createServerClient();
   const origin = (await headers()).get("origin") ?? "";
   await db.auth.signInWithOtp({
     email: email.data,
-    options: { shouldCreateUser: false, emailRedirectTo: `${origin}/auth/confirm?next=/` },
+    options: { shouldCreateUser: false, emailRedirectTo: `${origin}/auth/confirm?${new URLSearchParams({ next: destination })}` },
   });
-  redirect("/login?sent=1");
+  redirect(`/login?sent=1${returnQuery}`);
 }
 
 export async function logout() {
