@@ -3019,7 +3019,7 @@ export const SCREENS: Screen[] = [
     job: "Create or edit one physical subdivision of a location",
     reads: "list_bins",
     writes: "create_bin · update_bin · delete_bin",
-    states: [["permission", "warehouse or admin required", 1], ["missing name", "Still needed: Enter a bin name · submit blocked"], ["duplicate name", "A bin named Dry already exists here · inline error and submit blocked"], ["last bin", "rename it instead of removing it", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1], ["menu bin", "a POS menu uses it · point the menu at another bin first", 1], ["never used", "Remove asks to confirm first"]],
+    states: [["permission", "warehouse or admin required", 1], ["missing name", "Still needed: a bin name · submit blocked"], ["duplicate name", "A bin named Dry already exists here · inline error and submit blocked"], ["last bin", "rename it instead of removing it", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1], ["menu bin", "a POS menu uses it · point the menu at another bin first", 1], ["never used", "Remove asks to confirm first"]],
     spec: "Titled with the bin’s name (Edit bin · Cold), or Add bin. Remove sits in its own section below Save and opens a confirmation that states the rule. Taps are not bins; the note links the Tap board.",
     body: <BinView model={toBinViewProps(binCold)} />,
   },
