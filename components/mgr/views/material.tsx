@@ -77,7 +77,7 @@ export function MaterialView({ model, controls = {}, messages, footer }: {
       )}
       {E.row(
         "Lot-tracked",
-        "receipts name a lot · consumption picks one",
+        "Receipts name a lot. Consumption picks one.",
         <Switch
           checked={controls.lotTracked ? model.lotTracked : undefined}
           defaultChecked={controls.lotTracked ? undefined : model.lotTracked}
@@ -88,7 +88,7 @@ export function MaterialView({ model, controls = {}, messages, footer }: {
       )}
       {E.row(
         "Active",
-        "available to recipes and purchase orders",
+        "This material is available to recipes and purchase orders.",
         <Switch
           checked={controls.active ? model.active : undefined}
           defaultChecked={controls.active ? undefined : model.active}

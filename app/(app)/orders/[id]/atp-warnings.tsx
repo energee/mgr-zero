@@ -23,7 +23,7 @@ export function AtpWarnings({ warnings, skuNames, saved }: { warnings: AtpWarnin
       {saved && <p role="status" className="text-sm">{saved}</p>}
       {warnings.map((w) => (
         <CommandFormMessage key={w.sku_id} tone="warning">
-          ATP negative for {skuNames.get(w.sku_id) ?? w.sku_id}
+          Available is below zero for {skuNames.get(w.sku_id) ?? w.sku_id}
         </CommandFormMessage>
       ))}
     </div>

@@ -46,7 +46,7 @@ export function toShipmentDoneViewProps({ order, invoice, lines, backHref, invoi
     if (qty <= 0) continue;
     const name = l.skus?.name ?? "Line";
     const short = l.short_reason ? ` · short: ${l.short_reason}` : "";
-    tape.push([`−${qty} ${name} · sale removal · ${dest}${short}`, saleVolume(qty, l.bbl_per_unit)]);
+    tape.push([`−${qty} ${name} · removed for sale${dest ? ` · ships to ${dest}` : ""}${short}`, saleVolume(qty, l.bbl_per_unit)]);
   }
   if (invoice) tape.push([inv, "invoiced now"]);
   return {

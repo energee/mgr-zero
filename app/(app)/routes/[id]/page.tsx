@@ -1,6 +1,6 @@
 // app/(app)/routes/[id]/page.tsx — one route. Planned: the builder
 // (route-form.tsx → save_route, depart_route). Departed: the run (stops with
-// delivered times, Resume on the next open stop, route-run.tsx →
+// delivered times, Deliver on the next open stop, route-run.tsx →
 // return_route). Returned: read-only with the return time.
 import { E } from "@/components/mgr/e";
 import { DriverRouteView } from "@/components/mgr/views/driver-route";
@@ -12,6 +12,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { notFound } from "next/navigation";
 import { formatTime } from "@/lib/time-window";
+import { sentenceCase } from "@/lib/mgr/labels";
 import { driverLabel, type RouteList } from "../labels";
 import { RouteForm } from "../route-form";
 import { ReturnRoute } from "../route-run";
@@ -64,7 +65,7 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
             title: `Stop ${s.stop_no} · ${s.label}`,
             outstanding: s.outstanding_qty,
             returnHref: `/work/deliveries/${s.id}/return`,
-            detail: s.delivered_at ? `${s.outcome ?? "delivered"} ${formatTime(s.delivered_at, brewery.timeZone)}` : "",
+            detail: s.delivered_at ? `${sentenceCase(s.outcome ?? "delivered")} ${formatTime(s.delivered_at, brewery.timeZone)}` : "",
           })),
         }}
         action={action}
@@ -81,7 +82,7 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
         stops: route.stops.map((s) => {
           const isNext = s.id === next?.id;
           if (s.delivered_at) {
-            const done = { key: s.id, title: `Stop ${s.stop_no} · ${s.label}`, detail: `${s.outcome ?? "delivered"} ${formatTime(s.delivered_at, brewery.timeZone)}` };
+            const done = { key: s.id, title: `Stop ${s.stop_no} · ${s.label}`, detail: `${sentenceCase(s.outcome ?? "delivered")} ${formatTime(s.delivered_at, brewery.timeZone)}` };
             return s.outstanding_qty
               ? { ...done, trailing: `${s.outstanding_qty} awaiting check-in`, verb: "Check in", href: `/work/deliveries/${s.id}/return`, warning: true }
               : { ...done, trailing: "done", ok: true };
@@ -89,8 +90,8 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
           return {
             key: s.id,
             title: `Stop ${s.stop_no} · ${s.label}`,
-            detail: isNext ? "next" : "later",
-            verb: isNext ? "Resume" : undefined,
+            detail: isNext ? "Next" : "Later",
+            verb: isNext ? "Deliver" : undefined,
             href: isNext ? `/work/deliveries/${s.id}` : undefined,
             warning: isNext,
           };

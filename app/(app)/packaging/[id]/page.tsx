@@ -6,7 +6,6 @@ import { cache } from "react";
 import type { PackagingSourceOccupancy as Occupancy } from "@/components/mgr/views/plan-actions";
 import { ChangePlan } from "../../plan-actions";
 import type { PackagingClosePlan, PackagingMaterialRecord } from "@/lib/mgr/packaging-actuals";
-import { E } from "@/components/mgr/e";
 import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
 import { RunClosedView } from "@/components/mgr/views/run-closed";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -74,20 +73,15 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
     <ClosePackagingRunView
       model={{
         title, backTo: "Packaging", backHref: "/packaging", brand: run.brand_name ?? "—",
-        plannedOn: run.planned_on, cancelled: !!run.cancelled_at, source: run.vessel_name ?? "no source yet", showCloseReview: false,
+        plannedOn: run.planned_on, cancelled: !!run.cancelled_at, source: run.vessel_name ?? "No source yet", showCloseReview: false,
         plannedOutputs: outputs.map((o) => [o.sku_name ?? o.sku_id.slice(0, 8), Number(o.qty_planned), o.qty_actual === null ? "Not recorded" : Number(o.qty_actual)]),
       }}
       planActions={!run.started_at ? <ChangePlan kind="packaging_run" id={run.id} plannedOn={run.planned_on} /> : undefined}
-      action={
-        <>
-          {E.sp()}
-          {!run.occupancy_id
-            ? <PickTankForm runId={run.id} occupancies={occupancies} />
-            : !run.started_at
-              ? <StartRunButton runId={run.id} />
-              : <CloseRunForm runId={run.id} outputs={outputs} locations={locations} bins={bins} today={today} initialPlan={closePlan!} />}
-        </>
-      }
+      action={!run.occupancy_id
+        ? <PickTankForm runId={run.id} occupancies={occupancies} />
+        : !run.started_at
+          ? <StartRunButton runId={run.id} />
+          : <CloseRunForm runId={run.id} outputs={outputs} locations={locations} bins={bins} today={today} initialPlan={closePlan!} />}
     />
   );
 }

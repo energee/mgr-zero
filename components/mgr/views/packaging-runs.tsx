@@ -32,7 +32,7 @@ function RecentTable({ rows }: { rows: PackagingRunRowView[] }) {
   const yieldPercent = rows.some(row => row.yieldPercent !== undefined);
   const loss = rows.some(row => row.lossBbl !== undefined);
   return <RecordTable
-    headers={["Run", "Brand", "Status", "Finished date", "Planned quantity", ...(lot ? ["Lot"] : []), ...(output ? ["Output"] : []), ...(yieldPercent ? ["Yield"] : []), ...(loss ? ["Loss (bbl)"] : [])]}
+    headers={["Run", "Brand", "Status", "Closed or cancelled", "Planned quantity", ...(lot ? ["Lot"] : []), ...(output ? ["Output"] : []), ...(yieldPercent ? ["Yield"] : []), ...(loss ? ["Loss (bbl)"] : [])]}
     align={["l", "l", "l", "l", "r", ...(lot ? ["l" as const] : []), ...(output ? ["r" as const] : []), ...(yieldPercent ? ["r" as const] : []), ...(loss ? ["r" as const] : [])]}
     rows={rows.map(row => ({
       key: row.key,

@@ -6,6 +6,7 @@ import { bblExact, bblFixed } from "@/lib/volume";
 import { formatDate } from "@/lib/date-format";
 import type { EmptyState } from "./empty-state";
 import { periodStatus, type PeriodStatus } from "@/lib/compliance-period";
+import { submitReason } from "./submit-reason";
 
 export type MonthlyComplianceSnapshot = {
   monthLabel: string;
@@ -112,15 +113,32 @@ export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot
       source: loss,
       key: loss.adjustment_id,
       title: `Batch ${loss.batch_no} · ${loss.kind} loss`,
-      detail: `Recorded ${loss.original_bbl} bbl · ${loss.remaining_bbl} bbl left to reattribute`,
+      detail: `Recorded ${bblExact(Number(loss.original_bbl), 8)} · ${bblExact(Number(loss.remaining_bbl), 8)} left to reattribute`,
       allocations: loss.allocations.map((allocation) => ({
         key: allocation.id,
-        title: `${allocation.classification[0].toUpperCase()}${allocation.classification.slice(1)}`,
+        title: sentenceCase(allocation.classification),
         detail: `${allocation.destination_state ? `Destination ${allocation.destination_state}` : allocation.tax_treatment ? `Reported as ${label(allocation.tax_treatment)}` : ""} · reattributed earlier`.replace(/^ · /, ""),
-        bbl: `${allocation.bbl} bbl`,
+        bbl: bblExact(Number(allocation.bbl), 8),
       })),
     })),
   };
+}
+
+function bblUnits(value: string) {
+  if (!/^(?:\d+(?:\.\d{0,8})?|\.\d{1,8})$/.test(value) || !/[1-9]/.test(value)) return null;
+  const [whole = "0", fraction = ""] = value.split(".");
+  return BigInt(whole || "0") * BigInt(100_000_000) + BigInt(fraction.padEnd(8, "0") || "0");
+}
+
+/** Keep the reason and Save eligibility on the same exact, eight-decimal comparison. */
+export function lossReviewReason(amount: string, remaining: string, target: "sample" | "taproom" | "destruction", state: string): string | null {
+  const amountUnits = bblUnits(amount);
+  const remainingUnits = bblUnits(remaining);
+  const missing: string[] = [];
+  if (amountUnits === null) missing.push("a positive amount with up to eight decimal places");
+  else if (remainingUnits === null || amountUnits > remainingUnits) missing.push(`an amount no greater than the remaining ${bblExact(Number(remaining), 8)}`);
+  if (target === "sample" && !/^[A-Z]{2}$/.test(state)) missing.push("a two-letter destination state");
+  return submitReason(missing);
 }
 
 /** The Before the books opened empty state; `action` is absent for roles that cannot open Settings. */
