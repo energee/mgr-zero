@@ -46,6 +46,7 @@ const pureTests = [
   "tests/invite-entry-view.test.ts",
   "tests/password-page.test.ts",
   "tests/auth-actions.test.ts",
+  "tests/qbo-pay-route.test.ts",
   "tests/register-cell-keys.test.ts",
   "tests/invite-errors.test.ts",
   "tests/command-field-shapes.test.ts",

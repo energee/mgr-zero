@@ -35,6 +35,8 @@ import LoginPage from "@/app/(auth)/login/page";
 import PortalLoginPage from "@/app/(auth)/portal/login/page";
 import AcceptPage from "@/app/(auth)/accept/page";
 import { LoginForm } from "@/components/login-form";
+import { getActiveCustomer, getPortalContext } from "@/lib/portal";
+import { getActiveBrewery } from "@/lib/brewery";
 
 afterEach(() => {
   request.db = undefined;
@@ -56,6 +58,17 @@ async function signInAs(email: string, fetch: typeof globalThis.fetch) {
 }
 
 describe("request authentication", () => {
+  it("sends signed-out portal pages to portal sign-in without changing staff entry (#1416)", async () => {
+    request.db = requestClient(globalThis.fetch);
+    await expect(getActiveCustomer()).rejects.toThrow("redirect:/portal/login");
+    await expect(getPortalContext()).rejects.toThrow("redirect:/portal/login");
+    await expect(getActiveBrewery()).rejects.toThrow("redirect:/login");
+    const html = renderToStaticMarkup(await PortalLoginPage({ searchParams: Promise.resolve({}) }));
+    expect(html).toContain("Sign in to your account");
+    expect(html).toContain('href="/reset?portal=1"');
+    expect(html).not.toContain("Email me a link");
+  });
+
   it("distinguishes an unauthenticated request from a valid identity without brewery membership", async () => {
     request.db = requestClient(globalThis.fetch);
     await expect(buildContext(crypto.randomUUID())).rejects.toMatchObject({
