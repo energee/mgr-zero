@@ -142,7 +142,7 @@ export function tapSheetNeeds(sheet: TapBoardSheet): TapSheetNeeds {
     if (!fields.guestLabel.trim()) needs.guestLabel = "a guest keg label";
     if (!(Number.isFinite(nominalBbl) && nominalBbl > 0)) needs.guestNominalBbl = "a guest nominal bbl above zero";
   }
-  if (fields.tapNumber !== "" && !tapNumberSchema.safeParse(fields.tapNumber).success) needs.tapNumber = TAP_NUMBER_NEED;
+  if (fields.tapNumber.trim() !== "" && !tapNumberSchema.safeParse(fields.tapNumber).success) needs.tapNumber = TAP_NUMBER_NEED;
   return needs;
 }
 

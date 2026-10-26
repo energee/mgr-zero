@@ -171,6 +171,12 @@ describe("Tap board polish (#1302)", () => {
     expect(render({ ...tapBoard, snapshot: { open: [], history: [] } })).not.toContain("Unnumbered kegs sort last.");
   });
 
+  it("keeps an empty on-tap list compact", () => {
+    const html = render({ ...tapBoard, snapshot: { open: [], history: [] } });
+    expect(html).toContain("No kegs are on tap.");
+    expect(html).not.toContain('data-slot="empty"');
+  });
+
   it("keeps legacy numbers visible and renders supplied actor names without inventing handles", () => {
     const state = { ...tapBoard, snapshot: { open: [{ ...tapBoard.snapshot.open[0], tap_number: "abc", opened_by_label: "Dana Brewer" }], history: [] } };
     const html = render(state);
@@ -187,7 +193,8 @@ describe("Tap board polish (#1302)", () => {
     const html = renderToStaticMarkup(createElement(TapKegView, { sheet, skus: tapBoardSkus, timeZone: "America/New_York" }));
     expect(html).toMatch(/inputMode="numeric"/i);
     expect(html).toMatch(/maxLength="80"/i);
-    expect(html).toContain("a positive whole tap number up to 9007199254740991, or no number");
+    expect(html).toContain("a positive whole tap number, or no number");
+    expect(html).not.toContain("9007199254740991");
     const swap = renderToStaticMarkup(createElement(TapKegView, { sheet: swapKeg, skus: tapBoardSkus, timeZone: "America/New_York" }));
     expect(swap).toContain("Swap closes this keg and opens its replacement together.");
     expect(swap).not.toContain("atomic swap");
