@@ -31,6 +31,7 @@ describe("route error reference (#1299)", () => {
     const line = String(log.mock.calls[0].join(" "));
     expect(line).toContain('"digest":"4012345678"');
     expect(line).toContain('"routePath":"/(app)/page"');
+    expect(line).not.toContain("secret");
     log.mockRestore();
   });
 });
