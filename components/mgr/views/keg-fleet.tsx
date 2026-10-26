@@ -1,6 +1,7 @@
 // components/mgr/views/keg-fleet.tsx — Keg fleet: pool rows, navigation, and
 // shared pool fields. The complete Record keg event surface lives in
 // keg-event-form.tsx, mounted by both the inventory fixture and live adapter.
+"use client";
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
@@ -8,7 +9,8 @@ import { FieldDescription } from "@/components/ui/field";
 import { KegEventFixtureForm } from "@/components/mgr/views/keg-event-form";
 import { KEG_POOL_KINDS } from "@/lib/mgr/enums";
 import { KIND_LABEL } from "@/lib/mgr/keg-labels";
-import type { KegFleetViewModel, KegOption, KegPoolValue } from "@/lib/mgr/keg-fleet-view";
+import { kegPoolFieldErrors, type KegFleetViewModel, type KegOption, type KegPoolValue } from "@/lib/mgr/keg-fleet-view";
+import { useTouchedLines } from "@/lib/mgr/touched-lines";
 
 export { KegEventFields } from "@/components/mgr/views/keg-event-form";
 export type { KegFleetViewModel };
@@ -19,10 +21,12 @@ const KIND_OPTIONS = KEG_POOL_KINDS.map((value) => ({ value, label: KIND_LABEL[v
  *  creation) and offers In service. Without onChange the fields draw the
  *  value uncontrolled, as the inventory does. Each money field says which
  *  pools it applies to (#1119). */
-export function KegPoolFields({ value, vendors, editing = false, onChange }: {
-  value: KegPoolValue; vendors: KegOption[]; editing?: boolean; onChange?: (next: KegPoolValue) => void;
+export function KegPoolFields({ value, vendors, editing = false, onChange, attempted = false }: {
+  value: KegPoolValue; vendors: KegOption[]; editing?: boolean; onChange?: (next: KegPoolValue) => void; attempted?: boolean;
 }) {
   const set = <K extends keyof KegPoolValue>(key: K) => onChange ? (next: KegPoolValue[K]) => onChange({ ...value, [key]: next }) : undefined;
+  const touched = useTouchedLines(!onChange);
+  const errors = kegPoolFieldErrors(value);
   // update_keg_pool keeps a stored per-fill cost when the field is cleared, so Edit never says to leave it blank.
   const perFillRequired = value.kind === "pay_per_fill";
   let perFillHelp = "Optional for this pool. Blank means not set, not $0.00.";
@@ -39,11 +43,11 @@ export function KegPoolFields({ value, vendors, editing = false, onChange }: {
         ? E.fld("Vendor", "None · the brewery owns these kegs")
         : E.pick("Vendor", value.vendorId, vendors, { id: "pool-vendor", onChange: set("vendorId"), placeholder: "Select a vendor", required: true })}
       <div className="flex min-w-0 flex-col gap-2">
-        {E.edit(`Per-fill cost ($) · ${perFillRequired ? "required" : "optional"}`, value.perFill, "number", undefined, { id: "pool-per-fill", min: 0, step: 0.01, placeholder: perFillRequired ? "Enter cost" : "Not set", onChange: set("perFill"), required: perFillRequired, "aria-describedby": "pool-per-fill-help" })}
+        {E.edit(`Per-fill cost ($) · ${perFillRequired ? "required" : "optional"}`, value.perFill, "number", undefined, { id: "pool-per-fill", min: 0, step: 0.01, placeholder: perFillRequired ? "Enter cost" : "Not set", onChange: set("perFill"), onBlur: () => touched.touch(0), error: attempted || touched.shown(0) ? errors.perFill : undefined, required: perFillRequired, "aria-describedby": "pool-per-fill-help" })}
         <FieldDescription id="pool-per-fill-help">{perFillHelp}</FieldDescription>
       </div>
       <div className="flex min-w-0 flex-col gap-2">
-        {E.edit("Deposit per keg ($)", value.deposit, "number", undefined, { id: "pool-deposit", min: 0, step: 0.01, onChange: set("deposit"), "aria-describedby": "pool-deposit-help" })}
+        {E.edit("Deposit per keg ($)", value.deposit, "number", undefined, { id: "pool-deposit", min: 0, step: 0.01, onChange: set("deposit"), onBlur: () => touched.touch(1), error: attempted || touched.shown(1) ? errors.deposit : undefined, "aria-describedby": "pool-deposit-help" })}
         <FieldDescription id="pool-deposit-help">Charged on wholesale orders for each keg from this pool. Defaults to $0.00: no deposit.</FieldDescription>
       </div>
       {editing && <label className="flex items-center gap-2 text-sm">{E.sw(value.active, "In service", set("active"))}In service</label>}
