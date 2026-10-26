@@ -73,7 +73,7 @@ Fill these before testing.
 | Environment | Preview or Production. Preview is Supabase `ugzhwxzictzvrzlacjmv`; Production is `uogrvqmrbmolvtftotsf` |
 | URL | The deployment URL opened in the browser |
 | Deployed SHA | Vercel dashboard → Deployments → the deployment's commit, or `vercel inspect <url>` |
-| Model | The effective model in **Settings → AI model**, checked against the brewery/env/default precedence above at the deployed SHA; it is not shown in the chat header |
+| Model | The effective model, resolved by the order above at the deployed SHA. The chat header does not show it |
 | Account | A synthetic staff user and its role; never a real customer |
 | Brewery | A synthetic test brewery with at least one SKU, location and on-hand stock |
 
