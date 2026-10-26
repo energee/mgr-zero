@@ -12,6 +12,7 @@ import { notFound } from "next/navigation";
 import { readingIdentity } from "@/components/mgr/views/fermentation-reading";
 import { ReadingForm } from "./reading-form";
 import { navTitle } from "@/lib/mgr/nav";
+import VesselPage from "@/app/(app)/cellar/vessels/[id]/page";
 
 export async function generateMetadata({ params }: { params: Promise<{ occupancyId: string }> }) {
   const { occupancyId } = await params;
@@ -39,18 +40,22 @@ export default async function OccupancyReadingPage({ params }: { params: Promise
   ]) as [Reading[], { effective: GravityUnit }];
 
   return (
-    <ReadingForm
-      occupancyId={occupancyId}
-      identity={readingIdentity(occupancy)}
-      unit={gravityUnit.effective}
-      roles={brewery.roles}
-      openByDefault
-      returnHref={`/cellar/vessels/${occupancy.vessel_id}`}
-      prior={readings[0] ? {
-        tempF: readings[0].temp_f == null ? undefined : String(readings[0].temp_f),
-        gravity: readings[0].gravity_plato == null ? undefined : formatGravity(readings[0].gravity_plato, gravityUnit.effective),
-        ph: readings[0].ph == null ? undefined : String(readings[0].ph),
-      } : undefined}
-    />
+    <>
+      <VesselPage params={Promise.resolve({ id: occupancy.vessel_id })} />
+      <ReadingForm
+        occupancyId={occupancyId}
+        identity={readingIdentity(occupancy)}
+        unit={gravityUnit.effective}
+        timeZone={brewery.timeZone}
+        roles={brewery.roles}
+        openByDefault
+        returnHref={`/cellar/vessels/${occupancy.vessel_id}`}
+        prior={readings[0] ? {
+          tempF: readings[0].temp_f == null ? undefined : String(readings[0].temp_f),
+          gravity: readings[0].gravity_plato == null ? undefined : formatGravity(readings[0].gravity_plato, gravityUnit.effective),
+          ph: readings[0].ph == null ? undefined : String(readings[0].ph),
+        } : undefined}
+      />
+    </>
   );
 }
