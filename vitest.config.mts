@@ -86,6 +86,7 @@ const pureTests = [
   "tests/purchasing-view.test.ts",
   "tests/delivery-view.test.ts",
   "tests/transfers-view.test.ts",
+  "tests/disabled-action-reasons.test.ts",
 ];
 
 export default defineConfig({
