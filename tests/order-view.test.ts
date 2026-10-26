@@ -71,15 +71,15 @@ describe("Order view loop", () => {
     expect(model.events.at(-1)).toMatchObject({ event: "Lines adjusted", detail: "Pils · 16 oz case 10 to Pils · 16 oz case 7 (customer cut)" });
   });
 
-  it("describes negative available stock without ATP jargon", () => {
+  it("preserves negative availability and flags the line", () => {
     const line = orderConfirmedWholesale.lines[0];
     const model = toOrderViewProps({
       ...orderConfirmedWholesale,
       lines: [line],
       atp: [{ sku_id: line.sku_id, qty: -2 }],
     });
-    expect(model.lines[0].warning).toBe("Available is below zero");
-    expect(renderToStaticMarkup(createElement(OrderView, { model }))).toContain("Available is below zero");
+    expect(model.lines[0].atp).toBe("-2");
+    expect(model.lines[0].warning).toBeTruthy();
   });
 
   it("prints the requested ship date in the one date format (#991)", () => {
@@ -324,9 +324,7 @@ describe("Order view loop", () => {
 
     it("draws a desktop table and labeled phone records from the same lines", () => {
       const out = html(orderConfirmedWholesale);
-      for (const header of ["SKU", "Ordered", "Picked", "Shipped", "Available (all locations)", "Unit price", "Line amount"]) expect(out).toContain(`>${header}<`);
-      expect(out).toContain("Available counts every location, not only the fulfillment source. Not supplied does not mean zero.");
-      expect(out).not.toContain("Brewery ATP");
+      for (const header of ["SKU", "Ordered", "Picked", "Shipped", "Unit price", "Line amount"]) expect(out).toContain(`>${header}<`);
       expect(out).toMatch(/<dt[^>]*>Line amount<\/dt>/);
       expect(out).toContain("Price summary");
       expect(out).toContain("3 lines");

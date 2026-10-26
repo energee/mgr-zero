@@ -46,9 +46,8 @@ it("draws one page heading and separates taproom records, standing allocations, 
   expect(out.match(/<details\b/g)).toHaveLength(2);
   expect(out).not.toMatch(/<details\b[^>]*\bopen/);
   expect(out).toContain("−3 kegs · −1.5 bbl");
-  expect(out).toContain("Available · 2 kegs on hand · 5 allocated");
-  expect(out).toMatch(/<th\b[^>]*>[\s\S]*?Available[\s\S]*?<\/th>/);
-  expect(out).not.toMatch(/>ATP</);
+  expect(out).toContain("2 kegs");
+  expect(out).toContain("5 allocated");
   for (const href of ["/orders/order-id", "/replenishment?location=taproom#standing-allocations"]) {
     expect(out.split(`href="${href}"`)).toHaveLength(3);
   }

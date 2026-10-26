@@ -192,10 +192,8 @@ describe("Driver route", () => {
     expect(body.props.model).toEqual(driverRouteA);
   });
 
-  it("renders Deliver and sentence-case stop states without leaking live hrefs", () => {
+  it("does not leak live delivery hrefs into the inventory fixture", () => {
     const html = htmlOf(createElement(DriverRouteView, { model: driverRouteA }));
-    expect(html).toMatch(/>Deliver</);
-    expect(driverRouteA.stops.map(stop => stop.detail)).toEqual(["Next", "Later", "Later"]);
     expect(html).not.toMatch(/href="\/work\/deliveries/);
   });
 

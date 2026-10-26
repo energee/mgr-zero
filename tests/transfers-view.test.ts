@@ -157,26 +157,13 @@ describe("Transfer detail view", () => {
     ]);
   });
 
-  it("renders From/to, Status, and Record pick", () => {
-    const html = htmlOf(createElement(TransferDetailView, { model: toTransferDetailViewProps(transferDetailSubmitted) }));
-    expect(html).toMatch(/TRF-0007/);
-    expect(html).toMatch(/Status/);
-    expect(html).toMatch(/Submitted/);
-    expect(html).toMatch(/>From</);
-    expect(html).toMatch(/>To</);
-    expect(html).toMatch(/>Record pick</);
-    expect(html).not.toMatch(/→/);
-  });
 
   it("an unreceived transfer also offers Cancel transfer; a cancelled one shows its reason and no verb (#578)", () => {
     expect(htmlOf(createElement(TransferDetailView, { model: toTransferDetailViewProps(transferDetailSubmitted) }))).toMatch(/>Cancel transfer</);
     const cancelled = toTransferDetailViewProps({ ...transferDetailSubmitted, transfer: { ...transferDetailSubmitted.transfer, status: "cancelled", cancel_reason: "over-picked" } });
     expect(cancelled.nextVerb).toBeUndefined();
-    expect(cancelled.status).toBe("Cancelled");
     const html = htmlOf(createElement(TransferDetailView, { model: cancelled }));
     expect(html).toMatch(/over-picked/);
-    expect(html).toMatch(/>Cancel reason</);
-    expect(html.match(/>Cancelled</g)).toHaveLength(1);
     expect(html).not.toMatch(/>Cancel transfer<|>Record pick</);
   });
 

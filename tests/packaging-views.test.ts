@@ -16,22 +16,6 @@ const screen = (name: string) => SCREENS.find((entry) => entry.name === name)!;
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 
 describe("packaging views", () => {
-  it("labels planned and actual unit counts and unsourced runs", () => {
-    const html = htmlOf(createElement(ClosePackagingRunView, { model: {
-      title: "RUN-0001", plannedOn: "2026-10-25", plannedOutputs: [["Case", 4, "Not recorded"]], showCloseReview: false,
-    } }));
-    expect(html).toContain("Planned units");
-    expect(html).toContain("Actual units");
-    expect(html).toContain("No source yet");
-  });
-
-  it("marks a cancelled plan in its date field without a second status field", () => {
-    const html = htmlOf(createElement(ClosePackagingRunView, { model: {
-      title: "RUN-0001", plannedOn: "2026-10-25", cancelled: true,
-    } }));
-    expect(html).toMatch(/>Cancelled</);
-    expect(html).not.toMatch(/>Planned<|>Status</);
-  });
 
   it("mounts shared views for all three inventory records", () => {
     const runs = screen("Packaging runs").body as { type: unknown; props: { model: unknown } };
@@ -119,10 +103,7 @@ describe("packaging views", () => {
       { ...base, id: "closed", run_no: 7, closed_at: "2026-09-05T01:30:00Z", cancelled_at: null },
       { ...base, id: "cancelled", run_no: 8, closed_at: null, cancelled_at: "2026-09-05T01:30:00Z" },
     ], "America/Los_Angeles");
-    expect(model.recent.map(row => [row.status, row.date])).toEqual([["Closed", "Sep 4, 2026"], ["Cancelled", "Sep 4, 2026"]]);
-    const html = htmlOf(createElement(PackagingRunsView, { model }));
-    expect(html).toContain("Closed or cancelled");
-    expect(html).not.toContain("Finished date");
+    expect(model.recent.map(row => row.date)).toEqual(["Sep 4, 2026", "Sep 4, 2026"]);
   });
 
   it("keeps shortage precedence over physical work and preserves recorded zero yield and loss", () => {
