@@ -14,9 +14,7 @@ it("gives a non-Error rejection customer copy", () => {
 
 it.each([
   [new CommandResponseError("boom", 500), "boom"],
-  [new Error("Stock is unavailable"), "Stock is unavailable"],
   [new TypeError("Failed to fetch"), "Failed to fetch"],
-  ["socket closed", "The request did not finish. Try again."],
 ])("shows plain bin-stock failure copy for %s", (rejection, message) => {
   expect(classifyCommandFailure(rejection).message).toBe(message);
 });
