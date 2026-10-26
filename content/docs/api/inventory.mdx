@@ -26,7 +26,7 @@ transaction, so a transfer is never left half-received.
 
 `create_bin` and `update_bin` reject names already used by another bin at the
 same location and brewery, comparing after trimming spaces and ignoring case.
-The refusal changes no bin or stock and names the existing bin. Original display
+The refusal is `400 bad_request`, changes no bin or stock, and names the existing bin. Original display
 spelling is preserved; a case-only rename is allowed when no other bin conflicts.
 Historical case-variant bins are not rewritten, and an exact unchanged name
 remains valid. An unchanged completed request replays its original result before
