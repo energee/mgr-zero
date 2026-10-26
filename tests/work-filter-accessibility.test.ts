@@ -10,7 +10,7 @@ import { WorkList } from "../app/(app)/work/work-list";
 import { TabBar } from "../components/mgr/qty";
 import { WorkView } from "../components/mgr/views/work";
 import { workWarehouse } from "../lib/mgr/fixtures/work";
-import { toWorkViewProps, workEmpty } from "../lib/mgr/work-view";
+import { toWorkViewProps, WORK_FILTER_CHIPS, workEmpty } from "../lib/mgr/work-view";
 import type { WorkRow } from "../lib/commands/landings";
 
 const render = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -40,7 +40,7 @@ function expectTabsToControlPanels(html: string) {
 }
 
 describe("Work filter tab accessibility (#727)", () => {
-  it("associates every inventory tab with its result panel", () => {
+  it("associates every inventory filter tab with its result panel, not the navigation links", () => {
     const html = render(createElement(WorkView, { model: toWorkViewProps(workWarehouse) }));
     const { selected, shown } = expectTabsToControlPanels(html);
     expect(selected).toBe("All");
@@ -51,6 +51,8 @@ describe("Work filter tab accessibility (#727)", () => {
     const html = render(createElement(WorkView, { model: toWorkViewProps(workWarehouse) }));
     const tabs = [...html.matchAll(/<button\b[^>]*role="tab"[^>]*>(.*?)<\/button>/g)].map(([, text]) => text);
     expect(tabs).toEqual(["All", "Orders", "Transfers", "Batches", "Packaging", "Purchase orders", "Deliveries"]);
+    const links = [...html.matchAll(/<a\b[^>]*role="tab"[^>]*>(.*?)<\/a>/g)].map(([, text]) => text);
+    expect(links).toEqual(["Pick", "Replenishment"]);
   });
 
   it("keeps the live WorkList on the same panel-backed WorkView", () => {
@@ -58,10 +60,12 @@ describe("Work filter tab accessibility (#727)", () => {
       { id: "order-1", kind: "orders", label: "ORD-LIVE-1", detail: "submitted", href: "/orders/1", verb: "Confirm", tone: "success", dueAt: null },
       { id: "route-1", kind: "routes", label: "Route-LIVE-1", detail: "3 stops", href: "/routes/1", verb: "Resume", tone: "info", dueAt: null },
     ];
-    const html = render(createElement(WorkList, { rows, defaults: ["orders", "routes"], createAction: null, chips: ["all", "orders", "transfers", "batches", "runs", "POs", "routes"] }));
+    const html = render(createElement(WorkList, { rows, defaults: ["orders", "routes"], createAction: null, chips: [...WORK_FILTER_CHIPS, "pick", "replenishment"] }));
     const { shown } = expectTabsToControlPanels(html);
     expect(shown).toContain("ORD-LIVE-1");
     expect(shown).toContain("Route-LIVE-1");
+    expect(html).toContain('href="/pick"');
+    expect(html).toContain('href="/replenishment"');
   });
 
   it("shows the chosen chip's panel with only that kind's rows", () => {
@@ -112,6 +116,28 @@ describe("Work filter tab accessibility (#727)", () => {
     const { selected, shown } = expectTabsToControlPanels(html);
     expect(selected).toBe("All");
     expect(shown).toContain("ORD-0231 · Ridgeline");
+  });
+
+  it.each(["pick", "replenishment"])("does not select %s as a result filter", chip => {
+    const html = render(createElement(WorkView, { model: toWorkViewProps(workWarehouse), chip }));
+    const { selected, shown } = expectTabsToControlPanels(html);
+    expect(selected).toBe("All");
+    expect(shown).toContain("ORD-0231 · Ridgeline");
+  });
+
+  it("mounts panels only for non-link names, retaining their original tab indices", () => {
+    const html = render(createElement(TabBar, {
+      names: ["all", "pick", "orders", "replenishment"], on: 2, cls: "w-full",
+      hrefs: { pick: "/pick", replenishment: "/replenishment" },
+      onChange: () => {}, label: "Filter work", panel: "order rows",
+    }));
+    expect(expectTabsToControlPanels(html).selected).toBe("orders");
+    const links = [...html.matchAll(/<a\b[^>]*role="tab"[^>]*>/g)].map(([tag]) => tag);
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      expect(html).not.toContain(`id="${attr(link, "aria-controls")}"`);
+      expect(link).toContain('aria-selected="false"');
+    }
   });
 
   it("builds tab ids without whitespace, so a multi-word name still resolves", () => {

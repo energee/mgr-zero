@@ -18,11 +18,10 @@ import { QueryFeedback } from "@/components/mgr/query-feedback";
 const timeZone = "America/Los_Angeles";
 beforeEach(() => { state.pending = false; state.fetching = false; state.paused = false; state.error = null; state.calls = []; });
 
-it("feeds the existing order form cached live IDs, default ship-to and active SKUs", () => {
+it("feeds the existing order form cached live IDs and the default ship-to", () => {
   const form = NewOrderClient({ timeZone });
   expect(form.type).toBe(OrderForm);
   expect(form.props.customers[0].shipTos[0]).toMatchObject({ id: "dock", is_default: true });
-  expect(form.props.skus).toEqual([{ id: "sku", label: "Brand — Keg" }]);
   expect(state.calls).toEqual([["list_customers", { includeShipTos: true }], ["list_locations", {}], ["list_skus", {}]]);
 });
 

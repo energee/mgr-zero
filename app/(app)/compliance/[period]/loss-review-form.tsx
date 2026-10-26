@@ -8,21 +8,16 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
-import { submitReason } from "@/lib/mgr/submit-reason";
 import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
 import { command, CommandResponseError } from "@/lib/commands/client";
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 import type { LossReview } from "@/lib/commands/compliance";
+import { bblExact } from "@/lib/volume";
+import { lossReviewReason } from "@/lib/mgr/monthly-compliance-view";
 
 type Target = "sample" | "taproom" | "destruction";
 type Payload = { adjustmentId: string; bbl: string; classification: Target; destinationState?: string };
 type Phase = "idle" | "submitting" | "unknown" | "saved";
-
-function bblUnits(value: string) {
-  if (!/^(?:\d+(?:\.\d{0,8})?|\.\d{1,8})$/.test(value) || !/[1-9]/.test(value)) return null;
-  const [whole = "0", fraction = ""] = value.split(".");
-  return BigInt(whole || "0") * BigInt(100_000_000) + BigInt(fraction.padEnd(8, "0") || "0");
-}
 
 export function LossReviewForm({ loss }: { loss: LossReview }) {
   const breweryId = useBrewery();
@@ -37,14 +32,7 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
   const requestId = useRef<string | null>(null);
   const payload = useRef<Payload | null>(null);
   const locked = phase === "submitting" || phase === "unknown" || phase === "saved";
-  const amountUnits = bblUnits(amount);
-  const remainingUnits = bblUnits(loss.remaining_bbl);
-  // What a new allocation still needs. Only an idle form shows it: a retry resends its frozen request unchanged.
-  const missing: string[] = [];
-  if (amountUnits === null) missing.push("a BBL amount above zero with up to 8 decimal places");
-  else if (remainingUnits === null || amountUnits > remainingUnits) missing.push(`a BBL amount of at most ${loss.remaining_bbl}`);
-  if (target === "sample" && !/^[A-Z]{2}$/.test(state)) missing.push("a two-letter destination state");
-  const reason = submitReason(missing);
+  const reason = lossReviewReason(amount, loss.remaining_bbl, target, state);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -78,7 +66,7 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
 
   return <CommandForm title="Reattribute loss" trigger={<Button size="sm" variant="outline" disabled={Number(loss.remaining_bbl) === 0}>Reattribute loss</Button>} open={open} onOpenChange={changeOpen}>
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <p className="text-sm">Batch {loss.batch_no} · original {loss.original_bbl} bbl · remaining {loss.remaining_bbl} bbl</p>
+      <p className="text-sm">Batch {loss.batch_no} · original {bblExact(Number(loss.original_bbl), 8)} · remaining {bblExact(Number(loss.remaining_bbl), 8)}</p>
       <div className="flex flex-col gap-1">
         <Label htmlFor={`loss-bbl-${loss.adjustment_id}`}>BBL to reattribute</Label>
         <Input id={`loss-bbl-${loss.adjustment_id}`} type="text" inputMode="decimal" aria-describedby={`loss-bbl-help-${loss.adjustment_id}`} value={amount} disabled={locked} onChange={(event) => setAmount(event.target.value)} required />

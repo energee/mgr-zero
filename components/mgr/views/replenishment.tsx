@@ -126,7 +126,7 @@ export function ReplenishmentView({
     <p className="text-sm text-muted-foreground">Inventory and reservations across all locations, independent of the selected taproom.</p>
     {model.skuFilter && model.allShortfallsHref && <Link href={model.allShortfallsHref} className="text-sm text-muted-foreground underline">All shortfalls</Link>}
     {shortfalls.length ? <RecordTable
-      headers={["SKU", "On hand", "Reserved", "ATP", <span key="detail" className="sr-only">Reservations</span>]}
+      headers={["SKU", "On hand", "Reserved", "Available", <span key="detail" className="sr-only">Reservations</span>]}
       align={["l", "r", "r", "r", "l"]}
       rows={shortfalls.map((shortfall) => ({
         key: shortfall.skuId,
