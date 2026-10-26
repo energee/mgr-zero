@@ -38,6 +38,7 @@ const pureTests = [
   "tests/quantity-field-blur.test.ts",
   "tests/quantity-form-submission.test.ts",
   "tests/water-profile-submission.test.ts",
+  "tests/required-text-submission.test.ts",
   "tests/pricing-view.test.ts",
   "tests/auth-page-metadata.test.ts",
   "tests/shell-view.test.ts",

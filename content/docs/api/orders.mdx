@@ -9,6 +9,12 @@ are snapshotted from the customer's price group when the order is created, so a
 later price change never rewrites an existing order. Mutations return
 `{ order_id }` unless noted otherwise.
 
+`cancel_order` requires a reason containing non-whitespace text. New cancellations
+trim leading and trailing whitespace before recording the reason; blank reasons
+are rejected with `invalid_input`. Retry an uncertain cancellation with its exact
+original input and `requestId`: committed historical requests, including older
+whitespace-only reasons, replay their original result without another cancellation.
+
 Confirming creates allocations and returns `{ order_id, warnings }`, where
 `warnings` is `[{ sku_id, atp }]` for any SKU whose available-to-promise went
 negative. Adjusting lines returns the same shape, listing each SKU now on the
