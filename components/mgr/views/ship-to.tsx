@@ -36,7 +36,7 @@ export function ShipToView({
       {fields.map(([key, label]) => (
         <Fragment key={key}>{E.edit(label, model[key], "text", undefined, { id: `${id}-${key}`, error: errors[key], onChange: controls[key] ? (nextValue: string) => controls[key]?.(key === "state" ? nextValue.toUpperCase() : nextValue) : undefined, required: key === "label" || (us && key === "state"), maxLength: key === "state" ? 2 : undefined, placeholder: key === "state" ? "PA" : key === "zip" && us ? "15201 or 15201-1234" : undefined, "aria-label": label })}</Fragment>
       ))}
-      {E.row("Default ship-to", "selected first on new orders", <Switch aria-label="Default ship-to" checked={controls.isDefault ? model.isDefault : undefined} defaultChecked={controls.isDefault ? undefined : model.isDefault} onCheckedChange={controls.isDefault} />, model.isDefault ? "ok" : "")}
+      {E.row("Default ship-to", "This ship-to is selected first on new orders.", <Switch aria-label="Default ship-to" checked={controls.isDefault ? model.isDefault : undefined} defaultChecked={controls.isDefault ? undefined : model.isDefault} onCheckedChange={controls.isDefault} />, model.isDefault ? "ok" : "")}
       {messages}
       {footer !== undefined ? footer : <Button type="submit" className="w-full md:w-fit md:self-end" disabled={submitting}>{submitting ? "Saving…" : "Save ship-to"}</Button>}
     </>

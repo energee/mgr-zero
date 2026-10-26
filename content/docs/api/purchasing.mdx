@@ -139,6 +139,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_purchase_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "vendorId": "00000000-0000-0000-0000-000000000000", "lines": [ { "materialId": "00000000-0000-0000-0000-000000000000", "qtyOrdered": 1 } ] } }'
 ```
 
+## delete_material_contract [#delete_material_contract]
+
+`command` · admin, warehouse, brewer
+
+Delete an unused material contract; contracts on purchase orders must be ended instead
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `contractId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "delete_material_contract", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "contractId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 ## draft_purchase_order_from_requirements [#draft_purchase_order_from_requirements]
 
 `command` · admin, warehouse

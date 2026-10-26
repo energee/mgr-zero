@@ -22,6 +22,30 @@ it("keeps missing mappings and preview cells empty rather than undefined", () =>
   }
 });
 
+it("shows rejected-file errors beside the picker with an error attachment (#1395)", () => {
+  const html = renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, step: 0, fileName: "empty.csv", error: "File needs fixing" } }));
+  expect(html).toMatch(/data-slot="attachment"[^>]*data-state="error"/);
+  expect(html).toMatch(/<input[^>]*type="file"[^>]*aria-invalid="true"/);
+  expect(html).toMatch(/data-slot="field"[^>]*data-invalid="true"/);
+  expect(html.indexOf('data-slot="field-error"')).toBeGreaterThan(html.indexOf('type="file"'));
+  expect(html).toMatch(/role="alert"[^>]*data-slot="field-error"[^>]*>File needs fixing<\/div><\/div>/);
+  expect(html.match(/File needs fixing/g)).toHaveLength(1);
+});
+
+it("keeps non-file errors in the top alert and the picker neutral (#1395)", () => {
+  const html = renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, step: 0, error: "Saved import could not be read" } }));
+  expect(html).toContain('<p role="alert" class="text-destructive">Saved import could not be read</p>');
+  expect(html.indexOf('role="alert"')).toBeLessThan(html.indexOf("Customers columns"));
+  expect(html).toMatch(/data-slot="attachment"[^>]*data-state="idle"/);
+  expect(html).not.toContain('data-slot="field-error"');
+});
+
+it("keeps later-step errors above the content even when the file has a name (#1395)", () => {
+  const html = renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, fileName: "customers.csv", error: "Import could not finish" } }));
+  expect(html).toContain('<p role="alert" class="text-destructive">Import could not finish</p>');
+  expect(html).not.toContain('data-slot="field-error"');
+});
+
 it("shares an editable mixed preview and prevents all-invalid batches from committing", () => {
   const html = renderToStaticMarkup(createElement(ImportView, { model: importPreview }));
   expect(html).toContain("2 ready · 1 blocked");

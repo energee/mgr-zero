@@ -11,17 +11,22 @@ export type LicensesViewModel = {
 
 export type LicensesSnapshot = {
   backHref?: string;
+  today: string;
   licenses: License[];
 };
 
 export function toLicensesViewProps(s: LicensesSnapshot): LicensesViewModel {
   return {
     backHref: s.backHref,
-    licenses: s.licenses.map((license) => ({
-      key: license.id,
-      title: `${license.state} ${license.kind}`,
-      detail: `${license.license_no ?? "no number"}${expires(license.expires_on)}`,
-      verb: "Edit",
-    })),
+    licenses: s.licenses.map((license) => {
+      const expired = license.expires_on !== null && license.expires_on < s.today;
+      return {
+        key: license.id,
+        title: `${license.state} ${license.kind}`,
+        detail: `${license.license_no ?? "no number"}${expires(license.expires_on)}${expired ? " · expired" : ""}`,
+        ...(expired ? { warning: true } : {}),
+        verb: "Edit",
+      };
+    }),
   };
 }

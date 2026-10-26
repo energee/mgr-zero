@@ -1,3 +1,4 @@
+import { skuLabel } from "@/lib/mgr/finished-goods-view";
 import { isNumber, numberNotationError } from "@/lib/mgr/quantity-input";
 
 // lib/order-form-rules.ts — the pure "is this New order form submittable" rule
@@ -120,7 +121,7 @@ export function skuPickerChannel(kind: "wholesale" | "taproom_transfer", custome
   return kind === "wholesale" ? customer?.sale_channel_id : undefined;
 }
 
-/** A list_skus row as a picker option: "Brand — SKU". */
+/** A list_skus row as a picker option, using the shared inventory label. */
 export function toSkuOption(sku: { id: string; name: string; brands: { name: string } | null }) {
-  return { id: sku.id, label: sku.brands ? `${sku.brands.name} — ${sku.name}` : sku.name };
+  return { id: sku.id, label: skuLabel(sku) };
 }

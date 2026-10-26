@@ -17,7 +17,7 @@ export function ShipView({ model, sources, footer, fulfillmentOptions, tape, inv
   reasons?: Record<string, string>; onReason?: (key: string, value: string) => void;
   carrier?: string; tracking?: string; onCarrier?: (value: string) => void; onTracking?: (value: string) => void;
   onInvoiceTiming?: (timing: "now" | "on_delivery") => void;
-  /** Why Ship order is withheld (shipReason), printed beside it; absent when ready. */
+  /** Why Ship order is withheld, printed beside it; absent when ready. */
   messages?: ReactNode; submitting?: boolean; reason?: string | null;
 }) {
   const timing = model.pickup ? 0 : invoiceTiming ?? (model.invoiceTiming === "on_delivery" ? 1 : 0);

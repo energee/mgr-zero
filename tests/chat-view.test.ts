@@ -1,13 +1,109 @@
-import { createElement } from "react";
+import { Children, createElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { NOTIFICATION_REASON_LABEL } from "../lib/chat/contracts";
 import { personalChatPreferences } from "../lib/mgr/fixtures/chat";
 import { CHAT_PREVIEW_FIXTURES } from "../lib/chat/preview-fixtures";
 import { chatSettingIsSaved, type ChatSettingSave } from "../lib/mgr/chat-save-feedback";
-import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView, ChatQuietHoursView } from "../components/mgr/views/chat";
+import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView, ChatQuietHoursView, ChatSettingsFieldsView } from "../components/mgr/views/chat";
 import { SCREENS } from "../components/mgr/screens";
+import { personalQuietHoursReason, breweryQuietHoursReason } from "../lib/chat/quiet-hours";
+import { readingCadenceReason } from "../lib/mgr/settings-view";
+import { chatConnected } from "../lib/mgr/fixtures/chat";
+
+it("derives quiet-hours readiness from the saved window and timezone, including reverts", () => {
+  const initial = { start: "22:00", end: "06:00", timezone: "America/New_York" };
+  expect(personalQuietHoursReason(initial, initial)).toBeTruthy();
+  expect(personalQuietHoursReason({ ...initial, end: "07:00" }, initial)).toBeNull();
+  expect(personalQuietHoursReason({ ...initial, timezone: "UTC" }, initial)).toBeNull();
+  expect(personalQuietHoursReason({ ...initial }, initial)).toBeTruthy();
+  expect(breweryQuietHoursReason(initial, initial)).toBeTruthy();
+  expect(breweryQuietHoursReason({ ...initial, start: "", end: "" }, initial)).toBeNull();
+  expect(breweryQuietHoursReason({ ...initial }, initial)).toBeTruthy();
+});
+
+it("requires a changed, whole-number reading cadence from 1 to 168", () => {
+  expect(readingCadenceReason("24", 24)).toBeTruthy();
+  expect(readingCadenceReason("024", 24)).toBeTruthy();
+  for (const hours of ["", "0", "169", "1.5", "NaN"]) {
+    expect(readingCadenceReason(hours, 24)).toBeTruthy();
+  }
+  for (const hours of ["1", "48", "168"]) expect(readingCadenceReason(hours, 24)).toBeNull();
+});
+
+it("withholds pristine personal quiet hours with an accessible reason", () => {
+  const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: personalChatPreferences }));
+  const button = html.match(/<button\b[^>]*>Save my quiet hours<\/button>/)?.[0];
+  expect(button).toContain('disabled=""');
+  const reasonId = /aria-describedby="([^"]+)"/.exec(button!)?.[1];
+  expect(reasonId).toBeDefined();
+  expect(html).toContain(`<p id="${reasonId}"`);
+});
+
+it("guards pristine personal quiet-hours submission even when the form submit event fires", () => {
+  const onSaveQuiet = vi.fn();
+  let view: ReactElement<{ children: ReactNode }>;
+  function Capture() {
+    view = ChatPersonalPreferencesView({ preferences: personalChatPreferences, onSaveQuiet });
+    return view;
+  }
+  renderToStaticMarkup(createElement(Capture));
+  const form = Children.toArray(view!.props.children).find(child => (child as ReactElement).type === "form") as ReactElement<{ onSubmit: (event: { preventDefault: () => void }) => void }>;
+  form.props.onSubmit({ preventDefault: vi.fn() });
+  expect(onSaveQuiet).not.toHaveBeenCalled();
+});
+
+it("withholds pristine brewery quiet hours and reading cadence in the shared settings fields", () => {
+  const html = renderToStaticMarkup(createElement(ChatSettingsFieldsView, {
+    installation: chatConnected.installation!, timezone: "America/New_York", hours: "24", initialHours: 24,
+    start: "21:00", end: "06:00", channels: null, channel: "",
+  }));
+  const buttons = html.match(/<button\b[^>]*>[^<]*<\/button>/g);
+  for (const label of ["Save brewery quiet hours", "Save reading cadence"]) {
+    const button = buttons?.find(button => button.includes(label));
+    expect(button).toContain('disabled=""');
+    const reasonId = /aria-describedby="([^"]+)"/.exec(button!)?.[1];
+    expect(reasonId).toBeDefined();
+    expect(html).toContain(`<p id="${reasonId}"`);
+  }
+});
+
+it("guards brewery quiet-hours submits for pristine, invalid, busy and changed drafts", () => {
+  const initial = { start: "21:00", end: "06:00" };
+  for (const [start, end, busy, expected] of [
+    ["21:00", "06:00", false, 0], ["22:00", "", false, 0], ["22:00", "22:00", false, 0],
+    ["22:00", "06:00", true, 0], ["22:00", "06:00", false, 1], ["", "", false, 1],
+  ] as const) {
+    const onSave = vi.fn();
+    let form: ReactElement<{ onSubmit: (event: { preventDefault: () => void }) => void }>;
+    function Capture() {
+      form = ChatQuietHoursView({ start, end, initial, timezone: "UTC", busy, onChange: vi.fn(), onSave });
+      return form;
+    }
+    renderToStaticMarkup(createElement(Capture));
+    form!.props.onSubmit({ preventDefault: vi.fn() });
+    expect(onSave).toHaveBeenCalledTimes(expected);
+  }
+});
+
+it("guards reading-cadence submits for pristine, invalid, busy and changed drafts", () => {
+  for (const [hours, busy, expected] of [["24", false, 0], ["0", false, 0], ["1.5", false, 0], ["169", false, 0], ["48", true, 0], ["48", false, 1]] as const) {
+    const onSaveHours = vi.fn();
+    let view: ReactElement<{ children: ReactNode }>;
+    function Capture() {
+      view = ChatSettingsFieldsView({
+        installation: chatConnected.installation!, timezone: "UTC", hours, initialHours: 24,
+        start: "21:00", end: "06:00", channels: null, channel: "", busy, onSaveHours,
+      });
+      return view;
+    }
+    renderToStaticMarkup(createElement(Capture));
+    const form = Children.toArray(view!.props.children).find(child => (child as ReactElement).type === "form") as ReactElement<{ onSubmit: (event: { preventDefault: () => void }) => void }>;
+    form.props.onSubmit({ preventDefault: vi.fn() });
+    expect(onSaveHours).toHaveBeenCalledTimes(expected);
+  }
+});
 
 it("keeps reading cadence restricted to whole hours", () => {
   const markup = renderToStaticMarkup(SCREENS.find(screen => screen.name === "Chat settings")!.body);
@@ -193,11 +289,11 @@ it.each([
 it.each([
   { quietStart: "22:00", quietEnd: "06:00" },
   { quietStart: null, quietEnd: null },
-])("allows overnight personal quiet hours and following the brewery window", quiet => {
+])("accepts overnight personal quiet hours and following the brewery window but withholds unchanged saves", quiet => {
   const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences: { ...personalChatPreferences, ...quiet } }));
   const button = html.match(/<button\b[^>]*>Save my quiet hours<\/button>/)?.[0];
   expect(button).toBeDefined();
-  expect(button).not.toContain('disabled=""');
+  expect(button).toContain('disabled=""');
 });
 
 it.each([

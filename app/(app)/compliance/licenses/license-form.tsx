@@ -5,6 +5,7 @@
 "use client";
 
 import { CommandForm, CommandFormMessage, sheetTrigger } from "@/components/mgr/command-form";
+import { ConfirmDeleteControl } from "@/components/mgr/views/confirm-delete";
 import { LicenseView } from "@/components/mgr/views/license";
 import type { License } from "@/lib/commands/compliance";
 import { licenseInput } from "@/lib/mgr/license-view";
@@ -34,6 +35,11 @@ export function LicenseForm({ license }: { license?: License }) {
           messages={<CommandFormMessage error={form.error} />}
           submitting={form.submitting}
           onCancel={() => form.setOpen(false)}
+          remove={license ? <ConfirmDeleteControl title="Delete license" busyLabel="Deleting…"
+            name={<>Delete the <strong>{license.state} {license.kind}</strong> license?</>}
+            warning="This permanently removes the brewery's state license."
+            busy={form.busy} error={form.error}
+            onDelete={() => form.run("delete_brewery_state_license", { licenseId: license.id }, () => form.setOpen(false), { target: license.id })} /> : null}
         />
       </form>
     </CommandForm>

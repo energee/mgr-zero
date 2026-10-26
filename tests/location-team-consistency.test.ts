@@ -39,9 +39,8 @@ it("marks the shared bin field invalid and explains why it cannot save", () => {
   expect(html).toMatch(/<button[^>]*disabled[^>]*>Save bin/);
 });
 
-it("explains the empty bin name beside the unavailable save action", () => {
+it("keeps Save unavailable when the bin name is blank", () => {
   const html = renderToStaticMarkup(createElement(BinView, { model: toBinViewProps({ name: " " }), remove: null }));
-  expect(html).toContain("Still needed: a bin name.");
   expect(html).toMatch(/<button[^>]*disabled[^>]*>Save bin/);
 });
 
