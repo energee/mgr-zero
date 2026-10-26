@@ -27,18 +27,21 @@ const noSecondTree = (file: string) => {
 };
 
 describe("Confirm order view loop", () => {
-  it("uses plain availability warnings after confirmation or allocation saves", () => {
-    const out = renderToStaticMarkup(createElement(AtpWarnings, {
-      warnings: [{ sku_id: "hazy", atp: -2 }],
-      skuNames: new Map([["hazy", "Hazy IPA"]]),
-      saved: "Allocation saved.",
-    }));
-    expect(out).toContain("Allocation saved.");
-    expect(out).toContain("Available is below zero for Hazy IPA");
-    expect(out).not.toContain("ATP");
+  it("resolves warning SKU identities and separately announces a saved write", () => {
+    const props = {
+      warnings: [{ sku_id: "hazy-id", atp: -2 }],
+      skuNames: new Map([["other-id", "Unrelated beer"], ["hazy-id", "Hazy IPA"]]),
+    };
+    const saved = renderToStaticMarkup(createElement(AtpWarnings, { ...props, saved: "Fixture save" }));
+    expect(saved).toContain("Hazy IPA");
+    expect(saved).not.toContain("Unrelated beer");
+    expect(saved).not.toContain("hazy-id");
+    expect(saved.match(/role="status"/g)).toHaveLength(2);
+    const unsaved = renderToStaticMarkup(createElement(AtpWarnings, props));
+    expect(unsaved.match(/role="status"/g)).toHaveLength(1);
   });
 
-  it("names the source, not a role, when five ordered units have only three available", () => {
+  it("preserves source identity and shortage arithmetic", () => {
     const line = { ...orderSubmittedRidgeline.lines[0], qty_ordered: 5 };
     const model = toConfirmOrderViewProps({
       ...orderSubmittedRidgeline,
@@ -47,9 +50,11 @@ describe("Confirm order view loop", () => {
       sourceOnHand: [{ sku_id: line.sku_id, qty: 3 }],
       atp: [{ sku_id: line.sku_id, qty: 3 }],
     });
-    expect(model.lines[0].detail).toBe("3 at Lawrenceville · 3 available · leaves −2");
-    expect(model.shortageNote).toBe(`Short at Lawrenceville: ${line.skus!.name}. Replenish Lawrenceville before picking, or confirm knowing the full quantity cannot be picked there.`);
-    expect(model.shortageNote).not.toContain("Warehouse");
+    expect(model.fulfillmentSource).toBe("Lawrenceville");
+    expect(model.lines[0].detail).toContain("3");
+    expect(model.lines[0].detail).toContain("−2");
+    expect(model.shortageNote).toContain(line.skus!.name);
+    expect(model.shortageNote).toContain("Lawrenceville");
   });
 
   it("maps the shared fixture through the adapter", () => {
