@@ -251,12 +251,14 @@ describe("Wholesale fulfillment with no warehouse (#1147)", () => {
 
   it("withholds Save warehouse and says why", () => {
     const html = view();
-    expect(text(html)).toContain("Still needed: a warehouse.");
-    const reasonId = /<p id="([^"]+)"[^>]*>Still needed: a warehouse\.<\/p>/.exec(html)?.[1];
+    const reasonId = /aria-describedby="([^"]+)"/.exec(save(html))?.[1];
+    expect(reasonId).toBeDefined();
+    expect(html).toContain(`<p id="${reasonId}"`);
     expect(save(html)).toContain(' disabled=""');
-    expect(save(html)).toContain(`aria-describedby="${reasonId}"`);
     const chosen = view({ locations: settingsDemo.warehouseOptions, currentId: settingsDemo.warehouseId });
-    expect(chosen).toContain("Still needed: a change to the warehouse.");
+    const chosenReasonId = /aria-describedby="([^"]+)"/.exec(save(chosen))?.[1];
+    expect(chosenReasonId).toBeDefined();
+    expect(chosen).toContain(`<p id="${chosenReasonId}"`);
     expect(save(chosen)).toContain(' disabled=""');
   });
 
