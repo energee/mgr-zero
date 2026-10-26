@@ -63,4 +63,11 @@ describe("staff deep-link sign-in (#1399)", () => {
     expect(response.headers.get("location")).toBe(`http://localhost:3000${hasInvitations ? "/invitations" : "/settings/team?tab=invites"}`);
     expect(exchangeCodeForSession).toHaveBeenCalledWith("valid");
   });
+
+  it.each(["/password", "/password?portal=1"])("finishes recovery at %s even with pending invitations", async next => {
+    pending.mockResolvedValue([{}]);
+    const response = await GET(new NextRequest(`http://localhost:3000/auth/confirm?${new URLSearchParams({ code: "recovery", next })}`));
+    expect(response.headers.get("location")).toBe(`http://localhost:3000${next}`);
+    expect(exchangeCodeForSession).toHaveBeenCalledWith("recovery");
+  });
 });
