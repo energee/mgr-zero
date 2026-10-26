@@ -85,6 +85,10 @@ describe("resolveTap", () => {
     expect(walk("Shop", "Review order · $828.00", "Place order · $948.00")).toBe("Order detail");
     expect(resolveTap(by("Sign in"), "Forgot password?", null, "Reset password")).toBe("Reset password");
     expect(walk("Finished goods", "Hazy IPA · ½ bbl keg", "Record movement")).toBe("Record movement");
+    expect(walk("Beer", "Weekly count")).toBe("Weekly count");
+    expect(walk("Beer", "Tap board")).toBe("Tap board");
+    expect(walk("Beer", "Materials on hand")).toBe("Materials on hand");
+    expect(walk("Beer", "Keg fleet")).toBe("Keg fleet");
   });
 });
 

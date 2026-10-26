@@ -33,16 +33,16 @@ export function toBeerViewProps(s: BeerSnapshot): BeerViewModel {
   ];
   if (s.showTaproom) {
     navs.push(
-      { key: "taproom", title: "Taproom", detail: `${plural(o.taproomBelowPar, "SKU")} below par · weekly count`, href: "/taproom" },
-      { key: "taps", title: "Taps", detail: `${plural(o.openTaps, "keg")} on tap`, href: "/taproom/board" },
+      { key: "taproom", title: "Weekly count", detail: `${plural(o.taproomBelowPar, "SKU")} below par · weekly count`, href: "/taproom" },
+      { key: "taps", title: "Tap board", detail: `${plural(o.openTaps, "keg")} on tap`, href: "/taproom/board" },
       { key: "variance", title: "Variance by brand", detail: "Compare completed count periods", href: "/taproom/variance" },
     );
   }
   navs.push(
     { key: "cellar", title: "Cellar", detail: `${plural(o.openOccupancies, "tank")} in use`, href: "/cellar" },
     // On a phone this row is the only way into Materials on hand, so it stays.
-    { key: "materials", title: "Materials", detail: "Stock on hand · cycle counts", href: "/materials" },
-    { key: "kegs", title: "Kegs", detail: `${plural(o.kegsOut, "keg")} at customers`, href: "/kegs" },
+    { key: "materials", title: "Materials on hand", detail: "Stock on hand · cycle counts", href: "/materials" },
+    { key: "kegs", title: "Keg fleet", detail: `${plural(o.kegsOut, "keg")} at customers`, href: "/kegs" },
   );
   return { navs };
 }

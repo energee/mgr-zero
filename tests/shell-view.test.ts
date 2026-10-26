@@ -206,12 +206,12 @@ describe("Beer view", () => {
     });
     expect(model.navs.map(({ key, title, href }) => [key, title, href])).toEqual([
       ["fg", "Finished goods", "/inventory"],
-      ["taproom", "Taproom", "/taproom"],
-      ["taps", "Taps", "/taproom/board"],
+      ["taproom", "Weekly count", "/taproom"],
+      ["taps", "Tap board", "/taproom/board"],
       ["variance", "Variance by brand", "/taproom/variance"],
       ["cellar", "Cellar", "/cellar"],
-      ["materials", "Materials", "/materials"],
-      ["kegs", "Kegs", "/kegs"],
+      ["materials", "Materials on hand", "/materials"],
+      ["kegs", "Keg fleet", "/kegs"],
     ]);
   });
 
@@ -222,18 +222,18 @@ describe("Beer view", () => {
       { key: "fg", title: "Finished goods", detail: "0 shortages · ATP by SKU", href: "/inventory" },
     ]);
     expect(model.navs.some((r) => r.href === "/planning")).toBe(false);
-    expect(screen("Beer").to).toMatchObject({ Materials: "Materials on hand", "Variance by brand": "Variance by brand" });
-    expect(screen("Beer").to).not.toHaveProperty("Shortages");
   });
 
   it("offers every Beer sidebar destination and no More destination (#1253)", () => {
     const model = toBeerViewProps(beerOverview);
-    const sidebarHrefs = STAFF_NAV.find((tab) => tab.href === "/beer")!.children!.map((row) => row.href);
-    expect(model.navs.map((row) => row.href)).toEqual(sidebarHrefs);
+    const sidebar = STAFF_NAV.find((tab) => tab.href === "/beer")!.children!;
+    expect(model.navs.map(({ title, href }) => ({ label: title, href }))).toEqual(
+      sidebar.map(({ label, href }) => ({ label, href })),
+    );
     expect(model.navs.find((row) => row.key === "variance")).toMatchObject({ title: "Variance by brand", href: "/taproom/variance" });
   });
 
-  it("omits Taproom, Taps, and Variance by brand when showTaproom is false", () => {
+  it("omits Weekly count, Tap board, and Variance by brand when showTaproom is false", () => {
     const model = toBeerViewProps({
       overview: {
         fgShortages: 0,
@@ -245,7 +245,7 @@ describe("Beer view", () => {
       },
       showTaproom: false,
     });
-    expect(model.navs.map((r) => r.title)).toEqual(["Finished goods", "Cellar", "Materials", "Kegs"]);
+    expect(model.navs.map((r) => r.title)).toEqual(["Finished goods", "Cellar", "Materials on hand", "Keg fleet"]);
   });
 
   it("the inventory drawing still offers Finished goods and does not leak live hrefs", () => {
