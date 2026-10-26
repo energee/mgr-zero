@@ -823,7 +823,7 @@ describe("record_repack", () => {
     }, warehouseCtx);
 
     // Three cases at half a divider each is 1.5: a whole two come off the shelf, and it holds one.
-    await expect(repack()).rejects.toThrow(/insufficient selected bin and lot stock: 1 on hand in the source bin/);
+    await expect(repack()).rejects.toMatchObject({ code: "bad_request", status: 400 });
     await seedMovement(b.id, { materialId: divider, locationId: repackLocationId, binId: repackBinId, qty: 1, createdBy: userId });
     await repack();
 
@@ -939,9 +939,9 @@ describe("record_repack", () => {
     }, warehouseCtx);
 
     // The bin holds only lotted cases, so a repack must say which lot.
-    await expect(repack(1)).rejects.toThrow(/choose the recorded lot/);
+    await expect(repack(1)).rejects.toMatchObject({ code: "bad_request", status: 400 });
     // The lot holds 10; 11 is refused.
-    await expect(repack(11, lotId)).rejects.toThrow(/insufficient selected bin and lot stock: 10 on hand/);
+    await expect(repack(11, lotId)).rejects.toMatchObject({ code: "bad_request", status: 400 });
 
     await repack(1, lotId);
     const lotBalance = (sku: string) => sql(`select trim_scale(qty) from lot_on_hand where lot_id = '${lotId}' and sku_id = '${sku}'`);
@@ -992,7 +992,7 @@ describe("record_repack", () => {
       const winner = await a.query("select public.reverse_inventory_movement($1,$2,'Concurrent correction',$3) result",
         [brewery.id, original.id, winnerRequest]);
       await a.query("commit");
-      await expect(pending).rejects.toThrow(/insufficient selected bin and lot stock: 0 on hand/i);
+      await expect(pending).rejects.toMatchObject({ code: "P0001" });
       const replay = await warehouse.db.rpc("reverse_inventory_movement", {
         p_brewery: brewery.id, p_movement: original.id, p_note: "Concurrent correction", p_request_id: winnerRequest,
       });

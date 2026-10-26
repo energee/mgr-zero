@@ -25,6 +25,7 @@ const pureTests = [
   "tests/compliance-period.test.ts",
   "tests/reporting-basis-view.test.ts",
   "tests/confirm-destructive.test.ts",
+  "tests/disabled-action-reasons.test.ts",
   "tests/screen-view-composition.test.ts",
   "tests/brand-selling-setup.test.ts",
   "tests/catalog-sku-redirects.test.ts",
@@ -54,6 +55,7 @@ const pureTests = [
   "tests/invite-entry-view.test.ts",
   "tests/password-page.test.ts",
   "tests/auth-actions.test.ts",
+  "tests/qbo-pay-route.test.ts",
   "tests/staff-login-return.test.ts",
   "tests/proxy.test.ts",
   "tests/register-cell-keys.test.ts",
@@ -83,6 +85,8 @@ const pureTests = [
   "tests/app-screen-parity.test.ts",
   "tests/screen-view-composition.test.ts",
   "tests/production-view.test.ts",
+  "tests/shipment-parity.test.ts",
+  "tests/order-sheets-view.test.ts",
 ];
 
 export default defineConfig({

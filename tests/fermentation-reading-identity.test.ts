@@ -7,7 +7,7 @@ import { FermentationReadingView, readingIdentity } from "@/components/mgr/views
 
 const values = { observedAt: "", tempF: "", gravity: "", ph: "", note: "" };
 const render = (identity: { vessel: string; batch?: string }) =>
-  renderToStaticMarkup(createElement(FermentationReadingView, { formId: "f", unit: "sg", values, identity }));
+  renderToStaticMarkup(createElement(FermentationReadingView, { formId: "f", unit: "sg", timeZone: "America/New_York", values, identity }));
 
 describe("fermentation reading identity (#716)", () => {
   it("shows the vessel and the batch", () => {
