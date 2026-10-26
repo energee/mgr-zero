@@ -1,5 +1,5 @@
 // components/mgr/views/driver-route.tsx — Driver route (departed run). Live
-// slots Resume hrefs and ReturnRoute; inventory draws unlabeled Resume.
+// supplies stop-action hrefs and ReturnRoute; inventory keeps its actions inert.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { DriverRouteViewModel } from "@/lib/mgr/driver-route-view";

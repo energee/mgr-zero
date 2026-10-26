@@ -120,7 +120,7 @@ function lineChange(entries: unknown, skuNames: Map<string, string>): string {
 
 function lineWarning(picked: number | null, ordered: number, atp?: number): string | undefined {
   if (picked !== null && picked > ordered) return `Picked ${picked}, more than ordered`;
-  if (atp !== undefined && atp < 0) return "Brewery ATP is below zero";
+  if (atp !== undefined && atp < 0) return "Available is below zero";
   return undefined;
 }
 
@@ -259,7 +259,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, backHre
       event: titled(e.event.replace(/_/g, " ")),
       ...(actorNames ? { by: actorNames[e.actor] ?? "a user not on the team" } : {}),
       detail: e.event === "lines_adjusted"
-        ? `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${typeof e.payload.reason === "string" ? ` (${e.payload.reason})` : ""}`
+        ? `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${typeof e.payload.reason === "string" && e.payload.reason.trim() ? ` (${e.payload.reason.trim()})` : ""}`
         : typeof e.payload.reason === "string" ? e.payload.reason.trim() : "",
     })),
   };

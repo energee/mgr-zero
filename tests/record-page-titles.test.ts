@@ -110,10 +110,10 @@ function dynamicPages(dir: string): string[] {
 }
 
 describe("missing-record browser metadata", () => {
-  it("covers every dynamic staff record route, including the compliance period validator", () => {
+  it("covers every dynamic staff record route and the period and missing-address validators", () => {
     const root = join(ROOT, "app/(app)");
     const actual = dynamicPages(root).map((path) => path.slice(root.length + 1, -"/page.tsx".length)).sort();
-    expect(actual).toEqual([...RECORDS.map(([route]) => route), "compliance/[period]"].sort());
+    expect(actual).toEqual([...RECORDS.map(([route]) => route), "compliance/[period]", "[...missing]"].sort());
   });
 
   it.each(RECORDS)("%s rejects missing metadata and rendering at the authorized read boundary", async (route, parameter, primary) => {

@@ -6,10 +6,12 @@ vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query, requirePagePermiss
 vi.mock("next/navigation", () => ({ redirect: (href: string) => { throw new Error(href); } }));
 import ShipPage from "@/app/(app)/orders/[id]/ship/page";
 import CompleteTransferPage from "@/app/(app)/orders/[id]/complete/page";
-import { ShipForm, buildShipLines, shippedLines, type ShippingSnapshot } from "@/app/(app)/orders/[id]/ship-form";
+import { ShipForm, buildShipLines, shipmentSourceNeeds, shippedLines, type ShippingSnapshot } from "@/app/(app)/orders/[id]/ship-form";
 import { toShipmentDoneViewProps } from "@/lib/mgr/shipment-done-view";
 import { ShipmentDoneView } from "@/components/mgr/views/shipment-done";
 import type { ShipSources } from "@/lib/commands/orders";
+import { newShipmentSource } from "@/components/mgr/views/shipment-sources";
+import { submitReason } from "@/lib/mgr/submit-reason";
 
 const params = Promise.resolve({ id: "order" });
 const order = { id: "order", order_no: 23, kind: "wholesale", status: "picked", from_location_id: "warehouse", to_location_id: null };
@@ -41,6 +43,35 @@ it("preserves explicit bin/lot identities, decimals, transfer destinations and h
     { lineId: "b", qty: 0, sources: [] },
   ]);
   expect(buildShipLines(lines, { a: "1", b: "0" }, { a: [{ key: "wrong:", qty: "1", toBinId: "" }] }, available)[0].sources[0].binId).toBeUndefined();
+});
+
+it("explains missing and invalid shipment sources before submitting (#1385)", () => {
+  const shipLines = [lines[0]];
+  const quantities = { a: "2" };
+  const needs = (rows: { key: string; qty: string; toBinId: string }[], transfer = false) =>
+    shipmentSourceNeeds(shipLines, quantities, { a: rows }, available, transfer);
+  expect(needs([])).toHaveLength(1);
+  expect(needs([{ key: "", qty: "2", toBinId: "" }])).toHaveLength(1);
+  expect(needs([{ key: "wrong:", qty: "2", toBinId: "" }])).toHaveLength(1);
+  expect(needs([{ key: "bin:", qty: "", toBinId: "" }])).toHaveLength(1);
+  const wrongTotal = needs([{ key: "bin:", qty: "3", toBinId: "" }]);
+  expect(wrongTotal).toHaveLength(1);
+  expect(wrongTotal[0]).toEqual(expect.stringContaining("2"));
+  expect(wrongTotal[0]).toEqual(expect.stringContaining("3"));
+  expect(needs([{ key: "bin:", qty: "1", toBinId: "" }, { key: "bin:", qty: "1", toBinId: "" }])).toHaveLength(1);
+  expect(needs([{ key: "bin:", qty: "2", toBinId: "" }], true)).toHaveLength(1);
+  expect(submitReason(needs([{ key: "bin:", qty: "2", toBinId: "destination" }], true))).toBeNull();
+  expect(shipmentSourceNeeds(shipLines, { a: "0" }, {}, available, true)).toEqual([]);
+  expect(shipmentSourceNeeds(shipLines, { a: "0.3" }, { a: [
+    { key: "bin:", qty: "0.1", toBinId: "" }, { key: "second:", qty: "0.2", toBinId: "" },
+  ] }, { ...available, stock: [...available.stock, { ...available.stock[1], bin_id: "second" }] }, false)).toEqual([]);
+});
+
+it("prefills each added source with the edited line's remaining quantity (#1385)", () => {
+  expect(newShipmentSource(2, [])).toEqual({ key: "", qty: "2", toBinId: "" });
+  expect(newShipmentSource(3, [{ key: "bin:", qty: "1.25", toBinId: "" }])).toEqual({ key: "", qty: "1.75", toBinId: "" });
+  expect(newShipmentSource(0.3, [{ key: "bin:", qty: "0.1", toBinId: "" }]).qty).toBe("0.2");
+  expect(newShipmentSource(2, [{ key: "bin:", qty: "3", toBinId: "" }]).qty).toBe("0");
 });
 
 it("sends a trimmed reason only for a line shipped below picked (#624)", () => {

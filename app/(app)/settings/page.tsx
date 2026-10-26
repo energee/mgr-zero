@@ -64,7 +64,7 @@ export default async function SettingsPage() {
       reportingBasisForm={<ReportingBasisForm key={row.books_opened_on ?? "unset"} basis={row.books_opened_on} history={basisCorrections} timeZone={row.timezone} />}
       fulfillmentForm={<PortalFulfillmentForm key={row.portal_fulfillment_location_id ?? "unconfigured"} locations={warehouses} currentId={row.portal_fulfillment_location_id} />}
       aiModelForm={<AiModelSettingsForm current={ai.model} models={aiModels} />}
-      hrefs={{ water: "/catalog/water-profiles?from=settings", locations: "/locations", team: "/settings/team", accounting: "/settings/accounting", pos: "/settings/pos", chat: "/settings/chat", import: "/settings/import" }}
+      hrefs={{ water: "/catalog/water-profiles?from=settings", locations: "/locations", team: "/settings/team", accounting: "/settings/accounting", pos: "/settings/pos", chat: "/settings/chat", import: "/settings/import", channels: "/settings/channels", units: "/settings/units" }}
     />
   );
 }

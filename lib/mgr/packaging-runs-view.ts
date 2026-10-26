@@ -1,4 +1,4 @@
-import { formatDate } from "@/lib/date-format";
+import { breweryDate, formatDate } from "@/lib/date-format";
 import { runNo } from "@/lib/mgr/doc-no";
 import type { EmptyState } from "@/lib/mgr/empty-state";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
@@ -29,6 +29,7 @@ export type PackagingRunRowView = {
   source: string | null;
   quantity: string;
   status?: "Closed" | "Cancelled";
+  overdue?: boolean;
   shortfall?: string;
   lot?: string;
   output?: string;
@@ -48,7 +49,7 @@ export type PackagingRunsViewModel = {
   workTabs: Record<string, string>;
 };
 
-function row(run: PackagingRunSnapshot, timeZone: string, href?: string): PackagingRunRowView {
+function row(run: PackagingRunSnapshot, timeZone: string, today: string, href?: string): PackagingRunRowView {
   const common = {
     key: run.id,
     runNo: runNo(run.run_no),
@@ -72,6 +73,7 @@ function row(run: PackagingRunSnapshot, timeZone: string, href?: string): Packag
   return {
     ...common,
     date: formatDate(run.planned_on),
+    overdue: !run.started_at && run.planned_on < today,
     shortfall: run.material_shortfall,
     verb,
     tone: run.material_shortfall || run.started_at ? "attention" : "info",
@@ -82,10 +84,11 @@ function row(run: PackagingRunSnapshot, timeZone: string, href?: string): Packag
 /** A closed or cancelled run is history; everything else is still upcoming. */
 const finished = (run: PackagingRunSnapshot) => !!(run.closed_at || run.cancelled_at);
 
-export function toPackagingRunsViewProps(runs: PackagingRunSnapshot[], timeZone: string, hrefFor?: (id: string) => string): PackagingRunsViewModel {
+export function toPackagingRunsViewProps(runs: PackagingRunSnapshot[], timeZone: string, hrefFor?: (id: string) => string, at: Date = new Date()): PackagingRunsViewModel {
+  const today = breweryDate(timeZone, at);
   return {
-    upcoming: runs.filter((run) => !finished(run)).map((run) => row(run, timeZone, hrefFor?.(run.id))),
-    recent: runs.filter(finished).map((run) => row(run, timeZone, hrefFor?.(run.id))),
+    upcoming: runs.filter((run) => !finished(run)).map((run) => row(run, timeZone, today, hrefFor?.(run.id))),
+    recent: runs.filter(finished).map((run) => row(run, timeZone, today, hrefFor?.(run.id))),
     empty: runs.length === 0 ? { title: "No runs planned", description: "Select Schedule run to plan one: a date, a brand, and how many of each SKU." } : undefined,
     workChips: WORK_CHIPS,
     workTabs: WORK_TABS,

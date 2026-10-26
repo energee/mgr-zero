@@ -192,9 +192,10 @@ describe("Driver route", () => {
     expect(body.props.model).toEqual(driverRouteA);
   });
 
-  it("renders Resume without leaking live hrefs", () => {
+  it("renders Deliver and sentence-case stop states without leaking live hrefs", () => {
     const html = htmlOf(createElement(DriverRouteView, { model: driverRouteA }));
-    expect(html).toMatch(/>Resume</);
+    expect(html).toMatch(/>Deliver</);
+    expect(driverRouteA.stops.map(stop => stop.detail)).toEqual(["Next", "Later", "Later"]);
     expect(html).not.toMatch(/href="\/work\/deliveries/);
   });
 

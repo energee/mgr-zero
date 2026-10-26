@@ -30,10 +30,28 @@ export function buildShipLines(lines: ShippingSnapshot["lines"], qtys: Record<st
   }));
 }
 
-/** Why Ship order or Complete transfer is withheld: each line shipping a quantity needs a source; null when all have one. */
-export function shipReason(lines: ShippingSnapshot["lines"], qtys: Record<string, string>, allocations: ShipmentAllocations) {
-  return submitReason(lines.filter(line => Number(qtys[line.id]) > 0 && !allocations[line.id]?.length)
-    .map(line => `a source for ${line.skus?.name ?? "Line"}`));
+/** Missing source details, including totals and duplicate bin/lot selections. */
+export function shipmentSourceNeeds(lines: ShippingSnapshot["lines"], qtys: Record<string, string>, allocations: ShipmentAllocations, available: ShipSources, transfer: boolean): string[] {
+  return lines.flatMap(line => {
+    const quantity = Number(qtys[line.id]);
+    if (!(quantity > 0)) return [];
+    const name = line.skus?.name ?? "Line";
+    const rows = allocations[line.id] ?? [];
+    const missing: string[] = [];
+    if (!rows.length || rows.some(row => !available.stock.some(stock => stock.stock_id === line.sku_id && `${stock.bin_id}:${stock.lot_id ?? ""}` === row.key))) {
+      missing.push(`a source bin and lot for ${name}`);
+    }
+    const validQuantities = rows.every(row => row.qty.trim() !== "" && Number.isFinite(Number(row.qty)) && Number(row.qty) > 0);
+    if (!validQuantities) missing.push(`a source quantity above zero for ${name}`);
+    if (transfer && rows.some(row => !row.toBinId)) missing.push(`a destination bin for ${name}`);
+    if (rows.length && validQuantities) {
+      const total = rows.reduce((sum, row) => sum + Number(row.qty), 0);
+      if (Math.abs(total - quantity) > 1e-9) missing.push(`source quantities totaling ${quantity} for ${name} (currently ${total})`);
+    }
+    const keys = rows.map(row => row.key).filter(Boolean);
+    if (new Set(keys).size !== keys.length) missing.push(`each bin and lot chosen only once for ${name}`);
+    return missing;
+  });
 }
 
 /** Match ship_order: save a submitted shortage reason, otherwise keep the
@@ -63,7 +81,7 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
       label: `${available.bins.find(bin => bin.id === stock.bin_id)?.name ?? stock.bin_id} · ${stock.lot_code ?? "Untracked / legacy stock"} · ${stock.qty} available`,
     })),
   }))} allocations={allocations} onChange={setAllocations} destinationBins={available.destinationBins} disabled={busy} />;
-  const reason = shipReason(snapshot.lines, qtys, allocations);
+  const reason = submitReason(shipmentSourceNeeds(snapshot.lines, qtys, allocations, available, transfer));
   const onQuantity = (id: string, value: string) => setQtys(prev => ({ ...prev, [id]: value }));
   const messages = <CommandFormMessage error={error} />;
   if (result) return <ShipmentDoneView model={result} />;

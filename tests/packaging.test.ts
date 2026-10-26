@@ -107,6 +107,43 @@ beforeAll(async () => {
 });
 
 describe("planning a packaging run before a tank exists", () => {
+  it("rejects fractional planned kegs at command and authenticated RPC boundaries, without moving inventory (#1380)", async () => {
+    const formatId = await insert("formats", { brewery_id: b.id, name: "Unlabelled draft format", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: 0.5 });
+    const skuId = await insert("skus", { brewery_id: b.id, brand_id: stout.brandId, format_id: formatId, name: "Draft package" });
+    const before = sql(`select id from inventory_movements where brewery_id='${b.id}' order by id`, true);
+    const input = { brandId: stout.brandId, plannedOn: "2026-11-20", outputs: [{ skuId, qtyPlanned: 1.5 }] };
+    for (const name of ["schedule_packaging_run", "update_packaging_run"]) {
+      const requestId = crypto.randomUUID();
+      const runId = crypto.randomUUID();
+      const payload = name === "schedule_packaging_run"
+        ? { brewery: b.id, brand: stout.brandId, planned_on: input.plannedOn, occupancy: null, outputs: [{ sku_id: skuId, qty_planned: 1.5 }] }
+        : { brewery: b.id, run: runId, occupancy: null, outputs: [{ sku_id: skuId, qty_planned: 1.5 }], started_at: null };
+      sql(`insert into private.command_requests(actor_id,brewery_id,request_id,command_name,payload_hash,result)
+        values('${ctx.userId}','${b.id}','${requestId}','${name}',extensions.digest('${JSON.stringify(payload)}'::jsonb::text,'sha256'),'{"legacy":true}'::jsonb)`);
+      const legacyInput = name === "schedule_packaging_run" ? input : { runId, outputs: input.outputs };
+      const execution = { requestId, correlationId: requestId };
+      expect(await runCommand(name, legacyInput, ctx, execution)).toEqual({ legacy: true });
+      await expect(runCommand(name, { ...legacyInput, outputs: [{ skuId, qtyPlanned: 1.6 }] }, ctx, execution)).rejects.toMatchObject({ code: "conflict" });
+    }
+    await expect(runCommand("schedule_packaging_run", input, ctx)).rejects.toThrow(/whole number of kegs/i);
+    const raw = { p_brewery: b.id, p_brand: stout.brandId, p_planned_on: input.plannedOn, p_occupancy: null, p_outputs: [{ sku_id: skuId, qty_planned: 1.5 }], p_request_id: crypto.randomUUID() };
+    const rejected = await ctx.db.rpc("schedule_packaging_run", raw);
+    expect(rejected.error?.message).toMatch(/whole number of kegs/i);
+    expect(sql(`select count(*) from private.command_requests where request_id='${raw.p_request_id}'`, true)).toEqual(["0"]);
+    const rounded = await ctx.db.rpc("schedule_packaging_run", { ...raw, p_outputs: [{ sku_id: skuId, qty_planned: 1.0001 }], p_request_id: crypto.randomUUID() });
+    expect(rounded.error?.message).toMatch(/whole number of kegs/i);
+    const run = await runCommand("schedule_packaging_run", { ...input, outputs: [{ skuId, qtyPlanned: 2 }] }, ctx) as { id: string };
+    const update = { runId: run.id, outputs: input.outputs };
+    await expect(runCommand("update_packaging_run", update, ctx)).rejects.toThrow(/whole number of kegs/i);
+    const rawUpdate = await ctx.db.rpc("update_packaging_run", { p_brewery: b.id, p_run: run.id, p_occupancy: null, p_started_at: null, p_outputs: raw.p_outputs, p_request_id: crypto.randomUUID() });
+    expect(rawUpdate.error?.message).toMatch(/whole number of kegs/i);
+    const saved = await runCommand("get_packaging_run", { runId: run.id }, ctx) as { outputs: { qty_planned: number }[] };
+    expect(saved.outputs[0].qty_planned).toBe(2);
+    const fractionalCase = await runCommand("schedule_packaging_run", { ...input, outputs: [{ skuId: stout.skuId, qtyPlanned: 1.5 }] }, ctx) as { id: string; occupancy_id: string | null };
+    expect(fractionalCase.occupancy_id).toBeNull();
+    expect(sql(`select qty_planned from packaging_run_outputs where run_id='${fractionalCase.id}'`, true)).toEqual(["1.50"]);
+    expect(sql(`select id from inventory_movements where brewery_id='${b.id}' order by id`, true)).toEqual(before);
+  });
   it("schedules a run with a brand and no occupancy, and lists it with no vessel", async () => {
     const run = (await runCommand("schedule_packaging_run", {
       brandId: stout.brandId, plannedOn: "2026-11-20",
@@ -735,7 +772,7 @@ describe("list_repack_parents", () => {
       child: { skuId: string; unit: string; quantity: number } | null;
     }[];
     expect(rows.map((r) => r.id)).toEqual([caseSkuId]);
-    expect(rows[0]).toMatchObject({ label: "Repack IPA — Repack IPA case", unit: "case of 6 4-packs" });
+    expect(rows[0]).toMatchObject({ label: "Repack IPA case", unit: "case of 6 4-packs" });
     expect(rows[0].bblPerUnit).toBeCloseTo(FOUR_PACK_BBL * PER_CASE, 6);
     expect(rows[0].child).toEqual({ skuId: fourPackSkuId, unit: "4-pack 16oz", quantity: PER_CASE });
   });
@@ -786,7 +823,7 @@ describe("record_repack", () => {
     }, warehouseCtx);
 
     // Three cases at half a divider each is 1.5: a whole two come off the shelf, and it holds one.
-    await expect(repack()).rejects.toThrow(/insufficient selected bin and lot stock: 1 on hand in the source bin/);
+    await expect(repack()).rejects.toMatchObject({ code: "bad_request", status: 400 });
     await seedMovement(b.id, { materialId: divider, locationId: repackLocationId, binId: repackBinId, qty: 1, createdBy: userId });
     await repack();
 
@@ -902,9 +939,9 @@ describe("record_repack", () => {
     }, warehouseCtx);
 
     // The bin holds only lotted cases, so a repack must say which lot.
-    await expect(repack(1)).rejects.toThrow(/choose the recorded lot/);
+    await expect(repack(1)).rejects.toMatchObject({ code: "bad_request", status: 400 });
     // The lot holds 10; 11 is refused.
-    await expect(repack(11, lotId)).rejects.toThrow(/insufficient selected bin and lot stock: 10 on hand/);
+    await expect(repack(11, lotId)).rejects.toMatchObject({ code: "bad_request", status: 400 });
 
     await repack(1, lotId);
     const lotBalance = (sku: string) => sql(`select trim_scale(qty) from lot_on_hand where lot_id = '${lotId}' and sku_id = '${sku}'`);
@@ -955,7 +992,7 @@ describe("record_repack", () => {
       const winner = await a.query("select public.reverse_inventory_movement($1,$2,'Concurrent correction',$3) result",
         [brewery.id, original.id, winnerRequest]);
       await a.query("commit");
-      await expect(pending).rejects.toThrow(/insufficient selected bin and lot stock: 0 on hand/i);
+      await expect(pending).rejects.toMatchObject({ code: "P0001" });
       const replay = await warehouse.db.rpc("reverse_inventory_movement", {
         p_brewery: brewery.id, p_movement: original.id, p_note: "Concurrent correction", p_request_id: winnerRequest,
       });

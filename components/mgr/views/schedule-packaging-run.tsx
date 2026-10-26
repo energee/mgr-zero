@@ -3,9 +3,10 @@
 // passes callbacks in `controls` and its error and submit in `messages`/`footer`.
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import Link from "next/link";
 import { E } from "@/components/mgr/e";
-import { scheduleRunReason, type SchedulePackagingRunViewModel } from "@/lib/mgr/schedule-packaging-run-view";
+import { plannedOutputError, scheduleRunReason, type SchedulePackagingRunViewModel } from "@/lib/mgr/schedule-packaging-run-view";
 
 export type SchedulePackagingRunControls = Partial<Record<"plannedOn" | "brand" | "source", (value: string) => void>> & {
   qty?: (key: string, value: string) => void;
@@ -15,8 +16,10 @@ export function SchedulePackagingRunView({ model, controls = {}, messages, foote
   model: SchedulePackagingRunViewModel; controls?: SchedulePackagingRunControls; messages?: ReactNode; footer?: ReactNode; catalogHref?: string | null;
 }) {
   const { qty } = controls;
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   return <>
     {E.edit("Planned date", model.plannedOn, "date", undefined, { onChange: controls.plannedOn, required: Boolean(controls.plannedOn) })}
+    {model.dateWarning ? E.note(model.dateWarning) : null}
     {E.ttl("Source")}
     {E.pick("Brand", model.brandId, model.brandOptions, { id: "schedule-run-brand", onChange: controls.brand, placeholder: "Brand", required: Boolean(controls.brand), empty: catalogHref === null
       ? { text: "No brands yet. An admin or sales member can add a brand in Catalog." }
@@ -26,11 +29,20 @@ export function SchedulePackagingRunView({ model, controls = {}, messages, foote
     {E.ttl("Planned outputs")}
     {model.outputs.length
       ? model.outputs.map((row) => <div key={row.key}>{E.row(row.title, row.detail, <>
-        {E.stq(Number(row.qty) || 0, `${row.title} quantity`, qty ? { value: row.qty, onChange: (value) => qty(row.key, value), required: false } : undefined)}
+        {E.edit(`${row.title} quantity`, row.qty, "number", undefined, {
+          id: `schedule-output-${row.key}`, hideLabel: true,
+          onChange: qty ? (value) => qty(row.key, value) : undefined,
+          onBlur: () => setTouched(previous => ({ ...previous, [row.key]: true })),
+          min: 0, step: row.whole ? 1 : "any", required: false,
+          error: touched[row.key] ? plannedOutputError(row.qty, row.whole) : undefined,
+        })}
         {row.listed === undefined ? null : E.sw(row.listed, "On the wholesale list")}
       </>)}</div>)
-      : E.info(model.brandId ? "This brand has no packages yet." : "Pick a brand to plan its packages.")}
+      : E.info(model.brandId ? <>This brand has no packages yet. {catalogHref === null
+        ? "An admin or sales member can add a package in Catalog."
+        : <Link href={catalogHref ?? "#"} data-to="Catalog">Add a package in Catalog</Link>}</> : "Pick a brand to plan its packages.")}
     {model.leftInSource ? E.fld(model.leftLabel, model.leftInSource) : null}
+    {model.sourceWarning ? E.note(model.sourceWarning) : null}
     {E.ttl("Materials")}
     {model.materials ? E.tbl(["Material", "Planned", "On hand", "Short"], model.materials, ["l", "r", "r", "r"]) : E.info(model.materialsMessage ?? "Choose planned outputs to preview materials.")}
     {model.warning ? E.note(model.warning) : null}

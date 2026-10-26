@@ -11,6 +11,9 @@ import { ReturnCreditView, ReturnSourcesView } from "../components/mgr/views/ret
 import { ShipView } from "../components/mgr/views/ship";
 import { ShipmentDoneView } from "../components/mgr/views/shipment-done";
 import { ShortPickView } from "../components/mgr/views/short-pick";
+import { CompleteTransferView } from "../components/mgr/views/complete-transfer";
+import { orderTransferComplete } from "../lib/mgr/fixtures/orders";
+import { toCompleteTransferViewProps } from "../lib/mgr/complete-transfer-view";
 import {
   orderAdjustLines,
   orderPick,
@@ -135,7 +138,11 @@ describe("Pick view", () => {
 describe("Ship view", () => {
   it("preserves exact SKU names without inventing units or barrel volumes", () => {
     const model = toShipViewProps({ ...orderShipOnDelivery, lines: [{ ...orderShipOnDelivery.lines[0], skus: { name: "Hazy special can" }, bbl_per_unit: undefined }] });
-    expect(model.tape[0]).toEqual(["−4 Hazy special can · sale removal · PA", ""]);
+    expect(model.tape[0]).toEqual(["−4 Hazy special can · removed for sale · ships to PA", ""]);
+  });
+  it("omits the destination clause when a ship-to state is blank", () => {
+    const model = toShipViewProps({ ...orderShipOnDelivery, order: { ...orderShipOnDelivery.order, ship_tos: { state: "" } } });
+    expect(model.tape[0][0]).toBe("−4 Hazy IPA · ½ bbl keg · removed for sale");
   });
   it("names every held-back line on the restock preview", () => {
     const model = toShipViewProps({ ...orderShipInvoice, lines: orderShipInvoice.lines.map(line => ({ ...line, qty_shipped: 0 })) });
@@ -148,8 +155,8 @@ describe("Ship view", () => {
     expect(model.lines[1]).toMatchObject({ qty: 9, tone: "w", detail: "ordered 10 · picked 10" });
     expect(model.shortNote).toMatch(/Shipping 9 of 10 Pils/);
     expect(model.tape).toEqual([
-      ["−4 Hazy IPA · ½ bbl keg · sale removal · PA", "2.00 bbl"],
-      ["−9 Pils · 16 oz case · sale removal · PA", "0.87 bbl"],
+      ["−4 Hazy IPA · ½ bbl keg · removed for sale · ships to PA", "2.00 bbl"],
+      ["−9 Pils · 16 oz case · removed for sale · ships to PA", "0.87 bbl"],
       ["1 Pils · 16 oz case released · restock", ""],
       ["invoice number", "assigned on commit"],
     ]);
@@ -172,6 +179,22 @@ describe("Ship view", () => {
     expect(markup).toMatch(/0\.87 bbl/);
     expect(markup).toMatch(/>Ship order</);
     expect(markup).toContain('data-variant="irreversible"');
+  });
+
+  it("shows why Ship order and Complete transfer are disabled (#1385)", () => {
+    const reason = "Still needed: a source bin and lot for Hazy IPA.";
+    for (const node of [
+      createElement(ShipView, { model: toShipViewProps(orderShipOnDelivery), reason }),
+      createElement(CompleteTransferView, { model: toCompleteTransferViewProps(orderTransferComplete), reason }),
+    ]) {
+      const markup = html(node);
+      expect(markup).toContain(reason);
+      expect(markup).toMatch(/<button[^>]*disabled=""/);
+      expect(markup).toContain('data-variant="irreversible"');
+      const description = markup.match(/<button[^>]*aria-describedby="([^"]+)"/)?.[1];
+      expect(description).toBeTruthy();
+      expect(markup).toContain(`id="${description}"`);
+    }
   });
 
   it("asks each short line for its reason, prefilled from the stored one (#624)", () => {
@@ -210,8 +233,8 @@ describe("Ship view", () => {
       [10, "picked 10", "ok"],
     ]);
     expect(model.tape).toEqual([
-      ["−4 Hazy IPA · ½ bbl keg · sale removal · PA", "2.00 bbl"],
-      ["−10 Pils · 16 oz case · sale removal · PA", "0.97 bbl"],
+      ["−4 Hazy IPA · ½ bbl keg · removed for sale · ships to PA", "2.00 bbl"],
+      ["−10 Pils · 16 oz case · removed for sale · ships to PA", "0.97 bbl"],
       ["invoice number", "deferred to delivery"],
     ]);
   });
@@ -233,6 +256,15 @@ describe("Ship view", () => {
 });
 
 describe("Shipment done view", () => {
+  it("names the shipping destination only when supplied, preserving shortage notes", () => {
+    expect(toShipmentDoneViewProps(orderShipmentDone).tape[0][0]).toBe("−4 Hazy IPA · ½ bbl keg · removed for sale · ships to PA");
+    const model = toShipmentDoneViewProps({
+      ...orderShipmentDone,
+      order: { ...orderShipmentDone.order, ship_tos: null },
+      lines: [{ ...orderShipmentDone.lines[0], short_reason: "one keg dented" }],
+    });
+    expect(model.tape[0][0]).toBe("−4 Hazy IPA · ½ bbl keg · removed for sale · short: one keg dented");
+  });
   it("#815 shows saved shell shortages without inventing warnings on legacy receipts", () => {
     // Two short pools at one location must read differently: pool and size are named.
     const warnings = [

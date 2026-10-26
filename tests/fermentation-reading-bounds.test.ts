@@ -50,7 +50,7 @@ describe("fermentation reading bounds (#468)", () => {
 
   it("the form's temperature and pH fields carry the same min and max", () => {
     const html = renderToStaticMarkup(createElement(FermentationReadingView, {
-      formId: "f", unit: "plato", identity: { vessel: "FV3" },
+      formId: "f", unit: "plato", timeZone: "America/New_York", identity: { vessel: "FV3" },
       values: { observedAt: "", tempF: "66", gravity: "", ph: "4.4", note: "" },
     }));
     const attrs = (id: string) => html.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))?.[0] ?? "";
@@ -101,7 +101,7 @@ describe("fermentation reading bounds (#468)", () => {
     const values = { observedAt: "2026-10-25T10:00:00", tempF: "66", gravity: "1050", ph: "0", note: "" };
     expect(readingValidation(values, "sg").measurements).toEqual({ tempF: 66, gravityPlato: parseGravity("1050", "sg"), ph: 0 });
     const html = renderToStaticMarkup(createElement(FermentationReadingView, {
-      formId: "f", unit: "sg", identity: { vessel: "FV3" }, values: { ...values, ph: "15" },
+      formId: "f", unit: "sg", timeZone: "America/New_York", identity: { vessel: "FV3" }, values: { ...values, ph: "15" },
     }));
     const input = html.match(/<input[^>]*id="fr-ph"[^>]*>/)?.[0];
     expect(input).toContain('aria-invalid="true"');

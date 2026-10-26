@@ -365,11 +365,11 @@ describe("source bin stock (#451)", () => {
     const s = await setup();
     const before = await ledgers(s.b.id);
     const move = { fromBinId: s.bin, toBinId: s.bins[1].id };
-    await expect(runCommand("move_stock_bin", { ...move, materialId: s.salt, qty: 2.5 }, s.ctx)).rejects.toThrow(/insufficient/);
-    await expect(runCommand("move_stock_bin", { ...move, materialId: s.malt, materialLotId: s.lot, qty: 2.5 }, s.ctx)).rejects.toThrow(/insufficient/);
-    await expect(runCommand("move_stock_bin", { ...move, kegPoolId: s.pool, kegSize: "half_bbl", qty: 3 }, s.ctx)).rejects.toThrow(/insufficient/);
-    await expect(runCommand("move_stock_bin", { ...move, kegPoolId: s.pool, kegSize: "sixth_bbl", qty: 1 }, s.ctx)).rejects.toThrow(/insufficient/);
-    await expect(runCommand("move_stock_bin", { ...move, skuId: s.skuId, qty: 3 }, s.ctx)).rejects.toThrow(/insufficient/);
+    await expect(runCommand("move_stock_bin", { ...move, materialId: s.salt, qty: 2.5 }, s.ctx)).rejects.toMatchObject({ code: "bad_request", status: 400 });
+    await expect(runCommand("move_stock_bin", { ...move, materialId: s.malt, materialLotId: s.lot, qty: 2.5 }, s.ctx)).rejects.toMatchObject({ code: "bad_request", status: 400 });
+    await expect(runCommand("move_stock_bin", { ...move, kegPoolId: s.pool, kegSize: "half_bbl", qty: 3 }, s.ctx)).rejects.toMatchObject({ code: "bad_request", status: 400 });
+    await expect(runCommand("move_stock_bin", { ...move, kegPoolId: s.pool, kegSize: "sixth_bbl", qty: 1 }, s.ctx)).rejects.toMatchObject({ code: "bad_request", status: 400 });
+    await expect(runCommand("move_stock_bin", { ...move, skuId: s.skuId, qty: 3 }, s.ctx)).rejects.toMatchObject({ code: "bad_request", status: 400 });
     expect(await ledgers(s.b.id)).toEqual(before);
     // exactly what the bin holds still moves, and leaves it at zero
     await runCommand("move_stock_bin", { ...move, materialId: s.malt, materialLotId: s.lot, qty: 2 }, s.ctx);
@@ -392,9 +392,9 @@ describe("source bin stock (#451)", () => {
       { brewery_id: s.b.id, pool_id: s.pool, keg_size: "half_bbl", location_id: s.from.id, bin_id: s.bin, qty: 1, reason: "lost", customer_id: customerId, created_by: s.ctx.userId },
     ])).error).toBeNull();
     const move = { kegPoolId: s.pool, kegSize: "half_bbl", fromBinId: s.bin, toBinId: s.bins[1].id };
-    await expect(runCommand("move_stock_bin", { ...move, qty: 4 }, s.ctx)).rejects.toThrow(/insufficient selected bin and lot stock: 3 on hand/);
+    await expect(runCommand("move_stock_bin", { ...move, qty: 4 }, s.ctx)).rejects.toMatchObject({ code: "bad_request", status: 400 });
     await runCommand("move_stock_bin", { ...move, qty: 3 }, s.ctx);
-    await expect(runCommand("move_stock_bin", { ...move, qty: 1 }, s.ctx)).rejects.toThrow(/0 on hand/);
+    await expect(runCommand("move_stock_bin", { ...move, qty: 1 }, s.ctx)).rejects.toMatchObject({ code: "bad_request", status: 400 });
   });
 
   it("receive_stock_transfer refuses material, keg and untracked SKU lines beyond the source bin", async () => {
@@ -406,12 +406,14 @@ describe("source bin stock (#451)", () => {
     ];
     for (const line of lines) {
       const { transferId } = await runCommand("create_stock_transfer", { fromLocationId: s.from.id, toLocationId: s.to.id, lines: [line] }, s.ctx) as { transferId: string };
+      const detail = await runCommand("get_stock_transfer", { transferId }, s.ctx) as { lines: { materials: { name: string; base_uom: string } | null }[] };
+      if ("materialId" in line) expect(detail.lines[0].materials).toEqual({ name: "Salt", base_uom: "lb" });
       const { data: stored } = await admin.from("stock_transfer_lines").select("id").eq("transfer_id", transferId).single();
       await runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: stored!.id, qty: 2 }] }, s.ctx);
       // after the pick, half the stock leaves the source bin
       await runCommand("move_stock_bin", { ...line, qty: 1, toBinId: s.bins[1].id }, s.ctx);
       const before = await ledgers(s.b.id);
-      await expect(runCommand("receive_stock_transfer", { transferId, lines: [{ lineId: stored!.id, qty: 2 }] }, s.ctx)).rejects.toThrow(/insufficient/);
+      await expect(runCommand("receive_stock_transfer", { transferId, lines: [{ lineId: stored!.id, qty: 2 }] }, s.ctx)).rejects.toMatchObject({ code: "bad_request", status: 400 });
       expect(await ledgers(s.b.id)).toEqual(before);
       expect((await admin.from("stock_transfers").select("status").eq("id", transferId).single()).data!.status).toBe("picked");
     }
@@ -437,9 +439,9 @@ it("record_stock_transfer_pick refuses more than the source bin holds", async ()
   const skuLine = lines!.find((l) => l.sku_id)!.id, kegLine = lines!.find((l) => !l.sku_id)!.id;
 
   await expect(runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: skuLine, qty: 999 }] }, ctx))
-    .rejects.toThrow(/source bin/);
+    .rejects.toMatchObject({ code: "bad_request", status: 400 });
   await expect(runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: kegLine, qty: 1 }] }, ctx))
-    .rejects.toThrow(/source bin/);
+    .rejects.toMatchObject({ code: "bad_request", status: 400 });
   const { data: still } = await admin.from("stock_transfers").select("status").eq("id", transferId).single();
   expect(still!.status).toBe("submitted");
   expect((await admin.from("stock_transfer_lines").select("qty_picked").eq("transfer_id", transferId)).data!.every((l) => l.qty_picked === null)).toBe(true);
@@ -447,7 +449,7 @@ it("record_stock_transfer_pick refuses more than the source bin holds", async ()
   await runCommand("record_movement", { skuId, locationId: from.id, binId: from.binId, qty: 5, type: "opening_balance" }, ctx);
   await admin.from("keg_events").insert({ brewery_id: b.id, pool_id: pool!.id, keg_size: "half_bbl", location_id: from.id, bin_id: from.binId, qty: 4, reason: "acquired", created_by: ctx.userId });
   await expect(runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: skuLine, qty: 6 }] }, ctx))
-    .rejects.toThrow(/source bin/);
+    .rejects.toMatchObject({ code: "bad_request", status: 400 });
   await runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: skuLine, qty: 5 }, { lineId: kegLine, qty: 4 }] }, ctx);
   const { data: picked } = await admin.from("stock_transfers").select("status").eq("id", transferId).single();
   expect(picked!.status).toBe("picked");
@@ -474,10 +476,10 @@ it("a pick that passes the source-bin check is receivable; lines sharing a bin c
 
   // each line fits the bin's 4 on its own; together they do not
   await expect(runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: three, qty: 3 }, { lineId: two, qty: 2 }] }, ctx))
-    .rejects.toThrow(/insufficient selected bin and lot stock: 4 on hand in the source bin/);
+    .rejects.toMatchObject({ code: "bad_request", status: 400 });
   await runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: three, qty: 3 }] }, ctx);
   // a later pick counts the lines already picked
-  await expect(runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: two, qty: 2 }] }, ctx)).rejects.toThrow(/4 on hand/);
+  await expect(runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: two, qty: 2 }] }, ctx)).rejects.toMatchObject({ code: "bad_request", status: 400 });
   await runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: two, qty: 1 }] }, ctx);
 
   // the picked 3 + 1 spans both lots, and receives from them

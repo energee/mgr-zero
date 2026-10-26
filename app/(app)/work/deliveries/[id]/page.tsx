@@ -2,7 +2,7 @@
 // shipped lines and invoice timing (or, for a transfer stop, the destination
 // and picked lines). The shared surface confirms delivery/refusal or leaves an
 // unattempted stop for later through delivered-form.tsx's command adapter.
-// Today's delivery_next row and the route's Resume land here.
+// Today's delivery_next row and the route's Deliver land here.
 import { E } from "@/components/mgr/e";
 import { ConfirmDeliveryView } from "@/components/mgr/views/confirm-delivery";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -11,6 +11,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { docNo } from "@/lib/mgr/doc-no";
 import { orNotFound } from "@/lib/mgr/not-found";
+import { sentenceCase } from "@/lib/mgr/labels";
 import type { ShipToSnapshot } from "@/lib/mgr/ship-to-view";
 import { DeliveredForm } from "./delivered-form";
 import { navTitle } from "@/lib/mgr/nav";
@@ -79,7 +80,7 @@ function deliveryAction(
     return (
       <>
         {E.fld("Received by", delivery.signed_by ?? "")}
-        {E.fld("Outcome", delivery.outcome ?? "Delivered")}
+        {E.fld("Outcome", sentenceCase(delivery.outcome ?? "delivered"))}
         {delivery.outcome && delivery.outcome !== "delivered" && !transfer && E.btn("Check in refused beer", "p", `/work/deliveries/${delivery.id}/return`)}
         {E.status(transfer ? "Transfer remains in transit until received or cancelled" : docNo("INV", invoice?.invoice_no ?? null, "Delivered"), "ok")}
       </>
@@ -89,10 +90,5 @@ function deliveryAction(
   if (!ctx.roles.includes("admin") && delivery.routes.driver_user_id !== ctx.userId) {
     return E.status("Only the route's assigned driver or an admin may confirm this stop", "w");
   }
-  return (
-    <>
-      {E.sp()}
-      <DeliveredForm routeId={delivery.routes.id} deliveryId={delivery.id} transfer={Boolean(transfer)} lines={lines.map((l) => ({ key: l.id, title: l.name, qty: String(l.qty) }))} />
-    </>
-  );
+  return <DeliveredForm routeId={delivery.routes.id} deliveryId={delivery.id} transfer={Boolean(transfer)} lines={lines.map((l) => ({ key: l.id, title: l.name, qty: String(l.qty) }))} />;
 }

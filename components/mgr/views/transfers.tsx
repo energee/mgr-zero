@@ -1,6 +1,6 @@
 // Shared Transfers list; adapters supply actions and explicit destinations.
 import { Fragment, type ReactNode } from "react";
-import { E } from "@/components/mgr/e";
+import { E, ROW_LINK_COVER } from "@/components/mgr/e";
 import type { TransfersViewModel } from "@/lib/mgr/transfers-view";
 import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 
@@ -27,7 +27,7 @@ export function TransfersView({
         : model.rows.map((row) => (
           <Fragment key={row.key}>
             {row.verb
-              ? E.row(row.title, row.detail, E.act(row.verb, row.tone, linkRows ? row.href : undefined), row.warning ? "w" : "")
+              ? E.row(row.title, row.detail, E.act(row.verb, row.tone, linkRows ? row.href : undefined, undefined, undefined, ROW_LINK_COVER), row.warning ? "w" : "")
               : E.nav(row.title, row.detail, row.warning ? "w" : "", undefined, linkRows ? row.href : undefined)}
           </Fragment>
         ))}

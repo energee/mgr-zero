@@ -95,7 +95,31 @@ describe("vendors, materials, contracts", () => {
     const sales = await makeStaffCtx(b.id, "sales");
     await expect(runCommand("upsert_vendor", { name: "Nope" }, sales)).rejects.toThrow(/permission/i);
   });
+  it("deletes an unused contract and keeps one on a purchase order", async () => {
+    const vendor = await runCommand("upsert_vendor", { name: "Delete contract supplier" }, ctx) as { id: string };
+    const material = await runCommand("upsert_material", {
+      name: "Delete contract malt", category: "malt", baseUom: "lb", purchaseUom: "lb",
+    }, ctx) as { id: string };
+    const unused = await runCommand("upsert_material_contract", {
+      vendorId: vendor.id, materialId: material.id, qtyCommitted: 100,
+    }, ctx) as { id: string };
+
+    await runCommand("delete_material_contract", { contractId: unused.id }, ctx);
+    expect((await admin.from("material_contracts").select("id").eq("id", unused.id)).data).toEqual([]);
+
+    const referenced = await runCommand("upsert_material_contract", {
+      vendorId: vendor.id, materialId: material.id, qtyCommitted: 100,
+    }, ctx) as { id: string };
+    await runCommand("create_purchase_order", {
+      vendorId: vendor.id, lines: [{ materialId: material.id, qtyOrdered: 10, contractId: referenced.id }],
+    }, ctx);
+    await expect(runCommand("delete_material_contract", { contractId: referenced.id }, ctx))
+      .rejects.toMatchObject({ status: 409, code: "conflict", message: "Contract is on purchase orders. Set an end date instead." });
+    expect((await admin.from("material_contracts").select("id").eq("id", referenced.id)).data)
+      .toEqual([{ id: referenced.id }]);
+  });
 });
+
 
 describe("purchase orders: draft, mark sent, receive", () => {
   it("records an overreceipt once and makes the missing damage/disposition contract explicit", async () => {

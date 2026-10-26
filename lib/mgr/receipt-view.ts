@@ -97,7 +97,7 @@ export function toPostedReceiptViewProps(po: PostedReceiptSnapshot, receiptId: s
   const name = (line: PostedReceiptSnapshot["lines"][number]) => line.material?.name ?? `Line ${line.id}`;
   const owed = po.lines.filter(line => line.qty_open > 0).map(line => `${line.qty_open}${line.material ? ` ${line.material.purchase_uom}` : ""} ${name(line)}`);
   return {
-    title: `${poNo(po.po_no)} · received`, backTo: "Purchase orders", backHref,
+    title: `${poNo(po.po_no)} · receipt ${formatDate(receipt.received_on)}`, backTo: "Purchase orders", backHref,
     status: po.status.replaceAll("_", " "), stillOwed: owed.join(" · ") || "Nothing owed",
     bill: receiptBillPresentation(receipt, billContext),
     tape: receipt.receipt_lines.map(count => {

@@ -11,6 +11,7 @@
 // `product_volume_requirements` (a view) reads these plans back as demand and
 // answers the brewhouse's question: what still has to be brewed?
 import { z } from "zod";
+import { skuLabel } from "@/lib/mgr/finished-goods-view";
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, CommandError, type Ctx } from "./registry";
 
 // z.string().date() rather than a regex: api-schema.ts renders it as
@@ -19,7 +20,7 @@ export const isoDate = z.string().date();
 
 const outputs = z.array(z.object({
   skuId: z.string().uuid(),
-  qtyPlanned: z.number().nonnegative(),
+  qtyPlanned: z.number().nonnegative().describe("Planned package units; keg formats require a whole number"),
 }));
 
 const rpcOutputs = (lines: z.infer<typeof outputs>) =>
@@ -242,7 +243,7 @@ export function shapeRepackParents(components: RepackComponent[], skus: RepackSk
     if (!Number.isFinite(bblPerUnit)) continue;
     const child = rows.length === 1 ? byBrandFormat.get(`${s.brand_id}:${rows[0].child_format_id}`) : undefined;
     parents.push({
-      id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name, unit: s.formats?.name ?? "", bblPerUnit,
+      id: s.id, label: skuLabel(s), unit: s.formats?.name ?? "", bblPerUnit,
       child: child ? { skuId: child.id, unit: child.formats?.name ?? child.name, quantity: Number(rows[0].qty) } : null,
     });
   }
