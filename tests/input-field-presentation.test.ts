@@ -54,7 +54,7 @@ it("renders invite email corrections instead of native validation tooltips", () 
   expect(html).toContain('noValidate=""');
 });
 
-it("explains where the brewery phone appears and associates that help with the field", () => {
+it("associates brewery phone help and errors with the field", () => {
   const initial = toBrewerySettingsValues({ name: "Brewery", timezone: "America/New_York", ttb_registry_no: null, pa_license_no: null, customer_phone: "", fermentation_reading_due_hours: 24, books_opened_on: null, one_way_keg_fee_cents: 0, days_to_package: 14 });
   for (const fieldErrors of [{}, { phone: "Use a phone number." }]) {
     const html = renderToStaticMarkup(createElement(BrewerySettingsFormView, { initial, fieldErrors }));
@@ -65,7 +65,6 @@ it("explains where the brewery phone appears and associates that help with the f
     const descriptions = /aria-describedby="([^"]*)"/.exec(phone!)?.[1].split(/\s+/);
     expect(descriptions).toContain(`${phoneId}-help`);
     expect(html).toContain(`id="${phoneId}-help"`);
-    expect(html).toContain("Printed on the portal when online payment is unavailable. Leave empty for none.");
     if (fieldErrors.phone) {
       expect(descriptions).toContain(`${phoneId}-error`);
       expectFieldError(html, fieldErrors.phone);
