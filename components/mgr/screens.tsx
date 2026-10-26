@@ -1774,7 +1774,7 @@ export const SCREENS: Screen[] = [
       const values = { observedAt: "2026-09-10T08:10:00", tempF: "68.2", gravity: "1.019", ph: "", note: "" };
       return <>
         <FermentationReadingView formId={formId} values={values} identity={{ vessel: "FV3", batch: "Batch 416 · Hazy IPA" }} unit="sg" prior={{ tempF: "67.8", gravity: "1.021", ph: "4.21" }} />
-        {E.pin(<FermentationReadingActionsView formId={formId} values={values} />)}
+        {E.pin(<FermentationReadingActionsView formId={formId} values={values} unit="sg" />)}
       </>;
     })(),
   },
