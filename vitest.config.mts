@@ -44,6 +44,8 @@ const pureTests = [
   "tests/settings-field-validation.test.ts",
   "tests/input-field-presentation.test.ts",
   "tests/quantity-field-validation.test.ts",
+  "tests/kegs-view.test.ts",
+  "tests/form-feedback.test.ts",
   "tests/quantity-field-blur.test.ts",
   "tests/quantity-form-submission.test.ts",
   "tests/adjust-lines-submission.test.ts",

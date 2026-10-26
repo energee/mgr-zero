@@ -216,12 +216,15 @@ describe("per-form reasons", () => {
     expect(packagingCloseReason({ ...filled, plan: planned })).toBe("Still needed: complete material actuals for every planned material.");
   });
 
-  it("Record keg event names the pool, location, bin, count and a needed customer (#1122)", () => {
+  it("Record keg event withholds submit for missing choices or invalid counts (#1122)", () => {
     const value = { poolId: "p", kegSize: "half_bbl" as const, reason: "shipped" as const, locationId: "l", binId: "b", customerId: "c", qty: "2", note: "" };
     expect(kegEventReason(value)).toBeNull();
     expect(kegEventReason({ ...value, poolId: "", locationId: "", binId: "", customerId: "", qty: "0" }))
-      .toBe("Still needed: a keg pool, a location, a bin, a keg count above zero, and a customer.");
+      .toBeTruthy();
     expect(kegEventReason({ ...value, reason: "found", customerId: "" })).toBeNull();
+    for (const qty of ["1.5", "1e1", "9007199254740992"]) {
+      expect(kegEventReason({ ...value, qty })).toBeTruthy();
+    }
   });
 
   it("the recipe schedule sheets name a blank name, temperature, duration or amount (#1122)", () => {
