@@ -34,6 +34,7 @@ const pureTests = [
   "tests/field-number-notation.test.ts",
   "tests/field-validation-followup.test.ts",
   "tests/settings-field-validation.test.ts",
+  "tests/input-field-presentation.test.ts",
   "tests/quantity-field-validation.test.ts",
   "tests/quantity-field-blur.test.ts",
   "tests/quantity-form-submission.test.ts",
