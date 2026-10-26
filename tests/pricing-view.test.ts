@@ -9,7 +9,7 @@ import { PriceGroupView } from "../components/mgr/views/price-group";
 import { PriceCellInput, PriceGroupsView } from "../components/mgr/views/price-groups";
 import { priceGroupTwo, pricingGrid } from "../lib/mgr/fixtures/pricing";
 import { money } from "../lib/mgr/money";
-import { priceGroupReason, toPriceGroupViewProps } from "../lib/mgr/price-group-view";
+import { priceGroupFieldErrors, priceGroupReason, toPriceGroupViewProps } from "../lib/mgr/price-group-view";
 import { cellCommit, toPriceGroupsViewProps } from "../lib/mgr/price-groups-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -207,6 +207,12 @@ describe("Price group view", () => {
     expect(priceGroupReason({ name: "Core", position: "1", costCeilingInput: "" })).toBeNull();
     const form = readFileSync("app/(app)/pricing/group-form.tsx", "utf8");
     expect(form).toContain("reason: priceGroupReason(draft)");
+  });
+
+  it("keeps Save disabled when Position exceeds Postgres's integer range (#1385)", () => {
+    const fields = { name: "Core", position: "99999999999", costCeilingInput: "" };
+    expect(priceGroupFieldErrors(fields).position).toBeTruthy();
+    expect(priceGroupReason(fields)).toContain("2,147,483,647");
   });
 
   it("marks Group name required, says what Position does, and marks Cost ceiling optional (#1133)", () => {

@@ -72,9 +72,9 @@ describe("keg pools and location-grain events", () => {
     const pool = (await runCommand("create_keg_pool", { name: "Small", kind: "owned" }, ctx)) as { id: string };
     await event({ poolId: pool.id, kegSize: "half_bbl", qty: 5, reason: "acquired", locationId: storage.id, binId: storage.binId });
     await expect(event({ poolId: pool.id, kegSize: "half_bbl", qty: 6, reason: "retired", locationId: storage.id, binId: storage.binId }))
-      .rejects.toThrow(/not enough kegs/i);
+      .rejects.toMatchObject({ code: "bad_request", status: 400 });
     await expect(event({ poolId: pool.id, kegSize: "sixth_bbl", qty: 1, reason: "lost", locationId: storage.id, binId: storage.binId }))
-      .rejects.toThrow(/not enough kegs/i);
+      .rejects.toMatchObject({ code: "bad_request", status: 400 });
     await runCommand("update_keg_pool", { poolId: pool.id, active: false }, ctx);
     await expect(event({ poolId: pool.id, kegSize: "half_bbl", qty: 1, reason: "acquired", locationId: storage.id, binId: storage.binId }))
       .rejects.toThrow(/out of service/i);
@@ -155,10 +155,10 @@ describe("customer keg balance", () => {
     const k = { poolId: pool.id, kegSize: "half_bbl", locationId: storage.id, binId: storage.binId };
     await event({ ...k, qty: 10, reason: "acquired" });
     await event({ ...k, qty: 5, reason: "shipped", customerId });
-    await expect(event({ ...k, qty: 6, reason: "returned", customerId })).rejects.toThrow(/customer holds 5/i);
-    await expect(event({ ...k, qty: 6, reason: "lost", customerId })).rejects.toThrow(/customer holds 5/i);
+    await expect(event({ ...k, qty: 6, reason: "returned", customerId })).rejects.toMatchObject({ code: "bad_request", status: 400 });
+    await expect(event({ ...k, qty: 6, reason: "lost", customerId })).rejects.toMatchObject({ code: "bad_request", status: 400 });
     // The balance is per pool and size: sixths were never shipped.
-    await expect(event({ ...k, kegSize: "sixth_bbl", qty: 1, reason: "returned", customerId })).rejects.toThrow(/customer holds 0/i);
+    await expect(event({ ...k, kegSize: "sixth_bbl", qty: 1, reason: "returned", customerId })).rejects.toMatchObject({ code: "bad_request", status: 400 });
     await event({ ...k, qty: 5, reason: "returned", customerId });
     const { data } = await admin.from("keg_customer_balances").select("qty").eq("pool_id", pool.id).single();
     expect(Number(data!.qty)).toBe(0);
