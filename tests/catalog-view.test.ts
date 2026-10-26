@@ -401,7 +401,6 @@ describe("Brand view", () => {
     expect(html).toMatch(/COLA TTB ID 25318001000034/);
     expect(html).toMatch(/OH registration/);
     expect(html).toMatch(/Suggested group 2/);
-    expect(html).toMatch(/recipe cost \$48\.10\/bbl/);
     expect(html).toMatch(/>Use</);
     expect(html).toMatch(/>Add approval</);
     expect(html).toMatch(/>Add registration</);

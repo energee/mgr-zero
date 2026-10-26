@@ -65,6 +65,8 @@ export type WorkRowView = {
 export type WorkViewModel = {
   rows: WorkRowView[];
   workChips: string[];
+  /** Standalone task chips, separate from filters; inventory destinations stay inert. */
+  workHrefs: Record<string, string>;
   workChipIndex: number;
   workTabs: Record<string, string>;
   defaults?: WorkKind[];
@@ -73,7 +75,7 @@ export type WorkViewModel = {
 export type WorkSnapshot = { rows: WorkRowView[] };
 
 export function toWorkViewProps({ rows }: WorkSnapshot): WorkViewModel {
-  return { rows, workChips: WORK_FILTER_CHIPS, workChipIndex: 0, workTabs: WORK_TABS };
+  return { rows, workChips: WORK_FILTER_CHIPS, workHrefs: { pick: "#", replenishment: "#" }, workChipIndex: 0, workTabs: WORK_TABS };
 }
 
 export function workFromQuery(rows: WorkRow[], defaults: WorkKind[]): WorkViewModel {

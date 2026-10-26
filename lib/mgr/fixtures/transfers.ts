@@ -58,7 +58,7 @@ export const transferDetailSubmitted: TransferDetailSnapshot = {
     to_name: LOC_TAPROOM.name,
   },
   lines: [
-    { id: "l1", name: SKU_HAZY.name, from_bin: "Walk-in", to_bin: "Cold", qty: 2 },
-    { id: "l2", name: SKU_PILS.name, from_bin: "Walk-in", to_bin: "Cold", qty: 4 },
+    { id: "l1", name: SKU_HAZY.name, from_bin: "Walk-in", to_bin: "Cold", qty: 2, unit: "units" },
+    { id: "l2", name: SKU_PILS.name, from_bin: "Walk-in", to_bin: "Cold", qty: 4, unit: "units" },
   ],
 };
