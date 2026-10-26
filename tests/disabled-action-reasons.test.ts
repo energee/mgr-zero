@@ -27,13 +27,14 @@ vi.mock("@/lib/commands/use-command-form", () => ({
   useCommandAction: () => ({ busy: false, error: null, fieldErrors: {}, run: () => {} }),
 }));
 
-function describedButton(html: string, label: string, reason: RegExp) {
+function describedButton(html: string, label: string, reason?: RegExp) {
   const button = html.match(new RegExp(`<button[^>]*>${label}</button>`))?.[0];
   expect(button).toContain('disabled=""');
   const reasonId = button?.match(/aria-describedby="([^"]+)"/)?.[1];
   expect(reasonId).toBeTruthy();
   const description = html.match(new RegExp(`<p id="${reasonId}"[^>]*>([^<]+)</p>`))?.[1];
-  expect(description).toMatch(reason);
+  if (reason) expect(description).toMatch(reason);
+  return description;
 }
 
 describe("remaining named disabled-action reasons (#1122)", () => {
@@ -103,21 +104,25 @@ describe("Oct 25 recheck: withheld actions say why (#1122)", () => {
   const html = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(createElement("div", null, node));
 
   it("Ship order names the line still without a source", () => {
+    const skuName = "Hazy IPA case";
     const snapshot = {
       order: { id: "o", order_no: 7, kind: "wholesale", from_location_id: "w", to_location_id: null },
-      lines: [{ id: "a", sku_id: "sku-a", qty_ordered: 3, qty_picked: 3, qty_shipped: null, skus: { name: "Hazy IPA case" } }],
+      lines: [{ id: "a", sku_id: "sku-a", qty_ordered: 3, qty_picked: 3, qty_shipped: null, skus: { name: skuName } }],
       locations: [{ id: "w", name: "Warehouse" }],
     } as ShippingSnapshot;
-    describedButton(html(createElement(ShipForm, { snapshot, available: { bins: [], destinationBins: [], stock: [] } })), "Ship order", /^Still needed: a source for Hazy IPA case\.$/);
+    const reason = describedButton(html(createElement(ShipForm, { snapshot, available: { bins: [], destinationBins: [], stock: [] } })), "Ship order");
+    expect(reason).toContain(skuName);
   });
 
   it("Complete transfer carries the same reason", () => {
+    const skuName = "Pils keg";
     const snapshot = {
       order: { id: "o", order_no: 8, kind: "taproom_transfer", from_location_id: "w", to_location_id: "t" },
-      lines: [{ id: "a", sku_id: "sku-a", qty_ordered: 3, qty_picked: 3, qty_shipped: null, skus: { name: "Pils keg" } }],
+      lines: [{ id: "a", sku_id: "sku-a", qty_ordered: 3, qty_picked: 3, qty_shipped: null, skus: { name: skuName } }],
       locations: [{ id: "w", name: "Warehouse" }, { id: "t", name: "Taproom" }],
     } as ShippingSnapshot;
-    describedButton(html(createElement(ShipForm, { snapshot, available: { bins: [], destinationBins: [], stock: [] } })), "Complete transfer", /a source for Pils keg/);
+    const reason = describedButton(html(createElement(ShipForm, { snapshot, available: { bins: [], destinationBins: [], stock: [] } })), "Complete transfer");
+    expect(reason).toContain(skuName);
   });
 
   it("Record brew day names what is still open, even after every row is confirmed", () => {

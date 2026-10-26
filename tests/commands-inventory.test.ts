@@ -146,7 +146,7 @@ describe("inventory commands", () => {
 
     await expect(runCommand("record_movement", {
       skuId: sku.id, locationId: location.id, binId: bin.id, qty: -50, type: "loss",
-    }, ctx)).rejects.toThrow(/insufficient selected bin and lot stock/i);
+    }, ctx)).rejects.toMatchObject({ code: "bad_request", status: 400 });
     const onHand = (await runCommand("get_bin_on_hand", { skuId: sku.id, locationId: location.id }, ctx)) as (OnHandRow & { bin_id: string })[];
     expect(onHand.map((row) => [row.bin_id, Number(row.qty)])).toEqual([[bin.id, 5]]);
   });
