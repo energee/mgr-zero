@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { KegEventPresentation } from "@/components/mgr/views/keg-event-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { KEG_EVENT_REASONS } from "@/lib/mgr/enums";
-import { kegEventReady, mayHaveKegCustomer, toKegOption as toOption, withLocationBin, type KegEventValue } from "@/lib/mgr/keg-fleet-view";
+import { mayHaveKegCustomer, toKegOption as toOption, withLocationBin, type KegEventValue } from "@/lib/mgr/keg-fleet-view";
 
 export function KegEventForm({ pools, locations, bins, customers }: {
   pools: { id: string; name: string }[];
@@ -31,6 +31,6 @@ export function KegEventForm({ pools, locations, bins, customers }: {
   return (
     <KegEventPresentation open={form.open} onOpenChange={form.setOpen} trigger={<Button data-preview-action size="sm">Record keg event</Button>}
       value={value} options={{ pools: pools.map(toOption), locations: locations.map(toOption), bins: binsAt(value.locationId).map(toOption), customers: customers.map(toOption) }}
-      onChange={change} onSubmit={form.submit} error={form.error} submitting={form.submitting} ready={kegEventReady(value)} />
+      onChange={change} onSubmit={form.submit} error={form.error} submitting={form.submitting} />
   );
 }

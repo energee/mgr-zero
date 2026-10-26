@@ -9,7 +9,7 @@ import { Fragment, useId, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { TabBar } from "@/components/mgr/qty";
 import { Button } from "@/components/ui/button";
-import { isShort, pullDetail, pullTone, showsPacks, sourceChoices, type BrewDayStage, type BrewIngredient, type BrewPrepViewModel } from "@/lib/mgr/brew-prep-view";
+import { isShort, prepReason, pullDetail, pullTone, showsPacks, sourceChoices, type BrewDayStage, type BrewIngredient, type BrewPrepViewModel } from "@/lib/mgr/brew-prep-view";
 import { vesselOptions } from "@/lib/mgr/brew-day-view";
 import { materialSourceKey } from "@/lib/mgr/material-source";
 import { BREW_DAY_STAGES } from "@/lib/mgr/recipe-process-view";
@@ -74,8 +74,9 @@ export function SourcePick({ row, choices, onChange, disabled = false }: {
 
 /** Short and Choose lot act in place: Short moves to the line's first amount field to enter what was pulled (Pick's Short
  *  opens the same amount entry); Choose lot opens the line's source pick when `sources` holds stock of its material,
- *  and is disabled when `sources` is given but holds none. Without `sources` (the inventory) it stays a plain verb. */
-export function BrewPrepView({ model, onChange, onPrint, onSave, messages, planActions, submitting = false, disabled = false, tabHrefs }: {
+ *  and is disabled when `sources` is given but holds none, saying the material has no stock. Without `sources` (the
+ *  inventory) it stays a plain verb. Done pulling is withheld with prepReason beside it. */
+export function BrewPrepView({ model, onChange, onPrint, onSave, messages, planActions, submitting = false, tabHrefs }: {
   model: BrewPrepViewModel;
   onChange?: (patch: Partial<BrewPrepViewModel>) => void;
   onPrint?: () => void;
@@ -85,8 +86,6 @@ export function BrewPrepView({ model, onChange, onPrint, onSave, messages, planA
   planActions?: ReactNode;
   messages?: ReactNode;
   submitting?: boolean;
-  /** A validation gate (canSavePrep) disables Done pulling without claiming an in-flight command, as PickView's does. */
-  disabled?: boolean;
   tabHrefs?: Record<string, string>;
 }) {
   const id = useId(), [draft, setDraft] = useState(model), [choosing, setChoosing] = useState<string | null>(null);
@@ -94,11 +93,12 @@ export function BrewPrepView({ model, onChange, onPrint, onSave, messages, planA
   const change = (patch: Partial<BrewPrepViewModel>) => { setDraft({ ...value, ...patch }); onChange?.(patch); };
   const patchLine = (key: string, patch: Partial<BrewIngredient>) => change({ ingredients: value.ingredients.map(row => row.key === key ? { ...row, ...patch } : row) });
   const byStage = (stage: BrewDayStage) => value.ingredients.filter(row => row.stage === stage);
+  const reason = prepReason(value);
   return <>
     {E.back("Batches", model.title, undefined, model.backHref)}
     <BrewTabs on={0} hrefs={tabHrefs} />
     <PlannedLine planned={model.planned} note={model.note} />
-    <form className="contents" onSubmit={event => { event.preventDefault(); if (!submitting && !disabled) onSave?.(); }}>
+    <form className="contents" onSubmit={event => { event.preventDefault(); if (!submitting && !reason) onSave?.(); }}>
       <div className="md:max-w-sm">{E.pick("Vessel", value.vesselId, vesselOptions(value.vessels), { onChange: vesselId => change({ vesselId }), placeholder: "Choose vessel" })}</div>
       <div className={DESK_LINE}>
         {BREW_DAY_STAGES.filter(stage => byStage(stage).length).map(stage => <Fragment key={stage}>
@@ -111,7 +111,9 @@ export function BrewPrepView({ model, onChange, onPrint, onSave, messages, planA
                 {isShort(row) && <Button type="button" size="sm" variant="outline" data-preview-action onClick={() => document.getElementById(fieldId)?.focus()}>Short</Button>}
                 {choosing === row.key
                   ? <SourcePick row={row} choices={choices} disabled={submitting} onChange={source => patchLine(row.key, { source })} />
-                  : !row.source && E.act("Choose lot", "attention", undefined, choices.length ? () => setChoosing(row.key) : undefined, submitting || (value.sources !== undefined && !choices.length))}
+                  : !row.source && E.submit("Choose lot", { type: "button", size: "sm", variant: "outline", disabled: submitting, onClick: choices.length ? () => setChoosing(row.key) : undefined,
+                    // No stock is a missing record, not missing input: a plain sentence, not a Still needed line.
+                    reason: value.sources !== undefined && !choices.length ? `No ${row.name} in stock to choose from.` : null })}
               </div>)}
             </div>;
           })}
@@ -121,7 +123,7 @@ export function BrewPrepView({ model, onChange, onPrint, onSave, messages, planA
       {messages}
       <BrewFooter>
         <Button type="button" variant="outline" data-preview-action onClick={onPrint}>Print pull list</Button>
-        <Button type="submit" disabled={submitting || disabled}>{submitting ? "Saving…" : "Done pulling"}</Button>
+        {E.submit("Done pulling", { reason, submitting })}
       </BrewFooter>
     </form>
     <ChangePlanFold>{planActions}</ChangePlanFold>

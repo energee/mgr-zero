@@ -1,6 +1,6 @@
 ---
 name: issue-resolution
-description: Resolve an MGR GitHub issue or pull-request conflict from a numeric reference such as "fix #247". Use for implementation, conflict repair, verification, and delivery; do not use for read-only issue triage or code review.
+description: Resolve an MGR GitHub issue, PR review findings, or pull-request conflict from a numeric reference such as "fix #247". Use for implementation, review fixes, conflict repair, verification, and delivery; do not use for read-only issue triage or code review.
 ---
 
 # Issue resolution
@@ -41,6 +41,14 @@ when the visible behavior changes.
 For screen work, also use `.agents/skills/screen-parity/SKILL.md`; it owns the
 inventory/live composition contract and exact proof suite.
 
+### Address review findings
+
+List the unresolved threads (`gh api graphql`, `reviewThreads` where
+`isResolved` is false). Check each claim against the code. A valid one gets a
+failing test, then the fix. Reply on every thread with the fixing commit or the
+reason it is skipped, then resolve it (`resolveReviewThread`). None stay open
+(AGENTS.md Negative 11).
+
 ### Repair a PR conflict
 
 Run `scripts/land-pr.sh <pr>` from the PR's worktree; never merge `main` by
@@ -77,8 +85,11 @@ inspect the relevant live route and inventory frame, then close the session and
 server.
 
 Before committing, inspect `git status`, `git diff`, and `git diff --check`.
-Commit the implementation or conclude the merge, push the PR head branch, and
-query GitHub again. Completion requires the pushed revision to report
+Commit the implementation or conclude the merge. Immediately before pushing,
+re-read `gh pr view <n> --json state,mergedAt` (AGENTS.md Negative 18): a PR
+can merge mid-work. If it merged, cherry-pick onto a new branch from
+`origin/main` and open a new PR. Otherwise push the PR head branch and query
+GitHub again. Completion requires the pushed revision to report
 `mergeable: MERGEABLE`; report CI as pending, failing, or passing exactly as
 GitHub reports it. A cleared conflict with pending checks is mergeable, not ready
 to merge.
