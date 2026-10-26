@@ -39,7 +39,7 @@ export function ShopView({ model, footer, comingUp, controls = {}, quantities, l
         <CommandForm title="Delivery details" open={deliveryOpen} onOpenChange={setDeliveryOpen}
           trigger={<Button type="button" variant="ghost" disabled={locked} aria-label="Change delivery details">Change</Button>}>
           <fieldset disabled={locked} className="flex flex-col gap-2">
-            {E.pick("Ship to", model.shipToId, [{ value: "", label: "Select a ship-to" }, ...(model.shipTos.map(shipTo => ({ value: shipTo.id, label: shipTo.label })))], { onChange: controls.shipTo })}
+            {E.pick("Ship to", model.shipToId, [{ value: "", label: "Select a ship-to", disabled: true }, ...(model.shipTos.map(shipTo => ({ value: shipTo.id, label: shipTo.label })))], { onChange: controls.shipTo })}
             <DatePicker label="Requested date (optional)" value={controls.requestedDate ? model.requestedDate : undefined} defaultValue={model.requestedDate} onChange={controls.requestedDate} />
             {E.edit("PO number", model.po, "text", undefined, { onChange: controls.po })}
             {E.edit("Note", model.note, "text", undefined, { onChange: controls.note })}

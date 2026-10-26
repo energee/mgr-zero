@@ -71,6 +71,20 @@ describe("Order view loop", () => {
     expect(model.events.at(-1)).toMatchObject({ event: "Lines adjusted", detail: "Pils · 16 oz case 10 to Pils · 16 oz case 7 (customer cut)" });
   });
 
+  it.each(["", "   ", "\t\r\n", "\u00a0\u2003"])("omits empty parentheses for historical adjustment reason %j", reason => {
+    const events = orderPickedRestock.events.map(event => event.event === "lines_adjusted"
+      ? { ...event, payload: { ...event.payload, reason } } : event);
+    expect(toOrderViewProps({ ...orderPickedRestock, events }).events.at(-1)?.detail)
+      .toBe("Pils · 16 oz case 10 to Pils · 16 oz case 7");
+  });
+
+  it("trims historical padded adjustment reasons for display", () => {
+    const events = orderPickedRestock.events.map(event => event.event === "lines_adjusted"
+      ? { ...event, payload: { ...event.payload, reason: " \tcustomer cut\n " } } : event);
+    expect(toOrderViewProps({ ...orderPickedRestock, events }).events.at(-1)?.detail)
+      .toBe("Pils · 16 oz case 10 to Pils · 16 oz case 7 (customer cut)");
+  });
+
   it("preserves negative availability and flags the line", () => {
     const line = orderConfirmedWholesale.lines[0];
     const model = toOrderViewProps({
