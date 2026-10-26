@@ -2392,7 +2392,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Bulk process COLAs",
-    to: { "Open COLA on TTB": "Bulk process COLAs", "Selected: Brand (front) or keg collar": "Bulk process COLAs", Skip: "Bulk process COLAs", "Save and next": "Bulk process COLAs" },
+    to: { COLA: "Bulk process COLAs", "Open COLA on TTB": "Bulk process COLAs", "Selected: Brand (front) or keg collar": "Bulk process COLAs", Skip: "Bulk process COLAs", "Save and next": "Bulk process COLAs" },
     job: "Review the brewery’s approved labels and select a catalog image for each brand",
     reads: "search_colas · get_cola_details · get_cola_image",
     writes: "upsert_brand_approval",
