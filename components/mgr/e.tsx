@@ -101,6 +101,9 @@ type VolumeUnit = "oz" | "gal" | "bbl" | "mL" | "L";
  *  text, and the matching negative margin keeps the text on the column edge
  *  (w-auto replaces Item's w-full so both margins widen the row). */
 const TAP_ROW = "has-[[data-tap]]:cursor-pointer has-[[data-tap]]:select-none has-[[data-tap]]:hover:bg-accent/50 has-[[data-tap]]:-mx-4 has-[[data-tap]]:w-auto has-[[data-tap]]:px-4";
+/** Opt in for primary row navigation, never a destructive action. Translation
+ *  would make the pressed link its cover's containing block instead of the row. */
+export const ROW_LINK_COVER = "after:absolute after:inset-0 active:not-aria-[haspopup]:translate-none";
 
 /** Keys the fields itself, so callers pass bare elements. The index is the
  *  identity because a field group is a fixed, ordered list — never reordered,
@@ -232,14 +235,16 @@ export const E = {
    *  the action, independently of row status.
    *  `href` makes it a link on a live page, `onClick` a button that acts in place; fixtures leave both out.
    *  `disabled` holds an in-place action while its command runs.
+   *  `linkClassName` styles only live links, including opt-in whole-row covers.
    *  Primary and destructive keep their 10% tint on hover: the tap row's hover wash already
    *  darkens underneath, and a deeper tint drops the text below AA (#1041). Dark mode drops
    *  that tint, at rest and on hover: it pulled the text below AA when hovered on every surface,
    *  and at rest on popovers (#1065). Success, attention and info restate their hover fill under
    *  dark:, or the ghost Button's dark:hover:bg-muted/50 replaces it and hovered attention text
    *  falls below AA on cards. */
-  act: (t: React.ReactNode, tone: "primary" | "success" | "attention" | "info" | "destructive" = "primary", href?: string, onClick?: () => void, disabled?: boolean) => (
+  act: (t: React.ReactNode, tone: "primary" | "success" | "attention" | "info" | "destructive" = "primary", href?: string, onClick?: () => void, disabled?: boolean, linkClassName?: string) => (
     <Button variant="ghost" size="sm" type="button" data-row-action data-tap asChild={Boolean(href)} onClick={onClick} disabled={disabled} className={cn(
+      href && linkClassName,
       tone === "destructive" && "bg-destructive/10 text-destructive hover:bg-destructive/10 hover:text-destructive dark:bg-transparent dark:hover:bg-transparent",
       tone === "primary" && "bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary dark:bg-transparent dark:hover:bg-transparent",
       tone === "success" && "bg-success text-success-foreground hover:bg-success/80 hover:text-success-foreground dark:hover:bg-success/80",

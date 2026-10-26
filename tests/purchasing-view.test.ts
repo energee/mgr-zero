@@ -37,6 +37,20 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
 
 describe("Purchase orders", () => {
+  it("Vendor, Material, Received into and Bin prompts are unavailable choices (#1388)", () => {
+    const pick = vi.spyOn(E, "pick");
+    htmlOf(createElement(NewPoView, { model: newPoCountryMalt }));
+    htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }));
+    const calls = [...pick.mock.calls];
+    pick.mockRestore();
+    for (const label of ["Vendor", "Material", "Received into", "Bin"]) {
+      const options = calls.find(([name]) => name === label)?.[2];
+      expect(options, label).toEqual(expect.arrayContaining([
+        expect.objectContaining({ value: "", disabled: true }),
+      ]));
+    }
+  });
+
   it("a closed order with no next action is a row link, not an Open verb (#996)", () => {
     const model = toPurchaseOrdersViewProps({ title: "Purchase orders", subtitle: "every order", rows: [
       { key: "po", title: "PO-0012 · Hop Co", detail: "received", href: "/purchase-orders/po" },
@@ -48,7 +62,7 @@ describe("Purchase orders", () => {
   });
 
   it("each order status names its next action; received and cancelled have none (#996)", () => {
-    expect(purchaseOrderNext("draft")).toEqual({ verb: "Mark sent", tone: "info" });
+    expect(purchaseOrderNext("draft")).toEqual({ verb: "Send", tone: "info" });
     expect(purchaseOrderNext("sent")).toEqual({ verb: "Receive", tone: "info" });
     expect(purchaseOrderNext("partially_received")).toEqual({ verb: "Receive", tone: "attention" });
     expect(purchaseOrderNext("received")).toBeUndefined();
@@ -160,7 +174,9 @@ it("posted receipt uses counted quantities, captured lot references and current 
     receipts: [{ id: "receipt-id", received_on: "2026-09-12", receipt_lines: [{ po_line_id: "line-id", qty_counted: 3, variance: -1, lot_id: "actual-lot-id", material_name: "Actual material", purchase_uom: "box", purchase_uom_factor: 10, base_uom: "kg" }] }],
   };
   const model = toPostedReceiptViewProps(snapshot, "receipt-id")!;
-  expect(model.title).toBe("PO-0042 · received");
+  expect(model.title).toBe("PO-0042 · receipt Sep 12, 2026");
+  expect(model.title).not.toContain("· received");
+  expect(model.status).toBe("partially received");
   expect(model.stillOwed).toBe("1 box Actual material");
   expect(model.tape[0][0]).toBe("+30 kg Actual material · receipt");
   expect(model.tape[0][1]).toContain("short 1 box");

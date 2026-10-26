@@ -72,6 +72,9 @@ const pureTests = [
   "tests/app-screen-parity.test.ts",
   "tests/screen-view-composition.test.ts",
   "tests/production-view.test.ts",
+  "tests/purchasing-view.test.ts",
+  "tests/delivery-view.test.ts",
+  "tests/transfers-view.test.ts",
 ];
 
 export default defineConfig({
