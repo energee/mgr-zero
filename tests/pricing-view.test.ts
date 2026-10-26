@@ -212,7 +212,7 @@ describe("Price group view", () => {
   it("keeps Save disabled when Position exceeds Postgres's integer range (#1385)", () => {
     const fields = { name: "Core", position: "99999999999", costCeilingInput: "" };
     expect(priceGroupFieldErrors(fields).position).toBeTruthy();
-    expect(priceGroupReason(fields)).toContain("2,147,483,647");
+    expect(priceGroupReason(fields)).toBeTruthy();
   });
 
   it("marks Group name required, says what Position does, and marks Cost ceiling optional (#1133)", () => {

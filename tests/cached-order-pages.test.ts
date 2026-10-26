@@ -22,6 +22,7 @@ it("feeds the existing order form cached live IDs and the default ship-to", () =
   const form = NewOrderClient({ timeZone });
   expect(form.type).toBe(OrderForm);
   expect(form.props.customers[0].shipTos[0]).toMatchObject({ id: "dock", is_default: true });
+  expect(form.props.skus).toEqual([expect.objectContaining({ id: "sku" })]);
   expect(state.calls).toEqual([["list_customers", { includeShipTos: true }], ["list_locations", {}], ["list_skus", {}]]);
 });
 

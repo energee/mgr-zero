@@ -101,7 +101,7 @@ export function toSetPasswordViewProps(account: string, error?: string, recovery
     inputs: [...(recovery ? [] : ["Current password"]), "Choose a password", "Confirm new password"],
     field: { label: "Account", value: account }, primary: "Save password", secondary: "Back to MGR",
     passwordRules: "Use at least 8 characters and choose a password different from your current one.",
-    note: recovery ? "Your reset link verified this account. Choose and confirm your new password." : undefined,
+    info: recovery ? "Your reset link verified this account. Choose and confirm your new password." : undefined,
     link: { label: "Need a reset link?", to: "Reset password" },
     // A field's error is drawn beside that field; only the rest go in the top alert.
     error: Object.keys(passwordErrors).length ? undefined : message, passwordErrors,
@@ -122,9 +122,8 @@ export function toPasswordSavedViewProps(error: string | undefined, canRetry: bo
   if (error === "signout_failed") warning = "Other sessions were signed out, but we could not confirm that this reset session ended.";
   return {
     title: "Password saved", inputs: [], primary: "Sign in with your new password",
-    note: "Your password was saved. You do not need to change it again.",
     error: warning,
-    info: canRetry ? "Select Sign out all sessions to try again." : "Sign in with your new password, then use Sign out to end all sessions.",
+    info: `Your password was saved. You do not need to change it again. ${canRetry ? "Select Sign out all sessions to try again." : "Sign in with your new password, then use Sign out to end all sessions."}`,
     extraPrimary: canRetry ? "Sign out all sessions" : undefined,
   };
 }
