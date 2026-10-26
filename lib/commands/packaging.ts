@@ -20,7 +20,7 @@ export const isoDate = z.string().date();
 
 const outputs = z.array(z.object({
   skuId: z.string().uuid(),
-  qtyPlanned: z.number().nonnegative(),
+  qtyPlanned: z.number().nonnegative().describe("Planned package units; keg formats require a whole number"),
 }));
 
 const rpcOutputs = (lines: z.infer<typeof outputs>) =>

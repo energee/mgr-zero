@@ -1,3 +1,4 @@
+import { NotFoundView } from "@/components/mgr/views/not-found";
 import { BatchCompletionFixture } from "@/components/mgr/fixtures/batch-completion";
 import { AccountInvitationsView } from "@/components/mgr/views/account-invitations";
 import { CommandRecoveryView } from "@/components/mgr/views/command-recovery";
@@ -1920,7 +1921,7 @@ export const SCREENS: Screen[] = [
     job: "See what is planned, what is due and what closed, and schedule the next run",
     reads: "list_packaging_runs · list_brands · list_occupancies · list_skus · list_locations · list_bins",
     writes: "none [scheduling and closing happen on their own surfaces]",
-    states: [["short", "a planned run whose materials fall short says so beneath its run number and its next action is Resolve, not Start"], ["due today", "the same run also appears in Today for the brewer"], ["closed", "finished runs stay under Recent, with optional lot, output, yield and loss only when supplied"], ["empty", "no runs planned: the empty state points at Schedule run"]],
+    states: [["short", "a planned run whose materials fall short says so beneath its run number and its next action is Resolve, not Start"], ["overdue", "an unstarted active plan before brewery-local today is marked Overdue; finished runs never are"], ["due today", "the same run also appears in Today for the brewer"], ["closed", "finished runs stay under Recent, with optional lot, output, yield and loss only when supplied"], ["empty", "no runs planned: the empty state points at Schedule run"]],
     spec: "Reuse the responsive RecordTable register shared with Batches: sortable columns on desktop and labeled records on phones. Keep Upcoming and Recent separate. Upcoming shows run, brand, planned date, source, planned quantity and next action. Recent shows run, brand, status, finished date and planned quantity; lot, actual output, yield and loss appear only when supplied, never inferred from planned quantities. Dates for finished runs use the brewery timezone. Schedule run and Repack keep their existing forms. A run number opens its record; finished runs have no next action.",
     body: <PackagingRunsView model={toPackagingRunsViewProps(packagingRuns, DEMO_TIME_ZONE)} />,
   },
@@ -1930,12 +1931,12 @@ export const SCREENS: Screen[] = [
     tab: "Work",
     surface: "sheet",
     name: "Schedule packaging run",
-    to: { "Save run plan": "Packaging plan", "FV3 · Hazy IPA": "Entity picker" },
-    job: "Plan a run against one source occupancy and see shortages before the day",
-    reads: "list_occupancies [open, with volume and contents] · list_formats [for the brand in the source] · get_packaging_material_plan [preview for the planned outputs]",
-    writes: "schedule_packaging_run [one RPC: run planned against a brand, with an optional source occupancy, + planned outputs, each flagged on/off the wholesale list] · update_packaging_run [same sheet reopens a planned run until it starts; picking the tank or starting both require one]",
-    states: [["permission", "brewer or warehouse required", 1], ["source chosen", "the brand comes from what is in the vessel, so only that brand's formats are offered"], ["short", "the materials table shows the shortage now, not on the day; Save still works, Start will not"], ["editing", "a planned run reopens here with its values filled; a started run cannot be rescheduled, only closed"], ["no open occupancy", "nothing to package: the source picker says so and links to Cellar"]],
-    spec: "The plan half of the packaging frame, pulled out so a run can be scheduled before it exists and edited until it starts. One source occupancy, chosen exactly, is the rule that lets close revalidate it later. Planned outputs are counts per format; the sheet converts to barrels and shows what is left in the vessel so a plan cannot exceed the source. Each output can be listed on the wholesale shop (the brand × package buyers will see); listing is the offer, not an ATP promise, and a format left off is absent from Shop. Materials are previewed from the format BOM so a shortage is a planning fact, not a surprise at the line. Saving writes the run and its planned outputs in one RPC and lands on the run; nothing moves in the ledger until close.",
+    to: { "Save run plan": "Packaging plan", "FV3 · Hazy IPA": "Entity picker", "Add a package in Catalog": "Catalog" },
+    job: "Plan a brand's packages with an optional source and visible planning warnings",
+    reads: "list_brands · list_occupancies [open, with volume and contents] · list_skus [with authoritative format package type and volume] · get_packaging_material_plan [preview for the planned outputs]",
+    writes: "schedule_packaging_run [one RPC: brand, planned date, optional source occupancy and planned outputs]",
+    states: [["permission", "admin, brewer or warehouse required", 1], ["no source", "a valid plan can be saved without selecting a tank"], ["fractional kegs", "whole keg quantities required; fractional non-keg packages remain permitted", 1], ["source short", "warn before saving when planned volume exceeds the selected tank; Save still works"], ["past date", "warn before brewery-local today; Save still works"], ["no packages", "Catalog recovery for a creator, otherwise name who can add packages"], ["material short", "preview the shortage; planning remains allowed"]],
+    spec: "A brand identifies the run; a source tank is optional until starting. Planned outputs use the SKU format's package type, never its name: keg counts must be whole. Entered invalid quantities cannot be silently omitted. The sheet converts known volumes to barrels and shows the source remainder, warning when the selected source is short without reserving beer or blocking a flexible plan. Dates before brewery-local today warn without recording physical work. Materials come from the format BOM. Saving writes the run and outputs atomically; inventory moves only at close.",
     body: <SchedulePackagingRunView model={schedulePackagingRun} />,
   },
   {
@@ -3338,5 +3339,19 @@ export const SCREENS: Screen[] = [
     states: [["empty", "no saved profiles · Add water profile"]],
     spec: "The empty list uses the same water-profile catalog view as the populated list. Profiles have no source or target classification; those choices belong on a recipe’s Water sheet.",
     body: <WaterProfilesView model={toWaterProfilesViewProps({ profiles: [] })} />,
+  },
+  {
+    step: 2, slice: 1, tab: "Beer", name: "Staff page not found",
+    job: "Leave an unknown staff address without losing the staff shell",
+    reads: "none", writes: "none",
+    states: [["unknown route", "/kegs/missing · the link is wrong or out of date"]],
+    body: <NotFoundView message="There is nothing at this address in this brewery. It may have been removed, or the link may be wrong." backLabel="Back to Today" backTo="Today" />,
+  },
+  {
+    step: 2, slice: 1, portal: "Order", name: "Portal page not found",
+    job: "Leave an unknown customer address without losing the portal shell",
+    reads: "none", writes: "none",
+    states: [["unknown route", "/portal/missing · the link is wrong or out of date"]],
+    body: <NotFoundView message="There is nothing at this address for your account. It may have been removed, or the link may be wrong." backLabel="Back to Orders" backTo="Order history" />,
   },
 ];

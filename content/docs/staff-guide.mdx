@@ -34,6 +34,8 @@ Signed in already? **Change password** in **Me** asks for **Current password**, 
 
 On **Change password**, use at least eight characters and a password different from your current one. **Show password** lets you check for a typo before saving; **Hide password** masks it again. **Back to MGR** leaves without saving and returns to the page you opened from Me. If you followed a recovery link or opened the address directly, it returns to Today. An unknown page offers **Back to Today**, so a mistyped address is not a dead end.
 
+<Screen name="Staff page not found" />
+
 ## Accept an invitation and create a brewery [#getting-started]
 
 <Screen name="Accept invite" />
@@ -1149,7 +1151,13 @@ Open **Packaging** from the **Work** navigation to see every run by planned date
 
 **Save run plan** names what is **Still needed**: a brand, a planned date, and at least one positive planned output quantity. An empty **Brand** picker says **No brands yet**. Admins and Sales can follow **Add a brand in Catalog**; Brewers and Warehouse are told that an admin or sales member can add one. **Source tank · optional** picks an existing occupied tank, not a typed name. With none available, it explains that you can leave the source blank and pick it before starting the run.
 
+Planned **keg** quantities must be whole numbers. Other packages may use fractional quantities. Invalid entered quantities must be corrected before saving, even when another output is valid; use ordinary decimal notation rather than exponents. If a selected tank holds less beer than the plan needs, MGR warns before saving but still allows the plan. No tank is required, and saving does not reserve beer or move inventory. A date before today in the brewery’s timezone also warns without blocking the plan.
+
+When the selected brand has no packages, **Add a package in Catalog** opens Catalog for Admin and Sales. Brewer and Warehouse instead see who can add the package.
+
 Packaging separates **Upcoming** and **Recent** runs into sortable tables on desktop and labeled lists on phones. Upcoming shows the run number, brand, planned date, source, planned quantity, and next action. Recent shows status and the **Closed or cancelled** date instead of a next action. Planned quantity is the total package count from the plan, not the actual output; when a package unit is not supplied, no unit is guessed. The detail's planned outputs table labels SKU counts **Planned units** and **Actual units**. An unsourced plan says **No source yet**; a cancelled plan labels its date **Cancelled** and retains the cancellation note. Lot, output, yield, and loss columns appear only when those facts are available. Select a run number or its row to open the record. Closed and cancelled dates follow the brewery’s timezone.
+
+An active, unstarted run whose planned date is before today in the brewery’s timezone is marked **Overdue** beside its planned date. Today’s plans are not overdue, and cancelled or closed runs never carry that cue.
 
 The scheduling material preview separates **Material**, **Planned**, **On hand**, and **Short**. Planned amounts include each material's base unit. A dash means unavailable, while zero means a known zero. Plan and close requirements also show **On order**; incoming stock is not on-hand stock.
 
@@ -1273,11 +1281,13 @@ If the email service refuses an invitation, MGR explains whether the address is 
 
 <Screen name="Settings" />
 
-**Brewery details**, **Ask MGR** and **Wholesale fulfillment** are separate forms, each with its own Save button. Saving one never saves edits in the others, and pressing Enter in a field saves only that field's form. On desktop, Brewery details sits beside the other two. **Customer-facing phone** and **One-way keg fee ($)** sit together, with **Books opened on** and its explanation on a full-width row below the other brewery fields. **People and places** groups Team, Locations, Water profiles, and Import; **Connections** groups Accounting, Point of sale, and Chat. On phones these sections stack. Use the shared **− / +** count control or type a whole number from 1 to 168 for **Reading overdue after (hours)**, then **Save brewery**.
+**Brewery details**, **Ask MGR** and **Wholesale fulfillment** are separate forms, each with its own Save button. Saving one never saves edits in the others, and pressing Enter in a field saves only that field's form. On desktop, Brewery details sits beside the other two. **Customer-facing phone** and **One-way keg fee ($)** sit together, with **Books opened on** and its explanation on a full-width row below the other brewery fields. **People and places** groups Team, Locations, Water profiles, Sale channels, Units, and Import; **Connections** groups Accounting, Point of sale, and Chat. On phones these sections stack. Use the shared **− / +** count control or type a whole number from 1 to 168 for **Reading overdue after (hours)**, then **Save brewery**.
 
 The **Customer-facing phone** field explains that the portal prints this number when online payment is unavailable. Leave it empty if you do not want a phone number shown.
 
 **Save brewery** and **Save AI model** stay disabled until their own form has a valid change. The adjacent **Still needed** line explains an unchanged form, a missing brewery name or timezone, an out-of-range whole-number setting, or an unavailable AI model catalog. Reverting an edit disables Save again. Saving one form leaves edits in the others alone.
+
+**Save warehouse** stays disabled until you choose a different warehouse. Its **Still needed** line asks for a warehouse when none is chosen, or a change to the warehouse when the saved choice is unchanged.
 
 After filing, **Correct reporting basis** is another independently saved form. **Save brewery**, **Save AI model**, and **Save warehouse** never submit a reporting-basis correction or change its permanent history.
 
@@ -1401,6 +1411,8 @@ Every staff member can open **More → Chat** to set personal notification reaso
 
 Personal reminder switches save immediately; quiet hours save when you choose **Save my quiet hours**. The page announces **Saved** only after a successful save. While a request is pending it shows **Saving…**; failed or uncertain requests keep their error and saved-request recovery.
 
+**Save my quiet hours** stays disabled until the times or timezone differ from your saved preferences. The **Still needed** line asks for a change to your quiet hours; reverting an edit disables Save again.
+
 Each confirmation belongs to the setting you saved. Editing its draft hides **Saved** until the values match that successful save again; saving a reminder switch never saves a quiet-hours draft.
 
 For personal quiet hours, enter both a start and an end and choose your timezone. The end must differ from the start; an overnight window such as 22:00–06:00 is valid. If one time is missing, the form explains which one to add before you can save. Clear both times to follow the brewery window instead. The same two-time rule applies to brewery quiet hours; clearing both brewery times turns them off.
@@ -1418,6 +1430,8 @@ Linked eligible staff receive private Slack messages when assigned work first be
 The brewery digest goes only to one admin-approved private, non-shared Slack channel where MGR is already a member. Public, archived, and Slack Connect channels cannot be selected. It runs on the brewery's local morning and midday windows; the default fermentation reading cadence is 24 hours. Personal mutes, snoozes, and quiet hours affect Slack delivery only, not Today or the shared digest.
 
 In Chat settings, **Load private channels**, choose a channel, then **Save operations channel**. Adjust the brewery quiet-hours range or open **Exact times** for minute-precise entry; clear both times to turn quiet hours off, then save. Reading cadence accepts 1–168 hours. **Connection permissions** shows required and granted scopes. The four preview tabs show App Home, Personal DM, Team digest, and **Sample preferences**. Each is labelled **Sample data**: the orders and stops in it are made up, and a preview never sends a Slack message. **Sample quiet hours** illustrates a window, not your brewery's actual setting. The Sample preferences dialog's **Save preferences** is disabled; change your own reasons and see the actual brewery quiet hours under **My notification preferences**. If Slack is not available for your brewery yet, **Connect Slack** is disabled; ask MGR support to turn it on. Turning **Slack delivery** off disables the integration; use reauthorization to enable delivery again.
+
+**Save brewery quiet hours** and **Save reading cadence** stay disabled until their own saved values change. Each shows a **Still needed** line when unchanged, and reverting an edit disables Save again. Reading cadence must be a whole number from 1 to 168; its **Still needed** line explains that range for invalid values.
 
 All sample action buttons are disabled and marked **Preview**. Sample preferences use the same six personal reminder names as your real preferences; their quiet hours are sample values, not your brewery’s settings.
 
@@ -1441,7 +1455,7 @@ A bookmarked staff page that your role cannot read opens **No access**, names th
 
 **A record seems missing.** Confirm the brewery shown in the navigation, clear any order-status filter, and check the exact brand, SKU, customer, or location name.
 
-**A page says "Not found".** Opening a record link with an invalid address or one that matches nothing in your brewery, including a batch, route, or customer, shows a Not found page with MGR navigation and **Back to Today**, not an error. Its browser tab reads **Not found · MGR**, including linked record actions and histories. The record was removed, the link is wrong, or it belongs to a brewery you are not signed in to. Switch brewery, or ask the person who sent the link.
+**A page says "Not found".** A mistyped or unknown staff address, or a record link that matches nothing in your brewery, shows a Not found page with MGR navigation and **Back to Today**, not an error. Its browser tab reads **Not found · MGR**, including linked record actions and histories. The record was removed, the link is wrong, or it belongs to a brewery you are not signed in to. Check the address, switch brewery, or ask the person who sent the link.
 
 **Inventory is wrong.** Do a physical count and figure out what happened. Record an adjustment only for a verified count difference. Never disguise a sale, sample, loss, destruction, festival removal, return, or transfer as another type. Put a note on the correction.
 

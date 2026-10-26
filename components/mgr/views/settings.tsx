@@ -29,7 +29,7 @@ export function SettingsView({
   fulfillmentForm?: ReactNode;
   aiModelForm?: ReactNode;
   reportingBasisForm?: ReactNode;
-  hrefs?: Partial<Record<"locations" | "team" | "accounting" | "pos" | "chat" | "import" | "water", string>>;
+  hrefs?: Partial<Record<"locations" | "team" | "accounting" | "pos" | "chat" | "import" | "water" | "units" | "channels", string>>;
 }) {
   return (
     <div className="@container flex flex-col gap-3">
@@ -53,6 +53,8 @@ export function SettingsView({
           {E.nav("Team", model.team, "", undefined, hrefs.team)}
           {E.nav("Locations", model.locations, "", undefined, hrefs.locations)}
           {E.nav("Water profiles", "Manage source and target water profiles", "", undefined, hrefs.water)}
+          {E.nav("Sale channels", navAbout("Sale channels"), "", undefined, hrefs.channels)}
+          {E.nav("Units", navAbout("Units"), "", undefined, hrefs.units)}
           {E.nav("Import", navAbout("Import"), "", undefined, hrefs.import)}
         </section>
         <section aria-labelledby="settings-connections" className="flex min-w-0 flex-col gap-2">
