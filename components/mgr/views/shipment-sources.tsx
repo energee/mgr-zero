@@ -8,6 +8,12 @@ export type ShipmentAllocation = { key: string; qty: string; toBinId: string };
 export type ShipmentAllocations = Record<string, ShipmentAllocation[]>;
 export type ShipmentSourceLine = { key: string; name: string; qty: number; options: { key: string; label: string }[] };
 
+/** A new source starts with what the edited shipped line still needs. */
+export function newShipmentSource(quantity: number, rows: ShipmentAllocation[]): ShipmentAllocation {
+  const remaining = quantity - rows.reduce((sum, row) => sum + Number(row.qty), 0);
+  return { key: "", qty: String(Math.max(0, Number(remaining.toFixed(2)))), toBinId: "" };
+}
+
 export function ShipmentSourcesView({ lines, allocations, onChange, destinationBins = [], disabled = false }: {
   lines: ShipmentSourceLine[]; allocations?: ShipmentAllocations;
   onChange?: (value: ShipmentAllocations) => void;
@@ -29,7 +35,7 @@ export function ShipmentSourcesView({ lines, allocations, onChange, destinationB
         {destinationBins.length > 0 && E.pick("Destination bin", row.toBinId, [{ value: "", label: "Choose destination" }, ...(destinationBins.map(bin => ({ value: bin.id, label: bin.name })))], { onChange: (nextValue: string) => patch(line.key, index, { toBinId: nextValue }), required: true, "aria-label": `${line.name} destination ${index + 1}` })}
         <Button type="button" variant="ghost" onClick={() => change({ ...current, [line.key]: current[line.key].filter((_, i) => i !== index) })}>Remove source</Button>
       </div>)}
-      <Button type="button" variant="outline" disabled={disabled} onClick={() => change({ ...current, [line.key]: [...(current[line.key] ?? []), { key: "", qty: "", toBinId: "" }] })}>Add source</Button>
+      <Button type="button" variant="outline" disabled={disabled} onClick={() => change({ ...current, [line.key]: [...(current[line.key] ?? []), newShipmentSource(line.qty, current[line.key] ?? [])] })}>Add source</Button>
     </div>)}
   </>;
 }

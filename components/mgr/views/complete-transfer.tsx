@@ -2,7 +2,7 @@
 "use client";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { Button } from "@/components/ui/button";
+import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { OrderQuantity } from "./new-order";
 import type { CompleteTransferViewModel } from "@/lib/mgr/complete-transfer-view";
 
@@ -18,6 +18,7 @@ export function CompleteTransferView({
   messages,
   submitting = false,
   disabled = false,
+  reason,
 }: {
   sources?: ReactNode;
   model: CompleteTransferViewModel;
@@ -25,7 +26,7 @@ export function CompleteTransferView({
   tape?: [ReactNode, ReactNode?][];
   quantities?: Record<string, string>;
   onQuantity?: (key: string, value: string) => void;
-  messages?: ReactNode; submitting?: boolean; disabled?: boolean;
+  messages?: ReactNode; submitting?: boolean; disabled?: boolean; reason?: string | null;
 }) {
   return (
     <>
@@ -39,7 +40,7 @@ export function CompleteTransferView({
       {sources}
       {messages}
       {E.sp()}
-      {footer !== undefined ? footer : <Button type="submit" data-variant="irreversible" className="w-full bg-irreversible text-irreversible-foreground hover:bg-irreversible/90 md:w-fit md:self-end" disabled={submitting || disabled}>{submitting ? "Completing…" : "Complete transfer"}</Button>}
+      {footer !== undefined ? footer : <IrreversibleSubmit label="Complete transfer" busy="Completing…" submitting={submitting} disabled={disabled} reason={reason} />}
     </>
   );
 }
