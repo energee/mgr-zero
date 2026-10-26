@@ -2,7 +2,7 @@
 // one registered query each. get_beer_overview is counts every staff role may
 // read (zeros allowed); list_work unions Today's rows with the open purchase
 // orders and routes the caller's role may open, each tagged with a Work chip.
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { asUser, channelId, ins, insertFixture, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import { defaultWorkKinds, type WorkRow } from "@/lib/commands/landings";
@@ -19,15 +19,21 @@ beforeAll(async () => {
 });
 
 describe("get_beer_overview", () => {
-  it("returns numeric counts for every staff role", async () => {
+  it("returns only displayed counts for every non-taproom staff role without querying material requirements (#1421)", async () => {
     for (const ctx of [adminCtx, sales, warehouse, brewer]) {
-      const o = await runCommand("get_beer_overview", {}, ctx) as Record<string, number>;
-      for (const k of ["fgShortages", "taproomBelowPar", "openTaps", "openOccupancies", "materialShortages", "kegsOut"]) {
-        expect(typeof o[k], `${ctx.roles.join("+")} ${k}`).toBe("number");
-      }
-      expect(o).toEqual({
-        fgShortages: 0, taproomBelowPar: 0, openTaps: 0, openOccupancies: 0, materialShortages: 0, kegsOut: 0,
-      });
+      const fetch = vi.spyOn(globalThis, "fetch");
+      try {
+        const o = await runCommand("get_beer_overview", {}, ctx) as Record<string, number>;
+        for (const k of ["fgShortages", "taproomBelowPar", "openTaps", "openOccupancies", "kegsOut"]) {
+          expect(typeof o[k], `${ctx.roles.join("+")} ${k}`).toBe("number");
+        }
+        expect(o).toEqual({
+          fgShortages: 0, taproomBelowPar: 0, openTaps: 0, openOccupancies: 0, kegsOut: 0,
+        });
+        expect(fetch.mock.calls.map(([url]) => new URL(String(url)).pathname).sort()).toEqual([
+          "/rest/v1/atp", "/rest/v1/occupancy_volumes", "/rest/v1/rpc/get_beer_overview_aggregates", "/rest/v1/tap_intervals",
+        ]);
+      } finally { fetch.mockRestore(); }
     }
   });
 
@@ -56,7 +62,7 @@ describe("get_beer_overview", () => {
       })));
     }
     expect(await runCommand("get_beer_overview", {}, owner)).toEqual({
-      fgShortages: 0, taproomBelowPar: 4, openTaps: 0, openOccupancies: 0, materialShortages: 0, kegsOut: 0,
+      fgShortages: 0, taproomBelowPar: 4, openTaps: 0, openOccupancies: 0, kegsOut: 0,
     });
   });
 
@@ -116,7 +122,7 @@ describe("get_beer_overview", () => {
         2011, 'returned', '${owner.userId}' from public.keg_pools where brewery_id = '${own.id}' and name = 'Grid 1';
     `, true);
     expect(await runCommand("get_beer_overview", {}, owner)).toEqual({
-      fgShortages: 0, taproomBelowPar: 1050, openTaps: 0, openOccupancies: 0, materialShortages: 0, kegsOut: -1,
+      fgShortages: 0, taproomBelowPar: 1050, openTaps: 0, openOccupancies: 0, kegsOut: -1,
     });
   });
 });
@@ -148,7 +154,7 @@ describe("get_beer_overview_aggregates SQL boundary", () => {
       expect(result.error).toBeNull();
       expect(result.data).toEqual([{ taproom_below_par: 1, kegs_out: -3 }]);
       expect(await runCommand("get_beer_overview", {}, ctx)).toEqual({
-        fgShortages: 0, taproomBelowPar: 1, openTaps: 0, openOccupancies: 0, materialShortages: 0, kegsOut: -3,
+        fgShortages: 0, taproomBelowPar: 1, openTaps: 0, openOccupancies: 0, kegsOut: -3,
       });
     }
     // Both another tenant's staff and this tenant's buyer see none of its metrics.

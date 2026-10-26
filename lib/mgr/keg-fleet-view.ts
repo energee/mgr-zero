@@ -5,6 +5,7 @@ import { SIZE_LABEL } from "./keg-labels";
 import type { EmptyState } from "./empty-state";
 import type { KEG_EVENT_REASONS, KEG_POOL_KINDS, KEG_SIZES } from "./enums";
 import { isNumber, numberNotationError } from "./quantity-input";
+import { submitReason } from "./submit-reason";
 
 export type KegFleetBinRow = { key: string; title: string; detail: string; qty: string };
 export type KegFleetPoolRow = { key: string; title: string; detail: string; bins: KegFleetBinRow[] };
@@ -77,6 +78,15 @@ export function kegEventFieldErrors(v: KegEventValue): Partial<Record<keyof KegE
     errors.qty = "Enter a whole number of kegs, at least 1.";
   }
   return errors;
+}
+
+/** The same field errors also name what Record keg event still needs. */
+export function kegEventReason(v: KegEventValue): string | null {
+  const errors = kegEventFieldErrors(v);
+  return submitReason([
+    errors.poolId && "a keg pool", errors.locationId && "a location", errors.binId && "a bin",
+    errors.qty && "a whole keg count of at least 1 (no exponent notation)", errors.customerId && "a customer",
+  ].filter((need): need is string => Boolean(need)));
 }
 
 /** Optional money stays optional, but a filled value must be dollars and cents. */

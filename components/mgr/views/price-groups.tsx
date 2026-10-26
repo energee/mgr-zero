@@ -15,7 +15,7 @@ import type { PriceGroupsChannelView, PriceGroupsRowView, PriceGroupsViewModel }
 
 export type { PriceGroupsViewModel };
 
-/** One price cell: "$" and a decimal field, "—" when unpriced. Enter or leaving the cell commits (live only). */
+/** One price cell: "$" and a decimal field, "—" when unpriced. Enter or leaving the input commits (live only). */
 export function PriceCellInput({ label, value, onChange, onCommit, disabled, error, status, children }: {
   /** Names the cell for assistive tech: group · format on channel. */
   label: string;
@@ -32,24 +32,22 @@ export function PriceCellInput({ label, value, onChange, onCommit, disabled, err
   return (
     <form className="flex flex-col items-end gap-1" {...(onCommit ? {
       onSubmit: (event) => { event.preventDefault(); event.stopPropagation(); void onCommit(); },
-      onBlur: (event) => {
-        const form = event.currentTarget;
-        // Follow focus through Clear to the next cell, but ignore portal events.
-        if (!form.contains(event.target) || form.contains(event.relatedTarget)) return;
-        // Opening Clear is not a save, whether activated by mouse or keyboard.
-        if (event.target instanceof HTMLElement && event.target.closest('[aria-haspopup="dialog"][data-state="open"]')) return;
-        if (event.relatedTarget instanceof HTMLElement && event.relatedTarget.closest('[role="dialog"]')) return;
-        void onCommit();
-      },
     } : {})}>
       <div className="flex items-center gap-1">
         <InputGroup className="w-28">
           <InputGroupAddon>$</InputGroupAddon>
           <InputGroupInput aria-label={label} inputMode="decimal" placeholder="—" autoComplete="off" disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={error || status ? feedbackId : undefined}
             className="text-right tabular-nums"
+            onBlur={onCommit ? event => {
+              const dialog = event.relatedTarget instanceof HTMLElement ? event.relatedTarget.closest('[role="dialog"]') : null;
+              // Only this cell's Clear dialog holds its draft; another cell's dialog is a departure.
+              if (dialog && event.currentTarget.form?.querySelector('[aria-haspopup="dialog"]')?.getAttribute("aria-controls") === dialog.id) return;
+              void onCommit();
+            } : undefined}
             {...(onChange ? { value, onChange: (event) => onChange(event.target.value) } : { defaultValue: value })} />
         </InputGroup>
-        {children}
+        {/* Keep the trigger under the pointer while opening; blur handles the dialog's owning cell. */}
+        {children && <div onMouseDown={event => event.preventDefault()}>{children}</div>}
       </div>
       {error ? <p id={feedbackId} role="alert" className="max-w-40 whitespace-normal text-right text-xs text-destructive">{error}</p>
         : status ? <p id={feedbackId} role="status" className="max-w-40 whitespace-normal text-right text-xs text-muted-foreground">{status}</p> : null}
@@ -63,7 +61,7 @@ export function PriceCellClear({ groupName, formatName, channelName, ...action }
   formatName: string;
   channelName: string;
 } & Pick<ComponentProps<typeof ConfirmDeleteControl>, "busy" | "reason" | "error" | "onDelete">) {
-  return <ConfirmDeleteControl title="Clear price" triggerLabel="Clear" size="sm" busyLabel="Clearing…" {...action}
+  return <ConfirmDeleteControl title="Clear price" triggerLabel="Clear" size="sm" busyLabel="Clearing…" retainTriggerFocus {...action}
     name={<>Clear the {groupName} · {formatName} price on <strong>{channelName}</strong>?</>}
     warning="Every SKU of a brand on this group becomes unpriced in this format on this channel and cannot sell there until a price is saved again." />;
 }
@@ -104,7 +102,7 @@ export function PriceGroupsView({
           {model.tabHrefs
             ? <LinkTabs items={model.tabHrefs} current={channel.name} className="w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none] md:w-fit" />
             : E.tabs(model.tabs, model.tab, "w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none] md:w-fit")}
-          <div className="min-w-0 overflow-x-auto">
+          <div className="min-w-0 shrink-0 overflow-x-auto">
             {E.tbl(
               ["Group", ...model.formats],
               channel.rows.map((row) => [

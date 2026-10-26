@@ -9,8 +9,7 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { E } from "@/components/mgr/e";
 import { KEG_EVENT_REASONS, KEG_SIZES } from "@/lib/mgr/enums";
 import { REASON_EFFECT, REASON_LABEL, SIZE_LABEL } from "@/lib/mgr/keg-labels";
-import { kegEventFieldErrors, mayHaveKegCustomer, needsKegCustomer, withLocationBin, type KegEventOptions, type KegEventValue } from "@/lib/mgr/keg-fleet-view";
-import { submitReason } from "@/lib/mgr/submit-reason";
+import { kegEventFieldErrors, kegEventReason, mayHaveKegCustomer, needsKegCustomer, withLocationBin, type KegEventOptions, type KegEventValue } from "@/lib/mgr/keg-fleet-view";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 
 const SIZE_OPTIONS = KEG_SIZES.map((value) => ({ value, label: SIZE_LABEL[value] }));
@@ -47,7 +46,8 @@ export function KegEventFields({ value, options, onChange, attempted = false }: 
 
 /** The shared dialog/sheet, body, error slot, and action row for every Record
  *  keg event. The error and the submit ride in CommandForm's pinned footer, so
- *  both stay on screen while the long form scrolls (#1037). */
+ *  both stay on screen while the long form scrolls (#1037); the submit says why
+ *  it is withheld (kegEventReason). */
 export function KegEventPresentation({ open, onOpenChange, trigger, value, options, onChange, onSubmit, error, submitting }: {
   open: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -61,11 +61,7 @@ export function KegEventPresentation({ open, onOpenChange, trigger, value, optio
 }) {
   const formId = useId();
   const [attempted, setAttempted] = useState(false);
-  const errors = kegEventFieldErrors(value);
-  const reason = submitReason([
-    errors.poolId && "a keg pool", errors.locationId && "a location", errors.binId && "a bin",
-    errors.customerId && "a customer", errors.qty && "a whole number of kegs, at least 1 (no exponent notation)",
-  ].filter((need): need is string => Boolean(need)));
+  const reason = kegEventReason(value);
   return (
     <CommandForm open={open} onOpenChange={(next) => { setAttempted(false); onOpenChange?.(next); }} title="Record keg event" trigger={trigger}
       footer={<>

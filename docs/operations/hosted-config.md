@@ -26,6 +26,14 @@ invite path (`inviteUserByEmail`) and admin-created accounts still work. Hosted
 Supabase Auth keeps its own signup setting; turn off **Allow new users to sign
 up** in the hosted project separately.
 
+Hosted Auth requires the current password to change a password
+(`security_update_password_require_current_password: true`, enabled 2026-10-26,
+#1319). A direct `PUT /auth/v1/user` without `current_password` gets
+`current_password_required` (400). The app's Change password sends it. A
+reset-link session and a first password set while accepting an invitation do
+not need it. Leave `security_update_password_require_reauthentication` off: that
+is the recent-login nonce, not the same control.
+
 Local Auth configs allow password-recovery callbacks on localhost and 127.0.0.1,
 ports 3000 and 3002, under `/auth/confirm`. Restart the relevant local Supabase
 stack after changing its redirect allowlist. Hosted Auth needs its own approved

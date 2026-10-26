@@ -1,14 +1,18 @@
 // lib/brewery.ts — resolves which brewery this request operates as.
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getRequestIdentity, getStaffMemberships } from "@/lib/auth/request-context";
 import { buildContext } from "@/lib/commands/context";
 import { deniedHref } from "@/lib/mgr/denied";
 import { hasAnyRole } from "@/lib/mgr/roles";
+import { passwordReturnHref } from "@/lib/mgr/entry-view";
 
 /** The brewery this request operates as, with its time zone for formatting timestamps. */
 export async function getActiveBrewery() {
-  if (!(await getRequestIdentity())) redirect("/login");
+  if (!(await getRequestIdentity())) {
+    const next = passwordReturnHref((await headers()).get("x-mgr-path") ?? undefined);
+    redirect(`/login?${new URLSearchParams({ next })}`);
+  }
 
   const memberships = await getStaffMemberships();
   if (!memberships.length) redirect("/no-membership");

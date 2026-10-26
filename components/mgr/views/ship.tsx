@@ -2,14 +2,14 @@
 
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { Button } from "@/components/ui/button";
+import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { OrderQuantity } from "./new-order";
 import type { ShipViewModel } from "@/lib/mgr/ship-view";
 
 export type { ShipViewModel };
 
-export function ShipView({ model, sources, footer, fulfillmentOptions, tape, invoiceTiming, quantities, onQuantity, reasons, onReason, carrier = "", tracking = "", onCarrier, onTracking, onInvoiceTiming, messages, submitting = false, disabled = false }: {
+export function ShipView({ model, sources, footer, fulfillmentOptions, tape, invoiceTiming, quantities, onQuantity, reasons, onReason, carrier = "", tracking = "", onCarrier, onTracking, onInvoiceTiming, messages, submitting = false, reason }: {
   model: ShipViewModel; sources?: ReactNode; footer?: ReactNode;
   fulfillmentOptions?: string[]; tape?: [ReactNode, ReactNode?][]; invoiceTiming?: number;
   quantities?: Record<string, string>; onQuantity?: (key: string, value: string) => void;
@@ -17,7 +17,8 @@ export function ShipView({ model, sources, footer, fulfillmentOptions, tape, inv
   reasons?: Record<string, string>; onReason?: (key: string, value: string) => void;
   carrier?: string; tracking?: string; onCarrier?: (value: string) => void; onTracking?: (value: string) => void;
   onInvoiceTiming?: (timing: "now" | "on_delivery") => void;
-  messages?: ReactNode; submitting?: boolean; disabled?: boolean;
+  /** Why Ship order is withheld (shipReason), printed beside it; absent when ready. */
+  messages?: ReactNode; submitting?: boolean; reason?: string | null;
 }) {
   const timing = model.pickup ? 0 : invoiceTiming ?? (model.invoiceTiming === "on_delivery" ? 1 : 0);
   return <>
@@ -41,6 +42,6 @@ export function ShipView({ model, sources, footer, fulfillmentOptions, tape, inv
     {sources}
     {messages}
     {E.sp()}
-    {footer !== undefined ? footer : <Button type="submit" data-variant="irreversible" className="w-full bg-irreversible text-irreversible-foreground hover:bg-irreversible/90 md:w-fit md:self-end" disabled={submitting || disabled}>{submitting ? "Shipping…" : "Ship order"}</Button>}
+    {footer !== undefined ? footer : <IrreversibleSubmit label="Ship order" reason={reason} submitting={submitting} busy="Shipping…" className="w-full md:w-fit md:self-end" />}
   </>;
 }

@@ -4,8 +4,7 @@
 // tied to it with aria-describedby, because a disabled button cannot be focused
 // and a hover tooltip never reaches touch or keyboard users. Screen authors call
 // E.submit; IrreversibleSubmit draws it with the irreversible fill.
-// Pick sheet's Print and ConfirmDeleteControl's sheet trigger use it as a
-// plain button (`type="button"`).
+// A verb that submits no form passes `type="button"` and does its work in onClick.
 // The trigger's Radix props and ref reach Button through `...button`, so keep
 // that spread.
 // This file is its own "use client" module because SubmitButton needs useId
