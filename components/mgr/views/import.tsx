@@ -100,7 +100,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
       <p className="break-all text-sm">Batch request: {model.batchId}</p>
       {E.info("Retry same batch sends the same rows again and shows their first results, so no row is imported twice. Keep this tab open until the results show. If you reload the tab, this batch comes back. To fix blocked rows, import only those rows in a new batch.")}
       {kind === "opening_balances" && E.info("Never import opening balances that already went in again, or the stock is counted twice.")}
-      {result && E.tbl(["Row", "Result"], result.outcomes.map(row => [String(model.previewRows?.[row.row - 1] ?? row.row), `${row.status}${row.error ? `: ${row.error}` : row.result?.id ? ` · ${row.result.id}` : ""}`]), ["r", "l"])}
+      {result && E.tbl(["Row", "Result"], result.outcomes.map(row => [String(model.previewRows?.[row.row - 1] ?? row.row), `${row.status}${row.error ? `: ${row.error}` : ""}`]), ["r", "l"])}
       <Button variant="outline" disabled={busy} onClick={onCommit}>Retry same batch</Button>
       {!!result?.blocked && <Button disabled={busy} onClick={onCorrectBlocked}>Correct blocked rows in a new batch</Button>}
       {result && !busy && <Button variant="outline" onClick={onNextFile}>Import another file</Button>}

@@ -3,6 +3,7 @@ import { formatDate } from "@/lib/date-format";
 import { sentenceCase } from "./labels";
 import { shipToAddress } from "./ship-to-view";
 import { bblFixed } from "@/lib/volume";
+import { batNo } from "./doc-no";
 
 export type LotTraceRowView = { key: string; title: string; detail?: string; trailing?: string };
 export type LotTraceTapeView = { key: string; label: string; when?: string };
@@ -19,10 +20,8 @@ export type LotTraceMovementView = {
   title: string;
   detail: string;
   trailing: string;
-  sourceMovementId?: string;
   sourceHref?: string;
   reference?: string;
-  creditMemo?: boolean;
   referenceHref?: string;
 };
 
@@ -57,7 +56,7 @@ export type LotTraceSnapshot = LotTraceSources & {
   // The receiving packaging batch; `batches` includes every recorded lineage member.
   batch: { batch_no: number | null; brewed_on: string | null } | null;
   ingredients: { material_id: string; material: string; lot_id: string | null; code: string | null; unit: string; source: string; qty: number }[];
-  movements: { id: string; type: string; qty: number; bbl: number; bin: string; ref: string | null; source_movement_id: string | null; created_at: string; sku: string; location: string }[];
+  movements: { id: string; type: string; qty: number; bbl: number; bin: string; ref: string | null; ref_label?: string | null; ref_kind?: string | null; source_movement_id: string | null; created_at: string; sku: string; location: string }[];
   on_hand_bbl: number;
   warning: string;
   balances: { sku_id: string; bin_id: string; sku: string; bin: string; location: string; qty: number; bbl: number }[];
@@ -86,9 +85,9 @@ export function toLotTraceViewProps(s: LotTraceSnapshot, timeZone: string, backH
     sku,
     skuDetail: `run ${s.run?.run_no ?? "?"} · packaged ${formatDate(s.lot.packaged_on)}${s.lot.best_by ? ` · best by ${formatDate(s.lot.best_by)}` : ""}`,
     skuTrailing: `${bblFixed(s.on_hand_bbl)} recorded balance`,
-    tankBatch: [s.run?.vessel, s.batch?.batch_no != null ? `batch ${s.batch.batch_no}` : null, s.batch?.brewed_on ? `brewed ${formatDate(s.batch.brewed_on)}` : null].filter(Boolean).join(" · "),
+    tankBatch: [s.run?.vessel, s.batch?.batch_no != null ? batNo(s.batch.batch_no) : null, s.batch?.brewed_on ? `brewed ${formatDate(s.batch.brewed_on)}` : null].filter(Boolean).join(" · "),
     drawn: s.run?.bbl_drawn != null ? bblFixed(s.run.bbl_drawn) : "—",
-    memberBatches: s.batches.map(batch => ({ key: batch.id, title: `Batch ${batch.batch_no ?? "?"}`, detail: batch.brewed_on ? `brewed ${formatDate(batch.brewed_on)}` : "Brew date not recorded" })),
+    memberBatches: s.batches.map(batch => ({ key: batch.id, title: batNo(batch.batch_no), detail: batch.brewed_on ? `brewed ${formatDate(batch.brewed_on)}` : "Brew date not recorded" })),
     sourceTransfers: s.transfers.map(transfer => ({ key: transfer.id, title: `${transfer.from_vessel} to ${transfer.to_vessel}`, detail: formatDate(transfer.at, timeZone), trailing: `${bblFixed(Number(transfer.bbl))} transferred` })),
     ingredients: s.ingredients.map(row => ({ key: `${row.material_id}:${row.lot_id}:${row.source}`, title: row.material, tracked: row.lot_id !== null, detail: `${row.code ?? "Untracked"} · ${row.source} · ${Number(row.qty)} ${row.unit}`, href: backHref && row.lot_id ? `/compliance/material-lots/${row.lot_id}` : undefined })),
     tape: s.movements.map((movement) => ({
@@ -104,11 +103,9 @@ export function toLotTraceViewProps(s: LotTraceSnapshot, timeZone: string, backH
       title: `${movement.qty > 0 ? "+" : ""}${movement.qty} · ${sentenceCase(movement.type)} · ${ownedSku(s.lot.brand, movement.sku)}`,
       detail: `${movement.location} · ${movement.bin} · ${formatDate(movement.created_at, timeZone)}`,
       trailing: `${movement.bbl} bbl recorded`,
-      sourceMovementId: movement.source_movement_id ?? undefined,
       sourceHref: movement.source_movement_id ? `#movement-${movement.source_movement_id}` : undefined,
-      reference: movement.ref ?? undefined,
-      creditMemo: Boolean(movement.ref && (movement.type === "return_in" || (movement.type === "loss" && movement.source_movement_id))),
-      referenceHref: backHref && movement.ref && (movement.type === "return_in" || (movement.type === "loss" && movement.source_movement_id)) ? `/invoices/${movement.ref}` : undefined,
+      reference: movement.ref_label ?? undefined,
+      referenceHref: backHref && movement.ref && movement.ref_kind === "invoice" ? `/invoices/${movement.ref}` : undefined,
     })),
     note: s.warning,
   };

@@ -269,7 +269,8 @@ describe("registry sheets", () => {
 describe("Lot trace", () => {
   it("renders blend members and stored transfer facts without proportional attribution", () => {
     const model = toLotTraceViewProps(lotTraceHazy, DEMO_TIME_ZONE);
-    expect(model.memberBatches.map(row => row.title)).toEqual(["Batch 40", "Batch 41"]);
+    expect(model.memberBatches.map(row => row.title)).toEqual(["B-0040", "B-0041"]);
+    expect(model.tankBatch).toContain("B-0041");
     expect(model.sourceTransfers).toEqual([{ key: "blend", title: "FV-2 to FV-3", detail: "Aug 30, 2026", trailing: "10.00 bbl transferred" }]);
     const html = htmlOf(createElement(LotTraceView, { model }));
     expect(html).toMatch(/Member batches/);
@@ -329,7 +330,7 @@ describe("Lot trace", () => {
   it("preserves live movement provenance and links", () => {
     const model = toLotTraceViewProps({
       ...lotTraceHazy,
-      movements: [{ ...lotTraceHazy.movements[1], id: "return", type: "return_in", bin: "Returns", bbl: 0.13, ref: "credit", source_movement_id: "shipped" }],
+      movements: [{ ...lotTraceHazy.movements[1], id: "return", type: "return_in", bin: "Returns", bbl: 0.13, ref: "credit", ref_label: "CM-0009", ref_kind: "invoice", source_movement_id: "shipped" }],
     }, DEMO_TIME_ZONE, "/compliance");
     const html = htmlOf(createElement(LotTraceView, { model, tape: null }));
     expect(html).toMatch(/Returns · Sep 2, 2026/);
@@ -338,10 +339,25 @@ describe("Lot trace", () => {
     expect(html).toMatch(/href="\/invoices\/credit"/);
   });
 
+  it("shows resolved references without exposing UUIDs and never links a refused delivery as an invoice (#1382)", () => {
+    const id = "53e1d7c9-e862-4de1-908c-5f1134c729ab";
+    const movement = { ...lotTraceHazy.movements[1], id, type: "return_in", ref: id, source_movement_id: id };
+    for (const [ref_kind, ref_label] of [["delivery", "Refused delivery · ORD-0001"], ["invoice", "CM-0001"], [null, null]] as const) {
+      const model = toLotTraceViewProps({ ...lotTraceHazy, movements: [{ ...movement, ref_kind, ref_label }] }, DEMO_TIME_ZONE, "/compliance");
+      const html = htmlOf(createElement(LotTraceView, { model, tape: null }));
+      const text = html.replace(/<[^>]*>/g, "");
+      expect(text).not.toMatch(/[0-9a-f]{8}-[0-9a-f-]{27,}/i);
+      expect(html).toContain(`href="#movement-${id}"`);
+      if (ref_label) expect(text).toContain(ref_label);
+      if (ref_kind === "invoice") expect(html).toContain(`href="/invoices/${id}"`);
+      else expect(html).not.toContain('href="/invoices/');
+    }
+  });
+
   it("formats every date as a short calendar day and owns every movement SKU", () => {
     const model = toLotTraceViewProps(lotTraceHazy, DEMO_TIME_ZONE);
     expect(model.skuDetail).toBe("run 28 · packaged Aug 31, 2026 · best by Feb 27, 2027");
-    expect(model.tankBatch).toBe("FV-3 · batch 41 · brewed Aug 10, 2026");
+    expect(model.tankBatch).toBe("FV-3 · B-0041 · brewed Aug 10, 2026");
     expect(model.tape).toEqual([
       { key: "in", label: "+120 · Production in · Hazy IPA · 16 oz case · Warehouse", when: "Aug 31, 2026" },
       { key: "sample", label: "−2 · Sample · Hazy IPA · 16 oz case · Warehouse", when: "Sep 2, 2026" },

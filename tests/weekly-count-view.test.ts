@@ -1,10 +1,18 @@
-import { expect, it } from "vitest";
-import { createElement } from "react";
+import { expect, it, vi } from "vitest";
+import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { WeeklyCountDraftView, WeeklyCountPrintAction, WeeklyCountView } from "../components/mgr/views/weekly-count";
+import { WeeklyCountCorrectionView, WeeklyCountDraftView, WeeklyCountPrintAction, WeeklyCountView } from "../components/mgr/views/weekly-count";
 import { weeklyCount } from "../lib/mgr/fixtures/taproom";
 import { readFileSync } from "node:fs";
-import { countDraftFromSnapshot, updateCountQuantity, beginCountAttempt, failCountAttempt } from "../lib/mgr/taproom-count-state";
+import { countDraftFromSnapshot, correctionStateFromReceipt, updateCountQuantity, beginCountAttempt, failCountAttempt } from "../lib/mgr/taproom-count-state";
+import type * as CommandFormModule from "@/components/mgr/command-form";
+
+// Portaled dialog bodies do not render on the server; expose an open body's real children.
+vi.mock("@/components/mgr/command-form", async (original) => {
+  const real = await original<typeof CommandFormModule>();
+  return { ...real, CommandForm: ({ open, trigger, children }: { open: boolean; trigger?: ReactNode; children: ReactNode }) =>
+    createElement("div", null, trigger, open ? children : null) };
+});
 
 it("freezes the shared bucket controls while keeping exact retry available", () => {
   let state = countDraftFromSnapshot({ location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "captured", lines: [{ bin_id: "cold", bin_name: "Cold", sku_id: "keg", sku_name: "Actual keg", brand_id: "brand", brand_name: "Actual brand", bbl_per_unit: 0.5, lot_id: "private-lot-id", qty_before: 3 }] }, { prior_count: null, expected_bbl: null, reason: "no_pos_coverage", rows: [] });
@@ -24,6 +32,18 @@ it("keeps correction permission and explicit slot suppression in the shared page
   expect(render("warehouse")).not.toContain("Correct count");
   expect(render("admin")).not.toContain("Record count");
   expect(render("admin")).not.toContain("Open count");
+});
+
+it("#1382 labels count corrections by their saved lot code without displaying the lot UUID", () => {
+  const lotId = "12345678-1234-4234-8234-123456789abc";
+  const state = correctionStateFromReceipt("saved-count", [{
+    id: "saved-line", sku_name: "Hazy · ½ bbl keg", bin_name: "Cold",
+    lot_id: lotId, lot_code: "COUNTED-TO-ZERO", qty_before: 7, qty_counted: 0,
+  }]);
+  const html = renderToStaticMarkup(createElement(WeeklyCountCorrectionView, { state, open: true }));
+  expect(html).toContain("tracked lot COUNTED-TO-ZERO");
+  expect(html).not.toContain(lotId);
+  expect(html).not.toMatch(/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/i);
 });
 
 it("a saved count in the history is a row link to that count, not an Open count verb (#1026)", () => {

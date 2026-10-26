@@ -16,7 +16,7 @@ export const metadata = { title: navTitle("/taproom") };
 
 type Location = { id: string; name: string; uses: string[] };
 type CountHeader = { id: string; root_id: string; effective_id: string; location_id: string; counted_on: string; observed_at: string; counted_by: string; created_at: string; prior_count_id: string | null; corrected_at: string | null; corrected_by: string | null; correction_reason: string | null; observations: number; movements: number; depleted_units: number; destroyed_units: number };
-type ReceiptLine = { id: string; bin_id: string; bin_name: string | null; sku_id: string; sku_name: string | null; lot_id: string | null; qty_before: number; qty_counted: number; movement_id: string | null; bbl: number | null; movement_type: TaproomLineMovementType };
+type ReceiptLine = { id: string; bin_id: string; bin_name: string | null; sku_id: string; sku_name: string | null; lot_id: string | null; lot_code: string | null; qty_before: number; qty_counted: number; movement_id: string | null; bbl: number | null; movement_type: TaproomLineMovementType };
 type Receipt = CountHeader & { correction_eligible: boolean; lines: ReceiptLine[] };
 const key = (binId: string, skuId: string, lotId: string | null) => `${binId}:${skuId}:${lotId ?? "untracked"}`;
 
@@ -54,12 +54,16 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
       priorHref: shownReceipt.prior_count_id ? `/taproom?location=${location.id}&count=${shownReceipt.prior_count_id}` : undefined,
       correction: shownReceipt.corrected_at ? `Corrected by ${shownReceipt.corrected_by === ctx.userId ? "you" : "Admin"} at ${formatDateTime(shownReceipt.corrected_at, brewery.timeZone)} · ${shownReceipt.correction_reason}` : undefined,
       lines: shownReceipt.lines.map((line, index) => {
-        const savedIdentity = line.lot_id
-          ? onlyRoles(roles, ["taproom"]) ? `tracked · saved row ${index + 1}` : `tracked lot ${lotLabels[key(line.bin_id, line.sku_id, line.lot_id)] ?? line.lot_id} · saved row ${index + 1}`
-          : `untracked stock · saved row ${index + 1}`;
+        let savedIdentity = `untracked stock · saved row ${index + 1}`;
+        if (line.lot_id) {
+          savedIdentity = onlyRoles(roles, ["taproom"])
+            ? `tracked · saved row ${index + 1}`
+            : `tracked lot ${line.lot_code} · saved row ${index + 1}`;
+        }
+        const disposition = line.movement_type === "destruction" ? "destroyed" : "depleted";
         return { key: line.id, name: line.sku_name ?? "Saved SKU",
-          detail: `${line.bin_name ?? "Saved bin"} · ${savedIdentity} · ${Number(line.qty_before)} recorded, ${Number(line.qty_counted)} counted · ${line.bbl == null ? "0 bbl depleted" : `${Math.abs(Number(line.bbl))} bbl ${line.movement_type === "destruction" ? "destroyed" : "depleted"}`}`,
-          result: line.movement_id ? `movement ${line.movement_id}` : "matched · no movement" };
+          detail: `${line.bin_name ?? "Saved bin"} · ${savedIdentity} · ${Number(line.qty_before)} recorded, ${Number(line.qty_counted)} counted · ${line.bbl == null ? "0 bbl depleted" : `${Math.abs(Number(line.bbl))} bbl ${disposition}`}`,
+          result: line.movement_id ? disposition : "matched · no movement" };
       }),
     } : undefined,
     history: history.map(count => ({ key: count.id, date: formatDate(count.counted_on), detail: `${formatDateTime(count.created_at, brewery.timeZone)} · ${plural(count.observations, "observation")} · ${plural(count.movements, "movement")} · ${plural(count.depleted_units, "unit")} depleted · ${plural(count.destroyed_units, "unit")} destroyed${count.corrected_at ? ` · corrected ${formatDateTime(count.corrected_at, brewery.timeZone)} by Admin` : ""}`, href: `/taproom?location=${location.id}&count=${count.id}` })),

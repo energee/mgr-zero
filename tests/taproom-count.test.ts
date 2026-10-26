@@ -122,6 +122,31 @@ describe("durable explicit taproom counts", () => {
     expect((await admin.from("inventory_movements").select("id").eq("brewery_id", f.brewery.id)).data).toHaveLength(1);
   });
 
+  it("#1382 returns the saved lot code after its count removes all current stock", async () => {
+    const f = await fixture(0);
+    const lotId = await lot(f, "COUNTED-TO-ZERO");
+    await movement(f, 7, lotId);
+    const input = await args(f);
+    const saved = await f.ctx.db.rpc("record_taproom_count", {
+      ...input,
+      p_lines: input.p_lines.map(line => ({ ...line, qty_counted: 0 })),
+    });
+    expect(saved.error).toBeNull();
+    assert(saved.data !== null);
+
+    const snapshot = await prepare(f);
+    const labels = await f.ctx.db.rpc("get_taproom_print_labels", {
+      p_brewery: f.brewery.id, p_location: f.location.id, p_revision: snapshot.revision,
+    });
+    expect(labels.error).toBeNull();
+    expect(labels.data).toEqual([]);
+
+    const receipt = await runCommand("get_taproom_count", { countId: saved.data.id }, f.ctx);
+    expect(receipt).toMatchObject({
+      lines: [{ lot_id: lotId, lot_code: "COUNTED-TO-ZERO", qty_counted: 0, movement_type: "depletion" }],
+    });
+  });
+
   it("lists only an owned taproom's newest 50 durable count headers in stable order", async () => {
     const f = await fixture();
     const other = await fixture();
@@ -791,7 +816,7 @@ it("count tables are append-only with tenant-safe references and direct DML deni
 
   const line: Partial<typeof result.data.lines[number]> = { ...result.data.lines[0] }; delete line.id; delete line.bbl;
   delete line.effective_line_id; delete line.movement_type;
-  delete line.bin_name; delete line.sku_name;
+  delete line.bin_name; delete line.sku_name; delete line.lot_code;
   expect(() => insertFixture("taproom_count_lines", { ...line, count_id: crypto.randomUUID() })).toThrow(/SQLSTATE 23503/);
   expect((await other.ctx.db.rpc("get_taproom_count", { p_brewery: other.brewery.id, p_count: result.data.id })).error?.message).toBe("count not found");
   expect((await other.ctx.db.rpc("record_taproom_count", { ...await args(f) })).error?.code).toBe("42501");

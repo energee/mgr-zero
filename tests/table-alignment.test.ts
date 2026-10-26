@@ -97,15 +97,21 @@ describe("E.tbl column alignment", () => {
   });
 
   it("keeps import results and original preview row numbers with text results left", () => {
+    const rowError = "Name already exists";
     const html = renderToStaticMarkup(createElement(ImportView, { model: {
       ...importPreview, step: 3, previewRows: [2, 4],
       result: { committed: 1, blocked: 1, outcomes: [
         { row: 1, status: "committed", result: { id: "saved-record" } },
-        { row: 2, status: "blocked", error: "Name already exists" },
+        { row: 2, status: "blocked", error: rowError },
       ] },
     } }));
     expectAlignment(html, ["r", "l"]);
-    expect(cells(html, "td").map(cell => cell.content)).toEqual(["2", "committed · saved-record", "4", "blocked: Name already exists"]);
+    const values = cells(html, "td").map(cell => cell.content);
+    expect([values[0], values[2]]).toEqual(["2", "4"]);
+    expect(values[1]).toBe("committed");
+    expect(values[1]).not.toContain("saved-record");
+    expect(values[3]).toContain("blocked");
+    expect(values[3]).toContain(rowError);
   });
 
   it("keeps every format and group of the showing channel in the scrollable price matrix", () => {

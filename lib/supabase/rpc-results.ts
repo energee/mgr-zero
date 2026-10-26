@@ -14,7 +14,7 @@ export type TaproomCount = {
   prior_count_id: string | null; corrected_at: string | null; corrected_by: string | null;
   correction_reason: string | null; correction_eligible: boolean;
   lines: (Row<"taproom_count_lines"> & {
-    bbl: number | null; movement_type: TaproomLineMovementType; effective_line_id: string; corrects_line_id: string | null; bin_name: string | null; sku_name: string | null;
+    bbl: number | null; movement_type: TaproomLineMovementType; effective_line_id: string; corrects_line_id: string | null; bin_name: string | null; sku_name: string | null; lot_code: string | null;
   })[];
 };
 

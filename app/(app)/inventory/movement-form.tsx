@@ -24,10 +24,11 @@ import { formatDateTime } from "@/lib/date-format";
 import { toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
 import type { MovementInput } from "@/lib/commands/movement-input";
 
-type MovementReceipt = { id: string; created_at: string; sku_id: string; location_id: string; bin_id: string; qty: number; bbl: number; type: string; dest_state: string | null; sale_channel_id: string | null; lot_id: string | null; ref: string | null; note: string | null };
+type MovementReceipt = { id: string; created_at: string; sku_id: string; location_id: string; bin_id: string; qty: number; bbl: number; type: string; dest_state: string | null; sale_channel_id: string | null; lot_id: string | null; lot_code: string | null; ref: string | null; note: string | null };
 
 export function MovementForm({
   initial,
+  initialLot,
   skus,
   locations,
   bins,
@@ -36,6 +37,7 @@ export function MovementForm({
   skusHref,
 }: {
   initial?: Partial<MovementInput>;
+  initialLot?: { id: string; code: string } | null;
   skus: { id: string; label: string; bblPerUnit: number | null }[];
   locations: { id: string; name: string; uses: string[] }[];
   bins: { id: string; location_id: string; name: string }[];
@@ -52,7 +54,7 @@ export function MovementForm({
   const movementOpen = pathname === "/inventory" && searchParams.get("recordMovement") === "1";
   const [receipt, setReceipt] = useState<MovementReceipt | null>(null);
   const [stock, setStock] = useState<BinMoveStock[]>([]);
-  const [lotId, setLotId] = useState(initial?.lotId ?? "");
+  const [lotId, setLotId] = useState(initialLot?.id ?? initial?.lotId ?? "");
   const [stockError, setStockError] = useState<string | null>(null);
   const [skuId, setSkuId] = useState(initial?.skuId ?? "");
   const [locationId, setLocationId] = useState(initial?.locationId ?? "");
@@ -67,7 +69,10 @@ export function MovementForm({
   const [saleChannelId, setSaleChannelId] = useState(initial?.saleChannelId ?? defaultChannelId);
   const [note, setNote] = useState(initial?.note ?? "");
   const form = useCommandForm("record_movement", {
-    onSuccess: data => setReceipt(data as MovementReceipt),
+    onSuccess: data => {
+      const movement = data as MovementReceipt;
+      setReceipt({ ...movement, lot_code: lotChoices.find(lot => lot.id === movement.lot_id)?.code ?? null });
+    },
     build: () => ({ skuId, locationId, binId, lotId: lotId || undefined, ...movementFields(type, qty, direction, destState, saleChannelId), type, note: note || undefined }),
     reset: () => { setStockError(null); setLotId(""); setStock([]); setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType(""); setSaleChannelId(defaultChannelId); setNote(""); setDestState(""); setDirection("add"); },
   });
@@ -78,11 +83,17 @@ export function MovementForm({
     command(breweryId, "get_bin_move_stock", { locationId }).then(data => { if (live) { setStock(data as BinMoveStock[]); setStockError(null); } }).catch(err => { if (live) setStockError(String(err)); });
     return () => { live = false; };
   }, [breweryId, locationId, movementOpen, receipt]);
-  const reason = movementReason({ type, skuId, locationId, binId, saleChannelId, qty, destState });
+  const availableLots = stock.filter((item): item is BinMoveStock & { lot_id: string } => item.kind === "sku" && item.stock_id === skuId && item.bin_id === binId && item.lot_id !== null);
+  const lotChoices = availableLots.map(lot => ({ id: lot.lot_id, code: lot.lot_code, label: `${lot.lot_code} · ${lot.qty} available` }));
+  if (initialLot?.id === lotId && !lotChoices.some(lot => lot.id === initialLot.id)) {
+    lotChoices.push({ id: initialLot.id, code: initialLot.code, label: initialLot.code });
+  }
+  const reason = movementReason({ type, skuId, locationId, binId, saleChannelId, qty, destState })
+    ?? (lotId && !lotChoices.some(lot => lot.id === lotId && lot.code) ? "Still needed: a readable lot. Choose an available lot or No lot (untracked)." : null);
   const fields = reason ? null : movementFields(type, qty, direction, destState, saleChannelId);
   const unitVolume = skus.find(s => s.id === skuId)?.bblPerUnit;
   const receiptModel = receipt ? toMovementRecordedViewProps({
-    sku: skus.find(s => s.id === receipt.sku_id)?.label ?? receipt.sku_id,
+    sku: skus.find(s => s.id === receipt.sku_id)?.label ?? "—",
     qty: receipt.qty,
     unit: "SKU unit",
     kind: sentenceCase(receipt.type),
@@ -90,20 +101,17 @@ export function MovementForm({
     bbl: String(receipt.bbl),
     when: formatDateTime(receipt.created_at, timeZone),
     details: [
-      { label: "Location", value: `${locations.find(l => l.id === receipt.location_id)?.name ?? receipt.location_id} / ${bins.find(b => b.id === receipt.bin_id)?.name ?? receipt.bin_id}` },
-      ...(receipt.sale_channel_id ? [{ label: "Channel", value: channels.find(c => c.id === receipt.sale_channel_id)?.name ?? receipt.sale_channel_id }] : []),
-      ...(receipt.lot_id ? [{ label: "Lot", value: receipt.lot_id }] : []),
+      { label: "Location", value: `${locations.find(l => l.id === receipt.location_id)?.name ?? "—"} / ${bins.find(b => b.id === receipt.bin_id)?.name ?? "—"}` },
+      ...(receipt.sale_channel_id ? [{ label: "Channel", value: channels.find(c => c.id === receipt.sale_channel_id)?.name ?? "—" }] : []),
+      ...(receipt.lot_code ? [{ label: "Lot", value: receipt.lot_code }] : []),
       ...(receipt.note ? [{ label: "Note", value: receipt.note }] : []),
-      { label: "Movement reference", value: receipt.id },
-      ...(receipt.ref ? [{ label: "Source reference", value: receipt.ref }] : []),
     ],
   }) : null;
   const selectedSku = skus.find(item => item.id === skuId);
   const selectedLocation = locations.find(item => item.id === locationId);
   const selectedBin = bins.find(item => item.id === binId);
   const selectedChannel = channels.find(item => item.id === saleChannelId);
-  const availableLots = stock.filter(item => item.kind === "sku" && item.stock_id === skuId && item.bin_id === binId && item.lot_id);
-  const lotOptions = ["No lot (untracked)", ...availableLots.map(item => `${item.lot_code} · ${item.qty} available`)];
+  const lotOptions = [{ value: "", label: "No lot (untracked)" }, ...lotChoices.map(lot => ({ value: lot.id, label: lot.label }))];
   const movementModel: RecordMovementViewModel = {
     // An empty `kind` shows the Select movement type placeholder and
     // no pressed toggle.
@@ -118,8 +126,8 @@ export function MovementForm({
     preview: fields ? `Preview: ${fields.qty > 0 ? "+" : ""}${fields.qty} SKU units${unitVolume != null ? ` · ${formatVolume(fields.qty * unitVolume)}` : ""} · ${sentenceCase(type)}${fields.destState ? ` · ${fields.destState}` : ""}. Volume is calculated when recorded.` : undefined,
     direction: type === "adjustment" ? direction === "add" ? "Add stock" : "Remove stock" : undefined,
     directionOptions: type === "adjustment" ? ["Add stock", "Remove stock"] : undefined,
-    lot: lotId ? availableLots.map(item => ({ id: item.lot_id, label: `${item.lot_code} · ${item.qty} available` })).find(item => item.id === lotId)?.label ?? lotId : "No lot (untracked)",
-    lotOptions,
+    lot: lotId ? lotChoices.find(lot => lot.id === lotId)?.label ?? "—" : "No lot (untracked)",
+    lotId, lotOptions,
     note,
   };
 
@@ -178,7 +186,7 @@ export function MovementForm({
               channel: value => setSaleChannelId(channels.find(item => item.name === value)?.id ?? ""),
               destState: value => setDestState(value.toUpperCase()),
               direction: value => setDirection(value === "Remove stock" ? "remove" : "add"),
-              lot: value => setLotId(value === "No lot (untracked)" ? "" : availableLots.find(item => `${item.lot_code} · ${item.qty} available` === value)?.lot_id ?? ""),
+              lot: setLotId,
               qty: setQty,
               note: setNote,
             }}

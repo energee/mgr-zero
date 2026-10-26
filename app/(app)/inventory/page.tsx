@@ -31,7 +31,7 @@ type Bin = { id: string; location_id: string; name: string };
 type SaleChannel = { id: string; name: string; tax_treatment: string };
 type BinOnHandRow = { sku_id: string; location_id: string; bin_id: string; qty: string };
 type AtpRow = { sku_id: string; qty: string };
-type Movement = { bin_id: string; bbl: string; dest_state: string | null; sale_channel_id: string | null; ref: string | null; id: string; created_at: string; type: string; qty: string; sku_id: string; location_id: string; note: string | null };
+type Movement = { bin_id: string; bbl: string; dest_state: string | null; sale_channel_id: string | null; ref_label: string | null; lots: { code: string } | null; id: string; created_at: string; type: string; qty: string; sku_id: string; location_id: string; note: string | null };
 
 type InventorySearch = { page?: string; recordMovement?: string; movementHandoff?: string; skuId?: string; locationId?: string; binId?: string; lotId?: string; qty?: string; type?: string; saleChannelId?: string; destState?: string; note?: string };
 const movementKinds = new Set<string>(movementInput.shape.type.options);
@@ -66,10 +66,13 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
     ...(/^[A-Za-z]{2}$/.test(params.destState ?? "") ? { destState: params.destState!.toUpperCase() } : {}),
     ...(params.note?.trim() ? { note: params.note.slice(0, 500) } : {}),
   } : undefined;
+  const initialLot = initial?.lotId && canMove
+    ? await runCommand("get_inventory_lot", { lotId: initial.lotId }, ctx) as { id: string; code: string } | null
+    : null;
   return (
     <FinishedGoodsView
       model={toFinishedGoodsViewProps(assembleFinishedGoods(skus, onHand, atp, value))}
-      createAction={canMove ? <MovementForm key={movementFormInstanceKey(handoffId)} timeZone={brewery.timeZone} initial={initial} skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} skusHref={skusHref} /> : null}
+      createAction={canMove ? <MovementForm key={movementFormInstanceKey(handoffId)} timeZone={brewery.timeZone} initial={initial} initialLot={initialLot} skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} skusHref={skusHref} /> : null}
       addSkuHref={skusHref}
       countHref={canRun(ctx, "record_taproom_count") ? "/taproom" : null}
       linkRows
@@ -79,7 +82,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           {movements.length === 0
             ? E.blank("No movements recorded yet")
             : movements.slice(0, 50).map((m) => (
-              <div key={m.id}>{E.row(`${Number(m.qty) > 0 ? "+" : ""}${m.qty} ${skuLabel(skuById.get(m.sku_id) ?? { name: "—" })}`, `${sentenceCase(m.type)} · ${locationName(m.location_id)} · ${bins.find(b => b.id === m.bin_id)?.name ?? m.bin_id} · ${m.bbl} bbl${m.dest_state ? ` · ${m.dest_state}` : ""}${m.sale_channel_id ? ` · ${channels.find(c => c.id === m.sale_channel_id)?.name ?? m.sale_channel_id}` : ""}${m.note ? ` · ${m.note}` : ""}`, <span className="break-all">{formatDateTime(m.created_at, brewery.timeZone)}{m.ref ? ` · source ${m.ref}` : ""}</span>, Number(m.qty) < 0 ? "w" : "ok")}</div>
+              <div key={m.id}>{E.row(`${Number(m.qty) > 0 ? "+" : ""}${m.qty} ${skuLabel(skuById.get(m.sku_id) ?? { name: "—" })}`, `${sentenceCase(m.type)} · ${locationName(m.location_id)} · ${bins.find(b => b.id === m.bin_id)?.name ?? "—"}${m.lots?.code ? ` · ${m.lots.code}` : ""} · ${m.bbl} bbl${m.dest_state ? ` · ${m.dest_state}` : ""}${m.sale_channel_id ? ` · ${channels.find(c => c.id === m.sale_channel_id)?.name ?? "—"}` : ""}${m.note ? ` · ${m.note}` : ""}`, <span>{formatDateTime(m.created_at, brewery.timeZone)}{m.ref_label ? ` · ${m.ref_label}` : ""}</span>, Number(m.qty) < 0 ? "w" : "ok")}</div>
             ))}
           <div className="flex gap-2">{page > 0 && E.btn("Newer movements", "g", `/inventory?page=${page}`)}{movements.length > 50 && E.btn("Older movements", "g", `/inventory?page=${page + 2}`)}</div>
         </>

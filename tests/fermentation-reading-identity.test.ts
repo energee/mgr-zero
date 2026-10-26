@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { FermentationReadingView, readingIdentity } from "@/components/mgr/views/fermentation-reading";
+import { SCREENS } from "@/components/mgr/screens";
 
 const values = { observedAt: "", tempF: "", gravity: "", ph: "", note: "" };
 const render = (identity: { vessel: string; batch?: string }) =>
@@ -11,9 +12,16 @@ const render = (identity: { vessel: string; batch?: string }) =>
 
 describe("fermentation reading identity (#716)", () => {
   it("shows the vessel and the batch", () => {
-    const html = render({ vessel: "FV3", batch: "Batch 416 · Hazy IPA" });
+    const html = render(readingIdentity({ vessel_name: "FV3", batch_no: 416, brand_name: "Hazy IPA" }));
     expect(html).toContain("FV3");
-    expect(html).toContain("Batch 416 · Hazy IPA");
+    expect(html).toContain("B-0416 · Hazy IPA");
+  });
+
+  it("uses the same canonical batch identity in the screen inventory (#1382)", () => {
+    const frame = SCREENS.find(screen => screen.name === "Fermentation reading")!;
+    const html = renderToStaticMarkup(createElement("div", null, frame.body));
+    expect(html).toContain("B-0416 · Hazy IPA");
+    expect(html).not.toContain("Batch 416");
   });
 
   it("shows the vessel alone when no batch is known", () => {
@@ -23,8 +31,8 @@ describe("fermentation reading identity (#716)", () => {
   });
 
   it("builds identity from an occupancy without inventing missing facts", () => {
-    expect(readingIdentity({ vessel_name: "FV3", batch_no: 416, brand_name: "Hazy IPA" })).toEqual({ vessel: "FV3", batch: "Batch 416 · Hazy IPA" });
-    expect(readingIdentity({ vessel_name: "FV3", batch_no: 416, brand_name: null })).toEqual({ vessel: "FV3", batch: "Batch 416" });
+    expect(readingIdentity({ vessel_name: "FV3", batch_no: 416, brand_name: "Hazy IPA" })).toEqual({ vessel: "FV3", batch: "B-0416 · Hazy IPA" });
+    expect(readingIdentity({ vessel_name: "FV3", batch_no: 416, brand_name: null })).toEqual({ vessel: "FV3", batch: "B-0416" });
     expect(readingIdentity({ vessel_name: "FV3", batch_no: null, brand_name: "Hazy IPA" })).toEqual({ vessel: "FV3", batch: "Hazy IPA" });
     expect(readingIdentity({ vessel_name: null, batch_no: null, brand_name: null })).toEqual({ vessel: "unknown vessel" });
   });

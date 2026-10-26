@@ -38,7 +38,7 @@ export const weeklyCount: WeeklyCountViewModel = {
   locations: TAPROOMS, location: "ridgeline", roles: ["admin"], draft: weeklyDraft,
   lotLabels: { "cold:hazy-half:hazy-lot": "L-260901-HZ" },
   receipt: { date: "Sep 8, 2026", recorded: "Latest uncorrected count", canCorrect: true,
-    correctionForm: correctionStateFromReceipt("saved-sep8", [{ id: "saved2", sku_name: "Hazy · ½ bbl keg", bin_name: "Cold", lot_id: "L-260901-HZ", qty_before: 7, qty_counted: 2 }]),
+    correctionForm: correctionStateFromReceipt("saved-sep8", [{ id: "saved2", sku_name: "Hazy · ½ bbl keg", bin_name: "Cold", lot_id: "hazy-lot", lot_code: "L-260901-HZ", qty_before: 7, qty_counted: 2 }]),
     lines: [{ key: "saved2", name: "Hazy · ½ bbl keg", detail: "saved row 2 · recorded 7, counted 2", result: "2.5 bbl depleted" }] },
   history: [{ key: "sep1", date: "Sep 1, 2026", detail: "3 observations · 1 movement · 1 unit depleted · corrected by Admin" }],
 };

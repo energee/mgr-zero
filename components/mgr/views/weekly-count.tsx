@@ -144,7 +144,7 @@ export function WeeklyCountCorrectionView({ state: controlledState, open: contro
       {state.lines.map((line, index) => <div key={line.id} className="grid gap-2 rounded-xl border p-3 md:grid-cols-[1fr_8rem] md:items-end">
         <div>
           <p className="font-medium">{line.sku_name ?? "Saved SKU"}</p>
-          <p className="text-sm text-muted-foreground">{line.bin_name ?? "Saved bin"} · saved row {index + 1} · {line.lot_id ? `tracked lot ${line.lot_id}` : "untracked stock"} · counted {line.qty_counted} · recorded before {line.qty_before}</p>
+          <p className="text-sm text-muted-foreground">{line.bin_name ?? "Saved bin"} · saved row {index + 1} · {line.lot_id ? `tracked lot ${line.lot_code}` : "untracked stock"} · counted {line.qty_counted} · recorded before {line.qty_before}</p>
         </div>
         {E.edit("Corrected units", line.quantity, "number", undefined, { onChange: (nextValue: string) => { const value = nextValue; if (onQuantity) onQuantity(line.id, value); else setInternalState(current => updateCorrectionQuantity(current, line.id, value)); }, id: `correction-${state.countId}-${index}`, disabled: locked || line.movement_type === "destruction" || line.qty_counted === line.qty_before, min: line.qty_counted, max: line.qty_before, step: "1", inputMode: "numeric" })}
         {line.movement_type === "destruction" && <p className="text-sm text-muted-foreground">Destroyed shortages cannot be corrected.</p>}
