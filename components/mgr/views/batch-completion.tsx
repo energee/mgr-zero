@@ -27,9 +27,11 @@ export function BatchCompletionView({ batches, open, onOpenChange, batchId, prev
   const frozen = phase === "loading" || phase === "submitting" || phase === "unknown" || phase === "saved";
   // Saved pre-upgrade receipts deliberately retain their original shape without tank metadata.
   const acknowledgement = preview && phase !== "saved" && batchCompletionAcknowledgement(preview);
-  // A batch, then the write-off switch; nothing while the preview loads, which the loading line already says.
-  const reason = phase === "loading" ? null
-    : submitReason(!batchId ? ["a batch"] : acknowledgement && !confirmInTank ? [`the “${acknowledgement}” switch turned on`] : []);
+  // A batch, then the write-off switch. Nothing while the preview loads: the loading line already says so.
+  const missing: string[] = [];
+  if (!batchId) missing.push("a batch");
+  else if (acknowledgement && !confirmInTank) missing.push(`the “${acknowledgement}” switch turned on`);
+  const reason = phase === "loading" ? null : submitReason(missing);
   return <div data-preview-action className="flex flex-col items-start gap-2"><CommandForm open={open} onOpenChange={onOpenChange} title="Complete batch"
     trigger={<Button variant="outline" disabled={none} aria-describedby={none ? "completion-none" : undefined}>Complete batch</Button>}>
     <form onSubmit={onSubmit} className="flex flex-col gap-4">

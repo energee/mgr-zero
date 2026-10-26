@@ -39,12 +39,12 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
   const locked = phase === "submitting" || phase === "unknown" || phase === "saved";
   const amountUnits = bblUnits(amount);
   const remainingUnits = bblUnits(loss.remaining_bbl);
-  // What a new allocation still needs; a retry resends its frozen request, so only an idle form names one.
-  const reason = phase !== "idle" ? null : submitReason([
-    ...(amountUnits === null ? ["a BBL amount above zero with up to 8 decimal places"]
-      : remainingUnits === null || amountUnits > remainingUnits ? [`a BBL amount of at most ${loss.remaining_bbl}`] : []),
-    ...(target === "sample" && !/^[A-Z]{2}$/.test(state) ? ["a two-letter destination state"] : []),
-  ]);
+  // What a new allocation still needs. Only an idle form shows it: a retry resends its frozen request unchanged.
+  const missing: string[] = [];
+  if (amountUnits === null) missing.push("a BBL amount above zero with up to 8 decimal places");
+  else if (remainingUnits === null || amountUnits > remainingUnits) missing.push(`a BBL amount of at most ${loss.remaining_bbl}`);
+  if (target === "sample" && !/^[A-Z]{2}$/.test(state)) missing.push("a two-letter destination state");
+  const reason = submitReason(missing);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -99,7 +99,7 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
       {phase === "saved" && <CommandFormMessage tone="warning">Loss reattribution saved.</CommandFormMessage>}
       <CommandFormMessage error={error} />
       <CommandFormFooter>{E.submit(phase === "unknown" ? "Retry unchanged reattribution" : phase === "saved" ? "Saved" : "Save reattribution", {
-        reason, submitting: phase === "submitting", disabled: phase === "saved",
+        reason: phase === "idle" ? reason : null, submitting: phase === "submitting", disabled: phase === "saved",
       })}</CommandFormFooter>
     </form>
   </CommandForm>;
