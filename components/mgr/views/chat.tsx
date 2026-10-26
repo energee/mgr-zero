@@ -138,7 +138,9 @@ export function ChatSettingsFieldsView({ installation, timezone, hours, initialH
   onQuietChange?: (start: string, end: string) => void; onSaveQuiet?: (start: string, end: string) => void; onHours?: (value: string) => void; onSaveHours?: () => void;
 }) {
   const id = useId();
-  const hoursReason = readingCadenceReason(hours, initialHours);
+  const [draftHours, setDraftHours] = useState(hours);
+  const currentHours = onHours ? hours : draftHours;
+  const hoursReason = readingCadenceReason(currentHours, initialHours);
   return <div className="flex flex-col gap-4">
     {installation.state === "active" && <section className="flex flex-col gap-3" aria-label="Operations channel">
       <Button variant="outline" disabled={busy || !configured} onClick={onLoadChannels}>Load private channels</Button>
@@ -151,10 +153,10 @@ export function ChatSettingsFieldsView({ installation, timezone, hours, initialH
     </section>}
     <ChatQuietHoursView start={start} end={end} initial={{ start: installation.quietStart?.slice(0, 5) ?? "", end: installation.quietEnd?.slice(0, 5) ?? "" }} timezone={timezone} busy={busy} saved={saved} error={error} onChange={onQuietChange} onSave={onSaveQuiet} />
     <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && !hoursReason) onSaveHours?.(); }}>
-      {E.edit("Reading overdue after (hours)", hours, "number", undefined, { onChange: onHours, id: `${id}-hours`, disabled: busy, required: true, min: 1, max: 168, step: 1 })}
+      {E.edit("Reading overdue after (hours)", currentHours, "number", undefined, { onChange: onHours ?? setDraftHours, id: `${id}-hours`, disabled: busy, required: true, min: 1, max: 168, step: 1 })}
       <p className="text-sm text-muted-foreground">Default: 24 hours. This changes when a reading becomes overdue in MGR Today and Slack.</p>
       {E.submit("Save reading cadence", { submitting: busy, reason: hoursReason })}
-      <SettingsSaveStatus saved={!busy && chatSettingIsSaved(saved, { name: "set_brewery_operating_defaults", hours })} error={error} />
+      <SettingsSaveStatus saved={!busy && chatSettingIsSaved(saved, { name: "set_brewery_operating_defaults", hours: currentHours })} error={error} />
     </form>
     {delivery !== undefined ? delivery : <ChatDeliveryView enabled={installation.state === "active"} />}
     <SettingsSaveStatus busy={busy} />
