@@ -351,9 +351,11 @@ defineQuery({
         .eq("brewery_id", ctx.breweryId).eq("run_id", i.runId).order("id")).then((r) => r ?? []),
       unwrap(ctx.db.rpc("get_packaging_run_lot", { p_brewery: ctx.breweryId, p_run: i.runId })),
     ]);
-    const skus = (await unwrap(ctx.db.from("skus").select("id, name")
+    const skus = (await unwrap(ctx.db.from("skus").select("id, name, formats(package_type)")
       .eq("brewery_id", ctx.breweryId).in("id", [...new Set(rows.map((o) => o.sku_id as string))]))) ?? [];
     const skuNames = new Map(skus.map((s) => [s.id as string, s.name as string]));
+    // A keg output is counted in whole kegs; close_packaging_run refuses a fraction (#1477).
+    const kegSkus = new Set(skus.filter((s) => (s.formats as { package_type: string } | null)?.package_type === "keg").map((s) => s.id as string));
 
     return {
       lot,
@@ -366,6 +368,7 @@ defineQuery({
         id: o.id as string, sku_id: o.sku_id as string,
         qty_planned: Number(o.qty_planned), qty_actual: o.qty_actual === null ? null : Number(o.qty_actual),
         sku_name: skuNames.get(o.sku_id as string) ?? null,
+        whole: kegSkus.has(o.sku_id as string),
       })),
     };
   },

@@ -25,6 +25,14 @@ describe("packagingCloseReason", () => {
     expect(packagingCloseReason({ ...filled, outputs: output("") })).not.toBeNull();
     expect(packagingCloseReason({ ...filled, outputs: output("0") })).toBeNull();
   });
+  it("names a negative, exponent or fractional keg count; a fractional case count passes (#1477)", () => {
+    const keg = (qty: string) => [filled.outputs[0], { ...filled.outputs[1], qty, whole: true }];
+    for (const qty of ["-1", "1e1", "1.5"]) {
+      expect(packagingCloseReason({ ...filled, outputs: keg(qty) })).toBe("Still needed: valid actual counts (whole numbers for kegs).");
+    }
+    expect(packagingCloseReason({ ...filled, outputs: keg("2") })).toBeNull();
+    expect(packagingCloseReason({ ...filled, outputs: output("1.5") })).toBeNull();
+  });
   it("needs a lot code, date and bin", () => {
     expect(packagingCloseReason({ ...filled, lotCode: "  " })).not.toBeNull();
     expect(packagingCloseReason({ ...filled, binId: "" })).not.toBeNull();
