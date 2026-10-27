@@ -11,12 +11,23 @@ export type RefusedReturnModel = {
 };
 export type RefusedReturnEntry = { qty: number; binId: string; damaged: boolean };
 
+/** Check-in's starting entries (#1504): a line with one shipped source starts
+ *  with the refused quantity that source can cover, in the location's only bin
+ *  when it has just one. A line with several sources waits for the user. */
+export function defaultRefusedEntries(model: RefusedReturnModel, locationId: string): Record<string, RefusedReturnEntry> {
+  const bins = model.bins.filter((b) => b.locationId === locationId);
+  const binId = locationId && bins.length === 1 ? bins[0].value : "";
+  return Object.fromEntries(model.lines.flatMap((l) => l.sources.length === 1
+    ? [[l.sources[0].id, { qty: Math.min(l.sources[0].shipped, l.outstanding), binId, damaged: false }]]
+    : []));
+}
+
 export function RefusedReturnFormView({ model, busy, error, onSubmit }: {
   model: RefusedReturnModel; busy?: boolean; error?: string | null;
   onSubmit?: (input: { locationId: string; lines: { orderLineId: string; sources: (RefusedReturnEntry & { movementId: string })[] }[] }) => void;
 }) {
   const [locationId, setLocationId] = useState(model.locationId);
-  const [entries, setEntries] = useState<Record<string, RefusedReturnEntry>>({});
+  const [entries, setEntries] = useState<Record<string, RefusedReturnEntry>>(() => defaultRefusedEntries(model, model.locationId));
   function submit() {
     const lines = model.lines.map((l) => ({ orderLineId: l.id, sources: l.sources
       .filter((s) => (entries[s.id]?.qty ?? 0) > 0).map((s) => ({ movementId: s.id, ...entries[s.id] })) })).filter((l) => l.sources.length);
@@ -27,7 +38,7 @@ export function RefusedReturnFormView({ model, busy, error, onSubmit }: {
   return <>
     {E.back("Confirm delivery", model.title, undefined, model.backHref)}
     {E.note("Record only beer physically received. Choose its shipped source and destination bin. Damaged beer is checked in and posted as loss together.")}
-    {E.pick("Return location", locationId, model.locations, { onChange: (id) => { setLocationId(id); setEntries({}); }, required: true })}
+    {E.pick("Return location", locationId, model.locations, { onChange: (id) => { setLocationId(id); setEntries(defaultRefusedEntries(model, id)); }, required: true })}
     {model.lines.map((l) => <Fragment key={l.id}>
       {E.ttl(l.name)}{E.fld("Outstanding refused", String(l.outstanding))}
       {l.sources.map((s) => {

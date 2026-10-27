@@ -42,7 +42,7 @@ it("refuses returning a credit memo", async () => {
 
 it("keeps explicit shipped movement IDs, and omits sources only for legacy invoices", () => {
   const rows = [{ id: "line", kind: "sku" as const, skuId: "sku", label: "Actual line", qty: 2 }];
-  const sources = [{ id: "movement", sku_id: "sku", qty: -2, lot_id: null, lots: null, bins: null }];
+  const sources = [{ id: "movement", sku_id: "sku", qty: -2, lot_id: null, location_id: "wh", lots: null, bins: null }];
   expect(buildReturnLines(rows, { line: "0.5" }, sources, { movement: "0.5" }, "bin", "shipment")).toEqual([
     { invoiceLineId: "line", qty: 0.5, sources: [{ movementId: "movement", binId: "bin", qty: 0.5 }] },
   ]);
