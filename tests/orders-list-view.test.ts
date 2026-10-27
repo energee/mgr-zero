@@ -20,7 +20,7 @@ import { OrdersView } from "../components/mgr/views/orders-list";
 import { newOrderDraft, ordersWorkList } from "../lib/mgr/fixtures/orders";
 import { toNewOrderViewProps } from "../lib/mgr/new-order-view";
 import { toOrdersListViewProps } from "../lib/mgr/orders-list-view";
-import { ORDER_STATUSES, parseOrderStatus } from "../lib/mgr/order-status";
+import { ORDER_FILTERS, parseOrderStatus } from "../lib/mgr/order-status";
 
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const html = (name: string) => renderToStaticMarkup(createElement("div", null, screen(name).body));
@@ -73,7 +73,7 @@ describe("Orders list view loop", () => {
   it("offers every status in one Status pick; each keeps the customer and drops the cursor", () => {
     const model = toOrdersListViewProps({ roles: ["sales"], linked: true, status: "picked", customer: "Ridgeline Tap Room", customerId: "c1", orders: [] });
     expect(model.status).toBe("picked");
-    expect(model.statusOptions.map((o) => o.label)).toEqual(["All states", "Draft", "Submitted", "Confirmed", "Picked", "Shipped", "Cancelled"]);
+    expect(model.statusOptions.map((o) => o.label)).toEqual(["All states", "Draft", "Submitted", "Confirmed", "Picked", "Shipped", "Delivered", "Cancelled"]);
     expect(model.statusOptions[0]).toEqual({ value: "all", label: "All states", href: "/orders?customerId=c1" });
     expect(model.statusOptions[2]?.href).toBe("/orders?customerId=c1&status=submitted");
     // Clear removes only the customer scope.
@@ -81,12 +81,19 @@ describe("Orders list view loop", () => {
     expect(toOrdersListViewProps({ roles: ["sales"], linked: true, orders: [] })).toMatchObject({ status: "all", customer: undefined });
   });
 
+  it("labels a shipped row by its delivery stop (#1483)", () => {
+    const row = (outcome: "delivered" | "partial" | null, pickup = false) => ({ id: "o1", order_no: 1, status: "shipped" as const, requested_ship_date: null,
+      needs_restock: false, pickup, customers: null, shipments: [{ deliveries: outcome ? [{ outcome }] : [] }] });
+    const labels = toOrdersListViewProps({ roles: ["admin"], orders: [row("delivered"), row("partial"), row(null), row(null, true)] }).rows.map((r) => r.statusLabel);
+    expect(labels).toEqual(["Delivered", "Partly delivered", "Shipped", "Shipped"]);
+  });
+
   it("builds routable status choices from the live page while preserving and encoding its customer", async () => {
     const page = await OrdersPage({ searchParams: Promise.resolve({ status: "picked", customerId: "customer & partner", cursor: "older-page" }) });
     const list = OrdersClient(page.props);
     expect(list.props.model.statusOptions).toEqual([
       { value: "all", label: "All states", href: "/orders?customerId=customer+%26+partner" },
-      ...ORDER_STATUSES.map((status) => ({
+      ...ORDER_FILTERS.map((status) => ({
         value: status,
         label: status[0].toUpperCase() + status.slice(1),
         href: `/orders?customerId=customer+%26+partner&status=${status}`,
@@ -95,7 +102,7 @@ describe("Orders list view loop", () => {
     const unscopedPage = await OrdersPage({ searchParams: Promise.resolve({ status: "picked" }) });
     expect(OrdersClient(unscopedPage.props).props.model.statusOptions).toEqual([
       { value: "all", label: "All states", href: "/orders" },
-      ...ORDER_STATUSES.map((status) => ({
+      ...ORDER_FILTERS.map((status) => ({
         value: status,
         label: status[0].toUpperCase() + status.slice(1),
         href: `/orders?status=${status}`,
@@ -103,7 +110,7 @@ describe("Orders list view loop", () => {
     ]);
   });
 
-  it.each(ORDER_STATUSES)("takes the %s deep-link status through to list_orders and the controlled pick", async (status) => {
+  it.each(ORDER_FILTERS)("takes the %s deep-link status through to list_orders and the controlled pick", async (status) => {
     const page = await OrdersPage({ searchParams: Promise.resolve({ status }) });
     expect(page.props.status).toBe(status);
     const list = OrdersClient(page.props);

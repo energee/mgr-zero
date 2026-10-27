@@ -334,12 +334,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Orders newest-first, optionally by status and customer
+Orders newest-first with each one's delivery stop outcome, optionally by status (delivered: shipped orders whose stop closed delivered or partly delivered) and customer
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `customerId` | uuid | no |
-| `status` | draft or submitted or confirmed or picked or shipped or cancelled | no |
+| `status` | draft or submitted or confirmed or picked or shipped or delivered or cancelled | no |
 | `limit` | integer | no |
 | `cursor` | string | no |
 

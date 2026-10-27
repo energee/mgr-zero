@@ -96,6 +96,15 @@ describe("Order view loop", () => {
     expect(model.lines[0].warning).toBeTruthy();
   });
 
+  it("names a shipped order by its delivery stop, and the page passes the stop's outcome (#1483)", () => {
+    const shipped = { ...orderPickedRestock.order, status: "shipped" as const, needs_restock: false };
+    const delivered = toOrderViewProps({ ...orderPickedRestock, order: shipped, deliveryOutcome: "delivered" });
+    expect([delivered.currentState, delivered.next]).toEqual(["Delivered", "Next: none"]);
+    const open = toOrderViewProps({ ...orderPickedRestock, order: shipped, deliveryOutcome: null });
+    expect([open.currentState, open.next]).toEqual(["Shipped", "Next: delivered or returned"]);
+    expect(readFileSync(PAGE, "utf8")).toMatch(/deliveryOutcome: shipment\?\.deliveries\[0\]\?\.outcome \?\? null/);
+  });
+
   it("prints the requested ship date in the one date format (#991)", () => {
     const model = toOrderViewProps({ ...orderPickedRestock, order: { ...orderPickedRestock.order, requested_ship_date: "2026-09-14" } });
     expect(model.facts).toContainEqual({ label: "Requested ship date", value: "Sep 14, 2026" });

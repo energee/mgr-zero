@@ -18,7 +18,7 @@ import type { OrderCogs } from "@/lib/commands/orders";
 import type { PortalUser, TeamMember } from "@/lib/commands/invites";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toOrderViewProps, type OrderSnapshot } from "@/lib/mgr/order-view";
-import type { OrderStatus } from "@/lib/mgr/order-status";
+import type { DeliveryOutcome, OrderStatus } from "@/lib/mgr/order-status";
 import "@/lib/commands/all";
 import { getOrderPageData } from "../order-data";
 import { CancelOrderAction, LifecycleButtons, OrderActionScope } from "./lifecycle-buttons";
@@ -39,7 +39,7 @@ type Atp = { sku_id: string; qty: number };
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { brewery, ctx, snapshot } = await getOrderPageData(id);
-  const { order, lines, events, atp, deposits } = snapshot as { order: Order; lines: OrderLine[]; events: OrderEvent[]; atp: Atp[]; deposits: OrderSnapshot["deposits"] };
+  const { order, lines, events, atp, deposits, shipment } = snapshot as { order: Order; lines: OrderLine[]; events: OrderEvent[]; atp: Atp[]; deposits: OrderSnapshot["deposits"]; shipment: { deliveries: { outcome: DeliveryOutcome | null }[] } | null };
   const locations = await runCommand("list_locations", {}, ctx) as { id: string; name: string }[];
   const canSell = canRun(ctx, "confirm_order"), canFulfill = canRun(ctx, "record_pick");
   const [cogs, team, buyers]: [OrderCogs | undefined, TeamMember[], PortalUser[]] = await Promise.all([
@@ -50,7 +50,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     order.customer_id && canRun(ctx, "list_customer_users") ? runCommand("list_customer_users", { customerId: order.customer_id }, ctx) as Promise<PortalUser[]> : Promise.resolve([]),
   ]);
   const actorNames = Object.fromEntries([...buyers.map((u) => [u.userId, u.email] as const), ...team.map((m) => [m.userId, m.name] as const)]);
-  const model = toOrderViewProps({ order, lines, events, atp, locations, backHref: "/orders", timeZone: brewery.timeZone, cogs, deposits, actorNames });
+  const model = toOrderViewProps({ order, lines, events, atp, locations, deliveryOutcome: shipment?.deliveries[0]?.outcome ?? null, backHref: "/orders", timeZone: brewery.timeZone, cogs, deposits, actorNames });
   if (!canSell) model.confirmHref = undefined;
   if (!canRun(ctx, "update_draft_order")) model.editHref = undefined;
   if (!canFulfill) model.putBackHref = undefined;
