@@ -39,7 +39,9 @@ describe("Orders list view loop", () => {
     for (const [i, row] of rows.entries()) {
       // The order number always opens the order; Open would repeat it, so no action is drawn.
       expect(row.href).toBe(`/orders/${i}`);
-      if (row.action) expect(row.action.href).toBe(`/orders/${i}${row.action.verb === "Confirm" ? "/confirm" : row.action.verb === "Put back" ? "/restock" : ""}`);
+      // Each verb opens the page that does the work (#1503); Finish edits the draft on the order page.
+      const path: Record<string, string> = { Finish: "", Confirm: "/confirm", Pick: "/pick", Ship: "/ship", "Put back": "/restock" };
+      if (row.action) expect(row.action.href).toBe(`/orders/${i}${path[row.action.verb]}`);
       // Lifecycle status stays its own fact whatever the action.
       expect(row.status).toBe(states[i]);
     }

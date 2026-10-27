@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { getCommandDefinition, STAFF_ROLES } from "@/lib/commands/registry";
 import "@/lib/commands/orders";
+import { pickDoneHref, type PickSnapshot } from "@/lib/mgr/pick-view";
 import { nextAction, parseOrderStatus, salesRoles, shownState, warehouseRoles, type OrderStatus } from "@/lib/mgr/order-status";
 
 /** The command each list verb finishes. */
@@ -29,10 +30,16 @@ describe("nextAction", () => {
 
   it("offers each lifecycle step to a member holding both sales and warehouse", () => {
     expect(nextAction("submitted", false, "o", ["sales", "warehouse"])).toMatchObject({ verb: "Confirm", href: "/orders/o/confirm" });
-    expect(nextAction("confirmed", false, "o", ["sales", "warehouse"])).toMatchObject({ verb: "Pick", href: "/orders/o" });
+    expect(nextAction("confirmed", false, "o", ["sales", "warehouse"])).toMatchObject({ verb: "Pick", href: "/orders/o/pick" });
     expect(nextAction("confirmed", true, "o", ["brewer", "warehouse"])).toMatchObject({ verb: "Put back", href: "/orders/o/restock" });
     expect(nextAction("submitted", false, "o", ["brewer", "warehouse"]).verb).toBe("Open");
     expect(nextAction("submitted", false, "o", []).verb).toBe("Open");
+  });
+
+  it("links each verb to the page that does the work, not the order page (#1503)", () => {
+    expect(nextAction("picked", false, "o", ["warehouse"])).toMatchObject({ verb: "Ship", href: "/orders/o/ship" });
+    expect(nextAction("picked", false, "o", ["warehouse"], true)).toMatchObject({ verb: "Complete transfer", href: "/orders/o/complete" });
+    expect(nextAction("picked", true, "o", ["warehouse"], true)).toMatchObject({ verb: "Put back", href: "/orders/o/restock" });
   });
 
   it("shares its role lists with the order commands", () => {
@@ -59,5 +66,18 @@ describe("shownState (#1483)", () => {
     expect(parseOrderStatus("delivered")).toBe("delivered");
     expect(parseOrderStatus("shipped")).toBe("shipped");
     expect(parseOrderStatus("returned")).toBeUndefined();
+  });
+});
+
+describe("pickDoneHref (#1503)", () => {
+  const order = (over: Partial<PickSnapshot["order"]> = {}) => ({ id: "o", order_no: 1, from_location_id: "wh", ...over });
+  const lines = [{ id: "a", sku_id: "s", qty_ordered: 3, qty_picked: null, skus: null as never }];
+  it("goes on to Ship once every line is counted in full and nothing waits to be put back", () => {
+    expect(pickDoneHref(order(), lines, { a: "3" })).toBe("/orders/o/ship");
+    expect(pickDoneHref(order({ kind: "taproom_transfer" }), lines, { a: "3" })).toBe("/orders/o/complete");
+  });
+  it("returns to the order while a line is short or staged beer waits", () => {
+    expect(pickDoneHref(order(), lines, { a: "2" })).toBe("/orders/o");
+    expect(pickDoneHref(order({ needs_restock: true }), lines, { a: "3" })).toBe("/orders/o");
   });
 });
