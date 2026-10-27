@@ -49,6 +49,14 @@ describe("actual brew-day record (#622)", () => {
     await expect(runCommand("record_brew_day", { ...input, actuals: [], confirmEmpty: true }, f.brewer)).rejects.toThrow(/three decimals/i);
   });
 
+  it("refuses knockout and whirlpool temperatures outside 25 to 212 °F before recording (#1476)", async () => {
+    const f = await plannedBrew();
+    for (const process of [{ knockoutTempF: -500 }, { knockoutTempF: 9999 }, { whirlpoolTempF: 300 }]) {
+      await expect(runCommand("record_brew_day", { ...f.input, actuals: [], confirmEmpty: true, process }, f.brewer)).rejects.toMatchObject({ status: 400 });
+    }
+    await runCommand("record_brew_day", { ...f.input, actuals: [], confirmEmpty: true, process: { knockoutTempF: 66, whirlpoolTempF: 180 } }, f.brewer);
+  });
+
   it("requires deliberate empty use and leaves omitted usage unrecorded", async () => {
     const f = await plannedBrew();
     await expect(runCommand("record_brew_day", { ...f.input, actuals: [] }, f.brewer)).rejects.toThrow(/confirm.*no ingredients/i);

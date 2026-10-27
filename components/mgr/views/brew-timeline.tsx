@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { DatePicker } from "@/components/mgr/date-picker";
-import { anyPulled, confirmAll, currentStage, isShort, knockoutReady, pullDetail, pulledQty, sourceChoices, stageProgress, timelineReason, timelineStages, timelineTone, type BrewIngredient, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
+import { anyPulled, confirmAll, currentStage, isShort, knockoutReady, processErrors, pullDetail, pulledQty, sourceChoices, stageProgress, timelineReason, timelineStages, timelineTone, type BrewIngredient, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import { vesselOptions } from "@/lib/mgr/brew-day-view";
 import { packs } from "@/lib/mgr/pack-qty";
 import { processFields } from "./brew-day";
@@ -50,7 +50,8 @@ export function BrewTimelineView({ model, busy = false, error, onChange, onRecor
   const patchRow = (key: string, patch: Partial<BrewIngredient>) => change({ ingredients: value.ingredients.map(row => row.key === key ? { ...row, ...patch } : row) });
   const vessel = value.vessels.find(item => item.id === value.vesselId);
   const open = currentStage(value), reason = timelineReason(value);
-  const reading = (key: string) => <Fragment key={key}>{E.edit(processLabel[key], value.process[key] ?? "", "number", undefined, { disabled: busy, step: key.endsWith("Minutes") ? "1" : "any", onChange: next => change({ process: { ...value.process, [key]: next } }) })}</Fragment>;
+  const errors = processErrors(value.process);
+  const reading = (key: string) => <Fragment key={key}>{E.edit(processLabel[key], value.process[key] ?? "", "number", undefined, { id: `${id}-${key}`, error: errors[key], disabled: busy, step: key.endsWith("Minutes") ? "1" : "any", onChange: next => change({ process: { ...value.process, [key]: next } }) })}</Fragment>;
   const ingredient = (row: BrewIngredient) => {
     const choices = sourceChoices(value.sources ?? [], row.materialId);
     return <div key={row.key} className={ROW_ACTIONS}>

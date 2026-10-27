@@ -9,7 +9,7 @@
 import { z } from "zod";
 import type { VesselReading } from "@/lib/mgr/vessel-detail-view";
 import { INGREDIENT_STAGES } from "@/lib/mgr/recipe-process-view";
-import { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/lib/composer/offline-policy";
+import { fermentationReadingInput, fermentationReadingOfflinePolicy, MASH_PH_BOUNDS, READING_BOUNDS } from "@/lib/composer/offline-policy";
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, CommandError, type Ctx, latestOf } from "./registry";
 import { brandNames, isoDate } from "./packaging";
 import { recipeGravity } from "@/lib/recipe-gravity";
@@ -23,13 +23,16 @@ import { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER
 export { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
 const mashStep = z.object({ name: z.string().trim().min(1), kind: z.enum(MASH_STEP_KINDS), tempF: z.number(), minutes: z.number().int().positive() });
 const fermentationStage = z.object({ name: z.string().trim().min(1), kind: z.enum(FERMENTATION_STAGE_KINDS), tempF: z.number(), days: z.number().positive() });
+// Whirlpool and knockout temperatures share the reading range, so a typo such as -500 °F is refused, not frozen into a
+// recipe version or brew record (#1476, #1478).
+const processTempF = z.number().min(READING_BOUNDS.tempF.min).max(READING_BOUNDS.tempF.max);
 const processInput = z.object({
-  preBoilBbl: z.number().positive().optional(), whirlpoolMinutes: z.number().int().nonnegative().optional(), whirlpoolTempF: z.number().optional(),
-  whirlpoolRestMinutes: z.number().int().nonnegative().optional(), knockoutTempF: z.number().optional(),
+  preBoilBbl: z.number().positive().optional(), whirlpoolMinutes: z.number().int().nonnegative().optional(), whirlpoolTempF: processTempF.optional(),
+  whirlpoolRestMinutes: z.number().int().nonnegative().optional(), knockoutTempF: processTempF.optional(),
 });
 const waterInput = z.object({
   targetProfileId: z.string().uuid().optional(), sourceProfileId: z.string().uuid().optional(),
-  mashGal: z.number().positive().optional(), spargeGal: z.number().nonnegative().optional(), targetMashPh: z.number().min(4).max(7).optional(),
+  mashGal: z.number().positive().optional(), spargeGal: z.number().nonnegative().optional(), targetMashPh: z.number().min(MASH_PH_BOUNDS.min).max(MASH_PH_BOUNDS.max).optional(),
   additions: z.array(z.object({ materialId: z.string().uuid(), qty: z.number().positive(), unit: z.enum(WATER_ADDITION_UNITS), stage: z.enum(WATER_ADDITION_STAGES) })).default([]),
 });
 
@@ -299,7 +302,7 @@ const brewActual = z.object({
 });
 const brewProcess = processInput.extend({
   boilMinutes: z.number().int().nonnegative().optional(), mashWaterGal: z.number().positive().optional(),
-  spargeWaterGal: z.number().nonnegative().optional(), targetMashPh: z.number().min(4).max(7).optional(),
+  spargeWaterGal: z.number().nonnegative().optional(), targetMashPh: z.number().min(MASH_PH_BOUNDS.min).max(MASH_PH_BOUNDS.max).optional(),
 });
 // A Prep pull is a brew actual before brew day: no stage, and zero is allowed
 // (nothing pulled yet).
