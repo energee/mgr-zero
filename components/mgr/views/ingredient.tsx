@@ -15,17 +15,23 @@ import { Button } from "@/components/ui/button";
 import { CommandFormFooter } from "@/components/mgr/command-form";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { noMaterialsPick } from "@/lib/mgr/materials-view";
-import { ingredientReason, INGREDIENT_STAGES, type IngredientLine } from "@/lib/mgr/recipe-process-view";
+import { ingredientReason, INGREDIENT_STAGES, timedInDays, type IngredientFields, type TimingLimits } from "@/lib/mgr/recipe-process-view";
 
-export type IngredientFields = IngredientLine;
+export type { IngredientFields };
 /** `unit` is the material's base unit as the command returns it; absent until a material is picked.
  *  `category` (hop, malt…) is shown beside the name when present. */
 export type IngredientMaterial = { id: string; name: string; unit?: string; category?: string };
 /** The Stage pick's options, here and on Brew day: the stored value, shown in sentence case ("dry_hop" reads "Dry hop"). */
 export const INGREDIENT_STAGE_OPTIONS = INGREDIENT_STAGES.map((s) => ({ value: s, label: sentenceCase(s) }));
 
-export function IngredientView({ fields, materials, onChange, onSave, onDelete, footer }: {
-  fields: IngredientFields; materials: IngredientMaterial[]; onChange?: (patch: Partial<IngredientFields>) => void; onSave?: () => void; onDelete?: (() => void) | null; footer?: ReactNode;
+/** No boil time and no schedule: the one-day and 120-day ceilings. */
+const DEFAULT_LIMITS: TimingLimits = { fermentationDays: 0 };
+
+export function IngredientView({ fields, materials, limits = DEFAULT_LIMITS, onChange, onSave, onDelete, footer }: {
+  fields: IngredientFields; materials: IngredientMaterial[];
+  /** The draft's boil time and fermentation schedule length, which bound the timing (#1478). */
+  limits?: TimingLimits;
+  onChange?: (patch: Partial<IngredientFields>) => void; onSave?: () => void; onDelete?: (() => void) | null; footer?: ReactNode;
 }) {
   const bind = (key: keyof IngredientFields) => onChange && { onChange: (value: string) => onChange({ [key]: value } as Partial<IngredientFields>) };
   const id = useId();
@@ -36,11 +42,12 @@ export function IngredientView({ fields, materials, onChange, onSave, onDelete, 
     {E.pick("Stage", fields.stage, INGREDIENT_STAGE_OPTIONS, bind("stage"))}
     {E.inline(
       E.edit(qtyLabel, fields.perBblQty, "number", undefined, { id: `${id}-qty`, ...bind("perBblQty") }),
-      E.edit("Timing min · optional", fields.timingMinutes, "number", undefined, bind("timingMinutes")),
+      // Fermentation and dry hop count days from the start of fermentation; other stages count minutes.
+      E.edit(timedInDays(fields.stage) ? "Timing day · optional" : "Timing min · optional", fields.timing, "number", undefined, bind("timing")),
     )}
     {footer !== undefined ? footer : <CommandFormFooter>
       {onDelete !== null && <Button type="button" variant="outline" onClick={onDelete}>Delete ingredient</Button>}
-      {E.submit("Save ingredient", { type: "button", reason: ingredientReason(fields), onClick: onSave })}
+      {E.submit("Save ingredient", { type: "button", reason: ingredientReason(fields, limits), onClick: onSave })}
     </CommandFormFooter>}
   </>;
 }

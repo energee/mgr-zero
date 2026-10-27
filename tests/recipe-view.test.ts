@@ -111,6 +111,23 @@ describe("draftBlocker", () => {
     expect(fifth).toMatch(/attenuation/i);
     expect(draftBlocker({ ...ready, efficiency: "101" })).toMatch(/efficiency/i);
   });
+  it("names an out-of-range process number before the version is cut (#1478)", () => {
+    expect(draftBlocker({ ...ready, numbers: { preBoil: "-1" } })).toBe("Set pre-boil volume above zero.");
+    expect(draftBlocker({ ...ready, numbers: { boilMin: "-5" } })).toBe("Set boil time in whole minutes above zero.");
+    expect(draftBlocker({ ...ready, numbers: { whirlpoolTemp: "5000" } })).toBe("Set whirlpool temperature from 25 to 212 °F.");
+    expect(draftBlocker({ ...ready, numbers: { knockoutTemp: "-300" } })).toBe("Set knockout temperature from 25 to 212 °F.");
+    expect(draftBlocker({ ...ready, numbers: { whirlpoolMin: "1e1" } })).toBe("Set whirlpool time in whole minutes, zero or more.");
+    expect(draftBlocker({ ...ready, numbers: { preBoil: "7", boilMin: "60", whirlpoolTemp: "180", knockoutTemp: "66", whirlpoolMin: "" } })).toBeNull();
+  });
+  it("names a line whose timing is out of range instead of dropping it (#1478)", () => {
+    const boil = { ...line, stage: "boil" as const, timingMinutes: "90" };
+    expect(draftBlocker({ ...ready, lines: [line, boil], numbers: { boilMin: "60" } })).toBe("Fix the boil timing: enter 0 to 60 minutes.");
+    const dryHop = { ...line, stage: "dry_hop" as const, timingMinutes: String(121 * 1440) };
+    expect(draftBlocker({ ...ready, lines: [line, dryHop] })).toBe("Fix the dry hop timing: enter day 0 to 120.");
+    // A schedule longer than 120 days, conditioning included, raises the ceiling.
+    const long = [{ name: "Primary", kind: "primary", tempF: 68, days: 30 }, { name: "Barrel", kind: "conditioning", tempF: 55, days: 150 }];
+    expect(draftBlocker({ ...ready, lines: [line, dryHop], fermentationSchedule: long })).toBeNull();
+  });
 });
 
 describe("toRecipePageModel", () => {

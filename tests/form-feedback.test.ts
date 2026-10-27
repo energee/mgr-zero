@@ -229,7 +229,7 @@ describe("per-form reasons", () => {
   });
 
   it("the recipe schedule sheets name a blank name, temperature, duration or amount (#1122)", () => {
-    expect(stageReason({ name: "", kind: "primary", tempF: "", days: "0" })).toBe("Still needed: a stage name, a temperature, and a duration above zero.");
+    expect(stageReason({ name: "", kind: "primary", tempF: "", days: "0" })).toBe("Still needed: a stage name, a temperature from 25 to 212 °F, and a duration above zero.");
     expect(stageReason({ name: "Primary", kind: "primary", tempF: "66", days: "7" })).toBeNull();
     expect(mashStepReason({ name: " ", kind: "infusion", tempF: "152", minutes: "" })).toBe("Still needed: a step name and a duration above zero.");
     expect(mashStepReason({ name: "Sacch", kind: "infusion", tempF: "152", minutes: "60" })).toBeNull();

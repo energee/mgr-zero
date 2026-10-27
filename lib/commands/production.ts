@@ -8,7 +8,7 @@
 // (lib/recipe-gravity.ts) — the schema stores assumptions, never results.
 import { z } from "zod";
 import type { VesselReading } from "@/lib/mgr/vessel-detail-view";
-import { INGREDIENT_STAGES } from "@/lib/mgr/recipe-process-view";
+import { INGREDIENT_STAGES, scheduleDays, timedInDays, timingLimitMinutes } from "@/lib/mgr/recipe-process-view";
 import { fermentationReadingInput, fermentationReadingOfflinePolicy, MASH_PH_BOUNDS, READING_BOUNDS } from "@/lib/composer/offline-policy";
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, CommandError, type Ctx, latestOf } from "./registry";
 import { brandNames, isoDate } from "./packaging";
@@ -21,11 +21,11 @@ import { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER
 // views can read them without importing this module and registering every
 // command in it.
 export { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
-const mashStep = z.object({ name: z.string().trim().min(1), kind: z.enum(MASH_STEP_KINDS), tempF: z.number(), minutes: z.number().int().positive() });
-const fermentationStage = z.object({ name: z.string().trim().min(1), kind: z.enum(FERMENTATION_STAGE_KINDS), tempF: z.number(), days: z.number().positive() });
-// Whirlpool and knockout temperatures share the reading range, so a typo such as -500 °F is refused, not frozen into a
-// recipe version or brew record (#1476, #1478).
+// Process temperatures share the reading range, so a typo such as -500 °F is refused, not frozen into a recipe version
+// or brew record (#1476, #1478).
 const processTempF = z.number().min(READING_BOUNDS.tempF.min).max(READING_BOUNDS.tempF.max);
+const mashStep = z.object({ name: z.string().trim().min(1), kind: z.enum(MASH_STEP_KINDS), tempF: processTempF, minutes: z.number().int().positive() });
+const fermentationStage = z.object({ name: z.string().trim().min(1), kind: z.enum(FERMENTATION_STAGE_KINDS), tempF: processTempF, days: z.number().positive() });
 const processInput = z.object({
   preBoilBbl: z.number().positive().optional(), whirlpoolMinutes: z.number().int().nonnegative().optional(), whirlpoolTempF: processTempF.optional(),
   whirlpoolRestMinutes: z.number().int().nonnegative().optional(), knockoutTempF: processTempF.optional(),
@@ -80,8 +80,19 @@ defineCommand({
       materialId: z.string().uuid(),
       perBblQty: z.number().positive(),
       stage: z.enum(INGREDIENT_STAGES),
-      timingMinutes: z.number().int().optional(),
+      timingMinutes: z.number().int().nonnegative().optional(),
     })).min(1),
+  }).superRefine((v, issue) => {
+    // Each line's timing stays within its stage's range: the boil time, the fermentation schedule (at least 120 days),
+    // or one day; fermentation and dry hop are whole days (#1478). The editor enforces the same timingLimitMinutes.
+    const limits = { boilMinutes: v.boilMinutes, fermentationDays: scheduleDays(v.fermentationSchedule) };
+    v.ingredients.forEach((line, index) => {
+      if (line.timingMinutes === undefined) return;
+      const max = timingLimitMinutes(line.stage, limits);
+      if (line.timingMinutes > max || (timedInDays(line.stage) && line.timingMinutes % 1440 !== 0)) {
+        issue.addIssue({ code: "custom", path: ["ingredients", index, "timingMinutes"], message: timedInDays(line.stage) ? `Enter a whole day from 0 to ${max / 1440}.` : `Enter 0 to ${max} minutes.` });
+      }
+    });
   }),
   roles: ["admin", "brewer"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_recipe_version", {

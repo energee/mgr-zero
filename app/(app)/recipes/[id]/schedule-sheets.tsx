@@ -14,7 +14,7 @@ import { FermentationScheduleView, FermentationStageView } from "@/components/mg
 import { IngredientView, type IngredientMaterial } from "@/components/mgr/views/ingredient";
 import { MashScheduleView, MashStepView } from "@/components/mgr/views/mash-schedule";
 import { WaterAdditionView, WaterView } from "@/components/mgr/views/water";
-import { additionReason, mashStepReason, moveItem, removeAt, stageReason, toAdditionFields, toMashStepFields, toStageFields, upsertAt, waterRowSummary, type FermentationStage, type IngredientLine, type MashStep, type SaltMaterial, type WaterAddition, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import { additionReason, fromIngredientFields, mashStepReason, moveItem, removeAt, stageReason, toAdditionFields, toIngredientFields, toMashStepFields, toStageFields, upsertAt, waterRowSummary, type FermentationStage, type IngredientFields, type IngredientLine, type MashStep, type TimingLimits, type SaltMaterial, type WaterAddition, type WaterDraft, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 
 type Editing = { index?: number } | null;
 type ListProps<T> = { items: T[]; onEdit: (index: number) => void; onMove: (index: number, by: -1 | 1) => void; add: ReactNode; onAdd: () => void };
@@ -81,14 +81,15 @@ export function WaterSheet({ water, profiles, materials, onChange, trigger }: { 
 const emptyLine = (): IngredientLine => ({ materialId: "", perBblQty: "", stage: "mash", timingMinutes: "" });
 
 /** One ingredient, edited in place: "Add ingredient" opens a blank editor, Edit on a row opens it filled. No list of its own; the recipe page is the list. */
-export function IngredientSheet({ line, materials, onSave, onDelete, trigger }: { line?: IngredientLine; materials: IngredientMaterial[]; onSave: (line: IngredientLine) => void; onDelete?: () => void; trigger: ReactNode }) {
+export function IngredientSheet({ line, materials, limits, onSave, onDelete, trigger }: { line?: IngredientLine; materials: IngredientMaterial[]; limits: TimingLimits; onSave: (line: IngredientLine) => void; onDelete?: () => void; trigger: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [f, setF] = useState<IngredientLine>(line ?? emptyLine());
-  const patch = (p: Partial<IngredientLine>) => setF((c) => ({ ...c, ...p }));
-  return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (o) setF(line ?? emptyLine()); }} title={line ? "Edit ingredient" : "Add ingredient"} trigger={asTrigger(trigger)}>
+  // Timing is edited in the stage's unit (days or minutes) and stored as minutes on save (#1478).
+  const [f, setF] = useState<IngredientFields>(toIngredientFields(line ?? emptyLine()));
+  const patch = (p: Partial<IngredientFields>) => setF((c) => ({ ...c, ...p }));
+  return <CommandForm open={open} onOpenChange={(o) => { setOpen(o); if (o) setF(toIngredientFields(line ?? emptyLine())); }} title={line ? "Edit ingredient" : "Add ingredient"} trigger={asTrigger(trigger)}>
     <div className="flex flex-col gap-4">
-      <IngredientView fields={f} materials={materials} onChange={patch}
-        onSave={() => { onSave(f); setOpen(false); }}
+      <IngredientView fields={f} materials={materials} limits={limits} onChange={patch}
+        onSave={() => { onSave(fromIngredientFields(f)); setOpen(false); }}
         onDelete={onDelete ? () => { onDelete(); setOpen(false); } : null}
       />
     </div>
