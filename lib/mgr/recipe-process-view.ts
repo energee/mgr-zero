@@ -5,7 +5,8 @@
 // and the labelled read-out of a cut version's process scalars and water.
 import { sentenceCase } from "./labels";
 import { plural } from "./plural";
-import { isNumber, isPositive } from "./quantity-input";
+import { isNumber, isPositive, numberNotationError } from "./quantity-input";
+import { READING_BOUNDS } from "@/lib/composer/offline-policy";
 import { saccharificationRest, totalMinutes, type MashStep } from "./recipe-schedule";
 import { gramsOf, IONS, ION_LABELS, suggestSalts, waterChemistry, type Ions, type Salt } from "@/lib/water-chemistry";
 import { submitReason } from "./submit-reason";
@@ -20,12 +21,50 @@ export const isBrewDayStage = (stage: string): stage is (typeof BREW_DAY_STAGES)
 /** One ingredient line as the editor holds it: strings until the version is built. */
 export type IngredientLine = { materialId: string; perBblQty: string; stage: IngredientStage; timingMinutes: string };
 export const lineReady = (l: IngredientLine) => l.materialId !== "" && Number(l.perBblQty) > 0 && (l.timingMinutes === "" || Number.isInteger(Number(l.timingMinutes)));
-/** The same prerequisites as lineReady, named beside Save ingredient without changing eligibility. */
-export function ingredientReason(line: IngredientLine): string | null {
+
+const MINUTES_PER_DAY = 1440;
+/** Fermentation and dry-hop additions are timed in whole days from the start of fermentation; the rest in minutes (#1478).
+ *  Stored as minutes either way (timing_minutes). */
+export const timedInDays = (stage: string) => stage === "fermentation" || stage === "dry_hop";
+/** What bounds a line's timing: the boil time and the fermentation schedule's total days (conditioning included). */
+export type TimingLimits = { boilMinutes?: number; fermentationDays: number };
+/** The latest timing a line may carry, in minutes: a boil addition up to the boil time; fermentation and dry hop up to
+ *  120 days or the recipe's own fermentation schedule, whichever is longer; anything else within one day. Without a
+ *  boil time, a boil addition gets the one-day ceiling too. Shared with create_recipe_version's schema. */
+export function timingLimitMinutes(stage: string, limits: TimingLimits): number {
+  if (stage === "boil") return limits.boilMinutes ?? MINUTES_PER_DAY;
+  if (timedInDays(stage)) return Math.max(120, limits.fermentationDays) * MINUTES_PER_DAY;
+  return MINUTES_PER_DAY;
+}
+/** A fermentation schedule's length in days, for TimingLimits. */
+export const scheduleDays = (stages: readonly { days: number }[]) => stages.reduce((sum, s) => sum + Number(s.days), 0);
+
+/** The sheet's fields: timing as typed, in days for timedInDays stages and minutes otherwise. */
+export type IngredientFields = Omit<IngredientLine, "timingMinutes"> & { timing: string };
+export const toIngredientFields = ({ timingMinutes, ...line }: IngredientLine): IngredientFields => ({
+  ...line, timing: timingMinutes !== "" && timedInDays(line.stage) ? String(Number(timingMinutes) / MINUTES_PER_DAY) : timingMinutes,
+});
+export const fromIngredientFields = ({ timing, ...fields }: IngredientFields): IngredientLine => ({
+  ...fields, timingMinutes: timing.trim() !== "" && timedInDays(fields.stage) ? String(Number(timing) * MINUTES_PER_DAY) : timing.trim(),
+});
+
+/** The range a timing typed in its stage's unit must fall in, or undefined when it is blank or already in range.
+ *  `days` says the unit: whole days for fermentation and dry hop, whole minutes otherwise. */
+export function timingOutOfRange(stage: string, timing: string, limits: TimingLimits): { days: boolean; max: number } | undefined {
+  if (timing.trim() === "") return undefined;
+  const days = timedInDays(stage), max = timingLimitMinutes(stage, limits) / (days ? MINUTES_PER_DAY : 1);
+  const n = Number(timing);
+  const ok = !numberNotationError(timing) && isNumber(timing) && Number.isInteger(n) && n >= 0 && n <= max;
+  return ok ? undefined : { days, max };
+}
+/** The same prerequisites as lineReady, plus the stage's timing range, named beside Save ingredient. */
+export function ingredientReason(fields: IngredientFields, limits: TimingLimits): string | null {
+  const range = timingOutOfRange(fields.stage, fields.timing, limits);
+  const stage = sentenceCase(fields.stage).toLowerCase();
   return submitReason([
-    ...(!line.materialId ? ["a material"] : []),
-    ...(!(Number(line.perBblQty) > 0) ? ["a quantity per barrel above zero"] : []),
-    ...(line.timingMinutes !== "" && !Number.isInteger(Number(line.timingMinutes)) ? ["timing in whole minutes or left blank"] : []),
+    ...(!fields.materialId ? ["a material"] : []),
+    ...(!(Number(fields.perBblQty) > 0) ? ["a quantity per barrel above zero"] : []),
+    ...(range ? [range.days ? `${stage} day from 0 to ${range.max}` : `${stage} timing from 0 to ${range.max} minutes`] : []),
   ]);
 }
 /** A per-bbl quantity to three significant digits: 40.909091 reads "40.9", 0.011364 reads "0.0114".
@@ -33,7 +72,7 @@ export function ingredientReason(line: IngredientLine): string | null {
 export const perBblDisplay = (n: number): string => n.toLocaleString("en-US", { maximumSignificantDigits: 3 });
 /** "Dry hop · 4 min · 1.2 lb / bbl": the row detail for a line, drawn the same on the draft and on a cut version. */
 export const ingredientDetail = (stage: string, timingMinutes: number | string | null, perBbl: number | string, unit?: string) =>
-  `${sentenceCase(stage)}${timingMinutes !== null && timingMinutes !== "" ? ` · ${timingMinutes} min` : ""} · ${perBbl}${unit ? ` ${unit}` : ""} / bbl`;
+  `${sentenceCase(stage)}${timingMinutes !== null && timingMinutes !== "" ? (timedInDays(stage) ? ` · day ${Number(timingMinutes) / MINUTES_PER_DAY}` : ` · ${timingMinutes} min`) : ""} · ${perBbl}${unit ? ` ${unit}` : ""} / bbl`;
 /** Name and base unit by material id, for rows that name a material the command returned. */
 export function materialLookup<M extends { id: string; name: string; base_uom: string }>(materials: readonly M[]) {
   const byId = new Map(materials.map((m) => [m.id, m]));
@@ -130,17 +169,21 @@ export function processReadout(v: ProcessColumns, profileName: (id: string | nul
 // cannot export a function the server invokes.
 export type MashStepFields = { name: string; kind: string; tempF: string; minutes: string };
 export const toMashStepFields = (s?: MashStep): MashStepFields => ({ name: s?.name ?? "", kind: s?.kind ?? "infusion", tempF: s ? String(s.tempF) : "", minutes: s ? String(s.minutes) : "" });
+/** A schedule temperature in plain notation within the reading range (25 to 212 °F), as the schema requires (#1478). */
+const scheduleTempOk = (s: string) => !numberNotationError(s) && isNumber(s) && Number(s) >= READING_BOUNDS.tempF.min && Number(s) <= READING_BOUNDS.tempF.max;
+const TEMP_NEED = `a temperature from ${READING_BOUNDS.tempF.min} to ${READING_BOUNDS.tempF.max} °F`;
+const durationOk = (s: string) => !numberNotationError(s) && isNumber(s) && isPositive(s);
 export const mashStepReason = (f: MashStepFields) => submitReason([
   ...(f.name.trim() ? [] : ["a step name"]),
-  ...(isNumber(f.tempF) ? [] : ["a temperature"]),
-  ...(isPositive(f.minutes) ? [] : ["a duration above zero"]),
+  ...(scheduleTempOk(f.tempF) ? [] : [TEMP_NEED]),
+  ...(durationOk(f.minutes) ? [] : ["a duration above zero"]),
 ]);
 export type FermentationStageFields = { name: string; kind: string; tempF: string; days: string };
 export const toStageFields = (s?: FermentationStage): FermentationStageFields => ({ name: s?.name ?? "", kind: s?.kind ?? "primary", tempF: s ? String(s.tempF) : "", days: s ? String(s.days) : "" });
 export const stageReason = (f: FermentationStageFields) => submitReason([
   ...(f.name.trim() ? [] : ["a stage name"]),
-  ...(isNumber(f.tempF) ? [] : ["a temperature"]),
-  ...(isPositive(f.days) ? [] : ["a duration above zero"]),
+  ...(scheduleTempOk(f.tempF) ? [] : [TEMP_NEED]),
+  ...(durationOk(f.days) ? [] : ["a duration above zero"]),
 ]);
 export type WaterAdditionFields = { materialId: string; qty: string; unit: string; stage: string };
 export const toAdditionFields = (a?: WaterAddition): WaterAdditionFields => ({ materialId: a?.materialId ?? "", qty: a ? String(a.qty) : "", unit: a?.unit ?? "g", stage: a?.stage ?? "mash" });

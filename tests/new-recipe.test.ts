@@ -78,7 +78,7 @@ describe("Recipe creation", () => {
 
   describe("the ingredient sheet fields (plan task 13)", () => {
     const materials = [{ id: "citra", name: "Citra", unit: "lb", category: "hop" }, { id: "cans", name: "Cans", unit: "each" }];
-    const draw = (materialId: string) => renderToStaticMarkup(createElement(IngredientView, { fields: { materialId, stage: "dry_hop", perBblQty: "1.2", timingMinutes: "" }, materials }));
+    const draw = (materialId: string) => renderToStaticMarkup(createElement(IngredientView, { fields: { materialId, stage: "dry_hop", perBblQty: "1.2", timing: "" }, materials }));
 
     it("an unpicked material reads Choose a material on a searchable trigger, never a Select", () => {
       const html = draw("");
@@ -104,7 +104,8 @@ describe("Recipe creation", () => {
       expect(html.match(/aria-label="Decrease"/g)).toHaveLength(2);
       expect(html.match(/aria-label="Increase"/g)).toHaveLength(2);
       expect(html).toMatch(/<input[^>]*aria-label="Quantity per bbl \(lb\)"[^>]*value="1.2"/);
-      expect(html).toMatch(/<input[^>]*aria-label="Timing min · optional"[^>]*value=""/);
+      // A dry-hop line is timed in days from the start of fermentation (#1478).
+      expect(html).toMatch(/<input[^>]*aria-label="Timing day · optional"[^>]*value=""/);
       expect(html.match(/step="any"/g)).toHaveLength(2);
     });
 
@@ -196,7 +197,7 @@ describe("Recipe creation", () => {
     expect(sheets).not.toMatch(/sheetTitle="Ingredients"/);
     expect(sheets).toMatch(/<IngredientView\b/);
     // Quantity is per barrel in the picked material's own unit, never a retyped one.
-    const ing = renderToStaticMarkup(createElement(IngredientView, { fields: { materialId: "citra", stage: "dry_hop", perBblQty: "1.2", timingMinutes: "" }, materials: [{ id: "citra", name: "Citra", unit: "lb" }] }));
+    const ing = renderToStaticMarkup(createElement(IngredientView, { fields: { materialId: "citra", stage: "dry_hop", perBblQty: "1.2", timing: "" }, materials: [{ id: "citra", name: "Citra", unit: "lb" }] }));
     expect(ing).toMatch(/Quantity per bbl/);
     expect(ing).toMatch(/Quantity per bbl \(lb\)/);
     expect(ing).not.toMatch(/Per bbl</);
@@ -235,7 +236,7 @@ describe("recipe form copy (#1139)", () => {
   it("stage and type picks show sentence case and keep the stored value", () => {
     expect(INGREDIENT_STAGE_OPTIONS.map((o) => o.value)).toEqual([...INGREDIENT_STAGES]);
     expect(INGREDIENT_STAGE_OPTIONS.map((o) => o.label)).toEqual(["Mash", "Boil", "Whirlpool", "Fermentation", "Dry hop", "Packaging", "Other"]);
-    expect(html(createElement(IngredientView, { fields: { materialId: "", stage: "dry_hop", perBblQty: "", timingMinutes: "" }, materials: [] }))).toMatch(/>Dry hop</);
+    expect(html(createElement(IngredientView, { fields: { materialId: "", stage: "dry_hop", perBblQty: "", timing: "" }, materials: [] }))).toMatch(/>Dry hop</);
     expect(html(createElement(MashStepView, { fields: { name: "Mash-out", kind: "direct heat", tempF: "168", minutes: "10" } }))).toMatch(/>Direct heat</);
     expect(html(createElement(FermentationStageView, { fields: { name: "Rest", kind: "diacetyl rest", tempF: "72", days: "2" } }))).toMatch(/>Diacetyl rest</);
     expect(html(createElement(WaterAdditionView, { fields: { materialId: "", qty: "", unit: "g", stage: "sparge" }, materials: [] }))).toMatch(/>Sparge</);

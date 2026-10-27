@@ -7,7 +7,7 @@ import { QboConnectionView, QboDefaultsView, QboSyncView } from "../components/m
 import { RecipeView } from "../components/mgr/views/recipe";
 import { toBrandViewProps } from "../lib/mgr/brand-view";
 import type { IngredientFields } from "../components/mgr/views/ingredient";
-import { ingredientReason, lineReady } from "../lib/mgr/recipe-process-view";
+import { ingredientReason, lineReady, timingOutOfRange, toIngredientFields } from "../lib/mgr/recipe-process-view";
 import { ShipForm, type ShippingSnapshot } from "../app/(app)/orders/[id]/ship-form";
 import { BrewTimelineView } from "../components/mgr/views/brew-timeline";
 import { BrewPrepView } from "../components/mgr/views/brew-prep";
@@ -48,24 +48,26 @@ describe("remaining named disabled-action reasons (#1122)", () => {
   });
 
   const ingredient = (patch: Partial<IngredientFields> = {}) => renderToStaticMarkup(createElement(IngredientView, {
-    fields: { materialId: "", stage: "mash", perBblQty: "", timingMinutes: "", ...patch },
+    fields: { materialId: "", stage: "mash", perBblQty: "", timing: "", ...patch },
     materials: [{ id: "malt", name: "Malt", unit: "lb" }],
   }));
   it("names missing ingredient inputs and preserves the existing timing requirement", () => {
     describedButton(ingredient(), "Save ingredient", /material.*quantity/i);
     describedButton(ingredient({ materialId: "malt" }), "Save ingredient", /quantity.*above zero/i);
-    describedButton(ingredient({ materialId: "malt", perBblQty: "1", timingMinutes: "1.5" }), "Save ingredient", /timing.*whole minutes/i);
+    describedButton(ingredient({ materialId: "malt", perBblQty: "1", timing: "1.5" }), "Save ingredient", /mash timing from 0 to 1440 minutes/i);
     const ready = ingredient({ materialId: "malt", perBblQty: "1" });
     expect(ready).not.toContain("Still needed:");
     expect(ready.match(/<button[^>]*>Save ingredient<\/button>/)?.[0]).not.toContain('disabled=""');
   });
 
-  it("keeps ingredient eligibility identical to lineReady, including optional timing", () => {
+  it("keeps ingredient eligibility identical to lineReady plus the stage's timing range (#1478)", () => {
+    const limits = { fermentationDays: 0 };
     for (const materialId of ["", "malt"]) {
       for (const perBblQty of ["", "-1", "0", "1", "NaN", "Infinity"]) {
         for (const timingMinutes of ["", "0", "-1", "1.5", "NaN"]) {
-          const fields: IngredientFields = { materialId, perBblQty, timingMinutes, stage: "mash" };
-          expect(ingredientReason(fields) === null).toBe(lineReady(fields));
+          const line = { materialId, perBblQty, timingMinutes, stage: "mash" as const };
+          const fields: IngredientFields = toIngredientFields(line);
+          expect(ingredientReason(fields, limits) === null).toBe(lineReady(line) && !timingOutOfRange(line.stage, fields.timing, limits));
         }
       }
     }
