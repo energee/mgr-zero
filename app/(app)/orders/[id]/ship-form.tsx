@@ -78,7 +78,7 @@ export function shippedLines(lines: ShippingSnapshot["lines"], ship: ReturnType<
 export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; available: ShipSources }) {
   const router = useRouter();
   const transfer = snapshot.order.kind === "taproom_transfer";
-  const { busy, error, run } = useCommandAction();
+  const { busy, error, setError, run } = useCommandAction();
   const [qtys, setQtys] = useState<Record<string, string>>(() => Object.fromEntries(snapshot.lines.map(line => [line.id, String(line.qty_picked ?? 0)])));
   const [allocations, setAllocations] = useState<ShipmentAllocations>(() => defaultShipAllocations(snapshot.lines, qtys, available));
   const [reasons, setReasons] = useState<Record<string, string>>(() => Object.fromEntries(snapshot.lines.map(line => [line.id, line.short_reason ?? ""])));
@@ -95,9 +95,10 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
       key: `${stock.bin_id}:${stock.lot_id ?? ""}`,
       label: `${available.bins.find(bin => bin.id === stock.bin_id)?.name ?? stock.bin_id} · ${stock.lot_code ?? "Untracked / legacy stock"} · ${stock.qty} available`,
     })),
-  }))} allocations={allocations} onChange={setAllocations} destinationBins={available.destinationBins} disabled={busy} />;
+  }))} allocations={allocations} onChange={value => { setError(null); setAllocations(value); }} destinationBins={available.destinationBins} disabled={busy} />;
   const reason = submitReason(shipmentSourceNeeds(snapshot.lines, qtys, allocations, available, transfer));
-  const onQuantity = (id: string, value: string) => setQtys(prev => ({ ...prev, [id]: value }));
+  // A refused ship's error describes the old quantities; editing them clears it (#1385).
+  const onQuantity = (id: string, value: string) => { setError(null); setQtys(prev => ({ ...prev, [id]: value })); };
   const messages = <CommandFormMessage error={error} />;
   if (result) return <ShipmentDoneView model={result} />;
   return <form className="contents" onSubmit={event => {

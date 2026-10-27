@@ -83,7 +83,7 @@ describe("get_today (registered reader)", () => {
     const item = (await today(warehouse, "2000-01-01T00:00:00Z")).find((i) => i.subjectId === id);
     expect(item).toMatchObject({
       reason: "pick_due", subjectType: "order", subjectId: id, dueAt: null,
-      detail: "pick due · no ship date", href: `/orders/${id}`,
+      detail: "pick due · no ship date", href: `/orders/${id}/pick`,
       recipientRoles: ["admin", "warehouse"],
     });
     expect((await today(adminCtx, "2000-01-01T00:00:00Z")).find((i) => i.subjectId === id)).toEqual(item);
@@ -95,7 +95,7 @@ describe("get_today (registered reader)", () => {
     expect(picks.findIndex((i) => i.subjectId === dated)).toBeLessThan(picks.findIndex((i) => i.subjectId === id));
     expect(picks.at(-1)?.subjectId).toBe(id);
     const work = await runCommand("list_work", {}, warehouse) as WorkRow[];
-    expect(work.find((r) => r.href === `/orders/${id}`)).toMatchObject({
+    expect(work.find((r) => r.href === `/orders/${id}/pick`)).toMatchObject({
       kind: "orders", verb: "Pick", dueAt: null, detail: "pick due · no ship date",
     });
   });
@@ -104,7 +104,8 @@ describe("get_today (registered reader)", () => {
     const id = await createOrder("2026-09-06", true);
     const item = (await today(sales, "2026-09-06T12:00:00Z")).find((i) => i.subjectId === id)!;
     expect(item.safeLabel).toMatch(/^ORD-\d{4,}$/);
-    expect(item.href).toBe(`/orders/${id}`);
+    // Today opens the page that does the work: Review and confirm (#1503).
+    expect(item.href).toBe(`/orders/${id}/confirm`);
     expect(item.subjectType).toBe("order");
     expect(item.recipientRoles).toEqual(["admin", "sales"]);
     expect(item.assignedUserId).toBeNull();
