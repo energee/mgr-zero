@@ -31,7 +31,6 @@ import { toShipmentDoneViewProps } from "../lib/mgr/shipment-done-view";
 import { toShortPickViewProps } from "../lib/mgr/short-pick-view";
 
 const html = (node: ReturnType<typeof createElement>) => renderToStaticMarkup(node);
-const SOURCES = ["Warehouse", "Taproom"];
 
 it("leaves unspecified return-source quantities blank", () => {
   const markup = html(createElement(ReturnSourcesView, { groups: [{ key: "sku", name: "Pils", sources: [{ id: "source", label: "Shelf", shipped: 5 }] }] }));
@@ -171,10 +170,11 @@ describe("Ship view", () => {
   it("the invoice-now drawing still shows Reason required and Ship order", () => {
     const markup = html(createElement(ShipView, {
       model: toShipViewProps(orderShipInvoice),
-      fulfillmentOptions: SOURCES,
     }));
     expect(markup).toMatch(/ORD-0231/);
-    expect(markup).toMatch(/Fulfillment source/);
+    // The ship-from location reads as text, not a disabled one-option select (#1504).
+    expect(markup).toMatch(/<dt[^>]*>Fulfillment source<\/dt>/);
+    expect(markup).not.toMatch(/data-disabled="true"/);
     expect(markup).toMatch(/Reason/);
     expect(markup).toMatch(/required/);
     expect(markup).toMatch(/Shipping 9 of 10 Pils/);
@@ -247,7 +247,6 @@ describe("Ship view", () => {
   it("On delivery is the same ShipView with chips index 1", () => {
     const markup = html(createElement(ShipView, {
       model: toShipViewProps(orderShipOnDelivery),
-      fulfillmentOptions: SOURCES,
       invoiceTiming: 1,
     }));
     expect(markup).toMatch(/picked 10/);

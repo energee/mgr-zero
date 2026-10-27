@@ -36,7 +36,8 @@ import { prepReason, timelineReason, type BrewIngredient, type BrewTimelineViewM
 import { packagingCloseReason } from "@/lib/mgr/close-packaging-run-view";
 import { kegEventReason } from "@/lib/mgr/keg-fleet-view";
 import { additionReason, mashStepReason, stageReason } from "@/lib/mgr/recipe-process-view";
-import { shipmentSourceNeeds, type ShippingSnapshot } from "@/app/(app)/orders/[id]/ship-form";
+import { defaultShipAllocations, shipmentSourceNeeds, type ShippingSnapshot } from "@/app/(app)/orders/[id]/ship-form";
+import { defaultRefusedEntries } from "@/components/mgr/views/refused-return";
 
 // The live forms render without a router or a command round trip.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {} }) }));
@@ -246,6 +247,25 @@ describe("per-form reasons", () => {
     ] };
     expect(shipmentSourceNeeds(lines, { a: "3", b: "0" }, {}, available, false)).toHaveLength(1);
     expect(submitReason(shipmentSourceNeeds(lines, { a: "3", b: "0" }, { a: [{ key: "bin:", qty: "3", toBinId: "" }] }, available, false))).toBeNull();
+  });
+
+  it("Ship prefills a line's source only when one bin and lot covers it, and names a line no bin holds (#1504)", () => {
+    const line = (id: string, picked: number) => ({ id, sku_id: `sku-${id}`, qty_ordered: picked, qty_picked: picked, qty_shipped: null, skus: { name: `SKU ${id}` } });
+    const stock = (sku: string, bin: string, qty: number) => ({ stock_id: `sku-${sku}`, bin_id: bin, lot_id: "lot", kind: "sku" as const, keg_size: null, name: sku, unit: "case", lot_code: "L1", qty });
+    const lines: ShippingSnapshot["lines"] = [line("a", 3), line("b", 2), line("c", 4), line("d", 1)];
+    const available = { bins: [], destinationBins: [{ id: "tap", name: "Tap cooler", location_id: "taproom" }], stock: [
+      stock("a", "cold", 5),                     // one row covers 3: prefilled
+      stock("b", "cold", 2), stock("b", "dock", 2), // two rows cover 2: the user picks
+      stock("c", "cold", 1),                     // one row, too little: the user picks
+    ] };
+    const qtys = { a: "3", b: "2", c: "4", d: "1" };
+    const defaults = defaultShipAllocations(lines, qtys, available);
+    expect(defaults).toEqual({ a: [{ key: "cold:lot", qty: "3", toBinId: "tap" }] });
+    expect(shipmentSourceNeeds(lines, qtys, defaults, available, true)).toEqual([
+      "a source bin and lot for SKU b", "a source bin and lot for SKU c", "recorded stock of SKU d in a bin at the ship-from location",
+    ]);
+    expect(defaultShipAllocations(lines, qtys, { ...available, destinationBins: [...available.destinationBins, { id: "keg", name: "Keg room", location_id: "taproom" }] }))
+      .toEqual({ a: [{ key: "cold:lot", qty: "3", toBinId: "" }] });
   });
 });
 
@@ -461,5 +481,22 @@ describe("live forms withhold their submit with the reason", () => {
       skus: [],
       workHrefs: {},
     })), "Still needed: a warehouse to send from and a transfer quantity above zero.");
+  });
+});
+
+describe("refused beer check-in defaults (#1504)", () => {
+  it("prefills each line's only source with what came back and the location's only bin", () => {
+    const model = {
+      title: "Check in", locationId: "wh",
+      locations: [{ value: "wh", label: "Warehouse" }, { value: "tap", label: "Taproom" }],
+      bins: [{ value: "cold", label: "Cold", locationId: "wh" }, { value: "a", label: "A", locationId: "tap" }, { value: "b", label: "B", locationId: "tap" }],
+      lines: [
+        { id: "one", name: "Pils", outstanding: 2, sources: [{ id: "s1", label: "L1 · Cold", shipped: 4 }] },
+        { id: "two", name: "IPA", outstanding: 1, sources: [{ id: "s2", label: "L2 · Cold", shipped: 1 }, { id: "s3", label: "L3 · Cold", shipped: 1 }] },
+      ],
+    };
+    expect(defaultRefusedEntries(model, "wh")).toEqual({ s1: { qty: 2, binId: "cold", damaged: false } });
+    expect(defaultRefusedEntries(model, "tap")).toEqual({ s1: { qty: 2, binId: "", damaged: false } });
+    expect(defaultRefusedEntries(model, "")).toEqual({ s1: { qty: 2, binId: "", damaged: false } });
   });
 });
