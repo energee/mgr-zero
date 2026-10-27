@@ -39,6 +39,7 @@ const SUBJECT_ICON: Record<TodayItem["subjectType"], TodayIcon> = {
 export const TODAY_VERB: Record<TodayItem["reason"], [string, "info" | "attention" | "success"]> = {
   submitted_order: ["Confirm", "success"],
   pick_due: ["Pick", "info"],
+  ship_due: ["Ship", "info"],
   restock_due: ["Put back", "attention"],
   delivery_next: ["Resume", "info"],
   refused_return: ["Check in", "attention"],
