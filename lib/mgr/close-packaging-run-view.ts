@@ -2,6 +2,7 @@
 import { isNumber, isPositive } from "./quantity-input";
 import { packagingActualsReady, type PackagingActualDraft, type PackagingClosePlan } from "./packaging-actuals";
 import { submitReason } from "./submit-reason";
+import { packageQtyError } from "./schedule-packaging-run-view";
 export type ClosePackagingRunViewModel = {
   backHref?: string;
   backTo?: string;
@@ -18,7 +19,8 @@ export type ClosePackagingRunViewModel = {
 };
 
 export type PackagingCloseFieldsModel = {
-  bblDrawn: string; outputs: { id: string; name: string; qty: string }[];
+  /** whole: a keg output, counted in whole kegs (#1477). */
+  bblDrawn: string; outputs: { id: string; name: string; qty: string; whole?: boolean }[];
   lotCode: string; packagedOn: string; bestBy: string; locationId: string; binId: string;
   locations: { id: string; name: string }[]; bins: { id: string; location_id: string; name: string }[];
   plan: PackagingClosePlan; actuals: PackagingActualDraft[];
@@ -30,7 +32,8 @@ export type PackagingCloseFieldsModel = {
 export function packagingCloseReason(model: PackagingCloseFieldsModel): string | null {
   return submitReason([
     ...(isNumber(model.bblDrawn) && isPositive(model.bblDrawn) ? [] : ["barrels drawn above zero"]),
-    ...(model.outputs.every(row => isNumber(row.qty)) ? [] : ["an actual count for every output"]),
+    ...(model.outputs.every(row => row.qty.trim()) ? [] : ["an actual count for every output"]),
+    ...(model.outputs.some(row => packageQtyError(row.qty, row.whole)) ? ["valid actual counts (whole numbers for kegs)"] : []),
     ...(model.lotCode.trim() ? [] : ["a lot code"]),
     ...(model.packagedOn ? [] : ["a packaged-on date"]),
     ...(model.locationId ? [] : ["a finished goods location"]),
