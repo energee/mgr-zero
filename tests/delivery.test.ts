@@ -577,6 +577,8 @@ describe("route edges", () => {
     const { data: billed } = await admin.from("invoice_lines").select("id").eq("invoice_id", result.invoice_id).eq("kind", "sku").single();
     await runCommand("return_shipment", { invoiceId: result.invoice_id, locationId: whId, reason: "unsold", lines: [{ invoiceLineId: billed!.id, qty: 1, sources: [{ movementId: source!.id, binId: whBinId, qty: 1 }] }] }, adminCtx);
     expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, adminCtx)).toMatchObject([{ outstanding_qty: 2 }]);
+    // The check-in page defaults its return location to where the beer shipped from (#1504).
+    expect(await runCommand("get_invoice_return_sources", { deliveryId: stop!.id }, adminCtx)).toEqual([expect.objectContaining({ id: source!.id, location_id: whId })]);
     const warehouse = await makeStaffCtx(b.id, "warehouse");
     const input = { deliveryId: stop!.id, locationId: whId, lines: [{ orderLineId, sources: [{ movementId: source!.id, binId: whBinId, qty: 1, damaged: true }] }] };
     const requestId = crypto.randomUUID();

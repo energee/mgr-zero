@@ -499,7 +499,7 @@ defineQuery({
   },
 });
 
-export type ReturnSource = { id: string; sku_id: string; qty: number; lot_id: string | null; lots: { code: string } | null; bins: { name: string } | null };
+export type ReturnSource = { id: string; sku_id: string; qty: number; lot_id: string | null; location_id: string; lots: { code: string } | null; bins: { name: string } | null };
 defineQuery({
   name: "get_invoice_return_sources", description: "Original shipped movements available as explicit return identities",
   roles: ["admin", "warehouse", "sales"], input: z.object({ invoiceId: z.string().uuid().optional(), deliveryId: z.string().uuid().optional() }).refine((i) => Boolean(i.invoiceId) !== Boolean(i.deliveryId), "Choose an invoice or delivery"),
@@ -510,7 +510,7 @@ defineQuery({
     if (!invoice?.shipment_id) return [];
     const shipment = await unwrap(ctx.db.from("shipments").select("order_id").eq("id", invoice.shipment_id).single());
     if (!shipment) throw new Error("Shipment not found");
-    return await completeRows("Shipped sources", start => ctx.db.from("inventory_movements").select("id,sku_id,qty,lot_id,lots(code),bins(name)", { count: "exact" })
+    return await completeRows("Shipped sources", start => ctx.db.from("inventory_movements").select("id,sku_id,qty,lot_id,location_id,lots(code),bins(name)", { count: "exact" })
       .eq("brewery_id", ctx.breweryId).eq("ref", shipment.order_id).eq("type", "sale_removal").order("id").range(start, start + PAGE_SIZE - 1)) as unknown as ReturnSource[];
   },
 });
