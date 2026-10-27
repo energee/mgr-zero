@@ -6,6 +6,7 @@ import { bblExact, bblFixed } from "@/lib/volume";
 import { formatDate } from "@/lib/date-format";
 import type { EmptyState } from "./empty-state";
 import { periodStatus, type PeriodStatus } from "@/lib/compliance-period";
+import { batNo } from "./doc-no";
 import { submitReason } from "./submit-reason";
 
 export type MonthlyComplianceSnapshot = {
@@ -112,7 +113,7 @@ export function toMonthlyComplianceViewProps(snapshot: MonthlyComplianceSnapshot
     losses: snapshot.losses.map((loss) => ({
       source: loss,
       key: loss.adjustment_id,
-      title: `Batch ${loss.batch_no} · ${loss.kind} loss`,
+      title: `${batNo(loss.batch_no)} · ${loss.kind} loss`,
       detail: `Recorded ${bblExact(Number(loss.original_bbl), 8)} · ${bblExact(Number(loss.remaining_bbl), 8)} left to reattribute`,
       allocations: loss.allocations.map((allocation) => ({
         key: allocation.id,

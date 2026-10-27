@@ -179,6 +179,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_bin_on_hand", "input": {} }'
 ```
 
+## get_inventory_lot [#get_inventory_lot]
+
+`query` · admin, sales, warehouse
+
+The display code of one existing finished-goods lot, including lots with no remaining stock; null when not visible
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `lotId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_inventory_lot", "input": { "lotId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 ## get_inventory_sku [#get_inventory_sku]
 
 `query` · admin, sales, warehouse
@@ -283,7 +300,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Paginated immutable movements with location/bin/lot labels and reversal links; movementId selects an original and its exact compensation
+Paginated immutable movements with location/bin/lot labels, resolved source document ref_label (null without a visible source document), and reversal links; movementId selects an original and its exact compensation
 
 | Field | Type | Required |
 | --- | --- | --- |

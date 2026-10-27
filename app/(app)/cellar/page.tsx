@@ -18,6 +18,7 @@ import { CellarAdditionForm } from "./cellar-addition-form";
 import type { AdditionLot, AdditionMaterial } from "@/lib/mgr/cellar-addition-view";
 import { BatchCompletionForm } from "./batch-completion-form";
 import { navTitle } from "@/lib/mgr/nav";
+import { batNo } from "@/lib/mgr/doc-no";
 
 export const metadata = { title: navTitle("/cellar") };
 
@@ -42,7 +43,7 @@ export default async function CellarPage() {
   const additionMaterials: AdditionMaterial[] = materials.map(({ id, name, category, base_uom, lot_tracked }) => ({ id, name, category, base_uom, lot_tracked }));
   const lotsByMaterial: Record<string, AdditionLot[]> = {};
   for (const lot of lots) (lotsByMaterial[lot.material_id] ??= []).push(lot);
-  const completionCandidates = batches.map((batch) => ({ id: batch.id, label: `Batch ${batch.batch_no ?? "—"} · ${batch.brand_name ?? "no brand"}` }));
+  const completionCandidates = batches.map((batch) => ({ id: batch.id, label: `${batNo(batch.batch_no)} · ${batch.brand_name ?? "no brand"}` }));
 
   const readings = cellarReadings(batches, unit.effective, brewery.timeZone);
   const model = toCellarMapViewProps(vessels, occupancies, readings, Object.fromEntries(vessels.map(vessel => [vessel.id, `/cellar/vessels/${vessel.id}`])), occupancyId => `/cellar/${occupancyId}/reading`);

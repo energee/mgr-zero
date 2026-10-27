@@ -616,6 +616,20 @@ describe("closing the run", () => {
     expect(vol.trim()).toBe("4.000");
   });
 
+  it("refuses fractional actual kegs before rounding, and still takes a fractional case count (#1477)", async () => {
+    const { runId } = await startedRun("FV-WHOLE-KEG", 20, "2026-12-04");
+    const close = (kegs: number) => closeWithConfirmedMaterials({
+      runId, bblDrawn: 10, outputs: [{ skuId: stout.skuId, qtyActual: 10.5 }, { skuId: kegSkuId, qtyActual: kegs }],
+      lotCode: `WK-${Math.random().toString(36).slice(2, 8)}`, packagedOn: fixtureDate, locationId: wh.id, binId: wh.binId,
+    }, ctx);
+    const run = await runCommand("get_packaging_run", { runId }, ctx) as { outputs: { sku_id: string; whole: boolean }[] };
+    expect(Object.fromEntries(run.outputs.map((o) => [o.sku_id, o.whole]))).toEqual({ [stout.skuId]: false, [kegSkuId]: true });
+    await expect(close(1.5)).rejects.toThrow("Enter a whole number of kegs.");
+    await expect(close(1.999)).rejects.toThrow("Enter a whole number of kegs.");
+    expect(sql(`select count(*) from inventory_movements where ref='${runId}'`, true)).toEqual(["0"]);
+    await close(2);
+  });
+
   it("refuses a second close, an unknown package, and more beer than the tank holds", async () => {
     const { runId } = await startedRun("FV-CLOSE-2", 20, "2026-12-02");
     const close = (over: Record<string, unknown> = {}) => closeWithConfirmedMaterials({

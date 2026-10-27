@@ -557,6 +557,27 @@ describe("route edges", () => {
     expect((await admin.from("stock_transfers").select("status").eq("id", tr).single()).data?.status).toBe("in_transit");
   });
 
+  it("names the shortfall when a shipped source or a removal asks for more than the bin holds (#1385)", async () => {
+    const { data: sku } = await admin.from("skus").select("brand_id").eq("id", skuId).single();
+    const brandId = sku!.brand_id;
+    const run = await ins("packaging_runs", { brewery_id: b.id, brand_id: brandId, planned_on: "2026-09-01", created_by: adminCtx.userId });
+    const short = await ins("lots", { brewery_id: b.id, packaging_run_id: run.id, brand_id: brandId, code: "SHORT-LOT", packaged_on: "2026-09-01" });
+    const bin = await ins("bins", { brewery_id: b.id, location_id: whId, name: "Short shelf" });
+    await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: bin.id, lot_id: short.id, qty: 2, type: "opening_balance", created_by: adminCtx.userId });
+    const { order_id: id } = await runCommand("create_order", { kind: "wholesale", customerId, shipToId, fromLocationId: whId, lines: [{ skuId, qty: 3 }] }, adminCtx) as { order_id: string };
+    await runCommand("submit_order", { orderId: id }, adminCtx);
+    await runCommand("confirm_order", { orderId: id }, adminCtx);
+    const { data: line } = await admin.from("order_lines").select("id").eq("order_id", id).single();
+    await runCommand("record_pick", { orderId: id, picks: [{ lineId: line!.id, qty: 3 }] }, adminCtx);
+    await expect(runCommand("ship_order", { orderId: id, ship: [{ lineId: line!.id, qty: 3, sources: [{ binId: bin.id, lotId: short.id, qty: 3 }] }] }, adminCtx))
+      .rejects.toThrow("Not enough stock in the selected bin and lot: 2 on hand. Reduce the quantity or choose another source.");
+    // Once the bin's only lot is used up, an untracked removal has no lot to choose; it names the shortfall instead.
+    await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: bin.id, lot_id: short.id, qty: -2, type: "adjustment", created_by: adminCtx.userId });
+    await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: bin.id, qty: 1, type: "opening_balance", created_by: adminCtx.userId });
+    await expect(runCommand("record_movement", { skuId, locationId: whId, binId: bin.id, qty: -99, type: "loss" }, adminCtx))
+      .rejects.toThrow("Not enough stock in the selected bin and lot: 1 on hand. Reduce the quantity or choose another source.");
+  });
+
   it("invoices accepted quantities and checks refused beer into its source lot once", async () => {
     const sh = await shipment(10, "on_delivery", lotId);
     const { routeId } = await runCommand("save_route", { deliveryDate: "2026-09-17", stops: [{ shipmentId: sh, stopNo: 1 }] }, adminCtx) as { routeId: string };
@@ -568,10 +589,17 @@ describe("route edges", () => {
     expect((await admin.from("invoice_lines").select("qty, unit_price_cents").eq("invoice_id", result.invoice_id).eq("kind", "sku")).data).toEqual([{ qty: 8, unit_price_cents: 12000 }]);
     expect((await admin.from("invoice_lines").select("qty, unit_price_cents").eq("invoice_id", result.invoice_id).eq("kind", "keg_deposit")).data).toEqual([{ qty: 8, unit_price_cents: 2500 }]);
     const { data: line } = await admin.from("order_lines").select("order_id").eq("id", orderLineId).single();
+    // A partly refused stop reads as delivered on the order page and in the Delivered filter (#1483).
+    const delivered = await runCommand("list_orders", { status: "delivered" }, adminCtx) as { rows: { id: string; shipments: { deliveries: { outcome: string }[] }[] }[] };
+    expect(delivered.rows.find((o) => o.id === line!.order_id)?.shipments[0].deliveries[0].outcome).toBe("partial");
+    expect((await runCommand("list_orders", { status: "shipped" }, adminCtx) as { rows: { id: string }[] }).rows.map((o) => o.id)).toContain(line!.order_id);
+    expect((await runCommand("get_order", { orderId: line!.order_id }, adminCtx) as { shipment: { deliveries: { outcome: string }[] } }).shipment.deliveries[0].outcome).toBe("partial");
     const { data: source } = await admin.from("inventory_movements").select("id, lot_id").eq("ref", line!.order_id).eq("type", "sale_removal").single();
     const { data: billed } = await admin.from("invoice_lines").select("id").eq("invoice_id", result.invoice_id).eq("kind", "sku").single();
     await runCommand("return_shipment", { invoiceId: result.invoice_id, locationId: whId, reason: "unsold", lines: [{ invoiceLineId: billed!.id, qty: 1, sources: [{ movementId: source!.id, binId: whBinId, qty: 1 }] }] }, adminCtx);
     expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, adminCtx)).toMatchObject([{ outstanding_qty: 2 }]);
+    // The check-in page defaults its return location to where the beer shipped from (#1504).
+    expect(await runCommand("get_invoice_return_sources", { deliveryId: stop!.id }, adminCtx)).toEqual([expect.objectContaining({ id: source!.id, location_id: whId })]);
     const warehouse = await makeStaffCtx(b.id, "warehouse");
     const input = { deliveryId: stop!.id, locationId: whId, lines: [{ orderLineId, sources: [{ movementId: source!.id, binId: whBinId, qty: 1, damaged: true }] }] };
     const requestId = crypto.randomUUID();

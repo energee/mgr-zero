@@ -8,7 +8,6 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { ScopePick } from "@/components/mgr/scope-pick";
 import type { OrdersListRowView, OrdersListViewModel } from "@/lib/mgr/orders-list-view";
-import { sentenceCase } from "@/lib/mgr/labels";
 import { ORDER_STATUSES } from "@/lib/mgr/order-status";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
 import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
@@ -22,7 +21,7 @@ const muted = (text: string) => <span key={text} className="text-muted-foregroun
 /** Lifecycle status, and staged restock as a second worded badge so color is never the only signal. */
 const statusCell = (row: OrdersListRowView) => (
   <span key="status" className="inline-flex flex-wrap gap-1.5">
-    {E.status(sentenceCase(row.status))}
+    {E.status(row.statusLabel)}
     {row.restock && E.status("Restock staged", "w")}
   </span>
 );

@@ -6,7 +6,7 @@ import { z } from "zod";
 import { qboStaffInvoiceLink, type QboInvoiceIdentity, type QboPushedIdentity, type QboStaffConnection } from "@/lib/mgr/qbo-ui";
 import type { Ctx } from "./registry";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
-import { ORDER_STATUSES, salesRoles, warehouseRoles } from "@/lib/mgr/order-status";
+import { ORDER_FILTERS, salesRoles, warehouseRoles } from "@/lib/mgr/order-status";
 import { hasAnyRole } from "@/lib/mgr/roles";
 import { PAYMENT_METHODS, REFUSAL_REASONS } from "@/lib/mgr/enums";
 import { isoDate } from "./packaging";
@@ -253,12 +253,15 @@ defineCommand({
 // ---- queries ----
 
 defineQuery({
-  name: "list_orders", description: "Orders newest-first, optionally by status and customer",
+  name: "list_orders", description: "Orders newest-first with each one's delivery stop outcome, optionally by status (delivered: shipped orders whose stop closed delivered or partly delivered) and customer",
   roles: [...readRoles],
-  input: z.object({ customerId: z.string().uuid().optional(), status: z.enum(ORDER_STATUSES).optional(), ...historyInput }),
+  input: z.object({ customerId: z.string().uuid().optional(), status: z.enum(ORDER_FILTERS).optional(), ...historyInput }),
   handler: async (ctx, i) => {
-    let q = ctx.db.from("orders").select("*, customers(name)").eq("brewery_id", ctx.breweryId).limit(i.limit + 1);
-    if (i.status) q = q.eq("status", i.status);
+    // Delivered is not an orders.status; it is a shipped order whose stop closed delivered or partial (#1483).
+    let q = ctx.db.from("orders").select(i.status === "delivered" ? "*, customers(name), shipments!inner(deliveries!inner(outcome))" : "*, customers(name), shipments(deliveries(outcome))")
+      .eq("brewery_id", ctx.breweryId).limit(i.limit + 1);
+    if (i.status === "delivered") q = q.eq("status", "shipped").in("shipments.deliveries.outcome", ["delivered", "partial"]);
+    else if (i.status) q = q.eq("status", i.status);
     if (i.customerId) q = q.eq("customer_id", i.customerId);
     return historyResult(await unwrap(newestFirst(q, i.cursor)) as HistoryRow[], i.limit);
   },
@@ -303,7 +306,7 @@ defineQuery({
       completeRows("Order lines", start => ctx.db.from("order_lines").select("*, skus(name, brands(name, alias), formats(name))", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId).order("sku_id").range(start, start + PAGE_SIZE - 1)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
-      unwrap(ctx.db.from("shipments").select().eq("order_id", i.orderId).maybeSingle()),
+      unwrap(ctx.db.from("shipments").select("*, deliveries(outcome)").eq("order_id", i.orderId).maybeSingle()),
       completeRows("Order deposits", start => ctx.db.from("order_deposit_lines")
         .select("id, order_line_id, description, qty_ordered, unit_price_cents, amount_cents", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId).order("id").range(start, start + PAGE_SIZE - 1)),
@@ -496,7 +499,7 @@ defineQuery({
   },
 });
 
-export type ReturnSource = { id: string; sku_id: string; qty: number; lot_id: string | null; lots: { code: string } | null; bins: { name: string } | null };
+export type ReturnSource = { id: string; sku_id: string; qty: number; lot_id: string | null; location_id: string; lots: { code: string } | null; bins: { name: string } | null };
 defineQuery({
   name: "get_invoice_return_sources", description: "Original shipped movements available as explicit return identities",
   roles: ["admin", "warehouse", "sales"], input: z.object({ invoiceId: z.string().uuid().optional(), deliveryId: z.string().uuid().optional() }).refine((i) => Boolean(i.invoiceId) !== Boolean(i.deliveryId), "Choose an invoice or delivery"),
@@ -507,7 +510,7 @@ defineQuery({
     if (!invoice?.shipment_id) return [];
     const shipment = await unwrap(ctx.db.from("shipments").select("order_id").eq("id", invoice.shipment_id).single());
     if (!shipment) throw new Error("Shipment not found");
-    return await completeRows("Shipped sources", start => ctx.db.from("inventory_movements").select("id,sku_id,qty,lot_id,lots(code),bins(name)", { count: "exact" })
+    return await completeRows("Shipped sources", start => ctx.db.from("inventory_movements").select("id,sku_id,qty,lot_id,location_id,lots(code),bins(name)", { count: "exact" })
       .eq("brewery_id", ctx.breweryId).eq("ref", shipment.order_id).eq("type", "sale_removal").order("id").range(start, start + PAGE_SIZE - 1)) as unknown as ReturnSource[];
   },
 });

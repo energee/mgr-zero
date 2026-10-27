@@ -61,12 +61,15 @@ describe("Pick sheet view loop", () => {
     expect(html()).not.toContain("changed after pick");
   });
 
-  it("a row that is no longer confirmed has no verb; it is a row link, not an Open verb (#1026)", () => {
-    const orders = pickSheet.orders.map((o, i) => i === 1 ? { ...o, status: "picked" } : o);
+  it("every row's verb opens the page that does the work: Pick, Ship, Complete transfer or Put back (#1503)", () => {
+    const orders = pickSheet.orders.map((o, i) => i === 1 ? { ...o, status: "picked" } : i === 2 ? { ...o, status: "picked", needs_restock: true } : o);
     const model = toPickSheetViewProps({ orders });
-    expect(model.groups[0]!.rows.map((r) => r.verb)).toEqual(["Pick", undefined, "Pick"]);
+    const id = (n: number) => `/orders/00000000-0000-4000-8000-00000000023${n}`;
+    expect(model.groups[0]!.rows.map((r) => [r.verb, r.actionHref])).toEqual([["Pick", `${id(1)}/pick`], ["Ship", `${id(2)}/ship`], ["Put back", `${id(4)}/restock`]]);
+    const transfer = toPickSheetViewProps({ orders: [{ ...pickSheet.orders[0]!, status: "picked", kind: "taproom_transfer" }] });
+    expect(transfer.groups[0]!.rows.map((r) => [r.verb, r.actionHref])).toEqual([["Complete transfer", `${id(1)}/complete`]]);
     const markup = html(model, { linkRows: true });
-    expect(markup).toMatch(/<a[^>]*href="\/orders\/00000000-0000-4000-8000-000000000232"[^>]*>(?:(?!<\/a>)[\s\S])*Al’s Bar · ORD-0232/);
+    expect(markup).toMatch(/<a[^>]*href="\/orders\/00000000-0000-4000-8000-000000000232\/ship"/);
     expect(markup).not.toMatch(/>Open</);
   });
 
@@ -91,7 +94,7 @@ describe("Pick sheet view loop", () => {
   it("hides the weekday chips when filters is null and links rows when asked", () => {
     const markup = html(toPickSheetViewProps(pickSheet), { filters: null, linkRows: true });
     expect(markup).not.toMatch(/Thu 9\/3/);
-    expect(markup).toMatch(/href="\/orders\/00000000-0000-4000-8000-000000000231"/);
+    expect(markup).toMatch(/href="\/orders\/00000000-0000-4000-8000-000000000231\/pick"/);
   });
 
   it("the Pick sheet inventory record is PickSheetView painted from that fixture", () => {

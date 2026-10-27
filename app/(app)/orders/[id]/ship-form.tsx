@@ -30,6 +30,20 @@ export function buildShipLines(lines: ShippingSnapshot["lines"], qtys: Record<st
   }));
 }
 
+/** Ship's starting sources (#1504): a line starts with one source when exactly
+ *  one recorded bin and lot holds its whole quantity; any other line waits for
+ *  the user to choose. A transfer's only destination bin, if it has just one,
+ *  is chosen too. */
+export function defaultShipAllocations(lines: ShippingSnapshot["lines"], qtys: Record<string, string>, available: ShipSources): ShipmentAllocations {
+  const toBinId = available.destinationBins.length === 1 ? available.destinationBins[0].id : "";
+  return Object.fromEntries(lines.flatMap(line => {
+    const quantity = Number(qtys[line.id]);
+    const covering = available.stock.filter(stock => stock.stock_id === line.sku_id && stock.qty >= quantity);
+    if (!(quantity > 0) || covering.length !== 1) return [];
+    return [[line.id, [{ key: `${covering[0].bin_id}:${covering[0].lot_id ?? ""}`, qty: String(quantity), toBinId }]]];
+  }));
+}
+
 /** Missing source details, including totals and duplicate bin/lot selections. */
 export function shipmentSourceNeeds(lines: ShippingSnapshot["lines"], qtys: Record<string, string>, allocations: ShipmentAllocations, available: ShipSources, transfer: boolean): string[] {
   return lines.flatMap(line => {
@@ -38,7 +52,8 @@ export function shipmentSourceNeeds(lines: ShippingSnapshot["lines"], qtys: Reco
     const name = line.skus?.name ?? "Line";
     const rows = allocations[line.id] ?? [];
     const missing: string[] = [];
-    if (!rows.length || rows.some(row => !available.stock.some(stock => stock.stock_id === line.sku_id && `${stock.bin_id}:${stock.lot_id ?? ""}` === row.key))) {
+    if (!available.stock.some(stock => stock.stock_id === line.sku_id)) missing.push(`recorded stock of ${name} in a bin at the ship-from location`);
+    else if (!rows.length || rows.some(row => !available.stock.some(stock => stock.stock_id === line.sku_id && `${stock.bin_id}:${stock.lot_id ?? ""}` === row.key))) {
       missing.push(`a source bin and lot for ${name}`);
     }
     const validQuantities = rows.every(row => row.qty.trim() !== "" && Number.isFinite(Number(row.qty)) && Number(row.qty) > 0);
@@ -63,9 +78,9 @@ export function shippedLines(lines: ShippingSnapshot["lines"], ship: ReturnType<
 export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; available: ShipSources }) {
   const router = useRouter();
   const transfer = snapshot.order.kind === "taproom_transfer";
-  const { busy, error, run } = useCommandAction();
-  const [allocations, setAllocations] = useState<ShipmentAllocations>({});
+  const { busy, error, setError, run } = useCommandAction();
   const [qtys, setQtys] = useState<Record<string, string>>(() => Object.fromEntries(snapshot.lines.map(line => [line.id, String(line.qty_picked ?? 0)])));
+  const [allocations, setAllocations] = useState<ShipmentAllocations>(() => defaultShipAllocations(snapshot.lines, qtys, available));
   const [reasons, setReasons] = useState<Record<string, string>>(() => Object.fromEntries(snapshot.lines.map(line => [line.id, line.short_reason ?? ""])));
   const [carrier, setCarrier] = useState("");
   const [tracking, setTracking] = useState("");
@@ -80,9 +95,10 @@ export function ShipForm({ snapshot, available }: { snapshot: ShippingSnapshot; 
       key: `${stock.bin_id}:${stock.lot_id ?? ""}`,
       label: `${available.bins.find(bin => bin.id === stock.bin_id)?.name ?? stock.bin_id} · ${stock.lot_code ?? "Untracked / legacy stock"} · ${stock.qty} available`,
     })),
-  }))} allocations={allocations} onChange={setAllocations} destinationBins={available.destinationBins} disabled={busy} />;
+  }))} allocations={allocations} onChange={value => { setError(null); setAllocations(value); }} destinationBins={available.destinationBins} disabled={busy} />;
   const reason = submitReason(shipmentSourceNeeds(snapshot.lines, qtys, allocations, available, transfer));
-  const onQuantity = (id: string, value: string) => setQtys(prev => ({ ...prev, [id]: value }));
+  // A refused ship's error describes the old quantities; editing them clears it (#1385).
+  const onQuantity = (id: string, value: string) => { setError(null); setQtys(prev => ({ ...prev, [id]: value })); };
   const messages = <CommandFormMessage error={error} />;
   if (result) return <ShipmentDoneView model={result} />;
   return <form className="contents" onSubmit={event => {

@@ -2,6 +2,7 @@ export type InventoryMovement = {
   id: string; sku_id: string; location_id: string; bin_id: string; lot_id: string | null;
   qty: number; bbl: number; package_type: string; type: string; created_at: string; note: string | null;
   ref: string | null; source_movement_id: string | null; compensates_id: string | null; reversed_by: string | null;
+  ref_label?: string | null;
   sale_channel_id: string | null; tax_treatment: string | null; dest_state: string | null;
   locations: { name: string } | null; bins: { name: string } | null; lots: { code: string } | null;
 };

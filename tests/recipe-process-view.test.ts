@@ -1,6 +1,6 @@
 // tests/recipe-process-view.test.ts — draft helpers for the schedule sheets (issue #278).
 import { describe, expect, it } from "vitest";
-import { fermentationSummary, ingredientDetail, ionReadout, mashRowSummary, mashStepDetail, mashSummary, moveItem, perBblDisplay, processReadout, profileIons, splitByStage, suggestAdditions, upsertAt, waterAdditionDetail, waterRowSummary, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
+import { fermentationSummary, fromIngredientFields, ingredientDetail, ingredientReason, mashStepReason, stageReason, toIngredientFields, ionReadout, mashRowSummary, mashStepDetail, mashSummary, moveItem, perBblDisplay, processReadout, profileIons, splitByStage, suggestAdditions, upsertAt, waterAdditionDetail, waterRowSummary, type FermentationStage, type MashStep, type SaltMaterial, type WaterDraft } from "@/lib/mgr/recipe-process-view";
 
 const mash: MashStep[] = [
   { name: "Mash-in", kind: "infusion", tempF: 104, minutes: 15 },
@@ -36,7 +36,9 @@ describe("schedule drafts", () => {
     expect(fermentationSummary(ferm, 9)).toBe("Total 6 days · dry hop day 9 is after the last stage.");
   });
   it("an ingredient row names its stage in sentence case, as the Stage pick does (#1139)", () => {
-    expect(ingredientDetail("dry_hop", 4, "1.2", "lb")).toBe("Dry hop · 4 min · 1.2 lb / bbl");
+    expect(ingredientDetail("whirlpool", 4, "1.2", "lb")).toBe("Whirlpool · 4 min · 1.2 lb / bbl");
+    // Fermentation and dry hop are timed in days from the start of fermentation (#1478).
+    expect(ingredientDetail("dry_hop", 3 * 1440, "1.2", "lb")).toBe("Dry hop · day 3 · 1.2 lb / bbl");
     expect(ingredientDetail("mash", null, "40.9")).toBe("Mash · 40.9 / bbl");
   });
   it("a water addition row reads its amount and its stage in sentence case (#1139)", () => {
@@ -119,5 +121,32 @@ describe("water suggestions", () => {
     const na = rows.find((r) => r.ion === "Sodium")!;
     expect(na.detail).toContain("+0");
     expect(na.detail).not.toContain("−0");
+  });
+});
+
+describe("ingredient timing and schedule rows (#1478)", () => {
+  const limits = { boilMinutes: 60, fermentationDays: 14 };
+  it("takes fermentation and dry-hop timing in whole days and stores minutes", () => {
+    const fields = toIngredientFields({ materialId: "hop", perBblQty: "1", stage: "dry_hop", timingMinutes: String(3 * 1440) });
+    expect(fields.timing).toBe("3");
+    expect(fromIngredientFields({ ...fields, timing: "5" }).timingMinutes).toBe(String(5 * 1440));
+    expect(fromIngredientFields({ ...fields, stage: "boil", timing: "15" }).timingMinutes).toBe("15");
+  });
+  it("names timing outside the stage's range or in exponent notation", () => {
+    const f = (stage: "boil" | "dry_hop" | "mash", timing: string) => ingredientReason({ materialId: "m", perBblQty: "1", stage, timing }, limits);
+    expect(f("boil", "-5")).toBe("Still needed: boil timing from 0 to 60 minutes.");
+    expect(f("boil", "61")).toBe("Still needed: boil timing from 0 to 60 minutes.");
+    expect(f("mash", "1e1")).toBe("Still needed: mash timing from 0 to 1440 minutes.");
+    expect(f("dry_hop", "121")).toBe("Still needed: dry hop day from 0 to 120.");
+    expect(f("dry_hop", "2.5")).toBe("Still needed: dry hop day from 0 to 120.");
+    expect(f("dry_hop", "120")).toBeNull();
+    expect(f("boil", "")).toBeNull();
+  });
+  it("refuses exponent notation and out-of-range temperatures on mash steps and fermentation stages", () => {
+    expect(mashStepReason({ name: "Sacch", kind: "infusion", tempF: "152", minutes: "1e1" })).toBe("Still needed: a duration above zero.");
+    expect(mashStepReason({ name: "Sacch", kind: "infusion", tempF: "300", minutes: "60" })).toBe("Still needed: a temperature from 25 to 212 °F.");
+    expect(stageReason({ name: "Primary", kind: "primary", tempF: "68", days: "1e1" })).toBe("Still needed: a duration above zero.");
+    expect(stageReason({ name: "Primary", kind: "primary", tempF: "-10", days: "7" })).toBe("Still needed: a temperature from 25 to 212 °F.");
+    expect(stageReason({ name: "Primary", kind: "primary", tempF: "68", days: "7" })).toBeNull();
   });
 });

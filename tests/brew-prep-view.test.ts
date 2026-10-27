@@ -1,7 +1,7 @@
 // tests/brew-prep-view.test.ts — the brew prep pull list and the brew-day
 // timeline's pure rules (lib/mgr/brew-prep-view.ts).
 import { describe, expect, it } from "vitest";
-import { anyPulled, brewIngredients, confirmAll, brewPullsPayload, brewTargets, currentStage, isShort, laterAdditions, openBrewTab, prepReason, pullDetail, pullTone, sourceChoices, showsPacks, stageProgress, startAtPlan, timelineReason, timelineRecordPayload, timelineStages, timelineTone, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
+import { anyPulled, brewIngredients, confirmAll, brewPullsPayload, brewTargets, currentStage, isShort, laterAdditions, openBrewTab, prepReason, processErrors, pullDetail, pullTone, sourceChoices, showsPacks, stageProgress, startAtPlan, timelineReason, timelineRecordPayload, timelineStages, timelineTone, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { BrewMaterialSource, BrewPlan, BrewPull } from "@/lib/mgr/brew-day-view";
 
 const chit: BrewIngredient = startAtPlan({ key: "chit", name: "Chit Malt", materialId: "chit", stage: "mash", plan: 220, unit: "lb", packSize: 50, source: null });
@@ -69,6 +69,25 @@ describe("timeline", () => {
     expect(timelineReason(sourced)).toBeNull();
     expect(timelineReason({ ...sourced, ingredients: [oats, { ...hops, confirmed: true }] })).not.toBeNull();
     for (const patch of [{ initialBbl: "0" }, { initialBbl: "" }, { vesselId: "missing" }, { brewedOn: "" }]) expect(timelineReason({ ...sourced, ...patch })).not.toBeNull();
+  });
+  it("names each out-of-range or exponent process reading, the field and the reason from one check (#1476)", () => {
+    const bad: [string, string, string][] = [
+      ["targetMashPh", "3.9", "Enter a mash pH from 4 to 7."], ["targetMashPh", "7.1", "Enter a mash pH from 4 to 7."],
+      ["targetMashPh", "1e1", "Enter a decimal number, not exponent notation (for example, 1000 instead of 1e3)."],
+      ["boilMinutes", "-5", "Enter whole minutes, zero or more."], ["boilMinutes", "1.5", "Enter whole minutes, zero or more."],
+      ["knockoutTempF", "-500", "Enter a temperature from 25 to 212 °F."], ["knockoutTempF", "9999", "Enter a temperature from 25 to 212 °F."],
+      ["whirlpoolTempF", "300", "Enter a temperature from 25 to 212 °F."],
+      ["mashWaterGal", "0", "Enter an amount above zero."], ["spargeWaterGal", "-1", "Enter an amount of zero or more."],
+    ];
+    for (const [key, value, message] of bad) {
+      expect(processErrors({ [key]: value })).toEqual({ [key]: message });
+      expect(timelineReason({ ...sourced, process: { [key]: value } })).toBe("Still needed: process readings in range.");
+    }
+    expect(processErrors({ targetMashPh: "5.4", boilMinutes: "60", knockoutTempF: "66", whirlpoolTempF: "", spargeWaterGal: "0" })).toEqual({});
+  });
+  it("refuses knockout barrels above the vessel's capacity (#1476)", () => {
+    expect(timelineReason({ ...sourced, initialBbl: "26" })).toBe("Still needed: at most 25.5 bbl into FV1.");
+    expect(timelineReason({ ...sourced, initialBbl: "25.5" })).toBeNull();
   });
   it("refuses a pulled ingredient without a source, but not one pulled to zero", () => {
     expect(timelineReason(timeline)).not.toBeNull();

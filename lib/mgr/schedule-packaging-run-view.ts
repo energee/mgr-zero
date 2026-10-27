@@ -51,12 +51,14 @@ export const plannedQty = (value: string | undefined) => {
   return value && isNumber(value) && qty > 0 ? qty : 0;
 };
 
-/** Blank spare outputs are omitted; an entered quantity must never be silently dropped. */
-export function plannedOutputError(value: string, whole = false): string | undefined {
+/** A package count's error, planned (Schedule) or actual (Close, #1477): plain
+ *  notation, zero or more, whole kegs. Blank is no error here; each form says
+ *  whether a blank is allowed. */
+export function packageQtyError(value: string, whole = false): string | undefined {
   if (!value.trim()) return undefined;
   const notation = numberNotationError(value);
   if (notation) return notation;
-  if (!isNumber(value) || Number(value) < 0) return "Enter a planned quantity of zero or more.";
+  if (!isNumber(value) || Number(value) < 0) return "Enter a quantity of zero or more.";
   if (whole && !Number.isInteger(Number(value))) return "Enter a whole number of kegs.";
 }
 
@@ -65,7 +67,7 @@ export function scheduleRunReason(model: Pick<SchedulePackagingRunViewModel, "br
   if (!model.brandId) missing.push("a brand");
   if (!model.plannedOn) missing.push("a planned date");
   if (!model.outputs.some((output) => plannedQty(output.qty) > 0)) missing.push("a positive planned output quantity");
-  if (model.outputs.some(output => plannedOutputError(output.qty, output.whole))) missing.push("valid planned quantities (whole numbers for kegs)");
+  if (model.outputs.some(output => packageQtyError(output.qty, output.whole))) missing.push("valid planned quantities (whole numbers for kegs)");
   return submitReason(missing);
 }
 

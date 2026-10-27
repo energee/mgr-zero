@@ -96,6 +96,15 @@ describe("Order view loop", () => {
     expect(model.lines[0].warning).toBeTruthy();
   });
 
+  it("names a shipped order by its delivery stop, and the page passes the stop's outcome (#1483)", () => {
+    const shipped = { ...orderPickedRestock.order, status: "shipped" as const, needs_restock: false };
+    const delivered = toOrderViewProps({ ...orderPickedRestock, order: shipped, deliveryOutcome: "delivered" });
+    expect([delivered.currentState, delivered.next]).toEqual(["Delivered", "Next: none"]);
+    const open = toOrderViewProps({ ...orderPickedRestock, order: shipped, deliveryOutcome: null });
+    expect([open.currentState, open.next]).toEqual(["Shipped", "Next: delivered or returned"]);
+    expect(readFileSync(PAGE, "utf8")).toMatch(/deliveryOutcome: shipment\?\.deliveries\[0\]\?\.outcome \?\? null/);
+  });
+
   it("prints the requested ship date in the one date format (#991)", () => {
     const model = toOrderViewProps({ ...orderPickedRestock, order: { ...orderPickedRestock.order, requested_ship_date: "2026-09-14" } });
     expect(model.facts).toContainEqual({ label: "Requested ship date", value: "Sep 14, 2026" });
@@ -163,8 +172,11 @@ describe("Order view loop", () => {
       expect(html).toContain("$1,500.00 · margin 58.3%");
     });
 
-    it("withholds the margin and names the gap while any unit has no cost", () => {
-      expect(costLine({ cost_cents: 1000, revenue_cents: 24000, uncosted_qty: 2, margin_pct: null })).toBe("$10.00 · 2 units without cost, margin withheld");
+    it.each([[1, "1 unit"], [2, "2 units"], [1.5, "1.5 units"]] as const)("withholds the margin and names %s uncosted units (#1382)", (uncosted_qty, label) => {
+      const line = costLine({ cost_cents: 1000, revenue_cents: 24000, uncosted_qty, margin_pct: null });
+      expect(line).toContain("$10.00");
+      expect(line).toMatch(new RegExp(`\\b${label.replace(".", "\\.")}\\b`));
+      expect(line).toMatch(/margin.*withheld/i);
     });
 
     it("draws nothing without get_order_cogs data or before the order ships", () => {

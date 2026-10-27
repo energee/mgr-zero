@@ -18,6 +18,14 @@ or both, and are what an overdue reading notification is measured against. A
 reading must carry at least one of `tempF`, `gravityPlato` or `ph`; a note
 alone is refused with `400 invalid_input`.
 
+`create_recipe_version` checks each ingredient's `timingMinutes` against its
+stage, in minutes. Fermentation and dry hop take whole days, so send a multiple
+of 1440, up to 120 days or the fermentation schedule's total, whichever is
+longer. Boil takes up to `boilMinutes`, or one day when it is unset. Every other
+stage takes 0 to 1440. Mash and fermentation `tempF` values, and the whirlpool
+and knockout temperatures, take 25 to 212. A value outside these ranges returns
+`400 invalid_input` with the field's path.
+
 {/* ops:production */}
 
 ## cancel_batch [#cancel_batch]
@@ -120,7 +128,7 @@ Add the next version of a recipe: its mash and fermentation schedules, whirlpool
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_recipe_version", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "recipeId": "00000000-0000-0000-0000-000000000000", "mashSchedule": [ { "name": "string", "kind": "infusion", "tempF": 1, "minutes": 1 } ], "brewhouseEfficiency": 1, "yeastAttenuation": 1, "ingredients": [ { "materialId": "00000000-0000-0000-0000-000000000000", "perBblQty": 1, "stage": "mash" } ] } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_recipe_version", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "recipeId": "00000000-0000-0000-0000-000000000000", "mashSchedule": [ { "name": "string", "kind": "infusion", "tempF": 25, "minutes": 1 } ], "brewhouseEfficiency": 1, "yeastAttenuation": 1, "ingredients": [ { "materialId": "00000000-0000-0000-0000-000000000000", "perBblQty": 1, "stage": "mash" } ] } }'
 ```
 
 ## delete_vessel [#delete_vessel]

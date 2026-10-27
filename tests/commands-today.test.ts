@@ -83,7 +83,7 @@ describe("get_today (registered reader)", () => {
     const item = (await today(warehouse, "2000-01-01T00:00:00Z")).find((i) => i.subjectId === id);
     expect(item).toMatchObject({
       reason: "pick_due", subjectType: "order", subjectId: id, dueAt: null,
-      detail: "pick due · no ship date", href: `/orders/${id}`,
+      detail: "pick due · no ship date", href: `/orders/${id}/pick`,
       recipientRoles: ["admin", "warehouse"],
     });
     expect((await today(adminCtx, "2000-01-01T00:00:00Z")).find((i) => i.subjectId === id)).toEqual(item);
@@ -95,7 +95,7 @@ describe("get_today (registered reader)", () => {
     expect(picks.findIndex((i) => i.subjectId === dated)).toBeLessThan(picks.findIndex((i) => i.subjectId === id));
     expect(picks.at(-1)?.subjectId).toBe(id);
     const work = await runCommand("list_work", {}, warehouse) as WorkRow[];
-    expect(work.find((r) => r.href === `/orders/${id}`)).toMatchObject({
+    expect(work.find((r) => r.href === `/orders/${id}/pick`)).toMatchObject({
       kind: "orders", verb: "Pick", dueAt: null, detail: "pick due · no ship date",
     });
   });
@@ -104,7 +104,8 @@ describe("get_today (registered reader)", () => {
     const id = await createOrder("2026-09-06", true);
     const item = (await today(sales, "2026-09-06T12:00:00Z")).find((i) => i.subjectId === id)!;
     expect(item.safeLabel).toMatch(/^ORD-\d{4,}$/);
-    expect(item.href).toBe(`/orders/${id}`);
+    // Today opens the page that does the work: Review and confirm (#1503).
+    expect(item.href).toBe(`/orders/${id}/confirm`);
     expect(item.subjectType).toBe("order");
     expect(item.recipientRoles).toEqual(["admin", "sales"]);
     expect(item.assignedUserId).toBeNull();
@@ -188,6 +189,19 @@ describe("get_today (registered reader)", () => {
     expect((await today(warehouse, "2026-09-07T12:00:00Z")).find((i) => i.reason === "pick_due" && i.subjectId === id)).toBeUndefined();
   });
 
+  it("moves a fully picked order from pick_due to ship_due until it ships (#1514)", async () => {
+    const id = await createOrder("2026-09-07", true, true);
+    const { data: line } = await admin.from("order_lines").select("id").eq("order_id", id).single();
+    await adminCtx.db.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line!.id, qty_picked: 1 }], p_request_id: crypto.randomUUID() });
+    const rows = async (ctx: CommandCtx) => (await today(ctx, "2026-09-07T12:00:00Z")).filter((i) => i.subjectId === id);
+    expect(await rows(warehouse)).toEqual([expect.objectContaining({
+      reason: "ship_due", href: `/orders/${id}/ship`, detail: "ship due · ships Sep 7, 2026", recipientRoles: ["admin", "warehouse"],
+    })]);
+    expect(await rows(sales)).toEqual([]);
+    await sql.query("update orders set status = 'shipped' where id = $1", [id]);
+    expect(await rows(warehouse)).toEqual([]);
+  });
+
   it("rejects customers", async () => {
     const customerUser = await makeCustomerUser(customerId);
     const ctx = { db: await asUser(customerUser.email), userId: customerUser.id, breweryId: b.id, roles: ["customer" as const], customerId };
@@ -252,6 +266,9 @@ describe("today candidates (shared projection) and internal scan", () => {
     const { data: line } = await admin.from("order_lines").select("id").eq("order_id", restocked).single();
     await adminCtx.db.rpc("record_pick", { p_order: restocked, p_picks: [{ line_id: line!.id, qty_picked: 1 }], p_request_id: crypto.randomUUID() });
     await adminCtx.db.rpc("adjust_order_lines", { p_order: restocked, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason: "cut", p_request_id: crypto.randomUUID() });  // restock_due
+    const picked = await createOrder("2026-09-05", true, true);
+    const { data: pickedLine } = await admin.from("order_lines").select("id").eq("order_id", picked).single();
+    await adminCtx.db.rpc("record_pick", { p_order: picked, p_picks: [{ line_id: pickedLine!.id, qty_picked: 1 }], p_request_id: crypto.randomUUID() });  // ship_due
     const shipped = await createOrder("2026-09-05", true, true);
     const ship = await ins("shipments", { brewery_id: b.id, order_id: shipped, created_by: adminCtx.userId });
     const gateRoute = await ins("routes", { brewery_id: b.id, name: "Gate", delivery_date: "2026-09-05", departed_at: "2026-09-05T12:00:00Z" });
@@ -262,7 +279,8 @@ describe("today candidates (shared projection) and internal scan", () => {
     const scanned = (await sql.query("select distinct reason from public.scan_chat_today_candidates($1, $2)", [b.id, "2026-09-10T12:00:00Z"])).rows.map((r) => r.reason).sort();
     expect(scanned).toEqual(["delivery_next", "fermentation_reading_overdue", "pick_due", "restock_due", "submitted_order"]);
     const reasons = new Set((await today(adminCtx, "2026-09-10T12:00:00Z")).map((i) => i.reason));
-    expect([...reasons].sort()).toEqual(["delivery_next", "fermentation_reading_overdue", "pick_due", "restock_due", "submitted_order"]);
+    // ship_due is Today-only, like refused_return: not a live reason, so chat never scans it (#1514).
+    expect([...reasons].sort()).toEqual(["delivery_next", "fermentation_reading_overdue", "pick_due", "restock_due", "ship_due", "submitted_order"]);
 
     // The cellar reading page ships, so a brewer now sees the overdue vessel.
     // arrayContaining: other tests may leave further overdue vessels behind.

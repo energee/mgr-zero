@@ -90,6 +90,16 @@ describe("search_entities", () => {
     await expect(search("ORD-99999999999999999999")).resolves.toEqual([]);
     await expect(search("INV-2147483648")).resolves.toEqual([]);
   });
+  it("a batch number returns the batch with its brand (#1473)", async () => {
+    const brand = await ins("brands", { brewery_id: b.id, name: "Batch Brand" });
+    const batch = await ins<{ id: string; batch_no: number }>("batches", { brewery_id: b.id, intended_brand_id: brand.id, planned_on: "2026-09-01", planned_bbl: 15, created_by: adminCtx.userId });
+    const hits = await search(`b-${batch.batch_no}`, adminCtx, ["batch"]);
+    expect(hits).toEqual([expect.objectContaining({ kind: "batch", id: batch.id, href: `/batches/${batch.id}` })]);
+    expect(hits[0].label).toContain("Batch Brand");
+  });
+  it("status and kind details read in sentence case (#1473)", async () => {
+    expect((await search("ORD-0001", adminCtx, ["order"]))[0].detail).toBe("Draft");
+  });
 
   it("kinds narrow the search and never widen it", async () => {
     const hits = await search("Haz", adminCtx, ["customer"]);

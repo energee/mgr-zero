@@ -161,7 +161,7 @@ describe("Monthly compliance view", () => {
   it("names which loss each review row is, since a batch can have several (#485)", () => {
     const [completion] = monthlyComplianceAugust.losses;
     const model = toMonthlyComplianceViewProps({ ...monthlyComplianceAugust, losses: [completion, { ...completion, adjustment_id: "loss-transfer", kind: "transfer", closed_at: null }] });
-    expect(model.losses.map((loss) => loss.title)).toEqual(["Batch 1042 · completion loss", "Batch 1042 · transfer loss"]);
+    expect(model.losses.map((loss) => loss.title)).toEqual(["B-1042 · completion loss", "B-1042 · transfer loss"]);
   });
 
   it("the live route mounts the shared view and slots both mutation controls", () => {

@@ -14,9 +14,11 @@ import { gravityBlockers, type GravityBlocker } from "@/lib/recipe-gravity";
 import { formatGravity, type GravityUnit } from "./gravity-unit";
 import { splitPacks, withPacks } from "./pack-qty";
 import { plural } from "./plural";
-import { fromTicks, toTicks } from "./quantity-input";
+import { fromTicks, isNumber, numberNotationError, toTicks } from "./quantity-input";
+import { sentenceCase } from "./labels";
+import { READING_BOUNDS } from "@/lib/composer/offline-policy";
 import {
-  fermentationSummary, ingredientDetail, isBrewDayStage, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, processReadout, waterAdditionDetail,
+  fermentationSummary, ingredientDetail, isBrewDayStage, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, processReadout, scheduleDays, timingOutOfRange, toIngredientFields, waterAdditionDetail,
   type FermentationStage, type IngredientLine, type IngredientStage, type MashStep, type ProcessColumns, type RecipeMaterial, type WaterDraft,
 } from "./recipe-process-view";
 /** A brew-day line's per-bbl amount, its material's pack size (base units per pack; 1 = no pack) and base unit. */
@@ -137,14 +139,36 @@ export function versionToDraft(s: RecipeSnapshot): RecipeDraft | null {
 /** A percent field's text is usable when it is above 0 and at most 100. */
 const validPercent = (s: string) => Number(s) > 0 && Number(s) <= 100;
 
+/** A typed optional process number: blank, or plain notation that passes `ok`. */
+const optionalOk = (s: string | undefined, ok: (n: number) => boolean) =>
+  !s?.trim() || (!numberNotationError(s) && isNumber(s) && ok(Number(s)));
+const inTempRange = (n: number) => n >= READING_BOUNDS.tempF.min && n <= READING_BOUNDS.tempF.max;
+const wholeAtLeast = (min: number) => (n: number) => Number.isInteger(n) && n >= min;
+
 /** The first thing a draft still needs before it can be saved, or null when it is ready.
- * `name` is the new recipe's name and is passed only when the recipe is being created. */
-export function draftBlocker(input: { name?: string; lines: IngredientLine[]; mashSchedule: MashStep[]; efficiency: string; attenuation: string }): string | null {
+ * `name` is the new recipe's name and is passed only when the recipe is being created. The process numbers and each
+ * line's timing are checked against create_recipe_version's bounds, because a cut version cannot be edited (#1478). */
+export function draftBlocker(input: {
+  name?: string; lines: IngredientLine[]; mashSchedule: MashStep[]; efficiency: string; attenuation: string;
+  numbers?: Partial<Record<RecipeNumberKey, string>>; fermentationSchedule?: FermentationStage[];
+}): string | null {
+  const n = input.numbers ?? {};
   if (input.name !== undefined && input.name.trim() === "") return "Give the recipe a name.";
   if (!input.lines.some(lineReady)) return "Add an ingredient with a quantity per bbl.";
   if (input.mashSchedule.length === 0) return "Add a mash step.";
   if (!validPercent(input.efficiency)) return "Set brewhouse efficiency between 0 and 100%.";
   if (!validPercent(input.attenuation)) return "Set yeast attenuation between 0 and 100%.";
+  if (!optionalOk(n.preBoil, (v) => v > 0)) return "Set pre-boil volume above zero.";
+  if (!optionalOk(n.boilMin, wholeAtLeast(1))) return "Set boil time in whole minutes above zero.";
+  if (!optionalOk(n.whirlpoolMin, wholeAtLeast(0))) return "Set whirlpool time in whole minutes, zero or more.";
+  if (!optionalOk(n.whirlpoolRest, wholeAtLeast(0))) return "Set whirlpool rest in whole minutes, zero or more.";
+  if (!optionalOk(n.whirlpoolTemp, inTempRange)) return "Set whirlpool temperature from 25 to 212 °F.";
+  if (!optionalOk(n.knockoutTemp, inTempRange)) return "Set knockout temperature from 25 to 212 °F.";
+  const limits = { boilMinutes: n.boilMin?.trim() ? Number(n.boilMin) : undefined, fermentationDays: scheduleDays(input.fermentationSchedule ?? []) };
+  for (const line of input.lines.filter((l) => l.materialId)) {
+    const range = timingOutOfRange(line.stage, toIngredientFields(line).timing, limits);
+    if (range) return `Fix the ${sentenceCase(line.stage).toLowerCase()} timing: enter ${range.days ? `day 0 to ${range.max}` : `0 to ${range.max} minutes`}.`;
+  }
   return null;
 }
 

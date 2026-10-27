@@ -46,7 +46,8 @@ export function ConfirmOrderForm({ snapshot }: { snapshot: ConfirmOrderSnapshot 
         <Button type="button" disabled={action.busy} onClick={() => void action.run("confirm_order", { orderId }, (data) => {
           const next = atpWarnings(data);
           if (next.length > 0) return setWarnings(next);
-          router.push("/orders");
+          // A clean confirm lands on the order, whose next step is Pick (#1503).
+          router.push(`/orders/${orderId}`);
           router.refresh();
         }, { refresh: false })}>{action.busy ? "Confirming…" : "Confirm order"}</Button>
         <CancelOrderDialog orderId={orderId} action={action} trigger={<Button variant="destructive" disabled={action.busy}>Cancel order</Button>} onCancelled={() => router.push("/orders")} />

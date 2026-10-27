@@ -12,6 +12,7 @@ import { canRun, defineQuery, unwrap, type Ctx } from "./registry";
 import { formatDate } from "@/lib/date-format";
 import { docNo, poNo, batNo } from "@/lib/mgr/doc-no";
 import { escapeRegex } from "@/lib/escape-regex";
+import { sentenceCase } from "@/lib/mgr/labels";
 import { SEARCH_QUERY_MAX_LENGTH } from "@/lib/mgr/search-view";
 
 export const SEARCH_KINDS = ["sku", "order", "invoice", "lot", "customer", "po", "batch", "material_lot"] as const;
@@ -76,21 +77,21 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
     case "order": {
       if (n === null) return [];
       const rows = await unwrap(ctx.db.from("orders").select("id, order_no, status, customers(name)").eq("brewery_id", b).eq("order_no", n)) as Row[];
-      return rows.map((r) => hit(r.id as string, `${docNo("ORD", r.order_no as number, "Order")} · ${(r.customers as { name: string } | null)?.name ?? "transfer"}`, r.status as string, `/orders/${r.id}`, true));
+      return rows.map((r) => hit(r.id as string, `${docNo("ORD", r.order_no as number, "Order")} · ${(r.customers as { name: string } | null)?.name ?? "transfer"}`, sentenceCase(r.status as string), `/orders/${r.id}`, true));
     }
     case "invoice": {
       if (n === null) return [];
       const rows = await unwrap(ctx.db.from("invoices").select("id, invoice_no, kind, customers(name)").eq("brewery_id", b).eq("invoice_no", n)) as Row[];
-      return rows.map((r) => hit(r.id as string, `${docNo("INV", r.invoice_no as number, "Invoice")} · ${(r.customers as { name: string } | null)?.name ?? ""}`, r.kind as string, `/invoices/${r.id}`, true));
+      return rows.map((r) => hit(r.id as string, `${docNo("INV", r.invoice_no as number, "Invoice")} · ${(r.customers as { name: string } | null)?.name ?? ""}`, sentenceCase(r.kind as string), `/invoices/${r.id}`, true));
     }
     case "po": {
       if (n === null) return [];
       const rows = await unwrap(ctx.db.from("purchase_orders").select("id, po_no, status, vendors(name)").eq("brewery_id", b).eq("po_no", n)) as Row[];
-      return rows.map((r) => hit(r.id as string, `${poNo(r.po_no as number)} · ${(r.vendors as { name: string } | null)?.name ?? ""}`, r.status as string, `/purchase-orders/${r.id}`, true));
+      return rows.map((r) => hit(r.id as string, `${poNo(r.po_no as number)} · ${(r.vendors as { name: string } | null)?.name ?? ""}`, sentenceCase(r.status as string), `/purchase-orders/${r.id}`, true));
     }
     case "batch": {
       if (n === null) return [];
-      const rows = await unwrap(ctx.db.from("batches").select("id, batch_no, planned_on, brands:intended_brand_id(name)").eq("brewery_id", b).eq("batch_no", n)) as Row[];
+      const rows = await unwrap(ctx.db.from("batches").select("id, batch_no, planned_on, brands!batches_intended_brand_id_brewery_id_fkey(name)").eq("brewery_id", b).eq("batch_no", n)) as Row[];
       return rows.map((r) => hit(r.id as string, `${batNo(r.batch_no as number)} · ${(r.brands as { name: string } | null)?.name ?? ""}`, `planned ${formatDate(r.planned_on as string)}`, `/batches/${r.id}`, true));
     }
   }

@@ -16,6 +16,8 @@ import { getColaDetails, getColaImage, isColaImageUrl, matchColas, searchColasBy
 import type { ColaDetails, ColaRecord } from "@/lib/ttb/colas";
 import { breweryToday, CommandError, completeRows, defineCommand, defineQuery, PAGE_SIZE, rows, STAFF_ROLES, stateCode, unwrap } from "./registry";
 import type { Ctx } from "./registry";
+import { requireAdmission } from "./admission";
+import { movementReferences } from "./inventory";
 
 const ROLES = ["admin", "sales"] as const;
 // The three registry upserts below keep a saved value when the caller omits
@@ -158,6 +160,7 @@ defineQuery({
     const label = { p_brewery: ctx.breweryId, p_ttb_id: i.ttbId, p_image_url: i.url };
     const stored = await unwrap(ctx.db.rpc("get_stored_cola_label_image", label));
     if (stored) return { dataUrl: stored };
+    await requireAdmission(ctx.db);
     const image = await getColaImage(i.ttbId, i.url, permit).catch(colaUpstreamError);
     await (await import("@/lib/supabase/cola-label-images")).storeColaLabelImage(ctx.breweryId, i.ttbId, i.url, image.dataUrl);
     return image;
@@ -333,10 +336,22 @@ defineQuery({
       unwrap(ctx.db.rpc("trace_lot_ingredients", { p_brewery: ctx.breweryId, p_lot: i.lotId })),
     ]);
     const orderIds = [...new Set(movements.filter(m => m.type === "sale_removal" && m.ref).map(m => m.ref!))];
-    const recipients = await recipientsFor(ctx, orderIds);
+    const [recipients, references] = await Promise.all([
+      recipientsFor(ctx, orderIds),
+      movementReferences(ctx, movements.map(movement => movement.ref)),
+    ]);
     const run = lot.packaging_runs;
     const occ = run?.vessel_occupancies;
-    const moves = movements.map((m) => ({ id: m.id, type: m.type, qty: Number(m.qty), bbl: Number(m.bbl), sku_id: m.sku_id, bin_id: m.bin_id, bin: m.bins?.name ?? "", ref: m.ref, source_movement_id: m.source_movement_id, created_at: m.created_at, sku: m.skus?.name ?? "", location: m.locations?.name ?? "" }));
+    const moves = movements.map((m) => {
+      const reference = references.get(m.ref ?? "");
+      return {
+        id: m.id, type: m.type, qty: Number(m.qty), bbl: Number(m.bbl),
+        sku_id: m.sku_id, bin_id: m.bin_id, bin: m.bins?.name ?? "",
+        ref: m.ref, ref_label: reference?.ref_label ?? null, ref_kind: reference?.ref_kind ?? null,
+        source_movement_id: m.source_movement_id, created_at: m.created_at,
+        sku: m.skus?.name ?? "", location: m.locations?.name ?? "",
+      };
+    });
     const balances = new Map<string, { sku_id: string; sku: string; bin_id: string; bin: string; location: string; qty: number; bbl: number }>();
     for (const m of moves) {
       const key = `${m.sku_id}:${m.bin_id}`;

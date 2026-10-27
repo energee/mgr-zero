@@ -107,6 +107,20 @@ describe("recipes and immutable versions", () => {
       note: "Original",
     };
     const first = await runCommand("create_recipe_version", input, ctx) as { id: string };
+    // A cut version cannot be edited, so impossible process values are refused up front (#1478).
+    for (const bad of [
+      { process: { whirlpoolTempF: 5000 } }, { process: { knockoutTempF: -300 } },
+      { mashSchedule: [{ name: "Rest", kind: "infusion", tempF: 400, minutes: 60 }] },
+      { boilMinutes: 60, ingredients: [{ materialId: hop, perBblQty: 1, stage: "boil", timingMinutes: 90 }] },
+      { ingredients: [{ materialId: hop, perBblQty: 1, stage: "boil", timingMinutes: -5 }] },
+      { ingredients: [{ materialId: hop, perBblQty: 1, stage: "dry_hop", timingMinutes: 121 * 1440 }] },
+      { ingredients: [{ materialId: hop, perBblQty: 1, stage: "dry_hop", timingMinutes: 100 }] },
+    ]) {
+      await expect(runCommand("create_recipe_version", { ...input, ...bad }, ctx)).rejects.toMatchObject({ status: 400 });
+    }
+    const long = [{ name: "Primary", kind: "primary", tempF: 68, days: 30 }, { name: "Barrel", kind: "conditioning", tempF: 55, days: 150 }];
+    const aged = await runCommand("create_recipe", { name: "Barrel-aged IPA" }, ctx) as { id: string };
+    await runCommand("create_recipe_version", { ...input, recipeId: aged.id, fermentationSchedule: long, ingredients: [...input.ingredients, { materialId: hop, perBblQty: 1, stage: "dry_hop", timingMinutes: 150 * 1440 }] }, ctx);
     const second = await runCommand("create_recipe_version", {
       ...input, note: "Revised", ingredients: [{ materialId: hop, perBblQty: 1, stage: "boil" }],
       water: { additions: [] },

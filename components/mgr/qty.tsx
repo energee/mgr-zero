@@ -170,10 +170,15 @@ export function TabBar({
   const value = String(on);
   return (
     <Tabs value={hrefs || onChange ? value : undefined} defaultValue={hrefs || onChange ? undefined : value} onValueChange={onChange && ((v) => onChange(names[Number(v)]))} className={panel === undefined ? "min-w-0" : "min-w-0 flex-1 gap-3"}>
-      <TabsList className={cn("rounded-xl border border-foreground/40 p-0", cls)} aria-label={label}>
+      {/* Only the selected tab is filled (bg-muted). Each trigger overlaps
+          the list's 1px border (-my-px, and -ml-px/-mr-px on the ends), so
+          the selected tab's own border falls on the same pixels as the list
+          border. The base trigger's shadow-sm is forced off so it cannot blur
+          that shared edge. */}
+      <TabsList className={cn("rounded-xl border border-foreground/40 bg-transparent p-0", cls)} aria-label={label}>
         {names.map((n, i) => {
           const text = labels?.[n] ?? n;
-          return <TabsTrigger key={n} value={String(i)} data-to={to?.[n]} className="h-full rounded-none px-3 first:rounded-l-[calc(var(--radius-xl)-1px)] last:rounded-r-[calc(var(--radius-xl)-1px)] data-active:shadow-none data-active:ring-1 data-active:ring-inset data-active:ring-foreground/40" asChild={Boolean(hrefs?.[n])}>{hrefs?.[n] ? <Link href={hrefs[n]}>{text}</Link> : text}</TabsTrigger>;
+          return <TabsTrigger key={n} value={String(i)} data-to={to?.[n]} className="-my-px h-[calc(100%+2px)] rounded-none px-3 first:-ml-px first:rounded-l-xl last:-mr-px last:rounded-r-xl data-active:border-foreground/40 data-active:bg-muted data-active:shadow-none! dark:data-active:border-foreground/40 dark:data-active:bg-muted" asChild={Boolean(hrefs?.[n])}>{hrefs?.[n] ? <Link href={hrefs[n]}>{text}</Link> : text}</TabsTrigger>;
         })}
       </TabsList>
       {panel === undefined ? null : names.map((n, i) => hrefs?.[n] ? null : <TabsContent key={n} value={String(i)} tabIndex={-1} className="flex flex-col gap-3">{panel}</TabsContent>)}

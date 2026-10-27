@@ -3,6 +3,8 @@ import { defineCommand, defineQuery, unwrap, completeRows, inChunks, PAGE_SIZE, 
 import { stockLine } from "./stock-line";
 import { movementInput } from "./movement-input";
 import type { Database } from "@/lib/supabase/database";
+import { docNo, runNo, trfNo } from "@/lib/mgr/doc-no";
+import { formatDate } from "@/lib/date-format";
 
 /**
  * Appends an inventory movement through its security-definer RPC. `binId` is
@@ -159,8 +161,33 @@ defineQuery({
   },
 });
 
+/** Resolve polymorphic movement references only to documents visible to this caller. */
+export async function movementReferences(ctx: Ctx, references: (string | null)[]) {
+  const refs = [...new Set(references.filter((ref): ref is string => ref !== null))];
+  const labels = new Map<string, { ref_label: string; ref_kind: "order" | "run" | "transfer" | "invoice" | "delivery" | "count" }>();
+  if (!refs.length) return labels;
+  const [orders, runs, transfers, invoices, deliveries, counts] = await Promise.all([
+    inChunks(refs, async chunk => (await unwrap(ctx.db.from("orders").select("id, order_no").eq("brewery_id", ctx.breweryId).in("id", chunk).limit(chunk.length))) ?? []),
+    inChunks(refs, async chunk => (await unwrap(ctx.db.from("packaging_runs").select("id, run_no").eq("brewery_id", ctx.breweryId).in("id", chunk).limit(chunk.length))) ?? []),
+    inChunks(refs, async chunk => (await unwrap(ctx.db.from("stock_transfers").select("id, transfer_no").eq("brewery_id", ctx.breweryId).in("id", chunk).limit(chunk.length))) ?? []),
+    inChunks(refs, async chunk => (await unwrap(ctx.db.from("invoices").select("id, invoice_no").eq("brewery_id", ctx.breweryId).in("id", chunk).limit(chunk.length))) ?? []),
+    inChunks(refs, async chunk => (await unwrap(ctx.db.from("deliveries").select("id, shipments(orders(order_no))").eq("brewery_id", ctx.breweryId).in("id", chunk).limit(chunk.length))) ?? []),
+    inChunks(refs, async chunk => (await unwrap(ctx.db.from("taproom_counts").select("id, counted_on").eq("brewery_id", ctx.breweryId).in("id", chunk).limit(chunk.length))) ?? []),
+  ]);
+  for (const row of orders) labels.set(row.id, { ref_label: docNo("ORD", row.order_no, "Order"), ref_kind: "order" });
+  for (const row of runs) labels.set(row.id, { ref_label: runNo(row.run_no), ref_kind: "run" });
+  for (const row of transfers) labels.set(row.id, { ref_label: trfNo(row.transfer_no), ref_kind: "transfer" });
+  for (const row of invoices) labels.set(row.id, { ref_label: docNo("CM", row.invoice_no, "Credit memo"), ref_kind: "invoice" });
+  for (const row of deliveries) {
+    const order = row.shipments?.orders;
+    if (order) labels.set(row.id, { ref_label: `Refused delivery · ${docNo("ORD", order.order_no, "Order")}`, ref_kind: "delivery" });
+  }
+  for (const row of counts) labels.set(row.id, { ref_label: `Count ${formatDate(row.counted_on)}`, ref_kind: "count" });
+  return labels;
+}
+
 defineQuery({
-  name: "list_movements", description: "Paginated immutable movements with location/bin/lot labels and reversal links; movementId selects an original and its exact compensation",
+  name: "list_movements", description: "Paginated immutable movements with location/bin/lot labels, resolved source document ref_label (null without a visible source document), and reversal links; movementId selects an original and its exact compensation",
   input: z.object({ skuId: z.string().uuid().optional(), movementId: z.string().uuid().optional(), limit: z.number().int().min(1).max(200).default(50), offset: z.number().int().nonnegative().default(0) }),
   roles: [...readRoles],
   handler: async (ctx, i) => {
@@ -170,9 +197,12 @@ defineQuery({
     if (i.movementId) q = q.or(`id.eq.${i.movementId},compensates_id.eq.${i.movementId}`);
     const rows = (await unwrap(q)) ?? [];
     if (!rows.length) return [];
-    const corrections = await unwrap(ctx.db.from("inventory_movements").select("id, compensates_id")
-      .eq("brewery_id", ctx.breweryId).in("compensates_id", rows.map(r => r.id)));
-    return rows.map(row => ({ ...row, reversed_by: corrections?.find(c => c.compensates_id === row.id)?.id ?? null }));
+    const [corrections, references] = await Promise.all([
+      unwrap(ctx.db.from("inventory_movements").select("id, compensates_id")
+        .eq("brewery_id", ctx.breweryId).in("compensates_id", rows.map(r => r.id))),
+      movementReferences(ctx, rows.map(row => row.ref)),
+    ]);
+    return rows.map(row => ({ ...row, ref_label: references.get(row.ref ?? "")?.ref_label ?? null, reversed_by: corrections?.find(c => c.compensates_id === row.id)?.id ?? null }));
   },
 });
 
@@ -185,6 +215,13 @@ defineQuery({
     if (!row) throw new CommandError("SKU not found", 404, "not_found");
     return row;
   },
+});
+
+defineQuery({
+  name: "get_inventory_lot", description: "The display code of one existing finished-goods lot, including lots with no remaining stock; null when not visible",
+  input: z.object({ lotId: z.string().uuid() }), roles: [...readRoles],
+  handler: (ctx, i) => unwrap(ctx.db.from("lots").select("id, code")
+    .eq("brewery_id", ctx.breweryId).eq("id", i.lotId).maybeSingle()),
 });
 
 defineQuery({

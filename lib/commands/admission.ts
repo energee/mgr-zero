@@ -5,6 +5,17 @@ import { CommandError, type Ctx } from "@/lib/commands/registry";
 
 export type AdmissionDecision = { allowed: true } | { allowed: false; retryAfter: number };
 
+export class AdmissionError extends CommandError {
+  constructor(readonly retryAfter: number) {
+    super("too many requests", 429, "rate_limited");
+  }
+}
+
+export async function requireAdmission(db: Ctx["db"]): Promise<void> {
+  const decision = await consumeAdmission(db);
+  if (!decision.allowed) throw new AdmissionError(decision.retryAfter);
+}
+
 /**
  * Spends one unit of the caller's admission budget. Returns `allowed: false`
  * with a whole-second `retryAfter` (at least 1) when the budget is spent.

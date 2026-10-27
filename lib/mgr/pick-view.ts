@@ -26,7 +26,7 @@ export type PickViewModel = {
 
 export type PickSnapshot = {
   backHref?: string;
-  order: { id: string; order_no: number | null; from_location_id: string; requested_ship_date?: string | null; customers?: { name: string } | null };
+  order: { id: string; order_no: number | null; from_location_id: string; requested_ship_date?: string | null; customers?: { name: string } | null; kind?: string; needs_restock?: boolean };
   lines: {
     id: string;
     sku_id: string;
@@ -38,6 +38,15 @@ export type PickSnapshot = {
   }[];
   locations: { id: string; name: string }[];
 };
+
+/** Where Done picking goes (#1503): on to Ship (Complete transfer for a
+ *  taproom transfer) when every line was counted in full and no staged beer
+ *  waits to be put back; otherwise back to the order. */
+export function pickDoneHref(order: PickSnapshot["order"], lines: PickSnapshot["lines"], qtys: Record<string, string>): string {
+  const full = lines.every((line) => Number(qtys[line.id]) >= Number(line.qty_ordered));
+  if (!full || order.needs_restock) return `/orders/${order.id}`;
+  return `/orders/${order.id}/${order.kind === "taproom_transfer" ? "complete" : "ship"}`;
+}
 
 /** Map get_order onto PickView, lines grouped by format. Count defaults to qty_picked, else qty_ordered. */
 export function toPickViewProps({ order, lines, locations, backHref }: PickSnapshot): PickViewModel {

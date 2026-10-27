@@ -31,7 +31,7 @@ type Run = {
   cancelled_at: string | null; started_at: string | null; closed_at: string | null; bbl_drawn: number | null; note: string | null;
   brand_name: string | null; vessel_name: string | null;
 };
-type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null };
+type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null; whole: boolean };
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 

@@ -57,8 +57,8 @@ describe("taproom count controlled state", () => {
   });
   it("#814 omits destroyed lines from correction requests", () => {
     let state = correctionStateFromReceipt("count", [
-      { id: "destroyed", sku_name: "Keg", bin_name: "Cold", lot_id: null, qty_before: 7, qty_counted: 5, movement_type: "destruction" },
-      { id: "sold", sku_name: "Keg", bin_name: "Cold", lot_id: null, qty_before: 7, qty_counted: 5, movement_type: "depletion" },
+      { id: "destroyed", sku_name: "Keg", bin_name: "Cold", lot_id: null, lot_code: null, qty_before: 7, qty_counted: 5, movement_type: "destruction" },
+      { id: "sold", sku_name: "Keg", bin_name: "Cold", lot_id: null, lot_code: null, qty_before: 7, qty_counted: 5, movement_type: "depletion" },
     ]);
     expect(updateCorrectionQuantity(state, "destroyed", "6").lines[0].quantity).toBe("5");
     state = updateCorrectionQuantity(state, "sold", "6");
@@ -72,8 +72,8 @@ describe("taproom count controlled state", () => {
       "00000000-0000-4000-8000-000000000012",
     ];
     let state = correctionStateFromReceipt("00000000-0000-4000-8000-000000000010", [
-      { id: lineIds[0], sku_name: "Hazy half", bin_name: "Cold", lot_id: ids.lot, qty_before: 7, qty_counted: 2 },
-      { id: lineIds[1], sku_name: "Pils case", bin_name: "Shelf", lot_id: null, qty_before: 6, qty_counted: 5 },
+      { id: lineIds[0], sku_name: "Hazy half", bin_name: "Cold", lot_id: ids.lot, lot_code: "L-260901-HZ", qty_before: 7, qty_counted: 2 },
+      { id: lineIds[1], sku_name: "Pils case", bin_name: "Shelf", lot_id: null, lot_code: null, qty_before: 6, qty_counted: 5 },
     ]);
     state = updateCorrectionQuantity(state, lineIds[0], "4");
     state = updateCorrectionReason(state, " Misread the tally ");
@@ -102,7 +102,7 @@ describe("taproom count controlled state", () => {
   });
 
   it("requires a reason and at least one whole increase within the recorded quantity", () => {
-    const line = { id: "00000000-0000-4000-8000-000000000011", sku_name: "Hazy half", bin_name: "Cold", lot_id: null, qty_before: 7, qty_counted: 2 };
+    const line = { id: "00000000-0000-4000-8000-000000000011", sku_name: "Hazy half", bin_name: "Cold", lot_id: null, lot_code: null, qty_before: 7, qty_counted: 2 };
     let state = correctionStateFromReceipt("00000000-0000-4000-8000-000000000010", [line]);
     expect(() => beginCorrectionAttempt(state, crypto.randomUUID())).toThrow(/reason/);
     state = updateCorrectionReason(state, "Tally error");
