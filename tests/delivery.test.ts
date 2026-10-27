@@ -568,6 +568,11 @@ describe("route edges", () => {
     expect((await admin.from("invoice_lines").select("qty, unit_price_cents").eq("invoice_id", result.invoice_id).eq("kind", "sku")).data).toEqual([{ qty: 8, unit_price_cents: 12000 }]);
     expect((await admin.from("invoice_lines").select("qty, unit_price_cents").eq("invoice_id", result.invoice_id).eq("kind", "keg_deposit")).data).toEqual([{ qty: 8, unit_price_cents: 2500 }]);
     const { data: line } = await admin.from("order_lines").select("order_id").eq("id", orderLineId).single();
+    // A partly refused stop reads as delivered on the order page and in the Delivered filter (#1483).
+    const delivered = await runCommand("list_orders", { status: "delivered" }, adminCtx) as { rows: { id: string; shipments: { deliveries: { outcome: string }[] }[] }[] };
+    expect(delivered.rows.find((o) => o.id === line!.order_id)?.shipments[0].deliveries[0].outcome).toBe("partial");
+    expect((await runCommand("list_orders", { status: "shipped" }, adminCtx) as { rows: { id: string }[] }).rows.map((o) => o.id)).toContain(line!.order_id);
+    expect((await runCommand("get_order", { orderId: line!.order_id }, adminCtx) as { shipment: { deliveries: { outcome: string }[] } }).shipment.deliveries[0].outcome).toBe("partial");
     const { data: source } = await admin.from("inventory_movements").select("id, lot_id").eq("ref", line!.order_id).eq("type", "sale_removal").single();
     const { data: billed } = await admin.from("invoice_lines").select("id").eq("invoice_id", result.invoice_id).eq("kind", "sku").single();
     await runCommand("return_shipment", { invoiceId: result.invoice_id, locationId: whId, reason: "unsold", lines: [{ invoiceLineId: billed!.id, qty: 1, sources: [{ movementId: source!.id, binId: whBinId, qty: 1 }] }] }, adminCtx);
