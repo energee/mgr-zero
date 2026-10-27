@@ -26,7 +26,7 @@ export function parseOrderStatus(value: string | string[] | undefined): OrderFil
 /** verb, tone, and the path under the order that finishes it. */
 const ACTION: Record<OrderStatus, [string, ActionTone, string]> = {
   draft: ["Finish", "primary", ""], submitted: ["Confirm", "success", "/confirm"],
-  confirmed: ["Pick", "info", ""], picked: ["Ship", "info", ""],
+  confirmed: ["Pick", "info", "/pick"], picked: ["Ship", "info", "/ship"],
   shipped: ["Open", "primary", ""], cancelled: ["Open", "primary", ""],
 };
 
@@ -41,12 +41,14 @@ export const warehouseRoles = ["admin", "warehouse"] as const;
 export const stagedOnOpenOrder = (status: OrderStatus, needsRestock: boolean) =>
   needsRestock && (status === "picked" || status === "confirmed");
 
-/** The verb a staff list offers on this order, and where it goes. Only a role
- * the next step's command allows gets the verb; anyone else gets Open. */
-export function nextAction(status: OrderStatus, needsRestock: boolean, id: string, heldRoles: readonly string[]): { verb: string; tone: ActionTone; href: string } {
+/** The verb a staff list offers on this order, and the page that does it
+ * (#1503). Only a role the next step's command allows gets the verb; anyone
+ * else gets Open. A picked taproom transfer completes rather than ships. */
+export function nextAction(status: OrderStatus, needsRestock: boolean, id: string, heldRoles: readonly string[], transfer = false): { verb: string; tone: ActionTone; href: string } {
   const roles = status === "draft" || status === "submitted" ? salesRoles : warehouseRoles;
   if (!hasAnyRole(heldRoles, roles)) return { verb: "Open", tone: "primary", href: `/orders/${id}` };
   if (stagedOnOpenOrder(status, needsRestock)) return { verb: "Put back", tone: "attention", href: `/orders/${id}/restock` };
+  if (status === "picked" && transfer) return { verb: "Complete transfer", tone: "info", href: `/orders/${id}/complete` };
   const [verb, tone, path] = ACTION[status];
   return { verb, tone, href: `/orders/${id}${path}` };
 }

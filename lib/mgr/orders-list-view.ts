@@ -52,6 +52,7 @@ export type OrdersListSnapshot = {
     status: OrderStatus;
     requested_ship_date: string | null;
     needs_restock: boolean;
+    kind?: string;
     pickup?: boolean;
     customers: { name: string } | null;
     /** One shipment per order and one stop per shipment, but the composite keys make PostgREST return arrays. */
@@ -80,7 +81,7 @@ export function toOrdersListViewProps({ roles, status, customer, customerId, lin
     ],
     customer: customer ? { name: customer, clearHref: link(ordersHref(undefined, status)) } : undefined,
     rows: orders.map((o) => {
-      const { verb, tone, href } = nextAction(o.status, o.needs_restock, o.id, roles);
+      const { verb, tone, href } = nextAction(o.status, o.needs_restock, o.id, roles, o.kind === "taproom_transfer");
       return {
         key: o.id,
         orderNo: docNo("ORD", o.order_no, "Order"),

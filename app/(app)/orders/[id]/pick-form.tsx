@@ -9,7 +9,7 @@ import { PickView } from "@/components/mgr/views/pick";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { isNumber } from "@/lib/mgr/quantity-input";
 import { draftCounts, pickCountDraftKey, readPickCounts, savePickCounts } from "@/lib/mgr/pick-counts";
-import { toPickViewProps, type PickSnapshot } from "@/lib/mgr/pick-view";
+import { pickDoneHref, toPickViewProps, type PickSnapshot } from "@/lib/mgr/pick-view";
 
 export function PickForm({ snapshot }: { snapshot: PickSnapshot }) {
   const router = useRouter();
@@ -70,7 +70,7 @@ export function PickForm({ snapshot }: { snapshot: PickSnapshot }) {
       committed.current = true; setSaved(true);
       try { retire(); }
       catch { toast.error("Pick saved, but working counts could not be cleared. Reopen Pick to check the saved quantities."); }
-      router.push(`/orders/${snapshot.order.id}`);
+      router.push(pickDoneHref(snapshot.order, snapshot.lines, qtys));
     });
   }}>
     <PickView model={model} quantities={qtys} onQuantity={(id, value) => {

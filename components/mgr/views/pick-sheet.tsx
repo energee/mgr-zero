@@ -57,7 +57,7 @@ export function PickSheetView({
                       ? E.row(
                         row.title,
                         row.detail,
-                        E.act(row.verb, "primary", linkRows ? row.href : undefined),
+                        E.act(row.verb, "primary", linkRows ? row.actionHref : undefined),
                         row.changedAfterPick ? "w" : "",
                         undefined,
                         row.changedAfterPick ? <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">{E.status("changed after pick", "w")}Count only the added or raised lines.</div> : undefined,

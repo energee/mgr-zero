@@ -67,7 +67,7 @@ describe("notification occurrences", () => {
     const [occ] = await occurrences(id);
     expect(occ).toMatchObject({ reason: "submitted_order", subject_type: "order", state: "active", owner_query: "orders", urgency: "attention" });
     expect(occ.semantic_key).toBe(`submitted_order:${id}:${occ.source_version}`);
-    expect(occ.payload).toMatchObject({ href: `/orders/${id}`, recipient_roles: ["admin", "sales"] });
+    expect(occ.payload).toMatchObject({ href: `/orders/${id}/confirm`, recipient_roles: ["admin", "sales"] });
     expect(JSON.stringify(occ.payload)).not.toContain("Bar");
     expect((await deliveriesFor(occ.id)).length).toBe(2); // admin + sales, fanned out in the same transaction
 
@@ -114,7 +114,7 @@ describe("notification occurrences", () => {
     const [pick] = picks;
     expect(pick).toMatchObject({
       state: "active", owner_query: "picks", due_at: null,
-      payload: { detail: "pick due · no ship date", due_at: null, href: `/orders/${id}`, recipient_roles: ["admin", "warehouse"] },
+      payload: { detail: "pick due · no ship date", due_at: null, href: `/orders/${id}/pick`, recipient_roles: ["admin", "warehouse"] },
     });
     const deliveries = await deliveriesFor(pick.id);
     expect((await recipientsOf(deliveries)).sort()).toEqual([adminCtx.userId, warehouse.userId].sort());
