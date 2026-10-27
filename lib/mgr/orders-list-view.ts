@@ -7,7 +7,7 @@ import { formatDate } from "@/lib/date-format";
 import type { EmptyState } from "./empty-state";
 import { docNo } from "./doc-no";
 import { sentenceCase } from "./labels";
-import { nextAction, ORDER_STATUSES, type ActionTone, type OrderStatus } from "./order-status";
+import { nextAction, ORDER_FILTERS, shownState, type ActionTone, type DeliveryOutcome, type OrderFilter, type OrderStatus } from "./order-status";
 
 export type OrdersListRowView = {
   key: string;
@@ -18,6 +18,8 @@ export type OrdersListRowView = {
   /** The requested calendar day, formatted; null when none was requested. */
   shipDate: string | null;
   status: OrderStatus;
+  /** shownState's label: a shipped order reads its delivery stop's outcome (#1483). */
+  statusLabel: string;
   /** Staged stock waits for Put back; shown as its own badge beside the status. */
   restock: boolean;
   /** The order page; live only. */
@@ -29,8 +31,8 @@ export type OrdersListRowView = {
 export type OrdersListViewModel = {
   rows: OrdersListRowView[];
   empty?: EmptyState;
-  /** The Status pick: "all" or one OrderStatus. */
-  status: OrderStatus | "all";
+  /** The Status pick: "all" or one OrderFilter. */
+  status: OrderFilter | "all";
   statusOptions: ScopeOption[];
   /** The customer scope line; clearHref drops the customer and keeps the status. */
   customer?: { name: string; clearHref?: string };
@@ -38,7 +40,7 @@ export type OrdersListViewModel = {
 
 export type OrdersListSnapshot = {
   roles: readonly string[];
-  status?: OrderStatus;
+  status?: OrderFilter;
   /** The filtered customer's name; an empty list then names it instead of saying "No orders yet". */
   customer?: string;
   customerId?: string;
@@ -50,12 +52,16 @@ export type OrdersListSnapshot = {
     status: OrderStatus;
     requested_ship_date: string | null;
     needs_restock: boolean;
+    kind?: string;
+    pickup?: boolean;
     customers: { name: string } | null;
+    /** One shipment per order and one stop per shipment, but the composite keys make PostgREST return arrays. */
+    shipments?: { deliveries: { outcome: DeliveryOutcome | null }[] }[];
   }[];
 };
 
 /** /orders with this customer and status; a filter change starts at the newest page, so no cursor. */
-function ordersHref(customerId: string | undefined, status: OrderStatus | undefined) {
+function ordersHref(customerId: string | undefined, status: OrderFilter | undefined) {
   const query = new URLSearchParams();
   if (customerId) query.set("customerId", customerId);
   if (status) query.set("status", status);
@@ -71,17 +77,18 @@ export function toOrdersListViewProps({ roles, status, customer, customerId, lin
     status: status ?? "all",
     statusOptions: [
       { value: "all", label: "All states", href: link(ordersHref(customerId, undefined)) },
-      ...ORDER_STATUSES.map((s) => ({ value: s, label: sentenceCase(s), href: link(ordersHref(customerId, s)) })),
+      ...ORDER_FILTERS.map((s) => ({ value: s, label: sentenceCase(s), href: link(ordersHref(customerId, s)) })),
     ],
     customer: customer ? { name: customer, clearHref: link(ordersHref(undefined, status)) } : undefined,
     rows: orders.map((o) => {
-      const { verb, tone, href } = nextAction(o.status, o.needs_restock, o.id, roles);
+      const { verb, tone, href } = nextAction(o.status, o.needs_restock, o.id, roles, o.kind === "taproom_transfer");
       return {
         key: o.id,
         orderNo: docNo("ORD", o.order_no, "Order"),
         customer: o.customers?.name ?? null,
         shipDate: o.requested_ship_date ? formatDate(o.requested_ship_date) : null,
         status: o.status,
+        statusLabel: shownState(o.status, o.needs_restock, o.shipments?.[0]?.deliveries[0]?.outcome ?? null, Boolean(o.pickup)).label,
         restock: o.needs_restock,
         href: link(`/orders/${o.id}`),
         // Open is nextAction's documented fallback (no permitted next step, or nothing left to do) and the only verb that repeats the order link.

@@ -16,7 +16,7 @@ import { command } from "@/lib/commands/client";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { packagingCloseReason } from "@/lib/mgr/close-packaging-run-view";
 
-type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null };
+type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null; whole: boolean };
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 
@@ -47,7 +47,7 @@ export function CloseRunForm({ runId, outputs, locations, bins, today, initialPl
   const { busy, blocked, pending, error, setError, run } = useCommandAction(runId);
   const [reviewing, setReviewing] = useState(false);
   const retry = pending?.name === "close_packaging_run" && !busy;
-  const model = { ...fields, outputs: outputs.map(row => ({ id: row.sku_id, name: row.sku_name ?? row.sku_id, qty: quantities[row.sku_id] })), plan, actuals, locations, bins };
+  const model = { ...fields, outputs: outputs.map(row => ({ id: row.sku_id, name: row.sku_name ?? row.sku_id, qty: quantities[row.sku_id], whole: row.whole })), plan, actuals, locations, bins };
   async function refreshPlan() {
     if (busy || blocked || reviewing) return;
     setReviewing(true); setError(null);

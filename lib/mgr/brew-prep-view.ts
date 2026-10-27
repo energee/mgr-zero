@@ -9,7 +9,8 @@ import { brewDayLines, brewSourceKey, fitsStock, observedProcess, plannedQty, so
 import { sentenceCase } from "./labels";
 import { materialSourceKey, type SourceIds } from "./material-source";
 import { fromPacks, splitPacks, withPacks } from "./pack-qty";
-import { toTicks } from "./quantity-input";
+import { isNumber, numberNotationError, toTicks } from "./quantity-input";
+import { MASH_PH_BOUNDS, READING_BOUNDS } from "@/lib/composer/offline-policy";
 import { totalMinutes } from "./recipe-schedule";
 import { submitReason } from "./submit-reason";
 
@@ -190,12 +191,45 @@ export const confirmAll = (rows: BrewIngredient[]) => rows.map(row => ({ ...row,
 export const currentStage = (model: BrewTimelineViewModel): TimelineStage =>
   timelineStages(model).find(stage => stage.ingredients.some(row => !row.confirmed))?.stage ?? "knockout";
 
-/** What knockout still needs: a listed vessel, positive barrels and a brew date, as record_brew_day requires. */
-const knockoutNeeds = (model: BrewTimelineViewModel) => [
-  ...(model.vessels.some(vessel => vessel.id === model.vesselId) ? [] : ["a knockout vessel"]),
-  ...(Number(model.initialBbl) > 0 && Number.isFinite(Number(model.initialBbl)) ? [] : ["knockout barrels above zero"]),
-  ...(model.brewedOn ? [] : ["a brew date"]),
-];
+const TEMP = "Enter a temperature from 25 to 212 °F.";
+const MINUTES = "Enter whole minutes, zero or more.";
+/** Each process reading's rule, matching record_brew_day's schema (#1476). */
+const PROCESS_RULES: Record<string, { ok: (n: number) => boolean; help: string }> = {
+  mashWaterGal: { ok: n => n > 0, help: "Enter an amount above zero." },
+  targetMashPh: { ok: n => n >= MASH_PH_BOUNDS.min && n <= MASH_PH_BOUNDS.max, help: `Enter a mash pH from ${MASH_PH_BOUNDS.min} to ${MASH_PH_BOUNDS.max}.` },
+  spargeWaterGal: { ok: n => n >= 0, help: "Enter an amount of zero or more." },
+  preBoilBbl: { ok: n => n > 0, help: "Enter an amount above zero." },
+  boilMinutes: { ok: n => Number.isInteger(n) && n >= 0, help: MINUTES },
+  whirlpoolMinutes: { ok: n => Number.isInteger(n) && n >= 0, help: MINUTES },
+  whirlpoolRestMinutes: { ok: n => Number.isInteger(n) && n >= 0, help: MINUTES },
+  whirlpoolTempF: { ok: n => n >= READING_BOUNDS.tempF.min && n <= READING_BOUNDS.tempF.max, help: TEMP },
+  knockoutTempF: { ok: n => n >= READING_BOUNDS.tempF.min && n <= READING_BOUNDS.tempF.max, help: TEMP },
+};
+
+/** What is wrong with each typed process reading, by key; a blank reading was not measured and is fine. One check drives
+ *  the field errors and timelineReason, so the form and the record cannot disagree. */
+export function processErrors(process: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(process).flatMap(([key, value]) => {
+    if (!value.trim()) return [];
+    const notation = numberNotationError(value);
+    if (notation) return [[key, notation]];
+    const rule = PROCESS_RULES[key];
+    return rule && (!isNumber(value) || !rule.ok(Number(value))) ? [[key, rule.help]] : [];
+  }));
+}
+
+/** What knockout still needs: a listed vessel, positive barrels within its capacity and a brew date, as record_brew_day
+ *  requires. A top-up into a tank already holding beer is checked against what is left by the server. */
+const knockoutNeeds = (model: BrewTimelineViewModel) => {
+  const vessel = model.vessels.find(item => item.id === model.vesselId);
+  const bbl = Number(model.initialBbl);
+  return [
+    ...(vessel ? [] : ["a knockout vessel"]),
+    ...(bbl > 0 && Number.isFinite(bbl) ? [] : ["knockout barrels above zero"]),
+    ...(vessel && bbl > Number(vessel.capacity_bbl) ? [`at most ${Number(vessel.capacity_bbl)} bbl into ${vessel.name}`] : []),
+    ...(model.brewedOn ? [] : ["a brew date"]),
+  ];
+};
 /** Knockout is complete: when the loss-baseline tape shows. */
 export const knockoutReady = (model: BrewTimelineViewModel) => knockoutNeeds(model).length === 0;
 
@@ -219,6 +253,7 @@ export const timelineReason = (model: BrewTimelineViewModel) => submitReason([
   ...model.ingredients.flatMap(pullNeeds),
   ...(fitsStock(stockDraws(model.ingredients), model.sources) ? [] : ["pulls within the stock on hand"]),
   ...(anyPulled(model) || model.confirmEmpty ? [] : ["a pulled ingredient or Confirm no ingredients used"]),
+  ...(Object.keys(processErrors(model.process)).length ? ["process readings in range"] : []),
   ...knockoutNeeds(model),
 ]);
 

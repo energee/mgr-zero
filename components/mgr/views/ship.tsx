@@ -9,9 +9,9 @@ import type { ShipViewModel } from "@/lib/mgr/ship-view";
 
 export type { ShipViewModel };
 
-export function ShipView({ model, sources, footer, fulfillmentOptions, tape, invoiceTiming, quantities, onQuantity, reasons, onReason, carrier = "", tracking = "", onCarrier, onTracking, onInvoiceTiming, messages, submitting = false, reason }: {
+export function ShipView({ model, sources, footer, tape, invoiceTiming, quantities, onQuantity, reasons, onReason, carrier = "", tracking = "", onCarrier, onTracking, onInvoiceTiming, messages, submitting = false, reason }: {
   model: ShipViewModel; sources?: ReactNode; footer?: ReactNode;
-  fulfillmentOptions?: string[]; tape?: [ReactNode, ReactNode?][]; invoiceTiming?: number;
+  tape?: [ReactNode, ReactNode?][]; invoiceTiming?: number;
   quantities?: Record<string, string>; onQuantity?: (key: string, value: string) => void;
   /** Shortage reason per line key; a line shipped below picked asks for one. */
   reasons?: Record<string, string>; onReason?: (key: string, value: string) => void;
@@ -23,7 +23,7 @@ export function ShipView({ model, sources, footer, fulfillmentOptions, tape, inv
   const timing = model.pickup ? 0 : invoiceTiming ?? (model.invoiceTiming === "on_delivery" ? 1 : 0);
   return <>
     {E.back(model.backTo, model.title, undefined, model.backHref)}
-    {E.pick("Fulfillment source", model.fulfillmentSource, ((fulfillmentOptions ?? [model.fulfillmentSource]).map(source => ({ value: source, label: source }))), { disabled: true })}
+    {E.fld("Fulfillment source", model.fulfillmentSource)}
     {model.lines.map(line => <div key={line.key}>{E.row(line.name, line.detail,
       <OrderQuantity label={`${line.name} shipped quantity`} value={quantities?.[line.key] ?? line.qty} max={line.picked} step="0.01" required onChange={onQuantity && (value => onQuantity(line.key, value))} />, line.tone ?? "")}
       {line.tone === "w" && E.edit("Reason · required", reasons?.[line.key] ?? line.shortReason ?? "", "text", undefined, {

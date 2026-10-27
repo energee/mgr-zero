@@ -125,6 +125,15 @@ describe("Licenses", () => {
     expect(licenseSubmitReason({ state: "PA", kind: "brewery" })).toBeNull();
   });
 
+  it("Add refuses a state and kind that already has a license and points to its Edit (#1493)", () => {
+    const existing = [{ state: "PA", kind: "brewery" }];
+    expect(licenseSubmitReason({ state: "PA", kind: " Brewery ", existing })).toBe("Still needed: a state and kind without a license (edit the PA brewery license instead).");
+    expect(licenseSubmitReason({ state: "PA", kind: "distributor", existing })).toBeNull();
+    expect(licenseSubmitReason({ state: "OH", kind: "brewery", existing })).toBeNull();
+    // Edit passes no existing pairs: the license being edited is that pair.
+    expect(licenseSubmitReason({ state: "PA", kind: "brewery" })).toBeNull();
+  });
+
   it("guides empty licenses and shares neutral help, state picker, and Cancel (#1262)", () => {
     const empty = htmlOf(createElement(LicensesView, { model: { licenses: [] } }));
     expect(empty).toContain("No licenses yet. Record your state licenses here so their numbers and expiry dates are in one place.");

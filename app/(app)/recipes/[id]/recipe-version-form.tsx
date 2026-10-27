@@ -30,7 +30,7 @@ import { gravityBlockers, recipeGravity } from "@/lib/recipe-gravity";
 import { plural } from "@/lib/mgr/plural";
 import { readRecipeDraft, recipeDraftKey, shouldKeepDraft, writeRecipeDraft } from "@/lib/mgr/recipe-draft";
 import { draftBlocker, gravityBlockerText, ingredientPack, noMashText, RECIPE_NUMBERS, type RecipeDraft, type RecipeNumberKey } from "@/lib/mgr/recipe-view";
-import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashRowSummary, materialLookup, optionalNumber as num, removeAt, upsertAt, waterRowSummary, type RecipeMaterial, type MashStep, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
+import { EMPTY_WATER, fermentationSummary, ingredientDetail, lineReady, mashRowSummary, materialLookup, optionalNumber as num, removeAt, scheduleDays, upsertAt, waterRowSummary, type RecipeMaterial, type MashStep, type WaterProfileIons } from "@/lib/mgr/recipe-process-view";
 import { FermentationScheduleSheet, IngredientSheet, MashScheduleSheet, WaterSheet } from "./schedule-sheets";
 
 type Numbers = Record<RecipeNumberKey, string>;
@@ -100,6 +100,8 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
   // Declared before the preview reads it during render (#440).
   const material = materialLookup(materials);
   const validLines = lines.filter(lineReady);
+  // An ingredient's timing is bounded by this draft's boil time and fermentation schedule (#1478).
+  const timingLimits = { boilMinutes: numbers.boilMin.trim() ? Number(numbers.boilMin) : undefined, fermentationDays: scheduleDays(fermentationSchedule) };
   const eff = pctToFraction(numbers.efficiency), att = pctToFraction(numbers.attenuation);
   const build = (id: string) => ({
     recipeId: id, mashSchedule, fermentationSchedule,
@@ -142,7 +144,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
     });
   }
   // What the draft still lacks, named for the brewer; the submit stays disabled until it is null.
-  const blockedReason = draftBlocker({ name: creating ? parent.name : undefined, lines, mashSchedule, efficiency: numbers.efficiency, attenuation: numbers.attenuation });
+  const blockedReason = draftBlocker({ name: creating ? parent.name : undefined, lines, mashSchedule, fermentationSchedule, numbers, efficiency: numbers.efficiency, attenuation: numbers.attenuation });
   const parentLocked = creating && createdId !== "";
   const sheetMaterials = materials.map((m) => ({ id: m.id, name: m.name, unit: m.base_uom, category: m.category }));
   const target = profiles.find((p) => p.id === water.targetProfileId)?.name;
@@ -156,7 +158,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
         title, backHref, backLabel, ...numbers, notes,
         ingredients: lines.map((l, i) => ({
           key: `${i}-${l.materialId}`, title: material.name(l.materialId), detail: ingredientDetail(l.stage, l.timingMinutes, l.perBblQty, material.unit(l.materialId)), qty: "",
-          action: <IngredientSheet line={l} materials={sheetMaterials} onSave={(f) => change({ lines: upsertAt(draft.lines, i, f) })} onDelete={() => change({ lines: removeAt(draft.lines, i) })} trigger={E.act(<>Edit<span className="sr-only"> {material.name(l.materialId)}</span></>)} />,
+          action: <IngredientSheet line={l} materials={sheetMaterials} limits={timingLimits} onSave={(f) => change({ lines: upsertAt(draft.lines, i, f) })} onDelete={() => change({ lines: removeAt(draft.lines, i) })} trigger={E.act(<>Edit<span className="sr-only"> {material.name(l.materialId)}</span></>)} />,
           pack: ingredientPack(l.stage, Number(l.perBblQty), material.get(l.materialId)),
           onRound: (perBbl: number) => change({ lines: upsertAt(draft.lines, i, { ...l, perBblQty: String(perBbl) }) }),
         })),
@@ -176,7 +178,7 @@ export function RecipeEditor({ recipeId, title, backHref, backLabel, brands = []
         submitLabel: creating && !parentLocked ? "Create recipe" : "Create recipe version",
       }}
       slots={{
-        addIngredient: <IngredientSheet materials={sheetMaterials} onSave={(f) => change({ lines: [...draft.lines, f] })} trigger={ADD_INGREDIENT_ROW} />,
+        addIngredient: <IngredientSheet materials={sheetMaterials} limits={timingLimits} onSave={(f) => change({ lines: [...draft.lines, f] })} trigger={ADD_INGREDIENT_ROW} />,
         mash: <MashScheduleSheet steps={mashSchedule} onChange={(mashSchedule) => change({ mashSchedule })} trigger={E.nav(mashRow.title, mashRow.detail)} />,
         fermentation: <FermentationScheduleSheet stages={fermentationSchedule} onChange={(fermentationSchedule) => change({ fermentationSchedule })} trigger={E.nav(fermentationRow.title, fermentationRow.detail)} />,
         water: <WaterSheet water={water} profiles={profiles} materials={materials} onChange={(water) => change({ water })} trigger={E.nav(waterRow.title, waterRow.detail)} />,

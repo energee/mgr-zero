@@ -5,7 +5,7 @@
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { shipToAddress } from "./ship-to-view";
-import { nextState, stagedOnOpenOrder, type OrderStatus } from "./order-status";
+import { shownState, stagedOnOpenOrder, type DeliveryOutcome, type OrderStatus } from "./order-status";
 import { formatDate, formatDateTime } from "@/lib/date-format";
 import { stagedQty } from "./put-back-view";
 import type { OrderCogs } from "@/lib/commands/orders";
@@ -79,6 +79,8 @@ export type OrderSnapshot = {
     ship_tos: { label: string; country: string; city: string | null; state: string | null } | null;
   };
   locations?: { id: string; name: string }[];
+  /** The order's delivery stop outcome; null while the stop is open or there is none. */
+  deliveryOutcome?: DeliveryOutcome | null;
   lines: {
     id: string;
     sku_id: string;
@@ -200,20 +202,21 @@ function costLineFor(order: OrderSnapshot["order"], cogs?: OrderCogs): string | 
 
 /** Map a get_order payload onto OrderView's model. Inventory frames pass a
  *  fixture snapshot through this same function. */
-export function toOrderViewProps({ order, lines, events, atp, locations, backHref, timeZone, cogs, deposits, actorNames }: OrderSnapshot): OrderViewModel {
+export function toOrderViewProps({ order, lines, events, atp, locations, deliveryOutcome, backHref, timeZone, cogs, deposits, actorNames }: OrderSnapshot): OrderViewModel {
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? "line"]));
   const lineNames = new Map(lines.map((l) => [l.id, l.skus?.name ?? "Line"]));
   const source = order.from_location_id ? locations?.find((l) => l.id === order.from_location_id)?.name : undefined;
+  const state = shownState(order.status, order.needs_restock, deliveryOutcome ?? null, Boolean(order.pickup));
   const shipTo = order.pickup ? "Pickup" : order.ship_tos ? [order.ship_tos.label, shipToAddress(order.ship_tos)].filter(Boolean).join(" · ") : undefined;
   return {
     backHref,
     title: docNo("ORD", order.order_no, "Order"),
     customer: order.customers?.name ?? "Taproom transfer",
     kind: order.kind === "taproom_transfer" ? "Taproom transfer" : "Wholesale",
-    currentState: `${titled(order.status)}${order.needs_restock ? " · restock pending" : ""}`,
+    currentState: `${state.label}${order.needs_restock ? " · restock pending" : ""}`,
     stateTone: order.needs_restock ? "w" : order.status === "cancelled" ? "" : "ok",
-    next: `Next: ${nextState(order.status, order.needs_restock)}`,
+    next: `Next: ${state.next}`,
     timeZone,
     facts: [
       { label: "Fulfillment source", value: source ?? "Not specified" },
