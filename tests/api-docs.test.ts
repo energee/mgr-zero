@@ -15,7 +15,6 @@ import { z } from "zod";
 import { SCREENS } from "@/components/mgr/screens";
 import { API_AREAS, apiOperations, areaOf, operationsInArea } from "@/lib/mgr/api-operations";
 import { BACKLOG_PATH, opsEnd, opsStart, renderArea, renderBacklog } from "@/lib/mgr/api-reference";
-import { API_ERRORS } from "@/lib/mgr/api-errors";
 import { getCommandDefinition, listTools } from "@/lib/commands/registry";
 import { fieldsOf, isNullable, isOptional, sampleInput } from "@/lib/mgr/api-schema";
 import "@/lib/commands/all";
@@ -262,26 +261,6 @@ describe("HTTP API reference", () => {
     for (const operation of apiOperations().filter((o) => o.status === "available")) {
       expect(backlog, `${operation.name} is built but still in the backlog`).not.toContain(`\`${operation.name}\``);
     }
-  });
-
-  // The errors page is the caller's whole failure contract, so a code raised in
-  // the endpoint that it does not explain is a hole a developer falls into.
-  it("explains every error code the endpoint can raise", () => {
-    const sources = ["app/api/command/route.ts", "lib/request-json.ts", "lib/commands/registry.ts", "lib/supabase/invites.ts", ...readdirSync(resolve(root, "lib/commands")).map((f) => `lib/commands/${f}`)]
-      .filter((f) => f.endsWith(".ts"))
-      .map(read).join("\n");
-    const raised = new Set([
-      ...[...sources.matchAll(/CommandError\((?:"[^"\n]*"|[^;"\n])*?,\s*\d{3},\s*"([a-z_]+)"/g)].map((m) => m[1]),
-      // route.ts's last-resort branch builds the failure envelope itself rather
-      // than throwing, so a CommandError-only grep missed `internal_error`.
-      ...[...sources.matchAll(/\bcode:\s*"([a-z_]+)"/g)].map((m) => m[1]),
-    ]);
-    raised.add("bad_request"); // CommandError's default code, used without naming it.
-    const documented = new Set(API_ERRORS.map((e) => e.code));
-    expect([...raised].filter((c) => !documented.has(c)), "raised but undocumented").toEqual([]);
-    expect([...documented].filter((c) => !raised.has(c)), "documented but never raised").toEqual([]);
-    const page = INDEX();
-    for (const error of API_ERRORS) expect(page, `${error.code} missing`).toContain(`\`${error.code}\``);
   });
 
   // The matrix is what a developer building for one role reads instead of

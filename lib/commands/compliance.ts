@@ -16,6 +16,7 @@ import { getColaDetails, getColaImage, isColaImageUrl, matchColas, searchColasBy
 import type { ColaDetails, ColaRecord } from "@/lib/ttb/colas";
 import { breweryToday, CommandError, completeRows, defineCommand, defineQuery, PAGE_SIZE, rows, STAFF_ROLES, stateCode, unwrap } from "./registry";
 import type { Ctx } from "./registry";
+import { requireAdmission } from "./admission";
 import { movementReferences } from "./inventory";
 
 const ROLES = ["admin", "sales"] as const;
@@ -159,6 +160,7 @@ defineQuery({
     const label = { p_brewery: ctx.breweryId, p_ttb_id: i.ttbId, p_image_url: i.url };
     const stored = await unwrap(ctx.db.rpc("get_stored_cola_label_image", label));
     if (stored) return { dataUrl: stored };
+    await requireAdmission(ctx.db);
     const image = await getColaImage(i.ttbId, i.url, permit).catch(colaUpstreamError);
     await (await import("@/lib/supabase/cola-label-images")).storeColaLabelImage(ctx.breweryId, i.ttbId, i.url, image.dataUrl);
     return image;
