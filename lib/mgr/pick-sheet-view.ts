@@ -7,15 +7,17 @@ import { formatDate } from "@/lib/date-format";
 import { docNo } from "./doc-no";
 import { plural } from "./plural";
 import { formatLabel, byFormat, type BrandedSku } from "./brand-lines";
+import { nextAction, warehouseRoles, type OrderStatus } from "./order-status";
 
 export type PickSheetRowView = {
   key: string;
   title: string;
   detail: string;
   href: string;
-  /** Pick on a confirmed order; any other status has no next action here,
-   *  so its row is a plain link to the order (#1026). */
-  verb?: "Pick";
+  /** The order's next step and the page that does it (#1503): Pick, Ship,
+   *  Complete transfer or Put back. A row with none is a plain link to the order (#1026). */
+  verb?: string;
+  actionHref?: string;
   /** Order was changed after pick (#811): count only the added or raised lines. */
   changedAfterPick?: boolean;
 };
@@ -42,6 +44,8 @@ export type PickSheetSnapshot = {
     status: string;
     requested_ship_date: string | null;
     repick_since?: string | null;
+    needs_restock?: boolean;
+    kind?: string;
     customers: { name: string } | null;
     order_lines: {
       id: string;
@@ -70,12 +74,14 @@ export function toPickSheetViewProps({ orders }: PickSheetSnapshot): PickSheetVi
           const total = totals.get(l.sku_id) ?? { skus: l.skus, qty: 0 };
           totals.set(l.sku_id, { ...total, qty: total.qty + Number(l.qty_ordered) });
         }
+        // The pick sheet is warehouse work, so it offers the verbs warehouse roles may run.
+        const next = nextAction(o.status as OrderStatus, o.needs_restock ?? false, o.id, warehouseRoles, o.kind === "taproom_transfer");
         return {
           key: o.id,
           title: `${o.customers?.name ?? "Transfer"} · ${docNo("ORD", o.order_no, "Order")}`,
           detail: `${o.status} · ${plural(o.order_lines.length, "line")}`,
           href: `/orders/${o.id}`,
-          verb: o.status === "confirmed" ? "Pick" as const : undefined,
+          ...(next.verb === "Open" ? {} : { verb: next.verb, actionHref: next.href }),
           changedAfterPick: o.repick_since ? true : undefined,
         };
       });

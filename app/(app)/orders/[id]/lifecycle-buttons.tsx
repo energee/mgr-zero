@@ -1,6 +1,6 @@
 // app/(app)/orders/[id]/lifecycle-buttons.tsx — status-gated order actions,
 // drawn into OrderView's slots: LifecycleButtons fills the header (Submit for
-// a draft; Ship or Complete transfer once picked; Record pick and Adjust
+// a draft, which then opens Review and confirm (#1503); Ship or Complete transfer once picked; Record pick and Adjust
 // lines while confirmed or picked), primary first, and makes its fulfillment
 // verbs secondary while Put back leads; CancelOrderAction fills the bottom
 // row with the quiet Cancel order (any pre-ship status, via
@@ -51,6 +51,7 @@ export function LifecycleButtons({
   orderId: string;
   status: OrderStatus;
 }) {
+  const router = useRouter();
   const action = useOrderAction();
   const { busy, error } = action;
   const open = status === "confirmed" || status === "picked";
@@ -58,7 +59,7 @@ export function LifecycleButtons({
 
   return (
     <>
-      {canSell && status === "draft" && E.btn("Submit", busy ? "p disabled" : "p", undefined, () => void action.run("submit_order", { orderId }))}
+      {canSell && status === "draft" && E.btn("Submit", busy ? "p disabled" : "p", undefined, () => void action.run("submit_order", { orderId }, () => router.push(`/orders/${orderId}/confirm`)))}
       {canFulfill && status === "picked" && E.btn(transfer ? "Complete transfer" : "Ship", fulfil, `/orders/${orderId}/${transfer ? "complete" : "ship"}`)}
       {canFulfill && open && E.btn("Record pick", status === "confirmed" ? fulfil : "g", `/orders/${orderId}/pick`)}
       {/* Quantities change in place on the lines (order-lines-form.tsx); this page adds or removes a beer. */}

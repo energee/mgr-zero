@@ -203,7 +203,7 @@ describe("list_work", () => {
     const po = await runCommand("create_purchase_order", { vendorId: vendor.id, lines: [{ materialId: malt.id, qtyOrdered: 5 }] }, adminCtx) as { id: string };
 
     const kinds = async (ctx: Ctx) => (await runCommand("list_work", {}, ctx) as WorkRow[]).map((r) => `${r.kind}:${r.href}`);
-    expect(await kinds(sales)).toContain(`orders:/orders/${order.order_id}`);
+    expect(await kinds(sales)).toContain(`orders:/orders/${order.order_id}/confirm`);
     expect(await kinds(sales)).not.toContain(`POs:/purchase-orders/${po.id}`);
     expect(await kinds(warehouse)).toContain(`POs:/purchase-orders/${po.id}`);
     expect((await kinds(brewer)).some((k) => k.startsWith("routes:"))).toBe(false);
