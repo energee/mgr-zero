@@ -28,7 +28,7 @@ export default async function LicensesPage() {
         today,
       })}
       actions={Object.fromEntries(licenses.map((license) => [license.id, <LicenseForm key={`${license.id}-${license.license_no}-${license.expires_on}`} license={license} />]))}
-      addLicenses={<div className="py-2"><LicenseForm /></div>}
+      addLicenses={<div className="py-2"><LicenseForm existing={licenses.map(({ state, kind }) => ({ state, kind }))} /></div>}
     />
   );
 }

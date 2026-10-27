@@ -8,10 +8,10 @@ import { CommandForm, CommandFormMessage, sheetTrigger } from "@/components/mgr/
 import { ConfirmDeleteControl } from "@/components/mgr/views/confirm-delete";
 import { LicenseView } from "@/components/mgr/views/license";
 import type { License } from "@/lib/commands/compliance";
-import { licenseInput } from "@/lib/mgr/license-view";
+import { licenseInput, type LicenseViewModel } from "@/lib/mgr/license-view";
 import { useCommandForm, useFields } from "@/lib/commands/use-command-form";
 // state and kind are locked when editing (licenseInput omits the unshown note, so the upsert keeps it): a license is addressed by them, so changing one would add a row, not move it
-export function LicenseForm({ license }: { license?: License }) {
+export function LicenseForm({ license, existing }: { license?: License; existing?: LicenseViewModel["existing"] }) {
   const { v, set, reset } = useFields({ state: license?.state ?? "", kind: license?.kind ?? "brewery", licenseNo: license?.license_no ?? "", expiresOn: license?.expires_on ?? "" });
   const form = useCommandForm("upsert_brewery_state_license", {
     build: () => licenseInput(v),
@@ -19,7 +19,7 @@ export function LicenseForm({ license }: { license?: License }) {
     target: license?.id,
   });
   const model = {
-    state: v.state, kind: v.kind, licenseNo: v.licenseNo, expiresOn: v.expiresOn,
+    state: v.state, kind: v.kind, licenseNo: v.licenseNo, expiresOn: v.expiresOn, existing,
   };
   const controls = {
     state: set("state"), kind: set("kind"),
