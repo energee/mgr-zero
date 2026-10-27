@@ -8,7 +8,7 @@ import { command } from "@/lib/commands/client";
 import { type CommandExecution, type Ctx, defineCommand } from "@/lib/commands/registry";
 import { POST } from "@/app/api/command/route";
 import { MAX_COMMAND_BODY_BYTES } from "@/lib/commands/request-limits";
-import { makeBrewery, makeStaff, sql } from "./helpers";
+import { makeBrewery, makeStaff, seedCatalog, sql } from "./helpers";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54341";
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
@@ -312,6 +312,36 @@ describe("POST /api/command bearer auth", () => {
     expect(executionHandler).not.toHaveBeenCalled();
     expect(sql(`select count(*) from private.command_requests where request_id='${requestId}'`)).toEqual(["0"]);
     sql(`delete from private.command_admissions where user_id='${adminId}'`);
+  });
+
+  it("serves stored COLA labels after the budget is spent, but still limits TTB fetches", async () => {
+    const ttbId = "23023001000185";
+    const url = "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Array.jpg&filetype=l";
+    const dataUrl = "data:image/jpeg;base64,/9j/2Q==";
+    const { brandId } = await seedCatalog(breweryId);
+    sql(`update public.breweries set ttb_registry_no='BR-PA-20553' where id='${breweryId}'`);
+    const saved = await POST(commandReq({
+      breweryId, name: "upsert_brand_approval", requestId: randomUUID(),
+      input: { brandId, kind: "cola", ttbId, approvedOn: "2023-01-24", imageUrl: url },
+    }, adminToken));
+    expect(saved.status).toBe(200);
+    sql(`select public.store_cola_label_image('${breweryId}','${ttbId}','${url}','${dataUrl}');
+      insert into private.command_admissions(user_id,window_started_at,request_count) values ('${adminId}',now(),120)
+      on conflict(user_id) do update set window_started_at=now(),request_count=120`);
+    try {
+      const cached = await POST(commandReq({ breweryId, name: "get_cola_image", input: { ttbId, url } }, adminToken));
+      expect(cached.status).toBe(200);
+      await expect(cached.json()).resolves.toMatchObject({ ok: true, data: { dataUrl } });
+      expect(sql(`select request_count from private.command_admissions where user_id='${adminId}'`)).toEqual(["120"]);
+      const uncached = await POST(commandReq({
+        breweryId, name: "get_cola_image", input: { ttbId, url: url.replace("Array.jpg", "Other.jpg") },
+      }, adminToken));
+      expect(uncached.status).toBe(429);
+      expect(Number(uncached.headers.get("retry-after"))).toBeGreaterThan(0);
+      await expect(uncached.json()).resolves.toMatchObject({ ok: false, error: { code: "rate_limited" } });
+    } finally {
+      sql(`delete from private.command_admissions where user_id='${adminId}'`);
+    }
   });
 
   it("applies admission to authenticated pretenant requests", async () => {

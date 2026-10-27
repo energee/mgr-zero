@@ -3,7 +3,7 @@
 // server-generated correlation ID. Unexpected errors are logged and returned
 // as a generic 500; database errors are sanitized in registry.ts (unwrap).
 import { NextResponse } from "next/server";
-import { consumeAdmission } from "@/lib/commands/admission";
+import { AdmissionError, requireAdmission } from "@/lib/commands/admission";
 import { buildContextFromBearer, buildRouteContext, isUuid } from "@/lib/commands/context";
 import {
   type CommandContextExpectation,
@@ -101,14 +101,9 @@ export async function POST(req: Request) {
     const ctx = token === null
       ? await buildRouteContext(body.breweryId, expectedContext)
       : await buildContextFromBearer(body.breweryId, token, expectedContext);
-    const admission = await consumeAdmission(ctx.db);
-    if (!admission.allowed) {
-      const response: CommandFailure = {
-        ok: false, error: { code: "rate_limited", message: "too many requests" },
-        ...(requestId === undefined ? {} : { requestId }), correlationId,
-      };
-      return NextResponse.json(response, { status: 429, headers: { "Retry-After": String(admission.retryAfter) } });
-    }
+    // COLA image reads admit only cache misses, inside the authorized handler.
+    // Serving stored thumbnails must not exhaust the user's command budget.
+    if (body.name !== "get_cola_image") await requireAdmission(ctx.db);
     const response: CommandSuccess<unknown> = {
       ok: true,
       data: await runCommand(body.name, body.input, ctx, execution),
@@ -124,7 +119,10 @@ export async function POST(req: Request) {
         ...(requestId === undefined ? {} : { requestId }),
         correlationId,
       };
-      return NextResponse.json(response, { status: e.status });
+      return NextResponse.json(response, {
+        status: e.status,
+        headers: e instanceof AdmissionError ? { "Retry-After": String(e.retryAfter) } : undefined,
+      });
     }
     console.error("internal error:", e instanceof Error ? e.message : e);
     const response: CommandFailure = {

@@ -79,6 +79,12 @@ same budget is spent by Ask MGR chat turns (`/api/chat`); it is not an IP or
 general Data API limit. The 5,000-row CSV limit is separate, so imports with
 unusually large string cells may need to be split into smaller batches.
 
+`get_cola_image` serves an authorized stored label without spending admission
+budget. A cache miss spends one request before contacting TTB; denied admission
+returns the same `429` envelope and `Retry-After` header. Authentication,
+brewery membership, staff roles, and saved-label checks still apply to stored
+copies.
+
 ### Responses [#responses]
 
 Success carries the operation's result in `data`:
