@@ -7,13 +7,19 @@ export type LicenseViewModel = {
   kind: string;
   licenseNo?: string;
   expiresOn?: string;
+  /** Add only: the state and kind pairs already licensed. The upsert would
+   *  silently edit that license, so Add refuses the pair instead (#1493). */
+  existing?: { state: string; kind: string }[];
 };
 
 /** Keep the withheld Save explanation aligned with the shared state picker. */
-export function licenseSubmitReason(fields: Pick<LicenseViewModel, "state" | "kind">): string | null {
+export function licenseSubmitReason(fields: Pick<LicenseViewModel, "state" | "kind" | "existing">): string | null {
   const missing: string[] = [];
   if (!US_STATE_CODES.some((state) => state === fields.state)) missing.push("a state");
   if (!fields.kind.trim()) missing.push("a kind");
+  // Kinds compare trimmed and lowercased, the way the upsert stores them.
+  const taken = fields.existing?.find((l) => l.state === fields.state.toUpperCase() && l.kind.trim().toLowerCase() === fields.kind.trim().toLowerCase());
+  if (taken) missing.push(`a state and kind without a license (edit the ${taken.state} ${taken.kind} license instead)`);
   return submitReason(missing);
 }
 
