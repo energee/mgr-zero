@@ -6,7 +6,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
-import { plannedOutputError, scheduleRunReason, type SchedulePackagingRunViewModel } from "@/lib/mgr/schedule-packaging-run-view";
+import { packageQtyError, scheduleRunReason, type SchedulePackagingRunViewModel } from "@/lib/mgr/schedule-packaging-run-view";
 
 export type SchedulePackagingRunControls = Partial<Record<"plannedOn" | "brand" | "source", (value: string) => void>> & {
   qty?: (key: string, value: string) => void;
@@ -34,7 +34,7 @@ export function SchedulePackagingRunView({ model, controls = {}, messages, foote
           onChange: qty ? (value) => qty(row.key, value) : undefined,
           onBlur: () => setTouched(previous => ({ ...previous, [row.key]: true })),
           min: 0, step: row.whole ? 1 : "any", required: false,
-          error: touched[row.key] ? plannedOutputError(row.qty, row.whole) : undefined,
+          error: touched[row.key] ? packageQtyError(row.qty, row.whole) : undefined,
         })}
         {row.listed === undefined ? null : E.sw(row.listed, "On the wholesale list")}
       </>)}</div>)
