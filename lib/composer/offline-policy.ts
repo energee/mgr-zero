@@ -9,6 +9,10 @@ export const READING_BOUNDS = {
   ph: { min: 0, max: 14 },
 } as const;
 
+/** A planned or observed mash pH, shared by record_brew_day's schema and the
+ *  Brew day form (#1476). Narrower than a fermentation reading's 0 to 14. */
+export const MASH_PH_BOUNDS = { min: 4, max: 7 } as const;
+
 // A reading names its tank, its batch, or both (docs/plans/readings-on-batch.md).
 // The cellar form always sends the tank; a batch alone is for imported history.
 export const fermentationReadingInput = z.object({
