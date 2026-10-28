@@ -74,12 +74,6 @@ export function refreshBrewerySettingsValues(previous: BrewerySettingsValues, va
   return refreshed;
 }
 
-export function aiModelSettingsReason(value: string, initial: string, models: GatewayModelOption[]): string | null {
-  if (!models.length) return submitReason(["the Gateway model catalog"]);
-  if (value === initial) return submitReason(["a change to the AI model"]);
-  return submitReason(models.some(model => model.id === value) ? [] : ["an available AI model"]);
-}
-
 export type SettingsViewModel = {
   backHref?: string;
   name: string;

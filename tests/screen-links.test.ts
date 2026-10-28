@@ -125,11 +125,9 @@ describe("reported explorer flows", () => {
     ["Create brewery", "Create brewery", "First-run checklist"],
     ["Accounting", "Review", "Customers missing email"],
     ["Mapping conflict", "Save mapping", "Accounting"],
-    ["Disconnect QuickBooks", "Disconnect QuickBooks", "Connect QuickBooks"],
+    ["Disconnect QuickBooks", "Disconnect QuickBooks", "Accounting"],
     ["Disconnect Slack", "Disconnect Slack", "Chat disconnected"],
-    ["Disconnect Square", "Disconnect Square", "Connect Square"],
-    ["Connect QuickBooks", "Connect QuickBooks", "Accounting"],
-    ["Connect Square", "Connect Square", "Square locations"],
+    ["Disconnect Square", "Disconnect Square", "Point of sale"],
     ["Point of sale", "Taproom sales in QuickBooksAbout Square’s optional connector", "Taproom sales in QuickBooks"],
     ["Taproom sales in QuickBooks", "Open Accounting", "Accounting"],
   ])("%s: %s → %s", (screen, tap, target) => {

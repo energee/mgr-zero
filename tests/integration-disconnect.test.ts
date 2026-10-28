@@ -36,11 +36,10 @@ it("offers the QuickBooks disconnect in recovery and reports an unconfirmed revo
   expect(html("disconnected")).toContain("already disconnected");
 });
 
-it("links a recovery-state Square connection to its disconnect", () => {
+it("offers a recovery-state Square connection both Disconnect and Connect on Point of sale (#1509)", () => {
   const html = renderToStaticMarkup(createElement(PointOfSaleView, {
     model: { connected: false, canDisconnect: true, merchant: "Square seller", state: "recovery required", locations: "", lastSync: "" },
-    paths: { disconnect: "/settings/pos/disconnect", connect: "/settings/pos/connect" },
   }));
-  expect(html).toContain('href="/settings/pos/disconnect"');
-  expect(html).toContain('href="/settings/pos/connect"');
+  expect(html).toMatch(/<button[^>]*>Disconnect<\/button>/);
+  expect(html).toMatch(/<button[^>]*>Connect Square<\/button>/);
 });
