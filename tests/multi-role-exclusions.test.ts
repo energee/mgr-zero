@@ -40,6 +40,12 @@ vi.mock("@/lib/mgr/sidebar-state", () => ({ sidebarOpenFromCookie: async () => t
 vi.mock("@/app/(auth)/actions", () => ({ switchBrewery: async () => undefined }));
 vi.mock("@/lib/mgr/page-query", async importOriginal => ({
   ...(await importOriginal<typeof PageQuery>()),
+  // The staff layout's Me sheet reads the gravity unit as an enrichment.
+  optionalPageQuery: async (name: string) => {
+    pageState.calls.push(name);
+    if (name === "get_gravity_unit") return { brewery: "plato", mine: null, effective: "plato" };
+    throw new Error(`Unexpected optional page query: ${name}`);
+  },
   runPageQuery: async (name: string) => {
     pageState.calls.push(name);
     switch (name) {

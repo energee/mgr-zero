@@ -1,9 +1,11 @@
 // components/mgr/views/confirm-delivery.tsx — Confirm delivery. Live slots
-// DeliveredForm; inventory and live share the outcome controls.
+// DeliveredForm; inventory and live share the outcome controls. Both outcome
+// verbs sit in the shared CommandFormFooter, Delivered last (#1226).
 "use client";
 
 import { Fragment, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { CommandFormFooter } from "@/components/mgr/command-form";
 import { IRREVERSIBLE } from "@/components/mgr/irreversible-submit";
 import { deliveryOutcomeState, type ConfirmDeliveryViewModel } from "@/lib/mgr/confirm-delivery-view";
 import { REFUSAL_REASONS } from "@/lib/mgr/enums";
@@ -74,13 +76,15 @@ export function DeliveryOutcomeForm({ lines, transfer = false, initialSignedBy =
       {E.note("Refused beer closes on this order. Stock returns only after a physical check-in. Redelivery of refused beer needs a new order.")}
     </>}
     {E.edit("Received by", signedBy, "text", receivedSuggestions, { onChange: setSignedBy, required: !fullRefusal })}
-    {/* Inventory keeps the same action inert; the live adapter supplies the command. */}
-    {E.btn("Not delivered · leave for a later route", "g", undefined, onLeave ?? (() => {}))}
     {error && E.status(error, "w")}
-    {E.submit(fullRefusal ? "Record refusal" : hasRefusal ? "Record partial delivery" : "Delivered", {
-      id: "confirm-delivery", type: "button", reason: outcome.reason, submitting: busy, onClick: submit,
-      className: IRREVERSIBLE,
-    })}
+    <CommandFormFooter>
+      {/* Inventory keeps the same action inert; the live adapter supplies the command. */}
+      {E.btn("Not delivered · leave for a later route", "g", undefined, onLeave ?? (() => {}))}
+      {E.submit(fullRefusal ? "Record refusal" : hasRefusal ? "Record partial delivery" : "Delivered", {
+        id: "confirm-delivery", type: "button", reason: outcome.reason, submitting: busy, onClick: submit,
+        className: IRREVERSIBLE,
+      })}
+    </CommandFormFooter>
     </fieldset>
   </>;
 }

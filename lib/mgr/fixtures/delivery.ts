@@ -9,11 +9,11 @@ export const routesDriver: RoutesSnapshot = {
   title: "Deliveries",
   subtitle: "",
   rows: [
-    { key: "a", title: "Route A · Sep 10, 2026", detail: "departed · 1 of 3 delivered", verb: "Resume", tone: "info" },
+    { key: "a", title: "Route A · Sep 10, 2026", detail: "Departed · 1 of 3 delivered", verb: "Resume", tone: "info" },
     { key: "b", title: "Route B · Sep 11, 2026", detail: "2 stops · driver not assigned", verb: "Assign", tone: "attention", warning: true },
     { key: "c", title: "Route C · Sep 12, 2026", detail: "2 stops · sam@example.test" },
-    { key: "ord", title: "ORD-0236 · Ridgeline · Dock", detail: "shipped · no route", verb: "Add to route", tone: "attention", warning: true },
-    { key: "trf", title: "TRF-0004 · Storage", detail: "shipped · no route", verb: "Add to route", tone: "attention", warning: true },
+    { key: "ord", title: "ORD-0236 · Ridgeline · Dock", detail: "Shipped · no route", verb: "Add to route", tone: "attention", warning: true },
+    { key: "trf", title: "TRF-0004 · Storage", detail: "Shipped · no route", verb: "Add to route", tone: "attention", warning: true },
   ],
 };
 
@@ -31,7 +31,7 @@ export const routeAPlan: RouteViewModel = {
     { key: "s1", title: "ORD-0231 · Ridgeline · Tap Room", detail: "stop 1" },
     { key: "s2", title: "ORD-0233 · Al’s Bar · Dock", detail: "stop 2" },
     { key: "s3", title: "TRF-0004 · Storage", detail: "stop 3" },
-    { key: "s4", title: "ORD-0236 · Teresa’s · Dock", detail: "shipped · no route", warning: true },
+    { key: "s4", title: "ORD-0236 · Teresa’s · Dock", detail: "Shipped · no route", warning: true },
   ],
 };
 

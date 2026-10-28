@@ -1,10 +1,10 @@
 "use client";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { Button } from "@/components/ui/button";
+import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { OrderQuantity } from "./new-order";
-import { CLOSURE_FORM_ID, receiveMode, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
+import { CLOSURE_FORM_ID, receiveMode, receiveReason, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
 import { submitReason } from "@/lib/mgr/submit-reason";
 
 export type { ReceivePoViewModel };
@@ -15,13 +15,18 @@ export type ReceivePoControls = {
   bin?: (id: string) => void; receivedOn?: (value: string) => void; sentVia?: (value: string) => void;
 };
 
-export function ReceivePoView({ model, controls = {}, messages, submitting = false, disabled = false, footer }: {
+/** Receive purchase order and Correct receipt print why they are withheld
+ *  (receiveReason), beside their own button rather than the closure block's. */
+export function ReceivePoView({ model, controls = {}, messages, submitting = false, footer }: {
   model: ReceivePoViewModel; controls?: ReceivePoControls; messages?: ReactNode; footer?: ReactNode;
-  submitting?: boolean; disabled?: boolean;
+  submitting?: boolean;
 }) {
   const mode = receiveMode(model.state);
   const correcting = mode === "correct";
   const receiving = mode === "receive" || correcting;
+  let verb: ReactNode = null;
+  if (receiving) verb = E.pin(<IrreversibleSubmit label={correcting ? "Correct receipt" : "Receive purchase order"} submitting={submitting} reason={receiveReason(model)} />);
+  else if (mode === "draft") verb = E.pin(E.submit("Mark sent", { submitting }));
   return <>
     {E.back("Purchase orders", model.title, undefined, model.backHref)}
     {model.status && E.fld("Status", model.status)}
@@ -66,6 +71,6 @@ export function ReceivePoView({ model, controls = {}, messages, submitting = fal
     </fieldset>}
     {messages}
     {E.sp()}
-    {footer !== undefined ? footer : (receiving || mode === "draft") && E.pin(<Button type="submit" data-variant={receiving ? "irreversible" : undefined} className={receiving ? "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90" : ""} disabled={submitting || disabled}>{submitting ? "Saving…" : { draft: "Mark sent", correct: "Correct receipt", receive: "Receive purchase order", view: "" }[mode]}</Button>)}
+    {footer !== undefined ? footer : verb}
   </>;
 }

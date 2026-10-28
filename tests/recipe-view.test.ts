@@ -262,6 +262,12 @@ describe("batch totals in packs", () => {
     expect(draw({ ...model, totalsAtBbl: "22" }, false)).toContain("Round to 5 × 50 lb");
     expect(draw({ ...model, totalsAtBbl: "22", ingredients: [{ ...model.ingredients[0], pack: { ...malt, perBbl: 9.090909 } }] }, false)).toContain("Whole packs");
   });
+  it("#1479 reads an exponent batch size as no size, and says why", () => {
+    const model = { title: "Pale v3", ingredients: [{ key: "i1", title: "2-row", detail: "Mash · 10 lb / bbl", qty: "", pack: malt }], totalsAtBbl: "1e1" };
+    const html = renderToStaticMarkup(createElement(RecipeView, { model, readOnly: true }));
+    expect(html).not.toContain("100 lb");
+    expect(html).toContain("Enter a decimal number, not exponent notation");
+  });
   it("gives a pack to brew-day lines only, from the material's pack size", () => {
     const material = { base_uom: "lb", purchase_uom_factor: 50 };
     expect(ingredientPack("whirlpool", 2, material)).toEqual({ perBbl: 2, factor: 50, unit: "lb" });

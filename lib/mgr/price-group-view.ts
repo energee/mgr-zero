@@ -5,7 +5,7 @@
 // same row before it exists (the create form): blank name, next position,
 // under the last group's ceiling, no Prices line. priceGroupReason says what
 // the sheet's Save still needs.
-import { dollarsInput, money, toCents } from "./money";
+import { centsMaxError, dollarsInput, money } from "./money";
 import { plural } from "./plural";
 import { submitReason } from "./submit-reason";
 import { barcodeOf, byPosition, formatLabel, type PriceGroupRow, type PriceGroupsSnapshot } from "./price-groups-view";
@@ -78,7 +78,7 @@ export function priceGroupFieldErrors(fields: Pick<PriceGroupViewModel, "positio
   if (fields.costCeilingInput !== "") {
     if (/[eE]/.test(fields.costCeilingInput)) costCeiling = "Enter a decimal number without exponent notation.";
     else if (!Number.isFinite(cost) || cost < 0) costCeiling = "Enter a cost of zero or more.";
-    else if (toCents(fields.costCeilingInput)! > 2_147_483_647) costCeiling = "Enter a cost no greater than $21,474,836.47.";
+    else costCeiling = centsMaxError(fields.costCeilingInput, "a cost");
   }
   let positionError: string | undefined;
   if (/[eE]/.test(fields.position)) positionError = "Enter a decimal number without exponent notation.";
