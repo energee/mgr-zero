@@ -5,6 +5,7 @@
 import { brandLabel } from "./brand-view";
 import { batNo } from "@/lib/mgr/doc-no";
 import { formatVolume } from "@/lib/volume";
+import { isPastDay } from "@/lib/date-format";
 import { submitReason } from "./submit-reason";
 import { isNumber, numberNotationError } from "./quantity-input";
 
@@ -52,13 +53,15 @@ export const plannedQty = (value: string | undefined) => {
 };
 
 /** A package count's error, planned (Schedule) or actual (Close, #1477): plain
- *  notation, zero or more, whole kegs. Blank is no error here; each form says
- *  whether a blank is allowed. */
+ *  notation, zero or more, whole kegs, and within qty_planned / qty_actual's
+ *  numeric(12,2). Blank is no error here; each form says whether a blank is
+ *  allowed. */
 export function packageQtyError(value: string, whole = false): string | undefined {
   if (!value.trim()) return undefined;
   const notation = numberNotationError(value);
   if (notation) return notation;
   if (!isNumber(value) || Number(value) < 0) return "Enter a quantity of zero or more.";
+  if (Number(value) > 9_999_999_999.99) return "Enter a quantity no greater than 9,999,999,999.99.";
   if (whole && !Number.isInteger(Number(value))) return "Enter a whole number of kegs.";
 }
 
@@ -97,7 +100,7 @@ export function toSchedulePackagingRunView(data: ScheduleRunData, draft: Schedul
     sourceWarning: occupancy && drawn !== undefined && drawn > Number(occupancy.bbl)
       ? "This plan needs more beer than the selected tank currently holds. You can save the plan; it does not reserve or move beer."
       : undefined,
-    dateWarning: today && /^\d{4}-\d{2}-\d{2}$/.test(draft.plannedOn) && draft.plannedOn < today
+    dateWarning: isPastDay(draft.plannedOn, today)
       ? "This planned date is in the past for your brewery. You can save the plan; it does not record packaging or move inventory."
       : undefined,
   };

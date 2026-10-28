@@ -565,6 +565,7 @@ export type InvoicePaymentView = { key: string; id: string; amount: string; rece
 //   (mirrors record_invoice_payment's refusals; derived here, not in the page)
 export type InvoicePaymentValue = { amount: string; receivedOn: string; method: PaymentMethod | ""; reference: string };
 export function invoicePaymentReady(value: InvoicePaymentValue, balanceCents: number, today: string): boolean;
+// (#1485 replaced it with invoicePaymentReason, which names what is missing, and invoicePaymentAmountError.)
 
 // lib/mgr/qbo-ui.ts — qboInvoicePresentation input gains a required field, so tsc names every caller
 localPaidCents: number;  // > 0: "Payments recorded in MGR · not sent to QuickBooks", no actions

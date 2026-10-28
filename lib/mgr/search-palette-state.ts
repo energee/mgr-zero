@@ -1,4 +1,4 @@
-import { STAFF_NAV, navFor, shippedNav } from "@/lib/mgr/nav";
+import { STAFF_NAV, UNLISTED_NAV, navFor, shippedNav } from "@/lib/mgr/nav";
 import type { StaffRole } from "@/lib/commands/registry";
 import type { SearchHit, SearchKind } from "@/lib/commands/search";
 
@@ -21,8 +21,7 @@ export function excludeSeen(hits: SearchHit[], recent: SearchHit[] = []) {
 export function searchDestinations(roles: readonly StaffRole[], term: string) {
   const query = term.trim().toLowerCase();
   if (!query) return [];
-  return navFor(shippedNav(STAFF_NAV), roles)
-    .flatMap(item => [item, ...(item.children ?? [])])
+  return [...navFor(shippedNav(STAFF_NAV), roles).flatMap(item => [item, ...(item.children ?? [])]), ...navFor(UNLISTED_NAV, roles)]
     .filter(item => item.label.toLowerCase().includes(query));
 }
 

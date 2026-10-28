@@ -21,6 +21,8 @@ import { Icon } from "@/components/mgr/icon";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
 import { PERSONAS, type Persona, PORTAL_BUYER } from "@/lib/mgr/demo-personas";
+import { toUnitsViewProps } from "@/lib/mgr/units-view";
+import { unitsPlato } from "@/lib/mgr/fixtures/settings-catalog";
 
 /** A sheet record as the command form it ships in. Pinned open unless `onClose`
  * is given (the explorer passes it, and `container` to keep the portal in its box). */
@@ -58,7 +60,7 @@ export function ScreenFrame({ screen: s, persona = PERSONAS[0], container }: { s
   const me = (
     <MeSheet avatar={{ src: persona.avatar, name: persona.name }}>
       <MeView
-        model={{ name: persona.name, roles: persona.roles, email: `${persona.handle.slice(1)}@demobrewing.com`, breweries: [{ name: "Demo Brewing", current: true }] }}
+        model={{ name: persona.name, roles: persona.roles, email: `${persona.handle.slice(1)}@demobrewing.com`, breweries: [{ name: "Demo Brewing", current: true }], units: toUnitsViewProps(unitsPlato) }}
         avatar={<UserAvatar src={persona.avatar} name={persona.name} className="size-10" />}
       />
     </MeSheet>
