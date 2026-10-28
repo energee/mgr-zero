@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { ReceivePoView } from "@/components/mgr/views/receive-po";
 import { ReceiptView } from "@/components/mgr/views/receipt";
-import { CLOSURE_FORM_ID, CORRECTION_INFO, isCount, receiveMode, receiveReason, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
+import { CLOSURE_FORM_ID, CORRECTION_INFO, isCount, poLineDetail, poLineQty, receiveMode, receiveReason, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
 import { receiptBillRequest, receiptHref, type ReceiptViewModel } from "@/lib/mgr/receipt-view";
 import { fromPacks } from "@/lib/mgr/pack-qty";
 import { useCommandAction } from "@/lib/commands/use-command-form";
@@ -42,8 +42,8 @@ export function ReceiveForm({ poId, lines, locations, bins, today, model, correc
     lotSuggestionsUnavailable: open.some(line => line.material?.lot_tracked),
     lines: open.map(line => ({
       key: line.id, title: line.material?.name ?? `Line ${line.id}`,
-      detail: correcting ? `originally counted ${line.qty_counted} ${line.material?.purchase_uom ?? "purchase units"}` : `ordered ${line.qty_ordered} · received ${line.qty_received} · still due ${line.qty_open}${line.material ? ` ${line.material.purchase_uom}` : ""}${line.expected_lot_code ? ` · PO lot ${line.expected_lot_code}` : ""}`,
-      qty: receiving ? counts[line.id] ?? "" : line.qty_ordered,
+      detail: correcting ? `originally counted ${line.qty_counted} ${line.material?.purchase_uom ?? "purchase units"}` : poLineDetail(line),
+      qty: receiving ? counts[line.id] ?? "" : poLineQty(line.qty_ordered, line.material),
       lot: line.material?.lot_tracked ? lots[line.id] ?? "" : undefined, bestBy: bestBy[line.id],
       warning: receiving && counts[line.id] !== "" && Number(counts[line.id]) !== line.qty_open,
     })),
