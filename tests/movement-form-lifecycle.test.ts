@@ -89,3 +89,34 @@ it("the inventory trigger opens via URL state and browser Back closes it", () =>
   navigate("/inventory");
   expect(render()[0].props.open).toBe(false);
 });
+
+// A Finished goods row links /inventory?recordMovement=1&skuId=…; on
+// /inventory that soft-navigates into the mounted form, whose fields were
+// seeded only on mount (#1507). Each new deep link's SKU must still be chosen.
+it("chooses the SKU each newer deep link names in a form already mounted (#1507)", () => {
+  const skus = [{ id: "s1", label: "Hazy · Keg", bblPerUnit: 0.5 }, { id: "s2", label: "Pils · Case", bblPerUnit: 0.3 }];
+  // The dialog holds <form>, which holds RecordMovementView and its model.
+  type FormDialog = Dialog & { props: { children: ReactElement<{ children: ReactElement<{ model: { skuId: string } }> }> } };
+  const dialog = () => {
+    state.cursor = 0;
+    return (MovementForm({ skus, locations: [], bins: [], channels: [], timeZone: "UTC", skusHref: null }).props.children as FormDialog[])[0];
+  };
+  // React re-renders at once after a render-phase update; this mock needs a second call.
+  function sku() {
+    dialog();
+    return dialog().props.children.props.children.props.model.skuId;
+  }
+  expect(sku()).toBe("");
+  navigate("/inventory?recordMovement=1&skuId=s1");
+  expect(sku()).toBe("s1");
+  dialog().props.onOpenChange(false);
+  expect(sku()).toBe("");
+  navigate("/inventory?recordMovement=1&skuId=s1");
+  expect(sku()).toBe("s1");
+  dialog().props.onOpenChange(false);
+  navigate("/inventory?recordMovement=1&skuId=s2");
+  expect(sku()).toBe("s2");
+  dialog().props.onOpenChange(false);
+  navigate("/inventory?recordMovement=1&skuId=unknown");
+  expect(sku()).toBe("");
+});
