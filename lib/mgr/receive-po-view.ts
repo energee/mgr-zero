@@ -34,6 +34,15 @@ export type ReceivePoViewModel = {
   history?: { key: string; label: string; detail: string; href?: string }[];
 };
 
+type PoLineAmounts = { qty_ordered: number; qty_received: number; qty_open: number; expected_lot_code: string | null; material: { purchase_uom: string } | null };
+
+/** A PO line quantity with its purchase unit, when the material is known. */
+export const poLineQty = (qty: number, material: PoLineAmounts["material"]) => (material ? `${qty} ${material.purchase_uom}` : String(qty));
+
+/** A PO line's ordered, received and still-due amounts, each with its unit (#1501), then the PO's lot. */
+export const poLineDetail = (line: PoLineAmounts) =>
+  `ordered ${poLineQty(line.qty_ordered, line.material)} · received ${poLineQty(line.qty_received, line.material)} · still due ${poLineQty(line.qty_open, line.material)}${line.expected_lot_code ? ` · PO lot ${line.expected_lot_code}` : ""}`;
+
 /** What a receipt correction does, shown on the live form and its inventory frame. */
 export const CORRECTION_INFO = "The original receipt remains in history. Its stock is reversed and the corrected count is posted at the original receiving bin. Subsequent stock use or shared lot changes can prevent correction.";
 

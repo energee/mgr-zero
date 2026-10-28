@@ -1,10 +1,10 @@
 // tests/list-params.test.ts — a list page's URL params: typed, defaulted, and rebuilt into links.
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { listParams } from "@/lib/mgr/list-params";
+import { listParams, SEARCH_MAX, searchQuery } from "@/lib/mgr/list-params";
 
 const schema = z.object({
-  q: z.string().trim().max(100).catch(""),
+  q: searchQuery,
   sort: z.enum(["name", "abv"]).catch("name"),
   category: z.string().catch(""),
 });
@@ -15,6 +15,12 @@ describe("listParams", () => {
   });
   it("falls back on one bad param without losing the others", () => {
     expect(listParams(schema, { q: " hazy ", sort: "bogus" }).params).toEqual({ q: "hazy", sort: "name", category: "" });
+  });
+  it("cuts an over-long search to its first SEARCH_MAX characters instead of dropping it", () => {
+    expect(listParams(schema, { q: "a".repeat(300) }).params.q).toBe("a".repeat(SEARCH_MAX));
+  });
+  it("treats a whitespace-only search as no search", () => {
+    expect(listParams(schema, { q: "   " }).params.q).toBe("");
   });
   it("takes the first value of a repeated param", () => {
     expect(listParams(schema, { sort: ["abv", "name"] }).params.sort).toBe("abv");
