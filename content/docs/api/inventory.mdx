@@ -300,7 +300,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Paginated immutable movements with location/bin/lot labels, resolved source document ref_label (null without a visible source document), and reversal links; movementId selects an original and its exact compensation
+Paginated immutable movements with location/bin/lot labels, resolved source document ref_label and ref_kind (order, run, transfer, invoice, delivery or count; both null without a visible source document), and reversal links; movementId selects an original and its exact compensation
 
 | Field | Type | Required |
 | --- | --- | --- |

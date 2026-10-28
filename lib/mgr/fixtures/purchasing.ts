@@ -16,9 +16,9 @@ export const purchaseOrdersWarehouse: PurchaseOrdersSnapshot = {
   title: "Purchase orders",
   subtitle: "warehouse default",
   rows: [
-    { key: "po142", title: "PO-0142 · Country Malt", detail: "sent Sep 7, 2026 · expected Sep 10, 2026", verb: "Receive", tone: "info" },
-    { key: "po141", title: "PO-0141 · YCH", detail: "partially received · 1 Citra box due", verb: "Receive", tone: "info", warning: true },
-    { key: "po143", title: "PO-0143 · CanSource", detail: "draft · 4 pallets", verb: "Send", tone: "info" },
+    { key: "po142", title: "PO-0142 · Country Malt", detail: "Sent Sep 7, 2026 · expected Sep 10, 2026", verb: "Receive", tone: "info" },
+    { key: "po141", title: "PO-0141 · YCH", detail: "Partially received · 1 line still due", verb: "Receive", tone: "info", warning: true },
+    { key: "po143", title: "PO-0143 · CanSource", detail: "Draft", verb: "Mark sent", tone: "info" },
   ],
 };
 
@@ -69,7 +69,7 @@ export const receivePoCountryMalt: ReceivePoViewModel = {
 export const receiptPoCountryMalt: ReceiptViewModel = {
   correction: {},
   bill: { receiptId: "receipt-country-malt", status: "not_posted", action: "post" },
-  title: "PO-0142 · receipt Sep 10, 2026",
+  title: "PO-0142 · receipt Sep 10, 2026", backTo: "PO-0142",
   status: "partially received",
   stillOwed: "1 Citra box · 44 lb",
   tape: [

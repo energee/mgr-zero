@@ -21,8 +21,10 @@ function FormatSelect({ label, value, options, onChange }: { label: string; valu
   return E.pick(label, value, choices, { onChange, displayValue: choices.find(option => option.value === value)?.label });
 }
 
-export function FormatView({ model, createAction, controls = {}, messages, footer, onSubmit, materials, contents, editing = false, canCompose = !editing, componentOptions = [], componentRows = NO_ROWS, onComponentRowsChange = () => {}, deleteAction, formId }: {
+export function FormatView({ model, createAction, controls = {}, messages, footer, onSubmit, materials, contents, editing = false, canCompose = !editing, componentOptions = [], componentRows = NO_ROWS, onComponentRowsChange = () => {}, deleteAction, formId, nameError }: {
   model: FormatViewModel;
+  /** Live: the name is taken, by another format or the save's refusal. Opens the name field. */
+  nameError?: string;
   createAction?: ReactNode;
   controls?: Controls;
   messages?: ReactNode;
@@ -56,9 +58,9 @@ export function FormatView({ model, createAction, controls = {}, messages, foote
         </div>}
         {sizing.valid && <div className="py-3" aria-live="polite"><p className="text-xs text-muted-foreground">Beer per package</p><p className="text-lg font-medium tabular-nums">{sizing.volumeLabel}</p></div>}
       </>}
-      <details open={model.name || model.composed ? true : undefined}>
+      <details open={model.name || model.composed || nameError ? true : undefined}>
         <summary className="cursor-pointer text-sm font-medium">{model.composed ? "Format name · required" : model.name ? "Format name" : "Rename · optional"}</summary>
-        <div className="pt-3">{E.edit("Format name", model.name, "text", undefined, { onChange: controls.name, required: model.composed, placeholder: sizing.valid ? sizing.name : "Name this format", "aria-label": "Format name" })}</div>
+        <div className="pt-3">{E.edit("Format name", model.name, "text", undefined, { onChange: controls.name, required: model.composed, placeholder: sizing.valid ? sizing.name : "Name this format", "aria-label": "Format name", id: `${id}-name`, error: nameError })}</div>
       </details>
       {!model.name && sizing.valid && <p className="text-sm text-muted-foreground">Saves as <strong className="font-medium text-foreground">{sizing.name}</strong></p>}
       {canCompose && <details className="pt-3"><summary className="cursor-pointer text-sm font-medium">Build from other packages</summary><label className="mt-3 flex items-center gap-2 text-sm">{E.sw(model.composed, "Calculate volume from smaller packages", controls.composed)}Calculate volume from smaller packages.</label></details>}

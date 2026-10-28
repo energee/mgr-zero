@@ -295,7 +295,7 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_order", description: "One order with lines (each SKU with its brand name and staff alias, and format name), keg deposits, events, shipment, brewery ATP, and on-hand stock at its fulfillment source",
+  name: "get_order", description: "One order with lines (each SKU with its brand name and staff alias, and format name), keg deposits, events, shipment with its invoice, brewery ATP, and on-hand stock at its fulfillment source",
   roles: [...readRoles],
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
@@ -306,7 +306,7 @@ defineQuery({
       completeRows("Order lines", start => ctx.db.from("order_lines").select("*, skus(name, brands(name, alias), formats(name))", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId).order("sku_id").range(start, start + PAGE_SIZE - 1)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
-      unwrap(ctx.db.from("shipments").select("*, deliveries(outcome)").eq("order_id", i.orderId).maybeSingle()),
+      unwrap(ctx.db.from("shipments").select("*, deliveries(outcome), invoices(id, invoice_no)").eq("order_id", i.orderId).maybeSingle()),
       completeRows("Order deposits", start => ctx.db.from("order_deposit_lines")
         .select("id, order_line_id, description, qty_ordered, unit_price_cents, amount_cents", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId).order("id").range(start, start + PAGE_SIZE - 1)),
@@ -438,12 +438,12 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_invoice", description: "One invoice with its lines and the payments recorded in MGR",
+  name: "get_invoice", description: "One invoice with its lines, the order it bills (through its shipment), and the payments recorded in MGR",
   roles: [...readRoles],
   input: z.object({ invoiceId: z.string().uuid() }),
   handler: async (ctx, i) => {
     const [invoice, invLines, pushes, paymentRows] = await Promise.all([
-      unwrap(ctx.db.from("invoices").select("*, customers(id,name,qbo_customer_id,qbo_realm_id)").eq("id", i.invoiceId).eq("brewery_id", ctx.breweryId).single()),
+      unwrap(ctx.db.from("invoices").select("*, customers(id,name,qbo_customer_id,qbo_realm_id), shipments(orders(id, order_no))").eq("id", i.invoiceId).eq("brewery_id", ctx.breweryId).single()),
       completeRows("Invoice lines", start => ctx.db.from("invoice_lines").select("*, skus(name,qbo_item_id,qbo_realm_id)", { count: "exact" })
         .eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).order("kind").order("id").range(start, start + PAGE_SIZE - 1)),
       invoicePushFacts(ctx, [i.invoiceId]),

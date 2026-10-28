@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -223,26 +224,26 @@ it("#1030 starts the Accounting cell at the left edge its header uses", () => {
 
 it("#1135 shows the sync only while QuickBooks is connected, and writes the email note for staff", () => {
   const draw = (connected: boolean, canConnect = true) => renderToStaticMarkup(createElement(InvoicesView, {
-    rows: [], connection: { connected, reconnect: true, detail: "QuickBooks status", canConnect, connectHref: "/settings/accounting/connect" },
+    rows: [], connection: { connected, reconnect: true, detail: "QuickBooks status", canConnect, connectHref: "/settings/accounting" },
     sync: createElement("span", null, "live sync"),
   }));
   expect(draw(true)).toContain("live sync");
   expect(draw(true)).not.toContain("Payment status may be stale until QuickBooks is reconnected");
   const admin = draw(false);
   expect(admin).not.toContain("live sync");
-  expect(admin).toContain('href="/settings/accounting/connect"');
+  expect(admin).toContain('href="/settings/accounting"');
   expect(admin).toContain("Payment status may be stale until QuickBooks is reconnected and synced.");
   expect(admin).toContain("MGR can’t tell whether QuickBooks emailed an invoice.");
   expect(admin).not.toContain("invoice query");
   const sales = draw(false, false);
   expect(sales).not.toContain("live sync");
   expect(sales).toContain("Admin must connect");
-  expect(sales).not.toContain('href="/settings/accounting/connect"');
+  expect(sales).not.toContain('href="/settings/accounting"');
 });
 
 it("#1135 falls back to the shared sync view only while connected", () => {
   const draw = (connected: boolean) => renderToStaticMarkup(createElement(InvoicesView, {
-    rows: [], connection: { connected, detail: "QuickBooks status", canConnect: true, connectHref: "/settings/accounting/connect" },
+    rows: [], connection: { connected, detail: "QuickBooks status", canConnect: true, connectHref: "/settings/accounting" },
   }));
   expect(draw(true)).toContain("Sync QuickBooks");
   expect(draw(false)).not.toContain("Sync QuickBooks");
@@ -255,4 +256,40 @@ it("explains where invoices come from without requiring QuickBooks (#1261)", () 
   expect(html).toMatch(/push them to QuickBooks or record payments in MGR/);
   expect(html).toContain("MGR can’t tell whether QuickBooks emailed an invoice.");
   expect(html).toContain(">Unavailable<");
+});
+
+describe("Record payment from the register (#1506)", () => {
+  // Never sent to QuickBooks, so MGR's payment ledger owns the balance (#1045).
+  const ledger = { ...invoice, id: "ledger", qbo_invoice_id: null, qbo_sync_status: "pending" as const, qbo_balance_cents: null, local_paid_cents: 40000 };
+  const balance = (overrides: Partial<InvoiceListRecord>) => toInvoiceListRow({ ...ledger, ...overrides }, ["admin"], false, "UTC").paymentBalanceCents;
+
+  it("takes a payment on the same invoices as the invoice page, up to the rest of the balance", () => {
+    expect(balance({})).toBe(64000);
+    expect(balance({ local_paid_cents: 104000, paid_at: "2026-09-25T04:00:00Z" })).toBeNull();
+    expect(balance({ written_off_at: "2026-09-30T15:00:00Z" })).toBeNull();
+    expect(balance({ qbo_invoice_id: "qbo-1", qbo_balance_cents: 64000 })).toBeNull();
+    expect(balance({ has_pending_qbo_push: true })).toBeNull();
+    expect(balance({ total_cents: 0, subtotal_cents: 0, local_paid_cents: 0 })).toBeNull();
+    expect(balance({ kind: "credit_memo", total_cents: -18000 })).toBeNull();
+  });
+
+  it("draws Record payment only on rows that take one: inert in the inventory, the caller's control live, none for null", () => {
+    const rows = [toInvoiceListRow(ledger, ["admin"], false, "UTC"), toInvoiceListRow(invoice, ["admin"], false, "UTC")];
+    // Once in the desk table and once in the phone list, for the one ledger row.
+    expect(renderToStaticMarkup(createElement(InvoicesView, { rows })).match(/>Record payment</g)).toHaveLength(2);
+    const live = renderToStaticMarkup(createElement(InvoicesView, { rows, recordPayment: row => `PAY-${row.id}` }));
+    expect(live).toContain("PAY-ledger");
+    expect(live).not.toContain("PAY-actual");
+    expect(renderToStaticMarkup(createElement(InvoicesView, { rows, recordPayment: null }))).not.toContain("Record payment");
+  });
+
+  it("the live register mounts the invoice page's form for a viewer who may record payments", () => {
+    const page = readFileSync("app/(app)/invoices/page.tsx", "utf8");
+    expect(page).toMatch(/recordPayment=\{canRun\(ctx, "record_invoice_payment"\)/);
+    expect(page).toMatch(/<RecordPaymentForm invoiceId=\{row\.id\} balanceCents=\{row\.paymentBalanceCents!\}/);
+  });
+
+  it("Record payment starts with the balance due (#1506)", () => {
+    expect(readFileSync("app/(app)/invoices/[id]/payment-form.tsx", "utf8")).toMatch(/amount: dollarsInput\(balanceCents\)/);
+  });
 });

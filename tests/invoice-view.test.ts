@@ -9,7 +9,7 @@ import { SCREENS } from "../components/mgr/screens";
 import { InvoiceView, RecordPaymentView } from "../components/mgr/views/invoice";
 import { creditMemoAls, invoiceEditedInQbo, invoiceFailedAls, invoiceLocalPartlyPaid, invoicePartlyPaid } from "../lib/mgr/fixtures/invoice";
 import { ALS } from "../lib/mgr/fixtures/demo";
-import { invoiceMappingRows, invoicePaymentReady, toInvoiceViewProps } from "../lib/mgr/invoice-view";
+import { invoiceMappingRows, invoicePaymentAmountError, invoicePaymentReason, toInvoiceViewProps } from "../lib/mgr/invoice-view";
 import { invoiceIsCreditable } from "../lib/mgr/invoice-state";
 
 const htmlOf = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(createElement("div", null, node));
@@ -377,26 +377,62 @@ describe("RecordPaymentView (#1045)", () => {
   });
 });
 
-describe("invoicePaymentReady", () => {
+describe("invoicePaymentReason (#1485)", () => {
   const ready = { amount: "100.00", receivedOn: "2026-10-01", method: "check" as const, reference: "" };
   const today = "2026-10-23";
-  it("accepts an amount up to the balance with a date and a method", () => {
-    expect(invoicePaymentReady(ready, 31500, today)).toBe(true);
-    expect(invoicePaymentReady({ ...ready, amount: "315.00" }, 31500, today)).toBe(true);
-    expect(invoicePaymentReady({ ...ready, receivedOn: today }, 31500, today)).toBe(true);
+  it("is null for an amount up to the balance with a date and a method", () => {
+    expect(invoicePaymentReason(ready, 31500, today)).toBeNull();
+    expect(invoicePaymentReason({ ...ready, amount: "315.00" }, 31500, today)).toBeNull();
+    expect(invoicePaymentReason({ ...ready, receivedOn: today }, 31500, today)).toBeNull();
   });
   it("accepts a date before the invoice was issued: a prepayment (Q10)", () => {
-    expect(invoicePaymentReady({ ...ready, receivedOn: "2026-08-01" }, 31500, today)).toBe(true);
+    expect(invoicePaymentReason({ ...ready, receivedOn: "2026-08-01" }, 31500, today)).toBeNull();
   });
   it.each([
-    ["zero", { amount: "0" }],
-    ["no amount", { amount: "" }],
-    ["a non-number", { amount: "abc" }],
-    ["above the balance (Q1)", { amount: "315.01" }],
-    ["a date after today", { receivedOn: "2026-10-24" }],
-    ["no date", { receivedOn: "" }],
-    ["no method", { method: "" as const }],
-  ])("refuses %s", (_, patch) => {
-    expect(invoicePaymentReady({ ...ready, ...patch }, 31500, today)).toBe(false);
+    ["no amount", { amount: "" }, "an amount from $0.01 to $315.00"],
+    ["zero", { amount: "0" }, "an amount from $0.01 to $315.00"],
+    ["a negative amount", { amount: "-5" }, "an amount from $0.01 to $315.00"],
+    ["a fraction of a cent", { amount: "0.001" }, "an amount from $0.01 to $315.00"],
+    ["a non-number", { amount: "abc" }, "an amount from $0.01 to $315.00"],
+    ["above the balance (Q1)", { amount: "315.01" }, "an amount from $0.01 to $315.00"],
+    ["far above the balance", { amount: "99999999999" }, "an amount from $0.01 to $315.00"],
+    ["a date after today", { receivedOn: "2026-10-24" }, "a received day no later than today"],
+    ["no date", { receivedOn: "" }, "a received day no later than today"],
+    ["no method", { method: "" as const }, "a method"],
+  ])("names %s", (_, patch, need) => {
+    expect(invoicePaymentReason({ ...ready, ...patch }, 31500, today)).toBe(`Still needed: ${need}.`);
+  });
+  it("marks a bad amount at the field, but not an empty one", () => {
+    expect(invoicePaymentAmountError("", 45000)).toBeUndefined();
+    expect(invoicePaymentAmountError("450", 45000)).toBeUndefined();
+    for (const amount of ["-5", "0", "0.001", "450.01", "99999999999"]) {
+      expect(invoicePaymentAmountError(amount, 45000)).toBe("Enter an amount from $0.01 to $450.00, in dollars and cents.");
+    }
+    expect(invoicePaymentAmountError("1e3", 45000)).toMatch(/exponent notation/);
+  });
+  it("draws the amount error under Amount once the field is left", () => {
+    const html = htmlOf(createElement(RecordPaymentView, { value: { ...ready, amount: "-5" }, maxCents: 31500, maxDate: today, quickbooksConnected: false, onChange: () => {}, amountTouched: true }));
+    expect(html).toContain("Enter an amount from $0.01 to $315.00, in dollars and cents.");
+    expect(htmlOf(createElement(RecordPaymentView, { value: { ...ready, amount: "-5" }, maxCents: 31500, maxDate: today, quickbooksConnected: false, onChange: () => {} }))).not.toContain("Enter an amount");
+  });
+});
+
+describe("#1517 invoice ↔ order", () => {
+  const shipped = { ...invoiceFailedAls.invoice, shipments: { orders: { id: "order-1", order_no: 3 } } };
+  it("names the invoice's order as a fact, linked on the live page", () => {
+    expect(toInvoiceViewProps({ ...invoiceFailedAls, invoice: shipped, backHref: "/invoices" }).facts)
+      .toContainEqual({ label: "Order", value: "ORD-0003", href: "/orders/order-1" });
+    // The inventory draws the fact without the staff route.
+    expect(toInvoiceViewProps({ ...invoiceFailedAls, invoice: shipped }).facts).toContainEqual({ label: "Order", value: "ORD-0003" });
+  });
+  it("a document with no shipment, a credit memo, has no Order fact", () => {
+    expect(toInvoiceViewProps({ ...invoiceFailedAls, invoice: { ...shipped, shipments: null }, backHref: "/invoices" }).facts.map((f) => f.label)).toEqual(["Issued", "Due"]);
+  });
+  it("draws a linked fact as a link", () => {
+    const html = htmlOf(createElement(InvoiceView, { model: toInvoiceViewProps({ ...invoiceFailedAls, invoice: shipped, backHref: "/invoices" }) }));
+    expect(html).toMatch(/<a[^>]*href="\/orders\/order-1"[^>]*>ORD-0003<\/a>/);
+  });
+  it("get_invoice reads the order through the shipment", () => {
+    expect(readFileSync("lib/commands/orders.ts", "utf8")).toMatch(/from\("invoices"\)\.select\("\*, customers\([^)]*\), shipments\(orders\(id, order_no\)\)"\)/);
   });
 });

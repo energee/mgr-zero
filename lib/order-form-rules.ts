@@ -116,6 +116,22 @@ export function defaultShipToId(shipTos: { id: string; is_default?: boolean }[])
   return shipTos.find((s) => s.is_default)?.id ?? shipTos[0]?.id ?? "";
 }
 
+/** New order's opening choices (#1506): the customer a link named, when it is
+ *  one of the listed customers, with its default ship-to; and the source when
+ *  there is only one location to choose. With several, Source starts empty. */
+export function initialOrderChoices(
+  customers: { id: string; shipTos: { id: string; is_default?: boolean }[] }[],
+  locations: { id: string }[],
+  linkedCustomerId?: string,
+): { customerId: string; shipToId: string; fromLocationId: string } {
+  const customer = customers.find((c) => c.id === linkedCustomerId);
+  return {
+    customerId: customer?.id ?? "",
+    shipToId: customer ? defaultShipToId(customer.shipTos) : "",
+    fromLocationId: locations.length === 1 ? locations[0]!.id : "",
+  };
+}
+
 /** The sale channel a wholesale order's SKU picker narrows to; a transfer, or no customer yet, offers every active SKU. */
 export function skuPickerChannel(kind: "wholesale" | "taproom_transfer", customer: { sale_channel_id: string } | undefined): string | undefined {
   return kind === "wholesale" ? customer?.sale_channel_id : undefined;

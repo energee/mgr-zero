@@ -15,17 +15,25 @@ export function ChatConnectionAction({ installationId, configured }: { installat
       installationId ? { installationId } : {}, data => { location.assign((data as { authorizeUrl: string }).authorizeUrl); })} />;
 }
 
-export function ChatSettingsControls({ installation, readingDueHours, timezone, configured }: { installation: NonNullable<ChatHealth["installation"]>; readingDueHours: number; timezone: string; configured: boolean }) {
+/** `channels` and `channel` are what the page read: the eligible private
+ *  channels (null when they could not load) and the saved operations channel.
+ *  Picking a channel saves it at once and puts the old one back if the save fails (#1509). */
+export function ChatSettingsControls({ installation, readingDueHours, timezone, configured, channels: loaded, channel: savedChannel }: { installation: NonNullable<ChatHealth["installation"]>; readingDueHours: number; timezone: string; configured: boolean; channels: { id: string; name: string }[] | null; channel: string }) {
   const action = useCommandAction();
-  const [channels, setChannels] = useState<{ id: string; name: string }[] | null>(null);
-  const [channel, setChannel] = useState("");
+  const [channels, setChannels] = useState(loaded);
+  const [channel, setChannel] = useState(savedChannel);
   const [hours, setHours] = useState(String(readingDueHours));
   const [start, setStart] = useState(installation.quietStart?.slice(0, 5) ?? "");
   const [end, setEnd] = useState(installation.quietEnd?.slice(0, 5) ?? "");
   const [saved, setSaved] = useState<ChatSettingSave | null>(null);
   return <ChatSettingsFieldsView installation={installation} timezone={timezone} hours={hours} initialHours={readingDueHours} start={start} end={end} channels={channels} channel={channel} configured={configured} busy={action.busy} saved={action.succeeded === saved?.name ? saved : null} error={action.error}
-    onLoadChannels={() => void action.run("list_chat_channels", { installationId: installation.id }, data => { setChannels(data as { id: string; name: string }[]); setChannel(""); }, { durable: false })}
-    onChannel={setChannel} onSaveChannel={() => void action.run("set_notification_destination", { installationId: installation.id, externalDestinationId: channel }, () => setSaved({ name: "set_notification_destination", channel }))}
+    onLoadChannels={() => void action.run("list_chat_channels", { installationId: installation.id }, data => setChannels(data as { id: string; name: string }[]), { durable: false })}
+    onChannel={next => {
+      if (action.busy || next === channel) return;
+      setChannel(next);
+      void action.run("set_notification_destination", { installationId: installation.id, externalDestinationId: next }, () => setSaved({ name: "set_notification_destination", channel: next }))
+        .then(ok => { if (!ok) setChannel(channel); });
+    }}
     onQuietChange={(start, end) => { setStart(start); setEnd(end); }}
     onSaveQuiet={(start, end) => void action.run("set_brewery_quiet_hours", { installationId: installation.id, start: start || null, end: end || null }, () => setSaved({ name: "set_brewery_quiet_hours", start, end }))}
     onHours={setHours} onSaveHours={() => void action.run("set_brewery_operating_defaults", { readingDueHours: Number(hours) }, () => setSaved({ name: "set_brewery_operating_defaults", hours }))}
@@ -59,7 +67,7 @@ export function ChatDisconnect({ installationId, cleanupPending = false }: { ins
 
 export function ChatLinkedPeople({ people, timeZone }: { people: ChatLinkedPerson[]; timeZone: string }) {
   const action = useCommandAction();
-  return <ChatLinkedPeopleView people={people} timeZone={timeZone} backHref="/settings/chat" linkHref="/settings/chat/link" busy={action.busy} error={action.error} onUnlink={linkId => void action.run("unlink_chat_user", { linkId }, undefined, { target: linkId })} />;
+  return <ChatLinkedPeopleView people={people} timeZone={timeZone} busy={action.busy} error={action.error} onUnlink={linkId => void action.run("unlink_chat_user", { linkId }, undefined, { target: linkId })} />;
 }
 
 export function ChatDisable({ installationId }: { installationId: string }) {
@@ -69,5 +77,5 @@ export function ChatDisable({ installationId }: { installationId: string }) {
 
 export function ChatDelivery({ installationId, enabled }: { installationId: string; enabled: boolean }) {
   const action = useCommandAction();
-  return <ChatDeliveryView enabled={enabled} canDisable busy={action.busy} error={action.error} onDisable={() => void action.run("disable_chat_installation", { installationId })} />;
+  return <ChatDeliveryView enabled={enabled} busy={action.busy} error={action.error} onDisable={() => void action.run("disable_chat_installation", { installationId })} />;
 }

@@ -20,7 +20,7 @@ export const isoDate = z.string().date();
 
 const outputs = z.array(z.object({
   skuId: z.string().uuid(),
-  qtyPlanned: z.number().nonnegative().describe("Planned package units; keg formats require a whole number"),
+  qtyPlanned: z.number().nonnegative().max(9_999_999_999.99).describe("Planned package units; keg formats require a whole number"), // numeric(12,2)
 }));
 
 const rpcOutputs = (lines: z.infer<typeof outputs>) =>
@@ -121,7 +121,7 @@ defineCommand({
   input: z.object({
     runId: z.string().uuid(),
     bblDrawn: z.number().nonnegative(),
-    outputs: z.array(z.object({ skuId: z.string().uuid(), qtyActual: z.number().nonnegative() })),
+    outputs: z.array(z.object({ skuId: z.string().uuid(), qtyActual: z.number().nonnegative().max(9_999_999_999.99) })), // numeric(12,2)
     lotCode: z.string().min(1),
     packagedOn: isoDate,
     bestBy: isoDate.optional(),

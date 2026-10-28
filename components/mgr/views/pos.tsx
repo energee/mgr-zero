@@ -3,6 +3,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { SquareMark } from "@/components/mgr/brand-icons";
 import { CommandFormMessage } from "@/components/mgr/command-form";
+import { SettingsSaveStatus } from "@/components/mgr/settings-save-status";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import type { DisconnectStatus } from "@/lib/mgr/integration-disconnect";
@@ -13,32 +14,35 @@ const SelectField = ({ id, label, value, options, onChange }: {
   id: string; label: string; value: string; options: { value: string; label: string }[]; onChange: (value: string) => void;
 }) => E.pick(label, value, [{ value: "", label: "Select " + (label.toLowerCase()), disabled: true }, ...(options.map(option => ({ value: option.value, label: option.label })))], { onChange: (nextValue: string) => onChange(nextValue), id });
 
-export function PosSyncActions({ catalogBusy = false, salesBusy = false, catalogLabel = "Sync Square catalog", salesLabel = "Sync Square sales", feedback, onCatalog, onSales }: {
-  catalogBusy?: boolean; salesBusy?: boolean; catalogLabel?: string; salesLabel?: string; feedback?: ReactNode;
-  onCatalog?: () => void; onSales?: () => void;
+/** Point of sale's one Sync Square button and its feedback slot (#1509); SquareSyncControls runs the catalog and sales syncs behind it. */
+export function PosSyncActions({ busy = false, label = "Sync Square", feedback, onSync }: {
+  busy?: boolean; label?: string; feedback?: ReactNode; onSync?: () => void;
 }) {
   return <div className="flex flex-col gap-2">
     <div className="flex flex-wrap justify-end gap-2">
-      <Button variant="outline" disabled={catalogBusy} onClick={onCatalog}>{catalogBusy ? "Syncing catalog…" : catalogLabel}</Button>
-      <Button variant="outline" disabled={salesBusy} onClick={onSales}>{salesBusy ? "Syncing sales…" : salesLabel}</Button>
+      <Button variant="outline" disabled={busy} onClick={onSync}>{busy ? "Syncing…" : label}</Button>
     </div>
     {feedback}
   </div>;
 }
 
-export function PointOfSaleView({ model, sales = [], coverage = [], syncAction, paths }: {
+/** `connection` is the Connect Square control and `disconnect` the row's
+ *  Disconnect; the app page passes working controls (a confirming dialog for
+ *  Disconnect) and the inventory draws the plain views (#1509). */
+export function PointOfSaleView({ model, sales = [], coverage = [], syncAction, connection, disconnect, paths }: {
   model: { connected: boolean; configured?: boolean; canDisconnect?: boolean; merchant: string; state: string; locations?: string; lastSync?: string; error?: string | null; oauthFailed?: boolean };
   sales?: PosSaleRow[]; coverage?: string[];
-  syncAction?: ReactNode; paths?: { back?: string; connect?: string; disconnect?: string; locations?: string; menu?: string; connector?: string };
+  syncAction?: ReactNode; connection?: ReactNode; disconnect?: ReactNode; paths?: { back?: string; locations?: string; menu?: string; connector?: string };
 }) {
+  const disconnectAction = disconnect ?? E.act("Disconnect", "destructive");
   return <>
     {E.back("Settings", "Point of sale", undefined, paths?.back)}
     {E.info("Publish what the taproom can sell, and read Square sales as expected consumption. One provider is connected at a time.")}
     {model.connected
-      ? E.row(`Square · ${model.merchant}`, model.state, E.act("Disconnect", "destructive", paths?.disconnect), "ok", SquareMark)
-      : E.row("Square", model.state, <>{model.canDisconnect && E.act("Disconnect", "destructive", paths?.disconnect)}{E.act("Connect", "primary", model.configured === false ? undefined : paths?.connect, undefined, model.configured === false)}</>, "w", SquareMark)}
-    {!model.connected && model.configured === false && <p className="text-sm text-muted-foreground">{integrationUnavailableReason.square}</p>}
-    {model.oauthFailed && <>{E.note("Square authorization was cancelled or could not finish. The existing connection was not replaced.", "alert")}{model.connected && E.btn("Try connecting again", model.configured === false ? "g disabled" : "g", model.configured === false ? undefined : paths?.connect)}</>}
+      ? E.row(`Square · ${model.merchant}`, model.state, disconnectAction, "ok", SquareMark)
+      : E.row("Square", model.state, model.canDisconnect ? disconnectAction : "", "w", SquareMark)}
+    {model.oauthFailed && E.note("Square authorization was cancelled or could not finish. The existing connection was not replaced.", "alert")}
+    {(!model.connected || model.oauthFailed) && (connection ?? <ConnectSquareView configured={model.configured} reconnect={model.connected} />)}
     {model.error && E.note(`Last connection error: ${model.error}`, "alert")}
     {model.connected && <>
       {E.nav("Square locations", model.locations, "", undefined, paths?.locations)}
@@ -56,39 +60,50 @@ export function PointOfSaleView({ model, sales = [], coverage = [], syncAction, 
   </>;
 }
 
-export function ConnectSquareView({ configured = true, reconnect = false, busy = false, error, onConnect, backHref }: {
-  configured?: boolean; reconnect?: boolean; busy?: boolean; error?: string | null; onConnect?: () => void; backHref?: string;
+/** Point of sale's Connect Square control, drawn on the page itself (#1509). */
+export function ConnectSquareView({ configured = true, reconnect = false, busy = false, error, onConnect }: {
+  configured?: boolean; reconnect?: boolean; busy?: boolean; error?: string | null; onConnect?: () => void;
 }) {
-  return <>
-    {E.back("Point of sale", "Connect Square", undefined, backHref)}
-    {E.info("MGR publishes owned catalog items to Square and reads completed sales as expected consumption.")}
+  return <div className="flex flex-col gap-2">
     {E.note("Connecting does not publish a menu, import old sales, or change inventory.")}
     <Button disabled={!configured || busy} onClick={onConnect}>{busy ? "Opening Square…" : reconnect ? "Reconnect Square" : "Connect Square"}</Button>
     {!configured && <p className="text-sm text-muted-foreground">{integrationUnavailableReason.square}</p>}
     <CommandFormMessage error={error ?? null} />
-  </>;
+  </div>;
 }
 
-function LocationMappingRow({ row, locations, busy, onSave }: {
-  row: PosLocationRow; locations: { id: string; name: string }[]; busy?: boolean;
-  onSave?: (row: PosLocationRow, locationId: string) => void;
+/** A mapping row's pick, saved at once; a failed save puts the pick back (#1509). */
+function useSavedPick<Row>(row: Row, saved: string, onSave?: (row: Row, value: string) => Promise<boolean>) {
+  const [value, setValue] = useState(saved);
+  const pick = (next: string) => {
+    if (next === value) return;
+    setValue(next);
+    void onSave?.(row, next).then(ok => { if (!ok) setValue(value); });
+  };
+  return [value, pick] as const;
+}
+
+function LocationMappingRow({ row, locations, onSave }: {
+  row: PosLocationRow; locations: { id: string; name: string }[];
+  onSave?: (row: PosLocationRow, locationId: string) => Promise<boolean>;
 }) {
-  const [locationId, setLocationId] = useState(row.mgrLocationId);
-  return <form className="flex flex-col gap-3 rounded-lg border p-3" onSubmit={event => { event.preventDefault(); onSave?.(row, locationId); }}>
+  const [locationId, pick] = useSavedPick(row, row.mgrLocationId, onSave);
+  return <div className="flex flex-col gap-3 rounded-lg border p-3">
     {E.hd(row.name, row.detail)}
     <SelectField id={`pos-location-${row.externalLocationId}`} label="MGR location" value={locationId}
-      options={locations.map(location => ({ value: location.id, label: location.name }))} onChange={setLocationId} />
-    <Button disabled={busy || !locationId}>{busy ? "Saving…" : "Save mapping"}</Button>
-  </form>;
+      options={locations.map(location => ({ value: location.id, label: location.name }))} onChange={pick} />
+  </div>;
 }
 
 export function SquareLocationsView({ rows, locations, busy, error, onSave }: {
   rows: PosLocationRow[]; locations: { id: string; name: string }[]; busy?: boolean; error?: string | null;
-  onSave?: (row: PosLocationRow, locationId: string) => void;
+  /** Resolves false when the save failed. */
+  onSave?: (row: PosLocationRow, locationId: string) => Promise<boolean>;
 }) {
   return <>
     {E.info("Locations come from Square. Each can map to one MGR location; a location with observed sales history cannot be remapped.")}
-    {rows.length ? rows.map(row => <LocationMappingRow key={row.externalLocationId} row={row} locations={locations} busy={busy} onSave={onSave} />) : E.blank("Sync the Square catalog to load locations")}
+    {rows.length ? rows.map(row => <LocationMappingRow key={row.externalLocationId} row={row} locations={locations} onSave={onSave} />) : E.blank("Sync Square to load locations")}
+    <SettingsSaveStatus busy={busy} />
     <CommandFormMessage error={error ?? null} />
   </>;
 }
@@ -101,7 +116,7 @@ export function SquareConnectorView({ accountingHref }: { accountingHref?: strin
   </>;
 }
 
-/** The disconnect confirmation; `status` (lib/mgr/integration-disconnect.ts) decides whether the action is offered. */
+/** The disconnect dialog's body; `status` (lib/mgr/integration-disconnect.ts) decides whether the action is offered. */
 export function DisconnectSquareView({ status = "available", busy = false, error, onDisconnect }: {
   status?: DisconnectStatus; busy?: boolean; error?: string | null; onDisconnect?: () => void;
 }) {
@@ -109,7 +124,7 @@ export function DisconnectSquareView({ status = "available", busy = false, error
     {E.note("Stops: menu publishing, availability updates, and sales sync.")}
     {E.info("Stays: MGR stock, location mappings, sales history, and published item identities.")}
     {status === "available" && <>
-      {E.info("MGR deletes its stored Square credential first, then asks Square to revoke it. If Square does not confirm, this page says so.")}
+      {E.info("MGR deletes its stored Square credential first, then asks Square to revoke it. If Square does not confirm, this dialog says so.")}
       <Button variant="destructive" disabled={busy} onClick={onDisconnect}>{busy ? "Disconnecting…" : "Disconnect Square"}</Button>
     </>}
     {status === "unresolved" && <>
@@ -124,15 +139,15 @@ export function DisconnectSquareView({ status = "available", busy = false, error
 
 function VariationMappingRow({ row, targets, busy, onSave }: {
   row: PosVariationRow; targets: { value: string; label: string }[]; busy?: boolean;
-  onSave?: (row: PosVariationRow, target: string) => void;
+  onSave?: (row: PosVariationRow, target: string) => Promise<boolean>;
 }) {
-  const [target, setTarget] = useState(row.target);
-  return <form className="flex flex-col gap-3 rounded-lg border p-3" onSubmit={event => { event.preventDefault(); onSave?.(row, target); }}>
+  const [target, pick] = useSavedPick(row, row.target, onSave);
+  return <div className="flex flex-col gap-3 rounded-lg border p-3">
     {E.hd(row.label, row.detail)}
     <SelectField id={`pos-variation-${row.externalVariationId}`} label="Mapping" value={target}
-      options={[...targets, { value: "ignore", label: "Ignore this variation" }]} onChange={setTarget} />
-    <Button variant="outline" disabled={busy || !target || target === row.target}>{busy ? "Saving…" : row.disposition === "queued" ? "Save mapping" : "Change mapping"}</Button>
-  </form>;
+      options={[...targets, { value: "ignore", label: "Ignore this variation" }]} onChange={pick} />
+    {busy && <p role="status" className="text-sm text-muted-foreground">Saving…</p>}
+  </div>;
 }
 
 export function PosSaleDetailView({ title, sale, revisions, backHref, backLabel = "Point of sale" }: {
@@ -159,7 +174,8 @@ export function PosMenuView({ model, bins = [], channels = [], targets = [], bus
   /** `externalItemId:externalVariationId` of the Square row whose mapping is saving. */
   savingKey?: string;
   onConfigure?: (binId: string, channelId: string) => void; onPublish?: () => void;
-  onMap?: (row: PosVariationRow, target: string) => void;
+  /** Resolves false when the save failed. */
+  onMap?: (row: PosVariationRow, target: string) => Promise<boolean>;
 }) {
   const [binId, setBinId] = useState(""), [channelId, setChannelId] = useState("");
   const configure = (event: FormEvent) => { event.preventDefault(); onConfigure?.(binId, channelId); };
@@ -197,10 +213,11 @@ export function PosMenuView({ model, bins = [], channels = [], targets = [], bus
   </>;
 }
 
-export function PosItemView({ item, price, busy, error, notice, onSave, onWebsite, onPublish }: {
+/** One menu item. Save and publish saves the price override, then publishes the item to Square (#1509). */
+export function PosItemView({ item, price, busy, error, notice, onSave, onWebsite }: {
   item: { brand: string; format: string; sources: string; serving: string; price: string; override: string; websitePublished: boolean; available: boolean };
   price?: string; busy?: boolean; error?: string | null; notice?: ReactNode;
-  onSave?: (value: string) => void; onWebsite?: (published: boolean) => Promise<boolean>; onPublish?: () => void;
+  onSave?: (value: string) => void; onWebsite?: (published: boolean) => Promise<boolean>;
 }) {
   const [value, setValue] = useState(price ?? item.override), [website, setWebsite] = useState(item.websitePublished);
   return <>
@@ -208,11 +225,10 @@ export function PosItemView({ item, price, busy, error, notice, onSave, onWebsit
     {E.fld("Serving", item.serving)}{E.fld("Format price", item.price)}{E.fld("Availability", item.available ? "In the selected bin" : "Off register · no selected-bin stock")}
     <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); onSave?.(value); }}>
       {E.edit("Price override", value, "number", undefined, { onChange: (nextValue: string) => setValue(nextValue), id: "pos-price-override", min: "0", step: "0.01", placeholder: "Follow format price" })}
-      <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => setValue("")}>Reset to format price</Button><Button disabled={busy}>{busy ? "Saving…" : "Save override"}</Button></div>
+      <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => setValue("")}>Reset to format price</Button><Button disabled={busy}>{busy ? "Publishing…" : "Save and publish"}</Button></div>
     </form>
     <label className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm">Publish on website<input type="checkbox" className="size-5" checked={website} onChange={event => { if (onWebsite) void reconcileBooleanChange(website, event.target.checked, onWebsite, setWebsite); }} disabled={!onWebsite || busy || !item.available} /></label>
     {E.info("An empty override follows the format price. Availability remains derived from stock in this location's configured bin.")}
-    <Button disabled={busy} onClick={onPublish}>{busy ? "Publishing…" : "Publish item to Square"}</Button>
     {notice}<CommandFormMessage error={error ?? null} />
   </>;
 }

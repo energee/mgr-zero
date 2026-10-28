@@ -1,6 +1,7 @@
 // app/(app)/transfers/new-transfer-form.tsx — CommandForm for
 // create_stock_transfer: source and destination locations (bins default to
-// each location's first), SKU lines with quantities. Materials and kegs move
+// each location's first; with only one other location, picking From also
+// picks it as To), SKU lines with quantities. Materials and kegs move
 // through the same command from the API; this form draws the SKU case. A wholly
 // blank spare line is left out (transferPayloadLines); any other line must be
 // complete, or Create transfer stays withheld (newTransferReason) — it is never
@@ -15,7 +16,7 @@ import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components
 import { NewTransferView } from "@/components/mgr/views/new-transfer";
 import { E } from "@/components/mgr/e";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { newTransferReason, transferPayloadLines } from "@/lib/mgr/new-transfer-view";
+import { newTransferReason, onlyOtherLocation, transferPayloadLines } from "@/lib/mgr/new-transfer-view";
 
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
@@ -60,7 +61,11 @@ export function NewTransferForm({ locations, bins, skus, skusHref, autoOpen = fa
         <NewTransferView
           model={model}
           controls={{
-            from: value => { const id = locations.find(location => location.name === value)?.id ?? ""; setFromId(id); setFromBin(firstBin(id)); },
+            from: value => {
+              const id = locations.find(location => location.name === value)?.id ?? "";
+              setFromId(id); setFromBin(firstBin(id));
+              if (!toId || toId === id) { const other = onlyOtherLocation(locations, id); setToId(other); setToBin(firstBin(other)); }
+            },
             fromBin: value => setFromBin(fromBins.find(bin => bin.name === value)?.id ?? ""),
             to: value => { const id = locations.find(location => location.name === value)?.id ?? ""; setToId(id); setToBin(firstBin(id)); },
             toBin: value => setToBin(toBins.find(bin => bin.name === value)?.id ?? ""),

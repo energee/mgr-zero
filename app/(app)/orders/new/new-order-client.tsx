@@ -6,7 +6,7 @@ import { useCommandQuery } from "@/components/mgr/query-provider";
 import { toSkuOption } from "@/lib/order-form-rules";
 import { OrderForm, type CustomerOption, type LocationOption, type SkuRow } from "../order-form";
 
-export function NewOrderClient({ timeZone }: { timeZone: string }) {
+export function NewOrderClient({ timeZone, customerId }: { timeZone: string; customerId?: string }) {
   const customers = useCommandQuery<CustomerOption[]>("list_customers", { includeShipTos: true });
   const locations = useCommandQuery<LocationOption[]>("list_locations", {});
   const skus = useCommandQuery<SkuRow[]>("list_skus", {});
@@ -18,7 +18,7 @@ export function NewOrderClient({ timeZone }: { timeZone: string }) {
     {E.hd("New order")}
     <QueryFeedback timeZone={timeZone} error={error} loading="Loading order options" paused={paused} retry={retry} />
   </>;
-  return <OrderForm timeZone={timeZone}
+  return <OrderForm timeZone={timeZone} linkedCustomerId={customerId}
     feedback={<QueryFeedback timeZone={timeZone} showCheckedAt={false} error={error} fetching={fetching} paused={paused} updatedAt={Math.min(customers.dataUpdatedAt, locations.dataUpdatedAt, skus.dataUpdatedAt)} retry={retry} />}
     customers={customers.data} locations={locations.data} skus={skus.data.filter(sku => sku.active).map(toSkuOption)}
   />;

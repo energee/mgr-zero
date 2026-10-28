@@ -95,12 +95,12 @@ describe("POS UI truth", () => {
     expect(menu).toMatch(/<a[^>]*href="#"[^>]*>(?:(?!<\/a>)[\s\S])*Hazy · Pint/);
     expect(menu).not.toMatch(/>Open</);
     const item = renderToStaticMarkup(createElement(PosItemView, { item: { brand: "Hazy", format: "Pint", sources: "", serving: "16 oz", price: "$7.00", override: "", websitePublished: false, available: false } }));
-    expect(item).not.toMatch(/<button[^>]*disabled=""[^>]*>Publish item to Square/);
+    expect(item).not.toMatch(/<button[^>]*disabled=""[^>]*>Save and publish/);
   });
 
   it("renders the inventory sync and sale-opening action contract", () => {
     const html = (name: string) => renderToStaticMarkup(createElement("div", null, SCREENS.find(screen => screen.name === name)!.body));
-    expect(html("Point of sale")).toMatch(/Sync Square catalog[\s\S]*Sync Square sales/);
+    expect(html("Point of sale")).toContain(">Sync Square</button>");
     // A recent sale opens by its row arrow, not an Open verb (#1026).
     const saleRow = html("Point of sale").split('data-slot="item"').find(item => item.includes("Sale · Hazy IPA · pint"));
     expect(saleRow).toContain('aria-label="Open"');
@@ -155,8 +155,7 @@ describe("POS UI truth", () => {
     const ignored = { externalItemId: "m", externalVariationId: "s", label: "Shirt · Large", detail: "Ignored", disposition: "ignored" as const, target: "ignore" };
     const selling = renderToStaticMarkup(createElement(PosMenuView, { model: { ...base, externalItems: [queued, ignored] },
       targets: [{ value: "format:pint", label: "Pour · House · pint" }] }));
-    expect(selling).toMatch(/Also in Square[\s\S]*Guest cider · pint[\s\S]*Save mapping[\s\S]*Mapped or ignored[\s\S]*Shirt · Large[\s\S]*Change mapping/);
-    expect(selling).toMatch(/<button[^>]*data-variant="outline"[^>]*>Save mapping/);
+    expect(selling).toMatch(/Also in Square[\s\S]*Guest cider · pint[\s\S]*Mapped or ignored[\s\S]*Shirt · Large/);
     // Only the row being saved shows its progress.
     const saving = renderToStaticMarkup(createElement(PosMenuView, { model: { ...base, externalItems: [queued, ignored] }, busy: true, savingKey: "m:s" }));
     expect(saving.match(/Saving…/g)).toHaveLength(1);
@@ -166,7 +165,7 @@ describe("POS UI truth", () => {
   it("mounts one shared view from every POS inventory record", () => {
     const source = readFileSync("components/mgr/screens.tsx", "utf8");
     for (const view of [
-      "PointOfSaleView", "ConnectSquareView", "SquareLocationsView", "SquareConnectorView",
+      "PointOfSaleView", "SquareLocationsView", "SquareConnectorView",
       "DisconnectSquareView", "PosSaleDetailView", "PosMenuView", "PosItemView",
     ]) expect(source, view).toContain(`<${view}`);
   });
@@ -174,14 +173,13 @@ describe("POS UI truth", () => {
   it("maps every live POS route to its inventory screen", () => {
     const routes = new Map(SCREEN_ROUTES.map((route) => [route.name, route.file]));
     expect(Object.fromEntries([...routes].filter(([name]) => [
-      "Point of sale", "Connect Square", "Square locations", "Taproom sales in QuickBooks",
+      "Point of sale", "Square locations", "Taproom sales in QuickBooks",
       "Disconnect Square", "POS sale detail", "Menu", "POS item",
     ].includes(name)))).toEqual({
       "Point of sale": "app/(app)/settings/pos/page.tsx",
-      "Connect Square": "app/(app)/settings/pos/connect/page.tsx",
       "Square locations": "app/(app)/settings/pos/locations/page.tsx",
       "Taproom sales in QuickBooks": "app/(app)/settings/pos/connector/page.tsx",
-      "Disconnect Square": "app/(app)/settings/pos/disconnect/page.tsx",
+      "Disconnect Square": "components/mgr/views/pos-controls.tsx",
       "POS sale detail": "app/(app)/settings/pos/sales/[id]/page.tsx",
       Menu: "app/(app)/menu/page.tsx",
       "POS item": "app/(app)/menu/item/[formatId]/page.tsx",

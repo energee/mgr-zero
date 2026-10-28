@@ -47,8 +47,15 @@ export function VesselDetailView({ model, onName, onType, onCapacity, messages, 
         })}
       </FieldGroup>
       {messages}
-      {remove}
       {footer !== undefined ? footer : E.submit("Save vessel", { submitting, reason })}
+      {/* Apart from Save, under its own rule, as on Contract and License (#1481). */}
+      {remove && <section aria-label="Delete vessel" className="mt-2 flex flex-col gap-4 border-t pt-5 @min-[48rem]:flex-row @min-[48rem]:items-center @min-[48rem]:justify-between">
+        <div>
+          <h2 className="text-sm font-medium">Delete vessel</h2>
+          <p className="mt-1 text-sm text-muted-foreground">A vessel that has held beer is retired instead, and its batch history stays.</p>
+        </div>
+        <div className="shrink-0 self-start">{remove}</div>
+      </section>}
     </> : <>
       {E.fld("Name", model.name)}
       {E.fld("Type", model.type)}

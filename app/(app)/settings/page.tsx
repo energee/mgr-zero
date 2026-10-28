@@ -13,6 +13,8 @@ import { SettingsForm, type BrewerySettings } from "./settings-form";
 import { AiModelSettingsForm } from "./ai-model-settings-form";
 import { getGatewayLanguageModels } from "@/lib/chat/models";
 import { ReportingBasisForm } from "./reporting-basis-form";
+import { GravityUnitForm } from "./gravity-unit-form";
+import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import type { Filing, ReportingBasisCorrection } from "@/lib/commands/compliance";
 import { navTitle } from "@/lib/mgr/nav";
 
@@ -24,7 +26,7 @@ export default async function SettingsPage() {
   if (!brewery.roles.includes("admin")) redirect(deniedHref("Settings", ["admin"]));
   const ctx = await buildContext(brewery.id);
   const [row, locations, team, ai, aiModels, reports, basisCorrections] = await Promise.all([
-    runCommand("get_brewery", {}, ctx) as Promise<BrewerySettings & { portal_fulfillment_location_id: string | null }>,
+    runCommand("get_brewery", {}, ctx) as Promise<BrewerySettings & { portal_fulfillment_location_id: string | null; gravity_unit: GravityUnit }>,
     runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string; uses: string[] }[]>,
     runCommand("list_team_members", {}, ctx) as Promise<unknown[]>,
     runCommand("get_brewery_ai_model", {}, ctx) as Promise<{ model: string }>,
@@ -61,10 +63,11 @@ export default async function SettingsPage() {
         team: plural(team.length, "member"),
       }}
       breweryForm={<SettingsForm key={row.books_opened_on ?? "unset"} brewery={row} hasFiledReports={hasFiledReports} />}
+      unitsForm={<GravityUnitForm part="brewery" brewery={row.gravity_unit} mine={null} />}
       reportingBasisForm={<ReportingBasisForm key={row.books_opened_on ?? "unset"} basis={row.books_opened_on} history={basisCorrections} timeZone={row.timezone} />}
       fulfillmentForm={<PortalFulfillmentForm key={row.portal_fulfillment_location_id ?? "unconfigured"} locations={warehouses} currentId={row.portal_fulfillment_location_id} />}
       aiModelForm={<AiModelSettingsForm current={ai.model} models={aiModels} />}
-      hrefs={{ water: "/catalog/water-profiles?from=settings", locations: "/locations", team: "/settings/team", accounting: "/settings/accounting", pos: "/settings/pos", chat: "/settings/chat", import: "/settings/import", channels: "/settings/channels", units: "/settings/units" }}
+      hrefs={{ water: "/catalog/water-profiles?from=settings", locations: "/locations", team: "/settings/team", accounting: "/settings/accounting", pos: "/settings/pos", chat: "/settings/chat", import: "/settings/import", channels: "/settings/channels" }}
     />
   );
 }

@@ -23,6 +23,7 @@ import {
 } from "../lib/mgr/fixtures/production";
 import { toBatchesViewProps, batchesFromQuery, type BatchListRow } from "../lib/mgr/batches-view";
 import { brewTurnModel, canRecordBrewDay } from "../lib/mgr/brew-day-view";
+import { hasPackagingMaterials } from "../lib/mgr/packaging-actuals";
 import { PlanActions } from "../components/mgr/views/plan-actions";
 import { toRecipesViewProps } from "../lib/mgr/recipes-view";
 import { resolveTap } from "../lib/mgr/screen-links";
@@ -97,6 +98,14 @@ describe("vessels are admin-managed", () => {
     expect(html).not.toContain("Delete vessel");
   });
 
+  it("keeps Delete vessel in its own bordered section after Save vessel (#1481)", () => {
+    const html = htmlOf(createElement(VesselDetailView, { model: vesselFv3, remove: createElement("button", { type: "button" }, "Delete FV3") }));
+    expect(html.indexOf("Save vessel")).toBeGreaterThan(-1);
+    expect(html.indexOf("Save vessel")).toBeLessThan(html.indexOf("Delete FV3"));
+    expect(html).toMatch(/<section aria-label="Delete vessel" class="[^"]*border-t[^"]*">[\s\S]*Delete FV3/);
+    expect(htmlOf(createElement(VesselDetailView, { model: vesselFv3 }))).not.toContain('aria-label="Delete vessel"');
+  });
+
   it("a retired vessel says so", () => {
     expect(htmlOf(createElement(VesselDetailView, { model: { ...vesselFv3, retired: true } }))).toContain("retired");
     expect(htmlOf(createElement(VesselDetailView, { model: vesselFv3 }))).not.toContain("retired");
@@ -135,9 +144,9 @@ describe("Batches view", () => {
     expect(batchesFromQuery([base], []).planned?.[0].href).toBeUndefined();
     const model = toBatchesViewProps(batchesFromQuery([base, { ...base, id: "active", brewed_on: "2026-09-12", vessel_name: null }, { ...base, id: "closed", brewed_on: "2026-09-11", closed_at: "2026-09-12", vessel_name: null }], [], { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}` }));
     // Facts arrive as fields, never as one delimited sentence; missing brand and recipe stay null.
-    expect(model.planned[0]).toEqual({ key: "planned", batchNo: "Batch", brand: null, recipe: null, plannedOn: "Sep 12, 2026", plannedBbl: 12.5, vessel: "Actual tank", brewable: true, href: "/batches/planned" });
-    expect(model.active[0]).toMatchObject({ brewable: false, href: "/batches/active", readings: [] });
-    expect(model.completed?.[0]).toMatchObject({ key: "closed", brewable: false });
+    expect(model.planned[0]).toEqual({ key: "planned", batchNo: "Batch", brand: null, recipe: null, plannedOn: "Sep 12, 2026", plannedBbl: 12.5, vessel: "Actual tank", href: "/batches/planned" });
+    expect(model.active[0]).toMatchObject({ href: "/batches/active", readings: [] });
+    expect(model.completed?.[0]).toMatchObject({ key: "closed" });
     expect(model.completed?.[0].readings).toBeUndefined();
     const html = htmlOf(createElement(BatchesView, { model, workHrefs: { all: "/work", batches: "/batches" }, newVesselHref: "/cellar/vessels/new" }));
     for (const text of ["Planned", "Active", "Completed", "No open occupancy", "Actual tank", "No brand yet", "No recipe", "Sep 12, 2026", "12.5", "No vessels yet"]) expect(html).toContain(text);
@@ -145,6 +154,8 @@ describe("Batches view", () => {
     expect(html).not.toContain("°P");
     expect(html).toContain('href="/batches"');
     expect(html).not.toContain('href="/orders"');
+    // The row link already opens the batch; no Brew button repeats it (#1512).
+    expect(html).not.toMatch(/>Brew</);
   });
   it("explains vessel setup and keeps its empty note separate from the page empty state (#1303)", () => {
     const model = toBatchesViewProps({ ...batchesBrewer, vessels: [] });
@@ -161,12 +172,10 @@ describe("Batches view", () => {
     const page = src("app/(app)/batches/page.tsx");
     expect(page).not.toMatch(/\blist=|\bfooter=|tabs=\{null\}/);
   });
-  it("offers Brew only on the planned fixture batches", () => {
+  it("titles the fixture and live Batches lists alike", () => {
     const model = toBatchesViewProps(batchesBrewer);
     expect(model.title).toBe("Batches");
     expect(batchesFromQuery([], []).title).toBe("Batches");
-    expect(model.planned.map(row => row.brewable)).toEqual([true, true]);
-    expect(model.active.map(row => row.brewable)).toEqual([false, false, false]);
     expect(model.workChipIndex).toBe(3);
   });
 
@@ -429,6 +438,42 @@ describe("Close packaging run view", () => {
   });
 });
 
+describe("Finished records keep their facts (#1480)", () => {
+  it("a closed run shows its brand, source, planned day and closed day", () => {
+    const html = htmlOf(createElement(RunClosedView, { model: { ...runClosedHazy, closedAt: "2026-09-06T02:00:00Z", timeZone: "America/New_York" } }));
+    expect(html).toMatch(/Brand<[^]*?Hazy IPA/);
+    expect(html).toMatch(/Source<[^]*?FV3 · B-0416/);
+    expect(html).toMatch(/Planned<[^]*?Sep 4, 2026/);
+    // closed_at is an instant: 02:00 UTC on Sep 6 is still Sep 5 in New York.
+    expect(html).toMatch(/Closed<[^]*?Sep 5, 2026/);
+  });
+
+  it("a record with no packaging materials is one line, and offers no correction", () => {
+    const empty = { ...runClosedHazy.records![0]!, planned: [], actuals: [] };
+    expect(hasPackagingMaterials(empty)).toBe(false);
+    expect(hasPackagingMaterials(runClosedHazy.records![0]!)).toBe(true);
+    const html = htmlOf(createElement(RunClosedView, { model: { ...runClosedHazy, records: [empty], correction: undefined } }));
+    expect(html).toContain("No packaging materials.");
+    expect(html).not.toContain("Planned material");
+    expect(src("app/(app)/packaging/[id]/page.tsx")).toMatch(/latest && hasPackagingMaterials\(latest\)/);
+  });
+
+  it("a completed batch says when it completed and what it wrote off, not that cellar work continues", () => {
+    const completed = htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, recorded: true, completion: { on: "Oct 26, 2026", writeOffBbl: 1.25 } } }));
+    expect(completed).toMatch(/Completed<[^]*?Oct 26, 2026/);
+    expect(completed).toMatch(/Written off as loss<[^]*?1.25 bbl/);
+    expect(completed).not.toContain("Already brewed.");
+    const belowThreshold = htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, recorded: true, completion: { on: "Oct 26, 2026", writeOffBbl: null } } }));
+    expect(belowThreshold).toMatch(/Written off as loss<[^]*?None/);
+    expect(htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, recorded: true } }))).toContain("Already brewed.");
+  });
+
+  it("the brew sheet names the recipe with its pinned version", () => {
+    const html = htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, plan: { ...brewDayHazy.plan, recipe: "Hazy IPA", version: { version: 4 } } } }));
+    expect(html).toMatch(/Recipe<[^]*?Hazy IPA v4/);
+  });
+});
+
 describe("Recipes view", () => {
   it("the Recipes inventory record is RecipesView", () => {
     const body = screen("Recipes").body as { type: unknown; props: { model: unknown } };
@@ -451,9 +496,11 @@ describe("Recipes view", () => {
     expect(html).not.toContain(">Open<");
   });
 
-  it("links Water profiles, where a version's source and target come from (#1140)", () => {
+  it("links Water profiles, the catalog a version picks its water from (#1140, #1205)", () => {
     const live = htmlOf(createElement(RecipesView, { model: toRecipesViewProps({ recipes: [], waterProfilesHref: "/catalog/water-profiles" }) }));
     expect(live).toMatch(/<a[^>]*href="\/catalog\/water-profiles"[^>]*>[^]*?Water profiles/);
+    expect(live).toContain("Manage water profiles");
+    expect(live).not.toMatch(/source and target/i);
     // The inventory frame leaves the row for the explorer, which walks it to the Water profiles record.
     expect(htmlOf(screen("Recipes").body)).toContain("Water profiles");
     expect(resolveTap(screen("Recipes"), "Water profiles")).toBe("Water profiles");
@@ -589,9 +636,9 @@ describe("cellar sheets label every field (#1115)", () => {
     for (const chip of ["Dry hop", "Fermentation", "Other"]) expect(html).toMatch(new RegExp(`>${chip}</button>`));
   });
 
-  it("addition says what is still needed as guidance, not as an amber warning", () => {
+  it("addition says what is still needed only beside its button, never as an amber warning", () => {
     const html = htmlOf(createElement(CellarAdditionView, { model: { ...cellarAdditionCitra, occupancyId: "" }, footer: null }));
-    expect(html).toMatch(/bg-info[\s\S]*Choose a tank/);
+    expect(html).not.toContain("Still needed");
     expect(html).not.toContain("bg-warning");
     // Over what the lot holds is a real error, so it stays amber.
     expect(htmlOf(createElement(CellarAdditionView, { model: { ...cellarAdditionCitra, qty: "41" }, footer: null }))).toMatch(/bg-warning[\s\S]*Only 40 lb of L-0790 on hand/);

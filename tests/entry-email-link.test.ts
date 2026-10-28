@@ -100,3 +100,18 @@ describe("entry message tones (#1401)", () => {
     expect(html).toMatch(/role="note"[^>]*class="[^"]*bg-warning/);
   });
 });
+
+describe("#1517 staff and portal sign-in link each other", () => {
+  it("each sign-in names the other one's screen", () => {
+    expect(signIn.switchLink).toEqual({ label: "Customer? Sign in to the portal", to: "Portal sign in" });
+    expect(portalSignIn.switchLink).toEqual({ label: "Brewery staff? Sign in to MGR", to: "Sign in" });
+  });
+  it("draws an inert link in the inventory and the live route when given one", () => {
+    expect(renderToStaticMarkup(createElement(EntryView, { model: signIn }))).toMatch(/<a href="#" data-to="Portal sign in"[^>]*>Customer\? Sign in to the portal<\/a>/);
+    expect(renderToStaticMarkup(createElement(EntryView, { model: signIn, switchHref: "/portal/login" }))).toMatch(/<a[^>]*href="\/portal\/login"[^>]*>Customer\? Sign in to the portal<\/a>/);
+  });
+  it("the live sign-in form links /login and /portal/login", async () => {
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("components/login-form.tsx", "utf8")).toMatch(/switchHref=\{portal \? "\/login" : "\/portal\/login"\}/);
+  });
+});

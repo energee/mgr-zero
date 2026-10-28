@@ -62,3 +62,10 @@ export function newTransferReason(i: { fromId: string; toId: string; fromBinId: 
 export function transferPayloadLines(lines: { skuId: string; qty: string }[], fromBinId: string, toBinId: string) {
   return lines.filter((l) => !isBlankLine(l)).map((l) => ({ skuId: l.skuId, qty: Number(l.qty), fromBinId, toBinId }));
 }
+
+/** The To location to preselect: the only location other than From, or ""
+ *  when there are several to choose from. */
+export function onlyOtherLocation(locations: { id: string }[], fromId: string): string {
+  const others = locations.filter((l) => l.id !== fromId);
+  return others.length === 1 ? others[0].id : "";
+}

@@ -29,8 +29,8 @@ export const kegBalanceRidgeline: KegBalanceSnapshot = {
   kegs: "38 kegs",
   deposits: "$1,110 deposits held",
   rows: [
-    { key: "half", title: "Owned ½ bbl", detail: "34 out · $30 deposit each", trailing: "$1,020" },
-    { key: "sixth", title: "Owned ⅙ bbl", detail: "4 out · 3 on deposit", trailing: "$90", warning: true },
+    { key: "half", title: "Owned ½ bbl", detail: "34 out · $30 deposit each", trailing: "$1,020", verb: "Record return" },
+    { key: "sixth", title: "Owned ⅙ bbl", detail: "4 out · 3 on deposit", trailing: "$90", warning: true, verb: "Record return" },
     { key: "over", title: "Over 90 days", detail: "9 kegs · oldest shipped May 12, 2026", trailing: "", verb: "Review history", warning: true },
   ],
 };

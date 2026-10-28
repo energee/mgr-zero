@@ -82,7 +82,7 @@ export class CommandError extends Error {
 // Awaits a Supabase query and turns its { data, error } into data-or-throw,
 // so handlers don't each repeat `if (error) throw new CommandError(...)`.
 // This is the one place database errors become public: see rpcError.
-export async function unwrap<T>(query: PromiseLike<{ data: T; error: { message: string; code?: string } | null }>): Promise<T> {
+export async function unwrap<T>(query: PromiseLike<{ data: T; error: { message: string; code?: string; details?: string } | null }>): Promise<T> {
   const { data, error } = await query;
   if (error) throw rpcError(error);
   return data;
@@ -160,6 +160,20 @@ export async function breweryToday(ctx: Ctx): Promise<string> {
  * oversized value is a 400 validation error rather than a 22003 overflow from the database. */
 export const PG_INT_MAX = 2_147_483_647;
 
+// A command's invalid_input message reaches the form or API caller as is, so a
+// number bound without its own message reads as an instruction with the limit
+// ("Enter a number no greater than 9,999,999,999.99.") instead of zod's
+// "Too big: expected number to be <=9999999999.99" (#1482). Returning
+// undefined keeps zod's text for every other issue.
+const limit = (n: number | bigint) => Number(n).toLocaleString("en-US", { maximumFractionDigits: 4 });
+z.config({
+  customError: (issue) => {
+    if (issue.origin !== "number") return undefined;
+    if (issue.code === "too_big") return `Enter a number ${issue.inclusive ? "no greater than" : "less than"} ${limit(issue.maximum)}.`;
+    if (issue.code === "too_small") return `Enter a number ${issue.inclusive ? "of at least" : "greater than"} ${limit(issue.minimum)}.`;
+  },
+});
+
 /** Whole cents stored in an int column: never negative, never past PG_INT_MAX. */
 export const cents = z.number().int().nonnegative().max(PG_INT_MAX);
 
@@ -177,13 +191,15 @@ export const phone = z.string().trim().refine(
 // Maps a Supabase/PostgREST error to the public CommandError envelope. P0001 is
 // `raise exception` without an errcode, i.e. the domain rules our own RPCs
 // raise, so its message is the user-facing one. 23505 (unique violation) is a
-// 409; 22003 (numeric out of range) and 22023 (invalid parameter) are 400s.
+// 409; one on a name key also carries a `name` issue, so a form shows it under
+// its Name field (#1488). 22003 (numeric out of range) and 22023 (invalid
+// parameter) are 400s.
 // These use fixed messages: raw text may name constraints, types or internal
 // arguments, so it is only logged (#422, #427, #1306). Anything unlisted is logged
 // here and surfaces as a generic 500 so raw Postgres text never reaches a
 // client (security audit A2); detail pages turn not_found into the not-found
 // route (lib/mgr/not-found.ts).
-function rpcError(error: { message: string; code?: string }): CommandError {
+function rpcError(error: { message: string; code?: string; details?: string }): CommandError {
   switch (error.code) {
     case "42501":
       console.error("database error 42501:", error.message);
@@ -197,7 +213,7 @@ function rpcError(error: { message: string; code?: string }): CommandError {
     case "MG412": return new CommandError(error.message, 409, "stale_plan");
     case "23505":
       console.error("database error 23505:", error.message);
-      return new CommandError("That already exists. Use a different name or value.", 409, "conflict");
+      return uniqueViolation(error.details);
     case "22003":
       console.error("database error 22003:", error.message);
       return new CommandError("A number is out of range.");
@@ -210,6 +226,17 @@ function rpcError(error: { message: string; code?: string }): CommandError {
       console.error(`database error ${error.code ?? "unknown"}:`, error.message);
       return new CommandError("database error", 500, "db_error");
   }
+}
+
+const NAME_TAKEN = "That name is already used. Choose a different name.";
+
+// Postgres details read "Key (brewery_id, name)=(…) already exists." (or
+// btrim(name) for formats). Only the key's column list is read; the values are
+// never echoed.
+function uniqueViolation(details = ""): CommandError {
+  const columns = /^Key \((.*)\)=\(/.exec(details)?.[1] ?? "";
+  if (/\bname\b/.test(columns)) return new CommandError(NAME_TAKEN, 409, "conflict", [{ path: ["name"], code: "duplicate", message: NAME_TAKEN }]);
+  return new CommandError("That already exists. Use a different name or value.", 409, "conflict");
 }
 
 type DefinitionBase<In> = {

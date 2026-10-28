@@ -5,7 +5,7 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery, requirePagePermission } from "@/lib/mgr/page-query";
 import { orNotFound } from "@/lib/mgr/not-found";
-import { canReverseMovement, toInventoryDetailViewProps, type InventoryMovement } from "@/lib/mgr/inventory-detail-view";
+import { canReverseMovement, movementSourceHref, toInventoryDetailViewProps, type InventoryMovement } from "@/lib/mgr/inventory-detail-view";
 import "@/lib/commands/all";
 import { ReversalForm } from "../reversal-form";
 import { navTitle } from "@/lib/mgr/nav";
@@ -39,11 +39,16 @@ export default async function InventoryDetailPage({ params, searchParams }: Prop
   const { page: rawPage, movement } = await searchParams;
   const { brewery, page, sku, onHand, atp, movements } = await getInventoryDetailPageData(id, rawPage, movement);
   const href = `/inventory/${id}`;
+  const canMove = brewery.roles.includes("admin") || brewery.roles.includes("warehouse");
   return <InventoryDetailView model={toInventoryDetailViewProps({ sku, onHand, atp, movements: movements.slice(0, 50), backHref: "/inventory", timeZone: brewery.timeZone })}
+    // Finished goods' Record movement, opened on this SKU (#1507).
+    headerAction={canMove && sku.active ? E.btn("Record movement", "p", `/inventory?recordMovement=1&skuId=${id}`) : null}
     movementAction={m => m.compensates_id ? E.act("Original movement", "primary", `${href}?movement=${m.compensates_id}`)
       : m.reversed_by ? E.act("Reversal recorded", "primary", `${href}?movement=${m.id}`)
       : canReverseMovement(m) ? (brewery.roles.includes("admin") || brewery.roles.includes("warehouse") ? <ReversalForm movement={m} /> : "Read only")
       : m.type === "sale_removal" && m.ref ? E.act("Return shipment", "primary", `/orders/${m.ref}`)
+      // Corrected where it was made: open the document it came from.
+      : movementSourceHref(m) ? E.act(m.ref_label, "primary", movementSourceHref(m))
       : <span className="max-w-40 text-xs text-muted-foreground">{m.type === "depletion" ? "Count/depletion correction unavailable" : "Correct through the original workflow"}</span>}
     footer={<div className="flex gap-2">{movement && E.btn("All movements", "g", href)}{page > 0 && E.btn("Newer movements", "g", `${href}?page=${page}`)}{movements.length > 50 && E.btn("Older movements", "g", `${href}?page=${page + 2}`)}</div>} />;
 }

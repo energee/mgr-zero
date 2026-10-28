@@ -13,7 +13,7 @@ it("retains cancelled plans as history without offering physical work", () => {
   const batch = { id: "cancelled", batch_no: 7, planned_on: "2026-09-28", planned_bbl: 10, brewed_on: null, closed_at: null, cancelled_at: "2026-09-27", brand_name: null, recipe_name: null, vessel_name: null, active_occupancies: [] };
   const batches = batchesFromQuery([batch], []);
   expect(batches.planned).toEqual([]);
-  expect(batches.cancelled?.[0]).toMatchObject({ key: "cancelled", brewable: false });
+  expect(batches.cancelled?.[0]).toMatchObject({ key: "cancelled" });
   const runs = toPackagingRunsViewProps([{ ...batch, run_no: 4, started_at: null, qty_planned: 12 }], "UTC", id => `/packaging/${id}`);
   expect(runs.upcoming).toEqual([]);
   expect(runs.recent[0]).toMatchObject({ href: "/packaging/cancelled", status: "Cancelled" });

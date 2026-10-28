@@ -31,3 +31,20 @@ export type MaterialCountPreview = {
     adjustments: { lot_id: string | null; lot_code: string | null; qty_expected: number; qty_counted: number; delta: number }[];
   }[];
 };
+
+/** Where a cycle count starts: the bin holding the most of the material
+ *  (`onHand` is get_material_on_hand's rows for it), else the first
+ *  location's first bin. A row at a location not offered is skipped. */
+export function countDefaultBin(
+  onHand: { location_id: string; bin_id: string; qty: number | string }[],
+  locations: { id: string }[],
+  bins: { id: string; location_id: string }[],
+): { locationId: string; binId: string } {
+  let top: (typeof onHand)[number] | undefined;
+  for (const row of onHand) {
+    if (Number(row.qty) > Number(top?.qty ?? 0) && locations.some((l) => l.id === row.location_id)) top = row;
+  }
+  if (top) return { locationId: top.location_id, binId: top.bin_id };
+  const locationId = locations[0]?.id ?? "";
+  return { locationId, binId: bins.find((b) => b.location_id === locationId)?.id ?? "" };
+}

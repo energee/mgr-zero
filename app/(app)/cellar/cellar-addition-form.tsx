@@ -9,7 +9,7 @@ import { useId, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { CellarAdditionView, CellarAdditionFooter } from "@/components/mgr/views/cellar-addition";
-import { additionPreview, type AdditionLot, type AdditionMaterial, type AdditionStage } from "@/lib/mgr/cellar-addition-view";
+import { additionPreview, additionReason, type AdditionLot, type AdditionMaterial, type AdditionStage } from "@/lib/mgr/cellar-addition-view";
 import type { TransferOccupancy } from "@/lib/mgr/cellar-transfer-view";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { onlyOccupancy } from "@/lib/mgr/cellar-transfer-view";
@@ -22,10 +22,10 @@ export function CellarAdditionForm({ occupancies, materials, lotsByMaterial, dis
   const [fields, setFields] = useState(empty);
   const model = { ...fields, occupancies, materials, lotsByMaterial };
   const preview = additionPreview(model);
-  const reason = preview.valid ? null : preview.reason;
+  const reason = additionReason(preview);
   const form = useCommandForm("record_batch_addition", {
     build: () => {
-      if (!preview.valid) throw new Error(preview.reason);
+      if (!preview.valid) throw new Error(preview.need);
       return { occupancyId: fields.occupancyId, materialId: fields.materialId, stage: fields.stage, qty: preview.qty, lotId: fields.lotId || undefined };
     },
     reset: () => setFields(empty),

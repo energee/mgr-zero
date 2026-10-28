@@ -7,12 +7,13 @@ import { onlyOccupancy, transferPreview, transferReason, type TransferOccupancy,
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 /** `disabled` is the map's actionsOff: no tank holds beer, and the map's note says why (#1115).
- *  `fromId` is the tank the page is about (Vessel detail, a batch); without one the sheet starts on the only open tank (#1508). */
-export function CellarTransferForm({ occupancies, vessels, disabled, fromId = onlyOccupancy(occupancies) }: { occupancies: TransferOccupancy[]; vessels: TransferVessel[]; disabled?: boolean; fromId?: string }) {
+ *  `fromId` scopes the sheet to its tank; otherwise it starts on the only open tank.
+ *  `addVesselHref` links to New vessel when the source is the only vessel. */
+export function CellarTransferForm({ occupancies, vessels, addVesselHref, disabled, fromId = onlyOccupancy(occupancies) }: { occupancies: TransferOccupancy[]; vessels: TransferVessel[]; addVesselHref?: string | null; disabled?: boolean; fromId?: string }) {
   const formId = useId();
   const empty = { fromId, toId: "", volume: "", loss: "" };
   const [fields, setFields] = useState(empty);
-  const model = { ...fields, occupancies, vessels };
+  const model = { ...fields, occupancies, vessels, addVesselHref };
   const source = occupancies.find(o => o.occupancy_id === fields.fromId);
   const preview = transferPreview(source?.bbl, fields.volume, fields.loss);
   const reason = transferReason(model);

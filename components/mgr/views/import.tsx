@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { IMPORT_FIELDS, IMPORT_FIELD_LABELS, IMPORT_KINDS, IMPORT_ROW_CAP_LABEL, canReviewImport, importTemplateCsv, importTemplateName, readyImportRows, validateImportRows, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 import { downloadCsv } from "@/lib/download-csv";
-import { importKindLabel } from "@/lib/mgr/labels";
+import { importKindLabel, paymentTermLabel, sentenceCase } from "@/lib/mgr/labels";
 import { ConfirmDiscard } from "@/components/mgr/views/command-recovery";
 
 export type ImportViewModel = {
@@ -24,6 +24,19 @@ function columnRequirementLabel(field: { required?: boolean; usOnly?: boolean })
   if (field.usOnly) return "required for a US address";
   return "optional";
 }
+
+/** A fixed-choice cell as the New customer form reads it ("net30" → "Net 30", "retailer" → "Retailer"). */
+const choiceLabel = (field: string, value: string) => field === "paymentTerms" ? paymentTermLabel(value) : sentenceCase(value);
+/** Lists a field's choices by label. When the label is more than the cell in other capitals
+ *  ("Net 30" for net30), the cell to type follows in parentheses. */
+function choiceHint(field: string, values: readonly string[]): string {
+  return values.map(value => {
+    const label = choiceLabel(field, value);
+    return label.toLowerCase() === value ? label : `${label} (${value})`;
+  }).join(", ");
+}
+/** The name a row's record goes by, or empty when its name cell is blank. */
+const recordName = (row?: Record<string, string>) => row?.name?.trim() || row?.product?.trim() || row?.label?.trim() || "";
 
 /**
  * onDiscard drops an unresolved batch's saved request (after a confirming step) so a new batch can start.
@@ -67,14 +80,17 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
         <AttachmentContent><AttachmentTitle>{model.fileName ?? "Choose a CSV file"}</AttachmentTitle><AttachmentDescription>{model.headers ? `${model.csvRowCount} ${model.csvRowCount === 1 ? "row" : "rows"} ready` : `.csv · up to ${IMPORT_ROW_CAP_LABEL} rows`}</AttachmentDescription></AttachmentContent>
         <AttachmentTrigger asChild aria-label="Choose CSV file"><label className="cursor-pointer"><input type="file" accept=".csv,text/csv" className="sr-only" aria-invalid={fileRejected || undefined} onChange={event => onFile?.(event.target.files?.[0])} /></label></AttachmentTrigger>
       </Attachment>{fileRejected && <FieldError>{model.error}</FieldError>}</Field>
-      {model.headers && <Button onClick={() => onStep?.(1)}>Match columns</Button>}
+      {/* Every column already matched by name: go straight to Review, matching stays one tap away (#1509). */}
+      {model.headers && (canReview
+        ? <><Button onClick={() => onStep?.(2)}>Review {rows.length} {rows.length === 1 ? "row" : "rows"}</Button><Button variant="outline" onClick={() => onStep?.(1)}>Columns differ?</Button></>
+        : <Button onClick={() => onStep?.(1)}>Match columns</Button>)}
     </>}
     {step === 1 && <>
       <p>For each field, choose the column in your file that fills it. Fields marked * are required. A reference field takes a record’s exact name or its ID, as listed below. Capitals and extra spaces in a name do not matter. If two records share a name, use the ID.</p>
       {fields.map(field => <Field key={field.name}>
 
         {E.pick(IMPORT_FIELD_LABELS[field.name] + (field.required ? " *" : ""), String(mapping[field.name] ?? -1), [{ value: "-1", label: "No column" }, ...(model.headers?.map((header, index) => ({ value: String(index), label: header })) ?? [])], { onChange: onMapping ? value => onMapping?.(field.name, Number(value)) : undefined })}
-        {field.values && <span className="text-sm text-muted-foreground">{field.values.join(", ")}</span>}
+        {field.values && <span className="text-sm text-muted-foreground">{choiceHint(field.name, field.values)}</span>}
       </Field>)}
       {!canReview && <p className="text-sm text-muted-foreground">Match every required field before continuing. State also needs a column when any row has a US address.</p>}
       <Button disabled={!canReview || busy} onClick={() => { if (canReview) onStep?.(2); }}>Review {rows.length} {rows.length === 1 ? "row" : "rows"}</Button><Button variant="outline" onClick={() => onStep?.(0)}>Back to upload</Button>
@@ -86,11 +102,11 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
     </>}
     {step === 2 && <>
       <p>{ready} ready · {rows.length - ready} blocked. Fix values here, or go back to matching columns. Only ready rows are imported, each one on its own. Fix blocked rows first, or they are left out.</p>
-      {E.tbl(["Row", "Record", "Match", "State"], rows.map((row, index) => [String(index + 1), row.name?.trim() || row.product?.trim() || row.label?.trim() || `Row ${index + 1}`, validation[index]?.join("; ") || "validated", validation[index]?.length ? "blocked" : "ready"]), ["r", "l", "l", "l"])}
-      {rows.map((row, index) => <details key={index}><summary>Edit row {index + 1} · {row.name?.trim() || row.product?.trim() || row.label?.trim() || importKindLabel(kind)}</summary>
+      {E.tbl(["Row", "Record", "Problem", "Status"], rows.map((row, index) => [String(index + 1), recordName(row) || `Row ${index + 1}`, validation[index]?.join("; ") || "Validated", validation[index]?.length ? "Blocked" : "Ready"]), ["r", "l", "l", "l"])}
+      {rows.map((row, index) => <details key={index}><summary>Edit row {index + 1} · {recordName(row) || importKindLabel(kind)}</summary>
         <div className="grid gap-3 py-3 sm:grid-cols-2">{fields.map(field => <Field key={field.name}>
           {field.values
-            ? E.pick(`${IMPORT_FIELD_LABELS[field.name]}${field.required ? " *" : ""}`, row[field.name]?.trim() ?? "", [{ value: "", label: "Choose a value" }, ...field.values], { onChange: value => edit(index, field.name, value), "aria-label": `Row ${index + 1} ${IMPORT_FIELD_LABELS[field.name]}`, displayValue: row[field.name]?.trim() || undefined })
+            ? E.pick(`${IMPORT_FIELD_LABELS[field.name]}${field.required ? " *" : ""}`, row[field.name]?.trim() ?? "", [{ value: "", label: "Choose a value" }, ...field.values.map(value => ({ value, label: choiceLabel(field.name, value) }))], { onChange: value => edit(index, field.name, value), "aria-label": `Row ${index + 1} ${IMPORT_FIELD_LABELS[field.name]}`, displayValue: field.values.includes(row[field.name]?.trim() ?? "") ? undefined : row[field.name]?.trim() || undefined })
             : E.edit(`${IMPORT_FIELD_LABELS[field.name]}${field.required ? " *" : ""}`, row[field.name] ?? "", "text", undefined, { onChange: value => edit(index, field.name, value), "aria-label": `Row ${index + 1} ${IMPORT_FIELD_LABELS[field.name]}` })}
         </Field>)}</div>
       </details>)}
@@ -99,12 +115,15 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
       {E.info("If the connection drops during the import, you can retry it without importing any row twice. To fix blocked rows later, import only those rows in a new batch.")}
     </>}
     {step === 3 && <>
-      <p>{busy ? "Importing rows…" : result ? `${result.committed} committed · ${result.blocked} blocked` : "Results have not come back yet"}</p>
-      <p className="break-all text-sm">Batch request: {model.batchId}</p>
-      {E.info("Retry same batch sends the same rows again and shows their first results, so no row is imported twice. Keep this tab open until the results show. If you reload the tab, this batch comes back. To fix blocked rows, import only those rows in a new batch.")}
+      <p>{busy ? "Importing rows…" : result ? `${result.committed} imported · ${result.blocked} blocked` : "Results have not come back yet"}</p>
+      <details><summary>Batch request</summary><p className="break-all text-sm">{model.batchId}</p></details>
+      {!result && E.info("Retry same batch sends the same rows again and shows their first results, so no row is imported twice. Keep this tab open until the results show. If you reload the tab, this batch comes back. To fix blocked rows, import only those rows in a new batch.")}
       {kind === "opening_balances" && E.info("Never import opening balances that already went in again, or the stock is counted twice.")}
-      {result && E.tbl(["Row", "Result"], result.outcomes.map(row => [String(model.previewRows?.[row.row - 1] ?? row.row), `${row.status}${row.error ? `: ${row.error}` : ""}`]), ["r", "l"])}
-      <Button variant="outline" disabled={busy} onClick={onCommit}>Retry same batch</Button>
+      {result && E.tbl(["Row", "Record", "Result"], result.outcomes.map(row => {
+        const previewRow = model.previewRows?.[row.row - 1] ?? row.row;
+        return [String(previewRow), recordName(rows[previewRow - 1]), `${row.status === "committed" ? "Imported" : "Blocked"}${row.error ? `: ${row.error}` : ""}`];
+      }), ["r", "l", "l"])}
+      {!result && <Button variant="outline" disabled={busy} onClick={onCommit}>Retry same batch</Button>}
       {!!result?.blocked && <Button disabled={busy} onClick={onCorrectBlocked}>Correct blocked rows in a new batch</Button>}
       {result && !busy && <Button variant="outline" onClick={onNextFile}>Import another file</Button>}
       {!result && !busy && onDiscard && <ConfirmDiscard onDiscard={onDiscard}

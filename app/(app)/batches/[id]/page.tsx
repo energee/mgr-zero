@@ -3,8 +3,9 @@
 // default: Brew day once Prep pulls are saved, else Prep). Prep (PrepForm →
 // BrewPrepView) saves the pull list; Brew day (BrewTimelineView) starts each
 // ingredient from its saved pull, else plan; vessel and date sit in Knockout.
-// A recorded batch (history, Correct turn, Add brew turn) and a cancelled one
-// keep BrewDayView; the timeline does not model corrections or turns.
+// A recorded batch (history, Correct turn, Add brew turn; once completed, its
+// completion day and write-off) and a cancelled one keep BrewDayView; the
+// timeline does not model corrections or turns.
 // get_brew_day is the read; only open vessels not already occupied make
 // sense to offer, but record_brew_day itself is the one place that refuses
 // an overlap, so every active vessel is offered here (list_vessels hides
@@ -35,7 +36,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 type Batch = {
   id: string; batch_no: number | null; intended_brand_id: string | null; recipe_version_id: string | null;
-  planned_on: string; planned_bbl: number; brewed_on: string | null; cancelled_at: string | null; note: string | null;
+  planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null; cancelled_at: string | null; note: string | null;
 };
 type Occupancy = { id: string; vessel_id: string; initial_bbl: number; started_at: string; vessel_name: string };
 type Vessel = { id: string; name: string; kind: string; capacity_bbl: number };
@@ -46,13 +47,13 @@ const getBatchPageData = cache(async function getBatchPageData(id: string) {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   // Confirm the batch exists before its dependent RPCs can fail independently.
-  const { batch, occupancy } = await orNotFound(runCommand("get_brew_day", { batchId: id }, ctx)) as { batch: Batch; occupancy: Occupancy | null };
-  return { ctx, batch, occupancy };
+  const { batch, occupancy, writeOffBbl } = await orNotFound(runCommand("get_brew_day", { batchId: id }, ctx)) as { batch: Batch; occupancy: Occupancy | null; writeOffBbl: number | null };
+  return { brewery, ctx, batch, occupancy, writeOffBbl };
 });
 
 export default async function BatchPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const [{ id }, { tab }] = await Promise.all([params, searchParams]);
-  const { ctx, batch, occupancy } = await getBatchPageData(id);
+  const { brewery, ctx, batch, occupancy, writeOffBbl } = await getBatchPageData(id);
   const [vessels, today, plan, history] = (await Promise.all([
     runCommand("list_vessels", {}, ctx),
     breweryToday(ctx),
@@ -81,6 +82,7 @@ export default async function BatchPage({ params, searchParams }: { params: Prom
     today, plannedBbl, recorded, cancelled: !!batch.cancelled_at, vesselId: occupancy?.vessel_id ?? "", vesselName: occupancy?.vessel_name, vessels,
     initialBbl: history.records.length ? String(confirmedBbl) : occupancy ? String(Number(occupancy.initial_bbl)) : recorded ? "" : String(plannedBbl),
     brewedOn: batch.brewed_on ?? (recorded ? "" : today),
+    completion: batch.closed_at ? { on: formatDate(batch.closed_at, brewery.timeZone), writeOffBbl } : undefined,
   };
   // A recorded batch still in a tank gets that tank's cellar verbs, so its page is not a dead end (#1508).
   const actions = occupancy && <OccupancyActions ctx={ctx} occupancyId={occupancy.id} batch={{ id: batch.id, label: batNo(batch.batch_no) }} readingHref={`/cellar/${occupancy.id}/reading?from=/batches/${batch.id}`} />;

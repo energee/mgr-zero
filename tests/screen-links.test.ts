@@ -20,7 +20,6 @@ const names = new Set(SCREENS.map((s) => s.name));
 
 describe("resolveTap", () => {
   it("keeps batch history and exact occupancy reading destinations distinct", () => {
-    expect(resolveTap(by("Batches"), "Brew")).toBe("Brew prep");
     expect(resolveTap(by("Batches"), "B-0409")).toBe("Brew day");
     expect(resolveTap(by("Batches"), "FV1")).toBe("Vessel detail");
     expect(resolveTap(by("Batches"), "Reading")).toBe("Fermentation reading");
@@ -72,7 +71,7 @@ describe("resolveTap", () => {
         return next!;
       }, from);
     expect(walk("Today", "Pick", "Orders", "ORD-0231 · Ridgeline", "Adjust")).toBe("Adjust lines");
-    expect(walk("Short pick", "Pick")).toBe("Pick");
+    expect(walk("Short pick", "Adjust order to 7 cases")).toBe("Pick");
     expect(walk("Orders", "Confirm", "Confirm order")).toBe("Order");
     expect(walk("Orders", "New order", "Save draft")).toBe("Order");
     expect(walk("Customers", "Ridgeline Tap Room", "Invite")).toBe("Invite portal user");
@@ -126,11 +125,9 @@ describe("reported explorer flows", () => {
     ["Create brewery", "Create brewery", "First-run checklist"],
     ["Accounting", "Review", "Customers missing email"],
     ["Mapping conflict", "Save mapping", "Accounting"],
-    ["Disconnect QuickBooks", "Disconnect QuickBooks", "Connect QuickBooks"],
+    ["Disconnect QuickBooks", "Disconnect QuickBooks", "Accounting"],
     ["Disconnect Slack", "Disconnect Slack", "Chat disconnected"],
-    ["Disconnect Square", "Disconnect Square", "Connect Square"],
-    ["Connect QuickBooks", "Connect QuickBooks", "Accounting"],
-    ["Connect Square", "Connect Square", "Square locations"],
+    ["Disconnect Square", "Disconnect Square", "Point of sale"],
     ["Point of sale", "Taproom sales in QuickBooksAbout Square’s optional connector", "Taproom sales in QuickBooks"],
     ["Taproom sales in QuickBooks", "Open Accounting", "Accounting"],
   ])("%s: %s → %s", (screen, tap, target) => {

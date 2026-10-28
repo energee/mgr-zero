@@ -1,6 +1,6 @@
 // components/mgr/views/sale-channels.tsx — Sale channels list. Live passes
-// ChannelForm as createAction, ChannelForm + DeleteChannelControl (delete-channel.tsx) via rowTrailing, and the
-// tax-treatment info string; inventory uses Add channel and unlabeled nav.
+// ChannelForm as createAction and ChannelForm + DeleteChannelControl (delete-channel.tsx) via rowTrailing;
+// inventory uses Add channel and unlabeled nav. The tax-change rule is on the Channel sheet (channel.tsx).
 // The model's inUseRule draws whenever the model carries it: a role that may
 // delete sees it when some row has no Delete, and the inventory frame draws
 // the Admin persona. It is an info note: a standing rule, not a warning.
@@ -14,7 +14,6 @@ export function SaleChannelsView({
   model,
   backLabel = "Settings",
   createAction,
-  info,
   rowTrailing,
   linkRows,
 }: {
@@ -22,8 +21,6 @@ export function SaleChannelsView({
   /** Live: "More" for a role that cannot open Settings. */
   backLabel?: string;
   createAction?: ReactNode;
-  /** Live tax-treatment copy. Inventory omits this. */
-  info?: string;
   /** Live: ChannelForm + DeleteChannelControl where row.deletable. Inventory draws E.nav. */
   rowTrailing?: (row: SaleChannelsRowView) => ReactNode;
   /** Live list: nav rows are links. Inventory leaves them unlabeled taps. */
@@ -32,7 +29,6 @@ export function SaleChannelsView({
   return (
     <>
       {E.back(backLabel, "Sale channels", createAction !== undefined ? createAction : E.btn("Add channel"), model.backHref)}
-      {info ? E.info(info) : null}
       {model.inUseRule ? E.info(model.inUseRule) : null}
       {model.empty
         ? E.blank(model.empty)

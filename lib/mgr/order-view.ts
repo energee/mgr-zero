@@ -29,6 +29,10 @@ export type OrderLineView = {
   warning?: string;
 };
 
+/** The line table's number columns, in order; Line amount always follows. */
+const LINE_COLUMNS = [["Ordered", "ordered"], ["Picked", "picked"], ["Shipped", "shipped"], ["Available (all locations)", "atp"], ["Unit price", "unitPrice"]] as const;
+export type OrderLineColumn = (typeof LINE_COLUMNS)[number];
+
 export type OrderViewModel = {
   backHref?: string;
   title: string;
@@ -40,8 +44,9 @@ export type OrderViewModel = {
   next: string;
   /** breweries.timezone, named under the history. */
   timeZone: string;
-  /** Order details, in order; a fixed fact with no value reads "Not specified". The note is `wide`. */
-  facts: { label: string; value: string; wide?: boolean }[];
+  /** Order details, in order; a fixed fact with no value reads "Not specified". The note is `wide`.
+   *  A shipped order's Invoice links on the live page. */
+  facts: { label: string; value: string; wide?: boolean; href?: string }[];
   summary: PriceSummaryModel;
   /** "$X · margin Y%" for a shipped order, when the caller may run get_order_cogs (#810). */
   costLine?: string;
@@ -52,6 +57,9 @@ export type OrderViewModel = {
   confirmHref?: string;
   editHref?: string;
   lines: OrderLineView[];
+  /** The columns with something to say (#1506): Picked and Shipped once a line
+   *  records them, Available while the order still waits on stock. */
+  columns: OrderLineColumn[];
   /** Keg deposits and one-way keg fees, frozen on the order at submit, each named with its line. */
   kegCharges: { key: string; name: string; detail: string; amount: string }[];
   /** `by` names the actor when the page passed actorNames. */
@@ -81,6 +89,8 @@ export type OrderSnapshot = {
   locations?: { id: string; name: string }[];
   /** The order's delivery stop outcome; null while the stop is open or there is none. */
   deliveryOutcome?: DeliveryOutcome | null;
+  /** The invoice billing the order's shipment; null until one is issued. */
+  invoice?: { id: string; invoice_no: number | null } | null;
   lines: {
     id: string;
     sku_id: string;
@@ -125,6 +135,17 @@ function lineWarning(picked: number | null, ordered: number, atp?: number): stri
   if (picked !== null && picked > ordered) return `Picked ${picked}, more than ordered`;
   if (atp !== undefined && atp < 0) return "Available is below zero";
   return undefined;
+}
+
+/** Availability matters until the order is picked: before submit nothing is
+ *  promised, and once picked or shipped the stock is already counted out. */
+const awaitsStock = (status: OrderStatus) => status === "submitted" || status === "confirmed";
+
+/** A picked quantity can outlive the picked state (re-opened to confirmed by
+ *  an adjustment, or cancelled), so Picked and Shipped follow the lines. */
+function lineColumns(status: OrderStatus, lines: OrderSnapshot["lines"]): OrderLineColumn[] {
+  const shows = { picked: lines.some((l) => l.qty_picked !== null), shipped: lines.some((l) => l.qty_shipped !== null), atp: awaitsStock(status) };
+  return LINE_COLUMNS.filter(([, field]) => field === "ordered" || field === "unitPrice" || shows[field]);
 }
 
 const qtyText = (qty: number | null) => (qty === null ? "Not recorded" : String(qty));
@@ -202,7 +223,7 @@ function costLineFor(order: OrderSnapshot["order"], cogs?: OrderCogs): string | 
 
 /** Map a get_order payload onto OrderView's model. Inventory frames pass a
  *  fixture snapshot through this same function. */
-export function toOrderViewProps({ order, lines, events, atp, locations, deliveryOutcome, backHref, timeZone, cogs, deposits, actorNames }: OrderSnapshot): OrderViewModel {
+export function toOrderViewProps({ order, lines, events, atp, locations, deliveryOutcome, invoice, backHref, timeZone, cogs, deposits, actorNames }: OrderSnapshot): OrderViewModel {
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? "line"]));
   const lineNames = new Map(lines.map((l) => [l.id, l.skus?.name ?? "Line"]));
@@ -224,6 +245,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
       ...(order.kind === "wholesale" || order.pickup ? [{ label: "Ship-to", value: shipTo ?? "Not specified" }] : []),
       { label: "Requested ship date", value: order.requested_ship_date ? formatDate(order.requested_ship_date) : "Not specified" },
       ...(order.kind === "wholesale" ? [{ label: "Customer PO", value: order.po_number?.trim() || "Not specified" }] : []),
+      ...(invoice ? [{ label: "Invoice", value: docNo("INV", invoice.invoice_no, "Invoice"), ...(backHref ? { href: `/invoices/${invoice.id}` } : {}) }] : []),
       ...(order.note ? [{ label: "Note", value: order.note, wide: true }] : []),
     ],
     summary: orderSummary(order, lines, deposits, events),
@@ -233,6 +255,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
     putBackHref: stagedOnOpenOrder(order.status, order.needs_restock) ? (backHref ? `/orders/${order.id}/restock` : "#") : undefined,
     editHref: order.status === "draft" ? (backHref ? `/orders/${order.id}/edit` : "#") : undefined,
     confirmHref: order.status === "submitted" ? (backHref ? `/orders/${order.id}/confirm` : "#") : undefined,
+    columns: lineColumns(order.status, lines),
     lines: lines.map((l) => {
       const ordered = Number(l.qty_ordered);
       const picked = l.qty_picked === null ? null : Number(l.qty_picked);
@@ -248,7 +271,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
         unitPrice: money(Number(l.unit_price_cents)),
         amount: money(orderLineCents(ordered, l.unit_price_cents)),
         shortReason: l.short_reason ?? undefined,
-        warning: lineWarning(picked, ordered, qtyAtp),
+        warning: lineWarning(picked, ordered, awaitsStock(order.status) ? qtyAtp : undefined),
       };
     }),
     kegCharges: [

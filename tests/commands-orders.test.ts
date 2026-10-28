@@ -252,4 +252,16 @@ describe("standing taproom allocations", () => {
     const tap = await seedLocation(b.id, { name: "Tap2", uses: ["taproom"] });
     await expect(runCommand("set_standing_allocation", { locationId: tap.id, skuId, qty: 1 }, brewerCtx)).rejects.toThrow(/permission denied/);
   });
+
+  it("get_order names its shipment's invoice and get_invoice names its order (#1517)", async () => {
+    const buyer = await seedCustomer(b.id, { name: "Invoice link buyer" });
+    const order = await ins("orders", { brewery_id: b.id, kind: "wholesale", customer_id: buyer.customerId, ship_to_id: buyer.shipToId, sale_channel_id: buyer.saleChannelId, from_location_id: whId, created_by: adminCtx.userId });
+    const shipment = await ins("shipments", { brewery_id: b.id, order_id: order.id, created_by: adminCtx.userId });
+    const invoice = await ins<{ id: string; invoice_no: number }>("invoices", { brewery_id: b.id, customer_id: buyer.customerId, kind: "invoice", shipment_id: shipment.id, issued_on: "2026-09-02" });
+    const read = await runCommand("get_order", { orderId: order.id }, adminCtx) as { order: { order_no: number }; shipment: { invoices: { id: string; invoice_no: number }[] } };
+    // A shipment has at most one invoice (invoices.shipment_id is unique); PostgREST still embeds a list.
+    expect(read.shipment.invoices).toEqual([{ id: invoice.id, invoice_no: invoice.invoice_no }]);
+    const bill = await runCommand("get_invoice", { invoiceId: invoice.id }, adminCtx) as { invoice: { shipments: { orders: { id: string; order_no: number } | null } | null } };
+    expect(bill.invoice.shipments?.orders).toEqual({ id: order.id, order_no: read.order.order_no });
+  });
 });
