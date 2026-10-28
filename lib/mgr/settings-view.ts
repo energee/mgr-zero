@@ -1,8 +1,10 @@
 // lib/mgr/settings-view.ts — view-model for Settings (get_brewery extras).
 import type { GatewayModelOption } from "@/lib/chat/models";
-import { dollarsInput, toCents } from "@/lib/mgr/money";
+import { centsMaxError, dollarsInput, toCents } from "@/lib/mgr/money";
 import type { ReportingBasisCorrection } from "@/lib/commands/compliance";
 import { submitReason } from "@/lib/mgr/submit-reason";
+import { phoneError } from "@/lib/mgr/phone";
+import type { UnitsViewModel } from "@/lib/mgr/units-view";
 
 export type BrewerySettings = {
   name: string; timezone: string; ttb_registry_no: string | null; pa_license_no: string | null;
@@ -50,6 +52,7 @@ export function brewerySettingsReason(values: BrewerySettingsValues, initial: Br
   const missing: string[] = [];
   if (!values.name.trim()) missing.push("a brewery name");
   if (!values.timezone.trim()) missing.push("a timezone");
+  if (phoneError(values.phone)) missing.push("a phone number, such as (503) 555-0142");
   const { readingDueHours, daysToPackage } = breweryOperatingDefaultsCommand(values).input;
   if (!readingDueHoursIsValid(readingDueHours)) missing.push("reading overdue hours from 1 to 168 (whole numbers)");
   if (!Number.isInteger(daysToPackage) || daysToPackage < 1 || daysToPackage > 120) missing.push("days to package from 1 to 120 (whole numbers)");
@@ -101,6 +104,8 @@ export type SettingsViewModel = {
   warehouseOptions: { id: string; name: string }[];
   locations: string;
   team: string;
+  /** The brewery gravity unit chips; live passes GravityUnitForm in their place. */
+  units?: UnitsViewModel;
 };
 
 /**
@@ -120,8 +125,7 @@ export function oneWayKegFeeError(value: string): string | undefined {
     || (value.split(".")[1]?.replace(/0+$/, "").length ?? 0) > 2) {
     return "Enter zero or a positive dollar amount with at most two decimal places.";
   }
-  if ((toCents(value) ?? 0) > 2_147_483_647) return "Enter a fee of $21,474,836.47 or less.";
-  return undefined;
+  return centsMaxError(value, "a fee");
 }
 
 /**

@@ -1,5 +1,9 @@
 // lib/mgr/sku-view.ts — view-model for the SKU sheet. create_sku / list_skus
 // plus packaged formats and keg pools paint format, pool, active, and optional UPC.
+import { isNumber, numberNotationError, toTicks } from "./quantity-input";
+import { submitReason } from "./submit-reason";
+import { UPC_NEED, upcError } from "./upc";
+
 export type SkuViewModel = {
   kind?: "packaged" | "poured";
   pourName?: string;
@@ -60,14 +64,42 @@ export function skuCreateCommand(fields: { brandId: string; formatId: string; na
   return { name: "create_sku", input: { brandId: fields.brandId, formatId: fields.formatId, name: fields.name || undefined, upc: fields.upc || undefined, kegPoolId: fields.kegPoolId }, valid: Boolean(fields.formatId) };
 }
 
-/** An edit saves one command. Creation deliberately leaves the optional share unset. */
+/** Why a batch package share percent is out of range, or undefined; blank clears the share. */
+export function batchShareError(percent: string): string | undefined {
+  if (percent.trim() === "") return undefined;
+  const share = Number(percent);
+  return share > 0 && share <= 100 ? undefined : "Enter a share above 0% and at most 100%, or clear it.";
+}
+
+/** An edit saves one command; `reason` (submitReason) withholds Save SKU while the UPC or share is invalid.
+ *  Creation deliberately leaves the optional share unset. */
 export function skuUpdateCommand(fields: { skuId: string; active: boolean; upc: string; batchSharePercent: string; kegPoolId?: string | null }) {
   const batchShare = fields.batchSharePercent.trim() === "" ? null : Number(fields.batchSharePercent) / 100;
   return {
     name: "update_sku",
     input: { skuId: fields.skuId, active: fields.active, upc: fields.upc, batchShare, ...(fields.kegPoolId === undefined ? {} : { kegPoolId: fields.kegPoolId }) },
-    valid: batchShare === null || (batchShare > 0 && batchShare <= 1),
+    reason: submitReason([
+      ...(upcError(fields.upc) ? [UPC_NEED] : []),
+      ...(batchShareError(fields.batchSharePercent) ? ["a batch package share above 0% and at most 100%"] : []),
+    ]),
   };
 }
 
 export const pourSkuName = (name: string, ounces: string) => name.trim() || `${Number(ounces)} oz pour`;
+
+/** What is wrong with a typed serving size, or undefined. It keeps the table's
+ *  bounds (more than 0, under 1000 oz) as stored: numeric(12,4) rounds to four
+ *  decimals, so 0.00004 stores as 0 and 999.99995 as 1000, and both are refused. */
+export function pourOuncesError(value: string): string | undefined {
+  const notation = numberNotationError(value);
+  if (notation) return notation;
+  if (!isNumber(value)) return "Enter a serving size in ounces.";
+  if (Number(value) <= 0) return "Enter a serving size above 0 oz.";
+  const ticks = toTicks(Number(value));
+  if (ticks <= 0) return "Enter at least 0.0001 oz: serving sizes are stored to four decimal places.";
+  if (ticks >= toTicks(1000)) return "Enter a serving size under 1000 oz.";
+}
+
+/** Why Save pour is withheld, from the same check as the field error. */
+export const pourReason = (ounces: string) =>
+  submitReason(pourOuncesError(ounces) ? ["a serving size from 0.0001 to 999.9999 oz (no exponent notation)"] : []);

@@ -15,19 +15,16 @@ export function ComposerDemo({ disabled, container, initialOpen = false, childre
   const [open, setOpen] = useState(initialOpen);
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<ComposerConversationMessage[]>([]);
-  const [outboxOpen, setOutboxOpen] = useState(false);
 
   return <ComposerPanelView container={container} open={open} onOpenChange={setOpen}>
     {children ?? <>
       <ComposerConversationView messages={messages} onNewChat={() => { setMessages([]); setPrompt(""); }} />
       <p className="text-xs text-muted-foreground">Screen preview only. Messages stay here and are not sent to MGR.</p>
-      {outboxOpen && <p role="status">No offline readings in this preview.</p>}
       <ComposerStripView
         disabled={disabled}
         value={prompt}
         onChange={setPrompt}
         onAction={(value) => setPrompt(value === "attention" ? "What needs my attention today?" : value === "inventory" ? "What inventory is available?" : "Help me record an inventory movement.")}
-        onOutbox={() => setOutboxOpen((previous) => !previous)}
         onSubmit={(content) => { setMessages((previous) => [...previous, { id: crypto.randomUUID(), role: "user", content }]); setPrompt(""); }}
       />
     </>}

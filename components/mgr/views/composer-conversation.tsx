@@ -39,7 +39,7 @@ export function ComposerConversationView({ messages, activity, error, onRetry, o
           </EmptyHeader>
         </Empty>}
         {messages.map((message) => <div key={message.id} className={message.role === "user" ? "ml-auto w-fit max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground" : "max-w-[90%] text-sm"}><span className="sr-only">{message.role === "user" ? "You" : "MGR"}: </span>{message.role === "assistant" ? <Streamdown disallowedElements={DISALLOWED_ELEMENTS}>{message.content}</Streamdown> : message.content}</div>)}
-        {!activity && !error && messages.at(-1)?.role === "user" && <p role="status" className="text-sm text-muted-foreground">No completed MGR response was saved for this message. Chat messages are not queued; saved fermentation readings remain available below.</p>}
+        {!activity && !error && messages.at(-1)?.role === "user" && <p role="status" className="text-sm text-muted-foreground">No MGR response was saved for this message. Send it again to retry; if Ask MGR still cannot answer, it says why here.</p>}
         {activity && <ComposerActivity>{activity}</ComposerActivity>}
         {error && <Alert><AlertDescription className="flex flex-wrap items-center justify-between gap-3"><span>{error}</span>{onRetry && <Button type="button" size="sm" variant="outline" onClick={onRetry}>Try again</Button>}</AlertDescription></Alert>}
       </div>

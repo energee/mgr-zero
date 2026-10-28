@@ -4,6 +4,7 @@
 // (sent from a mail client, the draft page's default) and opens the PO; if
 // that second step fails, the error says the draft is saved and links it.
 // Once a vendor is chosen, its materials lead the picker (vendorMaterialsFirst).
+// `today` is breweryDate(timeZone), so a past Expected date warns.
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -19,7 +20,7 @@ type Material = { id: string; name: string; purchase_uom: string; lot_tracked: b
 type Line = { materialId: string; qty: string; cost: string; lot: string };
 const EMPTY: Line = { materialId: "", qty: "", cost: "", lot: "" };
 
-export function NewPoForm({ vendors, materials }: { vendors: Vendor[]; materials: Material[] }) {
+export function NewPoForm({ vendors, materials, today }: { vendors: Vendor[]; materials: Material[]; today: string }) {
   const router = useRouter();
   const [vendorId, setVendorId] = useState("");
   const [expectedOn, setExpectedOn] = useState("");
@@ -50,7 +51,7 @@ export function NewPoForm({ vendors, materials }: { vendors: Vendor[]; materials
     void action.run("create_purchase_order", input(), () => router.push("/purchase-orders"));
   }}>
     <NewPoView model={{
-      backHref: "/purchase-orders", vendorsHref: "/vendors", materialsHref: "/materials", vendor: vendorId, vendors, materials: vendorMaterialsFirst(materials, vendorId), expected: expectedOn,
+      backHref: "/purchase-orders", vendorsHref: "/vendors", materialsHref: "/materials", vendor: vendorId, vendors, materials: vendorMaterialsFirst(materials, vendorId), expected: expectedOn, today,
       lines: lines.map((line, index) => {
         const material = materials.find(item => item.id === line.materialId);
         return { key: String(index), materialId: line.materialId, title: material?.name ?? "", detail: material ? `${material.purchase_uom} · ${material.lot_tracked ? "lot-tracked" : "not lot-tracked"}` : "", qty: line.qty, cost: line.cost, lot: material?.lot_tracked ? line.lot : undefined };

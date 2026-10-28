@@ -44,11 +44,12 @@ type Balance = {
 export default async function CustomerKegBalancePage({ params }: { params: Promise<{ customerId: string }> }) {
   const { customerId } = await params;
   const { ctx, customer } = await getCustomerData(customerId);
-  const [balance, locations, bins] = (await Promise.all([
+  const [balance, locations, bins, fleet] = (await Promise.all([
     runCommand("get_customer_keg_balance", { customerId }, ctx),
     runCommand("list_locations", {}, ctx),
     runCommand("list_bins", {}, ctx),
-  ])) as [Balance, { id: string; name: string }[], { id: string; location_id: string; name: string }[]];
+    runCommand("get_keg_fleet", {}, ctx),
+  ])) as [Balance, { id: string; name: string }[], { id: string; location_id: string; name: string }[], { rows: { pool_id: string; keg_size: string; bin_id: string; qty: number }[] }];
   // The pools this customer holds kegs of are the only ones a return can name.
   const pools = [...new Map(balance.rows.map((r) => [r.pool_id, { id: r.pool_id, name: r.pool_name }])).values()];
   return (
@@ -68,7 +69,7 @@ export default async function CustomerKegBalancePage({ params }: { params: Promi
       })}
       // A row of deposits held with no keg out has nothing to return.
       rowActions={Object.fromEntries(balance.rows.map((r) => [`${r.pool_id}-${r.keg_size}`, r.kegs_out > 0
-        ? <KegEventForm label="Record return" pools={pools} locations={locations} bins={bins} customers={[customer]}
+        ? <KegEventForm label="Record return" pools={pools} locations={locations} bins={bins} customers={[customer]} stock={fleet.rows}
           prefill={{ poolId: r.pool_id, kegSize: r.keg_size as KegSize, reason: "returned", customerId }} />
         : null]))}
       footer={<Link href={`/kegs/history?customer=${customerId}`}>{E.nav("Keg event history", "this customer's events")}</Link>}

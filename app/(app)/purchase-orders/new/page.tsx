@@ -4,6 +4,7 @@ import { runPageQuery, requirePagePermission } from "@/lib/mgr/page-query";
 import { NewPoForm } from "../new-po-form";
 import "@/lib/commands/all";
 import { navTitle } from "@/lib/mgr/nav";
+import { breweryDate } from "@/lib/date-format";
 
 export const metadata = { title: navTitle("/purchase-orders/new") };
 
@@ -15,5 +16,5 @@ export default async function NewPurchaseOrderPage() {
     runPageQuery("list_vendors", {}, ctx) as Promise<{ id: string; name: string; active: boolean }[]>,
     runPageQuery("list_materials", {}, ctx) as Promise<{ id: string; name: string; purchase_uom: string; lot_tracked: boolean; default_vendor_id: string | null }[]>,
   ]);
-  return <NewPoForm vendors={vendors.filter(vendor => vendor.active)} materials={materials} />;
+  return <NewPoForm vendors={vendors.filter(vendor => vendor.active)} materials={materials} today={breweryDate(brewery.timeZone)} />;
 }

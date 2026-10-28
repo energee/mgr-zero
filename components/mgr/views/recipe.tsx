@@ -16,6 +16,7 @@ import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
+import { isNumber } from "@/lib/mgr/quantity-input";
 import { batchTotalText, packRounding, RECIPE_NUMBERS, type RecipeIngredientView, type RecipeNumberKey, type RecipeScheduleView, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 
 export type { RecipeViewModel };
@@ -49,7 +50,8 @@ export function RecipeView({
   slots?: RecipeSlots;
 }) {
   const [totalsAt, setTotalsAt] = useState(model.totalsAtBbl ?? "");
-  const bbl = Number(totalsAt);
+  // Exponent notation such as 1e1 is not a batch size: the field shows why, and no totals are drawn.
+  const bbl = isNumber(totalsAt) ? Number(totalsAt) : 0;
   const packed = (model.ingredients ?? []).some((row) => row.pack);
   // A brew-day line's total at the typed size, then Whole packs or (off the read page) its Round choices.
   const packFoot = ({ pack, onRound }: RecipeIngredientView) => {
@@ -68,7 +70,7 @@ export function RecipeView({
     );
   };
   const bind = (key: RecipeNumberKey | "notes") => (controls ? { onChange: (value: string) => controls.set(key, value) } : undefined);
-  // A schedule: the live draft's sheet trigger, else its heading, rows and summary on a cut version, else the row that opens its screen.
+  // A schedule: the live draft's sheet trigger, else its heading, rows and summary on a cut version (one row is its own summary, so it is not repeated), else the row that opens its screen.
   const schedule = (s: RecipeScheduleView | undefined, slot: ReactNode) => {
     if (slot) return slot;
     if (!s) return null;
@@ -77,7 +79,7 @@ export function RecipeView({
       <>
         {E.ttl(s.title)}
         {s.rows.map((r, i) => <Fragment key={`${s.title}-${i}`}>{E.row(r.title, r.detail)}</Fragment>)}
-        {s.detail ? E.info(s.detail) : null}
+        {s.detail && s.rows.length > 1 ? E.info(s.detail) : null}
       </>
     );
   };

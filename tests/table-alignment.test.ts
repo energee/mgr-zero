@@ -105,13 +105,15 @@ describe("E.tbl column alignment", () => {
         { row: 2, status: "blocked", error: rowError },
       ] },
     } }));
-    expectAlignment(html, ["r", "l"]);
+    // Row, Record, Result (#1497): the row number right, the record name and result text left.
+    expectAlignment(html, ["r", "l", "l"]);
     const values = cells(html, "td").map(cell => cell.content);
-    expect([values[0], values[2]]).toEqual(["2", "4"]);
-    expect(values[1]).toBe("committed");
-    expect(values[1]).not.toContain("saved-record");
-    expect(values[3]).toContain("blocked");
-    expect(values[3]).toContain(rowError);
+    expect([values[0], values[3]]).toEqual(["2", "4"]);
+    expect(values[1]).toBe("Al’s Bar");
+    expect(values[2]).toBe("Imported");
+    expect(values.join(" ")).not.toContain("saved-record");
+    expect(values[5]).toContain("Blocked");
+    expect(values[5]).toContain(rowError);
   });
 
   it("keeps every format and group of the showing channel in the scrollable price matrix", () => {

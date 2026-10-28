@@ -47,11 +47,18 @@ it("projects expected failures to declared fields with corrective copy", () => {
     { path: ["customerPhone"], code: "custom", message: "a phone number" },
   ] };
   expect(inputErrorPresentation(failure, ["state", "zip", "customerPhone"])).toEqual({ error: null, fieldErrors: {
-    state: "Use a two-letter state code, such as PA.",
+    state: "Choose a US state, such as PA.",
     zip: "Use a 5-digit ZIP code or ZIP+4, such as 15201 or 15201-1234.",
     customerPhone: "Use a phone number, such as (503) 555-0142.",
   } });
   expect(inputErrorPresentation(failure, ["state"]).error).toBe(failure.message);
+});
+
+it("places a duplicate-name conflict under a declared Name field, else keeps it in the form message (#1488)", () => {
+  const message = "That name is already used. Choose a different name.";
+  const failure = { status: 409, code: "conflict", message, issues: [{ path: ["name"], code: "duplicate", message }] };
+  expect(inputErrorPresentation(failure, ["name", "email"])).toEqual({ error: null, fieldErrors: { name: message } });
+  expect(inputErrorPresentation(failure, [])).toEqual({ error: message, fieldErrors: {} });
 });
 
 it("preserves unexpected, nested, ambiguous and domain errors", () => {
@@ -84,4 +91,13 @@ it.each([
   expect(detail).toMatchObject({ status, kind, issues });
   const presentation = inputErrorPresentation(detail, ["email"]);
   expect(Object.keys(presentation.fieldErrors)).toEqual(code === "invalid_input" ? ["email"] : []);
+});
+
+// #1482: an over-limit value is not a malformed one, so a field with its own
+// format copy (lead time) still says to enter something smaller.
+it("says an over-limit field is too large before its format copy", () => {
+  const failure = { status: 400, code: "invalid_input", message: "Enter a number no greater than 2,147,483,647.", issues: [
+    { path: ["leadTimeDays"], code: "too_big", message: "Enter a number no greater than 2,147,483,647." },
+  ] };
+  expect(inputErrorPresentation(failure, ["leadTimeDays"]).fieldErrors).toEqual({ leadTimeDays: "Enter a smaller value." });
 });
