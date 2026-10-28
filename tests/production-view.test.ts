@@ -65,15 +65,21 @@ it("cellar derives fills from occupancy and keeps links explicit", () => {
   expect(toCellarMapViewProps([{ ...vessels[0], capacity_bbl: 0 }], occupancies).tiles[0].fill).toBeUndefined();
 });
 
+it("#1516 puts Complete batch with the cellar actions above the tiles, which fill a wide screen", () => {
+  const model = toCellarMapViewProps([{ id: "v1", name: "FV1", capacity_bbl: 10 }], []);
+  const html = htmlOf(createElement(CellarMapView, { model }));
+  expect(html.indexOf(">Complete batch</button>")).toBeLessThan(html.indexOf("FV1"));
+  expect(html).toContain("md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]");
+});
+
 describe("cellar first-vessel setup (#1254)", () => {
-  it("puts the primary Add vessel action inside the empty state before batch completion", () => {
+  it("puts the primary Add vessel action inside the empty state", () => {
     const model = { ...toCellarMapViewProps([], []), addHref: "/cellar/vessels/new", brewHref: "/batches" };
     const html = htmlOf(createElement(CellarMapView, { model }));
     expect(html).toContain("No vessels yet");
     expect(html).toContain("Add your tanks to start tracking the cellar.");
     expect(html).toMatch(/data-slot="empty-content"[^]*?data-variant="default"[^]*?href="\/cellar\/vessels\/new"[^>]*>Add vessel<\/a>/);
     expect(html.match(/>Add vessel<\/a>/g)).toHaveLength(1);
-    expect(html.indexOf(">Add vessel</a>")).toBeLessThan(html.indexOf(">Complete batch</button>"));
     expect(html).not.toContain("Start a brew day in Batches");
     // The disabled Reading, Transfer and Addition still say why (#1122).
     expect(html).toContain("No tank holds beer");

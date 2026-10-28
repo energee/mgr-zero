@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { OrderQuantity } from "@/components/mgr/views/new-order";
 import { ScopePick, type ScopeOption } from "@/components/mgr/scope-pick";
 import { varianceBbl, varianceReason } from "@/lib/mgr/taproom-variance-view";
-import { countBrandComparison, countLocked, countQuantityError, countSubmitReason, isShortage, projectionExpectedText, projectionMatchesCountDraft, updateCountDisposition, updateCountQuantity, updateCorrectionQuantity, updateCorrectionReason, type TaproomCountState } from "@/lib/mgr/taproom-count-state";
+import { countBrandComparison, countLocked, countQuantityError, countSubmitReason, isShortage, projectionExpectedText, projectionMatchesCountDraft, updateCountDisposition, updateCountQuantity, updateCorrectionQuantity, updateCorrectionReason, worksheetOrder, type TaproomCountState } from "@/lib/mgr/taproom-count-state";
 import type { TaproomCorrectionState } from "@/lib/mgr/taproom-count-state";
 import type { StaffRole } from "@/lib/commands/registry";
 import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
@@ -81,7 +81,8 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
   const projection = state.projection as { expected_bbl: number | null; starts_at?: string | null; as_of?: string; reason?: string | null; unmapped_lines?: number; ignored_lines?: number; excluded_bbl?: number; unattributed_bbl?: number; coverage_complete?: boolean } | null;
   const expected = projectionExpectedText(projection ?? { expected_bbl: null });
   const prior = state.draft.priorCount;
-  const comparison = countBrandComparison(state);
+  // A brand with no expectation has nothing to compare, so it draws no row (#1516).
+  const comparison = countBrandComparison(state).filter(row => row.expectedBbl !== null);
   return <>
     <div className="contents print:hidden">
     {E.ttl("Expected consumption")}
@@ -105,18 +106,23 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
       {state.draft.lines.some(line => line.lotId !== null) && onlyRoles(roles, ["taproom"]) && E.note("Tracked lots use the full worksheet row numbers shown here. Use Print current stock labels before counting; do not guess a lot.")}
       {state.draft.lines.length === 0 && E.blank("No stock is recorded at this taproom. Record count saves a count of zero for today. Your next count compares against it.")}
       <fieldset disabled={locked} className="contents">
-        {state.draft.lines.map((line, index) => {
-          const lot = line.lotId ? (onlyRoles(roles, ["taproom"]) ? `Tracked worksheet row ${index + 1}` : `Lot ${lotLabels[line.key] ?? "label unavailable"} · worksheet row ${index + 1}`) : `Untracked stock · worksheet row ${index + 1}`;
-          const error = touched.shown(index) ? countQuantityError(line) : undefined;
+        {worksheetOrder(state.draft.lines).map(({ line, row }) => {
+          // An untracked bucket needs no worksheet row: only tracked lots match a printed label by it.
+          const lot = line.lotId ? (onlyRoles(roles, ["taproom"]) ? `Tracked worksheet row ${row}` : `Lot ${lotLabels[line.key] ?? "label unavailable"} · worksheet row ${row}`) : null;
+          const error = touched.shown(row - 1) ? countQuantityError(line) : undefined;
           return <div key={line.key}>
-            {E.row(line.skuName, `${line.binName} · ${lot} · recorded ${line.qtyBefore}`, <OrderQuantity
-              id={`${formId}-${index}`} label={`Remaining units · ${line.skuName} · worksheet row ${index + 1}`}
-              value={line.quantity} max={line.qtyBefore} step="1" required
-              invalid={state.attempt.kind === "error"} error={error}
-              onBlur={() => touched.touch(index)}
-              onChange={value => changeQuantity(line.key, value)}
-            />, isShortage(line) ? "w" : "")}
-            {isShortage(line) && E.pick(`Shortage disposition · worksheet row ${index + 1}`, line.disposition ?? "sold", [{ value: "sold", label: "Sold" }, { value: "destroyed", label: "Destroyed" }], { disabled: locked, onChange: value => changeDisposition(line.key, value as "sold" | "destroyed") })}
+            {E.row(line.skuName, [line.binName, lot, `recorded ${line.qtyBefore}`].filter(Boolean).join(" · "), <div className="flex items-center gap-1">
+              {/* Fills this one bucket on request; quantities never start at the recorded stock. */}
+              <Button type="button" variant="ghost" size="sm" aria-label={`Same as recorded · ${line.skuName} · worksheet row ${row}`} onClick={() => { touched.touch(row - 1); changeQuantity(line.key, String(line.qtyBefore)); }}>Same as recorded</Button>
+              <OrderQuantity
+                id={`${formId}-${row - 1}`} label={`Remaining units · ${line.skuName} · worksheet row ${row}`}
+                value={line.quantity} max={line.qtyBefore} step="1" required
+                invalid={state.attempt.kind === "error"} error={error}
+                onBlur={() => touched.touch(row - 1)}
+                onChange={value => changeQuantity(line.key, value)}
+              />
+            </div>, isShortage(line) ? "w" : "")}
+            {isShortage(line) && E.pick(`Shortage disposition · worksheet row ${row}`, line.disposition ?? "sold", [{ value: "sold", label: "Sold" }, { value: "destroyed", label: "Destroyed" }], { disabled: locked, onChange: value => changeDisposition(line.key, value as "sold" | "destroyed") })}
           </div>;
         })}
       </fieldset>

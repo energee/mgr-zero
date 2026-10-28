@@ -114,7 +114,7 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
           }, { target: name })}
         />}
         linkRows={canPrice}
-        formatAction={canManageFormats ? E.btn("Manage formats", "g", "/catalog") : null}
+        formatAction={canManageFormats ? E.btn("Manage formats", "g", "/catalog#formats") : null}
         pricingHref="/pricing"
         messages={<CommandFormMessage error={error} />}
         busy={busy}

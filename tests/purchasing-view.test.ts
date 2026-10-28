@@ -24,7 +24,7 @@ import {
   correctReceiptCountryMalt, newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
 } from "../lib/mgr/fixtures/purchasing";
 import { toContractsViewProps } from "../lib/mgr/contracts-view";
-import { toMaterialsOnHandViewProps } from "../lib/mgr/materials-on-hand-view";
+import { toMaterialsOnHandViewProps, toMaterialsScopes } from "../lib/mgr/materials-on-hand-view";
 import { poDetailStatus, poListStatus, purchaseOrderNext, toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
 import { poLineDetail, poLineQty } from "../lib/mgr/receive-po-view";
 import { receiptBillPresentation, receiptBillRequest, toPostedReceiptViewProps, type ReceiptSnapshot } from "../lib/mgr/receipt-view";
@@ -446,6 +446,18 @@ describe("Materials", () => {
     }
   });
 
+  it("#1516 offers a Type pick, All types first, each type linking live and inert in the inventory", () => {
+    const [type] = toMaterialsScopes({ category: "hop", href: patch => `/materials?category=${patch.category}` });
+    expect(type).toMatchObject({ label: "Type", value: "hop" });
+    expect(type!.options.slice(0, 3)).toEqual([
+      { value: "", label: "All types", href: "/materials?category=" },
+      { value: "malt", label: "Malt", href: "/materials?category=malt" },
+      { value: "hop", label: "Hop", href: "/materials?category=hop" },
+    ]);
+    expect(toMaterialsScopes({ category: "" })[0]!.options.every(option => option.href === undefined)).toBe(true);
+    expect(toMaterialsOnHandViewProps({ rows: [], filtered: true }).empty?.description).toBe("Clear the search or choose All types to see every material.");
+  });
+
   it("links the unfiltered empty list to Purchase orders and keeps inventory links inert", () => {
     const model = toMaterialsOnHandViewProps({ rows: [], purchaseOrdersHref: "/purchase-orders" });
     const html = htmlOf(createElement(MaterialsOnHandView, { model }));
@@ -581,7 +593,7 @@ describe("Vendors and Materials on hand search", () => {
   it("say nothing matches, not nothing yet, when a search is on", () => {
     expect(toVendorsViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No vendors match", description: "Clear the search to see every vendor." });
     expect(toVendorsViewProps({ rows: [] }).empty?.title).toBe("No vendors yet");
-    expect(toMaterialsOnHandViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No materials match", description: "Clear the search to see every material." });
+    expect(toMaterialsOnHandViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No materials match", description: "Clear the search or choose All types to see every material." });
     expect(toMaterialsOnHandViewProps({ rows: [] }).empty?.title).toBe("No materials yet");
     // #1112: the page's only action is Add material, so the empty state starts there. Receiving
     // is the one step that works for every material: a lot-tracked one with no lot can't be counted in.

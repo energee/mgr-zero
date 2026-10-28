@@ -315,11 +315,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Invoices and credit memos with current total plus frozen local subtotal and the sum of payments recorded in MGR, newest first
+Invoices and credit memos with current total plus frozen local subtotal and the sum of payments recorded in MGR, newest first; optionally only unpaid invoices
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `customerId` | uuid | no |
+| `status` | unpaid | no |
 | `limit` | integer | no |
 | `cursor` | string | no |
 

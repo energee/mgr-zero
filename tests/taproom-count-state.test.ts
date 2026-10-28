@@ -19,6 +19,7 @@ import {
   updateCorrectionReason,
   updateCountQuantity,
   updateCountDisposition,
+  worksheetOrder,
 } from "@/lib/mgr/taproom-count-state";
 
 const ids = {
@@ -319,4 +320,10 @@ describe("taproom count controlled state", () => {
     expect(countBrandComparison(state)).toEqual([{ brandId: "brand-projected", brandName: "Projected", expectedBbl: .25,
       actualBbl: 0, differenceBbl: .25, complete: true }]);
   });
+});
+
+it("#1516 lists count buckets by SKU then bin name, each keeping its printed worksheet row", () => {
+  const line = (skuName: string, binName: string) => ({ skuName, binName });
+  expect(worksheetOrder([line("Pils", "Cold"), line("Hazy", "Walk-in"), line("Hazy", "Cold")]))
+    .toEqual([{ line: line("Hazy", "Cold"), row: 3 }, { line: line("Hazy", "Walk-in"), row: 2 }, { line: line("Pils", "Cold"), row: 1 }]);
 });

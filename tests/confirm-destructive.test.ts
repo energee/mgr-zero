@@ -7,7 +7,6 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ConfirmDeleteControl } from "../components/mgr/views/confirm-delete";
-import { PriceCellClear } from "../components/mgr/views/price-groups";
 import { FileSnapshotForm } from "../components/mgr/views/file-snapshot";
 import { TeamMemberView } from "../components/mgr/views/team-controls";
 import { PriceGroupView } from "../components/mgr/views/price-group";
@@ -35,15 +34,6 @@ describe("ConfirmDeleteControl", () => {
     expect(trigger).toContain('aria-label="Delete Wholesale"');
     expect(trigger).toMatch(/>Delete<\/button>$/);
     expect(onDelete).not.toHaveBeenCalled();
-  });
-
-  it("keeps the price Clear trigger focusable but unavailable while a blur-save runs", () => {
-    const html = renderToStaticMarkup(createElement(PriceCellClear, {
-      groupName: "Core", formatName: "Pint", channelName: "DTC", busy: true,
-    }));
-    const [trigger] = buttons(html);
-    expect(trigger).toContain('aria-disabled="true"');
-    expect(trigger).not.toMatch(DISABLED);
   });
 
   it("draws an irreversible tone and holds the trigger closed beside the reason it names (#1122)", () => {

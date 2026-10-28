@@ -6,6 +6,7 @@ import { invoicePaymentBalanceCents } from "./invoice-view";
 import { invoiceBalanceCents, invoiceCurrentState, invoiceLedgerOwnsBalance, type InvoiceCurrentState } from "./invoice-state";
 import { qboInvoicePresentation, type QboStaffInvoiceLink } from "./qbo-ui";
 import { hasAnyRole } from "./roles";
+import type { ScopeOption } from "@/components/mgr/scope-pick";
 
 export type InvoiceListRecord = { quickbooks_link?: QboStaffInvoiceLink | null; id: string; invoice_no: number | null; kind: "invoice" | "credit_memo"; due_on: string | null; paid_at: string | null; qbo_sync_status: "pending" | "pushed" | "push_failed" | "not_synced"; qbo_sync_error: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_balance_cents: number | null; qbo_cash_collected_cents: number; qbo_accountant_drift: boolean; written_off_at: string | null; subtotal_cents: number; total_cents: number; has_pending_qbo_push: boolean; qbo_invoice_id: string | null; local_paid_cents: number; was_pushed_to_qbo: boolean; customers: { name: string } | null };
 
@@ -15,12 +16,25 @@ export type InvoiceListMoney = {
   value: string;
 };
 
+/** list_invoices' `status`: unpaid keeps only invoices still owing money. */
+export type InvoiceFilter = "unpaid";
+
+/** The register's Show choices. Live, each links to /invoices with it; a
+ *  change starts at the newest page, so no cursor. The inventory's stay inert. */
+export function invoiceStatusOptions(linked: boolean): ScopeOption[] {
+  return [
+    { value: "all", label: "All invoices", href: linked ? "/invoices" : undefined },
+    { value: "unpaid", label: "Unpaid", href: linked ? "/invoices?status=unpaid" : undefined },
+  ];
+}
+
 export type InvoiceListRow = {
   id: string;
   document: { number: string; kind: "invoice" | "credit_memo" };
   customer: string;
   total: InvoiceListMoney;
-  balance: InvoiceListMoney;
+  /** value is null when the balance is unknown: the row says nothing, never $0.00. */
+  balance: { cents: number | null; value: string | null };
   localSubtotal: InvoiceListMoney | null;
   due: { day: string | null; value: string };
   overdue: boolean;
@@ -64,7 +78,7 @@ function paymentFact(inv: InvoiceListRecord, state: InvoiceCurrentState): string
  *  them), then the QuickBooks detail only Admin and Sales may read. */
 function accountingFact(inv: InvoiceListRecord, state: InvoiceCurrentState, roles: readonly StaffRole[], connected: boolean, hasPendingPush: boolean, qboDetail: string): string | null {
   if (state === "written_off") return "Written off in MGR";
-  if (inv.qbo_sync_status === "not_synced") return "Not in QuickBooks (before the books opened)";
+  if (inv.qbo_sync_status === "not_synced") return "Before the books opened";
   if (state === "voided") return "Voided in QuickBooks";
   if (state === "deleted") return "Deleted in QuickBooks";
   // start_qbo_push refuses an invoice with an unvoided MGR payment (#1045).
@@ -89,7 +103,7 @@ export function toInvoiceListRow(inv: InvoiceListRecord, roles: readonly StaffRo
     document: { number: docNo(inv.kind === "credit_memo" ? "CM" : "INV", inv.invoice_no, inv.kind === "credit_memo" ? "Credit memo" : "Invoice"), kind: inv.kind },
     customer: inv.customers?.name ?? "Customer unavailable",
     total: { cents: inv.total_cents, value: money(inv.total_cents) },
-    balance: { cents: balanceCents, value: balanceCents == null ? "Unavailable" : money(balanceCents) },
+    balance: { cents: balanceCents, value: balanceCents == null ? null : money(balanceCents) },
     localSubtotal: inv.qbo_accountant_drift ? { cents: inv.subtotal_cents, value: money(inv.subtotal_cents) } : null,
     due: { day: dueDay, value: dueDay ? formatDate(dueDay) : inv.kind === "credit_memo" ? "No payment due" : "Due date unavailable" },
     // An unknown balance is not overdue (#1025): only a known positive balance,
