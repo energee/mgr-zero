@@ -234,6 +234,12 @@ describe("registry sheets", () => {
     expect(html).not.toMatch(/Date submitted/);
   });
 
+  it("offers Cancel beside Save approval, which closes the live sheet (#1498)", () => {
+    expect(htmlOf(createElement(BrandApprovalView, { model: brandApprovalStout }))).toMatch(/>Cancel<\/button>/);
+    const forms = src("app/(app)/catalog/brands/[id]/compliance-forms.tsx");
+    expect(forms).toMatch(/onClick=\{\(\) => form\.setOpen\(false\)\}>Cancel<\/Button>\{E\.submit\("Save approval"/);
+  });
+
   it("keeps the formula label on a formula approval, with no serial or COLA link", () => {
     const html = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, kind: "formula" } }));
     expect(html).toMatch(/Formula number/);

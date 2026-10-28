@@ -504,12 +504,13 @@ describe("SKU view", () => {
 
   it("converts edit percentages to update_sku fractions and blank to null without changing create_sku", () => {
     const fields = { skuId: "sku", active: true, upc: "", batchSharePercent: "37.5" };
-    expect(skuUpdateCommand(fields)).toEqual({ name: "update_sku", input: { skuId: "sku", active: true, upc: "", batchShare: 0.375 }, valid: true });
+    expect(skuUpdateCommand(fields)).toEqual({ name: "update_sku", input: { skuId: "sku", active: true, upc: "", batchShare: 0.375 }, reason: null });
     expect(skuUpdateCommand({ ...fields, batchSharePercent: "" }).input.batchShare).toBeNull();
     for (const batchSharePercent of ["0", "-1", "100.1", "invalid"]) {
-      expect(skuUpdateCommand({ ...fields, batchSharePercent }).valid).toBe(false);
+      expect(skuUpdateCommand({ ...fields, batchSharePercent }).reason).toBe("Still needed: a batch package share above 0% and at most 100%.");
     }
-    expect(skuUpdateCommand({ ...fields, batchSharePercent: "100" }).valid).toBe(true);
+    expect(skuUpdateCommand({ ...fields, upc: "abc", batchSharePercent: "101" }).reason).toBe("Still needed: a UPC of 8, 12, 13 or 14 digits and a batch package share above 0% and at most 100%.");
+    expect(skuUpdateCommand({ ...fields, batchSharePercent: "100" }).reason).toBeNull();
     expect(skuCreateCommand({ brandId: "brand", formatId: "format", name: "", upc: "" }).input).not.toHaveProperty("batchShare");
   });
 

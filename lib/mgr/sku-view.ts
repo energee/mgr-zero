@@ -1,5 +1,8 @@
 // lib/mgr/sku-view.ts — view-model for the SKU sheet. create_sku / list_skus
 // plus packaged formats and keg pools paint format, pool, active, and optional UPC.
+import { submitReason } from "./submit-reason";
+import { UPC_NEED, upcError } from "./upc";
+
 export type SkuViewModel = {
   kind?: "packaged" | "poured";
   pourName?: string;
@@ -60,13 +63,24 @@ export function skuCreateCommand(fields: { brandId: string; formatId: string; na
   return { name: "create_sku", input: { brandId: fields.brandId, formatId: fields.formatId, name: fields.name || undefined, upc: fields.upc || undefined, kegPoolId: fields.kegPoolId }, valid: Boolean(fields.formatId) };
 }
 
-/** An edit saves one command. Creation deliberately leaves the optional share unset. */
+/** Why a batch package share percent is out of range, or undefined; blank clears the share. */
+export function batchShareError(percent: string): string | undefined {
+  if (percent.trim() === "") return undefined;
+  const share = Number(percent);
+  return share > 0 && share <= 100 ? undefined : "Enter a share above 0% and at most 100%, or clear it.";
+}
+
+/** An edit saves one command; `reason` (submitReason) withholds Save SKU while the UPC or share is invalid.
+ *  Creation deliberately leaves the optional share unset. */
 export function skuUpdateCommand(fields: { skuId: string; active: boolean; upc: string; batchSharePercent: string; kegPoolId?: string | null }) {
   const batchShare = fields.batchSharePercent.trim() === "" ? null : Number(fields.batchSharePercent) / 100;
   return {
     name: "update_sku",
     input: { skuId: fields.skuId, active: fields.active, upc: fields.upc, batchShare, ...(fields.kegPoolId === undefined ? {} : { kegPoolId: fields.kegPoolId }) },
-    valid: batchShare === null || (batchShare > 0 && batchShare <= 1),
+    reason: submitReason([
+      ...(upcError(fields.upc) ? [UPC_NEED] : []),
+      ...(batchShareError(fields.batchSharePercent) ? ["a batch package share above 0% and at most 100%"] : []),
+    ]),
   };
 }
 

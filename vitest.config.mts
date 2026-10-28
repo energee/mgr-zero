@@ -110,7 +110,9 @@ const pureTests = [
   "tests/delivery-view.test.ts",
   "tests/transfers-view.test.ts",
   "tests/shipment-parity.test.ts",
-  "tests/order-sheets-view.test.ts"
+  "tests/order-sheets-view.test.ts",
+  "tests/upc.test.ts",
+  "tests/sku-share-controls.test.ts"
 ];
 
 export default defineConfig({
