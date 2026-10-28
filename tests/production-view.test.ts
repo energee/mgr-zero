@@ -23,6 +23,7 @@ import {
 } from "../lib/mgr/fixtures/production";
 import { toBatchesViewProps, batchesFromQuery, type BatchListRow } from "../lib/mgr/batches-view";
 import { brewTurnModel, canRecordBrewDay } from "../lib/mgr/brew-day-view";
+import { hasPackagingMaterials } from "../lib/mgr/packaging-actuals";
 import { PlanActions } from "../components/mgr/views/plan-actions";
 import { toRecipesViewProps } from "../lib/mgr/recipes-view";
 import { resolveTap } from "../lib/mgr/screen-links";
@@ -426,6 +427,42 @@ describe("Close packaging run view", () => {
     expect(page).not.toMatch(/\breview=/);
     expect(page).toMatch(/<RunClosedView\b/);
     expect(page).toMatch(/<CloseRunForm\b/);
+  });
+});
+
+describe("Finished records keep their facts (#1480)", () => {
+  it("a closed run shows its brand, source, planned day and closed day", () => {
+    const html = htmlOf(createElement(RunClosedView, { model: { ...runClosedHazy, closedAt: "2026-09-06T02:00:00Z", timeZone: "America/New_York" } }));
+    expect(html).toMatch(/Brand<[^]*?Hazy IPA/);
+    expect(html).toMatch(/Source<[^]*?FV3 · B-0416/);
+    expect(html).toMatch(/Planned<[^]*?Sep 4, 2026/);
+    // closed_at is an instant: 02:00 UTC on Sep 6 is still Sep 5 in New York.
+    expect(html).toMatch(/Closed<[^]*?Sep 5, 2026/);
+  });
+
+  it("a record with no packaging materials is one line, and offers no correction", () => {
+    const empty = { ...runClosedHazy.records![0]!, planned: [], actuals: [] };
+    expect(hasPackagingMaterials(empty)).toBe(false);
+    expect(hasPackagingMaterials(runClosedHazy.records![0]!)).toBe(true);
+    const html = htmlOf(createElement(RunClosedView, { model: { ...runClosedHazy, records: [empty], correction: undefined } }));
+    expect(html).toContain("No packaging materials.");
+    expect(html).not.toContain("Planned material");
+    expect(src("app/(app)/packaging/[id]/page.tsx")).toMatch(/latest && hasPackagingMaterials\(latest\)/);
+  });
+
+  it("a completed batch says when it completed and what it wrote off, not that cellar work continues", () => {
+    const completed = htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, recorded: true, completion: { on: "Oct 26, 2026", writeOffBbl: 1.25 } } }));
+    expect(completed).toMatch(/Completed<[^]*?Oct 26, 2026/);
+    expect(completed).toMatch(/Written off as loss<[^]*?1.25 bbl/);
+    expect(completed).not.toContain("Already brewed.");
+    const belowThreshold = htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, recorded: true, completion: { on: "Oct 26, 2026", writeOffBbl: null } } }));
+    expect(belowThreshold).toMatch(/Written off as loss<[^]*?None/);
+    expect(htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, recorded: true } }))).toContain("Already brewed.");
+  });
+
+  it("the brew sheet names the recipe with its pinned version", () => {
+    const html = htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, plan: { ...brewDayHazy.plan, recipe: "Hazy IPA", version: { version: 4 } } } }));
+    expect(html).toMatch(/Recipe<[^]*?Hazy IPA v4/);
   });
 });
 
