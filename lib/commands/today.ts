@@ -13,6 +13,9 @@ export type TodayItem = {
   subjectId: string;
   sourceVersion: string;
   safeLabel: string;
+  /** The order's customer, for the Today page only (#1512). safeLabel stays
+   *  free of names because chat payloads reuse it; the chat scan nulls this. */
+  customerName: string | null;
   detail: string;
   dueAt: string | null;
   href: string;
@@ -22,7 +25,7 @@ export type TodayItem = {
 
 type Row = {
   reason: TodayItem["reason"]; subject_type: TodayItem["subjectType"]; subject_id: string; source_version: string;
-  safe_label: string; detail: string; due_at: string | null; href: string; recipient_roles: StaffRole[]; assigned_user_id: string | null;
+  safe_label: string; customer_name: string | null; detail: string; due_at: string | null; href: string; recipient_roles: StaffRole[]; assigned_user_id: string | null;
 };
 
 defineQuery({
@@ -36,7 +39,7 @@ defineQuery({
     return rows
       .map((r) => ({
         reason: r.reason, subjectType: r.subject_type, subjectId: r.subject_id, sourceVersion: r.source_version,
-        safeLabel: r.safe_label, detail: r.detail, dueAt: r.due_at, href: r.href, recipientRoles: r.recipient_roles,
+        safeLabel: r.safe_label, customerName: r.customer_name, detail: r.detail, dueAt: r.due_at, href: r.href, recipientRoles: r.recipient_roles,
         assignedUserId: r.assigned_user_id,
       }))
       .filter((it) => hasAnyRole(ctx.roles, ["admin"]) || (hasAnyRole(ctx.roles, it.recipientRoles) && (!it.assignedUserId || it.assignedUserId === ctx.userId)));

@@ -213,3 +213,22 @@ describe(".env.example", () => {
     expect(missing).toEqual([]);
   });
 });
+
+describe("docs sidebar", () => {
+  // Developer pages stay published and linked, but leave the sidebar staff browse (#1517).
+  it("leaves Screen inventory, Screen explorer and the HTTP API out of the sidebar", async () => {
+    const { staffSidebar } = await import("../lib/docs-sidebar");
+    const page = (name: string, url: string) => ({ type: "page" as const, name, url });
+    const tree = { name: "MGR guides", children: [
+      page("Staff guide", "/docs/staff-guide"), page("Screen inventory", "/docs/screens"), page("Screen explorer", "/docs/screens-explore"),
+      page("Integrations", "/docs/integrations"),
+      { type: "folder" as const, name: "HTTP API", index: page("HTTP API", "/docs/api"), children: [page("Today", "/docs/api/today")] },
+    ] };
+    expect(staffSidebar(tree).children.map((node) => node.name)).toEqual(["Staff guide", "Integrations"]);
+    // content/docs/api/meta.json lists its index as the folder's first page.
+    const listed = { name: "MGR guides", children: [{ type: "folder" as const, name: "HTTP API", children: [page("HTTP API", "/docs/api"), page("Today", "/docs/api/today")] }] };
+    expect(staffSidebar(listed).children).toEqual([]);
+    // The routes still exist: the chooser keeps linking the API reference.
+    expect(GUIDES).toEqual(expect.arrayContaining(["screens", "screens-explore", "api"]));
+  });
+});

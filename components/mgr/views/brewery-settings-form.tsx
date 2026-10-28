@@ -38,7 +38,6 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
         {field("name", "Brewery name", "text", true)}
         <TimezonePicker id={`${id}-timezone`} label="Timezone" value={values.timezone} onChange={(timezone) => change("timezone", timezone)} />
         {field("ttb", "TTB registry number")}
-        {field("pa", "PA license")}
         <div className="flex min-w-0 flex-col gap-2">
           {E.edit("Customer-facing phone", values.phone, "tel", undefined, { onChange: (nextValue: string) => change("phone", nextValue), id: `${id}-phone`, placeholder: "(503) 555-0142", error: fieldErrors.phone ?? phoneError(values.phone), "aria-describedby": `${id}-phone-help` })}
           <FieldDescription id={`${id}-phone-help`}>Printed on the portal when online payment is unavailable. Leave empty for none.</FieldDescription>

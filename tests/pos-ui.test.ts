@@ -98,6 +98,17 @@ describe("POS UI truth", () => {
     expect(item).not.toMatch(/<button[^>]*disabled=""[^>]*>Save and publish/);
   });
 
+  it("collapses off-register rows behind a count, so current items lead the menu (#1516)", () => {
+    const off = (formatId: string) => ({ brandId: "hazy", formatId, label: `Hazy · ${formatId}`, retail: "$7.00", source: "format", destinations: "Square", available: false, reason: "out of stock", href: "#" });
+    const model = { locations: [], selectedLocationId: "taproom", locationName: "Taproom", binName: "Cold", channelName: "Taproom", externalItems: [],
+      items: [{ ...off("pint"), available: true, reason: undefined }], excluded: [off("half"), off("taster")] };
+    const menu = renderToStaticMarkup(createElement(PosMenuView, { model }));
+    expect(menu).toMatch(/<details[^>]*>\s*<summary[^>]*>2 need attention<\/summary>[\s\S]*Hazy · half[\s\S]*Hazy · taster[\s\S]*<\/details>/);
+    expect(menu.indexOf("Hazy · pint")).toBeLessThan(menu.indexOf("<details"));
+    const none = renderToStaticMarkup(createElement(PosMenuView, { model: { ...model, excluded: [] } }));
+    expect(none).not.toContain("need attention");
+  });
+
   it("renders the inventory sync and sale-opening action contract", () => {
     const html = (name: string) => renderToStaticMarkup(createElement("div", null, SCREENS.find(screen => screen.name === name)!.body));
     expect(html("Point of sale")).toContain(">Sync Square</button>");

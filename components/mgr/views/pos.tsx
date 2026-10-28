@@ -192,7 +192,11 @@ export function PosMenuView({ model, bins = [], channels = [], targets = [], bus
     </form>}
     {model.binName && <>{E.fld("Availability source", `${model.locationName} · ${model.binName}`)}{E.fld("Price source", model.channelName ?? "Not configured")}</>}
     {model.items.map(item => <div key={`${item.brandId}:${item.formatId}`}>{item.href ? E.nav(item.label, `${item.retail} · ${item.source} · ${item.destinations}`, "ok", undefined, item.href) : E.row(item.label, `${item.retail} · ${item.source} · ${item.destinations}`, "", "ok")}</div>)}
-    {model.excluded.map(item => <div key={`${item.brandId}:${item.formatId}`}>{item.href ? E.nav(item.label, item.reason ?? "Unavailable", "w", undefined, item.href) : E.row(item.label, item.reason ?? "Unavailable", E.status("Off register", "w"), "w")}</div>)}
+    {/* Off-register rows can number in the hundreds; the count keeps current items first (#1516). */}
+    {model.excluded.length > 0 && <details className="rounded border p-3">
+      <summary className="cursor-pointer text-sm font-medium">{model.excluded.length} need attention</summary>
+      <div className="mt-3">{model.excluded.map(item => <div key={`${item.brandId}:${item.formatId}`}>{item.href ? E.nav(item.label, item.reason ?? "Unavailable", "w", undefined, item.href) : E.row(item.label, item.reason ?? "Unavailable", E.status("Off register", "w"), "w")}</div>)}</div>
+    </details>}
     {model.binName && <Button disabled={busy || model.items.length + model.excluded.length === 0} onClick={onPublish}>{busy ? "Publishing…" : "Publish changes"}</Button>}
     {notice}
     <CommandFormMessage error={error ?? null} />

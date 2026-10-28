@@ -46,7 +46,6 @@ export default async function SettingsPage() {
         timezone: row.timezone,
         timezoneOptions: ["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles"],
         ttb: row.ttb_registry_no ?? "",
-        paLicense: row.pa_license_no ?? "",
         phone: row.customer_phone ?? "",
         overdueHours: String(row.fermentation_reading_due_hours),
         daysToPackage: String(row.days_to_package),

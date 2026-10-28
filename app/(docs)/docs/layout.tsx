@@ -1,13 +1,15 @@
 // app/(docs)/docs/layout.tsx — Fumadocs docs shell (sidebar from the content
-// tree, mobile nav, search) around every guide page. Colors come from the
-// app's tokens via ./docs.css, fonts from app/layout.tsx. RootProvider and the
-// stylesheet are mounted here, not in the root layout, so the search dialog,
-// next-themes and the docs CSS stay off every staff and portal page.
+// tree without the developer pages, lib/docs-sidebar.ts; mobile nav, search)
+// around every guide page. Colors come from the app's tokens via ./docs.css,
+// fonts from app/layout.tsx. RootProvider and the stylesheet are mounted here,
+// not in the root layout, so the search dialog, next-themes and the docs CSS
+// stay off every staff and portal page.
 import { DocsLayout } from "fumadocs-ui/layouts/docs";
 import { RootProvider } from "fumadocs-ui/provider/next";
 import "./docs.css";
 import { MgrIcon } from "@/components/mgr-icon";
 import { source } from "@/lib/source";
+import { staffSidebar } from "@/lib/docs-sidebar";
 
 // Same mark and wordmark as the app shells (components/mgr/app-shell.tsx).
 const brand = (
@@ -25,7 +27,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           desktop frames, so the grid may use the viewport. Prose pages keep
           their own 900px article cap, so they do not stretch. */}
       <DocsLayout
-        tree={source.getPageTree()}
+        // Developer pages stay reachable by link, not from the sidebar (#1517).
+        tree={staffSidebar(source.getPageTree())}
         nav={{ title: brand, url: "/" }}
         themeSwitch={{ enabled: false }}
         containerProps={{ style: { "--fd-layout-width": "100vw" } as React.CSSProperties }}

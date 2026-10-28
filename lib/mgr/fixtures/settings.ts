@@ -16,7 +16,6 @@ export const settingsDemo: SettingsViewModel = {
   timezone: DEMO_TIME_ZONE,
   timezoneOptions: ["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles"],
   ttb: "BR-PA-12345",
-  paLicense: "G-1234",
   phone: "(610) 555-0142",
   overdueHours: "24",
   daysToPackage: "14",

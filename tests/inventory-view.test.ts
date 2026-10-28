@@ -31,6 +31,12 @@ describe("Finished goods view", () => {
     expect(htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps({ skus: [] }) }))).not.toContain("Inventory value");
   });
 
+  it("leaves out Inventory value while no unit has a cost, so it never reads $0.00 (#1518)", () => {
+    const snapshot = assembleFinishedGoods([{ id: "s1", name: "Opening keg" }], [{ sku_id: "s1", qty: 15 }], [{ sku_id: "s1", qty: 15 }], { value_cents: 0, uncosted_qty: 15 });
+    expect(toFinishedGoodsViewProps(snapshot).valueLine).toBeUndefined();
+    expect(htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(snapshot) }))).not.toContain("Inventory value");
+  });
+
   it.each([[1, "1 unit"], [2, "2 units"], [1.5, "1.5 units"]] as const)("names %s uncosted units with the correct plural (#1382)", (uncostedUnits, label) => {
     const model = toFinishedGoodsViewProps({ skus: [], value: { cents: 2000, uncostedUnits } });
     const unitLabel = new RegExp(`\\b${label.replace(".", "\\.")}\\b`);

@@ -23,15 +23,15 @@ const prompt = 'textarea[aria-label="Ask MGR"]';
 try {
   browser("set", "viewport", "1280", "800");
   browser("open", `${base}/screens/frame/${index}`);
-  browser("wait", "--text", "Navigate");
-  browser("find", "role", "radio", "click", "--name", "Ask MGR", "--exact");
+  browser("wait", "--text", "Ask MGR");
+  browser("find", "role", "button", "click", "--name", "Ask MGR", "--exact");
   browser("fill", prompt, "Keep this draft while I use the page");
   const pageWidth = evaluate('document.querySelector("[data-mgr-page-scroll]").getBoundingClientRect().width');
-  browser("find", "role", "radio", "click", "--name", "Navigate", "--exact");
+  browser("find", "role", "button", "click", "--name", "Back to page", "--exact");
   wait(`getComputedStyle(${panel}).display === "none"`);
   assert.equal(evaluate('document.querySelector("[data-mgr-page-scroll]").getBoundingClientRect().width'), pageWidth, "Chat must not resize the page");
-  assert.equal(evaluate("document.activeElement.textContent"), "Navigate", "Closing chat returns focus to navigation");
-  browser("find", "role", "radio", "click", "--name", "Ask MGR", "--exact");
+  assert.equal(evaluate("document.activeElement.textContent"), "Ask MGR", "Closing chat returns focus to Ask MGR");
+  browser("find", "role", "button", "click", "--name", "Ask MGR", "--exact");
   assert.equal(browser("get", "value", prompt).value, "Keep this draft while I use the page", "Closing chat must retain its unsent message");
 
   // Radix foreground modals and the Base UI chat panel receive the same Escape event.
@@ -55,11 +55,11 @@ try {
   assert.equal(evaluate("document.documentElement.scrollWidth > innerWidth"), false, "Phone chat must fit the viewport");
   browser("find", "role", "button", "click", "--name", "Back to page", "--exact");
   wait(`getComputedStyle(${panel}).display === "none"`);
-  assert.equal(evaluate("document.activeElement.textContent"), "Navigate");
+  assert.equal(evaluate("document.activeElement.textContent"), "Ask MGR");
 
   // A foreground form keeps accessibility and focus ownership across a breakpoint change.
   browser("set", "viewport", "1280", "800");
-  browser("find", "role", "radio", "click", "--name", "Ask MGR", "--exact");
+  browser("find", "role", "button", "click", "--name", "Ask MGR", "--exact");
   browser("find", "role", "button", "click", "--name", "Me", "--exact");
   wait('document.querySelector("[data-slot=dialog-content]")');
   browser("set", "viewport", "390", "844");
@@ -80,14 +80,14 @@ try {
   wait('document.querySelector("[aria-label=Screens] button")');
   evaluate('Array.from(document.querySelectorAll("[aria-label=Screens] button")).find(button => button.textContent.trim() === "Composer answer").click()');
   wait('document.querySelector("[aria-label=Screens] [aria-selected=true]")?.textContent.trim() === "Composer answer"');
-  browser("find", "role", "radio", "click", "--name", "Ask MGR", "--exact");
+  browser("find", "role", "button", "click", "--name", "Ask MGR", "--exact");
   browser("fill", prompt, "Keep this explorer draft");
   browser("set", "viewport", "1024", "800");
   assert.equal(evaluate(`(() => { const box = document.querySelector(".screen-box").getBoundingClientRect(); const chat = ${panel}.getBoundingClientRect(); return chat.left >= box.left && chat.right <= box.right; })()`), true, "Chat must fit the explorer's containing block, not only the outer viewport");
   browser("set", "viewport", "1280", "900");
   browser("find", "role", "button", "click", "--name", "Back to page", "--exact");
   assert.equal(evaluate('document.querySelector("[aria-label=Screens] [aria-selected=true]")?.textContent.trim()'), "Composer answer", "Closing chat must not navigate the explorer to another record");
-  browser("find", "role", "radio", "click", "--name", "Ask MGR", "--exact");
+  browser("find", "role", "button", "click", "--name", "Ask MGR", "--exact");
   assert.equal(browser("get", "value", prompt).value, "Keep this explorer draft", "Closing chat must not remount the explorer frame");
   console.log("Ask MGR navigation smoke passed: draft retention, stable page width, foreground modal ownership, responsive tab navigation, mobile focus containment, return focus, and embedded panel containment.");
 } finally {

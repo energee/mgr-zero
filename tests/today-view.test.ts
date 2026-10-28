@@ -10,6 +10,7 @@ const item = (subjectId: string, dueAt: string | null, reason: TodayItem["reason
   subjectId,
   sourceVersion: "1",
   safeLabel: `FV-${subjectId}`,
+  customerName: null,
   detail: "Reading due",
   dueAt,
   href: `/cellar/${subjectId}`,
@@ -19,6 +20,14 @@ const item = (subjectId: string, dueAt: string | null, reason: TodayItem["reason
 
 const now = new Date("2026-10-08T18:00:00Z"); // 2:00 PM in New York
 const timeZone = "America/New_York";
+
+describe("Today row titles", () => {
+  it("names the customer after an order number, so the row can be acted on (#1512)", () => {
+    const order: TodayItem = { ...item("o1", null, "pick_due"), subjectType: "order", safeLabel: "ORD-0193", customerName: "Hillside Tavern" };
+    const model = toTodayViewProps({ date: "Thu, Oct 8", items: [order, item("2", null)], timeZone, now });
+    expect(model.rows.map((r) => r.title)).toEqual(["ORD-0193 · Hillside Tavern", "FV-2"]);
+  });
+});
 
 describe("Today due times", () => {
   it("keeps dueAt and names overdue and upcoming times in the brewery zone", () => {
@@ -63,7 +72,7 @@ describe("Today due times", () => {
 
   it("the warehouse inventory frame draws an overdue pick row with the attention dot (#1037)", () => {
     // lib/mgr/fixtures/today.ts builds this row through toTodayViewProps from a get_today item.
-    const row = todayWarehouse.rows.find((r) => r.title === "ORD-0228");
+    const row = todayWarehouse.rows.find((r) => r.title === "ORD-0228 · Hillside Tavern");
     expect(row).toMatchObject({ detail: "pick due · ships Sep 2, 2026 · overdue", verb: "Pick", warning: true, icon: "package" });
     expect(row?.href).toBeUndefined();
   });
