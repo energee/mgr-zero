@@ -71,7 +71,7 @@ describe("resolveTap", () => {
         return next!;
       }, from);
     expect(walk("Today", "Pick", "Orders", "ORD-0231 · Ridgeline", "Adjust")).toBe("Adjust lines");
-    expect(walk("Short pick", "Pick")).toBe("Pick");
+    expect(walk("Short pick", "Adjust order to 7 cases")).toBe("Pick");
     expect(walk("Orders", "Confirm", "Confirm order")).toBe("Order");
     expect(walk("Orders", "New order", "Save draft")).toBe("Order");
     expect(walk("Customers", "Ridgeline Tap Room", "Invite")).toBe("Invite portal user");
