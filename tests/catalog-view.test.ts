@@ -527,6 +527,8 @@ describe("SKU view", () => {
     expect(saved).toContain('aria-label="Batch package share (%)"');
     expect(saved).toContain('max="100"');
     expect(saved).toContain("Clear to stop projecting");
+    // The field error states the range, so the standing note does not repeat it (#1518).
+    expect(saved).not.toContain("Use more than 0%");
     const creation = htmlOf(createElement(SkuView, { model: toSkuViewProps({ formats: skuHazyHalf.formats }) }));
     expect(creation).not.toContain('aria-label="Batch package share (%)"');
     expect(creation).toContain("Edit the SKU after creation");

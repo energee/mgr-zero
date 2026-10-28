@@ -344,6 +344,24 @@ describe("Lot trace", () => {
     expect(html).not.toMatch(/\d+%/);
   });
 
+  it("links member batches on the live page and keeps them inert in the inventory (#1517)", () => {
+    const live = htmlOf(createElement(LotTraceView, { model: toLotTraceViewProps(lotTraceHazy, DEMO_TIME_ZONE, "/compliance"), tape: null }));
+    expect(live).toContain('href="/batches/batch-40"');
+    expect(live).toContain('href="/batches/batch-41"');
+    expect(htmlOf(createElement(LotTraceView, { model: toLotTraceViewProps(lotTraceHazy, DEMO_TIME_ZONE) }))).not.toMatch(/href="\/batches\//);
+  });
+
+  it("says no balance is recorded instead of a bare heading (#1517)", () => {
+    const html = htmlOf(createElement(LotTraceView, { model: toLotTraceViewProps({ ...lotTraceHazy, balances: [] }, DEMO_TIME_ZONE) }));
+    expect(html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ")).toMatch(/Recorded balances by SKU and bin No recorded balance of this lot/);
+  });
+
+  it("titles the live lot tab with the lot code (#1517)", () => {
+    const page = src("app/(app)/compliance/lots/[id]/page.tsx");
+    expect(page).toMatch(/title: trace\.lot\.code/);
+    expect(page).not.toMatch(/navTitle\("\/compliance\/lots"\)/);
+  });
+
   it("the Lot trace inventory record is LotTraceView", () => {
     const body = screen("Lot trace").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(LotTraceView);

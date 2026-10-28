@@ -107,7 +107,6 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Point of sale", file: "app/(app)/settings/pos/page.tsx" },
   { name: "Point of sale unavailable", file: "app/(app)/settings/pos/page.tsx" },
   { name: "Square locations", file: "app/(app)/settings/pos/locations/page.tsx" },
-  { name: "Taproom sales in QuickBooks", file: "app/(app)/settings/pos/connector/page.tsx" },
   { name: "Disconnect Square", file: "components/mgr/views/pos-controls.tsx" },
   { name: "POS sale detail", file: "app/(app)/settings/pos/sales/[id]/page.tsx" },
   { name: "Menu", file: "app/(app)/menu/page.tsx" },

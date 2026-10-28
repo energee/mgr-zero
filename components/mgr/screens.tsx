@@ -128,7 +128,7 @@ import { ReplenishmentView } from "@/components/mgr/views/replenishment";
 import { PickView } from "@/components/mgr/views/pick";
 import { PickSheetView } from "@/components/mgr/views/pick-sheet";
 import { PlanningView } from "@/components/mgr/views/planning";
-import { DisconnectSquareView, PointOfSaleView, PosItemView, PosMenuView, PosSaleDetailView, PosSyncActions, SquareConnectorView, SquareLocationsView } from "@/components/mgr/views/pos";
+import { DisconnectSquareView, PointOfSaleView, PosItemView, PosMenuView, PosSaleDetailView, PosSyncActions, SquareLocationsView } from "@/components/mgr/views/pos";
 import { PortalAccountView } from "@/components/mgr/views/portal-account";
 import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
 import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
@@ -2711,7 +2711,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "POS",
     name: "Point of sale",
-    to: { Disconnect: "Disconnect Square", "Sync Square": "Point of sale", "Square locations2 mapped · 1 needs mapping": "Square locations", "Taproom · Sep 1 to Sep 8": "Point of sale", "Sale · Hazy IPA · pint": "POS sale detail", "Return · Hazy IPA · pint": "POS sale detail", "MenuOne catalog · per-location stock and price": "Menu", "Taproom sales in QuickBooksAbout Square’s optional connector": "Taproom sales in QuickBooks" },
+    to: { Disconnect: "Disconnect Square", "Sync Square": "Point of sale", "Square locations2 mapped · 1 needs mapping": "Square locations", "Taproom · Sep 1 to Sep 8": "Point of sale", "Sale · Hazy IPA · pint": "POS sale detail", "Return · Hazy IPA · pint": "POS sale detail", "MenuOne catalog · per-location stock and price": "Menu", "Open Accounting": "Accounting" },
     job: "Connect one POS provider and see both directions at a glance",
     reads: "get_pos_integration_health · list_pos_locations · list_pos_sales",
     writes: "sync_square_catalog · sync_square_sales · disconnect_square",
@@ -2722,7 +2722,7 @@ export const SCREENS: Screen[] = [
   {
     step: 7, slice: 7, tab: "More", group: "POS",
     name: "Point of sale unavailable",
-    to: { "Connect Square": "Point of sale unavailable", Square: "Point of sale unavailable" },
+    to: { "Connect Square": "Point of sale unavailable", Square: "Point of sale unavailable", "Open Accounting": "Accounting" },
     job: "Explain that Square is not turned on before offering authorization",
     reads: "get_pos_integration_health",
     writes: "none",
@@ -2743,21 +2743,6 @@ export const SCREENS: Screen[] = [
     states: [["permission", "admin only", 1], ["mapped", "two locations ready"], ["unmapped", "sales cannot reconcile", 1], ["claimed", "an MGR location cannot be claimed twice", 1]],
     spec: "A provider location maps to exactly one MGR location, saved when it is picked; a failed save puts the pick back. Sales remain expected-consumption facts; the physical count owns depletion.",
     body: <SquareLocationsView locations={[{ id: "taproom", name: "Taproom" }, { id: "warehouse", name: "Warehouse" }]} rows={[{ externalLocationId: "square-tap", name: "Square Taproom", detail: "active · available · Taproom", mgrLocationId: "taproom" }, { externalLocationId: "square-events", name: "Third location", detail: "active · available · needs mapping", mgrLocationId: "" }]} />,
-  },
-  {
-    step: 7,
-    slice: 7,
-    tab: "More",
-    group: "POS",
-    surface: "sheet",
-    name: "Taproom sales in QuickBooks",
-    to: { "Open Accounting": "Accounting" },
-    job: "Explain the separate Square revenue feed and link to MGR accounting",
-    reads: "none",
-    writes: "none",
-    states: [["permission", "admin only", 1], ["review", "accountant confirms that the revenue streams stay separate"]],
-    spec: "This is a note and deep link only. MGR neither detects nor configures Square's QuickBooks connector.",
-    body: <SquareConnectorView />,
   },
   {
     step: 7,
