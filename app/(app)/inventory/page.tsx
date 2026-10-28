@@ -1,10 +1,10 @@
 // app/(app)/inventory/page.tsx — Finished goods (screen record): sellable
 // beer by SKU with on hand, allocated and ATP, plus frozen-cost value for Admin/Sales, then the
-// movement ledger (Movement recorded). Record movement opens
-// movement-form.tsx, the one append-only inventory write; on hand is read at
-// bin grain (get_bin_on_hand) and summed per SKU here. Combined live drawing
-// slots into FinishedGoodsView; MovementRecordedView is not mounted here
-// because it is the single-row echo. Add SKU in Catalog sits beside Record
+// movement ledger. Record movement opens movement-form.tsx, the one
+// append-only inventory write; on hand is read at bin grain (get_bin_on_hand),
+// summed per SKU here, and handed to the form so a chosen SKU starts on the
+// bin holding the most of it. Combined live drawing slots into
+// FinishedGoodsView. Add SKU in Catalog sits beside Record
 // movement, and the form's empty SKU picker links Catalog, only for a user who
 // may create a SKU (#1113). Each active SKU's row opens Record movement on
 // that SKU for the same roles (#1507).
@@ -73,7 +73,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   return (
     <FinishedGoodsView
       model={toFinishedGoodsViewProps(assembleFinishedGoods(skus, onHand, atp, value))}
-      createAction={canMove ? <MovementForm key={movementFormInstanceKey(handoffId)} timeZone={brewery.timeZone} initial={initial} initialLot={initialLot} skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} skusHref={skusHref} /> : null}
+      createAction={canMove ? <MovementForm key={movementFormInstanceKey(handoffId)} initial={initial} initialLot={initialLot} skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} onHand={onHand} skusHref={skusHref} /> : null}
       addSkuHref={skusHref}
       countHref={canRun(ctx, "record_taproom_count") ? "/taproom" : null}
       linkRows

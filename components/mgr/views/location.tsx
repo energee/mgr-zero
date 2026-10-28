@@ -1,7 +1,8 @@
 // components/mgr/views/location.tsx — Location detail drawing, and the
 // location fields it shares with the live Add/Edit location dialog
 // (LocationForm) and the first-run Add location step. Inventory paints the
-// fields + Save. Live is read-only flds with LocationForm in the header.
+// fields + Save. Live is read-only flds with LocationForm in the header. Both
+// draw the location's bins (LocationBinsView) below, through `bins` (#1507).
 import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { FieldDescription } from "@/components/ui/field";
@@ -11,8 +12,8 @@ import type { LocationViewModel } from "@/lib/mgr/location-view";
 
 export type { LocationViewModel };
 
-// create_location seeds these three bins; Location bins (admin, warehouse) edits them.
-const BINS_NOTE = "Bins are the rooms and racks inside a location where stock sits. Every new location starts with Cold, Dry and Walk-in. Admin and Warehouse add, rename or remove bins under Location bins.";
+// create_location seeds these three bins; the location's Bins section (admin, warehouse) edits them.
+const BINS_NOTE = "Bins are the rooms and racks inside a location where stock sits. Every new location starts with Cold, Dry and Walk-in. Admin and Warehouse add, rename or remove bins on the location page.";
 
 /** Location name and Uses, plus what a bin is. Uses takes several answers:
  *  every taproom or warehouse guard asks whether that use is among them.
@@ -49,10 +50,13 @@ export function LocationView({
   headerAction,
   footer,
   readOnly,
+  bins,
 }: {
   model: LocationViewModel;
   headerAction?: ReactNode;
   footer?: ReactNode;
+  /** The location's Bins section, drawn last. */
+  bins?: ReactNode;
   /** Live detail is read-only; edits live in LocationForm. */
   readOnly?: boolean;
 }) {
@@ -63,17 +67,16 @@ export function LocationView({
         <>
           {E.fld("Uses", model.usesLabel)}
           {E.fld("Timezone", model.timezone)}
-          {E.nav("Location bins", model.bins, "", undefined, model.binsHref)}
           {E.info(BINS_NOTE)}
         </>
       ) : (
         <>
           <LocationFields name={model.name} uses={model.uses} />
           {E.fld("Timezone", model.timezone)}
-          {E.nav("Location bins", model.bins)}
         </>
       )}
       {footer !== undefined ? footer : (readOnly ? null : E.btn("Save location"))}
+      {bins}
     </>
   );
 }

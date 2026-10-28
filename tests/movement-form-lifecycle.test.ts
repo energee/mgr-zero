@@ -38,7 +38,7 @@ const history = {
 };
 function render() {
   state.cursor = 0;
-  return MovementForm({ skus: [], locations: [], bins: [], channels: [], timeZone: "UTC", skusHref: null }).props.children as Dialog[];
+  return MovementForm({ skus: [], locations: [], bins: [], channels: [], onHand: [], skusHref: null }) as Dialog;
 }
 beforeEach(() => {
   state.values = [];
@@ -49,21 +49,21 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 it("opens a retained inventory form when Today navigates to the movement URL after Ask MGR closes", () => {
-  expect(render()[0].props.open).toBe(false);
+  expect(render().props.open).toBe(false);
   // Drawer close does not own navigation. The following client navigation
   // must open even when Next retains the manual form's existing hook state.
   navigate("/inventory?recordMovement=1");
-  expect(render()[0].props.open).toBe(true);
-  render()[0].props.onOpenChange(false);
+  expect(render().props.open).toBe(true);
+  render().props.onOpenChange(false);
   expect(url.pathname + url.search).toBe("/inventory");
-  expect(render()[0].props.open).toBe(false);
+  expect(render().props.open).toBe(false);
   navigate("/inventory?recordMovement=1");
-  expect(render()[0].props.open).toBe(true);
+  expect(render().props.open).toBe(true);
 });
 
 it.each(["/", "/inventory?recordMovement=1&movementHandoff=new", "/inventory?page=2"])("ignores an old dialog close after newer navigation to %s", href => {
   navigate("/inventory?recordMovement=1&movementHandoff=old");
-  const oldClose = render()[0].props.onOpenChange;
+  const oldClose = render().props.onOpenChange;
   navigate(href);
   oldClose(false);
   expect(url.pathname + url.search).toBe(href);
@@ -73,21 +73,21 @@ it.each(["/", "/inventory?recordMovement=1&movementHandoff=new", "/inventory?pag
 
 it("clears only movement parameters synchronously and preserves pagination, unrelated queries, and the fragment", () => {
   navigate("/inventory?recordMovement=1&movementHandoff=old&skuId=s1&locationId=l1&binId=b1&lotId=lot1&qty=2&type=depletion&saleChannelId=c1&destState=PA&note=sample&page=3&filter=available&filter=allocated#stock");
-  render()[0].props.onOpenChange(false);
+  render().props.onOpenChange(false);
   expect(url.pathname + url.search + url.hash).toBe("/inventory?page=3&filter=available&filter=allocated#stock");
   navigate("/inventory?recordMovement=1");
-  expect(render()[0].props.open).toBe(true);
+  expect(render().props.open).toBe(true);
   expect(router.replace).not.toHaveBeenCalled();
 });
 
 it("the inventory trigger opens via URL state and browser Back closes it", () => {
   navigate("/inventory?page=2&filter=available#stock");
-  render()[0].props.onOpenChange(true);
+  render().props.onOpenChange(true);
   expect(url.searchParams.get("recordMovement")).toBe("1");
   expect(url.pathname + url.search + url.hash).toBe("/inventory?page=2&filter=available&recordMovement=1#stock");
-  expect(render()[0].props.open).toBe(true);
+  expect(render().props.open).toBe(true);
   navigate("/inventory");
-  expect(render()[0].props.open).toBe(false);
+  expect(render().props.open).toBe(false);
 });
 
 // A Finished goods row links /inventory?recordMovement=1&skuId=…; on
@@ -99,7 +99,7 @@ it("chooses the SKU each newer deep link names in a form already mounted (#1507)
   type FormDialog = Dialog & { props: { children: ReactElement<{ children: ReactElement<{ model: { skuId: string } }> }> } };
   const dialog = () => {
     state.cursor = 0;
-    return (MovementForm({ skus, locations: [], bins: [], channels: [], timeZone: "UTC", skusHref: null }).props.children as FormDialog[])[0];
+    return MovementForm({ skus, locations: [], bins: [], channels: [], onHand: [], skusHref: null }) as FormDialog;
   };
   // React re-renders at once after a render-phase update; this mock needs a second call.
   function sku() {

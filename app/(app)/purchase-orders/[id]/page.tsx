@@ -14,7 +14,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { poNo } from "@/lib/mgr/doc-no";
-import { OPEN_PO_STATUSES } from "@/lib/mgr/receive-po-view";
+import { OPEN_PO_STATUSES, receiveMode } from "@/lib/mgr/receive-po-view";
 import { poDetailStatus } from "@/lib/mgr/purchase-orders-view";
 import { ReceiveForm, ReceiptBillAdapter, type PoLine } from "./po-actions";
 import { navTitle } from "@/lib/mgr/nav";
@@ -38,6 +38,7 @@ type Po = {
 };
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
+type OnHand = { location_id: string; bin_id: string; qty: number };
 type QboHealth = { connected: boolean; realmId?: string; purchaseAccountId: string | null };
 
 const getPurchaseOrderPageData = cache(async function getPurchaseOrderPageData(id: string, receipt?: string, correctReceipt?: string) {
@@ -65,13 +66,18 @@ export default async function PurchaseOrderPage({ params, searchParams }: Props)
   const { ctx, po, receiptModel } = await getPurchaseOrderPageData(id, receipt, correctReceipt);
   if (correctReceipt && po.correction_receipt) {
     return <ReceiveForm key={correctReceipt} poId={po.id} correctionReceiptId={correctReceipt}
-      lines={po.correction_lines} locations={[]} bins={[]} today={po.correction_receipt.received_on}
+      lines={po.correction_lines} locations={[]} bins={[]} onHand={[]} today={po.correction_receipt.received_on}
       model={{ title: `${poNo(po.po_no)} · correct receipt`, state: "correction", status: `Received ${formatDate(po.correction_receipt.received_on)}`, backHref: receiptHref(`/purchase-orders/${po.id}`, correctReceipt) }} />;
   }
   if (receiptModel) return <ReceiptBillAdapter model={receiptModel} />;
-  const [locations, bins, today] = await Promise.all([runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx), breweryToday(ctx)]) as [Location[], Bin[], string];
+  // Receive starts on the bin holding the most of the PO's first open material.
+  const firstMaterial = receiveMode(po.status) === "receive" ? po.lines.find(line => line.qty_open > 0)?.material_id : undefined;
+  const [locations, bins, today, onHand] = await Promise.all([
+    runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx), breweryToday(ctx),
+    firstMaterial ? runCommand("get_material_on_hand", { materialId: firstMaterial }, ctx) : [],
+  ]) as [Location[], Bin[], string, OnHand[]];
   const lineById = new Map(po.lines.map(line => [line.id, line]));
-  return <ReceiveForm key={`${po.status}:${po.receipts.length}`} poId={po.id} lines={po.lines} locations={locations} bins={bins} today={today} model={{
+  return <ReceiveForm key={`${po.status}:${po.receipts.length}`} poId={po.id} lines={po.lines} locations={locations} bins={bins} onHand={onHand} today={today} model={{
     title: `${poNo(po.po_no)} · ${po.vendor?.name ?? "—"}`,
     backHref: "/purchase-orders", state: po.status, status: poDetailStatus(po), note: po.note ?? undefined,
     closure: (OPEN_PO_STATUSES as readonly string[]).includes(po.status)

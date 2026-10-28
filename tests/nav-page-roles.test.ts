@@ -25,7 +25,7 @@ const PAGE_QUERIES: Record<string, readonly string[]> = {
   ],
   "/materials": ["list_materials", "get_material_on_hand", "list_vendors", "list_locations", "list_bins"],
   "/vendors": ["list_vendors_and_contracts", "list_materials"],
-  "/purchase-orders": ["list_purchase_orders", "list_vendors", "list_materials", "get_purchase_order", "list_locations", "list_bins"],
+  "/purchase-orders": ["list_purchase_orders", "list_vendors", "list_vendors_and_contracts", "list_materials", "get_purchase_order", "list_locations", "list_bins", "get_material_on_hand"],
   "/planning": ["get_material_requirements"],
   "/routes": ["list_routes"],
   "/compliance": ["list_compliance_reports", "list_lots", "generate_compliance_report", "get_compliance_registry", "trace_lot"],

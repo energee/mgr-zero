@@ -1,18 +1,17 @@
-// tests/inventory-view.test.ts — Finished goods, Record movement, and
-// Movement recorded adapters plus HTML. Views own no sample data.
+// tests/inventory-view.test.ts — Finished goods and Record movement adapters
+// plus HTML, and the receipt line a saved movement toasts. Views own no sample data.
 import { readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { FinishedGoodsView } from "../components/mgr/views/finished-goods";
-import { MovementRecordedView } from "../components/mgr/views/movement-recorded";
 import { RecordMovementView } from "../components/mgr/views/record-movement";
 import { SKU_HAZY, SKU_PILS, SKU_STOUT } from "../lib/mgr/fixtures/demo";
 import { ReverseMovementView } from "../components/mgr/views/reverse-movement";
-import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, reverseMovementAdjustment } from "../lib/mgr/fixtures/inventory";
+import { finishedGoodsList, recordMovementFestival, reverseMovementAdjustment } from "../lib/mgr/fixtures/inventory";
 import { assembleFinishedGoods, skuLabel, toFinishedGoodsViewProps } from "../lib/mgr/finished-goods-view";
-import { toMovementRecordedViewProps } from "../lib/mgr/movement-recorded-view";
+import { movementReceiptLine } from "../lib/mgr/movement-recorded-view";
 import { toRecordMovementViewProps } from "../lib/mgr/record-movement-view";
 import { MOVEMENT_KIND_LABELS } from "../lib/movement-form";
 import { toReverseMovementViewProps } from "../lib/mgr/reverse-movement-view";
@@ -161,7 +160,7 @@ describe("Finished goods view", () => {
     expect(body.props.model).toEqual(toFinishedGoodsViewProps(finishedGoodsList));
   });
 
-  it("the live inventory movement receipt uses its shared view", () => {
+  it("the live inventory page mounts its shared views; a saved movement toasts instead of opening a receipt sheet (#1507)", () => {
     const src = readFileSync("app/(app)/inventory/page.tsx", "utf8");
     const form = readFileSync("app/(app)/inventory/movement-form.tsx", "utf8");
     expect(src).toMatch(/from "@\/components\/mgr\/views\/finished-goods"/);
@@ -169,7 +168,8 @@ describe("Finished goods view", () => {
     expect(src).toMatch(/<MovementForm\b/);
     expect(form).not.toContain('title="Record Movement"');
     expect(form).toMatch(/<RecordMovementView\b/);
-    expect(form).toMatch(/<MovementRecordedView\b/);
+    expect(form).not.toMatch(/title="Movement recorded"/);
+    expect(form).toMatch(/toast\.success\("Movement recorded", \{ description: movementReceiptLine\(/);
   });
 
   it("names a SKU once when its name already starts with the brand (#493)", () => {
@@ -256,37 +256,19 @@ describe("Record movement view", () => {
   });
 });
 
-describe("Movement recorded view", () => {
-  it("maps the festival echo onto the tape and gated correction", () => {
-    const model = toMovementRecordedViewProps(movementRecordedFestival);
-    expect(model.sku).toBe("Hazy IPA · ½ bbl");
-    expect(model).not.toHaveProperty("backHref");
-    expect(model.tapeLabel).toBe("−1 keg · Festival removal · PA");
-    expect(model.tapeDetail).toBe(`${formatVolume("0.50000000")} · just now`);
-    expect(model.correctionGate).toMatch(/latest eligible saved weekly count/i);
-    expect(model.correctionGate).not.toMatch(/unavailable/i);
+describe("Movement receipt line", () => {
+  it("names the signed quantity, SKU, kind, state, frozen volume and bin (#1507)", () => {
+    expect(movementReceiptLine({ sku: "Hazy IPA · ½ bbl", qty: -1, kind: "Festival removal", destState: "PA", bbl: "-0.5", place: "Taproom / Cold" }))
+      .toBe(`−1 Hazy IPA · ½ bbl · Festival removal · PA · ${formatVolume("-0.5")} · Taproom / Cold`);
   });
 
-  it("renders the tape and Record inventory correction", () => {
-    const html = htmlOf(createElement(MovementRecordedView, { model: toMovementRecordedViewProps(movementRecordedFestival) }));
-    expect(html).toMatch(/Festival removal/);
-    expect(html).toMatch(/Record inventory correction/);
-    expect(html).toContain(formatVolume("0.50000000"));
-    expect(html).not.toMatch(/→/);
+  it("adds the lot code when the movement carries one", () => {
+    expect(movementReceiptLine({ sku: "Pils case", qty: 2, kind: "Adjustment", bbl: 0.1, place: "Warehouse / Dry", lot: "L-7" }))
+      .toBe(`+2 Pils case · Adjustment · ${formatVolume(0.1)} · Warehouse / Dry · lot L-7`);
   });
 
-  it("draws no in-sheet title or back link, and names the SKU in a row (#1167)", () => {
-    const html = htmlOf(createElement(MovementRecordedView, { model: toMovementRecordedViewProps(movementRecordedFestival) }));
-    expect(html).not.toMatch(/<h1\b|<a\b/);
-    expect(html).toMatch(/<dt[^>]*>SKU<\/dt><dd[^>]*>Hazy IPA · ½ bbl<\/dd>/);
-  });
-
-  it("the Movement recorded inventory record is a sheet drawing MovementRecordedView", () => {
-    const record = screen("Movement recorded");
-    expect(record.surface).toBe("sheet");
-    const body = record.body as { type: unknown; props: { model: unknown } };
-    expect(body.type).toBe(MovementRecordedView);
-    expect(body.props.model).toEqual(toMovementRecordedViewProps(movementRecordedFestival));
+  it("the inventory no longer draws a Movement recorded screen", () => {
+    expect(SCREENS.some((s) => s.name === "Movement recorded")).toBe(false);
   });
 });
 

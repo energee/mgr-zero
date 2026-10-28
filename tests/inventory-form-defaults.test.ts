@@ -1,5 +1,6 @@
 // Defaults and entry points that save taps on the inventory and purchasing
-// forms (#1507): the count bin, the New PO material order, the New transfer
+// forms (#1507): the count bin, the New PO material order and contract
+// prefill, the New transfer
 // To location, a single receive source, SKU detail's Record movement and the
 // customer keg balance's Record return.
 import { createElement } from "react";
@@ -9,7 +10,7 @@ import { InventoryDetailView } from "@/components/mgr/views/inventory-detail";
 import { KegBalanceView } from "@/components/mgr/views/keg-balance";
 import { E } from "@/components/mgr/e";
 import { countDefaultBin } from "@/lib/mgr/cycle-count-view";
-import { vendorMaterialsFirst } from "@/lib/mgr/new-po-view";
+import { onlyActiveContract, vendorMaterialsFirst } from "@/lib/mgr/new-po-view";
 import { onlyOtherLocation } from "@/lib/mgr/new-transfer-view";
 import { transferSourceQty } from "@/lib/mgr/transfer-detail-view";
 import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
@@ -46,6 +47,27 @@ describe("New PO material order", () => {
 
   it("keeps the list as it is before a vendor is chosen", () => {
     expect(vendorMaterialsFirst(materials, "")).toEqual(materials);
+  });
+});
+
+describe("New PO contract prefill", () => {
+  const contract = { id: "c1", vendor_id: "malt", material_id: "m2", unit_cost_cents: 1250, starts_on: "2026-01-01", ends_on: "2026-12-31" };
+
+  it("is the one contract in force for the vendor and material", () => {
+    expect(onlyActiveContract([contract, { ...contract, id: "c2", material_id: "m4" }], "malt", "m2", "2026-10-28")).toBe(contract);
+  });
+
+  it("counts an open-ended contract and its first and last days as in force", () => {
+    expect(onlyActiveContract([{ ...contract, starts_on: null, ends_on: null }], "malt", "m2", "2026-10-28")?.id).toBe("c1");
+    expect(onlyActiveContract([contract], "malt", "m2", "2026-01-01")?.id).toBe("c1");
+    expect(onlyActiveContract([contract], "malt", "m2", "2026-12-31")?.id).toBe("c1");
+  });
+
+  it("leaves the line blank when no contract is in force, or several are", () => {
+    expect(onlyActiveContract([contract], "malt", "m2", "2027-01-01")).toBeNull();
+    expect(onlyActiveContract([contract], "malt", "m2", "2025-12-31")).toBeNull();
+    expect(onlyActiveContract([contract], "hops", "m2", "2026-10-28")).toBeNull();
+    expect(onlyActiveContract([contract, { ...contract, id: "c2" }], "malt", "m2", "2026-10-28")).toBeNull();
   });
 });
 

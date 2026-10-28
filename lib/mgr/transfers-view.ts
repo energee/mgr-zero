@@ -7,9 +7,10 @@ import { WORK_CHIPS, WORK_TABS } from "./work-view";
 
 // A transfer's next action by status. Received and cancelled transfers have
 // none: their row is a plain link, because "Open" on a closed record reads as
-// reopen (#996, #1026).
+// reopen (#996, #1026). A submitted transfer skips the pick step, so it is
+// received directly (#1507).
 const VERB: Record<string, { label: string; tone: "info" | "success" }> = {
-  submitted: { label: "Pick", tone: "info" },
+  submitted: { label: "Receive", tone: "success" },
   picked: { label: "Receive", tone: "success" },
   in_transit: { label: "Receive", tone: "success" },
 };

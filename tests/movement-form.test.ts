@@ -1,7 +1,7 @@
 // tests/movement-form.test.ts — #1107: the live Record movement form starts
 // with no type picked (a deep-linked type still preselects), and closing a
 // form a deep link opened drops ?recordMovement=1 and its prefill from the URL,
-// while a successful record leaves the URL for the receipt dialog to clear.
+// and so does a successful record, which toasts its receipt line (#1507).
 // #1113: the withheld Record movement says what it still needs, and an empty
 // SKU picker links Catalog only for a user who may create a SKU.
 import { createElement, type ReactElement } from "react";
@@ -11,6 +11,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const router = { replace: vi.fn(), refresh: vi.fn(), push: vi.fn() };
 vi.mock("next/navigation", () => ({ useRouter: () => router, usePathname: () => location.pathname, useSearchParams: () => new URLSearchParams(location.search) }));
 vi.mock("@/lib/brewery-provider", () => ({ useBrewery: () => "brewery-a", useCommandContext: () => ({ actorId: "actor-a", breweryId: "brewery-a" }) }));
+const toasts = vi.hoisted(() => [] as [string, string | undefined][]);
+vi.mock("sonner", () => ({ toast: { success: (title: string, options?: { description?: string }) => { toasts.push([title, options?.description]); } } }));
 vi.mock("@/lib/commands/client", async (original) => ({ ...(await original<typeof import("@/lib/commands/client")>()), command: vi.fn(async () => receipt) }));
 type FormProps = { open: boolean; onOpenChange: (open: boolean) => void; children: ReactElement<{ onSubmit: (e: unknown) => void }> };
 let forms: FormProps[] = [];
@@ -20,6 +22,7 @@ vi.mock("@/components/mgr/command-form", async (original) => {
 });
 import { MovementForm } from "@/app/(app)/inventory/movement-form";
 import { command } from "@/lib/commands/client";
+import { formatVolume } from "@/lib/volume";
 
 const receipt = { id: "m1", created_at: "2026-10-22T12:00:00Z", sku_id: "s1", location_id: "l1", bin_id: "b1", qty: 2, bbl: 0.6, type: "production_in", dest_state: null, sale_channel_id: null, lot_id: null, ref: null, note: null };
 const lists = {
@@ -27,7 +30,7 @@ const lists = {
   locations: [{ id: "l1", name: "Back warehouse", uses: [] }],
   bins: [{ id: "b1", location_id: "l1", name: "Cold" }],
   channels: [{ id: "c1", name: "Taproom" }],
-  timeZone: "America/New_York",
+  onHand: [],
   skusHref: "/catalog",
 };
 const filled = { skuId: "s1", locationId: "l1", binId: "b1", qty: 2 };
@@ -143,11 +146,12 @@ it("closing an already-closed form leaves the URL alone", () => {
   expect(window.history.replaceState).not.toHaveBeenCalled();
 });
 
-it("a successful record does not replace the URL; closing its receipt dialog does", async () => {
+it("a successful record toasts its receipt line and closes the form by clearing the deep link (#1507)", async () => {
+  toasts.length = 0;
   render({ initial: { ...filled, type: "production_in" } });
+  expect(forms).toHaveLength(1);
   await forms[0].children.props.onSubmit({ preventDefault() {}, stopPropagation() {} });
   await vi.waitFor(() => expect(router.refresh).toHaveBeenCalled());
-  expect(window.history.replaceState).not.toHaveBeenCalled();
-  forms[1].onOpenChange(false);
+  expect(toasts).toEqual([["Movement recorded", `+2 Lantern Pils · Case · Production in · ${formatVolume(0.6)} · Back warehouse / Cold`]]);
   expect(window.history.replaceState).toHaveBeenCalledWith(null, "", "/inventory?page=3");
 });

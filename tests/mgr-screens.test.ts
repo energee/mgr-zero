@@ -309,7 +309,7 @@ describe("SCREENS", () => {
     const sheets = ["Invite portal user", "Fix mapping", "Package BOM", "SKU", "Brand approval", "State registration", "License", "Channel", "Format", "Bin"];
     for (const name of sheets) expect.soft(SCREENS.find((s) => s.name === name)?.surface, name).toBe("sheet");
     expect(SCREENS.find((s) => s.name === "Invoice")?.surface).toBeUndefined();
-    for (const name of ["Customers", "Invoices", "Catalog", "Vendors", "Licenses", "Sale channels", "Formats", "Price group", "Location bins"]) {
+    for (const name of ["Customers", "Invoices", "Catalog", "Vendors", "Licenses", "Sale channels", "Formats", "Price group"]) {
       const html = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
       expect.soft(html, `${name}: inline save`).not.toMatch(/>Save[^<]*<\/button>/);
     }
@@ -745,7 +745,7 @@ describe("SCREENS", () => {
       const body = renderToStaticMarkup(createElement("div", null, s.hd, s.body));
       expect(body, s.name).not.toMatch(banned);
     }
-    for (const name of ["Shipment done", "Run closed", "Receipt", "Movement recorded"]) {
+    for (const name of ["Shipment done", "Run closed", "Receipt"]) {
       expect(SCREENS.some((s) => s.name === name), name).toBe(true);
     }
   });
