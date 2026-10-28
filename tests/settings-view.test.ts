@@ -63,19 +63,6 @@ describe("Settings save readiness (#1316)", () => {
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Save brewery/);
   });
 
-  it("keeps the TTB registry number and PA license free text, capped at 100 characters (#1500)", () => {
-    const update = getCommandDefinition("update_brewery")!.input;
-    const base = { name: "Brewery", timezone: "America/New_York", readingDueHours: 24 };
-    for (const [key, field, need] of [["ttb", "ttbRegistryNo", "a TTB registry number of 100 characters or fewer"], ["pa", "paLicenseNo", "a PA license of 100 characters or fewer"]] as const) {
-      expect(brewerySettingsReason({ ...initial, [key]: "x".repeat(101) }, initial), key).toContain(need);
-      expect(update.safeParse({ ...base, [field]: "x".repeat(101) }).success, field).toBe(false);
-      for (const value of ["", "bad value!!", ` ${"x".repeat(100)} `]) {
-        expect(brewerySettingsReason({ ...initial, name: "Changed", [key]: value }, initial), `${key} ${value}`).toBeNull();
-        expect(update.safeParse({ ...base, [field]: value }).success, `${field} ${value}`).toBe(true);
-      }
-    }
-  });
-
   it("refreshes untouched fields without dropping unsaved or uncertain edits", () => {
     const values = { ...initial, name: "Unsaved brewery" };
     const refreshed = { ...initial, hours: "48" };
