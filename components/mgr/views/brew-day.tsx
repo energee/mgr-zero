@@ -46,6 +46,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, ac
       {E.fld("Brewed on", model.brewedOn ? formatDate(model.brewedOn) : "Unavailable")}
       {model.completion && <>
         {E.fld("Completed", model.completion.on)}
+        {E.fld("Packaged", bblExact(model.completion.packagedBbl, 8))}
         {E.fld("Written off as loss", model.completion.writeOffBbl === null ? "None" : bblExact(model.completion.writeOffBbl, 8))}
       </>}
       {!(model.records?.length) && E.note("Historical frozen brew sheet unavailable. This brew predates confirmed material records.")}

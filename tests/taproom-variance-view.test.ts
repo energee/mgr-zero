@@ -30,8 +30,9 @@ it("preserves nulls, coverage, exclusions and absent trends in the shared report
   expect(html).toContain("coverage incomplete");
   expect(html).toContain("3 unmapped POS lines");
   expect(html).toContain("variance —");
-  expect(html).toContain("Recurring brand trend");
-  expect(html).toContain("Not available yet.");
+  // No trend yet: the placeholder is hidden, not drawn locked (#1481).
+  expect(html).not.toContain("Recurring brand trend");
+  expect(html).not.toContain("Not available yet.");
   expect(html).not.toContain("short 4 weeks running");
   expect(html).not.toContain('href="/taproom');
 });
@@ -63,7 +64,7 @@ it("#1118 a window holding only a first count lists it under Count periods, not 
 
 it("#1118 shows the week-by-week tip only beside a trend, and reading help as neutral info", () => {
   const html = renderToStaticMarkup(createElement(TaproomVarianceView, { model: { ...taproomVariance, trend: undefined } }));
-  expect(html).toContain("Not available yet.");
+  expect(html).not.toContain("Not available yet.");
   expect(html).not.toContain("A brand short every week");
   expect(html).toContain("A dash means a value is unavailable");
   expect(html).not.toContain("bg-warning");

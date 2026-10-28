@@ -240,7 +240,6 @@ export const INERT: (string | RegExp)[] = [
   "Add source",
   "Add material source",
   /^Remove source \d+$/,
-  "Review current material plan",
   "Correct material actuals",
   "Remove source",
   "Add ingredient",

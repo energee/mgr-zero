@@ -39,3 +39,9 @@ export function readingValidation(values: { observedAt: string; tempF: string; g
 export function readingReturnHref(from: string | string[] | undefined, vesselId: string): string {
   return typeof from === "string" && /^\/(cellar|batches(\/[0-9a-f-]{36})?)$/.test(from) ? from : `/cellar/vessels/${vesselId}`;
 }
+
+/** Save and next tank's destination: that tank's reading sheet, keeping this sheet's `?from=` so the round still closes
+ *  where it began. readingReturnHref checks the value again on the next page. */
+export function nextReadingHref(from: string | string[] | undefined, occupancyId: string): string {
+  return `/cellar/${occupancyId}/reading${typeof from === "string" ? `?from=${encodeURIComponent(from)}` : ""}`;
+}

@@ -10,9 +10,10 @@
 // a phone (BrewFooter), and Change plan is folded below. The live batch page
 // mounts it for a planned batch; ./brew-day.tsx still draws recorded and
 // cancelled batches (history, corrections, brew turns). Planned water additions
-// are listed under Mash as a reminder only: the timeline has no Add ingredient,
-// so they are recorded with Correct turn after the brew. A row is green only
-// once confirmed with a source within stock (timelineTone).
+// are rows like any ingredient (waterAdditionRows); only one whose unit cannot
+// become its material's base unit is listed under Mash as a reminder, recorded
+// with Correct turn after the brew. A row is green only once confirmed with a
+// source within stock (timelineTone).
 "use client";
 import { Fragment, useId, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";

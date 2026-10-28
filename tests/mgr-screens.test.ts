@@ -1028,10 +1028,10 @@ describe("SCREENS", () => {
     expect(String(SCREENS.find((s) => s.name === "Complete transfer")!.writes)).toContain("ship_order");
   });
 
-  it("locks Water suggestions and the ion read-out, matching the live sheet (post-v1)", () => {
+  it("hides Water suggestions and the ion read-out, matching the live sheet (post-v1, #1481)", () => {
     const html = body("Water");
-    expect(html).toMatch(/Suggest additions/);
-    expect(html).toContain("data-gated");
+    expect(html).not.toMatch(/Suggest additions/);
+    expect(html).not.toContain("data-gated");
     expect(html).not.toMatch(/Against target<\//);
     const water = SCREENS.find((s) => s.name === "Water")!;
     expect(String(water.spec)).toMatch(/post-v1/i);

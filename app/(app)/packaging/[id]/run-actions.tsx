@@ -3,7 +3,8 @@
 // tank in the same call when none was picked at scheduling — starting needs a
 // tank), or close it (close_packaging_run: actual outputs, lot, packaged date,
 // and the finished-goods location + bin). Barrels drawn starts from the
-// planned outputs' draw (#1508).
+// planned outputs' draw, and the finished-goods location and bin start on the
+// only one; Close re-reads the material plan before it sends (#1508).
 "use client";
 
 import { PackagingSourcePicker, type PackagingSourceOccupancy as Occupancy } from "@/components/mgr/views/plan-actions";
@@ -15,7 +16,7 @@ import { emptyPackagingActual, packagingActualPayload, patchActual, removeActual
 import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
 import { command } from "@/lib/commands/client";
 import { useCommandAction } from "@/lib/commands/use-command-form";
-import { packagingCloseReason } from "@/lib/mgr/close-packaging-run-view";
+import { finishedGoodsStart, onlyBinIn, packagingCloseReason } from "@/lib/mgr/close-packaging-run-view";
 import { plannedDrawBbl } from "@/lib/mgr/schedule-packaging-run-view";
 
 type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null; whole: boolean; bbl_per_unit: number | null };
@@ -44,7 +45,7 @@ export function CloseRunForm({ runId, outputs, locations, bins, today, initialPl
   const context = useCommandContext();
   const draw = plannedDrawBbl(outputs.map(row => ({ qty: row.qty_planned, bblPerUnit: row.bbl_per_unit ?? undefined })));
   // close_packaging_run records the draw to three decimals.
-  const [fields, setFields] = useState({ bblDrawn: draw === undefined ? "" : String(Number(draw.toFixed(3))), lotCode: "", packagedOn: today, bestBy: "", locationId: "", binId: "" });
+  const [fields, setFields] = useState({ bblDrawn: draw === undefined ? "" : String(Number(draw.toFixed(3))), lotCode: "", packagedOn: today, bestBy: "", ...finishedGoodsStart(locations, bins) });
   const [quantities, setQuantities] = useState(Object.fromEntries(outputs.map(row => [row.sku_id, String(row.qty_planned)])));
   const [plan, setPlan] = useState(initialPlan);
   const [actuals, setActuals] = useState(() => suggestedPackagingActuals(initialPlan));
@@ -52,16 +53,28 @@ export function CloseRunForm({ runId, outputs, locations, bins, today, initialPl
   const [reviewing, setReviewing] = useState(false);
   const retry = pending?.name === "close_packaging_run" && !busy;
   const model = { ...fields, outputs: outputs.map(row => ({ id: row.sku_id, name: row.sku_name ?? row.sku_id, qty: quantities[row.sku_id], whole: row.whole })), plan, actuals, locations, bins };
-  async function refreshPlan() {
-    if (busy || blocked || reviewing) return;
+  /** Re-read the material plan, then close against it. A plan that changed since the page loaded is shown instead of
+   *  sent, so the actuals are reviewed against it first; close_packaging_run would refuse the old revision anyway. */
+  async function reviewAndClose() {
     setReviewing(true); setError(null);
-    try { setPlan(await command(breweryId, "get_packaging_close_plan", { runId }, undefined, context) as PackagingClosePlan); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not review material plan"); }
+    let current: PackagingClosePlan;
+    try { current = await command(breweryId, "get_packaging_close_plan", { runId }, undefined, context) as PackagingClosePlan; }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not review material plan"); return; }
     finally { setReviewing(false); }
+    if (current.revision !== plan.revision) {
+      setPlan(current);
+      setError("The material plan changed. Check the material actuals against it, then close again.");
+      return;
+    }
+    void run("close_packaging_run", {
+      runId, ...fields, bblDrawn: Number(fields.bblDrawn), bestBy: fields.bestBy || undefined,
+      outputs: outputs.map(row => ({ skuId: row.sku_id, qtyActual: Number(quantities[row.sku_id]) })),
+      planRevision: current.revision, actuals: packagingActualPayload(actuals),
+    });
   }
   return <PackagingCloseFields model={model}
     disabled={busy || blocked || reviewing} retry={retry}
-    onField={(field, value) => setFields(previous => ({ ...previous, [field]: value, ...(field === "locationId" ? { binId: "" } : {}) }))}
+    onField={(field, value) => setFields(previous => ({ ...previous, [field]: value, ...(field === "locationId" ? { binId: onlyBinIn(bins, value) } : {}) }))}
     onOutput={(id, value) => setQuantities(previous => ({ ...previous, [id]: value }))}
     onActual={(key, patch) => setActuals(previous => patchActual(previous, key, patch))}
     onAdd={() => setActuals(previous => [...previous, emptyPackagingActual()])}
@@ -70,11 +83,7 @@ export function CloseRunForm({ runId, outputs, locations, bins, today, initialPl
       if (busy || reviewing) return;
       if (retry) { void run(pending.name, pending.input, undefined, { requestId: pending.requestId }); return; }
       if (blocked || packagingCloseReason(model)) return;
-      void run("close_packaging_run", {
-        runId, ...fields, bblDrawn: Number(fields.bblDrawn), bestBy: fields.bestBy || undefined,
-        outputs: outputs.map(row => ({ skuId: row.sku_id, qtyActual: Number(quantities[row.sku_id]) })),
-        planRevision: plan.revision, actuals: packagingActualPayload(actuals),
-      });
+      void reviewAndClose();
     }}
-    onRefresh={() => { void refreshPlan(); }} messages={<CommandFormMessage error={error} />} />;
+    messages={<CommandFormMessage error={error} />} />;
 }

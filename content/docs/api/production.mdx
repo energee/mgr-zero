@@ -169,7 +169,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-One batch, with its intended brand's name, and the occupancy it is currently sitting in (the oldest open one when split across tanks): the vessel's name and the volume that went in; closed_at is set once the batch is completed, and writeOffBbl is the barrels its completion wrote off as loss (null when none)
+One batch, with its intended brand's name, and the occupancy it is currently sitting in (the oldest open one when split across tanks): the vessel's name and the volume that went in; closed_at is set once the batch is completed; then writeOffBbl is the barrels its completion wrote off as loss (null when none) and packagedBbl the barrels its closed packaging runs packaged (both null before completion)
 
 | Field | Type | Required |
 | --- | --- | --- |
