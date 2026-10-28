@@ -48,6 +48,21 @@ describe("Settings save readiness (#1316)", () => {
     }
   });
 
+  it("withholds Save brewery for a phone the server refuses (#1500)", () => {
+    for (const phone of ["abc", "12", "5".repeat(300)]) {
+      expect(brewerySettingsReason({ ...initial, phone }, initial), phone).toContain("a phone number, such as (503) 555-0142");
+    }
+    for (const phone of ["", "(503) 555-0142"]) {
+      expect(brewerySettingsReason({ ...initial, name: "Changed", phone }, initial), phone).toBeNull();
+    }
+  });
+
+  it("shows the phone correction under the field before saving (#1500)", () => {
+    const html = renderToStaticMarkup(createElement(BrewerySettingsFormView, { initial: { ...initial, phone: "abc" } }));
+    expect(html).toContain("Use a phone number, such as (503) 555-0142.");
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Save brewery/);
+  });
+
   it("refreshes untouched fields without dropping unsaved or uncertain edits", () => {
     const values = { ...initial, name: "Unsaved brewery" };
     const refreshed = { ...initial, hours: "48" };
