@@ -775,7 +775,7 @@ Open `/transfers/new` to go straight to **New transfer**. It redirects to `/tran
 
 <Screen name="Routes" />
 
-**Deliveries** (Work tab; Warehouse and Admin) lists every route that has not returned, and below it every shipped order and picked transfer that is on no route yet. A route is one day, one driver, one vehicle, and its stops in order; a stop is a shipped wholesale order or a picked [stock transfer](#transfers). Select anywhere on a route row to open it. Each row names its next action as a shortcut: **Assign** on a route with no driver, **Resume** on a departed one, and **Add to route** on a document waiting for one. A planned route with a driver has nothing to do yet, so it has no verb. **New route** opens the builder.
+**Deliveries** (Work tab; Warehouse and Admin) lists every route that has not returned, and below it every shipped order and picked transfer that is on no route yet. The **Status** pick switches the list: **Open** (the default) shows those routes, and **Returned** shows finished routes, newest first, so a past run stays one click away. When every route has returned, the Open list says *No open routes* and points to **Returned**. A route is one day, one driver, one vehicle, and its stops in order; a stop is a shipped wholesale order or a picked [stock transfer](#transfers). Select anywhere on a route row to open it. Each row names its next action as a shortcut: **Assign** on a route with no driver, **Resume** on a departed one, and **Add to route** on a document waiting for one. A planned route with a driver has nothing to do yet, so it has no verb. A returned route has no verb either; select it to read its stops and return time. **New route** opens the builder.
 
 <Screen name="Route" />
 
@@ -797,7 +797,7 @@ Enter each **refused** count as a whole number from **0** to that line's shipped
 
 <Screen name="Return route" />
 
-**Return route** is enabled once every stop has an outcome, delivered or refused, and stamps the return; the route then leaves the Deliveries list, and the return time replaces the button. Until then the page says how many stops are still open, and the return is refused. An unattempted stop uses **Not delivered · leave for a later route** on its page and becomes unassigned for another route. A customer rejection is recorded as a refusal, and any beer still waiting to come back shows *awaiting check-in* with a **Check in** button on the route, even after the route has returned. Before departing, untick a stop to move it to another route.
+**Return route** is enabled once every stop has an outcome, delivered or refused, and stamps the return; the route then moves from the Open list to **Returned** on Deliveries, and the return time replaces the button. Until then the page says how many stops are still open, and the return is refused. An unattempted stop uses **Not delivered · leave for a later route** on its page and becomes unassigned for another route. A customer rejection is recorded as a refusal, and any beer still waiting to come back shows *awaiting check-in* with a **Check in** button on the route, even after the route has returned. Before departing, untick a stop to move it to another route.
 
 ## Compliance [#compliance]
 
