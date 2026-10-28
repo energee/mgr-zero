@@ -6,6 +6,7 @@ import { NewOrderView } from "@/components/mgr/views/new-order";
 import { Select, SelectItem } from "@/components/ui/select";
 import { ShipToView } from "@/components/mgr/views/ship-to";
 import { toShipToViewProps } from "@/lib/mgr/ship-to-view";
+import { UsStateField } from "@/components/mgr/us-state-field";
 import { SCREENS } from "@/components/mgr/screens";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { PickView } from "@/components/mgr/views/pick";
@@ -96,7 +97,7 @@ describe("shared order-entry controls", () => {
     expect(SCREENS.find(screen => screen.name === "New order")?.surface).toBeUndefined();
   });
 
-  it("shares all address controls, normalizes state, and keeps the second line optional", () => {
+  it("shares all address controls, picks the US state from the list, and keeps the second line optional", () => {
     const state = vi.fn(), address2 = vi.fn(), isDefault = vi.fn();
     let node: ReactNode;
     function Capture() {
@@ -106,9 +107,8 @@ describe("shared order-entry controls", () => {
     const markup = renderToStaticMarkup(createElement(Capture));
     const nodes = elements(node);
     const field = (label: string) => nodes.find(element => element.props["aria-label"] === label)!;
-    invoke(field("State"), "onChange", { target: { value: "ny" } });
-    expect(state).toHaveBeenCalledWith("NY");
-    expect(field("State").props.maxLength).toBe(2);
+    const stateField = nodes.find(element => element.type === UsStateField)!;
+    expect(stateField.props.controls).toMatchObject({ onChange: state, required: true });
     expect(field("Address 2 (optional)").props.required).toBe(false);
     invoke(field("Address 2 (optional)"), "onChange", { target: { value: "" } });
     expect(address2).toHaveBeenCalledWith("");
