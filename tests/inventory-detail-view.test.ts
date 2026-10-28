@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { canReverseMovement, toInventoryDetailViewProps } from "@/lib/mgr/inventory-detail-view";
+import { canReverseMovement, movementSourceHref, toInventoryDetailViewProps } from "@/lib/mgr/inventory-detail-view";
 import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -29,4 +29,15 @@ it("shows source labels and lot codes rather than ledger identities (#1382)", ()
   expect(text).not.toMatch(/[0-9a-f]{8}-[0-9a-f-]{27,}/i);
   const unresolved = renderToStaticMarkup(createElement(InventoryDetailView, { model: { ...model, movements: [{ ...model.movements[0], ref_label: null, lots: null }] } })).replace(/<[^>]*>/g, "");
   expect(unresolved).not.toMatch(/[0-9a-f]{8}-[0-9a-f-]{27,}/i);
+});
+it("#1517 links a movement to the document it came from, when that document has a page", () => {
+  expect(movementSourceHref({ ref: "r1", ref_kind: "run" })).toBe("/packaging/r1");
+  expect(movementSourceHref({ ref: "o1", ref_kind: "order" })).toBe("/orders/o1");
+  expect(movementSourceHref({ ref: "t1", ref_kind: "transfer" })).toBe("/transfers/t1");
+  expect(movementSourceHref({ ref: "i1", ref_kind: "invoice" })).toBe("/invoices/i1");
+  expect(movementSourceHref({ ref: "d1", ref_kind: "delivery" })).toBe("/work/deliveries/d1");
+  // A weekly count has no page of its own; an unresolved or missing ref links nowhere.
+  expect(movementSourceHref({ ref: "c1", ref_kind: "count" })).toBeUndefined();
+  expect(movementSourceHref({ ref: "x", ref_kind: null })).toBeUndefined();
+  expect(movementSourceHref({ ref: null, ref_kind: null })).toBeUndefined();
 });

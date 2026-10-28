@@ -42,6 +42,10 @@ it("resolves actual source tables for movement history and lot trace without nam
   expect(labels.get(credit.id)).toBe("CM-0001");
   expect(labels.get(delivery.id)).toBe("Refused delivery · ORD-0001");
   expect(labels.get(count.id)).toBe("Count Sep 2, 2026");
+  // SKU detail links a movement to its source document by kind (#1517).
+  const kinds = new Map((movements as unknown as { ref: string; ref_kind: string | null }[]).map(row => [row.ref, row.ref_kind]));
+  expect(Object.fromEntries([run.id, order.id, transfer.id, pair, credit.id, delivery.id, count.id].map(id => [id, kinds.get(id)])))
+    .toEqual({ [run.id]: "run", [order.id]: "order", [transfer.id]: "transfer", [pair]: null, [credit.id]: "invoice", [delivery.id]: "delivery", [count.id]: "count" });
   expect(movements.every(row => row.lots.code === "QA-TEST-LOT")).toBe(true);
   const trace = await runCommand("trace_lot", { lotId: lot.id }, ctx) as LotTraceSnapshot;
   expect(trace.movements.find(row => row.ref === delivery.id)).toMatchObject({ ref_label: "Refused delivery · ORD-0001", ref_kind: "delivery" });

@@ -128,6 +128,14 @@ describe("Route", () => {
     expect(empty).not.toContain("Depart route");
     expect(empty).toMatch(/<button[^>]*disabled[^>]*>Save route plan/);
   });
+
+  it("#1517 a new route with no stop to plan shows only the empty state, not the form", () => {
+    const html = htmlOf(createElement(RouteView, { model: { ...routeAPlan, saved: false, selection: {}, stops: [], ordersHref: "/orders" } }));
+    expect(html).toContain("No stops ready for a route");
+    expect(html).toMatch(/href="\/orders"[^>]*>Open Orders/);
+    expect(html).not.toContain("Delivery date");
+    expect(html).not.toContain("Save route plan");
+  });
   it("explains empty route stops and links live users to Orders (#1258)", () => {
     const model = { ...routeAPlan, stops: [], selection: {}, saved: false, ordersHref: "/orders" };
     const html = htmlOf(createElement(RouteView, { model }));

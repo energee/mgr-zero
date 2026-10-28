@@ -40,8 +40,9 @@ export type OrderViewModel = {
   next: string;
   /** breweries.timezone, named under the history. */
   timeZone: string;
-  /** Order details, in order; a fixed fact with no value reads "Not specified". The note is `wide`. */
-  facts: { label: string; value: string; wide?: boolean }[];
+  /** Order details, in order; a fixed fact with no value reads "Not specified". The note is `wide`.
+   *  A shipped order's Invoice links on the live page. */
+  facts: { label: string; value: string; wide?: boolean; href?: string }[];
   summary: PriceSummaryModel;
   /** "$X · margin Y%" for a shipped order, when the caller may run get_order_cogs (#810). */
   costLine?: string;
@@ -81,6 +82,8 @@ export type OrderSnapshot = {
   locations?: { id: string; name: string }[];
   /** The order's delivery stop outcome; null while the stop is open or there is none. */
   deliveryOutcome?: DeliveryOutcome | null;
+  /** The invoice billing the order's shipment; null until one is issued. */
+  invoice?: { id: string; invoice_no: number | null } | null;
   lines: {
     id: string;
     sku_id: string;
@@ -202,7 +205,7 @@ function costLineFor(order: OrderSnapshot["order"], cogs?: OrderCogs): string | 
 
 /** Map a get_order payload onto OrderView's model. Inventory frames pass a
  *  fixture snapshot through this same function. */
-export function toOrderViewProps({ order, lines, events, atp, locations, deliveryOutcome, backHref, timeZone, cogs, deposits, actorNames }: OrderSnapshot): OrderViewModel {
+export function toOrderViewProps({ order, lines, events, atp, locations, deliveryOutcome, invoice, backHref, timeZone, cogs, deposits, actorNames }: OrderSnapshot): OrderViewModel {
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? "line"]));
   const lineNames = new Map(lines.map((l) => [l.id, l.skus?.name ?? "Line"]));
@@ -224,6 +227,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
       ...(order.kind === "wholesale" || order.pickup ? [{ label: "Ship-to", value: shipTo ?? "Not specified" }] : []),
       { label: "Requested ship date", value: order.requested_ship_date ? formatDate(order.requested_ship_date) : "Not specified" },
       ...(order.kind === "wholesale" ? [{ label: "Customer PO", value: order.po_number?.trim() || "Not specified" }] : []),
+      ...(invoice ? [{ label: "Invoice", value: docNo("INV", invoice.invoice_no, "Invoice"), ...(backHref ? { href: `/invoices/${invoice.id}` } : {}) }] : []),
       ...(order.note ? [{ label: "Note", value: order.note, wide: true }] : []),
     ],
     summary: orderSummary(order, lines, deposits, events),

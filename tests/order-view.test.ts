@@ -357,3 +357,16 @@ describe("Order view loop", () => {
     });
   });
 });
+
+describe("#1517 order ↔ invoice", () => {
+  it("names a shipped order's invoice as a fact, linked on the live page", () => {
+    const invoice = { id: "invoice-1", invoice_no: 2 };
+    expect(toOrderViewProps({ ...orderPickedRestock, invoice, backHref: "/orders" }).facts).toContainEqual({ label: "Invoice", value: "INV-0002", href: "/invoices/invoice-1" });
+    expect(toOrderViewProps({ ...orderPickedRestock, invoice }).facts).toContainEqual({ label: "Invoice", value: "INV-0002" });
+    expect(toOrderViewProps({ ...orderPickedRestock, backHref: "/orders" }).facts.map((f) => f.label)).not.toContain("Invoice");
+  });
+  it("get_order reads the shipment's invoice, and the page passes it", () => {
+    expect(readFileSync("lib/commands/orders.ts", "utf8")).toMatch(/from\("shipments"\)\.select\("\*, deliveries\(outcome\), invoices\(id, invoice_no\)"\)/);
+    expect(readFileSync(PAGE, "utf8")).toMatch(/invoice: shipment\?\.invoices\[0\] \?\? null/);
+  });
+});

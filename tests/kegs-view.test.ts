@@ -257,11 +257,24 @@ describe("Keg event history", () => {
   });
 
   it("#1030 asks to widen the filter only when a filter is set", () => {
-    expect(toKegHistoryViewProps({}).empty).toEqual({ title: "No keg events yet", description: "Record a keg event on Keg fleet to start the history." });
+    expect(toKegHistoryViewProps({}).empty).toEqual({ title: "No keg events yet", description: "Record a keg event to start the history.", action: "Record keg event" });
     const widen = { title: "No matching events", description: "Widen the filter to see more of the keg's history." };
     expect(toKegHistoryViewProps({ pool: "sixth" }).empty).toEqual(widen);
     expect(toKegHistoryViewProps({ customer: "ridgeline" }).empty).toEqual(widen);
     expect(toKegHistoryViewProps({ rows: [{ key: "e", title: "Found", detail: "" }] }).empty).toBeUndefined();
+  });
+
+  it("#1517 an empty history opens Record keg event on Keg fleet", () => {
+    expect(toKegHistoryViewProps({ backHref: "/kegs" }).empty?.href).toBe("/kegs?recordEvent=1");
+    const html = htmlOf(createElement(KegHistoryView, { model: toKegHistoryViewProps({ backHref: "/kegs" }) }));
+    expect(html).toMatch(/<a[^>]*href="\/kegs\?recordEvent=1"[^>]*>Record keg event<\/a>/);
+    // The inventory passes no backHref, so the button is drawn but goes nowhere.
+    expect(toKegHistoryViewProps({}).empty?.href).toBeUndefined();
+  });
+
+  it("#1517 ?recordEvent=1 opens the Record keg event sheet on Keg fleet", () => {
+    expect(src("app/(app)/kegs/page.tsx")).toMatch(/autoOpen=\{recordEvent === "1"\}/);
+    expect(src("app/(app)/kegs/event-form.tsx")).toMatch(/defaultOpen: autoOpen/);
   });
 
 });

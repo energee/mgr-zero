@@ -62,8 +62,9 @@ export type InvoiceViewModel = {
   customer: string;
   /** The document's state in words, from invoiceCurrentState. */
   state: { label: string; tone: "" | "w" | "ok" };
-  /** Issued and Due, each its own fact; a missing due date reads "Not set". */
-  facts: { label: string; value: string }[];
+  /** Issued and Due, each its own fact; a missing due date reads "Not set".
+   *  Then the Order it bills, through its shipment, linked on the live page. */
+  facts: { label: string; value: string; href?: string }[];
   summary: PriceSummaryModel;
   lines: InvoiceLineView[];
   questions: InvoiceQuestionView[];
@@ -100,6 +101,8 @@ export type InvoiceSnapshot = {
     qbo_cash_collected_cents?: number;
     written_off_at?: string | null;
     customers: { name: string } | null;
+    /** The shipment it bills and that shipment's order; null for a credit memo. */
+    shipments?: { orders: { id: string; order_no: number | null } | null } | null;
   };
   lines: {
     id: string;
@@ -259,6 +262,7 @@ export function toInvoiceViewProps(snapshot: InvoiceSnapshot): InvoiceViewModel 
   const credit = invoice.kind === "credit_memo";
   const localCents = lines.reduce((sum, l) => sum + l.amount_cents, 0);
   const totalCents = invoiceCurrentTotalCents(invoice, localCents);
+  const order = invoice.shipments?.orders;
   return {
     backHref,
     title: docNo(credit ? "CM" : "INV", invoice.invoice_no, credit ? "Credit memo" : "Invoice"),
@@ -267,6 +271,7 @@ export function toInvoiceViewProps(snapshot: InvoiceSnapshot): InvoiceViewModel 
     facts: [
       { label: "Issued", value: formatDate(invoice.issued_on) },
       { label: "Due", value: invoice.due_on ? formatDate(invoice.due_on) : "Not set" },
+      ...(order ? [{ label: "Order", value: docNo("ORD", order.order_no, "Order"), ...(backHref ? { href: `/orders/${order.id}` } : {}) }] : []),
     ],
     summary: invoiceSummary(snapshot, localCents, totalCents),
     lines: lines.map((l) => {
