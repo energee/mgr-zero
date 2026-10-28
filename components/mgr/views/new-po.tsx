@@ -15,6 +15,8 @@ export type NewPoControls = {
   material?: (index: number, value: string) => void; quantity?: (index: number, value: string) => void;
   cost?: (index: number, value: string) => void; lot?: (index: number, value: string) => void;
   add?: () => void; remove?: (index: number) => void;
+  /** Save and mark sent: save the draft, then mark it sent, in one tap. */
+  saveAndSend?: () => void;
 };
 
 export function NewPoView({ model, controls = {}, messages, footer, submitting = false, reason }: {
@@ -89,6 +91,10 @@ export function NewPoView({ model, controls = {}, messages, footer, submitting =
       </div>
     </fieldset>
     {messages}
-    {footer !== undefined ? footer : E.pin(E.submit("Save draft", { submitting, reason }))}
+    {/* One reason line serves both verbs: they wait on the same fields. */}
+    {footer !== undefined ? footer : E.pin(<>
+      {E.submit("Save draft", { submitting, reason, variant: "outline" })}
+      {E.submit("Save and mark sent", { type: "button", onClick: controls.saveAndSend, submitting, disabled: Boolean(reason) })}
+    </>)}
   </>;
 }

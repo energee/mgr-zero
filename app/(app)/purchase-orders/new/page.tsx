@@ -14,7 +14,7 @@ export default async function NewPurchaseOrderPage() {
   requirePagePermission(ctx, "create_purchase_order", "New PO");
   const [vendors, materials] = await Promise.all([
     runPageQuery("list_vendors", {}, ctx) as Promise<{ id: string; name: string; active: boolean }[]>,
-    runPageQuery("list_materials", {}, ctx) as Promise<{ id: string; name: string; purchase_uom: string; lot_tracked: boolean }[]>,
+    runPageQuery("list_materials", {}, ctx) as Promise<{ id: string; name: string; purchase_uom: string; lot_tracked: boolean; default_vendor_id: string | null }[]>,
   ]);
   return <NewPoForm vendors={vendors.filter(vendor => vendor.active)} materials={materials} today={breweryDate(brewery.timeZone)} />;
 }

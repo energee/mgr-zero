@@ -71,3 +71,8 @@ export function toTransferDetailViewProps({ transfer, lines, backHref }: Transfe
     })),
   };
 }
+
+/** One receive source's quantity: what was typed, else the whole picked
+ *  quantity when the line has a single source (nothing to split), else blank. */
+export const transferSourceQty = (typed: string | undefined, sourceCount: number, picked: number): string =>
+  typed ?? (sourceCount === 1 ? String(picked) : "");

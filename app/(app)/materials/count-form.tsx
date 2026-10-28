@@ -1,12 +1,16 @@
+// app/(app)/materials/count-form.tsx — Cycle count for one material: starts
+// on the bin holding the most of it (countDefaultBin), previews the count by
+// itself once the quantity is valid, then Record count sends the previewed
+// revision (#1507).
 "use client";
 
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { CycleCountView, CycleCountFooter } from "@/components/mgr/views/cycle-count";
-import { canRetireMaterialCountFailure, type MaterialCountPreview } from "@/lib/mgr/cycle-count-view";
+import { canRetireMaterialCountFailure, countDefaultBin, type MaterialCountPreview } from "@/lib/mgr/cycle-count-view";
 import { E } from "@/components/mgr/e";
 import { command, CommandResponseError } from "@/lib/commands/client";
 import { submitReason } from "@/lib/mgr/submit-reason";
@@ -24,9 +28,10 @@ export function CountForm({ materialId, materialName, uom, locations, bins, onHa
   const expectedContext = useRef(useCommandContext());
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [locationId, setLocationId] = useState(locations[0]?.id ?? "");
+  const [start] = useState(() => countDefaultBin(onHand, locations, bins));
+  const [locationId, setLocationId] = useState(start.locationId);
   const binsHere = bins.filter(bin => bin.location_id === locationId);
-  const [binId, setBinId] = useState(binsHere[0]?.id ?? "");
+  const [binId, setBinId] = useState(start.binId);
   const [qty, setQty] = useState("");
   const [plan, setPlan] = useState<MaterialCountPreview | null>(null);
   const [phase, setPhase] = useState<"idle" | "previewing" | "ready" | "submitting" | "unknown">("idle");
@@ -43,14 +48,29 @@ export function CountForm({ materialId, materialName, uom, locations, bins, onHa
   const variance = qty === "" ? null : Number(qty) - system;
 
   function clearPreview() { setPlan(null); setPhase("idle"); setError(null); }
-  async function preview() {
+  // `current` says whether the fields are still the ones previewed; a stale
+  // answer is dropped, since the quantity stays editable while it loads.
+  async function preview(current: () => boolean = () => true) {
     if (previewReason || locked) return;
     setPhase("previewing"); setError(null); setPlan(null);
     try {
-      setPlan(await command(breweryId, "get_material_count_preview", { locationId, binId, lines: [{ materialId, qty: Number(qty) }] }, undefined, expectedContext.current) as MaterialCountPreview);
-      setPhase("ready");
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not preview count"); setPhase("idle"); }
+      const next = await command(breweryId, "get_material_count_preview", { locationId, binId, lines: [{ materialId, qty: Number(qty) }] }, undefined, expectedContext.current) as MaterialCountPreview;
+      if (current()) { setPlan(next); setPhase("ready"); }
+    } catch (cause) {
+      if (current()) { setError(cause instanceof Error ? cause.message : "Could not preview count"); setPhase("idle"); }
+    }
   }
+  // Preview by itself a moment after the last change to a valid count. Every
+  // field change also clears the previous preview (clearPreview).
+  const previewable = open && !previewReason;
+  useEffect(() => {
+    if (!previewable) return;
+    let live = true;
+    const timer = setTimeout(() => { void preview(() => live); }, 400);
+    return () => { live = false; clearTimeout(timer); };
+    // preview reads these same fields; re-run only when they change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewable, locationId, binId, qty]);
   async function submit(event: FormEvent) {
     event.preventDefault(); event.stopPropagation();
     if (phase !== "ready" && phase !== "unknown") return;
