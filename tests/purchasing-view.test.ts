@@ -25,9 +25,10 @@ import {
 } from "../lib/mgr/fixtures/purchasing";
 import { toContractsViewProps } from "../lib/mgr/contracts-view";
 import { toMaterialsOnHandViewProps } from "../lib/mgr/materials-on-hand-view";
-import { purchaseOrderNext, toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
+import { poDetailStatus, poListStatus, purchaseOrderNext, toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
+import { poLineDetail, poLineQty } from "../lib/mgr/receive-po-view";
 import { receiptBillPresentation, receiptBillRequest, toPostedReceiptViewProps, type ReceiptSnapshot } from "../lib/mgr/receipt-view";
-import { toVendorsViewProps } from "../lib/mgr/vendors-view";
+import { toVendorsViewProps, vendorLeadLine } from "../lib/mgr/vendors-view";
 import { contractSubmitReason } from "../lib/mgr/contract-view";
 import { newPoReason } from "../lib/mgr/new-po-view";
 import { CLOSURE_FORM_ID } from "../lib/mgr/receive-po-view";
@@ -63,11 +64,40 @@ describe("Purchase orders", () => {
   });
 
   it("each order status names its next action; received and cancelled have none (#996)", () => {
-    expect(purchaseOrderNext("draft")).toEqual({ verb: "Send", tone: "info" });
+    expect(purchaseOrderNext("draft")).toEqual({ verb: "Mark sent", tone: "info" });
     expect(purchaseOrderNext("sent")).toEqual({ verb: "Receive", tone: "info" });
     expect(purchaseOrderNext("partially_received")).toEqual({ verb: "Receive", tone: "attention" });
     expect(purchaseOrderNext("received")).toBeUndefined();
     expect(purchaseOrderNext("cancelled")).toBeUndefined();
+  });
+
+  it("list and detail read status in sentence case and name a short closure (#1501)", () => {
+    const po = { status: "received", closed_at: null, close_reason: null, ordered_on: "2026-09-07", expected_on: "2026-09-10", sent_via: "mailto", lines_open: 0 };
+    expect(poListStatus({ ...po, status: "draft", ordered_on: null })).toBe("Draft");
+    expect(poListStatus(po)).toBe("Received");
+    expect(poListStatus({ ...po, status: "sent" })).toBe("Sent Sep 7, 2026 · expected Sep 10, 2026");
+    expect(poListStatus({ ...po, status: "partially_received", lines_open: 1 })).toBe("Partially received · 1 line still due");
+    expect(poListStatus({ ...po, closed_at: "2026-09-12T00:00:00Z" })).toBe("Closed short");
+    expect(poListStatus({ ...po, status: "cancelled", closed_at: "2026-09-12T00:00:00Z" })).toBe("Cancelled");
+    expect(poDetailStatus({ ...po, closed_at: "2026-09-12T00:00:00Z", close_reason: "QA test close" })).toBe("Closed short · QA test close");
+    expect(poDetailStatus({ ...po, status: "draft", ordered_on: null, sent_via: null })).toBe("Draft · not yet sent");
+    expect(poDetailStatus(po)).toBe("Marked sent Sep 7, 2026 · from a mail client · expected Sep 10, 2026 · received");
+  });
+
+  it("a PO line puts its purchase unit on every quantity (#1501)", () => {
+    const line = { qty_ordered: 10, qty_received: 8, qty_open: 0, expected_lot_code: null, material: { purchase_uom: "lb" } };
+    expect(poLineDetail(line)).toBe("ordered 10 lb · received 8 lb · still due 0 lb");
+    expect(poLineDetail({ ...line, expected_lot_code: "L-1" })).toBe("ordered 10 lb · received 8 lb · still due 0 lb · PO lot L-1");
+    expect(poLineQty(10, line.material)).toBe("10 lb");
+    expect(poLineQty(10, null)).toBe("10");
+  });
+
+  it("a vendor's observed lead time reads as orders and how they were sent (#1501)", () => {
+    const vendor = { lead_time_days: null, contracts: [], observed: [
+      { sent_via: "mailto", n: 2, avg_lead_days: 0 },
+      { sent_via: "external", n: 1, avg_lead_days: 3.5 },
+    ] };
+    expect(vendorLeadLine(vendor)).toBe("no lead time typed · observed 0 days over 2 orders sent from a mail client · observed 3.5 days over 1 order sent outside MGR · 0 contracts");
   });
 
   it("the Purchase orders inventory record is PurchaseOrdersView", () => {
@@ -183,6 +213,7 @@ it("posted receipt uses counted quantities, captured lot references and current 
   expect(model.tape[0][1]).toContain("short 1 box");
   expect(model.tape[0][1]).toContain("actual-lot-id");
   expect(model.backHref).toBeUndefined();
+  expect(model.backTo).toBe("PO-0042");
   expect(toPostedReceiptViewProps(snapshot, "wrong-receipt")).toBeUndefined();
   expect(toPostedReceiptViewProps({ ...snapshot, lines: [{ ...snapshot.lines[0], qty_open: 0 }] }, "receipt-id")!.stillOwed).toBe("Nothing owed");
 });

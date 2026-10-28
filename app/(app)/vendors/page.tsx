@@ -12,7 +12,7 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toContractsViewProps } from "@/lib/mgr/contracts-view";
-import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
+import { fmtVendorQty as fmt, toVendorsViewProps, vendorLeadLine } from "@/lib/mgr/vendors-view";
 import "@/lib/commands/all";
 import { VendorForm, type Vendor } from "./vendor-form";
 import { ContractForm, type Contract } from "./contract-form";
@@ -28,14 +28,6 @@ type VendorRow = Vendor & {
   contracts: (Contract & { material_name: string | null; qty_received: number; qty_on_order: number; qty_available: number })[];
 };
 type Material = { id: string; name: string; purchase_uom: string };
-
-const fmt = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 });
-
-function leadLine(v: VendorRow) {
-  const typed = v.lead_time_days === null ? "no lead time typed" : `${v.lead_time_days} day lead`;
-  const obs = v.observed.map((o) => `observed ${fmt(o.avg_lead_days)} days (n=${o.n}, ${o.sent_via})`);
-  return [typed, ...obs, `${v.contracts.length} ${v.contracts.length === 1 ? "contract" : "contracts"}`].join(" · ");
-}
 
 const vendorsParams = z.object({ q: searchQuery });
 
@@ -63,7 +55,7 @@ export default async function VendorsPage({ searchParams }: { searchParams?: Pro
         rows: vendors.map((v) => ({
           key: v.id,
           title: v.name,
-          detail: leadLine(v),
+          detail: vendorLeadLine(v),
           verb: "Edit",
           disabled: !v.active,
         })),

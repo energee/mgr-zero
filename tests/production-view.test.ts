@@ -451,9 +451,11 @@ describe("Recipes view", () => {
     expect(html).not.toContain(">Open<");
   });
 
-  it("links Water profiles, where a version's source and target come from (#1140)", () => {
+  it("links Water profiles, the catalog a version picks its water from (#1140, #1205)", () => {
     const live = htmlOf(createElement(RecipesView, { model: toRecipesViewProps({ recipes: [], waterProfilesHref: "/catalog/water-profiles" }) }));
     expect(live).toMatch(/<a[^>]*href="\/catalog\/water-profiles"[^>]*>[^]*?Water profiles/);
+    expect(live).toContain("Manage water profiles");
+    expect(live).not.toMatch(/source and target/i);
     // The inventory frame leaves the row for the explorer, which walks it to the Water profiles record.
     expect(htmlOf(screen("Recipes").body)).toContain("Water profiles");
     expect(resolveTap(screen("Recipes"), "Water profiles")).toBe("Water profiles");
