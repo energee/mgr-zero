@@ -16,6 +16,9 @@ export type FinishedGoodsRowView = {
   href: string;
   /** Replenishment for this SKU; the view links it only when `short`. */
   shortfallHref: string;
+  /** Record movement opened on this SKU (the deep link SKU detail's header
+   *  button uses); null for a retired SKU, which SKU detail withholds too. */
+  movementHref: string | null;
 };
 
 export type FinishedGoodsViewModel = {
@@ -29,6 +32,8 @@ export type FinishedGoodsSku = {
   id: string;
   name: string;
   brands?: { name: string } | null;
+  /** list_skus' flag; false withholds the row's Record movement. */
+  active?: boolean;
   on_hand: number;
   atp: number;
 };
@@ -87,6 +92,7 @@ export function toFinishedGoodsViewProps({ skus, backHref, value }: FinishedGood
         short,
         href: `/inventory/${s.id}`,
         shortfallHref: `/replenishment?sku=${s.id}#shortfalls`,
+        movementHref: s.active === false ? null : `/inventory?recordMovement=1&skuId=${s.id}`,
       };
     }),
   };
