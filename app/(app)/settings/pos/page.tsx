@@ -49,5 +49,5 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
   }} syncAction={health.connected ? <SquareSyncControls /> : undefined}
     connection={<SquareConnectControl configured={isSquareConfigured()} reconnect={Boolean(health.connectionId)} />}
     disconnect={disconnect}
-    paths={{ back: "/settings", locations: "/settings/pos/locations", menu: "/menu", connector: "/settings/pos/connector" }} />;
+    paths={{ back: "/settings", locations: "/settings/pos/locations", menu: "/menu", accounting: "/settings/accounting" }} />;
 }

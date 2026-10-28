@@ -64,7 +64,7 @@ const isPage = (i: number) => SCREENS[i].surface === undefined;
 
 // Sheets whose area's first page is not the one they open from.
 const OVER: Record<string, string> = {
-  "Square locations": "Point of sale", "Taproom sales in QuickBooks": "Point of sale", "Disconnect Square": "Point of sale",
+  "Square locations": "Point of sale", "Disconnect Square": "Point of sale",
   "POS item": "Menu", "Disconnect Slack": "Chat settings", "Question invoice": "Pay invoice", "Review order": "Shop", "Portal Me": "Shop",
 };
 

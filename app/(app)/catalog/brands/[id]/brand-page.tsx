@@ -107,7 +107,8 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
         nameError={fieldErrors.name}
         categoryAction={<CatalogCategoriesControl categories={categories} busy={categoryAction.busy} error={categoryAction.error}
           onSave={(name, previousName) => categoryAction.run("save_catalog_category", { name, previousName }, () => {
-            if (!previousName || f.category === previousName) set("category")(name);
+            // Only a rename follows into the form; Add never changes the brand's selection (#1495).
+            if (previousName && f.category === previousName) set("category")(name);
           }, { target: previousName })}
           onDelete={name => categoryAction.run("delete_catalog_category", { name }, () => {
             if (f.category === name) set("category")("");

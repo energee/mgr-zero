@@ -19,7 +19,7 @@ const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", nu
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("Transfers list", () => {
-  it("maps list_stock_transfers onto Pick / Receive and Work chips", () => {
+  it("maps list_stock_transfers onto Receive and Work chips: a submitted transfer skips the pick step (#1507)", () => {
     const model = toTransfersViewProps(transfersList);
     // Each Work kind page is titled by its kind, in the inventory as live (#1037).
     expect(model.title).toBe("Transfers");
@@ -27,7 +27,7 @@ describe("Transfers list", () => {
     expect(model.workChips).toBe(WORK_CHIPS);
     expect(model.workTabs).toBe(WORK_TABS);
     expect(model.rows.map((r) => [r.title, r.detail, r.verb])).toEqual([
-      ["TRF-0007", `${LOC_WAREHOUSE.name} to ${LOC_TAPROOM.name} · 2 lines · Submitted`, "Pick"],
+      ["TRF-0007", `${LOC_WAREHOUSE.name} to ${LOC_TAPROOM.name} · 2 lines · Submitted`, "Receive"],
       ["TRF-0006", `${LOC_WAREHOUSE.name} to Storage · 1 line · Picked`, "Receive"],
     ]);
   });
@@ -51,11 +51,10 @@ describe("Transfers list", () => {
     expect(model.empty?.title).toBe("No transfers yet");
   });
 
-  it("the inventory drawing still offers New transfer, Pick, and Work tabs", () => {
+  it("the inventory drawing still offers New transfer, Receive, and Work tabs", () => {
     const html = htmlOf(createElement(TransfersView, { model: toTransfersViewProps(transfersList) }));
     expect(html).toMatch(/>New transfer</);
-    expect(html).toMatch(/>Pick</);
-    expect(html).toMatch(/>Receive</);
+    expect(html.match(/>Receive</g)).toHaveLength(2);
     expect(html).toMatch(/TRF-0007/);
     expect(html).toMatch(/between locations/);
     expect(html).not.toMatch(/href="\/transfers\//);
@@ -143,13 +142,13 @@ describe("New transfer view", () => {
 });
 
 describe("Transfer detail view", () => {
-  it("maps TRF-0007 submitted onto Record pick", () => {
+  it("maps TRF-0007 submitted onto Receive, which records the pick at the ordered quantities first (#1507)", () => {
     const model = toTransferDetailViewProps(transferDetailSubmitted);
     expect(model.title).toBe("TRF-0007");
     expect(model.from).toBe(LOC_WAREHOUSE.name);
     expect(model.to).toBe(LOC_TAPROOM.name);
     expect(model.status).toBe("Submitted");
-    expect(model.nextVerb).toBe("Record pick");
+    expect(model.nextVerb).toBe("Receive");
     expect(model.received).toBe(false);
     expect(model.lines.map((l) => [l.title, l.detail, l.qty])).toEqual([
       [SKU_HAZY.name, "Walk-in to Cold", "2 units"],
@@ -183,13 +182,19 @@ describe("Transfer detail view", () => {
     expect(src).toMatch(/run\("cancel_stock_transfer", \{ transferId, reason \}/);
   });
 
-  it("a footer slot replaces Record pick", () => {
+  it("the live footer offers no Record pick: Receive on a submitted transfer records the ordered pick, then receives (#1507)", () => {
+    const src = readFileSync("app/(app)/transfers/[id]/transfer-actions.tsx", "utf8");
+    expect(src).not.toMatch(/>Record pick</);
+    expect(src).toMatch(/run\("record_stock_transfer_pick", \{ transferId, picks: lines\.map\(\(l\) => \(\{ lineId: l\.id, qty: l\.qty \}\)\) \}\)/);
+  });
+
+  it("a footer slot replaces the drawn verb", () => {
     const html = htmlOf(createElement(TransferDetailView, {
       model: toTransferDetailViewProps(transferDetailSubmitted),
       footer: "ACTIONS",
     }));
     expect(html).toMatch(/ACTIONS/);
-    expect(html).not.toMatch(/>Record pick</);
+    expect(html).not.toMatch(/>Receive</);
   });
 
   it("the Transfer detail inventory record is TransferDetailView", () => {

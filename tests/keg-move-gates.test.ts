@@ -22,12 +22,11 @@ describe("unavailable reasons", () => {
   });
 
   it("names what a bin move is missing; an empty location is an empty state instead (#1154)", () => {
-    const location = { id: "l", name: "Taproom" };
     const bins = [{ id: "a", name: "Cold" }, { id: "b", name: "Dry" }];
-    expect(toLocationBinsViewProps({ location, bins: bins.slice(0, 1), stock: [{ bin_id: "a" }] }).moveUnavailable).toMatch(/two bins/);
-    expect(toLocationBinsViewProps({ location, bins, stock: [] }).moveUnavailable).toBeNull();
-    expect(toLocationBinsViewProps({ location, bins, stock: [] }).empty?.title).toBe("Nothing is stored in these bins yet");
-    expect(toLocationBinsViewProps({ location, bins, stock: [{ bin_id: "a" }] }).moveUnavailable).toBeNull();
+    expect(toLocationBinsViewProps({ bins: bins.slice(0, 1), stock: [{ bin_id: "a" }] }).moveUnavailable).toMatch(/two bins/);
+    expect(toLocationBinsViewProps({ bins, stock: [] }).moveUnavailable).toBeNull();
+    expect(toLocationBinsViewProps({ bins, stock: [] }).empty?.title).toBe("Nothing is stored in these bins yet");
+    expect(toLocationBinsViewProps({ bins, stock: [{ bin_id: "a" }] }).moveUnavailable).toBeNull();
   });
 
   it("requires a customer only for shipped and returned", () => {
@@ -52,7 +51,7 @@ describe("Keg fleet shared fields", () => {
   });
 
   it("Location bins shows why Move stock is unavailable instead of the form", () => {
-    const out = html(createElement(LocationBinsView, { model: { title: "Bins at Taproom", backLabel: "Taproom", rows: [], moveUnavailable: "Moving stock needs at least two bins at this location. Add a bin first." }, footer: createElement("button", null, "live form") }));
+    const out = html(createElement(LocationBinsView, { model: { rows: [], moveUnavailable: "Moving stock needs at least two bins at this location. Add a bin first." }, footer: createElement("button", null, "live form") }));
     expect(out).toContain("Move stock");
     expect(out).toContain("Add a bin first.");
     expect(out).not.toContain("live form");
