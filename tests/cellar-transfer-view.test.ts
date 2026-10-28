@@ -42,4 +42,11 @@ describe("cellar transfer preview", () => {
     expect(transferReason({ ...cellarTransferPils, loss: "-1" })).toContain("loss of zero or more");
     expect(transferReason({ ...cellarTransferPils, occupancies: [] })).toContain("source tank");
   });
+  it("#1479 holds the volume to the room left in the destination", () => {
+    // BT1 holds 7 of 10 bbl; BT2 is empty at 10 bbl.
+    expect(transferReason({ ...cellarTransferPils, volume: "3.5" })).toBe("Still needed: at most 3 bbl into BT1.");
+    expect(transferReason({ ...cellarTransferPils, volume: "3" })).toBeNull();
+    expect(transferReason({ ...cellarTransferPils, toId: "bt2", volume: "10.5" })).toBe("Still needed: at most 10 bbl into BT2.");
+    expect(transferReason({ ...cellarTransferPils, toId: "bt2", volume: "10" })).toBeNull();
+  });
 });

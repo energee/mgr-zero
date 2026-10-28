@@ -22,6 +22,11 @@ describe("additionPreview", () => {
   it("more than the lot holds is refused up front", () => {
     expect(additionPreview({ ...base, lotId: "l1", qty: "41" })).toMatchObject({ valid: false, reason: "Only 40 lb of L-0790 on hand" });
   });
+  it("#1479 refuses a quantity past the material column's ceiling", () => {
+    const gypsum = { ...base, materialId: "m2", stage: "other" as const };
+    expect(additionPreview({ ...gypsum, qty: "99999999999" })).toMatchObject({ valid: false, error: true, reason: "Enter a quantity no greater than 9,999,999,999.9999 g" });
+    expect(additionPreview({ ...gypsum, qty: "9999999999.9999" }).valid).toBe(true);
+  });
   it("refuses exponent notation before readiness or payload construction", () => {
     expect(additionPreview({ ...base, lotId: "l1", qty: "1e1" }).valid).toBe(false);
     expect(additionPreview({ ...base, lotId: "l1", qty: "1E1" }).valid).toBe(false);

@@ -18,11 +18,13 @@ export type ScheduleBatchViewModel = {
   brandsHref?: string | null;
 };
 
-/** Mirrors schedule_batch's positive numeric(10,3) barrel bounds. */
+/** Mirrors schedule_batch's positive numeric(10,3) barrel bounds: a value that rounds to 0 at three decimals
+ *  (below 0.0005) would fail `planned_bbl > 0`. */
 export function plannedBarrelsError(value: string): string | undefined {
   if (/[eE]/.test(value)) return "Enter a decimal number without exponent notation.";
   const barrels = Number(value);
   if (!Number.isFinite(barrels) || barrels <= 0) return "Enter planned barrels above zero.";
+  if (Math.round(barrels * 1000) === 0) return "Enter at least 0.001 barrels; planned barrels are stored to three decimal places.";
   if (barrels > 9_999_999.999) return "Enter at most 9,999,999.999 barrels.";
 }
 

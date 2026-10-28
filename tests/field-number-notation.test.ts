@@ -18,6 +18,12 @@ it.each(["1e1", "1E1", "1e+1", "1e-1"])("rejects exponent entry %s at each field
   expect(waterPhError(value)).toBeTruthy();
 });
 
+it("#1479 refuses planned barrels that store as zero at three decimals", () => {
+  expect(plannedBarrelsError("0.0004")).toBe("Enter at least 0.001 barrels; planned barrels are stored to three decimal places.");
+  expect(plannedBarrelsError("0.0005")).toBeUndefined();
+  expect(plannedBarrelsError("0.001")).toBeUndefined();
+});
+
 it("retains ordinary decimal and whole-number entries", () => {
   for (const value of ["0.5", ".5", "2.555", "10"]) {
     expect(plannedBarrelsError(value)).toBeUndefined();
