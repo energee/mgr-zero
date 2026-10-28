@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ComposerConversationView } from "@/components/mgr/views/composer-conversation";
 import { APICallError, createUIMessageStreamResponse, DefaultChatTransport, readUIMessageStream, RetryError, toUIMessageStream, type TextStreamPart, type ToolSet } from "ai";
-import { CHAT_FAILURES, encodeChatFailure, readChatFailure, type ChatFailureCode } from "@/lib/chat/failure";
+import { blockedChatKey, CHAT_FAILURES, encodeChatFailure, readBlockedChat, readChatFailure, rememberBlockedChat, type ChatFailureCode } from "@/lib/chat/failure";
 import { providerFailureCode } from "@/lib/chat/provider-failure";
 import { Chat } from "@ai-sdk/react";
 import { BreweryProvider } from "@/lib/brewery-provider";
@@ -81,6 +81,20 @@ describe("Ask MGR failure recovery (#1294)", () => {
     }));
     expect(html).toContain("No completed MGR response was saved");
     expect(html).toContain("Chat messages are not queued");
+  });
+
+  it("remembers a blocked chat per conversation so a reload stays blocked (#1520)", () => {
+    const store = new Map<string, string>();
+    const storage = { getItem: (key: string) => store.get(key) ?? null, setItem: (key: string, value: string) => void store.set(key, value) };
+    const key = blockedChatKey("staff", "brewery", "conversation");
+    expect(readBlockedChat(storage, key)).toBeUndefined();
+    rememberBlockedChat(storage, key, readChatFailure(new Error(encodeChatFailure("rate_limited"))));
+    expect(readBlockedChat(storage, key)).toBeUndefined();
+    rememberBlockedChat(storage, key, readChatFailure(new Error(encodeChatFailure("provider_access"))));
+    expect(readBlockedChat(storage, key)).toMatchObject({ code: "provider_access", message: CHAT_FAILURES.provider_access.message });
+    expect(readBlockedChat(storage, blockedChatKey("staff", "brewery", "new-conversation"))).toBeUndefined();
+    store.set(key, "something-else");
+    expect(readBlockedChat(storage, key)).toBeUndefined();
   });
 
   it("disables the actual live adapter before accepting prompts when AI is not configured", () => {
