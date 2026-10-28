@@ -244,7 +244,7 @@ describe("Slack: channels load with the page and save on pick (#1509 item 4)", (
 
   it("saves a picked operations channel at once", () => {
     action.run.mockClear();
-    const view = capture(() => ChatSettingsControls({ installation, readingDueHours: 24, timezone: "UTC", configured: true, channels, channel: "COPS" }) as ReactElement<{ onChannel: (value: string) => void }>);
+    const view = capture(() => ChatSettingsControls({ installation, timezone: "UTC", configured: true, channels, channel: "COPS" }) as ReactElement<{ onChannel: (value: string) => void }>);
     view.props.onChannel("COPS");
     expect(action.run).not.toHaveBeenCalled();
     view.props.onChannel("CTWO");

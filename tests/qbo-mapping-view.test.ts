@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { QboMappingView, QboMappingsView } from "../components/mgr/views/qbo-mapping";
 import { qboMappingScopeOptions } from "../lib/mgr/accounting-view";
 
@@ -62,4 +62,34 @@ it("scopes the page to unmapped rows through the URL, with the count (#1515)", (
   const html = renderToStaticMarkup(createElement(QboMappingsView, { title: "QuickBooks mappings", backLabel: "Accounting", sections: [], scope: { value: "unmapped", options: qboMappingScopeOptions(4, false) } }));
   expect(html).toContain("Show");
   expect(html).toContain("Unmapped (4)");
+});
+
+// #1515 owner decision: customers and items are picked from a live QuickBooks
+// list read when the dialog opens. No row is preselected, so a person chooses.
+describe("QuickBooks picker (#1515)", () => {
+  const options = [{ id: "4", name: "Ale House" }, { id: "9", name: "Oak and Barrel" }];
+
+  it("offers the company's records with nothing chosen and no typed ID field", () => {
+    const html = renderToStaticMarkup(createElement(QboMappingView, { kind: "customer", value: "", picker: { options, loading: false, error: null } }));
+    expect(html).toContain("QuickBooks customer");
+    expect(html).toContain("Choose a QuickBooks customer");
+    expect(html).not.toContain("QuickBooks customer ID");
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Save mapping/);
+  });
+
+  it("names the saved record when changing an existing mapping", () => {
+    const html = renderToStaticMarkup(createElement(QboMappingView, { kind: "item", value: "9", picker: { options, loading: false, error: null } }));
+    expect(html).toContain("Oak and Barrel · ID 9");
+  });
+
+  it("waits while the list loads", () => {
+    const html = renderToStaticMarkup(createElement(QboMappingView, { kind: "item", value: "", picker: { options: [], loading: true, error: null } }));
+    expect(html).toContain("Loading QuickBooks items…");
+  });
+
+  it("keeps the typed ID when the list cannot load, and says why", () => {
+    const html = renderToStaticMarkup(createElement(QboMappingView, { kind: "customer", value: "", picker: { options: [], loading: false, error: "QuickBooks is unavailable" } }));
+    expect(html).toContain("QuickBooks is unavailable");
+    expect(html).toContain("QuickBooks customer ID");
+  });
 });

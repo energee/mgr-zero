@@ -36,7 +36,7 @@ export default async function ChatSettingsPage({ searchParams }: { searchParams:
     oauthError={Boolean(params.error)} installed={Boolean(params.installed)} previewFixtures={CHAT_PREVIEW_FIXTURES}
     backHref="/settings" healthHref="/settings/chat/health" disconnectHref="/settings/chat/disconnect" preferencesHref="/settings/chat/preferences"
     connection={<ChatConnectionAction key="connection" configured={configured} installationId={connected ? installation.id : undefined} />}
-    fields={connected ? <ChatSettingsControls key={installation.id + ":" + installation.state} installation={installation} configured={configured} timezone={defaults.timezone} readingDueHours={defaults.fermentation_reading_due_hours} channels={channels ?? null} channel={health.destinations[0]?.channelId ?? ""} /> : null}
+    fields={connected ? <ChatSettingsControls key={installation.id + ":" + installation.state} installation={installation} configured={configured} timezone={defaults.timezone} channels={channels ?? null} channel={health.destinations[0]?.channelId ?? ""} /> : null}
     people={people && <ChatLinkedPeople key="people" people={people} timeZone={brewery.timeZone} />}
     delivery={installation && ["active", "needs_reauthorization"].includes(installation.state) ? <ChatDelivery key="delivery" installationId={installation.id} enabled={installation.state === "active"} /> : undefined}
   />;

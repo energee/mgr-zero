@@ -425,12 +425,15 @@ describe("SCREENS", () => {
 
   it("gives Save screens an editable input, select or toggle choice", () => {
     // A Save button that writes a value must sit next to a real editable
-    // control, including the multi-select toggle group used for staff roles.
+    // control, including the multi-select toggle group used for staff roles
+    // and a searchable pick (E.searchPick): a labelled trigger, so it has an id,
+    // that opens its list in a dialog (the QuickBooks mapping picker, #1515).
     for (const screen of SCREENS) {
       const html = renderToStaticMarkup(createElement("div", null, screen.body));
       if (!/<button[^>]*>Save/.test(html)) continue;
       expect.soft(
-        /<input\b/.test(html) || html.includes('role="combobox"') || /<button\b[^>]*aria-pressed=/.test(html),
+        /<input\b/.test(html) || html.includes('role="combobox"') || /<button\b[^>]*aria-pressed=/.test(html)
+          || /<button\b(?=[^>]*data-slot="dialog-trigger")(?=[^>]*\bid=")[^>]*>/.test(html),
         `${screen.name}: Save without an editable control`,
       ).toBe(true);
     }

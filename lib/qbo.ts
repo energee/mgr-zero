@@ -17,6 +17,7 @@ import {
   leaseQboTokenRefresh,
   markQboAuthorizationFailed,
   readPortalInvoicePayment,
+  getQboHealth,
   readVersionedIntegrationTokens,
   releaseQboTokenRefresh,
   type QboInvoiceObservation,
@@ -52,7 +53,9 @@ export type QboCustomerWriteResult =
       intuitRequestId: string | null; requestId: string;
       /** authorization: 401/403. stale_token: code 5010. validation: 400/422 only, the one definite "not written" answer. retryable: every other status (408, 409, 429, 5xx...), outcome unknown. */
       kind: "authorization" | "stale_token" | "retryable" | "validation" };
-const CUSTOMER_PAGE_SIZE = 1000; // documented MAXRESULTS ceiling for a query
+/** A QuickBooks customer or item offered by the mapping picker: its exact id and the name a person reads. */
+export type QboRecord = { id: string; name: string };
+const QUERY_PAGE_SIZE = 1000; // documented MAXRESULTS ceiling for a query
 const QBO_TIMESTAMP = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-](\d{2}):?(\d{2}))$/;
 export type QboTaxInput = {
   transactionDate: string;
@@ -286,6 +289,38 @@ export async function resolvePortalInvoicePayment(
     return { kind: "unavailable", reason: "context_changed" };
   }
   return { kind: "redirect", url: url.href };
+}
+
+/**
+ * The connected company's active customers or items, read live when the
+ * mapping dialog opens, sorted by name (#1515). A person picks one; MGR never
+ * matches or preselects by name. One 401 refreshes the token and reads again;
+ * any other failure says only that QuickBooks is unavailable.
+ */
+export async function listQboRecords(ctx: Ctx, kind: "customer" | "item", client: QboOAuthClient): Promise<QboRecord[]> {
+  const health = await getQboHealth(ctx);
+  // A connected row always carries its realm; reading it this way only narrows the type.
+  const realmId = health.connected ? health.realmId : undefined;
+  if (!realmId) throw new CommandError("Connect QuickBooks before mapping records", 409, "conflict");
+  const read = async (accessToken: string): Promise<QboRecord[]> => kind === "item"
+    ? client.queryItems(realmId, accessToken)
+    : (await client.queryCustomers(realmId, accessToken)).filter(row => row.active).map(row => ({ id: row.id, name: row.displayName }));
+  let tokens = await readVersionedIntegrationTokens(ctx, "qbo");
+  if (tokens.connectionId !== health.connectionId) throw new CommandError("QuickBooks connection changed", 409, "conflict");
+  let refreshed = false;
+  if (isPast(tokens.accessExpiresAt)) {
+    tokens = await refreshQboCredentials(ctx, client, tokens);
+    refreshed = true;
+  }
+  let records: QboRecord[];
+  try {
+    records = await read(tokens.accessToken);
+  } catch (error) {
+    if (refreshed || !(error instanceof QboHttpError && error.status === 401)) throw new Error(sanitizeQboError(error));
+    tokens = await refreshQboCredentials(ctx, client, tokens);
+    records = await read(tokens.accessToken).catch((retryError: unknown) => { throw new Error(sanitizeQboError(retryError)); });
+  }
+  return records.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function beginQboOAuth(ctx: Ctx, client: QboOAuthClient, providerIntent: "connect" | "reconnect", requestId: string = randomUUID()) {
@@ -673,25 +708,49 @@ export class QboOAuthClient {
       throw new Error("QuickBooks customer query changedSince must be an ISO-8601 timestamp with a time zone");
     }
     const where = `Active IN (true, false)${changedSince === undefined ? "" : ` AND Metadata.LastUpdatedTime >= '${changedSince}'`}`;
-    const customers: QboCustomer[] = [];
+    return this.queryAll(realmId, accessToken, "Customer", where, parseCustomer);
+  }
+
+  /**
+   * Reads every active Item for the mapping picker (#1515), named by its full
+   * name ("Beer:Pils" for a sub-item). Category items are left out because an
+   * invoice line cannot use one. All-or-error, paged like queryCustomers.
+   */
+  async queryItems(realmId: string, accessToken: string): Promise<QboRecord[]> {
+    return this.queryAll(realmId, accessToken, "Item", "Active = true", parseItem);
+  }
+
+  /**
+   * Pages `SELECT * FROM <entity> WHERE <where>` until a short page, parsing
+   * each row with `parse`, which returns null for a row to leave out. Any HTTP,
+   * shape or repeated-id failure rejects the whole read, never a partial list.
+   */
+  private async queryAll<T extends { id: string }>(realmId: string, accessToken: string, entity: "Customer" | "Item", where: string, parse: (raw: unknown) => T | null): Promise<T[]> {
+    const invalid = () => new Error(`QuickBooks ${entity.toLowerCase()} response was invalid`);
+    const rows: T[] = [];
     const seen = new Set<string>();
-    for (let start = 1; ; start += CUSTOMER_PAGE_SIZE) {
+    for (let start = 1; ; start += QUERY_PAGE_SIZE) {
       const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/query`, this.config.apiBaseUrl);
-      url.searchParams.set("query", `SELECT * FROM Customer WHERE ${where} STARTPOSITION ${start} MAXRESULTS ${CUSTOMER_PAGE_SIZE}`);
+      url.searchParams.set("query", `SELECT * FROM ${entity} WHERE ${where} STARTPOSITION ${start} MAXRESULTS ${QUERY_PAGE_SIZE}`);
       url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
       const response = await this.transport(url, {
         method: "GET",
         headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
         redirect: "error",
       });
-      if (!response.ok) throw new QboHttpError(`QuickBooks customer query failed (${response.status})`, response.status);
-      const rows = parseCustomerPage(await response.json().catch(() => null));
-      for (const customer of rows) {
-        if (seen.has(customer.id)) throw new Error("QuickBooks customer response was invalid");
-        seen.add(customer.id);
-        customers.push(customer);
+      if (!response.ok) throw new QboHttpError(`QuickBooks ${entity.toLowerCase()} query failed (${response.status})`, response.status);
+      const payload = asObject(await response.json().catch(() => null));
+      const result = asObject(payload?.QueryResponse);
+      if (!result || result.Fault !== undefined || payload?.Fault !== undefined) throw invalid();
+      const raw = result[entity] ?? [];
+      if (!Array.isArray(raw) || raw.length > QUERY_PAGE_SIZE) throw invalid();
+      for (const row of raw.map(parse)) {
+        if (!row) continue;
+        if (seen.has(row.id)) throw invalid();
+        seen.add(row.id);
+        rows.push(row);
       }
-      if (rows.length < CUSTOMER_PAGE_SIZE) return customers;
+      if (raw.length < QUERY_PAGE_SIZE) return rows;
     }
   }
 
@@ -1094,12 +1153,14 @@ function parseCustomer(raw: unknown): QboCustomer {
   };
 }
 
-function parseCustomerPage(payload: unknown): QboCustomer[] {
-  const response = asObject(asObject(payload)?.QueryResponse);
-  if (!response || response.Fault !== undefined || asObject(payload)?.Fault !== undefined) throw invalidCustomer();
-  if (response.Customer === undefined) return [];
-  if (!Array.isArray(response.Customer) || response.Customer.length > CUSTOMER_PAGE_SIZE) throw invalidCustomer();
-  return response.Customer.map(parseCustomer);
+/** An active Item as a picker record, or null for a Category (no invoice line can use one). */
+function parseItem(raw: unknown): QboRecord | null {
+  const row = asObject(raw);
+  const name = row?.FullyQualifiedName ?? row?.Name;
+  if (!row || typeof row.Id !== "string" || !row.Id.trim() || typeof name !== "string" || !name.trim() || typeof row.Type !== "string") {
+    throw new Error("QuickBooks item response was invalid");
+  }
+  return row.Type === "Category" ? null : { id: row.Id, name };
 }
 
 /** Fault fields safe to keep: code and Message only (Detail can echo customer data), length-capped; never headers or credentials. */

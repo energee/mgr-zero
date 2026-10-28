@@ -1,6 +1,8 @@
-// components/mgr/views/settings.tsx — Settings. Brewery details, Ask MGR and
-// Wholesale fulfillment are three independently saved forms, unboxed and split
-// by rules; the brewery's gravity unit saves on tap under Brewery details.
+// components/mgr/views/settings.tsx — Settings. Connections (Accounting, Point
+// of sale, Chat) lead the page, so a phone reaches them without scrolling past
+// the forms (#1509). Brewery details, Ask MGR and Wholesale fulfillment are
+// three independently saved forms, unboxed and split by rules; the brewery's
+// gravity unit saves on tap under Brewery details.
 // Live slots SettingsForm / GravityUnitForm / AiModelSettingsForm /
 // PortalFulfillmentForm; inventory paints the same form views with fixture values.
 import type { ReactNode } from "react";
@@ -40,6 +42,12 @@ export function SettingsView({
   return (
     <div className="@container flex flex-col gap-3">
       {E.back("More", "Settings", undefined, model.backHref)}
+      <section aria-labelledby="settings-connections" className="flex min-w-0 flex-col gap-2 border-b pb-6">
+        <h2 id="settings-connections" className="mb-2 font-heading text-xl font-semibold">Connections</h2>
+        {E.nav("Accounting", "QuickBooks connection, mappings and payment defaults", "", QuickBooksMark, hrefs.accounting)}
+        {E.nav("Point of sale", "Square connection, location mappings, sync and menu", "", SquareMark, hrefs.pos)}
+        {E.nav("Chat", navAbout("Chat"), "", SlackMark, hrefs.chat)}
+      </section>
       <div className="grid gap-6 @min-[48rem]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] @min-[48rem]:items-start @min-[48rem]:gap-10">
         <div className="@container flex min-w-0 flex-col gap-2">
           {breweryForm ?? <BrewerySettingsFormView basisLocked={model.hasFiledReports} initial={{ name: model.name, timezone: model.timezone, ttb: model.ttb, phone: model.phone, hours: model.overdueHours, daysToPackage: model.daysToPackage, booksOpenedOn: model.booksOpenedOn, oneWayKegFee: model.oneWayKegFee }} />}
@@ -54,22 +62,14 @@ export function SettingsView({
         </div>
       </div>
       {model.hasFiledReports ? reportingBasisForm ?? <ReportingBasisView basis={model.booksOpenedOn || null} history={model.basisCorrections ?? []} timeZone={model.timezone} /> : null}
-      <div className="mt-2 grid gap-8 border-t pt-6 @min-[48rem]:grid-cols-2">
-        <section aria-labelledby="settings-people" className="flex min-w-0 flex-col gap-2">
-          <h2 id="settings-people" className="mb-2 font-heading text-xl font-semibold">People and places</h2>
-          {E.nav("Team", model.team, "", undefined, hrefs.team)}
-          {E.nav("Locations", model.locations, "", undefined, hrefs.locations)}
-          {E.nav("Water profiles", WATER_PROFILES_CAPTION, "", undefined, hrefs.water)}
-          {E.nav("Sale channels", navAbout("Sale channels"), "", undefined, hrefs.channels)}
-          {E.nav("Import", navAbout("Import"), "", undefined, hrefs.import)}
-        </section>
-        <section aria-labelledby="settings-connections" className="flex min-w-0 flex-col gap-2">
-          <h2 id="settings-connections" className="mb-2 font-heading text-xl font-semibold">Connections</h2>
-          {E.nav("Accounting", "QuickBooks connection, mappings and payment defaults", "", QuickBooksMark, hrefs.accounting)}
-          {E.nav("Point of sale", "Square connection, location mappings, sync and menu", "", SquareMark, hrefs.pos)}
-          {E.nav("Chat", navAbout("Chat"), "", SlackMark, hrefs.chat)}
-        </section>
-      </div>
+      <section aria-labelledby="settings-people" className="mt-2 flex min-w-0 flex-col gap-2 border-t pt-6">
+        <h2 id="settings-people" className="mb-2 font-heading text-xl font-semibold">People and places</h2>
+        {E.nav("Team", model.team, "", undefined, hrefs.team)}
+        {E.nav("Locations", model.locations, "", undefined, hrefs.locations)}
+        {E.nav("Water profiles", WATER_PROFILES_CAPTION, "", undefined, hrefs.water)}
+        {E.nav("Sale channels", navAbout("Sale channels"), "", undefined, hrefs.channels)}
+        {E.nav("Import", navAbout("Import"), "", undefined, hrefs.import)}
+      </section>
       <div className="mt-2 grid gap-6 border-t pt-6 @min-[48rem]:grid-cols-2">
         <section aria-labelledby="settings-appearance">
           <h2 id="settings-appearance" className="mb-4 font-heading text-xl font-semibold">Appearance</h2>

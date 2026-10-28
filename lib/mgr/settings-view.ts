@@ -30,12 +30,6 @@ export function readingDueHoursIsValid(hours: number): boolean {
   return Number.isInteger(hours) && hours >= 1 && hours <= 168;
 }
 
-export function readingCadenceReason(hours: string, initial: number): string | null {
-  const value = Number(hours);
-  if (!readingDueHoursIsValid(value)) return submitReason(["reading overdue hours from 1 to 168 (whole numbers)"]);
-  return submitReason(value === initial ? ["a change to reading cadence"] : []);
-}
-
 export function breweryOperatingDefaultsCommand(values: Pick<BrewerySettingsValues, "hours" | "daysToPackage">) {
   const readingDueHours = Number(values.hours);
   const daysToPackage = Number(values.daysToPackage);

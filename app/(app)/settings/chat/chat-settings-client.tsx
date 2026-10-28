@@ -18,15 +18,14 @@ export function ChatConnectionAction({ installationId, configured }: { installat
 /** `channels` and `channel` are what the page read: the eligible private
  *  channels (null when they could not load) and the saved operations channel.
  *  Picking a channel saves it at once and puts the old one back if the save fails (#1509). */
-export function ChatSettingsControls({ installation, readingDueHours, timezone, configured, channels: loaded, channel: savedChannel }: { installation: NonNullable<ChatHealth["installation"]>; readingDueHours: number; timezone: string; configured: boolean; channels: { id: string; name: string }[] | null; channel: string }) {
+export function ChatSettingsControls({ installation, timezone, configured, channels: loaded, channel: savedChannel }: { installation: NonNullable<ChatHealth["installation"]>; timezone: string; configured: boolean; channels: { id: string; name: string }[] | null; channel: string }) {
   const action = useCommandAction();
   const [channels, setChannels] = useState(loaded);
   const [channel, setChannel] = useState(savedChannel);
-  const [hours, setHours] = useState(String(readingDueHours));
   const [start, setStart] = useState(installation.quietStart?.slice(0, 5) ?? "");
   const [end, setEnd] = useState(installation.quietEnd?.slice(0, 5) ?? "");
   const [saved, setSaved] = useState<ChatSettingSave | null>(null);
-  return <ChatSettingsFieldsView installation={installation} timezone={timezone} hours={hours} initialHours={readingDueHours} start={start} end={end} channels={channels} channel={channel} configured={configured} busy={action.busy} saved={action.succeeded === saved?.name ? saved : null} error={action.error}
+  return <ChatSettingsFieldsView installation={installation} timezone={timezone} start={start} end={end} channels={channels} channel={channel} configured={configured} busy={action.busy} saved={action.succeeded === saved?.name ? saved : null} error={action.error}
     onLoadChannels={() => void action.run("list_chat_channels", { installationId: installation.id }, data => setChannels(data as { id: string; name: string }[]), { durable: false })}
     onChannel={next => {
       if (action.busy || next === channel) return;
@@ -36,7 +35,6 @@ export function ChatSettingsControls({ installation, readingDueHours, timezone, 
     }}
     onQuietChange={(start, end) => { setStart(start); setEnd(end); }}
     onSaveQuiet={(start, end) => void action.run("set_brewery_quiet_hours", { installationId: installation.id, start: start || null, end: end || null }, () => setSaved({ name: "set_brewery_quiet_hours", start, end }))}
-    onHours={setHours} onSaveHours={() => void action.run("set_brewery_operating_defaults", { readingDueHours: Number(hours) }, () => setSaved({ name: "set_brewery_operating_defaults", hours }))}
     delivery={null}
   />;
 }

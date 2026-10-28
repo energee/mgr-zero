@@ -49,6 +49,25 @@ defineQuery({
   handler: (ctx) => unwrap(ctx.db.rpc("get_qbo_sync_status", { p_brewery: ctx.breweryId })),
 });
 
+// The mapping picker's live reads (#1515): run when the Map dialog opens, never cached.
+defineQuery({
+  name: "list_qbo_customers", description: "Read the connected QuickBooks company's active customers live, by name, for a person to pick a customer mapping; nothing is preselected",
+  input: z.object({}), roles: ["admin", "sales"],
+  handler: async (ctx) => {
+    const { listQboRecords, qboConfig, QboOAuthClient } = await import("@/lib/qbo");
+    return listQboRecords(ctx, "customer", new QboOAuthClient(qboConfig()));
+  },
+});
+
+defineQuery({
+  name: "list_qbo_items", description: "Read the connected QuickBooks company's active items live, by name, for a person to pick an item mapping; nothing is preselected",
+  input: z.object({}), roles: ["admin", "sales"],
+  handler: async (ctx) => {
+    const { listQboRecords, qboConfig, QboOAuthClient } = await import("@/lib/qbo");
+    return listQboRecords(ctx, "item", new QboOAuthClient(qboConfig()));
+  },
+});
+
 defineCommand({
   name: "set_qbo_customer_mapping", description: "Bind a customer to a QuickBooks customer in the current company",
   input: z.object({ customerId: z.string().uuid(), qboCustomerId: z.string().trim().min(1) }), roles: ["admin", "sales"],

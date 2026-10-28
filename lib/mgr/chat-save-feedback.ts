@@ -1,6 +1,5 @@
 export type ChatSettingSave =
   | { name: "set_notification_destination"; channel: string }
-  | { name: "set_brewery_operating_defaults"; hours: string }
   | { name: "set_brewery_quiet_hours"; start: string; end: string }
   | { name: "set_personal_quiet_hours"; start: string; end: string; timezone: string };
 
@@ -9,8 +8,6 @@ export function chatSettingIsSaved(saved: ChatSettingSave | null | undefined, cu
   switch (saved?.name) {
     case "set_notification_destination":
       return current.name === saved.name && current.channel === saved.channel;
-    case "set_brewery_operating_defaults":
-      return current.name === saved.name && current.hours === saved.hours;
     case "set_brewery_quiet_hours":
       return current.name === saved.name && current.start === saved.start && current.end === saved.end;
     case "set_personal_quiet_hours":

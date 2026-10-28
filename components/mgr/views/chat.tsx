@@ -17,7 +17,7 @@ import { ChatPreview, ChatPreviewPicker } from "@/lib/chat/preview-web";
 import { NOTIFICATION_REASON_LABEL, type ChatPreviewFixture, type ChatPreviewId } from "@/lib/chat/contracts";
 import { chatSettingIsSaved, type ChatSettingSave } from "@/lib/mgr/chat-save-feedback";
 import { personalQuietHoursSchema, quietHoursWindowSchema, personalQuietHoursReason, breweryQuietHoursReason } from "@/lib/chat/quiet-hours";
-import { readingCadenceReason } from "@/lib/mgr/settings-view";
+import { plural } from "@/lib/mgr/plural";
 
 const PREVIEW_TABS: [ChatPreviewId, string][] = [["app-home", "App Home"], ["personal-dm", "Personal DM"], ["team-digest", "Team digest"], ["preferences", "Sample preferences"]];
 
@@ -38,7 +38,10 @@ export function ChatPreviewGallery({ fixtures }: { fixtures: readonly ChatPrevie
 /** Admin Chat settings, shared by the app and the screen inventory. The
  *  `fields`, `connection` and `delivery` slots draw the built-in view when
  *  left undefined and draw nothing when given `null`. `people` is the Linked
- *  people section (ChatLinkedPeopleView), drawn while Slack is connected (#1509). */
+ *  people section (ChatLinkedPeopleView), drawn while Slack is connected (#1509).
+ *  Reading overdue after is shown read-only and links back to Settings
+ *  (`backHref`), because Brewery details owns it: it drives Today as well as
+ *  Slack. The sample preview waits for a connected Slack (#1509). */
 export function ChatSettingsView({ health, timezone, readingDueHours, configured = true, fields, connection, delivery, people, previewFixtures = [], oauthError = false, installed = false, backHref, healthHref, disconnectHref, preferencesHref, channels = null, channel = "" }: {
   health: ChatHealth; timezone: string; readingDueHours: number; configured?: boolean; fields?: ReactNode; connection?: ReactNode; delivery?: ReactNode; people?: ReactNode; previewFixtures?: readonly ChatPreviewFixture[]; oauthError?: boolean; installed?: boolean;
   backHref?: string; healthHref?: string; disconnectHref?: string; preferencesHref?: string; channels?: { id: string; name: string }[] | null; channel?: string;
@@ -58,11 +61,12 @@ export function ChatSettingsView({ health, timezone, readingDueHours, configured
     {connected && <>
       {health.destinations.map(destination => <div key={destination.id}>{E.row(`Operations channel · ${destination.channelId}`, `${destination.privacy.replaceAll("_", " ")} · ${destination.state}${destination.reason ? ` · ${destination.reason.replaceAll("_", " ")}` : ""}`)}</div>)}
       {!health.destinations.length && E.note("No operations channel selected. Eligible personal reminders can still be delivered.", "alert")}
-      {fields !== undefined ? fields : <ChatSettingsFieldsView installation={installation} timezone={timezone} hours={String(readingDueHours)} initialHours={readingDueHours} start={installation.quietStart?.slice(0, 5) ?? ""} end={installation.quietEnd?.slice(0, 5) ?? ""} channels={channels} channel={channel} configured={configured} delivery={null} />}
+      {fields !== undefined ? fields : <ChatSettingsFieldsView installation={installation} timezone={timezone} start={installation.quietStart?.slice(0, 5) ?? ""} end={installation.quietEnd?.slice(0, 5) ?? ""} channels={channels} channel={channel} configured={configured} delivery={null} />}
+      {E.nav("Reading overdue after", `${plural(readingDueHours, "hour")} · set in Brewery details`, "", undefined, backHref)}
       {E.nav("Health", `${health.queue.retrying ?? "unavailable"} retrying · ${health.queue.queued ?? "unavailable"} queued`, "", undefined, healthHref)}
       {people}
     </>}
-    {previewFixtures.length > 0 && <ChatPreviewGallery fixtures={previewFixtures} />}
+    {connected && previewFixtures.length > 0 && <ChatPreviewGallery fixtures={previewFixtures} />}
     {connected && (delivery !== undefined ? delivery : <ChatDeliveryView enabled={installation.state === "active"} />)}
     {E.nav("My notification preferences", "Personal reminders and quiet hours", "", undefined, preferencesHref)}
   </>;
@@ -135,16 +139,13 @@ export function ChatQuietHoursView({ start, end, initial = { start, end }, timez
 /** `channels` is the list the page loaded, or null when it could not load
  *  them; picking one is the save (onChannel), and Load private channels asks
  *  again only when none were loaded (#1509). */
-export function ChatSettingsFieldsView({ installation, timezone, hours, initialHours, start, end, channels, channel, configured = true, busy = false, saved, error, delivery, onLoadChannels, onChannel, onQuietChange, onSaveQuiet, onHours, onSaveHours }: {
-  installation: NonNullable<ChatHealth["installation"]>; timezone: string; hours: string; initialHours: number; start: string; end: string;
+export function ChatSettingsFieldsView({ installation, timezone, start, end, channels, channel, configured = true, busy = false, saved, error, delivery, onLoadChannels, onChannel, onQuietChange, onSaveQuiet }: {
+  installation: NonNullable<ChatHealth["installation"]>; timezone: string; start: string; end: string;
   channels: { id: string; name: string }[] | null; channel: string; configured?: boolean; busy?: boolean; saved?: ChatSettingSave | null; error?: string | null; delivery?: ReactNode;
   onLoadChannels?: () => void; onChannel?: (value: string) => void;
-  onQuietChange?: (start: string, end: string) => void; onSaveQuiet?: (start: string, end: string) => void; onHours?: (value: string) => void; onSaveHours?: () => void;
+  onQuietChange?: (start: string, end: string) => void; onSaveQuiet?: (start: string, end: string) => void;
 }) {
   const id = useId();
-  const [draftHours, setDraftHours] = useState(hours);
-  const currentHours = onHours ? hours : draftHours;
-  const hoursReason = readingCadenceReason(currentHours, initialHours);
   return <div className="flex flex-col gap-4">
     {installation.state === "active" && <section className="flex flex-col gap-3" aria-label="Operations channel">
       {channels?.length ? <div className="flex flex-col gap-3">
@@ -157,12 +158,6 @@ export function ChatSettingsFieldsView({ installation, timezone, hours, initialH
       {E.note("Only active private channels with MGR added and sharing turned off are eligible. MGR checks again when you save and before delivery.")}
     </section>}
     <ChatQuietHoursView start={start} end={end} initial={{ start: installation.quietStart?.slice(0, 5) ?? "", end: installation.quietEnd?.slice(0, 5) ?? "" }} timezone={timezone} busy={busy} saved={saved} error={error} onChange={onQuietChange} onSave={onSaveQuiet} />
-    <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && !hoursReason) onSaveHours?.(); }}>
-      {E.edit("Reading overdue after (hours)", currentHours, "number", undefined, { onChange: onHours ?? setDraftHours, id: `${id}-hours`, disabled: busy, required: true, min: 1, max: 168, step: 1 })}
-      <p className="text-sm text-muted-foreground">Default: 24 hours. This changes when a reading becomes overdue in MGR Today and Slack.</p>
-      {E.submit("Save reading cadence", { submitting: busy, reason: hoursReason })}
-      <SettingsSaveStatus saved={!busy && chatSettingIsSaved(saved, { name: "set_brewery_operating_defaults", hours: currentHours })} error={error} />
-    </form>
     {delivery !== undefined ? delivery : <ChatDeliveryView enabled={installation.state === "active"} />}
     <SettingsSaveStatus busy={busy} />
     <CommandFormMessage error={error} />
@@ -192,15 +187,17 @@ export function ChatDisableView({ busy = false, error, onDisable }: { busy?: boo
   return <div className="flex flex-col gap-3"><Button variant="outline" disabled={busy} onClick={onDisable}>Disable integration</Button><CommandFormMessage error={error} /></div>;
 }
 
+/** Slack health. The raw queue states are listed only once Slack is connected (#1509). */
 export function ChatHealthView({ health, configured = true, connection, disable, backHref, disconnectHref }: { health: ChatHealth; configured?: boolean; connection?: ReactNode; disable?: ReactNode; backHref?: string; disconnectHref?: string }) {
   const installation = health.installation;
+  const connected = installation && !["disconnected", "pending"].includes(installation.state);
   return <>
     {E.back("Chat", "Health", undefined, backHref)}
     {installation?.state === "active" ? E.info("Slack delivery is enabled. Blocked channels do not receive team digests; eligible personal sends continue.") : E.note("Slack delivery is stopped. Your MGR work remains available.")}
     {E.row("Connection", installation?.state.replaceAll("_", " ") ?? "Not connected")}
     {E.row("Last successful message from Slack", health.lastCallback ?? "None yet", health.lastCallback ? E.status("Succeeded", "ok") : "")}
     {E.row("Last successful delivery", health.lastDelivery ?? "None yet", health.lastDelivery ? E.status("Succeeded", "ok") : "")}
-    {Object.entries(health.queue).map(([state, count]) => <div key={state}>{E.row(state.replaceAll("_", " "), `${count} deliveries`, state === "queued" && installation?.state !== "active" ? E.status("Paused", "w") : "", count ? "w" : "")}</div>)}
+    {connected && Object.entries(health.queue).map(([state, count]) => <div key={state}>{E.row(state.replaceAll("_", " "), `${count} deliveries`, state === "queued" && installation?.state !== "active" ? E.status("Paused", "w") : "", count ? "w" : "")}</div>)}
     {installation?.lastError && E.note(`Last provider error: ${installation.lastError.replaceAll("_", " ")}`, "alert")}
     {installation && ["active", "disabled", "needs_reauthorization"].includes(installation.state) && (connection !== undefined ? connection : <ChatConnectionView configured={configured} reauthorize />)}
     {installation && ["active", "needs_reauthorization"].includes(installation.state) && (disable !== undefined ? disable : <ChatDisableView />)}
