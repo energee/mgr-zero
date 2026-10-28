@@ -38,6 +38,7 @@ import { kegEventReason } from "@/lib/mgr/keg-fleet-view";
 import { additionReason, mashStepReason, stageReason } from "@/lib/mgr/recipe-process-view";
 import { defaultShipAllocations, shipmentSourceNeeds, type ShippingSnapshot } from "@/app/(app)/orders/[id]/ship-form";
 import { defaultRefusedEntries } from "@/components/mgr/views/refused-return";
+import { vendorReason } from "@/lib/mgr/vendor-view";
 
 // The live forms render without a router or a command round trip.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {} }) }));
@@ -481,6 +482,17 @@ describe("live forms withhold their submit with the reason", () => {
       skus: [],
       workHrefs: {},
     })), "Still needed: a warehouse to send from and a transfer quantity above zero.");
+  });
+});
+
+describe("vendorReason (#1485)", () => {
+  const blank = { name: "", email: "", phone: "", leadDays: "" };
+  it("names a blank name and each bad optional field, or null when ready", () => {
+    expect(vendorReason(blank)).toBe("Still needed: a vendor name.");
+    expect(vendorReason({ ...blank, name: "  " })).toBe("Still needed: a vendor name.");
+    expect(vendorReason({ ...blank, name: "YCH" })).toBeNull();
+    expect(vendorReason({ name: "YCH", email: "nope", phone: "abc", leadDays: "-1" }))
+      .toBe("Still needed: a valid email, a valid phone number, and a lead time of zero or more whole days.");
   });
 });
 

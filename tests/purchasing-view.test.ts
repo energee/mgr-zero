@@ -21,7 +21,7 @@ import { VendorView } from "../components/mgr/views/vendor";
 import { VendorsView } from "../components/mgr/views/vendors";
 import {
   contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsOnHandList,
-  newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
+  correctReceiptCountryMalt, newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
 } from "../lib/mgr/fixtures/purchasing";
 import { toContractsViewProps } from "../lib/mgr/contracts-view";
 import { toMaterialsOnHandViewProps } from "../lib/mgr/materials-on-hand-view";
@@ -30,7 +30,7 @@ import { receiptBillPresentation, receiptBillRequest, toPostedReceiptViewProps, 
 import { toVendorsViewProps } from "../lib/mgr/vendors-view";
 import { contractSubmitReason } from "../lib/mgr/contract-view";
 import { newPoReason } from "../lib/mgr/new-po-view";
-import { CLOSURE_FORM_ID } from "../lib/mgr/receive-po-view";
+import { CLOSURE_FORM_ID, receiveReason } from "../lib/mgr/receive-po-view";
 import { beginRecovery, discardRecovery } from "../lib/commands/recovery";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -138,6 +138,35 @@ describe("Purchase orders", () => {
     expect(closed).toContain("Vendor cancelled remainder");
     expect(closed).not.toContain("Close short");
     expect(closed).not.toContain("Receive purchase order");
+  });
+
+  it("Receive purchase order and Correct receipt name what they wait for (#1485)", () => {
+    const lines = receivePoCountryMalt.lines!;
+    const receive = (patch: Partial<typeof receivePoCountryMalt>) => receiveReason({ ...receivePoCountryMalt, ...patch });
+    expect(receive({})).toBeNull();
+    // One -1 line among valid lines is named, never dropped from the receipt.
+    expect(receive({ lines: lines.map(line => line.key === "hulls" ? { ...line, qty: "-1" } : line) })).toBe("Still needed: a count of zero or more for Rice hulls · 50 lb.");
+    expect(receive({ lines: lines.map(line => line.key === "hulls" ? { ...line, qty: "1e3" } : line) })).toBe("Still needed: a count of zero or more for Rice hulls · 50 lb.");
+    // A blank line is left out of a new receipt; an all-blank receipt counts nothing.
+    expect(receive({ lines: lines.map(line => line.key === "hulls" ? { ...line, qty: "" } : line) })).toBeNull();
+    expect(receive({ lines: lines.map(line => ({ ...line, qty: "" })) })).toBe("Still needed: a count on at least one line.");
+    expect(receive({ locationId: "", binId: "", receivedOn: "", lines: lines.map(line => line.key === "malt" ? { ...line, lot: " " } : line) }))
+      .toBe("Still needed: a location, a bin, a received day, and a lot code for 2-row · 55 lb bags.");
+    // A lot-tracked line counted 0 needs no lot.
+    expect(receive({ lines: lines.map(line => line.key === "malt" ? { ...line, qty: "0", lot: "" } : line) })).toBeNull();
+    const correct = (patch: Partial<typeof correctReceiptCountryMalt>) => receiveReason({ ...correctReceiptCountryMalt, ...patch });
+    expect(correct({})).toBeNull();
+    expect(correct({ correctionReason: " ", lines: correctReceiptCountryMalt.lines!.map(line => line.key === "hulls" ? { ...line, qty: "" } : line) }))
+      .toBe("Still needed: a correction reason and a count for Rice hulls · 50 lb.");
+    expect(receiveReason({ ...receivePoCountryMalt, state: "draft" })).toBeNull();
+  });
+
+  it("prints Receive's reason beside its own button, apart from the closure reason (#1485)", () => {
+    const html = htmlOf(createElement(ReceivePoView, { model: { ...receivePoCountryMalt, locationId: "" } }));
+    const button = html.match(/<button[^>]*>Receive purchase order<\/button>/)?.[0];
+    expect(button).toContain('disabled=""');
+    const id = button?.match(/aria-describedby="([^"]+)"/)?.[1];
+    expect(html).toMatch(new RegExp(`<p id="${id}"[^>]*>Still needed: a location\\.</p>`));
   });
 
   it("renders Receive purchase order without leaking live hrefs", () => {

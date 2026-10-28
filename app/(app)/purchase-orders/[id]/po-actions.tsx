@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { ReceivePoView } from "@/components/mgr/views/receive-po";
 import { ReceiptView } from "@/components/mgr/views/receipt";
-import { CLOSURE_FORM_ID, CORRECTION_INFO, receiveMode, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
+import { CLOSURE_FORM_ID, CORRECTION_INFO, isCount, receiveMode, receiveReason, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
 import { receiptBillRequest, receiptHref, type ReceiptViewModel } from "@/lib/mgr/receipt-view";
 import { fromPacks } from "@/lib/mgr/pack-qty";
 import { useCommandAction } from "@/lib/commands/use-command-form";
@@ -36,14 +36,30 @@ export function ReceiveForm({ poId, lines, locations, bins, today, model, correc
   const [receivedOn, setReceivedOn] = useState(today);
   const [via, setVia] = useState("mailto");
   const { busy, error, run } = useCommandAction();
-  const counted = open.filter(line => counts[line.id] !== "" && Number.isFinite(Number(counts[line.id])) && Number(counts[line.id]) >= 0);
-  const lotsOk = counted.every(line => !line.material?.lot_tracked || Number(counts[line.id]) === 0 || lots[line.id]?.trim());
-  const ready = Boolean((correcting ? reason.trim() && counted.length === open.length : locationId && binId && receivedOn) && counted.length > 0 && lotsOk);
+  const counted = open.filter(line => isCount(counts[line.id] ?? ""));
+  const view: ReceivePoViewModel = {
+    ...model, locationId, binId, locations, bins: binsHere, receivedOn, sentVia: via, correctionReason: reason, closureReason,
+    lotSuggestionsUnavailable: open.some(line => line.material?.lot_tracked),
+    lines: open.map(line => ({
+      key: line.id, title: line.material?.name ?? `Line ${line.id}`,
+      detail: correcting ? `originally counted ${line.qty_counted} ${line.material?.purchase_uom ?? "purchase units"}` : `ordered ${line.qty_ordered} · received ${line.qty_received} · still due ${line.qty_open}${line.material ? ` ${line.material.purchase_uom}` : ""}${line.expected_lot_code ? ` · PO lot ${line.expected_lot_code}` : ""}`,
+      qty: receiving ? counts[line.id] ?? "" : line.qty_ordered,
+      lot: line.material?.lot_tracked ? lots[line.id] ?? "" : undefined, bestBy: bestBy[line.id],
+      warning: receiving && counts[line.id] !== "" && Number(counts[line.id]) !== line.qty_open,
+    })),
+    tape: counted.map(line => {
+      const count = Number(counts[line.id]), difference = count - line.qty_open;
+      const quantity = line.material?.purchase_uom_factor != null ? fromPacks(count, 0, Number(line.material.purchase_uom_factor)) : count;
+      return [`+${quantity} ${line.material?.base_uom ?? line.material?.purchase_uom ?? "purchase units"} ${line.material?.name ?? `Line ${line.id}`} · preview`,
+        [line.material?.lot_tracked ? `lot ${lots[line.id]?.trim() || "required"}` : undefined, difference === 0 ? "as expected" : `${difference > 0 ? "over" : "short"} ${Math.abs(difference)}`].filter(Boolean).join(" · ")];
+    }),
+    info: correcting ? CORRECTION_INFO : "Only what you count posts. Over and short are both recorded; the order becomes partially received until every line is met.",
+  };
   return <><form className="flex flex-col gap-3" onSubmit={event => {
     event.preventDefault();
     if (busy) return;
     if (mode === "draft") { void run("send_purchase_order", { poId, sentVia: via }); return; }
-    if (!receiving || !ready) return;
+    if (!receiving || receiveReason(view)) return;
     const countedLines = counted.map(line => ({ poLineId: line.id, qtyCounted: Number(counts[line.id]), lotCode: lots[line.id]?.trim() || undefined, bestBy: bestBy[line.id] || undefined }));
     void run(correcting ? "correct_purchase_receipt" : "receive_purchase_order", correcting
       ? { receiptId: correctionReceiptId, reason, lines: countedLines }
@@ -52,31 +68,14 @@ export function ReceiveForm({ poId, lines, locations, bins, today, model, correc
       if (receiptId) router.push(receiptHref(`/purchase-orders/${poId}`, receiptId));
     });
   }}>
-    <ReceivePoView model={{
-      ...model, locationId, binId, locations, bins: binsHere, receivedOn, sentVia: via, correctionReason: reason, closureReason,
-      lotSuggestionsUnavailable: open.some(line => line.material?.lot_tracked),
-      lines: open.map(line => ({
-        key: line.id, title: line.material?.name ?? `Line ${line.id}`,
-        detail: correcting ? `originally counted ${line.qty_counted} ${line.material?.purchase_uom ?? "purchase units"}` : `ordered ${line.qty_ordered} · received ${line.qty_received} · still due ${line.qty_open}${line.material ? ` ${line.material.purchase_uom}` : ""}${line.expected_lot_code ? ` · PO lot ${line.expected_lot_code}` : ""}`,
-        qty: receiving ? counts[line.id] ?? "" : line.qty_ordered,
-        lot: line.material?.lot_tracked ? lots[line.id] ?? "" : undefined, bestBy: bestBy[line.id],
-        warning: receiving && counts[line.id] !== "" && Number(counts[line.id]) !== line.qty_open,
-      })),
-      tape: counted.map(line => {
-        const count = Number(counts[line.id]), difference = count - line.qty_open;
-        const quantity = line.material?.purchase_uom_factor != null ? fromPacks(count, 0, Number(line.material.purchase_uom_factor)) : count;
-        return [`+${quantity} ${line.material?.base_uom ?? line.material?.purchase_uom ?? "purchase units"} ${line.material?.name ?? `Line ${line.id}`} · preview`,
-          [line.material?.lot_tracked ? `lot ${lots[line.id]?.trim() || "required"}` : undefined, difference === 0 ? "as expected" : `${difference > 0 ? "over" : "short"} ${Math.abs(difference)}`].filter(Boolean).join(" · ")];
-      }),
-      info: correcting ? CORRECTION_INFO : "Only what you count posts. Over and short are both recorded; the order becomes partially received until every line is met.",
-    }} controls={{
+    <ReceivePoView model={view} controls={{
       quantity: (id, value) => setCounts(prev => ({ ...prev, [id]: value })),
       lot: (id, value) => setLots(prev => ({ ...prev, [id]: value })),
       bestBy: (id, value) => setBestBy(prev => ({ ...prev, [id]: value })),
       location: value => { setLocationId(value); setBinId(bins.find(bin => bin.location_id === value)?.id ?? ""); },
       bin: setBinId, receivedOn: setReceivedOn, sentVia: setVia, reason: setReason,
       closureReason: setClosureReason,
-    }} submitting={busy} disabled={receiving && !ready} messages={<CommandFormMessage error={error} />} />
+    }} submitting={busy} messages={<CommandFormMessage error={error} />} />
   </form>
   {model.closure && <form id={CLOSURE_FORM_ID} onSubmit={event => {
     event.preventDefault();

@@ -1,4 +1,8 @@
-// lib/mgr/receive-po-view.ts — view-model for Receive PO (inventory).
+// lib/mgr/receive-po-view.ts — view-model for Receive PO (inventory), and
+// what Receive purchase order or Correct receipt still needs (#1485).
+import { isNumber } from "./quantity-input";
+import { submitReason } from "./submit-reason";
+
 export type ReceivePoLineView = {
   key: string;
   title: string;
@@ -43,6 +47,37 @@ export function receiveMode(state: string | undefined): "draft" | "receive" | "c
   if (state === "correction") return "correct";
   if (state === "draft") return "draft";
   return state === undefined || state === "sent" || state === "partially_received" ? "receive" : "view";
+}
+
+/** A typed count posts when it is a plain number of zero or more. */
+export const isCount = (qty: string) => isNumber(qty) && Number(qty) >= 0;
+
+/** Why Receive purchase order or Correct receipt is withheld, or null when
+ *  ready (and in a mode that receives nothing). A new receipt needs its
+ *  location, bin and day; a correction needs its reason and every line counted.
+ *  A blank line is left out of a new receipt, but a negative or non-number
+ *  count is named, never dropped. A lot-tracked line (`lot` set) counted above
+ *  zero needs its lot code. */
+export function receiveReason(model: ReceivePoViewModel): string | null {
+  const mode = receiveMode(model.state);
+  if (mode !== "receive" && mode !== "correct") return null;
+  const missing: string[] = [];
+  if (mode === "correct" && !model.correctionReason?.trim()) missing.push("a correction reason");
+  if (mode === "receive") {
+    if (!model.locationId) missing.push("a location");
+    if (!model.binId) missing.push("a bin");
+    if (!model.receivedOn) missing.push("a received day");
+  }
+  const lines = model.lines ?? [];
+  for (const line of lines) {
+    const qty = String(line.qty);
+    if (qty.trim() === "") {
+      if (mode === "correct") missing.push(`a count for ${line.title}`);
+    } else if (!isCount(qty)) missing.push(`a count of zero or more for ${line.title}`);
+    else if (line.lot !== undefined && Number(qty) > 0 && !line.lot.trim()) missing.push(`a lot code for ${line.title}`);
+  }
+  if (mode === "receive" && lines.every(line => String(line.qty).trim() === "")) missing.push("a count on at least one line");
+  return submitReason(missing);
 }
 
 /** The purchase-order statuses still owed by the vendor: the PO list shows
