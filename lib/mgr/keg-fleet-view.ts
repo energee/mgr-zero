@@ -24,7 +24,8 @@ export type KegPoolValue = { name: string; kind: KegPoolKind; vendorId: string; 
 /** The Record keg event fields. */
 export type KegEventValue = { poolId: string; kegSize: KegSize; reason: KegEventReason; locationId: string; binId: string; customerId: string; qty: string; note: string };
 /** The pickers' options. `bins` are already the chosen location's bins. `onHand` is how many kegs of the chosen
- *  pool and size the chosen bin holds; it is left out where that is not known (the inventory fixture). */
+ *  pool and size the event can take (kegOnHand): the chosen customer's when it takes kegs from a customer, else the
+ *  chosen bin's; it is left out where that is not known (the inventory fixture). */
 export type KegEventOptions = { pools: KegOption[]; locations: KegOption[]; bins: KegOption[]; customers: KegOption[]; onHand?: number };
 
 export type KegFleetViewModel = {
@@ -67,20 +68,39 @@ export const mayHaveKegCustomer = (r: KegEventReason) => needsKegCustomer(r) || 
 export const withLocationBin = (prev: KegEventValue, next: KegEventValue, firstBin: (locationId: string) => string): KegEventValue =>
   next.locationId !== prev.locationId ? { ...next, binId: firstBin(next.locationId) } : next;
 
-type KegBinStock = Pick<KegEventOptions, "bins" | "onHand">;
+type KegBinStock = Pick<KegEventOptions, "bins" | "customers" | "onHand">;
 /** A keg count is typed as plain digits, at least 1. */
 const isKegCount = (qty: string) => /^\d+$/.test(qty) && Number.isSafeInteger(Number(qty)) && Number(qty) > 0;
 /** Retired, shipped, and lost with no customer take kegs out of the chosen bin, so record_keg_event checks the bin holds them. */
 const takesFromBin = (v: KegEventValue) => v.reason === "retired" || v.reason === "shipped" || (v.reason === "lost" && !v.customerId);
-/** "at most 8 kegs in Cold" when a keg count leaving the bin is more than `onHand`; undefined otherwise, or when
- *  `onHand` is not known. */
-function binLimit(v: KegEventValue, options?: KegBinStock): string | undefined {
-  if (options?.onHand === undefined || !takesFromBin(v) || !isKegCount(v.qty) || Number(v.qty) <= options.onHand) return undefined;
-  return `at most ${options.onHand} kegs in ${options.bins.find((b) => b.value === v.binId)?.label ?? "that bin"}`;
+/** Returned, and lost at a customer, take kegs from that customer, so record_keg_event checks the customer holds them. */
+const takesFromCustomer = (v: KegEventValue) => (v.reason === "returned" || v.reason === "lost") && Boolean(v.customerId);
+
+/** get_keg_fleet's rows: kegs one bin holds, and kegs one customer holds, of one pool and size. */
+type KegBinRow = { pool_id: string; keg_size: string; bin_id: string; qty: number };
+type KegCustomerRow = { customer_id: string; pool_id: string; keg_size: string; qty: number };
+
+/** How many kegs of the chosen pool and size the event can take: the chosen customer's balance when it takes kegs from
+ *  a customer, else the chosen bin's when it takes them from a bin. A customer or bin with no row holds none. Undefined
+ *  when the event takes no kegs, or its customer or bin is not chosen yet. */
+export function kegOnHand(v: KegEventValue, stock: KegBinRow[], balances: KegCustomerRow[]): number | undefined {
+  const ofKeg = (r: { pool_id: string; keg_size: string }) => r.pool_id === v.poolId && r.keg_size === v.kegSize;
+  if (takesFromCustomer(v)) return balances.find((r) => ofKeg(r) && r.customer_id === v.customerId)?.qty ?? 0;
+  if (takesFromBin(v) && v.binId) return stock.find((r) => ofKeg(r) && r.bin_id === v.binId)?.qty ?? 0;
+  return undefined;
+}
+
+/** "at most 8 kegs in Cold", or "at most 4 kegs at Ridgeline", when a count taken from a bin or a customer is more
+ *  than `onHand`; undefined otherwise, or when `onHand` is not known. */
+function stockLimit(v: KegEventValue, options?: KegBinStock): string | undefined {
+  if (options?.onHand === undefined || !isKegCount(v.qty) || Number(v.qty) <= options.onHand) return undefined;
+  if (takesFromCustomer(v)) return `at most ${options.onHand} kegs at ${options.customers.find((c) => c.value === v.customerId)?.label ?? "that customer"}`;
+  if (takesFromBin(v)) return `at most ${options.onHand} kegs in ${options.bins.find((b) => b.value === v.binId)?.label ?? "that bin"}`;
+  return undefined;
 }
 
 /** Field errors also own readiness, so invalid typed values never enable submit. With `options.onHand`, a count
- *  leaving the bin is held to the kegs it holds, as record_keg_event refuses more. */
+ *  taken from a bin or a customer is held to the kegs it holds, as record_keg_event refuses more. */
 export function kegEventFieldErrors(v: KegEventValue, options?: KegBinStock): Partial<Record<keyof KegEventValue, string>> {
   const errors: Partial<Record<keyof KegEventValue, string>> = {};
   if (!v.poolId) errors.poolId = "Choose a keg pool.";
@@ -91,7 +111,7 @@ export function kegEventFieldErrors(v: KegEventValue, options?: KegBinStock): Pa
   if (notation) errors.qty = notation;
   else if (!isKegCount(v.qty)) errors.qty = "Enter a whole number of kegs, at least 1.";
   else {
-    const limit = binLimit(v, options);
+    const limit = stockLimit(v, options);
     if (limit) errors.qty = `Enter ${limit}.`;
   }
   return errors;
@@ -102,7 +122,7 @@ export function kegEventReason(v: KegEventValue, options?: KegBinStock): string 
   const errors = kegEventFieldErrors(v, options);
   return submitReason([
     errors.poolId && "a keg pool", errors.locationId && "a location", errors.binId && "a bin",
-    errors.qty && (binLimit(v, options) ?? "a whole keg count of at least 1 (no exponent notation)"), errors.customerId && "a customer",
+    errors.qty && (stockLimit(v, options) ?? "a whole keg count of at least 1 (no exponent notation)"), errors.customerId && "a customer",
   ].filter((need): need is string => Boolean(need)));
 }
 

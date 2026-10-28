@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { KegEventPresentation } from "@/components/mgr/views/keg-event-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { KEG_EVENT_REASONS } from "@/lib/mgr/enums";
-import { mayHaveKegCustomer, toKegOption as toOption, withLocationBin, type KegEventValue } from "@/lib/mgr/keg-fleet-view";
+import { kegOnHand, mayHaveKegCustomer, toKegOption as toOption, withLocationBin, type KegEventValue } from "@/lib/mgr/keg-fleet-view";
 
-export function KegEventForm({ pools, locations, bins, customers, stock, prefill, label = "Record keg event", autoOpen = false }: {
+export function KegEventForm({ pools, locations, bins, customers, stock, balances, prefill, label = "Record keg event", autoOpen = false }: {
   pools: { id: string; name: string }[];
   locations: { id: string; name: string }[];
   bins: { id: string; location_id: string; name: string }[];
@@ -23,13 +23,13 @@ export function KegEventForm({ pools, locations, bins, customers, stock, prefill
   label?: string;
   /** get_keg_fleet's kegs on hand per pool, size and bin, so a count leaving the bin is held to what it holds. */
   stock: { pool_id: string; keg_size: string; bin_id: string; qty: number }[];
+  /** get_keg_fleet's kegs each customer holds per pool and size, so a return or a loss at a customer is held to what it holds. */
+  balances: { customer_id: string; pool_id: string; keg_size: string; qty: number }[];
 }) {
   const initial = (): KegEventValue => ({ poolId: pools[0]?.id ?? "", kegSize: "half_bbl", reason: KEG_EVENT_REASONS[0], locationId: "", binId: "", customerId: "", qty: "", note: "", ...prefill });
   const [value, setValue] = useState(initial);
   const binsAt = (locationId: string) => bins.filter((b) => b.location_id === locationId);
-  const binRow = stock.find((r) => r.pool_id === value.poolId && r.keg_size === value.kegSize && r.bin_id === value.binId);
-  // A bin with no fleet row for this pool and size holds none of them.
-  const onHand = value.binId ? binRow?.qty ?? 0 : undefined;
+  const onHand = kegOnHand(value, stock, balances);
   // Choosing a location preselects its first bin.
   const change = (next: KegEventValue) => setValue(withLocationBin(value, next, (locationId) => binsAt(locationId)[0]?.id ?? ""));
   const form = useCommandForm("record_keg_event", {

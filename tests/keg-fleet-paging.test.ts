@@ -40,6 +40,7 @@ type Fleet = {
   rows: { pool_id: string; qty: number; location_name: string; bin_name: string }[];
   shortages: { pool: string; short: number }[];
   customers: { customer_id: string; name: string; kegs_out: number }[];
+  balances: { customer_id: string; pool_id: string; keg_size: string; qty: number }[];
 };
 const fleet = (ctx: Ctx) => runCommand("get_keg_fleet", {}, ctx) as Promise<Fleet>;
 
@@ -51,6 +52,16 @@ describe("complete keg fleet (#726)", () => {
     expect(result.customers.reduce((total, c) => total + c.kegs_out, 0)).toBe(3010);
     expect(result.customers.find(c => c.customer_id === id(1000))?.name).toBe("Customer 01000");
     expect(result.customers.some(c => c.customer_id === "zero" || c.customer_id === "foreign")).toBe(false);
+  });
+
+  it("keeps each customer's balance per pool and size, so a return is held to it (#1479)", async () => {
+    const result = await fleet(context(fixture()));
+    expect(result.balances.filter(b => b.customer_id === id(0))).toEqual([
+      { customer_id: id(0), pool_id: id(0), keg_size: "half_bbl", qty: 3 },
+      { customer_id: id(0), pool_id: id(1000), keg_size: "sixth_bbl", qty: 7 },
+    ]);
+    expect(result.balances).toHaveLength(1002);
+    expect(result.balances.some(b => b.customer_id === "zero" || b.customer_id === "foreign")).toBe(false);
   });
 
   it("keeps every pool and bin balance with complete location/bin names, including zero stock", async () => {
@@ -83,7 +94,7 @@ describe("complete keg fleet (#726)", () => {
   });
 
   it("preserves empty-tenant results", async () => {
-    expect(await fleet(context({}))).toEqual({ pools: [], rows: [], shortages: [], customers: [] });
+    expect(await fleet(context({}))).toEqual({ pools: [], rows: [], shortages: [], customers: [], balances: [] });
   });
 
   it.each(["sales", "brewer", "taproom", "customer"] as const)("denies %s before reading fleet data", async role => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { brewCorrectionModel, brewPlanActuals, brewTurnModel, canRecordBrewDay, currentBrewRecords, type BrewDayViewModel, type BrewRecordView } from "@/lib/mgr/brew-day-view";
+import { brewCorrectionModel, brewedAsPlanned, brewPlanActuals, brewTurnModel, canRecordBrewDay, currentBrewRecords, showsTurnKnockout, type BrewDayViewModel, type BrewRecordView } from "@/lib/mgr/brew-day-view";
 
 describe("brew actual confirmation", () => {
   const source = { material_id: "m", material_name: "Malt", unit: "lb", location_id: "l", location_name: "Brewery", bin_id: "b", bin_name: "Stock", lot_id: "lot", lot_code: "M1", qty: 150 };
@@ -46,5 +46,21 @@ describe("brew actual confirmation", () => {
     expect(model.sources![0].qty).toBe(0.1);
     expect(correction).toMatchObject({ recorded: false, correctionRecordId: "record", plan: { recipe: "Frozen recipe" }, process: { knockoutTempF: "68" } });
   });
+});
 
+describe("recorded batch facts (#1508)", () => {
+  const turn = (id: string, bbl: number, corrects_id: string | null = null): BrewRecordView =>
+    ({ id, turn: 1, initial_bbl: bbl, brewed_on: "2026-10-01", created_at: "2026-10-01", correction_reason: null, corrects_id, plan_snapshot: {}, process: {}, additions: [] });
+  it("shows each turn's confirmed knockout only when it differs from Knockout or there are several turns", () => {
+    expect(showsTurnKnockout([turn("a", 22)], "22")).toBe(false);
+    expect(showsTurnKnockout([turn("a", 20)], "22")).toBe(true);
+    expect(showsTurnKnockout([turn("a", 11), turn("b", 11)], "22")).toBe(true);
+    expect(showsTurnKnockout([], "22")).toBe(false);
+  });
+  it("drops the Planned line when the batch knocked out the planned barrels on the planned day", () => {
+    expect(brewedAsPlanned({ bbl: 22, on: "2026-10-22" }, { bbl: "22", on: "2026-10-22" })).toBe(true);
+    expect(brewedAsPlanned({ bbl: 22, on: "2026-10-22" }, { bbl: "21.5", on: "2026-10-22" })).toBe(false);
+    expect(brewedAsPlanned({ bbl: 22, on: "2026-10-22" }, { bbl: "22", on: "2026-10-23" })).toBe(false);
+    expect(brewedAsPlanned({ bbl: 22, on: "2026-10-22" }, { bbl: "", on: "" })).toBe(false);
+  });
 });
