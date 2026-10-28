@@ -14,9 +14,12 @@ export function transferPreview(available: number | undefined, volume: string, l
   return { moving, loss, remainder, valid: available !== undefined && Number.isFinite(available) && isNumber(volume) && moving > 0 && (lossValue.trim() === "" || isNumber(lossValue)) && loss >= 0 && remainder !== undefined && remainder >= 0 };
 }
 
+/** `addVesselHref` is New vessel for an admin; null for anyone else (vessels are
+ *  admin-managed), and absent in the inventory, whose link stays "#". */
 export type CellarTransferViewModel = {
   occupancies: TransferOccupancy[]; vessels: TransferVessel[];
   fromId: string; toId: string; volume: string; loss: string;
+  addVesselHref?: string | null;
 };
 
 /** A source tank is never a transfer destination, including for a stale selection. */
@@ -30,7 +33,9 @@ export function transferReason(model: CellarTransferViewModel): string | null {
   const preview = transferPreview(source?.bbl, model.volume, model.loss);
   const missing: string[] = [];
   if (!source) missing.push("a source tank with beer");
-  if (!transferDestinations(model).some(v => v.id === model.toId)) missing.push("a different destination vessel");
+  const destinations = transferDestinations(model);
+  if (!destinations.length) missing.push("another vessel to transfer into");
+  else if (!destinations.some(v => v.id === model.toId)) missing.push("a different destination vessel");
   if (!isNumber(model.volume) || preview.moving <= 0) missing.push("barrels moving above zero in decimal notation");
   if (model.loss.trim() !== "" && (!isNumber(model.loss) || preview.loss < 0)) missing.push("a loss of zero or more in decimal notation");
   if (source && preview.remainder !== undefined && preview.remainder < 0) missing.push(`at most ${source.bbl} bbl moving and loss combined`);

@@ -115,7 +115,9 @@ describe("hint roles", () => {
 
   it("keeps cellar selection guidance quiet but an entered lot overdraw assertive", () => {
     const prompt = renderToStaticMarkup(createElement(CellarAdditionView, { model: { ...cellarAdditionCitra, lotId: "" } }));
-    expect(cards(prompt, "note")).toContain("Choose a lot");
+    // The need is said once, as plain text beside Record addition, not in a card (#1481).
+    expect(prompt).toContain("Still needed: a lot (Citra is lot-tracked).");
+    expect(cards(prompt, "note")).toBe("");
     expect(cards(prompt, "alert")).toBe("");
     const overdraw = renderToStaticMarkup(createElement(CellarAdditionView, { model: { ...cellarAdditionCitra, qty: "41" } }));
     expect(cards(overdraw, "alert")).toContain("Only 40 lb of L-0790 on hand");

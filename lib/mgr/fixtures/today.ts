@@ -2,9 +2,13 @@
 // Views own no sample data.
 import type { TodayItem } from "@/lib/commands/today";
 import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
-import { NOTHING_WAITING, toTodayViewProps, type TodayRowView, type TodayViewModel } from "@/lib/mgr/today-view";
+import { NOTHING_WAITING, todayActions, toTodayViewProps, type TodayAction, type TodayRowView, type TodayViewModel } from "@/lib/mgr/today-view";
+import type { StaffRole } from "@/lib/commands/registry";
 
 const DATE = "Thu 9/3";
+
+/** The role's live quick actions, inert: the inventory keeps no live href. */
+const actions = (role: StaffRole): TodayAction[] => todayActions([role]).map(({ label }) => ({ label }));
 
 /** A pick due on Sep 2, seen on Thu Sep 3, as get_today returns it
  *  (20261017190000_today_ship_date_format.sql). The adapter writes its
@@ -21,6 +25,7 @@ const overduePick: TodayRowView = {
 
 export const todayWarehouse: TodayViewModel = {
   date: DATE,
+  actions: actions("warehouse"),
   rows: [
     { key: "pick", title: "3 orders ready", detail: "quantities default to ordered", verb: "Pick", tone: "info", warning: true, icon: "package" },
     overduePick,
@@ -32,13 +37,14 @@ export const todayWarehouse: TodayViewModel = {
 
 export const todayEmpty: TodayViewModel = {
   date: DATE,
+  actions: actions("warehouse"),
   empty: NOTHING_WAITING,
-  emptyVerb: "Record movement",
   rows: [],
 };
 
 export const todaySales: TodayViewModel = {
   date: DATE,
+  actions: actions("sales"),
   rows: [
     { key: "ord1", title: "ORD-0231 · Ridgeline", detail: "submitted · ships Sep 3, 2026", verb: "Confirm", tone: "success", warning: true, icon: "package" },
     { key: "ord2", title: "ORD-0235 · Teresa’s", detail: "submitted · ships Sep 4, 2026", verb: "Confirm", tone: "success", icon: "package" },
@@ -51,6 +57,7 @@ export const todaySales: TodayViewModel = {
 
 export const todayBrewer: TodayViewModel = {
   date: DATE,
+  actions: actions("brewer"),
   rows: [
     { key: "fv3", title: "FV3 · Stout", detail: "reading overdue 31 h", verb: "Reading", tone: "info", warning: true, icon: "thermo" },
     { key: "brew", title: "B-0416 · Hazy IPA v4", detail: "brew day Sep 4, 2026 · 15 bbl", verb: "Start", tone: "info", icon: "beer" },

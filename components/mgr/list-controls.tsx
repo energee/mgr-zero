@@ -8,6 +8,7 @@
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { ScopePick, type ScopeOption } from "@/components/mgr/scope-pick";
+import { SEARCH_MAX } from "@/lib/mgr/list-params";
 
 /** One labeled pick: its options, the selected value, and (live) the href each opens. */
 export type ListScope = { label: string; value: string; options: ScopeOption[] };
@@ -22,7 +23,7 @@ export function ListControls({ search, scopes = [] }: {
       <div className="flex flex-wrap items-end gap-2">
         <form method="get" role="search" className="basis-full lg:basis-0 lg:grow">
           {Object.entries(search.keep).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
-          {E.search(search.label, { name: "q", defaultValue: search.value })}
+          {E.search(search.label, { name: "q", defaultValue: search.value, maxLength: SEARCH_MAX })}
         </form>
         {/* On a phone a pick is as wide as its chosen label (at least 9rem), so a
             long category wraps onto its own row instead of clipping beside Sort. */}

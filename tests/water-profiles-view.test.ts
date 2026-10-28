@@ -65,6 +65,11 @@ describe("water profiles view", () => {
     expect(waterProfilesBack(["brewer"], "settings")).toEqual({ label: "Recipes", href: "/recipes" });
     expect(waterProfilesBack(["admin"], "https://example.com")).toEqual({ label: "Catalog", href: "/catalog" });
   });
+  it("returns to Recipes for anyone arriving from the Recipes list (#1481)", () => {
+    expect(waterProfilesBack(["admin"], "recipes")).toEqual({ label: "Recipes", href: "/recipes" });
+    expect(waterProfilesBack(["brewer"], "recipes")).toEqual({ label: "Recipes", href: "/recipes" });
+    expect(readFileSync("app/(app)/recipes/page.tsx", "utf8")).toContain('waterProfilesHref: "/catalog/water-profiles?from=recipes"');
+  });
   it("withholds Save for invalid fields while allowing zero and optional blanks", () => {
     const blank = toWaterProfileFields();
     expect(waterProfileSaveReason(blank)).not.toBeNull();
