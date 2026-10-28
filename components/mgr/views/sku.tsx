@@ -7,9 +7,13 @@ import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { RegistryInput, RegistrySelect } from "@/components/mgr/views/registry-fields";
 import { Switch } from "@/components/ui/switch";
-import type { SkuViewModel } from "@/lib/mgr/sku-view";
+import { pourOuncesError, type SkuViewModel } from "@/lib/mgr/sku-view";
+import { useTouchedLines } from "@/lib/mgr/touched-lines";
 
 export type { SkuViewModel };
+
+/** The serving-size field's useTouchedLines slot. */
+const OUNCES = 0;
 
 type Controls = {
   pourName?: (value: string) => void;
@@ -43,11 +47,14 @@ export function SkuView({
 }) {
   // New SKU is packaged; a pour is created and edited on its price group (PourForm, locked).
   const kind = model.kind ?? "packaged";
+  // The serving-size error waits until the field is left; an inventory fixture shows it at once.
+  const touched = useTouchedLines(!controls.ounces);
+  const ouncesError = kind === "poured" && touched.shown(OUNCES) ? pourOuncesError(model.ounces ?? "") : undefined;
   return (
     <>
       {locked ? E.fld("Type", kind === "poured" ? "Pour" : "Packaged") : null}
       {kind === "poured" ? <>
-        {E.edit("Serving size · oz", model.ounces ?? "", "text", undefined, { onChange: controls.ounces, inputMode: "decimal", required: Boolean(controls.ounces) })}
+        {E.edit("Serving size · oz", model.ounces ?? "", "text", undefined, { id: "pour-ounces", onChange: controls.ounces, onBlur: () => touched.touch(OUNCES), error: ouncesError, inputMode: "decimal", required: Boolean(controls.ounces) })}
         <details open={model.pourName ? true : undefined}><summary className="cursor-pointer text-sm font-medium">Rename · optional</summary><div className="pt-3"><RegistryInput label="Name" value={model.pourName ?? ""} onChange={controls.pourName} placeholder={Number(model.ounces) > 0 ? `${Number(model.ounces)} oz pour` : "Pint"} /></div></details>
         {E.info("A pour is a non-stock SKU. Its serving volume is drawn from a keg; glasses are not held as inventory.")}
       </> : <>

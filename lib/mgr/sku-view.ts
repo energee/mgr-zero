@@ -1,5 +1,8 @@
 // lib/mgr/sku-view.ts — view-model for the SKU sheet. create_sku / list_skus
 // plus packaged formats and keg pools paint format, pool, active, and optional UPC.
+import { isNumber, numberNotationError, toTicks } from "./quantity-input";
+import { submitReason } from "./submit-reason";
+
 export type SkuViewModel = {
   kind?: "packaged" | "poured";
   pourName?: string;
@@ -71,3 +74,20 @@ export function skuUpdateCommand(fields: { skuId: string; active: boolean; upc: 
 }
 
 export const pourSkuName = (name: string, ounces: string) => name.trim() || `${Number(ounces)} oz pour`;
+
+/** What is wrong with a typed serving size, or undefined. It keeps the table's
+ *  bounds (more than 0, under 1000 oz) as stored: numeric(12,4) rounds to four
+ *  decimals, so 0.00004 stores as 0 and 999.99995 as 1000, and both are refused. */
+export function pourOuncesError(value: string): string | undefined {
+  const notation = numberNotationError(value);
+  if (notation) return notation;
+  if (!isNumber(value)) return "Enter a serving size in ounces.";
+  if (Number(value) <= 0) return "Enter a serving size above 0 oz.";
+  const ticks = toTicks(Number(value));
+  if (ticks <= 0) return "Enter at least 0.0001 oz: serving sizes are stored to four decimal places.";
+  if (ticks >= toTicks(1000)) return "Enter a serving size under 1000 oz.";
+}
+
+/** Why Save pour is withheld, from the same check as the field error. */
+export const pourReason = (ounces: string) =>
+  submitReason(pourOuncesError(ounces) ? ["a serving size from 0.0001 to 999.9999 oz (no exponent notation)"] : []);
