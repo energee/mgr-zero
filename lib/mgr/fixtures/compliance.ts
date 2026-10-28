@@ -16,6 +16,8 @@ export const complianceMonthsDemo: ComplianceMonthsViewModel = {
     { key: "2026-07", title: "July 2026", detail: "Filed Aug 4, 2026 · 38.75 bbl taxpaid", tone: "ok" },
   ],
   registry: { key: "registry", title: "Licenses", detail: "Your brewery’s state licenses." },
+  // A lot-code search result. The inventory search box stays empty, as on every
+  // list record: a filled one draws Clear search, a link with no screen to open.
   lots: [{ key: "l-hz", title: "L-240831-HZ", detail: "Hazy IPA · packaged Aug 31, 2026" }],
 };
 

@@ -131,6 +131,12 @@ function bblUnits(value: string) {
   return BigInt(whole || "0") * BigInt(100_000_000) + BigInt(fraction.padEnd(8, "0") || "0");
 }
 
+/** The remaining loss as the BBL field's starting text, so the whole-loss case is pick a target and Save (#1510).
+ *  Trims the stored decimal's trailing zeros as text: Number() would print 0.0000005 as "5e-7", which bblUnits rejects. */
+export function remainingAmountText(remaining: string) {
+  return remaining.includes(".") ? remaining.replace(/\.?0+$/, "") : remaining;
+}
+
 /** Keep the reason and Save eligibility on the same exact, eight-decimal comparison. */
 export function lossReviewReason(amount: string, remaining: string, target: "sample" | "taproom" | "destruction", state: string): string | null {
   const amountUnits = bblUnits(amount);

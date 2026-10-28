@@ -10,7 +10,7 @@ import { SCREENS } from "../components/mgr/screens";
 import { BrandApprovalView } from "../components/mgr/views/brand-approval";
 import { ComplianceMonthsView } from "../components/mgr/views/compliance-months";
 import { LicensesView } from "../components/mgr/views/licenses";
-import { noPeriodsYet, periodRow } from "../lib/mgr/compliance-months-view";
+import { noLotMatch, noPeriodsYet, periodRow } from "../lib/mgr/compliance-months-view";
 import { LicenseView } from "../components/mgr/views/license";
 import { MaterialLotTraceView } from "../components/mgr/views/material-lot-trace";
 import { toMaterialLotTraceViewProps } from "../lib/mgr/material-lot-trace-view";
@@ -68,6 +68,18 @@ describe("Compliance months", () => {
     expect(isValidElement(screen("Compliance months").body)).toBe(true);
     expect(body.type).toBe(ComplianceMonthsView);
     expect(body.props.model).toEqual(complianceMonthsDemo);
+    expect(isValidElement((body.props as { controls?: unknown }).controls)).toBe(true);
+  });
+
+  it("puts a lot-code search under Lot trace and says when it matches no lot (#1510)", () => {
+    const search = createElement("form", { role: "search" });
+    const html = htmlOf(createElement(ComplianceMonthsView, { model: { ...complianceMonthsDemo, lots: [] }, controls: search }));
+    expect(html).toMatch(/Lot trace[\s\S]*role="search"/);
+    expect(html).not.toMatch(/L-240831-HZ/);
+    const none = htmlOf(createElement(ComplianceMonthsView, { model: { ...complianceMonthsDemo, lots: [], lotsEmpty: noLotMatch }, controls: search }));
+    expect(none).toMatch(/No lots match/);
+    const page = src("app/(app)/compliance/page.tsx");
+    expect(page).toMatch(/runCommand\("list_lots", \{ q \}/);
   });
 
   it("renders licenses and lot navs without leaking live hrefs", () => {
