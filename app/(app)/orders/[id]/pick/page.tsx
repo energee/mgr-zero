@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function PickPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { ctx, snapshot } = await getPickPageData(id);
-  const { order, lines, events = [] } = snapshot as { order: PickSnapshot["order"] & { status: string }; lines: PickSnapshot["lines"]; events?: { id: string; created_at: string; event: string; payload: { line_id?: string } }[] };
+  const { order, lines, sourceOnHand, events = [] } = snapshot as { order: PickSnapshot["order"] & { status: string }; lines: PickSnapshot["lines"]; sourceOnHand: PickSnapshot["sourceOnHand"]; events?: { id: string; created_at: string; event: string; payload: { line_id?: string } }[] };
   const locations = await runPageQuery("list_locations", {}, ctx) as PickSnapshot["locations"];
   if (order.status !== "confirmed" && order.status !== "picked") redirect(`/orders/${order.id}`);
   // Recovery-panel retries skip the original form callback. Existing events still identify the resolved line.
@@ -34,5 +34,5 @@ export default async function PickPage({ params }: { params: Promise<{ id: strin
     if (event.event === "short_pick" && typeof event.payload.line_id === "string") latestShort.set(event.payload.line_id, event.id);
   }
   const countedLines = lines.map(line => ({ ...line, ...(latestShort.has(line.id) ? { shortPickEventId: latestShort.get(line.id) } : {}) }));
-  return <PickForm snapshot={{ order, lines: countedLines, locations, backHref: `/orders/${order.id}` }} />;
+  return <PickForm snapshot={{ order, lines: countedLines, sourceOnHand, locations, backHref: `/orders/${order.id}` }} />;
 }
