@@ -179,7 +179,11 @@ describe("Purchase orders", () => {
     expect(receive({ lines: lines.map(line => line.key === "hulls" ? { ...line, qty: "1e3" } : line) })).toBe("Still needed: a count of zero or more for Rice hulls · 50 lb.");
     // A blank line is left out of a new receipt; an all-blank receipt counts nothing.
     expect(receive({ lines: lines.map(line => line.key === "hulls" ? { ...line, qty: "" } : line) })).toBeNull();
-    expect(receive({ lines: lines.map(line => ({ ...line, qty: "" })) })).toBe("Still needed: a count on at least one line.");
+    expect(receive({ lines: lines.map(line => ({ ...line, qty: "" })) })).toBe("Still needed: a count above zero on at least one line.");
+    // A 0 is a short line beside a received one; a receipt of only zeros records nothing (#1485).
+    expect(receive({ lines: lines.map(line => line.key === "hulls" ? line : { ...line, qty: "0" }) })).toBeNull();
+    expect(receive({ lines: lines.map(line => ({ ...line, qty: line.key === "hulls" ? "0" : "" })) })).toBe("Still needed: a count above zero on at least one line.");
+    expect(receive({ lines: lines.map(line => ({ ...line, qty: "0" })) })).toBe("Still needed: a count above zero on at least one line.");
     expect(receive({ locationId: "", binId: "", receivedOn: "", lines: lines.map(line => line.key === "malt" ? { ...line, lot: " " } : line) }))
       .toBe("Still needed: a location, a bin, a received day, and a lot code for 2-row · 55 lb bags.");
     // A lot-tracked line counted 0 needs no lot.

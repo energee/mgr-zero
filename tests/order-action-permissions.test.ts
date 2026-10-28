@@ -23,8 +23,8 @@ it("offers sales and fulfillment actions only to their registered roles", () => 
       createElement(CancelOrderAction, { orderId: "order", status, canSell })));
   }
   expect(render("warehouse", "submitted")).not.toContain("Confirm");
-  expect(render("warehouse", "picked")).not.toContain("Add or remove lines");
-  expect(render("sales", "picked")).toContain("Add or remove lines");
+  // Lines add and remove in place on the order (#1503), so no header verb opens a separate page.
+  expect(render("sales", "picked")).not.toContain("Add or remove lines");
   expect(render("warehouse", "picked")).not.toContain("Cancel");
   expect(render("sales", "submitted")).toContain("Cancel");
   expect(render("sales", "picked")).not.toContain("Record pick");

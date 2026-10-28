@@ -203,5 +203,6 @@
   "20261027150000_today_action_hrefs.sql": "8b149cf10e1f873cbee0aad46eae343894b52df8be853bc3dd7e69add811e61b",
   "20261027160000_stock_shortfall_messages.sql": "f4f93c4a1b76e65a9ed7d4eb415176cef11c05521651164f6a8c32461861ade0",
   "20261027170000_close_run_whole_kegs.sql": "ffa3db42160907b96b6a42d9124e27be27c23989bc5071459edd0d90edfd73a0",
-  "20261028005813_catalog_category_case_insensitive.sql": "cf12247684f7ec42bab3b94538de8ac1d5f77dd8a48e3e47138c672ff864ba67"
+  "20261028005813_catalog_category_case_insensitive.sql": "cf12247684f7ec42bab3b94538de8ac1d5f77dd8a48e3e47138c672ff864ba67",
+  "20261028235900_delete_ship_to.sql": "2cb36eedbfd4df01716956164ec537b6eae24399cccdfa30182d77a6d03fab9e"
 }

@@ -43,7 +43,6 @@ import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHeal
 import { linkedChatPeople, chatLinkIntent, chatRecovery, chatDisconnected, chatConnected, personalChatPreferences } from "@/lib/mgr/fixtures/chat";
 import { CHAT_PREVIEW_FIXTURES } from "@/lib/chat/preview-fixtures";
 import { NOTIFICATION_REASON_LABEL, PERSONAL_NOTIFICATION_REASONS } from "@/lib/chat/contracts";
-import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { ShipmentSourcesView } from "@/components/mgr/views/shipment-sources";
 import { shipmentSources } from "@/lib/mgr/fixtures/order-sheets";
 import { BatchesView } from "@/components/mgr/views/batches";
@@ -199,7 +198,7 @@ import { invoiceFailedAls, invoiceFailedAlsAccounting, invoiceLocalPartlyPaid } 
 import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, reverseMovementAdjustment } from "@/lib/mgr/fixtures/inventory";
 import { binCold, locationBinsTaproom, locationTaproom, locationsList } from "@/lib/mgr/fixtures/locations";
 import { newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
-import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
+import { orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
 import { replenishmentDemo } from "@/lib/mgr/fixtures/replenishment";
 import {
   batchesBrewer, brewDayTurnsHazy, brewPrepMineral, brewTimelineMineral, closePackagingRunHazy, FERM_STAGES, MASH_STEPS, recipeBrandOptions, recipeHazyV4, recipesList, WATER_HAZY,
@@ -225,7 +224,6 @@ import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDri
 import {
   brandApprovalStout, complianceMonthsDemo, licensesDemo, licensePaBrewery, lotTraceHazy, materialLotTraceCitra, stateRegistrationHazy,
 } from "@/lib/mgr/fixtures/compliance";
-import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
 import { toBatchesViewProps } from "@/lib/mgr/batches-view";
 import { toBeerViewProps } from "@/lib/mgr/beer-view";
 import { toBinViewProps } from "@/lib/mgr/bin-view";
@@ -1005,13 +1003,13 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Order",
-    to: { Adjust: "Adjust lines", "Record pick": "Pick", Ship: "Ship and invoice", "Put back": "Put back", "Edit draft": "Edit draft", "Add line": "New order", "Cancel order": "Orders" },
+    to: { "Record pick": "Pick", Ship: "Ship and invoice", "Put back": "Put back", "Edit draft": "Edit draft", "Cancel order": "Orders" },
     job: "The staff home for one order: state, next action, lines, events, restock",
     reads: "get_order · get_atp · get_order_cogs",
     writes: "submit_order · adjust_order_lines [picked: an added or raised line sends the order back to confirmed for a re-pick; staged excess sets needs_restock] · cancel_order [needs_restock while quantities are staged]",
-    states: [["draft", "Edit draft corrects headers and lines; Submit advances the order"], ["confirmed / picked", "lines adjust; restock rows appear when picked qty exceeds ordered"], ["changed after pick", "count only the added or raised lines · the rest is already staged", 1], ["shipped", "read-only tape · Return shipment is the correction · Cost line for Admin and Sales: frozen lot cost, returns netted, margin on the order-line prices; units without a receipt cost are counted and the margin is withheld"], ["shipped · stop delivered", "the route stamped the stop; the order stays shipped · read-only, Return shipment still corrects"], ["stale", "another user changed a line · refresh", 1], ["permission", "sales or admin to adjust and see Cost; warehouse reads", 1]],
-    spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse. Adjusting down, shipping short and cancelling all set the restock flag; Put back is what clears it. Shipped is the last lifecycle state: Confirm delivery on the route stamps the stop, not the order, and no verb here sets it. Ship opens Ship and invoice rather than committing here. Cancel is destructive and asks for confirm. Every transition appends an order event row in the same RPC. A submitted order has no direct Confirm here: Review and confirm opens Confirm order, so stock and source warnings show before commit (#713).",
-    body: <OrderView model={toOrderViewProps(orderPickedRestock)} actions={<>{E.btn("Ship", "g")}{E.btn("Record pick", "g")}</>} adjustLines showAddLine complianceNote={OHIO_STOUT_NOTE} />,
+    states: [["draft", "Edit draft corrects headers and lines; Submit advances the order"], ["confirmed / picked", "Admin and Sales change, add (Add line) and remove (✕) lines in place with a required Reason; restock rows appear when picked qty exceeds ordered; a save leaving a SKU below zero available still saves: Lines saved · Available is below zero for … under the lines"], ["changed after pick", "count only the added or raised lines · the rest is already staged", 1], ["shipped", "read-only tape · Return shipment is the correction · Cost line for Admin and Sales: frozen lot cost, returns netted, margin on the order-line prices; units without a receipt cost are counted and the margin is withheld"], ["shipped · stop delivered", "the route stamped the stop; the order stays shipped · read-only, Return shipment still corrects"], ["stale", "another user changed a line · refresh", 1], ["permission", "sales or admin to adjust and see Cost; warehouse reads", 1]],
+    spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse. Adjusting down, shipping short and cancelling all set the restock flag; Put back is what clears it. Shipped is the last lifecycle state: Confirm delivery on the route stamps the stop, not the order, and no verb here sets it. Ship opens Ship and invoice rather than committing here. Cancel is destructive and asks for confirm. Every transition appends an order event row in the same RPC. A submitted order has no direct Confirm here: Review and confirm opens Confirm order, so stock and source warnings show before commit (#713). Lines change in place, not on a separate page: Ordered is a number field, ✕ removes a line, and Add line appends one that picks its SKU; any change asks for a Reason and saves the full line set in one RPC. On a picked order an added or raised line is unpicked work: the order returns to confirmed with that line uncounted and a changed-after-pick marker, and Ship stays hidden until Pick counts it.",
+    body: <OrderView model={toOrderViewProps(orderPickedRestock)} actions={<>{E.btn("Ship", "g")}{E.btn("Record pick", "g")}</>} lineEdit={{ skus: [], added: [] }} complianceNote={OHIO_STOUT_NOTE} />,
   },
   {
     step: 5,
@@ -1037,19 +1035,6 @@ export const SCREENS: Screen[] = [
     states: [["draft", "saved headers and lines prefilled"], ["incomplete line", "Save draft disabled until fixed or removed", 1], ["permission", "Admin and Sales only", 1], ["submitted", "returns to the order; editing refused", 1]],
     spec: "The shared page editor changes ship-to, requested ship date, customer PO, Pickup and lines. Customer, kind and fulfillment locations stay fixed. Saving keeps draft status and refreshes line prices; clearing the requested date explicitly removes it. Inventory simulates saving locally, while staff calls the existing authorized draft command.",
     body: <EditDraftOrderView model={editDraftOrder} />,
-  },
-  {
-    step: 5,
-    slice: 1,
-    tab: "Work",
-    name: "Adjust lines",
-    to: { "Save lines": "Order" },
-    job: "Replace the lines on a confirmed or picked order and say why",
-    reads: "get_order · list_skus",
-    writes: "adjust_order_lines [picked: an added or raised line sends the order back to confirmed for a re-pick; staged excess sets needs_restock]",
-    states: [["permission", "sales or admin required", 1], ["picked", "qty below picked stages the rest for Put back; an added or raised line sends the order back to confirmed · Pick again"], ["Available below zero", "the lines saved, but a SKU on the order is below zero available: Lines saved · Available is below zero for … · Back to order"], ["stale", "another user changed a line · refresh", 1]],
-    spec: "Opens from Order · Adjust. This is a line edit, not a short pick: Short pick is pick-time shortage from the Pick frame. Reason is required. Saving replaces the full line set in one RPC. On a picked order an added or raised line is unpicked work: the order returns to confirmed with that line uncounted and a changed-after-pick marker, and Ship stays hidden until Pick counts it.",
-    body: <AdjustLinesView model={toAdjustLinesViewProps(orderAdjustLines)} reason="customer cut" />,
   },
   {
     step: 5,
@@ -1114,7 +1099,7 @@ export const SCREENS: Screen[] = [
     reads: "get_order · get_invoice",
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["accepted", "INV number on the tape"], ["short", "restock row on Today"], ["kegs short", "saved warning names the short pool, size and shipping location", 1]],
-    spec: "Post-commit of Ship and invoice. Recorded shell shortages appear as reconciliation warnings; shipping is not refused for shells. A tape means recorded; a line shipped short names its saved reason after short:. Return shipment is the correction: live, it opens the invoice's Return page; deferred to delivery, it waits for the invoice delivery raises. A delivery order on no route offers Add to route, which opens New route with this shipment ticked; a pickup order does not.",
+    spec: "Post-commit of Ship and invoice. Recorded shell shortages appear as reconciliation warnings; shipping is not refused for shells. A tape means recorded; a line shipped short names its saved reason after short:. Return shipment is the correction: live, it opens the invoice's Return page; deferred to delivery, it waits for the invoice delivery raises. A delivery order on no route offers Add to route, which opens New route with this shipment ticked; a pickup order does not. Ship stays on this result; Open order goes on to the order.",
     body: <ShipmentDoneView model={toShipmentDoneViewProps(orderShipmentDone)} />,
   },
   {
@@ -2527,12 +2512,12 @@ export const SCREENS: Screen[] = [
     slice: 10,
     tab: "Work",
     name: "Routes",
-    to: { Assign: "Route", "Add to route": "Route" },
+    to: { Assign: "Route", Return: "Return route", "Add to route": "Route" },
     job: "See open and returned delivery routes and build the next one",
     reads: "list_routes",
     writes: "none [route planning happens on Route]",
     states: [["unassigned", "shipped orders and picked transfers waiting for a route are called out"], ["empty", "no routes yet: New route is the only action"], ["returned", "Status Returned lists finished routes newest first; an empty Open list points there"]],
-    spec: "Work › Deliveries. The Status pick shows Open routes, each naming its next action, or Returned routes, newest first. New route opens Route in builder mode, and Route returns here. A stop is a shipped order or a picked stock transfer.",
+    spec: "Work › Deliveries. The Status pick shows Open routes, each naming its next action (Return once every stop has an outcome, which opens the route's Return route), or Returned routes, newest first. New route opens Route in builder mode, and Route returns here. A stop is a shipped order or a picked stock transfer.",
     body: <RoutesView model={toRoutesViewProps(routesDriver)} />,
   },
   {

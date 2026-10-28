@@ -5059,6 +5059,9 @@ isOneToOne: false
 "delete_sale_channel":
 { Args: { "p_brewery": string,"p_id": string,"p_request_id": string }; Returns: Json
                            },
+"delete_ship_to":
+{ Args: { "p_brewery": string,"p_id": string,"p_request_id": string }; Returns: Json
+                           },
 "delete_vessel":
 { Args: { "p_brewery": string,"p_request_id": string,"p_vessel": string }; Returns: Json
                            },

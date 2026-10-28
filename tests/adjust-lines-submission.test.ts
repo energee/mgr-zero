@@ -1,4 +1,6 @@
-// Actual Order/Confirm shared handler and Adjust lines form must hold blank reasons before running a command.
+// The Order page's line edit (shared with Confirm order's quantity edit) holds
+// blank reasons before running a command, and sends every kept and added line
+// with adjust_order_lines; lines add and remove in place on the order (#1503).
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FormEvent } from "react";
 import type * as ReactModule from "react";
@@ -13,52 +15,62 @@ vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => ({
   busy: harness.busy, error: null, run: harness.run, setError: harness.setError,
 }) }));
 
-import { OrderLinesForm } from "@/app/(app)/orders/[id]/order-lines-form";
-import { AdjustLinesForm } from "@/app/(app)/orders/[id]/adjust-lines-form";
+import { OrderLinesEditor } from "@/app/(app)/orders/[id]/order-lines-form";
 import { orderConfirmedWholesale } from "@/lib/mgr/fixtures/orders";
 import { toOrderViewProps } from "@/lib/mgr/order-view";
 
 beforeEach(() => { harness.values = []; harness.busy = false; vi.clearAllMocks(); });
 
-function submit(surface: "inline" | "adjust", reason: string, nested = false) {
+const lines = [{ id: "line", sku_id: "sku", qty_ordered: 5 }, { id: "gone", sku_id: "old", qty_ordered: 1 }];
+
+/** useLineQuantities' state, in its useState order: quantities, reason, added lines, removed line ids. */
+function submit(state: { qtys?: Record<string, string>; reason: string; added?: { key: string; skuId: string }[]; removed?: string[] }, nested = false) {
   const form = {};
   const event = { preventDefault: vi.fn(), target: nested ? {} : form, currentTarget: form } as unknown as FormEvent<HTMLFormElement>;
-  if (surface === "inline") {
-    harness.values = [{ line: "2" }, reason];
-    OrderLinesForm({
-      orderId: "order", lines: [{ id: "line", sku_id: "sku", qty_ordered: 5 }],
-      editable: true, model: toOrderViewProps(orderConfirmedWholesale),
-    }).props.onSubmit(event);
-  } else {
-    harness.values = [[{ skuId: "sku", qty: "2" }], reason, []];
-    AdjustLinesForm({ orderId: "order", currentLines: [], skus: [] }).props.onSubmit(event);
-  }
+  harness.values = [state.qtys ?? { line: "2", gone: "1" }, state.reason, state.added ?? [], state.removed ?? []];
+  OrderLinesEditor({
+    orderId: "order", lines, editable: true, skus: [], warnings: [], onSaved: vi.fn(),
+    model: toOrderViewProps(orderConfirmedWholesale),
+  }).props.onSubmit(event);
 }
 
-describe("adjustment reason submit boundaries", () => {
-  it.each(["inline", "adjust"] as const)("holds blank %s submissions with the required message", surface => {
-    for (const reason of ["", "   ", "\t\r\n", "\u00a0\u2003", "\ufeff\u3000"]) submit(surface, reason);
+describe("order line edit submit boundaries", () => {
+  it("holds blank reasons with the required message", () => {
+    for (const reason of ["", "   ", "\t\r\n", "  ", "﻿　"]) submit({ reason });
     expect(harness.run).not.toHaveBeenCalled();
     expect(harness.setError).toHaveBeenCalledTimes(5);
     expect(harness.setError).toHaveBeenCalledWith("Reason required");
   });
 
-  it.each(["inline", "adjust"] as const)("sends trimmed valid %s reasons with all lines", surface => {
-    submit(surface, " \tCustomer cut\n ");
+  it("sends a trimmed reason with every line", () => {
+    submit({ reason: " \tCustomer cut\n " });
     expect(harness.run).toHaveBeenCalledOnce();
     expect(harness.run.mock.calls[0].slice(0, 2)).toEqual(["adjust_order_lines", {
-      orderId: "order", reason: "Customer cut", lines: [{ skuId: "sku", qty: 2 }],
+      orderId: "order", reason: "Customer cut", lines: [{ skuId: "sku", qty: 2 }, { skuId: "old", qty: 1 }],
     }]);
   });
 
-  it.each(["inline", "adjust"] as const)("does not resend %s while busy", surface => {
+  it("leaves a removed line out and sends an added one with its quantity", () => {
+    submit({ qtys: { line: "5", gone: "1", n1: "3" }, reason: "Swap", added: [{ key: "n1", skuId: "new" }], removed: ["gone"] });
+    expect(harness.run.mock.calls[0][1]).toEqual({
+      orderId: "order", reason: "Swap", lines: [{ skuId: "sku", qty: 5 }, { skuId: "new", qty: 3 }],
+    });
+  });
+
+  it("names an added line with no SKU instead of dropping it", () => {
+    submit({ qtys: { line: "5", gone: "1", n1: "3" }, reason: "Add", added: [{ key: "n1", skuId: "" }] });
+    expect(harness.run).not.toHaveBeenCalled();
+    expect(harness.setError).toHaveBeenCalledWith("Choose a SKU for each added line, or remove it.");
+  });
+
+  it("does not resend while busy", () => {
     harness.busy = true;
-    submit(surface, "Customer cut");
+    submit({ reason: "Customer cut" });
     expect(harness.run).not.toHaveBeenCalled();
   });
 
   it("keeps nested Cancel order submissions out of the shared Order/Confirm line handler", () => {
-    submit("inline", "Customer cut", true);
+    submit({ reason: "Customer cut" }, true);
     expect(harness.run).not.toHaveBeenCalled();
   });
 });

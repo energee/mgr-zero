@@ -82,7 +82,6 @@ const RECORDS = [
   ["locations/[id]/bins", "id", "list_locations"],
   ["menu/item/[formatId]", "formatId", "list_pos_locations"],
   ["orders/[id]", "id", "get_order"],
-  ["orders/[id]/adjust", "id", "get_order"],
   ["orders/[id]/complete", "id", "get_order"],
   ["orders/[id]/confirm", "id", "get_order"],
   ["orders/[id]/edit", "id", "get_order"],

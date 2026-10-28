@@ -4,7 +4,7 @@ import type { CommandContextExpectation } from "./registry";
 
 export type QueryScope = CommandContextExpectation & { roles?: readonly string[] };
 // Only registered reads belong here. Never cache/retry a mutation as a query.
-type CachedQuery = "list_orders" | "list_customers" | "list_locations" | "list_skus" | "get_packaging_material_plan" | "get_cola_image";
+type CachedQuery = "list_orders" | "list_customers" | "list_locations" | "list_skus" | "get_brewery" | "get_packaging_material_plan" | "get_cola_image";
 
 export function createQueryClient() {
   return new QueryClient({ defaultOptions: { queries: {

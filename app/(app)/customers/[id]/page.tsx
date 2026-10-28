@@ -9,6 +9,7 @@ import type { CustomerType } from "@/lib/mgr/enums";
 import { ShipToForm } from "../ship-to-form";
 import { DeleteCommandButton } from "../../delete-command-button";
 import { DeleteCustomerControl } from "@/components/mgr/views/delete-customer";
+import { DeleteShipToControl } from "@/components/mgr/views/delete-ship-to";
 import { RevokePortalUserControl } from "@/components/mgr/views/revoke-portal-user";
 import type { PortalUser } from "@/lib/commands/invites";
 import { shipToAddress } from "@/lib/mgr/ship-to-view";
@@ -42,6 +43,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         title: `${s.label}${s.is_default ? " · default" : ""}`,
         detail: shipToAddress(s),
         action: canWrite ? <ShipToForm key={JSON.stringify(s)} customerId={customer.id} customerCountry={customer.country} shipTo={s} shipTos={shipTos} /> : null,
+        // delete_ship_to refuses the default (make another the default first, #1487), so it offers no Delete.
+        remove: canWrite && !s.is_default ? <DeleteCommandButton control={DeleteShipToControl} command="delete_ship_to" input={{ shipToId: s.id }} name={s.label} redirect={`/customers/${customer.id}`} /> : null,
       })),
       addShipTo: canWrite ? <ShipToForm customerId={customer.id} customerCountry={customer.country} shipTos={shipTos} /> : null,
       portalUsers: canWrite ? <InviteForm customerId={customer.id} /> : null,

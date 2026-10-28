@@ -43,12 +43,13 @@ export type RoutesSnapshot = {
   empty?: EmptyState;
 };
 
-/** A route's next action: Resume once it has departed, Assign while it has no
- *  driver. An assigned route that has not departed, or one already returned,
- *  has none, so its row is a plain link rather than an "Open" verb (#1026). */
-export function routeNext(route: { departed_at: string | null; returned_at: string | null; driver_user_id: string | null }): { verb: string; tone: "info" | "attention" } | undefined {
+/** A route's next action: Resume once it has departed, Return once every stop
+ *  has an outcome (the driver records the truck back, #1505), Assign while it
+ *  has no driver. An assigned route that has not departed, or one already
+ *  returned, has none, so its row is a plain link rather than an "Open" verb (#1026). */
+export function routeNext(route: { departed_at: string | null; returned_at: string | null; driver_user_id: string | null; stops: { delivered_at: string | null }[] }): { verb: string; tone: "info" | "attention" } | undefined {
   if (route.returned_at) return undefined;
-  if (route.departed_at) return { verb: "Resume", tone: "info" };
+  if (route.departed_at) return route.stops.every(stop => stop.delivered_at) ? { verb: "Return", tone: "attention" } : { verb: "Resume", tone: "info" };
   if (!route.driver_user_id) return { verb: "Assign", tone: "attention" };
   return undefined;
 }

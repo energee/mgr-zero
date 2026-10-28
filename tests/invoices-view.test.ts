@@ -332,4 +332,9 @@ describe("Record payment from the register (#1506)", () => {
   it("Record payment starts with the balance due (#1506)", () => {
     expect(readFileSync("app/(app)/invoices/[id]/payment-form.tsx", "utf8")).toMatch(/amount: dollarsInput\(balanceCents\)/);
   });
+
+  it("Record payment on the invoice page starts on the customer's last payment method (#1506)", () => {
+    expect(readFileSync("app/(app)/invoices/[id]/payment-form.tsx", "utf8")).toMatch(/method: lastMethod \?\? ""/);
+    expect(readFileSync("app/(app)/invoices/[id]/page.tsx", "utf8")).toMatch(/<RecordPaymentForm [^>]*lastMethod=\{lastPaymentMethod\}/);
+  });
 });

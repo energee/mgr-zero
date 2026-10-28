@@ -5,7 +5,8 @@
 // Correct a shipment section: a credit memo against a subset of lines
 // (credit-memo-form.tsx). Payments recorded in MGR (#1045, payment-form.tsx):
 // Record payment when the model says the invoice takes one and the viewer may
-// run record_invoice_payment, and Void on each unvoided payment for a viewer
+// run record_invoice_payment (its Method starts on the customer's last
+// payment method), and Void on each unvoided payment for a viewer
 // who may run void_invoice_payment; otherwise both slots are null.
 // QuickBooks mapping, exact retry, corrected re-push and local write-off use
 // the same registered commands as the API. Write off also shows on an invoice
@@ -24,6 +25,7 @@ import { breweryDate } from "@/lib/date-format";
 import { RecordPaymentForm, VoidPaymentForm } from "./payment-form";
 import { QboInvoiceActions } from "@/app/(app)/settings/accounting/qbo-controls";
 import { navTitle } from "@/lib/mgr/nav";
+import type { PaymentMethod } from "@/lib/mgr/enums";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -38,7 +40,7 @@ type Question = { id: string; body: string; created_at: string; answered_at: str
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { brewery, ctx, snapshot } = await getInvoicePageData(id);
-  const { invoice, lines, payments, hasPendingPush, wasPushedToQbo, localPaidCents, quickbooksLink } = snapshot as { invoice: Invoice; lines: InvoiceLine[]; payments: InvoicePaymentRecord[]; hasPendingPush: boolean; wasPushedToQbo: boolean; localPaidCents: number; quickbooksLink: QboStaffInvoiceLink | null };
+  const { invoice, lines, payments, hasPendingPush, wasPushedToQbo, localPaidCents, quickbooksLink, lastPaymentMethod } = snapshot as { invoice: Invoice; lines: InvoiceLine[]; payments: InvoicePaymentRecord[]; hasPendingPush: boolean; wasPushedToQbo: boolean; localPaidCents: number; quickbooksLink: QboStaffInvoiceLink | null; lastPaymentMethod: PaymentMethod | null };
   const [questions, health] = (await Promise.all([
     canRun(ctx, "list_invoice_questions") ? runCommand("list_invoice_questions", { invoiceId: id }, ctx) : [],
     brewery.roles.includes("admin") || brewery.roles.includes("sales") ? runCommand("get_qbo_connection", {}, ctx) : null,
@@ -55,7 +57,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     ? invoiceMappingRows(invoice.customers, lines, realm, health?.depositItemId, brewery.roles.includes("admin"), health?.oneWayFeeItemId) : undefined;
   const model = toInvoiceViewProps({ invoice, lines, questions, mappings, payments, hasPendingPush, wasPushedToQbo, localPaidCents, backHref: "/invoices", timeZone: brewery.timeZone });
   const recordPayment = model.paymentBalanceCents != null && canRun(ctx, "record_invoice_payment")
-    ? <RecordPaymentForm invoiceId={invoice.id} balanceCents={model.paymentBalanceCents} today={breweryDate(brewery.timeZone)} quickbooksConnected={Boolean(health?.connected)} />
+    ? <RecordPaymentForm invoiceId={invoice.id} balanceCents={model.paymentBalanceCents} today={breweryDate(brewery.timeZone)} quickbooksConnected={Boolean(health?.connected)} lastMethod={lastPaymentMethod} />
     : null;
   const accountingActions = model.paymentBalanceCents != null && canRun(ctx, "write_off_invoice")
     ? [...presentation.actions, "write_off" as const]

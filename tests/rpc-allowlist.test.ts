@@ -120,6 +120,7 @@ const AUTHENTICATED_RPCS = [
   "delete_format(uuid,uuid,uuid)",
   "delete_price_group(uuid,uuid,uuid)",
   "delete_sale_channel(uuid,uuid,uuid)",
+  "delete_ship_to(uuid,uuid,uuid)",
   "save_catalog_category(uuid,text,text,uuid)",
   "disable_chat_installation(uuid,uuid,uuid)",
   "disconnect_chat_installation(uuid,uuid,uuid)",
