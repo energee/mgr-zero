@@ -52,6 +52,7 @@ defineCommand({
 });
 
 const readingDueHours = z.number().int().min(1).max(168);
+const breweryIdentifier = z.string().trim().max(BREWERY_IDENTIFIER_MAX).optional();
 const gatewayModel = z.string().trim().min(3).max(200).regex(MODEL_ID);
 const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, pa_license_no, customer_phone, fermentation_reading_due_hours, days_to_package, gravity_unit, portal_fulfillment_location_id, books_opened_on, one_way_keg_fee_cents";
 
@@ -68,7 +69,7 @@ defineCommand({
   roles: ["admin"],
   input: z.object({
     name: z.string().trim().min(1), timezone: z.string().trim().min(1),
-    ttbRegistryNo: z.string().trim().max(BREWERY_IDENTIFIER_MAX).optional(), paLicenseNo: z.string().trim().max(BREWERY_IDENTIFIER_MAX).optional(), customerPhone: phone.optional(),
+    ttbRegistryNo: breweryIdentifier, paLicenseNo: breweryIdentifier, customerPhone: phone.optional(),
     readingDueHours,
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_brewery", {
