@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { docNo, trfNo } from "@/lib/mgr/doc-no";
 import { hasAnyRole } from "@/lib/mgr/roles";
+import { ROUTE_STATUSES } from "@/lib/mgr/routes-view";
 import type { TeamMember } from "./invites";
 import { breweryToday, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, rows, runCommand, unwrap } from "./registry";
 
@@ -46,18 +47,23 @@ const shipmentDoc = (s: ShipmentRow): StopDoc => ({ id: s.id, kind: "shipment", 
 const transferDoc = (t: TransferRow): StopDoc => ({ id: t.id, kind: "transfer", label: [trfNo(t.transfer_no), t.to_location?.name].filter(Boolean).join(" · ") });
 
 defineQuery({
-  name: "list_routes", description: "Delivery routes (one route by id, one day, or every route not yet returned) with their stops and their driver's roster email (null when no driver is assigned or the driver has left the team); the shipped orders and picked transfers on no route; and the members who may drive, with their emails",
+  name: "list_routes", description: "Delivery routes (one route by id, one day, or by status: open, the default, is every route not yet returned; returned is every returned route, newest first) with their stops and their driver's roster email (null when no driver is assigned or the driver has left the team); whether any route has been returned; the shipped orders and picked transfers on no route; and the members who may drive, with their emails",
   roles: [...READ],
-  input: z.object({ id: z.string().uuid().optional(), date: z.string().date().optional() }),
+  input: z.object({ id: z.string().uuid().optional(), date: z.string().date().optional(), status: z.enum(ROUTE_STATUSES).optional() }),
   handler: async (ctx, i) => {
-    let q = ctx.db.from("routes").select("*").eq("brewery_id", ctx.breweryId).order("delivery_date").order("created_at");
-    q = i.id ? q.eq("id", i.id) : i.date ? q.eq("delivery_date", i.date) : q.is("returned_at", null);
+    const returned = i.status === "returned";
+    let q = ctx.db.from("routes").select("*").eq("brewery_id", ctx.breweryId)
+      .order("delivery_date", { ascending: !returned }).order("created_at", { ascending: !returned });
+    if (i.id) q = q.eq("id", i.id);
+    else if (i.date) q = q.eq("delivery_date", i.date);
+    else if (returned) q = q.not("returned_at", "is", null);
+    else q = q.is("returned_at", null);
     // Read only what the page shows: the listed routes' stops, and the documents on no route (an
     // anti-join on deliveries), each read whole by completeRows however many pages it spans (#473).
     // ponytail: a carrier-shipped order still waits in "unassigned" until someone routes it; a
     // shipment-level "handed to carrier" state is the upgrade path once that list outgrows one screen.
     // A pickup order (orders.pickup) is the customer collecting it, so it never waits here.
-    const [routes, shipments, transfers, team, today] = await Promise.all([
+    const [routes, shipments, transfers, team, today, returnedRoutes] = await Promise.all([
       rows<RouteRow>(q),
       completeRows("Unrouted shipments", (start) => ctx.db.from("shipments").select(`id, ${SHIPMENT_LABEL}, deliveries(id)`, { count: "exact" })
         .eq("brewery_id", ctx.breweryId).is("deliveries", null).eq("orders.pickup", false).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<ShipmentRow[]>,
@@ -67,6 +73,8 @@ defineQuery({
       // cannot read, so they come from the list_team_members RPC; it lists only current members.
       runCommand("list_team_members", {}, ctx) as Promise<TeamMember[]>,
       breweryToday(ctx),
+      // An empty Open list names Returned when routes were returned, instead of "No routes yet" (#1486).
+      rows<{ id: string }>(ctx.db.from("routes").select("id").eq("brewery_id", ctx.breweryId).not("returned_at", "is", null).limit(1)),
     ]);
     const routeIds = routes.map((r) => r.id);
     const [deliveries, outstanding] = await Promise.all([inChunks(routeIds, (chunk) => completeRows("Route stops", (start) => ctx.db.from("deliveries")
@@ -88,6 +96,7 @@ defineQuery({
           ...d, outstanding_qty: outstandingByStop.get(d.id) ?? 0, label: sh ? shipmentDoc(sh).label : tr ? transferDoc(tr).label : "Stop",
         })),
       })),
+      anyReturned: returnedRoutes.length > 0,
       unassigned: [...shipments.map(shipmentDoc), ...transfers.map(transferDoc)],
       drivers: team.filter((m) => hasAnyRole(m.roles, ROLES))
         .map((m) => ({ user_id: m.userId, email: m.email, roles: m.roles })),
@@ -97,26 +106,32 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_delivery_stop", description: "One delivery stop: route, ship-to or destination, its lines (shipped or picked quantities), invoice timing, and whether it is signed",
+  name: "get_delivery_stop", description: "One delivery stop: route, ship-to or destination, its lines (shipped or picked quantities), invoice timing, whether it is signed, and the names that signed earlier deliveries to its ship-to, newest first",
   roles: [...READ],
   input: z.object({ deliveryId: z.string().uuid() }),
   handler: async (ctx, i) => {
     const delivery = await unwrap(ctx.db.from("deliveries")
-      .select("id, stop_no, delivered_at, signed_by, outcome, refusal_reason, refusal_note, routes(id, name, delivery_date, driver_user_id, departed_at), shipments(id, invoice_timing, orders(id, order_no, customers(name), ship_tos(label, country, address1, address2, city, state, zip))), stock_transfers(id, transfer_no, to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name))")
+      .select("id, stop_no, delivered_at, signed_by, outcome, refusal_reason, refusal_note, routes(id, name, delivery_date, driver_user_id, departed_at), shipments(id, invoice_timing, orders(id, order_no, ship_to_id, customers(name), ship_tos(label, country, address1, address2, city, state, zip))), stock_transfers(id, transfer_no, to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name))")
       .eq("id", i.deliveryId).single());
     // to-one embeds come back as objects; without generated types supabase-js says array
-    const { shipments, stock_transfers } = delivery as unknown as { shipments: { id: string; orders: { id: string } } | null; stock_transfers: { id: string } | null };
+    const { shipments, stock_transfers } = delivery as unknown as { shipments: { id: string; orders: { id: string; ship_to_id: string | null } } | null; stock_transfers: { id: string } | null };
     // lines are {id, name, qty} whichever document the stop delivers
     if (shipments) {
-      const [lines, invoice] = await Promise.all([
+      const shipToId = shipments.orders.ship_to_id;
+      const [lines, invoice, signed] = await Promise.all([
         rows<{ id: string; qty_shipped: number; qty_refused: number; skus: { name: string } | null }>(ctx.db.from("order_lines").select("id, qty_shipped, qty_refused, skus(name)").eq("order_id", shipments.orders.id).gt("qty_shipped", 0)),
         unwrap(ctx.db.from("invoices").select("id, invoice_no").eq("shipment_id", shipments.id).eq("kind", "invoice").maybeSingle()),
+        // Received by suggestions (#1505): the latest signatures at this ship-to; 50 is ample for a handful of names.
+        shipToId ? rows<{ signed_by: string }>(ctx.db.from("deliveries").select("signed_by, shipments!inner(orders!inner(ship_to_id))")
+          .eq("brewery_id", ctx.breweryId).eq("shipments.orders.ship_to_id", shipToId).not("signed_by", "is", null).neq("signed_by", "")
+          .order("delivered_at", { ascending: false }).limit(50)) : [],
       ]);
-      return { delivery, lines: lines.map((l) => ({ id: l.id, name: l.skus?.name ?? "Line", qty: Number(l.qty_shipped), refused: Number(l.qty_refused) })), invoice };
+      const signers = [...new Set(signed.map((d) => d.signed_by))];
+      return { delivery, lines: lines.map((l) => ({ id: l.id, name: l.skus?.name ?? "Line", qty: Number(l.qty_shipped), refused: Number(l.qty_refused) })), invoice, signers };
     }
     const picked = await rows<{ id: string; qty_picked: number | null; skus: { name: string } | null; materials: { name: string } | null; keg_pools: { name: string } | null }>(
       ctx.db.from("stock_transfer_lines").select("id, qty_picked, skus(name), materials(name), keg_pools(name)").eq("transfer_id", stock_transfers!.id));
-    return { delivery, lines: picked.map((l) => ({ id: l.id, name: (l.skus ?? l.materials ?? l.keg_pools)?.name ?? "Line", qty: Number(l.qty_picked ?? 0) })), invoice: null };
+    return { delivery, lines: picked.map((l) => ({ id: l.id, name: (l.skus ?? l.materials ?? l.keg_pools)?.name ?? "Line", qty: Number(l.qty_picked ?? 0) })), invoice: null, signers: [] };
   },
 });
 

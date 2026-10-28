@@ -26,18 +26,24 @@ it("retains both keg actions without nesting buttons or inventing yield bars", (
   expect(html).not.toMatch(/<button[^>]*>(?:(?!<\/button>)[\s\S])*<button/);
   expect(html).not.toContain('style="width:');
   expect(html).toContain("no guest yield");
-  expect(html).toContain("Porter · ⅙ bbl tapped");
   expect(html).not.toContain("Recent ·");
-  expect(html).toContain('<ul aria-label="Recently tapped kegs"><li>');
   expect(html).not.toContain('href="/taproom');
   expect(isInertOn(SCREENS.find(screen => screen.name === "Tap board")!, "Tap keg")).toBe(true);
+});
+
+it("lists only closed kegs under Recent history, never the open kegs already on the board (#1512)", () => {
+  const html = renderToStaticMarkup(createElement(TapBoardView, { state: tapBoard, skus: tapBoardSkus, timeZone: "America/New_York", navigation: { locations: [{ value: "taproom", label: "Taproom" }], location: "taproom" } }));
+  const history = html.slice(html.indexOf("Recent history"));
+  expect(history).not.toContain("Recently tapped kegs");
+  expect(history).not.toMatch(/ tapped</);
+  expect(history).toContain('aria-label="Closed kegs"');
 });
 
 it("shows own and guest kegs in server order with the same opening date (#1383)", () => {
   const own = tapBoard.snapshot.open[0];
   const guest = { ...tapBoard.snapshot.open.find(tap => !tap.sku_id)!, opened_at: own.opened_at };
   const state = { ...tapBoard, snapshot: { open: [guest, own], history: [] } };
-  const html = renderToStaticMarkup(createElement(TapBoardView, { state, skus: tapBoardSkus, timeZone: "America/New_York", recentEvents: [], navigation: { locations: [{ value: "taproom", label: "Taproom" }], location: "taproom" } }));
+  const html = renderToStaticMarkup(createElement(TapBoardView, { state, skus: tapBoardSkus, timeZone: "America/New_York", navigation: { locations: [{ value: "taproom", label: "Taproom" }], location: "taproom" } }));
   expect(html.indexOf("Guest cider · keg")).toBeLessThan(html.indexOf(own.sku_name!));
   const dates = [...html.matchAll(/<time[^>]*>([^<]+)<\/time>/g)].map(match => match[1]);
   expect(dates).toHaveLength(2);
@@ -176,7 +182,8 @@ describe("Fill words match the chips (#1192)", () => {
     expect(html).toContain("opened full");
     expect(html).toContain("opened 60%");
     expect(html).not.toContain("opened 100%");
-    expect(html).toContain("Kicked empty · Empty · closed");
+    expect(html).toContain("Kicked empty · closed");
+    expect(html).not.toContain("Kicked empty · Empty");
     const [closed] = tapBoard.snapshot.history;
     expect(board({ ...tapBoard, snapshot: { ...tapBoard.snapshot, history: [{ ...closed, closing_fill: .5, close_reason: "Off flavor" }] } })).toContain("Off flavor · About 50% left · closed");
   });
@@ -218,5 +225,29 @@ describe("Tap board polish (#1302)", () => {
     expect(swap).toContain("Swap closes this keg and opens its replacement together.");
     expect(swap).not.toContain("atomic swap");
     expect(swap).not.toContain("half-finished swap");
+  });
+});
+
+describe("Unnumbered keg wording (#1481)", () => {
+  const [closed] = tapBoard.snapshot.history;
+  const board = (history = tapBoard.snapshot.history) => renderToStaticMarkup(createElement(TapBoardView, { state: { ...tapBoard, snapshot: { ...tapBoard.snapshot, history } }, skus: tapBoardSkus, timeZone: "America/New_York", navigation: { locations: [{ value: "taproom", label: "Taproom" }], location: "taproom" } }));
+
+  it("heads a kick sheet Kick keg, never Kick tap unnumbered", () => {
+    const unnumbered = { ...kickKeg, interval: { ...kickKeg.interval!, tap_number: null } };
+    const html = renderToStaticMarkup(createElement(TapKegView, { sheet: unnumbered, skus: [], timeZone: "America/New_York" }));
+    expect(html).toContain(">Kick keg<");
+    expect(html).not.toContain("unnumbered");
+    const numbered = renderToStaticMarkup(createElement(TapKegView, { sheet: { ...kickKeg, interval: { ...kickKeg.interval!, tap_number: "5" } }, skus: [], timeZone: "America/New_York" }));
+    expect(numbered).toContain("Kick tap 5");
+    const swap = renderToStaticMarkup(createElement(TapKegView, { sheet: { ...swapKeg, interval: { ...swapKeg.interval!, tap_number: null } }, skus: tapBoardSkus, timeZone: "America/New_York" }));
+    expect(swap).not.toContain("unnumbered");
+  });
+
+  it("leaves the number out of an unnumbered history row and keeps a fill the reason does not say", () => {
+    const html = board([{ ...closed, tap_number: null }]);
+    expect(html).toContain(`>${closed.sku_name}</`);
+    expect(html).not.toContain("Tap unnumbered");
+    expect(board([{ ...closed, tap_number: "4" }])).toContain(`Tap 4 · ${closed.sku_name}`);
+    expect(board([{ ...closed, close_reason: "Kicked empty", closing_fill: .25 }])).toContain("Kicked empty · About 25% left · closed");
   });
 });

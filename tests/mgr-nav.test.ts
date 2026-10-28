@@ -2,14 +2,15 @@
 // boundary: role filtering leaves no gaps, and the active tab is the longest
 // href prefix of the current path (so /orders/123 lights Work, / lights Today).
 import { describe, expect, it } from "vitest";
-import { activeChild, activeTab, canOpen, isUnder, navAbout, navGroups, navTitle, shippedNav, navFor, PORTAL_NAV, STAFF_NAV, type NavItem } from "../lib/mgr/nav";
+import { activeChild, activeTab, canOpen, isUnder, navAbout, navGroups, navTitle, shippedNav, navFor, PORTAL_NAV, STAFF_NAV, UNLISTED_NAV, type NavItem } from "../lib/mgr/nav";
+import { searchDestinations } from "../lib/mgr/search-palette-state";
 import { STAFF_ROLES } from "../lib/mgr/enums";
 import { workHrefsFor } from "../components/mgr/work-tabs";
 
 describe("navFor", () => {
   it("admin sees every item", () => {
     const labels = navFor(STAFF_NAV, ["admin"]).flatMap((t) => (t.children ?? []).map((c) => c.label));
-    for (const label of ["Weekly count", "Tap board", "Cellar", "Materials on hand", "Keg fleet", "Batches", "Packaging", "Purchase orders", "Deliveries", "Recipes", "Compliance", "Planning", "Import", "Settings"]) {
+    for (const label of ["Weekly count", "Tap board", "Cellar", "Materials on hand", "Keg fleet", "Batches", "Packaging", "Purchase orders", "Deliveries", "Recipes", "Compliance", "Planning", "Settings"]) {
       expect.soft(labels).toContain(label);
     }
   });
@@ -23,12 +24,9 @@ describe("navFor", () => {
   it("keeps only groups with a permitted child", () => {
     const warehouse = navFor(STAFF_NAV, ["warehouse"]);
     expect(warehouse.map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
-    // Menu is still planned; Vendors and Planning shipped with purchasing;
-    // Units is shipped and open to every staff role, since a gravity display
-    // unit is a personal preference rather than a permission
-    // (set_my_gravity_unit admits all four roles).
+    // Chat and the personal gravity unit live in the Me sheet, not More (#1513).
     expect(warehouse.find((t) => t.label === "Beer")!.children!.map((c) => c.label)).toContain("Weekly count");
-    expect(warehouse.find((t) => t.label === "More")!.children!.map((c) => c.label)).toEqual(["Menu", "Vendors", "Planning", "Chat", "Units"]);
+    expect(warehouse.find((t) => t.label === "More")!.children!.map((c) => c.label)).toEqual(["Menu", "Vendors", "Planning"]);
   });
 });
 
@@ -72,7 +70,6 @@ describe("activeChild", () => {
   it("picks only the longest matching child, never its parent path too (#446)", () => {
     expect(activeChild(beer, "/taproom/board")?.label).toBe("Tap board");
     expect(activeChild(beer, "/taproom")?.label).toBe("Weekly count");
-    expect(activeChild(more, "/settings/units")?.label).toBe("Units");
     expect(activeChild(more, "/settings")?.label).toBe("Settings");
     expect(activeChild(more, "/settings/team")?.label).toBe("Settings");
   });
@@ -81,10 +78,9 @@ describe("activeChild", () => {
   });
 });
 
-it("taproom has Beer and own settings without forbidden Work", () => {
+it("taproom has Today and Beer, with no Work and no More (#1513)", () => {
   const nav = navFor(shippedNav(STAFF_NAV), ["taproom"]);
-  expect(nav.map(t => t.label)).toEqual(["Today", "Beer", "More"]);
-  expect(nav.find(t => t.label === "More")!.children!.map(t => t.label)).toEqual(["Chat", "Units"]);
+  expect(nav.map(t => t.label)).toEqual(["Today", "Beer"]);
   expect(nav.find(t => t.label === "Beer")!.children).toMatchObject([
     { label: "Weekly count", href: "/taproom", roles: ["warehouse", "taproom"] },
     { label: "Tap board", href: "/taproom/board", roles: ["warehouse", "taproom"] },
@@ -94,13 +90,15 @@ it("taproom has Beer and own settings without forbidden Work", () => {
 
 describe("canOpen", () => {
   it("reads the role gate of the deepest nav entry covering the path (#444)", () => {
-    // /settings is admin-only; Units under it is not.
+    // /settings is admin-only; Chat under it is not.
     expect(canOpen(["admin"], "/settings")).toBe(true);
     for (const role of ["sales", "brewer", "warehouse", "taproom"] as const) {
       expect.soft(canOpen([role], "/settings"), role).toBe(false);
       expect.soft(canOpen([role], "/settings/pos"), role).toBe(false);
-      expect.soft(canOpen([role], "/settings/units"), role).toBe(true);
+      expect.soft(canOpen([role], "/settings/chat"), role).toBe(true);
+      expect.soft(canOpen([role], "/locations"), role).toBe(false);
     }
+    expect(canOpen(["admin"], "/locations")).toBe(true);
     expect(canOpen(["warehouse"], "/more")).toBe(true);
   });
 });
@@ -111,7 +109,10 @@ describe("navTitle", () => {
     expect(navTitle("/orders")).toBe("Orders");
     expect(navTitle("/routes")).toBe("Deliveries");
     expect(navTitle("/taproom/board")).toBe("Tap board");
-    expect(navTitle("/settings/units")).toBe("Units");
+    expect(navTitle("/settings/chat")).toBe("Chat");
+    expect(navTitle("/settings/import")).toBe("Import");
+    expect(navTitle("/settings/channels")).toBe("Sale channels");
+    expect(navTitle("/locations")).toBe("Locations");
     expect(navTitle("/settings/team")).toBe("Team");
   });
   it.each([
@@ -163,13 +164,13 @@ describe("about", () => {
   // Search's Pages results and the More cards both print `about`, so every
   // staff entry a role can reach carries one short sentence-case line (#1106, #1134).
   it("describes every staff tab and child in sentence case", () => {
-    for (const item of STAFF_NAV.flatMap(tab => [tab, ...(tab.children ?? [])])) {
+    for (const item of [...STAFF_NAV.flatMap(tab => [tab, ...(tab.children ?? [])]), ...UNLISTED_NAV]) {
       expect.soft(item.about, item.label).toMatch(/^[A-Z][^.]*[^.\s]$/);
     }
   });
 
   it("navAbout quotes an entry's line and refuses a label with none", () => {
-    const chat = STAFF_NAV.find(t => t.label === "More")!.children!.find(c => c.label === "Chat")!;
+    const chat = UNLISTED_NAV.find(c => c.label === "Chat")!;
     expect(navAbout("Chat")).toBe(chat.about);
     expect(() => navAbout("Formats")).toThrow(/Formats/);
   });
@@ -183,23 +184,35 @@ describe("navGroups (#1159)", () => {
     for (const c of STAFF_NAV.find(t => t.label === "More")!.children!) expect.soft(c.group, c.label).toBeDefined();
   });
 
-  it("draws admin's More under Sales, Production, Setup and Menu and chat", () => {
+  it("draws admin's More under Sales, Production, Setup and Menu, with one Settings entry (#1513)", () => {
     expect(drawn(moreFor(["admin"]))).toEqual([
       ["Sales", ["Invoices", "Catalog", "Customers", "Price groups", "Compliance"]],
       ["Production", ["Recipes", "Vendors", "Planning"]],
-      ["Setup", ["Import", "Settings", "Sale channels", "Locations", "Units"]],
-      ["Menu and chat", ["Menu", "Chat"]],
+      ["Setup", ["Settings"]],
+      ["Menu", ["Menu"]],
     ]);
   });
 
   it("drops an area the role has no entry under", () => {
-    expect(drawn(moreFor(["taproom"]))).toEqual([["Setup", ["Units"]], ["Menu and chat", ["Chat"]]]);
-    expect(drawn(moreFor(["brewer"]))).toEqual([["Production", ["Recipes", "Vendors", "Planning"]], ["Setup", ["Units"]], ["Menu and chat", ["Chat"]]]);
-    expect(drawn(moreFor(["warehouse"]))).toEqual([["Production", ["Vendors", "Planning"]], ["Setup", ["Units"]], ["Menu and chat", ["Menu", "Chat"]]]);
+    expect(drawn(moreFor(["brewer"]))).toEqual([["Production", ["Recipes", "Vendors", "Planning"]]]);
+    expect(drawn(moreFor(["warehouse"]))).toEqual([["Production", ["Vendors", "Planning"]], ["Menu", ["Menu"]]]);
   });
 
   it("keeps a tab's ungrouped children together under no heading", () => {
     const beer = STAFF_NAV.find(t => t.label === "Beer")!;
     expect(navGroups(beer.children!)).toEqual([{ group: undefined, items: beer.children }]);
+  });
+});
+
+describe("UNLISTED_NAV (#1513)", () => {
+  it("keeps the pages Settings and Me link, out of the rail and More", () => {
+    expect(UNLISTED_NAV.map(i => i.label)).toEqual(["Import", "Sale channels", "Locations", "Chat"]);
+    const drawnHrefs = STAFF_NAV.flatMap(t => [t.href, ...(t.children ?? []).map(c => c.href)]);
+    for (const item of UNLISTED_NAV) expect.soft(drawnHrefs, item.label).not.toContain(item.href);
+  });
+  it("Search still finds them for a role that may open them", () => {
+    expect(searchDestinations(["admin"], "locat").map(i => i.label)).toEqual(["Locations"]);
+    expect(searchDestinations(["taproom"], "chat").map(i => i.label)).toEqual(["Chat"]);
+    expect(searchDestinations(["sales"], "locat")).toEqual([]);
   });
 });

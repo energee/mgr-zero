@@ -2,14 +2,16 @@
 // records Me and Portal Me): who I am, which brewery, change password, sign
 // out, and a Guide link to the audience's customer guide. Uses the same
 // centered dialog at every viewport. Its children are the shared staff or
-// portal view; live layouts supply data and actions.
+// portal view; live layouts supply data and actions. Left uncontrolled, it
+// closes when the route changes, so a link inside it (staff Chat) does not
+// leave the sheet open over the page it opened.
 // `avatar` swaps the UserCircle icon for the person: their photo, or their
 // initials when `src` is omitted. The schema has no avatar column, so the app
 // passes nothing and only the design inventory (screen-frame.tsx, which owns
 // every other gallery fixture) supplies one.
 "use client";
 
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/(auth)/actions";
@@ -25,14 +27,24 @@ export function MeSheet({ avatar, children, open, onOpenChange }: {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
+  const pathname = usePathname();
+  const [ownOpen, setOwnOpen] = useState(false);
+  // Adjusted during render (React's "derive state from props" pattern), not in an effect.
+  const [shownOn, setShownOn] = useState(pathname);
+  if (shownOn !== pathname) {
+    setShownOn(pathname);
+    setOwnOpen(false);
+  }
+  // Radix's open focus skips links, so it would land on Sign out; start on the title instead.
+  const title = useRef<HTMLHeadingElement>(null);
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open ?? ownOpen} onOpenChange={onOpenChange ?? setOwnOpen}>
       {open === undefined && <DialogTrigger asChild>
         <Button variant="ghost" size="sm" aria-label="Me">{avatar ? <UserAvatar {...avatar} className="size-5 text-[0.6rem]" /> : <Icon icon={UserCircleIcon} />}Me</Button>
       </DialogTrigger>}
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" onOpenAutoFocus={(e) => { e.preventDefault(); title.current?.focus(); }}>
         <DialogHeader>
-          <DialogTitle>Me</DialogTitle>
+          <DialogTitle ref={title} tabIndex={-1}>Me</DialogTitle>
         </DialogHeader>
         {children}
       </DialogContent>

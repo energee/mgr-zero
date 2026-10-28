@@ -19,7 +19,7 @@ import { canRun } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { FormatForm } from "./format-form";
 import { ListControls } from "@/components/mgr/list-controls";
-import { listParams } from "@/lib/mgr/list-params";
+import { listParams, searchQuery } from "@/lib/mgr/list-params";
 import { BRAND_SORTS } from "@/lib/mgr/enums";
 import { navTitle } from "@/lib/mgr/nav";
 import { ColaReview } from "./cola-review";
@@ -38,7 +38,7 @@ type Format = { id: string; name: string; basis: "packaged" | "poured"; package_
 const PRICING_READS = ["list_sale_channels", "list_price_groups", "list_formats", "list_channel_prices", "list_price_group_barcodes"];
 
 const catalogParams = z.object({
-  q: z.string().trim().max(100).catch(""),
+  q: searchQuery,
   sort: z.enum(BRAND_SORTS).catch("name"),
   category: z.string().trim().catch(""),
 });
@@ -56,7 +56,7 @@ export default async function CatalogPage({ searchParams }: { searchParams?: Pro
   const scopes = toCatalogScopes({ ...params, categories: categories.map(c => c.name), href: patch => hrefWith("/catalog", patch) });
   // The search form resubmits only q, so it carries every other non-default param along.
   const keep = Object.fromEntries(queryWith({ q: "" }));
-  const controls = <ListControls search={{ label: "Search brands or aliases", value: params.q, keep }} scopes={scopes} />;
+  const controls = <ListControls search={{ label: "Search brands or aliases", value: params.q, keep, path: "/catalog" }} scopes={scopes} />;
   const model = toCatalogViewProps({ brands, priceGroups: groups, backHref: "/more", filtered: Boolean(params.q || params.category) });
   return (
     <CatalogView
@@ -71,7 +71,7 @@ export default async function CatalogPage({ searchParams }: { searchParams?: Pro
         waterProfiles: canRun(ctx, "list_water_profiles"),
       }}
       formats={toFormatsViewProps({ formats, formatHref: format => `/catalog/formats/${format.id}` })}
-      formatAction={canWrite ? <FormatForm componentOptions={formats.filter(format => format.bbl_per_unit !== null)} /> : null}
+      formatAction={canWrite ? <FormatForm componentOptions={formats.filter(format => format.bbl_per_unit !== null)} takenNames={formats.map(format => format.name)} /> : null}
     />
   );
 }

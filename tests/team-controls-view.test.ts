@@ -68,6 +68,12 @@ it("requires a nonempty changed role set and blocks empty, unchanged and pending
   expect(onSubmit).toHaveBeenCalledOnce();
 });
 
+it.each(["", "abc", "a@b", "   ", `${"a".repeat(300)}@example.org`, `${"a".repeat(70)}@example.org`])("withholds Send invite with its reason for %j (#1488)", email => {
+  const html = renderToStaticMarkup(createElement(InviteView, { buyer: true, email }));
+  expect(html.match(/<button[^>]*>Send invite<\/button>/)?.[0]).toContain('disabled=""');
+  expect(html).toContain("Still needed: a valid email address.");
+});
+
 it("keeps buyer invitations fixed and staff invitations inclusive of taproom", () => {
   const staff = renderToStaticMarkup(createElement(InviteView, { buyer: false, role: "taproom", busy: true, error: "Retry unchanged details" }));
   expect(staff).toContain('type="email"');

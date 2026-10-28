@@ -502,14 +502,20 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_brew_day", description: "One batch with the occupancy it is currently sitting in (the oldest open one when split across tanks): the vessel's name and the volume that went in",
+  name: "get_brew_day", description: "One batch with the occupancy it is currently sitting in (the oldest open one when split across tanks): the vessel's name and the volume that went in; closed_at is set once the batch is completed, and writeOffBbl is the barrels its completion wrote off as loss (null when none)",
   input: z.object({ batchId: z.string().uuid() }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     const batch = await unwrap(ctx.db.from("batches")
-      .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, cancelled_at, note")
+      .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, closed_at, cancelled_at, completion_adjustment_id, note")
       .eq("brewery_id", ctx.breweryId).eq("id", i.batchId).maybeSingle());
     if (!batch) throw new CommandError("batch not found", 404, "not_found");
-    return { batch, occupancy: (await openVessels(ctx, [i.batchId])).get(i.batchId)?.[0] ?? null };
+    const [vessels, writeOff] = await Promise.all([
+      openVessels(ctx, [i.batchId]),
+      // complete_batch records its write-off as one negative loss adjustment, named by completion_adjustment_id.
+      batch.completion_adjustment_id ? unwrap(ctx.db.from("volume_adjustments").select("bbl")
+        .eq("brewery_id", ctx.breweryId).eq("id", batch.completion_adjustment_id).single()) : null,
+    ]);
+    return { batch, occupancy: vessels.get(i.batchId)?.[0] ?? null, writeOffBbl: writeOff ? -Number(writeOff.bbl) : null };
   },
 });
 

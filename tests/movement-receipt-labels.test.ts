@@ -16,7 +16,7 @@ vi.mock("react", async original => ({
     return [state.values[index], (value: unknown) => { state.values[index] = typeof value === "function" ? value(state.values[index]) : value; }];
   },
 }));
-vi.mock("next/navigation", () => ({ usePathname: () => "/inventory", useSearchParams: () => new URLSearchParams("recordMovement=1") }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/inventory", useRouter: () => ({ replace: () => undefined }), useSearchParams: () => new URLSearchParams("recordMovement=1") }));
 vi.mock("@/lib/brewery-provider", () => ({ useBrewery: () => "brewery" }));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandForm: (_name: string, options: { onSuccess: (data: unknown) => void; build: () => unknown }) => {
   state.onSuccess = options.onSuccess;

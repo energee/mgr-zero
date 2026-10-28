@@ -48,6 +48,21 @@ describe("Settings save readiness (#1316)", () => {
     }
   });
 
+  it("withholds Save brewery for a phone the server refuses (#1500)", () => {
+    for (const phone of ["abc", "12", "5".repeat(300)]) {
+      expect(brewerySettingsReason({ ...initial, phone }, initial), phone).toContain("a phone number, such as (503) 555-0142");
+    }
+    for (const phone of ["", "(503) 555-0142"]) {
+      expect(brewerySettingsReason({ ...initial, name: "Changed", phone }, initial), phone).toBeNull();
+    }
+  });
+
+  it("shows the phone correction under the field before saving (#1500)", () => {
+    const html = renderToStaticMarkup(createElement(BrewerySettingsFormView, { initial: { ...initial, phone: "abc" } }));
+    expect(html).toContain("Use a phone number, such as (503) 555-0142.");
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Save brewery/);
+  });
+
   it("refreshes untouched fields without dropping unsaved or uncertain edits", () => {
     const values = { ...initial, name: "Unsaved brewery" };
     const refreshed = { ...initial, hours: "48" };
@@ -62,13 +77,18 @@ describe("Settings save readiness (#1316)", () => {
     expect(html).toContain("Still needed: a change to brewery details.");
   });
 
-  it("links Units and Sale channels from People and places", () => {
+  it("links Sale channels from People and places", () => {
     const html = renderToStaticMarkup(createElement(SettingsView, {
-      model: settingsDemo, hrefs: { units: "/settings/units", channels: "/settings/channels" },
+      model: settingsDemo, hrefs: { channels: "/settings/channels" },
     }));
     const people = html.match(/<section aria-labelledby="settings-people"[\s\S]*?<\/section>/)?.[0];
-    expect(people).toMatch(/<a[^>]*href="\/settings\/units"[^>]*>[\s\S]*?Units/);
     expect(people).toMatch(/<a[^>]*href="\/settings\/channels"[^>]*>[\s\S]*?Sale channels/);
+  });
+
+  it("captions Water profiles without a source or target role (#1205)", () => {
+    const html = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo, hrefs: {} }));
+    expect(html).toContain("Manage water profiles");
+    expect(html).not.toMatch(/source and target/i);
   });
 
   it("blocks pristine and pending brewery saves at the live adapter", () => {

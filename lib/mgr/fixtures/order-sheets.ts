@@ -108,6 +108,7 @@ export const orderShipOnDelivery: ShipSnapshot = {
 /** Post-commit of Ship and invoice: INV-1042 assigned. */
 export const orderShipmentDone: ShipmentDoneSnapshot = {
   warnings: [{ pool: "Owned", keg_size: "half_bbl", location: "Warehouse", short: 2 }],
+  routeHref: "#",
   order: { id: ORDER_231, order_no: 231, ship_tos: ridgeline.ship_tos },
   invoice: { invoice_no: 1042 },
   lines: [

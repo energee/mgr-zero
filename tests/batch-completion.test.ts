@@ -171,6 +171,21 @@ describe("batch completion reconciliation", () => {
     expect(result.adjustmentId).toBeNull();
   });
 
+  it("get_brew_day reads a completed batch's close and its write-off (#1480)", async () => {
+    const lossy = await brew(10);
+    await packageBeer(lossy, 8);
+    expect((await runCommand("get_brew_day", { batchId: lossy.batchId }, ctx) as { batch: { closed_at: string | null }; writeOffBbl: number | null })).toMatchObject({ batch: { closed_at: null }, writeOffBbl: null });
+    const saved = await complete(lossy.batchId);
+    const day = await runCommand("get_brew_day", { batchId: lossy.batchId }, ctx) as { batch: { closed_at: string }; writeOffBbl: number | null };
+    expect(new Date(day.batch.closed_at).getTime()).toBe(new Date(saved.closedAt!).getTime());
+    expect(day.writeOffBbl).toBe(2);
+
+    const clean = await brew(10);
+    await packageBeer(clean, 9.96);
+    await complete(clean.batchId);
+    expect((await runCommand("get_brew_day", { batchId: clean.batchId }, ctx) as { writeOffBbl: number | null }).writeOffBbl).toBeNull();
+  });
+
   it("refuses the run close that tips the batch's packaged total past its baseline (#499)", async () => {
     const source = await brew(10);
     // Both closes fit draw/tank tolerance; the batch guard still rejects any negative residual.

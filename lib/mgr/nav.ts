@@ -1,5 +1,6 @@
 // lib/mgr/nav.ts — the navigation manifests both shells consume (plan §3):
-// the four staff tabs with their desktop-rail children, the portal's tabs,
+// the four staff tabs with their desktop-rail children, the staff pages
+// reached only from Settings or the Me sheet (UNLISTED_NAV), the portal's tabs,
 // and the pure helpers AppShell needs — role filtering (a hidden entry
 // leaves no gap), shipped filtering, area grouping, and active tab/child
 // resolution — plus navTitle, which names each staff page's browser tab. Planned
@@ -19,7 +20,7 @@ import { hasAnyRole } from "./roles";
 
 /** The areas More's entries are filed under, in the order they are drawn
  * (#1159). The More page and the rail's More group both head each area. */
-const NAV_GROUPS = ["Sales", "Production", "Setup", "Menu and chat"] as const;
+const NAV_GROUPS = ["Sales", "Production", "Setup", "Menu"] as const;
 export type NavGroup = (typeof NAV_GROUPS)[number];
 
 export type NavItem = {
@@ -86,21 +87,29 @@ export const STAFF_NAV: readonly NavItem[] = [
     children: [
       { label: "Invoices", href: "/invoices", roles: ["sales"], group: "Sales", about: "See what customers owe and open an invoice" },
       { label: "Catalog", href: "/catalog", roles: ["sales"], group: "Sales", about: "Define brands, formats and SKUs" },
-      { label: "Menu", href: "/menu", roles: ["warehouse"], group: "Menu and chat", about: "Choose what Square sells, where and for how much" },
+      { label: "Menu", href: "/menu", roles: ["warehouse"], group: "Menu", about: "Choose what Square sells, where and for how much" },
       { label: "Customers", href: "/customers", roles: ["sales"], group: "Sales", about: "Manage accounts, ship-tos and portal users" },
       { label: "Price groups", href: "/pricing", roles: ["sales"], group: "Sales", about: "Set prices by group for each sale channel" },
       { label: "Recipes", href: "/recipes", roles: ["brewer"], group: "Production", about: "Write recipes and their versions" },
       { label: "Vendors", href: "/vendors", roles: ["brewer", "warehouse"], group: "Production", about: "Manage vendors, their terms and contracts" },
       { label: "Compliance", href: "/compliance", roles: ["sales"], group: "Sales", about: "Review and file compliance reports" },
       { label: "Planning", href: "/planning", roles: ["brewer", "warehouse"], group: "Production", about: "See what planned work is short of" },
-      { label: "Import", href: "/settings/import", roles: ["admin"], group: "Setup", about: "Bring in customers, ship-tos, SKUs, prices and opening stock from CSV" },
       { label: "Settings", href: "/settings", roles: ["admin"], group: "Setup", about: "Edit brewery details and connect integrations" },
-      { label: "Chat", href: "/settings/chat", group: "Menu and chat", about: "Link Slack and set your notifications" },
-      { label: "Sale channels", href: "/settings/channels", roles: ["admin"], group: "Setup", about: "Name how you sell and how each is taxed" },
-      { label: "Locations", href: "/locations", roles: ["admin"], group: "Setup", about: "Manage warehouses, taprooms and their bins" },
-      { label: "Units", href: "/settings/units", group: "Setup", about: "Choose how gravity is shown" },
     ],
   },
+];
+
+/**
+ * Staff pages with no rail or More entry (#1513): Settings is the one home of
+ * the admin setup pages, and the Me sheet links Chat. They are listed here so
+ * each keeps its role gate (canOpen), browser-tab title (navTitle), about line
+ * (navAbout) and Search match.
+ */
+export const UNLISTED_NAV: readonly NavItem[] = [
+  { label: "Import", href: "/settings/import", roles: ["admin"], about: "Bring in customers, ship-tos, SKUs, prices and opening stock from CSV" },
+  { label: "Sale channels", href: "/settings/channels", roles: ["admin"], about: "Name how you sell and how each is taxed" },
+  { label: "Locations", href: "/locations", roles: ["admin"], about: "Manage warehouses, taprooms and their bins" },
+  { label: "Chat", href: "/settings/chat", about: "Link Slack and set your notifications" },
 ];
 
 export const PORTAL_NAV: readonly NavItem[] = [
@@ -149,11 +158,11 @@ export function navGroups<T extends { group?: NavGroup }>(items: readonly T[]): 
     .filter((g) => g.items.length > 0);
 }
 
-/** Every STAFF_NAV entry, groups and their children alike. */
-const STAFF_ENTRIES = STAFF_NAV.flatMap((i) => [i, ...(i.children ?? [])]);
+/** Every STAFF_NAV entry, groups and their children alike, and UNLISTED_NAV. */
+const STAFF_ENTRIES = [...STAFF_NAV.flatMap((i) => [i, ...(i.children ?? [])]), ...UNLISTED_NAV];
 
 /**
- * The `about` line of the STAFF_NAV entry labelled `label`, so a surface that
+ * The `about` line of the staff entry labelled `label`, so a surface that
  * describes the same page (a Settings row, an inventory fixture) quotes it
  * instead of keeping its own copy. Throws for a label with no line, so a
  * renamed entry fails loudly rather than drawing a blank description.
@@ -177,12 +186,12 @@ function longestMatch<T>(pathname: string, candidates: readonly (readonly [T, st
   return best?.item;
 }
 
-/** The deepest STAFF_NAV entry whose href covers `path`, if any. */
+/** The deepest staff entry (STAFF_NAV or UNLISTED_NAV) whose href covers `path`, if any. */
 const coveringEntry = (path: string) => longestMatch(path, STAFF_ENTRIES.map((i) => [i, i.href] as const));
 
 /**
- * Whether `role` may open `path`, by the gate of the deepest STAFF_NAV entry
- * whose href covers it: /settings/units follows Units (every role), while
+ * Whether `role` may open `path`, by the gate of the deepest staff entry
+ * whose href covers it: /settings/chat follows Chat (every role), while
  * /settings/pos has no entry of its own and follows Settings (admin). A path
  * no entry covers has no nav gate and counts as open. Back links use this so
  * they never point a role at a page that sends it to No access (#444).
@@ -229,8 +238,7 @@ export function activeTab(items: readonly NavItem[], pathname: string): NavItem 
 
 /**
  * The one child of `tab` to highlight: the longest href prefix of the path, so
- * /taproom/board lights Taps and not Taproom too, and /settings/units lights
- * Units and not Settings.
+ * /taproom/board lights Tap board and not Weekly count too.
  */
 export function activeChild(tab: NavItem, pathname: string): NavItem | undefined {
   return longestMatch(pathname, (tab.children ?? []).map((c) => [c, c.href] as const));

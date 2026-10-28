@@ -12,7 +12,7 @@ import { SearchPick } from "@/components/mgr/search-pick";
 import { orderLineError, type LineErrors } from "@/lib/order-form-rules";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import { DatePicker } from "@/components/mgr/date-picker";
-import type { NewOrderViewModel, OrderOption } from "@/lib/mgr/new-order-view";
+import { pastShipDateWarning, type NewOrderViewModel, type OrderOption } from "@/lib/mgr/new-order-view";
 import { Fragment } from "react";
 
 export type { NewOrderViewModel };
@@ -42,8 +42,8 @@ export function OrderSkuPicker({ options, catalogHref, emptyMessage = catalogHre
 
 /** A quantity owns its corrective message, so it stays under the input even
  *  when the parent row has a separate SKU picker. */
-export function OrderQuantity({ value, label, onChange, onBlur, contextualLabels = false, max, step = "any", required = false, invalid = false, id, error }: { value: string | number; label: string; onChange?: (value: string) => void; onBlur?: FocusEventHandler<HTMLInputElement>; contextualLabels?: boolean; max?: number; step?: string; required?: boolean; invalid?: boolean; id?: string; error?: string }) {
-  return E.edit(label, String(value), "number", undefined, { onChange, onBlur, min: 0, max, step, required, id, error, "aria-invalid": invalid || undefined, contextualLabels, hideLabel: true });
+export function OrderQuantity({ value, label, onChange, onBlur, contextualLabels = false, max, step = "any", required = false, invalid = false, readOnly, id, error }: { value: string | number; label: string; onChange?: (value: string) => void; onBlur?: FocusEventHandler<HTMLInputElement>; contextualLabels?: boolean; max?: number; step?: string; required?: boolean; invalid?: boolean; readOnly?: boolean; id?: string; error?: string }) {
+  return E.edit(label, String(value), "number", undefined, { onChange, onBlur, min: 0, max, step, required, readOnly, id, error, "aria-invalid": invalid || undefined, contextualLabels, hideLabel: true });
 }
 
 /** The SKU picker describes its correction below the row. Quantity errors
@@ -71,6 +71,7 @@ export function NewOrderView({ model, controls = {}, messages, feedback, skuFeed
   const skus = model.skus ?? model.lines.map(line => ({ id: line.name, label: line.name }));
   const source = model.sources.find(option => typeof option !== "string" && option.id === model.source);
   const sourceLabel = typeof source === "object" ? source.label : model.source;
+  const dateWarning = pastShipDateWarning(model.requestedShip, model.today);
   return <>
     {E.back("Orders", "New order", undefined, model.backHref)}
     {feedback}
@@ -84,6 +85,7 @@ export function NewOrderView({ model, controls = {}, messages, feedback, skuFeed
       <OrderPick key="source" label="Source location" value={model.source} options={model.sources} onChange={controls.source} />,
       <DatePicker key="date" label="Requested ship" value={controls.requestedShip ? model.requestedShip : undefined} defaultValue={model.requestedShip} onChange={controls.requestedShip} />,
     )}
+    {dateWarning && E.note(dateWarning)}
     {E.edit("Customer PO", model.po, "text", undefined, { onChange: controls.po })}
     {model.kind === "taproom_transfer" ? null : <PickupSwitch on={Boolean(model.pickup)} onChange={controls.pickup} />}
     {skuFeedback}
@@ -104,7 +106,7 @@ export function NewOrderView({ model, controls = {}, messages, feedback, skuFeed
     </div>;
     })}
     <Button type="button" variant="ghost" className="w-fit" onClick={controls.addLine}>Add line</Button>
-    {E.info("Enter quantities above zero and at most 9,999,999,999.99. Fractions are allowed; saved quantities are rounded to two decimal places. Order number is assigned when you save the draft.")}
+    {E.info("Order number is assigned when you save the draft.")}
     {messages}
     {E.sp()}
     {footer !== undefined ? footer : E.pin(E.submit("Save draft", { submitting, disabled, reason }))}

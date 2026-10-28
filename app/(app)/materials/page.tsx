@@ -14,7 +14,7 @@ import "@/lib/commands/all";
 import { MaterialForm, type Material } from "./material-form";
 import { CountForm } from "./count-form";
 import { ListControls } from "@/components/mgr/list-controls";
-import { listParams } from "@/lib/mgr/list-params";
+import { listParams, searchQuery } from "@/lib/mgr/list-params";
 import { navTitle } from "@/lib/mgr/nav";
 
 export const metadata = { title: navTitle("/materials") };
@@ -25,7 +25,7 @@ type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 
 const materialsParams = z.object({
-  q: z.string().trim().max(100).catch(""),
+  q: searchQuery,
 });
 
 export default async function MaterialsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -51,7 +51,7 @@ export default async function MaterialsPage({ searchParams }: { searchParams: Pr
         })),
         filtered: Boolean(params.q),
       })}
-      controls={materials.length || params.q ? <ListControls search={{ label: "Search materials", value: params.q, keep: {} }} /> : undefined}
+      controls={materials.length || params.q ? <ListControls search={{ label: "Search materials", value: params.q, keep: {}, path: "/materials" }} /> : undefined}
       createAction={<MaterialForm vendors={vendors} />}
       rowEdit={(row) => <MaterialForm material={materials.find((m) => m.id === row.key)!} vendors={vendors} />}
       rowCount={(row) => {

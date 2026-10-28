@@ -4,7 +4,7 @@ import { paymentTermLabel, sentenceCase } from "./labels";
 import { US_STATE_CODES } from "./enums";
 import { submitReason } from "./submit-reason";
 
-/** State is required for US customers and is not supplied for other countries. */
+/** State is required for US customers and ship-tos and is not supplied for other countries. */
 export function customerStateReason(values: Pick<CustomerEditValues, "country" | "state">): string | null {
   return submitReason(values.country !== "US" || US_STATE_CODES.some(state => state === values.state) ? [] : ["a state"]);
 }
@@ -16,7 +16,7 @@ export type CustomerEditValues = { name: string; alias: string; type: string; co
 /** The note under Alias on both customer forms: list_customers (Search
  *  customers) matches it, the list titles "name · alias", and no buyer surface
  *  reads it. Global search matches customer names only. */
-export const CUSTOMER_ALIAS_HELP = "Another name staff know this customer by. Search customers finds the customer by it, and the customer list shows it beside the name. Buyers never see it.";
+export const CUSTOMER_ALIAS_HELP = "Another name staff know this customer by. Search finds it; buyers never see it.";
 
 /** Customer forms reject whitespace-only names; the RPC owns stored normalization. */
 export function customerNameError(name: string): string | undefined {

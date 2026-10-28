@@ -57,7 +57,6 @@ export function QboDefaultsView({ allowAch, allowCard, busy = false, disabled = 
     {E.info("Each new invoice is pushed with these payment options. Turning both off means new invoices cannot be paid online; invoices pushed earlier keep theirs.")}
     {E.row("Bank transfer (ACH)", `${ach ? "on" : "off"} · lowest fee`, <Switch aria-label="Bank transfer payments" checked={ach} onCheckedChange={setAch} disabled={busy || disabled} />, ach ? "ok" : "")}
     {E.row("Card", `${card ? "on" : "off"} · percentage fee applies`, <Switch aria-label="Card payments" checked={card} onCheckedChange={setCard} disabled={busy || disabled} />, card ? "ok" : "")}
-    <p className="text-sm text-muted-foreground">These choices apply to the next push, never retroactively.</p>
     {E.submit("Save push defaults", { submitting: busy, reason: disabled ? "Connect or reconnect QuickBooks before saving payment options." : null })}
     <CommandFormMessage error={error} />
   </form>;

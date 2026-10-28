@@ -5,9 +5,7 @@ vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ breweryI
 vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query, requirePagePermission: permission }));
 vi.mock("next/navigation", () => ({ redirect: (href: string) => { throw new Error(href); }, notFound: () => { throw new Error("not found"); } }));
 import PickPage from "@/app/(app)/orders/[id]/pick/page";
-import ShortPickPage from "@/app/(app)/orders/[id]/short-pick/page";
 import { PickForm } from "@/app/(app)/orders/[id]/pick-form";
-import { ShortPickForm } from "@/app/(app)/orders/[id]/short-pick-form";
 
 const params = Promise.resolve({ id: "order" });
 const order = { id: "order", order_no: 42, status: "confirmed", from_location_id: "source", customers: { name: "Customer" } };
@@ -17,22 +15,17 @@ beforeEach(() => {
   query.mockImplementation(async name => name === "get_order" ? { order, lines: [line] } : [{ id: "source", name: "Actual cooler" }]);
 });
 
-it("guards both deep links before reading data", async () => {
+it("guards the Pick deep link before reading data", async () => {
   permission.mockImplementation(() => { throw new Error("denied"); });
   await expect(PickPage({ params })).rejects.toThrow("denied");
-  await expect(ShortPickPage({ params, searchParams: Promise.resolve({ line: "line", qty: "1" }) })).rejects.toThrow("denied");
-  expect(permission.mock.calls.map(call => call[1])).toEqual(["record_pick", "resolve_short_pick"]);
+  expect(permission.mock.calls.map(call => call[1])).toEqual(["record_pick"]);
   expect(query).not.toHaveBeenCalled();
 });
 
-it("passes real identity, source and decimal count to the shared page adapters", async () => {
+it("passes real identity and source to the shared page adapter", async () => {
   const pick = await PickPage({ params });
   expect(pick.type).toBe(PickForm);
   expect(pick.props.snapshot).toMatchObject({ order, lines: [line], locations: [{ id: "source", name: "Actual cooler" }], backHref: "/orders/order" });
-  const short = await ShortPickPage({ params, searchParams: Promise.resolve({ line: "line", qty: "1.5" }) });
-  expect(short.type).toBe(ShortPickForm);
-  expect(short.props.snapshot.line).toEqual({ ...line, qty_picked: 1.5 });
-  expect(short.props.snapshot.backHref).toBe("/orders/order/pick");
 });
 
 it("maps the latest existing short_pick event to only its matching line", async () => {
@@ -45,13 +38,7 @@ it("maps the latest existing short_pick event to only its matching line", async 
   expect(page.props.snapshot.lines).toEqual([{ ...line, shortPickEventId: "new" }, { ...line, id: "other" }]);
 });
 
-it.each(["", "NaN", "Infinity", "-1", "5", "6"])("rejects invalid or non-short count %s", async qty => {
-  await expect(ShortPickPage({ params, searchParams: Promise.resolve({ line: "line", qty }) })).rejects.toThrow("/orders/order/pick");
-});
-
-it("rejects a line outside the order and redirects terminal orders", async () => {
-  await expect(ShortPickPage({ params, searchParams: Promise.resolve({ line: "foreign", qty: "1" }) })).rejects.toThrow("not found");
+it("redirects terminal orders", async () => {
   query.mockImplementation(async name => name === "get_order" ? { order: { ...order, status: "shipped" }, lines: [line] } : []);
   await expect(PickPage({ params })).rejects.toThrow("/orders/order");
-  await expect(ShortPickPage({ params, searchParams: Promise.resolve({ line: "line", qty: "1" }) })).rejects.toThrow("/orders/order");
 });

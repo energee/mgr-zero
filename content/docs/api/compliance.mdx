@@ -205,9 +205,11 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales
 
-Finished-goods lots, newest packaged first, as the entry to a lot trace
+Finished-goods lots, newest packaged first and at most 50, as the entry to a lot trace
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `q` | string | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

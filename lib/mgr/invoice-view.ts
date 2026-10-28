@@ -10,6 +10,8 @@ import { docNo } from "./doc-no";
 import type { PaymentMethod } from "./enums";
 import { PAYMENT_METHOD_LABEL } from "./labels";
 import { money, toCents } from "./money";
+import { isNumber, numberNotationError } from "./quantity-input";
+import { submitReason } from "./submit-reason";
 import { invoiceBalanceCents, invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment, invoiceLedgerOwnsBalance } from "./invoice-state";
 
 export type InvoiceLineView = {
@@ -224,11 +226,12 @@ function invoiceSummary(snapshot: InvoiceSnapshot, localCents: number, totalCent
 /** record_invoice_payment's refusals, mirrored: only a ledger-owned invoice
  *  (no QuickBooks identity, pending push or earlier push) that is not written
  *  off, not paid, and still has money due takes a payment, of at most its
- *  balance. Otherwise null. */
-function invoicePaymentBalanceCents(snapshot: InvoiceSnapshot, totalCents: number): number | null {
-  const takes = invoiceLedgerOwnsBalance(toLedgerFacts(snapshot)) && !snapshot.invoice.written_off_at && snapshot.invoice.paid_at == null
-    && totalCents > snapshot.localPaidCents;
-  return takes ? totalCents - snapshot.localPaidCents : null;
+ *  balance. Otherwise null. The invoice page and the Invoices register both
+ *  ask here (#1506), so the two never offer Record payment differently. */
+export function invoicePaymentBalanceCents(invoice: Parameters<typeof invoiceLedgerOwnsBalance>[0] & { written_off_at?: string | null }, totalCents: number): number | null {
+  const takes = invoiceLedgerOwnsBalance(invoice) && !invoice.written_off_at && invoice.paid_at == null
+    && totalCents > invoice.local_paid_cents;
+  return takes ? totalCents - invoice.local_paid_cents : null;
 }
 
 const paymentView = (p: InvoicePaymentRecord): InvoicePaymentView => ({
@@ -244,13 +247,28 @@ const paymentView = (p: InvoicePaymentRecord): InvoicePaymentView => ({
 /** The Record payment form's value: dollars and a YYYY-MM-DD day, as typed. */
 export type InvoicePaymentValue = { amount: string; receivedOn: string; method: PaymentMethod | ""; reference: string };
 
-/** Ready to submit: more than $0.00 and at most the balance, a method, and
- *  a received day no later than today; a day before issue is a prepayment.
- *  record_invoice_payment checks the same again. */
-export function invoicePaymentReady(value: InvoicePaymentValue, balanceCents: number, today: string): boolean {
-  const cents = toCents(value.amount);
-  return cents !== undefined && cents > 0 && cents <= balanceCents
-    && value.receivedOn !== "" && value.receivedOn <= today && value.method !== "";
+/** What is wrong with a typed payment amount, shown under Amount: exponent
+ *  notation, or anything but dollars and cents from $0.01 to the balance.
+ *  Empty is not an error; the reason names it. */
+export function invoicePaymentAmountError(amount: string, balanceCents: number): string | undefined {
+  if (amount === "") return undefined;
+  const notation = numberNotationError(amount);
+  if (notation) return notation;
+  const cents = toCents(amount) ?? 0;
+  const fits = isNumber(amount) && (amount.trim().split(".")[1]?.length ?? 0) <= 2 && cents > 0 && cents <= balanceCents;
+  return fits ? undefined : `Enter an amount from $0.01 to ${money(balanceCents)}, in dollars and cents.`;
+}
+
+/** Why Record payment is withheld (#1485), or null when ready: an amount
+ *  above $0.00 and at most the balance, a method, and a received day no later
+ *  than today; a day before issue is a prepayment. record_invoice_payment
+ *  checks the same again. */
+export function invoicePaymentReason(value: InvoicePaymentValue, balanceCents: number, today: string): string | null {
+  const missing: string[] = [];
+  if (value.amount === "" || invoicePaymentAmountError(value.amount, balanceCents)) missing.push(`an amount from $0.01 to ${money(balanceCents)}`);
+  if (value.receivedOn === "" || value.receivedOn > today) missing.push("a received day no later than today");
+  if (value.method === "") missing.push("a method");
+  return submitReason(missing);
 }
 
 /** Map a get_invoice + list_invoice_questions payload onto InvoiceView. */
@@ -290,6 +308,6 @@ export function toInvoiceViewProps(snapshot: InvoiceSnapshot): InvoiceViewModel 
     // An unvoided payment blocks the push the mapping rows serve, as in qboInvoicePresentation.
     mappings: snapshot.localPaidCents > 0 ? undefined : mappings,
     payments: snapshot.payments.map(paymentView),
-    paymentBalanceCents: invoicePaymentBalanceCents(snapshot, totalCents),
+    paymentBalanceCents: invoicePaymentBalanceCents(toLedgerFacts(snapshot), totalCents),
   };
 }

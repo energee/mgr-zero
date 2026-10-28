@@ -39,7 +39,10 @@ export default async function InventoryDetailPage({ params, searchParams }: Prop
   const { page: rawPage, movement } = await searchParams;
   const { brewery, page, sku, onHand, atp, movements } = await getInventoryDetailPageData(id, rawPage, movement);
   const href = `/inventory/${id}`;
+  const canMove = brewery.roles.includes("admin") || brewery.roles.includes("warehouse");
   return <InventoryDetailView model={toInventoryDetailViewProps({ sku, onHand, atp, movements: movements.slice(0, 50), backHref: "/inventory", timeZone: brewery.timeZone })}
+    // Finished goods' Record movement, opened on this SKU (#1507).
+    headerAction={canMove && sku.active ? E.btn("Record movement", "p", `/inventory?recordMovement=1&skuId=${id}`) : null}
     movementAction={m => m.compensates_id ? E.act("Original movement", "primary", `${href}?movement=${m.compensates_id}`)
       : m.reversed_by ? E.act("Reversal recorded", "primary", `${href}?movement=${m.id}`)
       : canReverseMovement(m) ? (brewery.roles.includes("admin") || brewery.roles.includes("warehouse") ? <ReversalForm movement={m} /> : "Read only")

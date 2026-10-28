@@ -12,6 +12,7 @@ import { QboMappingView, QboMappingSheetView, type QboMappingKind } from "@/comp
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 import type { QboSyncStatus } from "@/lib/mgr/accounting-view";
 import { qboMappingVersion, qboPushConfirmation, type QboInvoiceAction, type QboRemoteCreateAction } from "@/lib/mgr/qbo-ui";
+import { submitReason } from "@/lib/mgr/submit-reason";
 
 export function QboConnectionAction({ configured, reconnect = false }: { configured: boolean; reconnect?: boolean }) {
   const action = useCommandAction();
@@ -93,7 +94,7 @@ export function QboInvoiceActions({ invoiceId, invoiceLabel, actions }: { invoic
       <form className="flex flex-col gap-3" onSubmit={writeOff.submit}>
         <p className="text-sm text-muted-foreground">This records a local status and reason. It does not change QuickBooks, record cash, or create a credit.</p>
         <Label htmlFor="qbo-write-off-reason">Reason</Label><Input id="qbo-write-off-reason" value={reason} onChange={e => setReason(e.target.value)} required maxLength={500} />
-        <CommandFormMessage error={writeOff.error} /><CommandFormFooter><Button variant="destructive" disabled={writeOff.submitting || !reason.trim()}>{writeOff.submitting ? "Writing off…" : "Confirm write-off"}</Button></CommandFormFooter>
+        <CommandFormMessage error={writeOff.error} /><CommandFormFooter>{E.submit("Confirm write-off", { variant: "destructive", submitting: writeOff.submitting, busy: "Writing off…", reason: submitReason(reason.trim() ? [] : ["a reason"]) })}</CommandFormFooter>
       </form>
     </CommandForm>}
   </div>;

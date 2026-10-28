@@ -9,7 +9,7 @@ import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { Qty } from "@/components/mgr/qty";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { ADDITION_STAGES, additionPreview, type AdditionStage, type CellarAdditionViewModel } from "@/lib/mgr/cellar-addition-view";
+import { ADDITION_STAGES, additionPreview, additionReason, type AdditionStage, type CellarAdditionViewModel } from "@/lib/mgr/cellar-addition-view";
 import { occupancyIdentity } from "@/lib/mgr/cellar-transfer-view";
 
 export function CellarAdditionFooter(props: { formId?: string; submitting?: boolean; disabled?: boolean; reason?: string | null }) {
@@ -40,10 +40,10 @@ export function CellarAdditionView({ model, onChange, messages, footer, submitti
         </ToggleGroup>
       </Field>
       <Qty label="Quantity" value={model.qty} unit={material?.base_uom ?? ""} onChange={onChange ? (qty) => onChange({ qty }) : undefined} />
-      {/* What is still needed is guidance, not a warning; only a real error (more than the lot holds) is amber (#1115). */}
-      {preview.valid ? E.info(preview.text) : preview.error ? E.note(preview.reason, "alert") : E.info(preview.reason)}
+      {/* What is still needed is said once, beside Record addition (#1481); only a real error (more than the lot holds) is amber here too (#1115). */}
+      {preview.valid ? E.info(preview.text) : preview.error && E.note(preview.error, "alert")}
     </fieldset>
     {messages}
-    {footer !== undefined ? footer : E.pin(<CellarAdditionFooter submitting={submitting} reason={preview.valid ? null : preview.reason} />)}
+    {footer !== undefined ? footer : E.pin(<CellarAdditionFooter submitting={submitting} reason={additionReason(preview)} />)}
   </>;
 }

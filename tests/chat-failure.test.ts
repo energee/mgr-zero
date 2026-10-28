@@ -75,12 +75,12 @@ describe("Ask MGR failure recovery (#1294)", () => {
     expect(html).not.toContain("An error occurred.");
   });
 
-  it("explains an unanswered historical turn instead of implying that it is queued", () => {
+  it("explains an unanswered historical turn and says what to do next (#1520)", () => {
     const html = renderToStaticMarkup(createElement(ComposerConversationView, {
       messages: [{ id: "failed-turn", role: "user", content: "Check inventory" }],
     }));
-    expect(html).toContain("No completed MGR response was saved");
-    expect(html).toContain("Chat messages are not queued");
+    expect(html).toContain("No MGR response was saved for this message. Send it again to retry; if Ask MGR still cannot answer, it says why here.");
+    expect(html).not.toContain("fermentation readings");
   });
 
   it("disables the actual live adapter before accepting prompts when AI is not configured", () => {
@@ -88,6 +88,7 @@ describe("Ask MGR failure recovery (#1294)", () => {
       createElement(ComposerConversation, { chatConfigured: false, open: true, onOpenChange: () => undefined, focusRequest: 0, outboxCount: 0, onOutbox: () => undefined }, null)));
     expect(html).toContain(CHAT_FAILURES.not_configured.message);
     expect(html).toMatch(/<textarea[^>]*disabled=""/);
+    expect(html).toMatch(new RegExp(`<textarea[^>]*placeholder="${CHAT_FAILURES.not_configured.message.replaceAll(".", "\\.")}"`));
     expect(html).not.toContain("Try again");
     expect(html).not.toContain("Opening your conversation");
   });

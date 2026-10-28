@@ -46,6 +46,8 @@ export type CustomerDetailSlot = {
   addShipTo?: ReactNode;
   kegHref?: string;
   ordersHref?: string;
+  /** Live sales/admin: New order with this customer filled in (#1506). */
+  newOrderHref?: string;
   /** Live sales/admin: InviteForm. `null` hides the whole Portal users section. */
   portalUsers?: ReactNode;
   /** Live sales/admin: the Remove access verb per portal user, keyed by userId
@@ -137,13 +139,14 @@ export function CustomerView({
             <h2 className="mb-3 font-heading text-xl font-semibold">Trading terms</h2>
             <div className="flex flex-col gap-4">
               <CustomerSaleChannelField value={values.saleChannelId} channels={model.channelOptions} controls={controls("saleChannelId")} />
-              {E.pick("Terms", values.paymentTerms, TERMS_OPTIONS, controls("paymentTerms"))}
+              {E.pick("Payment terms", values.paymentTerms, TERMS_OPTIONS, controls("paymentTerms"))}
               <CustomerTaxTreatmentField value={values.taxTreatment} controls={controls("taxTreatment")} />
             </div>
           </section>
           <section aria-label="Customer activity" className="flex flex-col gap-3">
             <h2 className="font-heading text-xl font-semibold">Customer activity</h2>
             {E.nav("Orders", detail ? "Orders for this customer" : model.orders, "", undefined, detail?.ordersHref)}
+            {!detail || detail.newOrderHref ? E.nav("New order", "Start an order for this customer", "", undefined, detail?.newOrderHref) : null}
             {E.nav("Customer keg balance", detail ? "Kegs out and deposits held" : model.kegBalance, "", undefined, detail?.kegHref)}
           </section>
         </div>
