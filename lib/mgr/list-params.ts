@@ -2,8 +2,15 @@
 // listParams parses them with a zod schema whose fields each `.catch(default)`,
 // so one hand-edited bad value falls back instead of failing the page, and
 // queryWith/hrefWith build the query or link for one changed control while
-// keeping the others.
-import type { z } from "zod";
+// keeping the others. searchQuery is the `q` field every list shares.
+import { z } from "zod";
+
+/** The longest list search; the box stops typing here (components/mgr/list-controls.tsx). */
+export const SEARCH_MAX = 100;
+
+/** A list's `q`: trimmed, and a longer one hand-typed into the URL is cut to
+ *  SEARCH_MAX rather than dropped, so it still narrows the list and keeps Clear search. */
+export const searchQuery = z.string().trim().catch("").transform(q => q.slice(0, SEARCH_MAX));
 
 type Raw = Record<string, string | string[] | undefined>;
 
