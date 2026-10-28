@@ -47,7 +47,7 @@ it("projects expected failures to declared fields with corrective copy", () => {
     { path: ["customerPhone"], code: "custom", message: "a phone number" },
   ] };
   expect(inputErrorPresentation(failure, ["state", "zip", "customerPhone"])).toEqual({ error: null, fieldErrors: {
-    state: "Use a two-letter state code, such as PA.",
+    state: "Choose a US state, such as PA.",
     zip: "Use a 5-digit ZIP code or ZIP+4, such as 15201 or 15201-1234.",
     customerPhone: "Use a phone number, such as (503) 555-0142.",
   } });

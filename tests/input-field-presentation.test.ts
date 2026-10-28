@@ -40,9 +40,9 @@ it("shows controlled vendor server errors without losing local attempted-state d
 it("renders both state and ZIP corrections without losing ship-to values", () => {
   const html = renderToStaticMarkup(createElement(ShipToView, {
     model: toShipToViewProps({ label: "Dock", country: "US", address1: "", address2: "", city: "", state: "ZZ", zip: "abc", isDefault: false }),
-    errors: { state: "Use a two-letter state code, such as PA.", zip: "Use a 5-digit ZIP code or ZIP+4." },
+    errors: { state: "Choose a US state, such as PA.", zip: "Use a 5-digit ZIP code or ZIP+4." },
   }));
-  expectFieldError(html, "Use a two-letter state code, such as PA.");
+  expectFieldError(html, "Choose a US state, such as PA.");
   expect(html.match(/aria-invalid="true"/g)).toHaveLength(2);
   expect(html).toContain("Use a 5-digit ZIP code or ZIP+4.");
   expect(html).toContain('value="abc"');

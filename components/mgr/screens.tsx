@@ -1325,8 +1325,8 @@ export const SCREENS: Screen[] = [
     job: "Create or edit one delivery address for a customer",
     reads: "get_customer",
     writes: "upsert_ship_to",
-    states: [["permission", "sales or admin required", 1], ["new", "address required"], ["existing", "orders keep their frozen destination"], ["default", "new orders select it first"]],
-    spec: "Editing an address never rewrites the destination recorded on an existing order.",
+    states: [["permission", "sales or admin required", 1], ["new", "label required; a US ship-to also picks its state"], ["duplicate label", "A ship-to labeled Main already exists for this customer · inline error and save withheld"], ["bad ZIP", "a US postal code must be a ZIP or ZIP+4 · inline error and save withheld"], ["existing", "orders keep their frozen destination"], ["default", "new orders select it first"]],
+    spec: "Editing an address never rewrites the destination recorded on an existing order. Street, city and postal code stay optional until known.",
     body: <ShipToView model={toShipToViewProps(shipToMain)} />,
   },
   {
