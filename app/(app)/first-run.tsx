@@ -5,18 +5,23 @@ import { LocationForm } from "./locations/location-form";
 
 export type FirstRun = { hasLocation: boolean; hasBrand: boolean; hasMovement: boolean; hasStaff: boolean };
 
+/** Today shows the checklist until a location and a brand both exist; import, staff and opening stock stay optional (#1511). */
+export function showFirstRun(state: FirstRun): boolean {
+  return !state.hasLocation || !state.hasBrand;
+}
+
 export function FirstRunChecklist({ brewery, state }: { brewery: string; state: FirstRun }) {
   return (
     <FirstRunView
       model={{ brewery, steps: "5 steps" }}
       steps={
         <>
-          {E.row("1 · Add locations", "warehouse, taproom, storage, or several at once", state.hasLocation ? "done" : <LocationForm />, state.hasLocation ? "ok" : "")}
+          {E.row("1 · Add locations", "warehouse, taproom, storage, or several at once", state.hasLocation ? "Done" : <LocationForm />, state.hasLocation ? "ok" : "")}
           {E.nav("2 · Import CSV", "customers, catalog and opening balances", "", undefined, "/settings/import")}
-          {E.row("3 · Add a brand", "the catalog starts with one brand", state.hasBrand ? "done" : E.act("Add", "primary", "/catalog"), state.hasBrand ? "ok" : "")}
-          {E.row("4 · Invite the team", state.hasStaff ? "someone joined" : "email and role", state.hasStaff ? "done" : "", state.hasStaff ? "ok" : "")}
+          {E.row("3 · Add a brand", "the catalog starts with one brand", state.hasBrand ? "Done" : E.act("Add", "primary", "/catalog"), state.hasBrand ? "ok" : "")}
+          {E.row("4 · Invite the team", state.hasStaff ? "someone joined" : "email and role", state.hasStaff ? "Done" : "", state.hasStaff ? "ok" : "")}
           {!state.hasStaff && <InviteForm />}
-          {E.row("5 · Opening inventory", "count what’s on hand today", state.hasMovement ? "done" : E.act("Record opening count", "info", "/inventory"), state.hasMovement ? "ok" : "")}
+          {E.row("5 · Opening inventory", "count what’s on hand today", state.hasMovement ? "Done" : E.act("Record opening count", "info", "/inventory"), state.hasMovement ? "ok" : "")}
         </>
       }
     />

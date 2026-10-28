@@ -25,7 +25,7 @@ export function DriverRouteView({
           {E.row(
             row.title,
             row.detail,
-            row.verb ? E.act(row.verb, "info", linkRows ? row.href : undefined) : (row.trailing ?? (row.ok ? "done" : "")),
+            row.verb ? E.act(row.verb, "info", linkRows ? row.href : undefined) : (row.trailing ?? (row.ok ? "Done" : "")),
             row.warning ? "w" : row.ok ? "ok" : "",
           )}
         </Fragment>

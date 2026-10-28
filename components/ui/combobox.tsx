@@ -52,7 +52,7 @@ function ComboboxInput({
           className="data-pressed:bg-transparent"
           disabled={disabled}
         >
-          <ComboboxTrigger />
+          <ComboboxTrigger aria-label="Show options" />
         </InputGroupButton>
       </InputGroupAddon>
       {children}

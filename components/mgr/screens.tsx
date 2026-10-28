@@ -174,7 +174,6 @@ import { TodayView } from "@/components/mgr/views/today";
 import { WorkView } from "@/components/mgr/views/work";
 import { TransferDetailView } from "@/components/mgr/views/transfer-detail";
 import { TransfersView } from "@/components/mgr/views/transfers";
-import { UnitsView } from "@/components/mgr/views/units";
 import { VendorView } from "@/components/mgr/views/vendor";
 import { VendorsView } from "@/components/mgr/views/vendors";
 import { RemoveVesselControl, VesselDetailView } from "@/components/mgr/views/vessel-detail";
@@ -211,7 +210,7 @@ import { portalAccountRidgeline, portalMeRidgeline } from "@/lib/mgr/fixtures/po
 import { portalInvoicePaid, portalInvoiceUnpaid, portalInvoicesRidgeline } from "@/lib/mgr/fixtures/portal-invoices";
 import { portalOrderShipped, portalOrdersList } from "@/lib/mgr/fixtures/portal-orders";
 import { priceGroupTwo, pricingGrid } from "@/lib/mgr/fixtures/pricing";
-import { channelExport, saleChannelsList, unitsPlato } from "@/lib/mgr/fixtures/settings-catalog";
+import { channelExport, saleChannelsList } from "@/lib/mgr/fixtures/settings-catalog";
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
 import {
   contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsOnHandList,
@@ -301,7 +300,6 @@ import { toSkuViewProps } from "@/lib/mgr/sku-view";
 import { toTodayViewProps } from "@/lib/mgr/today-view";
 import { toTransferDetailViewProps } from "@/lib/mgr/transfer-detail-view";
 import { toTransfersViewProps } from "@/lib/mgr/transfers-view";
-import { toUnitsViewProps } from "@/lib/mgr/units-view";
 import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
 import { toWorkViewProps } from "@/lib/mgr/work-view";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
@@ -405,7 +403,7 @@ const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here y
 /** DEFAULT_STATES with the permission note swapped for who may open the screen. */
 const permitted = (who: string): NonNullable<Screen["states"]> => [["permission", who, 1], ...DEFAULT_STATES.filter(([st]) => st !== "permission")];
 /** Settings and its no-warehouse variant draw the same page, so they read and write the same. */
-const SETTINGS_IO = { reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_operating_defaults · set_books_opened_on · correct_reporting_basis · set_brewery_ai_model · update_location · set_portal_fulfillment_source" };
+const SETTINGS_IO = { reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_operating_defaults · set_books_opened_on · correct_reporting_basis · set_brewery_gravity_unit · set_brewery_ai_model · update_location · set_portal_fulfillment_source" };
 
 /** INV-1039 partly paid in MGR: Record payment's cap and the $300.00 check Void payment voids. */
 const LOCAL_PARTLY_PAID = toInvoiceViewProps(invoiceLocalPartlyPaid);
@@ -419,16 +417,16 @@ export const SCREENS: Screen[] = [
     to: { Pick: "Pick sheet", "Put back": "Put back", "3 orders ready": "Pick sheet", "Staged · ORD-0229": "Order" , "Next delivery \u00b7 Ridgeline": "Driver route" },
     job: "Role-filtered work that opens ready to finish · full-size exemplar at ship scale",
     reads: "get_today [delivery rows require assigned warehouse member or admin]", writes: "none",
-    states: [["empty", "one button: the role's first verb"], ["loading", "row-shaped skeletons"], ["error", "Today did not load · Retry", 1], ["offline", "cached rows · writes queue"], ["role hidden", "only relevant permitted work · no blank gaps"]],
-    spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3; the row verb is the action. A row standing for one order opens that order's Pick. This row stands for three, so Pick lands on the day's Pick sheet and each order opens its own Pick from there; the verb never becomes a noun to explain itself. The restock row appears while the order's restock flag is set and opens the order. Warehouse reaches the live Weekly count from Beer → Weekly count, so Today draws no count footer.",
+    states: [["empty", "Nothing waiting · the quick actions stay"], ["loading", "row-shaped skeletons"], ["error", "Today did not load · Retry", 1], ["offline", "cached rows · writes queue"], ["role hidden", "only relevant permitted work · no blank gaps"]],
+    spec: "Drawn as the warehouse persona at honest 16px density. Above the rows sit the role's quick actions: New order for sales, Record movement and Receive PO for warehouse, New batch for brewer, all four for admin. Record movement opens the form on Finished goods and closing it returns here. Rows are role-filtered per plan §3; the row verb is the action. A row standing for one order opens that order's Pick. This row stands for three, so Pick lands on the day's Pick sheet and each order opens its own Pick from there; the verb never becomes a noun to explain itself. The restock row appears while the order's restock flag is set and opens the order. Warehouse reaches the live Weekly count from Beer → Weekly count, so Today draws no count footer.",
     body: <TodayView model={toTodayViewProps(todayWarehouse)} />,
   },
   {
     step: 4, slice: "all", tab: "Today", name: "Today empty",
-    job: "Nothing waiting; the role's first verb is the only button",
+    job: "Nothing waiting; the role's quick actions stay",
     reads: "get_today", writes: "none",
-    states: [["empty", "one button: the role's first verb"]],
-    spec: "Empty Today. When work exists the row is where you act; with nothing waiting the first verb stands alone.",
+    states: [["empty", "Nothing waiting · the quick actions stay"]],
+    spec: "Empty Today, drawn for warehouse. When work exists the row is where you act; with nothing waiting the quick actions are the only buttons.",
     body: <TodayView model={toTodayViewProps(todayEmpty)} />,
   },
   {
@@ -436,17 +434,17 @@ export const SCREENS: Screen[] = [
     to: { "Pils · 16 oz case": "Pars and allocation", Open: "Invoice", "Al\u2019s Bar \u00b7 OH": "State registration" },
     job: "Sales landing: submitted orders to confirm and beer that is short",
     reads: "get_today [sales role filter] · get_shortfalls · list_invoice_questions", writes: "none",
-    states: [["empty", "one button: the role's first verb"], ["role hidden", "no Pick/Receive; no blank gaps"], ["buyer question", "a portal question lands here, because nothing else in MGR would show it"]],
-    spec: "The same Today read as the exemplar, filtered for sales. Confirm is the row verb (2 taps); shortfall rows open Shortfall, pars and standing allocation. A question raised from the portal's Question invoice sheet appears as a row here and opens that invoice, where Mark answered clears it: the note has a destination a person opens and a way to leave the list again. New order is the last row because the top button is gone.",
-    body: <TodayView model={toTodayViewProps(todaySales)} footer={E.nav("New order")} />,
+    states: [["empty", "Nothing waiting · New order stays"], ["role hidden", "no Pick/Receive; no blank gaps"], ["buyer question", "a portal question lands here, because nothing else in MGR would show it"]],
+    spec: "The same Today read as the exemplar, filtered for sales. Confirm is the row verb (2 taps); shortfall rows open Shortfall, pars and standing allocation. A question raised from the portal's Question invoice sheet appears as a row here and opens that invoice, where Mark answered clears it: the note has a destination a person opens and a way to leave the list again. New order is the quick action above the rows.",
+    body: <TodayView model={toTodayViewProps(todaySales)} />,
   },
   {
     step: 1, slice: "all", tab: "Today", name: "Brewer",
     to: { "Close": "Close packaging run" },
     job: "Brewer landing: readings due, brew day due, packaging to close",
     reads: "get_today [brewer role filter]", writes: "none",
-    states: [["empty", "one button: the role's first verb"], ["role hidden", "no picks or receipts"]],
-    spec: "Reading opens the Fermentation reading sheet defaulted to the overdue vessel. Brew day and packaging rows open their Work frames. Warehouse picks never appear here. The row verb is the action.",
+    states: [["empty", "Nothing waiting · New batch stays"], ["role hidden", "no picks or receipts"]],
+    spec: "New batch is the quick action above the rows and opens Batches. Reading opens the Fermentation reading sheet defaulted to the overdue vessel. Brew day and packaging rows open their Work frames. Warehouse picks never appear here. The row verb is the action.",
     body: <TodayView model={toTodayViewProps(todayBrewer)} />,
   },
   {
@@ -485,7 +483,7 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", tab: "More", name: "More", job: "Setup and desk review, never standing work",
     reads: "none [role navigation manifest]", writes: "none",
     states: DEFAULT_STATES,
-    spec: "Role-filtered; hidden entries leave no gaps. Entries sit under Sales, Production, Setup and Menu and chat headings, and an area with none of the role's entries has no heading. The rail's More group uses the same headings. Standing work remains in Today, Beer or Work.",
+    spec: "Role-filtered; hidden entries leave no gaps. Entries sit under Sales, Production, Setup and Menu headings, and an area with none of the role's entries has no heading. The rail's More group uses the same headings. Setup holds only Settings, the one home of Import, Sale channels, Locations, Team and the connections. Chat and your gravity unit are in Me, so a taproom user has no More tab. Standing work remains in Today, Beer or Work.",
     body: <MoreView model={toMoreViewProps(moreNavs)} />,
   },
   {
@@ -498,9 +496,9 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Me", job: "Who I am, which brewery, leave",
     to: { "Maria Alvarez": "Me" },
-    reads: "supabase_auth_get_session [platform] · get_first_run_state", writes: "supabase_auth_sign_out [platform]",
-    states: [["dedicated mode", "switcher hidden · one brewery"], ["single membership", "switcher hidden"]],
-    spec: "Opened from the header Me control. Brewery switcher renders only in SaaS mode with more than one membership. Change password opens Set new password (headed Change password), as portal Me opens Portal set password: a signed-in person should not have to sign out and use the recovery flow. No notification history, no settings; those live under More.",
+    reads: "supabase_auth_get_session [platform] · get_first_run_state · get_gravity_unit", writes: "supabase_auth_sign_out [platform] · set_my_gravity_unit",
+    states: [["dedicated mode", "switcher hidden · one brewery"], ["single membership", "switcher hidden"], ["gravity read failed", "the gravity unit section is left out"]],
+    spec: "Opened from the header Me control. Brewery switcher renders only in SaaS mode with more than one membership. Your own settings live here for every role: Chat opens your Slack link and notifications, and Gravity unit is your display choice, saved on tap, with “Use brewery default” following the admin's choice in Settings. Gravity is stored in °Plato everywhere, so the choice changes only what is printed and how a typed value is read. The preview converts one sample reading into the unit in effect. Change password opens Set new password (headed Change password), as portal Me opens Portal set password: a signed-in person should not have to sign out and use the recovery flow. No notification history.",
     body: <MeView model={meMaria} />,
   },
   {
@@ -508,7 +506,7 @@ export const SCREENS: Screen[] = [
     to: { "Water profiles": "Water profiles" },
     ...SETTINGS_IO,
     states: [...permitted("admin only"), ["filed basis", "ordinary field is locked · recorded correction flags every affected filed period"], ["correction history", "immutable old/new basis, actor, time and reason"], ["uncertain correction", "fields freeze · retry unchanged request"]],
-    spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Days to package is the brewery-wide projected packaging estimate, default 14 and whole days from 1 to 120. It adds to the actual brew date, or planned date before brewing. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Brewery details, Ask MGR and Wholesale fulfillment are three forms, each saved only by its own button. After filing, the ordinary books date is locked; Correct reporting basis has its own save and immutable correction history. Deployment mode is read-only. Team opens the Team frame.",
+    spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Gravity unit under Brewery details is the brewery default, saved on tap; each person may choose their own in Me. Days to package is the brewery-wide projected packaging estimate, default 14 and whole days from 1 to 120. It adds to the actual brew date, or planned date before brewing. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Brewery details, Ask MGR and Wholesale fulfillment are three forms, each saved only by its own button. After filing, the ordinary books date is locked; Correct reporting basis has its own save and immutable correction history. Deployment mode is read-only. Team opens the Team frame.",
     body: <SettingsView model={settingsDemo} />,
   },
   {
@@ -691,7 +689,7 @@ export const SCREENS: Screen[] = [
     group: "Entry",
     surface: "entry",
     name: "Portal forgot password",
-    to: { "Send reset link": "Portal set password" },
+    to: { "Send reset link": "Portal set password", "Back to sign in": "Portal sign in" },
     job: "Recover a buyer login without saying whether the email exists",
     reads: "none",
     writes: "supabase_auth_reset_password_for_email [platform]",
@@ -774,7 +772,7 @@ export const SCREENS: Screen[] = [
     reads: "get_first_run_state",
     writes: "invite_staff [existing] · create_location",
     states: permitted("admin only"),
-    spec: "Admin sees this only while neither a location nor a brand exists; adding either ends the checklist. Import and staff invitation are optional and do not block onboarding. Team and first-run use the same staff invitation form with one role.",
+    spec: "Admin sees this until a location and a brand both exist; adding the second of the two ends the checklist. Import and staff invitation are optional and do not block onboarding. Team and first-run use the same staff invitation form with one role.",
     body: <FirstRunView model={firstRunDemo} />,
   },
   {
@@ -1967,11 +1965,11 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Work",
     name: "Purchase orders",
-    to: { "New PO": "New PO", Send: "Receive PO" },
+    to: { "New PO": "New PO", "Mark sent": "Receive PO" },
     job: "See draft, sent and partially received purchase orders",
     reads: "list_purchase_orders",
     writes: "none [creation and receiving happen on their own surfaces]",
-    states: [["draft", "Send is the next action"], ["partial", "Receive stays available for the remainder"], ["empty", "no open purchase orders: New PO is the only action"]],
+    states: [["draft", "Mark sent is the next action"], ["partial", "Receive stays available for the remainder"], ["empty", "no open purchase orders: New PO is the only action"]],
     spec: "The Work list with the Purchase orders tab active. Each row names the next action; New PO opens the existing vendor purchase draft, and Receive PO returns here.",
     body: <PurchaseOrdersView model={toPurchaseOrdersViewProps(purchaseOrdersWarehouse)} />,
   },
@@ -2015,7 +2013,7 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Work",
     name: "Receipt",
-    to: { Work: "Purchase orders", "Correct receipt": "Correct receipt", "Original receipt": "Receipt", "Corrected receipt": "Receipt", "Fix Accounting mappings": "QuickBooks mappings" },
+    to: { Work: "Purchase orders", "PO-0142": "Receive PO", "Correct receipt": "Correct receipt", "Original receipt": "Receipt", "Corrected receipt": "Receipt", "Fix Accounting mappings": "QuickBooks mappings" },
     job: "What posted after a receive, including over, short, what is still owed, and its QuickBooks Bill",
     reads: "get_purchase_order [ordered less counted per line; correction-chain Bill identity and status] · get_qbo_connection [admin only; purchase account] · list_vendors [admin Bill mapping readiness]",
     writes: "post_receipt_bill [admin only; confirmation; one frozen Bill per receipt correction chain; pending retries query then replay the exact snapshot and provider request ID; definite rejection requires explicit newAttemptReason corrected]",
@@ -2539,11 +2537,11 @@ export const SCREENS: Screen[] = [
     tab: "Work",
     name: "Routes",
     to: { Assign: "Route", "Add to route": "Route" },
-    job: "See planned and active delivery routes and build the next one",
+    job: "See open and returned delivery routes and build the next one",
     reads: "list_routes",
     writes: "none [route planning happens on Route]",
-    states: [["unassigned", "shipped orders and picked transfers waiting for a route are called out"], ["empty", "no routes yet: New route is the only action"]],
-    spec: "Work › Deliveries. Every route not yet returned names its next action; New route opens Route in builder mode, and Route returns here. A stop is a shipped order or a picked stock transfer.",
+    states: [["unassigned", "shipped orders and picked transfers waiting for a route are called out"], ["empty", "no routes yet: New route is the only action"], ["returned", "Status Returned lists finished routes newest first; an empty Open list points there"]],
+    spec: "Work › Deliveries. The Status pick shows Open routes, each naming its next action, or Returned routes, newest first. New route opens Route in builder mode, and Route returns here. A stop is a shipped order or a picked stock transfer.",
     body: <RoutesView model={toRoutesViewProps(routesDriver)} />,
   },
   {
@@ -2904,18 +2902,6 @@ export const SCREENS: Screen[] = [
     states: [["permission", "admin required", 1], ["new", "titled Add channel · name and tax treatment required"], ["edit", "titled with the channel being edited"]],
     spec: "Drawn editing the Export channel. The sheet has no Delete: removal and its in-use rule live on the Sale channels list. Every selected tax treatment shows its meaning under the chips, including the default Taxable choice. The four removals without payment of tax (Export, Vessel supplies, Research, Transfer in bond) keep their approved TTB meanings.",
     body: <ChannelView model={toChannelViewProps(channelExport)} />,
-  },
-  {
-    step: 8,
-    slice: 1,
-    tab: "More",
-    name: "Units",
-    job: "Choose the unit gravity is shown and typed in, for the brewery and for yourself",
-    reads: "get_gravity_unit",
-    writes: "set_brewery_gravity_unit · set_my_gravity_unit",
-    states: [["brewery default", "admins only see and set this row", 1], ["personal override", "any staff role sets their own"], ["inherit", "“Use brewery default” clears the override"]],
-    spec: "Gravity is stored in °Plato everywhere and that never changes: this screen changes only what is printed and how a typed value is read back, so an existing reading cannot move. Two controls over one value because the two audiences differ. An admin sets what the brewery reads by default, and any brewer may override it for themselves without asking anyone. A membership with no unit of its own follows the brewery, which is why the personal control offers a third option rather than an empty one. SG input accepts both spellings a brewer uses, 1.050 and 1050. Gravity is the only unit chosen here, so the page is one Gravity unit section. Preview converts one sample reading from the other unit into the one in effect, so a brewer sees the conversion before relying on it.",
-    body: <UnitsView model={toUnitsViewProps(unitsPlato)} />,
   },
   {
     step: 8,
@@ -3333,7 +3319,7 @@ export const SCREENS: Screen[] = [
   {
     step: 5, slice: 1, tab: "More", name: "Water profiles empty",
     to: { "Add water profile": "Water profile" },
-    job: "Explain where source and target choices belong before the first profile",
+    job: "Invite the first profile, and say a recipe’s Water sheet picks its role",
     reads: "list_water_profiles",
     writes: "none [creation and editing happen on Water profile]",
     states: [["empty", "no saved profiles · Add water profile"]],
