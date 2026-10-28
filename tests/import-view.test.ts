@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import { E } from "../components/mgr/e";
 import { ImportView } from "../components/mgr/views/import";
-import { IMPORT_FIELDS, validateImportRows } from "../lib/import-csv";
+import { IMPORT_FIELDS, validateImportRows, type ImportKind } from "../lib/import-csv";
 import { importPreview } from "../lib/mgr/fixtures/import";
 
 it("keeps missing mappings and preview cells empty rather than undefined", () => {
@@ -97,10 +97,30 @@ it("identifies committed results by CSV row without exposing record UUIDs (#1382
       ],
     },
   } }));
-  expect(html).toMatch(/>2<\/td><td[^>]*>Al’s Bar<\/td><td[^>]*>Imported<\/td>/);
+  expect(html).toMatch(/>2<\/td><td[^>]*><a [^>]*>Al’s Bar<\/a><\/td><td[^>]*>Imported<\/td>/);
   expect(html).toMatch(/>5<\/td><td[^>]*><\/td><td[^>]*>Blocked: Customer name is required<\/td>/);
-  expect(html).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  // The id reaches only the link target, never the visible text.
+  expect(html.replace(/href="[^"]*"/g, "")).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
   expect(html).toContain("frozen-request");
+});
+
+it("links each imported record to its page, and leaves kinds without one as text (#1497)", () => {
+  const render = (kind: ImportKind, rows: Record<string, string>[], result: Record<string, string>) => renderToStaticMarkup(createElement(ImportView, { model: {
+    ...importPreview, kind, rows, step: 3, batchId: "done", previewRows: [1],
+    result: { committed: 1, blocked: 0, outcomes: [{ row: 1, status: "committed", result }] },
+  } }));
+  expect(render("customers", [{ name: "Al’s Bar" }], { id: "c1" })).toContain('<a href="/customers/c1"');
+  // A ship-to is edited on its customer's page.
+  expect(render("ship_tos", [{ label: "Dock" }], { id: "s1", customer_id: "c1" })).toContain('<a href="/customers/c1"');
+  // A SKU is switched on and edited under its brand's Sells as.
+  expect(render("products_skus", [{ product: "Pils" }], { id: "k1", brand_id: "b1" })).toContain('<a href="/catalog/brands/b1#sells-as"');
+  for (const kind of ["channel_prices", "opening_balances"] as const) expect(render(kind, [{ name: "Row" }], { id: "x1" })).not.toContain("<a href");
+  // A blocked row has no record to open.
+  const blocked = renderToStaticMarkup(createElement(ImportView, { model: {
+    ...importPreview, step: 3, batchId: "done", previewRows: [1],
+    result: { committed: 0, blocked: 1, outcomes: [{ row: 1, status: "blocked", error: "Customer name is required" }] },
+  } }));
+  expect(blocked).not.toContain("<a href");
 });
 
 it("offers Discard for an unresolved batch only after a confirming step (#615)", () => {
