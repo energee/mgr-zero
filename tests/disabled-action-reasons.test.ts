@@ -168,8 +168,9 @@ describe("Oct 25 recheck: withheld actions say why (#1122)", () => {
     expect(html(createElement(CellarMapView, { model }))).toContain("No tank holds beer");
   });
 
-  it("Send invite stays enabled so a click shows the email error", () => {
-    const button = html(createElement(InviteView, { buyer: false })).match(/<button[^>]*>Send invite<\/button>/)?.[0];
-    expect(button).not.toContain('disabled=""');
+  it("Send invite is withheld, with its reason, until the email is valid (#1488)", () => {
+    const page = html(createElement(InviteView, { buyer: false }));
+    expect(page.match(/<button[^>]*>Send invite<\/button>/)?.[0]).toContain('disabled=""');
+    expect(page).toContain("Still needed: a valid email address.");
   });
 });

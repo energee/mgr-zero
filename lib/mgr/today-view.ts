@@ -3,6 +3,7 @@ import type { EmptyState } from "./empty-state";
 import type { TodayItem } from "@/lib/commands/today";
 import type { TaproomTodayRow } from "@/lib/mgr/taproom-today";
 import { breweryDate, formatDateTime, formatTimeOfDay } from "@/lib/date-format";
+import { hasAnyRole } from "@/lib/mgr/roles";
 
 export type TodayIcon = "package" | "truck" | "route" | "thermo" | "beer" | "task" | "invoice";
 
@@ -20,12 +21,31 @@ export type TodayRowView = {
   dueAt?: string;
 };
 
+/** A quick action above Today's rows; the inventory leaves out `href`. */
+export type TodayAction = { label: string; href?: string };
+
 export type TodayViewModel = {
   date: string;
+  actions?: TodayAction[];
   empty?: EmptyState;
   emptyVerb?: string;
   rows: TodayRowView[];
 };
+
+/** Today's quick actions in drawing order, each with the roles it is offered
+ *  to (#1513). Admin is offered all four. Record movement passes `from` so its
+ *  form returns to Today when it closes (#1475). */
+const TODAY_ACTIONS: readonly (Required<TodayAction> & { roles: readonly string[] })[] = [
+  { label: "New order", href: "/orders/new", roles: ["sales"] },
+  { label: "Record movement", href: "/inventory?recordMovement=1&from=/", roles: ["warehouse"] },
+  { label: "Receive PO", href: "/purchase-orders", roles: ["warehouse"] },
+  { label: "New batch", href: "/batches", roles: ["brewer"] },
+];
+
+/** The quick actions a person holding `roles` is offered on Today. */
+export function todayActions(roles: readonly string[]): TodayAction[] {
+  return TODAY_ACTIONS.filter((a) => hasAnyRole(roles, ["admin", ...a.roles])).map(({ label, href }) => ({ label, href }));
+}
 
 const SUBJECT_ICON: Record<TodayItem["subjectType"], TodayIcon> = {
   order: "package",
@@ -49,6 +69,7 @@ export const TODAY_VERB: Record<TodayItem["reason"], [string, "info" | "attentio
 
 export type TodaySnapshot = {
   date: string;
+  actions?: TodayAction[];
   empty?: EmptyState;
   emptyVerb?: string;
   rows?: TodayRowView[];
@@ -76,6 +97,10 @@ function dueText(dueAt: string, timeZone: string, now: Date): string {
 export const NOTHING_WAITING: EmptyState = { title: "Nothing waiting", description: "Nothing needs your attention right now." };
 
 export function toTodayViewProps(s: TodaySnapshot): TodayViewModel {
+  return { ...todayRows(s), ...(s.actions ? { actions: s.actions } : {}) };
+}
+
+function todayRows(s: TodaySnapshot): TodayViewModel {
   if (s.rows !== undefined) {
     return { date: s.date, empty: s.empty, emptyVerb: s.emptyVerb, rows: s.rows };
   }
@@ -99,7 +124,7 @@ export function toTodayViewProps(s: TodaySnapshot): TodayViewModel {
     return {
       date: s.date,
       empty: s.empty ?? NOTHING_WAITING,
-      emptyVerb: s.emptyVerb ?? "Record movement",
+      emptyVerb: s.emptyVerb,
       rows: [],
     };
   }

@@ -29,9 +29,10 @@ function elements(node: ReactNode): Node[] {
   if (!isValidElement<Record<string, unknown> & { children?: ReactNode }>(node)) return [];
   return [node, ...Children.toArray(node.props.children).flatMap(elements)];
 }
-function assemble<T>(render: () => T): T {
+/** `cursor` starts SkuView's own hooks past the form's, so the two never share a slot. */
+function assemble<T>(render: () => T, cursor = 0): T {
   state.active = true;
-  state.cursor = 0;
+  state.cursor = cursor;
   try { return render(); } finally { state.active = false; }
 }
 const sku = { ...skuHazyHalf.sku!, batch_share: 0.375 };
@@ -39,8 +40,9 @@ const edit = () => assemble(() => SkuEditForm({ sku, formatName: "½ bbl keg", p
 function viewOf(sheet: Sheet) {
   return elements(sheet).find(node => node.type === SkuView)! as ReactElement<ComponentProps<typeof SkuView>>;
 }
+const drawn = (sheet: Sheet) => elements(assemble(() => SkuView(viewOf(sheet).props), 100));
 function shareControl(sheet: Sheet) {
-  return elements(SkuView(viewOf(sheet).props)).find(node => node.props.label === "Batch package share (%)")!;
+  return drawn(sheet).find(node => node.props.label === "Batch package share (%)")!;
 }
 function submit(sheet: Sheet) {
   const form = elements(sheet).find(node => node.type === "form")!;
@@ -73,13 +75,23 @@ it("clears the persisted share with null and resets unsaved state when reopening
   expect(viewOf(sheet).props.model.batchSharePercent).toBe("37.5");
 });
 
-it.each(["0", "-1", "101", "invalid"])("does not dispatch invalid share %s", value => {
+it.each(["0", "-1", "101", "invalid"])("withholds Save SKU with a reason for invalid share %s", value => {
   (shareControl(edit()).props.onChange as (value: string) => void)(value);
   const sheet = edit();
   const footer = viewOf(sheet).props.footer;
-  expect(elements(footer).some(node => node.props.disabled === true)).toBe(true);
+  expect(elements(footer).some(node => node.props.reason === "Still needed: a batch package share above 0% and at most 100%.")).toBe(true);
   expect(submit(sheet).preventDefault).toHaveBeenCalledOnce();
   expect(state.sent).toEqual([]);
+});
+
+it("shows the share error under the field once the field is left", () => {
+  const message = "Enter a share above 0% and at most 100%, or clear it.";
+  const shown = () => drawn(edit()).some(node => node.props.children === message);
+  (shareControl(edit()).props.onChange as (value: string) => void)("101");
+  expect(shown()).toBe(false);
+  (shareControl(edit()).props.onBlur as () => void)();
+  expect(shown()).toBe(true);
+  expect(shareControl(edit()).props["aria-invalid"]).toBe(true);
 });
 
 it("renders equivalent saved fixture/live shares through SkuView", () => {

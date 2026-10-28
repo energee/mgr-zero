@@ -3,6 +3,7 @@ import { cloneElement, Fragment, useId, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { formatDate } from "@/lib/date-format";
 import { sentenceCase } from "@/lib/mgr/labels";
+import { bblExact } from "@/lib/volume";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { DatePicker } from "@/components/mgr/date-picker";
@@ -40,6 +41,10 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord }: 
       {E.fld("Vessel", model.vesselName || "No open occupancy")}
       {E.fld("Knockout", model.initialBbl ? model.initialBbl + " bbl" : "Unavailable after the occupancy closes")}
       {E.fld("Brewed on", model.brewedOn ? formatDate(model.brewedOn) : "Unavailable")}
+      {model.completion && <>
+        {E.fld("Completed", model.completion.on)}
+        {E.fld("Written off as loss", model.completion.writeOffBbl === null ? "None" : bblExact(model.completion.writeOffBbl, 8))}
+      </>}
       {!(model.records?.length) && E.note("Historical frozen brew sheet unavailable. This brew predates confirmed material records.")}
       {(model.records ?? []).map(record => <section key={record.id} className="flex flex-col gap-2 rounded border p-3">
         {E.ttl(`Turn ${record.turn} · ${record.corrects_id ? "Corrected brew record" : "Original brew record"}`)}
@@ -52,7 +57,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord }: 
       </section>)}
       {model.vesselId && currentBrewRecords(model.records ?? []).map(record => <Fragment key={record.id}>{cloneElement(E.act(`Correct turn ${record.turn}`, "attention", undefined, () => change(brewCorrectionModel(model, record)), busy), { "data-preview-action": true } as Record<string, unknown>)}</Fragment>)}
       {model.vesselId && model.records?.length ? cloneElement(E.act("Add brew turn", "attention", undefined, () => change(brewTurnModel(model)), busy), { "data-preview-action": true } as Record<string, unknown>) : null}
-      {E.info("Already brewed. Cellar transfers and fermentation readings continue from the current occupancy, when one is open.")}
+      {!model.completion && E.info("Already brewed. Cellar transfers and fermentation readings continue from the current occupancy, when one is open.")}
     </> : <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); if (!busy && ready) onRecord?.(); }}>
 
       {E.pick("Vessel", value.vesselId, vesselOptions(value.vessels), { onChange: vesselId => change({ vesselId }), disabled: busy || Boolean(value.correctionRecordId) || Boolean(value.addingTurn), required: true, placeholder: "Choose vessel", id: id + "-vessel" })}
@@ -82,9 +87,11 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord }: 
 }
 
 function BrewPlanSheet({ plan, frozen }: { plan?: BrewPlan; frozen: boolean }) {
+  const version = plan?.version?.version;
+  const recipe = plan?.recipe && version ? `${plan.recipe} v${version}` : plan?.recipe;
   return <>
       <details open><summary className="font-medium">{frozen ? "Frozen recipe plan" : "Pinned recipe plan"}</summary>
-        {E.fld("Recipe", plan?.recipe ?? "No recipe")}
+        {E.fld("Recipe", recipe ?? "No recipe")}
         {(plan?.ingredients ?? []).map(row => <Fragment key={row.id}>{E.fld(row.materialName, `${perBblDisplay(row.per_bbl_qty)} ${row.unit} per bbl · ${sentenceCase(row.stage)}`)}</Fragment>)}
         {(plan?.version?.mash_schedule ?? []).map((row, index) => <Fragment key={index}>{E.fld(row.name, `${row.temp_f ?? row.tempF ?? "—"} °F · ${row.minutes} min`)}</Fragment>)}
         {(plan?.waterAdditions ?? []).map((row, index) => <Fragment key={index}>{E.fld(row.materialName, `${row.qty} ${row.unit} planned; confirm actual use in ${row.baseUnit}`)}</Fragment>)}

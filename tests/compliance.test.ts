@@ -856,6 +856,26 @@ describe("trace_lot", () => {
   });
 });
 
+describe("list_lots", () => {
+  it("q keeps the lots whose code contains it, ignoring case, as literal text (#1510)", async () => {
+    const brewery = await makeBrewery();
+    const owner = await makeStaffCtx(brewery.id, "admin");
+    const cat = await seedCatalog(brewery.id, { product: "Lot search", sku: "Lot search keg" });
+    const lot = async (code: string) => {
+      const run = await ins("packaging_runs", { brewery_id: brewery.id, brand_id: cat.brandId, planned_on: "2026-09-01", created_by: owner.userId });
+      return (await ins("lots", { brewery_id: brewery.id, packaging_run_id: run.id, brand_id: cat.brandId, code, packaged_on: "2026-09-01" })).id;
+    };
+    const hazy = await lot("L-260901-HZ");
+    const stout = await lot("L-260901-ST");
+    const dotted = await lot("L.1");
+    const found = async (input: { q?: string }) => ((await runCommand("list_lots", input, owner)) as { id: string }[]).map((row) => row.id).sort();
+    expect(await found({})).toEqual([hazy, stout, dotted].sort());
+    expect(await found({ q: "hz" })).toEqual([hazy]);
+    expect(await found({ q: "." })).toEqual([dotted]);
+    expect(await found({ q: "zz" })).toEqual([]);
+  });
+});
+
 describe("cellar transfer loss (#428)", () => {
   it("reports the volume lost on a transfer as a loss removal in the transfer's month", async () => {
     const brewery = await makeBrewery();

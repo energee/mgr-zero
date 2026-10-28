@@ -116,6 +116,12 @@ export function formatSizing(model: FormatViewModel) {
   return { name, bbl, volumeLabel, valid: error === undefined, error };
 }
 
+/** Why `name` cannot be created: another packaged format already has it. Matches
+ *  formats_packaged_name_idx, which compares trimmed names case-sensitively. */
+export function formatNameError(name: string, takenNames: readonly string[]): string | undefined {
+  return takenNames.some(taken => taken.trim() === name) ? `A format named ${name} already exists.` : undefined;
+}
+
 /** Field changes are identical in the live form and the interactive preview. */
 export function formatControls(model: FormatViewModel, patch: (next: Partial<FormatViewModel>) => void) {
   return {

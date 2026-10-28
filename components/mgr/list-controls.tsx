@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { E } from "@/components/mgr/e";
 import { ScopePick, type ScopeOption } from "@/components/mgr/scope-pick";
+import { SEARCH_MAX } from "@/lib/mgr/list-params";
 
 /** One labeled pick: its options, the selected value, and (live) the href each opens. */
 export type ListScope = { label: string; value: string; options: ScopeOption[] };
@@ -58,7 +59,7 @@ export function ListControls({ search, scopes = [] }: {
 function SearchForm({ search, onType }: { search: ListSearch; onType?: (q: string) => void }) {
   return <form method="get" role="search" className="basis-full lg:basis-0 lg:grow">
     {Object.entries(search.keep).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
-    {E.search(search.label, { name: "q", defaultValue: search.value, onChange: onType && (event => onType(event.target.value)) })}
+    {E.search(search.label, { name: "q", defaultValue: search.value, maxLength: SEARCH_MAX, onChange: onType && (event => onType(event.target.value)) })}
   </form>;
 }
 

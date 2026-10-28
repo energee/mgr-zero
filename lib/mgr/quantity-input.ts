@@ -18,6 +18,9 @@ export function numberNotationError(value: string): string | undefined {
   return /[eE]/.test(value) ? "Enter a decimal number, not exponent notation (for example, 1000 instead of 1e3)." : undefined;
 }
 
+/** The largest material quantity material_movements.qty, a numeric(14,4), stores. */
+export const MATERIAL_QTY_MAX = 9_999_999_999.9999;
+
 /** Material quantities are numeric with 4 decimals in the database; add and
  *  compare them as integer ten-thousandths so float sums never drift. */
 export const toTicks = (qty: number) => Math.round(qty * 10000);

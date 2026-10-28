@@ -8,6 +8,7 @@ import type { EmptyState } from "./empty-state";
 import { periodStatus, type PeriodStatus } from "@/lib/compliance-period";
 import { batNo } from "./doc-no";
 import { submitReason } from "./submit-reason";
+import { booksVerb, NOT_REPORTED_BEFORE_BOOKS } from "./compliance-months-view";
 
 export type MonthlyComplianceSnapshot = {
   monthLabel: string;
@@ -131,6 +132,12 @@ function bblUnits(value: string) {
   return BigInt(whole || "0") * BigInt(100_000_000) + BigInt(fraction.padEnd(8, "0") || "0");
 }
 
+/** The remaining loss as the BBL field's starting text, so the whole-loss case is pick a target and Save (#1510).
+ *  Trims the stored decimal's trailing zeros as text: Number() would print 0.0000005 as "5e-7", which bblUnits rejects. */
+export function remainingAmountText(remaining: string) {
+  return remaining.includes(".") ? remaining.replace(/\.?0+$/, "") : remaining;
+}
+
 /** Keep the reason and Save eligibility on the same exact, eight-decimal comparison. */
 export function lossReviewReason(amount: string, remaining: string, target: "sample" | "taproom" | "destruction", state: string): string | null {
   const amountUnits = bblUnits(amount);
@@ -148,8 +155,8 @@ export type BeforeBooksState = EmptyState & { action?: { label: string; href?: s
 /** A period that starts before the books opened has no report; say so instead of failing (#987).
  *  Settings is admin-only, so only an admin gets Open Settings; anyone else is told to ask an admin
  *  rather than given a link that would land on No access (the #1020 Menu pattern). */
-export function beforeBooksState(periodLabel: string, booksOpenedOn: string, admin: boolean): BeforeBooksState {
-  const why = `${periodLabel} starts before the books opened on ${formatDate(booksOpenedOn)}, so MGR has no report for it.`;
+export function beforeBooksState(periodLabel: string, booksOpenedOn: string, admin: boolean, today: string): BeforeBooksState {
+  const why = `${periodLabel} starts before the books ${booksVerb(booksOpenedOn, today)} on ${formatDate(booksOpenedOn)}, so MGR has no report for it. ${NOT_REPORTED_BEFORE_BOOKS}`;
   return admin
     ? { title: "Before the books opened", description: `${why} The books-opened date is in Settings.`, action: { label: "Open Settings", href: "/settings" } }
     : { title: "Before the books opened", description: `${why} Ask an admin to change the books-opened date.` };

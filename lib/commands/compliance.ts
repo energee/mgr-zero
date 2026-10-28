@@ -17,6 +17,7 @@ import type { ColaDetails, ColaRecord } from "@/lib/ttb/colas";
 import { breweryToday, CommandError, completeRows, defineCommand, defineQuery, PAGE_SIZE, rows, STAFF_ROLES, stateCode, unwrap } from "./registry";
 import type { Ctx } from "./registry";
 import { requireAdmission } from "./admission";
+import { escapeRegex } from "@/lib/escape-regex";
 import { movementReferences } from "./inventory";
 
 const ROLES = ["admin", "sales"] as const;
@@ -309,9 +310,13 @@ defineQuery({
 export type LotRowOut = { id: string; code: string; packaged_on: string; brands: { name: string } | null };
 
 defineQuery({
-  name: "list_lots", description: "Finished-goods lots, newest packaged first, as the entry to a lot trace",
-  roles: [...ROLES], input: z.object({}),
-  handler: (ctx) => rows<LotRowOut>(ctx.db.from("lots").select("id, code, packaged_on, brands(name)").eq("brewery_id", ctx.breweryId).order("packaged_on", { ascending: false }).limit(50)),
+  name: "list_lots", description: "Finished-goods lots, newest packaged first and at most 50, as the entry to a lot trace",
+  roles: [...ROLES],
+  input: z.object({ q: z.string().trim().max(100).optional().describe("Only lots whose code contains this text, ignoring case") }),
+  handler: (ctx, i) => {
+    const lots = ctx.db.from("lots").select("id, code, packaged_on, brands(name)").eq("brewery_id", ctx.breweryId).order("packaged_on", { ascending: false }).limit(50);
+    return rows<LotRowOut>(i.q ? lots.regexIMatch("code", escapeRegex(i.q)) : lots);
+  },
 });
 
 type TraceBatch = { id: string; batch_no: number | null; brewed_on: string | null };

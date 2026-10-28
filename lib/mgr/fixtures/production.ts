@@ -195,6 +195,10 @@ export const closePackagingRunHazy: ClosePackagingRunViewModel = {
 
 export const runClosedHazy: RunClosedViewModel = {
   title: "RUN-0031 · closed",
+  brand: "Hazy IPA",
+  source: "FV3 · B-0416",
+  plannedOn: "2026-09-04",
+  closedAt: "2026-09-05T20:00:00Z",
   records: [{ id: "material-record", created_at: "2026-09-05", corrects_id: null, correction_reason: null, planned: packagingPlan.planned, actuals: [{ material_id: "cans", material_name: "Cans", unit: "each", location_id: "warehouse", location_name: "Warehouse", bin_id: "dry", bin_name: "Dry", lot_id: null, lot_code: null, qty_used: 2832, qty_loss: 6, qty_unused: 12 }] }],
   correction: { plan: packagingPlan, locations: closePackagingRunHazy.closeFields!.locations, bins: closePackagingRunHazy.closeFields!.bins, rows: closePackagingRunHazy.closeFields!.actuals, reason: "" },
   bblDrawn: 40,

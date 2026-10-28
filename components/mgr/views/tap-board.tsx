@@ -13,7 +13,7 @@ import { bblExact } from "@/lib/volume";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { ScopePick, type ScopeOption } from "@/components/mgr/scope-pick";
-import { tapLabel, fillLabel, OPENING_FILLS, CLOSING_FILLS, tapSheetNeeds, tapSheetReason, openTapBoardSheet, editTapBoardSheet, type TapBoardState, type TapBoardSheet, type TapSheetFields, type TapInterval } from "@/lib/mgr/tap-board-state";
+import { tapLabel, fillLabel, OPENING_FILLS, CLOSING_FILLS, tapSheetNeeds, tapSheetReason, openTapBoardSheet, editTapBoardSheet, type TapBoardState, type TapBoardSheet, type TapSheetFields, type TapInterval, type TapHistory } from "@/lib/mgr/tap-board-state";
 import { TAP_NUMBER_MAX_DIGITS } from "@/lib/tap-number";
 
 export type TapSku = { id: string; name: string; nominalBbl: number };
@@ -23,6 +23,10 @@ const actor = (label: string | null) => label || "staff";
 const opened = (tap: TapInterval) => `opened ${fillLabel(OPENING_FILLS, tap.opening_fill).toLowerCase()}`;
 
 const VERBS = { tap: "Tap keg", kick: "Kick keg", swap: "Swap · one record" } as const;
+/** "Tap 4", or null for an unnumbered keg: it is named by its beer alone, never "Tap unnumbered" (#1481). */
+const tapName = (tap: TapInterval) => tap.tap_number === null ? null : `Tap ${tap.tap_number}`;
+/** A closed keg's reason, then its remaining fill unless the reason already says it was empty. */
+const closedAs = (tap: TapHistory) => tap.close_reason === "Kicked empty" && Number(tap.closing_fill) === 0 ? tap.close_reason : `${tap.close_reason} · ${fillLabel(CLOSING_FILLS, tap.closing_fill)}`;
 
 function fillChips<Fill extends number>(label: string, options: readonly (readonly [Fill, string])[], value: Fill, onChange: (fill: Fill) => void) {
   return E.chips(options.map(([, text]) => text), options.findIndex(([fill]) => fill === value), false, { label, onChange: index => onChange(options[index][0]) });
@@ -57,7 +61,7 @@ export function TapKegView({ sheet: controlledSheet, skus, skusHref, timeZone, o
   return <>
     {closedFact && E.row("Already swapped", closedFact, <Button type="button" variant="outline" onClick={onReload}>Reload</Button>, "w")}
     <fieldset disabled={locked} className="flex flex-col gap-3">
-      {sheet.interval && <>{E.ttl(sheet.kind === "kick" ? `Kick tap ${sheet.interval.tap_number ?? "unnumbered"}` : "Coming off")}{E.fld(sheet.kind === "kick" ? "Coming off" : `Tap ${sheet.interval.tap_number ?? "unnumbered"}`, `${tapLabel(sheet.interval)} · ${volume(sheet.interval.nominal_bbl)} · on since ${formatDateTime(sheet.interval.opened_at, timeZone)} · ${actor(sheet.interval.opened_by_label)}`)}</>}
+      {sheet.interval && <>{E.ttl(sheet.kind === "kick" ? sheet.interval.tap_number === null ? VERBS.kick : `Kick tap ${sheet.interval.tap_number}` : "Coming off")}{E.fld(sheet.kind === "kick" ? "Coming off" : tapName(sheet.interval) ?? "Keg", `${tapLabel(sheet.interval)} · ${volume(sheet.interval.nominal_bbl)} · on since ${formatDateTime(sheet.interval.opened_at, timeZone)} · ${actor(sheet.interval.opened_by_label)}`)}</>}
       {sheet.kind !== "tap" && <>
         {E.pick("Reason", sheet.fields.reason, (["Kicked empty", "Flavor change", "Quality hold"].map(reason => ({ value: reason, label: reason }))), { id: `${idPrefix}-close-reason`, onChange: (nextValue: string) => edit({ reason: nextValue }) })}
         {E.ttl("Remaining")}
@@ -122,6 +126,6 @@ export function TapBoardView({ state: controlledState, skus, timeZone, navigatio
     {state.snapshot.open.some(tap => tap.tap_number === null) && E.info("Unnumbered kegs sort last.")}
     {E.ttl("Recent history")}
     {E.info("Closed tap entries cannot be edited or deleted. They preserve who opened and closed each keg and when, and support historical variance calculations.")}
-    {state.snapshot.history.length === 0 ? E.polite("No closed kegs yet.") : <ul aria-label="Closed kegs">{state.snapshot.history.map(tap => <li key={tap.id}>{E.row(`Tap ${tap.tap_number ?? "unnumbered"} · ${tapLabel(tap)}`, `${tap.close_reason} · ${fillLabel(CLOSING_FILLS, tap.closing_fill)} · closed ${formatDateTime(tap.closed_at, timeZone)} by ${actor(tap.closed_by_label)}`)}</li>)}</ul>}
+    {state.snapshot.history.length === 0 ? E.polite("No closed kegs yet.") : <ul aria-label="Closed kegs">{state.snapshot.history.map(tap => <li key={tap.id}>{E.row([tapName(tap), tapLabel(tap)].filter(Boolean).join(" · "), `${closedAs(tap)} · closed ${formatDateTime(tap.closed_at, timeZone)} by ${actor(tap.closed_by_label)}`)}</li>)}</ul>}
   </>;
 }
