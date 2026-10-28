@@ -71,7 +71,7 @@ defineCommand({
 
 defineCommand({
   name: "upsert_material_contract",
-  description: "Create or edit a purchasing commitment for one material with one vendor; releases are ordered against it all year, and it never gates ordering",
+  description: "Create or edit a purchasing commitment for one material with one vendor; releases are ordered against it all year, and it never gates ordering; endsOn cannot precede startsOn",
   input: z.object({
     id: z.string().uuid().optional(),
     vendorId: z.string().uuid(),
@@ -81,7 +81,7 @@ defineCommand({
     startsOn: isoDate.optional(),
     endsOn: isoDate.optional(),
     contractNo: z.string().trim().optional(),
-  }),
+  }).refine(i => !i.startsOn || !i.endsOn || i.endsOn >= i.startsOn, { path: ["endsOn"], message: "end date must be on or after the start date" }),
   roles: [...PURCHASING],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_material_contract", {
     p_brewery: ctx.breweryId, p_contract: i.id ?? null, p_vendor: i.vendorId, p_material: i.materialId,

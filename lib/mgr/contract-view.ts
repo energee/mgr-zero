@@ -41,14 +41,22 @@ export function contractBalanceFields(
   };
 }
 
+/** The correction under Ends when both dates are set and the end comes first.
+ * ISO yyyy-mm-dd strings compare in date order. Equal dates are a one-day window. */
+export function contractDateError(starts: string, ends: string): string | undefined {
+  return starts && ends && ends < starts ? "Enter an end date on or after the start date." : undefined;
+}
+
 /** Why Save contract remains unavailable: the required links and quantity must
- * exist, numeric fields must obey the PO rules, and typed exponent notation is
- * never converted silently before the command sees it. */
-export function contractSubmitReason(fields: Pick<ContractViewModel, "vendorId" | "materialId" | "quantity" | "unitCost">): string | null {
+ * exist, an end date cannot precede the start date, numeric fields must obey
+ * the PO rules, and typed exponent notation is never converted silently before
+ * the command sees it. */
+export function contractSubmitReason(fields: Pick<ContractViewModel, "vendorId" | "materialId" | "quantity" | "unitCost" | "starts" | "ends">): string | null {
   const errors = poLineErrors({ qty: fields.quantity, cost: fields.unitCost });
   const missing: string[] = [];
   if (!fields.vendorId) missing.push("a vendor");
   if (!fields.materialId) missing.push("a material");
+  if (contractDateError(fields.starts, fields.ends)) missing.push("an end date on or after the start date");
   if (!fields.quantity.trim()) missing.push("a quantity");
   else if (numberNotationError(fields.quantity)) missing.push("a decimal quantity");
   else if (errors.qty) missing.push(Number(fields.quantity) > 0 ? "a quantity no greater than 9,999,999,999.9999" : "a quantity above zero");

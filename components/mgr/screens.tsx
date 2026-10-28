@@ -2150,7 +2150,7 @@ export const SCREENS: Screen[] = [
     job: "Create or edit one material purchasing commitment",
     reads: "list_materials · list_vendors_and_contracts",
     writes: "upsert_material_contract · delete_material_contract",
-    states: [["permission", "warehouse or brewer required", 1], ["new", "vendor, material and quantity required"], ["received", "received and on-order quantities are read-only"], ["on purchase orders", "Delete is refused; set an end date instead", 1]],
+    states: [["permission", "warehouse or brewer required", 1], ["new", "vendor, material and quantity required"], ["received", "received and on-order quantities are read-only"], ["dates", "an end before the start is named under Ends and blocks Save · a set date offers Clear"], ["on purchase orders", "Delete is refused; set an end date instead", 1]],
     spec: "This sheet owns the commitment and nothing else. Receipts and open releases both update progress, and neither is editable here: a quantity a buyer could type over would stop being evidence. Available is the commitment less what has arrived and less what is already ordered, which is the only one of the four numbers worth acting on. Delete confirms first and is refused once a purchase order uses the contract; set an end date instead.",
     body: <ContractView model={contractYchCitra} />,
   },
