@@ -354,7 +354,7 @@ describe("SCREENS", () => {
       "Correct receipt", "Add brew turn", "Correct turn 1", "Correct turn 2",
       "Add", "Add stop", "Add to route", "Adjust", "Assign", "Brew", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose lot", "Choose who gets it", "Close", "Confirm", "Confirm all", "Connect", "Count", "Create",
       "Deliver", "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Edit SKU", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open format",
-      "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",
+      "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Record return", "Release", "Reload", "Remove", "Reorder", "Re-push",
       "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
       "Unlink", "Use", "Write off", "Fix registration", "Forgot password?", "Import CSV", "Invite staff", "Invite portal user",
     ]);

@@ -45,3 +45,11 @@ export function newPoReason({ vendor, lines }: { vendor: string; lines: { materi
   if (lines.some(line => poLineErrors(line).cost)) missing.push("a unit cost of zero or more");
   return submitReason(missing);
 }
+
+/** The material picker's order once a vendor is chosen: materials whose
+ *  default vendor it is come first, then the rest, each in the given
+ *  (alphabetical) order. Nothing is hidden: any material may go on any PO. */
+export function vendorMaterialsFirst<M extends { default_vendor_id: string | null }>(materials: M[], vendorId: string): M[] {
+  if (!vendorId) return materials;
+  return [...materials.filter((m) => m.default_vendor_id === vendorId), ...materials.filter((m) => m.default_vendor_id !== vendorId)];
+}

@@ -4,11 +4,14 @@ import { E } from "@/components/mgr/e";
 import type { InventoryDetailViewModel, InventoryMovement } from "@/lib/mgr/inventory-detail-view";
 import { formatDateTime } from "@/lib/date-format";
 
-export function InventoryDetailView({ model, movementAction, footer }: {
-  model: InventoryDetailViewModel; movementAction?: (movement: InventoryMovement) => ReactNode; footer?: ReactNode;
+/** `headerAction` is Record movement for this SKU: live links the movement
+ *  deep link, or null for a user who may not record one; the inventory leaves
+ *  it out and draws it inert. */
+export function InventoryDetailView({ model, headerAction, movementAction, footer }: {
+  model: InventoryDetailViewModel; headerAction?: ReactNode; movementAction?: (movement: InventoryMovement) => ReactNode; footer?: ReactNode;
 }) {
   return <>
-    {E.back("Finished goods", model.sku.name, undefined, model.backHref)}
+    {E.back("Finished goods", model.sku.name, headerAction !== undefined ? headerAction : E.btn("Record movement"), model.backHref)}
     {!model.sku.active && E.fld("Status", "Inactive · history retained")}
     {E.num(String(model.available), `Available · ${model.onHandTotal} on hand · ${model.allocated} allocated`)}
     {E.ttl("On hand by location")}
