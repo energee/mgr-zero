@@ -1,8 +1,8 @@
 // app/(app)/routes/page.tsx — Work › Deliveries (screen record Routes): the
 // Status pick's routes from list_routes — Open (every route not yet returned)
 // by default, or ?status=returned newest first — with their next verb
-// (routeNext; an assigned route not yet departed, or a returned one, is a plain
-// row link). Open also lists the shipped orders and picked transfers on no
+// (routeNext: Resume, Return once every stop has an outcome, or Assign; an
+// assigned route not yet departed, or a returned one, is a plain row link). Open also lists the shipped orders and picked transfers on no
 // route; their Add to route opens /routes/new?add={id} with that document
 // ticked. New route → /routes/new.
 // Warehouse and Admin. New route is size="sm" like every Work list's create

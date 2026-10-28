@@ -8,7 +8,7 @@ import type { Ctx } from "./registry";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { ORDER_FILTERS, salesRoles, warehouseRoles } from "@/lib/mgr/order-status";
 import { hasAnyRole } from "@/lib/mgr/roles";
-import { PAYMENT_METHODS, REFUSAL_REASONS } from "@/lib/mgr/enums";
+import { PAYMENT_METHODS, REFUSAL_REASONS, type PaymentMethod } from "@/lib/mgr/enums";
 import { isoDate } from "./packaging";
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
 
@@ -445,7 +445,7 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_invoice", description: "One invoice with its lines, the order it bills (through its shipment), and the payments recorded in MGR",
+  name: "get_invoice", description: "One invoice with its lines, the order it bills (through its shipment), the payments recorded in MGR, and the method of the customer's last unvoided payment on any invoice",
   roles: [...readRoles],
   input: z.object({ invoiceId: z.string().uuid() }),
   handler: async (ctx, i) => {
@@ -462,13 +462,21 @@ defineQuery({
         .order("received_on", { ascending: false }).order("id").range(start, start + PAGE_SIZE - 1)),
     ]);
     if (!invoice) throw new Error("Invoice not found");
-    const staffLinks = await invoiceStaffLinks(ctx, [invoice]);
+    const [staffLinks, lastPayment] = await Promise.all([
+      invoiceStaffLinks(ctx, [invoice]),
+      // Record payment starts on the method this customer last paid with, on any invoice;
+      // a voided payment was a mistake and never sets it (#1506).
+      unwrap(ctx.db.from("invoice_payments").select("method, invoices!inner(customer_id), invoice_payment_voids(id)")
+        .eq("brewery_id", ctx.breweryId).eq("invoices.customer_id", invoice.customer_id).is("invoice_payment_voids", null)
+        .order("received_on", { ascending: false }).order("recorded_at", { ascending: false }).limit(1)),
+    ]);
     const payments = paymentRows.map(({ invoice_payment_voids: voids, ...payment }) => ({ ...payment, void: voids as unknown as { reason: string } | null }));
     const push = pushes.get(invoice.id);
     return { invoice, lines: invLines, payments,
       localPaidCents: payments.reduce((sum, payment) => payment.void ? sum : sum + payment.amount_cents, 0),
       hasPendingPush: push?.has_pending_push ?? false, wasPushedToQbo: push?.was_pushed ?? false,
-      quickbooksLink: staffLinks.get(invoice.id) ?? null };
+      quickbooksLink: staffLinks.get(invoice.id) ?? null,
+      lastPaymentMethod: (lastPayment as { method: PaymentMethod }[])[0]?.method ?? null };
   },
 });
 

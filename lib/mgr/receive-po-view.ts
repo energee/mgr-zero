@@ -65,7 +65,8 @@ export const isCount = (qty: string) => isNumber(qty) && Number(qty) >= 0;
  *  ready (and in a mode that receives nothing). A new receipt needs its
  *  location, bin and day; a correction needs its reason and every line counted.
  *  A blank line is left out of a new receipt, but a negative or non-number
- *  count is named, never dropped. A lot-tracked line (`lot` set) counted above
+ *  count is named, never dropped, and a new receipt needs one line above
+ *  zero. A lot-tracked line (`lot` set) counted above
  *  zero needs its lot code. */
 export function receiveReason(model: ReceivePoViewModel): string | null {
   const mode = receiveMode(model.state);
@@ -85,7 +86,8 @@ export function receiveReason(model: ReceivePoViewModel): string | null {
     } else if (!isCount(qty)) missing.push(`a count of zero or more for ${line.title}`);
     else if (line.lot !== undefined && Number(qty) > 0 && !line.lot.trim()) missing.push(`a lot code for ${line.title}`);
   }
-  if (mode === "receive" && lines.every(line => String(line.qty).trim() === "")) missing.push("a count on at least one line");
+  // A 0 records a short line beside a received one; a receipt of only zeros records nothing (#1485).
+  if (mode === "receive" && !lines.some(line => isCount(String(line.qty)) && Number(line.qty) > 0)) missing.push("a count above zero on at least one line");
   return submitReason(missing);
 }
 

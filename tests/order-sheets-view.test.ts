@@ -5,7 +5,6 @@ import { createElement, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
-import { AdjustLinesView } from "../components/mgr/views/adjust-lines";
 import { PickView } from "../components/mgr/views/pick";
 import { ReturnCreditView, ReturnSourcesView } from "../components/mgr/views/return-credit";
 import { ShipView } from "../components/mgr/views/ship";
@@ -15,7 +14,6 @@ import { CompleteTransferView } from "../components/mgr/views/complete-transfer"
 import { orderTransferComplete } from "../lib/mgr/fixtures/orders";
 import { toCompleteTransferViewProps } from "../lib/mgr/complete-transfer-view";
 import {
-  orderAdjustLines,
   orderPick,
   orderReturnCredit,
   orderShipInvoice,
@@ -23,7 +21,6 @@ import {
   orderShipmentDone,
   orderShortPick,
 } from "../lib/mgr/fixtures/order-sheets";
-import { toAdjustLinesViewProps } from "../lib/mgr/adjust-lines-view";
 import { toPickViewProps } from "../lib/mgr/pick-view";
 import { numberNotationError } from "../lib/mgr/quantity-input";
 import { returnCreditReason, returnQuantityError, toReturnCreditViewProps } from "../lib/mgr/return-credit-view";
@@ -37,39 +34,6 @@ it("leaves unspecified return-source quantities blank", () => {
   const markup = html(createElement(ReturnSourcesView, { groups: [{ key: "sku", name: "Pils", sources: [{ id: "source", label: "Shelf", shipped: 5 }] }] }));
   expect(markup).toContain('value=""');
   expect(markup).not.toContain('value="0"');
-});
-
-describe("Adjust lines view", () => {
-  it("notes a line ordered below what was picked", () => {
-    const model = toAdjustLinesViewProps(orderAdjustLines);
-    expect(model.backTo).toBe("ORD-0229");
-    expect(model.lines.map((l) => [l.group, l.name, l.qty, l.detail])).toEqual([
-      ["Hazy IPA", "½ bbl keg", 4, ""],
-      ["Pils", "16 oz case", 7, "picked 10"],
-      ["Stout", "⅙ bbl keg", 2, ""],
-    ]);
-  });
-
-  it("draws the Pick-style table: Product, Format, Ordered; a SKU picker only on an added line", () => {
-    const model = toAdjustLinesViewProps(orderAdjustLines);
-    const markup = html(createElement(AdjustLinesView, { model: { ...model, lines: [...model.lines, { key: "new", added: true, name: "", detail: "", qty: "" }] } }));
-    expect(markup.match(/<th[^>]*>[\s\S]*?<\/th>/g)?.map((h) => h.replace(/<[^>]+>/g, ""))).toEqual(["Product", "Format", "Ordered"]);
-    expect(markup.match(/<tr/g)).toHaveLength(5);
-    expect(markup.match(/aria-label="Line \d+ SKU"/g)).toEqual(['aria-label="Line 4 SKU"']);
-  });
-
-  it("the drawing still shows Save lines and the customer-cut reason", () => {
-    const markup = html(createElement(AdjustLinesView, {
-      model: toAdjustLinesViewProps(orderAdjustLines),
-      reason: "customer cut",
-    }));
-    expect(markup).toMatch(/ORD-0229/);
-    expect(markup).toMatch(/Adjust lines/);
-    expect(markup).toMatch(/picked 10/);
-    expect(markup).toMatch(/customer cut/);
-    expect(markup).toMatch(/>Save lines</);
-    expect(markup).toMatch(/aria-label="Decrease"/);
-  });
 });
 
 describe("Short pick view", () => {
@@ -350,6 +314,12 @@ describe("Shipment done view", () => {
     expect(html(createElement(ShipmentDoneView, { model: toShipmentDoneViewProps({ ...orderShipmentDone, routeHref: undefined }) }))).not.toContain("Add to route");
   });
 
+  it("stays on the result and offers Open order back to the order page (#1489)", () => {
+    const live = html(createElement(ShipmentDoneView, { model: toShipmentDoneViewProps({ ...orderShipmentDone, backHref: "/orders/o-1" }) }));
+    expect(live).toMatch(/<a\b[^>]*href="\/orders\/o-1"[^>]*>Open order<\/a>/);
+    expect(html(createElement(ShipmentDoneView, { model: toShipmentDoneViewProps(orderShipmentDone) }))).toMatch(/data-to="Order"[^>]*>Open order</);
+  });
+
   it("the drawing still names Return shipment as the correction", () => {
     const markup = html(createElement(ShipmentDoneView, { model: toShipmentDoneViewProps(orderShipmentDone) }));
     expect(markup).toMatch(/INV-1042 · assigned/);
@@ -443,7 +413,6 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("inventory records mount the sheet views", () => {
   it.each([
-    ["Adjust lines", AdjustLinesView, toAdjustLinesViewProps(orderAdjustLines)],
     ["Short pick", ShortPickView, toShortPickViewProps(orderShortPick)],
     ["Pick", PickView, toPickViewProps(orderPick)],
     ["Ship and invoice", ShipView, toShipViewProps(orderShipInvoice)],

@@ -14,13 +14,15 @@ import { RecordPaymentView, VoidPaymentView } from "@/components/mgr/views/invoi
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { dollarsInput, toCents } from "@/lib/mgr/money";
 import { invoicePaymentReason, type InvoicePaymentValue } from "@/lib/mgr/invoice-view";
+import type { PaymentMethod } from "@/lib/mgr/enums";
 import { submitReason } from "@/lib/mgr/submit-reason";
 
-/** `today` is breweryDate(timeZone), from the server page; `balanceCents` starts and caps the amount (#1506). */
-export function RecordPaymentForm({ invoiceId, balanceCents, today, quickbooksConnected }: {
-  invoiceId: string; balanceCents: number; today: string; quickbooksConnected: boolean;
+/** `today` is breweryDate(timeZone), from the server page; `balanceCents` starts and caps the amount, and
+ *  `lastMethod` (get_invoice's lastPaymentMethod, the customer's last one) starts the method (#1506). */
+export function RecordPaymentForm({ invoiceId, balanceCents, today, quickbooksConnected, lastMethod }: {
+  invoiceId: string; balanceCents: number; today: string; quickbooksConnected: boolean; lastMethod?: PaymentMethod | null;
 }) {
-  const initial = (): InvoicePaymentValue => ({ amount: dollarsInput(balanceCents), receivedOn: today, method: "", reference: "" });
+  const initial = (): InvoicePaymentValue => ({ amount: dollarsInput(balanceCents), receivedOn: today, method: lastMethod ?? "", reference: "" });
   const [value, setValue] = useState(initial);
   const [amountTouched, setAmountTouched] = useState(false);
   const form = useCommandForm("record_invoice_payment", {

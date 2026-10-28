@@ -1,14 +1,15 @@
 // app/(app)/orders/[id]/lifecycle-buttons.tsx — status-gated order actions,
 // drawn into OrderView's slots: LifecycleButtons fills the header (Submit for
-// a draft, which then opens Review and confirm (#1503); Ship or Complete transfer once picked; Record pick and Adjust
-// lines while confirmed or picked), primary first, and makes its fulfillment
+// a draft, which then opens Review and confirm (#1503); Ship or Complete transfer once picked; Record pick
+// while confirmed or picked), primary first, and makes its fulfillment
 // verbs secondary while Put back leads; CancelOrderAction fills the bottom
 // row with the quiet Cancel order (any pre-ship status, via
 // cancel-order-dialog.tsx). OrderActionScope wraps the page so both share one
 // command action: Submit and Cancel see the same busy and error state.
 // There is no Confirm here: a submitted order confirms only through Review and
 // confirm (/orders/[id]/confirm), so stock and source warnings show before
-// commit (#713). Add or remove lines (/adjust), Record pick and Ship / Complete transfer are
+// commit (#713). Lines change, add and remove in place on the order
+// (order-lines-form.tsx). Record pick and Ship / Complete transfer are
 // links to their own pages under /orders/[id]/. Calls commands directly rather
 // than through useCommandForm since these aren't single-field command forms.
 "use client";
@@ -62,8 +63,6 @@ export function LifecycleButtons({
       {canSell && status === "draft" && E.btn("Submit", busy ? "p disabled" : "p", undefined, () => void action.run("submit_order", { orderId }, () => router.push(`/orders/${orderId}/confirm`)))}
       {canFulfill && status === "picked" && E.btn(transfer ? "Complete transfer" : "Ship", fulfil, `/orders/${orderId}/${transfer ? "complete" : "ship"}`)}
       {canFulfill && open && E.btn("Record pick", status === "confirmed" ? fulfil : "g", `/orders/${orderId}/pick`)}
-      {/* Quantities change in place on the lines (order-lines-form.tsx); this page adds or removes a beer. */}
-      {canSell && open && E.btn("Add or remove lines", "g", `/orders/${orderId}/adjust`)}
       {error ? <div className="basis-full"><CommandFormMessage error={error} /></div> : null}
     </>
   );

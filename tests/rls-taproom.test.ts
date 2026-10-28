@@ -223,7 +223,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     reattribute_loss: [B,(await admin.from("volume_adjustments").select("id").eq("brewery_id", B).eq("reason", "loss").limit(1).single()).data!.id,0.01,"destruction",null,R()],
     create_purchase_order: [B,VENDOR,day,null,[{material_id:MAT,qty_ordered:1,unit_cost_cents:100}],R()], create_recipe: [B,BRAND,name,null,R()],
     create_recipe_version: [B,f.recipe.id,[{name:"Sacc",kind:"infusion",tempF:152,minutes:60}],[],{},0.75,0.75,60,40,null,[{material_id:MAT,per_bbl_qty:1,stage:"mash"}],R()],
-    create_composed_format: [B,name,"can",[{child_format_id:f.composed.id,qty:1}],R()], delete_catalog_category: [B,"Lager",R()], delete_customer: [B,f.customer.customerId,R()], delete_format: [B,f.composed.id,R()], delete_material_contract: [B,contract,R()], save_catalog_category: [B,null,name,R()],
+    create_composed_format: [B,name,"can",[{child_format_id:f.composed.id,qty:1}],R()], delete_catalog_category: [B,"Lager",R()], delete_customer: [B,f.customer.customerId,R()], delete_ship_to: [B,f.customer.shipToId,R()], delete_format: [B,f.composed.id,R()], delete_material_contract: [B,contract,R()], save_catalog_category: [B,null,name,R()],
     delete_bin: [B,emptyBin,R()], delete_brewery_state_license: [B,license.id,R()], disable_chat_installation: [B,I,R()], disconnect_chat_installation: [B,I,R()], draft_purchase_order_from_requirements: [B,[MAT],R()],
     portal_create_order: [B,f.customer.customerId,f.customer.shipToId,null,null,[{sku_id:SKU,qty:1}],R(),day],
     portal_quote_order: [B,f.customer.customerId,f.customer.shipToId,day,null,null,[{sku_id:SKU,qty:1}],R()],

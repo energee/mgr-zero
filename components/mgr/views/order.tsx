@@ -10,10 +10,13 @@
 // Cancel order dialog simulates locally); the live page passes LifecycleButtons
 // and CancelOrderAction (app/(app)/orders/[id]/lifecycle-buttons.tsx), and
 // footer={null} draws no bottom row. With onQuantity, Ordered is the shared
-// number field and a required Reason with `lineActions` (Save lines) follows
-// the lines: the live page adjusts quantities in place (order-lines-form.tsx).
+// number field and, with onReason, a required Reason follows the lines;
+// `lineActions` (Save lines, or the saved lines' ATP warnings) follows that.
+// With `lineEdit`, each line has ✕ and Add line appends a line that picks its
+// SKU: the live page adds, removes and adjusts lines in place
+// (order-lines-form.tsx, #1503).
 import type { ComponentProps, ReactNode } from "react";
-import { OrderQuantity } from "./new-order";
+import { OrderQuantity, OrderSkuPicker } from "./new-order";
 import { E } from "@/components/mgr/e";
 import { FactsGrid } from "@/components/mgr/views/facts-grid";
 import { PriceSummary } from "@/components/mgr/views/price-summary";
@@ -24,6 +27,18 @@ import type { OrderLineView, OrderViewModel } from "@/lib/mgr/order-view";
 import { cn } from "@/lib/utils";
 
 export type { OrderViewModel };
+
+/** Adding and removing lines in place. An added line's quantity lives in OrderView's `quantities`, by its key. */
+export type OrderLineEdit = {
+  /** The SKUs an added line picks from. */
+  skus: { id: string; label: string }[];
+  /** Lines added here and not saved yet. */
+  added: { key: string; skuId: string }[];
+  onAdd?: () => void;
+  onSku?: (key: string, skuId: string) => void;
+  /** Removes a saved or added line by key; the caller drops a saved one from the model's lines. */
+  onRemove?: (key: string) => void;
+};
 
 const H2 = "text-base font-semibold";
 const LEGEND = "text-xs text-muted-foreground";
@@ -52,8 +67,7 @@ export function OrderView({
   model,
   actions,
   footer,
-  adjustLines,
-  showAddLine,
+  lineEdit,
   complianceNote,
   quantities,
   onQuantity,
@@ -66,8 +80,7 @@ export function OrderView({
   actions?: ReactNode;
   /** The bottom row. Omitted: the shared fixture cancellation dialog; null: none. */
   footer?: ReactNode;
-  adjustLines?: boolean;
-  showAddLine?: boolean;
+  lineEdit?: OrderLineEdit;
   complianceNote?: string;
   /** Edited Ordered quantities by line key; a line not in it shows its ordered qty. */
   quantities?: Record<string, string>;
@@ -75,12 +88,21 @@ export function OrderView({
   /** Shown, and required, with onReason: adjust_order_lines records it. */
   reason?: string;
   onReason?: (value: string) => void;
-  /** Save lines and Discard changes, drawn under Reason. */
+  /** Save lines and Discard changes, or the saved lines' ATP warnings, drawn under the lines (and Reason). */
   lineActions?: ReactNode;
 }) {
-  const orderedField = (line: OrderViewModel["lines"][number]) => onQuantity
-    ? <div className="w-32 md:ml-auto"><OrderQuantity label={`${line.name} ordered`} value={quantities?.[line.key] ?? line.ordered} onChange={(value) => onQuantity(line.key, value)} /></div>
+  const orderedField = (line: { key: string; name: string; ordered?: string }) => onQuantity
+    ? <div className="w-32 md:ml-auto"><OrderQuantity label={`${line.name} ordered`} value={quantities?.[line.key] ?? line.ordered ?? ""} onChange={(value) => onQuantity(line.key, value)} /></div>
     : line.ordered;
+  const added = lineEdit?.added ?? [];
+  const lineCount = model.lines.length + added.length;
+  // The order keeps at least one line, so a lone line has no ✕.
+  const remove = (key: string, name: string) => lineEdit && lineCount > 1
+    ? <Button type="button" variant="ghost" size="sm" data-preview-action aria-label={`Remove ${name}`} title="Remove" onClick={() => lineEdit.onRemove?.(key)}>✕</Button>
+    : null;
+  const addedName = (index: number) => `Added line ${index + 1}`;
+  const skuPicker = (line: { key: string; skuId: string }, index: number) =>
+    <OrderSkuPicker label={`${addedName(index)} SKU`} value={line.skuId} options={lineEdit?.skus ?? []} onChange={lineEdit?.onSku && ((value) => lineEdit.onSku?.(line.key, value))} />;
   // Staged beer must go back before anything ships, so Put back leads (the
   // caller passes its fulfillment verbs as secondary then).
   const headerVerbs = (
@@ -127,7 +149,7 @@ export function OrderView({
       <section aria-labelledby="order-lines">
         <div className="flex items-baseline justify-between gap-3">
           <h2 id="order-lines" className={H2}>Ordered items</h2>
-          <span className={LEGEND}>{model.lines.length} {model.lines.length === 1 ? "line" : "lines"}</span>
+          <span className={LEGEND}>{lineCount} {lineCount === 1 ? "line" : "lines"}</span>
         </div>
         <div className="mt-2 hidden md:block">
           <Table>
@@ -135,8 +157,8 @@ export function OrderView({
               <TableRow>
                 <TableHead className="pl-0 text-xs">SKU</TableHead>
                 {model.columns.map(([label]) => <TableHead key={label} className="text-right text-xs">{label}</TableHead>)}
-                <TableHead className={cn("text-right text-xs", !adjustLines && "pr-0")}>Line amount</TableHead>
-                {adjustLines ? <TableHead className="pr-0"><span className="sr-only">Actions</span></TableHead> : null}
+                <TableHead className={cn("text-right text-xs", !lineEdit && "pr-0")}>Line amount</TableHead>
+                {lineEdit ? <TableHead className="pr-0"><span className="sr-only">Remove</span></TableHead> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -149,8 +171,18 @@ export function OrderView({
                   {model.columns.map(([label, field]) => (
                     <TableCell key={label} className={cn("text-right tabular-nums", (line[field] === "Not supplied" || line[field] === "Not recorded") && "text-xs text-muted-foreground")}>{field === "ordered" ? orderedField(line) : line[field]}</TableCell>
                   ))}
-                  <TableCell className={cn("text-right font-semibold tabular-nums", !adjustLines && "pr-0")}>{line.amount}</TableCell>
-                  {adjustLines ? <TableCell className="pr-0 text-right">{E.act("Adjust", "attention")}</TableCell> : null}
+                  <TableCell className={cn("text-right font-semibold tabular-nums", !lineEdit && "pr-0")}>{line.amount}</TableCell>
+                  {lineEdit ? <TableCell className="pr-0 text-right">{remove(line.key, line.name)}</TableCell> : null}
+                </TableRow>
+              ))}
+              {added.map((line, index) => (
+                <TableRow key={line.key}>
+                  <TableCell className="py-3.5 pl-0 whitespace-normal">{skuPicker(line, index)}</TableCell>
+                  {model.columns.map(([label, field]) => (
+                    <TableCell key={label} className="text-right tabular-nums">{field === "ordered" ? orderedField({ key: line.key, name: addedName(index) }) : null}</TableCell>
+                  ))}
+                  <TableCell />
+                  <TableCell className="pr-0 text-right">{remove(line.key, addedName(index))}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -169,12 +201,18 @@ export function OrderView({
                   </div>
                 ))}
               </dl>
-              {adjustLines ? <div className="mt-3">{E.act("Adjust", "attention")}</div> : null}
+              {lineEdit && lineCount > 1 ? <div className="mt-3 flex justify-end">{remove(line.key, line.name)}</div> : null}
+            </li>
+          ))}
+          {added.map((line, index) => (
+            <li key={line.key} className="flex flex-col gap-3 py-4">
+              {skuPicker(line, index)}
+              <div className="flex items-center justify-between gap-3">{orderedField({ key: line.key, name: addedName(index) })}{remove(line.key, addedName(index))}</div>
             </li>
           ))}
         </ul>
-        {showAddLine ? <div className="mt-3">{E.btn("Add line", "g")}</div> : null}
-        {onReason ? <div className="mt-3 flex flex-col gap-2">{E.edit("Reason", reason ?? "", "text", undefined, { onChange: onReason, required: true })}{lineActions}</div> : null}
+        {lineEdit ? <Button type="button" variant="ghost" className="mt-3 w-fit" data-preview-action onClick={lineEdit.onAdd}>Add line</Button> : null}
+        {onReason || lineActions ? <div className="mt-3 flex flex-col gap-2">{onReason ? E.edit("Reason", reason ?? "", "text", undefined, { onChange: onReason, required: true }) : null}{lineActions}</div> : null}
       </section>
 
       {model.kegCharges.length ? (

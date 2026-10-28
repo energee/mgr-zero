@@ -80,6 +80,15 @@ defineCommand({
 });
 
 defineCommand({
+  name: "delete_ship_to", description: "Delete a ship-to address no order names; the customer's default ship-to is refused until another ship-to is the default",
+  roles: [...roles],
+  input: z.object({ shipToId: z.string().uuid() }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_ship_to", {
+    p_brewery: ctx.breweryId, p_id: i.shipToId, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
   name: "set_portal_fulfillment_source", description: "Set the warehouse used for customer portal orders",
   roles: ["admin"],
   input: z.object({ locationId: z.string().uuid() }),
