@@ -39,7 +39,8 @@ it("mounts the same cancellation control and CommandForm from the inventory and 
   expect(confirmInventory.type).toBe(ConfirmOrderView);
   const confirm = ConfirmOrderView(confirmInventory.props);
   const footer = confirm.props.children.at(-1) as ReactElement<{ children: ReactElement[] }>;
-  expect(footer.props.children[1].type).toBe(CancelOrderControl);
+  expect(footer.props.children[1].type).toBe(OrderCancelRow);
+  expect((footer.props.children[1].props as { children: ReactElement }).children.type).toBe(CancelOrderControl);
   expect(CancelOrderButton({}).props["data-preview-action"]).toBe(true);
   const live = CancelOrderDialog({ orderId: "order", action: action as never, trigger: null, onCancelled: vi.fn() });
   expect(live.type).toBe(CancelOrderControl);
@@ -69,6 +70,15 @@ it("clears the error when the dialog closes, and a stale confirm error when it o
   action.setError.mockClear();
   form.onOpenChange(true);
   expect(action.setError).toHaveBeenCalledWith(null);
+});
+
+it("draws Cancel order as the order page's quiet trigger and keeps Confirm order in the sticky footer (#1503)", () => {
+  const html = renderToStaticMarkup(createElement(ConfirmOrderForm, { snapshot: orderSubmittedRidgeline }));
+  // The trigger is the ghost CancelOrderButton; only the dialog's own submit is solid red.
+  expect(html).toMatch(/<button[^>]*data-variant="ghost"[^>]*>Cancel order<\/button>/);
+  expect(html.match(/data-variant="destructive"/g)).toHaveLength(1);
+  // Confirm order sits in the footer that sticks to the bottom of the phone's scroll.
+  expect(html).toMatch(/<div class="sticky [^"]*">(?:(?!<\/div>).)*>Confirm order<\/button>/);
 });
 
 it("says why Complete batch is disabled when no batch is open", () => {

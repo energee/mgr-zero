@@ -3,7 +3,8 @@
 // by default, or ?status=returned newest first — with their next verb
 // (routeNext; an assigned route not yet departed, or a returned one, is a plain
 // row link). Open also lists the shipped orders and picked transfers on no
-// route. New route → /routes/new.
+// route; their Add to route opens /routes/new?add={id} with that document
+// ticked. New route → /routes/new.
 // Warehouse and Admin. New route is size="sm" like every Work list's create
 // button, so the tab strip sits at the same height (#1226).
 import Link from "next/link";
@@ -37,6 +38,6 @@ export default async function RoutesPage({ searchParams }: { searchParams: Promi
       ...routeNext(route),
       href: "/routes/" + route.id, warning: !route.driver_user_id,
     })),
-    ...(status === "open" ? unassigned : []).map(document => ({ key: document.id, title: document.label, detail: "Shipped · no route", verb: "Add to route", tone: "attention" as const, href: "/routes/new", warning: true })),
+    ...(status === "open" ? unassigned : []).map(document => ({ key: document.id, title: document.label, detail: "Shipped · no route", verb: "Add to route", tone: "attention" as const, href: `/routes/new?add=${document.id}`, warning: true })),
   ] })} createAction={<Button size="sm" asChild><Link href="/routes/new">New route</Link></Button>} workHrefs={workHrefsFor(brewery.roles)} />;
 }

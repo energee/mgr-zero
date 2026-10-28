@@ -203,6 +203,16 @@ describe("Orders list view loop", () => {
     expect(html).not.toMatch(/>Open</);
   });
 
+  it("drops the Customer column when the scope line already names the customer (#1506)", () => {
+    const orders = ordersWorkList.orders.filter((o) => o.customers?.name === "Ridgeline Tap Room");
+    const html = renderToStaticMarkup(createElement(OrdersView, { model: toOrdersListViewProps({ roles: ["admin"], linked: true, customer: "Ridgeline Tap Room", customerId: "c1", orders }) }));
+    const headers = [...html.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)].map(match => match[1].replace(/<[^>]*>/g, ""));
+    expect(headers).toEqual(expect.arrayContaining(["Order", "Requested ship date", "Status"]));
+    expect(headers).not.toContain("Customer");
+    // Only the scope line names the customer.
+    expect(html.match(/Ridgeline Tap Room/g)).toHaveLength(1);
+  });
+
   it("the Orders inventory record is OrdersView painted from that fixture", () => {
     const body = screen("Orders").body as { type: unknown; props: { model: unknown } };
     expect(isValidElement(screen("Orders").body)).toBe(true);

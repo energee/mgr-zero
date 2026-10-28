@@ -2,12 +2,16 @@
 // and the live page both pass toConfirmOrderViewProps(get_order-shaped data).
 // Lines sit under a brand heading, each named by its format, with its quantity
 // in the shared number field (the live page edits it before confirming).
+// Confirm order sits in the footer that sticks to the bottom of the phone's
+// scroll; Cancel order is the order page's quiet trigger in the row below.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { startsGroup } from "@/lib/mgr/brand-lines";
 import type { ConfirmOrderViewModel } from "@/lib/mgr/confirm-order-view";
 import { OrderQuantity } from "./new-order";
+import { BrewFooter } from "./brew-prep";
 import { CancelOrderControl } from "./cancel-order";
+import { CancelOrderButton, OrderCancelRow } from "./order";
 
 export type { ConfirmOrderViewModel };
 
@@ -50,10 +54,10 @@ export function ConfirmOrderView({
       {complianceNote ? E.note(complianceNote) : null}
       {onReason ? E.edit("Reason", reason ?? "", "text", undefined, { onChange: onReason, required: true }) : null}
       {E.sp()}
-      {footer !== undefined ? footer : <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
-        {E.btn("Confirm order")}
-        <CancelOrderControl trigger={E.btn("Cancel order", "del", undefined, undefined, { "data-preview-action": true })} />
-      </div>}
+      {footer !== undefined ? footer : <>
+        <BrewFooter>{E.btn("Confirm order")}</BrewFooter>
+        <OrderCancelRow><CancelOrderControl trigger={<CancelOrderButton />} /></OrderCancelRow>
+      </>}
     </>
   );
 }
