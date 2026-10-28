@@ -41,6 +41,9 @@ export const formatTimeOfDay = (value: string | Date, timeZone: string) => zoned
  *  default is the brewery's day, not the UTC day `toISOString()` names — which
  *  is already tomorrow on a US evening (#437). breweryToday(ctx) is the caller. */
 export const breweryDate = (timeZone: string, at: Date = new Date()) => at.toLocaleDateString("en-CA", { timeZone });
+/** Whether a YYYY-MM-DD `date` falls before `today` (breweryDate). Without a
+ *  today or a full date there is nothing to compare, so it is not past. */
+export const isPastDay = (date: string, today?: string) => Boolean(today && /^\d{4}-\d{2}-\d{2}$/.test(date) && date < today);
 
 /** A datetime-local field in the brewery's wall clock, never the browser's zone. */
 export function dateTimeInput(value: string | Date, timeZone: string): string {

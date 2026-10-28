@@ -1,4 +1,6 @@
 // lib/mgr/new-order-view.ts — view-model for the New order sheet.
+import { isPastDay } from "@/lib/date-format";
+
 export type OrderOption = string | { id: string; label: string };
 export type NewOrderLineView = { name: string; skuId?: string; qty: number | string; atp?: number; warning: boolean; /** Retained selection absent from the current order's SKU options. */ skuError?: string };
 
@@ -10,6 +12,8 @@ export type NewOrderViewModel = {
   sources: OrderOption[];
   source: string;
   requestedShip: string;
+  /** The brewery's day (breweryDate), so a past Requested ship warns; the inventory leaves it out. */
+  today?: string;
   po: string;
   /** Collected at the brewery, so never put on a route. */
   pickup?: boolean;
@@ -47,4 +51,9 @@ export function toNewOrderViewProps(s: NewOrderSnapshot): NewOrderViewModel {
     po: s.po,
     lines: s.lines.map((l) => ({ ...l, warning: l.atp < 0 })),
   };
+}
+
+/** A past Requested ship date still saves; the sheet says so rather than saving it silently (#1489). */
+export function pastShipDateWarning(date: string, today?: string): string | undefined {
+  return isPastDay(date, today) ? "This requested ship date is in the past for your brewery. You can still save the order." : undefined;
 }

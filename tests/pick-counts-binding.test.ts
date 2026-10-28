@@ -1,4 +1,5 @@
-// Live Pick/Short callbacks retain unsaved counts without committing them first.
+// Live Pick/Short callbacks retain unsaved counts without committing them first;
+// Short opens its sheet over Pick, so the working counts never leave the page.
 import { createElement } from "react";
 const notifications = vi.hoisted(() => ({ error: vi.fn() }));
 vi.mock("sonner", () => ({ toast: notifications }));
@@ -13,10 +14,15 @@ vi.mock("@/lib/brewery-provider", () => ({ useCommandContext: () => ({ actorId: 
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => ({ ...action, busy: false, error: null }) }));
 let submit: (event: { preventDefault: () => void }) => void;
 let back: (event: { target: Element; metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean; button?: number; preventDefault: () => void }) => void;
-function PickHarness() {
+let sheet: { type: unknown; props: { snapshot: { line: { id: string; qty_picked: number } }; onClose: () => void } } | undefined;
+/** PickForm's hooks run as this harness's own, so an onShort during render re-renders it with the sheet open. */
+function PickHarness({ shortLine }: { shortLine?: string }) {
   const element = PickForm({ snapshot });
-  submit = element.props.onSubmit;
-  back = element.props.onClickCapture;
+  const [form, open] = element.props.children;
+  if (shortLine && !open) form.props.children.props.onShort(shortLine);
+  sheet = open || undefined;
+  submit = form.props.onSubmit;
+  back = form.props.onClickCapture;
   return element;
 }
 let pick: ComponentProps<typeof PickView>;
@@ -25,11 +31,13 @@ vi.mock("@/components/mgr/views/pick", () => ({ PickView: (props: typeof pick) =
 vi.mock("@/components/mgr/views/short-pick", () => ({ ShortPickView: (props: typeof short) => { short = props; return null; } }));
 import { PickForm } from "@/app/(app)/orders/[id]/pick-form";
 import { ShortPickForm } from "@/app/(app)/orders/[id]/short-pick-form";
+const close = vi.fn();
 function ShortHarness() {
-  const element = ShortPickForm({ snapshot: { order: snapshot.order, line: snapshot.lines[0], locations: [] } });
-  const props = element.props.children.props as typeof short;
+  const element = ShortPickForm({ snapshot: { order: snapshot.order, line: snapshot.lines[0], locations: [] }, onClose: close });
+  const form = element.props.children;
+  const props = form.props.children.props as typeof short;
   if (!props.reasonValue) props.onReason!("Fictional shortage");
-  submit = element.props.onSubmit;
+  submit = form.props.onSubmit;
   return element;
 }
 const snapshot = { backHref: "/orders/order", order: { id: "order", order_no: 1, from_location_id: "source", customers: null }, lines: [
@@ -44,27 +52,21 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-it("saves all current observations before Short navigation without a record_pick", () => {
+it("opens Short pick as a sheet over Pick with the line's working count, without leaving or a record_pick (#1503)", () => {
   renderToStaticMarkup(createElement(PickHarness));
-  pick.onShort!("short");
-  expect(sessionStorage.getItem(key)).not.toBeNull();
-  expect(JSON.parse(sessionStorage.getItem(key)!)).toMatchObject({ other: { value: "6" } });
-  expect(action.run).not.toHaveBeenCalled();
-  expect(action.push).toHaveBeenCalledWith("/orders/order/short-pick?line=short&qty=2");
-});
-
-it("does not leave Pick when working counts cannot be retained", () => {
-  vi.stubGlobal("sessionStorage", { setItem: () => { throw new Error("blocked"); } });
-  renderToStaticMarkup(createElement(PickHarness));
-  pick.onShort!("short");
+  expect(sheet).toBeUndefined();
+  pick.onQuantity!("other", "4");
+  renderToStaticMarkup(createElement(PickHarness, { shortLine: "short" }));
+  expect(sheet?.type).toBe(ShortPickForm);
+  expect(sheet?.props.snapshot.line).toMatchObject({ id: "short", qty_picked: 2 });
+  expect(JSON.parse(sessionStorage.getItem(key)!)).toMatchObject({ other: { value: "4" } });
   expect(action.push).not.toHaveBeenCalled();
   expect(action.run).not.toHaveBeenCalled();
 });
 
 it("retires working counts only after a successful Done picking", () => {
   renderToStaticMarkup(createElement(PickHarness));
-  pick.onShort!("short");
-  action.push.mockClear();
+  pick.onQuantity!("other", "6");
   submit({ preventDefault() {} });
   expect(sessionStorage.getItem(key)).not.toBeNull();
   expect(action.push).not.toHaveBeenCalled();
@@ -99,13 +101,14 @@ it("does not report committed Short as failed when working-count cleanup throws"
   vi.stubGlobal("sessionStorage", { getItem: () => { throw Error("blocked"); } });
   const committed = action.run.mock.calls[0][2] as () => void;
   expect(committed).not.toThrow();
-  expect(action.push).toHaveBeenCalledWith("/orders/order/pick");
+  expect(close).toHaveBeenCalledOnce();
+  expect(action.push).not.toHaveBeenCalled();
   expect(notifications.error).toHaveBeenCalled();
 });
 
 it.each(["metaKey", "ctrlKey", "shiftKey", "altKey"])("keeps working counts on a modified back click (%s)", modifier => {
   renderToStaticMarkup(createElement(PickHarness));
-  pick.onShort!("short");
+  pick.onQuantity!("other", "6");
   back({ target: { closest: () => ({ getAttribute: () => "/orders/order" }) } as unknown as Element, [modifier]: true, button: 0, preventDefault() {} });
   expect(sessionStorage.getItem(key)).not.toBeNull();
 });
@@ -118,7 +121,13 @@ it("applies consecutive quantity edits without losing the first observation", ()
 });
 
 it("keeps the existing explicit shortage reason guard", () => {
-  renderToStaticMarkup(createElement(ShortPickForm, { snapshot: { order: snapshot.order, line: snapshot.lines[0], locations: [], backHref: "/orders/order/pick" } }));
+  // The sheet portals its body, which a static render leaves out; read the view's props from the tree.
+  function Harness() {
+    const element = ShortPickForm({ snapshot: { order: snapshot.order, line: snapshot.lines[0], locations: [] }, onClose: close });
+    short = element.props.children.props.children.props;
+    return element;
+  }
+  renderToStaticMarkup(createElement(Harness));
   expect(short.disabled).toBe(true);
   expect(short.reasonValue).toBe("");
 });

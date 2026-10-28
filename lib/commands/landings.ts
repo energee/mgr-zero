@@ -111,7 +111,7 @@ defineQuery({
       ...today.map((t) => ({ kind: KIND[t.reason], id: t.subjectId, label: t.safeLabel, detail: t.detail, href: t.href, verb: TODAY_VERB[t.reason][0], tone: TODAY_VERB[t.reason][1], dueAt: t.dueAt })),
       ...pos.map((p) => ({
         kind: "POs" as const, id: p.id, label: `${poNo(p.po_no)} · ${p.vendor_name ?? "vendor"}`, detail: p.status.replace("_", " ") + (p.expected_on ? ` · due ${formatDate(p.expected_on)}` : ""),
-        href: `/purchase-orders/${p.id}`, verb: p.status === "draft" ? "Send" : "Receive", tone: "info" as const, dueAt: p.expected_on,
+        href: `/purchase-orders/${p.id}`, verb: p.status === "draft" ? "Mark sent" : "Receive", tone: "info" as const, dueAt: p.expected_on,
       })),
       ...routes.map((r) => ({
         kind: "routes" as const, id: r.id, label: r.name ?? "Route", detail: `${plural(r.deliveries[0]?.count ?? 0, "stop")} · ${formatDate(r.delivery_date)}`,

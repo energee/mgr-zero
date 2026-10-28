@@ -6,7 +6,7 @@ import { lotTraceHazy, materialLotTraceCitra } from "@/lib/mgr/fixtures/complian
 import { monthlyComplianceAugust } from "@/lib/mgr/fixtures/monthly-compliance";
 import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
 import { toLotTraceViewProps } from "@/lib/mgr/lot-trace-view";
-import { lossReviewReason, toMonthlyComplianceViewProps } from "@/lib/mgr/monthly-compliance-view";
+import { lossReviewReason, remainingAmountText, toMonthlyComplianceViewProps } from "@/lib/mgr/monthly-compliance-view";
 import { toMaterialLotTraceViewProps } from "@/lib/mgr/material-lot-trace-view";
 
 // #1393: display formatting must never change the exact amount allowed by Save.
@@ -52,5 +52,16 @@ describe("Reattribute loss Save reason", () => {
     for (const amount of ["0.03741935", ".00000001"]) expect(lossReviewReason(amount, "0.03741935", "sample", "PA")).toBeNull();
     expect(lossReviewReason("1", "3", "sample", "P")).toBeTruthy();
     for (const target of ["taproom", "destruction"] as const) expect(lossReviewReason("1", "3", target, "")).toBeNull();
+  });
+
+  it("starts the amount at the whole remainder, exact and never in exponent form (#1510)", () => {
+    expect(remainingAmountText("3.00000000")).toBe("3");
+    expect(remainingAmountText("12.50000000")).toBe("12.5");
+    expect(remainingAmountText("0.03741935")).toBe("0.03741935");
+    expect(remainingAmountText("0.00000050")).toBe("0.0000005");
+    expect(remainingAmountText("30")).toBe("30");
+    for (const remaining of ["3.00000000", "0.03741935", "0.00000050", "0.500"]) {
+      expect(lossReviewReason(remainingAmountText(remaining), remaining, "taproom", "")).toBeNull();
+    }
   });
 });

@@ -86,7 +86,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Order", file: "app/(app)/orders/[id]/page.tsx" },
   { name: "Edit draft", file: "app/(app)/orders/[id]/edit/page.tsx" },
   { name: "Adjust lines", file: "app/(app)/orders/[id]/adjust/page.tsx" },
-  { name: "Short pick", file: "app/(app)/orders/[id]/short-pick/page.tsx" },
+  { name: "Short pick", file: "app/(app)/orders/[id]/pick/page.tsx" },
   { name: "Pick", file: "app/(app)/orders/[id]/pick/page.tsx" },
   { name: "Ship and invoice", file: "app/(app)/orders/[id]/ship/page.tsx" },
   { name: "Shipment done", file: "app/(app)/orders/[id]/ship/page.tsx" },
@@ -216,7 +216,6 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Confirm delivery", file: "app/(app)/work/deliveries/[id]/page.tsx" },
   { name: "Sale channels", file: "app/(app)/settings/channels/page.tsx" },
   { name: "Channel", file: "app/(app)/settings/channels/page.tsx" },
-  { name: "Units", file: "app/(app)/settings/units/page.tsx" },
   { name: "Price groups", file: "app/(app)/pricing/page.tsx" },
   { name: "Price group", file: "app/(app)/pricing/page.tsx" },
 ];

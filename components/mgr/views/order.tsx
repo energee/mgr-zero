@@ -33,9 +33,9 @@ export const CancelOrderButton = (props: ComponentProps<typeof Button>) => (
   <Button variant="ghost" size="sm" type="button" data-preview-action className="-mr-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive" {...props}>Cancel order</Button>
 );
 
-/** The bottom row: the Cancel button (or the dialog opened from it), on the right. */
+/** The bottom row: the Cancel button (or the dialog opened from it), at the end. Its dialog asks for the reason. */
 export function OrderCancelRow({ children }: { children: ReactNode }) {
-  return <div className="flex items-center justify-end gap-4 border-t pt-4">{children}</div>;
+  return <div className="flex justify-end border-t pt-4">{children}</div>;
 }
 
 /** Short reason and warning, in words, under a line's name. */

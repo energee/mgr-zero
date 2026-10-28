@@ -29,14 +29,13 @@ function Occupancies({ readings }: { readings: BatchOccupancyView[] }) {
 
 /** One lifecycle group. A batch with readings lists its open occupancies in
  *  the vessel cell; any other batch shows the vessel names it has. A group
- *  where no batch has either draws no vessel column at all, and one with no
- *  plannable batch draws no Brew column. */
+ *  where no batch has either draws no vessel column at all. The row itself
+ *  is the link that opens the batch. */
 function GroupTable({ rows }: { rows: BatchesRowView[] }) {
-  const brew = rows.some(row => row.brewable);
   const vesselHead = rows.some(row => row.readings) ? "Vessel and latest reading" : rows.some(row => row.vessel) ? "Vessel" : null;
   return <RecordTable
-    headers={["Batch", "Brand", "Recipe", "Planned on", "Planned barrels", ...(vesselHead ? [vesselHead] : []), ...(brew ? [<span key="action" className="sr-only">Action</span>] : [])]}
-    align={["l", "l", "l", "l", "r", ...(vesselHead ? ["l" as const] : []), ...(brew ? ["r" as const] : [])]}
+    headers={["Batch", "Brand", "Recipe", "Planned on", "Planned barrels", ...(vesselHead ? [vesselHead] : [])]}
+    align={["l", "l", "l", "l", "r", ...(vesselHead ? ["l" as const] : [])]}
     rows={rows.map(row => ({
       key: row.key,
       href: row.href,
@@ -48,10 +47,9 @@ function GroupTable({ rows }: { rows: BatchesRowView[] }) {
         row.plannedOn,
         row.plannedBbl,
         ...(vesselHead ? [row.readings ? <Occupancies key="vessel" readings={row.readings} /> : row.vessel] : []),
-        ...(brew ? [row.brewable && <Fragment key="brew">{E.act("Brew", "info", row.href)}</Fragment>] : []),
       ],
       // A missing brand or recipe sorts last rather than by its muted words;
-      // readings sort by their vessels. The Brew button has nothing to sort.
+      // readings sort by their vessels.
       sort: [
         row.batchNo,
         row.brand,

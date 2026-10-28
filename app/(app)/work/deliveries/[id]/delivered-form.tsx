@@ -8,13 +8,16 @@ import { useCommandContext } from "@/lib/brewery-provider";
 import { hasRecoveryForTarget, RECOVERY_CHANGED } from "@/lib/commands/recovery";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 
-type Props = { routeId: string; deliveryId: string; lines: { key: string; title: string; qty: string }[]; transfer: boolean };
+/** `signers`: who signed earlier deliveries to this ship-to, newest first (get_delivery_stop). */
+type Props = { routeId: string; deliveryId: string; lines: { key: string; title: string; qty: string }[]; transfer: boolean; signers: string[] };
 
 /**
  * Both verbs save their request under the stop's id (`target`), so an
  * unresolved request locks this stop's two actions and no other stop. When the
  * shared recovery panel retries or discards it, the actions remount with fresh
- * form and failure state and the server data refreshes.
+ * form and failure state and the server data refreshes. Either verb then
+ * returns the driver to the route, where the next open stop is Next (#1505).
+ * Received by starts as the newest earlier signer and suggests the rest.
  */
 export function DeliveredForm(props: Props) {
   const router = useRouter();
@@ -42,12 +45,14 @@ export function DeliveredForm(props: Props) {
   return <DeliveryActions key={generation} {...props} pending={pending} hasPending={hasPending} />;
 }
 
-function DeliveryActions({ routeId, deliveryId, lines, transfer, pending, hasPending }: Props & { pending: boolean; hasPending: () => boolean }) {
+function DeliveryActions({ routeId, deliveryId, lines, transfer, signers, pending, hasPending }: Props & { pending: boolean; hasPending: () => boolean }) {
   const router = useRouter();
   const { busy, error, failure, run } = useCommandAction();
   const target = deliveryId;
+  const toRoute = () => router.push(`/routes/${routeId}`);
   // The fieldset gates busy/blocked; this rechecks storage for a click that lands before the re-render.
   return <DeliveryOutcomeForm lines={lines} transfer={transfer} busy={busy} blocked={pending || failure?.kind === "unknown"} error={error}
-    onSubmit={(input) => { if (hasPending()) return; void run("confirm_delivery", { deliveryId, ...input }, undefined, { target }); }}
-    onLeave={() => { if (hasPending()) return; void run("leave_delivery_for_later", { routeId, deliveryId }, () => router.push(`/routes/${routeId}`), { target, refresh: false }); }} />;
+    initialSignedBy={signers[0]} receivedSuggestions={signers}
+    onSubmit={(input) => { if (hasPending()) return; void run("confirm_delivery", { deliveryId, ...input }, toRoute, { target, refresh: false }); }}
+    onLeave={() => { if (hasPending()) return; void run("leave_delivery_for_later", { routeId, deliveryId }, toRoute, { target, refresh: false }); }} />;
 }

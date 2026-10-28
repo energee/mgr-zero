@@ -11,7 +11,7 @@ import type { KegShortage } from "@/lib/mgr/keg-fleet-view";
 import "@/lib/commands/all";
 import { navTitle } from "@/lib/mgr/nav";
 
-type Snapshot = { order: ShippingSnapshot["order"] & { status: string }; lines: ShippingSnapshot["lines"]; events: { event: string; payload: { invoice_id?: string | null; warnings?: KegShortage[] } }[]; shipment: { invoice_timing: "now" | "on_delivery" } | null };
+type Snapshot = { order: ShippingSnapshot["order"] & { status: string }; lines: ShippingSnapshot["lines"]; events: { event: string; payload: { invoice_id?: string | null; warnings?: KegShortage[] } }[]; shipment: { id: string; invoice_timing: "now" | "on_delivery"; deliveries: unknown[] } | null };
 
 const getShipPageData = cache(async function getShipPageData(id: string) {
   const brewery = await getActiveBrewery();
@@ -42,7 +42,9 @@ export default async function ShipPage({ params }: { params: Promise<{ id: strin
     const shipped = events.find(event => event.event === "shipped")?.payload;
     const invoiceId = shipped?.invoice_id;
     const detail = invoiceId ? await runPageQuery("get_invoice", { invoiceId }, ctx) as { invoice: { invoice_no: number | null } } : null;
-    return <ShipmentDoneView model={toShipmentDoneViewProps({ order, lines, warnings: shipped?.warnings, invoice: detail?.invoice ?? null, invoiceTiming: shipment.invoice_timing, invoiceHref: invoiceId ? `/invoices/${invoiceId}` : undefined, backHref: `/orders/${order.id}` })} />;
+    // A delivery order on no route yet offers Add to route; a pickup never goes on one.
+    const routeHref = !order.pickup && shipment.deliveries.length === 0 ? `/routes/new?add=${shipment.id}` : undefined;
+    return <ShipmentDoneView model={toShipmentDoneViewProps({ order, lines, warnings: shipped?.warnings, invoice: detail?.invoice ?? null, invoiceTiming: shipment.invoice_timing, invoiceHref: invoiceId ? `/invoices/${invoiceId}` : undefined, routeHref, backHref: `/orders/${order.id}` })} />;
   }
   if (order.status !== "picked") redirect(`/orders/${order.id}`);
   const available = await getOrderShipSources(id);

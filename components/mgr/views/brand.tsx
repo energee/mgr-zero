@@ -66,6 +66,7 @@ export function BrandView({
   sellsMessages,
   formatAction,
   busy = false,
+  nameError,
 }: {
   model: BrandViewModel;
   controls?: BrandControls;
@@ -95,6 +96,8 @@ export function BrandView({
   /** Live: permitted link to Catalog's format setup; null hides the action. */
   formatAction?: ReactNode;
   busy?: boolean;
+  /** Live: the save's refusal of the name, such as a duplicate. */
+  nameError?: string;
 }) {
   const abvId = useId();
   const touched = useTouchedLines(!controls.abv || validationAttempted);
@@ -111,19 +114,16 @@ export function BrandView({
       <div className="grid items-start gap-6 @min-[48rem]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <section aria-label="Brand details" className="flex min-w-0 flex-col gap-4">
           {E.cols(
-            <RegistryInput label="Brand name" value={model.name} onChange={controls.name} required />,
+            <RegistryInput label="Brand name" value={model.name} onChange={controls.name} required id="brand-name" error={nameError} />,
             // Staff-only: list_brands and SKU search match it; Catalog notes it under the name, pickers beside it. Never on the portal, Square or SKU names.
             <div className="flex min-w-0 flex-col gap-2">
               {E.edit("Alias", model.alias, "text", undefined, { id: "brand-alias", onChange: controls.alias, "aria-describedby": "brand-alias-help" })}
-              <FieldDescription id="brand-alias-help">An informal name staff use, such as a series number. Search finds the beer by it. Catalog shows it under the name, and staff pickers show it beside the name. Buyers never see it.</FieldDescription>
+              <FieldDescription id="brand-alias-help">An informal name staff use, such as a series number. Search finds it; buyers never see it.</FieldDescription>
             </div>,
           )}
           {E.cols(
             <RegistryInput label="Style" value={model.style} onChange={controls.style} suggestions={model.styleOptions} />,
-            <div className="flex min-w-0 flex-col gap-2">
-              {E.edit("ABV %", model.abv, "number", undefined, { id: abvId, onChange: controls.abv, onBlur: () => touched.touch(0), error: touched.shown(0) ? brandAbvError(model.abv) : undefined, min: BRAND_ABV.min, max: BRAND_ABV.max, step: "any", "aria-describedby": `${abvId}-help` })}
-              <FieldDescription id={`${abvId}-help`}>Optional percentage from 0 to 99.99. Decimals such as 5.55 are valid; stored to two decimal places, with extra decimals rounded.</FieldDescription>
-            </div>,
+            E.edit("ABV %", model.abv, "number", undefined, { id: abvId, onChange: controls.abv, onBlur: () => touched.touch(0), error: touched.shown(0) ? brandAbvError(model.abv) : undefined, min: BRAND_ABV.min, max: BRAND_ABV.max, step: "any" }),
           )}
           <div className="flex flex-col gap-1">
             <RegistrySelect label="Category" value={model.category} options={[{ value: "", label: "Uncategorized" }, ...asOptions(model.categoryOptions)]} onChange={controls.category} />

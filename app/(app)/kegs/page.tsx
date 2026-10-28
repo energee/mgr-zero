@@ -20,7 +20,7 @@ export const metadata = { title: navTitle("/kegs") };
 
 type Fleet = {
   pools: (Pool & { vendor_id: string | null })[];
-  rows: { pool_id: string; keg_size: string; location_name: string; bin_name: string; qty: number }[];
+  rows: { pool_id: string; keg_size: string; bin_id: string; location_name: string; bin_name: string; qty: number }[];
   shortages: KegShortage[];
   customers: { customer_id: string; name: string; kegs_out: number }[];
 };
@@ -62,7 +62,7 @@ export default async function KegsPage() {
       })}
       createAction={<PoolForm vendors={vendors} />}
       poolActions={Object.fromEntries(fleet.pools.map((p) => [p.id, <PoolForm key={`${p.id}-${p.name}-${p.vendor_id}-${p.per_fill_cents}-${p.deposit_cents}-${p.active}`} pool={p} vendors={vendors} />]))}
-      eventForm={<div className="py-2"><KegEventForm pools={activePools} locations={locations} bins={bins} customers={customers} /></div>}
+      eventForm={<div className="py-2"><KegEventForm pools={activePools} locations={locations} bins={bins} customers={customers} stock={fleet.rows} /></div>}
     />
   );
 }

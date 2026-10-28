@@ -10,6 +10,7 @@ import { useCommandAction } from "@/lib/commands/use-command-form";
 import { isNumber } from "@/lib/mgr/quantity-input";
 import { draftCounts, pickCountDraftKey, readPickCounts, savePickCounts } from "@/lib/mgr/pick-counts";
 import { pickDoneHref, toPickViewProps, type PickSnapshot } from "@/lib/mgr/pick-view";
+import { ShortPickForm } from "./short-pick-form";
 
 export function PickForm({ snapshot }: { snapshot: PickSnapshot }) {
   const router = useRouter();
@@ -19,6 +20,9 @@ export function PickForm({ snapshot }: { snapshot: PickSnapshot }) {
   const [saved, setSaved] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [needsCounts, setNeedsCounts] = useState<string[]>([]);
+  // The line whose Short sheet is open over Pick (#1503); its count comes from the working counts.
+  const [shortId, setShortId] = useState<string | null>(null);
+  const shortLine = snapshot.lines.find(line => line.id === shortId);
   const working = useRef({ key, lines: snapshot.lines, values: qtys, restored: false });
   const { busy, error, setError, run } = useCommandAction();
   useEffect(() => {
@@ -46,17 +50,12 @@ export function PickForm({ snapshot }: { snapshot: PickSnapshot }) {
     window.addEventListener("pageshow", onPageShow);
     return () => window.removeEventListener("pageshow", onPageShow);
   }, [key, snapshot.lines, setError]);
-  function short(id: string) {
-    try { savePickCounts(sessionStorage, key, snapshot.lines, working.current.values); setDraftError(null); }
-    catch { return setDraftError("Working counts could not be kept. Stay on Pick and try again."); }
-    router.push(`/orders/${snapshot.order.id}/short-pick?line=${encodeURIComponent(id)}&qty=${encodeURIComponent(qtys[id])}`);
-  }
   function retire() {
     sessionStorage.removeItem(key);
   }
   const model = toPickViewProps({ ...snapshot, lines: snapshot.lines.map(line => ({ ...line, qty_picked: Number(qtys[line.id]) })) });
-  return <form className="contents" onClickCapture={event => {
-    // The explicit order-back link abandons this working pick; Short's back link does not.
+  return <><form className="contents" onClickCapture={event => {
+    // The explicit order-back link abandons this working pick.
     if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0 && snapshot.backHref && (event.target as Element).closest("a")?.getAttribute("href") === snapshot.backHref) {
       try { retire(); }
       catch { event.preventDefault(); setError("Working counts could not be discarded. Try again."); }
@@ -81,7 +80,9 @@ export function PickForm({ snapshot }: { snapshot: PickSnapshot }) {
         try { savePickCounts(sessionStorage, key, snapshot.lines, next); setDraftError(null); }
         catch { setDraftError("Working counts could not be kept. Stay on Pick and try again."); }
       }}
-      onShort={short}
+      onShort={setShortId}
       onPrint={() => window.print()} submitting={busy || saved} disabled={needsCounts.length > 0} messages={<CommandFormMessage error={error ?? (needsCounts.length ? "Re-enter every line before saving." : draftError)} />} />
-  </form>;
+  </form>
+  {shortLine && <ShortPickForm key={shortLine.id} snapshot={{ order: snapshot.order, line: { ...shortLine, qty_picked: Number(qtys[shortLine.id]) }, locations: snapshot.locations }} onClose={() => setShortId(null)} />}
+  </>;
 }

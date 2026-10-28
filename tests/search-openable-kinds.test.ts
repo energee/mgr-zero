@@ -14,12 +14,12 @@ describe("openableKinds", () => {
     expect(openableKinds(ctxFor("admin"), [...SEARCH_KINDS])).toEqual([...SEARCH_KINDS]);
   });
   it("brewer only searches what brewer pages open", () => {
-    expect(openableKinds(ctxFor("brewer"), [...SEARCH_KINDS])).toEqual(["batch"]);
+    expect(openableKinds(ctxFor("brewer"), [...SEARCH_KINDS])).toEqual(["batch", "packaging_run", "recipe", "vessel", "vendor", "material", "bin", "water_profile"]);
   });
-  it("warehouse cannot open lot traces or batches", () => {
-    expect(openableKinds(ctxFor("warehouse"), [...SEARCH_KINDS])).toEqual(["sku", "order", "invoice", "customer", "po"]);
+  it("warehouse cannot open lot traces, batches, recipes, vessels, licenses or water profiles", () => {
+    expect(openableKinds(ctxFor("warehouse"), [...SEARCH_KINDS])).toEqual(["sku", "order", "invoice", "customer", "po", "packaging_run", "transfer", "route", "vendor", "ship_to", "material", "keg_pool", "bin"]);
   });
-  it("sales cannot open purchase orders or batches", () => {
-    expect(openableKinds(ctxFor("sales"), [...SEARCH_KINDS])).toEqual(["sku", "order", "invoice", "lot", "customer", "material_lot"]);
+  it("sales cannot open purchase orders, batches, packaging runs or cellar and material records", () => {
+    expect(openableKinds(ctxFor("sales"), [...SEARCH_KINDS])).toEqual(["sku", "order", "invoice", "lot", "customer", "material_lot", "transfer", "route", "ship_to", "bin", "license"]);
   });
 });

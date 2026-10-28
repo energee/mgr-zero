@@ -2,8 +2,7 @@
 import { docNo } from "./doc-no";
 
 export type ShortPickViewModel = {
-  backTo: string;
-  backHref?: string;
+  /** The sheet title. */
   title: string;
   source: string;
   lineName: string;
@@ -17,12 +16,11 @@ export type ShortPickViewModel = {
 };
 
 export type ShortPickSnapshot = {
-  backHref?: string;
   order: {
     id: string;
     order_no: number | null;
     from_location_id: string;
-    customers: { name: string } | null;
+    customers?: { name: string } | null;
   };
   line: {
     id: string;
@@ -36,7 +34,7 @@ export type ShortPickSnapshot = {
 };
 
 /** Map get_order + the short line's count onto ShortPickView. */
-export function toShortPickViewProps({ order, line, locations, backHref }: ShortPickSnapshot): ShortPickViewModel {
+export function toShortPickViewProps({ order, line, locations }: ShortPickSnapshot): ShortPickViewModel {
   const name = line.skus?.name ?? "Line";
   const ordered = Number(line.qty_ordered);
   const counted = Number(line.qty_picked ?? 0);
@@ -44,8 +42,6 @@ export function toShortPickViewProps({ order, line, locations, backHref }: Short
   const loc = locations.find((l) => l.id === order.from_location_id)?.name ?? "—";
   const who = order.customers?.name ?? "Taproom transfer";
   return {
-    backTo: "Pick",
-    backHref,
     title: `${docNo("ORD", order.order_no, "Order")} · short line`,
     source: `${who} · ${loc}`,
     lineName: name,

@@ -139,7 +139,7 @@ export function CustomerView({
             <h2 className="mb-3 font-heading text-xl font-semibold">Trading terms</h2>
             <div className="flex flex-col gap-4">
               <CustomerSaleChannelField value={values.saleChannelId} channels={model.channelOptions} controls={controls("saleChannelId")} />
-              {E.pick("Terms", values.paymentTerms, TERMS_OPTIONS, controls("paymentTerms"))}
+              {E.pick("Payment terms", values.paymentTerms, TERMS_OPTIONS, controls("paymentTerms"))}
               <CustomerTaxTreatmentField value={values.taxTreatment} controls={controls("taxTreatment")} />
             </div>
           </section>

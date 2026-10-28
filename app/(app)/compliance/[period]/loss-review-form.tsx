@@ -13,7 +13,7 @@ import { command, CommandResponseError } from "@/lib/commands/client";
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 import type { LossReview } from "@/lib/commands/compliance";
 import { bblExact } from "@/lib/volume";
-import { lossReviewReason } from "@/lib/mgr/monthly-compliance-view";
+import { lossReviewReason, remainingAmountText } from "@/lib/mgr/monthly-compliance-view";
 
 type Target = "sample" | "taproom" | "destruction";
 type Payload = { adjustmentId: string; bbl: string; classification: Target; destinationState?: string };
@@ -59,8 +59,9 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
   function changeOpen(next: boolean) {
     if (!next && (phase === "submitting" || phase === "unknown")) return;
     setOpen(next);
-    if (next) return;
-    setAmount(""); setTarget("sample"); setState(""); setPhase("idle"); setError(null);
+    // Open with the whole remainder, read now so a refreshed remainder is never stale.
+    if (next) { setAmount(remainingAmountText(loss.remaining_bbl)); return; }
+    setTarget("sample"); setState(""); setPhase("idle"); setError(null);
     requestId.current = null; payload.current = null;
   }
 
