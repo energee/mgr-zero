@@ -1204,6 +1204,8 @@ Below the vendors, **Contracts** lists commitments: one vendor, one material, a 
 
 **Quantity** must be above zero, as a whole or decimal number without exponent notation. **Unit cost ($)** is optional and must be zero or more when entered. After you leave either field, invalid entries show **Enter a quantity above zero.** or **Enter a cost of zero or more.** beside it. **Save contract** stays unavailable while required fields are missing or either number is invalid, including exponent notation such as `1e3`.
 
+The quantity is in the material's purchase unit and may be fractional, such as **1.5** or **0.001**; it is stored to four decimal places. A unit cost with more than two decimal places is rounded to the nearest cent, so **1.234** saves as **$1.23**. **Starts** and **Ends** are optional. An end date before the start date shows **Enter an end date on or after the start date.** under **Ends**, and **Save contract** stays unavailable until you fix it. The same day for both is allowed. A chosen date shows **Clear start date** or **Clear end date** under it; clear it and save to remove that date from the contract.
+
 In **Edit contract**, **Delete contract** (Admin, Warehouse, and Brewer) asks for confirmation and removes an unused contract. A contract linked to a purchase order cannot be deleted; MGR asks you to set an end date instead, so the purchase order keeps its contract history.
 
 ### Materials

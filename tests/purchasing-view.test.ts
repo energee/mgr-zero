@@ -464,10 +464,10 @@ describe("Vendors", () => {
   });
 
   it("holds Save contract for missing, invalid, or exponent-notation values", () => {
-    expect(contractSubmitReason({ vendorId: "", materialId: "", quantity: "", unitCost: "" })).toBeTruthy();
-    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1", unitCost: "-1" })).toBeTruthy();
-    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1e3", unitCost: "" })).toBeTruthy();
-    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1.5", unitCost: "0" })).toBeNull();
+    expect(contractSubmitReason({ vendorId: "", materialId: "", quantity: "", unitCost: "", starts: "", ends: "" })).toBeTruthy();
+    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1", unitCost: "-1", starts: "", ends: "" })).toBeTruthy();
+    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1e3", unitCost: "", starts: "", ends: "" })).toBeTruthy();
+    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1.5", unitCost: "0", starts: "", ends: "" })).toBeNull();
   });
 
   it("waits to show contract errors in live controlled fields", () => {
