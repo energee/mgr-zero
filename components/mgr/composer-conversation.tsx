@@ -9,7 +9,7 @@ import { ComposerProposalView } from "@/components/mgr/views/composer";
 import { ComposerStripView } from "@/components/mgr/views/composer-strip";
 import { command } from "@/lib/commands/client";
 import { composerMessageText, latestComposerProposal } from "@/lib/chat/messages";
-import { CHAT_FAILURES, readChatFailure } from "@/lib/chat/failure";
+import { blockedChatKey, CHAT_FAILURES, readBlockedChat, readChatFailure, rememberBlockedChat } from "@/lib/chat/failure";
 import { COMPOSER_SETUP_ACTIVITY, loadComposerSetup } from "@/lib/composer/setup";
 import { movementFormHref } from "@/lib/composer/state";
 
@@ -19,6 +19,8 @@ function subscribeConnection(changed: () => void) {
 }
 const connectionSnapshot = () => navigator.onLine;
 const serverConnectionSnapshot = () => true;
+/** Read lazily: the readBlockedChat/rememberBlockedChat try/catch covers this access too. */
+const tabStorage = () => sessionStorage;
 
 export default function ComposerConversation({ chatConfigured, open, onOpenChange, focusRequest, outboxCount, onOutbox, children }: {
   chatConfigured: boolean;
@@ -121,7 +123,14 @@ export default function ComposerConversation({ chatConfigured, open, onOpenChang
   const { proposal, error: proposalError } = latestComposerProposal(messages);
   const transcript = messages.map((message) => ({ id: message.id, role: message.role === "user" ? "user" as const : "assistant" as const, content: composerMessageText(message) })).filter((message) => message.content);
   const streaming = status === "submitted" || status === "streaming";
-  const requestFailure = error ? readChatFailure(error) : undefined;
+  // conversationId is set only after mount, so sessionStorage is defined here.
+  const blockKey = conversationId ? blockedChatKey(expectedContext.actorId ?? "", breweryId, conversationId) : undefined;
+  const restoredBlock = useMemo(() => blockKey ? readBlockedChat(tabStorage, blockKey) : undefined, [blockKey]);
+  const requestFailure = error ? readChatFailure(error) : restoredBlock;
+  const requestFailureCode = requestFailure?.code;
+  useEffect(() => {
+    if (error && blockKey && requestFailureCode) rememberBlockedChat(tabStorage, blockKey, { code: requestFailureCode });
+  }, [error, blockKey, requestFailureCode]);
   let chatFailure: { message: string; retryable: boolean } | undefined = requestFailure;
   if (!online) chatFailure = CHAT_FAILURES.offline;
   if (!chatConfigured) chatFailure = CHAT_FAILURES.not_configured;
