@@ -43,6 +43,7 @@ describe("Finished goods view", () => {
     const row = (sku: { sku_id: string; name: string }, onHand: string, allocated: string, atp: string, short: boolean) => ({
       key: sku.sku_id, name: sku.name, onHand, allocated, atp, short,
       href: `/inventory/${sku.sku_id}`, shortfallHref: `/replenishment?sku=${sku.sku_id}#shortfalls`,
+      movementHref: `/inventory?recordMovement=1&skuId=${sku.sku_id}`,
     });
     expect(toFinishedGoodsViewProps(finishedGoodsList).rows).toEqual([
       row(SKU_HAZY, "15", "4", "11", false),
@@ -60,6 +61,30 @@ describe("Finished goods view", () => {
     const snapshot = assembleFinishedGoods([{ id: "s1", name: "Hazy" }], [{ sku_id: "s1", qty: "0.10" }, { sku_id: "s1", qty: "0.20" }], [{ sku_id: "s1", qty: "0.10" }]);
     expect(snapshot.skus[0]?.on_hand).toBe(0.3);
     expect(toFinishedGoodsViewProps(snapshot).rows[0]).toMatchObject({ onHand: "0.3", allocated: "0.2", atp: "0.1" });
+  });
+
+  it("withholds a retired SKU's Record movement, as SKU detail does (#1507)", () => {
+    const snapshot = assembleFinishedGoods([{ id: "s1", name: "Retired", active: false }, { id: "s2", name: "Current", active: true }], [{ sku_id: "s1", qty: 2 }, { sku_id: "s2", qty: 3 }], []);
+    expect(toFinishedGoodsViewProps(snapshot).rows.map((row) => row.movementHref)).toEqual([null, "/inventory?recordMovement=1&skuId=s2"]);
+  });
+
+  it("each live row opens Record movement on its SKU, only for a user who may record one (#1507)", () => {
+    const model = toFinishedGoodsViewProps({ skus: [...finishedGoodsList.skus, { id: "s-retired", name: "Retired keg", active: false, on_hand: 1, atp: 1 }] });
+    const live = htmlOf(createElement(FinishedGoodsView, { model, createAction: "MOVE", linkRows: true }));
+    for (const sku of [SKU_HAZY, SKU_PILS, SKU_STOUT]) {
+      expect(live).toMatch(new RegExp(`<a [^>]*href="/inventory\\?recordMovement=1&amp;skuId=${sku.sku_id}">Record movement</a>`));
+    }
+    expect(live).not.toContain("skuId=s-retired");
+    const reader = htmlOf(createElement(FinishedGoodsView, { model, createAction: null, linkRows: true }));
+    expect(reader).not.toMatch(/Record movement/);
+  });
+
+  it("the inventory draws each row's Record movement inert (#1507)", () => {
+    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList) }));
+    // The header's button plus one per row, drawn in both the desk table and
+    // the phone list, none of them a link.
+    expect(html.match(/<button[^>]*>Record movement<\/button>/g)).toHaveLength(1 + 2 * finishedGoodsList.skus.length);
+    expect(html).not.toContain("recordMovement=1");
   });
 
   it("names an empty list without inventing rows", () => {

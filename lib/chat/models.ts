@@ -1,4 +1,5 @@
 import { gateway } from "ai";
+import { unstable_cache } from "next/cache";
 
 export const DEFAULT_CHAT_MODEL = "minimax/minimax-m3.1-flash";
 /** Gateway model ids are `provider/model`; the same shape the database check enforces. */
@@ -34,12 +35,22 @@ export function gatewayLanguageModels(models: GatewayModel[]): GatewayModelOptio
     .sort((a, b) => modelProvider(a.id).localeCompare(modelProvider(b.id)) || a.name.localeCompare(b.name));
 }
 
+/** The catalog changes rarely, so one Gateway read serves every Settings load
+ *  for an hour instead of each render waiting on it (#1491). A failed read
+ *  throws out of the cache, so it is never kept. */
+const cachedLanguageModels = unstable_cache(
+  async () => gatewayLanguageModels((await gateway.getAvailableModels()).models),
+  ["gateway-language-models"],
+  { revalidate: 3600 },
+);
+
 /** The Gateway's language models, or an empty catalog when the Gateway read
  *  fails. Empty is safe: Settings then says the catalog is unavailable and
- *  keeps the saved model. The cause is logged so the outage is not silent. */
+ *  keeps the saved model. The cause is logged so the outage is not silent,
+ *  and the empty catalog is not cached, so the next load reads again. */
 export async function getGatewayLanguageModels(): Promise<GatewayModelOption[]> {
   try {
-    return gatewayLanguageModels((await gateway.getAvailableModels()).models);
+    return await cachedLanguageModels();
   } catch (error) {
     console.error("gateway model catalog unavailable:", error instanceof Error ? error.message : String(error));
     return [];

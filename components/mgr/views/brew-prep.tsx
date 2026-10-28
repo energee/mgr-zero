@@ -43,8 +43,8 @@ export function DetailParts({ text }: { text: string }) {
   return <>{text.split(" · ").map((part, index) => <Fragment key={index}>{index > 0 && " · "}<span className="whitespace-nowrap">{part}</span></Fragment>)}</>;
 }
 
-/** A tab's verbs: stuck to the bottom of the phone's scroll so they stay in reach on a long list; on desk, right-aligned
- *  just after the content. The negative margins reach the page column's padding (app-shell's p-4). */
+/** A tab's verbs (and Confirm order's): stuck to the bottom of the phone's scroll so they stay in reach on a long list;
+ *  on desk, right-aligned just after the content. The negative margins reach the page column's padding (app-shell's p-4). */
 export function BrewFooter({ children }: { children: ReactNode }) {
   return <div className="sticky -bottom-4 z-10 -mx-4 flex flex-col gap-2 border-t bg-background px-4 py-3 md:static md:mx-0 md:flex-row md:items-center md:justify-end md:border-0 md:bg-transparent md:p-0">{children}</div>;
 }
