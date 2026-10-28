@@ -6,6 +6,9 @@ export type InputIssue = { path: (string | number)[]; code: string; message: str
 export type FieldErrors = Partial<Record<string, string>>;
 
 function correction(issue: InputIssue): string {
+  // Over a column's limit, the value's format is fine; only its size is not
+  // (#1482). Fixed copy, because a string length issue still carries zod's raw text.
+  if (issue.code === "too_big") return "Enter a smaller value.";
   const field = issue.path[0];
   if (field === "state") return "Choose a US state, such as PA.";
   if (field === "zip") return US_ZIP_CORRECTION;

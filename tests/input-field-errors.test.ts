@@ -85,3 +85,12 @@ it.each([
   const presentation = inputErrorPresentation(detail, ["email"]);
   expect(Object.keys(presentation.fieldErrors)).toEqual(code === "invalid_input" ? ["email"] : []);
 });
+
+// #1482: an over-limit value is not a malformed one, so a field with its own
+// format copy (lead time) still says to enter something smaller.
+it("says an over-limit field is too large before its format copy", () => {
+  const failure = { status: 400, code: "invalid_input", message: "Enter a number no greater than 2,147,483,647.", issues: [
+    { path: ["leadTimeDays"], code: "too_big", message: "Enter a number no greater than 2,147,483,647." },
+  ] };
+  expect(inputErrorPresentation(failure, ["leadTimeDays"]).fieldErrors).toEqual({ leadTimeDays: "Enter a smaller value." });
+});

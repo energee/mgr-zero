@@ -160,6 +160,20 @@ export async function breweryToday(ctx: Ctx): Promise<string> {
  * oversized value is a 400 validation error rather than a 22003 overflow from the database. */
 export const PG_INT_MAX = 2_147_483_647;
 
+// A command's invalid_input message reaches the form or API caller as is, so a
+// number bound without its own message reads as an instruction with the limit
+// ("Enter a number no greater than 9,999,999,999.99.") instead of zod's
+// "Too big: expected number to be <=9999999999.99" (#1482). Returning
+// undefined keeps zod's text for every other issue.
+const limit = (n: number | bigint) => Number(n).toLocaleString("en-US", { maximumFractionDigits: 4 });
+z.config({
+  customError: (issue) => {
+    if (issue.origin !== "number") return undefined;
+    if (issue.code === "too_big") return `Enter a number ${issue.inclusive ? "no greater than" : "less than"} ${limit(issue.maximum)}.`;
+    if (issue.code === "too_small") return `Enter a number ${issue.inclusive ? "of at least" : "greater than"} ${limit(issue.minimum)}.`;
+  },
+});
+
 /** Whole cents stored in an int column: never negative, never past PG_INT_MAX. */
 export const cents = z.number().int().nonnegative().max(PG_INT_MAX);
 

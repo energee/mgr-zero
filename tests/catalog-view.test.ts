@@ -138,11 +138,12 @@ describe("Catalog view", () => {
   });
 
   // #965: inventory and live draw the same Water profiles row, with no invented count.
-  it("draws Water profiles as source and target profiles, linked only live", () => {
+  it("draws Water profiles as Manage water profiles, linked only live (#1205)", () => {
     const model = toCatalogViewProps(catalogBrands);
     const inert = htmlOf(createElement(CatalogView, { model }));
     expect(inert).toMatch(/Water profiles/);
-    expect(inert).toMatch(/Source and target profiles/);
+    expect(inert).toMatch(/Manage water profiles/);
+    expect(inert).not.toMatch(/source and target/i);
     expect(inert).not.toMatch(/href="\/catalog\/water-profiles"/);
     expect(htmlOf(createElement(CatalogView, { model, links: { brands: true, priceGroups: true, waterProfiles: true } }))).toMatch(/href="\/catalog\/water-profiles"/);
   });
