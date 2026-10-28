@@ -15,6 +15,11 @@ describe("reset confirmation belongs to the submit outcome (#1398)", () => {
     expect(html).toContain("Send reset link");
   });
 
+  it.each([[{}, "/login"], [{ portal: "1" }, "/portal/login"]])("links Back to sign in from reset %j (#1501)", async (query, href) => {
+    const html = renderToStaticMarkup(await ResetPage({ searchParams: Promise.resolve(query) }));
+    expect(html).toMatch(new RegExp(`<a[^>]*href="${href}"[^>]*>Back to sign in</a>`));
+  });
+
   it("keeps the inventory's initial portal reset state honest too", () => {
     expect(renderToStaticMarkup(createElement(EntryView, { model: portalForgotPassword }))).not.toContain(confirmation);
   });

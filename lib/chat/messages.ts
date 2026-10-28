@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { composerProposal, type ComposerProposal } from "@/lib/composer/state";
 
+/** The longest chat message MGR accepts: the request schema, the message box, and the chat_messages check all use 4,000. */
+export const MAX_CHAT_MESSAGE_CHARS = 4000;
+
 type Message = { role?: string; parts?: unknown[] };
 
 export function composerMessageText(message: Message) {

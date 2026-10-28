@@ -1,10 +1,11 @@
 "use client";
 
 import { E } from "@/components/mgr/e";
-import { Button } from "@/components/ui/button";
+import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { OrderQuantity } from "./new-order";
-import type { ReturnCreditViewModel } from "@/lib/mgr/return-credit-view";
+import { returnQuantityError, type ReturnCreditViewModel } from "@/lib/mgr/return-credit-view";
+import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import type { ReactNode } from "react";
 import { Fragment } from "react";
 
@@ -23,20 +24,29 @@ export function ReturnSourcesView({ groups, quantities = {}, onQuantity }: {
   </>;
 }
 
-export function ReturnCreditView({ model, sources, footer, tape, reason, quantities, onQuantity, onReason, onReturnTo, bins, binId = "", onBin, messages, submitting = false, disabled = false }: {
+/** `reason` is the selected chip; `blockedReason` (returnCreditReason) says why
+ *  Return shipment is withheld. A bad quantity is marked under its field once
+ *  the field is left, or at once in the inventory. */
+export function ReturnCreditView({ model, sources, footer, tape, reason, quantities, onQuantity, onReason, onReturnTo, bins, binId = "", onBin, messages, submitting = false, blockedReason }: {
   model: ReturnCreditViewModel; sources?: ReactNode; footer?: ReactNode;
   tape?: [ReactNode, ReactNode?][]; reason?: number;
   quantities?: Record<string, string>; onQuantity?: (id: string, value: string) => void;
   onReason?: (index: number) => void; onReturnTo?: (id: string) => void;
   bins?: { id: string; name: string }[]; binId?: string; onBin?: (id: string) => void;
-  messages?: ReactNode; submitting?: boolean; disabled?: boolean;
+  messages?: ReactNode; submitting?: boolean; blockedReason?: string | null;
 }) {
   const selectedReason = reason ?? model.reason;
+  const touched = useTouchedLines(!onQuantity);
   return <>
     {E.back(model.backTo, model.title, undefined, model.backHref)}
     {model.lines.length === 0 && E.info("No returnable lines")}
-    {model.lines.map(line => <div key={line.key}>{E.row(line.name, line.detail,
-      <OrderQuantity label={`${line.name} return quantity`} value={quantities?.[line.key] ?? line.qty} max={line.maxReturning} step={line.step} onChange={onQuantity && (value => onQuantity(line.key, value))} />)}</div>)}
+    {model.lines.map((line, index) => {
+      const value = quantities?.[line.key] ?? String(line.qty);
+      return <div key={line.key}>{E.row(line.name, line.detail,
+        <OrderQuantity label={`${line.name} return quantity`} value={value} max={line.maxReturning} step={line.step} id={`return-qty-${line.key}`}
+          error={touched.shown(index) ? returnQuantityError(value, line) : undefined} onBlur={() => touched.touch(index)}
+          onChange={onQuantity && (next => onQuantity(line.key, next))} />)}</div>;
+    })}
     <ToggleGroup type="single" aria-label="Reason" variant="outline" size="sm" className="flex-wrap justify-start"
       value={onReason ? String(selectedReason) : undefined} defaultValue={onReason ? undefined : String(selectedReason)}
       onValueChange={value => { if (value !== "") onReason?.(Number(value)); }}>
@@ -50,6 +60,6 @@ export function ReturnCreditView({ model, sources, footer, tape, reason, quantit
     {sources}
     {messages}
     {E.sp()}
-    {footer !== undefined ? footer : <Button type="submit" data-variant="irreversible" className="w-full bg-irreversible text-irreversible-foreground hover:bg-irreversible/90 md:w-fit md:self-end" disabled={submitting || disabled}>{submitting ? "Saving…" : "Return shipment"}</Button>}
+    {footer !== undefined ? footer : <IrreversibleSubmit label="Return shipment" className="w-full md:w-fit md:self-end" submitting={submitting} reason={blockedReason} />}
   </>;
 }

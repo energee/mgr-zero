@@ -12,6 +12,6 @@ export function ResetForm({ portal }: { portal: boolean }) {
     error: state.error,
     info: state.sent ? "If that email is on an account, a reset link is on its way." : undefined,
   };
-  return <EntryView model={model} action={submit} defaults={{ email: state.email }}
+  return <EntryView model={model} action={submit} defaults={{ email: state.email }} secondaryHref={portal ? "/portal/login" : "/login"}
     hidden={portal ? <input type="hidden" name="portal" value="1" /> : null} />;
 }

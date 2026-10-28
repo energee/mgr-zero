@@ -32,3 +32,13 @@ it("keeps the shared Work strips horizontal without native scrollbar steppers (#
     expect(source).toContain("overflow-x-auto justify-start scroll-cue");
   }
 });
+
+it("hides the Work page strip at desktop width while the sidebar is open, but not on phones (#1513)", async () => {
+  const { createElement } = await import("react");
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { WorkKindTabs } = await import("../components/mgr/views/work-kind-tabs");
+  const html = renderToStaticMarkup(createElement(WorkKindTabs, { chips: ["all", "orders"], current: "orders", tabs: {} }));
+  // The sidebar's desktop element carries data-state=expanded; on phones it is a sheet with none.
+  expect(html).toMatch(/class="[^"]*\bmd:group-has-\[\[data-slot=sidebar\]\[data-state=expanded\]\]\/sidebar-wrapper:hidden\b/);
+  expect(readFileSync("components/ui/sidebar.tsx", "utf8")).toMatch(/group\/sidebar-wrapper/);
+});
