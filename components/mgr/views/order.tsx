@@ -33,14 +33,9 @@ export const CancelOrderButton = (props: ComponentProps<typeof Button>) => (
   <Button variant="ghost" size="sm" type="button" data-preview-action className="-mr-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive" {...props}>Cancel order</Button>
 );
 
-/** The bottom row: why Cancel asks twice, beside the Cancel button (or the dialog opened from it). */
+/** The bottom row: the Cancel button (or the dialog opened from it), at the end. Its dialog asks for the reason. */
 export function OrderCancelRow({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-t pt-4">
-      <p className={LEGEND}>Cancellation requires a reason and confirmation.</p>
-      {children}
-    </div>
-  );
+  return <div className="flex justify-end border-t pt-4">{children}</div>;
 }
 
 /** Short reason and warning, in words, under a line's name. */
@@ -178,7 +173,6 @@ export function OrderView({
             </li>
           ))}
         </ul>
-        <p className={cn(LEGEND, "mt-2")}>Available counts every location, not only the fulfillment source. Not supplied does not mean zero.</p>
         {showAddLine ? <div className="mt-3">{E.btn("Add line", "g")}</div> : null}
         {onReason ? <div className="mt-3 flex flex-col gap-2">{E.edit("Reason", reason ?? "", "text", undefined, { onChange: onReason, required: true })}{lineActions}</div> : null}
       </section>

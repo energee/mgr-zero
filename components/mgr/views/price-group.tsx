@@ -49,11 +49,11 @@ export function PriceGroupView({ model, controls = {}, validationAttempted = fal
       {/* list_price_groups orders by position (gaps kept), and suggestPriceGroup reads ceilings in that order. */}
       <div className="flex min-w-0 flex-col gap-2">
         {E.edit("Position", model.position, "number", undefined, { id: "price-group-position", onChange: controls.position, onBlur: () => touched.touch(0), error: (!controls.position || touched.shown(0)) ? errors.position : undefined, min: 1, step: 1, required: true, "aria-describedby": "price-group-position-help" })}
-        <FieldDescription id="price-group-position-help">This group’s row in the price grid: lower numbers sit higher, and the lowest is the top row. No two groups share a position. Position starts at 1; use whole numbers.</FieldDescription>
+        <FieldDescription id="price-group-position-help">This group’s row in the price grid: lower numbers sit higher.</FieldDescription>
       </div>
       <div className="flex min-w-0 flex-col gap-2">
         {E.edit("Cost ceiling ($/bbl) · optional", model.costCeilingInput, "number", undefined, { id: "price-group-ceiling", onChange: controls.costCeiling, onBlur: () => touched.touch(1), error: (!controls.costCeiling || touched.shown(1)) ? errors.costCeiling : undefined, min: 0, max: 21474836.47, step: "any", "aria-describedby": "price-group-ceiling-help" })}
-        <FieldDescription id="price-group-ceiling-help">Dollars per barrel of recipe cost. A brand’s page suggests the first group, from the top row down, whose ceiling is at or above the brand’s recipe cost. Groups with no ceiling are skipped. Saving never moves a brand or changes a price. Enter zero or more, up to $21,474,836.47; decimals are rounded to the nearest cent.</FieldDescription>
+        <FieldDescription id="price-group-ceiling-help">Dollars per barrel of recipe cost. A brand’s page suggests the first group, from the top row down, whose ceiling is at or above the brand’s recipe cost.</FieldDescription>
       </div>
       {model.previousCeilingLabel && model.previousCeiling
         ? E.fld(model.previousCeilingLabel, model.previousCeiling)

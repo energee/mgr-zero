@@ -226,6 +226,9 @@ export function recipePageTitle({ recipe, version }: Pick<RecipeSnapshot, "recip
   return version ? `${recipe.name} v${version.version}` : recipe.name;
 }
 
+/** A source system's record id (a 24-hex Mongo id, as in "Imported from Lolev recipe 6720f0…") ending a recipe note; the read page hides it, the stored note keeps it. */
+const IMPORT_ID = /\s+[0-9a-f]{24}$/;
+
 /** The read page's selected saved version, or the empty state before the first version. */
 export function toRecipePageModel(
   s: RecipeSnapshot,
@@ -234,7 +237,7 @@ export function toRecipePageModel(
   const { recipe, version: v, ingredients, waterAdditions } = s;
   const material = materialLookup(ctx.materials);
   const profileName = (pid: string | null) => (pid && ctx.profiles.find((p) => p.id === pid)?.name) || null;
-  const base = { title: recipePageTitle(s), backHref: "/recipes", createHref: `/recipes/${recipe.id}/new`, recipeNote: recipe.note ?? undefined };
+  const base = { title: recipePageTitle(s), backHref: "/recipes", createHref: `/recipes/${recipe.id}/new`, recipeNote: recipe.note?.replace(IMPORT_ID, "") || undefined };
   if (!v) return { ...base, empty: NO_VERSION };
 
   // The water rows leave out the process scalars processReadout also returns; the numbers grid shows those.

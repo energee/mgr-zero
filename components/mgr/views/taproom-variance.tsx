@@ -31,7 +31,7 @@ export function TaproomVarianceView({ model }: { model: TaproomVarianceViewModel
           <p className="text-muted-foreground">{reason(period.reason)} · coverage {period.coverage_complete ? "complete" : "incomplete"} · {period.unmapped_lines} unmapped POS {period.unmapped_lines === 1 ? "line" : "lines"}</p>
         </article>)}
       </section>}
-      {E.info("A dash means a value is unavailable. Read zero alongside coverage and excluded consumption. Guest kegs are never matched by label, and no guest numeric yield is shown.")}
+      {E.info("A dash means a value is unavailable.")}
     </>}
   </>;
 }

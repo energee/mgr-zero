@@ -31,7 +31,7 @@ export function SkuEditForm({ sku, formatName, packageType, pools = [] }: { sku:
           controls={{ active: setActive, upc: setUpc, kegPool: setKegPool, batchSharePercent: setBatchSharePercent }}
           locked
           messages={<>
-            <p className="text-sm">Create another SKU to use a different format. Changing the keg pool affects future orders only.</p>
+            <p className="text-sm">Create another SKU to use a different format.{packageType === "keg" && " Changing the keg pool affects future orders only."}</p>
             <p className="text-sm text-muted-foreground">Inactive SKUs leave inventory and order history intact and cannot be added to new orders. Clear UPC to remove it.</p>
             <CommandFormMessage error={form.error} />
           </>}
