@@ -16,8 +16,10 @@ export type PriceGroupsChannelView = {
 };
 
 export type PriceGroupsViewModel = {
-  /** Column labels after "Group": the format, prefixed by its brand when it has one. */
+  /** Each column's format name, prefixed by its brand when it has one; a pour column's is the pour's name. */
   formats: string[];
+  /** Column headings after "Group": `formats`, with "Pour · " before a pour column's. */
+  headers: string[];
   /** How many groups exist, so a grid with no channels can still say which is missing. */
   groupCount: number;
   /** Sale channel names, one tab each. */
@@ -77,9 +79,10 @@ function pricingColumns(formats: PriceGroupsSnapshot["formats"]) {
   const packaged = formats.filter((f) => f.basis !== "poured");
   const pours = Map.groupBy(formats.filter((f) => f.basis === "poured"), (f) => f.name);
   return [
-    ...packaged.map((f) => ({ label: formatLabel(f), formatId: (): string | null => f.id })),
+    ...packaged.map((f) => ({ label: formatLabel(f), header: formatLabel(f), formatId: (): string | null => f.id })),
     ...[...pours].map(([name, group]) => ({
       label: name,
+      header: `Pour · ${name}`,
       formatId: (groupId: string) => group.find((f) => f.price_group_id === groupId)?.id ?? null,
     })),
   ];
@@ -93,6 +96,7 @@ export function toPriceGroupsViewProps({ channels, groups, formats, cells, chann
   const channel = channels[tab];
   return {
     formats: columns.map((c) => c.label),
+    headers: columns.map((c) => c.header),
     groupCount: groups.length,
     tabs: channels.map((c) => c.name),
     tab,
@@ -117,10 +121,10 @@ export function toPriceGroupsViewProps({ channels, groups, formats, cells, chann
   };
 }
 
-/** What leaving an inline price cell does: nothing, ask to clear, save cents, or refuse the text. */
+/** What leaving an inline price cell does: nothing, clear the price, save cents, or refuse the text. */
 export type CellCommit = { kind: "none" } | { kind: "clear" } | { kind: "save"; cents: number } | { kind: "invalid" };
 
-/** `initial` is the saved dollars text ("" when unpriced); emptying a priced cell asks before clearing. */
+/** `initial` is the saved dollars text ("" when unpriced); emptying a priced cell clears it. */
 export function cellCommit(initial: string, dollars: string): CellCommit {
   const text = dollars.trim().replace(/^\$/, "");
   if (text === "") return initial === "" ? { kind: "none" } : { kind: "clear" };

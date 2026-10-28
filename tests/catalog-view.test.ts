@@ -205,6 +205,13 @@ describe("Catalog view", () => {
     expect(html).toContain('href="/pricing"');
   });
 
+  it("#1516 anchors Formats so the brand page's Manage formats lands on it, not the top of Catalog", () => {
+    const model = toCatalogViewProps({ brands: [], priceGroups: [] });
+    const html = htmlOf(createElement(CatalogView, { model, formats: toFormatsViewProps({ formats: [] }) }));
+    expect(html).toMatch(/id="formats"[^>]*>[\s\S]*?Formats<\/h2>/);
+    expect(readFileSync("app/(app)/catalog/brands/[id]/brand-page.tsx", "utf8")).toContain('E.btn("Manage formats", "g", "/catalog#formats")');
+  });
+
   it("keeps filters available to recover from a search with no matches", () => {
     const model = toCatalogViewProps({ brands: [], priceGroups: [], filtered: true });
     const html = htmlOf(createElement(CatalogView, {

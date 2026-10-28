@@ -1064,7 +1064,7 @@ describe("screen command tokens", () => {
 });
 
 describe("vessel tile fill (#909)", () => {
-  const tile = (fill?: number) => renderToStaticMarkup(E.tiles([["FV1", "Pils · 10 / 20 bbl", "6.2 °P", 0, fill, "/cellar/fv1"]], "c2"));
+  const tile = (fill?: number) => renderToStaticMarkup(E.tiles([["FV1", "Pils · 10 / 20 bbl", "6.2 °P", 0, fill, "/cellar/fv1"]]));
 
   it("draws a named progressbar carrying its whole-percent value", () => {
     const html = tile(50);

@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { InvoicesView } from "../components/mgr/views/invoices";
 import { QboStaffInvoiceLinkView } from "../components/mgr/views/accounting";
-import { toInvoiceListRow, type InvoiceListRecord } from "../lib/mgr/invoices-view";
+import { invoiceStatusOptions, toInvoiceListRow, type InvoiceListRecord } from "../lib/mgr/invoices-view";
 
 const invoice: InvoiceListRecord = { id: "actual", invoice_no: 1042, kind: "invoice", due_on: "2026-09-12", paid_at: null, qbo_sync_status: "pushed", qbo_sync_error: null, qbo_remote_state: "live", qbo_balance_cents: 0, qbo_cash_collected_cents: 0, qbo_accountant_drift: false, written_off_at: null, subtotal_cents: 98000, total_cents: 104000, has_pending_qbo_push: false, qbo_invoice_id: "qbo-1042", local_paid_cents: 0, was_pushed_to_qbo: false, customers: { name: "Actual customer" } };
 
@@ -181,7 +181,8 @@ describe("an invoice whose balance MGR's payment ledger owns (#1045)", () => {
   it("keeps an invoice pushed to a previous QuickBooks company unknown (Q4)", () => {
     const purged = row({ was_pushed_to_qbo: true });
     expect(purged.payment).toBe("Payment status unavailable");
-    expect(purged.balance).toEqual({ cents: null, value: "Unavailable" });
+    // An unknown balance says nothing rather than "Unavailable" on every row (#1516); never $0.00.
+    expect(purged.balance).toEqual({ cents: null, value: null });
     expect(purged.overdue).toBe(false);
   });
 });
@@ -207,7 +208,7 @@ it("#1025 draws an ordinary row without an accounting caption, QuickBooks as a s
 it("reads a historical not_synced invoice as paid and not in QuickBooks, with nothing to fix", () => {
   const historical = { ...invoice, qbo_sync_status: "not_synced" as const, paid_at: "2025-08-14T16:00:00Z", due_on: "2025-08-14", qbo_balance_cents: null };
   const row = toInvoiceListRow(historical, ["admin"], true, "America/New_York", new Date("2026-10-15T12:00:00Z"));
-  expect(row.accounting).toMatch(/not in QuickBooks/i);
+  expect(row.accounting).toBe("Before the books opened");
   expect(row.payment).toBe("Paid");
   expect(row.overdue).toBe(false);
   expect(row.needsMapping).toBe(false);
@@ -255,4 +256,43 @@ it("explains where invoices come from without requiring QuickBooks (#1261)", () 
   expect(html).toMatch(/push them to QuickBooks or record payments in MGR/);
   expect(html).toContain("MGR can’t tell whether QuickBooks emailed an invoice.");
   expect(html).toContain(">Unavailable<");
+});
+
+describe("#1516 the register leads with its invoices", () => {
+  const unknown = toInvoiceListRow({ ...invoice, was_pushed_to_qbo: true, qbo_invoice_id: null, qbo_balance_cents: null }, ["admin"], true, "UTC");
+  const credit = toInvoiceListRow({ ...invoice, id: "cm", kind: "credit_memo", invoice_no: 12, total_cents: -18000, qbo_balance_cents: null }, ["admin"], true, "UTC");
+  const draw = (props: Partial<Parameters<typeof InvoicesView>[0]> = {}) => renderToStaticMarkup(createElement(InvoicesView, {
+    rows: [unknown, credit], connection: { connected: true, detail: "QuickBooks status", canConnect: true }, sync: "SYNC", ...props,
+  }));
+
+  it("leaves an unknown balance out and labels only credit memos under the number", () => {
+    const html = draw();
+    // Only the email-delivery note still reads Unavailable.
+    expect(html.match(/>Unavailable</g)).toHaveLength(1);
+    expect(html).not.toMatch(/>Invoice</);
+    expect(html).toContain(">Credit memo<");
+  });
+
+  it("draws the invoices before the QuickBooks status and sync", () => {
+    const html = draw();
+    expect(html.indexOf("INV-1042")).toBeLessThan(html.indexOf("QuickBooks status"));
+    expect(html.indexOf("INV-1042")).toBeLessThan(html.indexOf("SYNC"));
+    // Disconnected, Connect is the next step and stays above the rows.
+    const off = draw({ connection: { connected: false, reconnect: true, detail: "Needs reconnect", canConnect: true, connectHref: "/settings/accounting" } });
+    expect(off.indexOf("Needs reconnect")).toBeLessThan(off.indexOf("INV-1042"));
+  });
+
+  it("offers All invoices and Unpaid, linked live and inert in the inventory", () => {
+    expect(invoiceStatusOptions(true)).toEqual([
+      { value: "all", label: "All invoices", href: "/invoices" },
+      { value: "unpaid", label: "Unpaid", href: "/invoices?status=unpaid" },
+    ]);
+    expect(invoiceStatusOptions(false).every(option => option.href === undefined)).toBe(true);
+    expect(draw()).toContain("All invoices");
+  });
+
+  it("says no unpaid invoices when the filter leaves none", () => {
+    expect(draw({ rows: [], status: "unpaid" })).toContain("No unpaid invoices");
+    expect(draw({ rows: [] })).toContain("No invoices yet");
+  });
 });

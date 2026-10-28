@@ -7,12 +7,11 @@ import { z } from "zod";
 import { email } from "@/lib/mgr/email";
 import { completeRows, defineCommand, defineQuery, cents, PAGE_SIZE, phone, unwrap, CommandError } from "./registry";
 import { isoDate } from "./packaging";
-import { PAYMENT_TERMS } from "@/lib/mgr/enums";
+import { MATERIAL_CATEGORIES, PAYMENT_TERMS } from "@/lib/mgr/enums";
 import { OPEN_PO_STATUSES } from "@/lib/mgr/receive-po-view";
 import { escapeRegex } from "@/lib/escape-regex";
 
 const PURCHASING = ["admin", "warehouse", "brewer"] as const;
-const MATERIAL_CATEGORIES = ["malt", "hop", "yeast", "adjunct", "chemical", "packaging", "other"] as const;
 const UOMS = ["lb", "kg", "oz", "g", "each", "l", "gal", "ml"] as const;
 // Purchase orders are the warehouse's: a brewer reads materials and vendors but
 // does not place or receive orders (Purchase orders / Receive PO screens).
@@ -148,10 +147,11 @@ defineQuery({
 // a null one contributes no gravity) and PO/count line pickers. Inactive
 // materials are hidden unless asked for: history keeps them, pickers do not.
 defineQuery({
-  name: "list_materials", description: "Materials, alphabetical, with kind, units, lot tracking, default vendor, and extract potential; optionally only those whose name contains q",
+  name: "list_materials", description: "Materials, alphabetical, with kind, units, lot tracking, default vendor, and extract potential; optionally only one kind, or those whose name contains q",
   input: z.object({
     includeInactive: z.boolean().optional(),
     q: z.string().trim().max(100).optional().describe("Only materials whose name contains this text"),
+    category: z.enum(MATERIAL_CATEGORIES).optional().describe("Only materials of this kind"),
   }), roles: [...PURCHASING],
   handler: (ctx, i) => {
     let q = ctx.db.from("materials")
@@ -159,6 +159,7 @@ defineQuery({
       .eq("brewery_id", ctx.breweryId).order("name");
     if (!i.includeInactive) q = q.eq("active", true);
     if (i.q) q = q.regexIMatch("name", escapeRegex(i.q));
+    if (i.category) q = q.eq("category", i.category);
     return unwrap(q);
   },
 });

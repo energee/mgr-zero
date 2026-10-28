@@ -1,9 +1,9 @@
-// Inline price editing. Blank edits restore the saved amount; only the
-// explicit Clear confirmation removes a price. Feedback survives refreshes.
+// Inline price editing: leaving a cell saves its amount, and leaving it empty
+// clears a saved price (#1516). Feedback survives refreshes.
 "use client";
 
 import { useRef, useState } from "react";
-import { PriceCellClear, PriceCellInput } from "@/components/mgr/views/price-groups";
+import { PriceCellInput } from "@/components/mgr/views/price-groups";
 import { cellCommit } from "@/lib/mgr/price-groups-view";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { dollarsInput } from "@/lib/mgr/money";
@@ -55,9 +55,7 @@ export function PriceCellForm({
       setStatus(null);
       action.setError("Enter a non-negative price with at most two decimal places, like 12.50. Exponents are not accepted.");
     } else if (pending.kind === "clear") {
-      setDollars(persisted);
-      action.setError(null);
-      setStatus("Price unchanged. Use Clear and confirm to remove it.");
+      await save("clear_channel_price", ids, "");
     } else if (pending.kind === "save") {
       await save("set_channel_price", { ...ids, unitPriceCents: pending.cents }, dollarsInput(pending.cents));
     }
@@ -66,12 +64,6 @@ export function PriceCellForm({
   return (
     <PriceCellInput label={`${groupName} · ${formatName} on ${channelName}`} value={dollars}
       onChange={text => { setDollars(text); setStatus(null); action.setError(null); }} onCommit={commit}
-      disabled={action.busy || action.blocked} error={action.error} status={status}>
-      {persisted !== "" && (
-        <PriceCellClear groupName={groupName} formatName={formatName} channelName={channelName}
-          busy={action.busy} reason={action.blocked && !action.busy ? "Resolve the saved request before clearing this price." : null} error={action.error}
-          onDelete={() => save("clear_channel_price", ids, "")} />
-      )}
-    </PriceCellInput>
+      disabled={action.busy || action.blocked} error={action.error} status={status} />
   );
 }

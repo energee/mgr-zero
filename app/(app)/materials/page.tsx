@@ -2,14 +2,15 @@
 // (list_materials) with on hand summed across bins (get_material_on_hand).
 // Each row's Edit is material-form.tsx → upsert_material; its Count is
 // count-form.tsx → record_material_count at one bin. ?q= narrows list_materials
-// by name, as Catalog's search does.
+// by name, as Catalog's search does, and ?category= by type (the Type pick).
 import { z } from "zod";
 import { MaterialsOnHandView } from "@/components/mgr/views/materials-on-hand";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { canRun } from "@/lib/commands/registry";
-import { toMaterialsOnHandViewProps } from "@/lib/mgr/materials-on-hand-view";
+import { toMaterialsOnHandViewProps, toMaterialsScopes } from "@/lib/mgr/materials-on-hand-view";
+import { MATERIAL_CATEGORIES } from "@/lib/mgr/enums";
 import "@/lib/commands/all";
 import { MaterialForm, type Material } from "./material-form";
 import { CountForm } from "./count-form";
@@ -26,14 +27,15 @@ type Bin = { id: string; location_id: string; name: string };
 
 const materialsParams = z.object({
   q: z.string().trim().max(100).catch(""),
+  category: z.enum(["", ...MATERIAL_CATEGORIES]).catch(""),
 });
 
 export default async function MaterialsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const { params } = listParams(materialsParams, await searchParams);
+  const { params, queryWith, hrefWith } = listParams(materialsParams, await searchParams);
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [materials, onHand, vendors, locations, bins] = (await Promise.all([
-    runCommand("list_materials", { includeInactive: true, q: params.q }, ctx), runCommand("get_material_on_hand", {}, ctx),
+    runCommand("list_materials", { includeInactive: true, q: params.q, category: params.category || undefined }, ctx), runCommand("get_material_on_hand", {}, ctx),
     runCommand("list_vendors", {}, ctx), runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx),
   ])) as [Material[], OnHand[], Vendor[], Location[], Bin[]];
   const onHandBy = Map.groupBy(onHand, (o) => o.material_id);
@@ -49,9 +51,12 @@ export default async function MaterialsPage({ searchParams }: { searchParams: Pr
           title: m.name,
           detail: `${m.category} · ${m.base_uom} · ${total(m.id).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${m.base_uom} on hand${m.lot_tracked ? " · lot-tracked" : ""}${m.active ? "" : " · inactive"}`,
         })),
-        filtered: Boolean(params.q),
+        filtered: Boolean(params.q || params.category),
       })}
-      controls={materials.length || params.q ? <ListControls search={{ label: "Search materials", value: params.q, keep: {} }} /> : undefined}
+      controls={materials.length || params.q || params.category ? <ListControls
+        // The search form resubmits only q, so it carries the type along.
+        search={{ label: "Search materials", value: params.q, keep: Object.fromEntries(queryWith({ q: "" })) }}
+        scopes={toMaterialsScopes({ category: params.category, href: patch => hrefWith("/materials", patch) })} /> : undefined}
       createAction={<MaterialForm vendors={vendors} />}
       rowEdit={(row) => <MaterialForm material={materials.find((m) => m.id === row.key)!} vendors={vendors} />}
       rowCount={(row) => {

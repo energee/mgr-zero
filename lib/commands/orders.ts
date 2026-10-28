@@ -412,12 +412,19 @@ async function invoicePushFacts(ctx: Ctx, invoiceIds: string[]) {
 }
 
 defineQuery({
-  name: "list_invoices", description: "Invoices and credit memos with current total plus frozen local subtotal and the sum of payments recorded in MGR, newest first",
+  name: "list_invoices", description: "Invoices and credit memos with current total plus frozen local subtotal and the sum of payments recorded in MGR, newest first; optionally only unpaid invoices",
   roles: [...readRoles],
-  input: z.object({ customerId: z.string().uuid().optional(), ...historyInput }),
+  input: z.object({
+    customerId: z.string().uuid().optional(),
+    status: z.enum(["unpaid"]).optional().describe("unpaid: invoices still owing money — not written off, voided or deleted in QuickBooks, and either a positive QuickBooks balance or, with none, not marked paid"),
+    ...historyInput,
+  }),
   handler: async (ctx, i) => {
     let q = ctx.db.from("invoices").select("*, customers(name)").eq("brewery_id", ctx.breweryId).limit(i.limit + 1);
     if (i.customerId) q = q.eq("customer_id", i.customerId);
+    // invoiceCurrentState's "unpaid", less a QuickBooks balance of zero or below (settled or a credit).
+    if (i.status === "unpaid") q = q.eq("kind", "invoice").is("written_off_at", null).eq("qbo_remote_state", "live")
+      .or("qbo_balance_cents.gt.0,and(qbo_balance_cents.is.null,paid_at.is.null)");
     const page = historyResult((await unwrap(newestFirst(q, i.cursor))) as (HistoryRow & QboInvoiceIdentity & { qbo_total_cents: number | null })[], i.limit);
     const invoices = page.rows;
     const ids = invoices.map(inv => inv.id);

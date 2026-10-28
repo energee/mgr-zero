@@ -63,6 +63,8 @@ describe("Price groups view", () => {
       ],
     });
     expect(model.formats).toEqual(["½ Keg", "14 oz pour"]);
+    // The heading says a pour column is a pour, so a keg and a pour of one name differ (#1516).
+    expect(model.headers).toEqual(["½ Keg", "Pour · 14 oz pour"]);
     expect(model.channel?.rows[0]?.formatIds).toEqual(["half", "p1"]);
     expect(model.channel?.rows[0]?.cells[1]).toBe("7.00");
     expect(model.channel?.rows[1]?.formatIds).toEqual(["half", "p2"]);
@@ -86,8 +88,8 @@ describe("Price groups view", () => {
     expect(html).toContain('aria-label="2 · case · 24×16oz on Wholesale"');
     expect(html).toMatch(/placeholder="—"/);
     expect(html).not.toMatch(/not priced/);
-    const pricedCells = toPriceGroupsViewProps(pricingGrid).channel!.rows.flatMap(row => row.cells).filter(value => value !== null);
-    expect(html.match(/aria-label="Clear price"/g)).toHaveLength(pricedCells.length);
+    // Emptying a field clears it; no cell carries its own Clear button (#1516).
+    expect(html).not.toContain("Clear");
   });
 
   it("offers to add a missing pour where a group has none of that column's name", () => {
@@ -97,6 +99,7 @@ describe("Price groups view", () => {
       formats: [{ id: "p1", name: "Half", basis: "poured", price_group_id: pg1, ounces: 9 }],
     }) }));
     expect(html.match(/\+ add/g)).toHaveLength(2);
+    expect(html).toContain(">Pour · Half<");
     expect(html).toMatch(/Half pour to 2/);
     expect(html).toMatch(/Half pour to 3/);
   });
@@ -148,7 +151,7 @@ describe("Price groups view", () => {
     expect(cellCommit("7.00", text)).toEqual({ kind: "invalid" });
   });
 
-  it.each(["Saving…", "Saved", "Price unchanged. Use Clear and confirm to remove it."])("associates %s with its shared price input", status => {
+  it.each(["Saving…", "Saved"])("associates %s with its shared price input", status => {
     const html = htmlOf(createElement(PriceCellInput, { label: "Core · Pint on Taproom", value: "7.00", status }));
     const feedbackId = html.match(/aria-describedby="([^"]+)"/)?.[1];
     expect(feedbackId).toBeTruthy();
