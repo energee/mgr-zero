@@ -2344,7 +2344,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["before books", "the period starts before the books-opened date · no report, Settings holds the date"], ["sales", "no Open Settings button, which would land on No access · asks an admin to change the date", 1]],
     spec: "MGR reports only from the books-opened date on, so a period that starts earlier has nothing to generate. The page names that date instead of failing. Drawn as an admin, who gets Open Settings; Settings is admin-only, so Sales is asked to have an admin change the date instead. A filed period stays readable after a basis correction (Filed period needs amendment).",
-    body: <PeriodBeforeBooksView title="October 2026" state={{ ...beforeBooksState("October 2026", "2026-10-15", true), action: { label: "Open Settings" } }} />,
+    body: <PeriodBeforeBooksView title="October 2026" state={{ ...beforeBooksState("October 2026", "2026-10-15", true, "2026-10-20"), action: { label: "Open Settings" } }} />,
   },
   {
     step: 7,

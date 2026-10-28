@@ -55,12 +55,18 @@ export function LotTraceView({
 }
 
 
-/** Shared recorded recipients; trace screens do not draw a second shipment/customer block. */
+/** A live value links to its record; an inventory value (no href) is plain text. */
+const linked = (text: string, href?: string) => href ? <Link href={href} className="underline">{text}</Link> : text;
+
+/** Shared recorded recipients, one labeled field per fact; trace screens do not draw a second shipment/customer block. */
 export function LotRecipients({ recipients, empty }: { recipients: LotTraceRecipientView[]; empty?: string }) {
-  return recipients.length ? recipients.map(recipient => <div key={recipient.id} className="flex flex-col gap-2 border-b py-3">
-    {recipient.orderHref ? <Link href={recipient.orderHref} className="underline">Order {recipient.orderNo}</Link> : <p>Order {recipient.orderNo}</p>}
-    {recipient.customer && (recipient.customer.href ? <Link href={recipient.customer.href} className="underline">{recipient.customer.name}</Link> : <p>{recipient.customer.name}</p>)}
-    {recipient.shipTo && <p>{recipient.shipTo}</p>}
-    {recipient.shipments.map(shipment => <div key={shipment.id}><p>{shipment.label}</p>{shipment.invoices.map(invoice => invoice.href ? <Link key={invoice.id} href={invoice.href} className="underline">Invoice {invoice.number}</Link> : <p key={invoice.id}>Invoice {invoice.number}</p>)}</div>)}
+  return recipients.length ? recipients.map(recipient => <div key={recipient.id} className="border-b py-3">
+    {E.fld("Order", linked(recipient.orderNo, recipient.orderHref))}
+    {recipient.customer && E.fld("Customer", linked(recipient.customer.name, recipient.customer.href))}
+    {recipient.shipTo && E.fld("Ship to", recipient.shipTo)}
+    {recipient.shipments.map(shipment => <Fragment key={shipment.id}>
+      {E.fld("Shipment", shipment.label)}
+      {shipment.invoices.map(invoice => <Fragment key={invoice.id}>{E.fld("Invoice", linked(invoice.number, invoice.href))}</Fragment>)}
+    </Fragment>)}
   </div>) : empty ? E.blank(empty) : null;
 }
