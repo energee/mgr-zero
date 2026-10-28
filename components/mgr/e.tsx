@@ -568,9 +568,9 @@ export const E = {
     </Field>
   ),
   /** A search box: the one input whose placeholder is its whole label. A live
-   *  list passes `name` and `defaultValue` and wraps it in a GET form
-   *  (components/mgr/list-controls.tsx); a drawing passes neither. */
-  search: (t = "Search", controls?: { name: string; defaultValue: string }) => <Input type="search" placeholder={t} aria-label={t} {...controls} />,
+   *  list passes `name`, `defaultValue` and `maxLength` and wraps it in a GET form
+   *  (components/mgr/list-controls.tsx); a drawing passes none. */
+  search: (t = "Search", controls?: { name: string; defaultValue: string; maxLength: number }) => <Input type="search" placeholder={t} aria-label={t} {...controls} />,
   stq: (v: number, label = "Quantity", controls?: FieldControls & { value: string }) => <StepQuantity label={label} defaultValue={String(v)} min={controls ? controls.min : 0} step={controls ? controls.step : 1} {...controls} required={controls ? controls.required !== false : false} />,
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
   /** A row that opens something. `href` makes the whole row the link, as E.act

@@ -81,6 +81,12 @@ describe("Settings save readiness (#1316)", () => {
     expect(people).toMatch(/<a[^>]*href="\/settings\/channels"[^>]*>[\s\S]*?Sale channels/);
   });
 
+  it("captions Water profiles without a source or target role (#1205)", () => {
+    const html = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo, hrefs: {} }));
+    expect(html).toContain("Manage water profiles");
+    expect(html).not.toMatch(/source and target/i);
+  });
+
   it("blocks pristine and pending brewery saves at the live adapter", () => {
     action.run.mockReset();
     const live = SettingsForm({ brewery });
