@@ -6,6 +6,7 @@ import { formatDate } from "@/lib/date-format";
 import { RegistryDate, RegistryInput, RegistrySelect } from "@/components/mgr/views/registry-fields";
 import { approvalNumberError, approvalNumberLabel, colaUrl, type BrandApprovalViewModel } from "@/lib/mgr/brand-approval-view";
 import type { ColaRecord } from "@/lib/ttb/colas";
+import { Button } from "@/components/ui/button";
 import { FieldDescription } from "@/components/ui/field";
 import { ColaLabelChoices } from "@/components/mgr/views/cola-label-choices";
 import { ColaLabelImageView } from "@/components/mgr/views/cola-label-image";
@@ -82,7 +83,10 @@ export function BrandApprovalView({ model, controls = {}, messages, footer, imag
       </>}
       <RegistryDate label="Date approved · optional" value={model.approvedOn ?? ""} onChange={controls.approvedOn} />
       {messages}
-      {footer !== undefined ? footer : E.submit("Save approval", { reason: numberError })}
+      {footer !== undefined ? footer : E.pin(<>
+        <Button type="button" variant="outline">Cancel</Button>
+        {E.submit("Save approval", { reason: numberError })}
+      </>)}
     </fieldset>
   );
 }

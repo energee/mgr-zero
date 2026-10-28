@@ -35,22 +35,21 @@ describe("shippedNav", () => {
 
   it("keeps the planned entries in the manifest for the docs and the inventory", () => {
     const all = flatten(STAFF_NAV).map((i) => i.label);
-    for (const label of ["Weekly count", "Tap board", "Cellar", "Materials on hand", "Keg fleet", "Batches", "Packaging", "Purchase orders", "Deliveries", "Menu", "Recipes", "Compliance", "Planning", "Import"]) {
+    for (const label of ["Weekly count", "Tap board", "Cellar", "Materials on hand", "Keg fleet", "Batches", "Packaging", "Purchase orders", "Deliveries", "Menu", "Recipes", "Compliance", "Planning"]) {
       expect.soft(all).toContain(label);
     }
   });
 
   it("drops a group whose every child is planned or hidden from the role", () => {
     expect(navFor(shippedNav(STAFF_NAV), ["brewer"]).map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
-    // Warehouse now keeps More: Units is a personal display preference every
-    // staff role may set (set_my_gravity_unit admits all four), so it is the
-    // one child of that group warehouse can see. The group's own href
-    // (/invoices) stays openable for warehouse — list_invoices admits it — so
-    // the phone tab still lands somewhere real.
+    // Warehouse keeps More for Menu, Vendors and Planning. Chat and the gravity
+    // unit moved to the Me sheet, so taproom, whose More held only those, has
+    // no More tab (#1513).
     expect(navFor(shippedNav(STAFF_NAV), ["warehouse"]).map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
     expect(navFor(shippedNav(STAFF_NAV), ["warehouse"]).find((t) => t.label === "More")!.children!.map((c) => c.label))
-      .toEqual(["Menu", "Vendors", "Planning", "Chat", "Units"]);
+      .toEqual(["Menu", "Vendors", "Planning"]);
+    expect(navFor(shippedNav(STAFF_NAV), ["taproom"]).map((t) => t.label)).toEqual(["Today", "Beer"]);
     expect(navFor(shippedNav(STAFF_NAV), ["admin"]).find((t) => t.label === "More")!.children!.map((c) => c.label))
-      .toEqual(["Invoices", "Catalog", "Menu", "Customers", "Price groups", "Recipes", "Vendors", "Compliance", "Planning", "Import", "Settings", "Chat", "Sale channels", "Locations", "Units"]);
+      .toEqual(["Invoices", "Catalog", "Menu", "Customers", "Price groups", "Recipes", "Vendors", "Compliance", "Planning", "Settings"]);
   });
 });

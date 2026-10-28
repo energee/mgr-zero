@@ -216,7 +216,6 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Confirm delivery", file: "app/(app)/work/deliveries/[id]/page.tsx" },
   { name: "Sale channels", file: "app/(app)/settings/channels/page.tsx" },
   { name: "Channel", file: "app/(app)/settings/channels/page.tsx" },
-  { name: "Units", file: "app/(app)/settings/units/page.tsx" },
   { name: "Price groups", file: "app/(app)/pricing/page.tsx" },
   { name: "Price group", file: "app/(app)/pricing/page.tsx" },
 ];

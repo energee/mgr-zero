@@ -41,7 +41,7 @@ describe("catalog commands", () => {
       .rejects.toMatchObject({ status: 409, code: "conflict" }); // #422: a readable conflict, not a 500
     // a second location with the same name is a conflict, not a 500 "database error" (#422)
     await expect(runCommand("create_location", { name: "Command Warehouse", uses: ["warehouse"] }, adminCtx))
-      .rejects.toMatchObject({ status: 409, code: "conflict", message: "That already exists. Use a different name or value." });
+      .rejects.toMatchObject({ status: 409, code: "conflict", message: "That name is already used. Choose a different name.", issues: [{ path: ["name"], code: "duplicate" }] });
     // a poured format is never a sku
     const group = await runCommand("upsert_price_group", { name: `g-${crypto.randomUUID().slice(0, 8)}`, position: 99 }, salesCtx) as { id: string };
     const pour = await runCommand("upsert_format", { name: "pint", basis: "poured", priceGroupId: group.id, ounces: 16 }, salesCtx) as { id: string };

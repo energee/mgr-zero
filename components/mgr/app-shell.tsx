@@ -49,6 +49,8 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
   return (
     <TooltipProvider>
     <SidebarProvider defaultOpen={sidebarOpen} className="h-dvh min-h-0 print:h-auto">
+      {/* The first Tab stop, so keyboard users jump past every sidebar link. It acts in place, so the screen explorer leaves it alone. */}
+      <a href="#main" data-preview-action className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow-md">Skip to main content</a>
       <Sidebar collapsible="icon">
         <SidebarHeader className="h-12 justify-center px-4 text-sm font-medium">{brandMark}</SidebarHeader>
         <SidebarContent>
@@ -90,7 +92,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
           </SidebarGroup>
         </SidebarContent>
       </Sidebar>
-      <SidebarInset className="h-full min-h-0 min-w-0 overflow-hidden print:h-auto print:overflow-visible">
+      <SidebarInset id="main" tabIndex={-1} className="h-full min-h-0 min-w-0 overflow-hidden outline-none print:h-auto print:overflow-visible">
         <header className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b px-2 py-2 md:h-12 md:py-0">
           <div className="flex min-w-0 flex-col items-start gap-1 text-sm font-medium md:flex-row md:items-center">
             {composer && <span className="max-w-48 truncate text-xs text-muted-foreground md:hidden">{brandMark}</span>}
