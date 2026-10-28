@@ -100,16 +100,20 @@ describe("get_today (registered reader)", () => {
     });
   });
 
-  it("uses safe labels and MGR hrefs, never customer names", async () => {
+  it("keeps customer names out of safe labels and chat; Today alone gets the name (#1512)", async () => {
     const id = await createOrder("2026-09-06", true);
     const item = (await today(sales, "2026-09-06T12:00:00Z")).find((i) => i.subjectId === id)!;
     expect(item.safeLabel).toMatch(/^ORD-\d{4,}$/);
+    expect(item.customerName).toBe("Secret Bar LLC");
+    expect(JSON.stringify({ ...item, customerName: null })).not.toMatch(/Secret Bar/);
+    // The chat scan feeds Slack payloads: it never carries the customer.
+    const scanned = (await sql.query("select safe_label, customer_name from public.scan_chat_today_candidates($1, $2) where subject_id = $3", [b.id, "2026-09-06T12:00:00Z", id])).rows;
+    expect(scanned).toEqual([{ safe_label: item.safeLabel, customer_name: null }]);
     // Today opens the page that does the work: Review and confirm (#1503).
     expect(item.href).toBe(`/orders/${id}/confirm`);
     expect(item.subjectType).toBe("order");
     expect(item.recipientRoles).toEqual(["admin", "sales"]);
     expect(item.assignedUserId).toBeNull();
-    expect(JSON.stringify(item)).not.toMatch(/Secret Bar/);
   });
 
   it("labels order numbers past four digits in full, like docNo (#474)", async () => {

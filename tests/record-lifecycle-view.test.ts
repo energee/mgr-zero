@@ -42,16 +42,24 @@ describe("record lifecycle availability (#1311)", () => {
     expect(getCommandDefinition("delete_tap_interval")).toBeUndefined();
   });
 
-  it.each(["Brand", "Water profiles", "Locations"])("%s explains unsupported lifecycle actions without a fake removal control", name => {
+  // The owner kept these notes (#1311) and cut each to one sentence (#1512, #1518).
+  const lifecycleNote = (html: string, pattern: RegExp) =>
+    (html.match(/<[^>]*role="note"[^>]*>[\s\S]*?<\/div><\/div>/g) ?? []).map(note => note.replace(/<[^>]+>/g, "").trim()).find(note => pattern.test(note));
+
+  it.each(["Brand", "Water profiles", "Locations"])("%s explains unsupported lifecycle actions in one sentence, without a fake removal control", name => {
     const html = screenHtml(name);
-    const notes = html.match(/role="note"[\s\S]*?<\/div><\/div>/g)?.join(" ") ?? "";
-    expect(notes).toMatch(/cannot currently be deleted or archived/);
+    expect(lifecycleNote(html, /cannot be deleted or archived/)).toMatch(/^[^.]+\.$/);
     expect(html).not.toMatch(/<button[^>]*>\s*(Delete|Archive)\s*<\/button>/);
   });
 
-  it("explains the history boundary beside closed tap entries", () => {
+  it("says in one sentence that a vendor is deactivated, not deleted", () => {
+    expect(lifecycleNote(screenHtml("Vendor"), /cannot be deleted/)).toMatch(/^[^.]+\.$/);
+  });
+
+  it("explains the history boundary beside closed tap entries in one sentence", () => {
     const html = screenHtml("Tap board");
     expect(html).toMatch(/Recent history[\s\S]*role="note"[\s\S]*cannot be edited or deleted/);
+    expect(lifecycleNote(html, /cannot be edited or deleted/)).toMatch(/^[^.]+\.$/);
     expect(html).not.toMatch(/<button[^>]*>\s*(Delete|Archive)\s*<\/button>/);
   });
 

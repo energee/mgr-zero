@@ -140,7 +140,7 @@ function todayRows(s: TodaySnapshot): TodayViewModel {
       const pastDay = Boolean(it.dueAt && !timed && breweryDate(s.timeZone!, new Date(it.dueAt)) < today!);
       return {
         key: `${it.reason}:${it.subjectId}`,
-        title: it.safeLabel,
+        title: it.customerName ? `${it.safeLabel} · ${it.customerName}` : it.safeLabel,
         detail: timed ? `${it.detail} · ${dueText(timed, s.timeZone!, now)}` : pastDay ? `${it.detail} · overdue` : it.detail,
         ...(it.dueAt ? { dueAt: it.dueAt } : {}),
         verb,

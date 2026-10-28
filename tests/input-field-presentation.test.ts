@@ -55,7 +55,7 @@ it("renders invite email corrections instead of native validation tooltips", () 
 });
 
 it("associates brewery phone help and errors with the field", () => {
-  const initial = toBrewerySettingsValues({ name: "Brewery", timezone: "America/New_York", ttb_registry_no: null, pa_license_no: null, customer_phone: "", fermentation_reading_due_hours: 24, books_opened_on: null, one_way_keg_fee_cents: 0, days_to_package: 14 });
+  const initial = toBrewerySettingsValues({ name: "Brewery", timezone: "America/New_York", ttb_registry_no: null, customer_phone: "", fermentation_reading_due_hours: 24, books_opened_on: null, one_way_keg_fee_cents: 0, days_to_package: 14 });
   for (const fieldErrors of [{}, { phone: "Use a phone number." }]) {
     const html = renderToStaticMarkup(createElement(BrewerySettingsFormView, { initial, fieldErrors }));
     const phone = /<input\b[^>]*type="tel"[^>]*>/.exec(html)?.[0];
@@ -73,7 +73,7 @@ it("associates brewery phone help and errors with the field", () => {
 });
 
 it("maps brewery customerPhone failures to the visible phone field", () => {
-  const initial = toBrewerySettingsValues({ name: "Brewery", timezone: "America/New_York", ttb_registry_no: null, pa_license_no: null, customer_phone: "abc", fermentation_reading_due_hours: 24, books_opened_on: null, one_way_keg_fee_cents: 0, days_to_package: 14 });
+  const initial = toBrewerySettingsValues({ name: "Brewery", timezone: "America/New_York", ttb_registry_no: null, customer_phone: "abc", fermentation_reading_due_hours: 24, books_opened_on: null, one_way_keg_fee_cents: 0, days_to_package: 14 });
   const html = renderToStaticMarkup(createElement(BrewerySettingsFormView, { initial, fieldErrors: { phone: "Use a phone number." } }));
   expectFieldError(html, "Use a phone number.");
   expect(html).toContain("Customer-facing phone");

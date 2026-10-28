@@ -3,7 +3,6 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 function subscribeToForegroundDialogs(onChange: () => void) {
@@ -22,7 +21,9 @@ function subscribeToFocus(onChange: () => void) {
   return () => document.removeEventListener("focusin", onChange);
 }
 
-/** Shared staff-shell entry point and overlay; live and inventory supply the conversation. */
+/** Shared staff-shell entry point and overlay; live and inventory supply the conversation.
+ *  One Ask MGR button opens and closes the panel; Back to page or Escape also
+ *  closes it, and focus returns to Ask MGR (#1512). */
 export function ComposerPanelView({ children, open, onOpenChange, container }: {
   children: ReactNode;
   open?: boolean;
@@ -35,7 +36,7 @@ export function ComposerPanelView({ children, open, onOpenChange, container }: {
   const [internalOpen, setInternalOpen] = useState(false);
   const chatOpen = open ?? internalOpen;
   const panelId = useId();
-  const navigateRef = useRef<HTMLButtonElement>(null);
+  const askRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   // Enter the portal while non-modal so Base UI restores its tab stops before trapping focus.
   const panelHasFocus = useSyncExternalStore(subscribeToFocus, () => panelRef.current?.contains(document.activeElement) ?? false, () => false);
@@ -60,17 +61,14 @@ export function ComposerPanelView({ children, open, onOpenChange, container }: {
       }
       changeOpen(nextOpen);
     }} modal={isMobile && !foregroundDialogOpen && panelHasFocus} disablePointerDismissal>
-      <ToggleGroup type="single" value={chatOpen ? "chat" : "navigate"} onValueChange={(value) => { if (value) changeOpen(value === "chat"); }} variant="outline" size="sm" spacing={0} aria-label="Workspace mode">
-        <ToggleGroupItem ref={navigateRef} value="navigate">Navigate</ToggleGroupItem>
-        <ToggleGroupItem value="chat" aria-controls={panelId} aria-expanded={chatOpen} aria-keyshortcuts="Meta+K Control+K" title="Ask MGR (⌘K / Ctrl+K)">Ask MGR</ToggleGroupItem>
-      </ToggleGroup>
+      <Button ref={askRef} type="button" variant={chatOpen ? "secondary" : "outline"} size="sm" onClick={() => changeOpen(!chatOpen)} aria-controls={panelId} aria-expanded={chatOpen} aria-keyshortcuts="Meta+K Control+K" title="Ask MGR (⌘K / Ctrl+K)">Ask MGR</Button>
       <Dialog.Portal container={container} keepMounted>
         <Dialog.Popup
           id={panelId}
           ref={panelRef}
           data-mgr-composer=""
           initialFocus={foregroundDialogOpen ? false : panelRef}
-          finalFocus={foregroundDialogOpen ? false : navigateRef}
+          finalFocus={foregroundDialogOpen ? false : askRef}
           className="fixed inset-y-0 right-0 flex w-full max-w-full min-h-0 flex-col overflow-hidden border-l bg-popover text-sm text-popover-foreground shadow-lg outline-none data-closed:hidden md:top-12 md:w-[min(32rem,calc(100vw-12rem))]"
         >
           <div className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-2">

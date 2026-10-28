@@ -20,7 +20,7 @@ vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => acti
 
 const brewery = {
   name: settingsDemo.name, timezone: settingsDemo.timezone, ttb_registry_no: settingsDemo.ttb,
-  pa_license_no: settingsDemo.paLicense, customer_phone: settingsDemo.phone,
+  customer_phone: settingsDemo.phone,
   fermentation_reading_due_hours: 24, days_to_package: 14, books_opened_on: null, one_way_keg_fee_cents: 1000,
 };
 
@@ -104,6 +104,16 @@ describe("Settings save readiness (#1316)", () => {
   });
 });
 
+
+describe("one license home (#1517)", () => {
+  it("Settings has no PA license field: state licenses live on /compliance/licenses", () => {
+    const html = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo }));
+    expect(html).toContain("TTB registry number");
+    expect(html).not.toContain("PA license");
+    expect(Object.keys(toBrewerySettingsValues(brewery))).not.toContain("pa");
+    expect(getCommandDefinition("update_brewery")?.description).not.toMatch(/PA license/);
+  });
+});
 
 describe("packaging operating defaults", () => {
 

@@ -180,7 +180,8 @@ export const TAPS: [string | RegExp, string][] = [
 export const INERT: (string | RegExp)[] = [
   "Export state transactions",
   "Download template",
-  "Open Ask MGR",
+  // Opens the chat panel over the page in place (#1512).
+  "Ask MGR",
   "Guide",
   "Show password",
   "Hide password",

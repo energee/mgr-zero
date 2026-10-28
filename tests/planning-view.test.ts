@@ -5,11 +5,17 @@ import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { PlanningView } from "../components/mgr/views/planning";
 import { planningDemo } from "../lib/mgr/fixtures/planning";
-import { toPlanningViewProps } from "../lib/mgr/planning-view";
+import { toPlanningViewProps, type PlanningViewModel } from "../lib/mgr/planning-view";
 import { activeTab, STAFF_NAV } from "../lib/mgr/nav";
 import type { StaffRole } from "../lib/commands/registry";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
+const rows = (model: PlanningViewModel) => model.groups.flatMap((group) => group.rows);
+const gap = {
+  material_id: "ends", material_name: "Ends", base_uom: "each", purchase_uom: "case",
+  required: 10, projected: 0, on_hand: 0, on_order: 0, short: 10, purchase_units_short: 1,
+  needed_by: "2026-11-02", vendor_id: "can-co", vendor_name: "Can Co", lead_time_days: 7, buy_by: "2026-10-26", out_of_reach: false,
+};
 
 describe("Planning view", () => {
   it("owns the inventory drawing", () => {
@@ -26,8 +32,8 @@ describe("Planning view", () => {
       needed_by: "2026-09-12", vendor_id: null, vendor_name: null, lead_time_days: null,
       buy_by: null, out_of_reach: false,
     }] });
-    expect(model.requirements[0]).toMatchObject({ title: "Ends", quantity: "1 case", warning: true });
-    expect(model.requirements[0].detail).not.toContain("projected");
+    expect(rows(model)[0]).toMatchObject({ title: "Ends", quantity: "1 case", warning: true });
+    expect(rows(model)[0].detail).not.toContain("projected");
     expect(model.horizon).toBeUndefined();
   });
 
@@ -38,12 +44,51 @@ describe("Planning view", () => {
       needed_by: "2026-10-30", vendor_id: "vendor", vendor_name: "Label supplier", lead_time_days: 7,
       buy_by: "2026-10-23", out_of_reach: false,
     }] });
-    expect(model.requirements).toHaveLength(1);
-    expect(model.requirements[0]).toMatchObject({ key: "labels", quantity: "2 roll", warning: false });
-    expect(model.requirements[0].detail).toContain("need 960");
-    expect(model.requirements[0].detail).toContain("includes 480 projected");
-    expect(model.requirements[0].detail).toContain("needed by Oct 30, 2026");
-    expect(model.requirements[0].detail).toContain("buy by Oct 23, 2026");
+    expect(rows(model)).toHaveLength(1);
+    expect(rows(model)[0]).toMatchObject({ key: "labels", quantity: "2 roll", warning: false });
+    expect(rows(model)[0].detail).toContain("need 960");
+    expect(rows(model)[0].detail).toContain("includes 480 projected");
+    expect(rows(model)[0].detail).toContain("needed by Oct 30, 2026");
+    expect(rows(model)[0].detail).toContain("buy by Oct 23, 2026");
+  });
+
+  it("groups gaps by vendor, A to Z, with the rows that have no vendor last (#1516)", () => {
+    const model = toPlanningViewProps({ requirements: [
+      { ...gap, material_id: "hops", vendor_id: null, vendor_name: null, lead_time_days: null, buy_by: null },
+      { ...gap, material_id: "ends" },
+      { ...gap, material_id: "labels", vendor_id: "acme", vendor_name: "Acme Labels" },
+      { ...gap, material_id: "trays" },
+    ] });
+    expect(model.groups.map((group) => [group.vendor, group.rows.map((row) => row.key)])).toEqual([
+      ["Acme Labels", ["labels"]], ["Can Co", ["ends", "trays"]], [null, ["hops"]],
+    ]);
+    // The heading names the vendor, so a row does not repeat it.
+    expect(model.groups[1].rows[0].detail).not.toContain("Can Co");
+    expect(model.groups[1].rows[0].detail).toContain("7 day lead · buy by Oct 26, 2026");
+  });
+
+  it("a vendor's purchase order covers its rows still in reach; a vendorless group drafts nothing (#1516)", () => {
+    const model = toPlanningViewProps({ requirements: [
+      { ...gap, material_id: "ends" }, { ...gap, material_id: "late", out_of_reach: true },
+      { ...gap, material_id: "hops", vendor_id: null, vendor_name: null },
+    ] });
+    expect(model.groups.map((group) => group.draftIds)).toEqual([["ends"], []]);
+  });
+
+  it("offers Set vendor only on rows with no vendor, linking Materials for a role that can open it (#1516)", () => {
+    const requirements = [{ ...gap }, { ...gap, material_id: "hops", material_name: "Hop bags", vendor_id: null, vendor_name: null }];
+    const live = (roles: StaffRole[]) => toPlanningViewProps({ requirements, roles }).groups.flatMap((group) => group.rows.map((row) => row.setVendorHref));
+    expect(live(["brewer"])).toEqual([undefined, "/materials?q=Hop%20bags"]);
+    expect(live(["sales"])).toEqual([undefined, null]);
+    const html = htmlOf(createElement(PlanningView, { model: toPlanningViewProps({ requirements, roles: ["brewer"] }), groupAction: null }));
+    expect(html.match(/>Set vendor</g)).toHaveLength(1);
+    expect(html).toContain('href="/materials?q=Hop%20bags"');
+    expect(html).toMatch(/>Can Co<[\s\S]*Ends[\s\S]*>No vendor<[\s\S]*Hop bags/);
+  });
+
+  it("the inventory draws one Create purchase order per vendor group that can draft (#1516)", () => {
+    const html = htmlOf(createElement(PlanningView, { model: toPlanningViewProps({ requirements: [{ ...gap }, { ...gap, material_id: "hops", vendor_id: null, vendor_name: null }] }) }));
+    expect(html.match(/>Create purchase order</g)).toHaveLength(1);
   });
 
   it("the live route mounts PlanningView, slots DraftButton, and has no E tree", () => {
@@ -65,7 +110,7 @@ describe("Planning view", () => {
       { ...row, material_id: "today", needed_by: "2026-10-08" },
       { ...row, material_id: "undated", needed_by: null },
     ] });
-    expect(model.requirements.map((r) => [r.key, r.detail.startsWith("overdue · "), r.warning])).toEqual([
+    expect(rows(model).map((r) => [r.key, r.detail.startsWith("overdue · "), r.warning])).toEqual([
       ["late", true, true], ["today", false, false], ["undated", false, false],
     ]);
   });
@@ -102,7 +147,7 @@ describe("Planning view", () => {
       needed_by: null, vendor_id: "vendor", vendor_name: "Malt Co", lead_time_days: 7, buy_by: null, out_of_reach: false,
     };
     const model = toPlanningViewProps({ requirements: [covered] });
-    expect(model.requirements).toEqual([]);
+    expect(model.groups).toEqual([]);
     expect(model.empty?.title).toBe("No material shortages");
   });
 
@@ -122,7 +167,7 @@ describe("Planning view", () => {
   });
 
   it("the inventory draws an overdue gap through the adapter, so the marker has a frame (#1037)", () => {
-    const overdue = toPlanningViewProps(planningDemo).requirements.filter((r) => r.detail.startsWith("overdue · "));
+    const overdue = rows(toPlanningViewProps(planningDemo)).filter((r) => r.detail.startsWith("overdue · "));
     expect(overdue).toHaveLength(1);
     expect(overdue[0].warning).toBe(true);
   });

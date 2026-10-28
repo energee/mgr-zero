@@ -1,12 +1,13 @@
 // components/mgr/views/record-table.tsx — comparable records (Catalog's brands,
-// Formats, Finished goods, Batches, Orders, Invoices) drawn once for both surfaces: a
-// table from md up, and on the phone a list of records separated by rules,
-// each fact labeled by its column header. The first cell names the record and
-// is its one link; it covers each whole record, so no row repeats an Open
-// button. Without an href (the inventory) the name is an inert tap, the way
-// E.act draws one; an href of null (a live page withholding the link) draws
-// it as plain text. Other cells may hold any node, including their own links
-// and actions, which sit above the covering link. Headers sort the rows
+// Formats, Finished goods, Batches, Orders, Invoices) drawn once for both
+// surfaces: a table row per record from md up, and on the phone a compact
+// two-line card per record, separated by rules: the name, then its facts side
+// by side, each labeled by its column header (#1516). The first cell names the
+// record and is its one link; it covers each whole record, so no row repeats
+// an Open button. Without an href (the inventory) the name is an inert tap, the
+// way E.act draws one; an href of null (a live page withholding the link)
+// draws it as plain text. Other cells may hold any node, including their own
+// links and actions, which sit above the covering link. Headers sort the rows
 // (components/mgr/sort-head.tsx), and both surfaces draw the sorted order; the
 // last sort is remembered per browser.
 "use client";
@@ -130,15 +131,15 @@ export function RecordTable({ headers, align, rows: given, sortable = true }: {
               <ItemContent className="min-w-0">
                 <ItemTitle className="min-w-0 max-w-full line-clamp-none wrap-anywhere">{name(row)}</ItemTitle>
                 {row.note && <ItemDescription className="break-words">{row.note}</ItemDescription>}
-                <dl className="mt-1 grid gap-2 text-sm">
+                <dl className="flex flex-wrap gap-x-4 gap-y-0.5 text-sm">
                   {row.cells.slice(1).map((cell, i) => said(cell) && (
-                    // Every value starts at one left edge, numbers too. The label never
-                    // wraps and is at least 8.5rem; the value takes all but 9.5rem of the
-                    // line, so a label wider than the label column pushes its value onto
-                    // a full-width line of its own beneath it.
-                    <div key={i} className="flex flex-wrap gap-x-3 gap-y-1">
-                      <dt className="min-w-[8.5rem] whitespace-nowrap text-muted-foreground">{headers[i + 1]}</dt>
-                      <dd className={cn("min-w-0 grow basis-[calc(100%-9.5rem)] break-words", ABOVE_COVER)}>{cell}</dd>
+                    // A compact card (#1516): the facts flow side by side on one
+                    // line under the name, each label beside its value, and wrap
+                    // only when the line is full. A pair never splits its label
+                    // from its value.
+                    <div key={i} className="inline-flex min-w-0 max-w-full items-baseline gap-1">
+                      <dt className="whitespace-nowrap text-muted-foreground">{headers[i + 1]}</dt>
+                      <dd className={cn("min-w-0 break-words", ABOVE_COVER)}>{cell}</dd>
                     </div>
                   ))}
                 </dl>

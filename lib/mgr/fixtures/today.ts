@@ -15,7 +15,7 @@ const actions = (role: StaffRole): TodayAction[] => todayActions([role]).map(({ 
  *  "overdue" and attention dot (#993); the inventory row keeps no live href. */
 const OVERDUE_PICK: TodayItem = {
   reason: "pick_due", subjectType: "order", subjectId: "ord-0228", sourceVersion: "1",
-  safeLabel: "ORD-0228", detail: "pick due · ships Sep 2, 2026", dueAt: "2026-09-02T04:00:00Z",
+  safeLabel: "ORD-0228", customerName: "Hillside Tavern", detail: "pick due · ships Sep 2, 2026", dueAt: "2026-09-02T04:00:00Z",
   href: "/orders/ord-0228/pick", recipientRoles: ["warehouse"], assignedUserId: null,
 };
 const overduePick: TodayRowView = {

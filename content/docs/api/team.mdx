@@ -201,7 +201,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer
 
-The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, days to package, gravity unit, portal fulfillment warehouse, the books-opened date and the one-way keg fee
+The current brewery's basics: name, timezone, TTB registry number, customer-facing phone, reading-overdue hours, days to package, gravity unit, portal fulfillment warehouse, the books-opened date and the one-way keg fee
 
 Takes no input.
 
@@ -943,7 +943,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Edit the brewery's basics from Settings (admin): name, timezone, TTB registry number, PA license, the customer-facing phone the portal prints, and how many hours until a fermentation reading is overdue
+Edit the brewery's basics from Settings (admin): name, timezone, TTB registry number, the customer-facing phone the portal prints, and how many hours until a fermentation reading is overdue
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -951,7 +951,6 @@ Edit the brewery's basics from Settings (admin): name, timezone, TTB registry nu
 | `timezone` | string | yes |
 | `readingDueHours` | integer | yes |
 | `ttbRegistryNo` | string | no |
-| `paLicenseNo` | string | no |
 | `customerPhone` | string | no |
 
 ```bash

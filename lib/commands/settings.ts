@@ -52,27 +52,27 @@ defineCommand({
 
 const readingDueHours = z.number().int().min(1).max(168);
 const gatewayModel = z.string().trim().min(3).max(200).regex(MODEL_ID);
-const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, pa_license_no, customer_phone, fermentation_reading_due_hours, days_to_package, gravity_unit, portal_fulfillment_location_id, books_opened_on, one_way_keg_fee_cents";
+const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, customer_phone, fermentation_reading_due_hours, days_to_package, gravity_unit, portal_fulfillment_location_id, books_opened_on, one_way_keg_fee_cents";
 
 defineQuery({
   name: "get_brewery",
-  description: "The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, days to package, gravity unit, portal fulfillment warehouse, the books-opened date and the one-way keg fee",
+  description: "The current brewery's basics: name, timezone, TTB registry number, customer-facing phone, reading-overdue hours, days to package, gravity unit, portal fulfillment warehouse, the books-opened date and the one-way keg fee",
   input: z.object({}), roles: ["admin", "sales", "warehouse", "brewer"],
   handler: (ctx) => unwrap(ctx.db.from("breweries").select(BREWERY_COLUMNS).eq("id", ctx.breweryId).single()),
 });
 
 defineCommand({
   name: "update_brewery",
-  description: "Edit the brewery's basics from Settings (admin): name, timezone, TTB registry number, PA license, the customer-facing phone the portal prints, and how many hours until a fermentation reading is overdue",
+  description: "Edit the brewery's basics from Settings (admin): name, timezone, TTB registry number, the customer-facing phone the portal prints, and how many hours until a fermentation reading is overdue",
   roles: ["admin"],
   input: z.object({
     name: z.string().trim().min(1), timezone: z.string().trim().min(1),
-    ttbRegistryNo: z.string().trim().optional(), paLicenseNo: z.string().trim().optional(), customerPhone: phone.optional(),
+    ttbRegistryNo: z.string().trim().optional(), customerPhone: phone.optional(),
     readingDueHours,
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_brewery", {
     p_brewery: ctx.breweryId, p_name: i.name, p_timezone: i.timezone, p_ttb_registry_no: i.ttbRegistryNo || null,
-    p_pa_license_no: i.paLicenseNo || null, p_customer_phone: i.customerPhone || null, p_reading_due_hours: i.readingDueHours,
+    p_customer_phone: i.customerPhone || null, p_reading_due_hours: i.readingDueHours,
     p_request_id: execution.requestId,
   })),
 });

@@ -1,6 +1,6 @@
-// app/(app)/planning/draft-button.tsx — Planning's verb: one draft PO per
-// vendor the buyable gaps resolve to (draft_purchase_order_from_requirements).
-// The label says how many before it commits.
+// app/(app)/planning/draft-button.tsx — a Planning vendor group's verb: one
+// draft PO for that vendor's buyable gaps (draft_purchase_order_from_requirements,
+// which drafts one PO per resolved vendor; a group holds one vendor, #1516).
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 
-export function DraftButton({ materialIds, vendorCount }: { materialIds: string[]; vendorCount: number }) {
+export function DraftButton({ materialIds }: { materialIds: string[] }) {
   const { busy, error, run } = useCommandAction();
   const router = useRouter();
   if (materialIds.length === 0) return null;
@@ -16,7 +16,7 @@ export function DraftButton({ materialIds, vendorCount }: { materialIds: string[
     <div className="flex flex-col gap-2">
       <CommandFormMessage error={error} />
       <Button className="w-full md:w-fit" disabled={busy} onClick={() => run("draft_purchase_order_from_requirements", { materialIds }, () => router.push("/purchase-orders"))}>
-        Draft {vendorCount} purchase {vendorCount === 1 ? "order" : "orders"}
+        Create purchase order
       </Button>
     </div>
   );
