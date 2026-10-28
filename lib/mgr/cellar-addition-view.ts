@@ -3,7 +3,7 @@
 // adjunct against an open occupancy. Inventory renders a fixture, live renders
 // list_occupancies + list_materials + list_material_lots through the same view.
 import { occupancyIdentity, type TransferOccupancy } from "./cellar-transfer-view";
-import { isNumber } from "./quantity-input";
+import { isNumber, MATERIAL_QTY_MAX } from "./quantity-input";
 import { submitReason } from "./submit-reason";
 
 export type AdditionMaterial = { id: string; name: string; category: string; base_uom: string; lot_tracked: boolean };
@@ -19,7 +19,7 @@ export type CellarAdditionViewModel = {
 
 /** What the sheet will write, or the one thing it still needs (`need`, a
  *  submitReason item). The form's submit gate and the view read the same
- *  answer. `error` is set only when the quantity is more than the lot holds. */
+ *  answer. `error` marks a quantity above its storage limit or available lot. */
 export function additionPreview(m: CellarAdditionViewModel) {
   const occupancy = m.occupancies.find((o) => o.occupancy_id === m.occupancyId);
   const material = m.materials.find((x) => x.id === m.materialId);
@@ -27,6 +27,10 @@ export function additionPreview(m: CellarAdditionViewModel) {
   if (!occupancy) return { valid: false as const, need: "a tank" };
   if (!material) return { valid: false as const, need: "a material" };
   if (!isNumber(m.qty) || qty <= 0) return { valid: false as const, need: "a quantity above zero in decimal notation" };
+  if (qty > MATERIAL_QTY_MAX) {
+    const maximum = `${MATERIAL_QTY_MAX.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${material.base_uom}`;
+    return { valid: false as const, need: `a quantity no greater than ${maximum}`, error: `Enter a quantity no greater than ${maximum}` };
+  }
   const lot = (m.lotsByMaterial[m.materialId] ?? []).find((l) => l.lot_id === m.lotId);
   if (material.lot_tracked && !lot) return { valid: false as const, need: `a lot (${material.name} is lot-tracked)` };
   if (lot && qty > lot.qty) return { valid: false as const, need: `at most ${lot.qty} ${material.base_uom} of ${lot.lot_code}`, error: `Only ${lot.qty} ${material.base_uom} of ${lot.lot_code} on hand` };

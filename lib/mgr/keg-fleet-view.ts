@@ -4,6 +4,7 @@
 import { SIZE_LABEL } from "./keg-labels";
 import type { EmptyState } from "./empty-state";
 import type { KEG_EVENT_REASONS, KEG_POOL_KINDS, KEG_SIZES } from "./enums";
+import { centsMaxError } from "./money";
 import { isNumber, numberNotationError } from "./quantity-input";
 import { submitReason } from "./submit-reason";
 
@@ -22,8 +23,9 @@ export type KegEventReason = (typeof KEG_EVENT_REASONS)[number];
 export type KegPoolValue = { name: string; kind: KegPoolKind; vendorId: string; perFill: string; deposit: string; active: boolean };
 /** The Record keg event fields. */
 export type KegEventValue = { poolId: string; kegSize: KegSize; reason: KegEventReason; locationId: string; binId: string; customerId: string; qty: string; note: string };
-/** The pickers' options. `bins` are already the chosen location's bins. */
-export type KegEventOptions = { pools: KegOption[]; locations: KegOption[]; bins: KegOption[]; customers: KegOption[] };
+/** The pickers' options. `bins` are already the chosen location's bins. `onHand` is how many kegs of the chosen
+ *  pool and size the chosen bin holds; it is left out where that is not known (the inventory fixture). */
+export type KegEventOptions = { pools: KegOption[]; locations: KegOption[]; bins: KegOption[]; customers: KegOption[]; onHand?: number };
 
 export type KegFleetViewModel = {
   shortages?: string[];
@@ -65,8 +67,21 @@ export const mayHaveKegCustomer = (r: KegEventReason) => needsKegCustomer(r) || 
 export const withLocationBin = (prev: KegEventValue, next: KegEventValue, firstBin: (locationId: string) => string): KegEventValue =>
   next.locationId !== prev.locationId ? { ...next, binId: firstBin(next.locationId) } : next;
 
-/** Field errors also own readiness, so invalid typed values never enable submit. */
-export function kegEventFieldErrors(v: KegEventValue): Partial<Record<keyof KegEventValue, string>> {
+type KegBinStock = Pick<KegEventOptions, "bins" | "onHand">;
+/** A keg count is typed as plain digits, at least 1. */
+const isKegCount = (qty: string) => /^\d+$/.test(qty) && Number.isSafeInteger(Number(qty)) && Number(qty) > 0;
+/** Retired, shipped, and lost with no customer take kegs out of the chosen bin, so record_keg_event checks the bin holds them. */
+const takesFromBin = (v: KegEventValue) => v.reason === "retired" || v.reason === "shipped" || (v.reason === "lost" && !v.customerId);
+/** "at most 8 kegs in Cold" when a keg count leaving the bin is more than `onHand`; undefined otherwise, or when
+ *  `onHand` is not known. */
+function binLimit(v: KegEventValue, options?: KegBinStock): string | undefined {
+  if (options?.onHand === undefined || !takesFromBin(v) || !isKegCount(v.qty) || Number(v.qty) <= options.onHand) return undefined;
+  return `at most ${options.onHand} kegs in ${options.bins.find((b) => b.value === v.binId)?.label ?? "that bin"}`;
+}
+
+/** Field errors also own readiness, so invalid typed values never enable submit. With `options.onHand`, a count
+ *  leaving the bin is held to the kegs it holds, as record_keg_event refuses more. */
+export function kegEventFieldErrors(v: KegEventValue, options?: KegBinStock): Partial<Record<keyof KegEventValue, string>> {
   const errors: Partial<Record<keyof KegEventValue, string>> = {};
   if (!v.poolId) errors.poolId = "Choose a keg pool.";
   if (!v.locationId) errors.locationId = "Choose a location.";
@@ -74,28 +89,31 @@ export function kegEventFieldErrors(v: KegEventValue): Partial<Record<keyof KegE
   if (needsKegCustomer(v.reason) && !v.customerId) errors.customerId = "Choose a customer.";
   const notation = numberNotationError(v.qty);
   if (notation) errors.qty = notation;
-  else if (!/^\d+$/.test(v.qty) || !Number.isSafeInteger(Number(v.qty)) || Number(v.qty) <= 0) {
-    errors.qty = "Enter a whole number of kegs, at least 1.";
+  else if (!isKegCount(v.qty)) errors.qty = "Enter a whole number of kegs, at least 1.";
+  else {
+    const limit = binLimit(v, options);
+    if (limit) errors.qty = `Enter ${limit}.`;
   }
   return errors;
 }
 
 /** The same field errors also name what Record keg event still needs. */
-export function kegEventReason(v: KegEventValue): string | null {
-  const errors = kegEventFieldErrors(v);
+export function kegEventReason(v: KegEventValue, options?: KegBinStock): string | null {
+  const errors = kegEventFieldErrors(v, options);
   return submitReason([
     errors.poolId && "a keg pool", errors.locationId && "a location", errors.binId && "a bin",
-    errors.qty && "a whole keg count of at least 1 (no exponent notation)", errors.customerId && "a customer",
+    errors.qty && (binLimit(v, options) ?? "a whole keg count of at least 1 (no exponent notation)"), errors.customerId && "a customer",
   ].filter((need): need is string => Boolean(need)));
 }
 
-/** Optional money stays optional, but a filled value must be dollars and cents. */
+/** Optional money stays optional, but a filled value must be dollars and cents the int-cent column holds. */
 function kegMoneyError(value: string): string | undefined {
   if (value === "") return undefined;
   const notation = numberNotationError(value);
   if (notation) return notation;
   if (!isNumber(value) || Number(value) < 0) return "Enter an amount of zero or more.";
   if ((value.trim().split(".")[1]?.length ?? 0) > 2) return "Enter dollars and cents, with at most two decimal places.";
+  return centsMaxError(value, "an amount");
 }
 
 /** Add and Edit use the same money rules, including optional blank deposits. */

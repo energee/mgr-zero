@@ -1,4 +1,4 @@
-import { fromTicks, isNumber, toTicks } from "./quantity-input";
+import { fromTicks, isNumber, MATERIAL_QTY_MAX, toTicks } from "./quantity-input";
 import { materialSourceKey, restoreSources } from "./material-source";
 
 export type PackagingMaterial = { id: string; name: string; unit: string; lotTracked: boolean };
@@ -20,7 +20,7 @@ export function packagingActualsReady(rows: PackagingActualDraft[], materials: P
     return [row.used, row.loss, row.unused].every(value => {
       if (!isNumber(value)) return false;
       const quantity = Number(value);
-      return quantity >= 0 && quantity <= 9999999999.9999 && Number(quantity.toFixed(4)) === quantity
+      return quantity >= 0 && quantity <= MATERIAL_QTY_MAX && Number(quantity.toFixed(4)) === quantity
         && (material.unit !== "each" || Number.isInteger(quantity));
     });
   });
