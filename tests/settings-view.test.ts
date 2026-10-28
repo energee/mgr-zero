@@ -63,6 +63,18 @@ describe("Settings save readiness (#1316)", () => {
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Save brewery/);
   });
 
+  // #1500 owner decision: a blank TTB registry number warns but never blocks
+  // Save brewery; no number format until the owner names one.
+  it("warns under a blank TTB registry number without blocking Save brewery (#1500)", () => {
+    const warning = "COLA search and label retrieval need this number.";
+    const blank = renderToStaticMarkup(createElement(BrewerySettingsFormView, { initial: { ...initial, ttb: "" } }));
+    expect(blank).toContain(warning);
+    expect(blank).not.toMatch(/aria-invalid="true"[^>]*id="[^"]*-ttb"/);
+    expect(brewerySettingsReason({ ...initial, ttb: "", name: "Changed" }, initial)).toBeNull();
+    expect(brewerySettingsReason({ ...initial, ttb: "bad value!!", name: "Changed" }, initial)).toBeNull();
+    expect(renderToStaticMarkup(createElement(BrewerySettingsFormView, { initial }))).not.toContain(warning);
+  });
+
   it("refreshes untouched fields without dropping unsaved or uncertain edits", () => {
     const values = { ...initial, name: "Unsaved brewery" };
     const refreshed = { ...initial, hours: "48" };
@@ -75,6 +87,14 @@ describe("Settings save readiness (#1316)", () => {
     const html = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo }));
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Save brewery/);
     expect(html).toContain("Still needed: a change to brewery details.");
+  });
+
+  // #1509 owner decision: on a phone the integration links sat ~2,280 px down.
+  it("puts the Connections links above Brewery details (#1509)", () => {
+    const html = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo }));
+    expect(html.indexOf(">Connections<")).toBeGreaterThan(-1);
+    expect(html.indexOf(">Connections<")).toBeLessThan(html.indexOf(">Brewery details<"));
+    expect(html.indexOf(">Accounting<")).toBeLessThan(html.indexOf(">Brewery details<"));
   });
 
   it("links Sale channels from People and places", () => {

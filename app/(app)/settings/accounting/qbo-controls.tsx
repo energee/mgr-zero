@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
 import { QboConnectionView, QboDefaultsView, DisconnectQuickBooksView, QboSyncView } from "@/components/mgr/views/accounting";
-import { QboMappingView, QboMappingSheetView, type QboMappingKind } from "@/components/mgr/views/qbo-mapping";
+import { QboMappingView, QboMappingSheetView, type QboMappingKind, type QboPicker } from "@/components/mgr/views/qbo-mapping";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 import type { QboSyncStatus } from "@/lib/mgr/accounting-view";
 import { qboMappingVersion, qboPushConfirmation, type QboInvoiceAction, type QboRemoteCreateAction } from "@/lib/mgr/qbo-ui";
@@ -59,8 +59,18 @@ export function QboMappingForm(props: MappingProps) {
   return <QboMappingFields key={qboMappingVersion(props.currentId)} {...props} />;
 }
 
+/** Customer and item mappings pick from a live QuickBooks list, read each time
+ *  the dialog opens (#1515); vendors and the purchase account keep typed IDs. */
+const PICKER_QUERY: Partial<Record<QboMappingKind, string>> = {
+  customer: "list_qbo_customers", item: "list_qbo_items", deposit: "list_qbo_items", one_way_fee: "list_qbo_items",
+};
+
 function QboMappingFields({ kind, localId, label, currentId, context = "accounting" }: MappingProps) {
   const [remoteId, setRemoteId] = useState(currentId ?? "");
+  const list = useCommandAction();
+  const [options, setOptions] = useState<QboPicker["options"]>([]);
+  const query = PICKER_QUERY[kind];
+  const picker = query ? { options, loading: list.busy, error: list.error } : undefined;
   const name = kind === "customer" ? "set_qbo_customer_mapping" : kind === "item" ? "set_qbo_item_mapping"
     : kind === "vendor" ? "set_qbo_vendor_mapping" : kind === "purchase_account" ? "set_qbo_purchase_account"
       : kind === "deposit" ? "set_qbo_deposit_mapping" : "set_qbo_one_way_fee_mapping";
@@ -69,8 +79,12 @@ function QboMappingFields({ kind, localId, label, currentId, context = "accounti
       : kind === "vendor" ? { vendorId: localId, qboVendorId: remoteId.trim() }
         : kind === "purchase_account" ? { qboAccountId: remoteId.trim() } : { qboItemId: remoteId.trim() };
   const form = useCommandForm(name, { build, reset: () => setRemoteId(currentId ?? "") });
-  return <QboMappingSheetView open={form.open} onOpenChange={form.setOpen} context={context} currentId={currentId}>
-    <QboMappingView kind={kind} label={label} value={remoteId} onChange={setRemoteId} onSubmit={form.submit} busy={form.submitting} error={form.error} companyConflict={context === "accounting"} />
+  const openChange = (open: boolean) => {
+    form.setOpen(open);
+    if (open && query) void list.run(query, {}, data => setOptions(data as QboPicker["options"]), { durable: false, refresh: false });
+  };
+  return <QboMappingSheetView open={form.open} onOpenChange={openChange} context={context} currentId={currentId}>
+    <QboMappingView kind={kind} label={label} value={remoteId} onChange={setRemoteId} onSubmit={form.submit} busy={form.submitting} error={form.error} companyConflict={context === "accounting"} picker={picker} />
   </QboMappingSheetView>;
 }
 

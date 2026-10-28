@@ -231,3 +231,12 @@ it("lists allowed values and picker options by their labels (#1497)", () => {
     pick.mockRestore();
   }
 });
+
+// #1497 owner decision: a blank name reads "(no name)", muted, in the Record
+// column; the row editor keeps its #1315 kind fallback ("Edit row N · Customers").
+it("marks a blank-name row as (no name) in Record and keeps the editor title (#1497)", () => {
+  const html = renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, rows: [{ name: " " }], validation: [["Name is required"]] } }));
+  expect(html).toMatch(/<span class="text-muted-foreground">\(no name\)<\/span>/);
+  expect(html).not.toContain(">Row 1<");
+  expect(html).toContain("Edit row 1 · Customers");
+});

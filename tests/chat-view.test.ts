@@ -9,7 +9,6 @@ import { chatSettingIsSaved, type ChatSettingSave } from "../lib/mgr/chat-save-f
 import { ChatDisconnectView, ChatLinkedPeopleView, ChatLinkConsentView, ChatHealthView, ChatSettingsView, ChatPersonalPreferencesView, ChatQuietHoursView, ChatSettingsFieldsView } from "../components/mgr/views/chat";
 import { SCREENS } from "../components/mgr/screens";
 import { personalQuietHoursReason, breweryQuietHoursReason } from "../lib/chat/quiet-hours";
-import { readingCadenceReason } from "../lib/mgr/settings-view";
 import { chatConnected } from "../lib/mgr/fixtures/chat";
 
 it("derives quiet-hours readiness from the saved window and timezone, including reverts", () => {
@@ -29,15 +28,6 @@ it("names the missing or equal quiet-hours time in the footer, not only under En
   expect(personalQuietHoursReason({ ...initial, end: "" }, initial)).toBe("Still needed: an end time.");
   expect(personalQuietHoursReason({ ...initial, start: "" }, initial)).toBe("Still needed: a start time.");
   expect(breweryQuietHoursReason({ start: "22:00", end: "22:00" }, initial)).toBe("Still needed: an end time different from the start.");
-});
-
-it("requires a changed, whole-number reading cadence from 1 to 168", () => {
-  expect(readingCadenceReason("24", 24)).toBeTruthy();
-  expect(readingCadenceReason("024", 24)).toBeTruthy();
-  for (const hours of ["", "0", "169", "1.5", "NaN"]) {
-    expect(readingCadenceReason(hours, 24)).toBeTruthy();
-  }
-  for (const hours of ["1", "48", "168"]) expect(readingCadenceReason(hours, 24)).toBeNull();
 });
 
 it("withholds pristine personal quiet hours with an accessible reason", () => {
@@ -62,19 +52,16 @@ it("guards pristine personal quiet-hours submission even when the form submit ev
   expect(onSaveQuiet).not.toHaveBeenCalled();
 });
 
-it("withholds pristine brewery quiet hours and reading cadence in the shared settings fields", () => {
+it("withholds pristine brewery quiet hours in the shared settings fields", () => {
   const html = renderToStaticMarkup(createElement(ChatSettingsFieldsView, {
-    installation: chatConnected.installation!, timezone: "America/New_York", hours: "24", initialHours: 24,
+    installation: chatConnected.installation!, timezone: "America/New_York",
     start: "21:00", end: "06:00", channels: null, channel: "",
   }));
-  const buttons = html.match(/<button\b[^>]*>[^<]*<\/button>/g);
-  for (const label of ["Save brewery quiet hours", "Save reading cadence"]) {
-    const button = buttons?.find(button => button.includes(label));
-    expect(button).toContain('disabled=""');
-    const reasonId = /aria-describedby="([^"]+)"/.exec(button!)?.[1];
-    expect(reasonId).toBeDefined();
-    expect(html).toContain(`<p id="${reasonId}"`);
-  }
+  const button = html.match(/<button\b[^>]*>[^<]*<\/button>/g)?.find(button => button.includes("Save brewery quiet hours"));
+  expect(button).toContain('disabled=""');
+  const reasonId = /aria-describedby="([^"]+)"/.exec(button!)?.[1];
+  expect(reasonId).toBeDefined();
+  expect(html).toContain(`<p id="${reasonId}"`);
 });
 
 it("guards brewery quiet-hours submits for pristine, invalid, busy and changed drafts", () => {
@@ -95,29 +82,16 @@ it("guards brewery quiet-hours submits for pristine, invalid, busy and changed d
   }
 });
 
-it("guards reading-cadence submits for pristine, invalid, busy and changed drafts", () => {
-  for (const [hours, busy, expected] of [["24", false, 0], ["0", false, 0], ["1.5", false, 0], ["169", false, 0], ["48", true, 0], ["48", false, 1]] as const) {
-    const onSaveHours = vi.fn();
-    let view: ReactElement<{ children: ReactNode }>;
-    function Capture() {
-      view = ChatSettingsFieldsView({
-        installation: chatConnected.installation!, timezone: "UTC", hours, initialHours: 24,
-        start: "21:00", end: "06:00", channels: null, channel: "", busy, onSaveHours,
-      });
-      return view;
-    }
-    renderToStaticMarkup(createElement(Capture));
-    const form = Children.toArray(view!.props.children).find(child => (child as ReactElement).type === "form") as ReactElement<{ onSubmit: (event: { preventDefault: () => void }) => void }>;
-    form.props.onSubmit({ preventDefault: vi.fn() });
-    expect(onSaveHours).toHaveBeenCalledTimes(expected);
-  }
-});
-
-it("keeps reading cadence restricted to whole hours", () => {
+// #1509 owner decision: Brewery details owns Reading overdue after, because it
+// drives Today as well as Slack. Chat shows the value and links there.
+it("shows reading cadence read-only on Chat, linked to Brewery details (#1509)", () => {
   const markup = renderToStaticMarkup(SCREENS.find(screen => screen.name === "Chat settings")!.body);
-  const hours = markup.match(/<input\b[^>]*aria-label="Reading overdue after \(hours\)"[^>]*>/)?.[0];
-  expect(hours).toBeDefined();
-  expect(hours).toContain('step="1"');
+  expect(markup).not.toContain('aria-label="Reading overdue after (hours)"');
+  expect(markup).not.toContain("Save reading cadence");
+  expect(markup).toContain("Reading overdue after");
+  expect(markup).toContain("24 hours · set in Brewery details");
+  const live = renderToStaticMarkup(createElement(ChatSettingsView, { health: chatConnected, timezone: "UTC", readingDueHours: 36, backHref: "/settings", fields: null, delivery: null }));
+  expect(live).toMatch(/<a[^>]*href="\/settings"[^>]*>[\s\S]*?Reading overdue after[\s\S]*?36 hours · set in Brewery details/);
 });
 
 it("preserves personal notification reasons before linking and gates taproom quiet hours", () => {
@@ -144,7 +118,6 @@ it("announces Saved only after success and preserves saving and error feedback",
 
 it.each([
   [{ name: "set_notification_destination", channel: "private-a" }, { name: "set_notification_destination", channel: "private-b" }],
-  [{ name: "set_brewery_operating_defaults", hours: "24" }, { name: "set_brewery_operating_defaults", hours: "36" }],
   [{ name: "set_brewery_quiet_hours", start: "21:00", end: "06:00" }, { name: "set_brewery_quiet_hours", start: "22:00", end: "06:00" }],
   [{ name: "set_personal_quiet_hours", start: "21:00", end: "06:00", timezone: "America/New_York" }, { name: "set_personal_quiet_hours", start: "21:00", end: "06:00", timezone: "America/Chicago" }],
 ] satisfies [ChatSettingSave, ChatSettingSave][])("confirms only matching saved values for $0.name", (saved, edited) => {
@@ -152,9 +125,9 @@ it.each([
   expect(chatSettingIsSaved(saved, edited)).toBe(false);
   expect(chatSettingIsSaved(saved, { ...saved })).toBe(true);
   expect(chatSettingIsSaved(null, saved)).toBe(false);
-  const unrelated: ChatSettingSave = saved.name === "set_brewery_operating_defaults"
+  const unrelated: ChatSettingSave = saved.name === "set_brewery_quiet_hours"
     ? { name: "set_notification_destination", channel: "private-a" }
-    : { name: "set_brewery_operating_defaults", hours: "24" };
+    : { name: "set_brewery_quiet_hours", start: "21:00", end: "06:00" };
   expect(chatSettingIsSaved(unrelated, saved)).toBe(false);
 });
 
@@ -191,12 +164,23 @@ it("distinguishes stopped delivery from incomplete credential cleanup", () => {
 });
 
 it("keeps Slack recovery fail-closed and reports actual queue counters", () => {
-  const html = renderToStaticMarkup(createElement(ChatHealthView, { health: { installation: null, queue: { queued: 0, retrying: 2 }, lastCallback: null, lastDelivery: null, destinations: [], linkedCount: 0 }, configured: false }));
-  expect(html).toContain("Slack delivery is stopped");
+  const html = renderToStaticMarkup(createElement(ChatHealthView, { health: { ...chatConnected, queue: { queued: 0, retrying: 2 } }, configured: false }));
   expect(html).toContain("2 deliveries");
-  expect(html).toContain("None yet");
-  expect(html).not.toContain(">Disable integration<");
-  expect(html).not.toContain(">Reauthorize Slack<");
+  const stopped = renderToStaticMarkup(createElement(ChatHealthView, { health: { installation: null, queue: { queued: 0, retrying: 2 }, lastCallback: null, lastDelivery: null, destinations: [], linkedCount: 0 }, configured: false }));
+  expect(stopped).toContain("Slack delivery is stopped");
+  expect(stopped).toContain("None yet");
+  expect(stopped).not.toContain(">Disable integration<");
+  expect(stopped).not.toContain(">Reauthorize Slack<");
+});
+
+// #1509 owner decision: raw queue states mean nothing before Slack is connected.
+it("hides Health's queue states until Slack is connected (#1509)", () => {
+  const queue = { sent: 0, leased: 0, queued: 0, retrying: 0, terminal: 0 };
+  const disconnected = renderToStaticMarkup(createElement(ChatHealthView, { health: { installation: null, queue, lastCallback: null, lastDelivery: null, destinations: [], linkedCount: 0 } }));
+  expect(disconnected).not.toContain("deliveries");
+  expect(disconnected).not.toMatch(/>(sent|leased|queued|retrying|terminal)</);
+  const connected = renderToStaticMarkup(createElement(ChatHealthView, { health: { ...chatConnected, queue } }));
+  expect(connected).toContain("0 deliveries");
 });
 
 it("requires an actual link intent before showing identity consent", () => {
@@ -276,10 +260,18 @@ it("shows the brewery quiet hours read-only to every role", () => {
 // The "All preview states" picker renders only when NODE_ENV is "development";
 // vitest runs with NODE_ENV "test", so this checks what staff see.
 it("omits fixture wording and the dev-only state picker from Chat settings", () => {
-  const html = renderToStaticMarkup(createElement(ChatSettingsView, { health: { installation: null, queue: {}, lastCallback: null, lastDelivery: null, destinations: [], linkedCount: 0 }, configured: false, timezone: "America/New_York", readingDueHours: 24, previewFixtures: CHAT_PREVIEW_FIXTURES }));
+  const html = renderToStaticMarkup(createElement(ChatSettingsView, { health: chatConnected, timezone: "America/New_York", readingDueHours: 24, previewFixtures: CHAT_PREVIEW_FIXTURES }));
   expect(html).toContain("Sample data");
   expect(html).not.toMatch(/fixture|server setup|All preview states/i);
   expect(html).not.toContain(">Chat notifications<");
+});
+
+// #1509 owner decision: the four-tab sample preview waits for a connected Slack.
+it("hides the Sample data preview until Slack is connected (#1509)", () => {
+  const html = renderToStaticMarkup(createElement(ChatSettingsView, { health: { installation: null, queue: {}, lastCallback: null, lastDelivery: null, destinations: [], linkedCount: 0 }, configured: false, timezone: "America/New_York", readingDueHours: 24, previewFixtures: CHAT_PREVIEW_FIXTURES }));
+  expect(html).not.toContain("Sample data");
+  expect(html).not.toContain("Preview surfaces");
+  expect(html).toContain("Connect Slack");
 });
 
 it.each([

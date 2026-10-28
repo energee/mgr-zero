@@ -498,6 +498,36 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_pos_variations", "input": {} }'
 ```
 
+## list_qbo_customers [#list_qbo_customers]
+
+`query` · admin, sales
+
+Read the connected QuickBooks company's active customers live, by name, for a person to pick a customer mapping; nothing is preselected
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_qbo_customers", "input": {} }'
+```
+
+## list_qbo_items [#list_qbo_items]
+
+`query` · admin, sales
+
+Read the connected QuickBooks company's active items live, by name, for a person to pick an item mapping; nothing is preselected
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_qbo_items", "input": {} }'
+```
+
 ## list_team_members [#list_team_members]
 
 `query` · admin, sales, warehouse
