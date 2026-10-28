@@ -112,6 +112,8 @@ const pureTests = [
   "tests/transfers-view.test.ts",
   "tests/shipment-parity.test.ts",
   "tests/order-sheets-view.test.ts",
+  "tests/upc.test.ts",
+  "tests/sku-share-controls.test.ts",
   "tests/keyboard-focus.test.ts"
 ];
 
