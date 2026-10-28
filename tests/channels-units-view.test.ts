@@ -120,17 +120,15 @@ describe("Sale channels view", () => {
     expect(html).not.toMatch(/→/);
   });
 
-  it("createAction, info, and rowTrailing replace inventory Add / nav", () => {
+  it("createAction and rowTrailing replace inventory Add / nav", () => {
     const model = toSaleChannelsViewProps(saleChannelsList);
     const html = htmlOf(createElement(SaleChannelsView, {
       model,
       createAction: "ADD",
-      info: "LIVE INFO",
       rowTrailing: (row) => `T-${row.key}`,
     }));
     expect(html).toMatch(/ADD/);
     expect(html).not.toMatch(/>Add channel</);
-    expect(html).toMatch(/LIVE INFO/);
     expect(html).toMatch(`T-${model.rows[0]!.key}`);
     expect(html).not.toMatch(/aria-label="Open"/);
     expect(html).toMatch(/Wholesale/);
