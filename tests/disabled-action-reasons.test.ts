@@ -91,7 +91,15 @@ describe("remaining named disabled-action reasons (#1122)", () => {
     describedButton(sync, "Sync QuickBooks", /connect.*QuickBooks.*sync/i);
     expect(renderToStaticMarkup(createElement(QboSyncView))).not.toContain("before syncing payments");
     const defaults = renderToStaticMarkup(createElement(QboDefaultsView, { allowAch: false, allowCard: false, disabled: true }));
-    describedButton(defaults, "Save push defaults", /connect.*QuickBooks.*saving/i);
+    // Each switch saves on tap, so each one names the connection prerequisite (#1509).
+    const switches = defaults.match(/<button[^>]*role="switch"[^>]*>/g) ?? [];
+    const reasonId = switches[0]?.match(/aria-describedby="([^"]+)"/)?.[1];
+    expect(switches).toHaveLength(2);
+    for (const control of switches) {
+      expect(control).toContain('disabled=""');
+      expect(control).toContain(`aria-describedby="${reasonId}"`);
+    }
+    expect(defaults.match(new RegExp(`<p id="${reasonId}"[^>]*>([^<]+)</p>`))?.[1]).toMatch(/connect.*QuickBooks.*saving/i);
   });
 
   it("labels pending work as loading, not missing setup", () => {
