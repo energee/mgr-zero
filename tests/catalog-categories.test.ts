@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { makeBrewery, makeStaffCtx } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -33,4 +33,24 @@ it("validates names, isolates tenants, and restricts writes to Admin and Sales",
   expect((await ctx.db.from("catalog_categories").insert({ brewery_id: ctx.breweryId, name: "Direct write" })).error).not.toBeNull();
   const sales = await makeStaffCtx(ctx.breweryId, "sales");
   await expect(runCommand("save_catalog_category", { name: "Sales category" }, sales)).resolves.toMatchObject({ name: "Sales category" });
+});
+
+it("refuses a case variant of an existing category and files brands under its spelling (#1495)", async () => {
+  const ctx = await makeStaffCtx((await makeBrewery()).id);
+  await runCommand("save_catalog_category", { name: "Core" }, ctx);
+  await runCommand("save_catalog_category", { name: "Seasonal" }, ctx);
+  await expect(runCommand("save_catalog_category", { name: " core " }, ctx)).rejects.toThrow("A category named Core already exists");
+  await expect(runCommand("save_catalog_category", { previousName: "Seasonal", name: "CORE" }, ctx)).rejects.toThrow("A category named Core already exists");
+  await expect(runCommand("save_catalog_category", { previousName: "Core", name: "CORE" }, ctx)).resolves.toEqual({ name: "CORE" });
+  await runCommand("upsert_brand", { name: "Flagship", category: "core" }, ctx);
+  expect((await ctx.db.from("brands").select("category")).data).toEqual([{ category: "CORE" }]);
+  expect(await runCommand("list_catalog_categories", {}, ctx)).toEqual([{ name: "CORE" }, { name: "Seasonal" }]);
+});
+
+it("keeps historical case variants and an exact spelling a brand names (#1495)", async () => {
+  const ctx = await makeStaffCtx((await makeBrewery()).id);
+  await runCommand("save_catalog_category", { name: "Core" }, ctx);
+  expect((await admin.from("catalog_categories").insert({ brewery_id: ctx.breweryId, name: "core" })).error).toBeNull();
+  await runCommand("upsert_brand", { name: "Legacy", category: "core" }, ctx);
+  expect((await ctx.db.from("brands").select("category")).data).toEqual([{ category: "core" }]);
 });
