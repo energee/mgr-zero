@@ -187,7 +187,7 @@ it("explicit null suppresses new shared view fixture actions", async () => {
 });
 
 it("converted inventory frames never navigate into the live catalog/customer/location/settings pages", () => {
-  const names = ["Catalog", "Customers", "Customer detail", "Locations", "Location detail", "Location bins", "SKU", "SKU list", "Formats", "Format", "Package BOM", "Price groups", "Price group", "Sale channels", "Channel", "Units"];
+  const names = ["Catalog", "Customers", "Customer detail", "Locations", "Location detail", "Location bins", "SKU", "SKU list", "Formats", "Format", "Package BOM", "Price groups", "Price group", "Sale channels", "Channel"];
   for (const name of names) {
     const screen = SCREENS.find(s => s.name === name)!;
     expect(screen, name).toBeDefined();

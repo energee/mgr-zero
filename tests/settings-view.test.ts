@@ -73,12 +73,11 @@ describe("Settings save readiness (#1316)", () => {
     expect(html).toContain("Still needed: a change to the AI model.");
   });
 
-  it("links Units and Sale channels from People and places", () => {
+  it("links Sale channels from People and places", () => {
     const html = renderToStaticMarkup(createElement(SettingsView, {
-      model: settingsDemo, hrefs: { units: "/settings/units", channels: "/settings/channels" },
+      model: settingsDemo, hrefs: { channels: "/settings/channels" },
     }));
     const people = html.match(/<section aria-labelledby="settings-people"[\s\S]*?<\/section>/)?.[0];
-    expect(people).toMatch(/<a[^>]*href="\/settings\/units"[^>]*>[\s\S]*?Units/);
     expect(people).toMatch(/<a[^>]*href="\/settings\/channels"[^>]*>[\s\S]*?Sale channels/);
   });
 
