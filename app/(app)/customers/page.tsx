@@ -36,7 +36,7 @@ export default async function CustomersPage({ searchParams }: { searchParams?: P
   return <CustomersView
     model={toCustomersViewProps({ customers, missingPortalEmail, filtered: Boolean(params.q) })}
     createAction={canWrite ? <CustomerForm channels={channels} /> : null}
-    search={customers.length || params.q ? <ListControls search={{ label: "Search customers", value: params.q, keep }} /> : undefined}
+    search={customers.length || params.q ? <ListControls search={{ label: "Search customers", value: params.q, keep, path: "/customers" }} /> : undefined}
     linkRows
     backHref="/more"
   />;

@@ -70,7 +70,7 @@ export default async function VendorsPage({ searchParams }: { searchParams?: Pro
         filtered: Boolean(params.q),
       })}
       createAction={<VendorForm />}
-      controls={vendors.length || params.q ? <ListControls search={{ label: "Search vendors", value: params.q, keep: {} }} /> : undefined}
+      controls={vendors.length || params.q ? <ListControls search={{ label: "Search vendors", value: params.q, keep: {}, path: "/vendors" }} /> : undefined}
       rowTrailing={(row) => {
         const v = vendors.find((x) => x.id === row.key)!;
         return <VendorForm vendor={v} />;

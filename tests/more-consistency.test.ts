@@ -5,7 +5,7 @@ import { CatalogView } from "../components/mgr/views/catalog";
 import { SCREENS } from "../components/mgr/screens";
 import { ScreenSheet } from "../components/mgr/screen-frame";
 import { ShipToView } from "../components/mgr/views/ship-to";
-import { ListControls } from "../components/mgr/list-controls";
+import { ListControls, searchHref } from "../components/mgr/list-controls";
 import { toCatalogViewProps } from "../lib/mgr/catalog-view";
 import { toBrandViewProps } from "../lib/mgr/brand-view";
 import { toFormatsViewProps } from "../lib/mgr/formats-view";
@@ -28,6 +28,15 @@ describe("More page consistency", () => {
     expect(markup).toContain('name="category" value="Core"');
     expect(markup).toContain('name="sort" value="abv"');
     expect(markup).toContain('href="?category=Core&amp;sort=abv"');
+  });
+
+  it("searches as you type, so the box carries no Press Enter hint (#1512)", () => {
+    const markup = html(createElement(ListControls, { search: { label: "Search customers", value: "", keep: {} } }));
+    expect(markup).not.toContain("Press Enter");
+    // Typing replaces the URL with the trimmed query and the other params kept.
+    expect(searchHref("/catalog", { category: "Core" }, " hazy ")).toBe("/catalog?category=Core&q=hazy");
+    expect(searchHref("/catalog", { category: "Core" }, "   ")).toBe("/catalog?category=Core");
+    expect(searchHref("/recipes", {}, "")).toBe("/recipes?");
   });
 
   it("uses factual missing-COLA language in list, detail badge and compliance row", () => {

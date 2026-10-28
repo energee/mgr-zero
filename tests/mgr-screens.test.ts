@@ -352,7 +352,7 @@ describe("SCREENS", () => {
   it("keeps row actions to verbs", () => {
     const verbs = new Set([
       "Correct receipt", "Add brew turn", "Correct turn 1", "Correct turn 2",
-      "Add", "Add stop", "Add to route", "Adjust", "Assign", "Brew", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose lot", "Choose who gets it", "Close", "Confirm", "Confirm all", "Connect", "Count", "Create",
+      "Add", "Add stop", "Add to route", "Adjust", "Assign", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose lot", "Choose who gets it", "Close", "Confirm", "Confirm all", "Connect", "Count", "Create",
       "Deliver", "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Edit SKU", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",
       "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
@@ -1185,7 +1185,7 @@ describe("Cancelled batch history (#1304)", () => {
   it("collapses cancelled history without removing links or inventing a brand or recipe", () => {
     const batch = { id: "cancelled", batch_no: 1, planned_on: "2026-10-15", planned_bbl: 0.5, brewed_on: null, closed_at: null, cancelled_at: "2026-10-16T12:00:00Z", brand_name: null, recipe_name: null, vessel_name: null, active_occupancies: [] };
     const model = toBatchesViewProps(batchesFromQuery([batch, { ...batch, id: "planned", batch_no: 2, cancelled_at: null }], [], { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}` }));
-    expect(model.cancelled?.[0]).toMatchObject({ brand: null, recipe: null, brewable: false });
+    expect(model.cancelled?.[0]).toMatchObject({ brand: null, recipe: null });
     const html = renderToStaticMarkup(createElement(BatchesView, { model }));
     const history = html.match(/<details\b[^>]*>[\s\S]*?<\/details>/)?.[0];
     expect(history).toBeDefined();
