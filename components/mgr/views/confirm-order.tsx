@@ -18,6 +18,7 @@ export function ConfirmOrderView({
   complianceNote,
   quantities,
   onQuantity,
+  readOnly = false,
   reason,
   onReason,
 }: {
@@ -26,6 +27,8 @@ export function ConfirmOrderView({
   /** Edited quantities by line key; a line not in it shows its ordered qty. */
   quantities?: Record<string, string>;
   onQuantity?: (key: string, value: string) => void;
+  /** The order is already confirmed, so its quantities show but no longer edit. */
+  readOnly?: boolean;
   /** Shown, and required, once a quantity is edited: adjust_order_lines records it. */
   reason?: string;
   onReason?: (value: string) => void;
@@ -41,7 +44,7 @@ export function ConfirmOrderView({
         ? E.pick("Fulfillment source", model.fulfillmentSource ?? "", fulfillmentOptions)
         : model.fulfillmentSource ? E.fld("Fulfillment source", model.fulfillmentSource) : null}
       {model.lines.map((line, i) => (
-        <Fragment key={line.key}>{startsGroup(model.lines, i) ? E.group(line.group) : null}{E.row(line.name, line.detail, <div className="w-32"><OrderQuantity label={`${line.group ? `${line.group} ` : ""}${line.name} quantity`} value={quantities?.[line.key] ?? line.qty} onChange={onQuantity && (value => onQuantity(line.key, value))} /></div>, line.tone ?? "")}</Fragment>
+        <Fragment key={line.key}>{startsGroup(model.lines, i) ? E.group(line.group) : null}{E.row(line.name, line.detail, <div className="w-32"><OrderQuantity label={`${line.group ? `${line.group} ` : ""}${line.name} quantity`} value={quantities?.[line.key] ?? line.qty} readOnly={readOnly} onChange={onQuantity && (value => onQuantity(line.key, value))} /></div>, line.tone ?? "")}</Fragment>
       ))}
       {model.shortageNote ? E.note(model.shortageNote) : null}
       {complianceNote ? E.note(complianceNote) : null}

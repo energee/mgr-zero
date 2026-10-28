@@ -12,7 +12,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toRecipesViewProps } from "@/lib/mgr/recipes-view";
 import "@/lib/commands/all";
 import { ListControls } from "@/components/mgr/list-controls";
-import { listParams } from "@/lib/mgr/list-params";
+import { listParams, searchQuery } from "@/lib/mgr/list-params";
 import { navTitle } from "@/lib/mgr/nav";
 
 export const metadata = { title: navTitle("/recipes") };
@@ -20,7 +20,7 @@ export const metadata = { title: navTitle("/recipes") };
 type Recipe = { id: string; name: string; brand_id: string | null; note: string | null; latest_version: number | null };
 type Brand = { id: string; name: string };
 
-const recipesParams = z.object({ q: z.string().trim().max(100).catch("") });
+const recipesParams = z.object({ q: searchQuery });
 
 export default async function RecipesPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> } = {}) {
   const { params } = listParams(recipesParams, (await searchParams) ?? {});

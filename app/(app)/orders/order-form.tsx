@@ -8,6 +8,7 @@ import { CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { useCommandQuery } from "@/components/mgr/query-provider";
 import { QueryFeedback } from "@/components/mgr/query-feedback";
+import { breweryDate } from "@/lib/date-format";
 import { defaultShipToId, isBlankLine, isUnavailableSku, orderFormReadiness, skuPickerChannel, toSkuOption } from "@/lib/order-form-rules";
 
 type OrderKind = "wholesale" | "taproom_transfer";
@@ -119,7 +120,7 @@ export function OrderForm({
         kind, customer: customerId, shipTo: shipToId, source: fromLocationId, destination: toLocationId,
         customers: customers.map(customer => ({ id: customer.id, label: customer.name })),
         shipTos, sources: locations.map(location => ({ id: location.id, label: location.name })), skus: skuOptions,
-        requestedShip: requestedShipDate, po: poNumber, pickup, backHref: "/orders", customersHref: "/customers", catalogHref: "/catalog",
+        requestedShip: requestedShipDate, today: breweryDate(timeZone), po: poNumber, pickup, backHref: "/orders", customersHref: "/customers", catalogHref: "/catalog",
         lines: lines.map(line => ({ ...line,
           name: skuOptions.find(sku => sku.id === line.skuId)?.label ?? skus.find(sku => sku.id === line.skuId)?.label ?? (line.skuId ? "Selected SKU" : ""),
           skuError: skuOptionsReady && isUnavailableSku(line.skuId, availableSkuIds) ? "This SKU is unavailable for this order. Choose an available SKU or remove this line." : undefined,
