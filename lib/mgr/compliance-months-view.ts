@@ -23,8 +23,14 @@ export type ComplianceMonthsViewModel = {
   /** Shown in place of the periods when there are none. */
   empty?: EmptyState;
   registry: ComplianceNavView;
+  /** The lots a lot-code search found; none before a search. */
   lots: ComplianceNavView[];
+  /** Shown in place of the lots when a search matched none. */
+  lotsEmpty?: EmptyState;
 };
+
+/** A lot-code search that found no lot (#1510). */
+export const noLotMatch: EmptyState = { title: "No lots match", description: "Check the lot code, or clear the search." };
 
 const CADENCE_WORD: Record<Cadence, string> = { month: "monthly", quarter: "quarterly", year: "annual" };
 
