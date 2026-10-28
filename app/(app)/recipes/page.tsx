@@ -1,7 +1,8 @@
 // app/(app)/recipes/page.tsx — More › Recipes: recipes alphabetical
 // (list_recipes), each titled with its current version and opening its own
 // recipe page; the back goes to More, New recipe links to /recipes/new and
-// the Water profiles row to /catalog/water-profiles.
+// the Water profiles row to /catalog/water-profiles?from=recipes, whose back
+// then returns here.
 // ?q= narrows list_recipes by name, as Catalog's search does.
 import { z } from "zod";
 import { RecipesView } from "@/components/mgr/views/recipes";
@@ -35,7 +36,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
       model={toRecipesViewProps({
         backHref: "/more",
         createHref: "/recipes/new",
-        waterProfilesHref: "/catalog/water-profiles",
+        waterProfilesHref: "/catalog/water-profiles?from=recipes",
         recipes: recipes.map((r) => ({ id: r.id, name: r.name, brand: brandName(r.brand_id), latest_version: r.latest_version })),
         filtered: Boolean(params.q),
       })}
