@@ -5,7 +5,8 @@
 // adds the open/close and reset a mutation form needs (rendered in
 // components/mgr/command-form.tsx), and hands back its `run` so a sheet's
 // secondary verb (Remove, Delete, Clear) shares the one error slot that closing
-// clears (#447). Forms own only their fields and how to build the command input.
+// clears (#447). Its `setError` lets a form clear a refusal when the field it
+// names is edited (#1492). Forms own only their fields and how to build the command input.
 "use client";
 
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
@@ -164,5 +165,5 @@ export function useCommandForm(name: string, opts: { build: () => unknown; reset
     await run(name, opts.build(), data => { opts.onSuccess?.(data); setOpen(false); }, { target: opts.target });
   }
 
-  return { open, setOpen, error, failure, fieldErrors, submitting: running === name, busy: running !== null, submit, run };
+  return { open, setOpen, error, setError, failure, fieldErrors, submitting: running === name, busy: running !== null, submit, run };
 }

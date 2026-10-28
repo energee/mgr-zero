@@ -23,6 +23,14 @@ it("derives quiet-hours readiness from the saved window and timezone, including 
   expect(breweryQuietHoursReason({ ...initial }, initial)).toBeTruthy();
 });
 
+it("names the missing or equal quiet-hours time in the footer, not only under End (#1501)", () => {
+  const initial = { start: "22:00", end: "06:00", timezone: "America/New_York" };
+  expect(personalQuietHoursReason({ ...initial, end: "22:00" }, initial)).toBe("Still needed: an end time different from the start.");
+  expect(personalQuietHoursReason({ ...initial, end: "" }, initial)).toBe("Still needed: an end time.");
+  expect(personalQuietHoursReason({ ...initial, start: "" }, initial)).toBe("Still needed: a start time.");
+  expect(breweryQuietHoursReason({ start: "22:00", end: "22:00" }, initial)).toBe("Still needed: an end time different from the start.");
+});
+
 it("requires a changed, whole-number reading cadence from 1 to 168", () => {
   expect(readingCadenceReason("24", 24)).toBeTruthy();
   expect(readingCadenceReason("024", 24)).toBeTruthy();
@@ -311,6 +319,8 @@ it("offers a searchable timezone picker with the saved timezone and busy state",
   const html = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences }));
   expect(html).toMatch(/<input[^>]*role="combobox"[^>]*>/);
   expect(html).toContain('value="UTC"');
+  // The icon-only button that opens the list needs a name (#1501).
+  expect(html).toMatch(/<button\b[^>]*aria-label="Show options"/);
   const busy = renderToStaticMarkup(createElement(ChatPersonalPreferencesView, { preferences, busy: true }));
   expect(busy).toMatch(/<input(?=[^>]*role="combobox")(?=[^>]*disabled)[^>]*>/);
 });

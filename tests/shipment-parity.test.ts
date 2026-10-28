@@ -1,4 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 const { query, permission } = vi.hoisted(() => ({ query: vi.fn(), permission: vi.fn() }));
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery" }) }));
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ breweryId: "brewery" }) }));
@@ -125,6 +127,15 @@ it.each(["now", "on_delivery"] as const)("shows durable confirmation after route
   expect(page.type).toBe(ShipmentDoneView);
   expect(page.props.model.invoice).toBe(invoiceTiming === "now" ? "INV-0083 · assigned" : "Deferred to delivery");
   expect(page.props.model.invoiceHref).toBe(invoiceTiming === "now" ? "/invoices/invoice" : undefined);
+  expect(page.props.model.returnHref).toBe(invoiceTiming === "now" ? "/invoices/invoice/return" : undefined);
   expect(page.props.model.warnings).toEqual(["Owned ½ bbl · Warehouse: 2 kegs short · record Acquired kegs to reconcile"]);
   expect(query.mock.calls.some(call => call[0] === "get_order_ship_sources")).toBe(false);
+});
+
+it("links Return shipment to the invoice's return page, and says where a deferred one starts (#1489)", () => {
+  const invoiced = toShipmentDoneViewProps({ order, invoice: { invoice_no: 83 }, lines, invoiceHref: "/invoices/invoice" });
+  expect(renderToStaticMarkup(createElement(ShipmentDoneView, { model: invoiced }))).toMatch(/<a[^>]*href="\/invoices\/invoice\/return"[^>]*>Return shipment<\/a>/);
+  const deferred = toShipmentDoneViewProps({ order, invoice: null, lines, invoiceTiming: "on_delivery" });
+  expect(deferred.returnHref).toBeUndefined();
+  expect(deferred.info).toBe("The invoice is raised at delivery. To correct this shipment, open that invoice and select Return.");
 });
