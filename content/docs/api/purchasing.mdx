@@ -301,9 +301,11 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, brewer
 
-Vendors, alphabetical, with active flag and typed lead time
+Vendors, alphabetical, with active flag and typed lead time; unmapped keeps only those with no QuickBooks id in the connected company
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `unmapped` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

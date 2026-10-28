@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, completeRows, inChunks, PAGE_SIZE, Ctx, CommandExecution, CommandError, STAFF_ROLES } from "./registry";
 import { stockLine } from "./stock-line";
+import { qboUnmappedFilter, unmappedInput } from "./qbo";
 import { movementInput } from "./movement-input";
 import type { Database } from "@/lib/supabase/database";
 import { docNo, runNo, trfNo } from "@/lib/mgr/doc-no";
@@ -229,16 +230,18 @@ defineQuery({
 
 defineQuery({
   // Brewers read SKUs too: the packaging pages pick the SKU a run fills.
-  name: "list_skus", description: "SKUs with their brand and format, alphabetical; saleChannelId keeps only SKUs active and priced on that channel; packageType keeps only SKUs whose format is that package",
+  name: "list_skus", description: "SKUs with their brand and format, alphabetical; saleChannelId keeps only SKUs active and priced on that channel; packageType keeps only SKUs whose format is that package; unmapped keeps only those with no QuickBooks id in the connected company",
   input: z.object({
     saleChannelId: z.string().uuid().optional().describe("Keep only SKUs a wholesale order on this sale channel can price"),
     active: z.boolean().optional().describe("Keep only active or inactive SKUs when supplied"),
     packageType: z.enum(["keg", "can", "bottle"]).optional().describe("Keep only SKUs whose format packages this type"),
+    unmapped: unmappedInput,
   }), roles: STAFF_ROLES,
   aiExposed: true,
   handler: async (ctx, i) => {
     // `formats!inner` turns the format embed into a filter; the count joins the same way, or paging waits for rows the filter removed.
     const formats = i.packageType ? "formats!inner" : "formats";
+    const unmapped = i.unmapped ? await qboUnmappedFilter(ctx, "qbo_item_id") : null;
     const rows = await completeRows("SKU list", async (_, after?: { id: string }) => {
       let query = ctx.db.from("skus")
         .select(`id, name, active, brand_id, format_id, qbo_item_id, qbo_realm_id, brands(name), ${formats}(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)`)
@@ -248,6 +251,7 @@ defineQuery({
       for (const [column, value] of [["active", i.active], ["formats.package_type", i.packageType]] as const) {
         if (value !== undefined) { query = query.eq(column, value); count = count.eq(column, value); }
       }
+      if (unmapped) { query = query.or(unmapped); count = count.or(unmapped); }
       const [result, counted] = await Promise.all([query, count]);
       return { ...result, count: counted.count, error: result.error ?? counted.error };
     }, row => row.id);

@@ -85,7 +85,7 @@ it("warns about stale QuickBooks payments only with an actual previous connectio
   state.configured = true;
   state.connectionId = "previous-connection";
   expect(renderToStaticMarkup(await InvoicesPage({ searchParams: Promise.resolve({}) }))).toContain("Payment status may be stale until QuickBooks is reconnected and synced.");
-  const model = toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null }, "UTC");
+  const model = toAccountingViewProps({ connected: false, state: "disconnected", realmLabel: null, lastError: null });
   const draw = (reconnect: boolean) => renderToStaticMarkup(createElement(AccountingView, { model: { ...model, reconnect }, sync: createElement("span", null, "Sync QuickBooks · Payment status may be stale") }));
   expect(draw(false)).not.toContain("stale");
   expect(draw(false)).not.toContain("Sync QuickBooks");

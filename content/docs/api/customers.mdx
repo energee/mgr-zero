@@ -121,13 +121,14 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Customers alphabetical with sale channel name; optionally only those whose name or alias contains q
+Customers alphabetical with sale channel name; optionally only those whose name or alias contains q; unmapped keeps only those with no QuickBooks id in the connected company
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `includeShipTos` | boolean | no |
 | `missingPortalEmail` | boolean | no |
 | `q` | string | no |
+| `unmapped` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

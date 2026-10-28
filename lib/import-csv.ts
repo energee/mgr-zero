@@ -60,7 +60,8 @@ export function canReviewImport(kind: ImportKind, mapping: Record<string, number
 /** The channel_prices reference columns; together they name one price cell. */
 export const PRICE_REFERENCE_FIELDS = IMPORT_FIELDS.channel_prices.filter(f => f.lookup).map(f => f.name);
 export type ImportLookups = Record<string, { id: string; name: string; location_id?: string; basis?: string; price_group_id?: string | null }[]>;
-export type ImportOutcome = { row: number; status: "committed" | "blocked"; result?: { id?: string }; error?: string };
+/** `result` is the row command's own result: the customer, ship-to or SKU row it wrote, among others. */
+export type ImportOutcome = { row: number; status: "committed" | "blocked"; result?: { id?: string; customer_id?: string; brand_id?: string }; error?: string };
 export type ImportResult = { committed: number; blocked: number; outcomes: ImportOutcome[] };
 
 /** Rows that can collide on a unique key share an import key, so import_csv runs

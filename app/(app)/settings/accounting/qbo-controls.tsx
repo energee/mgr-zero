@@ -13,15 +13,32 @@ import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-for
 import type { QboSyncStatus } from "@/lib/mgr/accounting-view";
 import { qboMappingVersion, qboPushConfirmation, type QboInvoiceAction, type QboRemoteCreateAction } from "@/lib/mgr/qbo-ui";
 import { submitReason } from "@/lib/mgr/submit-reason";
+import { toast } from "sonner";
 
 export function QboConnectionAction({ configured, reconnect = false }: { configured: boolean; reconnect?: boolean }) {
   const action = useCommandAction();
   return <QboConnectionView configured={configured} reconnect={reconnect} busy={action.busy} error={action.error} onConnect={() => void action.run("connect_qbo", { reconnect }, data => location.assign((data as { authorizeUrl: string }).authorizeUrl))} />;
 }
 
+/** A tapped switch saves at once and returns to the stored values if the save
+ *  fails, as GravityUnitForm does (#1509). */
 export function QboDefaultsForm({ allowAch, allowCard }: { allowAch: boolean; allowCard: boolean }) {
   const action = useCommandAction();
-  return <QboDefaultsView allowAch={allowAch} allowCard={allowCard} busy={action.busy} error={action.error} onSave={(ach, card) => void action.run("set_qbo_push_defaults", { allowAch: ach, allowCard: card })} />;
+  const [choice, setChoice] = useState({ allowAch, allowCard });
+  // The server props are the truth once they catch up (GravityUnitForm explains the in-render reset).
+  const [seen, setSeen] = useState({ allowAch, allowCard });
+  if (seen.allowAch !== allowAch || seen.allowCard !== allowCard) {
+    setSeen({ allowAch, allowCard });
+    setChoice({ allowAch, allowCard });
+  }
+  const save = (ach: boolean, card: boolean) => {
+    setChoice({ allowAch: ach, allowCard: card });
+    void action.run("set_qbo_push_defaults", { allowAch: ach, allowCard: card }).then(ok => {
+      if (ok) toast.success("Push defaults saved");
+      else setChoice({ allowAch, allowCard });
+    });
+  };
+  return <QboDefaultsView {...choice} busy={action.busy} error={action.error} onChange={save} />;
 }
 
 /** Accounting's Disconnect: a confirming dialog over the page (#1509). A

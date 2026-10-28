@@ -7,6 +7,7 @@ import { CUSTOMER_TYPES, PAYMENT_TERMS } from "@/lib/mgr/enums";
 import { escapeRegex } from "@/lib/escape-regex";
 import { hasAnyRole } from "@/lib/mgr/roles";
 import { US_ZIP } from "@/lib/mgr/ship-to-view";
+import { qboUnmappedFilter, unmappedInput } from "./qbo";
 
 const roles = ["admin", "sales"] as const;
 
@@ -88,25 +89,28 @@ defineCommand({
 });
 
 defineQuery({
-  name: "list_customers", description: "Customers alphabetical with sale channel name; optionally only those whose name or alias contains q",
+  name: "list_customers", description: "Customers alphabetical with sale channel name; optionally only those whose name or alias contains q; unmapped keeps only those with no QuickBooks id in the connected company",
   roles: ["admin", "sales", "warehouse"],
   input: z.object({
     includeShipTos: z.boolean().optional().describe("Include ship-to picker options for each customer"),
     missingPortalEmail: z.boolean().optional().describe("Admin/Sales only: customers without a current portal login email"),
     q: z.string().trim().max(100).optional().describe("Only customers whose name or alias contains this text"),
+    unmapped: unmappedInput,
   }),
   // Paged past PostgREST's 1000-row cap (#475); id breaks name ties so pages never overlap.
-  handler: (ctx, i) => {
+  handler: async (ctx, i) => {
     if (i.missingPortalEmail && !hasAnyRole(ctx.roles, ["admin", "sales"])) throw new CommandError("permission denied", 403, "permission_denied");
     // An unanchored imatch is a case-insensitive contains. A PostgREST or() value is double-quoted, so `"` and `\`
     // (including escapeRegex's) are escaped again, as list_brands does.
     const pattern = i.q && `"${escapeRegex(i.q).replace(/["\\]/g, (c) => `\\${c}`)}"`;
+    const unmapped = i.unmapped ? await qboUnmappedFilter(ctx, "qbo_customer_id") : null;
     return completeRows("Customer list", start => {
     const columns = i.includeShipTos ? "*, sale_channels(name), shipTos:ship_tos(id, label, is_default)" : "*, sale_channels(name)";
     const base = i.missingPortalEmail
       ? ctx.db.rpc("customers_missing_portal_email", { p_brewery: ctx.breweryId }, { count: "exact" }).select(columns)
       : ctx.db.from("customers").select(columns, { count: "exact" }).eq("brewery_id", ctx.breweryId);
-    const query = (pattern ? base.or(`name.imatch.${pattern},alias.imatch.${pattern}`) : base).order("name").order("id");
+    const searched = pattern ? base.or(`name.imatch.${pattern},alias.imatch.${pattern}`) : base;
+    const query = (unmapped ? searched.or(unmapped) : searched).order("name").order("id");
     return (i.includeShipTos ? query.order("label", { referencedTable: "shipTos" }) : query).range(start, start + PAGE_SIZE - 1);
     });
   },

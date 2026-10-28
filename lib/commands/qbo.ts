@@ -1,5 +1,20 @@
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap } from "./registry";
+import { CommandError, defineCommand, defineQuery, unwrap, type Ctx } from "./registry";
+import { hasAnyRole } from "@/lib/mgr/roles";
+
+/** The `unmapped` input of list_customers, list_skus and list_vendors (#1515). */
+export const unmappedInput = z.boolean().optional().describe("Admin/Sales only: keep only rows with no QuickBooks id in the connected company");
+
+/** A PostgREST or() filter keeping rows whose `idColumn` holds no id in the
+ *  connected QuickBooks company: no id, or an id saved in another company. With
+ *  no company connected every row is unmapped, so it returns null (no filter).
+ *  Admin and Sales only, the roles that can read the connection (#1515). */
+export async function qboUnmappedFilter(ctx: Ctx, idColumn: string) {
+  if (!hasAnyRole(ctx.roles, ["admin", "sales"])) throw new CommandError("permission denied", 403, "permission_denied");
+  const connection = await unwrap(ctx.db.from("qbo_connections").select("realm_id")
+    .eq("brewery_id", ctx.breweryId).eq("state", "connected").maybeSingle());
+  return connection ? `${idColumn}.is.null,qbo_realm_id.is.null,qbo_realm_id.neq."${connection.realm_id}"` : null;
+}
 
 defineCommand({
   name: "connect_qbo", description: "Begin administrator consent for a QuickBooks connection",

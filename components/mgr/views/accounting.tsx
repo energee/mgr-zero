@@ -1,5 +1,5 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QuickBooksMark } from "@/components/mgr/brand-icons";
 import { Button } from "@/components/ui/button";
@@ -51,15 +51,19 @@ export function QboConnectionView({ configured = true, reconnect = false, busy =
   </div>;
 }
 
-export function QboDefaultsView({ allowAch, allowCard, busy = false, disabled = false, error, onSave }: { allowAch: boolean; allowCard: boolean; busy?: boolean; disabled?: boolean; error?: string | null; onSave?: (ach: boolean, card: boolean) => void }) {
-  const [ach, setAch] = useState(allowAch), [card, setCard] = useState(allowCard);
-  return <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && !disabled) onSave?.(ach, card); }}>
+/** The ACH and card push defaults. A switch saves when tapped (#1509): the
+ *  caller runs set_qbo_push_defaults with both values and owns them, so the
+ *  inventory, which passes no onChange, draws inert switches. */
+export function QboDefaultsView({ allowAch, allowCard, busy = false, disabled = false, error, onChange }: { allowAch: boolean; allowCard: boolean; busy?: boolean; disabled?: boolean; error?: string | null; onChange?: (ach: boolean, card: boolean) => void }) {
+  const reasonId = useId();
+  const locked = { disabled: busy || disabled, "aria-describedby": disabled ? reasonId : undefined };
+  return <div className="flex flex-col gap-3">
     {E.info("Each new invoice is pushed with these payment options. Turning both off means new invoices cannot be paid online; invoices pushed earlier keep theirs.")}
-    {E.row("Bank transfer (ACH)", `${ach ? "on" : "off"} · lowest fee`, <Switch aria-label="Bank transfer payments" checked={ach} onCheckedChange={setAch} disabled={busy || disabled} />, ach ? "ok" : "")}
-    {E.row("Card", `${card ? "on" : "off"} · percentage fee applies`, <Switch aria-label="Card payments" checked={card} onCheckedChange={setCard} disabled={busy || disabled} />, card ? "ok" : "")}
-    {E.submit("Save push defaults", { submitting: busy, reason: disabled ? "Connect or reconnect QuickBooks before saving payment options." : null })}
+    {E.row("Bank transfer (ACH)", `${allowAch ? "on" : "off"} · lowest fee`, <Switch aria-label="Bank transfer payments" checked={allowAch} onCheckedChange={ach => onChange?.(ach, allowCard)} {...locked} />, allowAch ? "ok" : "")}
+    {E.row("Card", `${allowCard ? "on" : "off"} · percentage fee applies`, <Switch aria-label="Card payments" checked={allowCard} onCheckedChange={card => onChange?.(allowAch, card)} {...locked} />, allowCard ? "ok" : "")}
+    {disabled && <p id={reasonId} className="text-sm text-muted-foreground">Connect or reconnect QuickBooks before saving payment options.</p>}
     <CommandFormMessage error={error} />
-  </form>;
+  </div>;
 }
 
 /** The portal's Pay button opens each invoice's QuickBooks payment link, so online
@@ -88,7 +92,7 @@ export function AccountingView({ model, connection, disconnect, defaults, messag
     {model.error && E.note(`Last connection error: ${model.error}`, "alert")}
     {!model.connected && (connection !== undefined ? connection : <QboConnectionView reconnect={model.reconnect} />)}
     <OnlinePaymentsRow model={model} />
-    {model.connected && <>{E.fld("Company", model.company)}{model.companyId && E.fld("Company ID", model.companyId)}{model.access && E.fld("Access", model.access)}{E.nav("Mappings", "Customers, SKUs and returnable-keg deposits", "", undefined, model.mappingsHref)}</>}
+    {model.connected && <>{model.companyId && E.fld("Company ID", model.companyId)}{E.nav("Mappings", "Customers, SKUs and returnable-keg deposits", "", undefined, model.mappingsHref)}</>}
     {(model.connected || model.reconnect) && (sync !== undefined ? sync : <QboSyncView status={model.syncStatus} disabled={!model.connected} />)}
     {E.ttl("Push defaults")}
     {defaults !== undefined ? defaults : model.defaults ? <QboDefaultsView {...model.defaults} disabled={!model.connected} /> : E.gated("Bank transfer (ACH) and card", "Connect QuickBooks to read and save the company's payment options.")}

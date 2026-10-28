@@ -31,6 +31,7 @@ import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QboMappingView, QboMappingsView } from "@/components/mgr/views/qbo-mapping";
+import { qboMappingScopeOptions } from "@/lib/mgr/accounting-view";
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { invoiceList, invoicesSync } from "@/lib/mgr/fixtures/invoices";
 import { dollarsInput } from "@/lib/mgr/money";
@@ -1339,11 +1340,11 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "QuickBooks Online",
     name: "Accounting",
-    to: { Review: "Customers missing email", "Customers missing a portal login email": "Customers missing email", Disconnect: "Disconnect QuickBooks", "Save push defaults": "Accounting", "Retry saved sync": "Accounting", "Sync QuickBooks": "Accounting" },
+    to: { Review: "Customers missing email", "Customers missing a portal login email": "Customers missing email", Disconnect: "Disconnect QuickBooks", "Retry saved sync": "Accounting", "Sync QuickBooks": "Accounting" },
     job: "One page for the QuickBooks connection, and for the three things a pay link needs",
     reads: "get_qbo_connection · get_qbo_sync_status · count_customers_missing_portal_email",
     writes: "connect_qbo · disconnect_qbo · set_qbo_push_defaults · sync_qbo_payments",
-    states: [["permission", "admin only", 1], ["healthy", "safe company and expiry status shown"], ["expired", "reconnect before mapping or push", 1], ["payments unavailable", "Pay returns the customer to the invoice when QuickBooks has no payment link", 1], ["ACH only", "card disabled; cheaper, and slower to arrive"], ["defaults changed", "applies to the next push, never retroactively"]],
+    states: [["permission", "admin only", 1], ["healthy", "safe company status shown; the self-renewing token expiry is not"], ["expired", "reconnect before mapping or push", 1], ["payments unavailable", "Pay returns the customer to the invoice when QuickBooks has no payment link", 1], ["ACH only", "card disabled; cheaper, and slower to arrive"], ["defaults changed", "applies to the next push, never retroactively"]],
     spec: "Accounting shows connection health and customer portal access readiness. The missing-email count means no current portal member has a nonblank login email; it does not establish QuickBooks billing-email or payment readiness. Review opens that same filtered customer set and is hidden when the count is zero. Staff correct access through the existing Invite and Remove actions. QuickBooks Payments and invoice payment options remain separate provider concerns.",
     body: <AccountingView model={accountingExpired} />,
   },
@@ -1363,9 +1364,9 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "QuickBooks Online",
     surface: "sheet",
-    name: "Mapping conflict",
+    name: "Map to QuickBooks",
     to: { "Save mapping": "Accounting" },
-    job: "Resolve an ambiguous QuickBooks customer or item without guessing",
+    job: "Map one customer, SKU, vendor, account or item to its exact QuickBooks record without guessing",
     reads: "list_customers · list_skus · get_qbo_connection",
     writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_deposit_mapping · set_qbo_one_way_fee_mapping",
     states: [["permission", "admin only", 1], ["customer", "two candidates match"], ["item", "two candidates match"], ["company claimed", "this company is connected to another brewery", 1]],
@@ -1375,12 +1376,12 @@ export const SCREENS: Screen[] = [
   {
     step: 5, slice: 1, tab: "More", group: "QuickBooks Online",
     name: "QuickBooks mappings",
-    to: { "Oak and Barrel": "Mapping conflict", "Pils · case": "Mapping conflict", "Country Malt": "Mapping conflict", "Purchase account": "Mapping conflict", "Deposit and refund item": "Mapping conflict", "One-way keg fee item": "Mapping conflict" },
+    to: { "Oak and Barrel": "Map to QuickBooks", "Pils · case": "Map to QuickBooks", "Country Malt": "Map to QuickBooks", "Purchase account": "Map to QuickBooks", "Deposit and refund item": "Map to QuickBooks", "One-way keg fee item": "Map to QuickBooks" },
     job: "Review verified customer, SKU, vendor, purchase account, deposit and one-way keg fee mappings for the connected company",
-    reads: "get_qbo_connection · list_customers · list_skus · list_vendors",
+    reads: "get_qbo_connection · list_customers · list_skus · list_vendors [unmapped: no id in the connected company]",
     writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_vendor_mapping · set_qbo_purchase_account · set_qbo_deposit_mapping · set_qbo_one_way_fee_mapping",
-    states: [["permission", "admin only", 1], ["disconnected", "mapping changes unavailable", 1], ["empty", "no customers, SKUs or vendors"], ["receipt Bills", "one exact vendor ID per vendor and one brewery-wide purchase account"]],
-    body: <QboMappingsView title="QuickBooks mappings" backLabel="Accounting" company="Demo Brewing LLC" sections={quickBooksMappings} />,
+    states: [["permission", "admin only", 1], ["disconnected", "mapping changes unavailable", 1], ["empty", "no customers, SKUs or vendors"], ["unmapped", "Show · Unmapped (N) keeps only rows with no id in the connected company"], ["receipt Bills", "one exact vendor ID per vendor and one brewery-wide purchase account"]],
+    body: <QboMappingsView title="QuickBooks mappings" backLabel="Accounting" company="Demo Brewing LLC" sections={quickBooksMappings} scope={{ value: "all", options: qboMappingScopeOptions(2, false) }} />,
   },
   {
     step: 5, slice: 1, tab: "More",

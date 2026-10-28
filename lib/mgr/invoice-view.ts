@@ -40,7 +40,7 @@ export type InvoiceMappingView = {
   title: string;
   detail: string;
   tone?: "" | "w" | "ok";
-  href?: string;
+  /** The viewer cannot fix it from this invoice: no local record, or a brewery-wide item only Admin maps. */
   unavailable?: boolean;
 };
 
@@ -93,6 +93,8 @@ export type InvoiceSnapshot = {
     /** Set once QuickBooks identified the invoice; then QuickBooks owns its balance. */
     qbo_invoice_id: string | null;
     qbo_remote_state?: "live" | "voided" | "deleted";
+    /** not_synced: issued before the books opened, so never pushed and never mapped. */
+    qbo_sync_status?: "pending" | "pushed" | "push_failed" | "not_synced";
     qbo_balance_cents?: number | null;
     qbo_total_cents?: number | null;
     /** Set by sync when accounting edited the invoice in QuickBooks: the only authority for "edited". */
@@ -132,23 +134,26 @@ export type InvoiceSnapshot = {
   localPaidCents: number;
 };
 
+/** The mappings an invoice still needs in `realm`. The invoice's one Fix mapping action
+ *  leads to them (#1515), so a row carries no link of its own. `canMapBrewerywide`:
+ *  the viewer is Admin, who alone maps the deposit and one-way fee items. */
 export function invoiceMappingRows(customer: { name: string; qbo_customer_id: string | null; qbo_realm_id: string | null } | null,
   lines: { id: string; kind: string; sku_id: string | null; description: string; skus: { name: string; qbo_item_id: string | null; qbo_realm_id: string | null } | null }[],
-  realm: string, depositItemId: string | null | undefined, mappingHref: string, depositHref?: string, oneWayFeeItemId?: string | null): InvoiceMappingView[] {
+  realm: string, depositItemId: string | null | undefined, canMapBrewerywide: boolean, oneWayFeeItemId?: string | null): InvoiceMappingView[] {
   // Only the rows that need action: a healthy mapping is not listed.
   const customerMapped = Boolean(customer?.qbo_customer_id && customer.qbo_realm_id === realm);
-  const rows: InvoiceMappingView[] = customerMapped ? [] : [{ key: "customer", title: "Customer mapping", detail: "QuickBooks customer is missing", tone: "w", href: customer ? mappingHref : undefined, unavailable: !customer }];
+  const rows: InvoiceMappingView[] = customerMapped ? [] : [{ key: "customer", title: "Customer mapping", detail: "QuickBooks customer is missing", tone: "w", unavailable: !customer }];
   const seen = new Set<string>();
   for (const line of lines) {
     if (line.kind !== "sku" || (line.skus?.qbo_item_id && line.skus.qbo_realm_id === realm)) continue;
     const key = line.sku_id ?? line.id;
     if (seen.has(key)) continue;
     seen.add(key);
-    rows.push({ key, title: line.skus?.name ?? line.description, detail: "QuickBooks item is missing", tone: "w", href: line.sku_id ? mappingHref : undefined, unavailable: !line.sku_id });
+    rows.push({ key, title: line.skus?.name ?? line.description, detail: "QuickBooks item is missing", tone: "w", unavailable: !line.sku_id });
   }
-  if (!depositItemId && lines.some(line => /keg_deposit/.test(line.kind))) rows.push({ key: "deposit", title: "Keg deposit mapping", detail: "QuickBooks deposit item is missing", tone: "w", href: depositHref, unavailable: !depositHref });
+  if (!depositItemId && lines.some(line => /keg_deposit/.test(line.kind))) rows.push({ key: "deposit", title: "Keg deposit mapping", detail: "QuickBooks deposit item is missing", tone: "w", unavailable: !canMapBrewerywide });
   // The fee item is set beside the deposit item, in Accounting mappings.
-  if (!oneWayFeeItemId && lines.some(line => line.kind === "one_way_keg_fee")) rows.push({ key: "one_way_fee", title: "One-way keg fee mapping", detail: "QuickBooks one-way keg fee item is missing", tone: "w", href: depositHref, unavailable: !depositHref });
+  if (!oneWayFeeItemId && lines.some(line => line.kind === "one_way_keg_fee")) rows.push({ key: "one_way_fee", title: "One-way keg fee mapping", detail: "QuickBooks one-way keg fee item is missing", tone: "w", unavailable: !canMapBrewerywide });
   return rows;
 }
 
@@ -310,8 +315,9 @@ export function toInvoiceViewProps(snapshot: InvoiceSnapshot): InvoiceViewModel 
       askedOn: formatDate(q.created_at, timeZone),
       answered: Boolean(q.answered_at),
     })),
-    // An unvoided payment blocks the push the mapping rows serve, as in qboInvoicePresentation.
-    mappings: snapshot.localPaidCents > 0 ? undefined : mappings,
+    // The rows serve a push: an unvoided payment blocks it, as in qboInvoicePresentation, and a
+    // not_synced invoice (from before the books opened) is never pushed (#1515).
+    mappings: snapshot.localPaidCents > 0 || invoice.qbo_sync_status === "not_synced" ? undefined : mappings,
     payments: snapshot.payments.map(paymentView),
     paymentBalanceCents: invoicePaymentBalanceCents(toLedgerFacts(snapshot), totalCents),
   };
