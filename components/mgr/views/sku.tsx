@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { RegistryInput, RegistrySelect } from "@/components/mgr/views/registry-fields";
 import { Switch } from "@/components/ui/switch";
-import { batchShareError, type SkuViewModel } from "@/lib/mgr/sku-view";
+import { batchShareError, pourOuncesError, type SkuViewModel } from "@/lib/mgr/sku-view";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import { upcError } from "@/lib/mgr/upc";
 
@@ -54,11 +54,7 @@ export function SkuView({
   return (
     <>
       {locked ? E.fld("Type", kind === "poured" ? "Pour" : "Packaged") : null}
-      {kind === "poured" ? <>
-        {E.edit("Serving size · oz", model.ounces ?? "", "text", undefined, { onChange: controls.ounces, inputMode: "decimal", required: Boolean(controls.ounces) })}
-        <details open={model.pourName ? true : undefined}><summary className="cursor-pointer text-sm font-medium">Rename · optional</summary><div className="pt-3"><RegistryInput label="Name" value={model.pourName ?? ""} onChange={controls.pourName} placeholder={Number(model.ounces) > 0 ? `${Number(model.ounces)} oz pour` : "Pint"} /></div></details>
-        {E.info("A pour is a non-stock SKU. Its serving volume is drawn from a keg; glasses are not held as inventory.")}
-      </> : <>
+      {kind === "poured" ? <PourFields model={model} controls={controls} /> : <>
       {locked
         ? E.fld("Format", model.format)
         : <RegistrySelect label="Format" value={model.format} options={model.formatOptions.map((name) => ({ value: name, label: name }))} onChange={controls.format} />}
@@ -79,4 +75,20 @@ export function SkuView({
       {footer !== undefined ? footer : E.btn("Save SKU")}
     </>
   );
+}
+
+/** The serving-size field's useTouchedLines slot. */
+const OUNCES = 0;
+
+/** A pour's serving size and optional name. Its own component, so the touched
+ *  state lives with the pour fields alone. The serving-size error waits until
+ *  the field is left; an inventory fixture shows it at once. */
+function PourFields({ model, controls }: { model: SkuViewModel; controls: Controls }) {
+  const touched = useTouchedLines(!controls.ounces);
+  const ouncesError = touched.shown(OUNCES) ? pourOuncesError(model.ounces ?? "") : undefined;
+  return <>
+    {E.edit("Serving size · oz", model.ounces ?? "", "text", undefined, { id: "pour-ounces", onChange: controls.ounces, onBlur: () => touched.touch(OUNCES), error: ouncesError, inputMode: "decimal", required: Boolean(controls.ounces) })}
+    <details open={model.pourName ? true : undefined}><summary className="cursor-pointer text-sm font-medium">Rename · optional</summary><div className="pt-3"><RegistryInput label="Name" value={model.pourName ?? ""} onChange={controls.pourName} placeholder={Number(model.ounces) > 0 ? `${Number(model.ounces)} oz pour` : "Pint"} /></div></details>
+    {E.info("A pour is a non-stock SKU. Its serving volume is drawn from a keg; glasses are not held as inventory.")}
+  </>;
 }
