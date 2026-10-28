@@ -6,7 +6,8 @@
 // slots into FinishedGoodsView; MovementRecordedView is not mounted here
 // because it is the single-row echo. Add SKU in Catalog sits beside Record
 // movement, and the form's empty SKU picker links Catalog, only for a user who
-// may create a SKU (#1113).
+// may create a SKU (#1113). Each active SKU's row opens Record movement on
+// that SKU for the same roles (#1507).
 import { E } from "@/components/mgr/e";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
@@ -25,7 +26,7 @@ import { navTitle } from "@/lib/mgr/nav";
 
 export const metadata = { title: navTitle("/inventory") };
 
-type Sku = { id: string; name: string; format_volume: { bbl_per_unit: number | null } | null; brands: { name: string } | null };
+type Sku = { id: string; name: string; active: boolean; format_volume: { bbl_per_unit: number | null } | null; brands: { name: string } | null };
 type Location = { id: string; name: string; uses: string[] };
 type Bin = { id: string; location_id: string; name: string };
 type SaleChannel = { id: string; name: string; tax_treatment: string };

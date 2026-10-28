@@ -1,10 +1,12 @@
 // components/mgr/views/finished-goods.tsx — Finished goods register, drawn by
 // the shared RecordTable. The SKU name is each row's one link (SKU detail); a
-// negative Available adds a Shortfall link under the figure. The header holds
+// negative Available adds a Shortfall link under the figure. For a user who may
+// record a movement, each active SKU's row ends with Record movement, the same
+// deep link as SKU detail's header button (#1507). The header holds
 // the page actions: live slots MovementForm as createAction beside Add SKU in
 // Catalog (#1113), and the movements ledger as footer.
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { RECORD_LINK, RecordTable } from "@/components/mgr/views/record-table";
 import type { FinishedGoodsRowView, FinishedGoodsViewModel } from "@/lib/mgr/finished-goods-view";
@@ -32,8 +34,9 @@ export function FinishedGoodsView({
   linkRows,
 }: {
   model: FinishedGoodsViewModel;
-  /** Live: Record movement, or null for a user who may not record one. The
-   *  inventory leaves it out and draws an inert Record movement. */
+  /** Live: Record movement, or null for a user who may not record one; null
+   *  also drops each row's Record movement. The inventory leaves it out and
+   *  draws the header's and the rows' Record movement inert. */
   createAction?: ReactNode;
   /** Where Add SKU in Catalog goes; null hides it for a user who may not
    *  create a SKU. The inventory leaves it out and the button stays inert. */
@@ -60,11 +63,16 @@ export function FinishedGoodsView({
       {countHref !== null && E.info(<>For physical taproom stock, <Link href={countHref ?? "#"} data-to="Weekly count" className={RECORD_LINK}>Record taproom count</Link> in Weekly count.</>)}
       {model.valueLine !== undefined ? E.fld("Inventory value", model.valueLine) : null}
       {model.empty ? E.blank(model.empty) : <RecordTable
-        headers={["SKU", "On hand", "Allocated", "Available"]}
-        align={["l", "r", "r", "r"]}
+        // The action column needs no visible header: its button names the verb.
+        headers={["SKU", "On hand", "Allocated", "Available", ...(record ? [<span key="action" className="sr-only">Record movement</span>] : [])]}
+        align={["l", "r", "r", "r", "l"]}
         rows={model.rows.map((row) => ({
           key: row.key,
-          cells: [row.name, row.onHand, row.allocated, <Available key="available" row={row} shortfallHref={to(row.shortfallHref)} />],
+          cells: [
+            row.name, row.onHand, row.allocated, <Available key="available" row={row} shortfallHref={to(row.shortfallHref)} />,
+            // Rows offer Record movement whenever the header does.
+            ...(record ? [row.movementHref && <Fragment key="action">{E.act("Record movement", "primary", linkRows ? row.movementHref : undefined)}</Fragment>] : []),
+          ],
           // Available is a component, so it sorts by its figure.
           sort: [row.name, row.onHand, row.allocated, row.atp],
           href: linkRows ? row.href : undefined,
