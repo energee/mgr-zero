@@ -111,7 +111,6 @@ import { MaterialsOnHandView } from "@/components/mgr/views/materials-on-hand";
 import { LocationsView } from "@/components/mgr/views/locations";
 import { MeView } from "@/components/mgr/views/me";
 import { MoreView } from "@/components/mgr/views/more";
-import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
 import { MonthlyComplianceView, PeriodBeforeBooksView } from "@/components/mgr/views/monthly-compliance";
 import { NewOrderView } from "@/components/mgr/views/new-order";
 import { EditDraftOrderView } from "@/components/mgr/views/edit-draft-order";
@@ -196,7 +195,7 @@ import { teamRoster } from "@/lib/mgr/fixtures/team";
 import { todayBrewer, todayDriver, todayEmpty, todaySales, todayTaproom, todayWarehouse } from "@/lib/mgr/fixtures/today";
 import { workWarehouse } from "@/lib/mgr/fixtures/work";
 import { invoiceFailedAls, invoiceFailedAlsAccounting, invoiceLocalPartlyPaid } from "@/lib/mgr/fixtures/invoice";
-import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, reverseMovementAdjustment } from "@/lib/mgr/fixtures/inventory";
+import { finishedGoodsList, recordMovementFestival, reverseMovementAdjustment } from "@/lib/mgr/fixtures/inventory";
 import { binCold, locationBinsTaproom, locationTaproom, locationsList } from "@/lib/mgr/fixtures/locations";
 import { newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
@@ -258,7 +257,6 @@ import { ComposerStripView } from "@/components/mgr/views/composer-strip";
 import { ComposerProposalView, OfflineOutboxView } from "@/components/mgr/views/composer";
 import { COMPOSER_SETUP_ACTIVITY, COMPOSER_SETUP_TIMEOUT_MESSAGE, COMPOSER_SETUP_TIMEOUT_MS } from "@/lib/composer/setup";
 import { toMoreViewProps } from "@/lib/mgr/more-view";
-import { MOVEMENT_CORRECTION_GATE, toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
 import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
 import { newPoReason } from "@/lib/mgr/new-po-view";
 import { vesselReason } from "@/lib/mgr/vessel-detail-view";
@@ -538,13 +536,13 @@ export const SCREENS: Screen[] = [
     slice: "all",
     tab: "More",
     name: "Location detail",
-    to: { "Save location": "Locations", "Location bins": "Location bins" },
-    job: "Edit one location and open its physical bins",
-    reads: "list_locations",
-    writes: "update_location",
-    states: [["permission", "admin only", 1], ["warehouse", "fulfillment source"], ["taproom", "POS and taps may map here"], ["several at once", "one building pours, stores and ships"], ["in use", "use changes preserve history"], ["timezone", "brewery zone by name · set in Settings → Timezone"]],
-    spec: "Location facts stay separate from bins, which are their own list. A place is put to as many uses as it is actually put to: one building pours, stores and ships. Every guard asks whether a use is among them, never what the place mainly is. Uses takes several answers, and the line under it names the screens each use gates. A note says what a bin is and where bins are edited.",
-    body: <LocationView model={toLocationViewProps(locationTaproom)} />,
+    to: { "Save location": "Locations", "Walk-in": "Bin", Cold: "Bin", Dry: "Bin", "Add bin": "Bin" },
+    job: "Edit one location and work its physical bins",
+    reads: "list_locations · list_bins · get_bin_move_stock",
+    writes: "update_location · create_bin · update_bin · delete_bin · move_stock_bin",
+    states: [["permission", "admin edits the location · warehouse or admin works the bins", 1], ["warehouse", "fulfillment source"], ["taproom", "POS and taps may map here"], ["several at once", "one building pours, stores and ships"], ["in use", "use changes preserve history"], ["timezone", "brewery zone by name · set in Settings → Timezone"], ["last bin", "a location keeps at least one · rename it instead", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1], ["empty", "nothing stored in any bin · says so and opens Record movement for this location, in place of Move stock"], ["move unavailable", "stock but only one bin · Move stock says why", 1], ["no stock access", "staff who cannot read bin stock see the bins without counts"]],
+    spec: "Location facts come first, then the location's Bins on the same page, since the bins are where the work is (#1507). A place is put to as many uses as it is actually put to: one building pours, stores and ships. Every guard asks whether a use is among them, never what the place mainly is. Uses takes several answers, and the line under it names the screens each use gates. A note says what a bin is. Each bin says how many kinds of stock it holds, or Empty. Every location starts with Walk-in, Cold and Dry. Rename or remove what doesn’t match the building, but a location always keeps one bin, so no on-hand or availability query carries a nullable branch. Bins are physical subdivisions a menu can read; they are explicitly not tap lines (§16.8). Par on a bin waits on a later schema change.",
+    body: <LocationView model={toLocationViewProps(locationTaproom)} bins={<LocationBinsView model={toLocationBinsViewProps(locationBinsTaproom)} />} />,
   },
   {
     step: 1, slice: "all", group: "Global", name: "Permission denied",
@@ -725,7 +723,7 @@ export const SCREENS: Screen[] = [
     reads: "list_team_members · list_pending_invitations",
     writes: "invite_staff [existing] · update_staff_role · revoke_staff · resend_account_invitation · revoke_account_invitation",
     states: [["last admin", "removing Admin refused · keep one admin", 1], ["permission", "admin only", 1], ["no pending invitations", "section hidden"]],
-    spec: "A person shows their saved profile name with email beneath; when no name is saved, the full email is the identity. Roles are listed in enum order: Admin, Sales, Warehouse, Brewer, Taproom. Admin invites one staff role and can assign several roles to another member; permissions are the union of the held roles. A new account joins the roster when its invite email is sent. Pending invitations lists invitations an existing account has not yet accepted: email, role and the day sent, with no expiry. Resend issues it again with the same role. Cancel confirms, then revokes it. After either, the old invitation can no longer be accepted. Removing membership leaves the sign-in account.",
+    spec: "A person shows their saved profile name with email beneath; when no name is saved, the full email is the identity. Roles are listed in enum order: Admin, Sales, Warehouse, Brewer, Taproom. Admin invites one staff role and can assign several roles to another member; permissions are the union of the held roles. A new account joins the roster when its invite email is sent. Pending invitations lists invitations an existing account has not yet accepted: email, role and the day sent, with no expiry; with none it says No pending invitations. Resend issues it again with the same role. Cancel confirms, then revokes it. After either, the old invitation can no longer be accepted. Removing membership leaves the sign-in account.",
     body: <TeamView model={teamRoster} />,
   },
   {
@@ -834,29 +832,16 @@ export const SCREENS: Screen[] = [
     group: "Global",
     surface: "sheet",
     name: "Record movement",
-    to: { "Record movement": "Movement recorded" },
+    to: { "Record movement": "Finished goods" },
     job: "Enter a positive amount; the form derives direction and the server calculates barrels",
-    reads: "list_skus · list_locations · list_bins · get_atp · get_inventory_lot [prefilled lot code, including depleted lots]",
+    reads: "list_skus · list_locations · list_bins · get_bin_on_hand [a chosen SKU starts on the bin holding the most of it] · get_atp · get_inventory_lot [prefilled lot code, including depleted lots]",
     writes: "record_movement [existing; one append-only inventory movement]",
-    states: [["no movement type", "No movement type preselected · Still needed: movement type, beside the withheld Record movement", 1], ["incomplete", "Still needed names each missing field; the preview appears once nothing is missing", 1], ["invalid quantity", "Zero or less, or a third decimal place, is marked under Quantity once the field is left · the movement type signs it; two decimals are allowed", 1], ["no SKUs", "No SKUs yet · Add a SKU opens Catalog for Admin · Warehouse is told who adds them", 1], ["offline", "Wait for a connection; movements are never queued"], ["stale", "ATP changed · preview again", 1], ["permission", "admin or warehouse required · sales reads Beer only", 1], ["echo", "Committed row · eligible standalone adjustment/loss correction opens inventory SKU detail"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
+    states: [["no movement type", "No movement type preselected · Still needed: movement type, beside the withheld Record movement", 1], ["incomplete", "Still needed names each missing field; the preview appears once nothing is missing", 1], ["invalid quantity", "Zero or less, or a third decimal place, is marked under Quantity once the field is left · the movement type signs it; two decimals are allowed", 1], ["no SKUs", "No SKUs yet · Add a SKU opens Catalog for Admin · Warehouse is told who adds them", 1], ["offline", "Wait for a connection; movements are never queued"], ["stale", "ATP changed · preview again", 1], ["permission", "admin or warehouse required · sales reads Beer only", 1], ["saved", "the form closes and a toast reads the receipt line: signed quantity, SKU, kind, state, frozen volume, bin and lot · the ledger lists the row"], ["stocked SKU", "choosing a SKU starts on the bin holding the most of it"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
     spec: "The form derives the signed API quantity from the movement kind (adjustments ask Add or Remove); the server derives 0.50000000 bbl and never accepts client-supplied barrels. It requires a live connection and is never put in the offline outbox. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. This frame carries Hazy IPA into PA, which is registered, so the warning is a state rather than drawn copy. Channel stays.",
     body: (<>
       <RecordMovementView model={toRecordMovementViewProps(recordMovementFestival)} footer={null} />
       {E.pin(<>{E.btn("Record movement", "irr")}</>)}
     </>),
-  },
-  {
-    step: 3,
-    slice: 1,
-    tab: "Beer",
-    surface: "sheet",
-    name: "Movement recorded",
-    job: "Echo the immutable row and name the correction",
-    reads: "list_movements",
-    writes: "none",
-    states: [["echo", "the tape is the record"], ["correction", `Record inventory correction ${MOVEMENT_CORRECTION_GATE}`]],
-    spec: "Post-commit of Record movement. A tape means recorded: show the committed quantity, lot code when tracked, bin, frozen barrel volume, destination state/channel and timestamp. A manual entry has no source document. An uncertain response never shows this receipt. The ledger has Older/Newer paging and names related runs, orders, transfers, credit memos, refused deliveries or count dates. The named correction is Record inventory correction, not Undo.",
-    body: <MovementRecordedView model={toMovementRecordedViewProps(movementRecordedFestival)} />,
   },
   {
     step: 3,
@@ -877,7 +862,7 @@ export const SCREENS: Screen[] = [
     tab: "Today",
     group: "Global",
     name: "Composer proposal",
-    to: { "Preview current data": "Composer proposal", "Open as form": "Record movement", Dismiss: "Today", "Commit movement": "Movement recorded" },
+    to: { "Preview current data": "Composer proposal", "Open as form": "Record movement", Dismiss: "Today", "Commit movement": "Composer proposal" },
     job: "A chat request becomes a canonical server preview; signed effect leads",
     reads: "list_skus · list_locations · list_bins · list_sale_channels · get_bin_move_stock · preview_command [internal query, not an AI tool]",
     writes: "record_movement [Commit; same requestId + previewToken; server revalidates]",
@@ -1167,7 +1152,7 @@ export const SCREENS: Screen[] = [
     reads: "list_locations · list_bins · list_skus",
     writes: "create_stock_transfer",
     states: [["permission", "warehouse or admin required", 1], ["same location", "refused · use a bin move", 1], ["empty lines", "Create transfer stays off until one SKU has a qty"]],
-    spec: "Opens from Transfers · New transfer. Materials and kegs move through the same command from the API; this sheet draws the SKU case. Bins default to the first bin at each location. There is no draft: Create transfer submits it, and Record pick is next.",
+    spec: "Opens from Transfers · New transfer. Materials and kegs move through the same command from the API; this sheet draws the SKU case. Bins default to the first bin at each location. There is no draft: Create transfer submits it, and Receive is next.",
     body: <NewTransferView model={toNewTransferViewProps(newTransferDraft)} />,
   },
   {
@@ -1175,11 +1160,11 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Transfer detail",
-    to: { Transfers: "Transfers", "Record pick": "Transfer detail", Receive: "Transfer detail", "Cancel transfer": "Transfer detail", "TRF-0007": "Transfers" },
-    job: "One next verb: Record pick or Receive the paired movements; or cancel it with a reason",
+    to: { Transfers: "Transfers", Receive: "Transfer detail", "Cancel transfer": "Transfer detail", "TRF-0007": "Transfers" },
+    job: "One next verb: Receive the paired movements; or cancel it with a reason",
     reads: "get_stock_transfer",
     writes: "record_stock_transfer_pick · receive_stock_transfer [one RPC: paired location_transfer movements, no invoice] · cancel_stock_transfer",
-    states: [["submitted", "Record pick defaults to requested qty"], ["picked", "Receive is irreversible"], ["received", "read-only tape · the stock has changed place"], ["cancelled", "the reason shows · picks released, nothing moved"], ["permission", "warehouse or admin required", 1]],
+    states: [["submitted", "Receive records the pick at the requested qty, then receives · no separate pick step"], ["picked", "Receive is irreversible"], ["received", "read-only tape · the stock has changed place"], ["cancelled", "the reason shows · picks released, nothing moved"], ["permission", "warehouse or admin required", 1]],
     spec: "Not Complete transfer: that ships a taproom replenishment order. Receive posts both ledger halves or neither. No invoice. Cancel transfer asks for a reason and is offered until the transfer is received: a pick never leaves the source bin, so cancelling releases the picks and moves nothing, which is how a transfer that can never balance at receipt is closed out.",
     body: <TransferDetailView model={toTransferDetailViewProps(transferDetailSubmitted)} />,
   },
@@ -1971,9 +1956,9 @@ export const SCREENS: Screen[] = [
     name: "New PO",
     to: { Vendor: "Entity picker", "Add line": "New PO", Remove: "New PO", "Save draft": "Purchase orders", "Save and mark sent": "Receive PO" },
     job: "Draft a vendor order: lines, cost, and the lot the vendor named",
-    reads: "list_vendors · list_materials · get_material_requirements",
+    reads: "list_vendors_and_contracts · list_materials · get_material_requirements",
     writes: "create_purchase_order [one RPC: draft PO + all lines] · send_purchase_order [Save and mark sent]",
-    states: [["permission", "warehouse or admin required", 1], ["new", "vendor and one line required · every line needs a material and a quantity above zero · Remove drops a line"], ["from requirements", "Planning drafts the lines; the shortfall is the quantity"], ["contracted lot", "the vendor named a lot on the contract · it prefills receiving"], ["no lot named", "the ordinary case · receiving captures it off the package"], ["past date", "an Expected date before brewery-local today warns; Save draft still works"]],
+    states: [["permission", "warehouse or admin required", 1], ["new", "vendor and one line required · every line needs a material and a quantity above zero · Remove drops a line"], ["from requirements", "Planning drafts the lines; the shortfall is the quantity"], ["contracted lot", "the vendor named a lot on the contract · it prefills receiving"], ["contract in force", "one contract for the vendor and material in force today · the line's cost starts at its price and the line draws it down · several leave it blank"], ["no lot named", "the ordinary case · receiving captures it off the package"], ["past date", "an Expected date before brewery-local today warns; Save draft still works"]],
     spec: "A flat form: vendor and optional expected date, then material lines with visible quantity and unit-cost labels. Spacing groups related fields without cards, repeated section headings, line-number headings, a Draft badge, or instructional paragraphs. Material, quantity, and cost align on large screens; smaller screens stack material above the numeric fields, and the narrowest screens stack all three. Each line owns its Remove action and optional expected lot. Expected lot is advisory, creates no lot record, and only appears for lot-tracked materials. Receiving prefills from it; the actual package decides the received lot. Once a vendor is chosen, its default materials lead the material picker. Save draft retains its validation reason; Save and mark sent waits on the same fields, marks the saved draft sent from a mail client, and opens it. If marking fails, the error says the draft is saved and links it.",
     body: <NewPoView model={newPoCountryMalt} />,
   },
@@ -1993,7 +1978,7 @@ export const SCREENS: Screen[] = [
     name: "Receive PO",
     to: { "Cancel purchase order": "Purchase orders", "Close short": "Purchase orders" },
     job: "Count what arrived; trigger derives receipt status",
-    reads: "get_purchase_order",
+    reads: "get_purchase_order · list_locations · list_bins · get_material_on_hand [the first open line's material: the receipt starts on the bin holding the most of it]",
     writes: "cancel_purchase_order [draft or sent without receipts; required reason releases remainder] · close_purchase_order_short [received stock retained; required reason releases remainder] · send_purchase_order [single row draft → sent; an attestation: Marked sent, never Delivered] · receive_purchase_order [one RPC: receipt + lines (counted, over or short) + lots with best_by + material movements] · Recent lot suggestions [SCHEMA-GATE: post-v1 scope; the purchase-order query does not return recent material lots]",
     states: [["loading", "PO-line skeleton"], ["draft", "Send purchase order is the one active verb · counts wait, and the receive verb is not drawn", 1], ["prefilled", "the PO named a lot · the field opens on it and the ordinary receipt changes nothing"], ["no lot on the PO", "the field opens empty · recent lots for that material are offered", 1], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
     spec: "Cancel purchase order requires a reason and no posted receipts. Close short requires a reason after a receipt; only the unreceived remainder is released, with actor and time retained. Closed orders leave Work and planning, refuse new receipts, and receipt corrections never reopen them. Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named so the ordinary receipt is a glance and no typing. When the PO named none the field opens empty and offers that material\u2019s recent lots, which is what keeps one vendor lot from becoming two records over a stray space. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. Punctuation or case alone never reads as one: the schema spec owns that comparison rule. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
@@ -2935,22 +2920,9 @@ export const SCREENS: Screen[] = [
     step: 8,
     slice: 1,
     tab: "More",
-    name: "Location bins",
-    to: { "Walk-in": "Bin", Cold: "Bin", Dry: "Bin", "Add bin": "Bin" },
-    job: "Subdivide a location without making every query carry an or-null",
-    reads: "list_locations · list_bins · get_bin_move_stock",
-    writes: "create_bin · update_bin · delete_bin",
-    states: [["permission", "warehouse or admin required", 1], ["last bin", "a location keeps at least one · rename it instead", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1], ["empty", "nothing stored in any bin · says so and opens Record movement for this location, in place of Move stock"], ["move unavailable", "stock but only one bin · Move stock says why", 1], ["no stock access", "staff who cannot read bin stock see the bins without counts"]],
-    spec: "Opened from Location detail. The title names the location, and each bin says how many kinds of stock it holds, or Empty. Every location starts with Walk-in, Cold and Dry. Rename or remove what doesn’t match the building, but a location always keeps one bin, so no on-hand or availability query carries a nullable branch. Bins are physical subdivisions a menu can read; they are explicitly not tap lines (§16.8). Par on a bin waits on a later schema change.",
-    body: <LocationBinsView model={toLocationBinsViewProps(locationBinsTaproom)} />,
-  },
-  {
-    step: 8,
-    slice: 1,
-    tab: "More",
     surface: "sheet",
     name: "Bin",
-    to: { "Save bin": "Location bins" },
+    to: { "Save bin": "Location detail" },
     job: "Create or edit one physical subdivision of a location",
     reads: "list_bins",
     writes: "create_bin · update_bin · delete_bin",

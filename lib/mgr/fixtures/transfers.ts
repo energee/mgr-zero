@@ -48,7 +48,7 @@ export const newTransferDraft: NewTransferSnapshot = {
   ],
 };
 
-/** TRF-0007 submitted, Record pick next. */
+/** TRF-0007 submitted, Receive next. */
 export const transferDetailSubmitted: TransferDetailSnapshot = {
   transfer: {
     id: TRF_7,

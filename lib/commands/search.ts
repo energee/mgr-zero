@@ -50,7 +50,7 @@ const PAGE_READS: Record<SearchKind, readonly string[]> = {
   ship_to: ["get_customer", "list_sale_channels"], // /customers/[id], which lists its ship-tos
   material: ["list_materials", "get_material_on_hand", "list_vendors", "list_locations", "list_bins"], // /materials
   keg_pool: ["get_keg_fleet", "list_locations", "list_bins", "list_customers", "list_vendors"], // /kegs
-  bin: ["list_locations", "list_bins"], // /locations/[id]/bins; its stock read is role-conditional
+  bin: ["list_locations", "list_bins"], // /locations/[id]; its stock read is role-conditional
   license: ["get_compliance_registry"], // /compliance/licenses
   water_profile: ["list_water_profiles"], // /catalog/water-profiles
 };
@@ -154,7 +154,7 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
     }
     case "bin": {
       const rows = await unwrap(ctx.db.from("bins").select("id, name, location_id, locations(name)").eq("brewery_id", b).regexIMatch("name", prefix).limit(LIMIT)) as Row[];
-      return rows.map((r) => hit(r.id as string, r.name as string, `Bin · ${name(r.locations)}`, `/locations/${r.location_id}/bins`));
+      return rows.map((r) => hit(r.id as string, r.name as string, `Bin · ${name(r.locations)}`, `/locations/${r.location_id}`));
     }
     case "license": {
       const rows = await unwrap(ctx.db.from("brewery_state_licenses").select("id, state, kind, license_no").eq("brewery_id", b).regexIMatch("license_no", prefix).limit(LIMIT)) as Row[];

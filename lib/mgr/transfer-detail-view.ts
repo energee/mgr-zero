@@ -45,9 +45,9 @@ export type TransferDetailSnapshot = {
   backHref?: string;
 };
 
+/** Receive on a submitted transfer records the pick at the ordered quantities first (#1507). */
 function nextVerb(status: string): string | undefined {
-  if (status === "submitted") return "Record pick";
-  if (status === "picked" || status === "in_transit") return "Receive";
+  if (status === "submitted" || status === "picked" || status === "in_transit") return "Receive";
   return undefined;
 }
 

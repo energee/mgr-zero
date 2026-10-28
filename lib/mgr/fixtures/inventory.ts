@@ -1,10 +1,9 @@
 // lib/mgr/fixtures/inventory.ts — get_on_hand / get_atp / record_movement
-// snapshots for Finished goods, Record movement, and Movement recorded.
+// snapshots for Finished goods, Record movement and Reverse movement.
 // Identities from demo.ts. Views own no sample data.
 import { SKU_HAZY, SKU_PILS, SKU_STOUT, LOC_WAREHOUSE, LOC_TAPROOM } from "./demo";
 import type { FinishedGoodsSnapshot } from "@/lib/mgr/finished-goods-view";
 import type { RecordMovementSnapshot } from "@/lib/mgr/record-movement-view";
-import type { MovementRecordedSnapshot } from "@/lib/mgr/movement-recorded-view";
 import type { ReverseMovementSnapshot } from "@/lib/mgr/reverse-movement-view";
 
 /** Beer → Finished goods: Hazy / Pils shortfall / Stout. */
@@ -41,15 +40,4 @@ export const reverseMovementAdjustment: ReverseMovementSnapshot = {
   lot: "Untracked",
   bbl: 0.5,
   note: "Entered twice",
-};
-
-/** Post-commit echo of recordMovementFestival. */
-export const movementRecordedFestival: MovementRecordedSnapshot = {
-  sku: "Hazy IPA · ½ bbl",
-  qty: -1,
-  unit: "keg",
-  kind: "Festival removal",
-  destState: "PA",
-  bbl: "0.50000000",
-  when: "just now",
 };
