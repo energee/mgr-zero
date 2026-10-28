@@ -1,5 +1,5 @@
 // app/(app)/orders/[id]/restock/put-back-button.tsx — the one write on the
-// Put back page: confirm_restock, then back to Today.
+// Put back page: confirm_restock, then back to the order.
 "use client";
 
 import { useRouter } from "next/navigation";

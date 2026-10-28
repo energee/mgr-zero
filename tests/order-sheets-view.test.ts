@@ -89,8 +89,9 @@ describe("Short pick view", () => {
 
   it("the drawing still shows the preview arrow and Adjust order to 7 cases", () => {
     const markup = html(createElement(ShortPickView, { model: toShortPickViewProps(orderShortPick) }));
-    expect(markup).toMatch(/Pick/);
-    expect(markup).toMatch(/ORD-0231 · short line/);
+    // The sheet carries the title; the body draws no back link to Pick.
+    expect(markup).not.toMatch(/ORD-0231 · short line/);
+    expect(markup).not.toMatch(/<a /);
     expect(markup).toMatch(/Ridgeline Tap Room · Warehouse/);
     expect(markup).toMatch(/ordered 10/);
     expect(markup).toMatch(/Reason/);

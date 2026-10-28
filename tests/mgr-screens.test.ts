@@ -1012,6 +1012,8 @@ describe("SCREENS", () => {
     expect(SCREENS.find((s) => s.name === "Order")!.to?.Adjust).toBe("Adjust lines");
     expect(SCREENS.some((s) => s.name === "Adjust lines")).toBe(true);
     expect(SCREENS.find((s) => s.name === "Short pick")!.spec).toMatch(/Opens from a Pick line/);
+    // A sheet over Pick, not a page round-trip per short line (#1503).
+    expect(SCREENS.find((s) => s.name === "Short pick")!.surface).toBe("sheet");
   });
 
   it("draws the stock-transfer document separately from Complete transfer", () => {
