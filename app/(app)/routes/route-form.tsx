@@ -1,9 +1,11 @@
 // app/(app)/routes/route-form.tsx — the Route builder (screen record Route):
 // date, driver, vehicle, name, and the stops as a checklist of this route's
 // documents plus every shipped order and picked transfer on no route, each
-// checked stop with its stop number. Save route plan → save_route; Depart
-// route → depart_route once the route is saved. A departed route is read-only
-// here; route-run.tsx takes over.
+// checked stop with its stop number. Save route plan → save_route, and a new
+// route's first save opens /routes/{id}, where Depart route waits; Depart
+// route → depart_route once the route is saved. `add` (from /routes/new?add=)
+// ticks that document as stop 1 when it is a candidate. A departed route is
+// read-only here; route-run.tsx takes over.
 "use client";
 
 import { useState } from "react";
@@ -14,14 +16,17 @@ import { useCommandAction } from "@/lib/commands/use-command-form";
 import type { StopDoc } from "@/lib/commands/delivery";
 import { driverOptions, type Driver, type Route } from "./labels";
 
-export function RouteForm({ route, candidates, drivers, today }: { route: Route | null; candidates: StopDoc[]; drivers: Driver[]; today: string }) {
+export function RouteForm({ route, candidates, drivers, today, add }: { route: Route | null; candidates: StopDoc[]; drivers: Driver[]; today: string; add?: string }) {
   const router = useRouter();
   const [deliveryDate, setDeliveryDate] = useState(route?.delivery_date ?? today);
   const [driverUserId, setDriverUserId] = useState(route?.driver_user_id ?? "");
   const [vehicle, setVehicle] = useState(route?.vehicle ?? "");
   const [name, setName] = useState(route?.name ?? "");
-  const [stops, setStops] = useState<Record<string, number>>(() =>
-    Object.fromEntries((route?.stops ?? []).map((s) => [s.shipment_id ?? s.stock_transfer_id ?? "", s.stop_no])));
+  const [stops, setStops] = useState<Record<string, number>>(() => {
+    if (route) return Object.fromEntries(route.stops.map((s) => [s.shipment_id ?? s.stock_transfer_id ?? "", s.stop_no]));
+    // ?add= ticks a document only when this route can take it.
+    return add && candidates.some((c) => c.id === add) ? { [add]: 1 } : {};
+  });
   const { busy, error, run } = useCommandAction();
   const delivered = new Set((route?.stops ?? []).filter((s) => s.delivered_at).map((s) => s.shipment_id ?? s.stock_transfer_id));
 
@@ -29,8 +34,10 @@ export function RouteForm({ route, candidates, drivers, today }: { route: Route 
     id: route?.id, name: name || undefined, deliveryDate, driverUserId: driverUserId || undefined, vehicle: vehicle || undefined, note: route?.note ?? undefined,
     stops: candidates.filter((c) => c.id in stops).map((c) => ({ [c.kind === "shipment" ? "shipmentId" : "stockTransferId"]: c.id, stopNo: stops[c.id] })),
   });
-  async function save() {
-    if (await run("save_route", input()) && !route) router.push("/routes");
+  function save() {
+    void run("save_route", input(), (data) => {
+      if (!route) router.push(`/routes/${(data as { routeId: string }).routeId}`);
+    });
   }
   return <RouteView model={{
     title: route ? (route.name ?? "Route") + " · " + formatDate(route.delivery_date) : "New route", backHref: "/routes",
@@ -39,6 +46,6 @@ export function RouteForm({ route, candidates, drivers, today }: { route: Route 
     driverOptions: driverOptions(drivers, route),
     stops: candidates.map(candidate => ({ key: candidate.id, title: candidate.label, detail: "Shipped · no route", locked: delivered.has(candidate.id), warning: !(candidate.id in stops) })),
   }} controls={{ date: setDeliveryDate, driverId: setDriverUserId, vehicle: setVehicle, name: setName, selection: setStops }} busy={busy} error={error}
-    onSave={() => { void save(); }} onDepart={() => { if (route) void run("depart_route", { routeId: route.id }); }}
+    onSave={save} onDepart={() => { if (route) void run("depart_route", { routeId: route.id }); }}
   />;
 }

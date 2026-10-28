@@ -261,6 +261,14 @@ describe("Confirm delivery", () => {
     expect(transfer).not.toContain("Fictional Lane");
   });
 
+  it("puts both outcome verbs in the shared form footer, Delivered last (#1226)", () => {
+    const html = htmlOf(createElement(ConfirmDeliveryView, { model: confirmDeliveryStop1 }));
+    const footer = html.match(/<div class="[^"]*md:justify-end[^"]*">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    const verbs = [...footer.matchAll(/<button\b[^>]*>([^<]*)<\/button>/g)].map((m) => m[1]);
+    expect(verbs).toEqual(["Not delivered · leave for a later route", "Delivered"]);
+    expect(footer).toMatch(/<button\b[^>]*bg-irreversible[^>]*>Delivered<\/button>/);
+  });
+
   it("the live stop page mounts ConfirmDeliveryView and slots DeliveredForm", () => {
     const page = src("app/(app)/work/deliveries/[id]/page.tsx");
     expect(page).toMatch(/<ConfirmDeliveryView\b/);

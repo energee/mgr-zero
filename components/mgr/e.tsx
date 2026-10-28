@@ -265,8 +265,9 @@ export const E = {
   sw: (on: boolean, label: string, onChange?: (checked: boolean) => void, disabled = false) => <Switch {...(onChange ? { checked: on, onCheckedChange: onChange } : { defaultChecked: on })} aria-label={label} disabled={disabled} />,
   /** Fills the phone column; hugs the label from md up (`w-fit`, not `w-auto`:
    *  a column flex item with width:auto still stretches). Entry cards override
-   *  back to full-width because they stay a phone-width column on the desk. */
-  btn: (t: React.ReactNode, k: BtnKind = "p", href?: string, onClick?: () => void, attributes?: { "data-preview-action"?: boolean }) => {
+   *  back to full-width because they stay a phone-width column on the desk.
+   *  `data-to` names the screen a link opens when its label is not that screen's name, as on E.back. */
+  btn: (t: React.ReactNode, k: BtnKind = "p", href?: string, onClick?: () => void, attributes?: { "data-preview-action"?: boolean; "data-to"?: string }) => {
     const [kind, disabled] = k.split(" ") as [BtnBase, string?];
     return (
       <Button

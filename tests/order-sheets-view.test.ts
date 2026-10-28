@@ -306,6 +306,12 @@ describe("Shipment done view", () => {
     expect(model.tape.at(-1)).toEqual(["INV-1042", "invoiced now"]);
   });
 
+  it("offers Add to route only when the caller passes a route link (#1505)", () => {
+    const routed = html(createElement(ShipmentDoneView, { model: toShipmentDoneViewProps({ ...orderShipmentDone, routeHref: "/routes/new?add=sh-1" }) }));
+    expect(routed).toMatch(/<a\b[^>]*href="\/routes\/new\?add=sh-1"[^>]*>Add to route<\/a>/);
+    expect(html(createElement(ShipmentDoneView, { model: toShipmentDoneViewProps({ ...orderShipmentDone, routeHref: undefined }) }))).not.toContain("Add to route");
+  });
+
   it("the drawing still names Return shipment as the correction", () => {
     const markup = html(createElement(ShipmentDoneView, { model: toShipmentDoneViewProps(orderShipmentDone) }));
     expect(markup).toMatch(/INV-1042 · assigned/);
