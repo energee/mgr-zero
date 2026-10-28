@@ -110,7 +110,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
     </>}
     {step === 2 && <>
       <p>{ready} ready · {rows.length - ready} blocked. Fix values here, or go back to matching columns. Only ready rows are imported, each one on its own. Fix blocked rows first, or they are left out.</p>
-      {E.tbl(["Row", "Record", "Problem", "Status"], rows.map((row, index) => [String(index + 1), recordName(row) || <span className="text-muted-foreground">(no name)</span>,validation[index]?.join("; ") || "Validated", validation[index]?.length ? "Blocked" : "Ready"]), ["r", "l", "l", "l"])}
+      {E.tbl(["Row", "Record", "Problem", "Status"], rows.map((row, index) => [String(index + 1), recordName(row) || <span className="text-muted-foreground">(no name)</span>, validation[index]?.join("; ") || "Validated", validation[index]?.length ? "Blocked" : "Ready"]), ["r", "l", "l", "l"])}
       {rows.map((row, index) => <details key={index}><summary>Edit row {index + 1} · {recordName(row) || importKindLabel(kind)}</summary>
         <div className="grid gap-3 py-3 sm:grid-cols-2">{fields.map(field => <Field key={field.name}>
           {field.values
