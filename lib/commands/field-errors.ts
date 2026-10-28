@@ -1,9 +1,12 @@
-// Structured input failures are projected only onto fields a form actually renders.
+// Structured input failures (a 400 invalid_input, or a 409 duplicate name) are
+// projected only onto fields a form actually renders.
 // Other failures keep their original message and recovery semantics.
 export type InputIssue = { path: (string | number)[]; code: string; message: string };
 export type FieldErrors = Partial<Record<string, string>>;
 
 function correction(issue: InputIssue): string {
+  // A unique-name conflict's own message is already the correction (registry uniqueViolation).
+  if (issue.code === "duplicate") return issue.message;
   const field = issue.path[0];
   if (field === "state") return "Use a two-letter state code, such as PA.";
   if (field === "zip") return "Use a 5-digit ZIP code or ZIP+4, such as 15201 or 15201-1234.";
@@ -18,7 +21,8 @@ function correction(issue: InputIssue): string {
 
 export function inputErrorPresentation(failure: { message: string; status?: number; code?: string; issues?: InputIssue[] }, fields: readonly string[]) {
   const fieldErrors: FieldErrors = {};
-  if (failure.status !== 400 || failure.code !== "invalid_input" || !failure.issues?.length) {
+  const structured = (failure.status === 400 && failure.code === "invalid_input") || (failure.status === 409 && failure.code === "conflict");
+  if (!structured || !failure.issues?.length) {
     return { error: failure.message, fieldErrors };
   }
   let unmapped = false;

@@ -54,6 +54,13 @@ it("projects expected failures to declared fields with corrective copy", () => {
   expect(inputErrorPresentation(failure, ["state"]).error).toBe(failure.message);
 });
 
+it("places a duplicate-name conflict under a declared Name field, else keeps it in the form message (#1488)", () => {
+  const message = "That name is already used. Choose a different name.";
+  const failure = { status: 409, code: "conflict", message, issues: [{ path: ["name"], code: "duplicate", message }] };
+  expect(inputErrorPresentation(failure, ["name", "email"])).toEqual({ error: null, fieldErrors: { name: message } });
+  expect(inputErrorPresentation(failure, [])).toEqual({ error: message, fieldErrors: {} });
+});
+
 it("preserves unexpected, nested, ambiguous and domain errors", () => {
   for (const failure of [
     { status: 500, code: "internal_error", message: "Uncertain outcome" },

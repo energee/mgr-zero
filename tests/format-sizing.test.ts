@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCommandInput, formatSizing, toFormatViewProps } from "@/lib/mgr/format-view";
+import { formatCommandInput, formatNameError, formatSizing, toFormatViewProps } from "@/lib/mgr/format-view";
 
 const format = (patch = {}) => toFormatViewProps({ format: { id: "f", name: "", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: 0.5, ...patch } });
 
@@ -10,6 +10,11 @@ describe("package sizing", () => {
     expect(formatSizing({ ...model, volumeValue: "16", unitsPerCase: "" })).toMatchObject({ valid: false, error: "Enter a whole number of containers per package, at least 1." });
     expect(formatSizing({ ...model, composed: true })).toMatchObject({ valid: false, error: "Enter a format name to continue." });
     expect(formatSizing({ ...model, volumeValue: "16", unitsPerCase: "24" })).toMatchObject({ valid: true, error: undefined });
+  });
+  it("names an existing packaged format before Create, matching the trimmed-name index (#1488)", () => {
+    expect(formatNameError("½ bbl keg", [" ½ bbl keg ", "16 oz can"])).toBe("A format named ½ bbl keg already exists.");
+    expect(formatNameError("¼ bbl keg", ["½ bbl keg"])).toBeUndefined();
+    expect(formatNameError("½ BBL keg", ["½ bbl keg"])).toBeUndefined();
   });
   it("derives standard keg volume and name without a second input", () => {
     expect(formatSizing(format())).toMatchObject({ name: "½ bbl keg", bbl: 0.5, valid: true });
