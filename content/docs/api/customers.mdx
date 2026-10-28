@@ -25,7 +25,8 @@ the command returns `{ inviteId, state: "pending_consent" }`, and membership is
 granted only when that account signs in and calls `accept_account_invitation`
 (see [Team](/docs/api/team)). The command conflicts only when that account
 already belongs to the customer or an invitation for the email is already open.
-There is no resend flow.
+An Admin can replace a pending invitation with `resend_account_invitation`, which
+keeps the same customer and starts a new seven-day consent window.
 Keep the same request ID and input after an interrupted invitation; completion
 reuses the saved user identity. Replaying a completed invite never restores
 revoked membership.
