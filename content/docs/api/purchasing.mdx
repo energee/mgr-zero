@@ -196,11 +196,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, brewer
 
-Material on hand by location and bin, in base units; optionally one location
+Material on hand by location and bin, in base units; optionally one location or one material
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `locationId` | uuid | no |
+| `materialId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

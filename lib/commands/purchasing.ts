@@ -170,13 +170,16 @@ defineQuery({
 });
 
 // On hand per material at bin grain (material_bin_on_hand), optionally one
-// location: Materials on hand reads it, Cycle count snapshots it as qty_expected.
+// location or one material: Materials on hand reads it, Cycle count snapshots
+// it as qty_expected, and Receive PO starts on the bin holding the most of the
+// PO's first material (#1507).
 defineQuery({
-  name: "get_material_on_hand", description: "Material on hand by location and bin, in base units; optionally one location",
-  input: z.object({ locationId: z.string().uuid().optional() }), roles: [...PURCHASING],
+  name: "get_material_on_hand", description: "Material on hand by location and bin, in base units; optionally one location or one material",
+  input: z.object({ locationId: z.string().uuid().optional(), materialId: z.string().uuid().optional() }), roles: [...PURCHASING],
   handler: (ctx, i) => completeRows("Material stock", start => {
     let q = ctx.db.from("material_bin_on_hand").select("material_id, location_id, bin_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId);
     if (i.locationId) q = q.eq("location_id", i.locationId);
+    if (i.materialId) q = q.eq("material_id", i.materialId);
     return q.order("material_id").order("location_id").order("bin_id").range(start, start + PAGE_SIZE - 1);
   }),
 });

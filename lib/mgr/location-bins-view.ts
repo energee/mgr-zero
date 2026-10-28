@@ -1,5 +1,6 @@
-// lib/mgr/location-bins-view.ts — view-model for Location bins (list_bins,
-// plus get_bin_move_stock for the readers allowed to see bin stock).
+// lib/mgr/location-bins-view.ts — view-model for the Bins section of
+// Location detail (list_bins, plus get_bin_move_stock for the readers allowed
+// to see bin stock).
 import type { EmptyState } from "@/lib/mgr/empty-state";
 import { plural } from "@/lib/mgr/plural";
 
@@ -10,9 +11,6 @@ export type LocationBinsRowView = {
 };
 
 export type LocationBinsViewModel = {
-  title: string;
-  backLabel: string;
-  backHref?: string;
   rows: LocationBinsRowView[];
   /** Nothing is stored in any bin; the view draws it in place of Move stock. */
   empty?: EmptyState;
@@ -28,15 +26,11 @@ export type MoveStockValue = { source: string; toBinId: string; qty: string; not
 export type MoveStockOptions = { stock: Option[]; destinations: Option[]; unit?: string; wholeUnits: boolean; max?: number };
 
 export type LocationBinsSnapshot = {
-  location: { id: string; name: string };
   bins: { id: string; name: string }[];
   /** get_bin_move_stock rows, one per stock identity (SKU or material lot, keg
    *  size) a bin holds. Omitted when the reader may not see bin stock, so the
    *  rows claim neither a count nor Empty. */
   stock?: { bin_id: string }[];
-  /** Inventory uses the parent screen name; live uses the location name. */
-  backLabel?: string;
-  backHref?: string;
   inventoryHref?: string;
 };
 
@@ -53,17 +47,11 @@ function binStockLabel(stock: LocationBinsSnapshot["stock"], binId: string): str
 }
 
 export function toLocationBinsViewProps({
-  location,
   bins,
   stock,
-  backLabel,
-  backHref,
   inventoryHref,
 }: LocationBinsSnapshot): LocationBinsViewModel {
   return {
-    title: `Bins at ${location.name}`,
-    backLabel: backLabel ?? location.name,
-    backHref,
     rows: bins.map((b) => ({ key: b.id, title: b.name, detail: binStockLabel(stock, b.id) })),
     empty: stock?.length === 0 ? { title: "Nothing is stored in these bins yet", description: "Record stock into a bin from Inventory." } : undefined,
     inventoryHref,
