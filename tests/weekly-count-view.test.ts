@@ -173,3 +173,9 @@ it("#814 shows the shared shortage disposition picker and freezes it on uncertai
   const frozen = failCountAttempt(beginCountAttempt(state, "request"), "unknown", "No response");
   expect(renderToStaticMarkup(createElement(WeeklyCountDraftView, { state: frozen, roles: ["taproom"], lotLabels: {}, timeZone: "America/New_York" }))).toContain('data-disabled');
 });
+
+it("#1481 names the link to the count before this one in plain words", () => {
+  const html = renderToStaticMarkup(createElement(WeeklyCountView, { model: { ...weeklyCount, receipt: { ...weeklyCount.receipt!, recorded: "Recorded by you at Sep 8, 2026, 4:00 PM", priorHref: "/taproom?count=sep1" } }, draft: null }));
+  expect(html).toMatch(/Recorded by you at Sep 8, 2026, 4:00 PM\. <a[^>]*href="\/taproom\?count=sep1"[^>]*>Open the previous count<\/a>/);
+  expect(html).not.toContain("prior count");
+});

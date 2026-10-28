@@ -97,8 +97,8 @@ it("identifies committed results by CSV row without exposing record UUIDs (#1382
       ],
     },
   } }));
-  expect(html).toMatch(/>2<\/td><td[^>]*>committed<\/td>/);
-  expect(html).toMatch(/>5<\/td><td[^>]*>blocked: Customer name is required<\/td>/);
+  expect(html).toMatch(/>2<\/td><td[^>]*>Al’s Bar<\/td><td[^>]*>Imported<\/td>/);
+  expect(html).toMatch(/>5<\/td><td[^>]*><\/td><td[^>]*>Blocked: Customer name is required<\/td>/);
   expect(html).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
   expect(html).toContain("frozen-request");
 });
@@ -175,3 +175,39 @@ it("uses friendly field labels and a readable import-kind fallback (#1315)", () 
   expect(html).not.toContain("unitPriceCents");
 });
 
+
+it("labels review columns as problem and status in sentence case (#1497)", () => {
+  const html = renderToStaticMarkup(createElement(ImportView, { model: importPreview }));
+  for (const header of ["Row", "Record", "Problem", "Status"]) expect(html).toMatch(new RegExp(`<th[^>]*>(<[^>]*>)*${header}<`));
+  expect(html).not.toMatch(/<th[^>]*>(<[^>]*>)*(Match|State)</);
+  expect(html).toMatch(/>Validated<\/td><td[^>]*>Ready<\/td>/);
+  expect(html).toMatch(/>Blocked<\/td>/);
+  expect(html).not.toMatch(/>(validated|ready|blocked)<\/td>/);
+});
+
+it("reads a finished batch as imported, tucks the request ID away, and drops Retry once results return (#1497)", () => {
+  const done = { ...importPreview, step: 3, batchId: "done-request", previewRows: [1], result: { committed: 1, blocked: 0, outcomes: [{ row: 1, status: "committed" as const }] } };
+  const html = renderToStaticMarkup(createElement(ImportView, { model: done }));
+  expect(html).toContain("1 imported · 0 blocked");
+  expect(html).not.toContain("committed");
+  expect(html).toMatch(/>1<\/td><td[^>]*>Ridgeline \+ Main<\/td><td[^>]*>Imported<\/td>/);
+  expect(html).toMatch(/<details><summary>Batch request<\/summary>[^]*done-request[^]*<\/details>/);
+  expect(html).not.toContain("Retry same batch");
+});
+
+it("lists allowed values and picker options by their labels (#1497)", () => {
+  const match = renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, step: 1 } }));
+  expect(match).toContain("Distributor, Retailer, Brewery, Other");
+  expect(match).toContain("Due on receipt (due_on_receipt), Net 15 (net15), Net 30 (net30)");
+  const pick = vi.spyOn(E, "pick");
+  try {
+    renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, rows: [{ ...importPreview.rows[0], paymentTerms: "net15" }], validation: [[]] } }));
+    const terms = pick.mock.calls.find(call => call[0].startsWith("Payment terms"))!;
+    expect(terms[2]).toContainEqual({ value: "net15", label: "Net 15" });
+    expect(terms[3]?.displayValue).toBeUndefined();
+    const type = pick.mock.calls.find(call => call[0].startsWith("Customer type"))!;
+    expect(type[2]).toContainEqual({ value: "retailer", label: "Retailer" });
+  } finally {
+    pick.mockRestore();
+  }
+});

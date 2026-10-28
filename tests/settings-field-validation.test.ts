@@ -59,8 +59,8 @@ describe("Oct 23 settings field validation (#1121)", () => {
     expectAssociatedError(html, "Lead time (days)", "Enter a whole number of days, zero or more.");
   });
 
-  // Send invite stays enabled so a click marks the email field (#1122); the submit still refuses the invalid email.
-  it("keeps Send invite enabled for an invalid staff invitation but prevents its submit callback", () => {
+  // Send invite is withheld for an invalid email (#1488); the submit still refuses it.
+  it("withholds Send invite for an invalid staff invitation and prevents its submit callback", () => {
     expect(emailError("")).toBeTruthy();
     expect(emailError("not-an-email")).toBeTruthy();
     expect(emailError("person@example.com")).toBeUndefined();
@@ -68,11 +68,18 @@ describe("Oct 23 settings field validation (#1121)", () => {
     let tree: ReactNode;
     const onSubmit = vi.fn();
     function Harness() { return tree = InviteView({ buyer: false, defaultEmail: "not-an-email", onSubmit }); }
-    renderToStaticMarkup(createElement(Harness));
+    const html = renderToStaticMarkup(createElement(Harness));
     const nodes = elements(tree!);
-    expect(nodes.find(node => node.props.type === "submit")?.props.disabled).toBe(false);
+    expect(html.match(/<button[^>]*>Send invite<\/button>/)?.[0]).toContain('disabled=""');
     (nodes.find(node => node.type === "form")!.props.onSubmit as (event: unknown) => void)({ preventDefault: vi.fn() });
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("draws a refused name under the name field of each create sheet (#1488)", () => {
+    const taken = "That name is already used. Choose a different name.";
+    expectAssociatedError(renderToStaticMarkup(createElement(WaterProfileView, { fields: toWaterProfileFields(), nameError: taken })), "Profile name", taken);
+    expectAssociatedError(renderToStaticMarkup(createElement(PriceGroupView, { model: { name: "Standard", position: "1", costCeilingInput: "" }, nameError: taken })), "Group name", taken);
+    expectAssociatedError(renderToStaticMarkup(createElement(BrandView, { model: toBrandViewProps(brandHazy), controls: { name: vi.fn() }, nameError: taken })), "Brand name", taken);
   });
 
   it("associates pH correction with the actual water field, retaining optional decimal values", () => {
@@ -106,9 +113,9 @@ describe("Oct 23 settings field validation (#1121)", () => {
     let tree: ReactNode;
     const onSubmit = vi.fn();
     function Harness() { return tree = InviteView({ buyer: false, email: "person@example.com", onSubmit }); }
-    renderToStaticMarkup(createElement(Harness));
+    const html = renderToStaticMarkup(createElement(Harness));
     const nodes = elements(tree!);
-    expect(nodes.find(node => node.props.type === "submit")?.props.disabled).toBe(false);
+    expect(html.match(/<button[^>]*>Send invite<\/button>/)?.[0]).not.toContain('disabled=""');
     (nodes.find(node => node.type === "form")!.props.onSubmit as (event: unknown) => void)({ preventDefault: vi.fn() });
     expect(onSubmit).toHaveBeenCalledOnce();
   });

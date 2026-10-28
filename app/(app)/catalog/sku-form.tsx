@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
+import { E } from "@/components/mgr/e";
 import { SkuView } from "@/components/mgr/views/sku";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { toSkuViewProps, skuUpdateCommand, type KegPoolOption } from "@/lib/mgr/sku-view";
@@ -24,18 +25,18 @@ export function SkuEditForm({ sku, formatName, packageType, pools = [] }: { sku:
   });
   return (
     <CommandForm open={form.open} onOpenChange={(open) => { if (open) reset(); form.setOpen(open); }} title={`Edit SKU · ${sku.name}`} trigger={<Button variant="outline" size="sm">Edit SKU</Button>}>
-      <form onSubmit={(event) => { if (!edit.valid) { event.preventDefault(); return; } void form.submit(event); }} className="flex flex-col gap-4">
+      <form onSubmit={(event) => { if (edit.reason) { event.preventDefault(); return; } void form.submit(event); }} className="flex flex-col gap-4">
         <SkuView
           // A saved SKU keeps its format, so the picker has no options to offer.
           model={{ ...initial, active, upc, kegPool, batchSharePercent }}
           controls={{ active: setActive, upc: setUpc, kegPool: setKegPool, batchSharePercent: setBatchSharePercent }}
           locked
           messages={<>
-            <p className="text-sm">Create another SKU to use a different format. Changing the keg pool affects future orders only.</p>
+            <p className="text-sm">Create another SKU to use a different format.{packageType === "keg" && " Changing the keg pool affects future orders only."}</p>
             <p className="text-sm text-muted-foreground">Inactive SKUs leave inventory and order history intact and cannot be added to new orders. Clear UPC to remove it.</p>
             <CommandFormMessage error={form.error} />
           </>}
-          footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !edit.valid}>{form.submitting ? "Saving…" : "Save SKU"}</Button></CommandFormFooter>}
+          footer={<CommandFormFooter>{E.submit("Save SKU", { submitting: form.submitting, reason: edit.reason })}</CommandFormFooter>}
         />
       </form>
     </CommandForm>

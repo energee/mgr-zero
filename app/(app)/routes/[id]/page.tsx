@@ -85,7 +85,7 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
             const done = { key: s.id, title: `Stop ${s.stop_no} · ${s.label}`, detail: `${sentenceCase(s.outcome ?? "delivered")} ${formatTime(s.delivered_at, brewery.timeZone)}` };
             return s.outstanding_qty
               ? { ...done, trailing: `${s.outstanding_qty} awaiting check-in`, verb: "Check in", href: `/work/deliveries/${s.id}/return`, warning: true }
-              : { ...done, trailing: "done", ok: true };
+              : { ...done, trailing: "Done", ok: true };
           }
           return {
             key: s.id,

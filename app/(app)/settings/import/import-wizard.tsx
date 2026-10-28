@@ -43,7 +43,7 @@ function ImportSession({ lookups }: { lookups: ImportLookups }) {
   const send = useCommandAction();
   const router = useRouter();
   const fields = IMPORT_FIELDS[kind];
-  const rows = useMemo(() => csv ? mapCsvRows(csv.rows, mapping) : [], [csv, mapping]);
+  const rows = useMemo(() => csv ? mapCsvRows(kind, csv.rows, mapping) : [], [csv, kind, mapping]);
   const validation = useMemo(() => validateImportRows(kind, rows, lookups), [rows, kind, lookups]);
 
   function stage(next: ReturnType<typeof parseCsv>) {

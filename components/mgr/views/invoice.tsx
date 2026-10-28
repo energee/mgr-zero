@@ -20,7 +20,7 @@ import { QboStaffInvoiceLinkView } from "./accounting";
 import { PAYMENT_METHODS } from "@/lib/mgr/enums";
 import { PAYMENT_METHOD_LABEL, sentenceCase } from "@/lib/mgr/labels";
 import type { QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
-import type { InvoicePaymentValue, InvoicePaymentView, InvoiceQuestionView, InvoiceViewModel } from "@/lib/mgr/invoice-view";
+import { invoicePaymentAmountError, type InvoicePaymentValue, type InvoicePaymentView, type InvoiceQuestionView, type InvoiceViewModel } from "@/lib/mgr/invoice-view";
 import { cn } from "@/lib/utils";
 
 export type { InvoiceViewModel };
@@ -33,17 +33,20 @@ const METHOD_OPTIONS = [{ value: "", label: "Select a method", disabled: true },
 /** The Record payment sheet's body, fields like KegPoolFields: amount capped at
  *  the balance, received day capped at the brewery's today, method,
  *  reference. Without onChange the fields draw the value uncontrolled, as the
- *  inventory does. At a QuickBooks-connected brewery it warns that payments stop
- *  the push. Then the live form's submit footer, or the inert Record payment
- *  button when omitted. */
-export function RecordPaymentView({ value, maxCents, maxDate, quickbooksConnected, onChange, footer }: {
-  value: InvoicePaymentValue; maxCents: number; maxDate: string; quickbooksConnected: boolean; onChange?: (next: InvoicePaymentValue) => void; footer?: ReactNode;
+ *  inventory does. A bad amount is marked under Amount once `amountTouched`
+ *  (the live form sets it on `onAmountBlur`), or at once in the inventory. At a
+ *  QuickBooks-connected brewery it warns that payments stop the push. Then the
+ *  live form's submit footer, or the inert Record payment button when omitted. */
+export function RecordPaymentView({ value, maxCents, maxDate, quickbooksConnected, onChange, amountTouched = false, onAmountBlur, footer }: {
+  value: InvoicePaymentValue; maxCents: number; maxDate: string; quickbooksConnected: boolean; onChange?: (next: InvoicePaymentValue) => void;
+  amountTouched?: boolean; onAmountBlur?: () => void; footer?: ReactNode;
 }) {
   const set = <K extends keyof InvoicePaymentValue>(key: K) => onChange ? (next: InvoicePaymentValue[K]) => onChange({ ...value, [key]: next }) : undefined;
+  const amountError = !onChange || amountTouched ? invoicePaymentAmountError(value.amount, maxCents) : undefined;
   return (
     <>
       {quickbooksConnected ? E.note("This invoice will not be sent to QuickBooks while it has payments recorded in MGR.") : null}
-      {E.edit("Amount ($)", value.amount, "number", undefined, { id: "payment-amount", min: 0, max: maxCents / 100, step: 0.01, onChange: set("amount"), required: true })}
+      {E.edit("Amount ($)", value.amount, "number", undefined, { id: "payment-amount", min: 0, max: maxCents / 100, step: 0.01, onChange: set("amount"), onBlur: onAmountBlur, error: amountError, required: true })}
       {E.edit("Received on", value.receivedOn, "date", undefined, { max: maxDate, onChange: set("receivedOn"), required: true })}
       {/* E.pick hands back a plain string; METHOD_OPTIONS holds only "" and PaymentMethod values, so the cast is safe (as in KegPoolFields). */}
       {E.pick("Method", value.method, METHOD_OPTIONS, { id: "payment-method", onChange: set("method") as ((v: string) => void) | undefined, required: true })}

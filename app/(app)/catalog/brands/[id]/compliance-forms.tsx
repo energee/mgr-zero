@@ -8,6 +8,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage, sheetTrigger } from "@/components/mgr/command-form";
 import { BrandApprovalView } from "@/components/mgr/views/brand-approval";
 import { StateRegistrationView } from "@/components/mgr/views/state-registration";
@@ -95,7 +96,7 @@ export function ApprovalForm({ brand, approval, approvals = [] }: { brand: Brand
           controls={controls}
           images={Object.fromEntries(imageOptions.map(image => [image.url, <ColaImage key={`${v.ttbId}:${image.url}`} ttbId={v.ttbId.trim()} url={image.url} label={image.label} />]))}
           messages={<><CommandFormMessage error={search.error} /><CommandFormMessage error={form.error} /></>}
-          footer={<CommandFormFooter>{E.submit("Save approval", { submitting: busy, reason })}</CommandFormFooter>}
+          footer={<CommandFormFooter><Button type="button" variant="outline" disabled={busy} onClick={() => form.setOpen(false)}>Cancel</Button>{E.submit("Save approval", { submitting: busy, reason })}</CommandFormFooter>}
         />
       </form>
     </CommandForm>

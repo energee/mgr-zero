@@ -1,6 +1,9 @@
-// lib/mgr/return-credit-view.ts — view-model for Return and credit.
+// lib/mgr/return-credit-view.ts — view-model for Return and credit, and what
+// Return shipment still needs (#1485).
 import { docNo } from "./doc-no";
 import { money } from "./money";
+import { isNumber, numberNotationError } from "./quantity-input";
+import { submitReason } from "./submit-reason";
 
 export type ReturnCreditLineView = {
   key: string;
@@ -59,10 +62,40 @@ export type ReturnCreditSnapshot = {
  *  the chip index stays an implementation detail here instead of a contract
  *  spelled out again in every caller. */
 export const RETURN_REASONS = [
-  { id: "damaged", label: "damaged · written to loss" },
-  { id: "wrong_item", label: "wrong item · back to stock" },
-  { id: "unsold", label: "unsold · back to stock" },
+  { id: "damaged", label: "Damaged · written to loss" },
+  { id: "wrong_item", label: "Wrong item · back to stock" },
+  { id: "unsold", label: "Unsold · back to stock" },
 ] as const;
+
+/** What is wrong with a typed return quantity, shown under it: a negative or
+ *  non-number, more than the line can return, or finer than its step (whole
+ *  kegs for a deposit, cents of a unit for beer). Blank or zero is not an
+ *  error: that line is not returned. return_shipment checks the same again. */
+export function returnQuantityError(qty: string, line: Pick<ReturnCreditLineView, "maxReturning" | "step">): string | undefined {
+  if (qty.trim() === "") return undefined;
+  const notation = numberNotationError(qty);
+  if (notation) return notation;
+  const n = Number(qty);
+  const whole = line.step === "1";
+  const fine = whole ? Number.isInteger(n) : (qty.trim().split(".")[1]?.length ?? 0) <= 2;
+  if (isNumber(qty) && n >= 0 && n <= line.maxReturning && fine) return undefined;
+  return whole ? `Enter a whole number of kegs from 0 to ${line.maxReturning}.` : `Enter a quantity from 0 to ${line.maxReturning}, with at most two decimal places.`;
+}
+
+/** Why Return shipment is withheld, or null when ready: every typed quantity
+ *  valid (a bad line is named, never dropped from the return), at least one
+ *  above zero, a reason, a return location, and the bin when beer comes back
+ *  against a shipment (`binMissing`). */
+export function returnCreditReason({ lines, quantities, reason, locationId, binMissing }: {
+  lines: ReturnCreditLineView[]; quantities: Record<string, string>; reason: string; locationId: string; binMissing: boolean;
+}): string | null {
+  const missing = lines.filter(line => returnQuantityError(quantities[line.key] ?? "", line)).map(line => `a valid quantity for ${line.name}`);
+  if (!missing.length && !lines.some(line => Number(quantities[line.key]) > 0)) missing.push("a quantity to return");
+  if (!reason) missing.push("a reason");
+  if (!locationId) missing.push("a return location");
+  if (binMissing) missing.push("a return bin");
+  return submitReason(missing);
+}
 
 /** Map get_order / get_invoice plus the return qty onto ReturnCreditView. Beer
  *  lines come back as stock (and, when damaged, go to loss); keg deposit lines

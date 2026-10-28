@@ -23,6 +23,11 @@ const CASES: Case[] = [
   { command: "schedule_batch", path: ["plannedBbl"], max: 9_999_999.999, over: 99_999_999, column: "numeric(10,3)" },
   { command: "create_keg_pool", path: ["depositCents"], max: INT_MAX, over: 99_999_999_999, column: "int" },
   { command: "update_keg_pool", path: ["perFillCents"], max: INT_MAX, over: INT_MAX + 1, column: "int" },
+  { command: "create_purchase_order", path: ["lines", 0, "qtyOrdered"], max: 9_999_999_999.9999, over: 10_000_000_000, column: "numeric(14,4)" },
+  { command: "upsert_material_contract", path: ["qtyCommitted"], max: 9_999_999_999.9999, over: 10_000_000_000, column: "numeric(14,4)" },
+  { command: "upsert_vendor", path: ["leadTimeDays"], max: INT_MAX, over: INT_MAX + 1, column: "int" },
+  { command: "schedule_packaging_run", path: ["outputs", 0, "qtyPlanned"], max: 9_999_999_999.99, over: 99_999_999_999, column: "numeric(12,2)" },
+  { command: "close_packaging_run", path: ["outputs", 0, "qtyActual"], max: 9_999_999_999.99, over: 99_999_999_999, column: "numeric(12,2)" },
 ];
 
 /** Build a payload holding `value` at `path`; the other fields may be missing — only this path's issues are read. */
@@ -45,4 +50,13 @@ describe("command number inputs are bounded by their columns (#427)", () => {
   it.each(CASES)("$command $path accepts $max ($column)", (c) => {
     expect(rangeIssue(c, c.max)).toBeUndefined();
   });
+});
+
+// #1482: a bound's message is shown to whoever sent the command, so it reads as
+// an instruction with the limit, not zod's "Too big: expected number to be <=…".
+it("says a number bound as an instruction", () => {
+  const issue = (c: Case, value: number) => rangeIssue(c, value)?.message;
+  expect(issue(CASES.find(c => c.path.includes("qtyOrdered"))!, 10_000_000_000)).toBe("Enter a number no greater than 9,999,999,999.9999.");
+  expect(issue(CASES.find(c => c.path.includes("qtyCommitted"))!, 0)).toBe("Enter a number greater than 0.");
+  expect(issue(CASES.find(c => c.path.includes("leadTimeDays"))!, -1)).toBe("Enter a number of at least 0.");
 });

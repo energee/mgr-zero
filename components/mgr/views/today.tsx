@@ -1,5 +1,6 @@
 // components/mgr/views/today.tsx — Today and persona landings. Live maps
 // get_today / taproomTodayRows onto rows with linkRows; inventory uses fixtures.
+// The role's quick actions (model.actions) sit under the header, above the rows.
 import { Fragment, type ReactNode } from "react";
 import { BeerIcon, DeliveryTruck01Icon, Invoice01Icon, Package01Icon, Route01Icon, TaskDone01Icon, ThermometerIcon } from "@hugeicons/core-free-icons";
 import { E } from "@/components/mgr/e";
@@ -25,9 +26,13 @@ export function TodayView({
   emptyAction?: ReactNode;
   linkRows?: boolean;
 }) {
+  const actions = model.actions ?? [];
   return (
     <>
       {E.hd("Today", model.date)}
+      {/* A lone action spans the phone column, as E.btn does; two or more share a grid. */}
+      {actions.length === 1 && E.btn(actions[0].label, "g", actions[0].href)}
+      {actions.length > 1 && E.btns(actions.map((a) => [a.label, "g", a.href]))}
       {lead}
       {model.empty
         ? (

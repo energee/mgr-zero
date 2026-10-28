@@ -3,8 +3,8 @@
 // pick any one as its source or its target). Each row has Edit →
 // water-profile-form.tsx; Add water profile opens the same sheet empty.
 // Brewer and Admin. Admin arrives from Catalog or Settings, both arrive from
-// Recipes or a recipe's Water sheet. Settings keeps its return destination;
-// other entries use a role-accessible default (waterProfilesBack).
+// Recipes or a recipe's Water sheet. Settings and Recipes keep their return
+// destination; other entries use a role-accessible default (waterProfilesBack).
 import { WaterProfilesView } from "@/components/mgr/views/water-profiles";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";

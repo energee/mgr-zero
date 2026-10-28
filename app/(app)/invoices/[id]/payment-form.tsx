@@ -2,16 +2,19 @@
 // verbs (#1045): Record payment (record_invoice_payment) draws the shared
 // RecordPaymentView, with the received day defaulting to and capped at the
 // brewery's today; Void payment (void_invoice_payment) draws VoidPaymentView,
-// a reason dialog like Write off. The RPCs re-check every rule.
+// a reason dialog like Write off. Each submit says why it is withheld
+// (#1485). The RPCs re-check every rule.
 "use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
+import { E } from "@/components/mgr/e";
 import { RecordPaymentView, VoidPaymentView } from "@/components/mgr/views/invoice";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { toCents } from "@/lib/mgr/money";
-import { invoicePaymentReady, type InvoicePaymentValue } from "@/lib/mgr/invoice-view";
+import { invoicePaymentReason, type InvoicePaymentValue } from "@/lib/mgr/invoice-view";
+import { submitReason } from "@/lib/mgr/submit-reason";
 
 /** `today` is breweryDate(timeZone), from the server page; `balanceCents` caps the amount. */
 export function RecordPaymentForm({ invoiceId, balanceCents, today, quickbooksConnected }: {
@@ -19,20 +22,22 @@ export function RecordPaymentForm({ invoiceId, balanceCents, today, quickbooksCo
 }) {
   const initial = (): InvoicePaymentValue => ({ amount: "", receivedOn: today, method: "", reference: "" });
   const [value, setValue] = useState(initial);
+  const [amountTouched, setAmountTouched] = useState(false);
   const form = useCommandForm("record_invoice_payment", {
     build: () => ({
       invoiceId, amountCents: toCents(value.amount), receivedOn: value.receivedOn, method: value.method,
       reference: value.reference.trim() || undefined,
     }),
-    reset: () => setValue(initial()),
+    reset: () => { setValue(initial()); setAmountTouched(false); },
   });
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Record payment"
       trigger={<Button variant="outline" size="sm" type="button">Record payment</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <RecordPaymentView value={value} maxCents={balanceCents} maxDate={today} quickbooksConnected={quickbooksConnected} onChange={setValue}
+          amountTouched={amountTouched} onAmountBlur={() => setAmountTouched(true)}
           footer={<><CommandFormMessage error={form.error} /><CommandFormFooter>
-            <Button type="submit" disabled={form.submitting || !invoicePaymentReady(value, balanceCents, today)}>{form.submitting ? "Recording…" : "Record payment"}</Button>
+            {E.submit("Record payment", { submitting: form.submitting, busy: "Recording…", reason: invoicePaymentReason(value, balanceCents, today) })}
           </CommandFormFooter></>} />
       </form>
     </CommandForm>
@@ -49,7 +54,7 @@ export function VoidPaymentForm({ paymentId, amount }: { paymentId: string; amou
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <VoidPaymentView paymentId={paymentId} amount={amount} reason={reason} onReasonChange={setReason}
           footer={<><CommandFormMessage error={form.error} /><CommandFormFooter>
-            <Button type="submit" variant="destructive" disabled={form.submitting || !reason.trim()}>{form.submitting ? "Voiding…" : "Confirm void"}</Button>
+            {E.submit("Confirm void", { variant: "destructive", submitting: form.submitting, busy: "Voiding…", reason: submitReason(reason.trim() ? [] : ["a reason"]) })}
           </CommandFormFooter></>} />
       </form>
     </CommandForm>

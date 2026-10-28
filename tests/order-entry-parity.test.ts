@@ -6,6 +6,7 @@ import { NewOrderView } from "@/components/mgr/views/new-order";
 import { Select, SelectItem } from "@/components/ui/select";
 import { ShipToView } from "@/components/mgr/views/ship-to";
 import { toShipToViewProps } from "@/lib/mgr/ship-to-view";
+import { UsStateField } from "@/components/mgr/us-state-field";
 import { SCREENS } from "@/components/mgr/screens";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { PickView } from "@/components/mgr/views/pick";
@@ -14,6 +15,8 @@ import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
 import { toPickViewProps } from "@/lib/mgr/pick-view";
 import { toShortPickViewProps } from "@/lib/mgr/short-pick-view";
 import { orderAdjustLines, orderPick, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
+import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
+import { newOrderDraft } from "@/lib/mgr/fixtures/orders";
 
 function elements(node: ReactNode): ReactElement<Record<string, unknown> & { children?: ReactNode }>[] {
   if (!isValidElement<Record<string, unknown> & { children?: ReactNode }>(node)) return [];
@@ -96,7 +99,7 @@ describe("shared order-entry controls", () => {
     expect(SCREENS.find(screen => screen.name === "New order")?.surface).toBeUndefined();
   });
 
-  it("shares all address controls, normalizes state, and keeps the second line optional", () => {
+  it("shares all address controls, picks the US state from the list, and keeps the second line optional", () => {
     const state = vi.fn(), address2 = vi.fn(), isDefault = vi.fn();
     let node: ReactNode;
     function Capture() {
@@ -106,9 +109,8 @@ describe("shared order-entry controls", () => {
     const markup = renderToStaticMarkup(createElement(Capture));
     const nodes = elements(node);
     const field = (label: string) => nodes.find(element => element.props["aria-label"] === label)!;
-    invoke(field("State"), "onChange", { target: { value: "ny" } });
-    expect(state).toHaveBeenCalledWith("NY");
-    expect(field("State").props.maxLength).toBe(2);
+    const stateField = nodes.find(element => element.type === UsStateField)!;
+    expect(stateField.props.controls).toMatchObject({ onChange: state, required: true });
     expect(field("Address 2 (optional)").props.required).toBe(false);
     invoke(field("Address 2 (optional)"), "onChange", { target: { value: "" } });
     expect(address2).toHaveBeenCalledWith("");
@@ -123,3 +125,13 @@ function invoke(node: ReactElement<Record<string, unknown>> | undefined, prop: s
   assert(typeof callback === "function", `Expected ${prop} callback`);
   Reflect.apply(callback, undefined, args);
 }
+
+describe("past Requested ship date (#1489)", () => {
+  const draft = toNewOrderViewProps(newOrderDraft);
+  const html = (requestedShip: string) => renderToStaticMarkup(createElement(NewOrderView, { model: { ...draft, requestedShip, today: "2026-10-23" } }));
+  it("warns before the brewery's today without blocking Save draft", () => {
+    expect(html("2026-10-05")).toContain("This requested ship date is in the past for your brewery. You can still save the order.");
+    expect(html("2026-10-23")).not.toContain("in the past");
+    expect(html("")).not.toContain("in the past");
+  });
+});

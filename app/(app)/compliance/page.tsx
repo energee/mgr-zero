@@ -45,7 +45,7 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
         cadences: CADENCES.map(([, name]) => name),
         cadence: on,
         months: months.map((m) => ({ ...periodRow(m, filed.get(m), today, brewery.timeZone, activePeriods.includes(m)), href: `/compliance/${m}` })),
-        empty: booksOpenedOn ? noPeriodsYet(cadence, booksOpenedOn) : undefined,
+        empty: booksOpenedOn ? noPeriodsYet(cadence, booksOpenedOn, today) : undefined,
         registry: { key: "registry", title: "Licenses", detail: "Your brewery’s state licenses.", href: "/compliance/licenses" },
         lots: lots.map((l) => ({ key: l.id, title: l.code, detail: `${l.brands?.name ?? ""} · packaged ${formatDate(l.packaged_on)}`, href: `/compliance/lots/${l.id}` })),
         lotsEmpty: q && lots.length === 0 ? noLotMatch : undefined,
