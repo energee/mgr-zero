@@ -12,6 +12,7 @@ import { defineCommand, defineQuery, phone, unwrap, STAFF_ROLES } from "./regist
 import { isoDate } from "./packaging";
 import { GRAVITY_UNITS, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { chatModelFromSettings, DEFAULT_CHAT_MODEL, MODEL_ID } from "@/lib/chat/models";
+import { BREWERY_IDENTIFIER_MAX } from "@/lib/mgr/settings-view";
 
 defineQuery({
   name: "get_gravity_unit",
@@ -67,7 +68,7 @@ defineCommand({
   roles: ["admin"],
   input: z.object({
     name: z.string().trim().min(1), timezone: z.string().trim().min(1),
-    ttbRegistryNo: z.string().trim().optional(), paLicenseNo: z.string().trim().optional(), customerPhone: phone.optional(),
+    ttbRegistryNo: z.string().trim().max(BREWERY_IDENTIFIER_MAX).optional(), paLicenseNo: z.string().trim().max(BREWERY_IDENTIFIER_MAX).optional(), customerPhone: phone.optional(),
     readingDueHours,
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_brewery", {

@@ -46,12 +46,17 @@ export function breweryOperatingDefaultsCommand(values: Pick<BrewerySettingsValu
   };
 }
 
+/** The TTB registry number and PA license are free text (no format yet, #1500); this only caps their trimmed length. */
+export const BREWERY_IDENTIFIER_MAX = 100;
+
 /** Compare the values sent by Settings, not harmless whitespace or numeric formatting. */
 export function brewerySettingsReason(values: BrewerySettingsValues, initial: BrewerySettingsValues): string | null {
   const missing: string[] = [];
   if (!values.name.trim()) missing.push("a brewery name");
   if (!values.timezone.trim()) missing.push("a timezone");
   if (phoneError(values.phone)) missing.push("a phone number, such as (503) 555-0142");
+  if (values.ttb.trim().length > BREWERY_IDENTIFIER_MAX) missing.push(`a TTB registry number of ${BREWERY_IDENTIFIER_MAX} characters or fewer`);
+  if (values.pa.trim().length > BREWERY_IDENTIFIER_MAX) missing.push(`a PA license of ${BREWERY_IDENTIFIER_MAX} characters or fewer`);
   const { readingDueHours, daysToPackage } = breweryOperatingDefaultsCommand(values).input;
   if (!readingDueHoursIsValid(readingDueHours)) missing.push("reading overdue hours from 1 to 168 (whole numbers)");
   if (!Number.isInteger(daysToPackage) || daysToPackage < 1 || daysToPackage > 120) missing.push("days to package from 1 to 120 (whole numbers)");
