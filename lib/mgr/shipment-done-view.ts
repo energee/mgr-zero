@@ -11,7 +11,10 @@ export type ShipmentDoneViewModel = {
   invoiceHref?: string;
   /** Add to route: /routes/new?add={shipmentId}, for a delivery order on no route yet. */
   routeHref?: string;
+  /** The invoice's Return page, where this shipment is corrected; live pages only. */
+  returnHref?: string;
   tape: [string, string][];
+  /** Where the correction starts: Return shipment on the invoice, or, deferred, the invoice delivery raises. */
   info: string;
   warnings: string[];
 };
@@ -52,15 +55,19 @@ export function toShipmentDoneViewProps({ order, invoice, lines, backHref, invoi
     tape.push([`−${qty} ${name} · removed for sale${dest ? ` · ships to ${dest}` : ""}${short}`, saleVolume(qty, l.bbl_per_unit)]);
   }
   if (invoice) tape.push([inv, "invoiced now"]);
+  const href = invoice ? invoiceHref : undefined;
   return {
     backTo: docNo("ORD", order.order_no, "Order"),
     backHref,
     title: "Shipped",
     invoice: invoice ? `${inv} · assigned` : invoiceTiming === "on_delivery" ? "Deferred to delivery" : "No invoice was created",
-    invoiceHref: invoice ? invoiceHref : undefined,
+    invoiceHref: href,
     routeHref,
+    returnHref: href && `${href}/return`,
     tape,
-    info: "To correct this shipment, Return shipment.",
+    info: invoice ? "To correct this shipment, use Return shipment."
+      : invoiceTiming === "on_delivery" ? "The invoice is raised at delivery. To correct this shipment, open that invoice and select Return."
+      : "Return shipment corrects a shipment through its invoice, and this one has none.",
     warnings: (warnings ?? []).map(kegShortageText),
   };
 }

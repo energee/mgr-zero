@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { docNo, trfNo } from "@/lib/mgr/doc-no";
 import { hasAnyRole } from "@/lib/mgr/roles";
+import { ROUTE_STATUSES } from "@/lib/mgr/routes-view";
 import type { TeamMember } from "./invites";
 import { breweryToday, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, rows, runCommand, unwrap } from "./registry";
 
@@ -46,18 +47,23 @@ const shipmentDoc = (s: ShipmentRow): StopDoc => ({ id: s.id, kind: "shipment", 
 const transferDoc = (t: TransferRow): StopDoc => ({ id: t.id, kind: "transfer", label: [trfNo(t.transfer_no), t.to_location?.name].filter(Boolean).join(" · ") });
 
 defineQuery({
-  name: "list_routes", description: "Delivery routes (one route by id, one day, or every route not yet returned) with their stops and their driver's roster email (null when no driver is assigned or the driver has left the team); the shipped orders and picked transfers on no route; and the members who may drive, with their emails",
+  name: "list_routes", description: "Delivery routes (one route by id, one day, or by status: open, the default, is every route not yet returned; returned is every returned route, newest first) with their stops and their driver's roster email (null when no driver is assigned or the driver has left the team); whether any route has been returned; the shipped orders and picked transfers on no route; and the members who may drive, with their emails",
   roles: [...READ],
-  input: z.object({ id: z.string().uuid().optional(), date: z.string().date().optional() }),
+  input: z.object({ id: z.string().uuid().optional(), date: z.string().date().optional(), status: z.enum(ROUTE_STATUSES).optional() }),
   handler: async (ctx, i) => {
-    let q = ctx.db.from("routes").select("*").eq("brewery_id", ctx.breweryId).order("delivery_date").order("created_at");
-    q = i.id ? q.eq("id", i.id) : i.date ? q.eq("delivery_date", i.date) : q.is("returned_at", null);
+    const returned = i.status === "returned";
+    let q = ctx.db.from("routes").select("*").eq("brewery_id", ctx.breweryId)
+      .order("delivery_date", { ascending: !returned }).order("created_at", { ascending: !returned });
+    if (i.id) q = q.eq("id", i.id);
+    else if (i.date) q = q.eq("delivery_date", i.date);
+    else if (returned) q = q.not("returned_at", "is", null);
+    else q = q.is("returned_at", null);
     // Read only what the page shows: the listed routes' stops, and the documents on no route (an
     // anti-join on deliveries), each read whole by completeRows however many pages it spans (#473).
     // ponytail: a carrier-shipped order still waits in "unassigned" until someone routes it; a
     // shipment-level "handed to carrier" state is the upgrade path once that list outgrows one screen.
     // A pickup order (orders.pickup) is the customer collecting it, so it never waits here.
-    const [routes, shipments, transfers, team, today] = await Promise.all([
+    const [routes, shipments, transfers, team, today, returnedRoutes] = await Promise.all([
       rows<RouteRow>(q),
       completeRows("Unrouted shipments", (start) => ctx.db.from("shipments").select(`id, ${SHIPMENT_LABEL}, deliveries(id)`, { count: "exact" })
         .eq("brewery_id", ctx.breweryId).is("deliveries", null).eq("orders.pickup", false).order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<ShipmentRow[]>,
@@ -67,6 +73,8 @@ defineQuery({
       // cannot read, so they come from the list_team_members RPC; it lists only current members.
       runCommand("list_team_members", {}, ctx) as Promise<TeamMember[]>,
       breweryToday(ctx),
+      // An empty Open list names Returned when routes were returned, instead of "No routes yet" (#1486).
+      rows<{ id: string }>(ctx.db.from("routes").select("id").eq("brewery_id", ctx.breweryId).not("returned_at", "is", null).limit(1)),
     ]);
     const routeIds = routes.map((r) => r.id);
     const [deliveries, outstanding] = await Promise.all([inChunks(routeIds, (chunk) => completeRows("Route stops", (start) => ctx.db.from("deliveries")
@@ -88,6 +96,7 @@ defineQuery({
           ...d, outstanding_qty: outstandingByStop.get(d.id) ?? 0, label: sh ? shipmentDoc(sh).label : tr ? transferDoc(tr).label : "Stop",
         })),
       })),
+      anyReturned: returnedRoutes.length > 0,
       unassigned: [...shipments.map(shipmentDoc), ...transfers.map(transferDoc)],
       drivers: team.filter((m) => hasAnyRole(m.roles, ROLES))
         .map((m) => ({ user_id: m.userId, email: m.email, roles: m.roles })),

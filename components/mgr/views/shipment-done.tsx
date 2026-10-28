@@ -22,6 +22,7 @@ export function ShipmentDoneView({
       {model.warnings.map((warning) => <div key={warning}>{E.note(warning)}</div>)}
       {E.info(model.info)}
       {model.routeHref && E.btn("Add to route", "p", model.routeHref, undefined, { "data-to": "Route" })}
+      {model.returnHref && <div className="flex justify-end">{E.act("Return shipment", "primary", model.returnHref)}</div>}
     </>
   );
 }

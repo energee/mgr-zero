@@ -1,11 +1,12 @@
 // app/(app)/packaging/[id]/page.tsx — one packaging run: planned facts and
 // its planned outputs, with the one next action for its state (run-actions.tsx):
 // pick a tank, start, or close; before it starts, reschedule or cancel the
-// plan (plan-actions.tsx). get_packaging_run is the read.
+// plan (plan-actions.tsx). A closed run (RunClosedView) keeps the planned facts
+// beside its close day. get_packaging_run is the read.
 import { cache } from "react";
 import type { PackagingSourceOccupancy as Occupancy } from "@/components/mgr/views/plan-actions";
 import { ChangePlan } from "../../plan-actions";
-import type { PackagingClosePlan, PackagingMaterialRecord } from "@/lib/mgr/packaging-actuals";
+import { hasPackagingMaterials, type PackagingClosePlan, type PackagingMaterialRecord } from "@/lib/mgr/packaging-actuals";
 import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
 import { RunClosedView } from "@/components/mgr/views/run-closed";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -57,14 +58,17 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
     closing ? runCommand("get_packaging_close_plan", { runId: id }, ctx) : null,
     run.closed_at ? runCommand("get_packaging_material_record", { runId: id }, ctx) : { records: [] },
   ])) as [Occupancy[], Location[], Bin[], string, PackagingClosePlan | null, { records: PackagingMaterialRecord[] }];
+  // A closed run needs the current plan only to correct its latest record, and a record with no materials has nothing to correct.
   const latest = materialHistory.records.at(-1);
-  // A closed run needs the current plan only to correct its latest record.
-  const correctionPlan = latest ? await runCommand("get_packaging_close_plan", { runId: id }, ctx) as PackagingClosePlan : null;
+  const correctionPlan = latest && hasPackagingMaterials(latest) ? await runCommand("get_packaging_close_plan", { runId: id }, ctx) as PackagingClosePlan : null;
   const title = runNo(run.run_no);
   if (run.closed_at) {
     return (
       <RunClosedView
-        model={{ title, backTo: "Packaging", backHref: "/packaging", bblDrawn: run.bbl_drawn, lot, outputs, records: materialHistory.records, timeZone: brewery.timeZone }}
+        model={{
+          title, backTo: "Packaging", backHref: "/packaging", brand: run.brand_name ?? "—", source: run.vessel_name ?? "No source yet",
+          plannedOn: run.planned_on, closedAt: run.closed_at, bblDrawn: run.bbl_drawn, lot, outputs, records: materialHistory.records, timeZone: brewery.timeZone,
+        }}
         action={latest && correctionPlan ? <MaterialCorrection key={latest.id} runId={run.id} record={latest} plan={correctionPlan} locations={locations} bins={bins} /> : null}
       />
     );

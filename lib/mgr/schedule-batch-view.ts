@@ -1,6 +1,7 @@
 // lib/mgr/schedule-batch-view.ts — view-model for the New batch sheet, and
 // what its Schedule batch still needs.
 import { submitReason } from "@/lib/mgr/submit-reason";
+import { isPastDay } from "@/lib/date-format";
 
 export type ScheduleBatchViewModel = {
   recipeId?: string;
@@ -18,11 +19,13 @@ export type ScheduleBatchViewModel = {
   brandsHref?: string | null;
 };
 
-/** Mirrors schedule_batch's positive numeric(10,3) barrel bounds. */
+/** Mirrors schedule_batch's positive numeric(10,3) barrel bounds: a value that rounds to 0 at three decimals
+ *  (below 0.0005) would fail `planned_bbl > 0`. */
 export function plannedBarrelsError(value: string): string | undefined {
   if (/[eE]/.test(value)) return "Enter a decimal number without exponent notation.";
   const barrels = Number(value);
   if (!Number.isFinite(barrels) || barrels <= 0) return "Enter planned barrels above zero.";
+  if (Math.round(barrels * 1000) === 0) return "Enter at least 0.001 barrels; planned barrels are stored to three decimal places.";
   if (barrels > 9_999_999.999) return "Enter at most 9,999,999.999 barrels.";
 }
 
@@ -36,6 +39,6 @@ export function scheduleBatchReason({ date, plannedBbl }: { date: string; planne
 
 /** Planning in the past is legal; distinguish intent from a recorded brew day. */
 export function pastPlanWarning(date: string, today?: string): string | undefined {
-  if (!today || !/^\d{4}-\d{2}-\d{2}$/.test(date) || date >= today) return undefined;
+  if (!isPastDay(date, today)) return undefined;
   return "This planned date is in the past for your brewery. You can save this plan; it does not record a brew day or change Brewed on.";
 }

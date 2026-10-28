@@ -61,24 +61,30 @@ describe("compliance period status (#1310)", () => {
 
 describe("Monthly compliance view", () => {
   it("explains a period that starts before the books opened instead of failing (#987)", () => {
-    expect(beforeBooksState("October 2026", "2026-10-15", true)).toEqual({
+    expect(beforeBooksState("October 2026", "2026-10-15", true, "2026-10-20")).toEqual({
       title: "Before the books opened",
-      description: "October 2026 starts before the books opened on Oct 15, 2026, so MGR has no report for it. The books-opened date is in Settings.",
+      description: "October 2026 starts before the books opened on Oct 15, 2026, so MGR has no report for it. Activity before that date is not reported in MGR. The books-opened date is in Settings.",
       action: { label: "Open Settings", href: "/settings" },
     });
     const body = SCREENS.find((screen) => screen.name === "Period before the books opened")!.body as { type: unknown };
     expect(body.type).toBe(PeriodBeforeBooksView);
     expect(htmlOf(body as ReactNode)).not.toMatch(/href="\/settings/);
-    const admin = htmlOf(createElement(PeriodBeforeBooksView, { title: "October 2026", state: beforeBooksState("October 2026", "2026-10-15", true), backHref: "/compliance" }));
+    const admin = htmlOf(createElement(PeriodBeforeBooksView, { title: "October 2026", state: beforeBooksState("October 2026", "2026-10-15", true, "2026-10-20"), backHref: "/compliance" }));
     expect(admin).toMatch(/href="\/settings"[^>]*>Open Settings/);
     expect(admin).toMatch(/Oct 15, 2026/);
   });
 
   it("gives Sales no Settings button, which would land on No access, only a sentence to ask an admin (#987 review)", () => {
-    const sales = htmlOf(createElement(PeriodBeforeBooksView, { title: "October 2026", state: beforeBooksState("October 2026", "2026-10-15", false), backHref: "/compliance" }));
+    const sales = htmlOf(createElement(PeriodBeforeBooksView, { title: "October 2026", state: beforeBooksState("October 2026", "2026-10-15", false, "2026-10-20"), backHref: "/compliance" }));
     expect(sales).toContain("Ask an admin to change the books-opened date.");
     expect(sales).not.toContain("Open Settings");
     expect(sales).not.toContain("/settings");
+  });
+
+  it("says the books open, not opened, while that day is still ahead (#1496)", () => {
+    expect(beforeBooksState("October 2026", "2026-11-01", false, "2026-10-26").description).toBe(
+      "October 2026 starts before the books open on Nov 1, 2026, so MGR has no report for it. Activity before that date is not reported in MGR. Ask an admin to change the books-opened date.",
+    );
   });
 
   it("owns the inventory drawing", () => {

@@ -4,8 +4,9 @@
 // differs from the order, the verbs are a required Reason and Save lines
 // (adjust_order_lines, which leaves a submitted order unallocated), or Discard
 // changes; otherwise they are confirm_order and cancel_order. A clean confirm
-// goes back to Orders; one that returns ATP warnings stays to show them
-// (atp-warnings.tsx) until "Back to Orders" — it skips the post-confirm
+// lands on the order; one that returns ATP warnings stays to show them
+// (atp-warnings.tsx) under "Order confirmed.", with the quantities read-only,
+// until "Back to Orders" — it skips the post-confirm
 // refresh, which would re-render page.tsx and redirect the now-confirmed order
 // away before the warnings are read. Cancel order is the shared
 // cancel-order-dialog.tsx.
@@ -32,7 +33,7 @@ export function ConfirmOrderForm({ snapshot }: { snapshot: ConfirmOrderSnapshot 
   let footer: ReactNode;
   if (warnings) footer = (
     <div className="flex flex-col gap-2">
-      <AtpWarnings warnings={warnings} skuNames={new Map(snapshot.lines.map((l) => [l.sku_id, l.skus?.name ?? l.sku_id]))} />
+      <AtpWarnings warnings={warnings} skuNames={new Map(snapshot.lines.map((l) => [l.sku_id, l.skus?.name ?? l.sku_id]))} saved="Order confirmed." />
       <div className="grid grid-cols-1 gap-2 md:flex md:justify-end">
         <Button onClick={() => { router.push("/orders"); router.refresh(); }}>Back to Orders</Button>
       </div>
@@ -56,7 +57,7 @@ export function ConfirmOrderForm({ snapshot }: { snapshot: ConfirmOrderSnapshot 
   );
   // The form submits only Save lines; Reason is required while it shows.
   return <form className="contents" onSubmit={edit.onSubmit}>
-    <ConfirmOrderView model={model} quantities={qtys} onQuantity={warnings ? undefined : edit.setQty}
+    <ConfirmOrderView model={model} readOnly={Boolean(warnings)} quantities={qtys} onQuantity={warnings ? undefined : edit.setQty}
       reason={edit.reason} onReason={changed && !warnings ? edit.setReason : undefined} footer={footer} />
   </form>;
 }
