@@ -176,6 +176,18 @@ describe("Confirm order view loop", () => {
     expect(src).toMatch(/from "@\/components\/mgr\/views\/confirm-order"/);
     expect(src).toMatch(/<ConfirmOrderView\b/);
   });
+
+  it("a confirm that returns warnings says it was confirmed and stops editing quantities (#1489)", () => {
+    const src = readFileSync("app/(app)/orders/[id]/confirm/confirm-buttons.tsx", "utf8");
+    expect(src).toMatch(/<AtpWarnings\b[^\n]*saved="Order confirmed\."/);
+    expect(src).toMatch(/<ConfirmOrderView\b[^\n]*readOnly=\{Boolean\(warnings\)\}/);
+    const model = toConfirmOrderViewProps(orderSubmittedRidgeline);
+    const confirmed = renderToStaticMarkup(createElement(ConfirmOrderView, { model, readOnly: true, footer: null }));
+    expect(confirmed.match(/<input[^>]*type="number"[^>]*>/g)!.every(input => /\breadOnly=""/.test(input))).toBe(true);
+    expect(confirmed).toMatch(/aria-label="Increase"[^>]*disabled=""|disabled=""[^>]*aria-label="Increase"/);
+    const editable = renderToStaticMarkup(createElement(ConfirmOrderView, { model, footer: null }));
+    expect(editable).not.toMatch(/readOnly=""/);
+  });
 });
 
 describe("Complete transfer view loop", () => {

@@ -1,15 +1,20 @@
 // Structured input failures (a 400 invalid_input, or a 409 duplicate name) are
 // projected only onto fields a form actually renders.
 // Other failures keep their original message and recovery semantics.
+import { US_ZIP_CORRECTION } from "@/lib/mgr/ship-to-view";
+
 export type InputIssue = { path: (string | number)[]; code: string; message: string };
 export type FieldErrors = Partial<Record<string, string>>;
 
 function correction(issue: InputIssue): string {
   // A unique-name conflict's own message is already the correction (registry uniqueViolation).
   if (issue.code === "duplicate") return issue.message;
+  // Over a column's limit, the value's format is fine; only its size is not
+  // (#1482). Fixed copy, because a string length issue still carries zod's raw text.
+  if (issue.code === "too_big") return "Enter a smaller value.";
   const field = issue.path[0];
-  if (field === "state") return "Use a two-letter state code, such as PA.";
-  if (field === "zip") return "Use a 5-digit ZIP code or ZIP+4, such as 15201 or 15201-1234.";
+  if (field === "state") return "Choose a US state, such as PA.";
+  if (field === "zip") return US_ZIP_CORRECTION;
   if (field === "phone" || field === "customerPhone") return "Use a phone number, such as (503) 555-0142.";
   if (field === "email") return "Use a complete email address, such as name@example.com.";
   if (field === "country") return "Choose a country.";

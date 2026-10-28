@@ -40,6 +40,8 @@ const pureTests = [
   "tests/cola-review.test.ts",
   "tests/ttb-colas.test.ts",
   "tests/pour-sku-catalog.test.ts",
+  "tests/pour-form-view.test.ts",
+  "tests/group-form-error.test.ts",
   "tests/app-screen-parity.test.ts",
   "tests/field-number-notation.test.ts",
   "tests/field-validation-followup.test.ts",
@@ -58,6 +60,7 @@ const pureTests = [
   "tests/pricing-view.test.ts",
   "tests/auth-page-metadata.test.ts",
   "tests/shell-view.test.ts",
+  "tests/first-run.test.ts",
   "tests/route-error.test.ts",
   // Entry rendering and Auth-boundary tests use fixtures or explicit Auth mocks, not a database.
   "tests/entry-email-link.test.ts",
@@ -110,7 +113,10 @@ const pureTests = [
   "tests/delivery-view.test.ts",
   "tests/transfers-view.test.ts",
   "tests/shipment-parity.test.ts",
-  "tests/order-sheets-view.test.ts"
+  "tests/order-sheets-view.test.ts",
+  "tests/upc.test.ts",
+  "tests/sku-share-controls.test.ts",
+  "tests/keyboard-focus.test.ts"
 ];
 
 export default defineConfig({

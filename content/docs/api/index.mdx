@@ -710,6 +710,10 @@ to associate a correction with the matching field:
 }
 ```
 
+A number past its field's stored range has code `too_big` or `too_small`, and
+its message states the limit, such as `Enter a number no greater than
+9,999,999,999.99.` Each limit is the database column's own bound.
+
 Do not parse the message as a field identifier. Forms show plain corrections
 under supported fields and retain the public reasons for issues that do not
 match a visible field. Direct API and chat callers can also use these reasons

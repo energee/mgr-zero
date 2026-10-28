@@ -54,7 +54,8 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
           // Only the three fields are drafts; pours come from the refreshed model, so
           // Add pour and Remove show up without reopening the dialog.
           model={{ ...model, name: draft.name, position: draft.position, costCeilingInput: draft.costCeilingInput }}
-          controls={{ name: edit("name"), position: edit("position"), costCeiling: edit("costCeilingInput") }}
+          // A refusal such as a duplicate name clears once the name is edited (#1492).
+          controls={{ name: value => { edit("name")(value); form.setError(null); }, position: edit("position"), costCeiling: edit("costCeilingInput") }}
           validationAttempted={validationAttempted}
           nameError={form.fieldErrors.name}
           back={null}

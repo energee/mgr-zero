@@ -19,7 +19,7 @@ import { canRun } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { FormatForm } from "./format-form";
 import { ListControls } from "@/components/mgr/list-controls";
-import { listParams } from "@/lib/mgr/list-params";
+import { listParams, searchQuery } from "@/lib/mgr/list-params";
 import { BRAND_SORTS } from "@/lib/mgr/enums";
 import { navTitle } from "@/lib/mgr/nav";
 import { ColaReview } from "./cola-review";
@@ -38,7 +38,7 @@ type Format = { id: string; name: string; basis: "packaged" | "poured"; package_
 const PRICING_READS = ["list_sale_channels", "list_price_groups", "list_formats", "list_channel_prices", "list_price_group_barcodes"];
 
 const catalogParams = z.object({
-  q: z.string().trim().max(100).catch(""),
+  q: searchQuery,
   sort: z.enum(BRAND_SORTS).catch("name"),
   category: z.string().trim().catch(""),
 });
