@@ -37,6 +37,9 @@ export type PackagingMaterialRecord = {
   actuals: { material_id: string; location_id: string; bin_id: string; lot_id: string | null; material_name: string; unit: string; location_name: string; bin_name: string; lot_code: string | null; qty_used: number; qty_loss: number; qty_unused: number }[];
 };
 
+/** False for a run closed with no planned materials and no actuals: nothing to show or correct. */
+export const hasPackagingMaterials = (record: PackagingMaterialRecord) => record.planned.length > 0 || record.actuals.length > 0;
+
 /** A blank source row the person fills in. */
 export const emptyPackagingActual = (): PackagingActualDraft => ({ key: crypto.randomUUID(), materialId: "", locationId: "", binId: "", lotId: null, used: "0", loss: "0", unused: "0" });
 

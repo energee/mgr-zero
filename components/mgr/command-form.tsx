@@ -11,7 +11,7 @@
 
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
-import { isValidElement } from "react";
+import { isValidElement, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -28,6 +28,21 @@ function FormClose({ className, onClose, previewAction }: { className: string; o
       <span className="sr-only">Close</span>
     </Button>
   );
+}
+
+/** Radix gives focus back only to a Trigger. A form opened from state (Tap
+ *  keg's onClick) has none, so it remembers what had focus as it first opened
+ *  and focuses that again once it closes. */
+export function rememberOpener(opener: { current: HTMLElement | null }) {
+  opener.current ??= document.activeElement as HTMLElement | null;
+}
+
+/** `open` is still true when a resize swaps the phone sheet for the desk
+ *  dialog; that swap keeps the opener and leaves focus in the form. */
+export function returnToOpener(opener: { current: HTMLElement | null }, open: boolean) {
+  if (open) return;
+  opener.current?.focus();
+  opener.current = null;
 }
 
 export function CommandForm({
@@ -47,7 +62,7 @@ export function CommandForm({
   previewAction?: boolean;
   /** Omit to pin the form open (the screen inventory's frames); dismiss gestures then do nothing. */
   onOpenChange?: (open: boolean) => void;
-  /** Omit when the caller controls `open` itself (the screen inventory's frames). */
+  /** Omit when the caller controls `open` itself (Tap keg, the screen inventory's frames); closing then refocuses whatever had focus when it opened. */
   trigger?: React.ReactNode;
   title: React.ReactNode;
   /** Stays on screen; the body scrolls. Quantity sheets put the commit verb here. */
@@ -58,6 +73,12 @@ export function CommandForm({
   const body = (bleed: string) => <div className={cn("min-h-0 flex-1 overflow-y-auto px-4 py-1", bleed)}>{children}</div>;
   const foot = (bleed: string) => footer && <div className={cn("shrink-0 border-t px-4 pt-2", bleed)}>{footer}</div>;
   const mobile = useIsMobile();
+  const opener = useRef<HTMLElement | null>(null);
+  // Radix's own close handler would focus the missing trigger, so it is prevented.
+  const returnFocus = trigger ? undefined : {
+    onOpenAutoFocus: () => rememberOpener(opener),
+    onCloseAutoFocus: (event: Event) => { event.preventDefault(); returnToOpener(opener, open); },
+  };
   // Explorer-only portal plumbing belongs here, not in generated shadcn files.
   if (container) return (
     <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
@@ -82,7 +103,7 @@ export function CommandForm({
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
         {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
-        <SheetContent showCloseButton={false} side="bottom" className="flex max-h-[90svh] flex-col overflow-hidden rounded-t-xl pb-[max(1rem,env(safe-area-inset-bottom))]" data-preview-action={previewAction || undefined}>
+        <SheetContent {...returnFocus} showCloseButton={false} side="bottom" className="flex max-h-[90svh] flex-col overflow-hidden rounded-t-xl pb-[max(1rem,env(safe-area-inset-bottom))]" data-preview-action={previewAction || undefined}>
           <SheetHeader className="shrink-0 pb-0">
             <SheetTitle className="min-w-0 pr-8 [overflow-wrap:anywhere]">{title}</SheetTitle>
           </SheetHeader>
@@ -96,7 +117,7 @@ export function CommandForm({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent showCloseButton={false} className="flex max-h-[90svh] flex-col overflow-hidden sm:max-w-md" data-preview-action={previewAction || undefined}>
+      <DialogContent {...returnFocus} showCloseButton={false} className="flex max-h-[90svh] flex-col overflow-hidden sm:max-w-md" data-preview-action={previewAction || undefined}>
         <DialogHeader className="shrink-0">
           <DialogTitle className="min-w-0 pr-8 [overflow-wrap:anywhere]">{title}</DialogTitle>
         </DialogHeader>

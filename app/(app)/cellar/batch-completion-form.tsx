@@ -19,6 +19,8 @@ export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
   const expectedContext = useRef(useCommandContext());
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  // The list as the dialog opened: the refresh on save drops the completed batch, and its receipt still names it.
+  const [listed, setListed] = useState(batches);
   const [batchId, setBatchId] = useState("");
   const [preview, setPreview] = useState<BatchCompletionPreview | null>(null);
   const [confirmInTank, setConfirmInTank] = useState(false);
@@ -64,6 +66,7 @@ export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
       }, requestId.current, expectedContext.current) as BatchCompletionPreview);
       requestId.current = null;
       setPhase("saved");
+      router.refresh();
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Could not complete this batch";
       setError(message);
@@ -79,15 +82,14 @@ export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
   function changeOpen(next: boolean) {
     if (!next && !canCloseBatchCompletion(phase)) return;
     setOpen(next);
-    if (next) return;
+    if (next) { setListed(batches); return; }
     reviewSequence.current += 1;
     selectedBatchId.current = "";
-    if (phase === "saved") router.refresh();
     setConfirmInTank(false);
     setBatchId(""); setPreview(null); setError(null); setPhase("idle"); requestId.current = null;
   }
 
-  return <BatchCompletionView batches={batches} open={open} onOpenChange={changeOpen}
+  return <BatchCompletionView batches={open ? listed : batches} open={open} onOpenChange={changeOpen}
     batchId={batchId} preview={preview} phase={phase} error={error}
     confirmInTank={confirmInTank} onConfirmInTank={setConfirmInTank}
     onReview={review} onSubmit={submit} />;

@@ -11,8 +11,10 @@ import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import type { ReactNode } from "react";
 import { Fragment, useId, useState } from "react";
 
-export function WaterProfileView({ fields, onChange, validationAttempted = false, messages, footer, submitting = false }: {
+export function WaterProfileView({ fields, onChange, validationAttempted = false, messages, footer, submitting = false, nameError }: {
   fields: WaterProfileFields; onChange?: (patch: Partial<WaterProfileFields>) => void; validationAttempted?: boolean; messages?: ReactNode; footer?: ReactNode; submitting?: boolean;
+  /** Live: the save's refusal of the name, such as a duplicate. */
+  nameError?: string;
 }) {
   // One help line covers all six ions, so each ion input points at it; a
   // second covers the three optional fields the same way.
@@ -32,7 +34,7 @@ export function WaterProfileView({ fields, onChange, validationAttempted = false
   );
   return <>
     <fieldset disabled={submitting} className="flex flex-col gap-3">
-      {E.edit("Profile name", values.name, "text", undefined, { onChange: set("name"), required: true })}
+      {E.edit("Profile name", values.name, "text", undefined, { id: `${helpId}-name`, onChange: set("name"), required: true, error: nameError })}
       <FieldDescription id={helpId}>All six ions are required. Enter 0 to 999,999.9 ppm (the same as mg/L). Values are stored rounded to one decimal place; for example, 12.345 becomes 12.3.</FieldDescription>
       {E.cols(ion(IONS[0], 0), ion(IONS[1], 1))}
       {E.cols(ion(IONS[2], 2), ion(IONS[3], 3))}

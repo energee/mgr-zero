@@ -28,12 +28,18 @@ export type ComplianceMonthsViewModel = {
 
 const CADENCE_WORD: Record<Cadence, string> = { month: "monthly", quarter: "quarterly", year: "annual" };
 
+/** "open" while the books-opened day is still after `today` (the brewery's day), else "opened" (#1496). */
+export const booksVerb = (booksOpenedOn: string, today: string) => (booksOpenedOn > today ? "open" : "opened");
+
+/** Why activity dated before books_opened_on shows in no period: the report never counts it. */
+export const NOT_REPORTED_BEFORE_BOOKS = "Activity before that date is not reported in MGR.";
+
 /** Why a cadence lists no period: every recent one starts before the books opened (#987). */
-export function noPeriodsYet(cadence: Cadence, booksOpenedOn: string): EmptyState {
+export function noPeriodsYet(cadence: Cadence, booksOpenedOn: string, today: string): EmptyState {
   const word = CADENCE_WORD[cadence];
   return {
     title: `No ${word} period yet`,
-    description: `The books opened on ${formatDate(booksOpenedOn)}. ${periodLabel(firstPeriodFrom(booksOpenedOn, cadence))} is the first ${word} period MGR can report, and it is listed here once it starts.`,
+    description: `The books ${booksVerb(booksOpenedOn, today)} on ${formatDate(booksOpenedOn)}. ${NOT_REPORTED_BEFORE_BOOKS} ${periodLabel(firstPeriodFrom(booksOpenedOn, cadence))} is the first ${word} period MGR can report, and it is listed here once it starts.`,
   };
 }
 
