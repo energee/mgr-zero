@@ -98,6 +98,10 @@ record all 32 production-runtime repetitions at the agreed synthetic volumes,
 including the 1.046-second warm report observation. They do not fill this
 protocol's real-pilot authorization table or replace pilot-time real-data evidence.
 
+[Work and More pages, live and local, 2026-10-28](work-and-more-latency-2026-10-28.md)
+time the #1490 and #1491 pages and saves. They are local and public-live
+measurements, not pilot evidence.
+
 | Date | Release SHA | Task | Condition | Runs | Median (s) | Max (s) | Failures | Within agreed limit | Operator |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |
 | | | T1 | cold | | | | | | |
