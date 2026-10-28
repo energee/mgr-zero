@@ -26,6 +26,8 @@ export function ComposerStripView({
 }: {
   actions?: ComposerStripAction[];
   onAction?: (value: string) => void;
+  /** Opens Pending readings. Left out, the strip draws no Pending readings
+   *  button: Composer passes it only while there is a reading or a notice to show. */
   onOutbox?: () => void;
   outboxCount?: number;
   disabled?: boolean;
@@ -76,10 +78,10 @@ export function ComposerStripView({
             {tooLong && <span role="alert" className="text-xs text-destructive">{`${length.toLocaleString("en-US")} / ${MAX_CHAT_MESSAGE_CHARS.toLocaleString("en-US")} characters. Shorten your message to send it.`}</span>}
           </InputGroupAddon>
         </InputGroup>
-        <div className="flex flex-wrap items-center gap-x-1 px-1 pt-1">
+        {onOutbox && <div className="flex flex-wrap items-center gap-x-1 px-1 pt-1">
           <Button type="button" variant="ghost" size="sm" onClick={onOutbox}>Pending readings ({outboxCount})</Button>
           <span className="text-xs text-muted-foreground">Saved fermentation readings to retry or review.</span>
-        </div>
+        </div>}
       </form>
   );
 }

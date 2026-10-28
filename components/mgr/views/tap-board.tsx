@@ -95,9 +95,8 @@ export function TapKegView({ sheet: controlledSheet, skus, skusHref, timeZone, o
 export type TapBoardNavigation = { backHref?: string; countHref?: string; varianceHref?: string; skusHref?: string | null; locations: ScopeOption[]; location: string };
 
 /** `timeZone` is the brewery's: the server renders this client view first, so both sides must format in one zone (#442). */
-export function TapBoardView({ state: controlledState, skus, timeZone, navigation, recentEvents, pollError, onOpen, onClose, onEdit, onSubmit, onReload }: {
+export function TapBoardView({ state: controlledState, skus, timeZone, navigation, pollError, onOpen, onClose, onEdit, onSubmit, onReload }: {
   state: TapBoardState; skus: TapSku[]; timeZone: string; navigation: TapBoardNavigation; pollError?: string | null;
-  recentEvents?: { title: string; detail: string }[];
   onOpen?: (kind: "tap" | "kick" | "swap", interval: TapInterval | null) => void; onClose?: () => void;
   onEdit?: (fields: Partial<TapSheetFields>) => void; onSubmit?: (event: FormEvent<HTMLFormElement>) => void; onReload?: () => void;
 }) {
@@ -106,7 +105,6 @@ export function TapBoardView({ state: controlledState, skus, timeZone, navigatio
   const open = onOpen ?? ((kind: "tap" | "kick" | "swap", interval: TapInterval | null) => setInternalState(current => openTapBoardSheet(current.snapshot, kind, interval, navigation.location, skus[0]?.id)));
   const edit = onEdit ?? ((fields: Partial<TapSheetFields>) => setInternalState(current => editTapBoardSheet(current, fields)));
   const sheet = state.sheet;
-  const recent = recentEvents ?? [...state.snapshot.open].sort((a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime()).slice(0, 2).map(tap => ({ title: `${tapLabel(tap)} tapped`, detail: `${actor(tap.opened_by_label)} · ${formatDateTime(tap.opened_at, timeZone)}` }));
   const closed = sheet?.interval && state.snapshot.history.find(tap => tap.id === sheet.interval?.id);
   const locked = sheet?.attempt.kind === "submitting" || sheet?.attempt.kind === "unknown";
   const actions = (tap: TapInterval) => <div className="mt-2 flex flex-wrap gap-1"><Button type="button" size="sm" variant="outline" disabled={state.refreshing} onClick={() => open("swap", tap)}>Swap</Button><Button type="button" size="sm" variant="destructive" disabled={state.refreshing} onClick={() => open("kick", tap)}>Kick</Button></div>;
@@ -128,7 +126,6 @@ export function TapBoardView({ state: controlledState, skus, timeZone, navigatio
     {state.snapshot.open.some(tap => tap.tap_number === null) && E.info("Unnumbered kegs sort last.")}
     {E.ttl("Recent history")}
     {E.info("Closed tap entries cannot be edited or deleted. They preserve who opened and closed each keg and when, and support historical variance calculations.")}
-    {recent.length > 0 && <ul aria-label="Recently tapped kegs">{recent.map((event, index) => <li key={index}>{E.row(event.title, event.detail)}</li>)}</ul>}
     {state.snapshot.history.length === 0 ? E.polite("No closed kegs yet.") : <ul aria-label="Closed kegs">{state.snapshot.history.map(tap => <li key={tap.id}>{E.row([tapName(tap), tapLabel(tap)].filter(Boolean).join(" · "), `${closedAs(tap)} · closed ${formatDateTime(tap.closed_at, timeZone)} by ${actor(tap.closed_by_label)}`)}</li>)}</ul>}
   </>;
 }

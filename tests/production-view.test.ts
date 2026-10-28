@@ -144,9 +144,9 @@ describe("Batches view", () => {
     expect(batchesFromQuery([base], []).planned?.[0].href).toBeUndefined();
     const model = toBatchesViewProps(batchesFromQuery([base, { ...base, id: "active", brewed_on: "2026-09-12", vessel_name: null }, { ...base, id: "closed", brewed_on: "2026-09-11", closed_at: "2026-09-12", vessel_name: null }], [], { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}` }));
     // Facts arrive as fields, never as one delimited sentence; missing brand and recipe stay null.
-    expect(model.planned[0]).toEqual({ key: "planned", batchNo: "Batch", brand: null, recipe: null, plannedOn: "Sep 12, 2026", plannedBbl: 12.5, vessel: "Actual tank", brewable: true, href: "/batches/planned" });
-    expect(model.active[0]).toMatchObject({ brewable: false, href: "/batches/active", readings: [] });
-    expect(model.completed?.[0]).toMatchObject({ key: "closed", brewable: false });
+    expect(model.planned[0]).toEqual({ key: "planned", batchNo: "Batch", brand: null, recipe: null, plannedOn: "Sep 12, 2026", plannedBbl: 12.5, vessel: "Actual tank", href: "/batches/planned" });
+    expect(model.active[0]).toMatchObject({ href: "/batches/active", readings: [] });
+    expect(model.completed?.[0]).toMatchObject({ key: "closed" });
     expect(model.completed?.[0].readings).toBeUndefined();
     const html = htmlOf(createElement(BatchesView, { model, workHrefs: { all: "/work", batches: "/batches" }, newVesselHref: "/cellar/vessels/new" }));
     for (const text of ["Planned", "Active", "Completed", "No open occupancy", "Actual tank", "No brand yet", "No recipe", "Sep 12, 2026", "12.5", "No vessels yet"]) expect(html).toContain(text);
@@ -154,6 +154,8 @@ describe("Batches view", () => {
     expect(html).not.toContain("°P");
     expect(html).toContain('href="/batches"');
     expect(html).not.toContain('href="/orders"');
+    // The row link already opens the batch; no Brew button repeats it (#1512).
+    expect(html).not.toMatch(/>Brew</);
   });
   it("explains vessel setup and keeps its empty note separate from the page empty state (#1303)", () => {
     const model = toBatchesViewProps({ ...batchesBrewer, vessels: [] });
@@ -170,12 +172,10 @@ describe("Batches view", () => {
     const page = src("app/(app)/batches/page.tsx");
     expect(page).not.toMatch(/\blist=|\bfooter=|tabs=\{null\}/);
   });
-  it("offers Brew only on the planned fixture batches", () => {
+  it("titles the fixture and live Batches lists alike", () => {
     const model = toBatchesViewProps(batchesBrewer);
     expect(model.title).toBe("Batches");
     expect(batchesFromQuery([], []).title).toBe("Batches");
-    expect(model.planned.map(row => row.brewable)).toEqual([true, true]);
-    expect(model.active.map(row => row.brewable)).toEqual([false, false, false]);
     expect(model.workChipIndex).toBe(3);
   });
 

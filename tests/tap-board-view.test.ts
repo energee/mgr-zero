@@ -26,18 +26,24 @@ it("retains both keg actions without nesting buttons or inventing yield bars", (
   expect(html).not.toMatch(/<button[^>]*>(?:(?!<\/button>)[\s\S])*<button/);
   expect(html).not.toContain('style="width:');
   expect(html).toContain("no guest yield");
-  expect(html).toContain("Porter · ⅙ bbl tapped");
   expect(html).not.toContain("Recent ·");
-  expect(html).toContain('<ul aria-label="Recently tapped kegs"><li>');
   expect(html).not.toContain('href="/taproom');
   expect(isInertOn(SCREENS.find(screen => screen.name === "Tap board")!, "Tap keg")).toBe(true);
+});
+
+it("lists only closed kegs under Recent history, never the open kegs already on the board (#1512)", () => {
+  const html = renderToStaticMarkup(createElement(TapBoardView, { state: tapBoard, skus: tapBoardSkus, timeZone: "America/New_York", navigation: { locations: [{ value: "taproom", label: "Taproom" }], location: "taproom" } }));
+  const history = html.slice(html.indexOf("Recent history"));
+  expect(history).not.toContain("Recently tapped kegs");
+  expect(history).not.toMatch(/ tapped</);
+  expect(history).toContain('aria-label="Closed kegs"');
 });
 
 it("shows own and guest kegs in server order with the same opening date (#1383)", () => {
   const own = tapBoard.snapshot.open[0];
   const guest = { ...tapBoard.snapshot.open.find(tap => !tap.sku_id)!, opened_at: own.opened_at };
   const state = { ...tapBoard, snapshot: { open: [guest, own], history: [] } };
-  const html = renderToStaticMarkup(createElement(TapBoardView, { state, skus: tapBoardSkus, timeZone: "America/New_York", recentEvents: [], navigation: { locations: [{ value: "taproom", label: "Taproom" }], location: "taproom" } }));
+  const html = renderToStaticMarkup(createElement(TapBoardView, { state, skus: tapBoardSkus, timeZone: "America/New_York", navigation: { locations: [{ value: "taproom", label: "Taproom" }], location: "taproom" } }));
   expect(html.indexOf("Guest cider · keg")).toBeLessThan(html.indexOf(own.sku_name!));
   const dates = [...html.matchAll(/<time[^>]*>([^<]+)<\/time>/g)].map(match => match[1]);
   expect(dates).toHaveLength(2);

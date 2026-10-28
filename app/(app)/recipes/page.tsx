@@ -41,7 +41,7 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
         filtered: Boolean(params.q),
       })}
       linkRows
-      controls={recipes.length || params.q ? <ListControls search={{ label: "Search recipes", value: params.q, keep: {} }} /> : undefined}
+      controls={recipes.length || params.q ? <ListControls search={{ label: "Search recipes", value: params.q, keep: {}, path: "/recipes" }} /> : undefined}
     />
   );
 }

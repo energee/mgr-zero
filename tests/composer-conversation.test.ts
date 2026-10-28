@@ -37,11 +37,19 @@ describe("composer conversation surface", () => {
     expect(render({ messages: [], error: "Setup failed" })).not.toContain(welcome);
   });
 
-  it.each([0, 2])("explains pending readings even when the queue has %s entries (#1251)", (outboxCount) => {
-    const html = renderToStaticMarkup(createElement(ComposerStripView, { outboxCount }));
-    expect(html).toContain(`Pending readings (${outboxCount})`);
+  it("explains pending readings when the composer offers them (#1251)", () => {
+    const html = renderToStaticMarkup(createElement(ComposerStripView, { outboxCount: 2, onOutbox: () => undefined }));
+    expect(html).toContain("Pending readings (2)");
     expect(html).toContain("Saved fermentation readings to retry or review.");
     expect(html).not.toContain(">Outbox");
+  });
+
+  it("draws no Pending readings button when there is nothing to open (#1512)", () => {
+    const html = renderToStaticMarkup(createElement(ComposerStripView, { outboxCount: 0 }));
+    expect(html).not.toContain("Pending readings");
+    expect(html).not.toContain("Saved fermentation readings");
+    const loading = renderToStaticMarkup(ComposerUnavailableView({ outboxCount: 0, children: null }));
+    expect(loading).not.toContain("Pending readings");
   });
 
 
@@ -133,7 +141,7 @@ it("shows progress while setup is pending and offers setup recovery before a con
 });
 
 it("shows progress while the chat interface itself loads (#1105)", () => {
-  const html = renderToStaticMarkup(ComposerUnavailableView({ outboxCount: 0, onOutbox: () => undefined, children: null }));
+  const html = renderToStaticMarkup(ComposerUnavailableView({ outboxCount: 0, children: null }));
   expect(html).toContain('data-slot="skeleton"');
 });
 

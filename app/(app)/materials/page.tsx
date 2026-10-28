@@ -51,7 +51,7 @@ export default async function MaterialsPage({ searchParams }: { searchParams: Pr
         })),
         filtered: Boolean(params.q),
       })}
-      controls={materials.length || params.q ? <ListControls search={{ label: "Search materials", value: params.q, keep: {} }} /> : undefined}
+      controls={materials.length || params.q ? <ListControls search={{ label: "Search materials", value: params.q, keep: {}, path: "/materials" }} /> : undefined}
       createAction={<MaterialForm vendors={vendors} />}
       rowEdit={(row) => <MaterialForm material={materials.find((m) => m.id === row.key)!} vendors={vendors} />}
       rowCount={(row) => {
