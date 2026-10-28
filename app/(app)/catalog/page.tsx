@@ -71,7 +71,7 @@ export default async function CatalogPage({ searchParams }: { searchParams?: Pro
         waterProfiles: canRun(ctx, "list_water_profiles"),
       }}
       formats={toFormatsViewProps({ formats, formatHref: format => `/catalog/formats/${format.id}` })}
-      formatAction={canWrite ? <FormatForm componentOptions={formats.filter(format => format.bbl_per_unit !== null)} /> : null}
+      formatAction={canWrite ? <FormatForm componentOptions={formats.filter(format => format.bbl_per_unit !== null)} takenNames={formats.map(format => format.name)} /> : null}
     />
   );
 }

@@ -26,6 +26,7 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
   const [validationAttempted, setValidationAttempted] = useState(false);
   const edit = (key: "name" | "position" | "costCeilingInput") => (value: string) => setDraft((d) => ({ ...d, [key]: value }));
   const form = useCommandForm("upsert_price_group", {
+    validationFields: ["name"],
     build: () => ({
       ...(groupId ? { id: groupId } : {}),
       name: draft.name,
@@ -56,6 +57,7 @@ export function GroupForm({ groupId, model }: { groupId?: string; model: PriceGr
           // A refusal such as a duplicate name clears once the name is edited (#1492).
           controls={{ name: value => { edit("name")(value); form.setError(null); }, position: edit("position"), costCeiling: edit("costCeilingInput") }}
           validationAttempted={validationAttempted}
+          nameError={form.fieldErrors.name}
           back={null}
           addPour={groupId ? <PourForm priceGroupId={groupId} groupName={model.name} /> : undefined}
           renderPour={groupId ? (pour) => <div className="flex gap-2">
