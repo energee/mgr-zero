@@ -48,7 +48,7 @@ it("bounds purchasing and planned-output quantities by their columns (#1482)", (
     cost: "Enter a cost no greater than $21,474,836.47.",
   });
 
-  const contract = (quantity: string, unitCost = "") => contractSubmitReason({ vendorId: "v", materialId: "m", quantity, unitCost });
+  const contract = (quantity: string, unitCost = "") => contractSubmitReason({ vendorId: "v", materialId: "m", quantity, unitCost, starts: "", ends: "" });
   expect(contract("9999999999.9999", "21474836.47")).toBeNull();
   expect(contract("10000000000")).not.toBeNull();
   expect(contract("4", "21474836.48")).not.toBeNull();
