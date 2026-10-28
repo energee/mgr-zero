@@ -145,9 +145,9 @@ describe("Oct 25 recheck: withheld actions say why (#1122)", () => {
     describedButton(html(createElement(PackagingCloseFields, { model })), "Close packaging run", /^Still needed: a lot code, a finished goods location, and a finished goods bin\.$/);
   });
 
-  it("Reschedule and Pick source say what they wait for", () => {
+  it("Reschedule and Start run say what they wait for", () => {
     describedButton(html(createElement(PlanActions, { plannedOn: "2026-10-22" })), "Reschedule", /^Still needed: a different planned date\.$/);
-    describedButton(html(createElement(PackagingSourcePicker, { occupancies: [] })), "Pick source", /^Still needed: a source tank\.$/);
+    describedButton(html(createElement(PackagingSourcePicker, { occupancies: [] })), "Start run", /^Still needed: a source tank\.$/);
   });
 
   it("Preview count names the missing count", () => {

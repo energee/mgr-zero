@@ -4,6 +4,7 @@
 // (picked later, on the run's own page); outputs are a planned count per
 // package of the chosen brand. The model comes from the page's reads through
 // toSchedulePackagingRunView; the shared requirement query supplies current shortages.
+// The planned date starts on the brewery's today (#1508).
 "use client";
 
 import { useCommandQuery } from "@/components/mgr/query-provider";
@@ -16,10 +17,9 @@ import { SchedulePackagingRunView } from "@/components/mgr/views/schedule-packag
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { plannedQty, scheduleRunReason, toSchedulePackagingRunView, type ScheduleRunData, type ScheduleRunDraft } from "@/lib/mgr/schedule-packaging-run-view";
 
-const EMPTY: ScheduleRunDraft = { brandId: "", occupancyId: "", plannedOn: "", qty: {} };
-
 export function ScheduleRunForm({ catalogHref, today, ...data }: ScheduleRunData & { catalogHref: string | null; today: string }) {
-  const [draft, setDraft] = useState(EMPTY);
+  const empty: ScheduleRunDraft = { brandId: "", occupancyId: "", plannedOn: today, qty: {} };
+  const [draft, setDraft] = useState(empty);
   const change = (patch: Partial<ScheduleRunDraft>) => setDraft((prev) => ({ ...prev, ...patch }));
   const model = toSchedulePackagingRunView(data, draft, today);
   const outputs = model.outputs
@@ -27,7 +27,7 @@ export function ScheduleRunForm({ catalogHref, today, ...data }: ScheduleRunData
     .map((output) => ({ skuId: output.key, qtyPlanned: plannedQty(output.qty) }));
   const form = useCommandForm("schedule_packaging_run", {
     build: () => ({ brandId: draft.brandId, plannedOn: draft.plannedOn, occupancyId: draft.occupancyId || undefined, outputs }),
-    reset: () => setDraft(EMPTY),
+    reset: () => setDraft(empty),
   });
   const materials = useCommandQuery<{ planned: PackagingRequirement[] }>("get_packaging_material_plan", { outputs }, form.open && outputs.length > 0);
   return (

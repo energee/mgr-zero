@@ -7,6 +7,7 @@ import { READING_BOUNDS } from "@/lib/composer/offline-policy";
 import { batNo } from "@/lib/mgr/doc-no";
 import { readingValidation } from "@/lib/mgr/fermentation-reading-view";
 import { SubmitButton } from "@/components/mgr/submit-button";
+import { formatDateTime } from "@/lib/date-format";
 
 export type FermentationReadingValues = {
   observedAt: string;
@@ -69,22 +70,18 @@ export function FermentationReadingView({
         {identity.batch && <span className="text-muted-foreground"> · {identity.batch}</span>}
       </p>
       <fieldset disabled={locked || busy} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
+        {/* The time defaults to now, so it stays folded until someone changes it (#1508). */}
+        <details className="flex flex-col gap-2">
+          <summary className="text-sm">Observed {values.observedAt ? formatDateTime(`${values.observedAt}Z`, "UTC") : "now"} · Change</summary>
           {E.edit(`Observed at (${timeZone})`, values.observedAt, "datetime-local", undefined, { ...field("observedAt"), id: "fr-observed", step: "1", required: true })}
-        </div>
+        </details>
+        {/* Each prior value is its field's placeholder: a reference, never a typed value (#1508). */}
+        {E.edit("Temperature (°F)", values.tempF, "number", undefined, { ...field("tempF"), id: "fr-temp", required: true, ...READING_BOUNDS.tempF, placeholder: prior?.tempF && `Prior ${prior.tempF}`, error: values.tempF ? errors.tempF : undefined })}
         <div className="flex flex-col gap-2">
-          {E.edit("Temperature (°F)", values.tempF, "number", undefined, { ...field("tempF"), id: "fr-temp", required: true, ...READING_BOUNDS.tempF, error: values.tempF ? errors.tempF : undefined })}
-          {prior?.tempF && <p className="text-xs text-muted-foreground">Prior {prior.tempF} °F</p>}
-        </div>
-        <div className="flex flex-col gap-2">
-          {E.edit(`Gravity (${gravityUnitShort(unit)}) · optional`, values.gravity, "text", undefined, { ...field("gravity"), id: "fr-gravity", inputMode: "decimal", placeholder: gravityPlaceholder(unit), error: errors.gravity })}
-          {!errors.gravity && prior?.gravity && <p className="text-xs text-muted-foreground">Prior {prior.gravity}</p>}
+          {E.edit(`Gravity (${gravityUnitShort(unit)}) · optional`, values.gravity, "text", undefined, { ...field("gravity"), id: "fr-gravity", inputMode: "decimal", placeholder: prior?.gravity ? `Prior ${prior.gravity}` : gravityPlaceholder(unit), error: errors.gravity })}
           {unit === "plato" && <p className="text-xs text-muted-foreground">Negative °P is valid for fermented beer; SG cannot be negative.</p>}
         </div>
-        <div className="flex flex-col gap-2">
-          {E.edit("pH · optional", values.ph, "number", undefined, { ...field("ph"), id: "fr-ph", ...READING_BOUNDS.ph, error: errors.ph })}
-          {prior?.ph && <p className="text-xs text-muted-foreground">Prior {prior.ph}</p>}
-        </div>
+        {E.edit("pH · optional", values.ph, "number", undefined, { ...field("ph"), id: "fr-ph", ...READING_BOUNDS.ph, placeholder: prior?.ph && `Prior ${prior.ph}`, error: errors.ph })}
         <p className="text-sm text-muted-foreground">Enter only values taken now; blanks are not rewritten.</p>
         <div className="flex flex-col gap-2">
           {E.edit("Note · optional", values.note, "text", undefined, { ...field("note"), id: "fr-note" })}

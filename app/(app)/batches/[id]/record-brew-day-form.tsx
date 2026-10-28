@@ -1,7 +1,7 @@
 // Bind the shared brew-day views to record_brew_day / correct_brew_record:
 // RecordBrewTimelineForm for a planned batch's Brew day tab (./prep-form.tsx
 // is its Prep tab), RecordBrewDayForm for a recorded or cancelled one
-// (history, Correct turn, Add brew turn).
+// (history, Correct turn, Add brew turn, and the open occupancy's cellar verbs).
 "use client";
 import { useState, type ReactNode } from "react";
 import { BrewDayView } from "@/components/mgr/views/brew-day";
@@ -10,10 +10,10 @@ import { brewRecordPayload, type BrewDayViewModel } from "@/lib/mgr/brew-day-vie
 import { timelineRecordPayload, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 
-export function RecordBrewDayForm({ batchId, model }: { batchId: string; model: BrewDayViewModel }) {
+export function RecordBrewDayForm({ batchId, model, actions }: { batchId: string; model: BrewDayViewModel; actions?: ReactNode }) {
   const [values, setValues] = useState(model);
   const { busy, error, run } = useCommandAction();
-  return <BrewDayView model={{ ...model, ...values }} busy={busy} error={error}
+  return <BrewDayView model={{ ...model, ...values }} busy={busy} error={error} actions={actions}
     onChange={patch => setValues(current => ({ ...current, ...patch }))}
     onRecord={() => { void run(...brewRecordPayload(values, batchId)); }}
   />;

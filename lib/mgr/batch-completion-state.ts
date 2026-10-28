@@ -9,6 +9,14 @@ export function batchCompletionAcknowledgement(preview: {
   return `Write off ${preview.inTank.map(tank => `${bblExact(tank.bbl, 8)} in ${tank.vesselName}`).join(" and ")} as loss`;
 }
 
+/** Complete batch's one headline: the barrels its residual writes off as loss, which
+ *  complete_batch does at or above the threshold, else none and why (#1508). */
+export function completionLoss({ residualBbl, thresholdBbl }: { residualBbl: number; thresholdBbl: number }) {
+  return residualBbl >= thresholdBbl
+    ? `Loss written off: ${bblExact(residualBbl, 3)}`
+    : `Loss written off: none (${bblExact(residualBbl, 3)} is under the ${bblExact(thresholdBbl, 3)} threshold)`;
+}
+
 export type BatchCompletionPhase = "idle" | "loading" | "ready" | "submitting" | "unknown" | "saved";
 
 export function canCloseBatchCompletion(phase: BatchCompletionPhase) {

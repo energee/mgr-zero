@@ -71,17 +71,25 @@ export function scheduleRunReason(model: Pick<SchedulePackagingRunViewModel, "br
   return submitReason(missing);
 }
 
+type PlannedPackage = { qty: number; bblPerUnit: number | undefined };
+
+/** Barrels one planned package count draws: 0 for none, undefined when its volume is unknown. */
+const packageBbl = ({ qty, bblPerUnit }: PlannedPackage) => qty === 0 ? 0 : bblPerUnit === undefined ? undefined : qty * bblPerUnit;
+
+/** A run's planned draw in barrels, or undefined when a planned package's volume is unknown.
+ *  Schedule run shows what it leaves in the tank; Close packaging run starts Barrels drawn from it (#1508). */
+export function plannedDrawBbl(rows: PlannedPackage[]): number | undefined {
+  const bbl = rows.map(packageBbl);
+  return bbl.every((value) => value !== undefined) ? bbl.reduce<number>((sum, value) => sum + value!, 0) : undefined;
+}
+
 export function toSchedulePackagingRunView(data: ScheduleRunData, draft: ScheduleRunDraft, today?: string): SchedulePackagingRunViewModel {
   const skus = data.skus.filter((sku) => sku.brand_id === draft.brandId);
   const occupancy = data.occupancies.find((o) => o.occupancy_id === draft.occupancyId);
   const tank = (o: ScheduleRunData["occupancies"][number]) => `${o.vessel_name ?? "—"} · ${o.brand_name ?? "no brand"}`;
-  // Barrels planned per package; undefined when a planned package has no known volume.
-  const planned = skus.map((sku) => {
-    const qty = plannedQty(draft.qty[sku.id]);
-    const perUnit = bblPerUnit(sku);
-    return qty === 0 ? 0 : perUnit === undefined ? undefined : qty * perUnit;
-  });
-  const drawn = planned.every((bbl) => bbl !== undefined) ? planned.reduce<number>((sum, bbl) => sum + bbl!, 0) : undefined;
+  const rows = skus.map((sku) => ({ qty: plannedQty(draft.qty[sku.id]), bblPerUnit: bblPerUnit(sku) }));
+  const planned = rows.map(packageBbl);
+  const drawn = plannedDrawBbl(rows);
   return {
     plannedOn: draft.plannedOn,
     brandId: draft.brandId,

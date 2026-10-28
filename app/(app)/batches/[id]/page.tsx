@@ -24,6 +24,7 @@ import { batNo } from "@/lib/mgr/doc-no";
 import { ChangePlan } from "../../plan-actions";
 import { PrepForm } from "./prep-form";
 import { RecordBrewDayForm, RecordBrewTimelineForm } from "./record-brew-day-form";
+import { OccupancyActions } from "@/app/(app)/cellar/occupancy-actions";
 import { navTitle } from "@/lib/mgr/nav";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -81,5 +82,7 @@ export default async function BatchPage({ params, searchParams }: { params: Prom
     initialBbl: history.records.length ? String(confirmedBbl) : occupancy ? String(Number(occupancy.initial_bbl)) : recorded ? "" : String(plannedBbl),
     brewedOn: batch.brewed_on ?? (recorded ? "" : today),
   };
-  return <RecordBrewDayForm key={`${batch.id}:${history.records.length}`} batchId={batch.id} model={model} />;
+  // A recorded batch still in a tank gets that tank's cellar verbs, so its page is not a dead end (#1508).
+  const actions = occupancy && <OccupancyActions ctx={ctx} occupancyId={occupancy.id} batch={{ id: batch.id, label: batNo(batch.batch_no) }} readingHref={`/cellar/${occupancy.id}/reading?from=/batches/${batch.id}`} />;
+  return <RecordBrewDayForm key={`${batch.id}:${history.records.length}`} batchId={batch.id} model={model} actions={actions} />;
 }

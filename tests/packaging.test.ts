@@ -163,11 +163,12 @@ describe("planning a packaging run before a tank exists", () => {
 
     const got = (await runCommand("get_packaging_run", { runId: run.id }, ctx)) as {
       run: { id: string; brand_name: string };
-      outputs: { sku_id: string; sku_name: string; qty_planned: number }[];
+      outputs: { sku_id: string; sku_name: string; qty_planned: number; bbl_per_unit: number | null }[];
     };
     expect(got.run).toMatchObject({ id: run.id, brand_name: "Stout" });
+    // bbl_per_unit lets Close packaging run start Barrels drawn from the plan (#1508).
     expect(got.outputs).toEqual([
-      expect.objectContaining({ sku_id: stout.skuId, sku_name: "Stout case", qty_planned: 400 }),
+      expect.objectContaining({ sku_id: stout.skuId, sku_name: "Stout case", qty_planned: 400, bbl_per_unit: 0.0645 }),
     ]);
   });
 

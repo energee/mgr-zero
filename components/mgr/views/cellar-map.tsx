@@ -1,6 +1,6 @@
 // components/mgr/views/cellar-map.tsx — Beer › Cellar: the in-place actions
 // (Reading, Transfer, Addition), the note saying why any are off, the vessel
-// tiles, and Complete batch. Brew day is not a cellar action: it starts from
+// tiles (each tank with beer carries its own Reading, #1508), and Complete batch. Brew day is not a cellar action: it starts from
 // Batches, so the map draws it as a link there (#1115).
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
@@ -19,7 +19,7 @@ export function CellarMapView({ model, transfer, addition, complete }: { model: 
     {hasVessels && E.link("Start a brew day in Batches", "Batches", model.brewHref)}
     {model.detail && E.nav(model.detail.title, model.detail.description, "", undefined, model.detail.href)}
     {hasVessels
-      ? E.tiles(model.tiles.map(tile => [tile.name, tile.detail, tile.reading, tile.warning ? 1 : 0, tile.fill, tile.href]), "c2")
+      ? E.tiles(model.tiles.map(tile => [tile.name, tile.detail, tile.reading, tile.warning ? 1 : 0, tile.fill, tile.href, tile.readingHref !== undefined && E.act("Reading", "info", tile.readingHref || undefined)]), "c2")
       : E.blank(
         { title: "No vessels yet", description: "Add your tanks to start tracking the cellar." },
         undefined,

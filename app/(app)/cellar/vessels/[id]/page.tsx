@@ -11,6 +11,7 @@ import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { batNo } from "@/lib/mgr/doc-no";
 import { formatDateTime } from "@/lib/date-format";
 import "@/lib/commands/all";
+import { OccupancyActions } from "@/app/(app)/cellar/occupancy-actions";
 import { navTitle } from "@/lib/mgr/nav";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -52,5 +53,6 @@ export default async function VesselPage({ params }: { params: Promise<{ id: str
       history: readings.map(reading => ({ key: reading.id, title: formatDateTime(reading.at, brewery.timeZone), detail: formatVesselReading(reading, unit.effective) })),
     },
   };
-  return canRun(ctx, "upsert_vessel") ? <VesselForm key={id} vesselId={id} model={model} /> : <VesselDetailView model={model} editable={false} />;
+  const actions = occupancy && <OccupancyActions ctx={ctx} occupancyId={occupancy.occupancy_id} batch={{ id: occupancy.batch_id, label: `${batNo(occupancy.batch_no)} · ${occupancy.brand_name ?? "no brand"}` }} />;
+  return canRun(ctx, "upsert_vessel") ? <VesselForm key={id} vesselId={id} model={model} actions={actions} /> : <VesselDetailView model={model} editable={false} actions={actions} />;
 }
