@@ -14,6 +14,8 @@ import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
 import { toPickViewProps } from "@/lib/mgr/pick-view";
 import { toShortPickViewProps } from "@/lib/mgr/short-pick-view";
 import { orderAdjustLines, orderPick, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
+import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
+import { newOrderDraft } from "@/lib/mgr/fixtures/orders";
 
 function elements(node: ReactNode): ReactElement<Record<string, unknown> & { children?: ReactNode }>[] {
   if (!isValidElement<Record<string, unknown> & { children?: ReactNode }>(node)) return [];
@@ -123,3 +125,13 @@ function invoke(node: ReactElement<Record<string, unknown>> | undefined, prop: s
   assert(typeof callback === "function", `Expected ${prop} callback`);
   Reflect.apply(callback, undefined, args);
 }
+
+describe("past Requested ship date (#1489)", () => {
+  const draft = toNewOrderViewProps(newOrderDraft);
+  const html = (requestedShip: string) => renderToStaticMarkup(createElement(NewOrderView, { model: { ...draft, requestedShip, today: "2026-10-23" } }));
+  it("warns before the brewery's today without blocking Save draft", () => {
+    expect(html("2026-10-05")).toContain("This requested ship date is in the past for your brewery. You can still save the order.");
+    expect(html("2026-10-23")).not.toContain("in the past");
+    expect(html("")).not.toContain("in the past");
+  });
+});

@@ -5,6 +5,7 @@
 import { brandLabel } from "./brand-view";
 import { batNo } from "@/lib/mgr/doc-no";
 import { formatVolume } from "@/lib/volume";
+import { isPastDay } from "@/lib/date-format";
 import { submitReason } from "./submit-reason";
 import { isNumber, numberNotationError } from "./quantity-input";
 
@@ -97,7 +98,7 @@ export function toSchedulePackagingRunView(data: ScheduleRunData, draft: Schedul
     sourceWarning: occupancy && drawn !== undefined && drawn > Number(occupancy.bbl)
       ? "This plan needs more beer than the selected tank currently holds. You can save the plan; it does not reserve or move beer."
       : undefined,
-    dateWarning: today && /^\d{4}-\d{2}-\d{2}$/.test(draft.plannedOn) && draft.plannedOn < today
+    dateWarning: isPastDay(draft.plannedOn, today)
       ? "This planned date is in the past for your brewery. You can save the plan; it does not record packaging or move inventory."
       : undefined,
   };

@@ -1,6 +1,7 @@
 // lib/mgr/new-po-view.ts — view-model for New PO, its per-line field errors,
 // and what its Save draft still needs.
 import { submitReason } from "@/lib/mgr/submit-reason";
+import { isPastDay } from "@/lib/date-format";
 
 export type NewPoLineView = {
   key: string;
@@ -21,8 +22,15 @@ export type NewPoViewModel = {
   vendors?: { id: string; name: string }[];
   materials?: { id: string; name: string; purchase_uom: string; lot_tracked: boolean }[];
   expected: string;
+  /** The brewery's day (breweryDate), so a past Expected date warns; the inventory leaves it out. */
+  today?: string;
   lines: NewPoLineView[];
 };
+
+/** A past Expected date still saves; the draft says so rather than saving it silently (#1489). */
+export function pastExpectedWarning(date: string, today?: string): string | undefined {
+  return isPastDay(date, today) ? "This expected date is in the past for your brewery. You can still save the PO." : undefined;
+}
 
 /** A typed value the PO cannot take, shown under its own field. A blank field
  *  is not an error: the quantity is then missing (newPoReason), and the cost

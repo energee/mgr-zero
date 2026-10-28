@@ -310,7 +310,7 @@ describe("Shipment done view", () => {
     const markup = html(createElement(ShipmentDoneView, { model: toShipmentDoneViewProps(orderShipmentDone) }));
     expect(markup).toMatch(/INV-1042 · assigned/);
     expect(markup).toMatch(/2\.00 bbl/);
-    expect(markup).toMatch(/To correct this shipment, Return shipment/);
+    expect(markup).toMatch(/To correct this shipment, use Return shipment\./);
   });
 });
 
