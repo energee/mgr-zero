@@ -97,6 +97,14 @@ describe("vessels are admin-managed", () => {
     expect(html).not.toContain("Delete vessel");
   });
 
+  it("keeps Delete vessel in its own bordered section after Save vessel (#1481)", () => {
+    const html = htmlOf(createElement(VesselDetailView, { model: vesselFv3, remove: createElement("button", { type: "button" }, "Delete FV3") }));
+    expect(html.indexOf("Save vessel")).toBeGreaterThan(-1);
+    expect(html.indexOf("Save vessel")).toBeLessThan(html.indexOf("Delete FV3"));
+    expect(html).toMatch(/<section aria-label="Delete vessel" class="[^"]*border-t[^"]*">[\s\S]*Delete FV3/);
+    expect(htmlOf(createElement(VesselDetailView, { model: vesselFv3 }))).not.toContain('aria-label="Delete vessel"');
+  });
+
   it("a retired vessel says so", () => {
     expect(htmlOf(createElement(VesselDetailView, { model: { ...vesselFv3, retired: true } }))).toContain("retired");
     expect(htmlOf(createElement(VesselDetailView, { model: vesselFv3 }))).not.toContain("retired");
@@ -590,9 +598,9 @@ describe("cellar sheets label every field (#1115)", () => {
     for (const chip of ["Dry hop", "Fermentation", "Other"]) expect(html).toMatch(new RegExp(`>${chip}</button>`));
   });
 
-  it("addition says what is still needed as guidance, not as an amber warning", () => {
+  it("addition says what is still needed only beside its button, never as an amber warning", () => {
     const html = htmlOf(createElement(CellarAdditionView, { model: { ...cellarAdditionCitra, occupancyId: "" }, footer: null }));
-    expect(html).toMatch(/bg-info[\s\S]*Choose a tank/);
+    expect(html).not.toContain("Still needed");
     expect(html).not.toContain("bg-warning");
     // Over what the lot holds is a real error, so it stays amber.
     expect(htmlOf(createElement(CellarAdditionView, { model: { ...cellarAdditionCitra, qty: "41" }, footer: null }))).toMatch(/bg-warning[\s\S]*Only 40 lb of L-0790 on hand/);

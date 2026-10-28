@@ -1740,7 +1740,7 @@ export const SCREENS: Screen[] = [
     reads: "list_vessels · list_occupancies · list_fermentation_readings · get_gravity_unit",
     writes: "upsert_vessel [mutable facts only] · delete_vessel",
     states: [["permission", "brewer or admin required", 1], ["brewer", "vessel facts read-only; no Save or Delete"], ["occupied", "batch and fill shown"], ["empty", "available for a batch"], ["reading overdue", "last reading flagged", 1], ["holding beer", "delete refused", 1], ["with batch history", "retired, not deleted"], ["incomplete", "Save vessel says what is still needed; a capacity of 0 or less is marked at its field", 1]],
-    spec: "Batch occupancy and reading history are records; only the vessel name, type and capacity are editable here, and only by an admin. A brewer sees the facts as text. Delete vessel confirms first. A vessel holding beer is refused. A vessel that has held beer is retired: it leaves the cellar, transfer targets and brew day, while its batch history and the Batches vessel table keep it. A vessel that never held beer is deleted.",
+    spec: "Batch occupancy and reading history are records; only the vessel name, type and capacity are editable here, and only by an admin. A brewer sees the facts as text. Delete vessel sits in its own section below Save vessel and confirms first. A vessel holding beer is refused. A vessel that has held beer is retired: it leaves the cellar, transfer targets and brew day, while its batch history and the Batches vessel table keep it. A vessel that never held beer is deleted.",
     body: <VesselDetailView model={vesselFv3} remove={<RemoveVesselControl vessel="FV3" />} />,
   },
   {
@@ -1787,7 +1787,7 @@ export const SCREENS: Screen[] = [
     job: "Post-knockout dry hop, fruit or adjunct against an occupancy",
     reads: "list_occupancies · list_materials · list_material_lots",
     writes: "record_batch_addition [one RPC: batch_additions row (stage, occupancy) + material consumption movement from the bin holding the most of it; lot required when the material is lot-tracked]",
-    states: [["permission", "brewer or admin required", 1], ["no lot", "Choose a lot · Citra is lot-tracked", 1], ["short", "only what the bin holds can be consumed", 1], ["offline", "queue with requestId"], ["stale", "occupancy closed · choose another", 1]],
+    states: [["permission", "brewer or admin required", 1], ["no lot", "Still needed: a lot (Citra is lot-tracked)", 1], ["short", "only what the bin holds can be consumed", 1], ["offline", "queue with requestId"], ["stale", "occupancy closed · choose another", 1]],
     spec: "Not Record movement (that is finished goods) and not Brew day (that is knockout). The consumption movement carries the lot; the addition row carries stage and occupancy so loss accounting stays anchored to the batch. The bin is not picked: the RPC drains the bin holding the most of that material and lot.",
     body: <><CellarAdditionView model={cellarAdditionCitra} footer={null} />{E.pin(<CellarAdditionFooter />)}</>,
   },
@@ -1868,7 +1868,7 @@ export const SCREENS: Screen[] = [
     reads: "list_occupancies · list_vessels",
     writes: "record_cellar_transfer [one RPC: create target occupancy(initial_bbl=0) when empty + append transfer + a generic loss volume adjustment on the source when loss > 0 + close source occupancy iff fully emptied]",
     states: permitted("brewer or admin required"),
-    spec: "Drawn as a blend into an occupied brite: BT1 keeps its occupancy and B-0412 keeps its identity: the schema has one batch per occupancy, and blends are transfers into the surviving one (renaming a blend as a new batch is a plan §8 schema gap). An empty target (BT2) gets a new occupancy starting at zero bbl in the same RPC; the transfer row stays immutable; a fully emptied source closes its occupancy. A partial transfer never implies loss: the person explicitly holds the remainder or records loss. No vessel status.",
+    spec: "Drawn as a blend into an occupied brite: BT1 keeps its occupancy and B-0412 keeps its identity: the schema has one batch per occupancy, and blends are transfers into the surviving one (renaming a blend as a new batch is a plan §8 schema gap). An empty target (BT2) gets a new occupancy starting at zero bbl in the same RPC; the transfer row stays immutable; a fully emptied source closes its occupancy. A partial transfer never implies loss: the person explicitly holds the remainder or records loss. No vessel status. With no other vessel, the To list says so and links Add a vessel for an admin; anyone else is told to ask Admin.",
     body: <><CellarTransferView model={cellarTransferPils} footer={null} />{E.pin(<CellarTransferFooter />)}</>,
   },
   {

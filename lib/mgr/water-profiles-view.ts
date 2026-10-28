@@ -49,9 +49,10 @@ function profileLine(p: WaterProfile): string {
   return parts.join(" · ");
 }
 
-/** Preserve the Settings entry for Admin; otherwise use a role-accessible default. */
+/** Preserve the Settings entry for Admin and the Recipes entry for anyone; otherwise use a role-accessible default. */
 export function waterProfilesBack(roles: readonly string[], from?: string | string[]): { label: string; href: string } {
   if (from === "settings" && roles.includes("admin")) return { label: "Settings", href: "/settings" };
+  if (from === "recipes") return { label: "Recipes", href: "/recipes" };
   return hasAnyRole(roles, ["admin", "sales", "warehouse"]) ? { label: "Catalog", href: "/catalog" } : { label: "Recipes", href: "/recipes" };
 }
 
