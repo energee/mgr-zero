@@ -113,7 +113,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Menu setup", file: "app/(app)/menu/page.tsx" },
   { name: "Menu unmapped", file: "app/(app)/menu/page.tsx" },
   { name: "POS item", file: "app/(app)/menu/item/[formatId]/page.tsx" },
-  { name: "Mapping conflict", file: "app/(app)/settings/accounting/qbo-controls.tsx" },
+  { name: "Map to QuickBooks", file: "app/(app)/settings/accounting/qbo-controls.tsx" },
   { name: "QuickBooks mappings", file: "app/(app)/settings/accounting/mappings/page.tsx" },
   { name: "Invoice mappings", file: "app/(app)/invoices/[id]/mapping/page.tsx" },
   { name: "Disconnect QuickBooks", file: "app/(app)/settings/accounting/qbo-controls.tsx" },

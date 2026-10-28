@@ -198,6 +198,10 @@ describe("Route", () => {
     expect(body.props.model).toEqual(routeAPlan);
   });
 
+  it("Add to route on an unassigned row opens New route with that document ticked (#1505)", () => {
+    expect(src("app/(app)/routes/page.tsx")).toContain('verb: "Add to route", tone: "attention" as const, href: `/routes/new?add=${document.id}`');
+  });
+
   it("the live route pages delegate to RouteForm and the shared RouteView", () => {
     const planned = src("app/(app)/routes/[id]/page.tsx");
     const created = src("app/(app)/routes/new/page.tsx");

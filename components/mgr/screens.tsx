@@ -31,6 +31,7 @@ import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QboMappingView, QboMappingsView } from "@/components/mgr/views/qbo-mapping";
+import { qboMappingScopeOptions } from "@/lib/mgr/accounting-view";
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { invoiceList, invoicesSync } from "@/lib/mgr/fixtures/invoices";
 import { dollarsInput } from "@/lib/mgr/money";
@@ -802,7 +803,7 @@ export const SCREENS: Screen[] = [
     reads: "get_on_hand · get_atp · get_inventory_value",
     writes: "none [SKU creation happens on its own surface]",
     states: [["uncosted", "units without receipt cost are counted but not valued"], ["permission", "value total shows only for Admin and Sales"], ["short", "a negative Available says Shortfall and links to the competing orders"], ["empty", "no finished goods yet: header actions and the taproom count pointer remain"]],
-    spec: "The Beer landing's Finished goods row opens this list. On hand, allocated and available sit in aligned columns on the desk and as labeled values on the phone; the SKU name opens SKU detail, and Shortfall under a negative Available opens the shortfall. The header holds the page actions. Record movement is for Admin and Warehouse. Record taproom count points to the existing Weekly count for taproom stock, not a general finished-goods count. Add SKU in Catalog is for Admin and Sales and opens Catalog, where SKUs are made. Inventory value uses frozen packaging-close cost and separately counts units without cost.",
+    spec: "The Beer landing's Finished goods row opens this list. On hand, allocated and available sit in aligned columns on the desk and as labeled values on the phone; the SKU name opens SKU detail, and Shortfall under a negative Available opens the shortfall. The header holds the page actions. Record movement is for Admin and Warehouse; for them each active SKU's row also ends with Record movement, which opens the form with that SKU chosen. Record taproom count points to the existing Weekly count for taproom stock, not a general finished-goods count. Add SKU in Catalog is for Admin and Sales and opens Catalog, where SKUs are made. Inventory value uses frozen packaging-close cost and separately counts units without cost.",
     body: <FinishedGoodsView model={toFinishedGoodsViewProps(finishedGoodsList)} />,
   },
   {
@@ -994,8 +995,8 @@ export const SCREENS: Screen[] = [
     job: "Confirm a submitted order in two taps from Today",
     reads: "get_order · get_atp",
     writes: "confirm_order · adjust_order_lines [submitted: replaces lines; allocations wait for confirm] · cancel_order",
-    states: [["loading", "order-shaped skeleton"], ["stale", "line changed · refresh", 1], ["permission", "sales or admin required", 1], ["cancelled", "staged quantities become restock work · Put back clears it"], ["Available below zero", "confirmed anyway: Order confirmed · Available is below zero for … · quantities read-only · Back to Orders"]],
-    spec: "2 taps from Today: Confirm → Confirm order, only when no blocking review exists. Lines sit under their brand, each named by its format, with the quantity as a number field: editing one asks for a Reason and swaps the verbs for Save lines and Discard changes. The registration warning is the same one the Order screen shows; it links to the brand’s compliance rows and never blocks.",
+    states: [["loading", "order-shaped skeleton"], ["stale", "line changed · refresh", 1], ["permission", "sales or admin required", 1], ["cancelled", "staged quantities become restock work · Put back clears it"], ["Available below zero", "confirmed anyway: Order confirmed · Available is below zero for … · quantities read-only · Back to order"]],
+    spec: "2 taps from Today: Confirm → Confirm order, only when no blocking review exists. Lines sit under their brand, each named by its format, with the quantity as a number field: editing one asks for a Reason and swaps the verbs for Save lines and Discard changes. Confirm order stays at the bottom of the phone screen; Cancel order is the order page's quiet trigger below it. The registration warning is the same one the Order screen shows; it links to the brand’s compliance rows and never blocks.",
     to: { "16 oz case": "SKU detail" },
     body: <ConfirmOrderView model={toConfirmOrderViewProps(orderSubmittedRidgeline)} fulfillmentOptions={[LOC_WAREHOUSE.name, LOC_TAPROOM.name]} complianceNote={OHIO_STOUT_NOTE} />,
   },
@@ -1339,11 +1340,11 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "QuickBooks Online",
     name: "Accounting",
-    to: { Review: "Customers missing email", "Customers missing a portal login email": "Customers missing email", Disconnect: "Disconnect QuickBooks", "Save push defaults": "Accounting", "Retry saved sync": "Accounting", "Sync QuickBooks": "Accounting" },
+    to: { Review: "Customers missing email", "Customers missing a portal login email": "Customers missing email", Disconnect: "Disconnect QuickBooks", "Retry saved sync": "Accounting", "Sync QuickBooks": "Accounting" },
     job: "One page for the QuickBooks connection, and for the three things a pay link needs",
     reads: "get_qbo_connection · get_qbo_sync_status · count_customers_missing_portal_email",
     writes: "connect_qbo · disconnect_qbo · set_qbo_push_defaults · sync_qbo_payments",
-    states: [["permission", "admin only", 1], ["healthy", "safe company and expiry status shown"], ["expired", "reconnect before mapping or push", 1], ["payments unavailable", "Pay returns the customer to the invoice when QuickBooks has no payment link", 1], ["ACH only", "card disabled; cheaper, and slower to arrive"], ["defaults changed", "applies to the next push, never retroactively"]],
+    states: [["permission", "admin only", 1], ["healthy", "safe company status shown; the self-renewing token expiry is not"], ["expired", "reconnect before mapping or push", 1], ["payments unavailable", "Pay returns the customer to the invoice when QuickBooks has no payment link", 1], ["ACH only", "card disabled; cheaper, and slower to arrive"], ["defaults changed", "applies to the next push, never retroactively"]],
     spec: "Accounting shows connection health and customer portal access readiness. The missing-email count means no current portal member has a nonblank login email; it does not establish QuickBooks billing-email or payment readiness. Review opens that same filtered customer set and is hidden when the count is zero. Staff correct access through the existing Invite and Remove actions. QuickBooks Payments and invoice payment options remain separate provider concerns.",
     body: <AccountingView model={accountingExpired} />,
   },
@@ -1363,9 +1364,9 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "QuickBooks Online",
     surface: "sheet",
-    name: "Mapping conflict",
+    name: "Map to QuickBooks",
     to: { "Save mapping": "Accounting" },
-    job: "Resolve an ambiguous QuickBooks customer or item without guessing",
+    job: "Map one customer, SKU, vendor, account or item to its exact QuickBooks record without guessing",
     reads: "list_customers · list_skus · get_qbo_connection",
     writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_deposit_mapping · set_qbo_one_way_fee_mapping",
     states: [["permission", "admin only", 1], ["customer", "two candidates match"], ["item", "two candidates match"], ["company claimed", "this company is connected to another brewery", 1]],
@@ -1375,12 +1376,12 @@ export const SCREENS: Screen[] = [
   {
     step: 5, slice: 1, tab: "More", group: "QuickBooks Online",
     name: "QuickBooks mappings",
-    to: { "Oak and Barrel": "Mapping conflict", "Pils · case": "Mapping conflict", "Country Malt": "Mapping conflict", "Purchase account": "Mapping conflict", "Deposit and refund item": "Mapping conflict", "One-way keg fee item": "Mapping conflict" },
+    to: { "Oak and Barrel": "Map to QuickBooks", "Pils · case": "Map to QuickBooks", "Country Malt": "Map to QuickBooks", "Purchase account": "Map to QuickBooks", "Deposit and refund item": "Map to QuickBooks", "One-way keg fee item": "Map to QuickBooks" },
     job: "Review verified customer, SKU, vendor, purchase account, deposit and one-way keg fee mappings for the connected company",
-    reads: "get_qbo_connection · list_customers · list_skus · list_vendors",
+    reads: "get_qbo_connection · list_customers · list_skus · list_vendors [unmapped: no id in the connected company]",
     writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_vendor_mapping · set_qbo_purchase_account · set_qbo_deposit_mapping · set_qbo_one_way_fee_mapping",
-    states: [["permission", "admin only", 1], ["disconnected", "mapping changes unavailable", 1], ["empty", "no customers, SKUs or vendors"], ["receipt Bills", "one exact vendor ID per vendor and one brewery-wide purchase account"]],
-    body: <QboMappingsView title="QuickBooks mappings" backLabel="Accounting" company="Demo Brewing LLC" sections={quickBooksMappings} />,
+    states: [["permission", "admin only", 1], ["disconnected", "mapping changes unavailable", 1], ["empty", "no customers, SKUs or vendors"], ["unmapped", "Show · Unmapped (N) keeps only rows with no id in the connected company"], ["receipt Bills", "one exact vendor ID per vendor and one brewery-wide purchase account"]],
+    body: <QboMappingsView title="QuickBooks mappings" backLabel="Accounting" company="Demo Brewing LLC" sections={quickBooksMappings} scope={{ value: "all", options: qboMappingScopeOptions(2, false) }} />,
   },
   {
     step: 5, slice: 1, tab: "More",
@@ -2543,7 +2544,7 @@ export const SCREENS: Screen[] = [
     reads: "list_routes",
     writes: "save_route · depart_route",
     states: [["permission", "warehouse membership; Depart needs the assigned driver or an admin", 1], ["departed", "the builder closes; Driver route and Return route take over"]],
-    spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. The stops are a checklist of this route's documents plus every shipped order and picked transfer on no route, each checked one with its stop number; driver, vehicle and stop order save in the same route-save RPC, and a delivered stop cannot be unchecked. A new route's first save opens the saved route, so Depart is one tap away; Add to route from Shipment done arrives with that shipment checked as stop 1. There is no loaded status or mark-loaded command. A refused delivery closes with an outcome; its physical return is recorded separately. A driver shows as their roster email, with their roles in the picker; a saved driver no longer on the team reads \"driver not on the team\", and one without Warehouse or Admin reads \"can no longer drive\".",
+    spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. The stops are a checklist of this route's documents plus every shipped order and picked transfer on no route, each checked one with its stop number; driver, vehicle and stop order save in the same route-save RPC, and a delivered stop cannot be unchecked. A new route's first save opens the saved route, so Depart is one tap away; Add to route from Shipment done or a Routes row arrives with that document checked as stop 1. There is no loaded status or mark-loaded command. A refused delivery closes with an outcome; its physical return is recorded separately. A driver shows as their roster email, with their roles in the picker; a saved driver no longer on the team reads \"driver not on the team\", and one without Warehouse or Admin reads \"can no longer drive\".",
     body: <RouteView model={routeAPlan} />,
   },
   {

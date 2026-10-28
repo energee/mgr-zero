@@ -5,7 +5,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Attachment, AttachmentContent, AttachmentDescription, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
-import { IMPORT_FIELDS, IMPORT_FIELD_LABELS, IMPORT_KINDS, IMPORT_ROW_CAP_LABEL, canReviewImport, importTemplateCsv, importTemplateName, readyImportRows, validateImportRows, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
+import { IMPORT_FIELDS, IMPORT_FIELD_LABELS, IMPORT_KINDS, IMPORT_ROW_CAP_LABEL, canReviewImport, importTemplateCsv, importTemplateName, readyImportRows, validateImportRows, type ImportKind, type ImportLookups, type ImportOutcome, type ImportResult } from "@/lib/import-csv";
 import { downloadCsv } from "@/lib/download-csv";
 import { importKindLabel, paymentTermLabel, sentenceCase } from "@/lib/mgr/labels";
 import { ConfirmDiscard } from "@/components/mgr/views/command-recovery";
@@ -37,6 +37,14 @@ function choiceHint(field: string, values: readonly string[]): string {
 }
 /** The name a row's record goes by, or empty when its name cell is blank. */
 const recordName = (row?: Record<string, string>) => row?.name?.trim() || row?.product?.trim() || row?.label?.trim() || "";
+/** The page an imported record opens on, from import_csv_row's `result` (#1497): a ship-to is edited
+ *  on its customer, a SKU under its brand's Sells as. Channel prices and opening balances have no page. */
+function recordHref(kind: ImportKind, result: ImportOutcome["result"]) {
+  if (kind === "customers" && result?.id) return `/customers/${result.id}`;
+  if (kind === "ship_tos" && result?.customer_id) return `/customers/${result.customer_id}`;
+  if (kind === "products_skus" && result?.brand_id) return `/catalog/brands/${result.brand_id}#sells-as`;
+  return undefined;
+}
 
 /**
  * onDiscard drops an unresolved batch's saved request (after a confirming step) so a new batch can start.
@@ -121,7 +129,8 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
       {kind === "opening_balances" && E.info("Never import opening balances that already went in again, or the stock is counted twice.")}
       {result && E.tbl(["Row", "Record", "Result"], result.outcomes.map(row => {
         const previewRow = model.previewRows?.[row.row - 1] ?? row.row;
-        return [String(previewRow), recordName(rows[previewRow - 1]), `${row.status === "committed" ? "Imported" : "Blocked"}${row.error ? `: ${row.error}` : ""}`];
+        const name = recordName(rows[previewRow - 1]), href = recordHref(kind, row.result);
+        return [String(previewRow), name && href ? E.link(name, undefined, href) : name, `${row.status === "committed" ? "Imported" : "Blocked"}${row.error ? `: ${row.error}` : ""}`];
       }), ["r", "l", "l"])}
       {!result && <Button variant="outline" disabled={busy} onClick={onCommit}>Retry same batch</Button>}
       {!!result?.blocked && <Button disabled={busy} onClick={onCorrectBlocked}>Correct blocked rows in a new batch</Button>}

@@ -91,7 +91,15 @@ describe("remaining named disabled-action reasons (#1122)", () => {
     describedButton(sync, "Sync QuickBooks", /connect.*QuickBooks.*sync/i);
     expect(renderToStaticMarkup(createElement(QboSyncView))).not.toContain("before syncing payments");
     const defaults = renderToStaticMarkup(createElement(QboDefaultsView, { allowAch: false, allowCard: false, disabled: true }));
-    describedButton(defaults, "Save push defaults", /connect.*QuickBooks.*saving/i);
+    // Each switch saves on tap, so each one names the connection prerequisite (#1509).
+    const switches = defaults.match(/<button[^>]*role="switch"[^>]*>/g) ?? [];
+    const reasonId = switches[0]?.match(/aria-describedby="([^"]+)"/)?.[1];
+    expect(switches).toHaveLength(2);
+    for (const control of switches) {
+      expect(control).toContain('disabled=""');
+      expect(control).toContain(`aria-describedby="${reasonId}"`);
+    }
+    expect(defaults.match(new RegExp(`<p id="${reasonId}"[^>]*>([^<]+)</p>`))?.[1]).toMatch(/connect.*QuickBooks.*saving/i);
   });
 
   it("labels pending work as loading, not missing setup", () => {
@@ -132,12 +140,16 @@ describe("Oct 25 recheck: withheld actions say why (#1122)", () => {
     describedButton(html(createElement(BrewTimelineView, { model: confirmed })), "Record brew day", /^Still needed: a source for Chit Malt\.$/);
   });
 
-  it("Done pulling names the ingredient without a source", () => {
-    describedButton(html(createElement(BrewPrepView, { model: brewPrepMineral })), "Done pulling", /^Still needed: a source for Chit Malt\.$/);
+  it("Done pulling names the ingredient without a source, as a tap that scrolls to its line (#1508)", () => {
+    const page = html(createElement(BrewPrepView, { model: brewPrepMineral }));
+    const reasonId = page.match(/<button[^>]*aria-describedby="([^"]+)"[^>]*>Done pulling<\/button>/)?.[1];
+    expect(page).toMatch(new RegExp(`<p id="${reasonId}"[^>]*><button type="button"[^>]*>Still needed: a source for Chit Malt\\.</button></p>`));
   });
 
-  it("Choose lot with no stock says so in a plain sentence, not a Still needed line", () => {
-    describedButton(html(createElement(BrewPrepView, { model: { ...brewPrepMineral, sources: [] } })), "Choose lot", /^No Chit Malt in stock to choose from\.$/);
+  it("Materials with no stock are named once above the list, with no disabled Choose lot per line (#1508)", () => {
+    const page = html(createElement(BrewPrepView, { model: { ...brewPrepMineral, sources: [] } }));
+    expect(page).toContain("No stock to choose a source from for Chit Malt.");
+    expect(page).not.toContain(">Choose lot</button>");
   });
 
   it("Close packaging run lists lot code, location and bin", () => {

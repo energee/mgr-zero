@@ -1,6 +1,7 @@
-import { formatDate, formatDateTime } from "@/lib/date-format";
+import { formatDateTime } from "@/lib/date-format";
 import { disconnectStatus } from "@/lib/mgr/integration-disconnect";
 import { connectionStateLabel } from "@/lib/mgr/labels";
+import type { ScopeOption } from "@/components/mgr/scope-pick";
 export type QboHealth = { connected: boolean; connectionId?: string; state: "connected" | "disconnected" | "recovery_required"; realmLabel: string | null; realmId?: string; remoteRevocationState?: string; lastError: string | null; accessExpiresAt?: string | null; allowAch?: boolean; allowCard?: boolean; purchaseAccountId?: string | null };
 export type QboEnvironment = "sandbox" | "production";
 export type QboMappingKind = "customer" | "item" | "deposit" | "one_way_fee" | "vendor" | "purchase_account";
@@ -12,13 +13,25 @@ export type AccountingViewModel = {
   connected: boolean; canDisconnect: boolean; company: string; status: string;
   /** Health carries a connectionId, so MGR has connected this brewery before: the button reads Reconnect QuickBooks. */
   reconnect: boolean;
-  error?: string | null; access?: string;
+  error?: string | null;
   /** QuickBooks realm id, shown as its own fact. */
   companyId?: string;
   syncStatus?: QboSyncStatus;
   defaults?: { allowAch: boolean; allowCard: boolean }; missingEmails?: number; remoteRevocationUnresolved: boolean;
   backHref?: string; mappingsHref?: string; customersHref?: string;
 };
+/** The QuickBooks mappings page's Show pick (#1515): every row, or only the
+ *  unmapped ones (?show=unmapped) with their count. `linked` false is the
+ *  inventory's inert pick, as invoiceStatusOptions does. */
+export type QboMappingScope = "all" | "unmapped";
+export function qboMappingScopeOptions(unmappedCount: number, linked: boolean): ScopeOption[] {
+  const href = "/settings/accounting/mappings";
+  return [
+    { value: "all", label: "All", href: linked ? href : undefined },
+    { value: "unmapped", label: `Unmapped (${unmappedCount})`, href: linked ? `${href}?show=unmapped` : undefined },
+  ];
+}
+
 /** Intuit's sandbox API host is the only way a deployment talks to sandbox companies; any other host is production. */
 export function qboEnvironment(apiBaseUrl: string): QboEnvironment {
   return new URL(apiBaseUrl).hostname.startsWith("sandbox-") ? "sandbox" : "production";
@@ -29,15 +42,15 @@ export function qboCompanyName(health: { realmLabel: string | null; realmId?: st
   return health.realmLabel && health.realmLabel !== health.realmId ? health.realmLabel : null;
 }
 
-/** timeZone: breweries.timezone, the day the token expires in. missingEmails: count_customers_missing_portal_email, when the caller read it. environment: qboEnvironment(QBO_API_BASE), when configured. */
-export function toAccountingViewProps(health: QboHealth, timeZone: string, missingEmails?: number, environment?: QboEnvironment): AccountingViewModel {
+/** missingEmails: count_customers_missing_portal_email, when the caller read it. environment: qboEnvironment(QBO_API_BASE), when configured.
+ *  The access-token expiry is not shown: MGR renews it automatically, so a past date reads as a fault that is not one (#1509). */
+export function toAccountingViewProps(health: QboHealth, missingEmails?: number, environment?: QboEnvironment): AccountingViewModel {
   const name = qboCompanyName(health);
   return {
     connected: health.connected && health.state === "connected", canDisconnect: disconnectStatus(health) === "available",
     company: name ?? "QuickBooks Online", status: `${connectionStateLabel(health.state)}${health.realmId && environment ? ` · ${environment}` : ""}`,
     companyId: health.realmId,
     reconnect: Boolean(health.connectionId), error: health.lastError,
-    access: health.accessExpiresAt ? `renews automatically · current token expires ${formatDate(health.accessExpiresAt, timeZone)}` : undefined,
     defaults: typeof health.allowAch === "boolean" && typeof health.allowCard === "boolean" ? { allowAch: health.allowAch, allowCard: health.allowCard } : undefined,
     missingEmails, remoteRevocationUnresolved: disconnectStatus(health) === "unresolved",
   };

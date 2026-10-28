@@ -124,7 +124,7 @@ describe("reported explorer flows", () => {
     ["Page not found", "Back to Today", "Today"],
     ["Create brewery", "Create brewery", "First-run checklist"],
     ["Accounting", "Review", "Customers missing email"],
-    ["Mapping conflict", "Save mapping", "Accounting"],
+    ["Map to QuickBooks", "Save mapping", "Accounting"],
     ["Disconnect QuickBooks", "Disconnect QuickBooks", "Accounting"],
     ["Disconnect Slack", "Disconnect Slack", "Chat disconnected"],
     ["Disconnect Square", "Disconnect Square", "Point of sale"],

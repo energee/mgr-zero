@@ -126,6 +126,16 @@ export function currentBrewRecords(records: BrewRecordView[]): BrewRecordView[] 
   return records.filter(record => !corrected.has(record.id));
 }
 
+/** A recorded batch prints each turn's Confirmed knockout only when it adds something: there are several turns
+ *  (corrections included), or the one turn's barrels differ from the Knockout line (`initialBbl`) (#1508). */
+export const showsTurnKnockout = (records: BrewRecordView[], initialBbl: string) =>
+  records.length > 1 || records.some(record => Number(record.initial_bbl) !== Number(initialBbl));
+
+/** The batch knocked out its planned barrels on its planned day, so a recorded batch's Planned line would only repeat
+ *  Knockout and Brewed on (#1508). `brewed` is the Knockout barrels and brew date as the page holds them. */
+export const brewedAsPlanned = (plan: { bbl: number; on: string }, brewed: { bbl: string; on: string }) =>
+  brewed.bbl !== "" && Number(brewed.bbl) === plan.bbl && brewed.on === plan.on;
+
 /** Start another turn in the same tank; its actuals begin with the remaining plan. */
 export function brewTurnModel(model: BrewDayViewModel): BrewDayViewModel {
   const recordedBbl = currentBrewRecords(model.records ?? []).reduce((sum, record) => sum + record.initial_bbl, 0);

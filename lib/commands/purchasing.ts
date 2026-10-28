@@ -10,6 +10,7 @@ import { isoDate } from "./packaging";
 import { MATERIAL_CATEGORIES, PAYMENT_TERMS } from "@/lib/mgr/enums";
 import { OPEN_PO_STATUSES } from "@/lib/mgr/receive-po-view";
 import { escapeRegex } from "@/lib/escape-regex";
+import { qboUnmappedFilter, unmappedInput } from "./qbo";
 
 const PURCHASING = ["admin", "warehouse", "brewer"] as const;
 const UOMS = ["lb", "kg", "oz", "g", "each", "l", "gal", "ml"] as const;
@@ -100,9 +101,13 @@ defineCommand({
 
 // The picker's list: PO and material forms need a name, not the contract report.
 defineQuery({
-  name: "list_vendors", description: "Vendors, alphabetical, with active flag and typed lead time",
-  input: z.object({}), roles: [...PURCHASING],
-  handler: (ctx) => unwrap(ctx.db.from("vendors").select("id, name, active, lead_time_days, qbo_vendor_id, qbo_realm_id").eq("brewery_id", ctx.breweryId).order("name")),
+  name: "list_vendors", description: "Vendors, alphabetical, with active flag and typed lead time; unmapped keeps only those with no QuickBooks id in the connected company",
+  input: z.object({ unmapped: unmappedInput }), roles: [...PURCHASING],
+  handler: async (ctx, i) => {
+    const query = ctx.db.from("vendors").select("id, name, active, lead_time_days, qbo_vendor_id, qbo_realm_id").eq("brewery_id", ctx.breweryId);
+    const unmapped = i.unmapped ? await qboUnmappedFilter(ctx, "qbo_vendor_id") : null;
+    return unwrap((unmapped ? query.or(unmapped) : query).order("name"));
+  },
 });
 
 // Vendors with their contracts nested, each contract carrying the four

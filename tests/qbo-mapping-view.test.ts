@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { QboMappingView, QboMappingsView } from "../components/mgr/views/qbo-mapping";
+import { qboMappingScopeOptions } from "../lib/mgr/accounting-view";
 
 it("keeps exact provider IDs and blocks blank or pending mapping submissions", () => {
   const blank = renderToStaticMarkup(createElement(QboMappingView, { kind: "customer", value: " " }));
@@ -43,4 +44,22 @@ it("uses exact vendor and brewery-wide purchase account IDs for receipt Bills", 
   expect(account).toContain("QuickBooks account ID");
   expect(account).toContain("One brewery-wide purchase account");
   expect(account).toContain("Payments are managed only in QuickBooks");
+});
+
+it("says the never-by-name rule once, in the dialog, not again on the page (#1515)", () => {
+  const page = renderToStaticMarkup(createElement(QboMappingsView, { title: "QuickBooks mappings", backLabel: "Accounting", company: "Demo Brewing LLC", sections: [] }));
+  expect(page).toContain("Verify each record in Demo Brewing LLC.");
+  expect(page).not.toContain("never chooses automatically");
+  expect(renderToStaticMarkup(createElement(QboMappingView, { kind: "customer" })).match(/never chooses automatically/g)).toHaveLength(1);
+});
+
+it("scopes the page to unmapped rows through the URL, with the count (#1515)", () => {
+  expect(qboMappingScopeOptions(4, true)).toEqual([
+    { value: "all", label: "All", href: "/settings/accounting/mappings" },
+    { value: "unmapped", label: "Unmapped (4)", href: "/settings/accounting/mappings?show=unmapped" },
+  ]);
+  expect(qboMappingScopeOptions(0, false).map(option => option.href)).toEqual([undefined, undefined]);
+  const html = renderToStaticMarkup(createElement(QboMappingsView, { title: "QuickBooks mappings", backLabel: "Accounting", sections: [], scope: { value: "unmapped", options: qboMappingScopeOptions(4, false) } }));
+  expect(html).toContain("Show");
+  expect(html).toContain("Unmapped (4)");
 });
