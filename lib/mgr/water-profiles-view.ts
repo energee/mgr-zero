@@ -13,6 +13,10 @@ import { submitReason } from "./submit-reason";
 
 export type Ion = `${keyof Ions}_ppm`;
 
+/** The one caption under every Water profiles link (Settings, Catalog, Recipes),
+ *  naming no source or target role, since a profile has none (#1205). */
+export const WATER_PROFILES_CAPTION = "Manage water profiles";
+
 /** Column name, label, and the upsert_water_profile input key, one row per ion.
  *  Derived from lib/water-chemistry's IONS: add a seventh ion there, not here. */
 export const IONS = CHEMISTRY_IONS.map((ion) => [`${ion}_ppm`, ION_LABELS[ion], `${ion}Ppm`] as const);
@@ -45,9 +49,10 @@ function profileLine(p: WaterProfile): string {
   return parts.join(" · ");
 }
 
-/** Preserve the Settings entry for Admin; otherwise use a role-accessible default. */
+/** Preserve the Settings entry for Admin and the Recipes entry for anyone; otherwise use a role-accessible default. */
 export function waterProfilesBack(roles: readonly string[], from?: string | string[]): { label: string; href: string } {
   if (from === "settings" && roles.includes("admin")) return { label: "Settings", href: "/settings" };
+  if (from === "recipes") return { label: "Recipes", href: "/recipes" };
   return hasAnyRole(roles, ["admin", "sales", "warehouse"]) ? { label: "Catalog", href: "/catalog" } : { label: "Recipes", href: "/recipes" };
 }
 

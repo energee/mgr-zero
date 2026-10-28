@@ -6,11 +6,12 @@ import { CellarTransferView, CellarTransferFooter } from "@/components/mgr/views
 import { transferPreview, transferReason, type TransferOccupancy, type TransferVessel } from "@/lib/mgr/cellar-transfer-view";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
-/** `disabled` is the map's actionsOff: no tank holds beer, and the map's note says why (#1115). */
-export function CellarTransferForm({ occupancies, vessels, disabled }: { occupancies: TransferOccupancy[]; vessels: TransferVessel[]; disabled?: boolean }) {
+/** `disabled` is the map's actionsOff: no tank holds beer, and the map's note says why (#1115).
+ *  `addVesselHref` is the map's addHref, linked when the source is the only vessel. */
+export function CellarTransferForm({ occupancies, vessels, addVesselHref, disabled }: { occupancies: TransferOccupancy[]; vessels: TransferVessel[]; addVesselHref?: string | null; disabled?: boolean }) {
   const formId = useId();
   const [fields, setFields] = useState({ fromId: "", toId: "", volume: "", loss: "" });
-  const model = { ...fields, occupancies, vessels };
+  const model = { ...fields, occupancies, vessels, addVesselHref };
   const source = occupancies.find(o => o.occupancy_id === fields.fromId);
   const preview = transferPreview(source?.bbl, fields.volume, fields.loss);
   const reason = transferReason(model);

@@ -36,7 +36,7 @@ export default async function PeriodPage({ params }: { params: Promise<{ period:
   ]);
   // generate_compliance_report refuses such a period; a filed one still shows its snapshot.
   if (!filing && booksOpenedOn && startsBeforeBooks(period, booksOpenedOn)) {
-    return <PeriodBeforeBooksView title={periodLabel(period)} state={beforeBooksState(periodLabel(period), booksOpenedOn, hasAnyRole(brewery.roles, ["admin"]))} backHref="/compliance" />;
+    return <PeriodBeforeBooksView title={periodLabel(period)} state={beforeBooksState(periodLabel(period), booksOpenedOn, hasAnyRole(brewery.roles, ["admin"]), today)} backHref="/compliance" />;
   }
   const report: Report = filing ? { figures: filing.figures, warnings: [] } : (await runCommand("generate_compliance_report", { jurisdiction: JURISDICTION, ...range }, ctx)) as Report;
   const model = toMonthlyComplianceViewProps({ monthLabel: periodLabel(period), today, timeZone: brewery.timeZone, report, filing, losses, backHref: "/compliance" });

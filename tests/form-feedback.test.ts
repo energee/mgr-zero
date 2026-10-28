@@ -38,6 +38,7 @@ import { kegEventReason } from "@/lib/mgr/keg-fleet-view";
 import { additionReason, mashStepReason, stageReason } from "@/lib/mgr/recipe-process-view";
 import { defaultShipAllocations, shipmentSourceNeeds, type ShippingSnapshot } from "@/app/(app)/orders/[id]/ship-form";
 import { defaultRefusedEntries } from "@/components/mgr/views/refused-return";
+import { vendorReason } from "@/lib/mgr/vendor-view";
 
 // The live forms render without a router or a command round trip.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {} }) }));
@@ -72,7 +73,7 @@ describe("per-form reasons", () => {
     expect(newPoReason({ vendor: "", lines: [{ materialId: "", qty: "", cost: "" }] }))
       .toBe("Still needed: a vendor, a material on each line, and a quantity above zero on each line.");
     expect(newPoReason({ vendor: "v", lines: [{ materialId: "m", qty: "0.5", cost: "" }] })).toBeNull();
-    expect(newPoReason({ vendor: "v", lines: [{ materialId: "m", qty: "4", cost: "-3" }] })).toBe("Still needed: a unit cost of zero or more.");
+    expect(newPoReason({ vendor: "v", lines: [{ materialId: "m", qty: "4", cost: "-3" }] })).toBe("Still needed: a unit cost from $0 to $21,474,836.47.");
   });
 
   it("New PO marks a bad quantity or cost on its own field, never a blank one", () => {
@@ -467,7 +468,7 @@ describe("live forms withhold their submit with the reason", () => {
   };
 
   it("New PO, before anything is chosen", () => {
-    withheld(html(createElement(NewPoForm, { vendors: [], materials: [] })), "Still needed: a vendor, a material on each line, and a quantity above zero on each line.");
+    withheld(html(createElement(NewPoForm, { vendors: [], materials: [], today: "2026-10-23" })), "Still needed: a vendor, a material on each line, and a quantity above zero on each line.");
   });
 
   it("New vessel, with no name or capacity (#1116)", () => {
@@ -481,6 +482,17 @@ describe("live forms withhold their submit with the reason", () => {
       skus: [],
       workHrefs: {},
     })), "Still needed: a warehouse to send from and a transfer quantity above zero.");
+  });
+});
+
+describe("vendorReason (#1485)", () => {
+  const blank = { name: "", email: "", phone: "", leadDays: "" };
+  it("names a blank name and each bad optional field, or null when ready", () => {
+    expect(vendorReason(blank)).toBe("Still needed: a vendor name.");
+    expect(vendorReason({ ...blank, name: "  " })).toBe("Still needed: a vendor name.");
+    expect(vendorReason({ ...blank, name: "YCH" })).toBeNull();
+    expect(vendorReason({ name: "YCH", email: "nope", phone: "abc", leadDays: "-1" }))
+      .toBe("Still needed: a valid email, a valid phone number, and a lead time of zero or more whole days.");
   });
 });
 

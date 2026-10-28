@@ -3,9 +3,10 @@ import { BRAND_ABV } from "@/lib/mgr/brand-abv";
 import { cents, completeRows, defineCommand, defineQuery, latestOf, PAGE_SIZE, PG_INT_MAX, unwrap, CommandError, STAFF_ROLES } from "./registry";
 import { escapeRegex } from "@/lib/escape-regex";
 import { BRAND_SORTS } from "@/lib/mgr/enums";
+import { UPC_MESSAGE, UPC_PATTERN } from "@/lib/mgr/upc";
 
 /** A UPC/EAN/GTIN barcode: 8, 12, 13 or 14 digits. "" clears it. */
-const upc = z.string().trim().regex(/^(\d{8}|\d{12,14})?$/, "a UPC of 8, 12, 13 or 14 digits");
+const upc = z.string().trim().regex(UPC_PATTERN, UPC_MESSAGE);
 
 defineQuery({
   name: "list_catalog_categories", description: "List this brewery's catalog categories",

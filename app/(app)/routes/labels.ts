@@ -9,7 +9,7 @@ export type Route = {
   id: string; name: string | null; delivery_date: string; driver_user_id: string | null; driver_email: string | null; vehicle: string | null; note: string | null;
   departed_at: string | null; returned_at: string | null; stops: Stop[];
 };
-export type RouteList = { routes: Route[]; unassigned: StopDoc[]; drivers: Driver[]; today: string };
+export type RouteList = { routes: Route[]; anyReturned: boolean; unassigned: StopDoc[]; drivers: Driver[]; today: string };
 export type Driver = { user_id: string; email: string; roles: string[] };
 
 /** A route's driver: their roster email, or plainly why there is none. A

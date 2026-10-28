@@ -22,11 +22,22 @@ it("explains how to fix empty and non-CSV files (#1395)", () => {
     expect(() => parseCsv(input)).toThrow("This file is not a CSV. In Excel or Google Sheets, save it as CSV and choose it again.");
   }
 });
+it("writes header-only and bad-header errors as full sentences with a fix (#1497)", () => {
+  expect(() => parseCsv("name,type\n")).toThrow("This file has column headers but no data rows. Add at least one record below the header row and choose the file again.");
+  for (const input of ["a,a\n1,2", "a,\n1,2"]) {
+    expect(() => parseCsv(input)).toThrow("Every column in the header row needs its own name, and no two can match. Fix the first row and choose the file again.");
+  }
+});
+it("ignores capitals and spaces in customer type and payment terms, so the batch sends stored values (#1497)", () => {
+  const [row] = mapCsvRows("customers", [["Ridgeline", " Retailer ", "NET30", "PA", "Wholesale"]], { name: 0, type: 1, paymentTerms: 2, state: 3, saleChannelId: 4 });
+  expect(row).toEqual({ name: "Ridgeline", type: "retailer", paymentTerms: "net30", state: "PA", saleChannelId: "Wholesale" });
+  expect(validateImportRow("customers", row)).toEqual([]);
+});
 it("names the row cap the way the upload step writes it (#1150)", () => {
   expect(() => parseCsv(`a\n${"1\n".repeat(5001)}`)).toThrow("At most 5,000 rows per batch");
 });
 it("maps explicit fields and rejects blank, fractional cents and nondecimal numbers", () => {
-  expect(mapCsvRows([["IPA", "2"]], { product: 0 })).toEqual([{ product: "IPA" }]);
+  expect(mapCsvRows("products_skus", [["IPA", "2"]], { product: 0 })).toEqual([{ product: "IPA" }]);
   const ids = { skuId: crypto.randomUUID(), locationId: crypto.randomUUID(), binId: crypto.randomUUID() };
   for (const qty of ["", "NaN", "Infinity", "0x10", "1e3", "0", "-2"]) expect(validateImportRow("opening_balances", { ...ids, qty })).not.toEqual([]);
   expect(validateImportRow("opening_balances", { ...ids, qty: "1.25" })).toEqual([]);
@@ -179,7 +190,7 @@ it("downloads friendly template filenames and stable keys with an example that c
     expect(template).not.toMatch(/[0-9a-f]{8}-[0-9a-f-]{27,}/i);
     expect(parsed.headers).toEqual(names);
     expect(parsed.rows).toHaveLength(1);
-    const [example] = mapCsvRows(parsed.rows, Object.fromEntries(names.map((name, index) => [name, index])));
+    const [example] = mapCsvRows(kind, parsed.rows, Object.fromEntries(names.map((name, index) => [name, index])));
     const blankRequired = fields.find(field => field.required && !example[field.name]);
     expect(blankRequired).toBeDefined();
     expect(validateImportRow(kind, example)).toContain(`${IMPORT_FIELD_LABELS[blankRequired!.name]} is required`);

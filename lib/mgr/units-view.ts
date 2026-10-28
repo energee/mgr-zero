@@ -1,11 +1,10 @@
-// lib/mgr/units-view.ts — view-model for Settings · Units.
-// Maps get_gravity_unit onto UnitsView; the preview takes a typical reading
+// lib/mgr/units-view.ts — view-model for the gravity unit chips (Settings and Me).
+// Maps get_gravity_unit onto GravityUnitControls; the preview takes a typical reading
 // typed in the other unit and shows it as formatGravity would in the unit in effect.
 import { sgToPlato } from "@/lib/recipe-gravity";
 import { formatGravity, GRAVITY_UNITS, gravityUnitLabel, type GravityUnit } from "./gravity-unit";
 
 export type UnitsViewModel = {
-  backHref?: string;
   breweryOptions: string[];
   breweryIndex: number;
   mineOptions: string[];
@@ -19,7 +18,6 @@ export type UnitsSnapshot = {
   brewery: GravityUnit;
   mine: GravityUnit | null;
   effective: GravityUnit;
-  backHref?: string;
 };
 
 const breweryOptions = GRAVITY_UNITS.map(gravityUnitLabel);
@@ -35,11 +33,10 @@ function reading(plato: number, unit: GravityUnit): string {
   return unit === "sg" ? `${formatGravity(plato, unit)} SG` : formatGravity(plato, unit);
 }
 
-/** Map a get_gravity_unit payload onto UnitsView. */
-export function toUnitsViewProps({ brewery, mine, effective, backHref }: UnitsSnapshot): UnitsViewModel {
+/** Map a get_gravity_unit payload onto GravityUnitControls. */
+export function toUnitsViewProps({ brewery, mine, effective }: UnitsSnapshot): UnitsViewModel {
   const otherUnit: GravityUnit = effective === "sg" ? "plato" : "sg";
   return {
-    backHref,
     breweryOptions,
     breweryIndex: BREWERY_UNITS.indexOf(brewery),
     mineOptions: [`Use brewery default · ${gravityUnitLabel(brewery)}`, ...breweryOptions],
