@@ -10,14 +10,21 @@ beforeEach(() => { query.mockReset(); permission.mockReset(); });
 
 it("guards new-order deep links before loading customer and catalog data", async () => {
   permission.mockImplementation(() => { throw new Error("denied"); });
-  await expect(NewOrderPage()).rejects.toThrow("denied");
+  await expect(NewOrderPage({ searchParams: Promise.resolve({}) })).rejects.toThrow("denied");
   expect(permission).toHaveBeenCalledWith({ breweryId: "brewery" }, "create_order", "New order");
   expect(query).not.toHaveBeenCalled();
 });
 
 it("defers option reads to the cached client after the permission guard", async () => {
-  const page = await NewOrderPage();
+  const page = await NewOrderPage({ searchParams: Promise.resolve({}) });
   expect(page.type).toBe(NewOrderClient);
   expect(permission).toHaveBeenCalledWith({ breweryId: "brewery" }, "create_order", "New order");
   expect(query).not.toHaveBeenCalled();
+});
+
+it("hands a linked customer id to the form, which checks it against the listed customers (#1506)", async () => {
+  const page = await NewOrderPage({ searchParams: Promise.resolve({ customerId: "c1" }) });
+  expect(page.props.customerId).toBe("c1");
+  const repeated = await NewOrderPage({ searchParams: Promise.resolve({ customerId: ["c1", "c2"] }) });
+  expect(repeated.props.customerId).toBeUndefined();
 });

@@ -10,14 +10,14 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { RecordPaymentView, VoidPaymentView } from "@/components/mgr/views/invoice";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { toCents } from "@/lib/mgr/money";
+import { dollarsInput, toCents } from "@/lib/mgr/money";
 import { invoicePaymentReady, type InvoicePaymentValue } from "@/lib/mgr/invoice-view";
 
-/** `today` is breweryDate(timeZone), from the server page; `balanceCents` caps the amount. */
+/** `today` is breweryDate(timeZone), from the server page; `balanceCents` starts and caps the amount (#1506). */
 export function RecordPaymentForm({ invoiceId, balanceCents, today, quickbooksConnected }: {
   invoiceId: string; balanceCents: number; today: string; quickbooksConnected: boolean;
 }) {
-  const initial = (): InvoicePaymentValue => ({ amount: "", receivedOn: today, method: "", reference: "" });
+  const initial = (): InvoicePaymentValue => ({ amount: dollarsInput(balanceCents), receivedOn: today, method: "", reference: "" });
   const [value, setValue] = useState(initial);
   const form = useCommandForm("record_invoice_payment", {
     build: () => ({

@@ -56,7 +56,7 @@ it("draws the primary verb first, Complete transfer once, and Cancel only in the
   expect(html.indexOf(">Complete transfer<")).toBeLessThan(html.indexOf(">Record pick<"));
   expect(html.match(/>Cancel order</g)).toHaveLength(1);
   expect(html.indexOf(">Cancel order<")).toBeGreaterThan(html.indexOf(">History<"));
-  expect(html).toContain("Cancellation requires a reason and confirmation.");
+  expect(html).not.toContain("Cancellation requires a reason and confirmation.");
   expect(renderToStaticMarkup(createElement(OrderActionScope, null, createElement(CancelOrderAction, { orderId: "o", status: "shipped", canSell: true })))).toBe("");
 });
 

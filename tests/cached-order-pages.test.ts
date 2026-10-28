@@ -69,6 +69,11 @@ it("preserves customer filters and read-only Warehouse controls", () => {
   expect(html).not.toContain("New order");
 });
 
+it("carries the customer filter into New order (#1506)", () => {
+  expect(renderToStaticMarkup(OrdersClient({ roles: ["sales"], timeZone, customerId: "buyer" }))).toContain('href="/orders/new?customerId=buyer"');
+  expect(renderToStaticMarkup(OrdersClient({ roles: ["sales"], timeZone }))).toContain('href="/orders/new"');
+});
+
 it("combines sales' create control with brewer's production navigation", () => {
   const html = renderToStaticMarkup(OrdersClient({ roles: ["brewer", "sales"], timeZone }));
   expect(html).toContain("New order");

@@ -224,11 +224,12 @@ function invoiceSummary(snapshot: InvoiceSnapshot, localCents: number, totalCent
 /** record_invoice_payment's refusals, mirrored: only a ledger-owned invoice
  *  (no QuickBooks identity, pending push or earlier push) that is not written
  *  off, not paid, and still has money due takes a payment, of at most its
- *  balance. Otherwise null. */
-function invoicePaymentBalanceCents(snapshot: InvoiceSnapshot, totalCents: number): number | null {
-  const takes = invoiceLedgerOwnsBalance(toLedgerFacts(snapshot)) && !snapshot.invoice.written_off_at && snapshot.invoice.paid_at == null
-    && totalCents > snapshot.localPaidCents;
-  return takes ? totalCents - snapshot.localPaidCents : null;
+ *  balance. Otherwise null. The invoice page and the Invoices register both
+ *  ask here (#1506), so the two never offer Record payment differently. */
+export function invoicePaymentBalanceCents(invoice: Parameters<typeof invoiceLedgerOwnsBalance>[0] & { written_off_at?: string | null }, totalCents: number): number | null {
+  const takes = invoiceLedgerOwnsBalance(invoice) && !invoice.written_off_at && invoice.paid_at == null
+    && totalCents > invoice.local_paid_cents;
+  return takes ? totalCents - invoice.local_paid_cents : null;
 }
 
 const paymentView = (p: InvoicePaymentRecord): InvoicePaymentView => ({
@@ -290,6 +291,6 @@ export function toInvoiceViewProps(snapshot: InvoiceSnapshot): InvoiceViewModel 
     // An unvoided payment blocks the push the mapping rows serve, as in qboInvoicePresentation.
     mappings: snapshot.localPaidCents > 0 ? undefined : mappings,
     payments: snapshot.payments.map(paymentView),
-    paymentBalanceCents: invoicePaymentBalanceCents(snapshot, totalCents),
+    paymentBalanceCents: invoicePaymentBalanceCents(toLedgerFacts(snapshot), totalCents),
   };
 }
