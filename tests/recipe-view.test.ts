@@ -97,33 +97,26 @@ describe("draftBlocker", () => {
     expect(draftBlocker(ready)).toBeNull();
     expect(draftBlocker({ ...ready, name: undefined })).toBeNull();
   });
-  it("names each unmet requirement in order: name, ingredient, mash step, efficiency, attenuation", () => {
+  it("names every unmet requirement in one Still needed sentence (#1481)", () => {
     const none = { name: " ", lines: [{ ...line, perBblQty: "" }], mashSchedule: [], efficiency: "0", attenuation: "" };
-    const first = draftBlocker(none);
-    const second = draftBlocker({ ...none, name: "Pale" });
-    const third = draftBlocker({ ...none, name: "Pale", lines: [line] });
-    const fourth = draftBlocker({ ...none, name: "Pale", lines: [line], mashSchedule: mash });
-    const fifth = draftBlocker({ ...none, name: "Pale", lines: [line], mashSchedule: mash, efficiency: "75" });
-    expect(first).toMatch(/name/i);
-    expect(second).toMatch(/ingredient/i);
-    expect(third).toMatch(/mash step/i);
-    expect(fourth).toMatch(/efficiency/i);
-    expect(fifth).toMatch(/attenuation/i);
-    expect(draftBlocker({ ...ready, efficiency: "101" })).toMatch(/efficiency/i);
+    expect(draftBlocker(none)).toBe("Still needed: a recipe name, an ingredient with a quantity per bbl, a mash step, brewhouse efficiency from 0 to 100%, and yeast attenuation from 0 to 100%.");
+    expect(draftBlocker({ ...none, name: "Pale", lines: [line], mashSchedule: mash, efficiency: "75" })).toBe("Still needed: yeast attenuation from 0 to 100%.");
+    expect(draftBlocker({ ...ready, efficiency: "101" })).toBe("Still needed: brewhouse efficiency from 0 to 100%.");
   });
   it("names an out-of-range process number before the version is cut (#1478)", () => {
-    expect(draftBlocker({ ...ready, numbers: { preBoil: "-1" } })).toBe("Set pre-boil volume above zero.");
-    expect(draftBlocker({ ...ready, numbers: { boilMin: "-5" } })).toBe("Set boil time in whole minutes above zero.");
-    expect(draftBlocker({ ...ready, numbers: { whirlpoolTemp: "5000" } })).toBe("Set whirlpool temperature from 25 to 212 °F.");
-    expect(draftBlocker({ ...ready, numbers: { knockoutTemp: "-300" } })).toBe("Set knockout temperature from 25 to 212 °F.");
-    expect(draftBlocker({ ...ready, numbers: { whirlpoolMin: "1e1" } })).toBe("Set whirlpool time in whole minutes, zero or more.");
+    expect(draftBlocker({ ...ready, numbers: { preBoil: "-1" } })).toBe("Still needed: a pre-boil volume above zero.");
+    expect(draftBlocker({ ...ready, numbers: { boilMin: "-5" } })).toBe("Still needed: a boil time of one or more whole minutes.");
+    expect(draftBlocker({ ...ready, numbers: { whirlpoolTemp: "5000" } })).toBe("Still needed: a whirlpool temperature from 25 to 212 °F.");
+    expect(draftBlocker({ ...ready, numbers: { knockoutTemp: "-300" } })).toBe("Still needed: a knockout temperature from 25 to 212 °F.");
+    expect(draftBlocker({ ...ready, numbers: { whirlpoolMin: "1e1" } })).toBe("Still needed: a whirlpool time of zero or more whole minutes.");
+    expect(draftBlocker({ ...ready, numbers: { whirlpoolRest: "-1" } })).toBe("Still needed: a whirlpool rest of zero or more whole minutes.");
     expect(draftBlocker({ ...ready, numbers: { preBoil: "7", boilMin: "60", whirlpoolTemp: "180", knockoutTemp: "66", whirlpoolMin: "" } })).toBeNull();
   });
   it("names a line whose timing is out of range instead of dropping it (#1478)", () => {
     const boil = { ...line, stage: "boil" as const, timingMinutes: "90" };
-    expect(draftBlocker({ ...ready, lines: [line, boil], numbers: { boilMin: "60" } })).toBe("Fix the boil timing: enter 0 to 60 minutes.");
+    expect(draftBlocker({ ...ready, lines: [line, boil], numbers: { boilMin: "60" } })).toBe("Still needed: boil timing from 0 to 60 minutes.");
     const dryHop = { ...line, stage: "dry_hop" as const, timingMinutes: String(121 * 1440) };
-    expect(draftBlocker({ ...ready, lines: [line, dryHop] })).toBe("Fix the dry hop timing: enter day 0 to 120.");
+    expect(draftBlocker({ ...ready, lines: [line, dryHop] })).toBe("Still needed: dry hop timing from day 0 to 120.");
     // A schedule longer than 120 days, conditioning included, raises the ceiling.
     const long = [{ name: "Primary", kind: "primary", tempF: 68, days: 30 }, { name: "Barrel", kind: "conditioning", tempF: 55, days: 150 }];
     expect(draftBlocker({ ...ready, lines: [line, dryHop], fermentationSchedule: long })).toBeNull();

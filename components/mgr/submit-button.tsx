@@ -18,8 +18,9 @@ export type SubmitButtonProps = Omit<ComponentProps<typeof Button>, "type" | "ch
   label: ReactNode;
   /** "button" for an action that is not a form submit (Print); defaults to "submit". */
   type?: "submit" | "button";
-  /** Why the button is withheld, usually submitReason (lib/mgr/submit-reason.ts); null or absent when ready. */
-  reason?: string | null;
+  /** Why the button is withheld, usually submitReason (lib/mgr/submit-reason.ts); null or absent when ready. A form may
+   *  wrap the sentence in a control, as Prep's scrolls to the first line still needing a source. */
+  reason?: ReactNode;
   submitting?: boolean;
   /** The label while submitting. */
   busy?: string;

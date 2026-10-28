@@ -8,7 +8,7 @@ import { VesselForm } from "@/app/(app)/batches/vessel-form";
 import { VesselDetailView } from "@/components/mgr/views/vessel-detail";
 import { formatVesselReading, VESSEL_TYPES, type VesselReading } from "@/lib/mgr/vessel-detail-view";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
-import { batNo } from "@/lib/mgr/doc-no";
+import { batchLabel, batNo } from "@/lib/mgr/doc-no";
 import { formatDateTime } from "@/lib/date-format";
 import "@/lib/commands/all";
 import { OccupancyActions } from "@/app/(app)/cellar/occupancy-actions";
@@ -53,6 +53,6 @@ export default async function VesselPage({ params }: { params: Promise<{ id: str
       history: readings.map(reading => ({ key: reading.id, title: formatDateTime(reading.at, brewery.timeZone), detail: formatVesselReading(reading, unit.effective) })),
     },
   };
-  const actions = occupancy && <OccupancyActions ctx={ctx} occupancyId={occupancy.occupancy_id} batch={{ id: occupancy.batch_id, label: `${batNo(occupancy.batch_no)} · ${occupancy.brand_name ?? "no brand"}` }} />;
+  const actions = occupancy && <OccupancyActions ctx={ctx} occupancyId={occupancy.occupancy_id} batch={{ id: occupancy.batch_id, label: batchLabel(occupancy.batch_no, occupancy.brand_name) }} />;
   return canRun(ctx, "upsert_vessel") ? <VesselForm key={id} vesselId={id} model={model} actions={actions} /> : <VesselDetailView model={model} editable={false} actions={actions} />;
 }

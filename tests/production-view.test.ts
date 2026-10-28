@@ -338,10 +338,11 @@ describe("Brew day view", () => {
     expect(htmlOf(createElement(BrewPrepView, { model: brewPrepMineral }))).not.toContain("?tab=");
   });
 
-  it("Choose lot opens no inline pick without stock, and is disabled when the given stock holds none of the material", () => {
+  it("Choose lot is left off a line whose material has no stock, which one note names instead (#1508)", () => {
     const html = htmlOf(createElement(BrewPrepView, { model: { ...brewPrepMineral, sources: [] } }));
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Choose lot<\/button>/);
-    expect(htmlOf(createElement(BrewPrepView, { model: brewPrepMineral }))).not.toMatch(/<button[^>]*disabled=""[^>]*>Choose lot<\/button>/);
+    expect(html).not.toContain(">Choose lot</button>");
+    expect(html).toContain("No stock to choose a source from for Chit Malt.");
+    expect(htmlOf(createElement(BrewPrepView, { model: brewPrepMineral }))).toMatch(/<button(?![^>]*disabled="")[^>]*>Choose lot<\/button>/);
   });
 
   it("the Brew day timeline inventory record is BrewTimelineView with Change plan", () => {

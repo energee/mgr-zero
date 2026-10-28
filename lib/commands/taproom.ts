@@ -72,11 +72,11 @@ defineQuery({
 });
 
 // The Keg fleet page: every pool, what each bin physically holds per pool ×
-// size, each pool/size/location netting below zero, and the customers holding kegs. Zero rows are kept so a bin that
+// size, each pool/size/location netting below zero, and the customers holding kegs, in total and per pool × size. Zero rows are kept so a bin that
 // emptied still shows; a customer with nothing out is not listed. Page every
 // balance and label read past the row cap; order views by their full grain (#726).
 defineQuery({
-  name: "get_keg_fleet", description: "Keg pools, kegs on hand per pool, size, location and bin, shell shortages per pool, size and location, and customers with kegs out", input: z.object({}), roles: ROLES,
+  name: "get_keg_fleet", description: "Keg pools, kegs on hand per pool, size, location and bin, shell shortages per pool, size and location, customers with kegs out, and each customer's kegs out per pool and size", input: z.object({}), roles: ROLES,
   handler: async (ctx) => {
     const [pools, rows, shortages, locations, bins, out, customers] = await Promise.all([
       listPools(ctx),
@@ -88,20 +88,24 @@ defineQuery({
         .eq("brewery_id", ctx.breweryId).order("id").range(start, start + PAGE_SIZE - 1)),
       completeRows("Keg fleet bins", start => ctx.db.from("bins").select("id, name", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).order("id").range(start, start + PAGE_SIZE - 1)),
-      completeRows("Kegs out", start => ctx.db.from("keg_customer_balances").select("customer_id, qty", { count: "exact" })
+      completeRows("Kegs out", start => ctx.db.from("keg_customer_balances").select("customer_id, pool_id, keg_size, qty", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).order("customer_id").order("pool_id").order("keg_size").range(start, start + PAGE_SIZE - 1)),
       completeRows("Keg fleet customers", start => ctx.db.from("customers").select("id, name", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).order("id").range(start, start + PAGE_SIZE - 1)),
     ]);
     const name = (list: { id: string; name: string }[] | null, id: string) => list?.find((x) => x.id === id)?.name ?? "";
+    // Per pool and size, so Record keg event can hold a return or a loss at a customer to what that customer holds.
+    const balances = (out ?? []).map((o) => ({ customer_id: o.customer_id as string, pool_id: o.pool_id as string, keg_size: o.keg_size as string, qty: Number(o.qty) }))
+      .filter((b) => b.qty !== 0);
     const kegsOut = new Map<string, number>();
-    for (const o of out ?? []) kegsOut.set(o.customer_id as string, (kegsOut.get(o.customer_id as string) ?? 0) + Number(o.qty));
+    for (const b of balances) kegsOut.set(b.customer_id, (kegsOut.get(b.customer_id) ?? 0) + b.qty);
     return {
       pools: pools ?? [],
       rows: (rows ?? []).map((r) => ({ ...r, qty: Number(r.qty), location_name: name(locations, r.location_id as string), bin_name: name(bins, r.bin_id as string) })),
       shortages: (shortages ?? []).map((r) => ({ ...r, short: Number(r.short) })),
       customers: [...kegsOut].filter(([, n]) => n !== 0).map(([customer_id, kegs_out]) => ({ customer_id, name: name(customers, customer_id), kegs_out }))
         .sort((a, b) => a.name.localeCompare(b.name)),
+      balances,
     };
   },
 });

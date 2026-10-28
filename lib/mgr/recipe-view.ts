@@ -16,6 +16,7 @@ import { splitPacks, withPacks } from "./pack-qty";
 import { plural } from "./plural";
 import { fromTicks, isNumber, numberNotationError, toTicks } from "./quantity-input";
 import { sentenceCase } from "./labels";
+import { submitReason } from "./submit-reason";
 import { READING_BOUNDS } from "@/lib/composer/offline-policy";
 import {
   fermentationSummary, ingredientDetail, isBrewDayStage, lineReady, mashRowSummary, mashStepDetail, materialLookup, perBblDisplay, processReadout, scheduleDays, timingOutOfRange, toIngredientFields, waterAdditionDetail,
@@ -145,31 +146,34 @@ const optionalOk = (s: string | undefined, ok: (n: number) => boolean) =>
 const inTempRange = (n: number) => n >= READING_BOUNDS.tempF.min && n <= READING_BOUNDS.tempF.max;
 const wholeAtLeast = (min: number) => (n: number) => Number.isInteger(n) && n >= min;
 
-/** The first thing a draft still needs before it can be saved, or null when it is ready.
- * `name` is the new recipe's name and is passed only when the recipe is being created. The process numbers and each
- * line's timing are checked against create_recipe_version's bounds, because a cut version cannot be edited (#1478). */
+/** What a draft still needs before it can be saved, as one "Still needed: …" sentence (submitReason), or null when it
+ * is ready (#1481). `name` is the new recipe's name and is passed only when the recipe is being created. The process
+ * numbers and each line's timing are checked against create_recipe_version's bounds, because a cut version cannot be
+ * edited (#1478). */
 export function draftBlocker(input: {
   name?: string; lines: IngredientLine[]; mashSchedule: MashStep[]; efficiency: string; attenuation: string;
   numbers?: Partial<Record<RecipeNumberKey, string>>; fermentationSchedule?: FermentationStage[];
 }): string | null {
   const n = input.numbers ?? {};
-  if (input.name !== undefined && input.name.trim() === "") return "Give the recipe a name.";
-  if (!input.lines.some(lineReady)) return "Add an ingredient with a quantity per bbl.";
-  if (input.mashSchedule.length === 0) return "Add a mash step.";
-  if (!validPercent(input.efficiency)) return "Set brewhouse efficiency between 0 and 100%.";
-  if (!validPercent(input.attenuation)) return "Set yeast attenuation between 0 and 100%.";
-  if (!optionalOk(n.preBoil, (v) => v > 0)) return "Set pre-boil volume above zero.";
-  if (!optionalOk(n.boilMin, wholeAtLeast(1))) return "Set boil time in whole minutes above zero.";
-  if (!optionalOk(n.whirlpoolMin, wholeAtLeast(0))) return "Set whirlpool time in whole minutes, zero or more.";
-  if (!optionalOk(n.whirlpoolRest, wholeAtLeast(0))) return "Set whirlpool rest in whole minutes, zero or more.";
-  if (!optionalOk(n.whirlpoolTemp, inTempRange)) return "Set whirlpool temperature from 25 to 212 °F.";
-  if (!optionalOk(n.knockoutTemp, inTempRange)) return "Set knockout temperature from 25 to 212 °F.";
   const limits = { boilMinutes: n.boilMin?.trim() ? Number(n.boilMin) : undefined, fermentationDays: scheduleDays(input.fermentationSchedule ?? []) };
-  for (const line of input.lines.filter((l) => l.materialId)) {
+  const timings = input.lines.filter((l) => l.materialId).flatMap((line) => {
     const range = timingOutOfRange(line.stage, toIngredientFields(line).timing, limits);
-    if (range) return `Fix the ${sentenceCase(line.stage).toLowerCase()} timing: enter ${range.days ? `day 0 to ${range.max}` : `0 to ${range.max} minutes`}.`;
-  }
-  return null;
+    return range ? [`${sentenceCase(line.stage).toLowerCase()} timing from ${range.days ? `day 0 to ${range.max}` : `0 to ${range.max} minutes`}`] : [];
+  });
+  const needs: [boolean, string][] = [
+    [input.name !== undefined && input.name.trim() === "", "a recipe name"],
+    [!input.lines.some(lineReady), "an ingredient with a quantity per bbl"],
+    [input.mashSchedule.length === 0, "a mash step"],
+    [!validPercent(input.efficiency), "brewhouse efficiency from 0 to 100%"],
+    [!validPercent(input.attenuation), "yeast attenuation from 0 to 100%"],
+    [!optionalOk(n.preBoil, (v) => v > 0), "a pre-boil volume above zero"],
+    [!optionalOk(n.boilMin, wholeAtLeast(1)), "a boil time of one or more whole minutes"],
+    [!optionalOk(n.whirlpoolMin, wholeAtLeast(0)), "a whirlpool time of zero or more whole minutes"],
+    [!optionalOk(n.whirlpoolRest, wholeAtLeast(0)), "a whirlpool rest of zero or more whole minutes"],
+    [!optionalOk(n.whirlpoolTemp, inTempRange), "a whirlpool temperature from 25 to 212 °F"],
+    [!optionalOk(n.knockoutTemp, inTempRange), "a knockout temperature from 25 to 212 °F"],
+  ];
+  return submitReason([...needs.filter(([missing]) => missing).map(([, need]) => need), ...timings]);
 }
 
 /** Why there is no prediction, naming the first blocked line, or null when nothing blocks it.

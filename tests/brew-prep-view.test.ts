@@ -1,7 +1,7 @@
 // tests/brew-prep-view.test.ts — the brew prep pull list and the brew-day
 // timeline's pure rules (lib/mgr/brew-prep-view.ts).
 import { describe, expect, it } from "vitest";
-import { anyPulled, brewIngredients, confirmAll, brewPullsPayload, brewTargets, currentStage, isShort, laterAdditions, openBrewTab, prepReason, processErrors, pullDetail, pullTone, sourceChoices, showsPacks, stageProgress, startAtPlan, timelineReason, timelineRecordPayload, timelineStages, timelineTone, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
+import { anyPulled, brewIngredients, confirmAll, brewPullsPayload, brewTargets, currentStage, isShort, laterAdditions, needsSource, noStockNote, openBrewTab, prepReason, processErrors, pullDetail, pullTone, sourceChoices, showsPacks, stageProgress, startAtPlan, timelineReason, timelineRecordPayload, timelineStages, timelineTone, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { BrewMaterialSource, BrewPlan, BrewPull } from "@/lib/mgr/brew-day-view";
 
 const chit: BrewIngredient = startAtPlan({ key: "chit", name: "Chit Malt", materialId: "chit", stage: "mash", plan: 220, unit: "lb", packSize: 50, source: null });
@@ -244,6 +244,28 @@ describe("prepReason", () => {
   it("refuses negative or non-numeric amounts", () => {
     expect(prepReason({ ...prep, ingredients: [{ ...hops, packs: "-1" }] })).not.toBeNull();
     expect(prepReason({ ...prep, ingredients: [{ ...hops, loose: "abc" }] })).not.toBeNull();
+  });
+  it("names one unsourced line, and counts several instead of listing each (#1508)", () => {
+    expect(prepReason({ ...prep, ingredients: [hops, chit] })).toBe("Still needed: a source for Chit Malt.");
+    const malts = ["a", "b", "c"].map(key => ({ ...chit, key, name: `Malt ${key}` }));
+    expect(prepReason({ ...prep, ingredients: [hops, ...malts] })).toBe("Still needed: a source for 3 items.");
+  });
+});
+
+describe("needsSource", () => {
+  it("marks a line pulled above zero with no source, so the reason can jump to the first (#1508)", () => {
+    expect([hops, chit, oats].find(needsSource)?.key).toBe("chit");
+    expect(needsSource({ ...chit, packs: "0", loose: "" })).toBe(false);
+  });
+});
+
+describe("noStockNote", () => {
+  it("names, once, each unsourced material with no stock to choose from (#1508)", () => {
+    const nelson = { ...chit, key: "nelson", name: "Nelson", materialId: "nelson" };
+    expect(noStockNote({ ...prep, ingredients: [hops, chit, nelson], sources: [] })).toBe("No stock to choose a source from for Chit Malt and Nelson.");
+    expect(noStockNote({ ...prep, ingredients: [hops, chit], sources: [onHand("chit", "malt", "a4", "c-1")] })).toBeNull();
+    // Without sources (the inventory), stock is unknown, so nothing is said.
+    expect(noStockNote({ ...prep, ingredients: [chit] })).toBeNull();
   });
 });
 

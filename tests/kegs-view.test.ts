@@ -12,7 +12,7 @@ import { KegHistoryView } from "../components/mgr/views/keg-history";
 import { KEG_EVENT_REASONS } from "../lib/mgr/enums";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger } from "../lib/mgr/fixtures/kegs";
 import { toKegBalanceViewProps } from "../lib/mgr/keg-balance-view";
-import { kegEventFieldErrors, kegEventReason, kegPoolFieldErrors, kegShortageText, toKegFleetViewProps, withLocationBin, type KegPoolValue } from "../lib/mgr/keg-fleet-view";
+import { kegEventFieldErrors, kegEventReason, kegOnHand, kegPoolFieldErrors, kegShortageText, toKegFleetViewProps, withLocationBin, type KegPoolValue } from "../lib/mgr/keg-fleet-view";
 import { REASON_EFFECT, REASON_LABEL } from "../lib/mgr/keg-labels";
 import { kegHistoryScope, toKegHistoryViewProps } from "../lib/mgr/keg-history-view";
 import { formatDate } from "../lib/date-format";
@@ -179,16 +179,40 @@ describe("Record keg event", () => {
     expect(kegEventFieldErrors({ ...value, qty: "8" }, options)).toEqual({});
     expect(kegEventFieldErrors({ ...value, reason: "retired" }, options).qty).toBe("Enter at most 8 kegs in Cold.");
     expect(kegEventFieldErrors({ ...value, reason: "shipped", customerId: "customer" }, options).qty).toBe("Enter at most 8 kegs in Cold.");
-    // Kegs lost at a customer, and incoming kegs, do not leave the bin.
-    expect(kegEventFieldErrors({ ...value, customerId: "customer" }, options)).toEqual({});
+    // Incoming kegs do not leave the bin.
     for (const reason of ["acquired", "found"] as const) expect(kegEventFieldErrors({ ...value, reason }, options)).toEqual({});
-    expect(kegEventFieldErrors({ ...value, reason: "returned", customerId: "customer" }, options)).toEqual({});
     // Without a known count (the inventory fixture), nothing is held back.
     expect(kegEventFieldErrors(value)).toEqual({});
   });
 
+  it("#1479 holds a count returned or lost at a customer to the kegs that customer holds", () => {
+    const value = { ...kegFleetMicrostar.eventForm!, poolId: "pool", locationId: "location", binId: "cold", reason: "returned" as const, customerId: "ridge", qty: "5" };
+    const options = { ...kegFleetMicrostar.eventOptions!, bins: [{ value: "cold", label: "Cold" }], customers: [{ value: "ridge", label: "Ridgeline" }], onHand: 4 };
+    expect(kegEventFieldErrors(value, options).qty).toBe("Enter at most 4 kegs at Ridgeline.");
+    expect(kegEventReason(value, options)).toBe("Still needed: at most 4 kegs at Ridgeline.");
+    expect(kegEventFieldErrors({ ...value, reason: "lost" }, options).qty).toBe("Enter at most 4 kegs at Ridgeline.");
+    expect(kegEventFieldErrors({ ...value, qty: "4" }, options)).toEqual({});
+  });
+
+  it("#1479 counts on hand from the customer's balance when kegs come from a customer, else from the bin", () => {
+    const stock = [{ pool_id: "p", keg_size: "half_bbl", bin_id: "cold", qty: 8 }];
+    const balances = [{ customer_id: "ridge", pool_id: "p", keg_size: "half_bbl", qty: 4 }, { customer_id: "ridge", pool_id: "p", keg_size: "sixth_bbl", qty: 9 }];
+    const value = { ...kegFleetMicrostar.eventForm!, poolId: "p", kegSize: "half_bbl" as const, binId: "cold", customerId: "ridge", reason: "returned" as const };
+    expect(kegOnHand(value, stock, balances)).toBe(4);
+    expect(kegOnHand({ ...value, reason: "lost" }, stock, balances)).toBe(4);
+    expect(kegOnHand({ ...value, customerId: "other" }, stock, balances)).toBe(0);
+    expect(kegOnHand({ ...value, reason: "lost", customerId: "" }, stock, balances)).toBe(8);
+    expect(kegOnHand({ ...value, reason: "shipped" }, stock, balances)).toBe(8);
+    expect(kegOnHand({ ...value, reason: "retired", binId: "empty" }, stock, balances)).toBe(0);
+    // Nothing chosen yet, or kegs coming in: no limit.
+    expect(kegOnHand({ ...value, customerId: "" }, stock, balances)).toBeUndefined();
+    expect(kegOnHand({ ...value, reason: "retired", binId: "" }, stock, balances)).toBeUndefined();
+    expect(kegOnHand({ ...value, reason: "acquired" }, stock, balances)).toBeUndefined();
+  });
+
   it("#1479 the live form passes the chosen bin's kegs on hand", () => {
-    expect(src("app/(app)/kegs/page.tsx")).toMatch(/<KegEventForm\b[^>]*\bstock=\{fleet\.rows\}/);
+    expect(src("app/(app)/kegs/page.tsx")).toMatch(/<KegEventForm\b[^>]*\bstock=\{fleet\.rows\}[^>]*\bbalances=\{fleet\.balances\}/);
+    expect(src("app/(app)/kegs/customers/[customerId]/page.tsx")).toMatch(/<KegEventForm\b[^>]*\bbalances=\{fleet\.balances\}/);
     expect(src("app/(app)/kegs/event-form.tsx")).toMatch(/options=\{\{[^}]*\bonHand\b/);
   });
   it("#1381 waits for blur or an attempt before drawing a fractional count error", () => {
