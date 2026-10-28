@@ -40,20 +40,23 @@ it("gates invoice navigation using deployment configuration, not Admin permissio
   const html = renderToStaticMarkup(page);
   expect(html).toContain("QuickBooks isn’t turned on in MGR yet.");
   expect(html).toMatch(/<button[^>]*disabled[^>]*>Connect<\/button>/);
-  expect(html).not.toContain('href="/settings/accounting/connect"');
+  expect(html).not.toContain('href="/settings/accounting"');
   expect(html).not.toContain("reconnected");
   expect(html).not.toContain("stale");
   state.configured = true;
-  expect(renderToStaticMarkup(await InvoicesPage({ searchParams: Promise.resolve({}) }))).toContain('href="/settings/accounting/connect"');
+  // Connect opens Accounting, which draws Connect QuickBooks itself (#1509).
+  expect(renderToStaticMarkup(await InvoicesPage({ searchParams: Promise.resolve({}) }))).toContain('href="/settings/accounting"');
 });
 
-it("gates Square navigation before the connect page", async () => {
-  const html = renderToStaticMarkup(await PosPage({ searchParams: Promise.resolve({}) }));
+it("gates Connect Square on Point of sale itself (#1509)", async () => {
+  // The staff layout supplies the command context around this page.
+  const renderPos = async () => renderToStaticMarkup(createElement(BreweryProvider, { id: "brewery", actorId: "staff" },
+    await PosPage({ searchParams: Promise.resolve({}) })));
+  const html = await renderPos();
   expect(html).toContain("Square isn’t turned on in MGR yet.");
-  expect(html).toMatch(/<button[^>]*disabled[^>]*>Connect<\/button>/);
-  expect(html).not.toContain('href="/settings/pos/connect"');
+  expect(html.match(/<button[^>]*>Connect Square<\/button>/)?.[0]).toContain(' disabled=""');
   state.configured = true;
-  expect(renderToStaticMarkup(await PosPage({ searchParams: Promise.resolve({}) }))).toContain('href="/settings/pos/connect"');
+  expect((await renderPos()).match(/<button[^>]*>Connect Square<\/button>/)?.[0]).not.toContain(' disabled=""');
 });
 
 it("passes deployment availability through Menu before offering Square setup (#1397)", async () => {

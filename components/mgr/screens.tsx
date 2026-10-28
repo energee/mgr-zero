@@ -76,7 +76,7 @@ import { TaproomVarianceView } from "@/components/mgr/views/taproom-variance";
 import { taproomVariance, weeklyCount } from "@/lib/mgr/fixtures/taproom";
 import { WeeklyCountView } from "@/components/mgr/views/weekly-count";
 import { TapBoardView, TapKegView } from "@/components/mgr/views/tap-board";
-import { AccountingView, ConnectQuickBooksView, DisconnectQuickBooksView, QboConnectionView, QboSyncView } from "@/components/mgr/views/accounting";
+import { AccountingView, DisconnectQuickBooksView, QboConnectionView, QboSyncView } from "@/components/mgr/views/accounting";
 import { accountingExpired, quickBooksMappings } from "@/lib/mgr/fixtures/accounting";
 import { tapBoard, tapBoardSkus, kickKeg, swapKeg } from "@/lib/mgr/fixtures/taproom";
 import { cellarAdditionCitra, cellarTransferPils } from "@/lib/mgr/fixtures/production";
@@ -127,7 +127,7 @@ import { ReplenishmentView } from "@/components/mgr/views/replenishment";
 import { PickView } from "@/components/mgr/views/pick";
 import { PickSheetView } from "@/components/mgr/views/pick-sheet";
 import { PlanningView } from "@/components/mgr/views/planning";
-import { ConnectSquareView, DisconnectSquareView, PointOfSaleView, PosItemView, PosMenuView, PosSaleDetailView, PosSyncActions, SquareConnectorView, SquareLocationsView } from "@/components/mgr/views/pos";
+import { DisconnectSquareView, PointOfSaleView, PosItemView, PosMenuView, PosSaleDetailView, PosSyncActions, SquareConnectorView, SquareLocationsView } from "@/components/mgr/views/pos";
 import { PortalAccountView } from "@/components/mgr/views/portal-account";
 import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
 import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
@@ -508,15 +508,15 @@ export const SCREENS: Screen[] = [
     to: { "Water profiles": "Water profiles" },
     ...SETTINGS_IO,
     states: [...permitted("admin only"), ["filed basis", "ordinary field is locked · recorded correction flags every affected filed period"], ["correction history", "immutable old/new basis, actor, time and reason"], ["uncertain correction", "fields freeze · retry unchanged request"]],
-    spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Days to package is the brewery-wide projected packaging estimate, default 14 and whole days from 1 to 120. It adds to the actual brew date, or planned date before brewing. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Brewery details, Ask MGR and Wholesale fulfillment are three forms, each saved only by its own button. After filing, the ordinary books date is locked; Correct reporting basis has its own save and immutable correction history. Deployment mode is read-only. Team opens the Team frame.",
+    spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Days to package is the brewery-wide projected packaging estimate, default 14 and whole days from 1 to 120. It adds to the actual brew date, or planned date before brewing. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Brewery details is one form saved by Save brewery. Picking an AI model or a fulfillment warehouse saves it at once; a failed save puts the picker back. After filing, the ordinary books date is locked; Correct reporting basis has its own save and immutable correction history. Deployment mode is read-only. Team opens the Team frame.",
     body: <SettingsView model={settingsDemo} />,
   },
   {
     step: 8, slice: "all", tab: "More", name: "Settings no warehouse", job: "Say why the portal has no fulfillment warehouse to choose",
     to: { "Water profiles": "Water profiles" },
     ...SETTINGS_IO,
-    states: [["permission", "admin only", 1], ["no warehouse", "picker disabled · note names Warehouse in Uses · Edit locations opens Locations"], ["warehouse use removed", "a saved source no longer offered starts unchosen · Save warehouse still needs a warehouse"]],
-    spec: "Wholesale fulfillment offers only locations whose Uses include Warehouse. With none, the disabled picker says so beneath it and Edit locations opens Locations, where an admin adds Warehouse to a location's Uses. Save warehouse says it still needs a warehouse.",
+    states: [["permission", "admin only", 1], ["no warehouse", "picker disabled · note names Warehouse in Uses · Edit locations opens Locations"], ["warehouse use removed", "a saved source no longer offered starts unchosen"]],
+    spec: "Wholesale fulfillment offers only locations whose Uses include Warehouse. With none, the disabled picker says so beneath it and Edit locations opens Locations, where an admin adds Warehouse to a location's Uses. Picking a warehouse saves it.",
     body: <SettingsView model={{ ...settingsDemo, warehouseId: null, warehouseOptions: [] }} />,
   },
   {
@@ -789,7 +789,7 @@ export const SCREENS: Screen[] = [
     reads: "list_skus · list_locations · list_bins · list_customers · list_formats · list_price_groups · list_sale_channels",
     writes: "import_csv",
     states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Import disabled · fix column matches", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "same requestId returns original committed and blocked results"], ["permission", "Import requires admin", 1], ["upload", "kind chosen · friendly labels beside stable CSV keys · required, optional, or required for a US address · Download template includes one incomplete example row"]],
-    spec: "The steps are Upload, Match columns, Review and Import. Before upload, the screen lists friendly field labels beside stable CSV keys and marks each one required, optional, or required for a US address. Download template uses a friendly filename and includes one incomplete example row with a mandatory cell blank, so it cannot import as downloaded. Review requires every mandatory column to be matched, including State for US addresses. One logical row is atomic; siblings commit independently. Reference ID cells accept a UUID or trimmed, case-insensitive exact name; missing or ambiguous names block the row. Bin names are scoped to the location, and pour formats to the price group. Product imports use packaged formats. Review is editable on phone and desk. All-invalid batches cannot be imported. Routine guidance is informational, including the retained explanation that importing opening stock in a new batch counts it twice. Same-batch retry preserves raw cells and returns original results; correction starts only blocked rows with a new identity. Reloading the same tab restores an unresolved batch; Discard saved request drops it after a confirming step and sends nothing.",
+    spec: "The steps are Upload, Match columns, Review and Import. When every required column already matches by name, Upload offers Review directly, and Columns differ? opens Match columns. Before upload, the screen lists friendly field labels beside stable CSV keys and marks each one required, optional, or required for a US address. Download template uses a friendly filename and includes one incomplete example row with a mandatory cell blank, so it cannot import as downloaded. Review requires every mandatory column to be matched, including State for US addresses. One logical row is atomic; siblings commit independently. Reference ID cells accept a UUID or trimmed, case-insensitive exact name; missing or ambiguous names block the row. Bin names are scoped to the location, and pour formats to the price group. Product imports use packaged formats. Review is editable on phone and desk. All-invalid batches cannot be imported. Routine guidance is informational, including the retained explanation that importing opening stock in a new batch counts it twice. Same-batch retry preserves raw cells and returns original results; correction starts only blocked rows with a new identity. Reloading the same tab restores an unresolved batch; Discard saved request drops it after a confirming step and sends nothing.",
     body: <ImportView model={importPreview} />,
   },
   {
@@ -1348,26 +1348,12 @@ export const SCREENS: Screen[] = [
   {
     step: 5, slice: 1, tab: "More", group: "QuickBooks Online",
     name: "Accounting unavailable",
-    to: { "QuickBooks Online": "Accounting unavailable", "Bank transfer (ACH) and card": "Accounting unavailable", "Customers missing a portal login email": "Customers missing email", Review: "Customers missing email" },
+    to: { "QuickBooks Online": "Accounting unavailable", "Connect QuickBooks": "Accounting unavailable", "Bank transfer (ACH) and card": "Accounting unavailable", "Customers missing a portal login email": "Customers missing email", Review: "Customers missing email" },
     job: "Explain that QuickBooks is not turned on before offering authorization",
     reads: "get_qbo_connection · count_customers_missing_portal_email",
     writes: "none",
     states: [["not turned on", "Connect QuickBooks disabled; no prior connection or sync facts", 1]],
     body: <AccountingView model={{ connected: false, canDisconnect: false, reconnect: false, company: "QuickBooks Online", status: "Not connected", remoteRevocationUnresolved: false }} connection={<QboConnectionView configured={false} />} />,
-  },
-  {
-    step: 5,
-    slice: 1,
-    tab: "More",
-    group: "QuickBooks Online",
-    name: "Connect QuickBooks",
-    to: { "Connect QuickBooks": "Accounting" },
-    job: "Authorize one QuickBooks company and explain the data exchange before OAuth",
-    reads: "get_qbo_connection [OAuth returns the selected company]",
-    writes: "connect_qbo",
-    states: [["permission", "admin only", 1], ["not turned on", "disabled Connect QuickBooks with the same reason as Accounting and Invoices", 1], ["cancelled", "return to Accounting unchanged"], ["already connected", "show Mapping conflict", 1]],
-    spec: "The disconnected Accounting state. OAuth is an external write, so the button is copper and the page says what MGR will exchange before leaving.",
-    body: <ConnectQuickBooksView />,
   },
   {
     step: 5,
@@ -1413,12 +1399,12 @@ export const SCREENS: Screen[] = [
     group: "QuickBooks Online",
     surface: "sheet",
     name: "Disconnect QuickBooks",
-    to: { "Disconnect QuickBooks": "Connect QuickBooks" },
+    to: { "Disconnect QuickBooks": "Accounting" },
     job: "Confirm the external effects of disconnecting QuickBooks",
     reads: "get_qbo_connection",
     writes: "disconnect_qbo",
     states: [["permission", "admin only", 1], ["confirmed", "connection disabled and tokens purged"], ["recovery required", "still offered: purges the credential and attempts revocation", 1], ["revocation unresolved", "credential purged; QuickBooks never confirmed revocation", 1]],
-    spec: "The confirmation names what stops and what remains so reconnecting can resume without remapping.",
+    spec: "A dialog over Accounting. The confirmation names what stops and what remains so reconnecting can resume without remapping. A finished disconnect closes it, and Accounting then offers Connect QuickBooks.",
     body: <DisconnectQuickBooksView />,
   },
   {
@@ -2653,11 +2639,11 @@ export const SCREENS: Screen[] = [
     name: "Chat settings",
     to: { Disconnect: "Disconnect Slack" },
     job: "Operate one brewery/provider installation and inspect every outbound surface",
-    reads: "get_chat_integration_health · get_notification_preferences · get_brewery_operating_defaults · [presentation: ten provider-free fixtures]",
-    writes: "set_notification_destination · set_brewery_quiet_hours · set_brewery_operating_defaults · disable_chat_installation · disconnect_chat_installation",
+    reads: "get_chat_integration_health · get_notification_preferences · get_brewery_operating_defaults · list_chat_channels · list_chat_user_links · [presentation: ten provider-free fixtures]",
+    writes: "set_notification_destination · set_brewery_quiet_hours · set_brewery_operating_defaults · disable_chat_installation · disconnect_chat_installation · unlink_chat_user",
     states: [["permission", "admin only", 1], ["healthy", "last callback and delivery shown"], ["retrying", "queue count + redacted reason", 1], ["disabled", "no sends; previews still work", 1]],
-    spec: "Four preview tabs render the same provider-neutral fixtures consumed by renderer contract tests, labelled as sample data. The All preview states picker shows only in development. Previews never query live customer data or send a message. Reading cadence is MGR-owned and controls both Today and chat.",
-    body: <ChatSettingsView health={chatConnected} timezone="America/New_York" readingDueHours={24} channels={[{ id: "COPS", name: "mgr-operations" }]} channel="COPS" previewFixtures={CHAT_PREVIEW_FIXTURES} />,
+    spec: "Four preview tabs render the same provider-neutral fixtures consumed by renderer contract tests, labelled as sample data. The All preview states picker shows only in development. Previews never query live customer data or send a message. Reading cadence is MGR-owned and controls both Today and chat. Private channels load with the page, and picking one saves it. The Delivery switch is the one way to stop sends here. Linked people lists who linked Slack, with Unlink for each and how to link your own, so an admin can remove a stale link without disconnecting Slack for everyone.",
+    body: <ChatSettingsView health={chatConnected} timezone="America/New_York" readingDueHours={24} channels={[{ id: "COPS", name: "mgr-operations" }]} channel="COPS" previewFixtures={CHAT_PREVIEW_FIXTURES} people={<ChatLinkedPeopleView people={linkedChatPeople} timeZone={DEMO_TIME_ZONE} />} />,
   },
   {
     step: 8,
@@ -2671,19 +2657,6 @@ export const SCREENS: Screen[] = [
     states: [["unlinked", "preferences remain available before linking"], ["linked", "unlink only your Slack identity"], ["permission", "every staff role; Taproom cannot set personal quiet hours", 1], ["Slack not connected", "a note replaces the link steps until the brewery's Slack is active", 1], ["error", "keep entered quiet hours and show the command error", 1]],
     spec: "Personal delivery preferences do not change MGR work, App Home or team digests. Each reason uses the label Slack's preferences dialog shows. The brewery quiet hours show read-only to every role; clearing both personal times follows them.",
     body: <ChatPersonalPreferencesView preferences={personalChatPreferences} />,
-  },
-  {
-    step: 8,
-    slice: "chat",
-    tab: "More",
-    group: "Chat",
-    name: "Linked people",
-    job: "See which MGR users linked Slack and remove a stale link",
-    reads: "list_chat_user_links",
-    writes: "unlink_chat_user",
-    states: [["permission", "admin only", 1], ["linked", "three people"], ["unlinked", "personal messages stop for that person", 1]],
-    spec: "A brewery admin can remove a stale identity link without disconnecting Slack for everyone.",
-    body: <ChatLinkedPeopleView people={linkedChatPeople} timeZone={DEMO_TIME_ZONE} />,
   },
   {
     step: 8,
@@ -2735,22 +2708,22 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "POS",
     name: "Point of sale",
-    to: { Disconnect: "Disconnect Square", "Sync Square catalog": "Point of sale", "Sync Square sales": "Point of sale", "Square locations2 mapped · 1 needs mapping": "Square locations", "Taproom · Sep 1 to Sep 8": "Point of sale", "Sale · Hazy IPA · pint": "POS sale detail", "Return · Hazy IPA · pint": "POS sale detail", "MenuOne catalog · per-location stock and price": "Menu", "Taproom sales in QuickBooksAbout Square’s optional connector": "Taproom sales in QuickBooks" },
+    to: { Disconnect: "Disconnect Square", "Sync Square": "Point of sale", "Square locations2 mapped · 1 needs mapping": "Square locations", "Taproom · Sep 1 to Sep 8": "Point of sale", "Sale · Hazy IPA · pint": "POS sale detail", "Return · Hazy IPA · pint": "POS sale detail", "MenuOne catalog · per-location stock and price": "Menu", "Taproom sales in QuickBooksAbout Square’s optional connector": "Taproom sales in QuickBooks" },
     job: "Connect one POS provider and see both directions at a glance",
     reads: "get_pos_integration_health · list_pos_locations · list_pos_sales",
     writes: "sync_square_catalog · sync_square_sales · disconnect_square",
-    states: [["permission", "admin only", 1], ["not turned on", "disabled Connect before navigation with the same reason as Connect Square", 1], ["no provider", "connect one before a menu can publish"], ["healthy", "catalog and sales both current"], ["sales lagging", "the menu still publishes", 1], ["token revoked", "publishing and sync both stop", 1], ["taproom sales in QuickBooks", "Square may send them through its own connector; MGR explains it, never detects it", 1], ["second location", "its own MGR location and its own channel", 1], ["unmapped location", "its sales cannot reconcile until it is mapped", 1], ["authorization failed", "note beside current health; the existing connection is kept"], ["partial sync", "never counts as complete coverage", 1], ["return", "retained as a source fact; never posts stock"]],
+    states: [["permission", "admin only", 1], ["not turned on", "disabled Connect Square with its reason", 1], ["no provider", "connect one before a menu can publish"], ["healthy", "catalog and sales both current"], ["sales lagging", "the menu still publishes", 1], ["token revoked", "publishing and sync both stop", 1], ["taproom sales in QuickBooks", "Square may send them through its own connector; MGR explains it, never detects it", 1], ["second location", "its own MGR location and its own channel", 1], ["unmapped location", "its sales cannot reconcile until it is mapped", 1], ["authorization failed", "note beside current health; the existing connection is kept"], ["partial sync", "never counts as complete coverage", 1], ["return", "retained as a source fact; never posts stock"]],
     spec: "Square is the sole POS provider in this slice. This page reports connection, mapping, and completed sync state without exposing token material. Square’s optional QuickBooks connector remains a separate accountant-reviewed revenue feed: MGR provides a note and Accounting deep link, but does not detect, configure, or synchronize it.",
     body: <PointOfSaleView model={{ connected: true, merchant: "Demo Brewing LLC", state: "Connected", locations: "2 mapped · 1 needs mapping", lastSync: "Today · 6:58 PM" }} syncAction={<PosSyncActions />} coverage={["Taproom · Sep 1 to Sep 8"]} sales={[{ id: "sale-1", label: "Sale · Hazy IPA · pint", detail: "Taproom · current revision", amount: "$7.00", status: "mapped", openable: true }, { id: "return-1", label: "Return · Hazy IPA · pint", detail: "Taproom · current revision", amount: "−$7.00", status: "mapped", openable: true }]} />,
   },
   {
     step: 7, slice: 7, tab: "More", group: "POS",
     name: "Point of sale unavailable",
-    to: { Connect: "Point of sale unavailable", Square: "Point of sale unavailable" },
-    job: "Explain that Square is not turned on before opening its connection page",
+    to: { "Connect Square": "Point of sale unavailable", Square: "Point of sale unavailable" },
+    job: "Explain that Square is not turned on before offering authorization",
     reads: "get_pos_integration_health",
     writes: "none",
-    states: [["not turned on", "Connect disabled before navigation; no prior seller or sales facts", 1]],
+    states: [["not turned on", "Connect Square disabled with its reason; no prior seller or sales facts", 1]],
     body: <PointOfSaleView model={{ connected: false, configured: false, merchant: "", state: "Not connected" }} />,
   },
 
@@ -2759,28 +2732,13 @@ export const SCREENS: Screen[] = [
     slice: 7,
     tab: "More",
     group: "POS",
-    name: "Connect Square",
-    to: { "Connect Square": "Square locations" },
-    job: "Authorize one Square seller and explain the data exchange before OAuth",
-    reads: "get_pos_integration_health",
-    writes: "connect_square",
-    states: [["permission", "admin only", 1], ["not turned on", "disabled Connect Square with the same reason as Point of sale", 1], ["cancelled", "return to Point of sale unchanged"], ["connected", "continue to Square locations"]],
-    spec: "The page explains both catalog writes and sales reads before leaving MGR.",
-    body: <ConnectSquareView />,
-  },
-  {
-    step: 7,
-    slice: 7,
-    tab: "More",
-    group: "POS",
     surface: "sheet",
     name: "Square locations",
-    to: { "Save mapping": "Point of sale" },
     job: "Map each Square location to one MGR location and sales channel",
     reads: "list_pos_locations · list_locations",
     writes: "set_pos_location_mapping",
     states: [["permission", "admin only", 1], ["mapped", "two locations ready"], ["unmapped", "sales cannot reconcile", 1], ["claimed", "an MGR location cannot be claimed twice", 1]],
-    spec: "A provider location maps to exactly one MGR location. Sales remain expected-consumption facts; the physical count owns depletion.",
+    spec: "A provider location maps to exactly one MGR location, saved when it is picked; a failed save puts the pick back. Sales remain expected-consumption facts; the physical count owns depletion.",
     body: <SquareLocationsView locations={[{ id: "taproom", name: "Taproom" }, { id: "warehouse", name: "Warehouse" }]} rows={[{ externalLocationId: "square-tap", name: "Square Taproom", detail: "active · available · Taproom", mgrLocationId: "taproom" }, { externalLocationId: "square-events", name: "Third location", detail: "active · available · needs mapping", mgrLocationId: "" }]} />,
   },
   {
@@ -2805,12 +2763,12 @@ export const SCREENS: Screen[] = [
     group: "POS",
     surface: "sheet",
     name: "Disconnect Square",
-    to: { "Disconnect Square": "Connect Square" },
+    to: { "Disconnect Square": "Point of sale" },
     job: "Confirm the external effects of disconnecting Square",
     reads: "get_pos_integration_health",
     writes: "disconnect_square",
     states: [["permission", "admin only", 1], ["confirmed", "installation disabled and token purged"], ["recovery required", "still offered: purges the credential and attempts revocation", 1], ["revocation unresolved", "credential purged; stays in recovery, never shown as disconnected", 1]],
-    spec: "The confirmation names what stops and what remains so reconnecting can reuse mappings.",
+    spec: "A dialog over Point of sale. The confirmation names what stops and what remains so reconnecting can reuse mappings. A confirmed revocation closes it, and Point of sale then offers Connect Square; an unconfirmed one keeps it open with Retry revocation.",
     body: <DisconnectSquareView />,
   },
   {
@@ -2819,7 +2777,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "POS",
     name: "Menu",
-    to: { Taproom: "Menu", Warehouse: "Menu", "Save mapping": "Menu", "Change mapping": "Menu" },
+    to: { Taproom: "Menu", Warehouse: "Menu" },
     job: "One catalog, published to every destination that sells from it",
     reads: "get_pos_menu [derived from brands × formats × configured-bin stock]",
     writes: "configure_pos_menu · set_pos_price_override [nullable, per POS location] · set_pos_website_publication · publish_pos_menu [complete derived location change set] · set_pos_item_mapping [Also in Square]",
@@ -2863,13 +2821,13 @@ export const SCREENS: Screen[] = [
     group: "POS",
     surface: "sheet",
     name: "POS item",
-    to: { "Save override": "Menu", "Publish item to Square": "POS item" },
+    to: { "Save and publish": "POS item" },
     job: "Override one price; everything else is inherited from the format",
     reads: "get_pos_menu_item",
     writes: "set_pos_price_override · set_pos_website_publication · publish_pos_item",
     states: [["permission", "warehouse or admin required", 1], ["inherited", "no override · the format price is what publishes"], ["overridden", "this row is priced away from the default", 1], ["reset", "override cleared · the row rejoins the format price"], ["no price at all", "no format default and no override · Save stays disabled", 1], ["per location", "a second taproom overrides the same row separately", 1], ["per beer", "another beer on the price group pours the same format with its own override", 1], ["format changed", "conversion and premise follow the format, not this sheet"], ["tax preserved", "publishing never clears the provider’s tax assignment", 1]],
     redrawn: true,
-    spec: "Against the brand and format schema, Serving and Premise are no longer authored here. A format owns its conversion (a pint is 1/124 of a ½ bbl) and its premise, so this sheet reads them instead of asking again. What is left is a register price, not a wholesale grid cell: an optional override keyed by POS location and beer (the pour itself is shared by every beer on the price group), so an empty field lets a format-wide Taproom cell propagate and the Warehouse register can ring a different number than the Taproom without either row copying a wholesale price. Availability stays a rule, not a per-keg switch: MGR retires the row when taproom stock runs out and re-publishes under the same provider id when it returns. Price still lands on the variation rather than the item, so an override writes to the format’s variation id.",
+    spec: "Against the brand and format schema, Serving and Premise are no longer authored here. A format owns its conversion (a pint is 1/124 of a ½ bbl) and its premise, so this sheet reads them instead of asking again. What is left is a register price, not a wholesale grid cell: an optional override keyed by POS location and beer (the pour itself is shared by every beer on the price group), so an empty field lets a format-wide Taproom cell propagate and the Warehouse register can ring a different number than the Taproom without either row copying a wholesale price. Availability stays a rule, not a per-keg switch: MGR retires the row when taproom stock runs out and re-publishes under the same provider id when it returns. Price still lands on the variation rather than the item, so an override writes to the format’s variation id. Save and publish saves the override, then publishes the item; a failed save publishes nothing.",
     body: <PosItemView item={{ brand: "Hazy IPA", format: "pint · poured", sources: "½ bbl keg · Taproom", serving: "16 oz · from the format", price: "$7.00", override: "6.50", websitePublished: true, available: true }} />,
   },
   // Revision 2 (schema §16, designed 2026-09-02). Most commits here are still

@@ -29,6 +29,6 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   }))} connection={health ? {
     connected: health.connected, detail: health.connected ? `Connected · ${qboCompanyName(health) ?? "verified company"}` : connectionStateLabel(health.state),
     configured: isQboConfigured(), reconnect: Boolean(health.connectionId),
-    canConnect: brewery.roles.includes("admin"), connectHref: "/settings/accounting/connect",
+    canConnect: brewery.roles.includes("admin"), connectHref: "/settings/accounting",
   } : undefined} sync={<QboSyncButton status={syncStatus ? toQboSyncViewProps(syncStatus, brewery.timeZone) : undefined} />} />;
 }

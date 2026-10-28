@@ -223,26 +223,26 @@ it("#1030 starts the Accounting cell at the left edge its header uses", () => {
 
 it("#1135 shows the sync only while QuickBooks is connected, and writes the email note for staff", () => {
   const draw = (connected: boolean, canConnect = true) => renderToStaticMarkup(createElement(InvoicesView, {
-    rows: [], connection: { connected, reconnect: true, detail: "QuickBooks status", canConnect, connectHref: "/settings/accounting/connect" },
+    rows: [], connection: { connected, reconnect: true, detail: "QuickBooks status", canConnect, connectHref: "/settings/accounting" },
     sync: createElement("span", null, "live sync"),
   }));
   expect(draw(true)).toContain("live sync");
   expect(draw(true)).not.toContain("Payment status may be stale until QuickBooks is reconnected");
   const admin = draw(false);
   expect(admin).not.toContain("live sync");
-  expect(admin).toContain('href="/settings/accounting/connect"');
+  expect(admin).toContain('href="/settings/accounting"');
   expect(admin).toContain("Payment status may be stale until QuickBooks is reconnected and synced.");
   expect(admin).toContain("MGR can’t tell whether QuickBooks emailed an invoice.");
   expect(admin).not.toContain("invoice query");
   const sales = draw(false, false);
   expect(sales).not.toContain("live sync");
   expect(sales).toContain("Admin must connect");
-  expect(sales).not.toContain('href="/settings/accounting/connect"');
+  expect(sales).not.toContain('href="/settings/accounting"');
 });
 
 it("#1135 falls back to the shared sync view only while connected", () => {
   const draw = (connected: boolean) => renderToStaticMarkup(createElement(InvoicesView, {
-    rows: [], connection: { connected, detail: "QuickBooks status", canConnect: true, connectHref: "/settings/accounting/connect" },
+    rows: [], connection: { connected, detail: "QuickBooks status", canConnect: true, connectHref: "/settings/accounting" },
   }));
   expect(draw(true)).toContain("Sync QuickBooks");
   expect(draw(false)).not.toContain("Sync QuickBooks");

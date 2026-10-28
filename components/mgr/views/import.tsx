@@ -67,7 +67,10 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
         <AttachmentContent><AttachmentTitle>{model.fileName ?? "Choose a CSV file"}</AttachmentTitle><AttachmentDescription>{model.headers ? `${model.csvRowCount} ${model.csvRowCount === 1 ? "row" : "rows"} ready` : `.csv · up to ${IMPORT_ROW_CAP_LABEL} rows`}</AttachmentDescription></AttachmentContent>
         <AttachmentTrigger asChild aria-label="Choose CSV file"><label className="cursor-pointer"><input type="file" accept=".csv,text/csv" className="sr-only" aria-invalid={fileRejected || undefined} onChange={event => onFile?.(event.target.files?.[0])} /></label></AttachmentTrigger>
       </Attachment>{fileRejected && <FieldError>{model.error}</FieldError>}</Field>
-      {model.headers && <Button onClick={() => onStep?.(1)}>Match columns</Button>}
+      {/* Every column already matched by name: go straight to Review, matching stays one tap away (#1509). */}
+      {model.headers && (canReview
+        ? <><Button onClick={() => onStep?.(2)}>Review {rows.length} {rows.length === 1 ? "row" : "rows"}</Button><Button variant="outline" onClick={() => onStep?.(1)}>Columns differ?</Button></>
+        : <Button onClick={() => onStep?.(1)}>Match columns</Button>)}
     </>}
     {step === 1 && <>
       <p>For each field, choose the column in your file that fills it. Fields marked * are required. A reference field takes a record’s exact name or its ID, as listed below. Capitals and extra spaces in a name do not matter. If two records share a name, use the ID.</p>

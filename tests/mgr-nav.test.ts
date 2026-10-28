@@ -124,7 +124,6 @@ describe("navTitle", () => {
     ["/orders/new", "New order"],
     ["/compliance/licenses", "Licenses"],
     ["/settings/accounting", "Accounting"],
-    ["/settings/accounting/connect", "Connect QuickBooks"],
     ["/settings/chat/preferences", "My notification preferences"],
     ["/settings/pos", "Point of sale"],
   ])("names the subpage %s rather than its section (#1255)", (route, title) => {
