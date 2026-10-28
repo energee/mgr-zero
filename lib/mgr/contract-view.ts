@@ -51,8 +51,8 @@ export function contractSubmitReason(fields: Pick<ContractViewModel, "vendorId" 
   if (!fields.materialId) missing.push("a material");
   if (!fields.quantity.trim()) missing.push("a quantity");
   else if (numberNotationError(fields.quantity)) missing.push("a decimal quantity");
-  else if (errors.qty) missing.push("a quantity above zero");
+  else if (errors.qty) missing.push(Number(fields.quantity) > 0 ? "a quantity no greater than 9,999,999,999.9999" : "a quantity above zero");
   if (numberNotationError(fields.unitCost)) missing.push("a decimal unit cost");
-  else if (errors.cost) missing.push("a unit cost of zero or more");
+  else if (errors.cost) missing.push("a unit cost from $0 to $21,474,836.47");
   return submitReason(missing);
 }

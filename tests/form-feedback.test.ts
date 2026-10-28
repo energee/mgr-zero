@@ -72,7 +72,7 @@ describe("per-form reasons", () => {
     expect(newPoReason({ vendor: "", lines: [{ materialId: "", qty: "", cost: "" }] }))
       .toBe("Still needed: a vendor, a material on each line, and a quantity above zero on each line.");
     expect(newPoReason({ vendor: "v", lines: [{ materialId: "m", qty: "0.5", cost: "" }] })).toBeNull();
-    expect(newPoReason({ vendor: "v", lines: [{ materialId: "m", qty: "4", cost: "-3" }] })).toBe("Still needed: a unit cost of zero or more.");
+    expect(newPoReason({ vendor: "v", lines: [{ materialId: "m", qty: "4", cost: "-3" }] })).toBe("Still needed: a unit cost from $0 to $21,474,836.47.");
   });
 
   it("New PO marks a bad quantity or cost on its own field, never a blank one", () => {
