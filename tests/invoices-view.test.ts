@@ -46,7 +46,7 @@ it("hands a rejected push's balance to MGR's ledger and keeps the mapping fix (#
   const failed = { ...invoice, qbo_invoice_id: null, qbo_sync_status: "push_failed" as const, qbo_sync_error: "QuickBooks rejected the invoice", qbo_balance_cents: null };
   const row = toInvoiceListRow(failed, ["admin"], true, "America/New_York");
   expect(row.needsMapping).toBe(true);
-  expect(row.payment).toBe("Balance due");
+  expect(row.payment).toBe("Unpaid");
   expect(row.balance).toEqual({ cents: 104000, value: "$1,040.00" });
   expect(row.accounting).toContain(failed.qbo_sync_error);
   expect(toInvoiceListRow(failed, ["sales"], true, "America/New_York").needsMapping).toBe(true);
@@ -89,8 +89,8 @@ it("keeps payment meanings distinct without treating a legacy marker or zero bal
   expect(toInvoiceListRow(paid, ["warehouse"], true, "UTC").payment).toBe("Paid");
   expect(toInvoiceListRow({ ...paid, qbo_cash_collected_cents: 50000 }, ["admin"], true, "UTC").payment).toBe("Settled / $500.00 cash received");
   expect(toInvoiceListRow({ ...paid, qbo_cash_collected_cents: 0 }, ["admin"], true, "UTC").payment).toBe("Settled / no cash payment recorded");
-  expect(toInvoiceListRow({ ...invoice, qbo_cash_collected_cents: 50000, qbo_balance_cents: 54000 }, ["admin"], true, "UTC").payment).toBe("Partial payment");
-  expect(toInvoiceListRow({ ...invoice, qbo_balance_cents: 104000 }, ["admin"], true, "UTC").payment).toBe("Balance due");
+  expect(toInvoiceListRow({ ...invoice, qbo_cash_collected_cents: 50000, qbo_balance_cents: 54000 }, ["admin"], true, "UTC").payment).toBe("Partially paid");
+  expect(toInvoiceListRow({ ...invoice, qbo_balance_cents: 104000 }, ["admin"], true, "UTC").payment).toBe("Unpaid");
   expect(toInvoiceListRow({ ...invoice, qbo_balance_cents: -100 }, ["admin"], true, "UTC").payment).toBe("Credit balance");
   expect(toInvoiceListRow({ ...paid, qbo_balance_cents: -100 }, ["admin"], true, "UTC").payment).toBe("Credit balance");
   expect(toInvoiceListRow({ ...invoice, written_off_at: "2026-09-12" }, ["admin"], true, "UTC").payment).toBe("Written off");
@@ -117,7 +117,7 @@ it("marks outstanding invoices overdue only after the brewery-local due day", ()
 it("#1025 does not mark an unknown balance overdue, while a rejected push's ledger balance can be (#1045)", () => {
   const now = new Date("2026-10-04T12:00:00Z");
   const failed = toInvoiceListRow({ ...invoice, qbo_invoice_id: null, qbo_sync_status: "push_failed", qbo_sync_error: "rejected", qbo_balance_cents: null }, ["admin"], true, "UTC", now);
-  expect(failed.payment).toBe("Balance due");
+  expect(failed.payment).toBe("Unpaid");
   expect(failed.overdue).toBe(true);
   const unknownPush = toInvoiceListRow({ ...invoice, qbo_invoice_id: null, qbo_sync_status: "pending", has_pending_qbo_push: true, qbo_balance_cents: null }, ["admin"], true, "UTC", now);
   expect(unknownPush.payment).toBe("Payment status unavailable");
@@ -130,11 +130,11 @@ describe("an invoice whose balance MGR's payment ledger owns (#1045)", () => {
   const local: InvoiceListRecord = { ...invoice, qbo_invoice_id: null, qbo_sync_status: "pending", qbo_balance_cents: null, qbo_cash_collected_cents: 0 };
   const row = (change: Partial<InvoiceListRecord> = {}, connected = true) => toInvoiceListRow({ ...local, ...change }, ["admin"], connected, "UTC", now);
 
-  it("reads Balance due, Partial payment or Paid from the ledger's balance", () => {
-    expect(row().payment).toBe("Balance due");
+  it("reads Unpaid, Partially paid or Paid from the ledger's balance", () => {
+    expect(row().payment).toBe("Unpaid");
     expect(row().balance).toEqual({ cents: 104000, value: "$1,040.00" });
     const partial = row({ local_paid_cents: 40000 });
-    expect(partial.payment).toBe("Partial payment");
+    expect(partial.payment).toBe("Partially paid");
     expect(partial.balance).toEqual({ cents: 64000, value: "$640.00" });
     const paid = row({ local_paid_cents: 104000, paid_at: "2026-09-30T04:00:00Z" });
     expect(paid.payment).toBe("Paid");
@@ -169,7 +169,7 @@ describe("an invoice whose balance MGR's payment ledger owns (#1045)", () => {
   it("drops the caption when every payment is voided (Q8)", () => {
     const voided = row({ local_paid_cents: 0 });
     expect(voided.accounting).toBe("Not pushed to QuickBooks");
-    expect(voided.payment).toBe("Balance due");
+    expect(voided.payment).toBe("Unpaid");
   });
 
   it("reads a $0.00 invoice as No payment due, never overdue", () => {

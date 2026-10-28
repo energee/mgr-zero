@@ -2,7 +2,7 @@
 
 // Sale channels → a row's Delete: confirm, then delete_sale_channel. Client
 // module so the server channels page can hand it to DeleteCommandButton. The
-// warning is the same in-use rule the list states above its rows.
+// warning is the in-use rule, stated here and nowhere on the list (#1518).
 import { CHANNEL_IN_USE_RULE } from "@/lib/mgr/sale-channels-view";
 import { ConfirmDeleteControl } from "./confirm-delete";
 

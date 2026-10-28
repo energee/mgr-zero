@@ -38,3 +38,15 @@ it.each([999, 1000, 1001])("returns exact material/bin balances across %i stock 
   expect(byGrain(selected)).toEqual(byGrain(expected.filter(row => row.location_id === locations[1].id)));
   expect(await runCommand("get_material_on_hand", { locationId: foreignLocation.id }, ctx)).toEqual([]);
 });
+
+it("narrows to one material, so Receive PO reads only its first material's bins (#1507)", async () => {
+  const brewery = await makeBrewery();
+  const ctx = await makeStaffCtx(brewery.id, "warehouse");
+  const location = await seedLocation(brewery.id);
+  const malt = await seedMaterial(brewery.id, { name: "Pale malt", category: "malt" });
+  const hops = await seedMaterial(brewery.id, { name: "Cascade", category: "hop" });
+  await seedMovement(brewery.id, { materialId: malt, locationId: location.id, binId: location.binId, qty: 5, createdBy: ctx.userId });
+  await seedMovement(brewery.id, { materialId: hops, locationId: location.id, binId: location.binId, qty: 2, createdBy: ctx.userId });
+  const rows = await runCommand("get_material_on_hand", { materialId: malt }, ctx) as Stock[];
+  expect(rows.map(row => [row.material_id, row.bin_id, Number(row.qty)])).toEqual([[malt, location.binId, 5]]);
+});

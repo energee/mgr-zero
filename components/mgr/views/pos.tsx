@@ -32,7 +32,7 @@ export function PosSyncActions({ busy = false, label = "Sync Square", feedback, 
 export function PointOfSaleView({ model, sales = [], coverage = [], syncAction, connection, disconnect, paths }: {
   model: { connected: boolean; configured?: boolean; canDisconnect?: boolean; merchant: string; state: string; locations?: string; lastSync?: string; error?: string | null; oauthFailed?: boolean };
   sales?: PosSaleRow[]; coverage?: string[];
-  syncAction?: ReactNode; connection?: ReactNode; disconnect?: ReactNode; paths?: { back?: string; locations?: string; menu?: string; connector?: string };
+  syncAction?: ReactNode; connection?: ReactNode; disconnect?: ReactNode; paths?: { back?: string; locations?: string; menu?: string; accounting?: string };
 }) {
   const disconnectAction = disconnect ?? E.act("Disconnect", "destructive");
   return <>
@@ -55,8 +55,9 @@ export function PointOfSaleView({ model, sales = [], coverage = [], syncAction, 
       {sales.length ? sales.map(sale => <div key={sale.id}>{sale.href || sale.openable ? E.nav(sale.label, sale.detail, sale.status === "mapped" ? "ok" : "w", undefined, sale.href) : E.row(sale.label, sale.detail, sale.amount, sale.status === "mapped" ? "ok" : "w")}</div>) : E.blank("No Square sale facts yet")}
     </>}
     {E.ttl("Separate accounting feed")}
-    {E.info("QuickBooks is not a POS provider. Square can send taproom sales to QuickBooks through its own optional connector. MGR sends wholesale invoices separately through Accounting.")}
-    {E.nav("Taproom sales in QuickBooks", "About Square’s optional connector", "", SquareMark, paths?.connector)}
+    {E.note("Square may already post taproom sales to QuickBooks Online as sales receipts.")}
+    {E.info("MGR pushes wholesale invoices only. Confirm with your accountant that the two revenue streams stay separate; MGR does not detect, configure, or synchronize this Square connector.")}
+    {E.btn("Open Accounting", "g", paths?.accounting)}
   </>;
 }
 
@@ -105,14 +106,6 @@ export function SquareLocationsView({ rows, locations, busy, error, onSave }: {
     {rows.length ? rows.map(row => <LocationMappingRow key={row.externalLocationId} row={row} locations={locations} onSave={onSave} />) : E.blank("Sync Square to load locations")}
     <SettingsSaveStatus busy={busy} />
     <CommandFormMessage error={error ?? null} />
-  </>;
-}
-
-export function SquareConnectorView({ accountingHref }: { accountingHref?: string } = {}) {
-  return <>
-    {E.note("Square may already post taproom sales to QuickBooks Online as sales receipts.")}
-    {E.info("MGR pushes wholesale invoices only. Confirm with your accountant that the two revenue streams stay separate; MGR does not detect, configure, or synchronize this Square connector.")}
-    {E.btn("Open Accounting", "g", accountingHref)}
   </>;
 }
 
@@ -199,7 +192,11 @@ export function PosMenuView({ model, bins = [], channels = [], targets = [], bus
     </form>}
     {model.binName && <>{E.fld("Availability source", `${model.locationName} · ${model.binName}`)}{E.fld("Price source", model.channelName ?? "Not configured")}</>}
     {model.items.map(item => <div key={`${item.brandId}:${item.formatId}`}>{item.href ? E.nav(item.label, `${item.retail} · ${item.source} · ${item.destinations}`, "ok", undefined, item.href) : E.row(item.label, `${item.retail} · ${item.source} · ${item.destinations}`, "", "ok")}</div>)}
-    {model.excluded.map(item => <div key={`${item.brandId}:${item.formatId}`}>{item.href ? E.nav(item.label, item.reason ?? "Unavailable", "w", undefined, item.href) : E.row(item.label, item.reason ?? "Unavailable", E.status("Off register", "w"), "w")}</div>)}
+    {/* Off-register rows can number in the hundreds; the count keeps current items first (#1516). */}
+    {model.excluded.length > 0 && <details className="rounded border p-3">
+      <summary className="cursor-pointer text-sm font-medium">{model.excluded.length} need attention</summary>
+      <div className="mt-3">{model.excluded.map(item => <div key={`${item.brandId}:${item.formatId}`}>{item.href ? E.nav(item.label, item.reason ?? "Unavailable", "w", undefined, item.href) : E.row(item.label, item.reason ?? "Unavailable", E.status("Off register", "w"), "w")}</div>)}</div>
+    </details>}
     {model.binName && <Button disabled={busy || model.items.length + model.excluded.length === 0} onClick={onPublish}>{busy ? "Publishing…" : "Publish changes"}</Button>}
     {notice}
     <CommandFormMessage error={error ?? null} />

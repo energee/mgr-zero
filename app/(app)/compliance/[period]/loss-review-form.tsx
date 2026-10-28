@@ -13,10 +13,9 @@ import { command, CommandResponseError } from "@/lib/commands/client";
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 import type { LossReview } from "@/lib/commands/compliance";
 import { bblExact } from "@/lib/volume";
-import { lossReviewReason, remainingAmountText } from "@/lib/mgr/monthly-compliance-view";
+import { lossReviewReason, remainingAmountText, type LossTarget } from "@/lib/mgr/monthly-compliance-view";
 
-type Target = "sample" | "taproom" | "destruction";
-type Payload = { adjustmentId: string; bbl: string; classification: Target; destinationState?: string };
+type Payload = { adjustmentId: string; bbl: string; classification: LossTarget; destinationState?: string };
 type Phase = "idle" | "submitting" | "unknown" | "saved";
 
 export function LossReviewForm({ loss }: { loss: LossReview }) {
@@ -25,7 +24,8 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
-  const [target, setTarget] = useState<Target>("sample");
+  // No default: the brewer chooses which TTB line the loss moves to (#1510).
+  const [target, setTarget] = useState<LossTarget | "">("");
   const [state, setState] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +38,7 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
     event.preventDefault();
     const retrying = phase === "unknown";
     if (!retrying) {
-      if (reason) return;
+      if (reason || !target) return; // reason names a missing target; `!target` narrows the type for the payload
       requestId.current = crypto.randomUUID();
       payload.current = { adjustmentId: loss.adjustment_id, bbl: amount, classification: target, ...(target === "sample" ? { destinationState: state } : {}) };
     }
@@ -61,7 +61,7 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
     setOpen(next);
     // Open with the whole remainder, read now so a refreshed remainder is never stale.
     if (next) { setAmount(remainingAmountText(loss.remaining_bbl)); return; }
-    setTarget("sample"); setState(""); setPhase("idle"); setError(null);
+    setTarget(""); setState(""); setPhase("idle"); setError(null);
     requestId.current = null; payload.current = null;
   }
 
@@ -75,8 +75,8 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
       </div>
       <div className="flex flex-col gap-1">
         <Label htmlFor={`loss-target-${loss.adjustment_id}`}>Target</Label>
-        <Select value={target} onValueChange={(value) => { setTarget(value as Target); if (value !== "sample") setState(""); }} disabled={locked}>
-          <SelectTrigger id={`loss-target-${loss.adjustment_id}`}><SelectValue /></SelectTrigger>
+        <Select value={target} onValueChange={(value) => { setTarget(value as LossTarget); if (value !== "sample") setState(""); }} disabled={locked}>
+          <SelectTrigger id={`loss-target-${loss.adjustment_id}`}><SelectValue placeholder="Choose a target" /></SelectTrigger>
           <SelectContent><SelectItem value="sample">Sample</SelectItem><SelectItem value="taproom">Taproom</SelectItem><SelectItem value="destruction">Destruction</SelectItem></SelectContent>
         </Select>
       </div>

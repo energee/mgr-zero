@@ -1,10 +1,10 @@
 // Program 14 P5: POS screens share their inventory/live presentation, and an
 // uncertain provider response keeps one retryable identity without claiming success.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ConnectSquareView, PointOfSaleView, PosItemView, PosMenuView, SquareConnectorView } from "@/components/mgr/views/pos";
+import { ConnectSquareView, PointOfSaleView, PosItemView, PosMenuView } from "@/components/mgr/views/pos";
 import { SCREENS } from "@/components/mgr/screens";
 import { classifyCommandFailure } from "@/lib/commands/client";
 import { isTerminalPublication, publicationNotice, readPublicationOutcome, reconcileBooleanChange, selectExactCommandAttempt, shouldStartNewCommandAttempt, syncFailureMessage, syncResultMessage, toPosMenuSetup, toPosVariationRow } from "@/lib/mgr/pos-view";
@@ -98,6 +98,17 @@ describe("POS UI truth", () => {
     expect(item).not.toMatch(/<button[^>]*disabled=""[^>]*>Save and publish/);
   });
 
+  it("collapses off-register rows behind a count, so current items lead the menu (#1516)", () => {
+    const off = (formatId: string) => ({ brandId: "hazy", formatId, label: `Hazy · ${formatId}`, retail: "$7.00", source: "format", destinations: "Square", available: false, reason: "out of stock", href: "#" });
+    const model = { locations: [], selectedLocationId: "taproom", locationName: "Taproom", binName: "Cold", channelName: "Taproom", externalItems: [],
+      items: [{ ...off("pint"), available: true, reason: undefined }], excluded: [off("half"), off("taster")] };
+    const menu = renderToStaticMarkup(createElement(PosMenuView, { model }));
+    expect(menu).toMatch(/<details[^>]*>\s*<summary[^>]*>2 need attention<\/summary>[\s\S]*Hazy · half[\s\S]*Hazy · taster[\s\S]*<\/details>/);
+    expect(menu.indexOf("Hazy · pint")).toBeLessThan(menu.indexOf("<details"));
+    const none = renderToStaticMarkup(createElement(PosMenuView, { model: { ...model, excluded: [] } }));
+    expect(none).not.toContain("need attention");
+  });
+
   it("renders the inventory sync and sale-opening action contract", () => {
     const html = (name: string) => renderToStaticMarkup(createElement("div", null, SCREENS.find(screen => screen.name === name)!.body));
     expect(html("Point of sale")).toContain(">Sync Square</button>");
@@ -120,10 +131,12 @@ describe("POS UI truth", () => {
   });
 
   it("describes Square's own QuickBooks feed as taproom sales, not a second provider (#1151)", () => {
-    const pos = renderToStaticMarkup(createElement(PointOfSaleView, { model: { connected: false, merchant: "", state: "Not connected" }, paths: { connector: "/settings/pos/connector" } }));
-    expect(pos).toMatch(/<a[^>]*href="\/settings\/pos\/connector"[^>]*>(?:(?!<\/a>)[\s\S])*Taproom sales in QuickBooks/);
-    const connector = renderToStaticMarkup(createElement<{ accountingHref?: string }>(SquareConnectorView, { accountingHref: "/settings/accounting" }));
-    expect(connector).toMatch(/href="\/settings\/accounting"[^>]*>Open Accounting/);
+    // The connector note and its Accounting link sit on Point of sale itself; there is no separate sheet (#1518).
+    const pos = renderToStaticMarkup(createElement(PointOfSaleView, { model: { connected: false, merchant: "", state: "Not connected" }, paths: { accounting: "/settings/accounting" } }));
+    expect(pos).toMatch(/Separate accounting feed[\s\S]*Square may already post taproom sales to QuickBooks Online[\s\S]*href="\/settings\/accounting"[^>]*>Open Accounting/);
+    expect(pos).not.toContain("Taproom sales in QuickBooks");
+    expect(pos).not.toContain("QuickBooks is not a POS provider");
+    expect(existsSync("app/(app)/settings/pos/connector/page.tsx")).toBe(false);
     const connect = renderToStaticMarkup(createElement(ConnectSquareView, { configured: false }));
     expect(connect).toContain("Square isn’t turned on in MGR yet.");
     expect(connect).not.toContain("support");
@@ -165,7 +178,7 @@ describe("POS UI truth", () => {
   it("mounts one shared view from every POS inventory record", () => {
     const source = readFileSync("components/mgr/screens.tsx", "utf8");
     for (const view of [
-      "PointOfSaleView", "SquareLocationsView", "SquareConnectorView",
+      "PointOfSaleView", "SquareLocationsView",
       "DisconnectSquareView", "PosSaleDetailView", "PosMenuView", "PosItemView",
     ]) expect(source, view).toContain(`<${view}`);
   });
@@ -173,12 +186,11 @@ describe("POS UI truth", () => {
   it("maps every live POS route to its inventory screen", () => {
     const routes = new Map(SCREEN_ROUTES.map((route) => [route.name, route.file]));
     expect(Object.fromEntries([...routes].filter(([name]) => [
-      "Point of sale", "Square locations", "Taproom sales in QuickBooks",
+      "Point of sale", "Square locations",
       "Disconnect Square", "POS sale detail", "Menu", "POS item",
     ].includes(name)))).toEqual({
       "Point of sale": "app/(app)/settings/pos/page.tsx",
       "Square locations": "app/(app)/settings/pos/locations/page.tsx",
-      "Taproom sales in QuickBooks": "app/(app)/settings/pos/connector/page.tsx",
       "Disconnect Square": "components/mgr/views/pos-controls.tsx",
       "POS sale detail": "app/(app)/settings/pos/sales/[id]/page.tsx",
       Menu: "app/(app)/menu/page.tsx",

@@ -2,7 +2,8 @@
 // the Fermentation reading sheet. The latest row supplies reference values;
 // reading history remains on Vessel detail. The sheet names the tank and,
 // when known, its batch (#716). Closing returns to `?from=` (Cellar, Batches,
-// or the batch) when the link came from there, else to Vessel detail (#1508).
+// or the batch) when the link came from there, else to Vessel detail; Save and
+// next tank opens the next occupied tank in the Cellar map's tile order (#1508).
 import { cache } from "react";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -11,7 +12,8 @@ import "@/lib/commands/all";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { notFound } from "next/navigation";
 import { readingIdentity } from "@/components/mgr/views/fermentation-reading";
-import { readingReturnHref } from "@/lib/mgr/fermentation-reading-view";
+import { nextReadingHref, readingReturnHref } from "@/lib/mgr/fermentation-reading-view";
+import { nextTankOccupancy } from "@/lib/mgr/cellar-map-view";
 import { ReadingForm } from "./reading-form";
 import { navTitle } from "@/lib/mgr/nav";
 import VesselPage from "@/app/(app)/cellar/vessels/[id]/page";
@@ -30,21 +32,24 @@ const getOccupancyReadingPageData = cache(async function getOccupancyReadingPage
   const ctx = await buildContext(brewery.id);
   const occupancies = await runCommand("list_occupancies", {}, ctx) as Occupancy[];
   const occupancy = occupancies.find((o) => o.occupancy_id === occupancyId) ?? notFound();
-  return { brewery, ctx, occupancy };
+  return { brewery, ctx, occupancy, occupancies };
 });
 
 export default async function OccupancyReadingPage({ params, searchParams }: { params: Promise<{ occupancyId: string }>; searchParams: Promise<{ from?: string | string[] }> }) {
   const [{ occupancyId }, { from }] = await Promise.all([params, searchParams]);
-  const { brewery, ctx, occupancy } = await getOccupancyReadingPageData(occupancyId);
-  const [readings, gravityUnit] = await Promise.all([
+  const { brewery, ctx, occupancy, occupancies } = await getOccupancyReadingPageData(occupancyId);
+  const [readings, gravityUnit, vessels] = await Promise.all([
     runCommand("list_fermentation_readings", { occupancyId }, ctx),
     runCommand("get_gravity_unit", {}, ctx),
-  ]) as [Reading[], { effective: GravityUnit }];
+    runCommand("list_vessels", {}, ctx),
+  ]) as [Reading[], { effective: GravityUnit }, { id: string }[]];
+  const next = nextTankOccupancy(vessels, occupancies, occupancyId);
 
   return (
     <>
       <VesselPage params={Promise.resolve({ id: occupancy.vessel_id })} />
       <ReadingForm
+        key={occupancyId}
         occupancyId={occupancyId}
         identity={readingIdentity(occupancy)}
         unit={gravityUnit.effective}
@@ -52,6 +57,7 @@ export default async function OccupancyReadingPage({ params, searchParams }: { p
         roles={brewery.roles}
         openByDefault
         returnHref={readingReturnHref(from, occupancy.vessel_id)}
+        nextHref={next ? nextReadingHref(from, next) : undefined}
         prior={readings[0] ? {
           tempF: readings[0].temp_f == null ? undefined : String(readings[0].temp_f),
           gravity: readings[0].gravity_plato == null ? undefined : formatGravity(readings[0].gravity_plato, gravityUnit.effective),

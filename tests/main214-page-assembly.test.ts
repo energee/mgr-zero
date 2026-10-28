@@ -53,7 +53,7 @@ import CatalogPage from "@/app/(app)/catalog/page";
 import SkuListPage from "@/app/(app)/catalog/brands/[id]/skus/page";
 import CustomersPage from "@/app/(app)/customers/page";
 import CustomerPage from "@/app/(app)/customers/[id]/page";
-import BinsPage from "@/app/(app)/locations/[id]/bins/page";
+import LocationPage from "@/app/(app)/locations/[id]/page";
 import { SCREENS } from "@/components/mgr/screens";
 import PricingPage from "@/app/(app)/pricing/page";
 import RoutesPage from "@/app/(app)/routes/page";
@@ -164,15 +164,16 @@ it("customer view keeps tax edit prefill, default ship-to, filtered Orders, Invi
   expect(readonly).toContain("Research");
   expect(readonly).not.toContain("/orders/new");
 });
-it("bins shared view retains actual stock move inputs and suppresses Warehouse-only queries for sales", async () => {
-  const page = await BinsPage({ params: Promise.resolve({ id: "location" }) });
-  expect(page.type).toBe(LocationBinsView);
-  expect(page.props.footer.props.stock).toEqual([{ bin_id: "bin", skuId: "sku", qty: 4 }]);
-  expect(page.props.footer.props.bins[0].id).toBe("bin");
-  // #1154: the title names the location and the row says what the bin holds.
-  expect(render(page)).toMatch(/Bins at Cold room[\s\S]*Cold[\s\S]*1 kind of stock/);
+it("Location detail's Bins section retains actual stock move inputs and suppresses Warehouse-only queries for sales (#1507)", async () => {
+  const page = await LocationPage({ params: Promise.resolve({ id: "location" }) });
+  const bins = page.props.bins;
+  expect(bins.type).toBe(LocationBinsView);
+  expect(bins.props.footer.props.stock).toEqual([{ bin_id: "bin", skuId: "sku", qty: 4 }]);
+  expect(bins.props.footer.props.bins[0].id).toBe("bin");
+  // #1154: the page names the location and the row says what the bin holds.
+  expect(render(page)).toMatch(/Cold room[\s\S]*Bins[\s\S]*Cold[\s\S]*1 kind of stock/);
   state.roles = ["sales"]; state.calls = [];
-  const readonly = await BinsPage({ params: Promise.resolve({ id: "location" }) });
+  const readonly = await LocationPage({ params: Promise.resolve({ id: "location" }) });
   expect(state.calls).not.toContain("get_bin_move_stock");
   // Sales never reads bin stock, so the row claims neither a count nor Empty.
   expect(render(readonly)).not.toMatch(/Add bin|Edit bin|Move stock|of stock|Empty|Nothing is stored/);
@@ -192,7 +193,7 @@ it("explicit null suppresses new shared view fixture actions", async () => {
 });
 
 it("converted inventory frames never navigate into the live catalog/customer/location/settings pages", () => {
-  const names = ["Catalog", "Customers", "Customer detail", "Locations", "Location detail", "Location bins", "SKU", "SKU list", "Formats", "Format", "Package BOM", "Price groups", "Price group", "Sale channels", "Channel"];
+  const names = ["Catalog", "Customers", "Customer detail", "Locations", "Location detail", "SKU", "SKU list", "Formats", "Format", "Package BOM", "Price groups", "Price group", "Sale channels", "Channel"];
   for (const name of names) {
     const screen = SCREENS.find(s => s.name === name)!;
     expect(screen, name).toBeDefined();

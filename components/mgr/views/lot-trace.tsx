@@ -29,16 +29,16 @@ export function LotTraceView({
       {E.ttl("Ingredients")}
       {model.ingredients.length ? model.ingredients.map(row => <Fragment key={row.key}>{row.tracked ? E.nav(row.title, row.detail, "", undefined, row.href) : E.fld(row.title, row.detail ?? "")}</Fragment>) : E.blank("No recorded ingredient lots")}
       {E.ttl("Member batches")}
-      {model.memberBatches.map(row => <Fragment key={row.key}>{E.fld(row.title, row.detail ?? "")}</Fragment>)}
+      {model.memberBatches.map(row => <Fragment key={row.key}>{E.nav(row.title, row.detail, "", undefined, row.href)}</Fragment>)}
       {model.sourceTransfers.length > 0 && <>
         {E.ttl("Recorded source transfers")}
         {model.sourceTransfers.map(row => <Fragment key={row.key}>{E.fld(row.title, [row.detail, row.trailing].filter(Boolean).join(" · "))}</Fragment>)}
       </>}
       {tape !== undefined ? tape : E.tape(model.tape.map((row) => [row.label, <span key={row.key} className="whitespace-nowrap">{row.when}</span>]))}
       {E.ttl("Recorded balances by SKU and bin")}
-      {balances !== undefined ? balances : model.balances.map((row) => (
+      {balances !== undefined ? balances : model.balances.length ? model.balances.map((row) => (
         <Fragment key={row.key}>{E.row(row.title, row.detail ?? "", row.trailing ?? "")}</Fragment>
-      ))}
+      )) : E.blank("No recorded balance of this lot")}
       {E.ttl("Recipients")}
       {recipients !== undefined ? recipients : <LotRecipients recipients={model.recipients ?? []} empty={model.recipientsEmpty} />}
       {movements !== undefined ? movements : (tape === null && model.movements?.length ? <>

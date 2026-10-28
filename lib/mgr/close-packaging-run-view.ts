@@ -26,6 +26,20 @@ export type PackagingCloseFieldsModel = {
   plan: PackagingClosePlan; actuals: PackagingActualDraft[];
 };
 
+type FinishedGoodsBin = PackagingCloseFieldsModel["bins"][number];
+
+/** A location's only bin, or "" when it has none or several, so a chosen location fills its bin only when there is no choice (#1508). */
+export function onlyBinIn(bins: FinishedGoodsBin[], locationId: string): string {
+  const here = bins.filter(bin => bin.location_id === locationId);
+  return here.length === 1 ? here[0].id : "";
+}
+
+/** Where Close packaging run's finished goods start: the only location and its only bin; "" where there is a choice (#1508). */
+export function finishedGoodsStart(locations: { id: string }[], bins: FinishedGoodsBin[]): { locationId: string; binId: string } {
+  const locationId = locations.length === 1 ? locations[0].id : "";
+  return { locationId, binId: onlyBinIn(bins, locationId) };
+}
+
 /** Why Close packaging run is withheld, or null when the whole form may submit. Barrels drawn and every actual output must
  *  be typed, not blank (#433; an explicit 0 output is allowed), with the lot, date and finished goods bin, and confirmed
  *  material actuals for every planned material. */

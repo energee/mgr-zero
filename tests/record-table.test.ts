@@ -147,3 +147,11 @@ it("keeps the server's row order before any sort is chosen", () => {
   const list = out.slice(out.indexOf("</table>"));
   expect(list.indexOf("Bravo")).toBeLessThan(list.indexOf("Alpha"));
 });
+
+it("draws each phone record as a compact two-line card: the name, then its facts on one wrapping line (#1516)", () => {
+  const out = html([{ key: "a", cells: ["Alpha", "Open", "3"] }]);
+  const phone = out.slice(out.indexOf('role="listitem"'));
+  // The facts flow side by side, each label beside its value, instead of one labeled row per fact.
+  expect(phone).toMatch(/<dl class="[^"]*\bflex\b[^"]*\bflex-wrap\b[^"]*"><div class="[^"]*\binline-flex\b[^"]*"><dt[^>]*>Status<\/dt><dd[^>]*>Open<\/dd><\/div><div class="[^"]*\binline-flex\b[^"]*"><dt[^>]*>Count<\/dt>/);
+  expect(phone).not.toContain("min-w-[8.5rem]");
+});

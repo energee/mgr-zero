@@ -356,7 +356,7 @@ describe("registered staff mutation role × RPC matrix", () => {
         const name = unique("matrix brewery", role);
         return {
           command: { name, timezone: "America/New_York", readingDueHours: 24 },
-          rpc: { p_brewery: brewery.id, p_name: name, p_timezone: "America/New_York", p_ttb_registry_no: null, p_pa_license_no: null, p_customer_phone: null, p_reading_due_hours: 24 },
+          rpc: { p_brewery: brewery.id, p_name: name, p_timezone: "America/New_York", p_ttb_registry_no: null, p_customer_phone: null, p_reading_due_hours: 24 },
         };
       },
     },

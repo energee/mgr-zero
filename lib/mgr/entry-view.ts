@@ -54,8 +54,10 @@ export const expiredInviteModel: EntryViewModel = {
 export const resetPasswordModel: EntryViewModel = {
   title: "Reset password", inputs: ["Email"], primary: "Send reset link", secondary: "Back to sign in",
 };
+/** Same form as staff reset; the title names the portal account (#1501). */
 export const portalForgotPasswordModel: EntryViewModel = {
   ...resetPasswordModel,
+  title: "Reset your portal password",
 };
 export const noMembershipModel: EntryViewModel = {
   title: "No brewery yet", inputs: [],

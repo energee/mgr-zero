@@ -1,8 +1,9 @@
 // app/(app)/transfers/[id]/transfer-actions.tsx — the one next verb for a
-// stock transfer by status: Record pick (submitted; picks default to the
-// ordered qty), Receive (picked; each line receives its picked qty, taken from
-// the lot quantities typed under it, prefilled when the line has one source),
-// and Cancel transfer with a reason until it is received (#578).
+// stock transfer: Receive, and Cancel transfer with a reason until it is
+// received (#578). Each line receives its picked qty, taken from the lot
+// quantities typed under it, prefilled when the line has one source. A
+// submitted transfer skips the pick step: picked equals ordered, so Receive
+// records that pick first, then receives (#1507).
 "use client";
 
 import { useState } from "react";
@@ -23,13 +24,17 @@ export function TransferActions({ transferId, status, lines, stock }: { stock: B
   const key = (line: string, lot: string | null) => `${line}:${lot ?? ""}`;
   const qtyOf = (l: Line, s: BinMoveStock) => transferSourceQty(quantities[key(l.id, s.lot_id)], sources(l).length, l.qtyPicked ?? l.qty);
   const { busy, error, run } = useCommandAction();
+  const receivable = status === "submitted" || status === "picked" || status === "in_transit";
+  async function receive() {
+    if (status === "submitted" && !await run("record_stock_transfer_pick", { transferId, picks: lines.map((l) => ({ lineId: l.id, qty: l.qty })) })) return;
+    await run("receive_stock_transfer", { transferId, lines: lines.map((l) => ({ lineId: l.id, qty: l.qtyPicked ?? l.qty, ...(l.skuId || l.materialId ? { sources: sources(l).filter(s => Number(qtyOf(l, s)) > 0).map(s => ({ lotId: s.lot_id, qty: Number(qtyOf(l, s)) })) } : {}) })) });
+  }
   const irreversible = "w-full bg-irreversible text-irreversible-foreground hover:bg-irreversible/90 md:w-fit";
   return (
     <div className="flex flex-col gap-2">
-      {status === "submitted" && <Button className="w-full md:w-fit" disabled={busy} onClick={() => run("record_stock_transfer_pick", { transferId, picks: lines.map((l) => ({ lineId: l.id, qty: l.qty })) })}>Record pick</Button>}
-      {(status === "picked" || status === "in_transit") && <>{lines.filter(l => l.skuId || l.materialId).map(l => <div key={l.id} className="flex flex-col gap-2 border-b pb-3"><p>Choose sources totaling {l.qtyPicked ?? l.qty} units</p>{sources(l).map(s => <div key={key(l.id, s.lot_id)}>{E.edit(`${s.name} · ${s.lot_code ?? "Untracked / legacy stock"} · ${s.qty} available`, qtyOf(l, s), "number", undefined, { min: 0, step: l.skuId ? 0.01 : 0.0001, onChange: qty => setQuantities(prev => ({ ...prev, [key(l.id,s.lot_id)]: qty })) })}</div>)}</div>)}</>}
-      {(status === "picked" || status === "in_transit") && (
-        <Button data-variant="irreversible" className={irreversible} disabled={busy} onClick={() => run("receive_stock_transfer", { transferId, lines: lines.map((l) => ({ lineId: l.id, qty: l.qtyPicked ?? l.qty, ...(l.skuId || l.materialId ? { sources: sources(l).filter(s => Number(qtyOf(l, s)) > 0).map(s => ({ lotId: s.lot_id, qty: Number(qtyOf(l, s)) })) } : {}) })) })}>Receive</Button>
+      {receivable && <>{lines.filter(l => l.skuId || l.materialId).map(l => <div key={l.id} className="flex flex-col gap-2 border-b pb-3"><p>Choose sources totaling {l.qtyPicked ?? l.qty} units</p>{sources(l).map(s => <div key={key(l.id, s.lot_id)}>{E.edit(`${s.name} · ${s.lot_code ?? "Untracked / legacy stock"} · ${s.qty} available`, qtyOf(l, s), "number", undefined, { min: 0, step: l.skuId ? 0.01 : 0.0001, onChange: qty => setQuantities(prev => ({ ...prev, [key(l.id,s.lot_id)]: qty })) })}</div>)}</div>)}</>}
+      {receivable && (
+        <Button data-variant="irreversible" className={irreversible} disabled={busy} onClick={() => void receive()}>Receive</Button>
       )}
       <CommandForm open={cancelOpen} onOpenChange={(next) => { setCancelOpen(next); if (!next) setReason(""); }} title="Cancel transfer" trigger={<Button variant="ghost" className="w-full md:w-fit" disabled={busy}>Cancel transfer</Button>}>
         <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); void run("cancel_stock_transfer", { transferId, reason }, () => setCancelOpen(false)); }}>

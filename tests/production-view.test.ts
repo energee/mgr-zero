@@ -466,11 +466,12 @@ describe("Finished records keep their facts (#1480)", () => {
   });
 
   it("a completed batch says when it completed and what it wrote off, not that cellar work continues", () => {
-    const completed = htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, recorded: true, completion: { on: "Oct 26, 2026", writeOffBbl: 1.25 } } }));
+    const completed = htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, recorded: true, completion: { on: "Oct 26, 2026", writeOffBbl: 1.25, packagedBbl: 8.75 } } }));
     expect(completed).toMatch(/Completed<[^]*?Oct 26, 2026/);
+    expect(completed).toMatch(/Packaged<[^]*?8.75 bbl/);
     expect(completed).toMatch(/Written off as loss<[^]*?1.25 bbl/);
     expect(completed).not.toContain("Already brewed.");
-    const belowThreshold = htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, recorded: true, completion: { on: "Oct 26, 2026", writeOffBbl: null } } }));
+    const belowThreshold = htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, recorded: true, completion: { on: "Oct 26, 2026", writeOffBbl: null, packagedBbl: 0 } } }));
     expect(belowThreshold).toMatch(/Written off as loss<[^]*?None/);
     expect(htmlOf(createElement(BrewDayView, { model: { ...brewDayHazy, recorded: true } }))).toContain("Already brewed.");
   });

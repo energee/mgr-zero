@@ -174,11 +174,13 @@ describe("batch completion reconciliation", () => {
   it("get_brew_day reads a completed batch's close and its write-off (#1480)", async () => {
     const lossy = await brew(10);
     await packageBeer(lossy, 8);
-    expect((await runCommand("get_brew_day", { batchId: lossy.batchId }, ctx) as { batch: { closed_at: string | null }; writeOffBbl: number | null })).toMatchObject({ batch: { closed_at: null }, writeOffBbl: null });
+    expect((await runCommand("get_brew_day", { batchId: lossy.batchId }, ctx) as { batch: { closed_at: string | null }; writeOffBbl: number | null })).toMatchObject({ batch: { closed_at: null }, writeOffBbl: null, packagedBbl: null });
     const saved = await complete(lossy.batchId);
-    const day = await runCommand("get_brew_day", { batchId: lossy.batchId }, ctx) as { batch: { closed_at: string }; writeOffBbl: number | null };
+    const day = await runCommand("get_brew_day", { batchId: lossy.batchId }, ctx) as { batch: { closed_at: string }; writeOffBbl: number | null; packagedBbl: number | null };
     expect(new Date(day.batch.closed_at).getTime()).toBe(new Date(saved.closedAt!).getTime());
     expect(day.writeOffBbl).toBe(2);
+    // The packaged volume comes from the database's one balance rule, after completion (#1480).
+    expect(day.packagedBbl).toBe(8);
 
     const clean = await brew(10);
     await packageBeer(clean, 9.96);

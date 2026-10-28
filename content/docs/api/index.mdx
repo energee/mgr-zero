@@ -258,6 +258,12 @@ should have refused still reads nothing from those records. Other records
 admit admin, sales, warehouse and brewer. A member whose only role is taproom reads the catalog and, beyond
 it, only records of taproom locations.
 
+`unmapped` is a filter, not a role. `list_customers`, `list_skus` and
+`list_vendors` accept `unmapped: true` to keep only rows with no QuickBooks id
+in the connected company. Only admin and sales may send `true`. Any other role
+that sends `true` gets `403 permission_denied`, even where the operation admits
+that role without the filter. With no company connected, every row counts as unmapped.
+
 An empty list and a forbidden read look the same from outside, on purpose.
 Keep that in mind when you debug an empty result. A caller cannot probe another
 tenant's data by watching which ids return `404` rather than `403`.

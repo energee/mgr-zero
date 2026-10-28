@@ -7,20 +7,20 @@ import { phoneError } from "@/lib/mgr/phone";
 import type { UnitsViewModel } from "@/lib/mgr/units-view";
 
 export type BrewerySettings = {
-  name: string; timezone: string; ttb_registry_no: string | null; pa_license_no: string | null;
+  name: string; timezone: string; ttb_registry_no: string | null;
   customer_phone: string | null; fermentation_reading_due_hours: number; days_to_package: number;
   books_opened_on: string | null; one_way_keg_fee_cents: number;
 };
 
 export type BrewerySettingsValues = {
-  name: string; timezone: string; ttb: string; pa: string; phone: string; hours: string;
+  name: string; timezone: string; ttb: string; phone: string; hours: string;
   daysToPackage: string; booksOpenedOn: string; oneWayKegFee: string;
 };
 
 export function toBrewerySettingsValues(brewery: BrewerySettings): BrewerySettingsValues {
   return {
     name: brewery.name, timezone: brewery.timezone, ttb: brewery.ttb_registry_no ?? "",
-    pa: brewery.pa_license_no ?? "", phone: brewery.customer_phone ?? "",
+    phone: brewery.customer_phone ?? "",
     hours: String(brewery.fermentation_reading_due_hours), daysToPackage: String(brewery.days_to_package),
     booksOpenedOn: brewery.books_opened_on ?? "", oneWayKegFee: dollarsInput(brewery.one_way_keg_fee_cents),
   };
@@ -80,7 +80,6 @@ export type SettingsViewModel = {
   timezone: string;
   timezoneOptions: string[];
   ttb: string;
-  paLicense: string;
   phone: string;
   overdueHours: string;
   daysToPackage: string;
