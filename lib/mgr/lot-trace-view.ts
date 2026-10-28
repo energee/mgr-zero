@@ -3,17 +3,19 @@ import { formatDate } from "@/lib/date-format";
 import { sentenceCase } from "./labels";
 import { shipToAddress } from "./ship-to-view";
 import { bblFixed } from "@/lib/volume";
-import { batNo } from "./doc-no";
+import { batNo, docNo, runNo } from "./doc-no";
 
 export type LotTraceRowView = { key: string; title: string; detail?: string; trailing?: string };
 export type LotTraceTapeView = { key: string; label: string; when?: string };
 export type LotTraceRecipientView = {
   id: string;
-  orderNo: number;
+  /** The order's document number, such as ORD-0003. */
+  orderNo: string;
   orderHref?: string;
   customer?: { id: string; name: string; href?: string };
   shipTo?: string;
-  shipments: { id: string; label: string; invoices: { id: string; number: number; href?: string }[] }[];
+  /** `label` is the carrier and tracking; `number` is INV-0002 (only invoices, never credit memos, carry a shipment). */
+  shipments: { id: string; label: string; invoices: { id: string; number: string; href?: string }[] }[];
 };
 export type LotTraceMovementView = {
   id: string;
@@ -69,10 +71,10 @@ const ownedSku = (brand: string, sku: string) =>
 /** Both recall directions display the same authorized orders, addresses, shipments and invoices. */
 export function toRecipientViews(recipients: LotTraceSnapshot["recipients"], backHref?: string): LotTraceRecipientView[] {
   return recipients.map(recipient => ({
-    id: recipient.id, orderNo: recipient.order_no, orderHref: backHref ? `/orders/${recipient.id}` : undefined,
+    id: recipient.id, orderNo: docNo("ORD", recipient.order_no, "Order"), orderHref: backHref ? `/orders/${recipient.id}` : undefined,
     customer: recipient.customers ? { ...recipient.customers, href: backHref ? `/customers/${recipient.customers.id}` : undefined } : undefined,
     shipTo: recipient.ship_tos ? [recipient.ship_tos.label, shipToAddress(recipient.ship_tos)].filter(Boolean).join(" · ") : undefined,
-    shipments: recipient.shipments.map(shipment => ({ id: shipment.id, label: `${shipment.carrier ?? "Shipment"} ${shipment.tracking ?? ""}`, invoices: shipment.invoices.map(invoice => ({ id: invoice.id, number: invoice.invoice_no, href: backHref ? `/invoices/${invoice.id}` : undefined })) })),
+    shipments: recipient.shipments.map(shipment => ({ id: shipment.id, label: [shipment.carrier, shipment.tracking].filter(Boolean).join(" · ") || "No carrier or tracking", invoices: shipment.invoices.map(invoice => ({ id: invoice.id, number: docNo("INV", invoice.invoice_no, "Invoice"), href: backHref ? `/invoices/${invoice.id}` : undefined })) })),
   }));
 }
 
@@ -83,7 +85,7 @@ export function toLotTraceViewProps(s: LotTraceSnapshot, timeZone: string, backH
     backHref,
     title: s.lot.code,
     sku,
-    skuDetail: `run ${s.run?.run_no ?? "?"} · packaged ${formatDate(s.lot.packaged_on)}${s.lot.best_by ? ` · best by ${formatDate(s.lot.best_by)}` : ""}`,
+    skuDetail: `${runNo(s.run?.run_no ?? null)} · packaged ${formatDate(s.lot.packaged_on)}${s.lot.best_by ? ` · best by ${formatDate(s.lot.best_by)}` : ""}`,
     skuTrailing: `${bblFixed(s.on_hand_bbl)} recorded balance`,
     tankBatch: [s.run?.vessel, s.batch?.batch_no != null ? batNo(s.batch.batch_no) : null, s.batch?.brewed_on ? `brewed ${formatDate(s.batch.brewed_on)}` : null].filter(Boolean).join(" · "),
     drawn: s.run?.bbl_drawn != null ? bblFixed(s.run.bbl_drawn) : "—",

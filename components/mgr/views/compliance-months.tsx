@@ -22,7 +22,8 @@ export function ComplianceMonthsView({
     <>
       {E.back("More", "Compliance", undefined, model.backHref)}
       <TabBar names={model.cadences} on={model.cadence} cls="w-full" hrefs={cadenceHrefs} />
-      {model.months.length === 0 && model.empty ? E.blank(model.empty) : null}
+      {/* The div keeps E.blank's flex-1 from stretching the empty state down to Licenses (#1496). */}
+      {model.months.length === 0 && model.empty ? <div>{E.blank(model.empty)}</div> : null}
       {model.months.map((row) => (
         <Fragment key={row.key}>
           {E.nav(row.title, row.detail, row.tone ?? "", undefined, linkRows ? row.href : undefined)}

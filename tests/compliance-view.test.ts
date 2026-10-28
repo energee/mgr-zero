@@ -32,13 +32,20 @@ const src = (file: string) => readFileSync(file, "utf8");
 
 describe("Compliance months", () => {
   it("says why no period is listed when the first one starts after the books opened (#987)", () => {
-    expect(noPeriodsYet("month", "2026-10-15")).toEqual({
+    expect(noPeriodsYet("month", "2026-10-15", "2026-10-20")).toEqual({
       title: "No monthly period yet",
-      description: "The books opened on Oct 15, 2026. November 2026 is the first monthly period MGR can report, and it is listed here once it starts.",
+      description: "The books opened on Oct 15, 2026. Activity before that date is not reported in MGR. November 2026 is the first monthly period MGR can report, and it is listed here once it starts.",
     });
-    const html = renderToStaticMarkup(createElement(ComplianceMonthsView, { model: { ...complianceMonthsDemo, months: [], empty: noPeriodsYet("quarter", "2026-10-15") } }));
+    const html = renderToStaticMarkup(createElement(ComplianceMonthsView, { model: { ...complianceMonthsDemo, months: [], empty: noPeriodsYet("quarter", "2026-10-15", "2026-10-20") } }));
     expect(html).toMatch(/No quarterly period yet/);
     expect(html).toMatch(/Q1 2027 is the first quarterly period/);
+  });
+
+  it("says the books open, not opened, while that day is still ahead (#1496)", () => {
+    expect(noPeriodsYet("month", "2026-11-01", "2026-10-26").description).toBe(
+      "The books open on Nov 1, 2026. Activity before that date is not reported in MGR. November 2026 is the first monthly period MGR can report, and it is listed here once it starts.",
+    );
+    expect(noPeriodsYet("month", "2026-11-01", "2026-11-01").description).toMatch(/^The books opened on Nov 1, 2026\./);
   });
 
 
@@ -356,7 +363,31 @@ describe("Lot trace", () => {
     const html = htmlOf(createElement(LotTraceView, { model, tape: null, balances: null, recipients: null, movements: null }));
     expect(html).not.toMatch(/href="\/(orders|customers|invoices)/);
     expect(html).not.toMatch(/Recorded balances by SKU and bin[\s\S]*118 units/);
-    expect(html).not.toMatch(/Order 7|production in/i);
+    expect(html).not.toMatch(/ORD-0007|production in/i);
+  });
+
+  it("prints run, order and invoice document numbers and labels each recipient field (#1496)", () => {
+    const snapshot: LotTraceSnapshot = {
+      ...lotTraceHazy,
+      run: { ...lotTraceHazy.run!, run_no: 3 },
+      recipients: [{
+        id: "order", order_no: 3, customers: { id: "customer", name: "Buyer" },
+        ship_tos: { label: "main", country: "US", address1: "1 Sample St", city: "Sample", state: "PA", zip: "19100" },
+        shipments: [
+          { id: "carried", carrier: "UPS", tracking: "1Z999", invoices: [{ id: "invoice", invoice_no: 2 }] },
+          { id: "bare", carrier: null, tracking: null, invoices: [] },
+        ],
+      }],
+    };
+    const model = toLotTraceViewProps(snapshot, DEMO_TIME_ZONE, "/compliance");
+    expect(model.skuDetail).toMatch(/^RUN-0003 · packaged/);
+    expect(model.recipients?.[0]).toMatchObject({
+      orderNo: "ORD-0003",
+      shipments: [{ label: "UPS · 1Z999", invoices: [{ number: "INV-0002" }] }, { label: "No carrier or tracking" }],
+    });
+    const text = htmlOf(createElement(LotTraceView, { model, tape: null })).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+    expect(text).toContain("Order ORD-0003 Customer Buyer Ship to main · 1 Sample St · Sample, PA 19100 Shipment UPS · 1Z999 Invoice INV-0002 Shipment No carrier or tracking");
+    expect(text).not.toMatch(/\brun 3\b|Order 3\b|Invoice 2\b/);
   });
 
   it("names a recipient ship-to's country and never prints a missing part as null", () => {
@@ -395,7 +426,7 @@ describe("Lot trace", () => {
 
   it("formats every date as a short calendar day and owns every movement SKU", () => {
     const model = toLotTraceViewProps(lotTraceHazy, DEMO_TIME_ZONE);
-    expect(model.skuDetail).toBe("run 28 · packaged Aug 31, 2026 · best by Feb 27, 2027");
+    expect(model.skuDetail).toBe("RUN-0028 · packaged Aug 31, 2026 · best by Feb 27, 2027");
     expect(model.tankBatch).toBe("FV-3 · B-0041 · brewed Aug 10, 2026");
     expect(model.tape).toEqual([
       { key: "in", label: "+120 · Production in · Hazy IPA · 16 oz case · Warehouse", when: "Aug 31, 2026" },
