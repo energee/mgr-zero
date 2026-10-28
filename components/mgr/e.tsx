@@ -265,8 +265,9 @@ export const E = {
   sw: (on: boolean, label: string, onChange?: (checked: boolean) => void, disabled = false) => <Switch {...(onChange ? { checked: on, onCheckedChange: onChange } : { defaultChecked: on })} aria-label={label} disabled={disabled} />,
   /** Fills the phone column; hugs the label from md up (`w-fit`, not `w-auto`:
    *  a column flex item with width:auto still stretches). Entry cards override
-   *  back to full-width because they stay a phone-width column on the desk. */
-  btn: (t: React.ReactNode, k: BtnKind = "p", href?: string, onClick?: () => void, attributes?: { "data-preview-action"?: boolean }) => {
+   *  back to full-width because they stay a phone-width column on the desk.
+   *  `data-to` names the screen a link opens when its label is not that screen's name, as on E.back. */
+  btn: (t: React.ReactNode, k: BtnKind = "p", href?: string, onClick?: () => void, attributes?: { "data-preview-action"?: boolean; "data-to"?: string }) => {
     const [kind, disabled] = k.split(" ") as [BtnBase, string?];
     return (
       <Button
@@ -287,10 +288,11 @@ export const E = {
       </Button>
     );
   },
-  btns: (arr: (React.ReactNode | [React.ReactNode, BtnKind])[], c: "c2" | "c3" = "c2") => (
+  /** A row of buttons; a tuple may add an href, which makes that button a link. */
+  btns: (arr: (React.ReactNode | [React.ReactNode, BtnKind, string?])[], c: "c2" | "c3" = "c2") => (
     <div className={cn("grid gap-2 md:flex md:flex-wrap md:justify-end", c === "c3" ? "grid-cols-3" : "grid-cols-2")}>
       {arr.map((v, i) => (
-        <React.Fragment key={i}>{Array.isArray(v) ? E.btn(v[0], v[1]) : E.btn(v)}</React.Fragment>
+        <React.Fragment key={i}>{Array.isArray(v) ? E.btn(v[0], v[1], v[2]) : E.btn(v)}</React.Fragment>
       ))}
     </div>
   ),
@@ -525,13 +527,18 @@ export const E = {
       ))}
     </div>
   ),
-  tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?, string?, React.ReactNode?][], c: "c2" | "c3" = "c3") => (
-    <ItemGroup className={cn("grid gap-2", c === "c2" ? "grid-cols-2" : "grid-cols-2 md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]")}>
-      {arr.map(([n, s, g, w, f, href, actions], i) => (
-        <Item key={i} variant="outline" size="sm" className="flex-col items-start gap-0.5" asChild>
-          {actions ? <div><TileContent {...{ n, s, g, w, f }} />{actions}</div> : href ? <Link href={href}><TileContent {...{ n, s, g, w, f }} /></Link> : <button type="button"><TileContent {...{ n, s, g, w, f }} /></button>}
-        </Item>
-      ))}
+  /** Status tiles. `actions` sit under a tile's facts; with an `href` too, the facts stay the link. */
+  tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?, string?, React.ReactNode?][]) => (
+    <ItemGroup className="grid grid-cols-2 gap-2 md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
+      {arr.map(([n, s, g, w, f, href, actions], i) => {
+        const content = <TileContent {...{ n, s, g, w, f }} />;
+        const facts = href ? <Link href={href}>{content}</Link> : content;
+        return (
+          <Item key={i} variant="outline" size="sm" className="flex-col items-start gap-0.5" asChild>
+            {actions ? <div>{facts}{actions}</div> : href ? facts : <button type="button">{content}</button>}
+          </Item>
+        );
+      })}
     </ItemGroup>
   ),
   /** A small fixed table whose headers sort its rows and remember the last
@@ -566,10 +573,10 @@ export const E = {
       <Input placeholder={hint} aria-label={label} />
     </Field>
   ),
-  /** A search box: the one input whose placeholder is its whole label. A live
-   *  list passes `name`, `defaultValue` and `maxLength` and wraps it in a GET form
-   *  (components/mgr/list-controls.tsx); a drawing passes none. */
-  search: (t = "Search", controls?: { name: string; defaultValue: string; maxLength: number }) => <Input type="search" placeholder={t} aria-label={t} {...controls} />,
+  /** A search box: the one input whose placeholder is its whole label. A list
+   *  passes `name`, `defaultValue` and `maxLength` and wraps it in a GET form, plus `onChange`
+   *  to search as you type (components/mgr/list-controls.tsx); a drawing passes none. */
+  search: (t = "Search", controls?: { name: string; defaultValue: string; maxLength: number; onChange?: React.ChangeEventHandler<HTMLInputElement> }) => <Input type="search" placeholder={t} aria-label={t} {...controls} />,
   stq: (v: number, label = "Quantity", controls?: FieldControls & { value: string }) => <StepQuantity label={label} defaultValue={String(v)} min={controls ? controls.min : 0} step={controls ? controls.step : 1} {...controls} required={controls ? controls.required !== false : false} />,
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
   /** A row that opens something. `href` makes the whole row the link, as E.act

@@ -187,7 +187,7 @@ export async function movementReferences(ctx: Ctx, references: (string | null)[]
 }
 
 defineQuery({
-  name: "list_movements", description: "Paginated immutable movements with location/bin/lot labels, resolved source document ref_label (null without a visible source document), and reversal links; movementId selects an original and its exact compensation",
+  name: "list_movements", description: "Paginated immutable movements with location/bin/lot labels, resolved source document ref_label and ref_kind (order, run, transfer, invoice, delivery or count; both null without a visible source document), and reversal links; movementId selects an original and its exact compensation",
   input: z.object({ skuId: z.string().uuid().optional(), movementId: z.string().uuid().optional(), limit: z.number().int().min(1).max(200).default(50), offset: z.number().int().nonnegative().default(0) }),
   roles: [...readRoles],
   handler: async (ctx, i) => {
@@ -202,7 +202,10 @@ defineQuery({
         .eq("brewery_id", ctx.breweryId).in("compensates_id", rows.map(r => r.id))),
       movementReferences(ctx, rows.map(row => row.ref)),
     ]);
-    return rows.map(row => ({ ...row, ref_label: references.get(row.ref ?? "")?.ref_label ?? null, reversed_by: corrections?.find(c => c.compensates_id === row.id)?.id ?? null }));
+    return rows.map(row => {
+      const reference = references.get(row.ref ?? "");
+      return { ...row, ref_label: reference?.ref_label ?? null, ref_kind: reference?.ref_kind ?? null, reversed_by: corrections?.find(c => c.compensates_id === row.id)?.id ?? null };
+    });
   },
 });
 

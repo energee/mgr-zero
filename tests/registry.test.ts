@@ -181,6 +181,24 @@ describe("unwrap maps RPC SQLSTATEs to command errors", () => {
     expect(log).toHaveBeenCalledWith("database error 23505:", raw);
     log.mockRestore();
   });
+  it.each([
+    "Key (brewery_id, name)=(00000000-0000-4000-8000-000000000001, QA test customer) already exists.",
+    "Key (brewery_id, btrim(name))=(00000000-0000-4000-8000-000000000001, ½ bbl keg) already exists.",
+  ])("23505 on a name key → 409 conflict that names the Name field, without the raw value (#1488): %s", async details => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const err = await unwrap(Promise.resolve({ data: null, error: { message: "duplicate key value violates unique constraint", code: "23505", details } })).catch((e: unknown) => e);
+    const message = "That name is already used. Choose a different name.";
+    expect(err).toMatchObject({ status: 409, code: "conflict", message, issues: [{ path: ["name"], code: "duplicate", message }] });
+    expect(JSON.stringify(err)).not.toMatch(/QA test|bbl|0000/);
+    log.mockRestore();
+  });
+  it("23505 on another key keeps the generic conflict and no field issue", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const err = await unwrap(Promise.resolve({ data: null, error: { message: "dup", code: "23505", details: "Key (brewery_id, rpc_name)=(x, y) already exists." } })).catch((e: unknown) => e);
+    expect(err).toMatchObject({ status: 409, code: "conflict", message: "That already exists. Use a different name or value." });
+    expect((err as CommandError).issues).toBeUndefined();
+    log.mockRestore();
+  });
   it("22003 (numeric value out of range) → 400 bad_request without the raw message (#427)", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(unwrap(failing("22003"))).rejects.toMatchObject({ status: 400, code: "bad_request", message: "A number is out of range." });

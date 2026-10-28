@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
+import { E } from "@/components/mgr/e";
 import { QboConnectionView, QboDefaultsView, DisconnectQuickBooksView, QboSyncView } from "@/components/mgr/views/accounting";
 import { QboMappingView, QboMappingSheetView, type QboMappingKind } from "@/components/mgr/views/qbo-mapping";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 import type { QboSyncStatus } from "@/lib/mgr/accounting-view";
-import { revocationConfirmed } from "@/lib/mgr/integration-disconnect";
 import { qboMappingVersion, qboPushConfirmation, type QboInvoiceAction, type QboRemoteCreateAction } from "@/lib/mgr/qbo-ui";
+import { submitReason } from "@/lib/mgr/submit-reason";
 
 export function QboConnectionAction({ configured, reconnect = false }: { configured: boolean; reconnect?: boolean }) {
   const action = useCommandAction();
@@ -23,11 +24,17 @@ export function QboDefaultsForm({ allowAch, allowCard }: { allowAch: boolean; al
   return <QboDefaultsView allowAch={allowAch} allowCard={allowCard} busy={action.busy} error={action.error} onSave={(ach, card) => void action.run("set_qbo_push_defaults", { allowAch: ach, allowCard: card })} />;
 }
 
-/** Leaves for Connect only when QuickBooks confirmed revocation; otherwise refreshes so the page shows the unresolved outcome. */
+/** Accounting's Disconnect: a confirming dialog over the page (#1509). A
+ *  finished disconnect closes it and refreshes Accounting, which then offers
+ *  Connect, or says QuickBooks did not confirm revocation. Unlike Square's
+ *  dialog it closes either way: QuickBooks has no Retry revocation step. */
 export function QboDisconnectAction({ connectionId }: { connectionId: string }) {
-  const action = useCommandAction(), router = useRouter();
-  return <DisconnectQuickBooksView busy={action.busy} error={action.error}
-    onDisconnect={() => void action.run("disconnect_qbo", { connectionId }, data => revocationConfirmed(data) ? router.push("/settings/accounting/connect") : router.refresh(), { refresh: false })} />;
+  const action = useCommandAction();
+  const [open, setOpen] = useState(false);
+  return <CommandForm open={open} onOpenChange={next => { if (!action.busy) { setOpen(next); action.setError(null); } }} title="Disconnect QuickBooks" trigger={E.act("Disconnect", "destructive")}>
+    <div className="flex flex-col gap-2"><DisconnectQuickBooksView busy={action.busy} error={action.error}
+      onDisconnect={() => void action.run("disconnect_qbo", { connectionId }, () => setOpen(false))} /></div>
+  </CommandForm>;
 }
 
 type MappingProps = { kind: QboMappingKind; localId?: string; label: string; currentId?: string | null; context?: "accounting" | "invoice" };
@@ -87,7 +94,7 @@ export function QboInvoiceActions({ invoiceId, invoiceLabel, actions }: { invoic
       <form className="flex flex-col gap-3" onSubmit={writeOff.submit}>
         <p className="text-sm text-muted-foreground">This records a local status and reason. It does not change QuickBooks, record cash, or create a credit.</p>
         <Label htmlFor="qbo-write-off-reason">Reason</Label><Input id="qbo-write-off-reason" value={reason} onChange={e => setReason(e.target.value)} required maxLength={500} />
-        <CommandFormMessage error={writeOff.error} /><CommandFormFooter><Button variant="destructive" disabled={writeOff.submitting || !reason.trim()}>{writeOff.submitting ? "Writing off…" : "Confirm write-off"}</Button></CommandFormFooter>
+        <CommandFormMessage error={writeOff.error} /><CommandFormFooter>{E.submit("Confirm write-off", { variant: "destructive", submitting: writeOff.submitting, busy: "Writing off…", reason: submitReason(reason.trim() ? [] : ["a reason"]) })}</CommandFormFooter>
       </form>
     </CommandForm>}
   </div>;

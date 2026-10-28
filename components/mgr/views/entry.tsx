@@ -26,6 +26,11 @@ function EntrySubmit({ label, pendingLabel }: { label: string; pendingLabel: str
   return E.submit(label, { busy: pendingLabel, submitting: pending, "aria-busy": pending });
 }
 
+/** A live text link, or the inventory's inert one naming its screen. */
+function textLink(link: { label: string; to: string }, href?: string) {
+  return href ? <Link href={href} className="text-sm underline">{link.label}</Link> : E.link(link.label, link.to);
+}
+
 export function EntryView({
   model,
   action,
@@ -34,6 +39,7 @@ export function EntryView({
   primaryHref,
   secondaryHref,
   linkHref,
+  switchHref,
   hidden,
   defaults = {},
 }: {
@@ -44,6 +50,8 @@ export function EntryView({
   primaryHref?: string | null;
   secondaryHref?: string;
   linkHref?: string;
+  /** Where model.switchLink goes live; without it the inventory link is inert. */
+  switchHref?: string;
   hidden?: ReactNode;
   defaults?: Record<string, string | undefined>;
 }) {
@@ -137,10 +145,8 @@ export function EntryView({
       {/* A local fixture action prevents native GET submission before hydration too. */}
       {action || emailLink || passwordChange ? <form action={action ?? (() => {})} noValidate={passwordChange} onSubmit={submit}>{controls}</form> : controls}
       {model.extraPrimary ? extraAction ? <form action={extraAction}><Button type="submit" variant="outline">{model.extraPrimary}</Button></form> : E.btn(model.extraPrimary, "g") : null}
-      {model.link ? linkHref
-        ? <Link href={linkHref} className="text-sm underline">{model.link.label}</Link>
-        : E.link(model.link.label, model.link.to)
-      : null}
+      {model.link ? textLink(model.link, linkHref) : null}
+      {model.switchLink ? textLink(model.switchLink, switchHref) : null}
       {model.info ? E.info(model.info) : null}
       {E.sp()}
     </>

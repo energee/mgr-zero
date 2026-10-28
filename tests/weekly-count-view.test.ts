@@ -173,3 +173,28 @@ it("#814 shows the shared shortage disposition picker and freezes it on uncertai
   const frozen = failCountAttempt(beginCountAttempt(state, "request"), "unknown", "No response");
   expect(renderToStaticMarkup(createElement(WeeklyCountDraftView, { state: frozen, roles: ["taproom"], lotLabels: {}, timeZone: "America/New_York" }))).toContain('data-disabled');
 });
+
+it("#1516 lists buckets alphabetically without repeating untracked worksheet rows, offers Same as recorded, and drops unavailable expectations", () => {
+  const line = (sku: string, name: string, lot: string | null) => ({ bin_id: "cold", bin_name: "Cold", sku_id: sku, sku_name: name, brand_id: sku, brand_name: name, bbl_per_unit: 0.5, lot_id: lot, qty_before: 4 });
+  const state = countDraftFromSnapshot({ location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "captured",
+    lines: [line("pils", "Pils · ½ bbl keg", null), line("hazy", "Hazy · ½ bbl keg", "lot-1")] },
+  { prior_count: null, expected_bbl: null, reason: "no_pos_coverage", rows: [] });
+  const html = renderToStaticMarkup(createElement(WeeklyCountDraftView, { state, roles: ["admin"], lotLabels: { [state.draft.lines[1].key]: "L-7" }, timeZone: "America/New_York" }));
+  expect(html.indexOf("Hazy · ½ bbl keg")).toBeLessThan(html.indexOf("Pils · ½ bbl keg"));
+  expect(html).toContain("Cold · Lot L-7 · worksheet row 2 · recorded 4");
+  expect(html).toContain("Cold · recorded 4");
+  expect(html).not.toContain("Untracked stock");
+  expect(html.match(/>Same as recorded</g)).toHaveLength(2);
+  expect(html).toContain('aria-label="Same as recorded · Pils · ½ bbl keg · worksheet row 1"');
+  // Quantities still start empty: a count is entered on purpose.
+  expect(html).not.toMatch(/value="4"/);
+  expect(html).toContain("Expected consumption unavailable.");
+  expect(html).not.toContain("expected unavailable");
+  expect(html).not.toContain("Draft actual is an estimate");
+});
+
+it("#1481 names the link to the count before this one in plain words", () => {
+  const html = renderToStaticMarkup(createElement(WeeklyCountView, { model: { ...weeklyCount, receipt: { ...weeklyCount.receipt!, recorded: "Recorded by you at Sep 8, 2026, 4:00 PM", priorHref: "/taproom?count=sep1" } }, draft: null }));
+  expect(html).toMatch(/Recorded by you at Sep 8, 2026, 4:00 PM\. <a[^>]*href="\/taproom\?count=sep1"[^>]*>Open the previous count<\/a>/);
+  expect(html).not.toContain("prior count");
+});

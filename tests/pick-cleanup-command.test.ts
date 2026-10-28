@@ -13,12 +13,15 @@ import { ShortPickForm } from "@/app/(app)/orders/[id]/short-pick-form";
 const order = { id: "order", order_no: 1, from_location_id: "source", customers: null };
 const line = { id: "line", sku_id: "sku", qty_ordered: 5, qty_picked: 2, skus: null };
 let submit: (event: { preventDefault(): void }) => void;
+const close = vi.fn();
 function Harness({ shortage }: { shortage: boolean }) {
-  const element = shortage ? ShortPickForm({ snapshot: { order, line, locations: [] } }) : PickForm({ snapshot: { order, lines: [line], locations: [] } });
-  if (shortage && !element.props.children.props.reasonValue) {
-    element.props.children.props.onReason("Fictional shortage");
+  // ShortPickForm is a CommandForm around its form; PickForm is its form beside the (closed) Short sheet.
+  const element = shortage ? ShortPickForm({ snapshot: { order, line, locations: [] }, onClose: close }) : PickForm({ snapshot: { order, lines: [line], locations: [] } });
+  const form = shortage ? element.props.children : element.props.children[0];
+  if (shortage && !form.props.children.props.reasonValue) {
+    form.props.children.props.onReason("Fictional shortage");
   }
-  submit = element.props.onSubmit;
+  submit = form.props.onSubmit;
   return element;
 }
 beforeEach(() => {
@@ -34,11 +37,13 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async () => ({ status: 200, json: async () => ({ ok: true, data: {} }) })));
 });
 afterEach(() => vi.unstubAllGlobals());
-it.each([false, true])("actual command run navigates and refreshes after cleanup failure (short=%s)", async shortage => {
+it.each([false, true])("actual command run leaves or closes and refreshes after cleanup failure (short=%s)", async shortage => {
   renderToStaticMarkup(createElement(Harness, { shortage }));
   submit({ preventDefault() {} });
-  await vi.waitFor(() => expect(push).toHaveBeenCalledWith(shortage ? "/orders/order/pick" : "/orders/order"));
-  expect(refresh).toHaveBeenCalledOnce();
+  // Done picking leaves Pick; a resolved Short closes its sheet and Pick refreshes in place.
+  await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce());
+  if (shortage) { expect(close).toHaveBeenCalledOnce(); expect(push).not.toHaveBeenCalled(); }
+  else expect(push).toHaveBeenCalledWith("/orders/order");
   expect(notice).toHaveBeenCalledOnce();
   expect(fetch).toHaveBeenCalledOnce();
   // Successful transport recovery was retired: no false "Retry saved request" remains.

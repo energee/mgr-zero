@@ -3,7 +3,8 @@
 // No movement type is preselected: the user picks one, unless a deep link passed it (#1107).
 // Record movement names what it still needs (movementReason), a wrong quantity
 // or state is marked on its field, and an empty SKU picker links Catalog only
-// when `skusHref` is set (#1113).
+// when `skusHref` is set (#1113). A deep link with `from` (Today's quick
+// action) goes back there when the form closes or its receipt is dismissed (#1475).
 "use client";
 
 import { classifyCommandFailure, command } from "@/lib/commands/client";
@@ -13,7 +14,8 @@ import { MOVEMENT_KIND_LABELS, MOVEMENT_TYPES, movementFieldErrors, movementFiel
 import { sentenceCase } from "@/lib/mgr/labels";
 import { formatVolume } from "@/lib/volume";
 import { useEffect, useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { passwordReturnHref } from "@/lib/mgr/entry-view";
 import { Button } from "@/components/ui/button";
 import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
@@ -49,6 +51,7 @@ export function MovementForm({
 }) {
   const breweryId = useBrewery();
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const search = searchParams.toString();
   const movementOpen = pathname === "/inventory" && searchParams.get("recordMovement") === "1";
@@ -154,11 +157,18 @@ export function MovementForm({
     window.history.replaceState(null, "", `/inventory${query ? `?${query}` : ""}${window.location.hash}`);
   }
 
+  // Back to the page that sent us (only an in-app path), else stay on Finished goods.
+  function leave() {
+    const from = searchParams.get("from");
+    if (from) router.replace(passwordReturnHref(from));
+    else clearDeepLinkUrl();
+  }
+
   function changeOpen(open: boolean) {
     if (!ownsCurrentUrl()) return;
     form.setOpen(open);
     if (!open) {
-      clearDeepLinkUrl();
+      leave();
       return;
     }
     const params = new URLSearchParams(search);
@@ -169,7 +179,7 @@ export function MovementForm({
   function dismissReceiptAndClearDeepLink() {
     if (!ownsCurrentUrl()) return;
     setReceipt(null);
-    clearDeepLinkUrl();
+    leave();
   }
 
   return (

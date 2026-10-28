@@ -77,6 +77,18 @@ describe("vendors, materials, contracts", () => {
     expect(await materials("e_m")).toEqual(["Pale_Malt"]);
   });
 
+  it("list_materials narrows by type, alone or with a search (#1516)", async () => {
+    const own = await makeStaffCtx((await makeBrewery()).id, "warehouse");
+    for (const [name, category] of [["Pale malt", "malt"], ["Citra", "hop"], ["Malt extract", "adjunct"]]) {
+      await runCommand("upsert_material", { name, category, baseUom: "lb", purchaseUom: "lb", purchaseUomFactor: 1 }, own);
+    }
+    const materials = async (input: Record<string, string>) => ((await runCommand("list_materials", input, own)) as { name: string }[]).map((m) => m.name);
+    expect(await materials({ category: "malt" })).toEqual(["Pale malt"]);
+    expect(await materials({ category: "hop", q: "malt" })).toEqual([]);
+    expect(await materials({ q: "malt" })).toEqual(["Malt extract", "Pale malt"]);
+    await expect(runCommand("list_materials", { category: "grain" }, own)).rejects.toMatchObject({ code: "invalid_input" });
+  });
+
   it("list_vendors_and_contracts and list_materials q treat * as literal text (#1029)", async () => {
     const own = await makeStaffCtx((await makeBrewery()).id, "warehouse");
     for (const name of ["Plain Supply", "Star*Hops"]) await runCommand("upsert_vendor", { name }, own);

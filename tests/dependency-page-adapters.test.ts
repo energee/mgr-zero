@@ -66,7 +66,7 @@ it("preserves customer filtering, default destinations, active SKUs and Warehous
   expect(renderToStaticMarkup(writable.props.createAction)).toContain('href="/orders/new"');
   // New order is its own page now; it owns the option lists and its own gate.
   state.calls = []; state.gates = [];
-  const page = await NewOrderPage();
+  const page = await NewOrderPage({ searchParams: Promise.resolve({}) });
   expect(page.type).toBe(NewOrderClient);
   const form = NewOrderClient(page.props);
   expect(form.props.timeZone).toBe("America/Los_Angeles");

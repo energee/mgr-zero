@@ -5,9 +5,9 @@
 import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { booksOpenedChange, oneWayKegFeeChange, oneWayKegFeeError, toBrewerySettingsValues, breweryOperatingDefaultsCommand, brewerySettingsReason, refreshBrewerySettingsValues, aiModelSettingsReason } from "@/lib/mgr/settings-view";
+import { booksOpenedChange, oneWayKegFeeChange, oneWayKegFeeError, toBrewerySettingsValues, breweryOperatingDefaultsCommand, brewerySettingsReason, refreshBrewerySettingsValues } from "@/lib/mgr/settings-view";
 import { BrewerySettingsFormView } from "@/components/mgr/views/brewery-settings-form";
-import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
+import { E } from "@/components/mgr/e";
 import { SettingsView } from "@/components/mgr/views/settings";
 import { PortalFulfillmentView } from "@/components/mgr/views/portal-fulfillment";
 import { settingsDemo } from "@/lib/mgr/fixtures/settings";
@@ -48,6 +48,21 @@ describe("Settings save readiness (#1316)", () => {
     }
   });
 
+  it("withholds Save brewery for a phone the server refuses (#1500)", () => {
+    for (const phone of ["abc", "12", "5".repeat(300)]) {
+      expect(brewerySettingsReason({ ...initial, phone }, initial), phone).toContain("a phone number, such as (503) 555-0142");
+    }
+    for (const phone of ["", "(503) 555-0142"]) {
+      expect(brewerySettingsReason({ ...initial, name: "Changed", phone }, initial), phone).toBeNull();
+    }
+  });
+
+  it("shows the phone correction under the field before saving (#1500)", () => {
+    const html = renderToStaticMarkup(createElement(BrewerySettingsFormView, { initial: { ...initial, phone: "abc" } }));
+    expect(html).toContain("Use a phone number, such as (503) 555-0142.");
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Save brewery/);
+  });
+
   it("refreshes untouched fields without dropping unsaved or uncertain edits", () => {
     const values = { ...initial, name: "Unsaved brewery" };
     const refreshed = { ...initial, hours: "48" };
@@ -56,30 +71,24 @@ describe("Settings save readiness (#1316)", () => {
     expect(brewerySettingsReason(refreshBrewerySettingsValues(refreshed, values, saved), saved)).toBeNull();
   });
 
-  it("requires a changed available AI model without rejecting an unchanged saved model", () => {
-    const models = [{ id: "openai/gpt-5", name: "GPT-5" }];
-    expect(aiModelSettingsReason("old/model", "old/model", models)).toContain("a change");
-    expect(aiModelSettingsReason("openai/gpt-5", "old/model", models)).toBeNull();
-    expect(aiModelSettingsReason("", "old/model", models)).toContain("an available AI model");
-    expect(aiModelSettingsReason("not/available", "old/model", models)).toContain("an available AI model");
-    expect(aiModelSettingsReason("old/model", "old/model", [])).toContain("the Gateway model catalog");
-  });
-
   it("withholds pristine submits in the shared inventory and names the reason", () => {
     const html = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo }));
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Save brewery/);
-    expect(html).toMatch(/<button[^>]*disabled[^>]*>Save AI model/);
     expect(html).toContain("Still needed: a change to brewery details.");
-    expect(html).toContain("Still needed: a change to the AI model.");
   });
 
-  it("links Units and Sale channels from People and places", () => {
+  it("links Sale channels from People and places", () => {
     const html = renderToStaticMarkup(createElement(SettingsView, {
-      model: settingsDemo, hrefs: { units: "/settings/units", channels: "/settings/channels" },
+      model: settingsDemo, hrefs: { channels: "/settings/channels" },
     }));
     const people = html.match(/<section aria-labelledby="settings-people"[\s\S]*?<\/section>/)?.[0];
-    expect(people).toMatch(/<a[^>]*href="\/settings\/units"[^>]*>[\s\S]*?Units/);
     expect(people).toMatch(/<a[^>]*href="\/settings\/channels"[^>]*>[\s\S]*?Sale channels/);
+  });
+
+  it("captions Water profiles without a source or target role (#1205)", () => {
+    const html = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo, hrefs: {} }));
+    expect(html).toContain("Manage water profiles");
+    expect(html).not.toMatch(/source and target/i);
   });
 
   it("blocks pristine and pending brewery saves at the live adapter", () => {
@@ -92,21 +101,6 @@ describe("Settings save readiness (#1316)", () => {
     pending.props.onSave({ ...pending.props.initial, name: "Changed" });
     expect(action.run).not.toHaveBeenCalled();
     action.busy = false;
-  });
-
-  it("guards AI Enter submission for pristine, invalid, pending and changed choices", () => {
-    const models = [{ id: "openai/gpt-5", name: "GPT-5" }];
-    for (const [value, busy, expected] of [["old/model", false, 0], ["missing/model", false, 0], ["openai/gpt-5", true, 0], ["openai/gpt-5", false, 1]] as const) {
-      const onSubmit = vi.fn();
-      let form: ReactElement<{ onSubmit: (event: { preventDefault: () => void }) => void }> | undefined;
-      function Capture() {
-        form = AiModelSettingsView({ value, initial: "old/model", models, busy, onSubmit });
-        return form;
-      }
-      renderToStaticMarkup(createElement(Capture));
-      form!.props.onSubmit({ preventDefault: vi.fn() });
-      expect(onSubmit).toHaveBeenCalledTimes(expected);
-    }
   });
 });
 
@@ -202,15 +196,13 @@ describe("Settings sections (#1025)", () => {
   const html = renderToStaticMarkup(createElement(SettingsView, { model: settingsDemo }));
   const forms = html.split("<form").slice(1).map((chunk) => chunk.slice(0, chunk.indexOf("</form>")));
 
-  it("draws three independent forms, each saved only by its own button", () => {
-    for (const [legend, save, field] of [["Brewery details", "Save brewery", "Brewery name"], ["Ask MGR", "Save AI model", "AI model"], ["Wholesale fulfillment", "Save warehouse", "Portal fulfillment warehouse"]]) {
-      const own = forms.filter((form) => form.includes(legend));
-      expect(own, legend).toHaveLength(1);
-      expect(own[0].match(/type="submit"/g), legend).toHaveLength(1);
-      expect(own[0], legend).toContain(save);
-      expect(own[0], legend).toContain(field);
-      expect(forms.filter((form) => form.includes(save)), save).toHaveLength(1);
-    }
+  it("keeps Brewery details its own form; the AI model and warehouse pickers save on select (#1509)", () => {
+    const own = forms.filter((form) => form.includes("Brewery details"));
+    expect(own).toHaveLength(1);
+    expect(own[0].match(/type="submit"/g)).toHaveLength(1);
+    expect(own[0]).toContain("Save brewery");
+    for (const legend of ["Ask MGR", "Wholesale fulfillment"]) expect(forms.some((form) => form.includes(legend)), legend).toBe(false);
+    for (const field of ["AI model", "Portal fulfillment warehouse"]) expect(html, field).toContain(field);
   });
 
   it("explains missing versus zero on the one-way fee and the reading hours", () => {
@@ -235,10 +227,9 @@ describe("Settings follow-up polish (#1147)", () => {
 });
 
 describe("Wholesale fulfillment with no warehouse (#1147)", () => {
-  const view = (props: { locations?: { id: string; name: string }[]; currentId?: string | null; locationsHref?: string } = {}) =>
+  const view = (props: { locations?: { id: string; name: string }[]; currentId?: string | null; locationsHref?: string; busy?: boolean; onSave?: (id: string) => Promise<boolean> } = {}) =>
     renderToStaticMarkup(createElement(PortalFulfillmentView, { locations: [], currentId: null, ...props }));
   const text = (html: string) => html.replace(/<[^>]*>/g, "").replaceAll("&#x27;", "'");
-  const save = (html: string) => /<button([^>]*)>Save warehouse<\/button>/.exec(html)?.[1] ?? "";
 
   it("names the Uses field and links Edit locations under the disabled picker", () => {
     const html = view({ locationsHref: "/locations" });
@@ -249,39 +240,22 @@ describe("Wholesale fulfillment with no warehouse (#1147)", () => {
     expect(/<button[^>]*id="portal-warehouse"[^>]*>/.exec(html)?.[0]).toMatch(/aria-describedby="portal-warehouse-empty"/);
   });
 
-  it("withholds Save warehouse and says why", () => {
-    const html = view();
-    const reasonId = /aria-describedby="([^"]+)"/.exec(save(html))?.[1];
-    expect(reasonId).toBeDefined();
-    expect(html).toContain(`<p id="${reasonId}"`);
-    expect(save(html)).toContain(' disabled=""');
-    const chosen = view({ locations: settingsDemo.warehouseOptions, currentId: settingsDemo.warehouseId });
-    const chosenReasonId = /aria-describedby="([^"]+)"/.exec(save(chosen))?.[1];
-    expect(chosenReasonId).toBeDefined();
-    expect(chosen).toContain(`<p id="${chosenReasonId}"`);
-    expect(save(chosen)).toContain(' disabled=""');
-  });
-
-  it("guards empty and pristine warehouse submits, including pending requests", () => {
-    for (const currentId of [null, settingsDemo.warehouseId]) {
+  it("sends nothing while a save is pending or when the saved warehouse is picked again (#1509)", () => {
+    const pick = vi.spyOn(E, "pick");
+    try {
       for (const busy of [false, true]) {
-        const onSave = vi.fn();
-        let form: ReactElement<{ onSubmit: (event: { preventDefault: () => void }) => void }>;
-        function Capture() {
-          form = PortalFulfillmentView({ locations: settingsDemo.warehouseOptions, currentId, busy, onSave });
-          return form;
-        }
-        renderToStaticMarkup(createElement(Capture));
-        form!.props.onSubmit({ preventDefault: vi.fn() });
+        const onSave = vi.fn(async () => true);
+        view({ locations: settingsDemo.warehouseOptions, currentId: settingsDemo.warehouseId, busy, onSave });
+        pick.mock.calls.at(-1)![3]!.onChange!(settingsDemo.warehouseId!);
         expect(onSave).not.toHaveBeenCalled();
       }
-    }
+    } finally { pick.mockRestore(); }
   });
 
-  it("withholds Save warehouse when the saved location no longer has the Warehouse use", () => {
+  it("starts unchosen when the saved location no longer has the Warehouse use", () => {
     const html = view({ currentId: settingsDemo.warehouseId });
-    expect(text(html)).toContain("Still needed: a warehouse.");
-    expect(save(html)).toContain(' disabled=""');
+    expect(html).toContain("Choose warehouse");
+    expect(html).not.toContain("Save warehouse");
   });
 
   it("leaves Settings one Locations row: People and places", () => {

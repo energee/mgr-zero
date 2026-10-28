@@ -159,6 +159,13 @@ export function countDraftFromSnapshot(snapshot: TaproomCountSnapshot, projectio
   return projectionMatchesCountDraft(state) ? state : { ...state, attempt: { kind: "stale", message: baselineChangedMessage } };
 }
 
+/** The draft's buckets by SKU, then bin, name for the screen. `row` stays the
+ *  bucket's place in the snapshot: the worksheet row its printed label carries. */
+export function worksheetOrder<L extends Pick<CountDraftLine, "skuName" | "binName">>(lines: L[]) {
+  return lines.map((line, index) => ({ line, row: index + 1 }))
+    .sort((a, b) => a.line.skuName.localeCompare(b.line.skuName) || a.line.binName.localeCompare(b.line.binName));
+}
+
 // A frozen or stale count accepts no edits until it is recovered or recounted.
 export function countLocked(state: TaproomCountState) {
   return state.attempt.kind === "unknown" || state.attempt.kind === "submitting" || state.attempt.kind === "stale";

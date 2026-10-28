@@ -4,6 +4,7 @@ import { E } from "@/components/mgr/e";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { submitReason } from "@/lib/mgr/submit-reason";
 import { ConfirmDeleteControl } from "./confirm-delete";
+import { onlyOccupancy } from "@/lib/mgr/cellar-transfer-view";
 
 /** The one notice a cancelled batch or packaging plan shows in place of its actions. */
 export function PlanCancelled() {
@@ -33,15 +34,16 @@ export function PlanActions({ plannedOn, busy = false, error, onReschedule, onCa
 
 export type PackagingSourceOccupancy = { occupancy_id: string; vessel_name: string | null; brand_name: string | null; bbl: number };
 
-/** The unstarted run's source-tank picker, shared with its inventory frame. */
+/** The unsourced run's one step, shared with its inventory frame: choose the source tank (the only
+ *  open one is already chosen) and Start run, which picks the tank and starts the run together (#1508). */
 export function PackagingSourcePicker({ occupancies, busy = false, error, onPick }: {
   occupancies: PackagingSourceOccupancy[]; busy?: boolean; error?: string | null;
   onPick?: (occupancyId: string) => void;
 }) {
-  const [occupancyId, setOccupancyId] = useState("");
+  const [occupancyId, setOccupancyId] = useState(onlyOccupancy(occupancies));
   return <div className="flex flex-col gap-3">
     {E.pick("Source tank", occupancyId, occupancies.map(occupancy => ({ value: occupancy.occupancy_id, label: `${occupancy.vessel_name ?? "—"} · ${occupancy.brand_name ?? "no brand"} · ${Number(occupancy.bbl)} bbl` })), { onChange: setOccupancyId, disabled: busy, required: true, placeholder: "Choose tank" })}
     <CommandFormMessage error={error} />
-    {E.submit("Pick source", { type: "button", size: "sm", className: "w-fit", disabled: busy, onClick: () => onPick?.(occupancyId), reason: submitReason(occupancyId ? [] : ["a source tank"]) })}
+    {E.submit("Start run", { type: "button", size: "sm", className: "w-fit", disabled: busy, onClick: () => onPick?.(occupancyId), reason: submitReason(occupancyId ? [] : ["a source tank"]) })}
   </div>;
 }

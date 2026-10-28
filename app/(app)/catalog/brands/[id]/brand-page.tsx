@@ -37,7 +37,7 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
   sells?: SellsReads; pools: KegPoolOption[]; canSell: boolean; canManageFormats: boolean; canPrice: boolean;
 }) {
   const router = useRouter();
-  const { busy, error, run } = useCommandAction();
+  const { busy, error, fieldErrors, run } = useCommandAction(undefined, ["name"]);
   const [validationAttempted, setValidationAttempted] = useState(false);
   const categoryAction = useCommandAction();
   const sellsAction = useCommandAction();
@@ -104,6 +104,7 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
         model={model}
         controls={controls}
         validationAttempted={validationAttempted}
+        nameError={fieldErrors.name}
         categoryAction={<CatalogCategoriesControl categories={categories} busy={categoryAction.busy} error={categoryAction.error}
           onSave={(name, previousName) => categoryAction.run("save_catalog_category", { name, previousName }, () => {
             if (!previousName || f.category === previousName) set("category")(name);
@@ -113,7 +114,7 @@ export function BrandPage({ brand, styles, categories, priceGroups, compliance, 
           }, { target: name })}
         />}
         linkRows={canPrice}
-        formatAction={canManageFormats ? E.btn("Manage formats", "g", "/catalog") : null}
+        formatAction={canManageFormats ? E.btn("Manage formats", "g", "/catalog#formats") : null}
         pricingHref="/pricing"
         messages={<CommandFormMessage error={error} />}
         busy={busy}

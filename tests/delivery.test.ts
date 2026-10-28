@@ -688,6 +688,26 @@ describe("route edges", () => {
   });
 });
 
+// #1486: a returned route left /routes for good; the Returned filter lists them newest first.
+describe("list_routes status", () => {
+  it("lists open routes by default and returned routes newest first under returned", async () => {
+    const own = await makeBrewery();
+    const ctx = await makeStaffCtx(own.id, "warehouse");
+    const listed = async (input: object) => await runCommand("list_routes", input, ctx) as { routes: { name: string }[]; anyReturned: boolean };
+    expect(await listed({})).toMatchObject({ routes: [], anyReturned: false });
+    const done = { departed_at: "2026-09-01T08:00:00Z", returned_at: "2026-09-01T17:00:00Z" };
+    const { error } = await admin.from("routes").insert([
+      { brewery_id: own.id, delivery_date: "2026-09-03", name: "Open" },
+      { brewery_id: own.id, delivery_date: "2026-09-01", name: "Older", ...done },
+      { brewery_id: own.id, delivery_date: "2026-09-02", name: "Newer", ...done },
+    ]);
+    expect(error).toBeNull();
+    expect((await listed({})).routes.map((r) => r.name)).toEqual(["Open"]);
+    expect((await listed({ status: "open" })).anyReturned).toBe(true);
+    expect((await listed({ status: "returned" })).routes.map((r) => r.name)).toEqual(["Newer", "Older"]);
+  });
+});
+
 // #473: list_routes read every shipment and delivery of the brewery in one
 // unpaged request, so past PostgREST's 1000-row cap new shipped orders fell
 // out of "unassigned" and stops fell off long routes.
@@ -729,4 +749,38 @@ describe("list_routes past one PostgREST page", () => {
     expect(history.routes[0].stops.map((s) => s.stop_no)).toEqual(Array.from({ length: n }, (_, k) => k + 1));
     expect(history.routes[0].stops.every((s) => s.label.startsWith("ORD-"))).toBe(true);
   }, 60_000);
+});
+
+// #1505: Received by was blank at every stop. get_delivery_stop names who
+// signed earlier deliveries to the same ship-to, newest first, once each.
+describe("get_delivery_stop earlier signers", () => {
+  it("lists distinct earlier signers at this ship-to, newest first, and none from another ship-to", async () => {
+    const own = await makeBrewery();
+    const ctx = await makeStaffCtx(own.id, "admin");
+    const { id: locationId } = await seedLocation(own.id);
+    const here = await seedCustomer(own.id);
+    const elsewhere = await seedCustomer(own.id, { name: "Elsewhere" });
+    const { data: route } = await admin.from("routes").insert({ brewery_id: own.id, delivery_date: "2026-09-01", name: "History" }).select("id").single();
+    let stopNo = 0;
+    const stop = async (cust: typeof here, signedBy: string | null, deliveredAt: string | null) => {
+      const { data: order } = await admin.from("orders").insert({
+        brewery_id: own.id, status: "shipped", customer_id: cust.customerId, ship_to_id: cust.shipToId,
+        from_location_id: locationId, sale_channel_id: cust.saleChannelId, created_by: ctx.userId,
+      }).select("id").single();
+      const { data: sh } = await admin.from("shipments").insert({ brewery_id: own.id, order_id: order!.id, created_by: ctx.userId }).select("id").single();
+      const { data: d, error } = await admin.from("deliveries").insert({
+        brewery_id: own.id, route_id: route!.id, shipment_id: sh!.id, stop_no: ++stopNo, signed_by: signedBy, delivered_at: deliveredAt,
+      }).select("id").single();
+      expect(error).toBeNull();
+      return d!.id as string;
+    };
+    await stop(here, "Chris", "2026-08-01T12:00:00Z");
+    await stop(here, "Dana", "2026-08-03T12:00:00Z");
+    await stop(here, "Chris", "2026-08-02T12:00:00Z");
+    await stop(here, null, "2026-08-04T12:00:00Z");
+    await stop(elsewhere, "Robin", "2026-08-05T12:00:00Z");
+    const open = await stop(here, null, null);
+    const detail = await runCommand("get_delivery_stop", { deliveryId: open }, ctx) as { signers: string[] };
+    expect(detail.signers).toEqual(["Dana", "Chris"]);
+  });
 });

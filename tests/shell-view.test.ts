@@ -53,9 +53,9 @@ import {
 import { workWarehouse } from "../lib/mgr/fixtures/work";
 import { taproomBeerView, toBeerViewProps } from "../lib/mgr/beer-view";
 import { toMoreViewProps } from "../lib/mgr/more-view";
-import { STAFF_NAV } from "../lib/mgr/nav";
+import { canOpen, STAFF_NAV } from "../lib/mgr/nav";
 import { searchEmptyMessage } from "../lib/mgr/search-palette-state";
-import { toTodayViewProps } from "../lib/mgr/today-view";
+import { todayActions, toTodayViewProps } from "../lib/mgr/today-view";
 import { filterWorkRows, toWorkViewProps, workFromQuery } from "../lib/mgr/work-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -105,7 +105,9 @@ describe("Today view", () => {
   it("names an empty list without inventing rows", () => {
     const model = toTodayViewProps(todayEmpty);
     expect(model.empty?.title).toBe("Nothing waiting");
-    expect(model.emptyVerb).toBe("Record movement");
+    // The quick actions carry Record movement now, so the empty state adds no verb (#1513).
+    expect(model.emptyVerb).toBeUndefined();
+    expect(model.actions?.map((a) => a.label)).toEqual(["Record movement", "Receive PO"]);
     expect(model.rows).toEqual([]);
   });
 
@@ -151,17 +153,45 @@ describe("Today view", () => {
 
   it("emptyAction and linkRows slot for live Today", () => {
     const html = htmlOf(createElement(TodayView, {
-      model: toTodayViewProps(todayEmpty),
+      model: toTodayViewProps({ date: "Thu 9/3", empty: { title: "No taproom location is available", description: "Ask Admin." }, emptyVerb: "Taproom stock", rows: [] }),
       emptyAction: "MOVE",
       linkRows: true,
     }));
     expect(html).toMatch(/MOVE/);
-    expect(html).not.toMatch(/>Record movement</);
+    expect(html).not.toMatch(/>Taproom stock</);
   });
 
-  it("deep-links the live Today movement action into the open form", () => {
-    const source = readFileSync("app/(app)/page.tsx", "utf8");
-    expect(source).toContain('E.btn("Record movement", "g", "/inventory?recordMovement=1")');
+  it("offers each role its quick actions; admin gets all four (#1513)", () => {
+    const labels = (roles: Parameters<typeof todayActions>[0]) => todayActions(roles).map((a) => a.label);
+    expect(labels(["sales"])).toEqual(["New order"]);
+    expect(labels(["warehouse"])).toEqual(["Record movement", "Receive PO"]);
+    expect(labels(["brewer"])).toEqual(["New batch"]);
+    expect(labels(["admin"])).toEqual(["New order", "Record movement", "Receive PO", "New batch"]);
+    expect(labels(["sales", "brewer"])).toEqual(["New order", "New batch"]);
+    expect(labels(["taproom"])).toEqual([]);
+  });
+
+  it("never offers a quick action whose page the role's nav gate refuses", () => {
+    for (const role of ["admin", "sales", "warehouse", "brewer", "taproom"] as const) {
+      for (const action of todayActions([role])) expect.soft(canOpen([role], action.href!.split("?")[0]), `${role} ${action.label}`).toBe(true);
+    }
+  });
+
+  it("Record movement on Today returns to Today when the form closes (#1475)", () => {
+    expect(todayActions(["warehouse"]).find((a) => a.label === "Record movement")?.href).toBe("/inventory?recordMovement=1&from=/");
+    const movement = readFileSync("app/(app)/inventory/movement-form.tsx", "utf8");
+    expect(movement).toMatch(/passwordReturnHref\(from\)/);
+  });
+
+  it("live Today draws the role's quick actions as links above the rows", () => {
+    const html = htmlOf(createElement(TodayView, {
+      model: toTodayViewProps({ ...todayWarehouse, actions: todayActions(["warehouse"]) }),
+      linkRows: true,
+    }));
+    expect(html).toMatch(/<a[^>]*href="\/inventory\?recordMovement=1&amp;from=\/"[^>]*>Record movement<\/a>/);
+    expect(html).toMatch(/<a[^>]*href="\/purchase-orders"[^>]*>Receive PO<\/a>/);
+    expect(html.indexOf(">Receive PO<")).toBeLessThan(html.indexOf("3 orders ready"));
+    expect(readFileSync("app/(app)/page.tsx", "utf8")).toContain("actions: todayActions(brewery.roles)");
   });
 
   it.each([
@@ -194,7 +224,7 @@ describe("Beer view", () => {
   });
 
   it("keeps shortages on Finished goods without a cross-section Planning card (#1253)", () => {
-    const model = toBeerViewProps({ overview: { fgShortages: 0, taproomBelowPar: 0, openTaps: 0, openOccupancies: 0, kegsOut: 0 } });
+    const model = toBeerViewProps({ overview: { fgShortages: 0, taproomBelowPar: 0, openTaps: 0, openOccupancies: 0, kegsOut: 0 }, roles: ["admin"] });
     expect(model.navs.find((r) => r.key === "materials")?.href).toBe("/materials");
     expect(model.navs.filter((r) => r.detail.includes("shortage"))).toEqual([
       { key: "fg", title: "Finished goods", detail: "0 shortages · Available by SKU", href: "/inventory" },
@@ -210,9 +240,12 @@ describe("Beer view", () => {
     );
   });
 
-  it("keeps non-taproom destinations available when taproom access is disabled", () => {
-    const model = toBeerViewProps({ ...beerOverview, showTaproom: false });
-    expect(model.navs.map(({ href }) => href)).toEqual(["/inventory", "/cellar", "/materials", "/kegs"]);
+  it("filters its rows by role with the sidebar's rule (#1513)", () => {
+    const hrefs = (roles: Parameters<typeof canOpen>[0]) => toBeerViewProps({ ...beerOverview, roles }).navs.map(({ href }) => href);
+    expect(hrefs(["brewer"])).toEqual(["/cellar", "/materials"]);
+    expect(hrefs(["sales"])).toEqual(["/inventory"]);
+    expect(hrefs(["warehouse"])).toEqual(["/inventory", "/taproom", "/taproom/board", "/taproom/variance", "/materials", "/kegs"]);
+    expect(hrefs(["brewer", "sales"])).toEqual(["/inventory", "/cellar", "/materials"]);
   });
 
   it("the inventory drawing still offers Finished goods and does not leak live hrefs", () => {
@@ -232,7 +265,7 @@ describe("Beer view", () => {
     { openTaps: 0, openOccupancies: 0, kegsOut: 0 },
     { openTaps: 1, openOccupancies: 2, kegsOut: 3 },
   ])("preserves each count source without inventing a Materials total: %j", (counts) => {
-    const model = toBeerViewProps({ overview: { fgShortages: 0, taproomBelowPar: 0, ...counts }, showTaproom: true });
+    const model = toBeerViewProps({ overview: { fgShortages: 0, taproomBelowPar: 0, ...counts }, roles: ["admin"] });
     for (const [key, count] of [["taps", counts.openTaps], ["cellar", counts.openOccupancies], ["kegs", counts.kegsOut]] as const) {
       expect(Number.parseInt(model.navs.find(row => row.key === key)!.detail, 10)).toBe(count);
     }
@@ -291,20 +324,22 @@ describe("Work view", () => {
 describe("More view", () => {
   it("maps the designed More list under every area, each card in one", () => {
     const model = toMoreViewProps(moreNavs);
-    expect(model.groups.map((g) => g.group)).toEqual(["Sales", "Production", "Setup", "Menu and chat"]);
+    expect(model.groups.map((g) => g.group)).toEqual(["Sales", "Production", "Setup", "Menu"]);
     expect(model.groups[0]?.items[0]?.title).toBe("Invoices");
     expect(model.groups.flatMap((g) => g.items)).toHaveLength(moreNavs.length);
   });
 
   it("hides an area heading when the role has no card under it (#1159)", () => {
-    // The live page's mapping, for a role whose More is Chat and Units.
+    // The live page's mapping, for warehouse: Vendors and Planning, then Menu.
     const model = toMoreViewProps([
-      { key: "/settings/chat", title: "Chat", group: "Menu and chat" },
-      { key: "/settings/units", title: "Units", group: "Setup" },
+      { key: "/vendors", title: "Vendors", group: "Production" },
+      { key: "/planning", title: "Planning", group: "Production" },
+      { key: "/menu", title: "Menu", group: "Menu" },
     ]);
-    expect(model.groups.map((g) => [g.group, g.items.map((r) => r.title)])).toEqual([["Setup", ["Units"]], ["Menu and chat", ["Chat"]]]);
+    expect(model.groups.map((g) => [g.group, g.items.map((r) => r.title)])).toEqual([["Production", ["Vendors", "Planning"]], ["Menu", ["Menu"]]]);
     const html = renderToStaticMarkup(createElement(MoreView, { model }));
-    expect(html).toContain(">Setup</h2>");
+    expect(html).toContain(">Production</h2>");
+    expect(html).not.toContain(">Setup</h2>");
     expect(html).not.toContain(">Sales</h2>");
   });
 

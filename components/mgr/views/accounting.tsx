@@ -57,7 +57,6 @@ export function QboDefaultsView({ allowAch, allowCard, busy = false, disabled = 
     {E.info("Each new invoice is pushed with these payment options. Turning both off means new invoices cannot be paid online; invoices pushed earlier keep theirs.")}
     {E.row("Bank transfer (ACH)", `${ach ? "on" : "off"} · lowest fee`, <Switch aria-label="Bank transfer payments" checked={ach} onCheckedChange={setAch} disabled={busy || disabled} />, ach ? "ok" : "")}
     {E.row("Card", `${card ? "on" : "off"} · percentage fee applies`, <Switch aria-label="Card payments" checked={card} onCheckedChange={setCard} disabled={busy || disabled} />, card ? "ok" : "")}
-    <p className="text-sm text-muted-foreground">These choices apply to the next push, never retroactively.</p>
     {E.submit("Save push defaults", { submitting: busy, reason: disabled ? "Connect or reconnect QuickBooks before saving payment options." : null })}
     <CommandFormMessage error={error} />
   </form>;
@@ -79,11 +78,13 @@ function missingEmailsDetail(count?: number) {
   return `${plural(count, "customer has", "customers have")} no portal login email`;
 }
 
-export function AccountingView({ model, connection, defaults, messages, sync }: { model: AccountingViewModel; connection?: ReactNode; defaults?: ReactNode; messages?: ReactNode; sync?: ReactNode }) {
+/** `disconnect` is the row's Disconnect control; the live page passes the
+ *  confirming dialog, and the inventory draws the plain verb (#1509). */
+export function AccountingView({ model, connection, disconnect, defaults, messages, sync }: { model: AccountingViewModel; connection?: ReactNode; disconnect?: ReactNode; defaults?: ReactNode; messages?: ReactNode; sync?: ReactNode }) {
   return <>
     {E.back("Settings", "Accounting", undefined, model.backHref)}
     {E.ttl("QuickBooks")}{messages}
-    {E.row(model.company, model.status, model.canDisconnect ? E.act("Disconnect", "destructive", model.disconnectHref) : "", model.connected ? "ok" : "w", QuickBooksMark)}
+    {E.row(model.company, model.status, model.canDisconnect ? disconnect ?? E.act("Disconnect", "destructive") : "", model.connected ? "ok" : "w", QuickBooksMark)}
     {model.error && E.note(`Last connection error: ${model.error}`, "alert")}
     {!model.connected && (connection !== undefined ? connection : <QboConnectionView reconnect={model.reconnect} />)}
     <OnlinePaymentsRow model={model} />
@@ -97,17 +98,13 @@ export function AccountingView({ model, connection, defaults, messages, sync }: 
   </>;
 }
 
-export function ConnectQuickBooksView({ backHref, connection }: { backHref?: string; connection?: ReactNode }) {
-  return <>{E.back("Settings", "Connect QuickBooks", undefined, backHref)}{E.info("MGR reads customers, items, invoice status and payments. It creates wholesale invoices and credit memos.")}{E.note("QuickBooks remains the accounting record. Connecting does not push existing invoices.")}{connection !== undefined ? connection : <QboConnectionView />}</>;
-}
-
-/** The disconnect confirmation; `status` (lib/mgr/integration-disconnect.ts) decides whether the action is offered. */
+/** The disconnect dialog's body; `status` (lib/mgr/integration-disconnect.ts) decides whether the action is offered. */
 export function DisconnectQuickBooksView({ status = "available", busy = false, error, onDisconnect }: { status?: DisconnectStatus; busy?: boolean; error?: string | null; onDisconnect?: () => void }) {
   return <>
     {E.note("Stops: invoice push, payment links and paid-date sync.")}
     {E.info("Stays: MGR invoices, QuickBooks ids and customer/item mappings. Reconnecting the same company restores its mappings; a different company clears them.")}
     {status === "available" && <>
-      {E.info("MGR deletes its stored QuickBooks credential first, then asks QuickBooks to revoke it. If QuickBooks does not confirm, this page says so.")}
+      {E.info("MGR deletes its stored QuickBooks credential first, then asks QuickBooks to revoke it. If QuickBooks does not confirm, Accounting says so.")}
       <Button type="button" variant="destructive" disabled={busy} onClick={onDisconnect}>{busy ? "Disconnecting…" : "Disconnect QuickBooks"}</Button>
     </>}
     {status === "unresolved" && E.note("MGR deleted its stored QuickBooks credential, but QuickBooks did not confirm revocation. Remove MGR's access in your QuickBooks company, or reconnect.", "alert")}

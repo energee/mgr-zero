@@ -13,6 +13,9 @@
 // The words operators read live elsewhere (`lib/mgr/keg-labels.ts`,
 // `sentenceCase` in `lib/mgr/labels.ts`); these are the stored values.
 
+/** The material_category enum: a material's type on Materials on hand. */
+export const MATERIAL_CATEGORIES = ["malt", "hop", "yeast", "adjunct", "chemical", "packaging", "other"] as const;
+
 /** Every staff role, in the database enum's display order. */
 export const STAFF_ROLES = ["admin", "sales", "warehouse", "brewer", "taproom"] as const;
 

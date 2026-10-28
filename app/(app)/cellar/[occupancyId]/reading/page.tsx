@@ -1,7 +1,8 @@
 // app/(app)/cellar/[occupancyId]/reading/page.tsx — the deep-link adapter for
 // the Fermentation reading sheet. The latest row supplies reference values;
 // reading history remains on Vessel detail. The sheet names the tank and,
-// when known, its batch (#716).
+// when known, its batch (#716). Closing returns to `?from=` (Cellar, Batches,
+// or the batch) when the link came from there, else to Vessel detail (#1508).
 import { cache } from "react";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -10,6 +11,7 @@ import "@/lib/commands/all";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { notFound } from "next/navigation";
 import { readingIdentity } from "@/components/mgr/views/fermentation-reading";
+import { readingReturnHref } from "@/lib/mgr/fermentation-reading-view";
 import { ReadingForm } from "./reading-form";
 import { navTitle } from "@/lib/mgr/nav";
 import VesselPage from "@/app/(app)/cellar/vessels/[id]/page";
@@ -31,8 +33,8 @@ const getOccupancyReadingPageData = cache(async function getOccupancyReadingPage
   return { brewery, ctx, occupancy };
 });
 
-export default async function OccupancyReadingPage({ params }: { params: Promise<{ occupancyId: string }> }) {
-  const { occupancyId } = await params;
+export default async function OccupancyReadingPage({ params, searchParams }: { params: Promise<{ occupancyId: string }>; searchParams: Promise<{ from?: string | string[] }> }) {
+  const [{ occupancyId }, { from }] = await Promise.all([params, searchParams]);
   const { brewery, ctx, occupancy } = await getOccupancyReadingPageData(occupancyId);
   const [readings, gravityUnit] = await Promise.all([
     runCommand("list_fermentation_readings", { occupancyId }, ctx),
@@ -49,7 +51,7 @@ export default async function OccupancyReadingPage({ params }: { params: Promise
         timeZone={brewery.timeZone}
         roles={brewery.roles}
         openByDefault
-        returnHref={`/cellar/vessels/${occupancy.vessel_id}`}
+        returnHref={readingReturnHref(from, occupancy.vessel_id)}
         prior={readings[0] ? {
           tempF: readings[0].temp_f == null ? undefined : String(readings[0].temp_f),
           gravity: readings[0].gravity_plato == null ? undefined : formatGravity(readings[0].gravity_plato, gravityUnit.effective),

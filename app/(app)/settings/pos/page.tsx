@@ -7,7 +7,7 @@ import { disconnectStatus, type DisconnectHealth } from "@/lib/mgr/integration-d
 import { connectionStateLabel } from "@/lib/mgr/labels";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
-import { SquareSyncControls } from "@/components/mgr/views/pos-controls";
+import { SquareConnectControl, SquareDisconnectControl, SquareSyncControls } from "@/components/mgr/views/pos-controls";
 import { navTitle } from "@/lib/mgr/nav";
 import { isSquareConfigured } from "@/lib/pos";
 
@@ -37,10 +37,17 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
     `${row.external_location_id} · ${formatDateTime(row.starts_at, brewery.timeZone)} to ${formatDateTime(row.ends_at, brewery.timeZone)}`,
   );
   const mapped = locations.filter(location => location.mgrLocationId).length;
+  const status = disconnectStatus(health);
+  // An unresolved revocation keeps Disconnect: its dialog offers Retry revocation (#640).
+  const disconnect = (status === "available" || status === "unresolved") && health.connectionId
+    ? <SquareDisconnectControl connectionId={health.connectionId} status={status} /> : undefined;
   return <PointOfSaleView sales={sales} coverage={coverage} model={{
-    connected: health.connected, configured: isSquareConfigured(), canDisconnect: disconnectStatus(health) === "available", merchant: health.merchantLabel ?? "Square seller", state: connectionStateLabel(health.state),
+    connected: health.connected, configured: isSquareConfigured(), canDisconnect: Boolean(disconnect), merchant: health.merchantLabel ?? "Square seller", state: connectionStateLabel(health.state),
     locations: locations.length ? `${mapped} mapped · ${locations.length - mapped} need mapping` : "No locations synced",
     lastSync: health.salesSyncedThrough ? formatDateTime(health.salesSyncedThrough, brewery.timeZone) : "No complete sales coverage yet",
     error: health.lastError, oauthFailed,
-  }} syncAction={health.connected ? <SquareSyncControls /> : undefined} paths={{ back: "/settings", connect: "/settings/pos/connect", disconnect: "/settings/pos/disconnect", locations: "/settings/pos/locations", menu: "/menu", connector: "/settings/pos/connector" }} />;
+  }} syncAction={health.connected ? <SquareSyncControls /> : undefined}
+    connection={<SquareConnectControl configured={isSquareConfigured()} reconnect={Boolean(health.connectionId)} />}
+    disconnect={disconnect}
+    paths={{ back: "/settings", locations: "/settings/pos/locations", menu: "/menu", connector: "/settings/pos/connector" }} />;
 }

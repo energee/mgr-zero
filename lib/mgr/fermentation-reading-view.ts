@@ -32,3 +32,10 @@ export function readingValidation(values: { observedAt: string; tempF: string; g
     measurements: reason ? null : { tempF, gravityPlato: typeof gravityPlato === "number" ? gravityPlato : undefined, ph },
   };
 }
+
+/** Where the reading sheet goes when it closes: the page it was opened from
+ *  (`?from=` — Cellar, Batches, or one batch), else the tank's Vessel detail.
+ *  Only those app paths are accepted, so the link cannot send anyone off-site (#1508). */
+export function readingReturnHref(from: string | string[] | undefined, vesselId: string): string {
+  return typeof from === "string" && /^\/(cellar|batches(\/[0-9a-f-]{36})?)$/.test(from) ? from : `/cellar/vessels/${vesselId}`;
+}

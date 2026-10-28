@@ -76,7 +76,7 @@ import { TaproomVarianceView } from "@/components/mgr/views/taproom-variance";
 import { taproomVariance, weeklyCount } from "@/lib/mgr/fixtures/taproom";
 import { WeeklyCountView } from "@/components/mgr/views/weekly-count";
 import { TapBoardView, TapKegView } from "@/components/mgr/views/tap-board";
-import { AccountingView, ConnectQuickBooksView, DisconnectQuickBooksView, QboConnectionView, QboSyncView } from "@/components/mgr/views/accounting";
+import { AccountingView, DisconnectQuickBooksView, QboConnectionView, QboSyncView } from "@/components/mgr/views/accounting";
 import { accountingExpired, quickBooksMappings } from "@/lib/mgr/fixtures/accounting";
 import { tapBoard, tapBoardSkus, kickKeg, swapKeg } from "@/lib/mgr/fixtures/taproom";
 import { cellarAdditionCitra, cellarTransferPils } from "@/lib/mgr/fixtures/production";
@@ -127,7 +127,7 @@ import { ReplenishmentView } from "@/components/mgr/views/replenishment";
 import { PickView } from "@/components/mgr/views/pick";
 import { PickSheetView } from "@/components/mgr/views/pick-sheet";
 import { PlanningView } from "@/components/mgr/views/planning";
-import { ConnectSquareView, DisconnectSquareView, PointOfSaleView, PosItemView, PosMenuView, PosSaleDetailView, PosSyncActions, SquareConnectorView, SquareLocationsView } from "@/components/mgr/views/pos";
+import { DisconnectSquareView, PointOfSaleView, PosItemView, PosMenuView, PosSaleDetailView, PosSyncActions, SquareConnectorView, SquareLocationsView } from "@/components/mgr/views/pos";
 import { PortalAccountView } from "@/components/mgr/views/portal-account";
 import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
 import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
@@ -174,7 +174,6 @@ import { TodayView } from "@/components/mgr/views/today";
 import { WorkView } from "@/components/mgr/views/work";
 import { TransferDetailView } from "@/components/mgr/views/transfer-detail";
 import { TransfersView } from "@/components/mgr/views/transfers";
-import { UnitsView } from "@/components/mgr/views/units";
 import { VendorView } from "@/components/mgr/views/vendor";
 import { VendorsView } from "@/components/mgr/views/vendors";
 import { RemoveVesselControl, VesselDetailView } from "@/components/mgr/views/vessel-detail";
@@ -211,7 +210,7 @@ import { portalAccountRidgeline, portalMeRidgeline } from "@/lib/mgr/fixtures/po
 import { portalInvoicePaid, portalInvoiceUnpaid, portalInvoicesRidgeline } from "@/lib/mgr/fixtures/portal-invoices";
 import { portalOrderShipped, portalOrdersList } from "@/lib/mgr/fixtures/portal-orders";
 import { priceGroupTwo, pricingGrid } from "@/lib/mgr/fixtures/pricing";
-import { channelExport, saleChannelsList, unitsPlato } from "@/lib/mgr/fixtures/settings-catalog";
+import { channelExport, saleChannelsList } from "@/lib/mgr/fixtures/settings-catalog";
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
 import {
   contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsOnHandList,
@@ -252,7 +251,7 @@ import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
 import { toLotTraceViewProps } from "@/lib/mgr/lot-trace-view";
 import { toLocationsViewProps } from "@/lib/mgr/locations-view";
-import { toMaterialsOnHandViewProps } from "@/lib/mgr/materials-on-hand-view";
+import { toMaterialsOnHandViewProps, toMaterialsScopes } from "@/lib/mgr/materials-on-hand-view";
 import { ComposerConversationView } from "@/components/mgr/views/composer-conversation";
 import { ComposerStripView } from "@/components/mgr/views/composer-strip";
 import { ComposerProposalView, OfflineOutboxView } from "@/components/mgr/views/composer";
@@ -301,7 +300,6 @@ import { toSkuViewProps } from "@/lib/mgr/sku-view";
 import { toTodayViewProps } from "@/lib/mgr/today-view";
 import { toTransferDetailViewProps } from "@/lib/mgr/transfer-detail-view";
 import { toTransfersViewProps } from "@/lib/mgr/transfers-view";
-import { toUnitsViewProps } from "@/lib/mgr/units-view";
 import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
 import { toWorkViewProps } from "@/lib/mgr/work-view";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
@@ -403,9 +401,11 @@ export { WORK_TABS } from "@/lib/mgr/work-view";
 // The states every screen can reach; a record with designed states lists its own instead.
 const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]];
 /** DEFAULT_STATES with the permission note swapped for who may open the screen. */
+/** One open occupancy's cellar verbs as Vessel detail and a recorded batch draw them (live: app/(app)/cellar/occupancy-actions.tsx). */
+const occupancyActions = (reading: boolean) => <div className="flex flex-wrap gap-2">{reading && E.btn("Reading", "g")}{E.btn("Transfer", "g")}{E.btn("Addition", "g")}<BatchCompletionFixture /></div>;
 const permitted = (who: string): NonNullable<Screen["states"]> => [["permission", who, 1], ...DEFAULT_STATES.filter(([st]) => st !== "permission")];
 /** Settings and its no-warehouse variant draw the same page, so they read and write the same. */
-const SETTINGS_IO = { reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_operating_defaults · set_books_opened_on · correct_reporting_basis · set_brewery_ai_model · update_location · set_portal_fulfillment_source" };
+const SETTINGS_IO = { reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_operating_defaults · set_books_opened_on · correct_reporting_basis · set_brewery_gravity_unit · set_brewery_ai_model · update_location · set_portal_fulfillment_source" };
 
 /** INV-1039 partly paid in MGR: Record payment's cap and the $300.00 check Void payment voids. */
 const LOCAL_PARTLY_PAID = toInvoiceViewProps(invoiceLocalPartlyPaid);
@@ -419,16 +419,16 @@ export const SCREENS: Screen[] = [
     to: { Pick: "Pick sheet", "Put back": "Put back", "3 orders ready": "Pick sheet", "Staged · ORD-0229": "Order" , "Next delivery \u00b7 Ridgeline": "Driver route" },
     job: "Role-filtered work that opens ready to finish · full-size exemplar at ship scale",
     reads: "get_today [delivery rows require assigned warehouse member or admin]", writes: "none",
-    states: [["empty", "one button: the role's first verb"], ["loading", "row-shaped skeletons"], ["error", "Today did not load · Retry", 1], ["offline", "cached rows · writes queue"], ["role hidden", "only relevant permitted work · no blank gaps"]],
-    spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3; the row verb is the action. A row standing for one order opens that order's Pick. This row stands for three, so Pick lands on the day's Pick sheet and each order opens its own Pick from there; the verb never becomes a noun to explain itself. The restock row appears while the order's restock flag is set and opens the order. Warehouse reaches the live Weekly count from Beer → Weekly count, so Today draws no count footer.",
+    states: [["empty", "Nothing waiting · the quick actions stay"], ["loading", "row-shaped skeletons"], ["error", "Today did not load · Retry", 1], ["offline", "cached rows · writes queue"], ["role hidden", "only relevant permitted work · no blank gaps"]],
+    spec: "Drawn as the warehouse persona at honest 16px density. Above the rows sit the role's quick actions: New order for sales, Record movement and Receive PO for warehouse, New batch for brewer, all four for admin. Record movement opens the form on Finished goods and closing it returns here. Rows are role-filtered per plan §3; the row verb is the action. A row standing for one order opens that order's Pick. This row stands for three, so Pick lands on the day's Pick sheet and each order opens its own Pick from there; the verb never becomes a noun to explain itself. The restock row appears while the order's restock flag is set and opens the order. Warehouse reaches the live Weekly count from Beer → Weekly count, so Today draws no count footer.",
     body: <TodayView model={toTodayViewProps(todayWarehouse)} />,
   },
   {
     step: 4, slice: "all", tab: "Today", name: "Today empty",
-    job: "Nothing waiting; the role's first verb is the only button",
+    job: "Nothing waiting; the role's quick actions stay",
     reads: "get_today", writes: "none",
-    states: [["empty", "one button: the role's first verb"]],
-    spec: "Empty Today. When work exists the row is where you act; with nothing waiting the first verb stands alone.",
+    states: [["empty", "Nothing waiting · the quick actions stay"]],
+    spec: "Empty Today, drawn for warehouse. When work exists the row is where you act; with nothing waiting the quick actions are the only buttons.",
     body: <TodayView model={toTodayViewProps(todayEmpty)} />,
   },
   {
@@ -436,17 +436,17 @@ export const SCREENS: Screen[] = [
     to: { "Pils · 16 oz case": "Pars and allocation", Open: "Invoice", "Al\u2019s Bar \u00b7 OH": "State registration" },
     job: "Sales landing: submitted orders to confirm and beer that is short",
     reads: "get_today [sales role filter] · get_shortfalls · list_invoice_questions", writes: "none",
-    states: [["empty", "one button: the role's first verb"], ["role hidden", "no Pick/Receive; no blank gaps"], ["buyer question", "a portal question lands here, because nothing else in MGR would show it"]],
-    spec: "The same Today read as the exemplar, filtered for sales. Confirm is the row verb (2 taps); shortfall rows open Shortfall, pars and standing allocation. A question raised from the portal's Question invoice sheet appears as a row here and opens that invoice, where Mark answered clears it: the note has a destination a person opens and a way to leave the list again. New order is the last row because the top button is gone.",
-    body: <TodayView model={toTodayViewProps(todaySales)} footer={E.nav("New order")} />,
+    states: [["empty", "Nothing waiting · New order stays"], ["role hidden", "no Pick/Receive; no blank gaps"], ["buyer question", "a portal question lands here, because nothing else in MGR would show it"]],
+    spec: "The same Today read as the exemplar, filtered for sales. Confirm is the row verb (2 taps); shortfall rows open Shortfall, pars and standing allocation. A question raised from the portal's Question invoice sheet appears as a row here and opens that invoice, where Mark answered clears it: the note has a destination a person opens and a way to leave the list again. New order is the quick action above the rows.",
+    body: <TodayView model={toTodayViewProps(todaySales)} />,
   },
   {
     step: 1, slice: "all", tab: "Today", name: "Brewer",
     to: { "Close": "Close packaging run" },
     job: "Brewer landing: readings due, brew day due, packaging to close",
     reads: "get_today [brewer role filter]", writes: "none",
-    states: [["empty", "one button: the role's first verb"], ["role hidden", "no picks or receipts"]],
-    spec: "Reading opens the Fermentation reading sheet defaulted to the overdue vessel. Brew day and packaging rows open their Work frames. Warehouse picks never appear here. The row verb is the action.",
+    states: [["empty", "Nothing waiting · New batch stays"], ["role hidden", "no picks or receipts"]],
+    spec: "New batch is the quick action above the rows and opens Batches. Reading opens the Fermentation reading sheet defaulted to the overdue vessel. Brew day and packaging rows open their Work frames. Warehouse picks never appear here. The row verb is the action.",
     body: <TodayView model={toTodayViewProps(todayBrewer)} />,
   },
   {
@@ -485,22 +485,22 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", tab: "More", name: "More", job: "Setup and desk review, never standing work",
     reads: "none [role navigation manifest]", writes: "none",
     states: DEFAULT_STATES,
-    spec: "Role-filtered; hidden entries leave no gaps. Entries sit under Sales, Production, Setup and Menu and chat headings, and an area with none of the role's entries has no heading. The rail's More group uses the same headings. Standing work remains in Today, Beer or Work.",
+    spec: "Role-filtered; hidden entries leave no gaps. Entries sit under Sales, Production, Setup and Menu headings, and an area with none of the role's entries has no heading. The rail's More group uses the same headings. Setup holds only Settings, the one home of Import, Sale channels, Locations, Team and the connections. Chat and your gravity unit are in Me, so a taproom user has no More tab. Standing work remains in Today, Beer or Work.",
     body: <MoreView model={toMoreViewProps(moreNavs)} />,
   },
   {
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Search", job: "Find permitted pages and records",
     reads: "search_entities", writes: "none",
     states: [["first use", "Type a page name, record name, or document number."], ["empty", "No pages or records found · Try a page name, record name, or document number."], ["loading", "row-shaped skeletons"], ["offline", "cached matches only", 1], ["permission", "Results honor row access"], ["document number", "ORD-0231 matches exactly and sorts first"]],
-    spec: "Pages are matched by name from the same role-filtered shipped navigation as the shell and appear in their own Pages group, even while records load or fail; each shows its navigation entry's one-line description, the same line a More card shows. Before a term, the latest five opened records show as Recent, or, when there are none, a first-use hint names what to type. Entity pickers offer records only. One registered search across the entity kinds the caller's role can read; results are grouped by kind and arrow keys move between matches; filtering never widens what is permitted, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
+    spec: "Pages are matched by name from the same role-filtered shipped navigation as the shell and appear in their own Pages group, even while records load or fail; each shows its navigation entry's one-line description, the same line a More card shows. Before a term, the latest five opened records show as Recent, or, when there are none, a first-use hint names what to type. Entity pickers offer records only. One registered search across the entity kinds the caller's role can read; results are grouped by kind and arrow keys move between matches; filtering never widens what is permitted, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. A number without its prefix matches every numbered kind. A kind with no detail page, such as a vendor, opens its list page. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
     body: <SearchView model={searchPalette} />,
   },
   {
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Me", job: "Who I am, which brewery, leave",
     to: { "Maria Alvarez": "Me" },
-    reads: "supabase_auth_get_session [platform] · get_first_run_state", writes: "supabase_auth_sign_out [platform]",
-    states: [["dedicated mode", "switcher hidden · one brewery"], ["single membership", "switcher hidden"]],
-    spec: "Opened from the header Me control. Brewery switcher renders only in SaaS mode with more than one membership. Change password opens Set new password (headed Change password), as portal Me opens Portal set password: a signed-in person should not have to sign out and use the recovery flow. No notification history, no settings; those live under More.",
+    reads: "supabase_auth_get_session [platform] · get_first_run_state · get_gravity_unit", writes: "supabase_auth_sign_out [platform] · set_my_gravity_unit",
+    states: [["dedicated mode", "switcher hidden · one brewery"], ["single membership", "switcher hidden"], ["gravity read failed", "the gravity unit section is left out"]],
+    spec: "Opened from the header Me control. Brewery switcher renders only in SaaS mode with more than one membership. Your own settings live here for every role: Chat opens your Slack link and notifications, and Gravity unit is your display choice, saved on tap, with “Use brewery default” following the admin's choice in Settings. Gravity is stored in °Plato everywhere, so the choice changes only what is printed and how a typed value is read. The preview converts one sample reading into the unit in effect. Change password opens Set new password (headed Change password), as portal Me opens Portal set password: a signed-in person should not have to sign out and use the recovery flow. No notification history.",
     body: <MeView model={meMaria} />,
   },
   {
@@ -508,15 +508,15 @@ export const SCREENS: Screen[] = [
     to: { "Water profiles": "Water profiles" },
     ...SETTINGS_IO,
     states: [...permitted("admin only"), ["filed basis", "ordinary field is locked · recorded correction flags every affected filed period"], ["correction history", "immutable old/new basis, actor, time and reason"], ["uncertain correction", "fields freeze · retry unchanged request"]],
-    spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Days to package is the brewery-wide projected packaging estimate, default 14 and whole days from 1 to 120. It adds to the actual brew date, or planned date before brewing. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Brewery details, Ask MGR and Wholesale fulfillment are three forms, each saved only by its own button. After filing, the ordinary books date is locked; Correct reporting basis has its own save and immutable correction history. Deployment mode is read-only. Team opens the Team frame.",
+    spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Gravity unit under Brewery details is the brewery default, saved on tap; each person may choose their own in Me. Days to package is the brewery-wide projected packaging estimate, default 14 and whole days from 1 to 120. It adds to the actual brew date, or planned date before brewing. AI model offers the live Vercel AI Gateway language-model catalog and sets one brewery-wide Ask MGR default. Brewery details is one form saved by Save brewery. Picking an AI model or a fulfillment warehouse saves it at once; a failed save puts the picker back. After filing, the ordinary books date is locked; Correct reporting basis has its own save and immutable correction history. Deployment mode is read-only. Team opens the Team frame.",
     body: <SettingsView model={settingsDemo} />,
   },
   {
     step: 8, slice: "all", tab: "More", name: "Settings no warehouse", job: "Say why the portal has no fulfillment warehouse to choose",
     to: { "Water profiles": "Water profiles" },
     ...SETTINGS_IO,
-    states: [["permission", "admin only", 1], ["no warehouse", "picker disabled · note names Warehouse in Uses · Edit locations opens Locations"], ["warehouse use removed", "a saved source no longer offered starts unchosen · Save warehouse still needs a warehouse"]],
-    spec: "Wholesale fulfillment offers only locations whose Uses include Warehouse. With none, the disabled picker says so beneath it and Edit locations opens Locations, where an admin adds Warehouse to a location's Uses. Save warehouse says it still needs a warehouse.",
+    states: [["permission", "admin only", 1], ["no warehouse", "picker disabled · note names Warehouse in Uses · Edit locations opens Locations"], ["warehouse use removed", "a saved source no longer offered starts unchosen"]],
+    spec: "Wholesale fulfillment offers only locations whose Uses include Warehouse. With none, the disabled picker says so beneath it and Edit locations opens Locations, where an admin adds Warehouse to a location's Uses. Picking a warehouse saves it.",
     body: <SettingsView model={{ ...settingsDemo, warehouseId: null, warehouseOptions: [] }} />,
   },
   {
@@ -691,7 +691,7 @@ export const SCREENS: Screen[] = [
     group: "Entry",
     surface: "entry",
     name: "Portal forgot password",
-    to: { "Send reset link": "Portal set password" },
+    to: { "Send reset link": "Portal set password", "Back to sign in": "Portal sign in" },
     job: "Recover a buyer login without saying whether the email exists",
     reads: "none",
     writes: "supabase_auth_reset_password_for_email [platform]",
@@ -774,7 +774,7 @@ export const SCREENS: Screen[] = [
     reads: "get_first_run_state",
     writes: "invite_staff [existing] · create_location",
     states: permitted("admin only"),
-    spec: "Admin sees this only while neither a location nor a brand exists; adding either ends the checklist. Import and staff invitation are optional and do not block onboarding. Team and first-run use the same staff invitation form with one role.",
+    spec: "Admin sees this until a location and a brand both exist; adding the second of the two ends the checklist. Import and staff invitation are optional and do not block onboarding. Team and first-run use the same staff invitation form with one role.",
     body: <FirstRunView model={firstRunDemo} />,
   },
   {
@@ -789,7 +789,7 @@ export const SCREENS: Screen[] = [
     reads: "list_skus · list_locations · list_bins · list_customers · list_formats · list_price_groups · list_sale_channels",
     writes: "import_csv",
     states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Import disabled · fix column matches", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "same requestId returns original committed and blocked results"], ["permission", "Import requires admin", 1], ["upload", "kind chosen · friendly labels beside stable CSV keys · required, optional, or required for a US address · Download template includes one incomplete example row"]],
-    spec: "The steps are Upload, Match columns, Review and Import. Before upload, the screen lists friendly field labels beside stable CSV keys and marks each one required, optional, or required for a US address. Download template uses a friendly filename and includes one incomplete example row with a mandatory cell blank, so it cannot import as downloaded. Review requires every mandatory column to be matched, including State for US addresses. One logical row is atomic; siblings commit independently. Reference ID cells accept a UUID or trimmed, case-insensitive exact name; missing or ambiguous names block the row. Bin names are scoped to the location, and pour formats to the price group. Product imports use packaged formats. Review is editable on phone and desk. All-invalid batches cannot be imported. Routine guidance is informational, including the retained explanation that importing opening stock in a new batch counts it twice. Same-batch retry preserves raw cells and returns original results; correction starts only blocked rows with a new identity. Reloading the same tab restores an unresolved batch; Discard saved request drops it after a confirming step and sends nothing.",
+    spec: "The steps are Upload, Match columns, Review and Import. When every required column already matches by name, Upload offers Review directly, and Columns differ? opens Match columns. Before upload, the screen lists friendly field labels beside stable CSV keys and marks each one required, optional, or required for a US address. Download template uses a friendly filename and includes one incomplete example row with a mandatory cell blank, so it cannot import as downloaded. Review requires every mandatory column to be matched, including State for US addresses. One logical row is atomic; siblings commit independently. Reference ID cells accept a UUID or trimmed, case-insensitive exact name; missing or ambiguous names block the row. Bin names are scoped to the location, and pour formats to the price group. Product imports use packaged formats. Review is editable on phone and desk. All-invalid batches cannot be imported. Routine guidance is informational, including the retained explanation that importing opening stock in a new batch counts it twice. Same-batch retry preserves raw cells and returns original results; correction starts only blocked rows with a new identity. Reloading the same tab restores an unresolved batch; Discard saved request drops it after a confirming step and sends nothing.",
     body: <ImportView model={importPreview} />,
   },
   {
@@ -810,12 +810,12 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Beer",
     name: "SKU detail",
-    to: { Warehouse: "SKU detail", Taproom: "SKU detail", "Reverse movement": "Reverse movement", "+1 · Adjustment": "Reverse movement" },
+    to: { Warehouse: "SKU detail", Taproom: "SKU detail", "Record movement": "Record movement", "Reverse movement": "Reverse movement", "+1 · Adjustment": "Reverse movement" },
     job: "See on-hand, ATP and immutable tape together",
     reads: "get_inventory_sku · get_on_hand · get_atp · list_movements",
     writes: "reverse_inventory_movement [standalone adjustment/loss only; admin or warehouse]",
     states: permitted("sales reads; admin or warehouse reverses eligible standalone adjustments/losses"),
-    spec: "The SKU name on Finished goods opens inventory SKU detail with complete on-hand by location, ATP and paginated immutable history. Admin and Warehouse reverse only standalone adjustments and losses with a required note; the exact linked opposite retains frozen volume, class, bin and lot. Sales reads only. Count corrections live on the eligible latest saved weekly count; shipment rows retain Return shipment. This is distinct from the catalog SKU editor.",
+    spec: "The SKU name on Finished goods opens inventory SKU detail with complete on-hand by location, ATP and paginated immutable history. Admin and Warehouse get Record movement in the header, opened on this SKU, and reverse only standalone adjustments and losses with a required note; the exact linked opposite retains frozen volume, class, bin and lot. Sales reads only. Count corrections live on the eligible latest saved weekly count; shipment rows retain Return shipment. This is distinct from the catalog SKU editor.",
     body: <InventoryDetailView model={INVENTORY_DETAIL} movementAction={() => E.btn("Reverse movement")} />,
   },
   {
@@ -994,7 +994,7 @@ export const SCREENS: Screen[] = [
     job: "Confirm a submitted order in two taps from Today",
     reads: "get_order · get_atp",
     writes: "confirm_order · adjust_order_lines [submitted: replaces lines; allocations wait for confirm] · cancel_order",
-    states: [["loading", "order-shaped skeleton"], ["stale", "line changed · refresh", 1], ["permission", "sales or admin required", 1], ["cancelled", "staged quantities become restock work · Put back clears it"]],
+    states: [["loading", "order-shaped skeleton"], ["stale", "line changed · refresh", 1], ["permission", "sales or admin required", 1], ["cancelled", "staged quantities become restock work · Put back clears it"], ["Available below zero", "confirmed anyway: Order confirmed · Available is below zero for … · quantities read-only · Back to Orders"]],
     spec: "2 taps from Today: Confirm → Confirm order, only when no blocking review exists. Lines sit under their brand, each named by its format, with the quantity as a number field: editing one asks for a Reason and swaps the verbs for Save lines and Discard changes. The registration warning is the same one the Order screen shows; it links to the brand’s compliance rows and never blocks.",
     to: { "16 oz case": "SKU detail" },
     body: <ConfirmOrderView model={toConfirmOrderViewProps(orderSubmittedRidgeline)} fulfillmentOptions={[LOC_WAREHOUSE.name, LOC_TAPROOM.name]} complianceNote={OHIO_STOUT_NOTE} />,
@@ -1054,13 +1054,15 @@ export const SCREENS: Screen[] = [
     step: 5,
     slice: 1,
     tab: "Work",
+    surface: "sheet",
     name: "Short pick",
-    to: { Pick: "Pick", "Adjust order to 7 cases": "Pick" },
+    sheetTitle: toShortPickViewProps(orderShortPick).title,
+    to: { "Adjust order to 7 cases": "Pick" },
     job: "Resolve one short line before the pick can finish",
     reads: "get_order",
     writes: "resolve_short_pick [one RPC: short_reason + chosen resolution (line qty + allocation) + order_events row]",
     states: [["permission", "warehouse or admin required", 1], ["adjust down", "ordered 10 → 7 · allocation shrinks · ATP recovers"], ["keep staged", "7 staged · 3 remain owed · the order keeps its Pick action"], ["resumed", "Pick reopens showing 7 already picked · only the owed 3 need counting"], ["stale", "another picker changed this line · recheck", 1], ["offline", "resolution waits for live ATP", 1]],
-    spec: "Opens from a Pick line whose count is below ordered. Reason is required; exactly one resolution is chosen and the verb names it: adjusting the order is green (mutable order edit); keeping the remainder staged is also green. Keeping the remainder owed does not finish the pick: the order stays picked with a line below ordered and keeps its Pick row in Work and Today until every line reaches its ordered quantity, and reopening Pick shows what is already counted. The restock implication is copy in the preview, never a status column. Done picking completes afterward on the Pick frame.",
+    spec: "Opens from a Pick line whose count is below ordered, as a sheet over Pick; saving closes it and Pick reloads the resolved line, so counts typed on other lines stay. Reason is required; exactly one resolution is chosen and the verb names it: adjusting the order is green (mutable order edit); keeping the remainder staged is also green. Keeping the remainder owed does not finish the pick: the order stays picked with a line below ordered and keeps its Pick row in Work and Today until every line reaches its ordered quantity, and reopening Pick shows what is already counted. The restock implication is copy in the preview, never a status column. Done picking completes afterward on the Pick frame.",
     body: <ShortPickView model={toShortPickViewProps(orderShortPick)} />,
   },
   {
@@ -1111,7 +1113,7 @@ export const SCREENS: Screen[] = [
     reads: "get_order · get_invoice",
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["accepted", "INV number on the tape"], ["short", "restock row on Today"], ["kegs short", "saved warning names the short pool, size and shipping location", 1]],
-    spec: "Post-commit of Ship and invoice. Recorded shell shortages appear as reconciliation warnings; shipping is not refused for shells. A tape means recorded; a line shipped short names its saved reason after short:. Return shipment is the correction.",
+    spec: "Post-commit of Ship and invoice. Recorded shell shortages appear as reconciliation warnings; shipping is not refused for shells. A tape means recorded; a line shipped short names its saved reason after short:. Return shipment is the correction: live, it opens the invoice's Return page; deferred to delivery, it waits for the invoice delivery raises. A delivery order on no route offers Add to route, which opens New route with this shipment ticked; a pickup order does not.",
     body: <ShipmentDoneView model={toShipmentDoneViewProps(orderShipmentDone)} />,
   },
   {
@@ -1203,7 +1205,7 @@ export const SCREENS: Screen[] = [
     reads: "get_taproom_count_snapshot · get_taproom_print_labels · get_taproom_draft_projection · list_taproom_counts · get_taproom_count · list_locations",
     writes: "record_taproom_count · correct_taproom_count [Admin only; latest uncorrected root; increases only]",
     states: permitted("taproom, warehouse or admin required").concat([["unknown response", "timeouts and 5xx freeze every quantity and retry the same request", 1], ["stale", "changed stock or brewery date starts a fresh blank recount", 1], ["no POS", "expected stays blank; the physical count still records"], ["matching", "durable receipt with every observation and no movement"], ["corrected", "one logical history row shows the effective receipt and correction audit"], ["correction permission", "Admin only on the latest uncorrected root", 1]]),
-    spec: "The physical count is the source of truth. Shortages default to Sold; Destroyed posts destruction with no channel or tax facts. Matching Sold is a no-op; matching Destroyed is refused. One choice applies to each bin/SKU/lot bucket and freezes with the request. Destroyed lines cannot be corrected; mixed counts retain their sold-line correction. Every bin/SKU/lot-or-untracked bucket is entered explicitly in whole packaged units; omitted zeros, fractions, inferred allocation and overcounts are refused. Taproom sees the full worksheet row number on every bucket instead of raw lot identifiers on screen; all three count roles can print the current positive-stock worksheet through one checked projection with lot codes, stable original row numbers, and no history. Print rechecks the captured revision and refuses stale stock without changing count entries or uncertain retries. The draft keeps and links the captured prior-count identity/date. Brand expectation refreshes independently and never replaces the captured stock revision; if its baseline changed, comparison and inputs lock until an explicit fresh recount. Draft actual groups explicit bucket depletion using captured package volumes; it and expected-minus-actual stay blank until every existing bucket for that brand is entered, while a projected brand with no physical bucket has zero actual. Both remain labeled as estimates until the authoritative receipt is saved. A timeout or 5xx response freezes request ID and payload for exact retry; a definitive first validation failure is editable. Changed stock or an expired brewery date offers a fresh blank recount. Saved receipts include safe bin/SKU labels for every observation beyond list-query caps, and the newest 50 logical root headers remain readable even when every line matched and no movement was posted. Admin can correct only the latest uncorrected root when at least one quantity was counted too low, up to the frozen quantity before that count. The replacement keeps every original bucket and observation time, appends signed ledger entries in the correction period, and leaves the original receipt immutable. History and the receipt show the effective count plus who corrected it, when, and why. Warehouse and Taproom can read that audit but never see the correction action. An uncertain response freezes the correction reason, quantities, request ID, and payload for exact retry.",
+    spec: "The physical count is the source of truth. Shortages default to Sold; Destroyed posts destruction with no channel or tax facts. Matching Sold is a no-op; matching Destroyed is refused. One choice applies to each bin/SKU/lot bucket and freezes with the request. Destroyed lines cannot be corrected; mixed counts retain their sold-line correction. Every bin/SKU/lot-or-untracked bucket is entered explicitly in whole packaged units; omitted zeros, fractions, inferred allocation and overcounts are refused. Buckets list by SKU, then bin, name; each starts empty, and its Same as recorded fills that one bucket with the recorded quantity. Taproom sees the full worksheet row number on every tracked bucket instead of raw lot identifiers on screen; an untracked bucket shows no row number; all three count roles can print the current positive-stock worksheet through one checked projection with lot codes, stable original row numbers, and no history. Print rechecks the captured revision and refuses stale stock without changing count entries or uncertain retries. The draft keeps and links the captured prior-count identity/date. Brand expectation refreshes independently and never replaces the captured stock revision; if its baseline changed, comparison and inputs lock until an explicit fresh recount. A brand with no expectation draws no comparison row. Draft actual groups explicit bucket depletion using captured package volumes; it and expected-minus-actual stay blank until every existing bucket for that brand is entered, while a projected brand with no physical bucket has zero actual. Both remain labeled as estimates until the authoritative receipt is saved. A timeout or 5xx response freezes request ID and payload for exact retry; a definitive first validation failure is editable. Changed stock or an expired brewery date offers a fresh blank recount. Saved receipts include safe bin/SKU labels for every observation beyond list-query caps, and the newest 50 logical root headers remain readable even when every line matched and no movement was posted. Admin can correct only the latest uncorrected root when at least one quantity was counted too low, up to the frozen quantity before that count. The replacement keeps every original bucket and observation time, appends signed ledger entries in the correction period, and leaves the original receipt immutable. History and the receipt show the effective count plus who corrected it, when, and why. Warehouse and Taproom can read that audit but never see the correction action. An uncertain response freezes the correction reason, quantities, request ID, and payload for exact retry.",
     body: <WeeklyCountFixture><WeeklyCountView model={weeklyCount} /></WeeklyCountFixture>,
   },
   {
@@ -1254,7 +1256,7 @@ export const SCREENS: Screen[] = [
     job: "Complete customer, source, ship-to and line entry for staff",
     reads: "list_customers · list_locations · list_skus · get_atp",
     writes: "create_order",
-    states: [...permitted("sales or admin required"), ["pricing loading", "Loading customer-priced SKUs; no empty claim"], ["pricing offline", "Waiting for connection; resumes on reconnect"], ["pricing failed", "error and Try again; cached choices marked last-known", 1], ["pricing empty", "no active SKUs priced for this customer; check Price groups"], ["customer changed", "unavailable selections keep quantities and labels; replace or remove before saving", 1], ["empty catalog", "names what is missing; links Customers (wholesale only) and Catalog, never Locations, which only an admin adds"]],
+    states: [...permitted("sales or admin required"), ["pricing loading", "Loading customer-priced SKUs; no empty claim"], ["pricing offline", "Waiting for connection; resumes on reconnect"], ["pricing failed", "error and Try again; cached choices marked last-known", 1], ["pricing empty", "no active SKUs priced for this customer; check Price groups"], ["customer changed", "unavailable selections keep quantities and labels; replace or remove before saving", 1], ["empty catalog", "names what is missing; links Customers (wholesale only) and Catalog, never Locations, which only an admin adds"], ["past date", "a Requested ship before brewery-local today warns; Save draft still works"]],
     spec: "Source is required and becomes the order's from-location; the app never guesses “Warehouse.” Save draft lands on the Order screen, where Submit lives. The shared QueryFeedback sits below the heading: Updating preserves inputs, and connection or retry feedback identifies last-known data without a Last checked timestamp on the unsaved form. Visible customer, location and SKU options refresh every 30 seconds and on tab return or reconnect, without resetting the draft. Offline, error and empty states are supplied through the shared feedback contract rather than additional fixture frames. Customer pricing uses the same feedback below the PO field and inside Select SKU: initial loading, paused connection, failed read with Try again, and last-known cached choices stay distinct from a successful empty list. A customer change preserves quantities and selections; an unavailable SKU keeps its label and a visible warning until replaced or removed. Save draft cannot count or submit an unavailable selection.",
     body: <NewOrderView model={toNewOrderViewProps(newOrderDraft)} feedback={<QueryFeedback timeZone={DEMO_TIME_ZONE} showCheckedAt={false} updatedAt={Date.parse("2026-09-13T12:00:00Z")} />} />,
   },
@@ -1327,8 +1329,8 @@ export const SCREENS: Screen[] = [
     job: "Create or edit one delivery address for a customer",
     reads: "get_customer",
     writes: "upsert_ship_to",
-    states: [["permission", "sales or admin required", 1], ["new", "address required"], ["existing", "orders keep their frozen destination"], ["default", "new orders select it first"]],
-    spec: "Editing an address never rewrites the destination recorded on an existing order.",
+    states: [["permission", "sales or admin required", 1], ["new", "label required; a US ship-to also picks its state"], ["duplicate label", "A ship-to labeled Main already exists for this customer · inline error and save withheld"], ["bad ZIP", "a US postal code must be a ZIP or ZIP+4 · inline error and save withheld"], ["existing", "orders keep their frozen destination"], ["default", "new orders select it first"]],
+    spec: "Editing an address never rewrites the destination recorded on an existing order. Street, city and postal code stay optional until known.",
     body: <ShipToView model={toShipToViewProps(shipToMain)} />,
   },
   {
@@ -1348,26 +1350,12 @@ export const SCREENS: Screen[] = [
   {
     step: 5, slice: 1, tab: "More", group: "QuickBooks Online",
     name: "Accounting unavailable",
-    to: { "QuickBooks Online": "Accounting unavailable", "Bank transfer (ACH) and card": "Accounting unavailable", "Customers missing a portal login email": "Customers missing email", Review: "Customers missing email" },
+    to: { "QuickBooks Online": "Accounting unavailable", "Connect QuickBooks": "Accounting unavailable", "Bank transfer (ACH) and card": "Accounting unavailable", "Customers missing a portal login email": "Customers missing email", Review: "Customers missing email" },
     job: "Explain that QuickBooks is not turned on before offering authorization",
     reads: "get_qbo_connection · count_customers_missing_portal_email",
     writes: "none",
     states: [["not turned on", "Connect QuickBooks disabled; no prior connection or sync facts", 1]],
     body: <AccountingView model={{ connected: false, canDisconnect: false, reconnect: false, company: "QuickBooks Online", status: "Not connected", remoteRevocationUnresolved: false }} connection={<QboConnectionView configured={false} />} />,
-  },
-  {
-    step: 5,
-    slice: 1,
-    tab: "More",
-    group: "QuickBooks Online",
-    name: "Connect QuickBooks",
-    to: { "Connect QuickBooks": "Accounting" },
-    job: "Authorize one QuickBooks company and explain the data exchange before OAuth",
-    reads: "get_qbo_connection [OAuth returns the selected company]",
-    writes: "connect_qbo",
-    states: [["permission", "admin only", 1], ["not turned on", "disabled Connect QuickBooks with the same reason as Accounting and Invoices", 1], ["cancelled", "return to Accounting unchanged"], ["already connected", "show Mapping conflict", 1]],
-    spec: "The disconnected Accounting state. OAuth is an external write, so the button is copper and the page says what MGR will exchange before leaving.",
-    body: <ConnectQuickBooksView />,
   },
   {
     step: 5,
@@ -1413,12 +1401,12 @@ export const SCREENS: Screen[] = [
     group: "QuickBooks Online",
     surface: "sheet",
     name: "Disconnect QuickBooks",
-    to: { "Disconnect QuickBooks": "Connect QuickBooks" },
+    to: { "Disconnect QuickBooks": "Accounting" },
     job: "Confirm the external effects of disconnecting QuickBooks",
     reads: "get_qbo_connection",
     writes: "disconnect_qbo",
     states: [["permission", "admin only", 1], ["confirmed", "connection disabled and tokens purged"], ["recovery required", "still offered: purges the credential and attempts revocation", 1], ["revocation unresolved", "credential purged; QuickBooks never confirmed revocation", 1]],
-    spec: "The confirmation names what stops and what remains so reconnecting can resume without remapping.",
+    spec: "A dialog over Accounting. The confirmation names what stops and what remains so reconnecting can resume without remapping. A finished disconnect closes it, and Accounting then offers Connect QuickBooks.",
     body: <DisconnectQuickBooksView />,
   },
   {
@@ -1729,7 +1717,7 @@ export const SCREENS: Screen[] = [
     reads: "list_occupancies · list_vessels · list_batches · list_fermentation_readings · get_gravity_unit · get_batch_completion_preview",
     writes: "upsert_vessel [mutable single rows; admin] · complete_batch",
     states: [["brewer", "Add vessel hidden; vessels are admin-managed"], ["no vessels", "Add your tanks to start tracking the cellar · primary Add vessel for admin; no Batches link", 1], ["no beer", "Reading, Transfer, Addition off · one note says why", 1], ["beer in tanks", "named volume requires explicit loss acknowledgement", 1], ["open run", "complete batch refused"], ["negative residual", "reload cellar facts", 1], ["uncertain", "retry unchanged request", 1], ["saved", "batch and all open occupancies closed"]],
-    spec: "Complete batch reviews the server-derived baseline, frozen packaged output, prior attributed volume, threshold, residual and current beer in each open tank. Beer at or above max(0.05 bbl, 0.5% of baseline) requires an explicit acknowledgement naming the barrels and tanks being written off. The same shared completion surface freezes the acknowledgement during submission and uncertain retry, then atomically closes the batch and all of its open occupancies. A threshold-qualified residual becomes one typed nonphysical loss root; the form accepts no amount or cause. Tile fill derives from occupancy vs vessel capacity, never from a status column. With no vessels, the empty state says to add tanks and offers Add vessel as its primary action for an admin. Once a vessel exists, Reading is the one primary; Transfer and Addition are outline, and with no beer in any tank all three are off under one note saying why. Brew day is not a cellar action: once a vessel exists, a link under the actions opens Batches. A tile opens Vessel detail. Retired vessels are not tiles. Add vessel shows only to an admin.",
+    spec: "Complete batch reviews the server-derived baseline, frozen packaged output, prior attributed volume, threshold, residual and current beer in each open tank. Beer at or above max(0.05 bbl, 0.5% of baseline) requires an explicit acknowledgement naming the barrels and tanks being written off. The same shared completion surface freezes the acknowledgement during submission and uncertain retry, then atomically closes the batch and all of its open occupancies. A threshold-qualified residual becomes one typed nonphysical loss root; the form accepts no amount or cause. Tile fill derives from occupancy vs vessel capacity, never from a status column. With no vessels, the empty state says to add tanks and offers Add vessel as its primary action for an admin. Once a vessel exists, Reading is the one primary; Transfer and Addition are outline, and with no beer in any tank all three are off under one note saying why. Brew day is not a cellar action: once a vessel exists, a link under the actions opens Batches. A tile opens Vessel detail, and each tile holding beer has its own Reading; Reading and its sheet return to Cellar. Complete batch with one open batch reviews it at once, and leads with one loss line; the ledger figures sit under Details. Retired vessels are not tiles. Add vessel shows only to an admin.",
     body: <CellarMapView model={cellarMapBrewer} complete={<BatchCompletionFixture />} />,
   },
   {
@@ -1742,8 +1730,8 @@ export const SCREENS: Screen[] = [
     reads: "list_vessels · list_occupancies · list_fermentation_readings · get_gravity_unit",
     writes: "upsert_vessel [mutable facts only] · delete_vessel",
     states: [["permission", "brewer or admin required", 1], ["brewer", "vessel facts read-only; no Save or Delete"], ["occupied", "batch and fill shown"], ["empty", "available for a batch"], ["reading overdue", "last reading flagged", 1], ["holding beer", "delete refused", 1], ["with batch history", "retired, not deleted"], ["incomplete", "Save vessel says what is still needed; a capacity of 0 or less is marked at its field", 1]],
-    spec: "Batch occupancy and reading history are records; only the vessel name, type and capacity are editable here, and only by an admin. A brewer sees the facts as text. Delete vessel confirms first. A vessel holding beer is refused. A vessel that has held beer is retired: it leaves the cellar, transfer targets and brew day, while its batch history and the Batches vessel table keep it. A vessel that never held beer is deleted.",
-    body: <VesselDetailView model={vesselFv3} remove={<RemoveVesselControl vessel="FV3" />} />,
+    spec: "Batch occupancy and reading history are records; only the vessel name, type and capacity are editable here, and only by an admin. A brewer sees the facts as text. Delete vessel sits in its own section below Save vessel and confirms first. A vessel holding beer is refused. A vessel that has held beer is retired: it leaves the cellar, transfer targets and brew day, while its batch history and the Batches vessel table keep it. A vessel that never held beer is deleted. A vessel holding beer has its cellar verbs beside Reading: Transfer and Addition open on this tank, and Complete batch reviews its batch at once.",
+    body: <VesselDetailView model={vesselFv3} remove={<RemoveVesselControl vessel="FV3" />} actions={occupancyActions(false)} />,
   },
   {
     step: 7,
@@ -1769,7 +1757,7 @@ export const SCREENS: Screen[] = [
     reads: "list_occupancies · list_fermentation_readings · get_gravity_unit",
     writes: "record_fermentation_reading [one immutable reading row]",
     states: [...permitted("brewer or admin required"), ["offline or response lost", "Retry exact reading · Fix as new reading · Discard FV3 reading", 1]],
-    spec: "The sheet names the receiving vessel and, when the occupancy has one, its batch. Its deep link opens over the existing vessel detail. Observed at defaults to now in the labeled brewery time zone, matching history; edited nonexistent or repeated DST times are refused rather than guessed. Observed at and Temperature are required. Gravity, pH and Note are optional; blanks remain absent, and prior values are reference only, never silently copied. Saving freezes every parsed field and the observation time before transport. Exact retry preserves that request; Fix starts a reviewed fresh request while the uncertain original remains queued; named discard removes only the selected attempt. The gravity field uses the reader's standing unit preference and stores degrees Plato.",
+    spec: "The sheet names the receiving vessel and, when the occupancy has one, its batch. Its deep link opens over the existing vessel detail, and closing returns to the page it came from: Cellar, Batches or the batch, else Vessel detail. Observed at defaults to now and stays folded behind Observed … · Change in the labeled brewery time zone, matching history; edited nonexistent or repeated DST times are refused rather than guessed. Observed at and Temperature are required. Gravity, pH and Note are optional; blanks remain absent, and prior values are each field's placeholder: reference only, never silently copied. Saving freezes every parsed field and the observation time before transport. Exact retry preserves that request; Fix starts a reviewed fresh request while the uncertain original remains queued; named discard removes only the selected attempt. The gravity field uses the reader's standing unit preference and stores degrees Plato.",
     body: (() => {
       const formId = "fermentation-reading-form";
       const values = { observedAt: "2026-09-10T08:10:00", tempF: "68.2", gravity: "1.019", ph: "", note: "" };
@@ -1789,7 +1777,7 @@ export const SCREENS: Screen[] = [
     job: "Post-knockout dry hop, fruit or adjunct against an occupancy",
     reads: "list_occupancies · list_materials · list_material_lots",
     writes: "record_batch_addition [one RPC: batch_additions row (stage, occupancy) + material consumption movement from the bin holding the most of it; lot required when the material is lot-tracked]",
-    states: [["permission", "brewer or admin required", 1], ["no lot", "Choose a lot · Citra is lot-tracked", 1], ["short", "only what the bin holds can be consumed", 1], ["offline", "queue with requestId"], ["stale", "occupancy closed · choose another", 1]],
+    states: [["permission", "brewer or admin required", 1], ["no lot", "Still needed: a lot (Citra is lot-tracked)", 1], ["short", "only what the bin holds can be consumed", 1], ["offline", "queue with requestId"], ["stale", "occupancy closed · choose another", 1]],
     spec: "Not Record movement (that is finished goods) and not Brew day (that is knockout). The consumption movement carries the lot; the addition row carries stage and occupancy so loss accounting stays anchored to the batch. The bin is not picked: the RPC drains the bin holding the most of that material and lot.",
     body: <><CellarAdditionView model={cellarAdditionCitra} footer={null} />{E.pin(<CellarAdditionFooter />)}</>,
   },
@@ -1831,7 +1819,7 @@ export const SCREENS: Screen[] = [
     writes: "record_brew_day [another turn: confirmed actual sources + frozen sheet + knockout into the open vessel], correct_brew_record [unused revision with linked compensation]",
     states: [...permitted("brewer or admin required"), ["multiple turns", "Add brew turn and correct each current turn"]],
     spec: "A brewed batch's page, drawn recorded and then with Add brew turn open; a planned batch opens Brew prep and the Brew day timeline instead, and a cancelled one shows only that it is cancelled. Add brew turn records another same-batch knockout into its existing open vessel. Each turn owns its frozen actuals and correction chain; the batch keeps its first brew date. Transfers, started packaging, closure, filed reports and capacity bounds prevent another turn. The brew sheet row is a read-out of the version’s process spec, opened frozen; brew day captures actuals, and fermentation reality arrives through Fermentation reading, so there is no mash-actuals form here. Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on the New batch sheet so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
-    body: <><BrewDayView model={brewDayTurnsHazy} /><BrewDayView model={brewTurnModel(brewDayTurnsHazy)} /></>,
+    body: <><BrewDayView model={brewDayTurnsHazy} actions={occupancyActions(true)} /><BrewDayView model={brewTurnModel(brewDayTurnsHazy)} /></>,
   },
   {
     step: 7,
@@ -1870,12 +1858,12 @@ export const SCREENS: Screen[] = [
     reads: "list_occupancies · list_vessels",
     writes: "record_cellar_transfer [one RPC: create target occupancy(initial_bbl=0) when empty + append transfer + a generic loss volume adjustment on the source when loss > 0 + close source occupancy iff fully emptied]",
     states: permitted("brewer or admin required"),
-    spec: "Drawn as a blend into an occupied brite: BT1 keeps its occupancy and B-0412 keeps its identity: the schema has one batch per occupancy, and blends are transfers into the surviving one (renaming a blend as a new batch is a plan §8 schema gap). An empty target (BT2) gets a new occupancy starting at zero bbl in the same RPC; the transfer row stays immutable; a fully emptied source closes its occupancy. A partial transfer never implies loss: the person explicitly holds the remainder or records loss. No vessel status.",
+    spec: "Drawn as a blend into an occupied brite: BT1 keeps its occupancy and B-0412 keeps its identity: the schema has one batch per occupancy, and blends are transfers into the surviving one (renaming a blend as a new batch is a plan §8 schema gap). An empty target (BT2) gets a new occupancy starting at zero bbl in the same RPC; the transfer row stays immutable; a fully emptied source closes its occupancy. A partial transfer never implies loss: the person explicitly holds the remainder or records loss. No vessel status. With no other vessel, the To list says so and links Add a vessel for an admin; anyone else is told to ask Admin.",
     body: <><CellarTransferView model={cellarTransferPils} footer={null} />{E.pin(<CellarTransferFooter />)}</>,
   },
   {
     name: "Packaging plan",
-    to: { Packaging: "Packaging runs", "Pick source": "Packaging plan", Start: "Close packaging run" },
+    to: { Packaging: "Packaging runs", "Start run": "Close packaging run" },
     step: 7,
     slice: 5,
     tab: "Work",
@@ -1883,7 +1871,7 @@ export const SCREENS: Screen[] = [
     reads: "get_packaging_run · list_occupancies",
     writes: "cancel_packaging_run · reschedule_packaging_run · update_packaging_run",
     states: [["permission", "brewer, warehouse or admin required", 1], ["unstarted", "change the date or cancel before physical work"], ["cancelled", "retained history; no demand or stock movement"]],
-    spec: "Retain the plan and outputs when cancelled. Cancellation removes demand and completion blockers without moving stock. Reschedule changes only the planned date before physical work.",
+    spec: "A run with no tank yet has one step: choose the source tank (the only open one is already chosen) and Start run, which picks it and starts the run together; a run whose tank was picked at scheduling shows only Start run. Retain the plan and outputs when cancelled. Cancellation removes demand and completion blockers without moving stock. Reschedule changes only the planned date before physical work.",
     body: <ClosePackagingRunView model={{ title: "RUN-0033", backTo: "Packaging", brand: "Hazy IPA", plannedOn: "2026-09-28", source: "No source yet", plannedOutputs: [["Hazy case", 120, "Not recorded"]], showCloseReview: false }} planActions={<PlanActions plannedOn="2026-09-28" />} action={<PackagingSourcePicker occupancies={[{ occupancy_id: "fv3-hazy", vessel_name: "FV3", brand_name: "Hazy IPA", bbl: 15 }]} />} />,
   },
   {
@@ -1896,7 +1884,7 @@ export const SCREENS: Screen[] = [
     reads: "get_packaging_run · get_packaging_close_plan · list_locations · list_bins",
     writes: "close_packaging_run [atomic lot, outputs, tank draw and explicit source material usage/loss]",
     states: [["permission", "admin, brewer or warehouse required", 1], ["short", "used plus lost exceeds selected source stock", 1], ["zero", "confirm zero for a planned material not used"], ["stale", "review the changed BOM plan before closing", 1], ["future date", "packaged on cannot be after today", 1], ["filed period", "packaged on falls in a filed report period", 1]],
-    spec: "Close freezes the reviewed BOM and confirmed source actuals. Used plus lost reduces stock; unused returned is informational because no material left stock at schedule or start. Counted quantities are whole units. Measured quantities use stored base units; roll conversion remains gated. Sources may be split and extra actual materials named. Output, lot, tank and material writes remain atomic. An uncertain close keeps the exact request and offers unchanged retry. Finished stock is dated Packaged on for compliance reporting.",
+    spec: "Barrels drawn starts from the planned outputs' barrels per unit when every planned package has a volume. Close freezes the reviewed BOM and confirmed source actuals. Used plus lost reduces stock; unused returned is informational because no material left stock at schedule or start. Counted quantities are whole units. Measured quantities use stored base units; roll conversion remains gated. Sources may be split and extra actual materials named. Output, lot, tank and material writes remain atomic. An uncertain close keeps the exact request and offers unchanged retry. Finished stock is dated Packaged on for compliance reporting.",
     body: <ClosePackagingRunView model={closePackagingRunHazy} />,
   },
   {
@@ -1967,11 +1955,11 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Work",
     name: "Purchase orders",
-    to: { "New PO": "New PO", Send: "Receive PO" },
+    to: { "New PO": "New PO", "Mark sent": "Receive PO" },
     job: "See draft, sent and partially received purchase orders",
     reads: "list_purchase_orders",
     writes: "none [creation and receiving happen on their own surfaces]",
-    states: [["draft", "Send is the next action"], ["partial", "Receive stays available for the remainder"], ["empty", "no open purchase orders: New PO is the only action"]],
+    states: [["draft", "Mark sent is the next action"], ["partial", "Receive stays available for the remainder"], ["empty", "no open purchase orders: New PO is the only action"]],
     spec: "The Work list with the Purchase orders tab active. Each row names the next action; New PO opens the existing vendor purchase draft, and Receive PO returns here.",
     body: <PurchaseOrdersView model={toPurchaseOrdersViewProps(purchaseOrdersWarehouse)} />,
   },
@@ -1980,17 +1968,17 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Work",
     name: "New PO",
-    to: { Vendor: "Entity picker", "Add line": "New PO", Remove: "New PO", "Save draft": "Purchase orders" },
+    to: { Vendor: "Entity picker", "Add line": "New PO", Remove: "New PO", "Save draft": "Purchase orders", "Save and mark sent": "Receive PO" },
     job: "Draft a vendor order: lines, cost, and the lot the vendor named",
     reads: "list_vendors · list_materials · get_material_requirements",
-    writes: "create_purchase_order [one RPC: draft PO + all lines]",
-    states: [["permission", "warehouse or admin required", 1], ["new", "vendor and one line required · every line needs a material and a quantity above zero · Remove drops a line"], ["from requirements", "Planning drafts the lines; the shortfall is the quantity"], ["contracted lot", "the vendor named a lot on the contract · it prefills receiving"], ["no lot named", "the ordinary case · receiving captures it off the package"]],
-    spec: "A flat form: vendor and optional expected date, then material lines with visible quantity and unit-cost labels. Spacing groups related fields without cards, repeated section headings, line-number headings, a Draft badge, or instructional paragraphs. Material, quantity, and cost align on large screens; smaller screens stack material above the numeric fields, and the narrowest screens stack all three. Each line owns its Remove action and optional expected lot. Expected lot is advisory, creates no lot record, and only appears for lot-tracked materials. Receiving prefills from it; the actual package decides the received lot. Save draft retains its validation reason.",
+    writes: "create_purchase_order [one RPC: draft PO + all lines] · send_purchase_order [Save and mark sent]",
+    states: [["permission", "warehouse or admin required", 1], ["new", "vendor and one line required · every line needs a material and a quantity above zero · Remove drops a line"], ["from requirements", "Planning drafts the lines; the shortfall is the quantity"], ["contracted lot", "the vendor named a lot on the contract · it prefills receiving"], ["no lot named", "the ordinary case · receiving captures it off the package"], ["past date", "an Expected date before brewery-local today warns; Save draft still works"]],
+    spec: "A flat form: vendor and optional expected date, then material lines with visible quantity and unit-cost labels. Spacing groups related fields without cards, repeated section headings, line-number headings, a Draft badge, or instructional paragraphs. Material, quantity, and cost align on large screens; smaller screens stack material above the numeric fields, and the narrowest screens stack all three. Each line owns its Remove action and optional expected lot. Expected lot is advisory, creates no lot record, and only appears for lot-tracked materials. Receiving prefills from it; the actual package decides the received lot. Once a vendor is chosen, its default materials lead the material picker. Save draft retains its validation reason; Save and mark sent waits on the same fields, marks the saved draft sent from a mail client, and opens it. If marking fails, the error says the draft is saved and links it.",
     body: <NewPoView model={newPoCountryMalt} />,
   },
   {
     step: 7, slice: 2, tab: "Work", name: "New PO incomplete",
-    to: { "Add a vendor": "Vendors", "Add line": "New PO", "Save draft": "Purchase orders" },
+    to: { "Add a vendor": "Vendors", "Add line": "New PO", "Save draft": "Purchase orders", "Save and mark sent": "Receive PO" },
     job: "See what a draft still needs before it can be saved",
     reads: "list_vendors · list_materials", writes: "create_purchase_order",
     states: [["no vendors", "the picker says so and links to Vendors", 1], ["bad value", "marked at its field with what to enter instead", 1], ["withheld", "Save draft names what is still missing"]],
@@ -2015,7 +2003,7 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Work",
     name: "Receipt",
-    to: { Work: "Purchase orders", "Correct receipt": "Correct receipt", "Original receipt": "Receipt", "Corrected receipt": "Receipt", "Fix Accounting mappings": "QuickBooks mappings" },
+    to: { Work: "Purchase orders", "PO-0142": "Receive PO", "Correct receipt": "Correct receipt", "Original receipt": "Receipt", "Corrected receipt": "Receipt", "Fix Accounting mappings": "QuickBooks mappings" },
     job: "What posted after a receive, including over, short, what is still owed, and its QuickBooks Bill",
     reads: "get_purchase_order [ordered less counted per line; correction-chain Bill identity and status] · get_qbo_connection [admin only; purchase account] · list_vendors [admin Bill mapping readiness]",
     writes: "post_receipt_bill [admin only; confirmation; one frozen Bill per receipt correction chain; pending retries query then replay the exact snapshot and provider request ID; definite rejection requires explicit newAttemptReason corrected]",
@@ -2044,7 +2032,7 @@ export const SCREENS: Screen[] = [
     writes: "none [edits happen in Edit material, counts in Cycle count]",
     states: [["expiring", "the earliest best-by date needs attention"], ["empty", "add a material, then open Purchase orders to receive stock"]],
     spec: "The Beer landing's Materials on hand row opens this list. Edit opens Edit material for that material's definition; Count opens Cycle count for its stock; Add material opens a blank definition. One list serves both, so there is no separate definitions list.",
-    body: <MaterialsOnHandView model={toMaterialsOnHandViewProps(materialsOnHandList)} controls={<ListControls search={{ label: "Search materials", value: "", keep: {} }} />} />,
+    body: <MaterialsOnHandView model={toMaterialsOnHandViewProps(materialsOnHandList)} controls={<ListControls search={{ label: "Search materials", value: "", keep: {} }} scopes={toMaterialsScopes({ category: "" })} />} />,
   },
   {
     step: 7,
@@ -2152,7 +2140,7 @@ export const SCREENS: Screen[] = [
     job: "Create or edit one material purchasing commitment",
     reads: "list_materials · list_vendors_and_contracts",
     writes: "upsert_material_contract · delete_material_contract",
-    states: [["permission", "warehouse or brewer required", 1], ["new", "vendor, material and quantity required"], ["received", "received and on-order quantities are read-only"], ["on purchase orders", "Delete is refused; set an end date instead", 1]],
+    states: [["permission", "warehouse or brewer required", 1], ["new", "vendor, material and quantity required"], ["received", "received and on-order quantities are read-only"], ["dates", "an end before the start is named under Ends and blocks Save · a set date offers Clear"], ["on purchase orders", "Delete is refused; set an end date instead", 1]],
     spec: "This sheet owns the commitment and nothing else. Receipts and open releases both update progress, and neither is editable here: a quantity a buyer could type over would stop being evidence. Available is the commitment less what has arrived and less what is already ordered, which is the only one of the four numbers worth acting on. Delete confirms first and is refused once a purchase order uses the contract; set an end date instead.",
     body: <ContractView model={contractYchCitra} />,
   },
@@ -2301,9 +2289,9 @@ export const SCREENS: Screen[] = [
     job: "Choose a monthly, quarterly, or annual reporting period and see whether its snapshot was filed",
     reads: "list_compliance_reports · list_lots",
     writes: "none",
-    states: [["not filed", "Not filed · Ready to review", 1], ["no activity", "an ended, unfiled period with no movement, cellar removal or invoice · Not filed · No activity", 1], ["in progress", "the current period: reviewable · In progress · File after the month ends"], ["filed", "the snapshot saved in MGR · Filed <date> · <bbl> taxpaid"], ["lots", "every packaged lot opens its trace"], ["no period yet", "every recent period starts before the books opened · names that date and the first period MGR can report"]],
-    spec: "This is the shared destination for the Licenses back link, the period rows, and the lot trace. Monthly, Quarterly, and Annual tabs swap the list: the last three months, four calendar quarters, or two calendar years show, less any that start before the books-opened date, plus every filed period of that length. A tab left with no period says No monthly (quarterly, annual) period yet. A TTB filing is exactly one calendar month, quarter, or year; the API takes other jurisdictions and ranges.",
-    body: <ComplianceMonthsView model={complianceMonthsDemo} />,
+    states: [["not filed", "Not filed · Ready to review", 1], ["no activity", "an ended, unfiled period with no movement, cellar removal or invoice · Not filed · No activity", 1], ["in progress", "the current period: reviewable · In progress · File after the month ends"], ["filed", "the snapshot saved in MGR · Filed <date> · <bbl> taxpaid"], ["lot search", "a lot code lists the newest matching lots, each opening its trace; none before a search"], ["no lot match", "No lots match · check the code or clear the search", 1], ["no period yet", "every recent period starts before the books opened · names that date and the first period MGR can report"]],
+    spec: "This is the shared destination for the Licenses back link, the period rows, and the lot trace. Monthly, Quarterly, and Annual tabs swap the list: the last three months, four calendar quarters, or two calendar years show, less any that start before the books-opened date, plus every filed period of that length. A tab left with no period says No monthly (quarterly, annual) period yet. Lot trace is a lot-code search: no lot is listed until a code is searched, then the 50 newest matches show. A TTB filing is exactly one calendar month, quarter, or year; the API takes other jurisdictions and ranges.",
+    body: <ComplianceMonthsView model={complianceMonthsDemo} controls={<ListControls search={{ label: "Search lot codes", value: "", keep: {} }} />} />,
   },
   {
     step: 7,
@@ -2346,7 +2334,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["before books", "the period starts before the books-opened date · no report, Settings holds the date"], ["sales", "no Open Settings button, which would land on No access · asks an admin to change the date", 1]],
     spec: "MGR reports only from the books-opened date on, so a period that starts earlier has nothing to generate. The page names that date instead of failing. Drawn as an admin, who gets Open Settings; Settings is admin-only, so Sales is asked to have an admin change the date instead. A filed period stays readable after a basis correction (Filed period needs amendment).",
-    body: <PeriodBeforeBooksView title="October 2026" state={{ ...beforeBooksState("October 2026", "2026-10-15", true), action: { label: "Open Settings" } }} />,
+    body: <PeriodBeforeBooksView title="October 2026" state={{ ...beforeBooksState("October 2026", "2026-10-15", true, "2026-10-20"), action: { label: "Open Settings" } }} />,
   },
   {
     step: 7,
@@ -2458,12 +2446,12 @@ export const SCREENS: Screen[] = [
     slice: 9,
     tab: "Beer",
     name: "Customer keg balance",
-    to: { "Over 90 days": "Keg event history" },
+    to: { "Over 90 days": "Keg event history", "Record return": "Keg fleet" },
     job: "See every keg pool one customer has out and the deposit exposure",
-    reads: "get_customer_keg_balance · list_customers",
-    writes: "none",
+    reads: "get_customer_keg_balance · list_customers · list_locations · list_bins",
+    writes: "record_keg_event [Record return]",
     states: [["permission", "warehouse or admin required", 1], ["current", "all pools and deposits shown"], ["overdue", "oldest unreturned kegs flagged", 1], ["mismatch", "a deposit was refunded and kegs on deposit disagree with kegs out plus kegs lost · flagged", 1], ["none", "no kegs currently out"]],
-    spec: "The same customer-owned detail is reachable from Customers and Keg fleet. A deposit refund and the empty keg's Returned event are separate records, so a pool and size where a deposit was refunded and the kegs on deposit differ from kegs out plus kegs lost at the customer is flagged. A shipped order charges the deposit and posts Shipped shells; a row with no refund is never flagged; a deposit still held with no keg out is a row too.",
+    spec: "The same customer-owned detail is reachable from Customers and Keg fleet. A deposit refund and the empty keg's Returned event are separate records, so a pool and size where a deposit was refunded and the kegs on deposit differ from kegs out plus kegs lost at the customer is flagged. A shipped order charges the deposit and posts Shipped shells; a row with no refund is never flagged; a deposit still held with no keg out is a row too. Each row with kegs out has Record return: Record keg event with its pool, size, Returned and this customer chosen.",
     body: <KegBalanceView model={toKegBalanceViewProps(kegBalanceRidgeline)} />,
   },
   {
@@ -2503,7 +2491,7 @@ export const SCREENS: Screen[] = [
     states: [["swap", "one act, one record · never kick-then-tap"], ["already swapped", "second attempt fails · safe closer and time shown", 1], ["not in taproom stock", "server-derived flag · expected shares excluded", 1], ["guest or event keg", "explicit label and nominal size · no numeric yield", 1], ["no number", "sorts last · a number is never required"], ["duplicate number", "shown as entered · nothing downstream reads it"], ["kicked", "interval closed with a reason · the tap goes empty"], ["no POS", "no usable numerator · no bar", 1], ["not ready", "submit withheld · the line beside it names what is missing"], ["no keg SKUs", "no keg SKU with a keg volume · the picker says so and points to Catalog · guest keg still works", 1]],
     redrawn: true,
     spec: <>Each own or guest tile offers Swap and Kick and shows the same opening day, date, actor and fill. Swap closes one interval and opens the replacement atomically; an own replacement defaults to the outgoing SKU, while a guest replacement requires its own label and positive nominal BBL. Tap numbers are optional and may repeat, and unnumbered tiles sort last. Opening and closing fill chips are coarse observations and never inventory quantities. After an action saves, its sheet closes and the board announces Updating the board while its existing refetch runs. A 30-second poll updates only the board and recent history, preserving dirty and uncertain sheets. Exact retries keep the original request. Own package size and inventory exclusion come from the server. Guest labels never match POS facts, so guest tiles show no numeric yield. No usable numerator means no bar. Every action here writes zero finished-goods movements; weekly count owns depletion.</>,
-    body: <TapBoardView state={tapBoard} skus={tapBoardSkus} timeZone={DEMO_TIME_ZONE} navigation={{ locations: [{ value: "taproom", label: "Taproom" }, { value: "downtown", label: "Downtown" }], location: "taproom" }} recentEvents={[{ title: "Kolsch tapped", detail: "Dana · Tue 4:10pm" }, { title: "Saison swapped in", detail: "Ali · Thu 11:20am" }]} />,
+    body: <TapBoardView state={tapBoard} skus={tapBoardSkus} timeZone={DEMO_TIME_ZONE} navigation={{ locations: [{ value: "taproom", label: "Taproom" }, { value: "downtown", label: "Downtown" }], location: "taproom" }} />,
   },
   {
     step: 7,
@@ -2539,11 +2527,11 @@ export const SCREENS: Screen[] = [
     tab: "Work",
     name: "Routes",
     to: { Assign: "Route", "Add to route": "Route" },
-    job: "See planned and active delivery routes and build the next one",
+    job: "See open and returned delivery routes and build the next one",
     reads: "list_routes",
     writes: "none [route planning happens on Route]",
-    states: [["unassigned", "shipped orders and picked transfers waiting for a route are called out"], ["empty", "no routes yet: New route is the only action"]],
-    spec: "Work › Deliveries. Every route not yet returned names its next action; New route opens Route in builder mode, and Route returns here. A stop is a shipped order or a picked stock transfer.",
+    states: [["unassigned", "shipped orders and picked transfers waiting for a route are called out"], ["empty", "no routes yet: New route is the only action"], ["returned", "Status Returned lists finished routes newest first; an empty Open list points there"]],
+    spec: "Work › Deliveries. The Status pick shows Open routes, each naming its next action, or Returned routes, newest first. New route opens Route in builder mode, and Route returns here. A stop is a shipped order or a picked stock transfer.",
     body: <RoutesView model={toRoutesViewProps(routesDriver)} />,
   },
   {
@@ -2555,7 +2543,7 @@ export const SCREENS: Screen[] = [
     reads: "list_routes",
     writes: "save_route · depart_route",
     states: [["permission", "warehouse membership; Depart needs the assigned driver or an admin", 1], ["departed", "the builder closes; Driver route and Return route take over"]],
-    spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. The stops are a checklist of this route's documents plus every shipped order and picked transfer on no route, each checked one with its stop number; driver, vehicle and stop order save in the same route-save RPC, and a delivered stop cannot be unchecked. There is no loaded status or mark-loaded command. A refused delivery closes with an outcome; its physical return is recorded separately. A driver shows as their roster email, with their roles in the picker; a saved driver no longer on the team reads \"driver not on the team\", and one without Warehouse or Admin reads \"can no longer drive\".",
+    spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. The stops are a checklist of this route's documents plus every shipped order and picked transfer on no route, each checked one with its stop number; driver, vehicle and stop order save in the same route-save RPC, and a delivered stop cannot be unchecked. A new route's first save opens the saved route, so Depart is one tap away; Add to route from Shipment done arrives with that shipment checked as stop 1. There is no loaded status or mark-loaded command. A refused delivery closes with an outcome; its physical return is recorded separately. A driver shows as their roster email, with their roles in the picker; a saved driver no longer on the team reads \"driver not on the team\", and one without Warehouse or Admin reads \"can no longer drive\".",
     body: <RouteView model={routeAPlan} />,
   },
   {
@@ -2589,12 +2577,12 @@ export const SCREENS: Screen[] = [
     slice: 10,
     tab: "Work",
     name: "Confirm delivery",
-    to: { "Check in refused beer": "Check in refused beer", "Not delivered · leave for a later route": "Driver route" },
+    to: { "Check in refused beer": "Check in refused beer", "Not delivered · leave for a later route": "Driver route", Delivered: "Driver route" },
     job: "Name receiving contact, then commit delivery and invoice",
     reads: "get_delivery_stop",
     writes: "confirm_delivery [one RPC: delivered_at + signed_by + invoice only when persisted mode is on-delivery; never ships] · leave_delivery_for_later [one RPC: deletes an open unattempted stop and unassigns its document]",
     states: [["offline", "keep stop open; commit waits", 1], ["response lost", "same requestId returns result"], ["permission", "warehouse membership and being the route’s assigned driver, or admin", 1], ["success", "INV number after commit"], ["transfer stop", "destination and picked lines instead of a customer; stamped, never invoiced; Receive on the transfer moves the stock"]],
-    spec: "Not delivered · leave for a later route removes an unattempted stop from its departed route, logs an order event for a shipment, and leaves stock, invoices and refusals untouched. No driver note is needed. The document is unassigned for a later route. Closed / no access is not a refusal reason. Enter refused quantities and a refusal reason when needed; accepted quantities are billed at captured order prices. Full refusal needs no receiving name and creates no on-delivery invoice. Back goes to Driver route. The receiving name is stored as text; the UI never implies a signature image is retained.",
+    spec: "Not delivered · leave for a later route removes an unattempted stop from its departed route, logs an order event for a shipment, and leaves stock, invoices and refusals untouched. No driver note is needed. The document is unassigned for a later route. Closed / no access is not a refusal reason. Enter refused quantities and a refusal reason when needed; accepted quantities are billed at captured order prices. Full refusal needs no receiving name and creates no on-delivery invoice. Either outcome returns to Driver route. Received by starts as the newest earlier signer at this ship-to and suggests the others. Back goes to Driver route. The receiving name is stored as text; the UI never implies a signature image is retained.",
     body: <ConfirmDeliveryView model={confirmDeliveryStop1} />,
   },
   {
@@ -2653,11 +2641,11 @@ export const SCREENS: Screen[] = [
     name: "Chat settings",
     to: { Disconnect: "Disconnect Slack" },
     job: "Operate one brewery/provider installation and inspect every outbound surface",
-    reads: "get_chat_integration_health · get_notification_preferences · get_brewery_operating_defaults · [presentation: ten provider-free fixtures]",
-    writes: "set_notification_destination · set_brewery_quiet_hours · set_brewery_operating_defaults · disable_chat_installation · disconnect_chat_installation",
+    reads: "get_chat_integration_health · get_notification_preferences · get_brewery_operating_defaults · list_chat_channels · list_chat_user_links · [presentation: ten provider-free fixtures]",
+    writes: "set_notification_destination · set_brewery_quiet_hours · set_brewery_operating_defaults · disable_chat_installation · disconnect_chat_installation · unlink_chat_user",
     states: [["permission", "admin only", 1], ["healthy", "last callback and delivery shown"], ["retrying", "queue count + redacted reason", 1], ["disabled", "no sends; previews still work", 1]],
-    spec: "Four preview tabs render the same provider-neutral fixtures consumed by renderer contract tests, labelled as sample data. The All preview states picker shows only in development. Previews never query live customer data or send a message. Reading cadence is MGR-owned and controls both Today and chat.",
-    body: <ChatSettingsView health={chatConnected} timezone="America/New_York" readingDueHours={24} channels={[{ id: "COPS", name: "mgr-operations" }]} channel="COPS" previewFixtures={CHAT_PREVIEW_FIXTURES} />,
+    spec: "Four preview tabs render the same provider-neutral fixtures consumed by renderer contract tests, labelled as sample data. The All preview states picker shows only in development. Previews never query live customer data or send a message. Reading cadence is MGR-owned and controls both Today and chat. Private channels load with the page, and picking one saves it. The Delivery switch is the one way to stop sends here. Linked people lists who linked Slack, with Unlink for each and how to link your own, so an admin can remove a stale link without disconnecting Slack for everyone.",
+    body: <ChatSettingsView health={chatConnected} timezone="America/New_York" readingDueHours={24} channels={[{ id: "COPS", name: "mgr-operations" }]} channel="COPS" previewFixtures={CHAT_PREVIEW_FIXTURES} people={<ChatLinkedPeopleView people={linkedChatPeople} timeZone={DEMO_TIME_ZONE} />} />,
   },
   {
     step: 8,
@@ -2671,19 +2659,6 @@ export const SCREENS: Screen[] = [
     states: [["unlinked", "preferences remain available before linking"], ["linked", "unlink only your Slack identity"], ["permission", "every staff role; Taproom cannot set personal quiet hours", 1], ["Slack not connected", "a note replaces the link steps until the brewery's Slack is active", 1], ["error", "keep entered quiet hours and show the command error", 1]],
     spec: "Personal delivery preferences do not change MGR work, App Home or team digests. Each reason uses the label Slack's preferences dialog shows. The brewery quiet hours show read-only to every role; clearing both personal times follows them.",
     body: <ChatPersonalPreferencesView preferences={personalChatPreferences} />,
-  },
-  {
-    step: 8,
-    slice: "chat",
-    tab: "More",
-    group: "Chat",
-    name: "Linked people",
-    job: "See which MGR users linked Slack and remove a stale link",
-    reads: "list_chat_user_links",
-    writes: "unlink_chat_user",
-    states: [["permission", "admin only", 1], ["linked", "three people"], ["unlinked", "personal messages stop for that person", 1]],
-    spec: "A brewery admin can remove a stale identity link without disconnecting Slack for everyone.",
-    body: <ChatLinkedPeopleView people={linkedChatPeople} timeZone={DEMO_TIME_ZONE} />,
   },
   {
     step: 8,
@@ -2735,22 +2710,22 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "POS",
     name: "Point of sale",
-    to: { Disconnect: "Disconnect Square", "Sync Square catalog": "Point of sale", "Sync Square sales": "Point of sale", "Square locations2 mapped · 1 needs mapping": "Square locations", "Taproom · Sep 1 to Sep 8": "Point of sale", "Sale · Hazy IPA · pint": "POS sale detail", "Return · Hazy IPA · pint": "POS sale detail", "MenuOne catalog · per-location stock and price": "Menu", "Taproom sales in QuickBooksAbout Square’s optional connector": "Taproom sales in QuickBooks" },
+    to: { Disconnect: "Disconnect Square", "Sync Square": "Point of sale", "Square locations2 mapped · 1 needs mapping": "Square locations", "Taproom · Sep 1 to Sep 8": "Point of sale", "Sale · Hazy IPA · pint": "POS sale detail", "Return · Hazy IPA · pint": "POS sale detail", "MenuOne catalog · per-location stock and price": "Menu", "Taproom sales in QuickBooksAbout Square’s optional connector": "Taproom sales in QuickBooks" },
     job: "Connect one POS provider and see both directions at a glance",
     reads: "get_pos_integration_health · list_pos_locations · list_pos_sales",
     writes: "sync_square_catalog · sync_square_sales · disconnect_square",
-    states: [["permission", "admin only", 1], ["not turned on", "disabled Connect before navigation with the same reason as Connect Square", 1], ["no provider", "connect one before a menu can publish"], ["healthy", "catalog and sales both current"], ["sales lagging", "the menu still publishes", 1], ["token revoked", "publishing and sync both stop", 1], ["taproom sales in QuickBooks", "Square may send them through its own connector; MGR explains it, never detects it", 1], ["second location", "its own MGR location and its own channel", 1], ["unmapped location", "its sales cannot reconcile until it is mapped", 1], ["authorization failed", "note beside current health; the existing connection is kept"], ["partial sync", "never counts as complete coverage", 1], ["return", "retained as a source fact; never posts stock"]],
+    states: [["permission", "admin only", 1], ["not turned on", "disabled Connect Square with its reason", 1], ["no provider", "connect one before a menu can publish"], ["healthy", "catalog and sales both current"], ["sales lagging", "the menu still publishes", 1], ["token revoked", "publishing and sync both stop", 1], ["taproom sales in QuickBooks", "Square may send them through its own connector; MGR explains it, never detects it", 1], ["second location", "its own MGR location and its own channel", 1], ["unmapped location", "its sales cannot reconcile until it is mapped", 1], ["authorization failed", "note beside current health; the existing connection is kept"], ["partial sync", "never counts as complete coverage", 1], ["return", "retained as a source fact; never posts stock"]],
     spec: "Square is the sole POS provider in this slice. This page reports connection, mapping, and completed sync state without exposing token material. Square’s optional QuickBooks connector remains a separate accountant-reviewed revenue feed: MGR provides a note and Accounting deep link, but does not detect, configure, or synchronize it.",
     body: <PointOfSaleView model={{ connected: true, merchant: "Demo Brewing LLC", state: "Connected", locations: "2 mapped · 1 needs mapping", lastSync: "Today · 6:58 PM" }} syncAction={<PosSyncActions />} coverage={["Taproom · Sep 1 to Sep 8"]} sales={[{ id: "sale-1", label: "Sale · Hazy IPA · pint", detail: "Taproom · current revision", amount: "$7.00", status: "mapped", openable: true }, { id: "return-1", label: "Return · Hazy IPA · pint", detail: "Taproom · current revision", amount: "−$7.00", status: "mapped", openable: true }]} />,
   },
   {
     step: 7, slice: 7, tab: "More", group: "POS",
     name: "Point of sale unavailable",
-    to: { Connect: "Point of sale unavailable", Square: "Point of sale unavailable" },
-    job: "Explain that Square is not turned on before opening its connection page",
+    to: { "Connect Square": "Point of sale unavailable", Square: "Point of sale unavailable" },
+    job: "Explain that Square is not turned on before offering authorization",
     reads: "get_pos_integration_health",
     writes: "none",
-    states: [["not turned on", "Connect disabled before navigation; no prior seller or sales facts", 1]],
+    states: [["not turned on", "Connect Square disabled with its reason; no prior seller or sales facts", 1]],
     body: <PointOfSaleView model={{ connected: false, configured: false, merchant: "", state: "Not connected" }} />,
   },
 
@@ -2759,28 +2734,13 @@ export const SCREENS: Screen[] = [
     slice: 7,
     tab: "More",
     group: "POS",
-    name: "Connect Square",
-    to: { "Connect Square": "Square locations" },
-    job: "Authorize one Square seller and explain the data exchange before OAuth",
-    reads: "get_pos_integration_health",
-    writes: "connect_square",
-    states: [["permission", "admin only", 1], ["not turned on", "disabled Connect Square with the same reason as Point of sale", 1], ["cancelled", "return to Point of sale unchanged"], ["connected", "continue to Square locations"]],
-    spec: "The page explains both catalog writes and sales reads before leaving MGR.",
-    body: <ConnectSquareView />,
-  },
-  {
-    step: 7,
-    slice: 7,
-    tab: "More",
-    group: "POS",
     surface: "sheet",
     name: "Square locations",
-    to: { "Save mapping": "Point of sale" },
     job: "Map each Square location to one MGR location and sales channel",
     reads: "list_pos_locations · list_locations",
     writes: "set_pos_location_mapping",
     states: [["permission", "admin only", 1], ["mapped", "two locations ready"], ["unmapped", "sales cannot reconcile", 1], ["claimed", "an MGR location cannot be claimed twice", 1]],
-    spec: "A provider location maps to exactly one MGR location. Sales remain expected-consumption facts; the physical count owns depletion.",
+    spec: "A provider location maps to exactly one MGR location, saved when it is picked; a failed save puts the pick back. Sales remain expected-consumption facts; the physical count owns depletion.",
     body: <SquareLocationsView locations={[{ id: "taproom", name: "Taproom" }, { id: "warehouse", name: "Warehouse" }]} rows={[{ externalLocationId: "square-tap", name: "Square Taproom", detail: "active · available · Taproom", mgrLocationId: "taproom" }, { externalLocationId: "square-events", name: "Third location", detail: "active · available · needs mapping", mgrLocationId: "" }]} />,
   },
   {
@@ -2805,12 +2765,12 @@ export const SCREENS: Screen[] = [
     group: "POS",
     surface: "sheet",
     name: "Disconnect Square",
-    to: { "Disconnect Square": "Connect Square" },
+    to: { "Disconnect Square": "Point of sale" },
     job: "Confirm the external effects of disconnecting Square",
     reads: "get_pos_integration_health",
     writes: "disconnect_square",
     states: [["permission", "admin only", 1], ["confirmed", "installation disabled and token purged"], ["recovery required", "still offered: purges the credential and attempts revocation", 1], ["revocation unresolved", "credential purged; stays in recovery, never shown as disconnected", 1]],
-    spec: "The confirmation names what stops and what remains so reconnecting can reuse mappings.",
+    spec: "A dialog over Point of sale. The confirmation names what stops and what remains so reconnecting can reuse mappings. A confirmed revocation closes it, and Point of sale then offers Connect Square; an unconfirmed one keeps it open with Retry revocation.",
     body: <DisconnectSquareView />,
   },
   {
@@ -2819,7 +2779,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "POS",
     name: "Menu",
-    to: { Taproom: "Menu", Warehouse: "Menu", "Save mapping": "Menu", "Change mapping": "Menu" },
+    to: { Taproom: "Menu", Warehouse: "Menu" },
     job: "One catalog, published to every destination that sells from it",
     reads: "get_pos_menu [derived from brands × formats × configured-bin stock]",
     writes: "configure_pos_menu · set_pos_price_override [nullable, per POS location] · set_pos_website_publication · publish_pos_menu [complete derived location change set] · set_pos_item_mapping [Also in Square]",
@@ -2863,13 +2823,13 @@ export const SCREENS: Screen[] = [
     group: "POS",
     surface: "sheet",
     name: "POS item",
-    to: { "Save override": "Menu", "Publish item to Square": "POS item" },
+    to: { "Save and publish": "POS item" },
     job: "Override one price; everything else is inherited from the format",
     reads: "get_pos_menu_item",
     writes: "set_pos_price_override · set_pos_website_publication · publish_pos_item",
     states: [["permission", "warehouse or admin required", 1], ["inherited", "no override · the format price is what publishes"], ["overridden", "this row is priced away from the default", 1], ["reset", "override cleared · the row rejoins the format price"], ["no price at all", "no format default and no override · Save stays disabled", 1], ["per location", "a second taproom overrides the same row separately", 1], ["per beer", "another beer on the price group pours the same format with its own override", 1], ["format changed", "conversion and premise follow the format, not this sheet"], ["tax preserved", "publishing never clears the provider’s tax assignment", 1]],
     redrawn: true,
-    spec: "Against the brand and format schema, Serving and Premise are no longer authored here. A format owns its conversion (a pint is 1/124 of a ½ bbl) and its premise, so this sheet reads them instead of asking again. What is left is a register price, not a wholesale grid cell: an optional override keyed by POS location and beer (the pour itself is shared by every beer on the price group), so an empty field lets a format-wide Taproom cell propagate and the Warehouse register can ring a different number than the Taproom without either row copying a wholesale price. Availability stays a rule, not a per-keg switch: MGR retires the row when taproom stock runs out and re-publishes under the same provider id when it returns. Price still lands on the variation rather than the item, so an override writes to the format’s variation id.",
+    spec: "Against the brand and format schema, Serving and Premise are no longer authored here. A format owns its conversion (a pint is 1/124 of a ½ bbl) and its premise, so this sheet reads them instead of asking again. What is left is a register price, not a wholesale grid cell: an optional override keyed by POS location and beer (the pour itself is shared by every beer on the price group), so an empty field lets a format-wide Taproom cell propagate and the Warehouse register can ring a different number than the Taproom without either row copying a wholesale price. Availability stays a rule, not a per-keg switch: MGR retires the row when taproom stock runs out and re-publishes under the same provider id when it returns. Price still lands on the variation rather than the item, so an override writes to the format’s variation id. Save and publish saves the override, then publishes the item; a failed save publishes nothing.",
     body: <PosItemView item={{ brand: "Hazy IPA", format: "pint · poured", sources: "½ bbl keg · Taproom", serving: "16 oz · from the format", price: "$7.00", override: "6.50", websitePublished: true, available: true }} />,
   },
   // Revision 2 (schema §16, designed 2026-09-02). Most commits here are still
@@ -2904,18 +2864,6 @@ export const SCREENS: Screen[] = [
     states: [["permission", "admin required", 1], ["new", "titled Add channel · name and tax treatment required"], ["edit", "titled with the channel being edited"]],
     spec: "Drawn editing the Export channel. The sheet has no Delete: removal and its in-use rule live on the Sale channels list. Every selected tax treatment shows its meaning under the chips, including the default Taxable choice. The four removals without payment of tax (Export, Vessel supplies, Research, Transfer in bond) keep their approved TTB meanings.",
     body: <ChannelView model={toChannelViewProps(channelExport)} />,
-  },
-  {
-    step: 8,
-    slice: 1,
-    tab: "More",
-    name: "Units",
-    job: "Choose the unit gravity is shown and typed in, for the brewery and for yourself",
-    reads: "get_gravity_unit",
-    writes: "set_brewery_gravity_unit · set_my_gravity_unit",
-    states: [["brewery default", "admins only see and set this row", 1], ["personal override", "any staff role sets their own"], ["inherit", "“Use brewery default” clears the override"]],
-    spec: "Gravity is stored in °Plato everywhere and that never changes: this screen changes only what is printed and how a typed value is read back, so an existing reading cannot move. Two controls over one value because the two audiences differ. An admin sets what the brewery reads by default, and any brewer may override it for themselves without asking anyone. A membership with no unit of its own follows the brewery, which is why the personal control offers a third option rather than an empty one. SG input accepts both spellings a brewer uses, 1.050 and 1050. Gravity is the only unit chosen here, so the page is one Gravity unit section. Preview converts one sample reading from the other unit into the one in effect, so a brewer sees the conversion before relying on it.",
-    body: <UnitsView model={toUnitsViewProps(unitsPlato)} />,
   },
   {
     step: 8,
@@ -2981,7 +2929,7 @@ export const SCREENS: Screen[] = [
     reads: "list_sale_channels · list_price_groups · list_formats · list_channel_prices",
     writes: "set_channel_price · clear_channel_price · upsert_price_group · delete_price_group",
     states: [["permission", "sales or admin required", 1], ["empty cell", "unpriced · an order for a SKU on that group and format is refused on that channel", 1], ["empty", "no price groups yet: New price group is the only action"], ["in use", "a group a brand sits on, or a cell prices, cannot be removed", 1]],
-    spec: "Reached from More and from Catalog; back returns to More. The brewery's price sheet is one grid: rows are price groups, columns are packaged formats plus pours owned by a group (one column per pour name). One tab per sale channel; the grid shows the selected channel, the first by default, and the address keeps the tab. A beer sits on one group (Catalog → Brand → Price group) and a customer sits on one channel, so the price of any SKU for any customer is the single cell where the two meet. Every cell is a dollars field edited in place: Enter or leaving the input saves. One Tab commits even when the next control is Clear; directly clicking Clear opens confirmation without saving a draft first. Saving and Saved appear inline; invalid, negative, exponent, or extra-precision amounts are refused without rounding. Zero is valid. An unpriced cell is empty with a dash. Blanking a priced cell and leaving it restores the persisted price with an explanation; only Clear followed by confirmation removes it. A group with no pour of a column's name shows + add, which opens Add pour on that group with the name filled in. A group's name opens Price group, where its position, cost ceiling, and pours live.",
+    spec: "Reached from More and from Catalog; back returns to More. The brewery's price sheet is one grid: rows are price groups, columns are packaged formats plus pours owned by a group (one column per pour name, headed Pour · and the name, so a keg and a pour of one name differ). One tab per sale channel; the grid shows the selected channel, the first by default, and the address keeps the tab. A beer sits on one group (Catalog → Brand → Price group) and a customer sits on one channel, so the price of any SKU for any customer is the single cell where the two meet. Every cell is a dollars field edited in place: Enter or leaving the input saves. Saving and Saved appear inline; invalid, negative, exponent, or extra-precision amounts are refused without rounding. Zero is valid. An unpriced cell is empty with a dash. Emptying a priced cell and leaving it clears the price; no cell carries its own Clear button. A group with no pour of a column's name shows + add, which opens Add pour on that group with the name filled in. A group's name opens Price group, where its position, cost ceiling, and pours live.",
     body: <PriceGroupsView model={toPriceGroupsViewProps(pricingGrid)} />,
   },
   {
@@ -3333,7 +3281,7 @@ export const SCREENS: Screen[] = [
   {
     step: 5, slice: 1, tab: "More", name: "Water profiles empty",
     to: { "Add water profile": "Water profile" },
-    job: "Explain where source and target choices belong before the first profile",
+    job: "Invite the first profile, and say a recipe’s Water sheet picks its role",
     reads: "list_water_profiles",
     writes: "none [creation and editing happen on Water profile]",
     states: [["empty", "no saved profiles · Add water profile"]],

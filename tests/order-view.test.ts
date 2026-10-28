@@ -230,6 +230,46 @@ describe("Order view loop", () => {
     }
   });
 
+  describe("line columns follow the order's state (#1506)", () => {
+    const at = (status: OrderSnapshot["order"]["status"], lines: OrderSnapshot["lines"] = orderPickedRestock.lines.map(l => ({ ...l, qty_picked: null })), atp = [{ sku_id: orderPickedRestock.lines[0]!.sku_id, qty: -2 }]) =>
+      toOrderViewProps({ ...orderPickedRestock, order: { ...orderPickedRestock.order, status, needs_restock: false }, lines, atp });
+    const labels = (model: ReturnType<typeof toOrderViewProps>) => model.columns.map(([label]) => label);
+    const picked = orderPickedRestock.lines;
+    const shipped = picked.map(l => ({ ...l, qty_shipped: l.qty_picked }));
+
+    it("shows Picked and Shipped only once a line records them", () => {
+      expect(labels(at("draft"))).toEqual(["Ordered", "Unit price"]);
+      expect(labels(at("submitted"))).toEqual(["Ordered", "Available (all locations)", "Unit price"]);
+      expect(labels(at("confirmed"))).toEqual(["Ordered", "Available (all locations)", "Unit price"]);
+      expect(labels(at("picked", picked))).toEqual(["Ordered", "Picked", "Unit price"]);
+      expect(labels(at("shipped", shipped))).toEqual(["Ordered", "Picked", "Shipped", "Unit price"]);
+    });
+
+    it("keeps Picked on a confirmed order re-opened after its pick, and on one cancelled after it", () => {
+      expect(labels(at("confirmed", picked))).toEqual(["Ordered", "Picked", "Available (all locations)", "Unit price"]);
+      expect(labels(at("cancelled", picked))).toEqual(["Ordered", "Picked", "Unit price"]);
+    });
+
+    it("flags availability below zero only while the order is submitted or confirmed", () => {
+      expect(at("submitted").lines[0]?.warning).toBe("Available is below zero");
+      expect(at("confirmed").lines[0]?.warning).toBe("Available is below zero");
+      for (const model of [at("draft"), at("picked", picked), at("shipped", shipped), at("cancelled")]) {
+        expect(model.lines.map(l => l.warning)).not.toContain("Available is below zero");
+      }
+    });
+
+    it("draws the phone records from the same columns, without standing legends", () => {
+      const out = renderToStaticMarkup(createElement(OrderView, { model: at("shipped", shipped), footer: null }));
+      expect(out).not.toContain("Available (all locations)");
+      expect(out).toMatch(/<dt[^>]*>Shipped<\/dt>/);
+      expect(out).not.toContain("Not supplied does not mean zero");
+      const draft = renderToStaticMarkup(createElement(OrderView, { model: at("draft") }));
+      expect(draft).not.toMatch(/<(th|dt)\b[^>]*>(Picked|Shipped)</);
+      expect(draft).not.toContain("Not recorded");
+      expect(draft).not.toContain("Cancellation requires a reason and confirmation.");
+    });
+  });
+
   describe("Price summary (#976)", () => {
     const html = (snapshot: OrderSnapshot) => renderToStaticMarkup(createElement(OrderView, { model: toOrderViewProps(snapshot), footer: null }));
 
@@ -350,10 +390,23 @@ describe("Order view loop", () => {
 
     it("draws a desktop table and labeled phone records from the same lines", () => {
       const out = html(orderConfirmedWholesale);
-      for (const header of ["SKU", "Ordered", "Picked", "Shipped", "Unit price", "Line amount"]) expect(out).toContain(`>${header}<`);
+      for (const header of ["SKU", "Ordered", "Available (all locations)", "Unit price", "Line amount"]) expect(out).toContain(`>${header}<`);
       expect(out).toMatch(/<dt[^>]*>Line amount<\/dt>/);
       expect(out).toContain("Price summary");
       expect(out).toContain("3 lines");
     });
+  });
+});
+
+describe("#1517 order ↔ invoice", () => {
+  it("names a shipped order's invoice as a fact, linked on the live page", () => {
+    const invoice = { id: "invoice-1", invoice_no: 2 };
+    expect(toOrderViewProps({ ...orderPickedRestock, invoice, backHref: "/orders" }).facts).toContainEqual({ label: "Invoice", value: "INV-0002", href: "/invoices/invoice-1" });
+    expect(toOrderViewProps({ ...orderPickedRestock, invoice }).facts).toContainEqual({ label: "Invoice", value: "INV-0002" });
+    expect(toOrderViewProps({ ...orderPickedRestock, backHref: "/orders" }).facts.map((f) => f.label)).not.toContain("Invoice");
+  });
+  it("get_order reads the shipment's invoice, and the page passes it", () => {
+    expect(readFileSync("lib/commands/orders.ts", "utf8")).toMatch(/from\("shipments"\)\.select\("\*, deliveries\(outcome\), invoices\(id, invoice_no\)"\)/);
+    expect(readFileSync(PAGE, "utf8")).toMatch(/invoice: shipment\?\.invoices\[0\] \?\? null/);
   });
 });

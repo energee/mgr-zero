@@ -21,16 +21,17 @@ import { VendorView } from "../components/mgr/views/vendor";
 import { VendorsView } from "../components/mgr/views/vendors";
 import {
   contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsOnHandList,
-  newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
+  correctReceiptCountryMalt, newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
 } from "../lib/mgr/fixtures/purchasing";
 import { toContractsViewProps } from "../lib/mgr/contracts-view";
-import { toMaterialsOnHandViewProps } from "../lib/mgr/materials-on-hand-view";
-import { purchaseOrderNext, toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
+import { toMaterialsOnHandViewProps, toMaterialsScopes } from "../lib/mgr/materials-on-hand-view";
+import { poDetailStatus, poListStatus, purchaseOrderNext, toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
+import { poLineDetail, poLineQty } from "../lib/mgr/receive-po-view";
 import { receiptBillPresentation, receiptBillRequest, toPostedReceiptViewProps, type ReceiptSnapshot } from "../lib/mgr/receipt-view";
-import { toVendorsViewProps } from "../lib/mgr/vendors-view";
+import { toVendorsViewProps, vendorLeadLine } from "../lib/mgr/vendors-view";
 import { contractSubmitReason } from "../lib/mgr/contract-view";
 import { newPoReason } from "../lib/mgr/new-po-view";
-import { CLOSURE_FORM_ID } from "../lib/mgr/receive-po-view";
+import { CLOSURE_FORM_ID, receiveReason } from "../lib/mgr/receive-po-view";
 import { beginRecovery, discardRecovery } from "../lib/commands/recovery";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -63,11 +64,40 @@ describe("Purchase orders", () => {
   });
 
   it("each order status names its next action; received and cancelled have none (#996)", () => {
-    expect(purchaseOrderNext("draft")).toEqual({ verb: "Send", tone: "info" });
+    expect(purchaseOrderNext("draft")).toEqual({ verb: "Mark sent", tone: "info" });
     expect(purchaseOrderNext("sent")).toEqual({ verb: "Receive", tone: "info" });
     expect(purchaseOrderNext("partially_received")).toEqual({ verb: "Receive", tone: "attention" });
     expect(purchaseOrderNext("received")).toBeUndefined();
     expect(purchaseOrderNext("cancelled")).toBeUndefined();
+  });
+
+  it("list and detail read status in sentence case and name a short closure (#1501)", () => {
+    const po = { status: "received", closed_at: null, close_reason: null, ordered_on: "2026-09-07", expected_on: "2026-09-10", sent_via: "mailto", lines_open: 0 };
+    expect(poListStatus({ ...po, status: "draft", ordered_on: null })).toBe("Draft");
+    expect(poListStatus(po)).toBe("Received");
+    expect(poListStatus({ ...po, status: "sent" })).toBe("Sent Sep 7, 2026 · expected Sep 10, 2026");
+    expect(poListStatus({ ...po, status: "partially_received", lines_open: 1 })).toBe("Partially received · 1 line still due");
+    expect(poListStatus({ ...po, closed_at: "2026-09-12T00:00:00Z" })).toBe("Closed short");
+    expect(poListStatus({ ...po, status: "cancelled", closed_at: "2026-09-12T00:00:00Z" })).toBe("Cancelled");
+    expect(poDetailStatus({ ...po, closed_at: "2026-09-12T00:00:00Z", close_reason: "QA test close" })).toBe("Closed short · QA test close");
+    expect(poDetailStatus({ ...po, status: "draft", ordered_on: null, sent_via: null })).toBe("Draft · not yet sent");
+    expect(poDetailStatus(po)).toBe("Marked sent Sep 7, 2026 · from a mail client · expected Sep 10, 2026 · received");
+  });
+
+  it("a PO line puts its purchase unit on every quantity (#1501)", () => {
+    const line = { qty_ordered: 10, qty_received: 8, qty_open: 0, expected_lot_code: null, material: { purchase_uom: "lb" } };
+    expect(poLineDetail(line)).toBe("ordered 10 lb · received 8 lb · still due 0 lb");
+    expect(poLineDetail({ ...line, expected_lot_code: "L-1" })).toBe("ordered 10 lb · received 8 lb · still due 0 lb · PO lot L-1");
+    expect(poLineQty(10, line.material)).toBe("10 lb");
+    expect(poLineQty(10, null)).toBe("10");
+  });
+
+  it("a vendor's observed lead time reads as orders and how they were sent (#1501)", () => {
+    const vendor = { lead_time_days: null, contracts: [], observed: [
+      { sent_via: "mailto", n: 2, avg_lead_days: 0 },
+      { sent_via: "external", n: 1, avg_lead_days: 3.5 },
+    ] };
+    expect(vendorLeadLine(vendor)).toBe("no lead time typed · observed 0 days over 2 orders sent from a mail client · observed 3.5 days over 1 order sent outside MGR · 0 contracts");
   });
 
   it("the Purchase orders inventory record is PurchaseOrdersView", () => {
@@ -140,6 +170,35 @@ describe("Purchase orders", () => {
     expect(closed).not.toContain("Receive purchase order");
   });
 
+  it("Receive purchase order and Correct receipt name what they wait for (#1485)", () => {
+    const lines = receivePoCountryMalt.lines!;
+    const receive = (patch: Partial<typeof receivePoCountryMalt>) => receiveReason({ ...receivePoCountryMalt, ...patch });
+    expect(receive({})).toBeNull();
+    // One -1 line among valid lines is named, never dropped from the receipt.
+    expect(receive({ lines: lines.map(line => line.key === "hulls" ? { ...line, qty: "-1" } : line) })).toBe("Still needed: a count of zero or more for Rice hulls · 50 lb.");
+    expect(receive({ lines: lines.map(line => line.key === "hulls" ? { ...line, qty: "1e3" } : line) })).toBe("Still needed: a count of zero or more for Rice hulls · 50 lb.");
+    // A blank line is left out of a new receipt; an all-blank receipt counts nothing.
+    expect(receive({ lines: lines.map(line => line.key === "hulls" ? { ...line, qty: "" } : line) })).toBeNull();
+    expect(receive({ lines: lines.map(line => ({ ...line, qty: "" })) })).toBe("Still needed: a count on at least one line.");
+    expect(receive({ locationId: "", binId: "", receivedOn: "", lines: lines.map(line => line.key === "malt" ? { ...line, lot: " " } : line) }))
+      .toBe("Still needed: a location, a bin, a received day, and a lot code for 2-row · 55 lb bags.");
+    // A lot-tracked line counted 0 needs no lot.
+    expect(receive({ lines: lines.map(line => line.key === "malt" ? { ...line, qty: "0", lot: "" } : line) })).toBeNull();
+    const correct = (patch: Partial<typeof correctReceiptCountryMalt>) => receiveReason({ ...correctReceiptCountryMalt, ...patch });
+    expect(correct({})).toBeNull();
+    expect(correct({ correctionReason: " ", lines: correctReceiptCountryMalt.lines!.map(line => line.key === "hulls" ? { ...line, qty: "" } : line) }))
+      .toBe("Still needed: a correction reason and a count for Rice hulls · 50 lb.");
+    expect(receiveReason({ ...receivePoCountryMalt, state: "draft" })).toBeNull();
+  });
+
+  it("prints Receive's reason beside its own button, apart from the closure reason (#1485)", () => {
+    const html = htmlOf(createElement(ReceivePoView, { model: { ...receivePoCountryMalt, locationId: "" } }));
+    const button = html.match(/<button[^>]*>Receive purchase order<\/button>/)?.[0];
+    expect(button).toContain('disabled=""');
+    const id = button?.match(/aria-describedby="([^"]+)"/)?.[1];
+    expect(html).toMatch(new RegExp(`<p id="${id}"[^>]*>Still needed: a location\\.</p>`));
+  });
+
   it("renders Receive purchase order without leaking live hrefs", () => {
     expect(htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }))).toMatch(/>Receive purchase order</);
     expect(htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }))).not.toMatch(/href="\/purchase-orders"/);
@@ -183,6 +242,7 @@ it("posted receipt uses counted quantities, captured lot references and current 
   expect(model.tape[0][1]).toContain("short 1 box");
   expect(model.tape[0][1]).toContain("actual-lot-id");
   expect(model.backHref).toBeUndefined();
+  expect(model.backTo).toBe("PO-0042");
   expect(toPostedReceiptViewProps(snapshot, "wrong-receipt")).toBeUndefined();
   expect(toPostedReceiptViewProps({ ...snapshot, lines: [{ ...snapshot.lines[0], qty_open: 0 }] }, "receipt-id")!.stillOwed).toBe("Nothing owed");
 });
@@ -386,6 +446,18 @@ describe("Materials", () => {
     }
   });
 
+  it("#1516 offers a Type pick, All types first, each type linking live and inert in the inventory", () => {
+    const [type] = toMaterialsScopes({ category: "hop", href: patch => `/materials?category=${patch.category}` });
+    expect(type).toMatchObject({ label: "Type", value: "hop" });
+    expect(type!.options.slice(0, 3)).toEqual([
+      { value: "", label: "All types", href: "/materials?category=" },
+      { value: "malt", label: "Malt", href: "/materials?category=malt" },
+      { value: "hop", label: "Hop", href: "/materials?category=hop" },
+    ]);
+    expect(toMaterialsScopes({ category: "" })[0]!.options.every(option => option.href === undefined)).toBe(true);
+    expect(toMaterialsOnHandViewProps({ rows: [], filtered: true }).empty?.description).toBe("Clear the search or choose All types to see every material.");
+  });
+
   it("links the unfiltered empty list to Purchase orders and keeps inventory links inert", () => {
     const model = toMaterialsOnHandViewProps({ rows: [], purchaseOrdersHref: "/purchase-orders" });
     const html = htmlOf(createElement(MaterialsOnHandView, { model }));
@@ -464,10 +536,10 @@ describe("Vendors", () => {
   });
 
   it("holds Save contract for missing, invalid, or exponent-notation values", () => {
-    expect(contractSubmitReason({ vendorId: "", materialId: "", quantity: "", unitCost: "" })).toBeTruthy();
-    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1", unitCost: "-1" })).toBeTruthy();
-    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1e3", unitCost: "" })).toBeTruthy();
-    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1.5", unitCost: "0" })).toBeNull();
+    expect(contractSubmitReason({ vendorId: "", materialId: "", quantity: "", unitCost: "", starts: "", ends: "" })).toBeTruthy();
+    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1", unitCost: "-1", starts: "", ends: "" })).toBeTruthy();
+    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1e3", unitCost: "", starts: "", ends: "" })).toBeTruthy();
+    expect(contractSubmitReason({ vendorId: "vendor", materialId: "material", quantity: "1.5", unitCost: "0", starts: "", ends: "" })).toBeNull();
   });
 
   it("waits to show contract errors in live controlled fields", () => {
@@ -521,7 +593,7 @@ describe("Vendors and Materials on hand search", () => {
   it("say nothing matches, not nothing yet, when a search is on", () => {
     expect(toVendorsViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No vendors match", description: "Clear the search to see every vendor." });
     expect(toVendorsViewProps({ rows: [] }).empty?.title).toBe("No vendors yet");
-    expect(toMaterialsOnHandViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No materials match", description: "Clear the search to see every material." });
+    expect(toMaterialsOnHandViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No materials match", description: "Clear the search or choose All types to see every material." });
     expect(toMaterialsOnHandViewProps({ rows: [] }).empty?.title).toBe("No materials yet");
     // #1112: the page's only action is Add material, so the empty state starts there. Receiving
     // is the one step that works for every material: a lot-tracked one with no lot can't be counted in.
@@ -623,4 +695,13 @@ it("receipt history uses frozen units and names and exposes explicit revision li
   expect(model.tape[0][1]).toContain("MALT-A · best by Jan 1, 2027");
   expect(model.info).toMatch(/^Received Sep 20, 2026\./);
   expect(model.info).toContain("superseded");
+});
+
+describe("past PO Expected date (#1489)", () => {
+  const html = (expected: string) => htmlOf(createElement(NewPoView, { model: { ...newPoCountryMalt, expected, today: "2026-10-23" } }));
+  it("warns before the brewery's today without blocking Save draft", () => {
+    expect(html("2026-10-03")).toContain("This expected date is in the past for your brewery. You can still save the PO.");
+    expect(html("2026-10-24")).not.toContain("in the past");
+    expect(html("")).not.toContain("in the past");
+  });
 });

@@ -9,6 +9,7 @@ import { ComposerUnavailableView } from "@/components/mgr/composer-load-boundary
 import { OfflineOutboxView } from "@/components/mgr/views/composer";
 import { COMPOSER_SETUP_TIMEOUT_MESSAGE, COMPOSER_SETUP_TIMEOUT_MS, loadComposerSetup } from "@/lib/composer/setup";
 import { MAX_HISTORY_MESSAGES } from "@/lib/chat/model-messages";
+import { MAX_CHAT_MESSAGE_CHARS } from "@/lib/chat/messages";
 
 describe("composer conversation surface", () => {
   it("renders a transcript, activity, recovery and conversation controls", () => {
@@ -36,11 +37,19 @@ describe("composer conversation surface", () => {
     expect(render({ messages: [], error: "Setup failed" })).not.toContain(welcome);
   });
 
-  it.each([0, 2])("explains pending readings even when the queue has %s entries (#1251)", (outboxCount) => {
-    const html = renderToStaticMarkup(createElement(ComposerStripView, { outboxCount }));
-    expect(html).toContain(`Pending readings (${outboxCount})`);
+  it("explains pending readings when the composer offers them (#1251)", () => {
+    const html = renderToStaticMarkup(createElement(ComposerStripView, { outboxCount: 2, onOutbox: () => undefined }));
+    expect(html).toContain("Pending readings (2)");
     expect(html).toContain("Saved fermentation readings to retry or review.");
     expect(html).not.toContain(">Outbox");
+  });
+
+  it("draws no Pending readings button when there is nothing to open (#1512)", () => {
+    const html = renderToStaticMarkup(createElement(ComposerStripView, { outboxCount: 0 }));
+    expect(html).not.toContain("Pending readings");
+    expect(html).not.toContain("Saved fermentation readings");
+    const loading = renderToStaticMarkup(ComposerUnavailableView({ outboxCount: 0, children: null }));
+    expect(loading).not.toContain("Pending readings");
   });
 
 
@@ -69,8 +78,26 @@ describe("composer conversation surface", () => {
   it("supports stopping a stream and documents the input keyboard behavior", () => {
     const html = renderToStaticMarkup(createElement(ComposerStripView, { value: "hello", onChange: () => undefined, streaming: true, onStop: () => undefined }));
     expect(html).toContain("Stop response");
-    expect(html).toContain('maxLength="4000"');
     expect(html).toContain("Shift + Enter");
+  });
+
+  it("shows the 4,000-character limit instead of cutting a longer prompt (#1520)", () => {
+    const render = (value: string) => renderToStaticMarkup(createElement(ComposerStripView, { value, onChange: () => undefined, onSubmit: () => undefined }));
+    const sendButton = (html: string) => html.match(/<button[^>]*>Send<\/button>/)?.[0];
+    const atLimit = render("x".repeat(MAX_CHAT_MESSAGE_CHARS));
+    expect(atLimit).not.toContain("characters");
+    expect(sendButton(atLimit)).not.toContain('disabled=""');
+    const over = render("x".repeat(MAX_CHAT_MESSAGE_CHARS + 1));
+    expect(over).not.toMatch(/maxLength=/i);
+    expect(over).toContain("4,001 / 4,000 characters. Shorten your message to send it.");
+    expect(over).toMatch(/<textarea[^>]*aria-invalid="true"/);
+    expect(sendButton(over)).toContain('disabled=""');
+  });
+
+  it("names the reason in a box disabled for that reason (#1520)", () => {
+    const html = renderToStaticMarkup(createElement(ComposerStripView, { disabled: true, disabledReason: "Ask MGR is not configured." }));
+    expect(html).toMatch(/<textarea[^>]*placeholder="Ask MGR is not configured\."/);
+    expect(renderToStaticMarkup(createElement(ComposerStripView, {}))).toContain('placeholder="Ask MGR about inventory, orders, production…"');
   });
 
   it("sends on Enter, but not on Shift+Enter or while an IME is composing (#446)", () => {
@@ -114,7 +141,7 @@ it("shows progress while setup is pending and offers setup recovery before a con
 });
 
 it("shows progress while the chat interface itself loads (#1105)", () => {
-  const html = renderToStaticMarkup(ComposerUnavailableView({ outboxCount: 0, onOutbox: () => undefined, children: null }));
+  const html = renderToStaticMarkup(ComposerUnavailableView({ outboxCount: 0, children: null }));
   expect(html).toContain('data-slot="skeleton"');
 });
 

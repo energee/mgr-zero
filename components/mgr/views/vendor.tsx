@@ -1,7 +1,7 @@
 // components/mgr/views/vendor.tsx — shared Vendor sheet body.
 "use client";
 import { E } from "@/components/mgr/e";
-import { vendorFieldErrors, type VendorViewModel } from "@/lib/mgr/vendor-view";
+import { vendorFieldErrors, vendorReason, type VendorViewModel } from "@/lib/mgr/vendor-view";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import type { ReactNode } from "react";
 import { Fragment, useId } from "react";
@@ -53,7 +53,7 @@ export function VendorView({
       )}
       {E.info("When Planning lists a material short and it resolves to this vendor, its buy-by date is the needed-by date less this lead time. Received orders show a separate observed average.")}
       {messages}
-      {footer !== undefined ? footer : E.btn("Save vendor", !model.name.trim() || localErrors.email || localErrors.phone || localErrors.leadDays ? "p disabled" : "p")}
+      {footer !== undefined ? footer : E.btn("Save vendor", vendorReason(model) ? "p disabled" : "p")}
       {model.active !== null && <>
         {E.ttl("Vendor status")}
         {E.fld("Status", model.active ? "Active" : "Inactive")}

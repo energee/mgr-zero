@@ -6,6 +6,7 @@
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { RecipesViewModel } from "@/lib/mgr/recipes-view";
+import { WATER_PROFILES_CAPTION } from "@/lib/mgr/water-profiles-view";
 
 export type { RecipesViewModel };
 
@@ -29,7 +30,7 @@ export function RecipesView({ model, controls, linkRows }: {
         ))}
       {/* A heading, so the row reads as its own destination and not as a recipe named Water profiles. */}
       {E.ttl("Water")}
-      {E.nav("Water profiles", "Source and target profiles", "", undefined, model.waterProfilesHref)}
+      {E.nav("Water profiles", WATER_PROFILES_CAPTION, "", undefined, model.waterProfilesHref)}
     </>
   );
 }

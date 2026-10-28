@@ -3,12 +3,14 @@
 // the COLA column reads its recorded approvals; the latest approved label
 // leads the row as a thumbnail. What a brand sells (packages
 // and pours) lives under its Sells as.
-// Price groups and Water profiles rows follow; inventory and live draw both.
+// Price groups and Water profiles rows follow, then Formats under the
+// #formats anchor that Brand's Manage formats opens; inventory and live draw both.
 // Live, a row the viewer may not open is plain (no tap, no Open); the
 // inventory, which passes no links, keeps every row an inert tap.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { NOT_SET, type CatalogViewModel } from "@/lib/mgr/catalog-view";
+import { WATER_PROFILES_CAPTION } from "@/lib/mgr/water-profiles-view";
 import { FormatsView, type FormatsViewModel } from "@/components/mgr/views/formats";
 import { RecordTable } from "@/components/mgr/views/record-table";
 import { COLA_SLOT, ColaLabelImageView } from "@/components/mgr/views/cola-label-image";
@@ -68,8 +70,8 @@ export function CatalogView({
           }))}
         />}
       {navRow("Price groups", model.priceGroups, links && (links.priceGroups ? model.priceGroupsHref : null))}
-      {navRow("Water profiles", "Source and target profiles", links && (links.waterProfiles ? model.waterProfilesHref : null))}
-      {formats && <FormatsView model={formats} header={<div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">{E.group("Formats")}{formatAction !== undefined ? formatAction : E.btn("New format")}</div>} />}
+      {navRow("Water profiles", WATER_PROFILES_CAPTION, links && (links.waterProfiles ? model.waterProfilesHref : null))}
+      {formats && <FormatsView model={formats} header={<div id="formats" className="flex scroll-m-20 flex-col gap-2 md:flex-row md:items-center md:justify-between">{E.group("Formats")}{formatAction !== undefined ? formatAction : E.btn("New format")}</div>} />}
     </>
   );
 }

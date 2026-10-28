@@ -24,8 +24,6 @@ import { ChannelForm } from "./channel-form";
 
 export const metadata = { title: navTitle("/settings/channels") };
 
-const TAX_INFO = "Changing a channel’s tax treatment applies to new sales only; filed months stay as they were.";
-
 export default async function ChannelsPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
@@ -38,7 +36,6 @@ export default async function ChannelsPage() {
       model={toSaleChannelsViewProps({ channels, canDelete, backHref: toSettings ? "/settings" : "/more" })}
       backLabel={toSettings ? "Settings" : "More"}
       createAction={canEdit ? <ChannelForm /> : null}
-      info={TAX_INFO}
       rowTrailing={(row) => {
         const c = channels.find((ch) => ch.id === row.key);
         if (!c || (!canEdit && !row.deletable)) return null;

@@ -12,7 +12,7 @@ vi.mock("react", async importOriginal => ({
     return [typeof initial === "function" ? initial() : initial, vi.fn()];
   },
 }));
-vi.mock("@/lib/commands/use-command-form", () => ({ useCommandForm: () => ({ open: true, setOpen: vi.fn(), submitting: false, busy: false, error: null, submit: harness.submit }) }));
+vi.mock("@/lib/commands/use-command-form", () => ({ useCommandForm: () => ({ open: true, setOpen: vi.fn(), submitting: false, busy: false, error: null, fieldErrors: {}, submit: harness.submit }) }));
 import { WaterProfileForm } from "@/app/(app)/catalog/water-profiles/water-profile-form";
 
 beforeEach(() => { harness.calcium = "0"; harness.alkalinity = ""; harness.waterPh = ""; harness.stateIndex = 0; harness.submit.mockClear(); });

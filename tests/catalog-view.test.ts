@@ -138,11 +138,12 @@ describe("Catalog view", () => {
   });
 
   // #965: inventory and live draw the same Water profiles row, with no invented count.
-  it("draws Water profiles as source and target profiles, linked only live", () => {
+  it("draws Water profiles as Manage water profiles, linked only live (#1205)", () => {
     const model = toCatalogViewProps(catalogBrands);
     const inert = htmlOf(createElement(CatalogView, { model }));
     expect(inert).toMatch(/Water profiles/);
-    expect(inert).toMatch(/Source and target profiles/);
+    expect(inert).toMatch(/Manage water profiles/);
+    expect(inert).not.toMatch(/source and target/i);
     expect(inert).not.toMatch(/href="\/catalog\/water-profiles"/);
     expect(htmlOf(createElement(CatalogView, { model, links: { brands: true, priceGroups: true, waterProfiles: true } }))).toMatch(/href="\/catalog\/water-profiles"/);
   });
@@ -203,6 +204,13 @@ describe("Catalog view", () => {
     expect(html.match(/href="\/catalog\/brands\/new"/g)).toHaveLength(1);
     expect(html).toMatch(/data-slot="empty-content"[\s\S]*data-variant="default"[^>]*href="\/catalog\/brands\/new"/);
     expect(html).toContain('href="/pricing"');
+  });
+
+  it("#1516 anchors Formats so the brand page's Manage formats lands on it, not the top of Catalog", () => {
+    const model = toCatalogViewProps({ brands: [], priceGroups: [] });
+    const html = htmlOf(createElement(CatalogView, { model, formats: toFormatsViewProps({ formats: [] }) }));
+    expect(html).toMatch(/id="formats"[^>]*>[\s\S]*?Formats<\/h2>/);
+    expect(readFileSync("app/(app)/catalog/brands/[id]/brand-page.tsx", "utf8")).toContain('E.btn("Manage formats", "g", "/catalog#formats")');
   });
 
   it("keeps filters available to recover from a search with no matches", () => {
@@ -504,12 +512,13 @@ describe("SKU view", () => {
 
   it("converts edit percentages to update_sku fractions and blank to null without changing create_sku", () => {
     const fields = { skuId: "sku", active: true, upc: "", batchSharePercent: "37.5" };
-    expect(skuUpdateCommand(fields)).toEqual({ name: "update_sku", input: { skuId: "sku", active: true, upc: "", batchShare: 0.375 }, valid: true });
+    expect(skuUpdateCommand(fields)).toEqual({ name: "update_sku", input: { skuId: "sku", active: true, upc: "", batchShare: 0.375 }, reason: null });
     expect(skuUpdateCommand({ ...fields, batchSharePercent: "" }).input.batchShare).toBeNull();
     for (const batchSharePercent of ["0", "-1", "100.1", "invalid"]) {
-      expect(skuUpdateCommand({ ...fields, batchSharePercent }).valid).toBe(false);
+      expect(skuUpdateCommand({ ...fields, batchSharePercent }).reason).toBe("Still needed: a batch package share above 0% and at most 100%.");
     }
-    expect(skuUpdateCommand({ ...fields, batchSharePercent: "100" }).valid).toBe(true);
+    expect(skuUpdateCommand({ ...fields, upc: "abc", batchSharePercent: "101" }).reason).toBe("Still needed: a UPC of 8, 12, 13 or 14 digits and a batch package share above 0% and at most 100%.");
+    expect(skuUpdateCommand({ ...fields, batchSharePercent: "100" }).reason).toBeNull();
     expect(skuCreateCommand({ brandId: "brand", formatId: "format", name: "", upc: "" }).input).not.toHaveProperty("batchShare");
   });
 

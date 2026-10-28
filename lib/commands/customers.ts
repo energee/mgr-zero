@@ -6,6 +6,7 @@ import { cents, CommandError, completeRows, countryCode, defineCommand, defineQu
 import { CUSTOMER_TYPES, PAYMENT_TERMS } from "@/lib/mgr/enums";
 import { escapeRegex } from "@/lib/escape-regex";
 import { hasAnyRole } from "@/lib/mgr/roles";
+import { US_ZIP } from "@/lib/mgr/ship-to-view";
 
 const roles = ["admin", "sales"] as const;
 
@@ -67,7 +68,7 @@ defineCommand({
     isDefault: z.boolean().optional(),
   }).refine(hasStateIffUs, stateByCountry)
     // `when` runs the ZIP shape check even while another field is missing.
-    .refine(i => i.country !== "US" || !i.zip || /^\d{5}(-\d{4})?$/.test(i.zip), {
+    .refine(i => i.country !== "US" || !i.zip || US_ZIP.test(i.zip), {
       path: ["zip"], message: "a 5-digit ZIP code or ZIP+4", when: p => typeof (p.value as { zip?: unknown } | undefined)?.zip === "string",
     }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_ship_to", {

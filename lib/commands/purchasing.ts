@@ -5,14 +5,13 @@
 // marking a PO sent is an attestation, so no email leaves here (§1).
 import { z } from "zod";
 import { email } from "@/lib/mgr/email";
-import { completeRows, defineCommand, defineQuery, cents, PAGE_SIZE, phone, unwrap, CommandError } from "./registry";
+import { completeRows, defineCommand, defineQuery, cents, PAGE_SIZE, PG_INT_MAX, phone, unwrap, CommandError } from "./registry";
 import { isoDate } from "./packaging";
-import { PAYMENT_TERMS } from "@/lib/mgr/enums";
+import { MATERIAL_CATEGORIES, PAYMENT_TERMS } from "@/lib/mgr/enums";
 import { OPEN_PO_STATUSES } from "@/lib/mgr/receive-po-view";
 import { escapeRegex } from "@/lib/escape-regex";
 
 const PURCHASING = ["admin", "warehouse", "brewer"] as const;
-const MATERIAL_CATEGORIES = ["malt", "hop", "yeast", "adjunct", "chemical", "packaging", "other"] as const;
 const UOMS = ["lb", "kg", "oz", "g", "each", "l", "gal", "ml"] as const;
 // Purchase orders are the warehouse's: a brewer reads materials and vendors but
 // does not place or receive orders (Purchase orders / Receive PO screens).
@@ -27,7 +26,7 @@ defineCommand({
     name: z.string().trim().min(1),
     email: email.optional(),
     phone: phone.optional(),
-    leadTimeDays: z.number().int().nonnegative().optional(),
+    leadTimeDays: z.number().int().nonnegative().max(PG_INT_MAX).optional(),
     paymentTerms: z.enum(PAYMENT_TERMS).optional(),
     active: z.boolean().optional(),
   }),
@@ -71,17 +70,17 @@ defineCommand({
 
 defineCommand({
   name: "upsert_material_contract",
-  description: "Create or edit a purchasing commitment for one material with one vendor; releases are ordered against it all year, and it never gates ordering",
+  description: "Create or edit a purchasing commitment for one material with one vendor; releases are ordered against it all year, and it never gates ordering; endsOn cannot precede startsOn",
   input: z.object({
     id: z.string().uuid().optional(),
     vendorId: z.string().uuid(),
     materialId: z.string().uuid(),
-    qtyCommitted: z.number().positive(),
+    qtyCommitted: z.number().positive().max(9_999_999_999.9999), // numeric(14,4)
     unitCostCents: cents.optional(),
     startsOn: isoDate.optional(),
     endsOn: isoDate.optional(),
     contractNo: z.string().trim().optional(),
-  }),
+  }).refine(i => !i.startsOn || !i.endsOn || i.endsOn >= i.startsOn, { path: ["endsOn"], message: "end date must be on or after the start date" }),
   roles: [...PURCHASING],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_material_contract", {
     p_brewery: ctx.breweryId, p_contract: i.id ?? null, p_vendor: i.vendorId, p_material: i.materialId,
@@ -148,10 +147,11 @@ defineQuery({
 // a null one contributes no gravity) and PO/count line pickers. Inactive
 // materials are hidden unless asked for: history keeps them, pickers do not.
 defineQuery({
-  name: "list_materials", description: "Materials, alphabetical, with kind, units, lot tracking, default vendor, and extract potential; optionally only those whose name contains q",
+  name: "list_materials", description: "Materials, alphabetical, with kind, units, lot tracking, default vendor, and extract potential; optionally only one kind, or those whose name contains q",
   input: z.object({
     includeInactive: z.boolean().optional(),
     q: z.string().trim().max(100).optional().describe("Only materials whose name contains this text"),
+    category: z.enum(MATERIAL_CATEGORIES).optional().describe("Only materials of this kind"),
   }), roles: [...PURCHASING],
   handler: (ctx, i) => {
     let q = ctx.db.from("materials")
@@ -159,6 +159,7 @@ defineQuery({
       .eq("brewery_id", ctx.breweryId).order("name");
     if (!i.includeInactive) q = q.eq("active", true);
     if (i.q) q = q.regexIMatch("name", escapeRegex(i.q));
+    if (i.category) q = q.eq("category", i.category);
     return unwrap(q);
   },
 });
@@ -177,7 +178,7 @@ defineQuery({
 
 const poLine = z.object({
   materialId: z.string().uuid(),
-  qtyOrdered: z.number().positive(),
+  qtyOrdered: z.number().positive().max(9_999_999_999.9999), // numeric(14,4)
   unitCostCents: cents.optional(),
   contractId: z.string().uuid().optional(),
   expectedLotCode: z.string().trim().optional(),

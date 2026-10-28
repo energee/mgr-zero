@@ -1,4 +1,4 @@
-// components/mgr/views/run-closed.tsx — committed lot, actual output and material history.
+// components/mgr/views/run-closed.tsx — a closed run's planned facts and close day, committed lot, actual output and material history.
 import type { ReactNode } from "react";
 import { PackagingMaterialHistory, PackagingMaterialCorrection } from "./packaging-materials";
 import { E } from "@/components/mgr/e";
@@ -17,6 +17,10 @@ export function RunClosedView({
   return (
     <>
       {E.back(model.backTo ?? "Packaging", model.title, undefined, model.backHref, "Packaging runs")}
+      {E.fld("Brand", model.brand)}
+      {E.fld("Source", model.source)}
+      {E.fld("Planned", formatDate(model.plannedOn))}
+      {E.fld("Closed", formatDate(model.closedAt, model.timeZone))}
       {model.bblDrawn !== undefined ? E.fld("Barrels drawn", model.bblDrawn === null ? "Not recorded" : model.bblDrawn) : null}
       {model.lot !== undefined ? <>
         {E.fld("Lot", model.lot?.code ?? "Not recorded")}

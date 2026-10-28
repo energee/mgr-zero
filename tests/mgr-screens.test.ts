@@ -52,6 +52,7 @@ describe("SCREENS", () => {
     const settings = text("Settings");
     expect(settings).toMatch(/Water profiles/);
     expect(settings).not.toMatch(/Source water/);
+    expect(SCREENS.find((s) => s.name === "Water profiles empty")!.job).not.toMatch(/source and target/i);
     expect(SCREENS.find((s) => s.name === "Settings")!.to?.["Water profiles"]).toBe("Water profiles");
   });
 
@@ -251,9 +252,9 @@ describe("SCREENS", () => {
 
   it("draws connection recovery and confirmation surfaces", () => {
     const expected = new Map<string, Screen["surface"]>([
-      ["Connect QuickBooks", undefined], ["Mapping conflict", "sheet"], ["Disconnect QuickBooks", "sheet"],
-      ["Connect Square", undefined], ["Square locations", "sheet"], ["Taproom sales in QuickBooks", "sheet"], ["Disconnect Square", "sheet"],
-      ["Linked people", undefined], ["Link your Slack", "entry"], ["Disconnect Slack", "sheet"],
+      ["Mapping conflict", "sheet"], ["Disconnect QuickBooks", "sheet"],
+      ["Square locations", "sheet"], ["Taproom sales in QuickBooks", "sheet"], ["Disconnect Square", "sheet"],
+      ["Link your Slack", "entry"], ["Disconnect Slack", "sheet"],
     ]);
     for (const [name, surface] of expected) {
       const screen = SCREENS.find((s) => s.name === name);
@@ -293,9 +294,12 @@ describe("SCREENS", () => {
       expect.soft(screen?.surface, name).toBe(surface);
     }
     const bodyText = (name: string) => renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
-    for (const destination of ["Vendors", "Sale channels", "Formats", "Price group", "Bins", "Chat"]) {
+    for (const destination of ["Vendors", "Formats", "Price group", "Settings"]) {
       expect.soft(bodyText("More"), destination).toContain(destination);
     }
+    // Settings is the one home of the setup pages, and Chat is in Me (#1513).
+    for (const moved of ["Sale channels", "Locations", "Chat"]) expect.soft(bodyText("More"), moved).not.toContain(moved);
+    for (const destination of ["Sale channels", "Locations", "Import", "Chat"]) expect.soft(bodyText("Settings"), destination).toContain(destination);
     expect(bodyText("Team")).not.toContain("Remove selected member");
     expect(bodyText("Import")).toContain("Settings");
     expect(bodyText("Planning")).toContain("More");
@@ -352,9 +356,9 @@ describe("SCREENS", () => {
   it("keeps row actions to verbs", () => {
     const verbs = new Set([
       "Correct receipt", "Add brew turn", "Correct turn 1", "Correct turn 2",
-      "Add", "Add stop", "Add to route", "Adjust", "Assign", "Brew", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose lot", "Choose who gets it", "Close", "Confirm", "Confirm all", "Connect", "Count", "Create",
-      "Deliver", "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Edit SKU", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open format",
-      "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",
+      "Add", "Add stop", "Add to route", "Adjust", "Assign", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose lot", "Choose who gets it", "Close", "Confirm", "Confirm all", "Connect", "Count", "Create",
+      "Deliver", "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Edit SKU", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Mark sent", "Open", "Open format",
+      "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Record return", "Release", "Reload", "Remove", "Reorder", "Re-push",
       "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
       "Unlink", "Use", "Write off", "Fix registration", "Forgot password?", "Import CSV", "Invite staff", "Invite portal user",
     ]);
@@ -658,8 +662,8 @@ describe("SCREENS", () => {
     expect(html("Today")).toMatch(/data-row-action[^>]*>Pick</);
     // The weekly count is live (record_taproom_count): Today draws no gated stand-in for it.
     expect(html("Today")).not.toMatch(/data-gated/);
-    expect(html("Sales")).not.toMatch(/<button[^>]*>New order</);
-    expect(html("Sales")).toMatch(/New order/);
+    // New order is Sales' quick action above the rows (#1513), not a row verb.
+    expect(html("Sales")).toMatch(/<button[^>]*>New order</);
     expect(html("Brewer")).not.toMatch(/grid-cols-2/);
     expect(html("Taproom")).not.toMatch(/<button[^>]*>Swap keg</);
     expect(html("Taproom")).toMatch(/data-row-action[^>]*>Open</);
@@ -1012,6 +1016,8 @@ describe("SCREENS", () => {
     expect(SCREENS.find((s) => s.name === "Order")!.to?.Adjust).toBe("Adjust lines");
     expect(SCREENS.some((s) => s.name === "Adjust lines")).toBe(true);
     expect(SCREENS.find((s) => s.name === "Short pick")!.spec).toMatch(/Opens from a Pick line/);
+    // A sheet over Pick, not a page round-trip per short line (#1503).
+    expect(SCREENS.find((s) => s.name === "Short pick")!.surface).toBe("sheet");
   });
 
   it("draws the stock-transfer document separately from Complete transfer", () => {
@@ -1064,7 +1070,7 @@ describe("screen command tokens", () => {
 });
 
 describe("vessel tile fill (#909)", () => {
-  const tile = (fill?: number) => renderToStaticMarkup(E.tiles([["FV1", "Pils · 10 / 20 bbl", "6.2 °P", 0, fill, "/cellar/fv1"]], "c2"));
+  const tile = (fill?: number) => renderToStaticMarkup(E.tiles([["FV1", "Pils · 10 / 20 bbl", "6.2 °P", 0, fill, "/cellar/fv1"]]));
 
   it("draws a named progressbar carrying its whole-percent value", () => {
     const html = tile(50);
@@ -1185,7 +1191,7 @@ describe("Cancelled batch history (#1304)", () => {
   it("collapses cancelled history without removing links or inventing a brand or recipe", () => {
     const batch = { id: "cancelled", batch_no: 1, planned_on: "2026-10-15", planned_bbl: 0.5, brewed_on: null, closed_at: null, cancelled_at: "2026-10-16T12:00:00Z", brand_name: null, recipe_name: null, vessel_name: null, active_occupancies: [] };
     const model = toBatchesViewProps(batchesFromQuery([batch, { ...batch, id: "planned", batch_no: 2, cancelled_at: null }], [], { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}` }));
-    expect(model.cancelled?.[0]).toMatchObject({ brand: null, recipe: null, brewable: false });
+    expect(model.cancelled?.[0]).toMatchObject({ brand: null, recipe: null });
     const html = renderToStaticMarkup(createElement(BatchesView, { model }));
     const history = html.match(/<details\b[^>]*>[\s\S]*?<\/details>/)?.[0];
     expect(history).toBeDefined();

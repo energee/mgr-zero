@@ -1,8 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { Children, isValidElement, type ComponentProps, type ReactElement } from "react";
 import type * as React from "react";
 import { PriceCellForm } from "@/app/(app)/pricing/price-cell-form";
-import { PriceCellClear, PriceCellInput } from "@/components/mgr/views/price-groups";
+import { PriceCellInput } from "@/components/mgr/views/price-groups";
 
 // Exercise the actual form callbacks and rerenders without a DOM or database.
 const state = vi.hoisted(() => ({ active: false, cursor: 0, values: [] as unknown[] }));
@@ -28,9 +27,6 @@ function cell(value: string | null = "7.00") {
   try { return PriceCellForm({ ...ids, value, groupName: "Core", formatName: "Pint", channelName: "Taproom" }); }
   finally { state.active = false; }
 }
-function clearOf(view: ReactElement<ComponentProps<typeof PriceCellInput>>) {
-  return Children.toArray(view.props.children).find(child => isValidElement(child) && child.type === PriceCellClear) as ReactElement<ComponentProps<typeof PriceCellClear>> | undefined;
-}
 beforeEach(() => {
   state.values = [];
   action.busy = false;
@@ -40,19 +36,16 @@ beforeEach(() => {
   action.run.mockReset().mockImplementation(async (_name: string, _input: unknown, onSuccess?: () => void) => { onSuccess?.(); return true; });
 });
 
-it("restores a blank edit with an explanation and leaves removal behind explicit confirmation", async () => {
+it("clears a priced cell when its field is emptied and left, with no separate Clear control (#1516)", async () => {
   expect(cell().type).toBe(PriceCellInput);
+  expect(cell().props.children).toBeUndefined();
   cell().props.onChange!("");
   await cell().props.onCommit!();
-  const restored = cell();
-  expect(restored.props.value).toBe("7.00");
-  expect(restored.props.status).toBe("Price unchanged. Use Clear and confirm to remove it.");
-  expect(action.run).not.toHaveBeenCalled();
-  expect(clearOf(restored)?.props.onDelete).toBeTypeOf("function");
-  await clearOf(restored)!.props.onDelete!();
   expect(action.run).toHaveBeenCalledWith("clear_channel_price", ids, expect.any(Function));
   expect(cell().props).toMatchObject({ value: "", status: "Saved" });
-  expect(clearOf(cell())).toBeUndefined();
+  // An unpriced cell left empty sends nothing.
+  await cell().props.onCommit!();
+  expect(action.run).toHaveBeenCalledTimes(1);
 });
 
 it.each(["-5", "abc", "1e3", "1.001"])("retains invalid %s and reports it inline without dispatch", async text => {
@@ -85,14 +78,11 @@ it("shows Saving then Saved for zero, locks duplicate commits, and retains confi
   expect(action.run).toHaveBeenCalledTimes(1);
 });
 
-it("keeps a rejected draft and its error, never calls it saved, and preserves the persisted price for blank restoration", async () => {
+it("keeps a rejected draft and its error, never calls it saved", async () => {
   action.run.mockImplementation(async () => { action.error = "Price could not be saved."; return false; });
   cell().props.onChange!("8.25");
   await cell().props.onCommit!();
   expect(cell().props).toMatchObject({ value: "8.25", status: null, error: "Price could not be saved." });
-  cell().props.onChange!("");
-  await cell().props.onCommit!();
-  expect(cell().props.value).toBe("7.00");
 });
 
 it("does not dispatch or replace a pending request when its cell is recovery-blocked", async () => {
@@ -100,7 +90,8 @@ it("does not dispatch or replace a pending request when its cell is recovery-blo
   action.blocked = true;
   expect(cell().props.disabled).toBe(true);
   await cell().props.onCommit!();
-  expect(await clearOf(cell())!.props.onDelete!()).toBe(false);
+  cell().props.onChange!("");
+  await cell().props.onCommit!();
   expect(action.run).not.toHaveBeenCalled();
 });
 

@@ -265,12 +265,13 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, brewer
 
-Materials, alphabetical, with kind, units, lot tracking, default vendor, and extract potential; optionally only those whose name contains q
+Materials, alphabetical, with kind, units, lot tracking, default vendor, and extract potential; optionally only one kind, or those whose name contains q
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `includeInactive` | boolean | no |
 | `q` | string | no |
+| `category` | malt or hop or yeast or adjunct or chemical or packaging or other | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -472,7 +473,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse, brewer
 
-Create or edit a purchasing commitment for one material with one vendor; releases are ordered against it all year, and it never gates ordering
+Create or edit a purchasing commitment for one material with one vendor; releases are ordered against it all year, and it never gates ordering; endsOn cannot precede startsOn
 
 | Field | Type | Required |
 | --- | --- | --- |
