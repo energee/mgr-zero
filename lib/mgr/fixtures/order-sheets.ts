@@ -1,9 +1,8 @@
 // lib/mgr/fixtures/order-sheets.ts — get_order-shaped snapshots for the
-// Adjust / Short pick / Pick / Ship / Shipment done / Return sheets. Identities
+// Short pick / Pick / Ship / Shipment done / Return sheets. Identities
 // come from demo.ts; order numbers match fixtures/orders.ts (229, 231).
 import { OUNCES_PER_BBL } from "@/lib/volume";
-import { ALS, branded, LOC_TAPROOM, LOC_WAREHOUSE, LOCATIONS, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT } from "./demo";
-import type { AdjustLinesSnapshot } from "@/lib/mgr/adjust-lines-view";
+import { branded, LOC_TAPROOM, LOC_WAREHOUSE, LOCATIONS, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT } from "./demo";
 import type { PickSnapshot } from "@/lib/mgr/pick-view";
 import type { ReturnCreditSnapshot } from "@/lib/mgr/return-credit-view";
 import type { ShipSnapshot } from "@/lib/mgr/ship-view";
@@ -18,7 +17,6 @@ export function shipmentSources(lines: { id: string; qty_picked: number | null; 
   };
 }
 
-const ORDER_229 = "00000000-0000-4000-8000-000000000229";
 const ORDER_231 = "00000000-0000-4000-8000-000000000231";
 
 const BBL_HAZY = 0.5;
@@ -49,16 +47,6 @@ const line = (
   bbl_per_unit,
   skus: { name: sku.name },
 });
-
-/** Picked Al’s order mid-adjust: Pils stepper is the new 7, picked 10 warns. */
-export const orderAdjustLines: AdjustLinesSnapshot = {
-  order: { id: ORDER_229, order_no: 229, customers: { name: ALS.name } },
-  lines: [
-    { ...line("l-hazy", SKU_HAZY, 4, 4), skus: branded(SKU_HAZY) },
-    { ...line("l-pils", SKU_PILS, 7, 10), skus: branded(SKU_PILS) },
-    { ...line("l-stout", SKU_STOUT, 2, 2), skus: branded(SKU_STOUT) },
-  ],
-};
 
 /** Warehouse pick of Ridgeline: counts start at ordered, lines under their format. */
 export const orderPick: PickSnapshot = {

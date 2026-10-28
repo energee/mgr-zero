@@ -389,6 +389,24 @@ describe("list_invoices and get_invoice carry the ledger", () => {
     ]);
   });
 
+  it("names the customer's last unvoided payment method, from any of its invoices (#1506)", async () => {
+    const f = await localInvoice();
+    const method = async () => ((await runCommand("get_invoice", { invoiceId: f.invoiceId }, f.sales)) as { lastPaymentMethod: string | null }).lastPaymentMethod;
+    expect(await method()).toBeNull();
+    const customerId = sql(`select customer_id from public.invoices where id='${f.invoiceId}'`, true)[0];
+    const earlier = await ins("invoices", { brewery_id: f.breweryId, customer_id: customerId, kind: "invoice" });
+    pay({ ...f, invoiceId: earlier.id }, 1000, "ach");
+    expect(await method()).toBe("ach");
+    // A voided payment was a mistake, so it never sets the method.
+    voidPayment(f, pay(f, 1000, "cash"));
+    expect(await method()).toBe("ach");
+    // Another customer's payment is never this customer's habit.
+    const { customerId: otherCustomer } = await seedCustomer(f.breweryId, { name: "Other bar" });
+    const others = await ins("invoices", { brewery_id: f.breweryId, customer_id: otherCustomer, kind: "invoice" });
+    pay({ ...f, invoiceId: others.id }, 1000, "other");
+    expect(await method()).toBe("ach");
+  });
+
   it("reports a pending push, and a push to a previous QuickBooks company", async () => {
     const pending = await localInvoice();
     await pushOf(pending, "pending");

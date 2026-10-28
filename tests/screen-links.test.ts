@@ -35,7 +35,6 @@ describe("resolveTap", () => {
   });
 
   it("prefers the record's own map, then global rules, then the exact name", () => {
-    expect(resolveTap(by("Order"), "Adjust")).toBe("Adjust lines");
     expect(resolveTap(by("Orders"), "Confirm")).toBe("Confirm order");
     expect(resolveTap(by("Orders"), "New order")).toBe("New order");
     expect(resolveTap(by("Order"), "Orders")).toBe("Orders");
@@ -70,7 +69,7 @@ describe("resolveTap", () => {
         expect(next, `${at} → "${tap}"`).toBeDefined();
         return next!;
       }, from);
-    expect(walk("Today", "Pick", "Orders", "ORD-0231 · Ridgeline", "Adjust")).toBe("Adjust lines");
+    expect(walk("Today", "Pick", "Orders", "ORD-0231 · Ridgeline", "Record pick")).toBe("Pick");
     expect(walk("Short pick", "Adjust order to 7 cases")).toBe("Pick");
     expect(walk("Orders", "Confirm", "Confirm order")).toBe("Order");
     expect(walk("Orders", "New order", "Save draft")).toBe("Order");

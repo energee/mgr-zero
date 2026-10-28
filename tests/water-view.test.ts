@@ -22,17 +22,12 @@ describe("WaterView", () => {
     for (const ion of ["Calcium", "Magnesium", "Sodium", "Sulfate", "Chloride", "Bicarbonate"]) expect(out).toContain(ion);
     expect(out).toMatch(/30 of 180 ppm · −150/);
   });
-  it("draws both gated when no material carries a salt yet", () => {
-    const out = html({ chemistryKnown: false });
-    expect(out.match(/data-gated/g)).toHaveLength(2);
-    expect(out).not.toMatch(/Against target/);
-    expect(out.match(/Salt suggestions aren&#x27;t available yet\./g)).toHaveLength(2);
-    expect(out).not.toContain("not part of this release");
-  });
-  it("draws only the verb gated when no salt is known and no target is picked either", () => {
-    const out = html({ chemistryKnown: false, water: { ...draft, targetProfileId: "" } });
-    expect(out.match(/data-gated/g)).toHaveLength(1);
-    expect(out).not.toMatch(/Against target/);
+  it("hides the verb and the read-out when no material carries a salt yet (#1481)", () => {
+    for (const water of [draft, { ...draft, targetProfileId: "" }]) {
+      const out = html({ chemistryKnown: false, water });
+      expect(out).not.toMatch(/Suggest additions|Against target|data-gated/);
+      expect(out).not.toContain("Salt suggestions aren");
+    }
   });
   it("hides the read-out and disables the verb without a target", () => {
     const out = html({ water: { ...draft, targetProfileId: "" } });
@@ -57,7 +52,7 @@ describe("WaterView", () => {
   });
 });
 
-it("the live sheet mounts WaterView with profile ions and no salt identity yet, so it draws gated", () => {
+it("the live sheet mounts WaterView with profile ions and no salt identity yet, so it hides suggestions", () => {
   const sheets = readFileSync("app/(app)/recipes/[id]/schedule-sheets.tsx", "utf8");
   expect(sheets).toMatch(/<WaterView\b/);
   expect(sheets).not.toMatch(/Suggest additions|Against target|salt:/);

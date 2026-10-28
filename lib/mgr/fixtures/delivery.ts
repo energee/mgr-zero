@@ -11,6 +11,7 @@ export const routesDriver: RoutesSnapshot = {
   rows: [
     { key: "a", title: "Route A · Sep 10, 2026", detail: "Departed · 1 of 3 delivered", verb: "Resume", tone: "info" },
     { key: "b", title: "Route B · Sep 11, 2026", detail: "2 stops · driver not assigned", verb: "Assign", tone: "attention", warning: true },
+    { key: "z", title: "Route Z · Sep 9, 2026", detail: "Departed · 2 of 2 delivered", verb: "Return", tone: "attention" },
     { key: "c", title: "Route C · Sep 12, 2026", detail: "2 stops · sam@example.test" },
     { key: "ord", title: "ORD-0236 · Ridgeline · Dock", detail: "Shipped · no route", verb: "Add to route", tone: "attention", warning: true },
     { key: "trf", title: "TRF-0004 · Storage", detail: "Shipped · no route", verb: "Add to route", tone: "attention", warning: true },

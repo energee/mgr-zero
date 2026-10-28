@@ -83,13 +83,13 @@ Run every row in order. Take a screenshot at each **Evidence** cell.
 
 | # | Action | Expected | Evidence |
 | --- | --- | --- | --- |
-| J1 | Sign in, open any staff page, select **Ask MGR** beside **Navigate** in the header (or ⌘K / Ctrl+K) | The chat panel opens over the right side on desktop, or fills the screen on a phone. Its conversation header shows **Retry setup** while setup loads, then **New chat**; no model name appears | Open panel and header |
+| J1 | Sign in, open any staff page, select **Ask MGR** in the header (or ⌘K / Ctrl+K) | The chat panel opens over the right side on desktop, or fills the screen on a phone. Its conversation header shows **Retry setup** while setup loads, then **New chat**; no model name appears | Open panel and header |
 | J2 | If the composer stays disabled, select **Retry setup** once | Setup finishes and the message box enables. If setup takes over 15 seconds, the panel shows "Ask MGR could not start. Check your connection, then try again." with **Try again**; selecting it once opens the same conversation, not a new one. Record how many retries it took and whether the timeout appeared | Enabled box, or the timeout error |
 | J3 | Send `What inventory is available?` | Text streams in. It names real SKUs from the test brewery, with an observation time. **Stop response** shows while streaming | Finished answer |
 | J4 | Note the SKU's on-hand, then send `Record an adjustment of +1 <a real SKU> at <a real location>, bin <a real bin>` | MGR asks one focused question if a field is missing. Then a **Composer proposal** card shows the server preview, with **Open as form**, **Dismiss**, and **Commit movement** | Proposal card |
 | J5 | Before committing, check the SKU's on-hand in another tab. Then select **Dismiss** | On-hand is unchanged: a proposal records nothing. Record whether the card closes | On-hand, and the card after Dismiss |
 | J6 | Select **Commit movement** once on the proposal (ask again if the card closed) | A status line reads `Recorded · <id>`. On-hand rises by exactly 1, and the movement appears once in inventory history | Receipt and history row |
-| J7 | Type an unsent draft, select **Back to page** (or **Navigate** / Escape), reopen **Ask MGR**, then reload and reopen it | Closing preserves the conversation and unsent draft. Reloading restores saved conversation history; on-hand has not changed again | Restored panel |
+| J7 | Type an unsent draft, select **Back to page** (or **Ask MGR** / Escape), reopen **Ask MGR**, then reload and reopen it | Closing preserves the conversation and unsent draft. Reloading restores saved conversation history; on-hand has not changed again | Restored panel |
 
 J4 to J6 use `record_movement`, the only AI-exposed write today.
 Only `admin` and `warehouse` roles may run it, so use one of those accounts.

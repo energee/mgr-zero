@@ -13,6 +13,12 @@ export const planningDemo: PlanningSnapshot = {
     required: 240, projected: 0, on_hand: 60, on_order: 0, short: 180, purchase_units_short: 1,
     needed_by: "2026-09-04", vendor_id: "lindenmeyr", vendor_name: "Lindenmeyr Munroe",
     lead_time_days: 3, buy_by: "2026-09-01", out_of_reach: true,
+  }, {
+    // No contract and no default vendor: grouped last, with Set vendor (#1516).
+    material_id: "hop-bags", material_name: "Hop bags", base_uom: "each", purchase_uom: "case",
+    required: 50, projected: 0, on_hand: 10, on_order: 0, short: 40, purchase_units_short: 1,
+    needed_by: "2026-09-21", vendor_id: null, vendor_name: null,
+    lead_time_days: null, buy_by: null, out_of_reach: false,
   }],
   today: "2026-09-08",
   horizon: [["Sep 7, 2026", "48 bbl", "40 bbl", "−8"], ["Sep 14, 2026", "52 bbl", "60 bbl", "+8"]],

@@ -34,14 +34,14 @@ export function TeamView({
           {memberActions?.[row.key] !== undefined ? memberActions[row.key] : <TeamRosterRowView row={row} />}
         </Fragment>
       ))}
-      {model.invitations.length > 0 && <section aria-label="Pending invitations" className="flex flex-col gap-3">
+      <section aria-label="Pending invitations" className="flex flex-col gap-3">
         {E.ttl("Pending invitations")}
-        {model.invitations.map((invite) => (
+        {model.invitations.length === 0 ? E.polite("No pending invitations") : model.invitations.map((invite) => (
           <Fragment key={invite.key}>
             {E.row(invite.email, invite.detail, invitationActions?.[invite.key] ?? <PendingInvitationActionsView email={invite.email} />)}
           </Fragment>
         ))}
-      </section>}
+      </section>
       {createAction !== undefined ? createAction : <Button variant="outline">Invite staff</Button>}
     </>
   );

@@ -1,7 +1,7 @@
-// tests/locations-view.test.ts — Locations, Location detail, Location bins,
-// and Bin share adapters with list_locations / list_bins snapshots. Views
+// tests/locations-view.test.ts — Locations, Location detail with its Bins
+// section, and Bin share adapters with list_locations / list_bins snapshots. Views
 // own no sample data.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -19,7 +19,7 @@ import { toLocationsViewProps } from "../lib/mgr/locations-view";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
-const BINS_NOTE = "Bins are the rooms and racks inside a location where stock sits. Every new location starts with Cold, Dry and Walk-in. Admin and Warehouse add, rename or remove bins under Location bins.";
+const BINS_NOTE = "Bins are the rooms and racks inside a location where stock sits. Every new location starts with Cold, Dry and Walk-in. Admin and Warehouse add, rename or remove bins on the location page.";
 
 describe("Locations list", () => {
   it("maps list_locations through every use, with optional units / taps / bins copy", () => {
@@ -106,20 +106,13 @@ describe("Locations list", () => {
 });
 
 describe("Location detail", () => {
-  it("maps a list_locations row plus bins and the brewery's zone by name (#1148)", () => {
+  it("maps a list_locations row and the brewery's zone by name (#1148)", () => {
     const model = toLocationViewProps(locationTaproom);
     expect(model.name).toBe(LOC_TAPROOM.name);
     expect(model.uses).toEqual(["storage", "taproom", "warehouse"]);
     expect(model.usesLabel).toBe("Storage · Taproom · Warehouse");
     expect(model.timezone).toBe("Brewery default · Eastern Time (America/New_York)");
-    expect(model.bins).toBe("Walk-in · Cold · Dry");
-    expect(model.binsHref).toBe(`/locations/${LOC_TAPROOM.id}/bins`);
     expect(model.backHref).toBeUndefined();
-  });
-
-  it("empty bins copy is none", () => {
-    const model = toLocationViewProps({ ...locationTaproom, bins: [] });
-    expect(model.bins).toBe("none");
   });
 
   it("the inventory drawing still has Save location and every use picked", () => {
@@ -132,23 +125,23 @@ describe("Location detail", () => {
     expect(html).toMatch(/Warehouse/);
     expect(html).toMatch(/Timezone/);
     expect(html).toContain("Brewery default · Eastern Time (America/New_York)");
-    expect(html).toMatch(/Location bins/);
-    expect(html).toMatch(/Walk-in · Cold · Dry/);
     expect(html).not.toMatch(/>Open</);
     expect(html).not.toMatch(/→/);
   });
 
-  it("readOnly paints the uses as a field and a bins row link, not an Open verb or Save (#1026)", () => {
+  it("readOnly paints the uses as a field and the Bins section below, not an Open verb or Save (#1026, #1507)", () => {
     const html = htmlOf(createElement(LocationView, {
       model: toLocationViewProps(locationTaproom),
       readOnly: true,
       headerAction: "EDIT",
+      bins: "BINS SECTION",
     }));
     expect(html).toMatch(/EDIT/);
     expect(html).toMatch(/Uses/);
     expect(html).toMatch(/Storage · Taproom · Warehouse/);
     expect(html).not.toMatch(/>Open</);
-    expect(html).toMatch(new RegExp(`<a[^>]*href="/locations/${LOC_TAPROOM.id}/bins"[^>]*>(?:(?!</a>)[\\s\\S])*Location bins`));
+    expect(html).not.toContain("/bins");
+    expect(html.indexOf("Storage · Taproom · Warehouse")).toBeLessThan(html.indexOf("BINS SECTION"));
     expect(html).not.toMatch(/>Save location</);
     expect(html).not.toMatch(/Location name/);
   });
@@ -165,7 +158,7 @@ describe("Location detail", () => {
     expect(html).toContain(BINS_NOTE);
   });
 
-  it("the read-only detail explains bins beside the Location bins link (#1148)", () => {
+  it("the read-only detail explains bins above its Bins section (#1148)", () => {
     const html = htmlOf(createElement(LocationView, { model: toLocationViewProps(locationTaproom), readOnly: true }));
     expect(html).toContain(BINS_NOTE);
   });
@@ -199,10 +192,13 @@ describe("Location detail", () => {
     expect(html).not.toMatch(/>Save location</);
   });
 
-  it("the Location detail inventory record is LocationView", () => {
-    const body = screen("Location detail").body as { type: unknown; props: { model: unknown } };
+  it("the Location detail inventory record is LocationView with LocationBinsView as its Bins section (#1507)", () => {
+    const body = screen("Location detail").body as { type: unknown; props: { model: unknown; bins: { type: unknown; props: { model: unknown } } } };
     expect(body.type).toBe(LocationView);
     expect(body.props.model).toEqual(toLocationViewProps(locationTaproom));
+    expect(body.props.bins.type).toBe(LocationBinsView);
+    expect(body.props.bins.props.model).toEqual(toLocationBinsViewProps(locationBinsTaproom));
+    expect(SCREENS.some((s) => s.name === "Location bins")).toBe(false);
   });
 
   it("the live location page mounts LocationView readOnly", () => {
@@ -215,17 +211,22 @@ describe("Location detail", () => {
     // The zone is the brewery's (Settings → Timezone), read from the membership (#1148).
     expect(src).toMatch(/timezone: brewery\.timeZone/);
   });
+
+  it("the live location page mounts LocationBinsView as its Bins section; no separate bins route (#1507)", () => {
+    const src = readFileSync("app/(app)/locations/[id]/page.tsx", "utf8");
+    expect(src).toMatch(/from "@\/components\/mgr\/views\/location-bins"/);
+    expect(src).toMatch(/bins=\{<LocationBinsView\b/);
+    expect(src).toMatch(/inventoryHref: `\/inventory\?recordMovement=1&locationId=\$\{id\}`/);
+    expect(src).toMatch(/rowActions=/);
+    expect(existsSync("app/(app)/locations/[id]/bins/page.tsx")).toBe(false);
+  });
 });
 
-describe("Location bins", () => {
-  const location = { id: LOC_TAPROOM.id, name: LOC_TAPROOM.name };
+describe("Location bins section", () => {
   const twoBins = [{ id: "b1", name: "Walk-in" }, { id: "b2", name: "Cold" }];
 
-  it("names the location and counts each bin's get_bin_move_stock rows (#1154)", () => {
+  it("counts each bin's get_bin_move_stock rows (#1154)", () => {
     const model = toLocationBinsViewProps(locationBinsTaproom);
-    expect(model.title).toBe(`Bins at ${LOC_TAPROOM.name}`);
-    expect(model.backLabel).toBe("Location detail");
-    expect(model.backHref).toBeUndefined();
     expect(model.rows.map((r) => [r.title, r.detail])).toEqual([
       ["Walk-in", "3 kinds of stock"],
       ["Cold", "1 kind of stock"],
@@ -236,30 +237,29 @@ describe("Location bins", () => {
   });
 
   it("says nothing about stock when the reader cannot see it", () => {
-    const model = toLocationBinsViewProps({ location, bins: [{ id: "b1", name: "Walk-in" }] });
-    expect(model.backLabel).toBe(LOC_TAPROOM.name);
+    const model = toLocationBinsViewProps({ bins: [{ id: "b1", name: "Walk-in" }] });
     expect(model.rows[0]?.detail).toBe("");
     expect(model.empty).toBeUndefined();
     expect(model.moveUnavailable).toBeNull();
   });
 
   it("an empty location gets the empty state, not a locked Move stock (#1154)", () => {
-    const model = toLocationBinsViewProps({ location, bins: twoBins, stock: [] });
+    const model = toLocationBinsViewProps({ bins: twoBins, stock: [] });
     expect(model.rows.map((r) => r.detail)).toEqual(["Empty", "Empty"]);
     expect(model.empty).toEqual({ title: "Nothing is stored in these bins yet", description: "Record stock into a bin from Inventory." });
     expect(model.moveUnavailable).toBeNull();
   });
 
   it("stock in a lone bin says why Move stock is unavailable", () => {
-    const model = toLocationBinsViewProps({ location, bins: [twoBins[0]], stock: [{ bin_id: "b1" }] });
+    const model = toLocationBinsViewProps({ bins: [twoBins[0]], stock: [{ bin_id: "b1" }] });
     expect(model.empty).toBeUndefined();
     expect(model.moveUnavailable).toBe("Moving stock needs at least two bins at this location. Add a bin first.");
   });
 
-  it("the inventory drawing names the location, offers Add bin and the trio with what each holds", () => {
+  it("the inventory drawing heads the section Bins, offers Add bin and the trio with what each holds", () => {
     const html = htmlOf(createElement(LocationBinsView, { model: toLocationBinsViewProps(locationBinsTaproom) }));
-    expect(html).toMatch(/Location detail/);
-    expect(html).toMatch(new RegExp(`<h1[^>]*>Bins at ${LOC_TAPROOM.name}</h1>`));
+    expect(html).toMatch(/<h2[^>]*>Bins<\/h2>/);
+    expect(html).not.toMatch(/<h1\b/);
     expect(html).toMatch(/Walk-in/);
     expect(html).toMatch(/3 kinds of stock/);
     expect(html).toMatch(/1 kind of stock/);
@@ -270,7 +270,7 @@ describe("Location bins", () => {
 
   it("the empty state opens Record movement and replaces Move stock", () => {
     const html = htmlOf(createElement(LocationBinsView, {
-      model: toLocationBinsViewProps({ location, bins: twoBins, stock: [], inventoryHref: "/inventory?recordMovement=1&locationId=l" }),
+      model: toLocationBinsViewProps({ bins: twoBins, stock: [], inventoryHref: "/inventory?recordMovement=1&locationId=l" }),
       footer: "live form",
     }));
     expect(html).toMatch(/Nothing is stored in these bins yet/);
@@ -298,23 +298,6 @@ describe("Location bins", () => {
     expect(html).toMatch(/1 kind of stock/);
     expect(html.match(/EDIT/g)).toHaveLength(1);
     expect(html).not.toMatch(/→/);
-  });
-
-  it("the Location bins inventory record is LocationBinsView", () => {
-    const body = screen("Location bins").body as { type: unknown; props: { model: unknown } };
-    expect(body.type).toBe(LocationBinsView);
-    expect(body.props.model).toEqual(toLocationBinsViewProps(locationBinsTaproom));
-  });
-
-  it("the live bins page mounts LocationBinsView over the adapter's rows", () => {
-    const src = readFileSync("app/(app)/locations/[id]/bins/page.tsx", "utf8");
-    expect(src).toMatch(/from "@\/components\/mgr\/views\/location-bins"/);
-    expect(src).toMatch(/<LocationBinsView\b/);
-    expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
-    expect(src).toMatch(/backHref:/);
-    expect(src).toMatch(/inventoryHref: `\/inventory\?recordMovement=1&locationId=\$\{id\}`/);
-    expect(src).toMatch(/rowActions=/);
-    expect(src).not.toMatch(/detail: ""/);
   });
 });
 

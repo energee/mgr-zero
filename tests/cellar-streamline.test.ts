@@ -12,12 +12,13 @@ vi.mock("@/components/mgr/command-form", async (original) => {
   const real = await original<typeof import("@/components/mgr/command-form")>();
   return { ...real, CommandForm: (props: { trigger: unknown; children: unknown; footer?: unknown }) => createElement("div", null, props.trigger as never, props.children as never, props.footer as never) };
 });
-import { toCellarMapViewProps } from "@/lib/mgr/cellar-map-view";
+import { nextTankOccupancy, toCellarMapViewProps } from "@/lib/mgr/cellar-map-view";
 import { CellarMapView } from "@/components/mgr/views/cellar-map";
-import { readingReturnHref } from "@/lib/mgr/fermentation-reading-view";
+import { nextReadingHref, readingReturnHref } from "@/lib/mgr/fermentation-reading-view";
 import { onlyOccupancy } from "@/lib/mgr/cellar-transfer-view";
 import { completionLoss } from "@/lib/mgr/batch-completion-state";
 import { plannedDrawBbl } from "@/lib/mgr/schedule-packaging-run-view";
+import { finishedGoodsStart, onlyBinIn } from "@/lib/mgr/close-packaging-run-view";
 import { brandAfterRecipePick } from "@/lib/mgr/schedule-batch-view";
 import { FermentationReadingView } from "@/components/mgr/views/fermentation-reading";
 import { CellarTransferForm } from "@/app/(app)/cellar/cellar-transfer-form";
@@ -46,6 +47,23 @@ describe("item 1: Reading from each tile, back to where it opened", () => {
     for (const from of [undefined, "", "https://evil.example", "//evil.example", "/settings", "/batches/x/../../settings", ["/cellar"]]) {
       expect(readingReturnHref(from, "v1")).toBe("/cellar/vessels/v1");
     }
+  });
+});
+
+describe("item 1: Save and next tank, in tile order", () => {
+  it("names the next occupied tank after this one in the map's tile order, and none after the last", () => {
+    const three = [{ vessel_id: "v3", occupancy_id: "o3", brand_name: null, bbl: 1 }, ...two];
+    expect(nextTankOccupancy(vessels, three, "o1")).toBe("o2");
+    expect(nextTankOccupancy(vessels, three, "o2")).toBe("o3");
+    expect(nextTankOccupancy(vessels, three, "o3")).toBeNull();
+    expect(nextTankOccupancy(vessels, [two[0], { ...two[1], vessel_id: "v3" }], "o1")).toBe("o2");
+    expect(nextTankOccupancy(vessels, two, "missing")).toBeNull();
+  });
+
+  it("opens the next tank's reading with the same return target", () => {
+    expect(nextReadingHref("/cellar", "o2")).toBe("/cellar/o2/reading?from=%2Fcellar");
+    expect(nextReadingHref(undefined, "o2")).toBe("/cellar/o2/reading");
+    expect(nextReadingHref(["/cellar"], "o2")).toBe("/cellar/o2/reading");
   });
 });
 
@@ -80,6 +98,23 @@ describe("item 6: Close packaging run starts from the planned draw", () => {
     expect(plannedDrawBbl([{ qty: 100, bblPerUnit: 0.0645 }, { qty: 4, bblPerUnit: 0.5 }])).toBeCloseTo(8.45, 8);
     expect(plannedDrawBbl([{ qty: 0, bblPerUnit: undefined }, { qty: 2, bblPerUnit: 0.5 }])).toBe(1);
     expect(plannedDrawBbl([{ qty: 2, bblPerUnit: undefined }])).toBeUndefined();
+  });
+});
+
+describe("item 6: Close packaging run preselects the only finished goods location and bin", () => {
+  const locations = [{ id: "wh", name: "Warehouse" }];
+  const bins = [{ id: "cold", location_id: "wh", name: "Cold" }, { id: "dock", location_id: "tap", name: "Dock" }];
+  it("starts on the only location and its only bin", () => {
+    expect(finishedGoodsStart(locations, bins)).toEqual({ locationId: "wh", binId: "cold" });
+  });
+  it("leaves the choice open when there are several", () => {
+    expect(finishedGoodsStart([...locations, { id: "tap", name: "Taproom" }], bins)).toEqual({ locationId: "", binId: "" });
+    expect(finishedGoodsStart(locations, [...bins, { id: "warm", location_id: "wh", name: "Warm" }])).toEqual({ locationId: "wh", binId: "" });
+    expect(finishedGoodsStart([], [])).toEqual({ locationId: "", binId: "" });
+  });
+  it("picks a chosen location's only bin", () => {
+    expect(onlyBinIn(bins, "tap")).toBe("dock");
+    expect(onlyBinIn(bins, "")).toBe("");
   });
 });
 

@@ -124,4 +124,11 @@ describe("initialOrderChoices (#1506)", () => {
     expect(initialOrderChoices(customers, [warehouse]).fromLocationId).toBe("l1");
     expect(initialOrderChoices(customers, [warehouse, { id: "l2" }]).fromLocationId).toBe("");
   });
+
+  it("with several locations, preselects the portal fulfillment warehouse when it is listed", () => {
+    expect(initialOrderChoices(customers, [warehouse, { id: "l2" }], undefined, "l2").fromLocationId).toBe("l2");
+    expect(initialOrderChoices(customers, [warehouse, { id: "l2" }], undefined, "gone").fromLocationId).toBe("");
+    expect(initialOrderChoices(customers, [warehouse, { id: "l2" }], undefined, null).fromLocationId).toBe("");
+    expect(initialOrderChoices(customers, [warehouse], undefined, "l2").fromLocationId).toBe("l1");
+  });
 });

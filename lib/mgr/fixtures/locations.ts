@@ -28,15 +28,12 @@ export const locationsList: LocationsSnapshot = {
 /** Taproom facts for Location detail. */
 export const locationTaproom: LocationSnapshot = {
   location: { id: LOC_TAPROOM.id, name: LOC_TAPROOM.name, uses: ["storage", "taproom", "warehouse"] },
-  bins: TAPROOM_BINS.map((b) => ({ name: b.name })),
   timezone: "America/New_York",
 };
 
 /** Taproom Walk-in / Cold / Dry. `stock` is get_bin_move_stock's one row per
  *  stock identity: three in Walk-in, one in Cold, and Dry holds nothing. */
 export const locationBinsTaproom: LocationBinsSnapshot = {
-  location: { id: LOC_TAPROOM.id, name: LOC_TAPROOM.name },
-  backLabel: "Location detail",
   bins: [...TAPROOM_BINS],
   stock: [{ bin_id: BIN_WALKIN }, { bin_id: BIN_WALKIN }, { bin_id: BIN_WALKIN }, { bin_id: BIN_COLD }],
 };

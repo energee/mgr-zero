@@ -73,15 +73,6 @@ describe("Sale channels view", () => {
     expect(toSaleChannelsViewProps(mixed).rows.map((r) => r.deletable)).toEqual([false, false, false]);
   });
 
-  it("states the rule only where a role that may delete sees a row without Delete (#1149, #1207)", () => {
-    expect(toSaleChannelsViewProps({ ...mixed, canDelete: true }).inUseRule).toBe(CHANNEL_IN_USE_RULE);
-    expect(toSaleChannelsViewProps(mixed).inUseRule).toBeUndefined();
-    // Every row offers Delete, so there is nothing to explain.
-    expect(toSaleChannelsViewProps({ channels: [mixed.channels[2]!], canDelete: true }).inUseRule).toBeUndefined();
-    // An empty list offers no Delete, so it states no rule.
-    expect(toSaleChannelsViewProps({ channels: [], canDelete: true }).inUseRule).toBeUndefined();
-  });
-
   it("the rule names the system Taproom channel the RPC refuses (#1207)", () => {
     expect(CHANNEL_IN_USE_RULE).toMatch(/system Taproom channel/);
   });
@@ -90,10 +81,10 @@ describe("Sale channels view", () => {
     expect(readFileSync("content/docs/staff-guide.mdx", "utf8")).toContain(CHANNEL_IN_USE_RULE);
   });
 
-  it("draws the in-use rule on the list where Delete is offered", () => {
-    const withRule = htmlOf(createElement(SaleChannelsView, { model: toSaleChannelsViewProps({ ...saleChannelsList, canDelete: true }) }));
-    expect(withRule).toContain(CHANNEL_IN_USE_RULE);
-    expect(htmlOf(createElement(SaleChannelsView, { model: toSaleChannelsViewProps(saleChannelsList) }))).not.toContain("cannot be deleted");
+  it("states the in-use rule only in the delete confirmation, never on the list (#1518)", () => {
+    const html = htmlOf(createElement(SaleChannelsView, { model: toSaleChannelsViewProps({ ...saleChannelsList, canDelete: true }) }));
+    expect(html).not.toContain(CHANNEL_IN_USE_RULE);
+    expect(html).not.toContain("cannot be deleted");
   });
 
   it("the delete confirm states the same rule", () => {

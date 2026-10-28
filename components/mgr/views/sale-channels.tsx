@@ -1,9 +1,7 @@
 // components/mgr/views/sale-channels.tsx — Sale channels list. Live passes
 // ChannelForm as createAction and ChannelForm + DeleteChannelControl (delete-channel.tsx) via rowTrailing;
-// inventory uses Add channel and unlabeled nav. The tax-change rule is on the Channel sheet (channel.tsx).
-// The model's inUseRule draws whenever the model carries it: a role that may
-// delete sees it when some row has no Delete, and the inventory frame draws
-// the Admin persona. It is an info note: a standing rule, not a warning.
+// inventory uses Add channel and unlabeled nav. The tax-change rule is on the Channel sheet (channel.tsx);
+// the in-use rule is stated only in the delete confirmation (delete-channel.tsx, #1518).
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { SaleChannelsRowView, SaleChannelsViewModel } from "@/lib/mgr/sale-channels-view";
@@ -29,7 +27,6 @@ export function SaleChannelsView({
   return (
     <>
       {E.back(backLabel, "Sale channels", createAction !== undefined ? createAction : E.btn("Add channel"), model.backHref)}
-      {model.inUseRule ? E.info(model.inUseRule) : null}
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (

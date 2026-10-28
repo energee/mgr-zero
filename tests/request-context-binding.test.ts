@@ -237,7 +237,7 @@ describe("request context headers", () => {
       const requestId = crypto.randomUUID();
       expect((await scoped.rpc("update_brewery", {
         p_brewery: breweryB, p_name: "Blocked", p_timezone: "UTC", p_ttb_registry_no: null,
-        p_pa_license_no: null, p_customer_phone: null,
+        p_customer_phone: null,
         p_reading_due_hours: 24, p_request_id: requestId,
       })).error?.code).toBe("42501");
       expect(sql(`select count(*) from private.command_requests where actor_id='${actor.id}' and request_id='${requestId}'`)).toEqual(["0"]);
@@ -254,7 +254,7 @@ describe("request context headers", () => {
       });
       expect((await scoped.rpc("update_brewery", {
         p_brewery: breweryB, p_name: "Must stay unchanged", p_timezone: "UTC", p_ttb_registry_no: null,
-        p_pa_license_no: null, p_customer_phone: null,
+        p_customer_phone: null,
         p_reading_due_hours: 24, p_request_id: requestId,
       })).error?.code).toBe("42501");
       expect((await admin.from("breweries").select("name").eq("id", breweryB).single()).data?.name).not.toBe("Must stay unchanged");
@@ -264,7 +264,7 @@ describe("request context headers", () => {
     const valid = await db({ "x-mgr-actor-id": actor.id, "x-mgr-brewery-id": breweryB, "x-mgr-customer-id": customerA });
     expect((await valid.rpc("update_brewery", {
       p_brewery: breweryB, p_name: "Valid scoped write", p_timezone: "UTC", p_ttb_registry_no: null,
-      p_pa_license_no: null, p_customer_phone: null, p_reading_due_hours: 24, p_request_id: crypto.randomUUID(),
+      p_customer_phone: null, p_reading_due_hours: 24, p_request_id: crypto.randomUUID(),
     })).error).toBeNull();
   });
 

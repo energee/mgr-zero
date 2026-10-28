@@ -117,18 +117,22 @@ export function defaultShipToId(shipTos: { id: string; is_default?: boolean }[])
 }
 
 /** New order's opening choices (#1506): the customer a link named, when it is
- *  one of the listed customers, with its default ship-to; and the source when
- *  there is only one location to choose. With several, Source starts empty. */
+ *  one of the listed customers, with its default ship-to; and the source: the
+ *  only location, or with several the portal fulfillment warehouse
+ *  (breweries.portal_fulfillment_location_id) when it is listed. Otherwise
+ *  Source starts empty. */
 export function initialOrderChoices(
   customers: { id: string; shipTos: { id: string; is_default?: boolean }[] }[],
   locations: { id: string }[],
   linkedCustomerId?: string,
+  fulfillmentLocationId?: string | null,
 ): { customerId: string; shipToId: string; fromLocationId: string } {
   const customer = customers.find((c) => c.id === linkedCustomerId);
+  const fulfillment = locations.find((l) => l.id === fulfillmentLocationId);
   return {
     customerId: customer?.id ?? "",
     shipToId: customer ? defaultShipToId(customer.shipTos) : "",
-    fromLocationId: locations.length === 1 ? locations[0]!.id : "",
+    fromLocationId: locations.length === 1 ? locations[0]!.id : fulfillment?.id ?? "",
   };
 }
 

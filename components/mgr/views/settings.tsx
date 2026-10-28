@@ -50,7 +50,7 @@ export function SettingsView({
       </section>
       <div className="grid gap-6 @min-[48rem]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] @min-[48rem]:items-start @min-[48rem]:gap-10">
         <div className="@container flex min-w-0 flex-col gap-2">
-          {breweryForm ?? <BrewerySettingsFormView basisLocked={model.hasFiledReports} initial={{ name: model.name, timezone: model.timezone, ttb: model.ttb, pa: model.paLicense, phone: model.phone, hours: model.overdueHours, daysToPackage: model.daysToPackage, booksOpenedOn: model.booksOpenedOn, oneWayKegFee: model.oneWayKegFee }} />}
+          {breweryForm ?? <BrewerySettingsFormView basisLocked={model.hasFiledReports} initial={{ name: model.name, timezone: model.timezone, ttb: model.ttb, phone: model.phone, hours: model.overdueHours, daysToPackage: model.daysToPackage, booksOpenedOn: model.booksOpenedOn, oneWayKegFee: model.oneWayKegFee }} />}
           {unitsForm ?? (model.units && <GravityUnitControls model={model.units} part="brewery" />)}
         </div>
         {/* Side by side on desk, the column gap parts Brewery details from the other two. */}

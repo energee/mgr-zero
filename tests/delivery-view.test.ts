@@ -44,10 +44,19 @@ describe("Routes", () => {
   });
 
   it("a route names its next action; an assigned route not yet departed has none (#1026)", () => {
-    expect(routeNext({ departed_at: "2026-09-10T14:00:00Z", returned_at: null, driver_user_id: "d" })).toEqual({ verb: "Resume", tone: "info" });
-    expect(routeNext({ departed_at: null, returned_at: null, driver_user_id: null })).toEqual({ verb: "Assign", tone: "attention" });
-    expect(routeNext({ departed_at: null, returned_at: null, driver_user_id: "d" })).toBeUndefined();
-    expect(routeNext({ departed_at: "2026-09-10T14:00:00Z", returned_at: "2026-09-10T18:00:00Z", driver_user_id: "d" })).toBeUndefined();
+    const open = [{ delivered_at: "2026-09-10T15:00:00Z" }, { delivered_at: null }];
+    expect(routeNext({ departed_at: "2026-09-10T14:00:00Z", returned_at: null, driver_user_id: "d", stops: open })).toEqual({ verb: "Resume", tone: "info" });
+    expect(routeNext({ departed_at: null, returned_at: null, driver_user_id: null, stops: [] })).toEqual({ verb: "Assign", tone: "attention" });
+    expect(routeNext({ departed_at: null, returned_at: null, driver_user_id: "d", stops: [] })).toBeUndefined();
+    expect(routeNext({ departed_at: "2026-09-10T14:00:00Z", returned_at: "2026-09-10T18:00:00Z", driver_user_id: "d", stops: open.slice(0, 1) })).toBeUndefined();
+  });
+
+  it("a departed route with no open stop names Return; the driver records the truck back (#1505)", () => {
+    expect(routeNext({ departed_at: "2026-09-10T14:00:00Z", returned_at: null, driver_user_id: "d", stops: [{ delivered_at: "2026-09-10T15:00:00Z" }] }))
+      .toEqual({ verb: "Return", tone: "attention" });
+    const routes = screen("Routes");
+    expect(routes.to?.Return).toBe("Return route");
+    expect(toRoutesViewProps(routesDriver).rows.some(row => row.verb === "Return")).toBe(true);
   });
 
   // #1486: a returned route left /routes with no way back, and the empty list said "No routes yet".

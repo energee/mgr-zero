@@ -9,7 +9,7 @@
 // movement, customer, order, price cell or Square menu references cannot be
 // deleted, and neither can the system Taproom channel. list_sale_channels
 // says which rows are in use, so Delete shows only where it would succeed
-// (#1207), and the rule (CHANNEL_IN_USE_RULE) is stated above the list.
+// (#1207); the rule (CHANNEL_IN_USE_RULE) is stated in the delete confirm (#1518).
 import { DeleteChannelControl } from "@/components/mgr/views/delete-channel";
 import { SaleChannelsView } from "@/components/mgr/views/sale-channels";
 import { DeleteCommandButton } from "../../delete-command-button";

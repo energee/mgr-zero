@@ -8,13 +8,11 @@ import { ShipToView } from "@/components/mgr/views/ship-to";
 import { toShipToViewProps } from "@/lib/mgr/ship-to-view";
 import { UsStateField } from "@/components/mgr/us-state-field";
 import { SCREENS } from "@/components/mgr/screens";
-import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { PickView } from "@/components/mgr/views/pick";
 import { ShortPickView } from "@/components/mgr/views/short-pick";
-import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
 import { toPickViewProps } from "@/lib/mgr/pick-view";
 import { toShortPickViewProps } from "@/lib/mgr/short-pick-view";
-import { orderAdjustLines, orderPick, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
+import { orderPick, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
 import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
 import { newOrderDraft } from "@/lib/mgr/fixtures/orders";
 
@@ -26,20 +24,6 @@ function elements(node: ReactNode): ReactElement<Record<string, unknown> & { chi
 }
 
 describe("shared order-entry controls", () => {
-  it("binds adjustment row IDs, add/remove, decimal counts and the required reason", () => {
-    const qty = vi.fn(), sku = vi.fn(), add = vi.fn(), remove = vi.fn(), reason = vi.fn();
-    // An added line (no SKU yet) carries the picker; saved lines are named rows.
-    const model = toAdjustLinesViewProps(orderAdjustLines);
-    const nodes = elements(AdjustLinesView({ model: { ...model, lines: [model.lines[0], { key: "new", added: true, name: "", detail: "", qty: "" }] }, onQuantity: qty, onSku: sku, onAdd: add, onRemove: remove, onReason: reason }));
-    invoke(nodes.find(node => node.props.label === "Line 2 quantity")!, "onChange", "1.5");
-    invoke(nodes.find(node => node.props.label === "Line 2 SKU")!, "onChange", "actual-id");
-    invoke(nodes.find(node => node.props.children === "Add line")!, "onClick");
-    invoke(nodes.find(node => node.props["aria-label"] === "Remove")!, "onClick");
-    invoke(nodes.find(node => node.props["aria-label"] === "Reason")!, "onChange", { target: { value: "cut" } });
-    expect(qty).toHaveBeenCalledWith(1, "1.5"); expect(sku).toHaveBeenCalledWith(1, "actual-id");
-    expect(add).toHaveBeenCalledOnce(); expect(remove).toHaveBeenCalledWith(0); expect(reason).toHaveBeenCalledWith("cut");
-  });
-
   it("keeps short-pick and print verbs attached to the counted line", () => {
     const qty = vi.fn(), short = vi.fn(), print = vi.fn();
     const model = toPickViewProps({ ...orderPick, lines: [{ ...orderPick.lines[0], qty_picked: 1.5 }] });

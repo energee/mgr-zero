@@ -309,7 +309,7 @@ describe("SCREENS", () => {
     const sheets = ["Invite portal user", "Fix mapping", "Package BOM", "SKU", "Brand approval", "State registration", "License", "Channel", "Format", "Bin"];
     for (const name of sheets) expect.soft(SCREENS.find((s) => s.name === name)?.surface, name).toBe("sheet");
     expect(SCREENS.find((s) => s.name === "Invoice")?.surface).toBeUndefined();
-    for (const name of ["Customers", "Invoices", "Catalog", "Vendors", "Licenses", "Sale channels", "Formats", "Price group", "Location bins"]) {
+    for (const name of ["Customers", "Invoices", "Catalog", "Vendors", "Licenses", "Sale channels", "Formats", "Price group"]) {
       const html = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
       expect.soft(html, `${name}: inline save`).not.toMatch(/>Save[^<]*<\/button>/);
     }
@@ -359,7 +359,7 @@ describe("SCREENS", () => {
       "Add", "Add stop", "Add to route", "Adjust", "Assign", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose lot", "Choose who gets it", "Close", "Confirm", "Confirm all", "Connect", "Count", "Create",
       "Deliver", "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Edit SKU", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Mark sent", "Open", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record movement", "Record opening count", "Record return", "Release", "Reload", "Remove", "Reorder", "Re-push",
-      "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
+      "Resolve", "Resume", "Retry", "Return", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Set vendor", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
       "Unlink", "Use", "Write off", "Fix registration", "Forgot password?", "Import CSV", "Invite staff", "Invite portal user",
     ]);
     for (const screen of SCREENS) {
@@ -673,8 +673,9 @@ describe("SCREENS", () => {
     expect(html("Driver")).toMatch(/Resume/);
     expect(html("Order")).not.toMatch(/Adjust line/);
     expect(html("Order")).toMatch(/>Add line</);
-    // Each line's Adjust draws in the desk table and again in the phone list.
-    expect(html("Order").match(/data-row-action[^>]*>Adjust</g)).toHaveLength(6);
+    // Lines change in place (#1503): each line's ✕ draws in the desk table and again in the phone list.
+    expect(html("Order").match(/aria-label="Remove [^"]+"/g)).toHaveLength(6);
+    expect(html("Order")).not.toMatch(/>Adjust</);
     expect(html("Confirm order")).toMatch(/Submitted · ships Sep 10, 2026/);
     expect(html("Confirm order")).not.toMatch(/Next: confirm/);
     expect(html("Confirm order")).toMatch(/>Confirm order</);
@@ -748,7 +749,7 @@ describe("SCREENS", () => {
       const body = renderToStaticMarkup(createElement("div", null, s.hd, s.body));
       expect(body, s.name).not.toMatch(banned);
     }
-    for (const name of ["Shipment done", "Run closed", "Receipt", "Movement recorded"]) {
+    for (const name of ["Shipment done", "Run closed", "Receipt"]) {
       expect(SCREENS.some((s) => s.name === name), name).toBe(true);
     }
   });
@@ -1015,9 +1016,9 @@ describe("SCREENS", () => {
     expect(String(SCREENS.find((s) => s.name === "Shop")!.reads)).not.toMatch(/SCHEMA\/RLS-GATE/);
   });
 
-  it("opens Order Adjust on Adjust lines, not Short pick", () => {
-    expect(SCREENS.find((s) => s.name === "Order")!.to?.Adjust).toBe("Adjust lines");
-    expect(SCREENS.some((s) => s.name === "Adjust lines")).toBe(true);
+  it("changes Order lines in place, with no Adjust lines page (#1503)", () => {
+    expect(SCREENS.find((s) => s.name === "Order")!.to?.Adjust).toBeUndefined();
+    expect(SCREENS.some((s) => s.name === "Adjust lines")).toBe(false);
     expect(SCREENS.find((s) => s.name === "Short pick")!.spec).toMatch(/Opens from a Pick line/);
     // A sheet over Pick, not a page round-trip per short line (#1503).
     expect(SCREENS.find((s) => s.name === "Short pick")!.surface).toBe("sheet");
@@ -1031,10 +1032,10 @@ describe("SCREENS", () => {
     expect(String(SCREENS.find((s) => s.name === "Complete transfer")!.writes)).toContain("ship_order");
   });
 
-  it("locks Water suggestions and the ion read-out, matching the live sheet (post-v1)", () => {
+  it("hides Water suggestions and the ion read-out, matching the live sheet (post-v1, #1481)", () => {
     const html = body("Water");
-    expect(html).toMatch(/Suggest additions/);
-    expect(html).toContain("data-gated");
+    expect(html).not.toMatch(/Suggest additions/);
+    expect(html).not.toContain("data-gated");
     expect(html).not.toMatch(/Against target<\//);
     const water = SCREENS.find((s) => s.name === "Water")!;
     expect(String(water.spec)).toMatch(/post-v1/i);

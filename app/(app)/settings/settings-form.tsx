@@ -26,7 +26,7 @@ export function SettingsForm({ brewery, hasFiledReports = false }: { brewery: Br
       const saved = () => toast.success("Brewery settings saved");
       const saveFee = fee ? () => { void action.run("set_one_way_keg_fee", fee, saved); } : saved;
       const saveDefaults = () => { void action.run(defaults.name, defaults.input, books ? () => { void action.run("set_books_opened_on", books, saveFee); } : saveFee); };
-      void action.run("update_brewery", { name: v.name, timezone: v.timezone, ttbRegistryNo: v.ttb, paLicenseNo: v.pa, customerPhone: v.phone, readingDueHours: defaults.input.readingDueHours }, saveDefaults);
+      void action.run("update_brewery", { name: v.name, timezone: v.timezone, ttbRegistryNo: v.ttb, customerPhone: v.phone, readingDueHours: defaults.input.readingDueHours }, saveDefaults);
     }}
   />;
 }

@@ -502,22 +502,25 @@ defineQuery({
 });
 
 defineQuery({
-  name: "get_brew_day", description: "One batch, with its intended brand's name, and the occupancy it is currently sitting in (the oldest open one when split across tanks): the vessel's name and the volume that went in; closed_at is set once the batch is completed, and writeOffBbl is the barrels its completion wrote off as loss (null when none)",
+  name: "get_brew_day", description: "One batch, with its intended brand's name, and the occupancy it is currently sitting in (the oldest open one when split across tanks): the vessel's name and the volume that went in; closed_at is set once the batch is completed; then writeOffBbl is the barrels its completion wrote off as loss (null when none) and packagedBbl the barrels its closed packaging runs packaged (both null before completion)",
   input: z.object({ batchId: z.string().uuid() }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
     const batch = await unwrap(ctx.db.from("batches")
       .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, closed_at, cancelled_at, completion_adjustment_id, note")
       .eq("brewery_id", ctx.breweryId).eq("id", i.batchId).maybeSingle());
     if (!batch) throw new CommandError("batch not found", 404, "not_found");
-    const [vessels, brands, writeOff] = await Promise.all([
+    const [vessels, brands, writeOff, balance] = await Promise.all([
       openVessels(ctx, [i.batchId]),
       brandNames(ctx, [batch.intended_brand_id]),
       // complete_batch records its write-off as one negative loss adjustment, named by completion_adjustment_id.
       batch.completion_adjustment_id ? unwrap(ctx.db.from("volume_adjustments").select("bbl")
         .eq("brewery_id", ctx.breweryId).eq("id", batch.completion_adjustment_id).single()) : null,
+      // The packaged figure is the database's batch balance; the completion preview refuses a completed batch (#1480).
+      batch.closed_at ? unwrap(ctx.db.rpc("get_batch_volume_balance", { p_brewery: ctx.breweryId, p_batch: i.batchId })) : null,
     ]);
     const brand_name = batch.intended_brand_id ? brands.get(batch.intended_brand_id) ?? null : null;
-    return { batch: { ...batch, brand_name }, occupancy: vessels.get(i.batchId)?.[0] ?? null, writeOffBbl: writeOff ? -Number(writeOff.bbl) : null };
+    return { batch: { ...batch, brand_name }, occupancy: vessels.get(i.batchId)?.[0] ?? null, writeOffBbl: writeOff ? -Number(writeOff.bbl) : null,
+      packagedBbl: balance ? Number((balance as { packagedBbl: number }).packagedBbl) : null };
   },
 });
 

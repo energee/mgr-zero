@@ -42,7 +42,8 @@ export function CustomerTaxTreatmentField({ value, controls }: { value: string; 
 }
 
 export type CustomerDetailSlot = {
-  shipTos?: { key: string; title: string; detail: string; action?: ReactNode }[];
+  /** `action` edits the ship-to; `remove` deletes it (live: a non-default ship-to only, #1487). */
+  shipTos?: { key: string; title: string; detail: string; action?: ReactNode; remove?: ReactNode }[];
   addShipTo?: ReactNode;
   kegHref?: string;
   ordersHref?: string;
@@ -110,7 +111,7 @@ export function CustomerView({
             </div>
             {detail ? <div className="flex flex-col gap-3">
               {detail.shipTos?.length ? detail.shipTos.map(s =>
-                <div key={s.key}>{E.row(s.title, s.detail, s.action)}</div>
+                <div key={s.key}>{E.row(s.title, s.detail, s.remove ? <>{s.action}{s.remove}</> : s.action)}</div>
               ) : <div className="py-6">
                 <p className="text-sm font-medium">No ship-to addresses yet</p>
                 {detail.addShipTo && <p className="mt-1 text-sm text-muted-foreground">Add a delivery address before placing an order.</p>}

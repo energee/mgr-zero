@@ -5,7 +5,8 @@ vi.mock("@/components/mgr/query-provider", () => ({ useCommandQuery: (name: stri
   state.calls.push([name, input]);
   const data = name === "list_customers" ? [{ id: "customer", name: "Buyer", shipTos: [{ id: "dock", label: "Dock", is_default: true }] }]
     : name === "list_skus" ? [{ id: "sku", name: "Keg", active: true, brands: { name: "Brand" } }, { id: "old", active: false }]
-    : name === "list_orders" ? { rows: [], nextCursor: null } : [];
+    : name === "list_orders" ? { rows: [], nextCursor: null }
+    : name === "get_brewery" ? { portal_fulfillment_location_id: "warehouse" } : [];
   return { data: state.pending ? undefined : data, error: state.error, isPending: state.pending, isFetching: state.fetching, isPaused: state.paused, dataUpdatedAt: state.pending ? 0 : Date.parse("2026-09-13T12:00:00Z"), refetch: vi.fn() };
 } }));
 // The Orders Status pick navigates with the app router; outside Next it needs a stand-in.
@@ -23,7 +24,9 @@ it("feeds the existing order form cached live IDs and the default ship-to", () =
   expect(form.type).toBe(OrderForm);
   expect(form.props.customers[0].shipTos[0]).toMatchObject({ id: "dock", is_default: true });
   expect(form.props.skus).toEqual([expect.objectContaining({ id: "sku" })]);
-  expect(state.calls).toEqual([["list_customers", { includeShipTos: true }], ["list_locations", {}], ["list_skus", {}]]);
+  expect(state.calls).toEqual([["list_customers", { includeShipTos: true }], ["list_locations", {}], ["list_skus", {}], ["get_brewery", {}]]);
+  // Source starts on the portal fulfillment warehouse when there are several locations (#1506).
+  expect(form.props.fulfillmentLocationId).toBe("warehouse");
 });
 
 it("keeps cached form data mounted when a background refresh fails", () => {

@@ -1,7 +1,7 @@
 // app/(app)/locations/location-form.tsx — one CommandForm for both location
 // writes: create_location (no id) and update_location (with id). It mounts the
 // shared LocationFields: name and uses — a place can be several at once; bins
-// are their own list (Location bins).
+// are their own section on Location detail.
 "use client";
 
 import { useState } from "react";

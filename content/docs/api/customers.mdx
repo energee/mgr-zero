@@ -65,6 +65,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "delete_customer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+## delete_ship_to [#delete_ship_to]
+
+`command` · admin, sales
+
+Delete a ship-to address no order names; the customer's default ship-to is refused until another ship-to is the default
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `shipToId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "delete_ship_to", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "shipToId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 ## get_customer [#get_customer]
 
 `query` · admin, sales, warehouse

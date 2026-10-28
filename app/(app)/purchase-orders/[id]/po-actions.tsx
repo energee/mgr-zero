@@ -8,6 +8,7 @@ import { CLOSURE_FORM_ID, CORRECTION_INFO, isCount, poLineDetail, poLineQty, rec
 import { receiptBillRequest, receiptHref, type ReceiptViewModel } from "@/lib/mgr/receipt-view";
 import { fromPacks } from "@/lib/mgr/pack-qty";
 import { useCommandAction } from "@/lib/commands/use-command-form";
+import { countDefaultBin } from "@/lib/mgr/cycle-count-view";
 import { discardRecovery } from "@/lib/commands/recovery";
 
 export type PoLine = {
@@ -18,8 +19,10 @@ export type PoLine = {
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 
-/** `today` is the brewery's day (breweryToday on the server page), the received-on default. */
-export function ReceiveForm({ poId, lines, locations, bins, today, model, correctionReceiptId }: { correctionReceiptId?: string; poId: string; lines: PoLine[]; locations: Location[]; bins: Bin[]; today: string; model: ReceivePoViewModel }) {
+/** `today` is the brewery's day (breweryToday on the server page), the received-on default.
+ *  `onHand` is the PO's first open material by bin (get_material_on_hand): the
+ *  receipt starts on the bin holding the most of it, as a count does (#1507). */
+export function ReceiveForm({ poId, lines, locations, bins, onHand, today, model, correctionReceiptId }: { correctionReceiptId?: string; poId: string; lines: PoLine[]; locations: Location[]; bins: Bin[]; onHand: { location_id: string; bin_id: string; qty: number | string }[]; today: string; model: ReceivePoViewModel }) {
   const router = useRouter();
   const mode = receiveMode(model.state);
   const correcting = mode === "correct";
@@ -30,9 +33,10 @@ export function ReceiveForm({ poId, lines, locations, bins, today, model, correc
   const [bestBy, setBestBy] = useState<Record<string, string>>(Object.fromEntries(open.map(line => [line.id, line.recorded_best_by ?? ""])));
   const [reason, setReason] = useState("");
   const [closureReason, setClosureReason] = useState("");
-  const [locationId, setLocationId] = useState(locations[0]?.id ?? "");
+  const [start] = useState(() => countDefaultBin(onHand, locations, bins));
+  const [locationId, setLocationId] = useState(start.locationId);
   const binsHere = bins.filter(bin => bin.location_id === locationId);
-  const [binId, setBinId] = useState(binsHere[0]?.id ?? "");
+  const [binId, setBinId] = useState(start.binId);
   const [receivedOn, setReceivedOn] = useState(today);
   const [via, setVia] = useState("mailto");
   const { busy, error, run } = useCommandAction();

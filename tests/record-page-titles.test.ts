@@ -79,10 +79,8 @@ const RECORDS = [
   ["invoices/[id]/return", "id", "get_invoice"],
   ["kegs/customers/[customerId]", "customerId", "list_customers"],
   ["locations/[id]", "id", "list_locations"],
-  ["locations/[id]/bins", "id", "list_locations"],
   ["menu/item/[formatId]", "formatId", "list_pos_locations"],
   ["orders/[id]", "id", "get_order"],
-  ["orders/[id]/adjust", "id", "get_order"],
   ["orders/[id]/complete", "id", "get_order"],
   ["orders/[id]/confirm", "id", "get_order"],
   ["orders/[id]/edit", "id", "get_order"],
@@ -187,7 +185,6 @@ describe("successful record metadata", () => {
 
   it.each([
     ["locations/[id]", "North warehouse"],
-    ["locations/[id]/bins", "Bins at North warehouse"],
   ])("names %s after its authorized location", async (route, title) => {
     const { bindings } = requestBindings();
     const data = loadPage("app/(app)/locations/location-data.ts", {

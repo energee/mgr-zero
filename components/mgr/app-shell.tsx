@@ -94,7 +94,8 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
       </Sidebar>
       <SidebarInset id="main" tabIndex={-1} className="h-full min-h-0 min-w-0 overflow-hidden outline-none print:h-auto print:overflow-visible">
         <header className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b px-2 py-2 md:h-12 md:py-0">
-          <div className="flex min-w-0 flex-col items-start gap-1 text-sm font-medium md:flex-row md:items-center">
+          {/* One Ask MGR button fits beside the brand, so a phone header stays one row (#1512). */}
+          <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
             {composer && <span className="max-w-48 truncate text-xs text-muted-foreground md:hidden">{brandMark}</span>}
             <SidebarTrigger className="hidden md:inline-flex" />
             {composer ?? <span className="md:hidden">{brandMark}</span>}

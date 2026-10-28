@@ -5059,6 +5059,9 @@ isOneToOne: false
 "delete_sale_channel":
 { Args: { "p_brewery": string,"p_id": string,"p_request_id": string }; Returns: Json
                            },
+"delete_ship_to":
+{ Args: { "p_brewery": string,"p_id": string,"p_request_id": string }; Returns: Json
+                           },
 "delete_vessel":
 { Args: { "p_brewery": string,"p_request_id": string,"p_vessel": string }; Returns: Json
                            },
@@ -5117,6 +5120,9 @@ isOneToOne: false
 { Args: { "p_brewery": string,"p_end": string,"p_jurisdiction": string,"p_start": string }; Returns: Json
                            },
 "get_batch_completion_preview":
+{ Args: { "p_batch": string,"p_brewery": string }; Returns: Json
+                           },
+"get_batch_volume_balance":
 { Args: { "p_batch": string,"p_brewery": string }; Returns: Json
                            },
 "get_beer_overview_aggregates":
@@ -5772,7 +5778,7 @@ isOneToOne: false
 { Args: { "p_bin": string,"p_brewery": string,"p_name": string,"p_request_id": string }; Returns: Json
                            },
 "update_brewery":
-{ Args: { "p_brewery": string,"p_customer_phone": string,"p_name": string,"p_pa_license_no": string,"p_reading_due_hours": number,"p_request_id": string,"p_timezone": string,"p_ttb_registry_no": string }; Returns: Json
+{ Args: { "p_brewery": string,"p_customer_phone": string,"p_name": string,"p_reading_due_hours": number,"p_request_id": string,"p_timezone": string,"p_ttb_registry_no": string }; Returns: Json
                            },
 "update_draft_order":
 { Args: { "p_clear_requested"?: boolean,"p_expected_brewery"?: string,"p_expected_customer"?: string,"p_lines": Json,"p_note": string,"p_order": string,"p_pickup"?: boolean,"p_po": string,"p_request_id": string,"p_requested": string,"p_ship_to": string }; Returns: Json

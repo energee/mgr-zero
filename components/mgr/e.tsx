@@ -200,7 +200,7 @@ export const E = {
   },
   /** A group heading, larger than `ttl`: the beer over its formats on Confirm order, the ship date on Pick sheet, the one Gravity unit section on Units. Both render h2, so the `ttl`s after it sit beside it in the outline. */
   group: (t: React.ReactNode) => <h2 className="mt-3 text-base font-semibold">{t}</h2>,
-  /** The same beer name in a table's first column (Pick, Adjust lines), at the row's text size so its row is no taller than a format row; a long name and alias wraps on a phone. */
+  /** The same beer name in a table's first column (Pick), at the row's text size so its row is no taller than a format row; a long name and alias wraps on a phone. */
   brand: (t: React.ReactNode) => <span className="inline-block max-w-28 whitespace-normal font-semibold md:max-w-none">{t}</span>,
   /** `id` makes the title an anchor; scroll-m keeps it clear of the sticky header (as screen-index does). */
   ttl: (t: React.ReactNode, id?: string) => <h2 id={id} className={cn("mt-2 text-sm font-medium text-muted-foreground", id && "scroll-m-20")}>{t}</h2>,

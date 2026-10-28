@@ -32,6 +32,7 @@ export function OrderForm({
   timeZone,
   feedback,
   linkedCustomerId,
+  fulfillmentLocationId,
 }: {
   customers: CustomerOption[];
   locations: LocationOption[];
@@ -40,9 +41,11 @@ export function OrderForm({
   feedback?: ReactNode;
   /** `?customerId=` from the link that opened New order; see initialOrderChoices. */
   linkedCustomerId?: string;
+  /** The brewery's portal fulfillment warehouse, Source's starting choice among several; see initialOrderChoices. */
+  fulfillmentLocationId?: string | null;
 }) {
   const router = useRouter();
-  const initial = initialOrderChoices(customers, locations, linkedCustomerId);
+  const initial = initialOrderChoices(customers, locations, linkedCustomerId, fulfillmentLocationId);
   const [kind, setKind] = useState<OrderKind>("wholesale");
   const [customerId, setCustomerId] = useState(initial.customerId);
   const [shipToId, setShipToId] = useState(initial.shipToId);

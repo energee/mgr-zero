@@ -46,7 +46,9 @@ export function ComposerStripView({
   const tooLong = length > MAX_CHAT_MESSAGE_CHARS;
   const send = () => { const message = value?.trim(); if (message && !tooLong) onSubmit?.(message); };
   return (
-      <form className="shrink-0" onSubmit={onSubmit ? (event) => { event.preventDefault(); send(); } : undefined}>
+      // At high zoom the composer caps its height and scrolls, so the message
+      // list above keeps room (#1474).
+      <form className="max-h-[50dvh] shrink-0 overflow-y-auto" onSubmit={onSubmit ? (event) => { event.preventDefault(); send(); } : undefined}>
         <InputGroup className="h-auto rounded-xl border-0 bg-muted/40 shadow-none">
           <InputGroupTextarea
             ref={promptRef}

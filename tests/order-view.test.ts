@@ -26,6 +26,28 @@ describe("Order view loop", () => {
     expect(edit).toContain("SAVE");
   });
 
+  it("adds and removes lines in place: ✕ on each line, Add line, and an added line's SKU picker (#1503)", () => {
+    const model = toOrderViewProps(orderConfirmedWholesale);
+    const lineEdit = { skus: [{ id: "new-sku", label: "Pils · case" }], added: [{ key: "n1", skuId: "" }] };
+    const html = renderToStaticMarkup(createElement(OrderView, { model, quantities: { n1: "4" }, onQuantity: () => {}, lineEdit }));
+    // Saved and added lines, each once in the desk table and once in the phone list.
+    expect(html.match(/aria-label="Remove [^"]+"/g)).toHaveLength((model.lines.length + 1) * 2);
+    expect(html).toMatch(/>Add line</);
+    expect(html.match(/Select SKU/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(html).toMatch(/value="4"/);
+    expect(html).toContain(`${model.lines.length + 1} lines`);
+    // A single line cannot be removed: the order keeps at least one.
+    const one = { ...model, lines: model.lines.slice(0, 1) };
+    expect(renderToStaticMarkup(createElement(OrderView, { model: one, onQuantity: () => {}, lineEdit: { skus: [], added: [] } }))).not.toMatch(/aria-label="Remove /);
+    expect(renderToStaticMarkup(createElement(OrderView, { model }))).not.toMatch(/Add line|aria-label="Remove /);
+  });
+
+  it("draws lineActions without a Reason, for the saved-lines ATP warnings (#1503)", () => {
+    const html = renderToStaticMarkup(createElement(OrderView, { model: toOrderViewProps(orderConfirmedWholesale), lineActions: "LINES SAVED" }));
+    expect(html).toContain("LINES SAVED");
+    expect(html).not.toMatch(/>Reason</);
+  });
+
   it("names who made each history entry: staff by name, a portal buyer by email", () => {
     const events = [
       { id: "e1", event: "submitted", actor: "buyer-id", payload: {}, created_at: "2026-10-16T13:02:00.000Z" },
@@ -208,8 +230,9 @@ describe("Order view loop", () => {
   it("the inventory Order drawing still shows the exemplar verbs and restock copy", () => {
     const html = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Order")!.body));
     expect(html).toMatch(/>Add line</);
-    // One Adjust per line in the desktop table and again in the phone list.
-    expect(html.match(/data-row-action[^>]*>Adjust</g)).toHaveLength(6);
+    // Lines add and remove in place (#1503): one ✕ per line in the desktop table and again in the phone list.
+    expect(html.match(/aria-label="Remove [^"]+"/g)).toHaveLength(6);
+    expect(html).not.toMatch(/>Adjust</);
     expect(html).toMatch(/ORD-0229/);
     expect(html).toMatch(/Picked · restock pending/);
     expect(html).toMatch(/>Ship</);
@@ -222,6 +245,8 @@ describe("Order view loop", () => {
     const form = readFileSync("app/(app)/orders/[id]/order-lines-form.tsx", "utf8");
     expect(src).toMatch(/from "@\/lib\/mgr\/order-view"/);
     expect(src).toMatch(/<OrderLinesForm\b/);
+    // An added line offers what New order offers, filtered in the query (#1503).
+    expect(src).toMatch(/runCommand\("list_skus", order\.kind === "wholesale" \? \{ saleChannelId: order\.sale_channel_id \} : \{ active: true \}/);
     expect(form).toMatch(/from "@\/components\/mgr\/views\/order"/);
     expect(form).toMatch(/<OrderView\b/);
     for (const file of [src, form]) {

@@ -2,7 +2,7 @@
 // confirm_order, adjust_order_lines and set_standing_allocation return
 // ({ sku_id, atp } per SKU left negative). Drawn by the Confirm order review
 // (confirm/confirm-buttons.tsx, the only place an order is confirmed, #713),
-// Adjust lines (adjust-lines-form.tsx) and the standing allocation sheet
+// the order page's in-place line edit (order-lines-form.tsx) and the standing allocation sheet
 // (replenishment/quantity-form.tsx) (#1088).
 "use client";
 

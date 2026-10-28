@@ -57,7 +57,7 @@ export function VendorView({
       {model.active !== null && <>
         {E.ttl("Vendor status")}
         {E.fld("Status", model.active ? "Active" : "Inactive")}
-        {E.info("Vendors cannot currently be deleted. Deactivation removes this vendor from New purchase order choices. Existing materials, contracts and orders remain linked.")}
+        {E.info("Vendors cannot be deleted; deactivate one to drop it from new purchase orders.")}
         <ConfirmDeleteControl
           title={model.active ? "Deactivate vendor" : "Reactivate vendor"}
           name={<>{model.active ? "Deactivate" : "Reactivate"} <strong>{model.name}</strong>?</>}

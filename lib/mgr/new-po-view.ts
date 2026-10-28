@@ -72,3 +72,14 @@ export function vendorMaterialsFirst<M extends { default_vendor_id: string | nul
   if (!vendorId) return materials;
   return [...materials.filter((m) => m.default_vendor_id === vendorId), ...materials.filter((m) => m.default_vendor_id !== vendorId)];
 }
+
+export type PoContract = { id: string; vendor_id: string; material_id: string; unit_cost_cents: number | null; starts_on: string | null; ends_on: string | null };
+
+/** The contract a New PO line draws down and takes its cost from: the one
+ *  contract for this vendor and material in force on `today` (open ends
+ *  count). Null when none is, or when several are and the line must not guess. */
+export function onlyActiveContract<C extends PoContract>(contracts: C[], vendorId: string, materialId: string, today: string): C | null {
+  const active = contracts.filter((c) => c.vendor_id === vendorId && c.material_id === materialId
+    && (c.starts_on == null || c.starts_on <= today) && (c.ends_on == null || c.ends_on >= today));
+  return active.length === 1 ? active[0] : null;
+}

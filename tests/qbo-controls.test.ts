@@ -31,7 +31,7 @@ describe("QuickBooks control boundaries", () => {
       customers: { name: "Ridgeline" }, quickbooks_link: { href: "https://app.qbo.intuit.com/app/invoice?txnId=7&companyId=9341", reason: null },
     }, ["admin"], true, "America/New_York");
     expect(row.accounting).toMatch(/review/i);
-    expect(row.payment).toBe("Balance due");
+    expect(row.payment).toBe("Unpaid");
     expect(row.localSubtotal?.cents).toBe(98000);
     expect(row.total.cents).toBe(99000);
     expect(row.quickbooksHref).toContain("txnId=7");

@@ -138,13 +138,18 @@ export function remainingAmountText(remaining: string) {
   return remaining.includes(".") ? remaining.replace(/\.?0+$/, "") : remaining;
 }
 
-/** Keep the reason and Save eligibility on the same exact, eight-decimal comparison. */
-export function lossReviewReason(amount: string, remaining: string, target: "sample" | "taproom" | "destruction", state: string): string | null {
+/** Where a reattributed loss goes; each posts to its own TTB line. */
+export type LossTarget = "sample" | "taproom" | "destruction";
+
+/** Keep the reason and Save eligibility on the same exact, eight-decimal comparison. The target starts unchosen ("")
+ *  because a wrong default would post the loss to the wrong TTB line (#1510). */
+export function lossReviewReason(amount: string, remaining: string, target: LossTarget | "", state: string): string | null {
   const amountUnits = bblUnits(amount);
   const remainingUnits = bblUnits(remaining);
   const missing: string[] = [];
   if (amountUnits === null) missing.push("a positive amount with up to eight decimal places");
   else if (remainingUnits === null || amountUnits > remainingUnits) missing.push(`an amount no greater than the remaining ${bblExact(Number(remaining), 8)}`);
+  if (!target) missing.push("a target");
   if (target === "sample" && !/^[A-Z]{2}$/.test(state)) missing.push("a two-letter destination state");
   return submitReason(missing);
 }

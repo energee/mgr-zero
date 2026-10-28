@@ -2,7 +2,7 @@
 // snapshots. Views own no sample data.
 import type { BatchesSnapshot } from "@/lib/mgr/batches-view";
 import type { BrewDayViewModel } from "@/lib/mgr/brew-day-view";
-import { startAtPlan, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
+import { startAtPlan, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
 import type { RecipeViewModel } from "@/lib/mgr/recipe-view";
 import type { RecipesSnapshot } from "@/lib/mgr/recipes-view";
@@ -138,12 +138,16 @@ const lineStock = mineralIngredients.flatMap(row => row.source ? [{
   bin_id: row.source.binId, bin_name: row.source.bin.split(" / ")[1], lot_id: row.source.lotId, lot_code: row.source.lot, qty: 2000,
 }] : []);
 
-/** Brew day mid-mash: the first two mash rows confirmed, so Mash is the open stage on a phone. */
+/** The recipe's one water addition, 40 g of gypsum in the mash, stocked in grams in one bin. */
+const gypsumStock = [{ material_id: "gypsum", material_name: "Gypsum", unit: "g", location_id: "dry-storage", location_name: "Dry storage", bin_id: "d3", bin_name: "D3", lot_id: null, lot_code: null, qty: 5000 }];
+const mineralWater = waterAdditionRows({ waterAdditions: [{ id: "gypsum-mash", material_id: "gypsum", materialName: "Gypsum", qty: 40, unit: "g", stage: "mash", baseUnit: "g" }] }, gypsumStock).rows;
+
+/** Brew day mid-mash: the first two mash rows confirmed, so Mash is the open stage on a phone; the gypsum row waits. */
 export const brewTimelineMineral: BrewTimelineViewModel = {
   title: brewPrepMineral.title,
   planned: brewPrepMineral.planned,
-  sources: [...lineStock, ...chitStock],
-  ingredients: brewPrepMineral.ingredients.map(row => ({ ...row, confirmed: row.key === "malted-oats" || row.key === "pilsen" })),
+  sources: [...lineStock, ...chitStock, ...gypsumStock],
+  ingredients: [...brewPrepMineral.ingredients.map(row => ({ ...row, confirmed: row.key === "malted-oats" || row.key === "pilsen" })), ...mineralWater],
   targets: { mash: "152 °F · 60 min · pH 5.3", lauter: "pre-boil 25 bbl", boil: "60 min", whirlpool: "180 °F · 20 min", knockout: "66 °F" },
   process: { mashWaterGal: "620", targetMashPh: "5.3" },
   vesselId: "fv3",

@@ -1,8 +1,8 @@
 // lib/mgr/sale-channels-view.ts — view-model for Sale channels.
 // list_sale_channels paints the domain; optional movements are inventory copy.
 // A row is deletable only where delete_sale_channel would succeed (#1207).
-// CHANNEL_IN_USE_RULE is the one wording of the delete refusal, shared by the
-// list (where a row lacks Delete) and the delete confirm.
+// CHANNEL_IN_USE_RULE is the one wording of the delete refusal; only the
+// delete confirm states it, never the list (#1518).
 import type { EmptyState } from "./empty-state";
 import { plural } from "./plural";
 import { sentenceCase } from "./labels";
@@ -27,9 +27,6 @@ export type SaleChannelsViewModel = {
   backHref?: string;
   rows: SaleChannelsRowView[];
   empty?: EmptyState;
-  /** The rule text (CHANNEL_IN_USE_RULE) drawn above the rows, explaining a
-   *  missing Delete. Set only when a role that may delete sees such a row. */
-  inUseRule?: string;
 };
 
 export type SaleChannelsSnapshot = {
@@ -65,7 +62,6 @@ export function toSaleChannelsViewProps({ channels, backHref, canDelete = false 
   }));
   return {
     backHref,
-    inUseRule: canDelete && rows.some((r) => !r.deletable) ? CHANNEL_IN_USE_RULE : undefined,
     empty: channels.length === 0 ? { title: "No sale channels yet", description: "A channel groups the customers that share a price list." } : undefined,
     rows,
   };

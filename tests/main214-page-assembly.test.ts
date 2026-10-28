@@ -29,7 +29,7 @@ async function query(name: string, input?: { basis?: string; missingPortalEmail?
     case "list_channel_prices": return [];
     case "list_price_group_barcodes": return [];
     case "list_sale_channels": return [{ id: "channel", name: "Wholesale", tax_treatment: "taxable" }];
-    case "get_customer": return { customer, shipTos: [shipTo] };
+    case "get_customer": return { customer, shipTos: [shipTo, { ...shipTo, id: "back", label: "Back door", is_default: false }] };
     case "list_customer_users": return [{ userId: "user", email: "jo@buyer.test", createdAt: "2026-09-01T00:00:00Z" }];
     case "list_customers": state.customerInput = input ?? {}; return [customer];
     case "list_locations": return [{ id: "location", name: "Cold room", uses: ["warehouse"] }];
@@ -41,7 +41,8 @@ async function query(name: string, input?: { basis?: string; missingPortalEmail?
     case "list_vendors": case "get_material_on_hand": return [];
     case "list_routes": return { routes: [
       { id: "planned", name: "North loop", delivery_date: "2026-09-11", driver_user_id: "driver-1", driver_email: "sam@example.test", vehicle: null, note: null, departed_at: null, returned_at: null, stops: [] },
-      { id: "gone", name: "Hill route", delivery_date: "2026-09-10", driver_user_id: "driver-1", driver_email: "sam@example.test", vehicle: null, note: null, departed_at: "2026-09-10T14:00:00Z", returned_at: null, stops: [] },
+      { id: "gone", name: "Hill route", delivery_date: "2026-09-10", driver_user_id: "driver-1", driver_email: "sam@example.test", vehicle: null, note: null, departed_at: "2026-09-10T14:00:00Z", returned_at: null, stops: [{ id: "s1", stop_no: 1, delivered_at: null }] },
+      { id: "done", name: "Mill route", delivery_date: "2026-09-09", driver_user_id: "driver-1", driver_email: "sam@example.test", vehicle: null, note: null, departed_at: "2026-09-09T14:00:00Z", returned_at: null, stops: [{ id: "s2", stop_no: 1, delivered_at: "2026-09-09T15:00:00Z" }] },
       { id: "nobody", name: "River run", delivery_date: "2026-09-12", driver_user_id: null, driver_email: null, vehicle: null, note: null, departed_at: null, returned_at: null, stops: [] },
       { id: "former", name: "Lake loop", delivery_date: "2026-09-13", driver_user_id: "driver-2", driver_email: null, vehicle: null, note: null, departed_at: null, returned_at: null, stops: [] },
     ], anyReturned: false, unassigned: [], drivers: [], today: "2026-09-10" };
@@ -52,7 +53,7 @@ import CatalogPage from "@/app/(app)/catalog/page";
 import SkuListPage from "@/app/(app)/catalog/brands/[id]/skus/page";
 import CustomersPage from "@/app/(app)/customers/page";
 import CustomerPage from "@/app/(app)/customers/[id]/page";
-import BinsPage from "@/app/(app)/locations/[id]/bins/page";
+import LocationPage from "@/app/(app)/locations/[id]/page";
 import { SCREENS } from "@/components/mgr/screens";
 import PricingPage from "@/app/(app)/pricing/page";
 import RoutesPage from "@/app/(app)/routes/page";
@@ -150,25 +151,29 @@ it("customer view keeps tax edit prefill, default ship-to, filtered Orders, Invi
   expect(page.type).toBe(CustomerDetailForm);
   expect(page.props.model.editValues.taxTreatment).toBe("research");
   expect(page.props.detail.shipTos[0].action.props.shipTo.is_default).toBe(true);
+  // Only a non-default ship-to offers Delete: the default goes once another is the default (#1487).
+  expect(page.props.detail.shipTos[0].remove).toBeNull();
+  expect(page.props.detail.shipTos[1].remove.props).toMatchObject({ command: "delete_ship_to", input: { shipToId: "back" }, redirect: "/customers/buyer" });
   expect(page.props.detail.revokePortalUser.user.props).toMatchObject({ command: "revoke_customer_user", input: { customerId: "buyer", userId: "user" } });
   const html = render(page);
-  for (const text of ["Tax treatment", "Research", "Dock · default", "/orders?customerId=buyer", "/orders/new?customerId=buyer", "Invite portal user", "jo@buyer.test", "Remove access"]) expect(html).toContain(text);
+  for (const text of ["Tax treatment", "Research", "Dock · default", "/orders?customerId=buyer", "/orders/new?customerId=buyer", "Invite portal user", "jo@buyer.test", "Remove access", "Delete ship-to"]) expect(html).toContain(text);
   state.roles = ["warehouse"]; state.calls = [];
   const readonly = render(await CustomerPage({ params: Promise.resolve({ id: "buyer" }) }));
   expect(state.calls).not.toContain("list_customer_users");
-  expect(readonly).not.toMatch(/Edit customer|Add ship-to|Edit ship-to|Invite portal user|invitations aren|Portal users|Remove access/);
+  expect(readonly).not.toMatch(/Edit customer|Add ship-to|Edit ship-to|Delete ship-to|Invite portal user|invitations aren|Portal users|Remove access/);
   expect(readonly).toContain("Research");
   expect(readonly).not.toContain("/orders/new");
 });
-it("bins shared view retains actual stock move inputs and suppresses Warehouse-only queries for sales", async () => {
-  const page = await BinsPage({ params: Promise.resolve({ id: "location" }) });
-  expect(page.type).toBe(LocationBinsView);
-  expect(page.props.footer.props.stock).toEqual([{ bin_id: "bin", skuId: "sku", qty: 4 }]);
-  expect(page.props.footer.props.bins[0].id).toBe("bin");
-  // #1154: the title names the location and the row says what the bin holds.
-  expect(render(page)).toMatch(/Bins at Cold room[\s\S]*Cold[\s\S]*1 kind of stock/);
+it("Location detail's Bins section retains actual stock move inputs and suppresses Warehouse-only queries for sales (#1507)", async () => {
+  const page = await LocationPage({ params: Promise.resolve({ id: "location" }) });
+  const bins = page.props.bins;
+  expect(bins.type).toBe(LocationBinsView);
+  expect(bins.props.footer.props.stock).toEqual([{ bin_id: "bin", skuId: "sku", qty: 4 }]);
+  expect(bins.props.footer.props.bins[0].id).toBe("bin");
+  // #1154: the page names the location and the row says what the bin holds.
+  expect(render(page)).toMatch(/Cold room[\s\S]*Bins[\s\S]*Cold[\s\S]*1 kind of stock/);
   state.roles = ["sales"]; state.calls = [];
-  const readonly = await BinsPage({ params: Promise.resolve({ id: "location" }) });
+  const readonly = await LocationPage({ params: Promise.resolve({ id: "location" }) });
   expect(state.calls).not.toContain("get_bin_move_stock");
   // Sales never reads bin stock, so the row claims neither a count nor Empty.
   expect(render(readonly)).not.toMatch(/Add bin|Edit bin|Move stock|of stock|Empty|Nothing is stored/);
@@ -188,7 +193,7 @@ it("explicit null suppresses new shared view fixture actions", async () => {
 });
 
 it("converted inventory frames never navigate into the live catalog/customer/location/settings pages", () => {
-  const names = ["Catalog", "Customers", "Customer detail", "Locations", "Location detail", "Location bins", "SKU", "SKU list", "Formats", "Format", "Package BOM", "Price groups", "Price group", "Sale channels", "Channel"];
+  const names = ["Catalog", "Customers", "Customer detail", "Locations", "Location detail", "SKU", "SKU list", "Formats", "Format", "Package BOM", "Price groups", "Price group", "Sale channels", "Channel"];
   for (const name of names) {
     const screen = SCREENS.find(s => s.name === name)!;
     expect(screen, name).toBeDefined();
@@ -273,6 +278,8 @@ it("routes list: an assigned route not yet departed is a row link; Resume and As
   expect(html).toMatch(/<a[^>]*href="\/routes\/planned"[^>]*>(?:(?!<\/a>)[\s\S])*North loop · Sep 11, 2026/);
   expect(html).toMatch(/<a[^>]*href="\/routes\/gone"[^>]*>Resume<\/a>/);
   expect(html).toMatch(/<a[^>]*href="\/routes\/nobody"[^>]*>Assign<\/a>/);
+  // Every stop has an outcome: Return opens the route, where the driver records the truck back (#1505).
+  expect(html).toMatch(/<a[^>]*href="\/routes\/done"[^>]*>Return<\/a>/);
   // "Open" is the Status pick's value; the route row itself has no Open verb.
   expect(html).not.toMatch(/<(?:a|button)\b[^>]*>Open<\/(?:a|button)>/);
 });
