@@ -688,6 +688,26 @@ describe("route edges", () => {
   });
 });
 
+// #1486: a returned route left /routes for good; the Returned filter lists them newest first.
+describe("list_routes status", () => {
+  it("lists open routes by default and returned routes newest first under returned", async () => {
+    const own = await makeBrewery();
+    const ctx = await makeStaffCtx(own.id, "warehouse");
+    const listed = async (input: object) => await runCommand("list_routes", input, ctx) as { routes: { name: string }[]; anyReturned: boolean };
+    expect(await listed({})).toMatchObject({ routes: [], anyReturned: false });
+    const done = { departed_at: "2026-09-01T08:00:00Z", returned_at: "2026-09-01T17:00:00Z" };
+    const { error } = await admin.from("routes").insert([
+      { brewery_id: own.id, delivery_date: "2026-09-03", name: "Open" },
+      { brewery_id: own.id, delivery_date: "2026-09-01", name: "Older", ...done },
+      { brewery_id: own.id, delivery_date: "2026-09-02", name: "Newer", ...done },
+    ]);
+    expect(error).toBeNull();
+    expect((await listed({})).routes.map((r) => r.name)).toEqual(["Open"]);
+    expect((await listed({ status: "open" })).anyReturned).toBe(true);
+    expect((await listed({ status: "returned" })).routes.map((r) => r.name)).toEqual(["Newer", "Older"]);
+  });
+});
+
 // #473: list_routes read every shipment and delivery of the brewery in one
 // unpaged request, so past PostgREST's 1000-row cap new shipped orders fell
 // out of "unassigned" and stops fell off long routes.

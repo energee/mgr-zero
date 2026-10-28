@@ -52,13 +52,15 @@ export const plannedQty = (value: string | undefined) => {
 };
 
 /** A package count's error, planned (Schedule) or actual (Close, #1477): plain
- *  notation, zero or more, whole kegs. Blank is no error here; each form says
- *  whether a blank is allowed. */
+ *  notation, zero or more, whole kegs, and within qty_planned / qty_actual's
+ *  numeric(12,2). Blank is no error here; each form says whether a blank is
+ *  allowed. */
 export function packageQtyError(value: string, whole = false): string | undefined {
   if (!value.trim()) return undefined;
   const notation = numberNotationError(value);
   if (notation) return notation;
   if (!isNumber(value) || Number(value) < 0) return "Enter a quantity of zero or more.";
+  if (Number(value) > 9_999_999_999.99) return "Enter a quantity no greater than 9,999,999,999.99.";
   if (whole && !Number.isInteger(Number(value))) return "Enter a whole number of kegs.";
 }
 

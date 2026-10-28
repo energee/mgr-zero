@@ -20,5 +20,6 @@ export function vendorFieldErrors(fields: Pick<VendorViewModel, "email" | "leadD
   let leadDays: string | undefined;
   if (/[eE]/.test(fields.leadDays)) leadDays = "Enter a decimal number without exponent notation.";
   else if (fields.leadDays !== "" && (!Number.isInteger(days) || days < 0)) leadDays = "Enter a whole number of days, zero or more.";
+  else if (days > 2_147_483_647) leadDays = "Enter a lead time no greater than 2,147,483,647 days."; // vendors.lead_time_days is int
   return { ...(email && { email }), ...(phone && { phone }), ...(leadDays && { leadDays }) };
 }

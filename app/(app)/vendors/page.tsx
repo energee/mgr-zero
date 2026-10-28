@@ -17,7 +17,7 @@ import "@/lib/commands/all";
 import { VendorForm, type Vendor } from "./vendor-form";
 import { ContractForm, type Contract } from "./contract-form";
 import { ListControls } from "@/components/mgr/list-controls";
-import { listParams } from "@/lib/mgr/list-params";
+import { listParams, searchQuery } from "@/lib/mgr/list-params";
 import { navTitle } from "@/lib/mgr/nav";
 
 export const metadata = { title: navTitle("/vendors") };
@@ -29,7 +29,7 @@ type VendorRow = Vendor & {
 };
 type Material = { id: string; name: string; purchase_uom: string };
 
-const vendorsParams = z.object({ q: z.string().trim().max(100).catch("") });
+const vendorsParams = z.object({ q: searchQuery });
 
 export default async function VendorsPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const { params } = listParams(vendorsParams, (await searchParams) ?? {});
