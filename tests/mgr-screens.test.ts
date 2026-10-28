@@ -293,9 +293,12 @@ describe("SCREENS", () => {
       expect.soft(screen?.surface, name).toBe(surface);
     }
     const bodyText = (name: string) => renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
-    for (const destination of ["Vendors", "Sale channels", "Formats", "Price group", "Bins", "Chat"]) {
+    for (const destination of ["Vendors", "Formats", "Price group", "Settings"]) {
       expect.soft(bodyText("More"), destination).toContain(destination);
     }
+    // Settings is the one home of the setup pages, and Chat is in Me (#1513).
+    for (const moved of ["Sale channels", "Locations", "Chat"]) expect.soft(bodyText("More"), moved).not.toContain(moved);
+    for (const destination of ["Sale channels", "Locations", "Import", "Chat"]) expect.soft(bodyText("Settings"), destination).toContain(destination);
     expect(bodyText("Team")).not.toContain("Remove selected member");
     expect(bodyText("Import")).toContain("Settings");
     expect(bodyText("Planning")).toContain("More");
@@ -658,8 +661,8 @@ describe("SCREENS", () => {
     expect(html("Today")).toMatch(/data-row-action[^>]*>Pick</);
     // The weekly count is live (record_taproom_count): Today draws no gated stand-in for it.
     expect(html("Today")).not.toMatch(/data-gated/);
-    expect(html("Sales")).not.toMatch(/<button[^>]*>New order</);
-    expect(html("Sales")).toMatch(/New order/);
+    // New order is Sales' quick action above the rows (#1513), not a row verb.
+    expect(html("Sales")).toMatch(/<button[^>]*>New order</);
     expect(html("Brewer")).not.toMatch(/grid-cols-2/);
     expect(html("Taproom")).not.toMatch(/<button[^>]*>Swap keg</);
     expect(html("Taproom")).toMatch(/data-row-action[^>]*>Open</);

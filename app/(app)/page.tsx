@@ -1,17 +1,16 @@
 // app/(app)/page.tsx — Today: the role-filtered work list from get_today,
 // drawn to the Today screen record (components/mgr/screens.tsx) in the E
 // vocabulary. The row verb is the action and opens the item's href; the
-// empty state offers Record movement to the roles that may record one. An
-// admin on a brewery with no location and no brand sees the First-run checklist (first-run.tsx) instead.
+// role's quick actions (todayActions) sit above the rows. An admin on a
+// brewery with no location and no brand sees the First-run checklist (first-run.tsx) instead.
 // Screens stay fixtures: nothing here imports SCREENS.
 import { E } from "@/components/mgr/e";
 import { TodayView } from "@/components/mgr/views/today";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { canRun } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { TodayItem } from "@/lib/commands/today";
-import { toTodayViewProps } from "@/lib/mgr/today-view";
+import { todayActions, toTodayViewProps } from "@/lib/mgr/today-view";
 import "@/lib/commands/all";
 import { FirstRunChecklist, type FirstRun } from "./first-run";
 import { taproomTodayRows } from "@/lib/mgr/taproom-today";
@@ -50,14 +49,5 @@ export default async function TodayPage() {
     return <TodayView model={toTodayViewProps({ date, taproom: taproomTodayRows(location, open, counts, report, brewery.timeZone) })} linkRows />;
   }
   const items = adminItems ?? (await runCommand("get_today", {}, ctx)) as TodayItem[];
-  // Only a role that may record a movement is offered one; the others get no
-  // empty-state verb rather than a link to No access or a formless page (#478).
-  const canMove = canRun(ctx, "record_movement");
-  return (
-    <TodayView
-      model={toTodayViewProps({ date, items, timeZone: brewery.timeZone, emptyVerb: canMove ? "Record movement" : "" })}
-      emptyAction={canMove ? E.btn("Record movement", "g", "/inventory?recordMovement=1") : null}
-      linkRows
-    />
-  );
+  return <TodayView model={toTodayViewProps({ date, items, timeZone: brewery.timeZone, actions: todayActions(brewery.roles) })} linkRows />;
 }

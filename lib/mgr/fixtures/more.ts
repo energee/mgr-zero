@@ -1,7 +1,8 @@
 // lib/mgr/fixtures/more.ts — More landing navs for the inventory drawing. A
 // card that is also a More entry in lib/mgr/nav.ts quotes that entry's
 // `about` line through navAbout and files under that entry's area, as the live
-// page does. Formats and Bins are not nav entries, so they name their own.
+// page does. Formats is not a nav entry, so it names its own. Setup holds only
+// Settings, the one home of the admin setup pages (#1513).
 import type { MoreNavView } from "@/lib/mgr/more-view";
 import { navAbout, STAFF_NAV } from "@/lib/mgr/nav";
 
@@ -19,11 +20,8 @@ export const moreNavs: MoreNavView[] = [
   entry("recipes", "Recipes"),
   entry("compliance", "Compliance"),
   entry("vendors", "Vendors"),
-  entry("channels", "Sale channels"),
   { key: "formats", title: "Formats", detail: "Define package formats and their volumes", group: "Sales" },
   entry("planning", "Planning"),
   entry("settings", "Settings"),
-  entry("locations", "Locations"),
-  { key: "bins", title: "Bins", detail: "Subdivide a location into bins", group: "Setup" },
-  entry("chat", "Chat"),
+  entry("menu", "Menu"),
 ];
