@@ -68,6 +68,7 @@ export const orderPick: PickSnapshot = {
     { ...line("l-pils", SKU_PILS, 10, null), skus: branded(SKU_PILS) },
     { ...line("l-stout", SKU_STOUT, 2, null), skus: branded(SKU_STOUT) },
   ],
+  sourceOnHand: [SKU_HAZY, SKU_PILS, SKU_STOUT].map(({ sku_id }) => ({ sku_id, qty: 40 })),
   locations: LOCATIONS,
 };
 

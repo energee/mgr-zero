@@ -1071,7 +1071,7 @@ export const SCREENS: Screen[] = [
     job: "Default lines to ordered; touch only exceptions",
     reads: "get_order",
     writes: "record_pick · resolve_short_pick",
-    states: [["permission", "warehouse or admin required", 1], ["short pick", "a line below ordered opens the Short pick frame", 1], ["partly picked", "reopened after a kept-owed line · counted lines start at what was picked"], ["concurrent", "another picker changed qty"], ["cancelled", "staged · restock now", 1], ["offline", "queue whole pick set once"]],
+    states: [["permission", "warehouse or admin required", 1], ["short pick", "a line below ordered opens the Short pick frame", 1], ["partly picked", "reopened after a kept-owed line · counted lines start at what was picked"], ["short stock", "the source holds less than ordered · Ordered says Only N available · the count still starts at ordered", 1], ["invalid count", "blank, negative, above ordered or exponent notation · named under the field · Done picking says why it waits", 1], ["concurrent", "another picker changed qty"], ["cancelled", "staged · restock now", 1], ["offline", "queue whole pick set once"]],
     spec: "2 taps from Today: Pick → Done picking (all-as-ordered only). The sheet is just the order: one table row per SKU (Format · Product · Ordered · Actual), grouped by package format then brand name, with the format named once on its first row, under the customer and ship date. Brands keep their staff aliases. Shortage is not a chip here: entering a count below ordered opens Short pick.",
     to: { "16 oz case": "SKU detail" },
     body: <PickView model={toPickViewProps(orderPick)} />,

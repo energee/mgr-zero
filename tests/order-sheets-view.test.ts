@@ -25,6 +25,7 @@ import {
 } from "../lib/mgr/fixtures/order-sheets";
 import { toAdjustLinesViewProps } from "../lib/mgr/adjust-lines-view";
 import { toPickViewProps } from "../lib/mgr/pick-view";
+import { numberNotationError } from "../lib/mgr/quantity-input";
 import { toReturnCreditViewProps } from "../lib/mgr/return-credit-view";
 import { toShipViewProps } from "../lib/mgr/ship-view";
 import { toShipmentDoneViewProps } from "../lib/mgr/shipment-done-view";
@@ -131,6 +132,42 @@ describe("Pick view", () => {
     const model = toPickViewProps(orderPick);
     const markup = html(createElement(PickView, { model }));
     expect(markup.match(/max="(\d+)"/g)?.toSorted()).toEqual(['max="10"', 'max="2"', 'max="4"']);
+  });
+
+  // Hazy is ordered 5 here; each typed count is judged against it (#1484).
+  const hazy = { ...orderPick.lines[0], qty_ordered: 5 };
+  const counted = (count: string) => toPickViewProps({ ...orderPick, lines: [hazy] }, { [hazy.id]: count });
+
+  it("names a count outside 0 to ordered and withholds Done picking (#1484)", () => {
+    for (const count of ["-1", "6", "", "1e1"]) {
+      const model = counted(count);
+      expect(model.lines[0].error, count).toBe(count === "1e1" ? numberNotationError(count) : "Enter a count from 0 to 5.");
+      expect(model.lines[0].tone, count).not.toBe("w");
+      expect(model.reason, count).toBe("Still needed: a count from 0 to the ordered quantity on every line.");
+    }
+    for (const count of ["0", "5"]) {
+      expect(counted(count).lines[0].error, count).toBeUndefined();
+      expect(counted(count).reason, count).toBeNull();
+    }
+    expect(counted("3").lines[0].tone).toBe("w");
+  });
+
+  it("draws the count error under the field and the reason beside a disabled Done picking (#1484)", () => {
+    const markup = html(createElement(PickView, { model: counted("-1"), quantities: { [hazy.id]: "-1" }, onQuantity: () => {} }));
+    expect(markup).toContain("Enter a count from 0 to 5.");
+    expect(markup).toContain("Still needed: a count from 0 to the ordered quantity on every line.");
+    expect(markup).toMatch(/<button[^>]*type="submit"[^>]*disabled/);
+    expect(markup).not.toContain(">Short<");
+  });
+
+  it("keeps the ordered prefill and says when the source holds less (#1484)", () => {
+    const [h, p, s] = orderPick.lines;
+    const model = toPickViewProps({ ...orderPick, sourceOnHand: [{ sku_id: h.sku_id, qty: 3 }, { sku_id: p.sku_id, qty: 10 }] });
+    expect(Object.fromEntries(model.lines.map(l => [l.key, [l.qty, l.available]]))).toEqual({
+      [h.id]: [4, "Only 3 available"], [p.id]: [10, undefined], [s.id]: [2, "Only 0 available"],
+    });
+    expect(html(createElement(PickView, { model }))).toContain("Only 3 available");
+    expect(toPickViewProps(orderPick).lines.every(l => l.available === undefined)).toBe(true);
   });
 });
 

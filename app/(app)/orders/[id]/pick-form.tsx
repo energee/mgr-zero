@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { PickView } from "@/components/mgr/views/pick";
 import { useCommandAction } from "@/lib/commands/use-command-form";
-import { isNumber } from "@/lib/mgr/quantity-input";
 import { draftCounts, pickCountDraftKey, readPickCounts, savePickCounts } from "@/lib/mgr/pick-counts";
 import { pickDoneHref, toPickViewProps, type PickSnapshot } from "@/lib/mgr/pick-view";
 
@@ -54,7 +53,7 @@ export function PickForm({ snapshot }: { snapshot: PickSnapshot }) {
   function retire() {
     sessionStorage.removeItem(key);
   }
-  const model = toPickViewProps({ ...snapshot, lines: snapshot.lines.map(line => ({ ...line, qty_picked: Number(qtys[line.id]) })) });
+  const model = toPickViewProps(snapshot, qtys);
   return <form className="contents" onClickCapture={event => {
     // The explicit order-back link abandons this working pick; Short's back link does not.
     if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0 && snapshot.backHref && (event.target as Element).closest("a")?.getAttribute("href") === snapshot.backHref) {
@@ -63,9 +62,8 @@ export function PickForm({ snapshot }: { snapshot: PickSnapshot }) {
     }
   }} onSubmit={event => {
     event.preventDefault();
-    if (committed.current || busy || needsCounts.length) return;
-    // A cleared field is not a count of 0 (#433).
-    if (!snapshot.lines.every(line => isNumber(qtys[line.id] ?? ""))) return setError("Enter a picked quantity for every line.");
+    // model.reason withholds Done picking for a blank or out-of-range count (#433, #1484).
+    if (committed.current || busy || needsCounts.length || model.reason) return;
     void run("record_pick", { orderId: snapshot.order.id, picks: snapshot.lines.map(line => ({ lineId: line.id, qty: Number(qtys[line.id]) })) }, () => {
       committed.current = true; setSaved(true);
       try { retire(); }
