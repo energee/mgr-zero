@@ -212,7 +212,7 @@ const AUTHENTICATED_RPCS = [
   "update_draft_order(uuid,uuid,date,text,text,jsonb,uuid,boolean,uuid,uuid,boolean)",
   "update_location(uuid,uuid,text,location_kind[],uuid)",
   "update_sku(uuid,uuid,boolean,text,uuid,uuid,boolean,numeric,boolean)",
-  "update_brewery(uuid,text,text,text,text,text,integer,uuid)",
+  "update_brewery(uuid,text,text,text,text,integer,uuid)",
   "list_team_members(uuid)",
   "update_staff_role(uuid,uuid,staff_role[],uuid)",
   "revoke_staff(uuid,uuid,uuid)",
