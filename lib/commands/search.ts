@@ -116,12 +116,12 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
     }
     case "packaging_run": {
       if (n === null) return [];
-      const rows = await unwrap(ctx.db.from("packaging_runs").select("id, run_no, planned_on, brands(name)").eq("brewery_id", b).eq("run_no", n)) as Row[];
+      const rows = await unwrap(ctx.db.from("packaging_runs").select("id, run_no, planned_on, brands(name)").eq("brewery_id", b).eq("run_no", n).limit(LIMIT)) as Row[];
       return rows.map((r) => hit(r.id as string, `${runNo(r.run_no as number)} · ${name(r.brands)}`, `planned ${formatDate(r.planned_on as string)}`, `/packaging/${r.id}`, true));
     }
     case "transfer": {
       if (n === null) return [];
-      const rows = await unwrap(ctx.db.from("stock_transfers").select("id, transfer_no, status, from_location:locations!stock_transfers_from_location_id_brewery_id_fkey(name), to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name)").eq("brewery_id", b).eq("transfer_no", n)) as Row[];
+      const rows = await unwrap(ctx.db.from("stock_transfers").select("id, transfer_no, status, from_location:locations!stock_transfers_from_location_id_brewery_id_fkey(name), to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name)").eq("brewery_id", b).eq("transfer_no", n).limit(LIMIT)) as Row[];
       return rows.map((r) => hit(r.id as string, `${trfNo(r.transfer_no as number)} · ${name(r.from_location)} → ${name(r.to_location)}`, sentenceCase(r.status as string), `/transfers/${r.id}`, true));
     }
     case "route": {
