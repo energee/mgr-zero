@@ -331,10 +331,11 @@ defineQuery({
   roles: [...ROLES],
   input: z.object({ lotId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    const lot = await unwrap(ctx.db.from("lots")
-      .select("id, code, packaged_on, best_by, brands(name), packaging_runs(id, run_no, bbl_drawn, vessel_occupancies(vessels(name), batches(id, batch_no, brewed_on)), batches(id, batch_no, brewed_on))")
-      .eq("id", i.lotId).eq("brewery_id", ctx.breweryId).single()) as unknown as LotRow;
-    const [sources, movements, ingredients] = await Promise.all([
+    // All four reads need only the lot id, so they start together (#1491).
+    const [lot, sources, movements, ingredients] = await Promise.all([
+      unwrap(ctx.db.from("lots")
+        .select("id, code, packaged_on, best_by, brands(name), packaging_runs(id, run_no, bbl_drawn, vessel_occupancies(vessels(name), batches(id, batch_no, brewed_on)), batches(id, batch_no, brewed_on))")
+        .eq("id", i.lotId).eq("brewery_id", ctx.breweryId).single()) as unknown as Promise<LotRow>,
       unwrap(ctx.db.rpc("trace_lot_sources", { p_brewery: ctx.breweryId, p_lot: i.lotId })) as unknown as Promise<LotTraceSources>,
       completeRows("Lot trace", start => ctx.db.from("inventory_movements").select("id,type,qty,bbl,sku_id,bin_id,ref,source_movement_id,created_at,skus(name),bins(name),locations(name)", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).eq("lot_id", i.lotId).order("created_at").order("id").range(start, start + PAGE_SIZE - 1)) as unknown as Promise<LotMovement[]>,

@@ -140,12 +140,16 @@ describe("Oct 25 recheck: withheld actions say why (#1122)", () => {
     describedButton(html(createElement(BrewTimelineView, { model: confirmed })), "Record brew day", /^Still needed: a source for Chit Malt\.$/);
   });
 
-  it("Done pulling names the ingredient without a source", () => {
-    describedButton(html(createElement(BrewPrepView, { model: brewPrepMineral })), "Done pulling", /^Still needed: a source for Chit Malt\.$/);
+  it("Done pulling names the ingredient without a source, as a tap that scrolls to its line (#1508)", () => {
+    const page = html(createElement(BrewPrepView, { model: brewPrepMineral }));
+    const reasonId = page.match(/<button[^>]*aria-describedby="([^"]+)"[^>]*>Done pulling<\/button>/)?.[1];
+    expect(page).toMatch(new RegExp(`<p id="${reasonId}"[^>]*><button type="button"[^>]*>Still needed: a source for Chit Malt\\.</button></p>`));
   });
 
-  it("Choose lot with no stock says so in a plain sentence, not a Still needed line", () => {
-    describedButton(html(createElement(BrewPrepView, { model: { ...brewPrepMineral, sources: [] } })), "Choose lot", /^No Chit Malt in stock to choose from\.$/);
+  it("Materials with no stock are named once above the list, with no disabled Choose lot per line (#1508)", () => {
+    const page = html(createElement(BrewPrepView, { model: { ...brewPrepMineral, sources: [] } }));
+    expect(page).toContain("No stock to choose a source from for Chit Malt.");
+    expect(page).not.toContain(">Choose lot</button>");
   });
 
   it("Close packaging run lists lot code, location and bin", () => {

@@ -5,6 +5,7 @@
 // or state is marked on its field, and an empty SKU picker links Catalog only
 // when `skusHref` is set (#1113). A deep link with `from` (Today's quick
 // action) goes back there when the form closes or its receipt is dismissed (#1475).
+// A newer deep link into the mounted form (a Finished goods row) chooses its SKU (#1507).
 "use client";
 
 import { classifyCommandFailure, command } from "@/lib/commands/client";
@@ -71,6 +72,15 @@ export function MovementForm({
   const defaultChannelId = (channels.find((c) => c.name === "Taproom") ?? channels[0])?.id ?? "";
   const [saleChannelId, setSaleChannelId] = useState(initial?.saleChannelId ?? defaultChannelId);
   const [note, setNote] = useState(initial?.note ?? "");
+  // A Finished goods row's Record movement soft-navigates into this mounted
+  // form, whose fields seed only on mount: choose each new link's SKU (#1507).
+  const linkedSkuId = movementOpen ? searchParams.get("skuId") : null;
+  const [seenSkuId, setSeenSkuId] = useState(linkedSkuId);
+  if (linkedSkuId !== seenSkuId) {
+    setSeenSkuId(linkedSkuId);
+    const linked = skus.find(item => item.id === linkedSkuId);
+    if (linked) { setSkuId(linked.id); setLotId(""); }
+  }
   const form = useCommandForm("record_movement", {
     onSuccess: data => {
       const movement = data as MovementReceipt;

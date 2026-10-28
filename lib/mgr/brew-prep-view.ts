@@ -12,7 +12,7 @@ import { fromPacks, splitPacks, withPacks } from "./pack-qty";
 import { isNumber, numberNotationError, toTicks } from "./quantity-input";
 import { MASH_PH_BOUNDS, READING_BOUNDS } from "@/lib/composer/offline-policy";
 import { totalMinutes } from "./recipe-schedule";
-import { submitReason } from "./submit-reason";
+import { andList, submitReason } from "./submit-reason";
 
 export type BrewDayStage = (typeof BREW_DAY_STAGES)[number];
 
@@ -131,16 +131,34 @@ export const pulledQty = (row: BrewIngredient) => fromPacks(Number(row.packs) ||
 /** A typed packs or loose field is a number at or above zero; blank counts as zero. */
 const isPullAmount = (value: string) => Number.isFinite(Number(value)) && Number(value) >= 0;
 
-/** What a line still needs: valid amounts, then a source unless pulled to zero (brew_pulls and record_brew_day both need an
- *  exact source). Empty when the line is ready. */
-function pullNeeds(row: BrewIngredient): string[] {
-  if (!isPullAmount(row.packs) || !isPullAmount(row.loose)) return [`pulled amounts of zero or more for ${row.name}`];
-  return row.source === null && pulledQty(row) !== 0 ? [`a source for ${row.name}`] : [];
+const validAmounts = (row: BrewIngredient) => isPullAmount(row.packs) && isPullAmount(row.loose);
+
+/** A line pulled above zero with no exact source yet (brew_pulls and record_brew_day both need one); a line pulled to
+ *  zero needs none. Prep's reason scrolls to the first such line. */
+export const needsSource = (row: BrewIngredient) => validAmounts(row) && row.source === null && pulledQty(row) !== 0;
+const pullReady = (row: BrewIngredient) => validAmounts(row) && !needsSource(row);
+
+/** What the lines still need: valid amounts per line, then sources. One missing source is named; several are counted,
+ *  so the sticky phone footer stays one line instead of listing every ingredient (#1508). */
+function pullNeeds(rows: BrewIngredient[]): string[] {
+  const amounts = rows.filter(row => !validAmounts(row)).map(row => `pulled amounts of zero or more for ${row.name}`);
+  const unsourced = rows.filter(needsSource);
+  if (unsourced.length === 0) return amounts;
+  return [...amounts, `a source for ${unsourced.length === 1 ? unsourced[0].name : `${unsourced.length} items`}`];
 }
-const pullReady = (row: BrewIngredient) => pullNeeds(row).length === 0;
 
 /** Why Done pulling is withheld, or null when every line is pullReady (a short line pulled to nothing needs no source). */
-export const prepReason = (model: BrewPrepViewModel) => submitReason(model.ingredients.flatMap(pullNeeds));
+export const prepReason = (model: BrewPrepViewModel) => submitReason(pullNeeds(model.ingredients));
+
+/** One note naming each unsourced line's material that has no stock to choose a source from, or null. Prep draws it once
+ *  above the list instead of a disabled Choose lot on every such line (#1508). Without `sources` (the inventory) stock
+ *  is unknown, so it is null. */
+export function noStockNote(model: BrewPrepViewModel): string | null {
+  if (!model.sources) return null;
+  const stocked = new Set(model.sources.map(s => s.material_id));
+  const names = [...new Set(model.ingredients.filter(row => !row.source && !stocked.has(row.materialId)).map(row => row.name))];
+  return names.length ? `No stock to choose a source from for ${andList(names)}.` : null;
+}
 
 /** save_batch_pulls input: each sourced line at its pulled amount; a line with no source was pulled to zero and is left out. */
 export function brewPullsPayload(model: BrewPrepViewModel) {
@@ -250,7 +268,7 @@ export function timelineTone(row: BrewIngredient, sources?: BrewMaterialSource[]
  *  pulls together within stock (canRecordBrewDay's rule), something pulled or confirmEmpty, and a valid knockout. */
 export const timelineReason = (model: BrewTimelineViewModel) => submitReason([
   ...(model.ingredients.every(row => row.confirmed) ? [] : ["every ingredient confirmed"]),
-  ...model.ingredients.flatMap(pullNeeds),
+  ...pullNeeds(model.ingredients),
   ...(fitsStock(stockDraws(model.ingredients), model.sources) ? [] : ["pulls within the stock on hand"]),
   ...(anyPulled(model) || model.confirmEmpty ? [] : ["a pulled ingredient or Confirm no ingredients used"]),
   ...(Object.keys(processErrors(model.process)).length ? ["process readings in range"] : []),
