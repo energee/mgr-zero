@@ -49,6 +49,8 @@ export type BrewDayViewModel = {
   today?: string;
   /** A cancelled plan shows only its planned facts and the cancelled notice. */
   cancelled?: boolean;
+  /** A completed batch: the day it completed and the loss its completion wrote off (null when none). */
+  completion?: { on: string; writeOffBbl: number | null };
   sheet?: { title: string; detail: string };
   tapeHead?: [string, string][];
 };
