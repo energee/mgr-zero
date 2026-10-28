@@ -72,6 +72,8 @@ bun scripts/experiment-production-attention.ts --dry-run
 bun --env-file=.env.local scripts/experiment-production-attention.ts --live
 ```
 
+`bunx vitest run tests/production-attention-experiment.test.ts` exercises the real CLI without live inference. It checks rejected modes, missing live credentials, and exclusion of evaluation labels from dry-run model payloads.
+
 The live command prints JSON lines containing each actual request, validated response, predicted labels, latency and token usage. API or schema failures are reported on stderr and fail the run; they are never converted to negative predictions. Save stdout and stderr outside the repository if retaining a run. Classification counts, missed open concerns, false alarms, unsafe resolutions and criterion-order instability are reported separately per formulation. Supporting-evidence accuracy, token usage and latency percentiles are shared because both formulations run in the same request. Semantic mistakes are experiment findings, not transport failures.
 
 ## Evaluation and decision gates
