@@ -41,7 +41,6 @@ const pureTests = [
   "tests/ttb-colas.test.ts",
   "tests/pour-sku-catalog.test.ts",
   "tests/pour-form-view.test.ts",
-  "tests/group-form-error.test.ts",
   "tests/app-screen-parity.test.ts",
   "tests/field-number-notation.test.ts",
   "tests/field-validation-followup.test.ts",
