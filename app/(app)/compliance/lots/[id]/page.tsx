@@ -10,12 +10,11 @@ import { toLotTraceViewProps } from "@/lib/mgr/lot-trace-view";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import type { LotTraceSnapshot } from "@/lib/mgr/lot-trace-view";
-import { navTitle } from "@/lib/mgr/nav";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await getLotTracePageData(id);
-  return { title: navTitle("/compliance/lots") };
+  const { trace } = await getLotTracePageData(id);
+  return { title: trace.lot.code };
 }
 
 const getLotTracePageData = cache(async function getLotTracePageData(id: string) {

@@ -83,8 +83,9 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
   const prior = state.draft.priorCount;
   // A brand with no expectation has nothing to compare, so it draws no row (#1516).
   const comparison = countBrandComparison(state).filter(row => row.expectedBbl !== null);
-  return <>
-    <div className="contents print:hidden">
+  // With no expectation the block has nothing to compare, so it follows the count inputs; a changed baseline stays on top (#1516).
+  const expectationBelow = aligned && !expected;
+  const expectation = <div className="contents print:hidden">
     {E.ttl("Expected consumption")}
     {prior && <p className="text-xs text-muted-foreground">Last count {priorHref ? <Link href={priorHref}>{formatDate(prior.counted_on)}</Link> : formatDate(prior.counted_on)}</p>}
     {!aligned ? <CommandFormMessage tone="warning">Expected comparison unavailable because a newer saved count changed its baseline. {state.attempt.kind === "unknown" || state.attempt.kind === "submitting" ? "Recover the frozen submission before starting a fresh recount." : "Start a fresh recount."}</CommandFormMessage>
@@ -95,7 +96,9 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
     {aligned && projection && ((projection.unmapped_lines ?? 0) > 0 || (projection.ignored_lines ?? 0) > 0 || Number(projection.excluded_bbl) > 0 || Number(projection.unattributed_bbl) > 0) && <p className="text-xs text-muted-foreground">Coverage {projection.coverage_complete ? "complete" : "incomplete"} · {projection.unmapped_lines} unmapped · {projection.ignored_lines} ignored · {projection.excluded_bbl} bbl excluded · {projection.unattributed_bbl} bbl unattributed</p>}
     <Button type="button" variant="outline" className="md:self-start" disabled={projectionBusy || locked || !aligned} onClick={onRefreshExpected}>{projectionBusy ? "Refreshing…" : "Refresh expected"}</Button>
     <CommandFormMessage error={projectionError} />
-    </div>
+    </div>;
+  return <>
+    {!expectationBelow && expectation}
     <form noValidate onSubmit={event => { event.preventDefault(); if (!countSubmitReason(state)) onSubmit?.(event); }} className="flex flex-col gap-3" aria-label="Count every stock bucket">
       <div className="contents print:hidden">
       {E.ttl("Count every stock bucket")}
@@ -135,6 +138,7 @@ export function WeeklyCountDraftView({ state: controlledState, roles, lotLabels,
       </div>
       </div>
     </form>
+    {expectationBelow && expectation}
   </>;
 }
 

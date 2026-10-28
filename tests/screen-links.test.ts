@@ -128,8 +128,7 @@ describe("reported explorer flows", () => {
     ["Disconnect QuickBooks", "Disconnect QuickBooks", "Accounting"],
     ["Disconnect Slack", "Disconnect Slack", "Chat disconnected"],
     ["Disconnect Square", "Disconnect Square", "Point of sale"],
-    ["Point of sale", "Taproom sales in QuickBooksAbout Square’s optional connector", "Taproom sales in QuickBooks"],
-    ["Taproom sales in QuickBooks", "Open Accounting", "Accounting"],
+    ["Point of sale", "Open Accounting", "Accounting"],
   ])("%s: %s → %s", (screen, tap, target) => {
     expect(resolveTap(by(screen), tap)).toBe(target);
   });
@@ -144,7 +143,7 @@ describe("reported explorer flows", () => {
   });
 
   it("keeps deep-linked sheets over their owning pages", () => {
-    for (const [sheet, page] of [["Question invoice", "Pay invoice"], ["Square locations", "Point of sale"], ["Taproom sales in QuickBooks", "Point of sale"], ["Disconnect Square", "Point of sale"], ["POS item", "Menu"], ["Disconnect Slack", "Chat settings"]]) {
+    for (const [sheet, page] of [["Question invoice", "Pay invoice"], ["Square locations", "Point of sale"], ["Disconnect Square", "Point of sale"], ["POS item", "Menu"], ["Disconnect Slack", "Chat settings"]]) {
       expect(SCREENS[pageUnder([], SCREENS.indexOf(by(sheet)))].name).toBe(page);
     }
   });

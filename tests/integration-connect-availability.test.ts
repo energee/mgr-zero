@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-import { Children, createElement, isValidElement, type ComponentProps } from "react";
+import { createElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { AccountingView, QboConnectionView } from "@/components/mgr/views/accounting";
@@ -30,7 +30,6 @@ vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: async (name: string) => {
 } }));
 import InvoicesPage from "@/app/(app)/invoices/page";
 import PosPage from "@/app/(app)/settings/pos/page";
-import SquareConnectorPage from "@/app/(app)/settings/pos/connector/page";
 import MenuPage from "@/app/(app)/menu/page";
 
 beforeEach(() => { state.configured = false; state.connectionId = undefined; });
@@ -103,12 +102,6 @@ it("keeps Admin-only guidance distinct from an integration that is unavailable",
   const html = renderToStaticMarkup(createElement(InvoicesView, { rows: [], connection }));
   expect(html).toContain("QuickBooks isn’t turned on in MGR yet.");
   expect(html).not.toContain("Admin must connect");
-});
-
-it("mounts the real Point of sale page behind the connector sheet", async () => {
-  const page = await SquareConnectorPage();
-  const children = Children.toArray(page.props.children);
-  expect(children.some(child => isValidElement(child) && child.type === PosPage)).toBe(true);
 });
 
 it("does not replace a healthy connection with an unavailable Connect action", () => {
