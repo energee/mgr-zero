@@ -93,18 +93,25 @@ export function FermentationReadingView({
   );
 }
 
-export function FermentationReadingActionsView({ formId, values, unit, recovery, busy = false, onFix, onDiscard }: {
+/** `next` adds Save and next tank, a second submit named "next" that saves and opens the next occupied tank's reading
+ *  in the Cellar map's tile order (#1508); the caller passes it only when such a tank exists. */
+export function FermentationReadingActionsView({ formId, values, unit, recovery, busy = false, next = false, onFix, onDiscard }: {
   formId: string;
   values: FermentationReadingValues;
   recovery?: FermentationReadingRecovery;
   busy?: boolean;
   unit: GravityUnit;
+  next?: boolean;
   onFix?: () => void;
   onDiscard?: () => void;
 }) {
+  const reason = readingValidation(values, unit).reason;
   return recovery ? <>
     {(recovery.state === "queued" || recovery.state === "uncertain") && <Button form={formId} type="submit" variant="outline" disabled={busy}>{busy ? "Retrying…" : "Retry exact reading"}</Button>}
     {recovery.state !== "permission_changed" && <Button type="button" variant="outline" disabled={busy} onClick={onFix}>Fix as new reading</Button>}
     <Button type="button" variant="destructive" disabled={busy} onClick={onDiscard}>Discard {recovery.discardLabel}</Button>
-  </> : <SubmitButton form={formId} label="Save reading" busy="Saving…" submitting={busy} reason={readingValidation(values, unit).reason} />;
+  </> : <>
+    {next && <Button form={formId} type="submit" name="next" variant="outline" disabled={busy || Boolean(reason)}>Save and next tank</Button>}
+    <SubmitButton form={formId} label="Save reading" busy="Saving…" submitting={busy} reason={reason} />
+  </>;
 }

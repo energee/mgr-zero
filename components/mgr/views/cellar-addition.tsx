@@ -30,7 +30,7 @@ export function CellarAdditionView({ model, onChange, messages, footer, submitti
   return <>
     <fieldset disabled={submitting} className="flex flex-col gap-3">
       {E.pick("Occupancy", model.occupancyId, [{ value: "", label: "Tank with beer in it" }, ...(model.occupancies.map((o) => ({ value: o.occupancy_id, label: (o.vessel_name ?? "Unnamed vessel") + " · " + (occupancyIdentity(o)) })))], { onChange: onChange ? (nextValue: string) => onChange?.({ occupancyId: nextValue }) : undefined, required: true })}
-      {E.pick("Material", model.materialId, [{ value: "", label: "Hop, fruit or adjunct" }, ...(model.materials.map((m) => ({ value: m.id, label: m.name + " · " + m.category })))], { onChange: onChange ? (nextValue: string) => onChange?.({ materialId: nextValue, lotId: "" }) : undefined, required: true })}
+      {E.pick("Material", model.materialId, [{ value: "", label: "Choose a material" }, ...(model.materials.map((m) => ({ value: m.id, label: m.name + " · " + m.category })))], { onChange: onChange ? (nextValue: string) => onChange?.({ materialId: nextValue, lotId: "" }) : undefined, required: true })}
       {material?.lot_tracked && E.pick("Lot", model.lotId, [{ value: "", label: "Choose a lot" }, ...lots.map(l => ({ value: l.lot_id, label: `${l.lot_code} · ${l.qty} ${material.base_uom}` }))], { onChange: onChange ? value => onChange({ lotId: value }) : undefined, required: true })}
       {/* The visible heading is the chip group's name (#1115). */}
       <Field>

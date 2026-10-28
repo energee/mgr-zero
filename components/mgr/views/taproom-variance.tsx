@@ -14,7 +14,8 @@ export function TaproomVarianceView({ model }: { model: TaproomVarianceViewModel
     <TabBar names={[...VARIANCE_WEEK_TABS]} on={model.weeks === 12 ? 1 : 0} cls="w-full" hrefs={model.weekHrefs} />
     {!report ? E.blank("No taproom locations yet. Ask Admin to add one under Locations.") : <>
       {report.rows.length === 0 ? E.blank(report.reason === "no_completed_periods" ? "No completed count periods in this window" : "No comparable brand totals yet") : E.tbl(["Brand", "Expected", "Actual", "Destroyed", "Variance"], report.rows.map(row => [row.brand_name, bbl(row.expected_bbl), bbl(row.actual_bbl), bbl(row.destroyed_bbl), bbl(row.variance_bbl)]), ["l", "r", "r", "r", "r"])}
-      {model.trend ? E.nav(model.trend.brand, model.trend.detail, "", undefined, model.trend.href) : E.gated("Recurring brand trend", "Not available yet. This report totals each brand over the whole window, not week by week.")}
+      {/* No trend is computed yet, so live draws none; the inventory shows the planned row (#1481). */}
+      {model.trend && E.nav(model.trend.brand, model.trend.detail, "", undefined, model.trend.href)}
       {/* The tip reads a week-by-week trend, so it shows only beside one. */}
       {model.trend && E.info("A brand short every week points at one line or one shift. A single short week is noise.")}
       <p className="text-sm text-muted-foreground">Completed count endings {formatDate(report.window_start)} through {formatDate(report.window_end)} · as of <time dateTime={report.as_of}>{formatDateTime(report.as_of, model.timeZone)}</time>. Variance is expected minus actual.</p>

@@ -9,7 +9,7 @@
 // reading that silently has none.
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCommandContext } from "@/lib/brewery-provider";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ import { readingValidation } from "@/lib/mgr/fermentation-reading-view";
 import type { StaffRole } from "@/lib/commands/registry";
 import { dateTimeInput, dateTimeInputInstant } from "@/lib/date-format";
 
-export function ReadingForm({ occupancyId, identity, unit, timeZone, roles, prior, openByDefault = false, returnHref }: {
+export function ReadingForm({ occupancyId, identity, unit, timeZone, roles, prior, openByDefault = false, returnHref, nextHref }: {
   occupancyId: string;
   identity: FermentationReadingIdentity;
   unit: GravityUnit;
@@ -41,6 +41,8 @@ export function ReadingForm({ occupancyId, identity, unit, timeZone, roles, prio
   prior?: Partial<Pick<FermentationReadingValues, "tempF" | "gravity" | "ph">>;
   openByDefault?: boolean;
   returnHref?: string;
+  /** The next occupied tank's reading sheet; given, the footer offers Save and next tank (#1508). */
+  nextHref?: string;
 }) {
   const router = useRouter();
   const expectedContext = useCommandContext();
@@ -58,6 +60,8 @@ export function ReadingForm({ occupancyId, identity, unit, timeZone, roles, prio
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Set from the submit button that sent the form: Save and next tank goes on to nextHref once the reading is sent.
+  const goNext = useRef(false);
   const values = { observedAt, tempF, gravity, ph, note };
   const validation = readingValidation(values, unit);
   const initializeObservation = useCallback(() => {
@@ -136,6 +140,12 @@ export function ReadingForm({ occupancyId, identity, unit, timeZone, roles, prio
     try {
       const result = await sendOutboxAttempt(localStorage, entry.id, scope, command);
       if (result.status === "sent") {
+        if (goNext.current && nextHref) {
+          setOpenState(false);
+          reset();
+          router.push(nextHref);
+          return;
+        }
         setOpen(false);
         router.refresh();
         return;
@@ -150,6 +160,7 @@ export function ReadingForm({ occupancyId, identity, unit, timeZone, roles, prio
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    goNext.current = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("name") === "next";
     if (attempt) { await deliver(attempt); return; }
     if (!validation.measurements || submitting) return;
     setError(null); setNotice(null);
@@ -190,7 +201,7 @@ export function ReadingForm({ occupancyId, identity, unit, timeZone, roles, prio
       onOpenChange={setOpen}
       title="Reading"
       trigger={<Button size="sm">Reading</Button>}
-      footer={<FermentationReadingActionsView formId={formId} values={values} unit={unit} recovery={recovery} busy={submitting} onFix={startFix} onDiscard={discardAttempt} />}
+      footer={<FermentationReadingActionsView formId={formId} values={values} unit={unit} recovery={recovery} busy={submitting} next={Boolean(nextHref)} onFix={startFix} onDiscard={discardAttempt} />}
     >
       <FermentationReadingView
         formId={formId}
