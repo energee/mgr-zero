@@ -172,7 +172,7 @@ export function toPosMenuSetup({ admin, connected, configured, observed }: { adm
     ? { title: "Square isn’t connected", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" } }
     : { title: "Square isn’t connected", description: "Ask an admin to connect Square." };
   if (observed === 0) return admin
-    ? { title: "No Square locations yet", description: "Square is connected, but no locations are synced yet. Sync the Square catalog, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" } }
+    ? { title: "No Square locations yet", description: "Square is connected, but no locations are synced yet. Sync Square, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" } }
     : { title: "No Square locations yet", description: "Square is connected, but no locations are synced yet. Ask an admin to sync and map one." };
   return admin
     ? { title: "No Square location mapped", description: "Square locations were found, but none is mapped to an MGR location.", action: { label: "Map Square locations", href: "/settings/pos/locations" } }

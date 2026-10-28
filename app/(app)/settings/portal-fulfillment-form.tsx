@@ -7,5 +7,5 @@ import { toast } from "sonner";
 export function PortalFulfillmentForm({ locations, currentId }: { locations: { id: string; name: string }[]; currentId: string | null }) {
   const { busy, error, run } = useCommandAction();
   return <PortalFulfillmentView locations={locations} currentId={currentId} busy={busy} error={error} locationsHref="/locations"
-    onSave={async locationId => { if (await run("set_portal_fulfillment_source", { locationId })) toast.success("Fulfillment warehouse updated"); }} />;
+    onSave={locationId => run("set_portal_fulfillment_source", { locationId }).then(ok => { if (ok) toast.success("Fulfillment warehouse updated"); return ok; })} />;
 }

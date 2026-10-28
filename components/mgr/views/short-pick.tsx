@@ -1,5 +1,8 @@
 "use client";
 
+// components/mgr/views/short-pick.tsx — the Short pick sheet body: one short
+// line's count, a required reason and the chosen resolution with its preview.
+// The sheet (CommandForm) carries the title, so the body draws no back link.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
@@ -17,7 +20,6 @@ export function ShortPickView({ model, footer, reason, reasonValue = "", onReaso
   messages?: ReactNode; submitting?: boolean; disabled?: boolean;
 }) {
   return <>
-    {E.back(model.backTo, model.title, undefined, model.backHref)}
     {E.fld("Order · source", model.source)}
     {E.row(model.lineName, model.orderedLabel, <OrderQuantity label="Counted" value={countedValue ?? model.counted} onChange={onCounted} />, "w")}
     {reason !== undefined ? reason : E.edit("Reason · required", reasonValue, "text", undefined, { onChange: onReason, required: true, "aria-label": "Reason" })}

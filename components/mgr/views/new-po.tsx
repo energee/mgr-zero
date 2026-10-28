@@ -5,7 +5,7 @@ import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { FieldGroup } from "@/components/ui/field";
-import { poLineErrors, type NewPoViewModel } from "@/lib/mgr/new-po-view";
+import { pastExpectedWarning, poLineErrors, type NewPoViewModel } from "@/lib/mgr/new-po-view";
 import { noMaterialsPick } from "@/lib/mgr/materials-view";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 
@@ -15,6 +15,8 @@ export type NewPoControls = {
   material?: (index: number, value: string) => void; quantity?: (index: number, value: string) => void;
   cost?: (index: number, value: string) => void; lot?: (index: number, value: string) => void;
   add?: () => void; remove?: (index: number) => void;
+  /** Save and mark sent: save the draft, then mark it sent, in one tap. */
+  saveAndSend?: () => void;
 };
 
 export function NewPoView({ model, controls = {}, messages, footer, submitting = false, reason }: {
@@ -26,6 +28,7 @@ export function NewPoView({ model, controls = {}, messages, footer, submitting =
   const touched = useTouchedLines(!controls.quantity);
   // Inventory snapshots may omit option lists; their displayed value remains selectable.
   const vendors = model.vendors ?? [{ id: model.vendor, name: model.vendor }];
+  const dateWarning = pastExpectedWarning(model.expected, model.today);
   const vendorOptions = [{ value: "", label: "Select vendor", disabled: true }, ...vendors.map(vendor => ({ value: vendor.id, label: vendor.name }))];
   return <>
     {E.back("Purchase orders", "New PO", undefined, model.backHref)}
@@ -37,6 +40,7 @@ export function NewPoView({ model, controls = {}, messages, footer, submitting =
         })}
         <DatePicker label="Expected · optional" value={controls.expected ? model.expected : undefined} defaultValue={model.expected} onChange={controls.expected} />
       </FieldGroup>
+      {dateWarning && E.note(dateWarning)}
       <div className="flex min-w-0 flex-col gap-6">
         {model.lines.map((line, index) => {
           // Inventory snapshots format money; editable numeric fields use dollars only.
@@ -87,6 +91,10 @@ export function NewPoView({ model, controls = {}, messages, footer, submitting =
       </div>
     </fieldset>
     {messages}
-    {footer !== undefined ? footer : E.pin(E.submit("Save draft", { submitting, reason }))}
+    {/* One reason line serves both verbs: they wait on the same fields. */}
+    {footer !== undefined ? footer : E.pin(<>
+      {E.submit("Save draft", { submitting, reason, variant: "outline" })}
+      {E.submit("Save and mark sent", { type: "button", onClick: controls.saveAndSend, submitting, disabled: Boolean(reason) })}
+    </>)}
   </>;
 }

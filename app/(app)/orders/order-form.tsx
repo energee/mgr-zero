@@ -8,7 +8,8 @@ import { CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { useCommandQuery } from "@/components/mgr/query-provider";
 import { QueryFeedback } from "@/components/mgr/query-feedback";
-import { defaultShipToId, isBlankLine, isUnavailableSku, orderFormReadiness, skuPickerChannel, toSkuOption } from "@/lib/order-form-rules";
+import { breweryDate } from "@/lib/date-format";
+import { defaultShipToId, initialOrderChoices, isBlankLine, isUnavailableSku, orderFormReadiness, skuPickerChannel, toSkuOption } from "@/lib/order-form-rules";
 
 type OrderKind = "wholesale" | "taproom_transfer";
 
@@ -30,18 +31,22 @@ export function OrderForm({
   skus,
   timeZone,
   feedback,
+  linkedCustomerId,
 }: {
   customers: CustomerOption[];
   locations: LocationOption[];
   skus: SkuOption[];
   timeZone: string;
   feedback?: ReactNode;
+  /** `?customerId=` from the link that opened New order; see initialOrderChoices. */
+  linkedCustomerId?: string;
 }) {
   const router = useRouter();
+  const initial = initialOrderChoices(customers, locations, linkedCustomerId);
   const [kind, setKind] = useState<OrderKind>("wholesale");
-  const [customerId, setCustomerId] = useState("");
-  const [shipToId, setShipToId] = useState("");
-  const [fromLocationId, setFromLocationId] = useState("");
+  const [customerId, setCustomerId] = useState(initial.customerId);
+  const [shipToId, setShipToId] = useState(initial.shipToId);
+  const [fromLocationId, setFromLocationId] = useState(initial.fromLocationId);
   const [toLocationId, setToLocationId] = useState("");
   const [requestedShipDate, setRequestedShipDate] = useState("");
   const [poNumber, setPoNumber] = useState("");
@@ -70,9 +75,9 @@ export function OrderForm({
 
   function reset() {
     setKind("wholesale");
-    setCustomerId("");
-    setShipToId("");
-    setFromLocationId("");
+    setCustomerId(initial.customerId);
+    setShipToId(initial.shipToId);
+    setFromLocationId(initial.fromLocationId);
     setToLocationId("");
     setRequestedShipDate("");
     setPoNumber("");
@@ -119,7 +124,7 @@ export function OrderForm({
         kind, customer: customerId, shipTo: shipToId, source: fromLocationId, destination: toLocationId,
         customers: customers.map(customer => ({ id: customer.id, label: customer.name })),
         shipTos, sources: locations.map(location => ({ id: location.id, label: location.name })), skus: skuOptions,
-        requestedShip: requestedShipDate, po: poNumber, pickup, backHref: "/orders", customersHref: "/customers", catalogHref: "/catalog",
+        requestedShip: requestedShipDate, today: breweryDate(timeZone), po: poNumber, pickup, backHref: "/orders", customersHref: "/customers", catalogHref: "/catalog",
         lines: lines.map(line => ({ ...line,
           name: skuOptions.find(sku => sku.id === line.skuId)?.label ?? skus.find(sku => sku.id === line.skuId)?.label ?? (line.skuId ? "Selected SKU" : ""),
           skuError: skuOptionsReady && isUnavailableSku(line.skuId, availableSkuIds) ? "This SKU is unavailable for this order. Choose an available SKU or remove this line." : undefined,

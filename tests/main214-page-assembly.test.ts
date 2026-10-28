@@ -44,7 +44,7 @@ async function query(name: string, input?: { basis?: string; missingPortalEmail?
       { id: "gone", name: "Hill route", delivery_date: "2026-09-10", driver_user_id: "driver-1", driver_email: "sam@example.test", vehicle: null, note: null, departed_at: "2026-09-10T14:00:00Z", returned_at: null, stops: [] },
       { id: "nobody", name: "River run", delivery_date: "2026-09-12", driver_user_id: null, driver_email: null, vehicle: null, note: null, departed_at: null, returned_at: null, stops: [] },
       { id: "former", name: "Lake loop", delivery_date: "2026-09-13", driver_user_id: "driver-2", driver_email: null, vehicle: null, note: null, departed_at: null, returned_at: null, stops: [] },
-    ], unassigned: [], drivers: [], today: "2026-09-10" };
+    ], anyReturned: false, unassigned: [], drivers: [], today: "2026-09-10" };
     default: throw new Error(name);
   }
 }
@@ -152,12 +152,13 @@ it("customer view keeps tax edit prefill, default ship-to, filtered Orders, Invi
   expect(page.props.detail.shipTos[0].action.props.shipTo.is_default).toBe(true);
   expect(page.props.detail.revokePortalUser.user.props).toMatchObject({ command: "revoke_customer_user", input: { customerId: "buyer", userId: "user" } });
   const html = render(page);
-  for (const text of ["Tax treatment", "Research", "Dock · default", "/orders?customerId=buyer", "Invite portal user", "jo@buyer.test", "Remove access"]) expect(html).toContain(text);
+  for (const text of ["Tax treatment", "Research", "Dock · default", "/orders?customerId=buyer", "/orders/new?customerId=buyer", "Invite portal user", "jo@buyer.test", "Remove access"]) expect(html).toContain(text);
   state.roles = ["warehouse"]; state.calls = [];
   const readonly = render(await CustomerPage({ params: Promise.resolve({ id: "buyer" }) }));
   expect(state.calls).not.toContain("list_customer_users");
   expect(readonly).not.toMatch(/Edit customer|Add ship-to|Edit ship-to|Invite portal user|invitations aren|Portal users|Remove access/);
   expect(readonly).toContain("Research");
+  expect(readonly).not.toContain("/orders/new");
 });
 it("bins shared view retains actual stock move inputs and suppresses Warehouse-only queries for sales", async () => {
   const page = await BinsPage({ params: Promise.resolve({ id: "location" }) });
@@ -187,7 +188,7 @@ it("explicit null suppresses new shared view fixture actions", async () => {
 });
 
 it("converted inventory frames never navigate into the live catalog/customer/location/settings pages", () => {
-  const names = ["Catalog", "Customers", "Customer detail", "Locations", "Location detail", "Location bins", "SKU", "SKU list", "Formats", "Format", "Package BOM", "Price groups", "Price group", "Sale channels", "Channel", "Units"];
+  const names = ["Catalog", "Customers", "Customer detail", "Locations", "Location detail", "Location bins", "SKU", "SKU list", "Formats", "Format", "Package BOM", "Price groups", "Price group", "Sale channels", "Channel"];
   for (const name of names) {
     const screen = SCREENS.find(s => s.name === name)!;
     expect(screen, name).toBeDefined();
@@ -268,14 +269,15 @@ it("passes Catalog's URL filters to list_brands", async () => {
   expect(href("Category", "")).toBe("/catalog?q=hazy");
 });
 it("routes list: an assigned route not yet departed is a row link; Resume and Assign stay verbs (#1026)", async () => {
-  const html = render(await RoutesPage());
+  const html = render(await RoutesPage({ searchParams: Promise.resolve({}) }));
   expect(html).toMatch(/<a[^>]*href="\/routes\/planned"[^>]*>(?:(?!<\/a>)[\s\S])*North loop · Sep 11, 2026/);
   expect(html).toMatch(/<a[^>]*href="\/routes\/gone"[^>]*>Resume<\/a>/);
   expect(html).toMatch(/<a[^>]*href="\/routes\/nobody"[^>]*>Assign<\/a>/);
-  expect(html).not.toMatch(/>Open</);
+  // "Open" is the Status pick's value; the route row itself has no Open verb.
+  expect(html).not.toMatch(/<(?:a|button)\b[^>]*>Open<\/(?:a|button)>/);
 });
 it("routes list: a planned route names its driver by roster email, or says the driver left the team (#1124)", async () => {
-  const html = render(await RoutesPage());
+  const html = render(await RoutesPage({ searchParams: Promise.resolve({}) }));
   expect(html).toContain("0 stops · sam@example.test");
   expect(html).toContain("0 stops · driver not on the team");
   expect(html).not.toMatch(/driver driver-/);

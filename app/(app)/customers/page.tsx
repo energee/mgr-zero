@@ -11,7 +11,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { CustomerForm } from "./customer-form";
 import { ListControls } from "@/components/mgr/list-controls";
-import { listParams } from "@/lib/mgr/list-params";
+import { listParams, searchQuery } from "@/lib/mgr/list-params";
 import { navTitle } from "@/lib/mgr/nav";
 
 export const metadata = { title: navTitle("/customers") };
@@ -20,7 +20,7 @@ type SaleChannel = { id: string; name: string };
 type Customer = { id: string; name: string; alias: string | null; type: string; country: string; state: string | null; payment_terms: string; sale_channels: { name: string } };
 
 const customersParams = z.object({
-  q: z.string().trim().max(100).catch(""),
+  q: searchQuery,
   missingEmail: z.string().catch(""),
 });
 
@@ -36,7 +36,7 @@ export default async function CustomersPage({ searchParams }: { searchParams?: P
   return <CustomersView
     model={toCustomersViewProps({ customers, missingPortalEmail, filtered: Boolean(params.q) })}
     createAction={canWrite ? <CustomerForm channels={channels} /> : null}
-    search={customers.length || params.q ? <ListControls search={{ label: "Search customers", value: params.q, keep }} /> : undefined}
+    search={customers.length || params.q ? <ListControls search={{ label: "Search customers", value: params.q, keep, path: "/customers" }} /> : undefined}
     linkRows
     backHref="/more"
   />;

@@ -42,15 +42,19 @@ export function PosRouteSheet({ title, backHref, children }: { title: string; ba
 
 export function SquareConnectControl({ configured, reconnect = false }: { configured: boolean; reconnect?: boolean }) {
   const action = useCommandAction();
-  return <ConnectSquareView configured={configured} reconnect={reconnect} busy={action.busy} error={action.error} backHref="/settings/pos" onConnect={() => void action.run("connect_square", { reconnect }, data => location.assign((data as { authorizeUrl: string }).authorizeUrl))} />;
+  return <ConnectSquareView configured={configured} reconnect={reconnect} busy={action.busy} error={action.error} onConnect={() => void action.run("connect_square", { reconnect }, data => location.assign((data as { authorizeUrl: string }).authorizeUrl))} />;
 }
 
-/** Runs disconnect_square; on an "unresolved" connection the same command retries revocation by merchant id (#640).
- *  Leaves for Connect only when Square confirmed revocation; otherwise refreshes so the page shows the unresolved outcome. */
+/** Point of sale's Disconnect: a confirming dialog over the page (#1509).
+ *  Runs disconnect_square; on an "unresolved" connection the same command retries revocation by merchant id (#640).
+ *  Closes when Square confirmed revocation; otherwise stays open, and the refreshed `status` shows the unresolved outcome and Retry. */
 export function SquareDisconnectControl({ connectionId, status }: { connectionId: string; status: "available" | "unresolved" }) {
-  const action = useCommandAction(), router = useRouter();
-  return <DisconnectSquareView status={status} busy={action.busy} error={action.error}
-    onDisconnect={() => void action.run("disconnect_square", { connectionId }, data => revocationConfirmed(data) ? router.push("/settings/pos/connect") : router.refresh(), { refresh: false })} />;
+  const action = useCommandAction();
+  const [open, setOpen] = useState(false);
+  return <CommandForm open={open} onOpenChange={next => { if (!action.busy) { setOpen(next); action.setError(null); } }} title="Disconnect Square" trigger={E.act("Disconnect", "destructive")}>
+    <div className="flex flex-col gap-2"><DisconnectSquareView status={status} busy={action.busy} error={action.error}
+      onDisconnect={() => void action.run("disconnect_square", { connectionId }, data => { if (revocationConfirmed(data)) setOpen(false); })} /></div>
+  </CommandForm>;
 }
 
 type ExactCommand = ReturnType<typeof useExactCommand>;
@@ -74,20 +78,24 @@ export function SyncFeedback({ runs }: { runs: [kind: string, action: ExactComma
   </>;
 }
 
+/** Sync Square runs the catalog sync, then the sales sync once the catalog
+ *  finished. A sales sync awaiting its exact retry skips the catalog step. */
 export function SquareSyncControls() {
   const catalog = useExactCommand(), sales = useExactCommand();
-  return <PosSyncActions catalogBusy={catalog.busy} salesBusy={sales.busy}
-    catalogLabel={catalog.failure?.kind === "unknown" ? "Retry exact catalog sync" : "Sync Square catalog"}
-    salesLabel={sales.failure?.kind === "unknown" ? "Retry exact sales sync" : "Sync Square sales"}
-    onCatalog={() => void catalog.run("sync_square_catalog", {}, shouldStartNewCommandAttempt(catalog.result, catalog.failure))}
-    onSales={() => void sales.run("sync_square_sales", {}, shouldStartNewCommandAttempt(sales.result, sales.failure))}
+  const salesRetry = sales.failure?.kind === "unknown" && Boolean(catalog.result);
+  const retry = catalog.failure?.kind === "unknown" || salesRetry;
+  async function sync() {
+    if (!salesRetry && !(await catalog.run("sync_square_catalog", {}, shouldStartNewCommandAttempt(catalog.result, catalog.failure))).ok) return;
+    await sales.run("sync_square_sales", {}, shouldStartNewCommandAttempt(sales.result, sales.failure));
+  }
+  return <PosSyncActions busy={catalog.busy || sales.busy} label={retry ? "Retry exact sync" : "Sync Square"} onSync={sync}
     feedback={<SyncFeedback runs={[["Catalog", catalog], ["Sales", sales]]} />} />;
 }
 
 export function SquareLocationsControl({ rows, locations }: { rows: PosLocationRow[]; locations: { id: string; name: string }[] }) {
   const action = useCommandAction();
   return <SquareLocationsView rows={rows} locations={locations} busy={action.busy} error={action.error}
-    onSave={(row, mgrLocationId) => void action.run("set_pos_location_mapping", { posLocationId: row.externalLocationId, mgrLocationId }, undefined, { target: row.externalLocationId })} />;
+    onSave={(row, mgrLocationId) => action.run("set_pos_location_mapping", { posLocationId: row.externalLocationId, mgrLocationId }, undefined, { target: row.externalLocationId })} />;
 }
 
 /** A publication's outcome. A confirmed publish reads out in the always-mounted
@@ -120,7 +128,7 @@ export function PosMenuControl({ model, bins, channels, targets }: {
     onMap={(row, target) => {
       const [kind, id] = target.split(":", 2);
       setSavingKey(`${row.externalItemId}:${row.externalVariationId}`);
-      void command.run("set_pos_item_mapping", {
+      return command.run("set_pos_item_mapping", {
         externalItemId: row.externalItemId, externalVariationId: row.externalVariationId,
         disposition: kind === "ignore" ? "ignored" : "mapped",
         ...(kind === "sku" ? { skuId: id } : kind === "format" ? { formatId: id } : {}),
@@ -142,7 +150,9 @@ export function PosItemControl({ posLocationId, brandId, formatId, item }: {
   const menuItem = `${posLocationId}:${brandId}:${formatId}`; // Recovery target: one menu item.
   return <PosItemView item={item} busy={command.busy || publication.busy} error={command.error ?? publication.error}
     notice={<PublicationResult action={publication} onRetry={() => void publish()} onCorrected={() => void publish(true, outcome?.errorCode === "version_mismatch")} />}
-    onSave={value => void command.run("set_pos_price_override", { posLocationId, formatId, brandId, unitPriceCents: toCents(value) ?? null }, undefined, { target: menuItem })}
-    onWebsite={published => command.run("set_pos_website_publication", { posLocationId, formatId, brandId, published }, undefined, { target: menuItem })}
-    onPublish={() => void publish(terminal || publication.failure?.kind === "definitive", outcome?.status === "rejected" && outcome.errorCode === "version_mismatch")} />;
+    onSave={async value => {
+      if (await command.run("set_pos_price_override", { posLocationId, formatId, brandId, unitPriceCents: toCents(value) ?? null }, undefined, { target: menuItem }))
+        await publish(terminal || publication.failure?.kind === "definitive", outcome?.status === "rejected" && outcome.errorCode === "version_mismatch");
+    }}
+    onWebsite={published => command.run("set_pos_website_publication", { posLocationId, formatId, brandId, published }, undefined, { target: menuItem })} />;
 }

@@ -1,6 +1,8 @@
-// tests/channels-units-view.test.ts — Sale channels, Channel, and Units
-// adapters plus view HTML. Views own no sample data.
-import { readFileSync } from "node:fs";
+// tests/channels-units-view.test.ts — Sale channels, Channel, and gravity
+// unit adapters plus view HTML. Views own no sample data. The gravity unit has
+// no page of its own: the brewery default sits under Brewery details in
+// Settings and the personal choice in the Me sheet (#1509 item 7, #1513).
+import { existsSync, readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -8,7 +10,11 @@ import { SCREENS } from "../components/mgr/screens";
 import { ChannelView } from "../components/mgr/views/channel";
 import { DeleteChannelControl } from "../components/mgr/views/delete-channel";
 import { SaleChannelsView } from "../components/mgr/views/sale-channels";
-import { GravityUnitControls, UnitsView } from "../components/mgr/views/units";
+import { GravityUnitControls } from "../components/mgr/views/units";
+import { MeView } from "../components/mgr/views/me";
+import { SettingsView } from "../components/mgr/views/settings";
+import { meMaria } from "../lib/mgr/fixtures/me";
+import { settingsDemo } from "../lib/mgr/fixtures/settings";
 import { channelExport, saleChannelsList, unitsPlato } from "../lib/mgr/fixtures/settings-catalog";
 import { toChannelViewProps } from "../lib/mgr/channel-view";
 import { CHANNEL_IN_USE_RULE, toSaleChannelsViewProps } from "../lib/mgr/sale-channels-view";
@@ -114,17 +120,15 @@ describe("Sale channels view", () => {
     expect(html).not.toMatch(/→/);
   });
 
-  it("createAction, info, and rowTrailing replace inventory Add / nav", () => {
+  it("createAction and rowTrailing replace inventory Add / nav", () => {
     const model = toSaleChannelsViewProps(saleChannelsList);
     const html = htmlOf(createElement(SaleChannelsView, {
       model,
       createAction: "ADD",
-      info: "LIVE INFO",
       rowTrailing: (row) => `T-${row.key}`,
     }));
     expect(html).toMatch(/ADD/);
     expect(html).not.toMatch(/>Add channel</);
-    expect(html).toMatch(/LIVE INFO/);
     expect(html).toMatch(`T-${model.rows[0]!.key}`);
     expect(html).not.toMatch(/aria-label="Open"/);
     expect(html).toMatch(/Wholesale/);
@@ -251,10 +255,9 @@ describe("Channel view", () => {
   });
 });
 
-describe("Units view", () => {
+describe("Gravity unit", () => {
   it("maps get_gravity_unit Plato default onto chip indices with one label per unit (#1155)", () => {
     const model = toUnitsViewProps(unitsPlato);
-    expect(model.backHref).toBeUndefined();
     expect(model.breweryOptions).toEqual(["Plato (°P)", "Specific gravity (SG)"]);
     expect(model.breweryIndex).toBe(0);
     expect(model.mineOptions).toEqual(["Use brewery default · Plato (°P)", "Plato (°P)", "Specific gravity (SG)"]);
@@ -268,75 +271,68 @@ describe("Units view", () => {
       .toBe("A reading of 12.5 °P shows as 1.050 SG.");
   });
 
-  it("explains who each gravity choice affects, in inventory and live alike (#671 review)", () => {
-    const html = htmlOf(createElement(UnitsView, { model: toUnitsViewProps(unitsPlato) }));
-    expect(html).toContain("What everyone here sees unless they choose otherwise below.");
-    expect(html).toContain("Yours alone; it changes nothing for anyone else.");
-    expect(html).toContain("Use brewery default · Plato (°P)");
-  });
-
   it("places the chips on brewery and mine when mine overrides brewery", () => {
     const model = toUnitsViewProps({ brewery: "plato", mine: "sg", effective: "sg" });
     expect(model.breweryIndex).toBe(0);
     expect(model.mineIndex).toBe(2);
   });
 
-  it("renders back, the gravity section, the display-only note, chip groups, and the preview", () => {
-    const html = htmlOf(createElement(UnitsView, { model: toUnitsViewProps(unitsPlato) }));
-    expect(html).toMatch(/Units/);
+  it("the brewery part draws only the brewery default, saying who it affects (#671 review)", () => {
+    const html = htmlOf(createElement(GravityUnitControls, { model: toUnitsViewProps(unitsPlato), part: "brewery" }));
     expect(html).toMatch(/>Gravity unit</);
-    expect(html).toContain("Changing this only changes how gravity is shown and typed. Your readings are not changed.");
-    expect(html).not.toMatch(/stored/i);
-    expect(html).toMatch(/Brewery default/);
-    expect(html).toMatch(/Your preference/);
     expect(html).toMatch(/>Plato \(°P\)</);
     expect(html).toMatch(/>Specific gravity \(SG\)</);
-    expect(html).toContain("A reading of 1.050 SG shows as 12.4 °P.");
-    expect(html).not.toMatch(/→/);
-  });
-
-  it("a controls slot replaces the chip groups and the preview, and keeps the note", () => {
-    const html = htmlOf(createElement(UnitsView, {
-      model: toUnitsViewProps(unitsPlato),
-      controls: "CONTROLS",
-    }));
-    expect(html).toMatch(/CONTROLS/);
+    expect(html).toContain("What everyone here sees unless they choose their own under Me.");
+    expect(html).toContain("Readings are not changed.");
     expect(html).not.toMatch(/Use brewery default/);
-    expect(html).not.toMatch(/Brewery default/);
-    expect(html).toContain("Changing this only changes how gravity is shown and typed. Your readings are not changed.");
     expect(html).not.toMatch(/A reading of/);
   });
 
-  it("the preview follows the controls' model, so a tapped chip and the preview agree (#1155 review)", () => {
-    const html = htmlOf(createElement(GravityUnitControls, {
-      model: toUnitsViewProps({ brewery: "plato", mine: "sg", effective: "sg" }),
-    }));
+  it("the personal part draws only your choice and the preview that follows it (#1155 review)", () => {
+    const html = htmlOf(createElement(GravityUnitControls, { model: toUnitsViewProps({ brewery: "plato", mine: "sg", effective: "sg" }), part: "mine" }));
+    expect(html).toContain("Use brewery default · Plato (°P)");
+    expect(html).toContain("Yours alone; it changes nothing for anyone else.");
     expect(html).toContain("A reading of 12.5 °P shows as 1.050 SG.");
+    expect(html).not.toContain("What everyone here sees");
   });
 
-  it("the Units inventory record is UnitsView", () => {
-    const body = screen("Units").body as { type: unknown; props: { model: unknown } };
-    expect(body.type).toBe(UnitsView);
-    expect(body.props.model).toEqual(toUnitsViewProps(unitsPlato));
+  it("Settings draws the brewery default with Brewery details and no Units row (#1509 item 7)", () => {
+    const html = htmlOf(createElement(SettingsView, { model: settingsDemo }));
+    expect(html).toContain("What everyone here sees unless they choose their own under Me.");
+    expect(html.indexOf(">Brewery details<")).toBeLessThan(html.indexOf(">Gravity unit<"));
+    expect(html.indexOf(">Gravity unit<")).toBeLessThan(html.indexOf(">People and places<"));
+    expect(html).not.toMatch(/>Units</);
+    expect(html).not.toMatch(/Use brewery default/);
   });
 
-  it("the live Units page mounts UnitsView with GravityUnitForm as controls", () => {
-    const src = readFileSync("app/(app)/settings/units/page.tsx", "utf8");
-    expect(src).toMatch(/from "@\/components\/mgr\/views\/units"/);
-    expect(src).toMatch(/<UnitsView\b/);
-    expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
-    expect(src).toMatch(/<GravityUnitForm\b/);
-    expect(src).toContain('backHref: toSettings ? "/settings" : "/more"');
+  it("Me draws Chat and your gravity unit (#1513 item 4)", () => {
+    const html = htmlOf(createElement(MeView, { model: meMaria }));
+    expect(html).toMatch(/>Chat</);
+    expect(html).toContain("Link Slack and set your notifications");
+    expect(html).toContain("Use brewery default · Plato (°P)");
+    expect(html).not.toContain("What everyone here sees");
+    const live = htmlOf(createElement(MeView, { model: { ...meMaria, units: undefined }, chatHref: "/settings/chat", units: "UNITS" }));
+    expect(live).toMatch(/<a[^>]*href="\/settings\/chat"/);
+    expect(live).toContain("UNITS");
+  });
+
+  it("the live Settings page and staff layout mount GravityUnitForm, each for its own part", () => {
+    expect(readFileSync("app/(app)/settings/page.tsx", "utf8")).toMatch(/unitsForm=\{<GravityUnitForm part="brewery"/);
+    const layout = readFileSync("app/(app)/layout.tsx", "utf8");
+    expect(layout).toMatch(/<GravityUnitForm part="mine"/);
+    expect(layout).toContain('chatHref="/settings/chat"');
+    expect(existsSync("app/(app)/settings/units/page.tsx")).toBe(false);
+    expect(SCREENS.some((s) => s.name === "Units")).toBe(false);
   });
 });
 
 it("puts a gravity choice back on the stored unit when its save fails (#447)", () => {
-  const src = readFileSync(new URL("../app/(app)/settings/units/gravity-unit-form.tsx", import.meta.url), "utf8");
+  const src = readFileSync(new URL("../app/(app)/settings/gravity-unit-form.tsx", import.meta.url), "utf8");
   expect(src).toContain('run("set_brewery_gravity_unit", { unit }).then(ok => { if (!ok) setBreweryChoice(brewery); })');
   expect(src).toContain('run("set_my_gravity_unit", { unit }).then(ok => { if (!ok) setMineChoice(mine); })');
 });
 
-it("shares Units controls between fixture and live adapters", () => {
-  expect(readFileSync("components/mgr/views/units.tsx", "utf8")).toContain("<GravityUnitControls");
-  expect(readFileSync("app/(app)/settings/units/gravity-unit-form.tsx", "utf8")).toContain("<GravityUnitControls");
+it("shares the gravity unit controls between fixture and live adapters", () => {
+  for (const view of ["settings", "me"]) expect(readFileSync(`components/mgr/views/${view}.tsx`, "utf8")).toContain("<GravityUnitControls");
+  expect(readFileSync("app/(app)/settings/gravity-unit-form.tsx", "utf8")).toContain("<GravityUnitControls");
 });

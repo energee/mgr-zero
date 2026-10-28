@@ -360,12 +360,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer
 
-Search SKUs, orders, invoices, lots, material lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows, kinds only narrow, and kinds whose page the caller's role cannot open are skipped
+Search SKUs, orders, invoices, lots, material lots, customers, purchase orders, batches, packaging runs, transfers, routes, recipes, vessels, vendors, ship-tos, materials, keg pools, bins, state licenses and water profiles by name prefix or exact document number (ORD-, INV-, PO-, B-, RUN-, TRF-, L-); a bare number matches every numbered kind; exact numbers sort first; kinds without a detail page link to their list page; RLS decides the rows, kinds only narrow, and kinds whose page the caller's role cannot open are skipped
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `q` | string | yes |
-| `kinds` | array of sku or order or invoice or lot or customer or po or batch or material_lot | no |
+| `kinds` | array of sku or order or invoice or lot or customer or po or batch or material_lot or packaging_run or transfer or route or recipe or vessel or vendor or ship_to or material or keg_pool or bin or license or water_profile | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

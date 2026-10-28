@@ -1,5 +1,7 @@
 // lib/mgr/fixtures/settings.ts — Settings inventory snapshot.
 import type { SettingsViewModel } from "@/lib/mgr/settings-view";
+import { toUnitsViewProps } from "@/lib/mgr/units-view";
+import { unitsPlato } from "@/lib/mgr/fixtures/settings-catalog";
 
 /** The demo brewery's zone: inventory frames print fixture timestamps in it, as live pages print in breweries.timezone (#442). */
 export const DEMO_TIME_ZONE = "America/New_York";
@@ -32,4 +34,5 @@ export const settingsDemo: SettingsViewModel = {
   warehouseOptions: [{ id: "00000000-0000-4000-8000-0000000000f1", name: "Warehouse" }],
   locations: "Warehouse · Taproom",
   team: "3 members · 1 pending invite",
+  units: toUnitsViewProps(unitsPlato),
 };

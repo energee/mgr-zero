@@ -42,4 +42,24 @@ describe("cellar transfer preview", () => {
     expect(transferReason({ ...cellarTransferPils, loss: "-1" })).toContain("loss of zero or more");
     expect(transferReason({ ...cellarTransferPils, occupancies: [] })).toContain("source tank");
   });
+  it("#1479 holds the volume to the room left in the destination", () => {
+    // BT1 holds 7 of 10 bbl; BT2 is empty at 10 bbl.
+    expect(transferReason({ ...cellarTransferPils, volume: "3.5" })).toBe("Still needed: at most 3 bbl into BT1.");
+    expect(transferReason({ ...cellarTransferPils, volume: "3" })).toBeNull();
+    expect(transferReason({ ...cellarTransferPils, toId: "bt2", volume: "10.5" })).toBe("Still needed: at most 10 bbl into BT2.");
+    expect(transferReason({ ...cellarTransferPils, toId: "bt2", volume: "10" })).toBeNull();
+  });
+  it("says no other vessel exists, with Add a vessel for an admin and Ask Admin otherwise (#1481)", () => {
+    const only = { ...cellarTransferPils, toId: "", vessels: [{ id: "fv1", name: "FV1", capacity_bbl: 15 }] };
+    expect(transferDestinations(only)).toEqual([]);
+    expect(transferReason(only)).toContain("another vessel to transfer into");
+    expect(transferReason(only)).not.toContain("a different destination vessel");
+    const render = (addVesselHref?: string | null) => renderToStaticMarkup(createElement(CellarTransferView, { model: { ...only, addVesselHref }, footer: null }));
+    expect(render("/cellar/vessels/new")).toMatch(/No other vessel\. <a[^>]*href="\/cellar\/vessels\/new"[^>]*>Add a vessel<\/a>/);
+    expect(render()).toMatch(/<a(?=[^>]*href="#")(?=[^>]*data-to="New vessel")[^>]*>Add a vessel<\/a>/);
+    const brewer = render(null);
+    expect(brewer).toContain("No other vessel. Ask Admin to add one.");
+    expect(brewer).not.toContain("Add a vessel");
+    expect(renderToStaticMarkup(createElement(CellarTransferView, { model: cellarTransferPils, footer: null }))).not.toContain("No other vessel");
+  });
 });

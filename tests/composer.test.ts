@@ -78,7 +78,7 @@ describe("AI composer", () => {
     expect(html).toContain("<title>OpenAI</title>");
     expect(html).toContain('placeholder="Search models…"');
     expect(readFileSync("components/mgr/views/ai-model-settings.tsx", "utf8")).not.toMatch(/<select\b/);
-    expect(html).toContain("Save AI model");
+    expect(html).not.toContain("Save AI model");
   });
 
   it("offers the browser's full timezone index in a searchable control", () => {

@@ -21,16 +21,17 @@ export class ComposerLoadBoundary extends Component<{ children: ReactNode; fallb
 export function ComposerUnavailableView({ failed = false, outboxCount, onOutbox, children }: {
   failed?: boolean;
   outboxCount: number;
-  onOutbox: () => void;
+  /** Left out when there is no reading or notice, so nothing promises Pending readings. */
+  onOutbox?: () => void;
   children: ReactNode;
 }) {
   return <>
     <section aria-label="MGR conversation" className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="min-h-40 flex-1 px-1 py-3">
         {failed ? <Alert><AlertDescription>
-          <p>Ask MGR could not load. Reconnect, then reload this page. Pending readings are still available.</p>
+          <p>Ask MGR could not load. Reconnect, then reload this page.{onOutbox && " Pending readings are still available."}</p>
           <Button type="button" size="sm" variant="outline" onClick={() => window.location.reload()}>Reload page</Button>
-        </AlertDescription></Alert> : <div role="status"><ComposerActivity>Opening your conversation… Pending readings are available while Ask MGR loads.</ComposerActivity></div>}
+        </AlertDescription></Alert> : <div role="status"><ComposerActivity>Opening your conversation…{onOutbox && " Pending readings are available while Ask MGR loads."}</ComposerActivity></div>}
       </div>
     </section>
     {children}

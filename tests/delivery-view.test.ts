@@ -44,9 +44,37 @@ describe("Routes", () => {
   });
 
   it("a route names its next action; an assigned route not yet departed has none (#1026)", () => {
-    expect(routeNext({ departed_at: "2026-09-10T14:00:00Z", driver_user_id: "d" })).toEqual({ verb: "Resume", tone: "info" });
-    expect(routeNext({ departed_at: null, driver_user_id: null })).toEqual({ verb: "Assign", tone: "attention" });
-    expect(routeNext({ departed_at: null, driver_user_id: "d" })).toBeUndefined();
+    expect(routeNext({ departed_at: "2026-09-10T14:00:00Z", returned_at: null, driver_user_id: "d" })).toEqual({ verb: "Resume", tone: "info" });
+    expect(routeNext({ departed_at: null, returned_at: null, driver_user_id: null })).toEqual({ verb: "Assign", tone: "attention" });
+    expect(routeNext({ departed_at: null, returned_at: null, driver_user_id: "d" })).toBeUndefined();
+    expect(routeNext({ departed_at: "2026-09-10T14:00:00Z", returned_at: "2026-09-10T18:00:00Z", driver_user_id: "d" })).toBeUndefined();
+  });
+
+  // #1486: a returned route left /routes with no way back, and the empty list said "No routes yet".
+  it("scopes Deliveries by an Open / Returned Status pick held in the URL (#1486)", () => {
+    const inventory = toRoutesViewProps(routesDriver);
+    expect(inventory.status).toBe("open");
+    expect(inventory.statusOptions).toEqual([{ value: "open", label: "Open" }, { value: "returned", label: "Returned" }]);
+    const live = toRoutesViewProps({ ...routesDriver, status: "returned", linked: true });
+    expect(live.statusOptions.map((option) => option.href)).toEqual(["/routes", "/routes?status=returned"]);
+    expect(htmlOf(createElement(RoutesView, { model: inventory }))).toMatch(/>Status<\/label>/);
+    expect(src("app/(app)/routes/page.tsx")).toMatch(/runCommand\("list_routes", \{ status \}/);
+  });
+
+  it("an empty Open list points at Returned when routes were returned, and says No routes yet only when none exist (#1486)", () => {
+    const empty = { title: "Deliveries", subtitle: "", rows: [] };
+    expect(toRoutesViewProps({ ...empty, anyReturned: true }).empty).toEqual({ title: "No open routes", description: "Returned routes are under Returned." });
+    expect(toRoutesViewProps({ ...empty, anyReturned: false }).empty?.title).toBe("No routes yet");
+    expect(toRoutesViewProps({ ...empty, status: "returned", anyReturned: false }).empty?.title).toBe("No returned routes");
+  });
+
+  it("capitalizes the stop and document states (#1486)", () => {
+    expect(src("app/(app)/routes/page.tsx")).toContain('"Shipped · no route"');
+    expect(src("app/(app)/routes/route-form.tsx")).toContain('"Shipped · no route"');
+    expect(src("app/(app)/routes/[id]/page.tsx")).toContain('trailing: "Done"');
+    const stop = { key: "s", title: "Stop 1", detail: "Delivered 2:00 PM" };
+    expect(htmlOf(createElement(ReturnRouteView, { model: { ...returnRouteA, stops: [stop] } }))).toMatch(/>Done</);
+    expect(htmlOf(createElement(DriverRouteView, { model: { ...driverRouteA, stops: [{ ...stop, ok: true }] } }))).toMatch(/>Done</);
   });
 
   // #1124: a driver reads as their roster email, never an id fragment or a made-up name.
@@ -73,7 +101,8 @@ describe("Routes", () => {
     const html = htmlOf(createElement(RoutesView, { model, createAction: null }));
     expect(html).toMatch(/<a[^>]*href="\/routes\/r"[^>]*>(?:(?!<\/a>)[\s\S])*Route C · 2026-09-12/);
     expect(html).toMatch(/>Resume</);
-    expect(html).not.toMatch(/>Open</);
+    // "Open" is the Status pick's value; the route row itself has no Open verb.
+    expect(html).not.toMatch(/<(?:a|button)\b[^>]*>Open<\/(?:a|button)>/);
   });
 
   it("headed Deliveries, the sidebar's name, in the inventory and the live page (#1104)", () => {
@@ -238,6 +267,14 @@ describe("Confirm delivery", () => {
     expect(transfer).toContain("Storage");
     expect(transfer).not.toContain('role="alert"');
     expect(transfer).not.toContain("Fictional Lane");
+  });
+
+  it("puts both outcome verbs in the shared form footer, Delivered last (#1226)", () => {
+    const html = htmlOf(createElement(ConfirmDeliveryView, { model: confirmDeliveryStop1 }));
+    const footer = html.match(/<div class="[^"]*md:justify-end[^"]*">([\s\S]*?)<\/div>/)?.[1] ?? "";
+    const verbs = [...footer.matchAll(/<button\b[^>]*>([^<]*)<\/button>/g)].map((m) => m[1]);
+    expect(verbs).toEqual(["Not delivered · leave for a later route", "Delivered"]);
+    expect(footer).toMatch(/<button\b[^>]*bg-irreversible[^>]*>Delivered<\/button>/);
   });
 
   it("the live stop page mounts ConfirmDeliveryView and slots DeliveredForm", () => {

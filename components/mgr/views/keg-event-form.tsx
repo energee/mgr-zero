@@ -21,7 +21,7 @@ export function KegEventFields({ value, options, onChange, attempted = false }: 
 }) {
   const set = <K extends keyof KegEventValue>(key: K) => onChange ? (next: KegEventValue[K]) => onChange({ ...value, [key]: next }) : undefined;
   const touched = useTouchedLines(!onChange);
-  const qtyError = attempted || touched.shown(0) ? kegEventFieldErrors(value).qty : undefined;
+  const qtyError = attempted || touched.shown(0) ? kegEventFieldErrors(value, options).qty : undefined;
   return (
     <>
       {E.pick("Keg pool", value.poolId, options.pools, { id: "keg-pool", onChange: set("poolId"), placeholder: "Select a pool" })}
@@ -61,7 +61,7 @@ export function KegEventPresentation({ open, onOpenChange, trigger, value, optio
 }) {
   const formId = useId();
   const [attempted, setAttempted] = useState(false);
-  const reason = kegEventReason(value);
+  const reason = kegEventReason(value, options);
   return (
     <CommandForm open={open} onOpenChange={(next) => { setAttempted(false); onOpenChange?.(next); }} title="Record keg event" trigger={trigger}
       footer={<>
