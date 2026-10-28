@@ -32,7 +32,7 @@ export function PosSyncActions({ busy = false, label = "Sync Square", feedback, 
 export function PointOfSaleView({ model, sales = [], coverage = [], syncAction, connection, disconnect, paths }: {
   model: { connected: boolean; configured?: boolean; canDisconnect?: boolean; merchant: string; state: string; locations?: string; lastSync?: string; error?: string | null; oauthFailed?: boolean };
   sales?: PosSaleRow[]; coverage?: string[];
-  syncAction?: ReactNode; connection?: ReactNode; disconnect?: ReactNode; paths?: { back?: string; locations?: string; menu?: string; connector?: string };
+  syncAction?: ReactNode; connection?: ReactNode; disconnect?: ReactNode; paths?: { back?: string; locations?: string; menu?: string; accounting?: string };
 }) {
   const disconnectAction = disconnect ?? E.act("Disconnect", "destructive");
   return <>
@@ -55,8 +55,9 @@ export function PointOfSaleView({ model, sales = [], coverage = [], syncAction, 
       {sales.length ? sales.map(sale => <div key={sale.id}>{sale.href || sale.openable ? E.nav(sale.label, sale.detail, sale.status === "mapped" ? "ok" : "w", undefined, sale.href) : E.row(sale.label, sale.detail, sale.amount, sale.status === "mapped" ? "ok" : "w")}</div>) : E.blank("No Square sale facts yet")}
     </>}
     {E.ttl("Separate accounting feed")}
-    {E.info("QuickBooks is not a POS provider. Square can send taproom sales to QuickBooks through its own optional connector. MGR sends wholesale invoices separately through Accounting.")}
-    {E.nav("Taproom sales in QuickBooks", "About Square’s optional connector", "", SquareMark, paths?.connector)}
+    {E.note("Square may already post taproom sales to QuickBooks Online as sales receipts.")}
+    {E.info("MGR pushes wholesale invoices only. Confirm with your accountant that the two revenue streams stay separate; MGR does not detect, configure, or synchronize this Square connector.")}
+    {E.btn("Open Accounting", "g", paths?.accounting)}
   </>;
 }
 
@@ -105,14 +106,6 @@ export function SquareLocationsView({ rows, locations, busy, error, onSave }: {
     {rows.length ? rows.map(row => <LocationMappingRow key={row.externalLocationId} row={row} locations={locations} onSave={onSave} />) : E.blank("Sync Square to load locations")}
     <SettingsSaveStatus busy={busy} />
     <CommandFormMessage error={error ?? null} />
-  </>;
-}
-
-export function SquareConnectorView({ accountingHref }: { accountingHref?: string } = {}) {
-  return <>
-    {E.note("Square may already post taproom sales to QuickBooks Online as sales receipts.")}
-    {E.info("MGR pushes wholesale invoices only. Confirm with your accountant that the two revenue streams stay separate; MGR does not detect, configure, or synchronize this Square connector.")}
-    {E.btn("Open Accounting", "g", accountingHref)}
   </>;
 }
 

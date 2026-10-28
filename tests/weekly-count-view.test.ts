@@ -97,6 +97,20 @@ it("#1117 says in plain words why expected consumption is unavailable", () => {
   expect(unloaded).not.toContain("POS sales data");
 });
 
+it("#1516 puts an unavailable expectation below the count inputs and keeps a changed baseline on top", () => {
+  const snapshot = { location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "captured", lines: [{ bin_id: "cold", bin_name: "Cold", sku_id: "keg", sku_name: "Actual keg", brand_id: "brand", brand_name: "Actual brand", bbl_per_unit: 0.5, lot_id: null, qty_before: 3 }] };
+  const render = (projection: Parameters<typeof countDraftFromSnapshot>[1]) => renderToStaticMarkup(createElement(WeeklyCountDraftView, { state: countDraftFromSnapshot(snapshot, projection), roles: ["taproom"], lotLabels: {}, timeZone: "America/New_York" }));
+  const unavailable = render({ prior_count: null, expected_bbl: null, reason: "missing_baseline", rows: [] });
+  expect(unavailable.indexOf("Remaining units")).toBeGreaterThan(-1);
+  expect(unavailable.indexOf("Remaining units")).toBeLessThan(unavailable.indexOf("Expected consumption unavailable."));
+  expect(unavailable.indexOf("Remaining units")).toBeLessThan(unavailable.indexOf("Refresh expected"));
+  const known = render({ prior_count: null, expected_bbl: 1.5, rows: [] });
+  expect(known.indexOf("Expected total")).toBeLessThan(known.indexOf("Remaining units"));
+  const moved = render({ prior_count: { id: "newer", counted_on: "2026-09-11" }, expected_bbl: null, rows: [] });
+  expect(moved.indexOf("newer saved count changed its baseline")).toBeGreaterThan(-1);
+  expect(moved.indexOf("newer saved count changed its baseline")).toBeLessThan(moved.indexOf("Remaining units"));
+});
+
 it("#1117 draws Refresh expected and Print current stock labels as visible buttons", () => {
   const html = renderToStaticMarkup(createElement(WeeklyCountDraftView, { state: countDraftFromSnapshot({ location_id: "taproom", counted_on: "2026-09-12", prior_count: null, revision: "captured", lines: [] }, null), roles: ["taproom"], lotLabels: {}, timeZone: "America/New_York" }));
   for (const label of ["Refresh expected", "Print current stock labels"]) expect(html).toMatch(new RegExp(`<button[^>]*data-variant="outline"[^>]*>${label}</button>`));

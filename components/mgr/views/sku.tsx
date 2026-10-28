@@ -67,7 +67,7 @@ export function SkuView({
       {model.showKegPool ? <>{E.pick("Keg pool", model.kegPool ?? "", model.kegPoolOptions ?? [{ value: "", label: "None" }], { onChange: controls.kegPool })}{E.info("Wholesale orders charge this pool's deposit per keg. None charges no deposit.")}</> : null}
       {model.batchSharePercent !== undefined ? <>
         {E.edit("Batch package share (%)", model.batchSharePercent, "number", undefined, { id: "sku-batch-share", onChange: controls.batchSharePercent, onBlur: () => touched.touch(SHARE), error: touched.shown(SHARE) ? batchShareError(model.batchSharePercent) : undefined, min: 0, max: 100, step: "any" })}
-        {E.info("Use more than 0% and at most 100% of a batch's volume for this SKU. All SKU shares for a brand together may not exceed 100%. Clear to stop projecting packaging materials for this SKU.")}
+        {E.info("All SKU shares for a brand together may not exceed 100%. Clear to stop projecting packaging materials for this SKU.")}
       </> : E.info("Edit the SKU after creation to set its batch package share for projected packaging materials.")}
       {E.info(model.volumeInfo)}
       </>}
