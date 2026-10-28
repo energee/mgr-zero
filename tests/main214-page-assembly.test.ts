@@ -152,12 +152,13 @@ it("customer view keeps tax edit prefill, default ship-to, filtered Orders, Invi
   expect(page.props.detail.shipTos[0].action.props.shipTo.is_default).toBe(true);
   expect(page.props.detail.revokePortalUser.user.props).toMatchObject({ command: "revoke_customer_user", input: { customerId: "buyer", userId: "user" } });
   const html = render(page);
-  for (const text of ["Tax treatment", "Research", "Dock · default", "/orders?customerId=buyer", "Invite portal user", "jo@buyer.test", "Remove access"]) expect(html).toContain(text);
+  for (const text of ["Tax treatment", "Research", "Dock · default", "/orders?customerId=buyer", "/orders/new?customerId=buyer", "Invite portal user", "jo@buyer.test", "Remove access"]) expect(html).toContain(text);
   state.roles = ["warehouse"]; state.calls = [];
   const readonly = render(await CustomerPage({ params: Promise.resolve({ id: "buyer" }) }));
   expect(state.calls).not.toContain("list_customer_users");
   expect(readonly).not.toMatch(/Edit customer|Add ship-to|Edit ship-to|Invite portal user|invitations aren|Portal users|Remove access/);
   expect(readonly).toContain("Research");
+  expect(readonly).not.toContain("/orders/new");
 });
 it("bins shared view retains actual stock move inputs and suppresses Warehouse-only queries for sales", async () => {
   const page = await BinsPage({ params: Promise.resolve({ id: "location" }) });

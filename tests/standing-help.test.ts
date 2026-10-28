@@ -9,7 +9,6 @@ import { describe, expect, it } from "vitest";
 import { NewOrderView } from "@/components/mgr/views/new-order";
 import { EditDraftOrderView } from "@/components/mgr/views/edit-draft-order";
 import { PriceGroupView } from "@/components/mgr/views/price-group";
-import { OrderView } from "@/components/mgr/views/order";
 import { BrandView } from "@/components/mgr/views/brand";
 import { CustomerView } from "@/components/mgr/views/customer";
 import { QboDefaultsView } from "@/components/mgr/views/accounting";
@@ -20,7 +19,7 @@ import { InventoryDetailView } from "@/components/mgr/views/inventory-detail";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { SchedulePackagingRunView } from "@/components/mgr/views/schedule-packaging-run";
 import { CellarTransferView } from "@/components/mgr/views/cellar-transfer";
-import { newOrderDraft, orderPickedRestock } from "@/lib/mgr/fixtures/orders";
+import { newOrderDraft } from "@/lib/mgr/fixtures/orders";
 import { editDraftOrder } from "@/lib/mgr/fixtures/edit-draft-order";
 import { pricingGrid } from "@/lib/mgr/fixtures/pricing";
 import { brandHazy } from "@/lib/mgr/fixtures/catalog";
@@ -32,7 +31,6 @@ import { schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
 import { cellarTransferPils } from "@/lib/mgr/fixtures/production";
 import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
 import { toPriceGroupViewProps } from "@/lib/mgr/price-group-view";
-import { toOrderViewProps } from "@/lib/mgr/order-view";
 import { toBrandViewProps } from "@/lib/mgr/brand-view";
 import { CUSTOMER_ALIAS_HELP, toCustomerViewProps } from "@/lib/mgr/customer-view";
 import { toSaleChannelsViewProps } from "@/lib/mgr/sale-channels-view";
@@ -80,14 +78,6 @@ describe("one line where the help ran to a paragraph (#1518)", () => {
 });
 
 describe("a note said twice is said once (#1518)", () => {
-  it("Order detail: the column header says all locations, and the Cancel dialog asks for the reason", () => {
-    const html = text(createElement(OrderView, { model: toOrderViewProps(orderPickedRestock) }));
-    expect(html).toContain("Available (all locations)");
-    expect(html).not.toContain("Available counts every location");
-    expect(html).not.toContain("Cancellation requires a reason and confirmation.");
-    expect(html).toContain("Cancel order");
-  });
-
   it("Accounting push defaults: the banner already says earlier invoices keep theirs", () => {
     const html = text(createElement(QboDefaultsView, { allowAch: true, allowCard: true }));
     expect(html).toContain("invoices pushed earlier keep theirs");

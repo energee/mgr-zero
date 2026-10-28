@@ -48,6 +48,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       revokePortalUser: Object.fromEntries(portalUsers.map(u => [u.userId, <DeleteCommandButton key={u.userId} control={RevokePortalUserControl} command="revoke_customer_user" input={{ customerId: customer.id, userId: u.userId }} name={u.email} redirect={`/customers/${customer.id}`} />])),
       kegHref: `/kegs/customers/${customer.id}`,
       ordersHref: `/orders?customerId=${customer.id}`,
+      // canWrite is create_order's roles (admin, sales).
+      newOrderHref: canWrite ? `/orders/new?customerId=${customer.id}` : undefined,
     }}
   />;
 }

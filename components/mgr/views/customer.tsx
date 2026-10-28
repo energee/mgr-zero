@@ -46,6 +46,8 @@ export type CustomerDetailSlot = {
   addShipTo?: ReactNode;
   kegHref?: string;
   ordersHref?: string;
+  /** Live sales/admin: New order with this customer filled in (#1506). */
+  newOrderHref?: string;
   /** Live sales/admin: InviteForm. `null` hides the whole Portal users section. */
   portalUsers?: ReactNode;
   /** Live sales/admin: the Remove access verb per portal user, keyed by userId
@@ -144,6 +146,7 @@ export function CustomerView({
           <section aria-label="Customer activity" className="flex flex-col gap-3">
             <h2 className="font-heading text-xl font-semibold">Customer activity</h2>
             {E.nav("Orders", detail ? "Orders for this customer" : model.orders, "", undefined, detail?.ordersHref)}
+            {!detail || detail.newOrderHref ? E.nav("New order", "Start an order for this customer", "", undefined, detail?.newOrderHref) : null}
             {E.nav("Customer keg balance", detail ? "Kegs out and deposits held" : model.kegBalance, "", undefined, detail?.kegHref)}
           </section>
         </div>

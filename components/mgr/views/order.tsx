@@ -1,7 +1,8 @@
 // components/mgr/views/order.tsx — the Order screen drawing, read as a
 // document (#976): header with the state and the next verbs, order details
 // beside the price summary (stacked on the phone, summary before the lines),
-// a line table on the desk and labeled line records on the phone, keg
+// a line table on the desk and labeled line records on the phone, both with
+// the model's columns (toOrderViewProps drops the empty ones, #1506), keg
 // charges, cost, history, and a quiet Cancel at the bottom. Inventory and the
 // live page both pass toOrderViewProps(get_order-shaped data); sample orders
 // live in lib/mgr/fixtures/orders.ts. Verbs come in through `actions` and
@@ -26,7 +27,6 @@ export type { OrderViewModel };
 
 const H2 = "text-base font-semibold";
 const LEGEND = "text-xs text-muted-foreground";
-const NUMBER_COLUMNS = [["Ordered", "ordered"], ["Picked", "picked"], ["Shipped", "shipped"], ["Available (all locations)", "atp"], ["Unit price", "unitPrice"]] as const;
 
 /** The quiet destructive Cancel order button; the live page makes it the CancelOrderDialog trigger. */
 export const CancelOrderButton = (props: ComponentProps<typeof Button>) => (
@@ -134,7 +134,7 @@ export function OrderView({
             <TableHeader>
               <TableRow>
                 <TableHead className="pl-0 text-xs">SKU</TableHead>
-                {NUMBER_COLUMNS.map(([label]) => <TableHead key={label} className="text-right text-xs">{label}</TableHead>)}
+                {model.columns.map(([label]) => <TableHead key={label} className="text-right text-xs">{label}</TableHead>)}
                 <TableHead className={cn("text-right text-xs", !adjustLines && "pr-0")}>Line amount</TableHead>
                 {adjustLines ? <TableHead className="pr-0"><span className="sr-only">Actions</span></TableHead> : null}
               </TableRow>
@@ -146,7 +146,7 @@ export function OrderView({
                     <span className="font-medium">{line.name}</span>
                     <LineNotes line={line} />
                   </TableCell>
-                  {NUMBER_COLUMNS.map(([label, field]) => (
+                  {model.columns.map(([label, field]) => (
                     <TableCell key={label} className={cn("text-right tabular-nums", (line[field] === "Not supplied" || line[field] === "Not recorded") && "text-xs text-muted-foreground")}>{field === "ordered" ? orderedField(line) : line[field]}</TableCell>
                   ))}
                   <TableCell className={cn("text-right font-semibold tabular-nums", !adjustLines && "pr-0")}>{line.amount}</TableCell>
@@ -162,10 +162,10 @@ export function OrderView({
               <p className="text-sm font-semibold">{line.name}</p>
               <LineNotes line={line} />
               <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3">
-                {([["Ordered", line.ordered], ["Available (all locations)", line.atp], ["Picked", line.picked], ["Shipped", line.shipped], ["Unit price", line.unitPrice], ["Line amount", line.amount]] as const).map(([label, value]) => (
+                {[...model.columns, ["Line amount", "amount"] as const].map(([label, field]) => (
                   <div key={label}>
                     <dt className="text-xs text-muted-foreground">{label}</dt>
-                    <dd className="mt-0.5 text-sm font-medium tabular-nums">{label === "Ordered" ? orderedField(line) : value}</dd>
+                    <dd className="mt-0.5 text-sm font-medium tabular-nums">{field === "ordered" ? orderedField(line) : line[field]}</dd>
                   </div>
                 ))}
               </dl>

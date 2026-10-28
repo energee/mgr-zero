@@ -144,6 +144,9 @@ describe("Customer detail", () => {
     // The keg balance row only navigates: one row link, not an Open verb (#1026).
     expect(markup).toMatch(/<a[^>]*href="\/kegs\/x"[^>]*>[\s\S]*?Customer keg balance/);
     expect(markup).not.toMatch(/>Open</);
+    expect(markup).not.toContain("New order"); // a live viewer who may not create orders
+    expect(html(createElement(CustomerView, { model: toCustomerViewProps(customerRidgeline), detail: { newOrderHref: "/orders/new?customerId=c" } })))
+      .toMatch(/<a[^>]*href="\/orders\/new\?customerId=c"[^>]*>[\s\S]*?New order/);
     expect(markup).toMatch(/>Save customer</);
     expect(markup).toMatch(/Customer name/);
   });
