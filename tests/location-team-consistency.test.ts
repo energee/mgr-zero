@@ -61,7 +61,7 @@ it("explains the global stock link in both inventory and live Locations", () => 
 it("uses the saved member name with email beneath, or the RPC's full-email fallback", () => {
   expect(toTeamMemberRow({ userId: "ted", name: "Ted Brewer", email: "ted@demobrewing.com", roles: ["sales"] }, "ted").title).toBe("Ted Brewer");
   expect(toTeamMemberRow({ userId: "ted", name: "ted@demobrewing.com", email: "ted@demobrewing.com", roles: ["sales"] }, "ted")).toEqual({
-    key: "ted", title: "ted@demobrewing.com", detail: "ted@demobrewing.com · Sales", you: true,
+    key: "ted", title: "ted@demobrewing.com", detail: "Sales", you: true,
   });
   for (const row of teamRoster.rows) expect(row.detail).toMatch(/^[^@]+@[^ ]+ · /);
 });

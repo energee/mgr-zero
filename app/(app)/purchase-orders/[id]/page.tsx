@@ -15,6 +15,7 @@ import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { poNo } from "@/lib/mgr/doc-no";
 import { OPEN_PO_STATUSES } from "@/lib/mgr/receive-po-view";
+import { poDetailStatus } from "@/lib/mgr/purchase-orders-view";
 import { ReceiveForm, ReceiptBillAdapter, type PoLine } from "./po-actions";
 import { navTitle } from "@/lib/mgr/nav";
 
@@ -38,16 +39,6 @@ type Po = {
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 type QboHealth = { connected: boolean; realmId?: string; purchaseAccountId: string | null };
-
-const VIA: Record<string, string> = { mailto: "from a mail client", external: "outside MGR" };
-
-function statusLine(po: Po) {
-  if (po.closed_at) return `${po.status === "cancelled" ? "cancelled" : "closed short"} · ${po.close_reason}`;
-  if (po.status === "draft") return "draft · not yet sent";
-  const sent = po.ordered_on ? `Marked sent ${formatDate(po.ordered_on)}${po.sent_via ? ` · ${VIA[po.sent_via] ?? po.sent_via}` : ""}` : po.status;
-  const expected = po.expected_on ? ` · expected ${formatDate(po.expected_on)}` : "";
-  return `${sent}${expected}${po.status === "partially_received" ? " · partially received" : po.status === "received" ? " · received" : ""}`;
-}
 
 const getPurchaseOrderPageData = cache(async function getPurchaseOrderPageData(id: string, receipt?: string, correctReceipt?: string) {
   const brewery = await getActiveBrewery();
@@ -82,7 +73,7 @@ export default async function PurchaseOrderPage({ params, searchParams }: Props)
   const lineById = new Map(po.lines.map(line => [line.id, line]));
   return <ReceiveForm key={`${po.status}:${po.receipts.length}`} poId={po.id} lines={po.lines} locations={locations} bins={bins} today={today} model={{
     title: `${poNo(po.po_no)} · ${po.vendor?.name ?? "—"}`,
-    backHref: "/purchase-orders", state: po.status, status: statusLine(po), note: po.note ?? undefined,
+    backHref: "/purchase-orders", state: po.status, status: poDetailStatus(po), note: po.note ?? undefined,
     closure: (OPEN_PO_STATUSES as readonly string[]).includes(po.status)
       ? po.receipts.length ? "short" : "cancel" : undefined,
     history: po.receipts.map(receipt => ({
