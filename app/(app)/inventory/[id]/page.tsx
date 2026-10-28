@@ -5,7 +5,7 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery, requirePagePermission } from "@/lib/mgr/page-query";
 import { orNotFound } from "@/lib/mgr/not-found";
-import { canReverseMovement, toInventoryDetailViewProps, type InventoryMovement } from "@/lib/mgr/inventory-detail-view";
+import { canReverseMovement, movementSourceHref, toInventoryDetailViewProps, type InventoryMovement } from "@/lib/mgr/inventory-detail-view";
 import "@/lib/commands/all";
 import { ReversalForm } from "../reversal-form";
 import { navTitle } from "@/lib/mgr/nav";
@@ -47,6 +47,8 @@ export default async function InventoryDetailPage({ params, searchParams }: Prop
       : m.reversed_by ? E.act("Reversal recorded", "primary", `${href}?movement=${m.id}`)
       : canReverseMovement(m) ? (brewery.roles.includes("admin") || brewery.roles.includes("warehouse") ? <ReversalForm movement={m} /> : "Read only")
       : m.type === "sale_removal" && m.ref ? E.act("Return shipment", "primary", `/orders/${m.ref}`)
+      // Corrected where it was made: open the document it came from.
+      : movementSourceHref(m) ? E.act(m.ref_label, "primary", movementSourceHref(m))
       : <span className="max-w-40 text-xs text-muted-foreground">{m.type === "depletion" ? "Count/depletion correction unavailable" : "Correct through the original workflow"}</span>}
     footer={<div className="flex gap-2">{movement && E.btn("All movements", "g", href)}{page > 0 && E.btn("Newer movements", "g", `${href}?page=${page}`)}{movements.length > 50 && E.btn("Older movements", "g", `${href}?page=${page + 2}`)}</div>} />;
 }

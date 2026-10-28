@@ -1,6 +1,7 @@
 // components/mgr/views/route.tsx — shared Route builder (planned route): date,
 // driver, vehicle, name and ordered stops. Save route plan names what it still
-// needs (routeReason); Depart route waits for a saved driver.
+// needs (routeReason); Depart route waits for a saved driver. A new route with
+// no stop to plan shows only its empty state: the form would have nothing to save.
 "use client";
 import { useId, useState } from "react";
 import { E } from "@/components/mgr/e";
@@ -24,19 +25,20 @@ export function RouteView({ model, controls, busy = false, error, onSave, onDepa
     if (patch.selection) controls?.selection?.(patch.selection);
   };
   const reason = routeReason(value);
+  const noStops = !model.stops?.length && E.blank({
+    title: "No stops ready for a route",
+    description: "In Orders, confirm an order, pick its stock, then ship it. Shipped delivery orders appear here until assigned to a route. Pickup orders do not appear. Picked stock transfers also appear here.",
+  }, undefined, E.act("Open Orders", "primary", model.ordersHref));
   return <>
     {E.back("Deliveries", model.title, undefined, model.backHref, "Routes")}
-    <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); if (!busy && !reason) onSave?.(); }}>
+    {noStops && !model.saved ? noStops : <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); if (!busy && !reason) onSave?.(); }}>
       <fieldset disabled={busy}><DatePicker label="Delivery date" value={value.date ?? ""} onChange={date => change({ date })} /></fieldset>
 
       {E.pick("Driver", value.driverId ?? "", (model.driverOptions ?? []).map(driver => ({ value: driver.id, label: driver.label })), { onChange: driverId => change({ driverId }), disabled: busy, placeholder: "Not assigned", id: id + "-driver" })}
       {E.edit("Vehicle", value.vehicle ?? "", "text", undefined, { onChange: (nextValue: string) => change({ vehicle: nextValue }), id: id + "-vehicle", disabled: busy })}
       {E.edit("Route name", value.name ?? "", "text", undefined, { onChange: (nextValue: string) => change({ name: nextValue }), id: id + "-name", disabled: busy, placeholder: "Route A" })}
       {E.ttl("Stops")}
-      {!model.stops?.length && E.blank({
-        title: "No stops ready for a route",
-        description: "In Orders, confirm an order, pick its stock, then ship it. Shipped delivery orders appear here until assigned to a route. Pickup orders do not appear. Picked stock transfers also appear here.",
-      }, undefined, E.act("Open Orders", "primary", model.ordersHref))}
+      {noStops}
       {(model.stops ?? []).map(row => {
         const selected = row.key in value.selection;
         return <div key={row.key}>{E.row(
@@ -52,6 +54,6 @@ export function RouteView({ model, controls, busy = false, error, onSave, onDepa
         {model.saved && <Button type="button" disabled={busy || !model.savedDriverId} onClick={onDepart}>Depart route</Button>}
       </>)}
       {model.saved && !model.savedDriverId && E.note("Assign a driver and save before departing.")}
-    </form>
+    </form>}
   </>;
 }

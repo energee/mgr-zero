@@ -17,7 +17,7 @@ export function KegHistoryView({ model }: { model: KegHistoryViewModel }) {
         <ScopePick label="Customer" value={model.customer} options={model.customerOptions} search />,
       )}
       {model.empty
-        ? E.blank(model.empty)
+        ? E.blank(model.empty, undefined, model.empty.action && E.btn(model.empty.action, "p", model.empty.href))
         : model.rows.map((row) => (
           <Fragment key={row.key}>
             {E.row(row.title, row.detail, "", row.warning ? "w" : row.ok ? "ok" : "")}

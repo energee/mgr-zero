@@ -20,7 +20,8 @@ export type KegHistoryViewModel = {
   customer: string;
   customerOptions: ScopeOption[];
   rows: KegHistoryRowView[];
-  empty?: EmptyState;
+  /** `action` labels Record keg event; `href` opens it on Keg fleet, live only. */
+  empty?: EmptyState & { action?: string; href?: string };
 };
 
 export type KegHistorySnapshot = Partial<Omit<KegHistoryViewModel, "empty">>;
@@ -40,7 +41,7 @@ export function toKegHistoryViewProps(s: KegHistorySnapshot): KegHistoryViewMode
     rows,
     empty: rows.length > 0 ? undefined
       : filtered ? { title: "No matching events", description: "Widen the filter to see more of the keg's history." }
-      : { title: "No keg events yet", description: "Record a keg event on Keg fleet to start the history." },
+      : { title: "No keg events yet", description: "Record a keg event to start the history.", action: "Record keg event", href: s.backHref && `${s.backHref}?recordEvent=1` },
   };
 }
 

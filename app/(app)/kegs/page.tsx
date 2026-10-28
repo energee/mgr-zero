@@ -2,8 +2,8 @@
 // pool with Edit → update_keg_pool, Add keg pool → create_keg_pool, and the
 // kegs each bin holds per pool × size from get_keg_fleet. Record keg event
 // → record_keg_event, or the reason it is unavailable. Links to Keg event
-// history and to the balance of each customer holding kegs. Warehouse and
-// Admin.
+// history and to the balance of each customer holding kegs. ?recordEvent=1
+// opens Record keg event. Warehouse and Admin.
 import { KegFleetView } from "@/components/mgr/views/keg-fleet";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -27,7 +27,8 @@ type Fleet = {
 type Named = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 
-export default async function KegsPage() {
+export default async function KegsPage({ searchParams }: { searchParams: Promise<{ recordEvent?: string }> }) {
+  const { recordEvent } = await searchParams;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [fleet, locations, bins, customers, vendors] = (await Promise.all([
@@ -62,7 +63,7 @@ export default async function KegsPage() {
       })}
       createAction={<PoolForm vendors={vendors} />}
       poolActions={Object.fromEntries(fleet.pools.map((p) => [p.id, <PoolForm key={`${p.id}-${p.name}-${p.vendor_id}-${p.per_fill_cents}-${p.deposit_cents}-${p.active}`} pool={p} vendors={vendors} />]))}
-      eventForm={<div className="py-2"><KegEventForm pools={activePools} locations={locations} bins={bins} customers={customers} stock={fleet.rows} /></div>}
+      eventForm={<div className="py-2"><KegEventForm autoOpen={recordEvent === "1"} pools={activePools} locations={locations} bins={bins} customers={customers} stock={fleet.rows} /></div>}
     />
   );
 }

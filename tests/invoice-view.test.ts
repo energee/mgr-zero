@@ -416,3 +416,23 @@ describe("invoicePaymentReason (#1485)", () => {
     expect(htmlOf(createElement(RecordPaymentView, { value: { ...ready, amount: "-5" }, maxCents: 31500, maxDate: today, quickbooksConnected: false, onChange: () => {} }))).not.toContain("Enter an amount");
   });
 });
+
+describe("#1517 invoice ↔ order", () => {
+  const shipped = { ...invoiceFailedAls.invoice, shipments: { orders: { id: "order-1", order_no: 3 } } };
+  it("names the invoice's order as a fact, linked on the live page", () => {
+    expect(toInvoiceViewProps({ ...invoiceFailedAls, invoice: shipped, backHref: "/invoices" }).facts)
+      .toContainEqual({ label: "Order", value: "ORD-0003", href: "/orders/order-1" });
+    // The inventory draws the fact without the staff route.
+    expect(toInvoiceViewProps({ ...invoiceFailedAls, invoice: shipped }).facts).toContainEqual({ label: "Order", value: "ORD-0003" });
+  });
+  it("a document with no shipment, a credit memo, has no Order fact", () => {
+    expect(toInvoiceViewProps({ ...invoiceFailedAls, invoice: { ...shipped, shipments: null }, backHref: "/invoices" }).facts.map((f) => f.label)).toEqual(["Issued", "Due"]);
+  });
+  it("draws a linked fact as a link", () => {
+    const html = htmlOf(createElement(InvoiceView, { model: toInvoiceViewProps({ ...invoiceFailedAls, invoice: shipped, backHref: "/invoices" }) }));
+    expect(html).toMatch(/<a[^>]*href="\/orders\/order-1"[^>]*>ORD-0003<\/a>/);
+  });
+  it("get_invoice reads the order through the shipment", () => {
+    expect(readFileSync("lib/commands/orders.ts", "utf8")).toMatch(/from\("invoices"\)\.select\("\*, customers\([^)]*\), shipments\(orders\(id, order_no\)\)"\)/);
+  });
+});

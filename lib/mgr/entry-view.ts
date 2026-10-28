@@ -11,6 +11,8 @@ export type EntryViewModel = {
   /** The secondary sign-in action requires only the email field. */
   secondaryEmailOnly?: boolean;
   link?: { label: string; to: string };
+  /** The other audience's sign-in: staff and portal sign-in link each other. */
+  switchLink?: { label: string; to: string };
   info?: string;
   note?: string;
   error?: string;
@@ -27,6 +29,7 @@ export const signInModel: EntryViewModel = {
   secondary: "Email me a link",
   secondaryEmailOnly: true,
   link: { label: "Forgot password?", to: "Reset password" },
+  switchLink: { label: "Customer? Sign in to the portal", to: "Portal sign in" },
 };
 
 export const portalSignInModel: EntryViewModel = {
@@ -35,6 +38,7 @@ export const portalSignInModel: EntryViewModel = {
   primary: "Sign in",
   pendingLabel: "Signing in…",
   link: { label: "Forgot password?", to: "Portal forgot password" },
+  switchLink: { label: "Brewery staff? Sign in to MGR", to: "Sign in" },
 };
 
 export function toAcceptInviteViewProps(breweryName: string, roles: readonly string[]): EntryViewModel {

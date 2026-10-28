@@ -1,7 +1,7 @@
 // app/(app)/kegs/event-form.tsx — live command adapter for Record keg event:
 // it supplies the existing query options, payload, recovery, and the shared
-// complete event presentation. Keg fleet opens it blank; Customer keg balance
-// opens it as Record return, prefilled from the row (`prefill`, `label`).
+// complete event presentation. `autoOpen` opens it for ?recordEvent=1.
+// Customer keg balance prefills Record return from its row (`prefill`, `label`).
 "use client";
 
 import { useState } from "react";
@@ -11,11 +11,12 @@ import { useCommandForm } from "@/lib/commands/use-command-form";
 import { KEG_EVENT_REASONS } from "@/lib/mgr/enums";
 import { mayHaveKegCustomer, toKegOption as toOption, withLocationBin, type KegEventValue } from "@/lib/mgr/keg-fleet-view";
 
-export function KegEventForm({ pools, locations, bins, customers, stock, prefill, label = "Record keg event" }: {
+export function KegEventForm({ pools, locations, bins, customers, stock, prefill, label = "Record keg event", autoOpen = false }: {
   pools: { id: string; name: string }[];
   locations: { id: string; name: string }[];
   bins: { id: string; location_id: string; name: string }[];
   customers: { id: string; name: string }[];
+  autoOpen?: boolean;
   /** Values the form opens with, over the blank defaults. */
   prefill?: Partial<KegEventValue>;
   /** The trigger's verb. */
@@ -32,6 +33,7 @@ export function KegEventForm({ pools, locations, bins, customers, stock, prefill
   // Choosing a location preselects its first bin.
   const change = (next: KegEventValue) => setValue(withLocationBin(value, next, (locationId) => binsAt(locationId)[0]?.id ?? ""));
   const form = useCommandForm("record_keg_event", {
+    defaultOpen: autoOpen,
     build: () => ({
       poolId: value.poolId, kegSize: value.kegSize, reason: value.reason, locationId: value.locationId, binId: value.binId, qty: Number(value.qty),
       customerId: mayHaveKegCustomer(value.reason) && value.customerId ? value.customerId : undefined, note: value.note || undefined,
