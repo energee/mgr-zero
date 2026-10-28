@@ -1,4 +1,6 @@
-// Shared unit choices save immediately and restore persisted values after failure.
+// app/(app)/settings/gravity-unit-form.tsx — one part of the gravity unit
+// choice: the brewery default (Settings, admin) or your own (the Me sheet).
+// A tapped chip saves at once and returns to the stored value if the save fails.
 "use client";
 
 import { useState } from "react";
@@ -10,11 +12,11 @@ import { useCommandAction } from "@/lib/commands/use-command-form";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 
 export function GravityUnitForm({
-  brewery, mine, canSetBrewery,
+  part, brewery, mine,
 }: {
+  part: "brewery" | "mine";
   brewery: GravityUnit;
   mine: GravityUnit | null;
-  canSetBrewery: boolean;
 }) {
   const { busy, succeeded, error, run } = useCommandAction();
   const [breweryChoice, setBreweryChoice] = useState<GravityUnit>(brewery);
@@ -33,7 +35,7 @@ export function GravityUnitForm({
   }
 
   return <div className="flex flex-col gap-2">
-    <GravityUnitControls model={toUnitsViewProps({ brewery: breweryChoice, mine: mineChoice, effective: mineChoice ?? breweryChoice })} canSetBrewery={canSetBrewery} busy={busy}
+    <GravityUnitControls model={toUnitsViewProps({ brewery: breweryChoice, mine: mineChoice, effective: mineChoice ?? breweryChoice })} part={part} busy={busy}
       onBrewery={unit => { setBreweryChoice(unit); run("set_brewery_gravity_unit", { unit }).then(ok => { if (!ok) setBreweryChoice(brewery); }); }}
       onMine={unit => { setMineChoice(unit); run("set_my_gravity_unit", { unit }).then(ok => { if (!ok) setMineChoice(mine); }); }} />
     <SettingsSaveStatus busy={busy} saved={succeeded !== null} error={error} />

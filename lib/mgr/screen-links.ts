@@ -184,6 +184,8 @@ export const INERT: (string | RegExp)[] = [
   "Guide",
   "Show password",
   "Hide password",
+  // A combobox's icon button opens its own list in place.
+  "Show options",
   "Reschedule",
   "Cancel plan",
   /^Switch to (dark|light) mode$/,
@@ -383,7 +385,6 @@ export const ROUTES: Record<string, string> = {
   "/settings/import": "Import",
   "/settings": "Settings",
   "/settings/team": "Team",
-  "/settings/units": "Units",
   "/portal": "Shop",
   "/portal/orders": "Order history",
   "/portal/invoices": "Invoice history",
