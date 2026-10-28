@@ -232,7 +232,7 @@ export function InvoiceView({
               {mappingRows?.length ? (
                 <div className="flex flex-col">
                   {mappingRows.map((row) => (
-                    <div key={row.key}>{E.row(row.title, row.detail, row.unavailable ? E.status("Mapping unavailable", "w") : E.act("Fix", "attention", row.href), row.tone ?? "")}</div>
+                    <div key={row.key}>{E.row(row.title, row.detail, row.unavailable ? E.status("Mapping unavailable", "w") : "", row.tone ?? "")}</div>
                   ))}
                 </div>
               ) : null}

@@ -18,21 +18,36 @@ describe("Invoice view", () => {
   it("checks mappings in the current realm, deduplicates SKUs, and gates unavailable fixes", () => {
     const customer = { name: "Actual customer", qbo_customer_id: "00227", qbo_realm_id: "current" };
     const line = { id: "line1", kind: "sku", sku_id: "sku1", description: "Actual SKU", skus: { name: "Actual SKU", qbo_item_id: "009", qbo_realm_id: "old" } };
-    const rows = invoiceMappingRows(customer, [line, { ...line, id: "line2" }, { ...line, id: "deposit", kind: "keg_deposit", sku_id: null }], "current", null, "/invoices/actual/mapping");
+    const rows = invoiceMappingRows(customer, [line, { ...line, id: "line2" }, { ...line, id: "deposit", kind: "keg_deposit", sku_id: null }], "current", null, false);
     // A mapped customer needs no action, so it is not a row.
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toMatchObject({ title: "Actual SKU", detail: "QuickBooks item is missing", href: "/invoices/actual/mapping" });
-    expect(rows[1]).toMatchObject({ unavailable: true, href: undefined });
-    expect(invoiceMappingRows(customer, [{ ...line, skus: { ...line.skus, qbo_realm_id: "current" } }], "current", null, "/mapping")).toEqual([]);
-    expect(invoiceMappingRows({ ...customer, qbo_realm_id: "old" }, [], "current", null, "/mapping")[0]).toMatchObject({ title: "Customer mapping", detail: "QuickBooks customer is missing" });
-    expect(invoiceMappingRows(null, [], "current", null, "/mapping")[0].unavailable).toBe(true);
+    expect(rows[0]).toMatchObject({ title: "Actual SKU", detail: "QuickBooks item is missing", unavailable: false });
+    expect(rows[1]).toMatchObject({ unavailable: true });
+    expect(invoiceMappingRows(customer, [{ ...line, skus: { ...line.skus, qbo_realm_id: "current" } }], "current", null, false)).toEqual([]);
+    expect(invoiceMappingRows({ ...customer, qbo_realm_id: "old" }, [], "current", null, false)[0]).toMatchObject({ title: "Customer mapping", detail: "QuickBooks customer is missing" });
+    expect(invoiceMappingRows(null, [], "current", null, false)[0].unavailable).toBe(true);
   });
   it("asks for the one-way keg fee item only when a fee line has none", () => {
     const customer = { name: "Export buyer", qbo_customer_id: "1", qbo_realm_id: "current" };
     const fee = { id: "fee", kind: "one_way_keg_fee", sku_id: null, description: "One-way keg fee", skus: null };
-    expect(invoiceMappingRows(customer, [fee], "current", null, "/mapping", "/settings/accounting/mappings").map(row => row.title))
+    expect(invoiceMappingRows(customer, [fee], "current", null, true).map(row => row.title))
       .toEqual(["One-way keg fee mapping"]);
-    expect(invoiceMappingRows(customer, [fee], "current", null, "/mapping", undefined, "fee-item")).toEqual([]);
+    expect(invoiceMappingRows(customer, [fee], "current", null, false, "fee-item")).toEqual([]);
+  });
+  it("lists each needed mapping once, with one Fix mapping action for the invoice, not a Fix per row (#1515)", () => {
+    const mappings = Array.from({ length: 7 }, (_, n) => ({ key: `sku${n}`, title: `SKU ${n}`, detail: "QuickBooks item is missing", tone: "w" as const }));
+    const html = htmlOf(createElement(InvoiceView, { model: { ...toInvoiceViewProps(invoiceFailedAls), mappings }, quickbooks: { detail: "mapping required before push" }, accountingActions: "Fix mapping" }));
+    expect(html.match(/QuickBooks item is missing/g)).toHaveLength(7);
+    expect(html).not.toMatch(/>Fix</);
+    expect(html.match(/Fix mapping/g)).toHaveLength(1);
+    // A row MGR cannot fix still says so.
+    const unavailable = htmlOf(createElement(InvoiceView, { model: { ...toInvoiceViewProps(invoiceFailedAls), mappings: [{ ...mappings[0], unavailable: true }] }, quickbooks: { detail: "mapping required before push" } }));
+    expect(unavailable).toContain("Mapping unavailable");
+  });
+  it("shows no mapping rows on an invoice that will never be pushed (not_synced, #1515)", () => {
+    const model = toInvoiceViewProps({ ...invoiceFailedAls, invoice: { ...invoiceFailedAls.invoice, qbo_sync_status: "not_synced" } });
+    expect(invoiceFailedAls.mappings).not.toHaveLength(0);
+    expect(model.mappings).toBeUndefined();
   });
   it("keeps the action-needed mappings and questions beside shared QuickBooks status and authorized actions", () => {
     const html = htmlOf(createElement(InvoiceView, { model: toInvoiceViewProps(invoiceFailedAls), quickbooks: { detail: "push failed · QuickBooks item mapping required" }, accountingActions: "Retry exact push" }));

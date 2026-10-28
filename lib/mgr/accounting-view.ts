@@ -1,6 +1,7 @@
 import { formatDateTime } from "@/lib/date-format";
 import { disconnectStatus } from "@/lib/mgr/integration-disconnect";
 import { connectionStateLabel } from "@/lib/mgr/labels";
+import type { ScopeOption } from "@/components/mgr/scope-pick";
 export type QboHealth = { connected: boolean; connectionId?: string; state: "connected" | "disconnected" | "recovery_required"; realmLabel: string | null; realmId?: string; remoteRevocationState?: string; lastError: string | null; accessExpiresAt?: string | null; allowAch?: boolean; allowCard?: boolean; purchaseAccountId?: string | null };
 export type QboEnvironment = "sandbox" | "production";
 export type QboMappingKind = "customer" | "item" | "deposit" | "one_way_fee" | "vendor" | "purchase_account";
@@ -19,6 +20,18 @@ export type AccountingViewModel = {
   defaults?: { allowAch: boolean; allowCard: boolean }; missingEmails?: number; remoteRevocationUnresolved: boolean;
   backHref?: string; mappingsHref?: string; customersHref?: string;
 };
+/** The QuickBooks mappings page's Show pick (#1515): every row, or only the
+ *  unmapped ones (?show=unmapped) with their count. `linked` false is the
+ *  inventory's inert pick, as invoiceStatusOptions does. */
+export type QboMappingScope = "all" | "unmapped";
+export function qboMappingScopeOptions(unmappedCount: number, linked: boolean): ScopeOption[] {
+  const href = "/settings/accounting/mappings";
+  return [
+    { value: "all", label: "All", href: linked ? href : undefined },
+    { value: "unmapped", label: `Unmapped (${unmappedCount})`, href: linked ? `${href}?show=unmapped` : undefined },
+  ];
+}
+
 /** Intuit's sandbox API host is the only way a deployment talks to sandbox companies; any other host is production. */
 export function qboEnvironment(apiBaseUrl: string): QboEnvironment {
   return new URL(apiBaseUrl).hostname.startsWith("sandbox-") ? "sandbox" : "production";

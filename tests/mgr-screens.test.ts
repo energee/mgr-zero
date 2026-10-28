@@ -252,7 +252,7 @@ describe("SCREENS", () => {
 
   it("draws connection recovery and confirmation surfaces", () => {
     const expected = new Map<string, Screen["surface"]>([
-      ["Mapping conflict", "sheet"], ["Disconnect QuickBooks", "sheet"],
+      ["Map to QuickBooks", "sheet"], ["Disconnect QuickBooks", "sheet"],
       ["Square locations", "sheet"], ["Taproom sales in QuickBooks", "sheet"], ["Disconnect Square", "sheet"],
       ["Link your Slack", "entry"], ["Disconnect Slack", "sheet"],
     ]);
