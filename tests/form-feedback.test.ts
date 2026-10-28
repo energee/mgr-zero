@@ -468,7 +468,7 @@ describe("live forms withhold their submit with the reason", () => {
   };
 
   it("New PO, before anything is chosen", () => {
-    withheld(html(createElement(NewPoForm, { vendors: [], materials: [] })), "Still needed: a vendor, a material on each line, and a quantity above zero on each line.");
+    withheld(html(createElement(NewPoForm, { vendors: [], materials: [], today: "2026-10-23" })), "Still needed: a vendor, a material on each line, and a quantity above zero on each line.");
   });
 
   it("New vessel, with no name or capacity (#1116)", () => {

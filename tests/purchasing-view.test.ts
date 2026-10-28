@@ -684,3 +684,12 @@ it("receipt history uses frozen units and names and exposes explicit revision li
   expect(model.info).toMatch(/^Received Sep 20, 2026\./);
   expect(model.info).toContain("superseded");
 });
+
+describe("past PO Expected date (#1489)", () => {
+  const html = (expected: string) => htmlOf(createElement(NewPoView, { model: { ...newPoCountryMalt, expected, today: "2026-10-23" } }));
+  it("warns before the brewery's today without blocking Save draft", () => {
+    expect(html("2026-10-03")).toContain("This expected date is in the past for your brewery. You can still save the PO.");
+    expect(html("2026-10-24")).not.toContain("in the past");
+    expect(html("")).not.toContain("in the past");
+  });
+});
