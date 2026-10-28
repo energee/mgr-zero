@@ -100,12 +100,44 @@ describe("search_entities", () => {
   it("status and kind details read in sentence case (#1473)", async () => {
     expect((await search("ORD-0001", adminCtx, ["order"]))[0].detail).toBe("Draft");
   });
+  it("every record kind is found by name and links to its page (#1473)", async () => {
+    const location = await ins("locations", { brewery_id: b.id, name: "Zest Cellar", uses: ["warehouse"] });
+    const route = await ins("routes", { brewery_id: b.id, name: "Zest Loop", delivery_date: "2026-09-02" });
+    const recipe = await ins("recipes", { brewery_id: b.id, name: "Zest Pils" });
+    const vessel = await ins("vessels", { brewery_id: b.id, name: "Zest FV1", kind: "fermenter", capacity_bbl: 15 });
+    await ins("vendors", { brewery_id: b.id, name: "Zest Malt Co" });
+    await ins("ship_tos", { brewery_id: b.id, customer_id: customerId, label: "Zest Dock", address1: "1", city: "P", state: "PA", zip: "19100" });
+    await ins("materials", { brewery_id: b.id, name: "Zest hops", category: "hop", base_uom: "lb", purchase_uom: "lb" });
+    await ins("keg_pools", { brewery_id: b.id, name: "Zest kegs", kind: "owned" });
+    await ins("bins", { brewery_id: b.id, location_id: location.id, name: "Zest rack" });
+    await ins("brewery_state_licenses", { brewery_id: b.id, state: "PA", kind: "wholesale", license_no: "ZEST-42" });
+    await ins("water_profiles", { brewery_id: b.id, name: "Zest water", calcium_ppm: 0, magnesium_ppm: 0, sodium_ppm: 0, sulfate_ppm: 0, chloride_ppm: 0, bicarbonate_ppm: 0 });
+    const hits = await search("zest");
+    expect(Object.fromEntries(hits.map((h) => [h.kind, h.href]))).toEqual({
+      route: `/routes/${route.id}`, recipe: `/recipes/${recipe.id}`, vessel: `/cellar/vessels/${vessel.id}`,
+      vendor: "/vendors", ship_to: `/customers/${customerId}`, material: "/materials", keg_pool: "/kegs",
+      bin: `/locations/${location.id}/bins`, license: "/compliance/licenses", water_profile: "/catalog/water-profiles",
+    });
+  });
+  it("RUN- and TRF- numbers match exactly, and a bare number searches every numbered kind (#1473)", async () => {
+    const fresh = await makeBrewery();
+    const ctx = await makeStaffCtx(fresh.id, "admin");
+    const brand = await ins("brands", { brewery_id: fresh.id, name: "Fresh" });
+    const [from, to] = [await ins("locations", { brewery_id: fresh.id, name: "A", uses: ["warehouse"] }), await ins("locations", { brewery_id: fresh.id, name: "B", uses: ["warehouse"] })];
+    const batch = await ins<{ id: string; batch_no: number }>("batches", { brewery_id: fresh.id, intended_brand_id: brand.id, planned_on: "2026-09-01", planned_bbl: 15, created_by: ctx.userId });
+    const run = await ins<{ id: string; run_no: number }>("packaging_runs", { brewery_id: fresh.id, brand_id: brand.id, planned_on: "2026-09-01", created_by: ctx.userId });
+    const trf = await ins<{ id: string; transfer_no: number }>("stock_transfers", { brewery_id: fresh.id, from_location_id: from.id, to_location_id: to.id, created_by: ctx.userId });
+    expect([batch.batch_no, run.run_no, trf.transfer_no]).toEqual([1, 1, 1]);
+    expect(await search("RUN-0001", ctx)).toEqual([expect.objectContaining({ kind: "packaging_run", id: run.id, href: `/packaging/${run.id}`, exact: true })]);
+    expect(await search("trf-1", ctx)).toEqual([expect.objectContaining({ kind: "transfer", id: trf.id, href: `/transfers/${trf.id}`, exact: true })]);
+    expect((await search("0001", ctx)).map((h) => `${h.kind}:${h.id}`).sort()).toEqual([`batch:${batch.id}`, `packaging_run:${run.id}`, `transfer:${trf.id}`].sort());
+  });
 
   it("kinds narrow the search and never widen it", async () => {
     const hits = await search("Haz", adminCtx, ["customer"]);
     expect(hits.map((h) => h.kind)).not.toContain("sku");
   });
-  it.each([SEARCH_KINDS.length + 1, 16])("rejects %i kinds before any database reads", async (count) => {
+  it.each([SEARCH_KINDS.length + 1, SEARCH_KINDS.length * 2])("rejects %i kinds before any database reads", async (count) => {
     const fetch = vi.spyOn(globalThis, "fetch");
     try {
       await expect(search("Haz", salesCtx, Array(count).fill("sku"))).rejects.toMatchObject({ status: 400, code: "invalid_input" });
@@ -124,7 +156,7 @@ describe("search_entities", () => {
       fetch.mockRestore();
     }
   });
-  it("accepts all eight kinds while retaining role-filtered results", async () => {
+  it("accepts every kind while retaining role-filtered results", async () => {
     const expected = await search("Haz", salesCtx);
     expect(expected).toContainEqual(expect.objectContaining({ kind: "sku", id: skuId }));
     expect(await search("Haz", salesCtx, [...SEARCH_KINDS])).toEqual(expected);
@@ -141,7 +173,7 @@ describe("search_entities", () => {
     expect(session).not.toBeNull();
     const fetch = vi.spyOn(globalThis, "fetch");
     try {
-      for (const count of [1, 2, 16]) {
+      for (const count of [1, 2, SEARCH_KINDS.length + 1]) {
         fetch.mockClear();
         const response = await POST(new Request("http://localhost/api/command", {
           method: "POST",
