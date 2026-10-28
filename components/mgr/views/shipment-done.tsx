@@ -21,6 +21,7 @@ export function ShipmentDoneView({
       {E.tape(tape ?? model.tape)}
       {model.warnings.map((warning) => <div key={warning}>{E.note(warning)}</div>)}
       {E.info(model.info)}
+      {model.routeHref && E.btn("Add to route", "p", model.routeHref, undefined, { "data-to": "Route" })}
     </>
   );
 }

@@ -1111,7 +1111,7 @@ export const SCREENS: Screen[] = [
     reads: "get_order · get_invoice",
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["accepted", "INV number on the tape"], ["short", "restock row on Today"], ["kegs short", "saved warning names the short pool, size and shipping location", 1]],
-    spec: "Post-commit of Ship and invoice. Recorded shell shortages appear as reconciliation warnings; shipping is not refused for shells. A tape means recorded; a line shipped short names its saved reason after short:. Return shipment is the correction.",
+    spec: "Post-commit of Ship and invoice. Recorded shell shortages appear as reconciliation warnings; shipping is not refused for shells. A tape means recorded; a line shipped short names its saved reason after short:. Return shipment is the correction. A delivery order on no route offers Add to route, which opens New route with this shipment ticked; a pickup order does not.",
     body: <ShipmentDoneView model={toShipmentDoneViewProps(orderShipmentDone)} />,
   },
   {
@@ -2555,7 +2555,7 @@ export const SCREENS: Screen[] = [
     reads: "list_routes",
     writes: "save_route · depart_route",
     states: [["permission", "warehouse membership; Depart needs the assigned driver or an admin", 1], ["departed", "the builder closes; Driver route and Return route take over"]],
-    spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. The stops are a checklist of this route's documents plus every shipped order and picked transfer on no route, each checked one with its stop number; driver, vehicle and stop order save in the same route-save RPC, and a delivered stop cannot be unchecked. There is no loaded status or mark-loaded command. A refused delivery closes with an outcome; its physical return is recorded separately. A driver shows as their roster email, with their roles in the picker; a saved driver no longer on the team reads \"driver not on the team\", and one without Warehouse or Admin reads \"can no longer drive\".",
+    spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. The stops are a checklist of this route's documents plus every shipped order and picked transfer on no route, each checked one with its stop number; driver, vehicle and stop order save in the same route-save RPC, and a delivered stop cannot be unchecked. A new route's first save opens the saved route, so Depart is one tap away; Add to route from Shipment done arrives with that shipment checked as stop 1. There is no loaded status or mark-loaded command. A refused delivery closes with an outcome; its physical return is recorded separately. A driver shows as their roster email, with their roles in the picker; a saved driver no longer on the team reads \"driver not on the team\", and one without Warehouse or Admin reads \"can no longer drive\".",
     body: <RouteView model={routeAPlan} />,
   },
   {
@@ -2589,12 +2589,12 @@ export const SCREENS: Screen[] = [
     slice: 10,
     tab: "Work",
     name: "Confirm delivery",
-    to: { "Check in refused beer": "Check in refused beer", "Not delivered · leave for a later route": "Driver route" },
+    to: { "Check in refused beer": "Check in refused beer", "Not delivered · leave for a later route": "Driver route", Delivered: "Driver route" },
     job: "Name receiving contact, then commit delivery and invoice",
     reads: "get_delivery_stop",
     writes: "confirm_delivery [one RPC: delivered_at + signed_by + invoice only when persisted mode is on-delivery; never ships] · leave_delivery_for_later [one RPC: deletes an open unattempted stop and unassigns its document]",
     states: [["offline", "keep stop open; commit waits", 1], ["response lost", "same requestId returns result"], ["permission", "warehouse membership and being the route’s assigned driver, or admin", 1], ["success", "INV number after commit"], ["transfer stop", "destination and picked lines instead of a customer; stamped, never invoiced; Receive on the transfer moves the stock"]],
-    spec: "Not delivered · leave for a later route removes an unattempted stop from its departed route, logs an order event for a shipment, and leaves stock, invoices and refusals untouched. No driver note is needed. The document is unassigned for a later route. Closed / no access is not a refusal reason. Enter refused quantities and a refusal reason when needed; accepted quantities are billed at captured order prices. Full refusal needs no receiving name and creates no on-delivery invoice. Back goes to Driver route. The receiving name is stored as text; the UI never implies a signature image is retained.",
+    spec: "Not delivered · leave for a later route removes an unattempted stop from its departed route, logs an order event for a shipment, and leaves stock, invoices and refusals untouched. No driver note is needed. The document is unassigned for a later route. Closed / no access is not a refusal reason. Enter refused quantities and a refusal reason when needed; accepted quantities are billed at captured order prices. Full refusal needs no receiving name and creates no on-delivery invoice. Either outcome returns to Driver route. Received by starts as the newest earlier signer at this ship-to and suggests the others. Back goes to Driver route. The receiving name is stored as text; the UI never implies a signature image is retained.",
     body: <ConfirmDeliveryView model={confirmDeliveryStop1} />,
   },
   {

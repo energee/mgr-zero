@@ -9,6 +9,8 @@ export type ShipmentDoneViewModel = {
   title: string;
   invoice: string;
   invoiceHref?: string;
+  /** Add to route: /routes/new?add={shipmentId}, for a delivery order on no route yet. */
+  routeHref?: string;
   tape: [string, string][];
   info: string;
   warnings: string[];
@@ -19,6 +21,7 @@ export type ShipmentDoneSnapshot = {
   warnings?: KegShortage[];
   backHref?: string;
   invoiceHref?: string;
+  routeHref?: string;
   invoiceTiming?: "now" | "on_delivery";
   order: {
     id: string;
@@ -37,7 +40,7 @@ export type ShipmentDoneSnapshot = {
 };
 
 /** Map get_order + get_invoice onto ShipmentDoneView. */
-export function toShipmentDoneViewProps({ order, invoice, lines, backHref, invoiceHref, invoiceTiming, warnings }: ShipmentDoneSnapshot): ShipmentDoneViewModel {
+export function toShipmentDoneViewProps({ order, invoice, lines, backHref, invoiceHref, routeHref, invoiceTiming, warnings }: ShipmentDoneSnapshot): ShipmentDoneViewModel {
   const dest = order.ship_tos?.state ?? "";
   const inv = docNo("INV", invoice?.invoice_no ?? null, "Invoice");
   const tape: [string, string][] = [];
@@ -55,6 +58,7 @@ export function toShipmentDoneViewProps({ order, invoice, lines, backHref, invoi
     title: "Shipped",
     invoice: invoice ? `${inv} · assigned` : invoiceTiming === "on_delivery" ? "Deferred to delivery" : "No invoice was created",
     invoiceHref: invoice ? invoiceHref : undefined,
+    routeHref,
     tape,
     info: "To correct this shipment, Return shipment.",
     warnings: (warnings ?? []).map(kegShortageText),
