@@ -1,8 +1,9 @@
 // app/(app)/packaging/[id]/run-actions.tsx — the packaging run's next verb,
-// by state: pick the tank (update_packaging_run), start it (same command,
-// stamped startedAt — both require a tank), or close it
-// (close_packaging_run: actual outputs, lot, packaged date, and the
-// finished-goods location + bin).
+// by state: Start run (update_packaging_run stamping startedAt, with the source
+// tank in the same call when none was picked at scheduling — starting needs a
+// tank), or close it (close_packaging_run: actual outputs, lot, packaged date,
+// and the finished-goods location + bin). Barrels drawn starts from the
+// planned outputs' draw (#1508).
 "use client";
 
 import { PackagingSourcePicker, type PackagingSourceOccupancy as Occupancy } from "@/components/mgr/views/plan-actions";
@@ -15,15 +16,16 @@ import { useBrewery, useCommandContext } from "@/lib/brewery-provider";
 import { command } from "@/lib/commands/client";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { packagingCloseReason } from "@/lib/mgr/close-packaging-run-view";
+import { plannedDrawBbl } from "@/lib/mgr/schedule-packaging-run-view";
 
-type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null; whole: boolean };
+type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null; whole: boolean; bbl_per_unit: number | null };
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 
-export function PickTankForm({ runId, occupancies }: { runId: string; occupancies: Occupancy[] }) {
+export function PickAndStartForm({ runId, occupancies }: { runId: string; occupancies: Occupancy[] }) {
   const { busy, error, run } = useCommandAction();
   return <PackagingSourcePicker occupancies={occupancies} busy={busy} error={error}
-    onPick={occupancyId => { void run("update_packaging_run", { runId, occupancyId }); }} />;
+    onPick={occupancyId => { void run("update_packaging_run", { runId, occupancyId, startedAt: new Date().toISOString() }); }} />;
 }
 
 export function StartRunButton({ runId }: { runId: string }) {
@@ -31,7 +33,7 @@ export function StartRunButton({ runId }: { runId: string }) {
   return (
     <div className="flex flex-col gap-2">
       <CommandFormMessage error={error} />
-      <Button className="w-full md:w-fit" disabled={busy} onClick={() => run("update_packaging_run", { runId, startedAt: new Date().toISOString() })}>Start</Button>
+      <Button className="w-full md:w-fit" disabled={busy} onClick={() => run("update_packaging_run", { runId, startedAt: new Date().toISOString() })}>Start run</Button>
     </div>
   );
 }
@@ -40,7 +42,9 @@ export function StartRunButton({ runId }: { runId: string }) {
 export function CloseRunForm({ runId, outputs, locations, bins, today, initialPlan }: { runId: string; outputs: Output[]; locations: Location[]; bins: Bin[]; today: string; initialPlan: PackagingClosePlan }) {
   const breweryId = useBrewery();
   const context = useCommandContext();
-  const [fields, setFields] = useState({ bblDrawn: "", lotCode: "", packagedOn: today, bestBy: "", locationId: "", binId: "" });
+  const draw = plannedDrawBbl(outputs.map(row => ({ qty: row.qty_planned, bblPerUnit: row.bbl_per_unit ?? undefined })));
+  // close_packaging_run records the draw to three decimals.
+  const [fields, setFields] = useState({ bblDrawn: draw === undefined ? "" : String(Number(draw.toFixed(3))), lotCode: "", packagedOn: today, bestBy: "", locationId: "", binId: "" });
   const [quantities, setQuantities] = useState(Object.fromEntries(outputs.map(row => [row.sku_id, String(row.qty_planned)])));
   const [plan, setPlan] = useState(initialPlan);
   const [actuals, setActuals] = useState(() => suggestedPackagingActuals(initialPlan));

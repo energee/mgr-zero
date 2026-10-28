@@ -17,10 +17,11 @@ export function RemoveVesselControl({ vessel, ...rest }: { vessel: string; busy?
 
 /** `editable` is false for a brewer: the vessel facts read as text, with no Save or Delete (vessels are admin-managed).
  *  A model with no `readings` is New vessel: nothing has happened in it yet, so only the facts are drawn.
- *  `reason` (vesselReason) says what Save vessel still needs. */
-export function VesselDetailView({ model, onName, onType, onCapacity, messages, submitting = false, reason, editable = true, remove, footer }: {
+ *  `reason` (vesselReason) says what Save vessel still needs. `actions` (Transfer, Addition, Complete batch for
+ *  the open occupancy) sit beside Reading, so they open on this tank (#1508). */
+export function VesselDetailView({ model, onName, onType, onCapacity, messages, submitting = false, reason, editable = true, remove, footer, actions }: {
   model: VesselDetailViewModel; onName?: (value: string) => void; onType?: (value: string) => void; onCapacity?: (value: string) => void;
-  messages?: ReactNode; submitting?: boolean; reason?: string | null; editable?: boolean; remove?: ReactNode; footer?: ReactNode;
+  messages?: ReactNode; submitting?: boolean; reason?: string | null; editable?: boolean; remove?: ReactNode; footer?: ReactNode; actions?: ReactNode;
 }) {
   const capacityId = useId();
   // A drawn fixture (no onCapacity) shows its capacity error at once; a live one waits until the field is left.
@@ -31,7 +32,7 @@ export function VesselDetailView({ model, onName, onType, onCapacity, messages, 
     {model.readings && <>
       {model.occupancy ? E.nav(model.occupancy.title, model.occupancy.detail, model.occupancy.warning ? "w" : "", undefined, model.occupancy.href) : E.blank("No open occupancy")}
       {E.fld("Current reading", model.readings.current)}
-      {model.readingHref && E.btn("Reading", "p", model.readingHref)}
+      {(model.readingHref || actions) && <div className="flex flex-wrap gap-2">{model.readingHref && E.btn("Reading", "p", model.readingHref)}{actions}</div>}
       {E.ttl("Reading history")}
       {model.readings.history.length ? model.readings.history.map(row => <Fragment key={row.key}>{E.row(row.title, row.detail, row.who)}</Fragment>) : E.blank("No readings yet")}
     </>}

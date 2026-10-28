@@ -527,13 +527,18 @@ export const E = {
       ))}
     </div>
   ),
+  /** Status tiles. `actions` sit under a tile's facts; with an `href` too, the facts stay the link. */
   tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?, string?, React.ReactNode?][], c: "c2" | "c3" = "c3") => (
     <ItemGroup className={cn("grid gap-2", c === "c2" ? "grid-cols-2" : "grid-cols-2 md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]")}>
-      {arr.map(([n, s, g, w, f, href, actions], i) => (
-        <Item key={i} variant="outline" size="sm" className="flex-col items-start gap-0.5" asChild>
-          {actions ? <div><TileContent {...{ n, s, g, w, f }} />{actions}</div> : href ? <Link href={href}><TileContent {...{ n, s, g, w, f }} /></Link> : <button type="button"><TileContent {...{ n, s, g, w, f }} /></button>}
-        </Item>
-      ))}
+      {arr.map(([n, s, g, w, f, href, actions], i) => {
+        const content = <TileContent {...{ n, s, g, w, f }} />;
+        const facts = href ? <Link href={href}>{content}</Link> : content;
+        return (
+          <Item key={i} variant="outline" size="sm" className="flex-col items-start gap-0.5" asChild>
+            {actions ? <div>{facts}{actions}</div> : href ? facts : <button type="button">{content}</button>}
+          </Item>
+        );
+      })}
     </ItemGroup>
   ),
   /** A small fixed table whose headers sort its rows and remember the last

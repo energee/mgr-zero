@@ -1,5 +1,5 @@
 "use client";
-import { cloneElement, Fragment, useId, useState } from "react";
+import { cloneElement, Fragment, useId, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { formatDate } from "@/lib/date-format";
 import { sentenceCase } from "@/lib/mgr/labels";
@@ -19,10 +19,12 @@ import { PlanCancelled } from "./plan-actions";
 
 export type { BrewDayViewModel };
 
-export function BrewDayView({ model, busy = false, error, onChange, onRecord }: {
+/** `actions` are a recorded batch's cellar verbs for its open occupancy (Reading, Transfer, Addition,
+ *  Complete batch), drawn first so the batch page is not a dead end (#1508). */
+export function BrewDayView({ model, busy = false, error, onChange, onRecord, actions }: {
   model: BrewDayViewModel; busy?: boolean; error?: string | null;
   onChange?: (patch: Partial<BrewDayViewModel>) => void;
-  onRecord?: () => void;
+  onRecord?: () => void; actions?: ReactNode;
 }) {
   const id = useId(), [draft, setDraft] = useState(model);
   const value = onChange ? model : draft;
@@ -38,6 +40,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord }: 
   return <>
     {header}
     {model.cancelled ? <PlanCancelled /> : value.recorded ? <>
+      {actions}
       {E.fld("Vessel", model.vesselName || "No open occupancy")}
       {E.fld("Knockout", model.initialBbl ? model.initialBbl + " bbl" : "Unavailable after the occupancy closes")}
       {E.fld("Brewed on", model.brewedOn ? formatDate(model.brewedOn) : "Unavailable")}

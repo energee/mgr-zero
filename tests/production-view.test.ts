@@ -566,12 +566,13 @@ it("explains a disabled cellar Reading instead of leaving a dead end (#715)", ()
   const two = [...one, { vessel_id: "v2", occupancy_id: "o2", brand_name: null, bbl: 3 }];
   const reading = (occupancyId: string) => `/cellar/${occupancyId}/reading`;
   expect(toCellarMapViewProps(vessels, one, {}, {}, reading).actionHint).toBeUndefined();
-  expect(toCellarMapViewProps(vessels, two, {}, {}, reading).actionHint).toBe("Several tanks hold beer. Open a tank to record its reading.");
+  expect(toCellarMapViewProps(vessels, two, {}, {}, reading).actionHint).toBe("Several tanks hold beer. Use Reading on a tank.");
   // #1115: Transfer and Addition are off for the same reason, so the one note names all three.
   expect(toCellarMapViewProps(vessels, [], {}, {}, reading).actionHint).toBe("No tank holds beer, so there is nothing to read, transfer or add to.");
   const html = htmlOf(createElement(CellarMapView, { model: toCellarMapViewProps(vessels, two, {}, { v1: "/cellar/vessels/v1" }, reading) }));
-  expect(html).toContain("Open a tank to record its reading.");
-  expect(html).not.toContain("/reading");
+  expect(html).toContain("Use Reading on a tank.");
+  // The top Reading stays unbound; each tile carries its own (#1508).
+  expect(html).not.toMatch(/<a[^>]*href="\/cellar\/o\d\/reading"[^>]*>Reading<\/a>\s*<button/);
 });
 
 // #994: an empty search is not an empty recipe book.

@@ -1,6 +1,6 @@
 // app/(app)/packaging/[id]/page.tsx — one packaging run: planned facts and
 // its planned outputs, with the one next action for its state (run-actions.tsx):
-// pick a tank, start, or close; before it starts, reschedule or cancel the
+// Start run (picking the tank too when none was) or close; before it starts, reschedule or cancel the
 // plan (plan-actions.tsx). A closed run (RunClosedView) keeps the planned facts
 // beside its close day. get_packaging_run is the read.
 import { cache } from "react";
@@ -18,7 +18,7 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import { runNo } from "@/lib/mgr/doc-no";
 import type { RunClosedViewModel } from "@/lib/mgr/run-closed-view";
 import { MaterialCorrection } from "./material-correction";
-import { PickTankForm, StartRunButton, CloseRunForm } from "./run-actions";
+import { PickAndStartForm, StartRunButton, CloseRunForm } from "./run-actions";
 import { navTitle } from "@/lib/mgr/nav";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -32,7 +32,7 @@ type Run = {
   cancelled_at: string | null; started_at: string | null; closed_at: string | null; bbl_drawn: number | null; note: string | null;
   brand_name: string | null; vessel_name: string | null;
 };
-type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null; whole: boolean };
+type Output = { id: string; sku_id: string; qty_planned: number; qty_actual: number | null; sku_name: string | null; whole: boolean; bbl_per_unit: number | null };
 type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 
@@ -82,7 +82,7 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
       }}
       planActions={!run.started_at ? <ChangePlan kind="packaging_run" id={run.id} plannedOn={run.planned_on} /> : undefined}
       action={!run.occupancy_id
-        ? <PickTankForm runId={run.id} occupancies={occupancies} />
+        ? <PickAndStartForm runId={run.id} occupancies={occupancies} />
         : !run.started_at
           ? <StartRunButton runId={run.id} />
           : <CloseRunForm runId={run.id} outputs={outputs} locations={locations} bins={bins} today={today} initialPlan={closePlan!} />}

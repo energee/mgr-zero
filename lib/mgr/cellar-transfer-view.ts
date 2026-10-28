@@ -8,6 +8,9 @@ export type TransferVessel = { id: string; name: string; capacity_bbl: number };
 /** "Pils · B-0409": how every cellar picker names an occupancy. */
 export const occupancyIdentity = (o: TransferOccupancy) => [o.brand_name, o.batch_no == null ? null : batNo(o.batch_no)].filter(Boolean).join(" · ");
 
+/** The tank a cellar sheet starts on when it was opened for none: the only open one, else none, so a choice is never guessed (#1508). */
+export const onlyOccupancy = (occupancies: { occupancy_id: string }[]) => occupancies.length === 1 ? occupancies[0].occupancy_id : "";
+
 export function transferPreview(available: number | undefined, volume: string, lossValue: string) {
   const moving = Number(volume), loss = Number(lossValue);
   const remainder = available === undefined ? undefined : Number((available - moving - loss).toFixed(8));

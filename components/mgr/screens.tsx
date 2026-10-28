@@ -401,6 +401,8 @@ export { WORK_TABS } from "@/lib/mgr/work-view";
 // The states every screen can reach; a record with designed states lists its own instead.
 const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]];
 /** DEFAULT_STATES with the permission note swapped for who may open the screen. */
+/** One open occupancy's cellar verbs as Vessel detail and a recorded batch draw them (live: app/(app)/cellar/occupancy-actions.tsx). */
+const occupancyActions = (reading: boolean) => <div className="flex flex-wrap gap-2">{reading && E.btn("Reading", "g")}{E.btn("Transfer", "g")}{E.btn("Addition", "g")}<BatchCompletionFixture /></div>;
 const permitted = (who: string): NonNullable<Screen["states"]> => [["permission", who, 1], ...DEFAULT_STATES.filter(([st]) => st !== "permission")];
 /** Settings and its no-warehouse variant draw the same page, so they read and write the same. */
 const SETTINGS_IO = { reads: "get_brewery · get_brewery_ai_model · list_locations · list_team_members · list_compliance_reports · list_reporting_basis_corrections · gateway.getAvailableModels [platform]", writes: "update_brewery · set_brewery_operating_defaults · set_books_opened_on · correct_reporting_basis · set_brewery_gravity_unit · set_brewery_ai_model · update_location · set_portal_fulfillment_source" };
@@ -1715,7 +1717,7 @@ export const SCREENS: Screen[] = [
     reads: "list_occupancies · list_vessels · list_batches · list_fermentation_readings · get_gravity_unit · get_batch_completion_preview",
     writes: "upsert_vessel [mutable single rows; admin] · complete_batch",
     states: [["brewer", "Add vessel hidden; vessels are admin-managed"], ["no vessels", "Add your tanks to start tracking the cellar · primary Add vessel for admin; no Batches link", 1], ["no beer", "Reading, Transfer, Addition off · one note says why", 1], ["beer in tanks", "named volume requires explicit loss acknowledgement", 1], ["open run", "complete batch refused"], ["negative residual", "reload cellar facts", 1], ["uncertain", "retry unchanged request", 1], ["saved", "batch and all open occupancies closed"]],
-    spec: "Complete batch reviews the server-derived baseline, frozen packaged output, prior attributed volume, threshold, residual and current beer in each open tank. Beer at or above max(0.05 bbl, 0.5% of baseline) requires an explicit acknowledgement naming the barrels and tanks being written off. The same shared completion surface freezes the acknowledgement during submission and uncertain retry, then atomically closes the batch and all of its open occupancies. A threshold-qualified residual becomes one typed nonphysical loss root; the form accepts no amount or cause. Tile fill derives from occupancy vs vessel capacity, never from a status column. With no vessels, the empty state says to add tanks and offers Add vessel as its primary action for an admin. Once a vessel exists, Reading is the one primary; Transfer and Addition are outline, and with no beer in any tank all three are off under one note saying why. Brew day is not a cellar action: once a vessel exists, a link under the actions opens Batches. A tile opens Vessel detail. Retired vessels are not tiles. Add vessel shows only to an admin.",
+    spec: "Complete batch reviews the server-derived baseline, frozen packaged output, prior attributed volume, threshold, residual and current beer in each open tank. Beer at or above max(0.05 bbl, 0.5% of baseline) requires an explicit acknowledgement naming the barrels and tanks being written off. The same shared completion surface freezes the acknowledgement during submission and uncertain retry, then atomically closes the batch and all of its open occupancies. A threshold-qualified residual becomes one typed nonphysical loss root; the form accepts no amount or cause. Tile fill derives from occupancy vs vessel capacity, never from a status column. With no vessels, the empty state says to add tanks and offers Add vessel as its primary action for an admin. Once a vessel exists, Reading is the one primary; Transfer and Addition are outline, and with no beer in any tank all three are off under one note saying why. Brew day is not a cellar action: once a vessel exists, a link under the actions opens Batches. A tile opens Vessel detail, and each tile holding beer has its own Reading; Reading and its sheet return to Cellar. Complete batch with one open batch reviews it at once, and leads with one loss line; the ledger figures sit under Details. Retired vessels are not tiles. Add vessel shows only to an admin.",
     body: <CellarMapView model={cellarMapBrewer} complete={<BatchCompletionFixture />} />,
   },
   {
@@ -1728,8 +1730,8 @@ export const SCREENS: Screen[] = [
     reads: "list_vessels · list_occupancies · list_fermentation_readings · get_gravity_unit",
     writes: "upsert_vessel [mutable facts only] · delete_vessel",
     states: [["permission", "brewer or admin required", 1], ["brewer", "vessel facts read-only; no Save or Delete"], ["occupied", "batch and fill shown"], ["empty", "available for a batch"], ["reading overdue", "last reading flagged", 1], ["holding beer", "delete refused", 1], ["with batch history", "retired, not deleted"], ["incomplete", "Save vessel says what is still needed; a capacity of 0 or less is marked at its field", 1]],
-    spec: "Batch occupancy and reading history are records; only the vessel name, type and capacity are editable here, and only by an admin. A brewer sees the facts as text. Delete vessel sits in its own section below Save vessel and confirms first. A vessel holding beer is refused. A vessel that has held beer is retired: it leaves the cellar, transfer targets and brew day, while its batch history and the Batches vessel table keep it. A vessel that never held beer is deleted.",
-    body: <VesselDetailView model={vesselFv3} remove={<RemoveVesselControl vessel="FV3" />} />,
+    spec: "Batch occupancy and reading history are records; only the vessel name, type and capacity are editable here, and only by an admin. A brewer sees the facts as text. Delete vessel sits in its own section below Save vessel and confirms first. A vessel holding beer is refused. A vessel that has held beer is retired: it leaves the cellar, transfer targets and brew day, while its batch history and the Batches vessel table keep it. A vessel that never held beer is deleted. A vessel holding beer has its cellar verbs beside Reading: Transfer and Addition open on this tank, and Complete batch reviews its batch at once.",
+    body: <VesselDetailView model={vesselFv3} remove={<RemoveVesselControl vessel="FV3" />} actions={occupancyActions(false)} />,
   },
   {
     step: 7,
@@ -1755,7 +1757,7 @@ export const SCREENS: Screen[] = [
     reads: "list_occupancies · list_fermentation_readings · get_gravity_unit",
     writes: "record_fermentation_reading [one immutable reading row]",
     states: [...permitted("brewer or admin required"), ["offline or response lost", "Retry exact reading · Fix as new reading · Discard FV3 reading", 1]],
-    spec: "The sheet names the receiving vessel and, when the occupancy has one, its batch. Its deep link opens over the existing vessel detail. Observed at defaults to now in the labeled brewery time zone, matching history; edited nonexistent or repeated DST times are refused rather than guessed. Observed at and Temperature are required. Gravity, pH and Note are optional; blanks remain absent, and prior values are reference only, never silently copied. Saving freezes every parsed field and the observation time before transport. Exact retry preserves that request; Fix starts a reviewed fresh request while the uncertain original remains queued; named discard removes only the selected attempt. The gravity field uses the reader's standing unit preference and stores degrees Plato.",
+    spec: "The sheet names the receiving vessel and, when the occupancy has one, its batch. Its deep link opens over the existing vessel detail, and closing returns to the page it came from: Cellar, Batches or the batch, else Vessel detail. Observed at defaults to now and stays folded behind Observed … · Change in the labeled brewery time zone, matching history; edited nonexistent or repeated DST times are refused rather than guessed. Observed at and Temperature are required. Gravity, pH and Note are optional; blanks remain absent, and prior values are each field's placeholder: reference only, never silently copied. Saving freezes every parsed field and the observation time before transport. Exact retry preserves that request; Fix starts a reviewed fresh request while the uncertain original remains queued; named discard removes only the selected attempt. The gravity field uses the reader's standing unit preference and stores degrees Plato.",
     body: (() => {
       const formId = "fermentation-reading-form";
       const values = { observedAt: "2026-09-10T08:10:00", tempF: "68.2", gravity: "1.019", ph: "", note: "" };
@@ -1817,7 +1819,7 @@ export const SCREENS: Screen[] = [
     writes: "record_brew_day [another turn: confirmed actual sources + frozen sheet + knockout into the open vessel], correct_brew_record [unused revision with linked compensation]",
     states: [...permitted("brewer or admin required"), ["multiple turns", "Add brew turn and correct each current turn"]],
     spec: "A brewed batch's page, drawn recorded and then with Add brew turn open; a planned batch opens Brew prep and the Brew day timeline instead, and a cancelled one shows only that it is cancelled. Add brew turn records another same-batch knockout into its existing open vessel. Each turn owns its frozen actuals and correction chain; the batch keeps its first brew date. Transfers, started packaging, closure, filed reports and capacity bounds prevent another turn. The brew sheet row is a read-out of the version’s process spec, opened frozen; brew day captures actuals, and fermentation reality arrives through Fermentation reading, so there is no mash-actuals form here. Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on the New batch sheet so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
-    body: <><BrewDayView model={brewDayTurnsHazy} /><BrewDayView model={brewTurnModel(brewDayTurnsHazy)} /></>,
+    body: <><BrewDayView model={brewDayTurnsHazy} actions={occupancyActions(true)} /><BrewDayView model={brewTurnModel(brewDayTurnsHazy)} /></>,
   },
   {
     step: 7,
@@ -1861,7 +1863,7 @@ export const SCREENS: Screen[] = [
   },
   {
     name: "Packaging plan",
-    to: { Packaging: "Packaging runs", "Pick source": "Packaging plan", Start: "Close packaging run" },
+    to: { Packaging: "Packaging runs", "Start run": "Close packaging run" },
     step: 7,
     slice: 5,
     tab: "Work",
@@ -1869,7 +1871,7 @@ export const SCREENS: Screen[] = [
     reads: "get_packaging_run · list_occupancies",
     writes: "cancel_packaging_run · reschedule_packaging_run · update_packaging_run",
     states: [["permission", "brewer, warehouse or admin required", 1], ["unstarted", "change the date or cancel before physical work"], ["cancelled", "retained history; no demand or stock movement"]],
-    spec: "Retain the plan and outputs when cancelled. Cancellation removes demand and completion blockers without moving stock. Reschedule changes only the planned date before physical work.",
+    spec: "A run with no tank yet has one step: choose the source tank (the only open one is already chosen) and Start run, which picks it and starts the run together; a run whose tank was picked at scheduling shows only Start run. Retain the plan and outputs when cancelled. Cancellation removes demand and completion blockers without moving stock. Reschedule changes only the planned date before physical work.",
     body: <ClosePackagingRunView model={{ title: "RUN-0033", backTo: "Packaging", brand: "Hazy IPA", plannedOn: "2026-09-28", source: "No source yet", plannedOutputs: [["Hazy case", 120, "Not recorded"]], showCloseReview: false }} planActions={<PlanActions plannedOn="2026-09-28" />} action={<PackagingSourcePicker occupancies={[{ occupancy_id: "fv3-hazy", vessel_name: "FV3", brand_name: "Hazy IPA", bbl: 15 }]} />} />,
   },
   {
@@ -1882,7 +1884,7 @@ export const SCREENS: Screen[] = [
     reads: "get_packaging_run · get_packaging_close_plan · list_locations · list_bins",
     writes: "close_packaging_run [atomic lot, outputs, tank draw and explicit source material usage/loss]",
     states: [["permission", "admin, brewer or warehouse required", 1], ["short", "used plus lost exceeds selected source stock", 1], ["zero", "confirm zero for a planned material not used"], ["stale", "review the changed BOM plan before closing", 1], ["future date", "packaged on cannot be after today", 1], ["filed period", "packaged on falls in a filed report period", 1]],
-    spec: "Close freezes the reviewed BOM and confirmed source actuals. Used plus lost reduces stock; unused returned is informational because no material left stock at schedule or start. Counted quantities are whole units. Measured quantities use stored base units; roll conversion remains gated. Sources may be split and extra actual materials named. Output, lot, tank and material writes remain atomic. An uncertain close keeps the exact request and offers unchanged retry. Finished stock is dated Packaged on for compliance reporting.",
+    spec: "Barrels drawn starts from the planned outputs' barrels per unit when every planned package has a volume. Close freezes the reviewed BOM and confirmed source actuals. Used plus lost reduces stock; unused returned is informational because no material left stock at schedule or start. Counted quantities are whole units. Measured quantities use stored base units; roll conversion remains gated. Sources may be split and extra actual materials named. Output, lot, tank and material writes remain atomic. An uncertain close keeps the exact request and offers unchanged retry. Finished stock is dated Packaged on for compliance reporting.",
     body: <ClosePackagingRunView model={closePackagingRunHazy} />,
   },
   {

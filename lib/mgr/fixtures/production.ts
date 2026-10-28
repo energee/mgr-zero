@@ -17,14 +17,14 @@ import { waterProfiles } from "./catalog";
 
 export const cellarMapBrewer: CellarMapViewModel = {
   readingHref: null,
-  actionHint: "Several tanks hold beer. Open a tank to record its reading.",
+  actionHint: "Several tanks hold beer. Use Reading on a tank.",
   tiles: [
-    { name: "FV1", detail: "Pils · 12.8 / 15 bbl", reading: "1.9 °P · read 4 h", fill: 85 },
-    { name: "FV2", detail: "Hazy · 9.0 / 15 bbl", reading: "7.5 °P · read 8 h", fill: 60 },
-    { name: "FV3", detail: "Stout · 13.5 / 15 bbl", reading: "5.2 °P · overdue 31 h", warning: true, fill: 90 },
-    { name: "BT1", detail: "Pils · 7.0 / 10 bbl", reading: "carbing", fill: 70 },
+    { name: "FV1", detail: "Pils · 12.8 / 15 bbl", reading: "1.9 °P · read 4 h", fill: 85, readingHref: "" },
+    { name: "FV2", detail: "Hazy · 9.0 / 15 bbl", reading: "7.5 °P · read 8 h", fill: 60, readingHref: "" },
+    { name: "FV3", detail: "Stout · 13.5 / 15 bbl", reading: "5.2 °P · overdue 31 h", warning: true, fill: 90, readingHref: "" },
+    { name: "BT1", detail: "Pils · 7.0 / 10 bbl", reading: "carbing", fill: 70, readingHref: "" },
     { name: "BT2", detail: "Empty · 0 / 10 bbl", reading: "available", fill: 0 },
-    { name: "FB1", detail: "Saison · 0.4 / 1 bbl", reading: "aging · read 1 d", fill: 40 },
+    { name: "FB1", detail: "Saison · 0.4 / 1 bbl", reading: "aging · read 1 d", fill: 40, readingHref: "" },
   ],
   detail: { title: "FV3 · fermenter · 15 bbl", description: "occupancy, readings and vessel facts" },
 };

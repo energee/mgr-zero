@@ -1,10 +1,12 @@
 // Shared completion surface: inventory supplies fixtures, live supplies ledger previews and commands.
+// Opened with one batch to choose, it reviews that batch at once; the loss line leads and the
+// ledger figures stay behind Details (#1508).
 "use client";
 
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { batchCompletionAcknowledgement, type BatchCompletionPhase } from "@/lib/mgr/batch-completion-state";
+import { batchCompletionAcknowledgement, completionLoss, type BatchCompletionPhase } from "@/lib/mgr/batch-completion-state";
 import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { submitReason } from "@/lib/mgr/submit-reason";
 import { bblExact } from "@/lib/volume";
@@ -32,18 +34,20 @@ export function BatchCompletionView({ batches, open, onOpenChange, batchId, prev
   if (!batchId) missing.push("a batch");
   else if (acknowledgement && !confirmInTank) missing.push(`the “${acknowledgement}” switch turned on`);
   const reason = phase === "loading" ? null : submitReason(missing);
-  return <div data-preview-action className="flex flex-col items-start gap-2"><CommandForm open={open} onOpenChange={onOpenChange} title="Complete batch"
+  return <div data-preview-action className="flex flex-col items-start gap-2"><CommandForm open={open} title="Complete batch"
+    onOpenChange={next => { onOpenChange(next); if (next && batches.length === 1 && !batchId) onReview(batches[0].id); }}
     trigger={<Button variant="outline" disabled={none} aria-describedby={none ? "completion-none" : undefined}>Complete batch</Button>}>
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       {E.pick("Batch", batchId, [{ value: "", label: "Batch to complete" }, ...batches.map(batch => ({ value: batch.id, label: batch.label }))], { onChange: onReview, disabled: frozen })}
       {phase === "loading" && <p className="text-sm text-muted-foreground">Calculating from the cellar ledger...</p>}
-      {preview && <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+      {preview && <p className="text-sm font-medium">{completionLoss(preview)}</p>}
+      {preview && <details className="text-sm"><summary>Details</summary><dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
         <dt>Baseline</dt><dd className="text-right">{bblExact(preview.baselineBbl, 8)}</dd>
         <dt>Frozen packaged</dt><dd className="text-right">{bblExact(preview.packagedBbl, 8)}</dd>
         <dt>Prior attributed</dt><dd className="text-right">{bblExact(preview.attributedBbl, 8)}</dd>
         <dt>Threshold</dt><dd className="text-right">{bblExact(preview.thresholdBbl, 8)}</dd>
         <dt>Predicted residual</dt><dd className="text-right">{bblExact(preview.residualBbl, 8)}</dd>
-      </dl>}
+      </dl></details>}
       {preview && phase !== "saved" && <p className="text-xs text-muted-foreground">Completing closes every open occupancy. A residual at or above the threshold becomes one automatic loss reconciliation.</p>}
       {acknowledgement && <div className="flex items-center justify-between gap-3"><span>{acknowledgement}</span><fieldset disabled={frozen}>{E.sw(confirmInTank, acknowledgement, onConfirmInTank)}</fieldset></div>}
       {phase === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The batch and request are frozen; retry unchanged to recover the original result.</CommandFormMessage>}

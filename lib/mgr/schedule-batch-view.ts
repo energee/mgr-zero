@@ -42,3 +42,6 @@ export function pastPlanWarning(date: string, today?: string): string | undefine
   if (!isPastDay(date, today)) return undefined;
   return "This planned date is in the past for your brewery. You can save this plan; it does not record a brew day or change Brewed on.";
 }
+
+/** The brand New batch holds after a recipe pick: the one already chosen, else the recipe's own (#1508). */
+export const brandAfterRecipePick = (chosen: string, recipeBrandId: string | null | undefined) => chosen || recipeBrandId || "";

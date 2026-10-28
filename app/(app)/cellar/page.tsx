@@ -17,6 +17,7 @@ import { CellarTransferForm } from "./cellar-transfer-form";
 import { CellarAdditionForm } from "./cellar-addition-form";
 import type { AdditionLot, AdditionMaterial } from "@/lib/mgr/cellar-addition-view";
 import { BatchCompletionForm } from "./batch-completion-form";
+import { additionChoices } from "./occupancy-actions";
 import { navTitle } from "@/lib/mgr/nav";
 import { batNo } from "@/lib/mgr/doc-no";
 
@@ -39,14 +40,11 @@ export default async function CellarPage() {
     runCommand("list_occupancies", {}, ctx), runCommand("list_vessels", {}, ctx), runCommand("list_batches", { readings: true, open: true }, ctx), runCommand("get_gravity_unit", {}, ctx), runCommand("list_materials", {}, ctx),
     runCommand("list_material_lots", {}, ctx),
   ])) as [Occupancy[], Vessel[], Batch[], { effective: GravityUnit }, AdditionMaterial[], (AdditionLot & { material_id: string })[]];
-  // The sheet is a client component: hand it the five fields it reads, not the whole materials row.
-  const additionMaterials: AdditionMaterial[] = materials.map(({ id, name, category, base_uom, lot_tracked }) => ({ id, name, category, base_uom, lot_tracked }));
-  const lotsByMaterial: Record<string, AdditionLot[]> = {};
-  for (const lot of lots) (lotsByMaterial[lot.material_id] ??= []).push(lot);
+  const { materials: additionMaterials, lotsByMaterial } = additionChoices(materials, lots);
   const completionCandidates = batches.map((batch) => ({ id: batch.id, label: `${batNo(batch.batch_no)} · ${batch.brand_name ?? "no brand"}` }));
 
   const readings = cellarReadings(batches, unit.effective, brewery.timeZone);
-  const model = toCellarMapViewProps(vessels, occupancies, readings, Object.fromEntries(vessels.map(vessel => [vessel.id, `/cellar/vessels/${vessel.id}`])), occupancyId => `/cellar/${occupancyId}/reading`);
+  const model = toCellarMapViewProps(vessels, occupancies, readings, Object.fromEntries(vessels.map(vessel => [vessel.id, `/cellar/vessels/${vessel.id}`])), occupancyId => `/cellar/${occupancyId}/reading?from=/cellar`);
   model.backHref = "/beer"; model.addHref = canRun(ctx, "upsert_vessel") ? "/cellar/vessels/new" : null; model.brewHref = "/batches";
   return <CellarMapView model={model} transfer={<CellarTransferForm occupancies={occupancies} vessels={vessels} addVesselHref={model.addHref} disabled={model.actionsOff} />} addition={<CellarAdditionForm occupancies={occupancies} materials={additionMaterials} lotsByMaterial={lotsByMaterial} disabled={model.actionsOff} />} complete={<BatchCompletionForm batches={completionCandidates} />} />;
 }

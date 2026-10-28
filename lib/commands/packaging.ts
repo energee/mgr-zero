@@ -336,7 +336,7 @@ defineQuery({
 
 defineQuery({
   name: "get_packaging_run",
-  description: "One packaging run with planned and recorded actual outputs and its committed lot identity and packaging dates",
+  description: "One packaging run with planned and recorded actual outputs (each with its SKU's barrels per unit, null when the format has no volume) and its committed lot identity and packaging dates",
   input: z.object({ runId: z.string().uuid() }), roles: ["admin", "brewer", "warehouse"],
   handler: async (ctx, i) => {
     const run = (await unwrap(ctx.db.from("packaging_runs").select(RUN_COLUMNS)
@@ -351,9 +351,14 @@ defineQuery({
         .eq("brewery_id", ctx.breweryId).eq("run_id", i.runId).order("id")).then((r) => r ?? []),
       unwrap(ctx.db.rpc("get_packaging_run_lot", { p_brewery: ctx.breweryId, p_run: i.runId })),
     ]);
-    const skus = (await unwrap(ctx.db.from("skus").select("id, name, formats(package_type)")
+    const skus = (await unwrap(ctx.db.from("skus").select("id, name, formats(package_type), format_volume:format_volumes(bbl_per_unit)")
       .eq("brewery_id", ctx.breweryId).in("id", [...new Set(rows.map((o) => o.sku_id as string))]))) ?? [];
     const skuNames = new Map(skus.map((s) => [s.id as string, s.name as string]));
+    // Close packaging run starts Barrels drawn from these (#1508); no format_volumes row is an unknown volume, not 0.
+    const bblPerUnit = new Map(skus.map((s) => {
+      const raw = (s.format_volume as { bbl_per_unit: number | string | null } | null)?.bbl_per_unit;
+      return [s.id as string, raw === null || raw === undefined ? null : Number(raw)];
+    }));
     // A keg output is counted in whole kegs; close_packaging_run refuses a fraction (#1477).
     const kegSkus = new Set(skus.filter((s) => (s.formats as { package_type: string } | null)?.package_type === "keg").map((s) => s.id as string));
 
@@ -369,6 +374,7 @@ defineQuery({
         qty_planned: Number(o.qty_planned), qty_actual: o.qty_actual === null ? null : Number(o.qty_actual),
         sku_name: skuNames.get(o.sku_id as string) ?? null,
         whole: kegSkus.has(o.sku_id as string),
+        bbl_per_unit: bblPerUnit.get(o.sku_id as string) ?? null,
       })),
     };
   },
