@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { AccountInvitationsView } from "../components/mgr/views/account-invitations";
 import { EntryView } from "../components/mgr/views/entry";
-import { passwordReturnHref, toAcceptInviteViewProps, toSetPasswordViewProps } from "../lib/mgr/entry-view";
+import { passwordReturnHref, portalForgotPasswordModel, resetPasswordModel, toAcceptInviteViewProps, toSetPasswordViewProps } from "../lib/mgr/entry-view";
 import { expiredInvite } from "../lib/mgr/fixtures/entry";
 import NotFound, { metadata as notFoundMetadata } from "../app/not-found";
 
@@ -101,4 +101,10 @@ it("shows invited roles in sentence case on both invitation landings (#1153)", (
     { id: "staff", breweryName: "Actual brewery", kind: "staff", role: "sales", customerName: null, expiresAt: "2026-10-29" },
   ] }));
   expect(invitations).toContain("Staff · Sales");
+});
+
+it("titles the portal reset so customers know which account they are resetting (#1501)", () => {
+  expect(portalForgotPasswordModel.title).toBe("Reset your portal password");
+  expect(resetPasswordModel.title).toBe("Reset password");
+  expect(portalForgotPasswordModel.secondary).toBe("Back to sign in");
 });

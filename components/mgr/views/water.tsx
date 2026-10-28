@@ -30,8 +30,9 @@ export function WaterView({ title = "Water", water, profiles, materials, header,
   const mashGal = Number(water.mashGal) || 0, spargeGal = Number(water.spargeGal) || 0;
   // A typed negative volume must never reach the formula (it throws by contract); the verb waits until the entry is corrected.
   const volumesOk = mashGal >= 0 && spargeGal >= 0 && mashGal + spargeGal > 0;
-  // gated: no salt identity yet · waiting: nothing valid to compute against · ready: suggest and read out.
-  const chemistry = !chemistryKnown ? "gated" : target && source && volumesOk ? "ready" : "waiting";
+  // hidden: no salt identity yet, so neither the verb nor the read-out is drawn (#1481) · waiting: nothing valid to
+  // compute against · ready: suggest and read out.
+  const chemistry = !chemistryKnown ? "hidden" : target && source && volumesOk ? "ready" : "waiting";
   const readout = chemistry === "ready" ? ionReadout(water, source!, target!, materials) : [];
   return <>
     {header !== undefined ? header : E.back("Recipe", title)}
@@ -49,14 +50,11 @@ export function WaterView({ title = "Water", water, profiles, materials, header,
     {E.ttl("Salts and acids")}
     {water.additions.map((a, i) => <Fragment key={`${i}-${a.materialId}`}>{listRow(name(materials, a.materialId), waterAdditionDetail(a), i, water.additions.length, verbs)}</Fragment>)}
     {E.row("Add addition", "Material, amount and stage", E.act("Add", "primary", undefined, onAdd))}
-    {chemistry === "gated"
-      ? E.gated("Suggest additions", "Salt suggestions aren't available yet.")
-      : E.btn("Suggest additions", chemistry === "ready" ? "g" : "g disabled", undefined, () => onChange?.({ additions: suggestAdditions(water, source!, target!, materials) }))}
+    {chemistry !== "hidden" && E.btn("Suggest additions", chemistry === "ready" ? "g" : "g disabled", undefined, () => onChange?.({ additions: suggestAdditions(water, source!, target!, materials) }))}
     {chemistry === "ready" && <>
       {E.ttl("Against target")}
       {readout.map((r) => <div key={r.ion}>{E.row(r.ion, r.detail, "", r.warning ? "w" : "")}</div>)}
     </>}
-    {chemistry === "gated" && target && source && E.gated("Ion read-out", "Salt suggestions aren't available yet.")}
   </>;
 }
 

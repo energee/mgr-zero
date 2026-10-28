@@ -17,7 +17,33 @@ This record does not fill that protocol's pilot authorization table.
 - **The live gap is in the hosted stages.** QA saw 4–6 s to network idle and 3–10 s saves on live. Local runs of the same work take a tenth of that. So the cost is hosted: cold starts, the network between Vercel and Supabase, and the hosted prefetch requests. This run could not split those stages. See "Not measured".
 - **No bounded fix is filed.** The owner's rule is one fix per concrete slow stage, with its numbers. No local stage was slow, and the hosted stages were not measured.
 
-## Code changes in the same PR
+## Metric and limits (owner, 2026-10-28)
+
+The owner chose these for #1490 and #1491.
+
+| Measure | Limit |
+| --- | --- |
+| Page | Main content and primary action usable within 2 s |
+| Save, warm | Result shown within 1 s (the #1403 limit) |
+| Save, cold | Result shown within 3 s (the #1403 limit) |
+
+Network idle is not the page metric.
+So prefetch traffic after the page is usable is not a defect.
+Every local page and save below is within these limits.
+The live docs pages are too.
+Live signed-in pages and live saves are not yet measured against them.
+
+## Staff guide weight (owner, 2026-10-28)
+
+The owner chose to lazy-load the guide's `<Screen>` frames if timing showed HTML weight as the cost.
+It did: the 108 frames' Mobile/Desktop switches were 474 KB of the live guide's 1,015 KB of markup.
+The rest was 593 KB of inline React data.
+The iframes themselves already loaded lazily.
+Now each switch and frame mounts only when its figure is within one screen of the viewport (`components/mgr/screen-embed.tsx`).
+Until then the figure is an empty box of the frame's starting height.
+The guide keeps its single page and its `/docs` links.
+
+## Code changes in the timing PR (#1576)
 
 These two #1491 items needed no decision, so they ship with this record.
 

@@ -18,6 +18,7 @@ const pureTests = [
   "tests/screen-persona.test.ts",
   "tests/design-docs.test.ts",
   "tests/docs.test.ts",
+  "tests/screen-embed.test.ts",
   "tests/tap-board-state.test.ts",
   "tests/tap-board-view.test.ts",
   "tests/date-format.test.ts",

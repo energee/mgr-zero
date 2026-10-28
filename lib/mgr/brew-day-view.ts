@@ -20,7 +20,10 @@ export type BrewPlan = { recipe?: string; version?: { version?: number; mash_sch
     mash_temp_f?: number | null; target_mash_ph?: number | null; pre_boil_bbl?: number | null; boil_minutes?: number | null;
     whirlpool_temp_f?: number | null; whirlpool_minutes?: number | null; knockout_temp_f?: number | null } | null;
   ingredients?: BrewPlanIngredient[];
-  waterAdditions?: { materialName: string; qty: number; unit: string; baseUnit: string }[] };
+  waterAdditions?: BrewWaterAddition[] };
+/** A pinned plan's water addition (recipe_water_additions): an absolute amount in its own unit (g, mL or oz) and stage
+ *  (mash, sparge or kettle); baseUnit is its material's stock unit. */
+export type BrewWaterAddition = { id: string; material_id: string; materialName: string; qty: number; unit: string; stage: string; baseUnit: string };
 export type BrewRecordView = { id: string; turn: number; initial_bbl: number; brewed_on: string; created_at: string; correction_reason: string | null; corrects_id: string | null;
   plan_snapshot: BrewPlan; process: Record<string, number>; additions: { id: string; material_name: string; unit: string; confirmed_qty: number; stage: IngredientStage; recipe_ingredient_id: string | null; lot_code: string | null; location_name: string; bin_name: string;
     source: { material_id: string; location_id: string; bin_id: string; lot_id: string | null } }[] };
@@ -49,8 +52,9 @@ export type BrewDayViewModel = {
   today?: string;
   /** A cancelled plan shows only its planned facts and the cancelled notice. */
   cancelled?: boolean;
-  /** A completed batch: the day it completed and the loss its completion wrote off (null when none). */
-  completion?: { on: string; writeOffBbl: number | null };
+  /** A completed batch: the day it completed, the loss its completion wrote off (null when none), and the barrels its
+   *  closed packaging runs packaged (get_brew_day's packagedBbl). */
+  completion?: { on: string; writeOffBbl: number | null; packagedBbl: number };
   sheet?: { title: string; detail: string };
   tapeHead?: [string, string][];
 };

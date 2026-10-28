@@ -1,7 +1,8 @@
-// components/mgr/views/location-bins.tsx — Location bins list. Both paths draw
-// the adapter's rows; live passes BinForm as createAction and as each row's
-// action, and the Move stock form (drawing MoveStockFields) as footer;
-// inventory uses Add bin and nav rows. Nothing stored draws the empty state.
+// components/mgr/views/location-bins.tsx — the Bins section of Location
+// detail (#1507). Both paths draw the adapter's rows under a Bins heading;
+// live passes BinForm as createAction and as each row's action, and the Move
+// stock form (drawing MoveStockFields) as footer; inventory uses Add bin and
+// nav rows. Nothing stored draws the empty state.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { LocationBinsViewModel, MoveStockOptions, MoveStockValue } from "@/lib/mgr/location-bins-view";
@@ -37,7 +38,7 @@ export function LocationBinsView({
 }) {
   return (
     <>
-      {E.back(model.backLabel, model.title, createAction, model.backHref)}
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">{E.group("Bins")}{createAction}</div>
       <div className="[&_[data-slot=item-content]]:min-w-0 [&_[data-slot=item-title]]:line-clamp-none [&_[data-slot=item-title]]:max-w-full">
         {model.rows.map((row) => {
           const title = <span className="min-w-0 whitespace-normal [overflow-wrap:anywhere]">{row.title}</span>;

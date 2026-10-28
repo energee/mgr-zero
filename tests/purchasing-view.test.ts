@@ -142,7 +142,7 @@ describe("Purchase orders", () => {
     expect(html).not.toContain('href="/purchase-orders"');
     expect(htmlOf(createElement(NewPoView, { model: newPoCountryMalt, footer: null }))).not.toContain("Save draft");
     const page = src("app/(app)/purchase-orders/new/page.tsx");
-    expect(page.indexOf('requirePagePermission(ctx, "create_purchase_order"')).toBeLessThan(page.indexOf('runPageQuery("list_vendors"'));
+    expect(page.indexOf('requirePagePermission(ctx, "create_purchase_order"')).toBeLessThan(page.indexOf('runPageQuery("list_vendors_and_contracts"'));
   });
 
   it("the Receive PO inventory record is ReceivePoView", () => {

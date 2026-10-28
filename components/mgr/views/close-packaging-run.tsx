@@ -7,10 +7,9 @@ import { PlanCancelled } from "./plan-actions";
 import { E } from "@/components/mgr/e";
 import { formatDate } from "@/lib/date-format";
 import { PackagingMaterialActuals } from "./packaging-materials";
-import { Button } from "@/components/ui/button";
 import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { emptyPackagingActual, patchActual, removeActual, type PackagingActualDraft } from "@/lib/mgr/packaging-actuals";
-import { packagingCloseReason, type PackagingCloseFieldsModel, type ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
+import { onlyBinIn, packagingCloseReason, type PackagingCloseFieldsModel, type ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
 
 export type { ClosePackagingRunViewModel };
 
@@ -42,16 +41,17 @@ export function ClosePackagingRunView({
 }
 
 /** Close packaging run's fields and verb. The verb says why it is withheld (packagingCloseReason); a retry of the
- *  unchanged close needs no reason, since its saved request is resent as it was. */
-export function PackagingCloseFields({ model, disabled, retry, onField, onOutput, onActual, onAdd, onRemove, onSubmit, onRefresh, messages }: {
+ *  unchanged close needs no reason, since its saved request is resent as it was. Choosing a location fills its only bin.
+ *  The live form re-reads the material plan when the verb is pressed, so there is no separate review button (#1508). */
+export function PackagingCloseFields({ model, disabled, retry, onField, onOutput, onActual, onAdd, onRemove, onSubmit, messages }: {
   model: PackagingCloseFieldsModel; disabled?: boolean; retry?: boolean;
   onField?: (field: "bblDrawn" | "lotCode" | "packagedOn" | "bestBy" | "locationId" | "binId", value: string) => void;
   onOutput?: (id: string, value: string) => void; onActual?: (key: string, patch: Partial<PackagingActualDraft>) => void;
-  onAdd?: () => void; onRemove?: (key: string) => void; onSubmit?: () => void; onRefresh?: () => void; messages?: ReactNode;
+  onAdd?: () => void; onRemove?: (key: string) => void; onSubmit?: () => void; messages?: ReactNode;
 }) {
   const [fixture, setFixture] = useState(model);
   const view = onField ? model : fixture;
-  const changeField = onField ?? ((field, value) => setFixture(previous => ({ ...previous, [field]: value, ...(field === "locationId" ? { binId: "" } : {}) })));
+  const changeField = onField ?? ((field, value) => setFixture(previous => ({ ...previous, [field]: value, ...(field === "locationId" ? { binId: onlyBinIn(previous.bins, value) } : {}) })));
   const changeOutput = onOutput ?? ((id, value) => setFixture(previous => ({ ...previous, outputs: previous.outputs.map(row => row.id === id ? { ...row, qty: value } : row) })));
   const changeActual = onActual ?? ((key, patch) => setFixture(previous => ({ ...previous, actuals: patchActual(previous.actuals, key, patch) })));
   const addActual = onAdd ?? (() => setFixture(previous => ({ ...previous, actuals: [...previous.actuals, emptyPackagingActual()] })));
@@ -67,7 +67,6 @@ export function PackagingCloseFields({ model, disabled, retry, onField, onOutput
     {E.pick("Finished goods location", view.locationId, view.locations.map(row => ({ value: row.id, label: row.name })), { disabled, required: true, onChange: value => changeField("locationId", value) })}
     {E.pick("Finished goods bin", view.binId, view.bins.filter(row => row.location_id === view.locationId).map(row => ({ value: row.id, label: row.name })), { disabled, required: true, onChange: value => changeField("binId", value) })}
     <PackagingMaterialActuals plan={view.plan} rows={view.actuals} locations={view.locations} bins={view.bins} disabled={disabled} onChange={changeActual} onAdd={addActual} onRemove={dropActual} />
-    <Button type="button" variant="outline" disabled={disabled} onClick={onRefresh}>Review current material plan</Button>
     {messages}
     <IrreversibleSubmit label={retry ? "Retry unchanged close" : "Close packaging run"} type="button" reason={reason} disabled={disabled && !retry} onClick={onSubmit} />
   </div>;

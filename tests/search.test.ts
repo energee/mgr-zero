@@ -116,7 +116,7 @@ describe("search_entities", () => {
     expect(Object.fromEntries(hits.map((h) => [h.kind, h.href]))).toEqual({
       route: `/routes/${route.id}`, recipe: `/recipes/${recipe.id}`, vessel: `/cellar/vessels/${vessel.id}`,
       vendor: "/vendors", ship_to: `/customers/${customerId}`, material: "/materials", keg_pool: "/kegs",
-      bin: `/locations/${location.id}/bins`, license: "/compliance/licenses", water_profile: "/catalog/water-profiles",
+      bin: `/locations/${location.id}`, license: "/compliance/licenses", water_profile: "/catalog/water-profiles",
     });
   });
   it("RUN- and TRF- numbers match exactly, and a bare number searches every numbered kind (#1473)", async () => {

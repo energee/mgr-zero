@@ -128,6 +128,7 @@ const AUTHENTICATED_RPCS = [
   "generate_compliance_report(uuid,text,date,date)",
   "get_loss_review(uuid,date,date)",
   "get_batch_completion_preview(uuid,uuid)",
+  "get_batch_volume_balance(uuid,uuid)",
   "get_today_items(uuid,timestamp with time zone)",
   "is_staff_of(uuid)",
   "move_stock_bin(uuid,uuid,uuid,uuid,keg_size,numeric,uuid,uuid,text,uuid,uuid,uuid)",

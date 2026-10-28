@@ -33,6 +33,8 @@ The batch page (`app/(app)/batches/[id]/page.tsx`, view `components/mgr/views/br
 | Decimals and loose pounds | A pull is entered as packs (decimals allowed, 4.4) plus optional loose pounds for a partly used bag. |
 | No open-bag tracking | Inventory stays in base units. A partly used bag is just pounds; no per-bag records. |
 | Recipes share the pack math | The recipe page shows batch totals in packs and offers rounding to whole packs in the draft editor. |
+| Prep pulls start confirmed (owner, 2026-10-28, #1508) | A Brew day line with a saved Prep pull starts confirmed; Record still needs every line confirmed, so only lines Prep left off ask again. |
+| Water additions are Brew day rows (owner, 2026-10-28, #1508) | Each planned water addition is a confirmable row in its material's stock unit, recorded by `record_brew_day` as an actual with no recipe line. One whose unit cannot convert stays a reminder for Correct turn. |
 
 ## Reuse
 

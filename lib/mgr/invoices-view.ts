@@ -51,7 +51,7 @@ export type InvoiceListRow = {
 function ledgerPaymentFact(inv: InvoiceListRecord, state: InvoiceCurrentState): string {
   if (inv.total_cents <= 0) return "No payment due";
   if (state === "paid") return "Paid";
-  return inv.local_paid_cents > 0 ? "Partial payment" : "Balance due";
+  return inv.local_paid_cents > 0 ? "Partially paid" : "Unpaid";
 }
 
 function paymentFact(inv: InvoiceListRecord, state: InvoiceCurrentState): string {
@@ -69,8 +69,8 @@ function paymentFact(inv: InvoiceListRecord, state: InvoiceCurrentState): string
       : "Settled / no cash payment recorded";
   }
   if (inv.qbo_balance_cents < 0) return "Credit balance";
-  if (inv.qbo_cash_collected_cents > 0) return "Partial payment";
-  return "Balance due";
+  if (inv.qbo_cash_collected_cents > 0) return "Partially paid";
+  return "Unpaid";
 }
 
 /** The first match wins, so the order is the rule: the document's own state,

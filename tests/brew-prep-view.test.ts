@@ -1,7 +1,7 @@
 // tests/brew-prep-view.test.ts — the brew prep pull list and the brew-day
 // timeline's pure rules (lib/mgr/brew-prep-view.ts).
 import { describe, expect, it } from "vitest";
-import { anyPulled, brewIngredients, confirmAll, brewPullsPayload, brewTargets, currentStage, isShort, laterAdditions, needsSource, noStockNote, openBrewTab, prepReason, processErrors, pullDetail, pullTone, sourceChoices, showsPacks, stageProgress, startAtPlan, timelineReason, timelineRecordPayload, timelineStages, timelineTone, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
+import { anyPulled, brewIngredients, confirmAll, brewPullsPayload, brewTargets, currentStage, isShort, laterAdditions, needsSource, noStockNote, openBrewTab, prepReason, processErrors, pullDetail, pullTone, sourceChoices, showsPacks, stageProgress, startAtPlan, timelineReason, timelineRecordPayload, timelineStages, timelineTone, waterAdditionRows, type BrewIngredient, type BrewPrepViewModel, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import type { BrewMaterialSource, BrewPlan, BrewPull } from "@/lib/mgr/brew-day-view";
 
 const chit: BrewIngredient = startAtPlan({ key: "chit", name: "Chit Malt", materialId: "chit", stage: "mash", plan: 220, unit: "lb", packSize: 50, source: null });
@@ -198,9 +198,46 @@ describe("brewIngredients", () => {
     const [chit] = brewIngredients(plan, [pull], sources, 22);
     expect(chit).toMatchObject({ plan: 220, packs: "4", loose: "10", source: { lot: "C-2", bin: "Malt room / A2", binId: "a2", lotId: "c-2" } });
   });
+  it("starts a line with a saved Prep pull confirmed, so Brew day does not ask again (#1508)", () => {
+    const [chit, ns] = brewIngredients(plan, [pull], sources, 22);
+    expect(chit.confirmed).toBe(true);
+    expect(ns.confirmed).toBeFalsy();
+    expect(brewIngredients(plan, [], sources, 22).some(row => row.confirmed)).toBe(false);
+  });
   it("once Prep is saved, starts a line it left off (pulled to zero with no source) at zero", () => {
     const [, ns] = brewIngredients(plan, [pull], sources, 22);
     expect(ns).toMatchObject({ plan: 44, packs: "0", loose: "0" });
+  });
+});
+
+describe("waterAdditionRows", () => {
+  const water: BrewPlan = { waterAdditions: [
+    { id: "wa-gyp", material_id: "gyp", materialName: "Gypsum", qty: 40, unit: "g", stage: "mash", baseUnit: "lb" },
+    { id: "wa-cacl", material_id: "cacl", materialName: "Calcium chloride", qty: 2, unit: "oz", stage: "sparge", baseUnit: "g" },
+    { id: "wa-salt", material_id: "salt", materialName: "Kettle salt", qty: 10, unit: "g", stage: "kettle", baseUnit: "g" },
+    { id: "wa-acid", material_id: "acid", materialName: "Lactic acid", qty: 5, unit: "mL", stage: "mash", baseUnit: "lb" },
+  ] };
+  const gypsum = { ...stock("gyp", "d1", null), unit: "lb" };
+
+  it("makes each planned addition a confirmable row in its base unit, under the stage that takes it (#1508)", () => {
+    const { rows } = waterAdditionRows(water, [gypsum]);
+    expect(rows.map(r => [r.key, r.name, r.stage, r.plan, r.unit, r.packs, r.loose, r.water, r.confirmed])).toEqual([
+      ["wa-gyp", "Gypsum", "mash", 0.0882, "lb", "0.0882", "0", true, undefined],
+      ["wa-cacl", "Calcium chloride", "mash", 56.699, "g", "56.699", "0", true, undefined],
+      ["wa-salt", "Kettle salt", "boil", 10, "g", "10", "0", true, undefined],
+    ]);
+    expect(rows[0].source).toMatchObject({ materialId: "gyp", binId: "d1", lotId: null });
+    expect(rows[1].source).toBeNull();
+  });
+  it("leaves an addition whose unit cannot become its base unit as a reminder", () => {
+    expect(waterAdditionRows(water, []).reminders.map(r => r.materialName)).toEqual(["Lactic acid"]);
+    expect(waterAdditionRows({}, [])).toEqual({ rows: [], reminders: [] });
+  });
+  it("records a confirmed water row as an actual with no recipe line", () => {
+    const [gyp] = waterAdditionRows(water, [gypsum]).rows;
+    expect(timelineRecordPayload({ ...sourced, sources: [...sourced.sources!, gypsum], ingredients: [{ ...gyp, confirmed: true }] }, "bat-1")[1].actuals).toEqual([
+      { materialId: "gyp", locationId: "malt-room", binId: "d1", lotId: null, stage: "mash", qty: 0.0882 },
+    ]);
   });
 });
 

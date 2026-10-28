@@ -54,6 +54,11 @@ describe("Reattribute loss Save reason", () => {
     for (const target of ["taproom", "destruction"] as const) expect(lossReviewReason("1", "3", target, "")).toBeNull();
   });
 
+  it("starts with no target, so Save waits for one to be chosen (#1510)", () => {
+    expect(lossReviewReason("3", "3", "", "")).toBe("Still needed: a target.");
+    expect(lossReviewReason("", "3", "", "")).toBe("Still needed: a positive amount with up to eight decimal places and a target.");
+  });
+
   it("starts the amount at the whole remainder, exact and never in exponent form (#1510)", () => {
     expect(remainingAmountText("3.00000000")).toBe("3");
     expect(remainingAmountText("12.50000000")).toBe("12.5");
