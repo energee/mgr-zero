@@ -314,9 +314,8 @@ defineQuery({
   roles: [...ROLES],
   input: z.object({ q: z.string().trim().max(100).optional().describe("Only lots whose code contains this text, ignoring case") }),
   handler: (ctx, i) => {
-    let q = ctx.db.from("lots").select("id, code, packaged_on, brands(name)").eq("brewery_id", ctx.breweryId);
-    if (i.q) q = q.regexIMatch("code", escapeRegex(i.q));
-    return rows<LotRowOut>(q.order("packaged_on", { ascending: false }).limit(50));
+    const lots = ctx.db.from("lots").select("id, code, packaged_on, brands(name)").eq("brewery_id", ctx.breweryId).order("packaged_on", { ascending: false }).limit(50);
+    return rows<LotRowOut>(i.q ? lots.regexIMatch("code", escapeRegex(i.q)) : lots);
   },
 });
 
