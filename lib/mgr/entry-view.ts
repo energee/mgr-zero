@@ -48,7 +48,7 @@ export const expiredInviteModel: EntryViewModel = {
 };
 
 export const resetPasswordModel: EntryViewModel = {
-  title: "Reset password", inputs: ["Email"], primary: "Send reset link",
+  title: "Reset password", inputs: ["Email"], primary: "Send reset link", secondary: "Back to sign in",
 };
 export const portalForgotPasswordModel: EntryViewModel = {
   ...resetPasswordModel,

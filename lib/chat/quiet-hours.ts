@@ -25,12 +25,20 @@ export const notificationQuietHoursSchema = personalQuietHoursSchema.safeExtend(
 
 type QuietHoursValues = { start: string; end: string };
 
+/** The footer's need for each window quietHoursWindowSchema rejects, so Save never greys out silently (#1501). */
+function windowNeeds({ start, end }: QuietHoursValues): string[] {
+  if (start && !end) return ["an end time"];
+  if (!start && end) return ["a start time"];
+  if (start && start === end) return ["an end time different from the start"];
+  return [];
+}
+
 export function breweryQuietHoursReason(values: QuietHoursValues, initial: QuietHoursValues): string | null {
   const unchanged = values.start === initial.start && values.end === initial.end;
-  return submitReason(unchanged ? ["a change to brewery quiet hours"] : []);
+  return submitReason(unchanged ? ["a change to brewery quiet hours"] : windowNeeds(values));
 }
 
 export function personalQuietHoursReason(values: QuietHoursValues & { timezone: string }, initial: QuietHoursValues & { timezone: string }): string | null {
   const unchanged = values.start === initial.start && values.end === initial.end && values.timezone === initial.timezone;
-  return submitReason(unchanged ? ["a change to your quiet hours"] : []);
+  return submitReason(unchanged ? ["a change to your quiet hours"] : windowNeeds(values));
 }

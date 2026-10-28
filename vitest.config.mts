@@ -58,6 +58,7 @@ const pureTests = [
   "tests/pricing-view.test.ts",
   "tests/auth-page-metadata.test.ts",
   "tests/shell-view.test.ts",
+  "tests/first-run.test.ts",
   "tests/route-error.test.ts",
   // Entry rendering and Auth-boundary tests use fixtures or explicit Auth mocks, not a database.
   "tests/entry-email-link.test.ts",
@@ -110,7 +111,8 @@ const pureTests = [
   "tests/delivery-view.test.ts",
   "tests/transfers-view.test.ts",
   "tests/shipment-parity.test.ts",
-  "tests/order-sheets-view.test.ts"
+  "tests/order-sheets-view.test.ts",
+  "tests/keyboard-focus.test.ts"
 ];
 
 export default defineConfig({

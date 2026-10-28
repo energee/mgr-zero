@@ -25,7 +25,7 @@ import {
 } from "../lib/mgr/fixtures/order-sheets";
 import { toAdjustLinesViewProps } from "../lib/mgr/adjust-lines-view";
 import { toPickViewProps } from "../lib/mgr/pick-view";
-import { toReturnCreditViewProps } from "../lib/mgr/return-credit-view";
+import { returnCreditReason, returnQuantityError, toReturnCreditViewProps } from "../lib/mgr/return-credit-view";
 import { toShipViewProps } from "../lib/mgr/ship-view";
 import { toShipmentDoneViewProps } from "../lib/mgr/shipment-done-view";
 import { toShortPickViewProps } from "../lib/mgr/short-pick-view";
@@ -326,7 +326,7 @@ describe("Return and credit view", () => {
     expect(model.title).toBe("Beer return");
     expect(model.lines[0]).toMatchObject({ detail: "shipped 4 · returning", qty: 1, step: "0.01" });
     expect(model.lines[1]).toMatchObject({ name: "Keg deposit · ½ bbl", detail: "deposit on 4 kegs · refunding", qty: 1, step: "1" });
-    expect(model.reasons).toEqual(["damaged · written to loss", "wrong item · back to stock", "unsold · back to stock"]);
+    expect(model.reasons).toEqual(["Damaged · written to loss", "Wrong item · back to stock", "Unsold · back to stock"]);
     expect(model.returnTo).toBe("Warehouse · original fulfillment source");
     expect(model.creditInfo).toMatch(/INV-1042/);
     expect(model.tape).toEqual([
@@ -341,15 +341,57 @@ describe("Return and credit view", () => {
     const markup = html(createElement(ReturnCreditView, { model: toReturnCreditViewProps(orderReturnCredit) }));
     expect(markup).toMatch(/Beer return/);
     expect(markup).toMatch(/shipped 4 · returning/);
-    expect(markup).toMatch(/damaged/);
-    expect(markup).toMatch(/wrong item/);
-    expect(markup).toMatch(/unsold/);
+    expect(markup).toMatch(/Damaged · written to loss/);
+    expect(markup).toMatch(/Wrong item · back to stock/);
+    expect(markup).toMatch(/Unsold · back to stock/);
     expect(markup).toMatch(/Return to/);
     expect(markup).toMatch(/−\$30\.00/);
     expect(markup).toMatch(/INV-1042/);
     expect(markup).toMatch(/Keg fleet/);
     expect(markup).toMatch(/>Return shipment</);
     expect(markup).toContain('data-variant="irreversible"');
+  });
+});
+
+describe("Return shipment names what it waits for (#1485)", () => {
+  // Beer shipped 3 (fractions allowed); a keg deposit on 3 kegs (whole kegs only).
+  const beer = { key: "beer", name: "Hazy IPA", maxReturning: 3, step: "0.01" };
+  const keg = { key: "keg", name: "Keg deposit", maxReturning: 3, step: "1" };
+  const lines = [beer, keg].map(line => ({ ...line, detail: "", qty: 0, shipped: 3 }));
+  const ready = { lines, quantities: { beer: "1" }, reason: "unsold", locationId: "warehouse", binMissing: false };
+
+  it("marks a negative, over-shipped or too-fine quantity at its field; 1.5 beer is valid", () => {
+    expect(returnQuantityError("", beer)).toBeUndefined();
+    expect(returnQuantityError("0", beer)).toBeUndefined();
+    expect(returnQuantityError("1.5", beer)).toBeUndefined();
+    expect(returnQuantityError("3", beer)).toBeUndefined();
+    for (const qty of ["-1", "5", "1.555", "abc"]) expect(returnQuantityError(qty, beer)).toBe("Enter a quantity from 0 to 3, with at most two decimal places.");
+    expect(returnQuantityError("1e3", beer)).toMatch(/exponent notation/);
+    expect(returnQuantityError("2", keg)).toBeUndefined();
+    expect(returnQuantityError("1.5", keg)).toBe("Enter a whole number of kegs from 0 to 3.");
+  });
+
+  it("is null when ready, and never drops a bad line silently", () => {
+    expect(returnCreditReason(ready)).toBeNull();
+    expect(returnCreditReason({ ...ready, quantities: { beer: "1.5" } })).toBeNull();
+    expect(returnCreditReason({ ...ready, quantities: { beer: "-1" } })).toBe("Still needed: a valid quantity for Hazy IPA.");
+    expect(returnCreditReason({ ...ready, quantities: { beer: "5" } })).toBe("Still needed: a valid quantity for Hazy IPA.");
+    // One valid line does not carry a bad one.
+    expect(returnCreditReason({ ...ready, quantities: { beer: "1", keg: "1.5" } })).toBe("Still needed: a valid quantity for Keg deposit.");
+  });
+
+  it("lists every missing choice in form order", () => {
+    expect(returnCreditReason({ lines, quantities: {}, reason: "", locationId: "", binMissing: false }))
+      .toBe("Still needed: a quantity to return, a reason, and a return location.");
+    expect(returnCreditReason({ ...ready, binMissing: true })).toBe("Still needed: a return bin.");
+  });
+
+  it("prints the reason beside the withheld button and a bad quantity under its field", () => {
+    const model = toReturnCreditViewProps({ ...orderReturnCredit, lines: orderReturnCredit.lines.map(line => ({ ...line, qty_returning: -1 })) });
+    const markup = html(createElement(ReturnCreditView, { model, blockedReason: "Still needed: a valid quantity for Hazy IPA." }));
+    expect(markup).toMatch(/<p id="([^"]+)"[^>]*>Still needed: a valid quantity for Hazy IPA\.<\/p>/);
+    expect(markup).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby="[^"]+"[^>]*>Return shipment<\/button>/);
+    expect(markup).toContain("Enter a quantity from 0 to 4, with at most two decimal places.");
   });
 });
 

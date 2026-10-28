@@ -3,6 +3,7 @@ import type { GatewayModelOption } from "@/lib/chat/models";
 import { dollarsInput, toCents } from "@/lib/mgr/money";
 import type { ReportingBasisCorrection } from "@/lib/commands/compliance";
 import { submitReason } from "@/lib/mgr/submit-reason";
+import type { UnitsViewModel } from "@/lib/mgr/units-view";
 
 export type BrewerySettings = {
   name: string; timezone: string; ttb_registry_no: string | null; pa_license_no: string | null;
@@ -101,6 +102,8 @@ export type SettingsViewModel = {
   warehouseOptions: { id: string; name: string }[];
   locations: string;
   team: string;
+  /** The brewery gravity unit chips; live passes GravityUnitForm in their place. */
+  units?: UnitsViewModel;
 };
 
 /**

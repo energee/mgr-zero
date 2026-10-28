@@ -1,15 +1,17 @@
 "use client";
 
 // components/mgr/views/contract.tsx — shared Contract sheet body. An empty
-// Vendor or Material picker says how to add one (#1123).
+// Vendor or Material picker says how to add one (#1123). Ends cannot precede
+// Starts, and a set date can be cleared (#1494).
 import { useId, type ReactNode } from "react";
-import { DatePicker } from "@/components/mgr/date-picker";
 import { ConfirmDeleteControl } from "./confirm-delete";
 import { E, type PickEmpty } from "@/components/mgr/e";
+import { Button } from "@/components/ui/button";
+import { FieldDescription } from "@/components/ui/field";
 import { poLineErrors } from "@/lib/mgr/new-po-view";
 import { numberNotationError } from "@/lib/mgr/quantity-input";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
-import { contractSubmitReason, type ContractViewModel } from "@/lib/mgr/contract-view";
+import { contractDateError, contractSubmitReason, type ContractViewModel } from "@/lib/mgr/contract-view";
 import { noMaterialsPick } from "@/lib/mgr/materials-view";
 export type { ContractViewModel };
 
@@ -38,6 +40,24 @@ function ContractSelect({ id, label, value, options, onChange, empty }: {
   );
 }
 
+/** An optional date. The calendar cannot return to blank, so a set date offers
+ * Clear; the server stores the blank as no date. Inventory has no onChange and no Clear. */
+function ContractDate({ id, label, clearLabel, value, onChange, error }: {
+  id: string;
+  label: string;
+  clearLabel: string;
+  value: string;
+  onChange?: (value: string) => void;
+  error?: string;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      {E.edit(label, value, "date", undefined, { id, onChange, error })}
+      {onChange && value ? <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => onChange("")}>{clearLabel}</Button> : null}
+    </div>
+  );
+}
+
 export function ContractView({ model, controls = {}, messages, footer, remove }: {
   model: ContractViewModel;
   controls?: Controls;
@@ -60,20 +80,19 @@ export function ContractView({ model, controls = {}, messages, footer, remove }:
     <>
       <ContractSelect id={`${id}-vendor`} label="Vendor" value={model.vendorId} options={model.vendorOptions} onChange={controls.vendorId} empty={NO_VENDORS} />
       <ContractSelect id={`${id}-material`} label="Material" value={model.materialId} options={model.materialOptions} onChange={controls.materialId} empty={noMaterialsPick("/materials")} />
-      {E.inline(
-        E.edit("Contract quantity", model.quantity, "number", undefined, { id: `${id}-quantity`, onChange: controls.quantity, onBlur: () => touched.touch(QUANTITY), error: touched.shown(QUANTITY) ? quantityError : undefined, required: Boolean(controls.quantity), min: 0, step: "any" }),
-        E.edit("Unit cost ($) · optional", model.unitCost, "number", undefined, { id: `${id}-cost`, onChange: controls.unitCost, onBlur: () => touched.touch(UNIT_COST), error: touched.shown(UNIT_COST) ? costError : undefined, min: 0 }),
-      )}
+      <div className="flex min-w-0 flex-col gap-2">
+        {E.inline(
+          E.edit("Contract quantity", model.quantity, "number", undefined, { id: `${id}-quantity`, onChange: controls.quantity, onBlur: () => touched.touch(QUANTITY), error: touched.shown(QUANTITY) ? quantityError : undefined, required: Boolean(controls.quantity), min: 0, step: "any", "aria-describedby": `${id}-number-help` }),
+          E.edit("Unit cost ($) · optional", model.unitCost, "number", undefined, { id: `${id}-cost`, onChange: controls.unitCost, onBlur: () => touched.touch(UNIT_COST), error: touched.shown(UNIT_COST) ? costError : undefined, min: 0, "aria-describedby": `${id}-number-help` }),
+        )}
+        <FieldDescription id={`${id}-number-help`}>Quantity is in the material’s purchase unit and may be fractional, stored to four decimal places. Unit cost decimals are rounded to the nearest cent.</FieldDescription>
+      </div>
       {model.received && E.fld("Received", model.received)}
       {model.onOrder && E.fld("On order", model.onOrder)}
       {model.available && E.fld("Available to release", model.available)}
       {E.inline(
-        controls.starts
-          ? <DatePicker label="Starts · optional" value={model.starts} onChange={controls.starts} />
-          : <DatePicker label="Starts · optional" defaultValue={model.starts} />,
-        controls.ends
-          ? <DatePicker label="Ends · optional" value={model.ends} onChange={controls.ends} />
-          : <DatePicker label="Ends · optional" defaultValue={model.ends} />,
+        <ContractDate id={`${id}-starts`} label="Starts · optional" clearLabel="Clear start date" value={model.starts} onChange={controls.starts} />,
+        <ContractDate id={`${id}-ends`} label="Ends · optional" clearLabel="Clear end date" value={model.ends} onChange={controls.ends} error={contractDateError(model.starts, model.ends)} />,
       )}
       {E.edit("Contract number · optional", model.contractNo, "text", undefined, controls.contractNo && { onChange: controls.contractNo })}
       {messages}

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { ReturnCreditView, ReturnSourcesView } from "@/components/mgr/views/return-credit";
-import { RETURN_REASONS, toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
+import { RETURN_REASONS, returnCreditReason, toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import type { ReturnSource } from "@/lib/commands/orders";
 
@@ -38,14 +38,14 @@ export function CreditMemoForm({ invoiceId, invoiceNo, shipmentId, refusedDelive
   const { busy, error, run } = useCommandAction();
   const beerLines = lines.filter(line => line.kind === "sku");
   const returningBeer = beerLines.some(line => Number(qtys[line.id]) > 0);
-  const disabled = !reason || !locationId || (shipmentId !== null && returningBeer && !binId) || !lines.some(line => Number(qtys[line.id]) > 0);
   const model = toReturnCreditViewProps({
     invoice: { invoice_no: invoiceNo }, refusedDeliveryId, locations, returnLocationId: locationId, reason, backHref: `/invoices/${invoiceId}`,
     lines: lines.map(line => ({ id: line.id, qty_shipped: line.qty, qty_returnable: refusedQuantities && line.kind === "sku" ? refusedQuantities[line.skuId] ?? 0 : undefined, qty_returning: Number(qtys[line.id] ?? 0), unit_price_cents: line.unitPriceCents, skus: { name: line.label }, kind: line.kind })),
   });
+  const blockedReason = returnCreditReason({ lines: model.lines, quantities: qtys, reason, locationId, binMissing: shipmentId !== null && returningBeer && !binId });
   return <form className="contents" onSubmit={event => {
     event.preventDefault();
-    if (busy || disabled) return;
+    if (busy || blockedReason) return;
     void run("return_shipment", { invoiceId, refusedDeliveryId, locationId, reason, lines: buildReturnLines(lines, qtys, sources, sourceQtys, binId, shipmentId) },
       () => router.push(`/invoices/${invoiceId}`));
   }}>
@@ -58,6 +58,6 @@ export function CreditMemoForm({ invoiceId, invoiceNo, shipmentId, refusedDelive
           id: source.id, label: `${source.lots?.code ?? "Untracked / legacy stock"} · shipped from ${source.bins?.name ?? "—"}`, shipped: -Number(source.qty),
         })),
       }))} quantities={sourceQtys} onQuantity={(id, value) => setSourceQtys(prev => ({ ...prev, [id]: value }))} />}
-      submitting={busy} disabled={disabled} messages={<CommandFormMessage error={error} />} />
+      submitting={busy} blockedReason={blockedReason} messages={<CommandFormMessage error={error} />} />
   </form>;
 }

@@ -1,5 +1,7 @@
 // lib/mgr/new-po-view.ts — view-model for New PO, its per-line field errors,
 // and what its Save draft still needs.
+import { toCents } from "@/lib/mgr/money";
+import { numberNotationError } from "@/lib/mgr/quantity-input";
 import { submitReason } from "@/lib/mgr/submit-reason";
 import { isPastDay } from "@/lib/date-format";
 
@@ -35,21 +37,30 @@ export function pastExpectedWarning(date: string, today?: string): string | unde
 /** A typed value the PO cannot take, shown under its own field. A blank field
  *  is not an error: the quantity is then missing (newPoReason), and the cost
  *  is optional. Decimals stay valid: quantities are fractional purchase units
- *  and a cost rounds to cents. */
+ *  and a cost rounds to cents. The maximums are the columns' storage bounds:
+ *  qty_ordered and qty_committed are numeric(14,4), unit cost is int cents. */
 export function poLineErrors(line: { qty: number | string; cost: string }): { qty?: string; cost?: string } {
-  return {
-    ...(line.qty !== "" && !(Number(line.qty) > 0) ? { qty: "Enter a quantity above zero." } : {}),
-    ...(line.cost !== "" && !(Number(line.cost) >= 0) ? { cost: "Enter a cost of zero or more." } : {}),
-  };
+  const qty = Number(line.qty);
+  const cost = Number(line.cost);
+  let qtyError: string | undefined;
+  if (line.qty !== "" && !(qty > 0)) qtyError = "Enter a quantity above zero.";
+  else if (qty > 9_999_999_999.9999) qtyError = "Enter a quantity no greater than 9,999,999,999.9999.";
+  let costError: string | undefined;
+  if (line.cost !== "" && !(cost >= 0)) costError = "Enter a cost of zero or more.";
+  else if ((toCents(line.cost) ?? 0) > 2_147_483_647) costError = "Enter a cost no greater than $21,474,836.47.";
+  return { ...(qtyError && { qty: qtyError }), ...(costError && { cost: costError }) };
 }
 
 /** What Save draft waits for: a vendor and, on every line, a material, a
- *  quantity above zero, and no negative unit cost. */
+ *  quantity above zero, a unit cost of zero or more, both within their
+ *  column limits and typed without exponent notation. */
 export function newPoReason({ vendor, lines }: { vendor: string; lines: { materialId?: string; qty: number | string; cost: string }[] }): string | null {
   const missing: string[] = [];
   if (!vendor) missing.push("a vendor");
   if (lines.some(line => !line.materialId)) missing.push("a material on each line");
+  if (lines.some(line => numberNotationError(String(line.qty)) || numberNotationError(line.cost))) missing.push("decimal numbers, not exponent notation");
   if (lines.some(line => !(Number(line.qty) > 0))) missing.push("a quantity above zero on each line");
-  if (lines.some(line => poLineErrors(line).cost)) missing.push("a unit cost of zero or more");
+  else if (lines.some(line => poLineErrors(line).qty)) missing.push("a quantity no greater than 9,999,999,999.9999 on each line");
+  if (lines.some(line => poLineErrors(line).cost)) missing.push("a unit cost from $0 to $21,474,836.47");
   return submitReason(missing);
 }
