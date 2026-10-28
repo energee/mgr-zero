@@ -1,7 +1,8 @@
 // components/mgr/views/orders-list.tsx — the Work → Orders register. One
 // drawing for inventory and live: the shared WorkKindTabs, a labeled Status
 // pick (ScopePick, so the URL holds it), the customer scope line, and a
-// RecordTable whose order number is the one link to the order. Live passes
+// RecordTable whose order number is the one link to the order (no Customer
+// column while the scope line names the customer). Live passes
 // OrderForm as createAction and the adapter's hrefs; the inventory's stay inert.
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
@@ -26,25 +27,31 @@ const statusCell = (row: OrdersListRowView) => (
   </span>
 );
 
-function Register({ rows }: { rows: OrdersListRowView[] }) {
+const CUSTOMER_COLUMN = 1;
+
+/** scoped: the customer scope line already names the customer, so the Customer column is left out (#1506). */
+function Register({ rows, scoped }: { rows: OrdersListRowView[]; scoped: boolean }) {
+  // The action column needs no visible header: its button names the verb.
+  const headers = ["Order", "Customer", "Requested ship date", "Status", <span key="action" className="sr-only">Next action</span>];
+  /** Every column list (headers, align, cells, sort) drops the Customer column when scoped. */
+  const shown = <T,>(cells: T[]) => (scoped ? cells.filter((_, i) => i !== CUSTOMER_COLUMN) : cells);
   return (
     <RecordTable
-      // The action column needs no visible header: its button names the verb.
-      headers={["Order", "Customer", "Requested ship date", "Status", <span key="action" className="sr-only">Next action</span>]}
-      align={["l", "l", "l", "l", "l"]}
+      headers={shown(headers)}
+      align={shown(["l", "l", "l", "l", "l"])}
       rows={rows.map((row) => ({
         key: row.key,
         href: row.href,
         to: "Order",
-        cells: [
+        cells: shown([
           row.orderNo,
           row.customer ? <span key="customer" className="font-medium">{row.customer}</span> : muted("transfer"),
           row.shipDate ?? muted("Not scheduled"),
           statusCell(row),
           row.action && <Fragment key="action">{E.act(row.action.verb, row.action.tone, row.action.href)}</Fragment>,
-        ],
+        ]),
         // Status sorts in lifecycle order (draft first); no ship date sorts last.
-        sort: [row.orderNo, row.customer ?? "transfer", row.shipDate, ORDER_STATUSES.indexOf(row.status)],
+        sort: shown([row.orderNo, row.customer ?? "transfer", row.shipDate, ORDER_STATUSES.indexOf(row.status)]),
       }))}
     />
   );
@@ -83,7 +90,7 @@ export function OrdersView({
         </p>
       )}
       {feedback}
-      {listStatus ?? (model.empty ? E.blank(model.empty, undefined, emptyAction) : <Register rows={model.rows} />)}
+      {listStatus ?? (model.empty ? E.blank(model.empty, undefined, emptyAction) : <Register rows={model.rows} scoped={Boolean(model.customer)} />)}
       <HistoryNavigation {...pagination} />
     </>
   );

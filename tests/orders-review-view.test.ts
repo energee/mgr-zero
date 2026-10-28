@@ -181,6 +181,9 @@ describe("Confirm order view loop", () => {
     const src = readFileSync("app/(app)/orders/[id]/confirm/confirm-buttons.tsx", "utf8");
     expect(src).toMatch(/<AtpWarnings\b[^\n]*saved="Order confirmed\."/);
     expect(src).toMatch(/<ConfirmOrderView\b[^\n]*readOnly=\{Boolean\(warnings\)\}/);
+    // It leaves for the order, as a clean confirm does (#1503).
+    expect(src).toMatch(/router\.push\(`\/orders\/\$\{orderId\}`\); router\.refresh\(\); \}\}>Back to order</);
+    expect(src).not.toContain("Back to Orders");
     const model = toConfirmOrderViewProps(orderSubmittedRidgeline);
     const confirmed = renderToStaticMarkup(createElement(ConfirmOrderView, { model, readOnly: true, footer: null }));
     expect(confirmed.match(/<input[^>]*type="number"[^>]*>/g)!.every(input => /\breadOnly=""/.test(input))).toBe(true);

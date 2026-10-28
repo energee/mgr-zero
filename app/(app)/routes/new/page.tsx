@@ -1,6 +1,6 @@
 // app/(app)/routes/new/page.tsx — New route: the builder (route-form.tsx →
 // save_route) over every shipped order and picked transfer on no route.
-// ?add={shipmentId} (Shipment done's Add to route) ticks that document.
+// ?add={id} (Add to route on Shipment done or a Deliveries row) ticks that document.
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
