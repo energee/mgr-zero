@@ -5,6 +5,12 @@ export type RunClosedViewModel = {
   backHref?: string;
   backTo?: string;
   title: string;
+  brand: string;
+  /** The tank it drew from, or "No source yet". */
+  source: string;
+  plannedOn: string;
+  /** packaging_runs.closed_at, an instant printed as its day in timeZone. */
+  closedAt: string;
   bblDrawn?: number | null;
   lot?: { id: string; code: string; packaged_on: string; best_by: string | null } | null;
   outputs?: { sku_id: string; sku_name: string | null; qty_actual: number | null }[];

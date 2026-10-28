@@ -37,10 +37,11 @@ export function ChatPreviewGallery({ fixtures }: { fixtures: readonly ChatPrevie
 
 /** Admin Chat settings, shared by the app and the screen inventory. The
  *  `fields`, `connection` and `delivery` slots draw the built-in view when
- *  left undefined and draw nothing when given `null`. */
-export function ChatSettingsView({ health, timezone, readingDueHours, configured = true, fields, connection, delivery, previewFixtures = [], oauthError = false, installed = false, backHref, healthHref, peopleHref, disconnectHref, preferencesHref, channels = null, channel = "" }: {
-  health: ChatHealth; timezone: string; readingDueHours: number; configured?: boolean; fields?: ReactNode; connection?: ReactNode; delivery?: ReactNode; previewFixtures?: readonly ChatPreviewFixture[]; oauthError?: boolean; installed?: boolean;
-  backHref?: string; healthHref?: string; peopleHref?: string; disconnectHref?: string; preferencesHref?: string; channels?: { id: string; name: string }[] | null; channel?: string;
+ *  left undefined and draw nothing when given `null`. `people` is the Linked
+ *  people section (ChatLinkedPeopleView), drawn while Slack is connected (#1509). */
+export function ChatSettingsView({ health, timezone, readingDueHours, configured = true, fields, connection, delivery, people, previewFixtures = [], oauthError = false, installed = false, backHref, healthHref, disconnectHref, preferencesHref, channels = null, channel = "" }: {
+  health: ChatHealth; timezone: string; readingDueHours: number; configured?: boolean; fields?: ReactNode; connection?: ReactNode; delivery?: ReactNode; people?: ReactNode; previewFixtures?: readonly ChatPreviewFixture[]; oauthError?: boolean; installed?: boolean;
+  backHref?: string; healthHref?: string; disconnectHref?: string; preferencesHref?: string; channels?: { id: string; name: string }[] | null; channel?: string;
 }) {
   const installation = health.installation;
   const connected = installation && !["disconnected", "pending"].includes(installation.state);
@@ -59,10 +60,10 @@ export function ChatSettingsView({ health, timezone, readingDueHours, configured
       {!health.destinations.length && E.note("No operations channel selected. Eligible personal reminders can still be delivered.", "alert")}
       {fields !== undefined ? fields : <ChatSettingsFieldsView installation={installation} timezone={timezone} hours={String(readingDueHours)} initialHours={readingDueHours} start={installation.quietStart?.slice(0, 5) ?? ""} end={installation.quietEnd?.slice(0, 5) ?? ""} channels={channels} channel={channel} configured={configured} delivery={null} />}
       {E.nav("Health", `${health.queue.retrying ?? "unavailable"} retrying · ${health.queue.queued ?? "unavailable"} queued`, "", undefined, healthHref)}
-      {E.nav("Linked people", `${health.linkedCount} linked`, "", undefined, peopleHref)}
+      {people}
     </>}
     {previewFixtures.length > 0 && <ChatPreviewGallery fixtures={previewFixtures} />}
-    {connected && (delivery !== undefined ? delivery : <ChatDeliveryView enabled={installation.state === "active"} canDisable={["active", "needs_reauthorization"].includes(installation.state)} />)}
+    {connected && (delivery !== undefined ? delivery : <ChatDeliveryView enabled={installation.state === "active"} />)}
     {E.nav("My notification preferences", "Personal reminders and quiet hours", "", undefined, preferencesHref)}
   </>;
 }
@@ -131,10 +132,13 @@ export function ChatQuietHoursView({ start, end, initial = { start, end }, timez
   </form>;
 }
 
-export function ChatSettingsFieldsView({ installation, timezone, hours, initialHours, start, end, channels, channel, configured = true, busy = false, saved, error, delivery, onLoadChannels, onChannel, onSaveChannel, onQuietChange, onSaveQuiet, onHours, onSaveHours }: {
+/** `channels` is the list the page loaded, or null when it could not load
+ *  them; picking one is the save (onChannel), and Load private channels asks
+ *  again only when none were loaded (#1509). */
+export function ChatSettingsFieldsView({ installation, timezone, hours, initialHours, start, end, channels, channel, configured = true, busy = false, saved, error, delivery, onLoadChannels, onChannel, onQuietChange, onSaveQuiet, onHours, onSaveHours }: {
   installation: NonNullable<ChatHealth["installation"]>; timezone: string; hours: string; initialHours: number; start: string; end: string;
   channels: { id: string; name: string }[] | null; channel: string; configured?: boolean; busy?: boolean; saved?: ChatSettingSave | null; error?: string | null; delivery?: ReactNode;
-  onLoadChannels?: () => void; onChannel?: (value: string) => void; onSaveChannel?: () => void;
+  onLoadChannels?: () => void; onChannel?: (value: string) => void;
   onQuietChange?: (start: string, end: string) => void; onSaveQuiet?: (start: string, end: string) => void; onHours?: (value: string) => void; onSaveHours?: () => void;
 }) {
   const id = useId();
@@ -143,12 +147,13 @@ export function ChatSettingsFieldsView({ installation, timezone, hours, initialH
   const hoursReason = readingCadenceReason(currentHours, initialHours);
   return <div className="flex flex-col gap-4">
     {installation.state === "active" && <section className="flex flex-col gap-3" aria-label="Operations channel">
-      <Button variant="outline" disabled={busy || !configured} onClick={onLoadChannels}>Load private channels</Button>
-      {channels && (channels.length ? <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); if (!busy && channel) onSaveChannel?.(); }}>
-
-        {E.pick("Operations channel", channel, channels.map(option => ({ value: option.id, label: `#${option.name} · private` })), { onChange: onChannel, disabled: busy, required: true, placeholder: "Choose a private channel", id: `${id}-channel` })}<Button disabled={busy || !channel}>Save operations channel</Button>
+      {channels?.length ? <div className="flex flex-col gap-3">
+        {E.pick("Operations channel", channel, channels.map(option => ({ value: option.id, label: `#${option.name} · private` })), { onChange: onChannel, disabled: busy, required: true, placeholder: "Choose a private channel", id: `${id}-channel` })}
         <SettingsSaveStatus saved={!busy && chatSettingIsSaved(saved, { name: "set_notification_destination", channel })} error={error} />
-      </form> : E.note("No eligible private channels. Add MGR to a private channel with sharing turned off, then load again."))}
+      </div> : <>
+        {channels && E.note("No eligible private channels. Add MGR to a private channel with sharing turned off, then load again.")}
+        <Button variant="outline" disabled={busy || !configured} onClick={onLoadChannels}>Load private channels</Button>
+      </>}
       {E.note("Only active private channels with MGR added and sharing turned off are eligible. MGR checks again when you save and before delivery.")}
     </section>}
     <ChatQuietHoursView start={start} end={end} initial={{ start: installation.quietStart?.slice(0, 5) ?? "", end: installation.quietEnd?.slice(0, 5) ?? "" }} timezone={timezone} busy={busy} saved={saved} error={error} onChange={onQuietChange} onSave={onSaveQuiet} />
@@ -164,13 +169,13 @@ export function ChatSettingsFieldsView({ installation, timezone, hours, initialH
   </div>;
 }
 
-export function ChatDeliveryView({ enabled, canDisable = enabled, busy = false, error, onDisable }: { enabled: boolean; canDisable?: boolean; busy?: boolean; error?: string | null; onDisable?: () => void }) {
+/** The Delivery switch is the one way to stop Slack sends from Chat settings (#1509). */
+export function ChatDeliveryView({ enabled, busy = false, error, onDisable }: { enabled: boolean; busy?: boolean; error?: string | null; onDisable?: () => void }) {
   const [localEnabled, setLocalEnabled] = useState(enabled);
   const active = onDisable ? enabled : localEnabled;
   const disable = () => { setLocalEnabled(false); onDisable?.(); };
   return <>
     {E.row("Delivery enabled", active ? "turn off all Slack sends" : "reauthorize Slack to enable delivery", <Switch aria-label="Slack delivery" checked={active} disabled={busy || !active} onCheckedChange={checked => { if (!checked) disable(); }} />, active ? "ok" : "w")}
-    {canDisable && (onDisable || localEnabled) && <ChatDisableView busy={busy} onDisable={disable} />}
     <CommandFormMessage error={error} />
   </>;
 }
@@ -214,13 +219,15 @@ export function ChatDisconnectView({ connected = true, cleanupPending = false, b
   </div>;
 }
 
-export function ChatLinkedPeopleView({ people, timeZone, backHref, linkHref, busy = false, error, onUnlink }: { people: ChatLinkedPerson[]; timeZone: string; backHref?: string; linkHref?: string; busy?: boolean; error?: string | null; onUnlink?: (id: string) => void }) {
+/** Chat settings' Linked people section: who linked Slack, Unlink for each,
+ *  and how anyone links their own Slack, so linking and unlinking sit together (#1509). */
+export function ChatLinkedPeopleView({ people, timeZone, busy = false, error, onUnlink }: { people: ChatLinkedPerson[]; timeZone: string; busy?: boolean; error?: string | null; onUnlink?: (id: string) => void }) {
   return <>
-    {E.back("Chat", "Linked people", undefined, backHref)}
+    {E.ttl("Linked people")}
     {!people.length && E.info("No current staff have linked Slack yet.")}
     {people.map(person => <div key={person.id}>{E.row(person.name, `${person.roles.join(", ")} · Slack ${person.slackIdentity} · linked ${formatDate(person.linkedAt, timeZone)}`, <Button variant="destructive" size="sm" disabled={busy} onClick={() => onUnlink?.(person.id)}>Unlink</Button>)}</div>)}
     <CommandFormMessage error={error} />
-    {E.btn("Link your Slack", "g", linkHref)}
+    {E.info("To link your own Slack, open the MGR app in Slack, go to its Home tab and choose Link MGR account.")}
   </>;
 }
 

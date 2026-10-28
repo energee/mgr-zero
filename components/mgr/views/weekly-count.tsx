@@ -49,7 +49,7 @@ export function WeeklyCountView({ model, draft, correction, onWorksheet }: { mod
       <div className="contents print:hidden">
         {model.receipt && <section aria-label="Saved count" className="flex flex-col gap-3">
           {E.ttl(`Saved count · ${model.receipt.date}`)}
-          <p className="text-sm text-muted-foreground">{model.receipt.recorded}{model.receipt.priorHref && <> · <Link href={model.receipt.priorHref}>prior count</Link></>}</p>
+          <p className="text-sm text-muted-foreground">{model.receipt.recorded}{model.receipt.priorHref && <>. <Link href={model.receipt.priorHref}>Open the previous count</Link></>}</p>
           {model.receipt.correction && <p className="text-sm text-muted-foreground">{model.receipt.correction}</p>}
           {model.receipt.lines.map(line => <div key={line.key}>{E.row(line.name, line.detail, <span className="break-all text-xs">{line.result}</span>)}</div>)}
           {hasAnyRole(model.roles, ["admin"]) && model.receipt.canCorrect && (correction !== undefined ? correction : model.receipt.correctionForm && <WeeklyCountCorrectionView state={model.receipt.correctionForm} />)}

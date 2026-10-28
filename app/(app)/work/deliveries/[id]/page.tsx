@@ -1,8 +1,9 @@
 // app/(app)/work/deliveries/[id]/page.tsx — Confirm delivery: one stop, its
 // shipped lines and invoice timing (or, for a transfer stop, the destination
 // and picked lines). The shared surface confirms delivery/refusal or leaves an
-// unattempted stop for later through delivered-form.tsx's command adapter.
-// Today's delivery_next row and the route's Deliver land here.
+// unattempted stop for later through delivered-form.tsx's command adapter,
+// which returns to the route. Received by starts from the ship-to's earlier
+// signers. Today's delivery_next row and the route's Deliver land here.
 import { E } from "@/components/mgr/e";
 import { ConfirmDeliveryView } from "@/components/mgr/views/confirm-delivery";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -32,6 +33,7 @@ type Stop = {
   };
   lines: { id: string; name: string; qty: number; refused?: number }[];
   invoice: { id: string; invoice_no: number | null } | null;
+  signers: string[];
 };
 const getDeliveryData = cache(async function getDeliveryData(id: string) {
   const brewery = await getActiveBrewery();
@@ -43,7 +45,7 @@ const getDeliveryData = cache(async function getDeliveryData(id: string) {
 
 export default async function DeliveryStopPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { ctx, stop: { delivery, lines, invoice } } = await getDeliveryData(id);
+  const { ctx, stop: { delivery, lines, invoice, signers } } = await getDeliveryData(id);
   const order = delivery.shipments?.orders;
   const transfer = delivery.stock_transfers;
   const timing = transfer ? "None · stock transfer" : delivery.shipments?.invoice_timing === "on_delivery" ? "On delivery · saved" : "At ship";
@@ -64,7 +66,7 @@ export default async function DeliveryStopPage({ params }: { params: Promise<{ i
           return { key: l.id, title: l.name, qty: delivery.delivered_at ? `${l.qty - refused} accepted · ${refused} refused` : String(l.qty) };
         }),
       }}
-      action={deliveryAction(delivery, ctx, invoice, transfer, lines)}
+      action={deliveryAction(delivery, ctx, invoice, transfer, lines, signers)}
     />
   );
 }
@@ -75,6 +77,7 @@ function deliveryAction(
   invoice: Stop["invoice"],
   transfer: Stop["delivery"]["stock_transfers"],
   lines: Stop["lines"],
+  signers: Stop["signers"],
 ) {
   if (delivery.delivered_at) {
     return (
@@ -90,5 +93,5 @@ function deliveryAction(
   if (!ctx.roles.includes("admin") && delivery.routes.driver_user_id !== ctx.userId) {
     return E.status("Only the route's assigned driver or an admin may confirm this stop", "w");
   }
-  return <DeliveredForm routeId={delivery.routes.id} deliveryId={delivery.id} transfer={Boolean(transfer)} lines={lines.map((l) => ({ key: l.id, title: l.name, qty: String(l.qty) }))} />;
+  return <DeliveredForm routeId={delivery.routes.id} deliveryId={delivery.id} transfer={Boolean(transfer)} signers={signers} lines={lines.map((l) => ({ key: l.id, title: l.name, qty: String(l.qty) }))} />;
 }

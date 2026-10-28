@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -56,5 +57,11 @@ describe("batch completion form attempt ownership", () => {
     expect(isCurrentBatchCompletionReview(2, 2, "batch-b", "batch-b")).toBe(true);
     expect(isCurrentBatchCompletionReview(1, 2, "batch-a", "batch-b")).toBe(false);
     expect(isCurrentBatchCompletionReview(2, 2, "batch-a", "batch-b")).toBe(false);
+  });
+
+  it("#1480 refreshes the page behind the dialog as soon as completion saves, keeping the receipt's batch listed", () => {
+    const form = readFileSync("app/(app)/cellar/batch-completion-form.tsx", "utf8");
+    expect(form).toMatch(/setPhase\("saved"\);\s*router\.refresh\(\);/);
+    expect(form).toMatch(/batches=\{open \? listed : batches\}/);
   });
 });

@@ -1,7 +1,8 @@
 // app/(app)/recipes/page.tsx — More › Recipes: recipes alphabetical
 // (list_recipes), each titled with its current version and opening its own
 // recipe page; the back goes to More, New recipe links to /recipes/new and
-// the Water profiles row to /catalog/water-profiles.
+// the Water profiles row to /catalog/water-profiles?from=recipes, whose back
+// then returns here.
 // ?q= narrows list_recipes by name, as Catalog's search does.
 import { z } from "zod";
 import { RecipesView } from "@/components/mgr/views/recipes";
@@ -11,7 +12,7 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toRecipesViewProps } from "@/lib/mgr/recipes-view";
 import "@/lib/commands/all";
 import { ListControls } from "@/components/mgr/list-controls";
-import { listParams } from "@/lib/mgr/list-params";
+import { listParams, searchQuery } from "@/lib/mgr/list-params";
 import { navTitle } from "@/lib/mgr/nav";
 
 export const metadata = { title: navTitle("/recipes") };
@@ -19,7 +20,7 @@ export const metadata = { title: navTitle("/recipes") };
 type Recipe = { id: string; name: string; brand_id: string | null; note: string | null; latest_version: number | null };
 type Brand = { id: string; name: string };
 
-const recipesParams = z.object({ q: z.string().trim().max(100).catch("") });
+const recipesParams = z.object({ q: searchQuery });
 
 export default async function RecipesPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> } = {}) {
   const { params } = listParams(recipesParams, (await searchParams) ?? {});
@@ -35,12 +36,12 @@ export default async function RecipesPage({ searchParams }: { searchParams?: Pro
       model={toRecipesViewProps({
         backHref: "/more",
         createHref: "/recipes/new",
-        waterProfilesHref: "/catalog/water-profiles",
+        waterProfilesHref: "/catalog/water-profiles?from=recipes",
         recipes: recipes.map((r) => ({ id: r.id, name: r.name, brand: brandName(r.brand_id), latest_version: r.latest_version })),
         filtered: Boolean(params.q),
       })}
       linkRows
-      controls={recipes.length || params.q ? <ListControls search={{ label: "Search recipes", value: params.q, keep: {} }} /> : undefined}
+      controls={recipes.length || params.q ? <ListControls search={{ label: "Search recipes", value: params.q, keep: {}, path: "/recipes" }} /> : undefined}
     />
   );
 }

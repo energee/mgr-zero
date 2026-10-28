@@ -13,7 +13,7 @@ import { DeliveredForm } from "@/app/(app)/work/deliveries/[id]/delivered-form";
 
 it.each(["confirm_delivery", "leave_delivery_for_later"])("freezes both verbs and fields after an uncertain %s result", () => {
   action.failure = { kind: "unknown" };
-  const html = renderToStaticMarkup(createElement(DeliveredForm, { routeId: "route", deliveryId: "stop", transfer: false, lines: [{ key: "line", title: "Beer", qty: "2" }] }));
+  const html = renderToStaticMarkup(createElement(DeliveredForm, { routeId: "route", deliveryId: "stop", transfer: false, signers: [], lines: [{ key: "line", title: "Beer", qty: "2" }] }));
   expect(html).toMatch(/<fieldset[^>]*disabled/);
   expect(html).toContain("Retry saved request");
   expect(html).toContain("Not delivered");
@@ -26,13 +26,13 @@ it.each(["confirm_delivery", "leave_delivery_for_later"])("freezes a remounted s
   const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) };
   beginRecovery(storage, { actorId: "driver", breweryId: "brewery" }, "/work/deliveries/stop", name, { deliveryId: "stop" }, { target: "stop" });
   vi.stubGlobal("sessionStorage", storage);
-  const html = renderToStaticMarkup(createElement(DeliveredForm, { routeId: "route", deliveryId: "stop", transfer: false, lines: [] }));
+  const html = renderToStaticMarkup(createElement(DeliveredForm, { routeId: "route", deliveryId: "stop", transfer: false, signers: [], lines: [] }));
   expect(html).toMatch(/<fieldset[^>]*disabled/);
   expect(html).toContain("Retry saved request");
 });
 it("allows edits after a definitive refusal when no request remains", () => {
   action.failure = { kind: "definitive" };
-  const html = renderToStaticMarkup(createElement(DeliveredForm, { routeId: "route", deliveryId: "stop", transfer: false, lines: [] }));
+  const html = renderToStaticMarkup(createElement(DeliveredForm, { routeId: "route", deliveryId: "stop", transfer: false, signers: [], lines: [] }));
   expect(html).not.toMatch(/<fieldset[^>]*disabled/);
 });
 
@@ -46,7 +46,7 @@ it.each(["confirm_delivery", "leave_delivery_for_later"])("refreshes only after 
   vi.stubGlobal("sessionStorage", storage);
   vi.stubGlobal("window", events);
   action.failure = { kind: "unknown" };
-  renderToStaticMarkup(createElement(DeliveredForm, { routeId: "route", deliveryId: "stop", transfer: false, lines: [] }));
+  renderToStaticMarkup(createElement(DeliveredForm, { routeId: "route", deliveryId: "stop", transfer: false, signers: [], lines: [] }));
   const cleanup = effects[0]();
   events.dispatchEvent(new Event(RECOVERY_CHANGED));
   expect(router.refresh).not.toHaveBeenCalled();
@@ -62,6 +62,6 @@ it("does not block a stop when another stop's request is saved under its own tar
   const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) };
   beginRecovery(storage, { actorId: "driver", breweryId: "brewery" }, "/work/deliveries/other", "confirm_delivery", { deliveryId: "other" }, { target: "other" });
   vi.stubGlobal("sessionStorage", storage);
-  const html = renderToStaticMarkup(createElement(DeliveredForm, { routeId: "route", deliveryId: "stop", transfer: false, lines: [] }));
+  const html = renderToStaticMarkup(createElement(DeliveredForm, { routeId: "route", deliveryId: "stop", transfer: false, signers: [], lines: [] }));
   expect(html).not.toMatch(/<fieldset[^>]*disabled/);
 });

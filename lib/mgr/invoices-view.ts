@@ -2,6 +2,7 @@ import { breweryDate, formatDate } from "@/lib/date-format";
 import type { StaffRole } from "@/lib/commands/registry";
 import { docNo } from "./doc-no";
 import { money } from "./money";
+import { invoicePaymentBalanceCents } from "./invoice-view";
 import { invoiceBalanceCents, invoiceCurrentState, invoiceLedgerOwnsBalance, type InvoiceCurrentState } from "./invoice-state";
 import { qboInvoicePresentation, type QboStaffInvoiceLink } from "./qbo-ui";
 import { hasAnyRole } from "./roles";
@@ -42,6 +43,8 @@ export type InvoiceListRow = {
   needsMapping: boolean;
   href?: string;
   quickbooksHref: string | null;
+  /** What Record payment may take, by the invoice page's rule; null when the invoice takes no payment. */
+  paymentBalanceCents: number | null;
 };
 
 /** A ledger-owned invoice reads its paid state from MGR's payments (#1045). */
@@ -110,5 +113,6 @@ export function toInvoiceListRow(inv: InvoiceListRecord, roles: readonly StaffRo
     accounting: accountingFact(inv, state, roles, connected, inv.has_pending_qbo_push, qbo.detail),
     needsMapping: qbo.actions.includes("fix_mapping"),
     quickbooksHref: hasAnyRole(roles, ["admin", "sales"]) ? inv.quickbooks_link?.href ?? null : null,
+    paymentBalanceCents: invoicePaymentBalanceCents(inv, inv.total_cents),
   };
 }

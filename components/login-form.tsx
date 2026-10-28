@@ -4,7 +4,8 @@
  * Adapted from the shadcn `login-03` block. The block's social-login buttons
  * and sign-up link were removed: MGR accounts are created by invitation (see
  * `invite_staff` / `invite_customer_user` commands) and no OAuth provider is
- * configured. Forgot password opens /reset. The login server action returns
+ * configured. Forgot password opens /reset; the staff and portal variants
+ * link each other (/login, /portal/login). The login server action returns
  * failed credentials as form state, never a query string. `portal` draws the
  * buyer's variant (screen record Portal sign in). Staff email-link entry
  * validates email only; password sign-in still requires both fields.
@@ -50,6 +51,7 @@ export function LoginForm({
             {next ? <input type="hidden" name="next" value={next} /> : null}
           </>}
           linkHref={portal ? "/reset?portal=1" : "/reset"}
+          switchHref={portal ? "/login" : "/portal/login"}
         />
       </EntrySurface>
     </div>

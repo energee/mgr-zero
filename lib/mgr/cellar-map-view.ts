@@ -5,30 +5,32 @@ export type CellarMapViewModel = {
   /** addHref null hides Add vessel (vessels are admin-managed). actionsOff: no
    *  tank holds beer, so Reading, Transfer and Addition are all off; the page
    *  hands the same flag to the live Transfer and Addition forms. actionHint
-   *  says why an action is off. */
+   *  says why an action is off. A tile's readingHref is set only when it holds beer;
+   *  the inventory gives "" to draw that Reading unlinked. */
   backHref?: string; addHref?: string | null; readingHref?: string | null; actionsOff?: boolean; actionHint?: string; brewHref?: string;
-  tiles: { name: string; detail: string; reading?: string; warning?: boolean; fill?: number; href?: string }[];
+  tiles: { name: string; detail: string; reading?: string; warning?: boolean; fill?: number; href?: string; readingHref?: string }[];
   detail?: { title: string; description: string; href?: string };
 };
 
 export function toCellarMapViewProps(vessels: { id: string; name: string; capacity_bbl: number }[], occupancies: { vessel_id: string; occupancy_id: string; brand_name: string | null; bbl: number }[], readings: Record<string, string> = {}, hrefs: Record<string, string> = {}, readingHref?: (occupancyId: string) => string): CellarMapViewModel {
-  // The map draws one Reading button, so it can only be bound when a single
-  // tank is occupied; with several there is no unambiguous target and guessing
-  // records the reading against the wrong one, so the tile opens the tank
-  // instead. The caller supplies the path — this never invents one. A disabled
-  // Reading carries a hint saying why, so it is never a silent dead end (#715).
+  // The map's top Reading button can only be bound when a single tank is
+  // occupied; with several there is no unambiguous target and guessing records
+  // the reading against the wrong one, so each occupied tile carries its own
+  // Reading instead (#1508). The caller supplies the path — this never invents
+  // one. A disabled Reading carries a hint saying why, so it is never a silent
+  // dead end (#715).
   // With no beer in any tank, Transfer and Addition are off too (actionsOff),
   // so the one hint names all three (#1115).
   const only = occupancies.length === 1 ? occupancies[0] : undefined;
   const actionsOff = occupancies.length === 0;
   let actionHint: string | undefined;
   if (actionsOff) actionHint = "No tank holds beer, so there is nothing to read, transfer or add to.";
-  else if (readingHref && occupancies.length > 1) actionHint = "Several tanks hold beer. Open a tank to record its reading.";
+  else if (readingHref && occupancies.length > 1) actionHint = "Several tanks hold beer. Use Reading on a tank.";
   return { readingHref: readingHref && (only ? readingHref(only.occupancy_id) : null), actionsOff, actionHint, tiles: vessels.map(vessel => {
     const occupancy = occupancies.find(item => item.vessel_id === vessel.id);
     const quantity = occupancy ? Number(occupancy.bbl) : 0;
     const capacity = Number(vessel.capacity_bbl);
-    return { name: vessel.name, detail: `${occupancy ? occupancy.brand_name ?? "No brand yet" : "Empty"} · ${quantity} / ${capacity} bbl`, reading: occupancy ? readings[occupancy.occupancy_id] ?? "No readings yet" : "available", fill: capacity > 0 ? quantity / capacity * 100 : undefined, href: hrefs[vessel.id] };
+    return { name: vessel.name, detail: `${occupancy ? occupancy.brand_name ?? "No brand yet" : "Empty"} · ${quantity} / ${capacity} bbl`, reading: occupancy ? readings[occupancy.occupancy_id] ?? "No readings yet" : "available", fill: capacity > 0 ? quantity / capacity * 100 : undefined, href: hrefs[vessel.id], readingHref: occupancy && readingHref?.(occupancy.occupancy_id) };
   }) };
 }
 

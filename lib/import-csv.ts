@@ -158,8 +158,12 @@ export function readyImportRowNumbers(validation: string[][]): number[] {
   return validation.flatMap((errors, index) => errors.length ? [] : [index + 1]);
 }
 
-export function mapCsvRows(rows: string[][], mapping: Record<string, number>): Record<string, string>[] {
-  return rows.map(row => Object.fromEntries(Object.entries(mapping).filter(([, index]) => index >= 0).map(([field, index]) => [field, row[index] ?? ""])));
+/** Matched cells by field. A fixed-choice cell (customer type, payment terms) is trimmed and
+ *  lower-cased, so "Retailer" or "NET30" previews, sends and replays as the stored value. */
+export function mapCsvRows(kind: ImportKind, rows: string[][], mapping: Record<string, number>): Record<string, string>[] {
+  const choices = new Set<string>(IMPORT_FIELDS[kind].filter(f => f.values).map(f => f.name));
+  const cell = (field: string, value = "") => choices.has(field) ? value.trim().toLowerCase() : value;
+  return rows.map(row => Object.fromEntries(Object.entries(mapping).filter(([, index]) => index >= 0).map(([field, index]) => [field, cell(field, row[index])])));
 }
 
 export function parseCsv(input: string): { headers: string[]; rows: string[][] } {
@@ -184,8 +188,8 @@ export function parseCsv(input: string): { headers: string[]; rows: string[][] }
   if (value || closed || row.length) record();
   if (!records.length) throw new Error("This file is empty. Add a header row and at least one data row.");
   const headers = records.shift()?.map(h => h.trim()) ?? [];
-  if (!headers.length || headers.some(h => !h) || new Set(headers).size !== headers.length) throw new Error("CSV needs unique, nonempty column headers");
-  if (!records.length) throw new Error("CSV has no data rows");
+  if (!headers.length || headers.some(h => !h) || new Set(headers).size !== headers.length) throw new Error("Every column in the header row needs its own name, and no two can match. Fix the first row and choose the file again.");
+  if (!records.length) throw new Error("This file has column headers but no data rows. Add at least one record below the header row and choose the file again.");
   if (records.some(r => r.length !== headers.length)) throw new Error("CSV rows must match the header column count");
   return { headers, rows: records };
 }

@@ -195,7 +195,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-One invoice with its lines and the payments recorded in MGR
+One invoice with its lines, the order it bills (through its shipment), and the payments recorded in MGR
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -230,7 +230,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-One order with lines (each SKU with its brand name and staff alias, and format name), keg deposits, events, shipment, brewery ATP, and on-hand stock at its fulfillment source
+One order with lines (each SKU with its brand name and staff alias, and format name), keg deposits, events, shipment with its invoice, brewery ATP, and on-hand stock at its fulfillment source
 
 | Field | Type | Required |
 | --- | --- | --- |

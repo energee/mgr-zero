@@ -8,6 +8,8 @@ import { CustomerView } from "@/components/mgr/views/customer";
 import { customerStateReason, toCustomerViewProps } from "@/lib/mgr/customer-view";
 import { customerRidgeline } from "@/lib/mgr/fixtures/customers";
 import { UsStateField } from "@/components/mgr/us-state-field";
+import { ShipToView } from "@/components/mgr/views/ship-to";
+import { shipToReason, toShipToViewProps, type ShipToSnapshot } from "@/lib/mgr/ship-to-view";
 
 it.each(["123", "12", "ZZ", ""])("withholds registration save for state %j and explains readiness", state => {
   const html = renderToStaticMarkup(createElement(StateRegistrationView, { model: { brand: "Fictional IPA", state } }));
@@ -65,4 +67,43 @@ it("reports invalid prefilled state once with an associated inline correction", 
 it("keeps registration identity disabled on edit", () => {
   const html = renderToStaticMarkup(createElement(StateRegistrationView, { model: { brand: "Fictional IPA", state: "PA" }, locked: true }));
   expect(html).toMatch(/<button[^>]*role="combobox"[^>]*disabled/);
+});
+
+// #1487: New ship-to withholds Save until its label, US state and ZIP are usable.
+const shipTo = (fields: Partial<ShipToSnapshot> = {}) => toShipToViewProps({ label: "Dock", country: "US", address1: null, city: null, state: "PA", zip: null, ...fields });
+
+it.each([
+  [{ label: " " }, "a label"],
+  [{ state: "ZZ" }, "a state"],
+  [{ state: "" }, "a state"],
+  [{ zip: "abc" }, "a 5-digit ZIP code or ZIP+4"],
+  [{ label: "dock 2 ", id: "b", shipTos: [{ id: "a", label: "Dock 2" }] }, "a label no other ship-to uses"],
+] as const)("withholds ship-to save for %j", (fields, need) => {
+  const model = shipTo(fields);
+  expect(shipToReason(model)).toBe(`Still needed: ${need}.`);
+  const html = renderToStaticMarkup(createElement(ShipToView, { model }));
+  expect(html).toMatch(/<button[^>]*disabled[^>]*>Save ship-to/);
+  expect(html).toContain(`Still needed: ${need}.`);
+});
+
+it("marks an invalid ZIP and a duplicate label inline before a write", () => {
+  const html = renderToStaticMarkup(createElement(ShipToView, { model: shipTo({ label: "Dock", zip: "abc", shipTos: [{ id: "a", label: "dock" }] }) }));
+  expect(html).toContain("Use a 5-digit ZIP code or ZIP+4, such as 15201 or 15201-1234.");
+  expect(html).toContain("A ship-to labeled dock already exists for this customer.");
+  expect(html.match(/aria-invalid="true"/g)).toHaveLength(2);
+});
+
+it("picks a US ship-to state from the list instead of a two-letter text box", () => {
+  const html = renderToStaticMarkup(createElement(ShipToView, { model: shipTo({ state: "PA" }) }));
+  expect(html).toContain('role="combobox"');
+  expect(html).not.toContain('maxLength="2"');
+});
+
+it.each([
+  [{}],
+  [{ zip: "15201-1234", address1: "", city: "" }],
+  [{ country: "JP", state: null, zip: "100-0001" }],
+  [{ id: "a", shipTos: [{ id: "a", label: "Dock" }] }],
+] as const)("allows ship-to %j without street or city", fields => {
+  expect(shipToReason(shipTo(fields))).toBeNull();
 });

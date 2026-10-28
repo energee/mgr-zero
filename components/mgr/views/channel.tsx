@@ -36,7 +36,7 @@ export function ChannelView({
       {E.ttl("Tax treatment")}
       {E.chips(model.taxOptions, model.taxIndex, /* bright */ false, onTaxTreatment ? { onChange: index => onTaxTreatment(TAX_TREATMENTS[index]), label: "Tax treatment" } : undefined)}
       <div role="status">{E.polite(model.taxHint)}</div>
-      {E.info("Customers may override this. Sales without a customer take the channel default.")}
+      {E.info("Customers may override this. Sales without a customer take the channel default. A change applies to new sales only; filed months stay as they were.")}
       {messages}
       {footer !== undefined ? footer?.(save) : save}
     </>

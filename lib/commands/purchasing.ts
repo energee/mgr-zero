@@ -5,7 +5,7 @@
 // marking a PO sent is an attestation, so no email leaves here (§1).
 import { z } from "zod";
 import { email } from "@/lib/mgr/email";
-import { completeRows, defineCommand, defineQuery, cents, PAGE_SIZE, phone, unwrap, CommandError } from "./registry";
+import { completeRows, defineCommand, defineQuery, cents, PAGE_SIZE, PG_INT_MAX, phone, unwrap, CommandError } from "./registry";
 import { isoDate } from "./packaging";
 import { MATERIAL_CATEGORIES, PAYMENT_TERMS } from "@/lib/mgr/enums";
 import { OPEN_PO_STATUSES } from "@/lib/mgr/receive-po-view";
@@ -26,7 +26,7 @@ defineCommand({
     name: z.string().trim().min(1),
     email: email.optional(),
     phone: phone.optional(),
-    leadTimeDays: z.number().int().nonnegative().optional(),
+    leadTimeDays: z.number().int().nonnegative().max(PG_INT_MAX).optional(),
     paymentTerms: z.enum(PAYMENT_TERMS).optional(),
     active: z.boolean().optional(),
   }),
@@ -70,17 +70,17 @@ defineCommand({
 
 defineCommand({
   name: "upsert_material_contract",
-  description: "Create or edit a purchasing commitment for one material with one vendor; releases are ordered against it all year, and it never gates ordering",
+  description: "Create or edit a purchasing commitment for one material with one vendor; releases are ordered against it all year, and it never gates ordering; endsOn cannot precede startsOn",
   input: z.object({
     id: z.string().uuid().optional(),
     vendorId: z.string().uuid(),
     materialId: z.string().uuid(),
-    qtyCommitted: z.number().positive(),
+    qtyCommitted: z.number().positive().max(9_999_999_999.9999), // numeric(14,4)
     unitCostCents: cents.optional(),
     startsOn: isoDate.optional(),
     endsOn: isoDate.optional(),
     contractNo: z.string().trim().optional(),
-  }),
+  }).refine(i => !i.startsOn || !i.endsOn || i.endsOn >= i.startsOn, { path: ["endsOn"], message: "end date must be on or after the start date" }),
   roles: [...PURCHASING],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_material_contract", {
     p_brewery: ctx.breweryId, p_contract: i.id ?? null, p_vendor: i.vendorId, p_material: i.materialId,
@@ -178,7 +178,7 @@ defineQuery({
 
 const poLine = z.object({
   materialId: z.string().uuid(),
-  qtyOrdered: z.number().positive(),
+  qtyOrdered: z.number().positive().max(9_999_999_999.9999), // numeric(14,4)
   unitCostCents: cents.optional(),
   contractId: z.string().uuid().optional(),
   expectedLotCode: z.string().trim().optional(),

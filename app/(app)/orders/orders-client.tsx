@@ -22,7 +22,7 @@ export function OrdersClient({ roles, timeZone, status, customerId, customerName
     <OrdersView
       model={toOrdersListViewProps({ roles, status, customer, customerId, linked: true, orders: page.rows })}
       // size="sm" like every Work list's create button, so the tab strip sits at the same height (#1226).
-      createAction={canWrite ? <Button size="sm" asChild><Link href="/orders/new">New order</Link></Button> : null}
+      createAction={canWrite ? <Button size="sm" asChild><Link href={customerId ? `/orders/new?customerId=${encodeURIComponent(customerId)}` : "/orders/new"}>New order</Link></Button> : null}
       listStatus={!result.data ? <QueryFeedback timeZone={timeZone} error={result.error} loading="Loading orders" paused={result.isPaused} retry={() => void result.refetch()} /> : undefined}
       feedback={result.data ? <QueryFeedback timeZone={timeZone} error={result.error} fetching={result.isFetching} paused={result.isPaused} updatedAt={result.dataUpdatedAt} retry={() => void result.refetch()} /> : undefined}
       pagination={page.pagination}

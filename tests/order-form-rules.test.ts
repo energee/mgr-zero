@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isUnavailableSku, orderFormReadiness, skuPickerChannel, toSkuOption } from "@/lib/order-form-rules";
+import { initialOrderChoices, isUnavailableSku, orderFormReadiness, skuPickerChannel, toSkuOption } from "@/lib/order-form-rules";
 
 const catalog = { customers: 1, locations: 1, skus: 1 };
 const line = { skuId: "sku-1", qty: "12" };
@@ -101,5 +101,27 @@ describe("SKU picker", () => {
   });
   it("does not repeat a brand already at the start of the SKU name", () => {
     expect(toSkuOption({ id: "s", name: "Hazy IPA · ½ bbl", brands: { name: "Hazy IPA" } })).toEqual({ id: "s", label: "Hazy IPA · ½ bbl" });
+  });
+});
+
+describe("initialOrderChoices (#1506)", () => {
+  const customers = [
+    { id: "c1", shipTos: [{ id: "s1" }, { id: "s2", is_default: true }] },
+    { id: "c2", shipTos: [] },
+  ];
+  const warehouse = { id: "l1" };
+
+  it("starts with the linked customer and its default ship-to", () => {
+    expect(initialOrderChoices(customers, [warehouse, { id: "l2" }], "c1")).toEqual({ customerId: "c1", shipToId: "s2", fromLocationId: "" });
+  });
+
+  it("ignores a customer id that is not one of the listed customers", () => {
+    expect(initialOrderChoices(customers, [warehouse, { id: "l2" }], "gone")).toEqual({ customerId: "", shipToId: "", fromLocationId: "" });
+    expect(initialOrderChoices(customers, [warehouse, { id: "l2" }])).toEqual({ customerId: "", shipToId: "", fromLocationId: "" });
+  });
+
+  it("preselects the source only when there is one location to choose", () => {
+    expect(initialOrderChoices(customers, [warehouse]).fromLocationId).toBe("l1");
+    expect(initialOrderChoices(customers, [warehouse, { id: "l2" }]).fromLocationId).toBe("");
   });
 });

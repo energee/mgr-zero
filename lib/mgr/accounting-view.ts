@@ -17,7 +17,7 @@ export type AccountingViewModel = {
   companyId?: string;
   syncStatus?: QboSyncStatus;
   defaults?: { allowAch: boolean; allowCard: boolean }; missingEmails?: number; remoteRevocationUnresolved: boolean;
-  backHref?: string; disconnectHref?: string; mappingsHref?: string; customersHref?: string;
+  backHref?: string; mappingsHref?: string; customersHref?: string;
 };
 /** Intuit's sandbox API host is the only way a deployment talks to sandbox companies; any other host is production. */
 export function qboEnvironment(apiBaseUrl: string): QboEnvironment {

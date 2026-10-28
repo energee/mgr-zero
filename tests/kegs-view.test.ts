@@ -30,6 +30,12 @@ describe("Keg fleet", () => {
     expect(kegPoolFieldErrors(value).deposit).toBeTruthy();
   });
 
+  it("#1479 names the int-cent limit for pool money", () => {
+    expect(kegPoolFieldErrors({ ...pool, deposit: "99999999999" }).deposit).toBe("Enter an amount no greater than $21,474,836.47.");
+    expect(kegPoolFieldErrors({ ...pool, kind: "pay_per_fill", vendorId: "v", perFill: "21474836.48" }).perFill).toBe("Enter an amount no greater than $21,474,836.47.");
+    expect(kegPoolFieldErrors({ ...pool, deposit: "21474836.47" })).toEqual({});
+  });
+
   it.each(["0.00", "5.25", ""])("#1381 accepts deposit %s without making it required", (deposit) => {
     const value = { ...pool, deposit };
     expect(kegPoolFieldErrors(value)).toEqual({});
@@ -164,6 +170,27 @@ describe("Record keg event", () => {
     expect(kegEventReason({ ...value, binId: "" })).toBeTruthy();
     expect(kegEventReason({ ...value, reason: "shipped", customerId: "" })).toBeTruthy();
   });
+
+  it("#1479 holds a count leaving the bin to the kegs it holds", () => {
+    const value = { ...kegFleetMicrostar.eventForm!, poolId: "pool", locationId: "location", binId: "cold", reason: "lost" as const, customerId: "", qty: "9" };
+    const options = { ...kegFleetMicrostar.eventOptions!, bins: [{ value: "cold", label: "Cold" }], onHand: 8 };
+    expect(kegEventFieldErrors(value, options).qty).toBe("Enter at most 8 kegs in Cold.");
+    expect(kegEventReason(value, options)).toBe("Still needed: at most 8 kegs in Cold.");
+    expect(kegEventFieldErrors({ ...value, qty: "8" }, options)).toEqual({});
+    expect(kegEventFieldErrors({ ...value, reason: "retired" }, options).qty).toBe("Enter at most 8 kegs in Cold.");
+    expect(kegEventFieldErrors({ ...value, reason: "shipped", customerId: "customer" }, options).qty).toBe("Enter at most 8 kegs in Cold.");
+    // Kegs lost at a customer, and incoming kegs, do not leave the bin.
+    expect(kegEventFieldErrors({ ...value, customerId: "customer" }, options)).toEqual({});
+    for (const reason of ["acquired", "found"] as const) expect(kegEventFieldErrors({ ...value, reason }, options)).toEqual({});
+    expect(kegEventFieldErrors({ ...value, reason: "returned", customerId: "customer" }, options)).toEqual({});
+    // Without a known count (the inventory fixture), nothing is held back.
+    expect(kegEventFieldErrors(value)).toEqual({});
+  });
+
+  it("#1479 the live form passes the chosen bin's kegs on hand", () => {
+    expect(src("app/(app)/kegs/page.tsx")).toMatch(/<KegEventForm\b[^>]*\bstock=\{fleet\.rows\}/);
+    expect(src("app/(app)/kegs/event-form.tsx")).toMatch(/options=\{\{[^}]*\bonHand\b/);
+  });
   it("#1381 waits for blur or an attempt before drawing a fractional count error", () => {
     const props = { value: { ...kegFleetMicrostar.eventForm!, qty: "1.5" }, options: kegFleetMicrostar.eventOptions!, onChange: () => {} };
     expect(htmlOf(createElement(KegEventFields, props))).not.toContain('id="keg-qty-error"');
@@ -257,11 +284,24 @@ describe("Keg event history", () => {
   });
 
   it("#1030 asks to widen the filter only when a filter is set", () => {
-    expect(toKegHistoryViewProps({}).empty).toEqual({ title: "No keg events yet", description: "Record a keg event on Keg fleet to start the history." });
+    expect(toKegHistoryViewProps({}).empty).toEqual({ title: "No keg events yet", description: "Record a keg event to start the history.", action: "Record keg event" });
     const widen = { title: "No matching events", description: "Widen the filter to see more of the keg's history." };
     expect(toKegHistoryViewProps({ pool: "sixth" }).empty).toEqual(widen);
     expect(toKegHistoryViewProps({ customer: "ridgeline" }).empty).toEqual(widen);
     expect(toKegHistoryViewProps({ rows: [{ key: "e", title: "Found", detail: "" }] }).empty).toBeUndefined();
+  });
+
+  it("#1517 an empty history opens Record keg event on Keg fleet", () => {
+    expect(toKegHistoryViewProps({ backHref: "/kegs" }).empty?.href).toBe("/kegs?recordEvent=1");
+    const html = htmlOf(createElement(KegHistoryView, { model: toKegHistoryViewProps({ backHref: "/kegs" }) }));
+    expect(html).toMatch(/<a[^>]*href="\/kegs\?recordEvent=1"[^>]*>Record keg event<\/a>/);
+    // The inventory passes no backHref, so the button is drawn but goes nowhere.
+    expect(toKegHistoryViewProps({}).empty?.href).toBeUndefined();
+  });
+
+  it("#1517 ?recordEvent=1 opens the Record keg event sheet on Keg fleet", () => {
+    expect(src("app/(app)/kegs/page.tsx")).toMatch(/autoOpen=\{recordEvent === "1"\}/);
+    expect(src("app/(app)/kegs/event-form.tsx")).toMatch(/defaultOpen: autoOpen/);
   });
 
 });

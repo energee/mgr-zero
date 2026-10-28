@@ -5,7 +5,7 @@ import { requireAdminContext } from "@/lib/brewery";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { isQboConfigured, qboConfig } from "@/lib/qbo";
 import "@/lib/commands/all";
-import { QboConnectionAction, QboDefaultsForm, QboSyncButton } from "./qbo-controls";
+import { QboConnectionAction, QboDefaultsForm, QboDisconnectAction, QboSyncButton } from "./qbo-controls";
 import { navTitle } from "@/lib/mgr/nav";
 
 export const metadata = { title: navTitle("/settings/accounting") };
@@ -14,11 +14,12 @@ export default async function AccountingPage({ searchParams }: { searchParams: P
   const { brewery, ctx } = await requireAdminContext("Accounting");
   const [health, missingEmails, params, syncStatus] = await Promise.all([runCommand("get_qbo_connection", {}, ctx) as Promise<QboHealth>, runCommand("count_customers_missing_portal_email", {}, ctx) as Promise<number>, searchParams, runCommand("get_qbo_sync_status", {}, ctx) as Promise<QboSyncStatus>]);
   const model = toAccountingViewProps(health, brewery.timeZone, missingEmails, isQboConfigured() ? qboEnvironment(qboConfig().apiBaseUrl) : undefined);
-  model.backHref = "/settings"; model.disconnectHref = "/settings/accounting/disconnect";
+  model.backHref = "/settings";
   model.mappingsHref = "/settings/accounting/mappings"; model.customersHref = "/customers?missingEmail=1";
   return <AccountingView model={model}
     sync={<QboSyncButton status={toQboSyncViewProps(syncStatus, brewery.timeZone)} disabled={!model.connected} />}
     connection={<QboConnectionAction configured={isQboConfigured()} reconnect={model.reconnect} />}
+    disconnect={health.connectionId ? <QboDisconnectAction connectionId={health.connectionId} /> : undefined}
     defaults={model.connected && model.defaults ? <QboDefaultsForm {...model.defaults} /> : undefined}
     messages={<>{params.connected && E.info("QuickBooks authorization completed for the selected company.")}{params.error && E.note("QuickBooks authorization was cancelled or could not finish. The existing connection was not replaced.", "alert")}</>}
   />;

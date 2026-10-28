@@ -48,6 +48,5 @@ export function SchedulePackagingRunView({ model, controls = {}, messages, foote
     {model.warning ? E.note(model.warning) : null}
     {messages}
     {footer !== undefined ? footer : E.submit("Save run plan", { reason: scheduleRunReason(model) })}
-    {E.info("Nothing moves until the run closes. Saving writes the run and its planned outputs together.")}
   </>;
 }

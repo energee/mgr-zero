@@ -192,3 +192,9 @@ it("#1516 lists buckets alphabetically without repeating untracked worksheet row
   expect(html).not.toContain("expected unavailable");
   expect(html).not.toContain("Draft actual is an estimate");
 });
+
+it("#1481 names the link to the count before this one in plain words", () => {
+  const html = renderToStaticMarkup(createElement(WeeklyCountView, { model: { ...weeklyCount, receipt: { ...weeklyCount.receipt!, recorded: "Recorded by you at Sep 8, 2026, 4:00 PM", priorHref: "/taproom?count=sep1" } }, draft: null }));
+  expect(html).toMatch(/Recorded by you at Sep 8, 2026, 4:00 PM\. <a[^>]*href="\/taproom\?count=sep1"[^>]*>Open the previous count<\/a>/);
+  expect(html).not.toContain("prior count");
+});

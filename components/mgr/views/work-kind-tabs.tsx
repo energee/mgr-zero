@@ -3,7 +3,9 @@
 // Transfers · Batches · Packaging · Purchase orders · Deliveries, the sidebar
 // names; WORK_LABELS). Every Work page draws it here, so it renders one way
 // everywhere (#992). Live passes `hrefs`, the chips the role may open; the
-// inventory draws every chip as an inert tab.
+// inventory draws every chip as an inert tab. At desktop width with the
+// sidebar open the strip hides, since the sidebar lists the same pages (#1513);
+// phones and a collapsed sidebar keep it.
 import { useEffect, useRef } from "react";
 import { TabBar } from "@/components/mgr/qty";
 import { WORK_LABELS } from "@/lib/mgr/work-view";
@@ -42,7 +44,7 @@ export function WorkKindTabs({ chips, current, tabs, hrefs }: {
     strip.scrollLeft += nearestScroll(strip.getBoundingClientRect(), tab.getBoundingClientRect(), pad);
   }, [current]);
   return (
-    <div ref={box} className="contents print:hidden">
+    <div ref={box} className="contents print:hidden md:group-has-[[data-slot=sidebar][data-state=expanded]]/sidebar-wrapper:hidden">
       <TabBar names={names} on={names.indexOf(current)} cls="w-full overflow-x-auto justify-start scroll-cue" to={tabs} hrefs={hrefs} labels={WORK_LABELS} />
     </div>
   );

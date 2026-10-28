@@ -14,8 +14,7 @@ export type BatchOccupancyView = { key: string; vessel: string; reading: string;
 /** One batch. `brand` and `recipe` are null when the plan names none. `vessel`
  *  is the query's joined open-tank names. `readings` is set only for a brewed,
  *  unclosed batch; an empty list there means it has no open occupancy.
- *  `brewable` (not brewed, closed or cancelled) is what offers Brew; `href`
- *  opens the batch. */
+ *  `href` opens the batch. */
 export type BatchesRowView = {
   key: string;
   batchNo: string;
@@ -24,7 +23,6 @@ export type BatchesRowView = {
   plannedOn: string;
   plannedBbl: number;
   vessel: string | null;
-  brewable: boolean;
   readings?: BatchOccupancyView[];
   href?: string;
 };
@@ -81,7 +79,7 @@ export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[]
     const row: BatchesRowView = {
       key: batch.id, batchNo: batNo(batch.batch_no), brand: batch.brand_name, recipe: batch.recipe_name,
       plannedOn: formatDate(batch.planned_on), plannedBbl: Number(batch.planned_bbl), vessel: batch.vessel_name,
-      brewable: !batch.brewed_on && !batch.closed_at && !batch.cancelled_at, href: hrefs?.batch(batch.id),
+      href: hrefs?.batch(batch.id),
     };
     if (batch.brewed_on && !batch.closed_at) {
       row.readings = batch.active_occupancies.map(occupancy => ({

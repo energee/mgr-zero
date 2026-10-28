@@ -8,7 +8,7 @@ it("keeps split occupancies and absent readings explicit with exact recording li
     { id: "second", vessel_name: "FV2", latest_reading: null },
   ] };
   const model = batchesFromQuery([batch], [], { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}`, reading: id => `/cellar/${id}/reading` });
-  expect(model.active?.[0]).toMatchObject({ batchNo: "B-0001", brand: "Pils", recipe: null, brewable: false, href: "/batches/batch", readings: [
+  expect(model.active?.[0]).toMatchObject({ batchNo: "B-0001", brand: "Pils", recipe: null, href: "/batches/batch", readings: [
     { key: "first", vessel: "FV1", reading: expect.stringContaining("5.0 °P"), href: "/cellar/first/reading" },
     { key: "second", vessel: "FV2", reading: "No readings yet", href: "/cellar/second/reading" },
   ] });
