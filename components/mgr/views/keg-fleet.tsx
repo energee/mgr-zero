@@ -1,4 +1,5 @@
-// components/mgr/views/keg-fleet.tsx — Keg fleet: pool rows, navigation, and
+// components/mgr/views/keg-fleet.tsx — Keg fleet: Record keg event as the
+// header action, pool rows with Add keg pool below them, navigation, and
 // shared pool fields. The complete Record keg event surface lives in
 // keg-event-form.tsx, mounted by both the inventory fixture and live adapter.
 "use client";
@@ -55,6 +56,15 @@ export function KegPoolFields({ value, vendors, editing = false, onChange, attem
   );
 }
 
+/** Keg fleet's header action: the live event form, else the inventory's
+ *  fixture form; nothing while `eventUnavailable` names why it is withheld. */
+function recordEventAction(model: KegFleetViewModel, eventForm: ReactNode | undefined): ReactNode {
+  if (model.eventUnavailable) return null;
+  if (eventForm !== undefined) return eventForm;
+  if (model.eventForm && model.eventOptions) return <KegEventFixtureForm initialValue={model.eventForm} options={model.eventOptions} />;
+  return null;
+}
+
 export function KegFleetView({
   model,
   createAction,
@@ -65,18 +75,23 @@ export function KegFleetView({
   model: KegFleetViewModel;
   createAction?: ReactNode;
   poolActions?: Record<string, ReactNode>;
-  /** Live: the complete Record keg event presentation. `model.eventUnavailable` replaces it with the reason. */
+  /** Live: the complete Record keg event presentation, drawn as the header action. `model.eventUnavailable` replaces it with the reason under the header. */
   eventForm?: ReactNode;
   note?: ReactNode;
 }) {
   return (
     <>
-      {E.back("Beer", "Keg fleet", createAction, model.backHref)}
+      {/* Recording an event is the daily verb, so it is the header action; adding a pool is rare and sits below the pools (#1584). */}
+      {E.back("Beer", "Keg fleet", recordEventAction(model, eventForm), model.backHref)}
+      {model.eventUnavailable && E.gated("Record keg event", model.eventUnavailable)}
       {(model.shortages ?? []).map((shortage) => <div key={shortage}>{E.note(shortage)}</div>)}
-      {model.pools ? (model.pools.length ? model.pools.map((pool) => <div key={pool.key}>
-        {E.row(pool.title, pool.detail, poolActions?.[pool.key])}
-        {pool.bins.map((row) => <div key={row.key}>{E.row(row.title, row.detail, row.qty)}</div>)}
-      </div>) : E.blank(model.empty)) : (
+      {model.pools ? <>
+        {model.pools.length ? model.pools.map((pool) => <div key={pool.key}>
+          {E.row(pool.title, pool.detail, poolActions?.[pool.key])}
+          {pool.bins.map((row) => <div key={row.key}>{E.row(row.title, row.detail, row.qty)}</div>)}
+        </div>) : E.blank(model.empty)}
+        {createAction && <div className="flex md:justify-end">{createAction}</div>}
+      </> : (
         <>
           {model.poolForm && <KegPoolFields value={model.poolForm} vendors={model.vendors ?? []} editing />}
           {E.btns([["Add keg pool", "g"], ["Save keg pool", "g"]])}
@@ -92,8 +107,6 @@ export function KegFleetView({
           {E.nav("Keg event history", model.history ?? "")}
         </>
       )}
-      {model.eventUnavailable ? E.gated("Record keg event", model.eventUnavailable) : eventForm !== undefined ? eventForm
-        : model.eventForm && model.eventOptions ? <KegEventFixtureForm initialValue={model.eventForm} options={model.eventOptions} /> : null}
       {note}
     </>
   );

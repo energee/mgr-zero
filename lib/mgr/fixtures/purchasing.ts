@@ -66,6 +66,24 @@ export const receivePoCountryMalt: ReceivePoViewModel = {
   info: "2-row is over by 2 bags and Citra short 1 on a substituted lot; the PO becomes partially received.",
 };
 
+/** A draft PO: Mark sent and Edit draft lead; Cancel folds below (#1584). */
+export const draftPoCanSource: ReceivePoViewModel = {
+  state: "draft", closure: "cancel", title: "PO-0143 · CanSource", status: "Draft · expected Oct 30, 2026",
+  lines: [
+    { key: "cans", title: "Cans · 16 oz", detail: "ordered 3 pallets", qty: "3 pallets" },
+  ],
+};
+
+/** Edit PO on the same draft: the New PO form on its saved vendor and lines (#1584). */
+export const editPoCanSource: NewPoViewModel = {
+  title: "Edit PO-0143",
+  vendor: "CanSource",
+  expected: "2026-10-30",
+  lines: [
+    { key: "cans", materialId: "cans", title: "Cans · 16 oz", detail: "pallet · not lot-tracked", qty: 3, cost: "$1850.00" },
+  ],
+};
+
 export const receiptPoCountryMalt: ReceiptViewModel = {
   correction: {},
   bill: { receiptId: "receipt-country-malt", status: "not_posted", action: "post" },

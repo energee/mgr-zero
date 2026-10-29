@@ -173,6 +173,8 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "New PO", file: "app/(app)/purchase-orders/new/page.tsx" },
   { name: "New PO incomplete", file: "app/(app)/purchase-orders/new/page.tsx" },
   { name: "Receive PO", file: "app/(app)/purchase-orders/[id]/po-actions.tsx" },
+  { name: "Draft PO", file: "app/(app)/purchase-orders/[id]/po-actions.tsx" },
+  { name: "Edit PO", file: "app/(app)/purchase-orders/[id]/edit/page.tsx" },
   { name: "Correct receipt", file: "app/(app)/purchase-orders/[id]/page.tsx" },
   { name: "Receipt", file: "app/(app)/purchase-orders/[id]/page.tsx" },
   { name: "Materials on hand", file: "app/(app)/materials/page.tsx" },

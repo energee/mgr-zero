@@ -81,6 +81,19 @@ describe("Keg fleet", () => {
     expect(body.props.model).toEqual(toKegFleetViewProps(kegFleetMicrostar));
   });
 
+  it("#1584 Record keg event is the header action and Add keg pool sits below the pools", () => {
+    const pools = [{ key: "owned", title: "Owned pool", detail: "Owned · 4 on hand", bins: [] }];
+    const live = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps({ pools, navRows: [] }),
+      createAction: createElement("button", null, "Add keg pool"), eventForm: createElement("button", null, "Record keg event") }));
+    expect(live.indexOf("Record keg event")).toBeLessThan(live.indexOf("Owned pool"));
+    expect(live.indexOf("Add keg pool")).toBeGreaterThan(live.indexOf("Owned pool"));
+    const unavailable = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps({ pools, navRows: [], eventUnavailable: "Recording a keg event needs a location." }), eventForm: null }));
+    expect(unavailable.indexOf("Recording a keg event needs a location.")).toBeLessThan(unavailable.indexOf("Owned pool"));
+    const inventory = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps(kegFleetMicrostar) }));
+    expect(inventory.indexOf(">Record keg event<")).toBeLessThan(inventory.indexOf("Pool name"));
+    expect(readFileSync("app/(app)/kegs/pool-form.tsx", "utf8")).toMatch(/<Button size="sm" variant="outline">\{pool \? "Edit" : "Add keg pool"\}<\/Button>/);
+  });
+
   it("renders Record keg event without leaking live hrefs", () => {
     const html = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps(kegFleetMicrostar) }));
     expect(html).toMatch(/>Record keg event</);

@@ -16,7 +16,8 @@ export type ReceivePoControls = {
 };
 
 /** Receive purchase order and Correct receipt print why they are withheld
- *  (receiveReason), beside their own button rather than the closure block's. */
+ *  (receiveReason), beside their own button rather than the closure block's.
+ *  A draft offers Mark sent and Edit draft (`model.editHref`, Edit PO). */
 export function ReceivePoView({ model, controls = {}, messages, submitting = false, footer }: {
   model: ReceivePoViewModel; controls?: ReceivePoControls; messages?: ReactNode; footer?: ReactNode;
   submitting?: boolean;
@@ -62,15 +63,19 @@ export function ReceivePoView({ model, controls = {}, messages, submitting = fal
       {model.info && E.info(model.info)}
     </>}
     {model.history?.length ? <>{E.ttl("Receipts")}{model.history.map(receipt => <Fragment key={receipt.key}>{E.nav(receipt.label, receipt.detail, "", undefined, receipt.href)}</Fragment>)}</> : null}
-    {/* Closure fields belong to the sibling closure form (CLOSURE_FORM_ID), not the receive form around this view. */}
-    {model.closure && <fieldset disabled={submitting} className="flex flex-col gap-3">
-      {E.ttl(model.closure === "cancel" ? "Cancel purchase order" : "Close remaining quantity")}
-      {E.edit("Closure reason", model.closureReason ?? "", "text", undefined, { onChange: controls.closureReason, form: CLOSURE_FORM_ID })}
-      {E.info("Only the unreceived remainder is released. Posted receipts and stock stay in history.")}
-      {E.pin(E.submit(model.closure === "cancel" ? "Cancel purchase order" : "Close short", { form: CLOSURE_FORM_ID, variant: "destructive", disabled: submitting, reason: submitReason(model.closureReason?.trim() ? [] : ["a closure reason"]) }))}
-    </fieldset>}
+    {mode === "draft" && E.btn("Edit draft", "g", model.editHref ?? "#")}
     {messages}
     {E.sp()}
     {footer !== undefined ? footer : verb}
+    {/* The rare closure folds behind its title, after the order's next verb (#1584).
+        Its fields belong to the sibling closure form (CLOSURE_FORM_ID), not the receive form around this view. */}
+    {model.closure && <details>
+      <summary className="cursor-pointer text-sm font-medium">{model.closure === "cancel" ? "Cancel purchase order" : "Close remaining quantity"}</summary>
+      <fieldset disabled={submitting} className="mt-3 flex flex-col gap-3">
+        {E.edit("Closure reason", model.closureReason ?? "", "text", undefined, { onChange: controls.closureReason, form: CLOSURE_FORM_ID })}
+        {E.info("Only the unreceived remainder is released. Posted receipts and stock stay in history.")}
+        {E.pin(E.submit(model.closure === "cancel" ? "Cancel purchase order" : "Close short", { form: CLOSURE_FORM_ID, variant: "destructive", disabled: submitting, reason: submitReason(model.closureReason?.trim() ? [] : ["a closure reason"]) }))}
+      </fieldset>
+    </details>}
   </>;
 }

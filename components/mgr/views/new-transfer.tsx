@@ -78,7 +78,6 @@ export function NewTransferView({
       })}
       <Button type="button" variant="ghost" size="sm" className="w-fit" onClick={controls.addLine}>Add line</Button>
       </Field>
-      {E.info("Fractional quantities are allowed; stored to two decimal places.")}
       {messages}
       {footer !== undefined ? footer : E.btn("Create transfer")}
     </>

@@ -340,6 +340,34 @@ describe("purchase orders: draft, mark sent, receive", () => {
     const po = (await runCommand("create_purchase_order", { vendorId: vendor.id, lines: [{ materialId: hop.id, qtyOrdered: 20, unitCostCents: 1800 }] }, ctx)) as { id: string };
     expect(po.id).toBeTruthy();
   });
+
+  it("a draft's vendor, expected date and lines can be edited until it is sent; its note stays (#1584)", async () => {
+    const a = (await runCommand("upsert_vendor", { name: "Edit Vendor A" }, ctx)) as { id: string };
+    const bVendor = (await runCommand("upsert_vendor", { name: "Edit Vendor B" }, ctx)) as { id: string };
+    const hop = (await runCommand("upsert_material", { name: "Nelson", category: "hop", baseUom: "lb", purchaseUom: "lb" }, ctx)) as { id: string };
+    const malt = (await runCommand("upsert_material", { name: "Edit-lane pale malt", category: "malt", baseUom: "lb", purchaseUom: "lb" }, ctx)) as { id: string };
+    const bContract = (await runCommand("upsert_material_contract", { vendorId: bVendor.id, materialId: malt.id, qtyCommitted: 100, unitCostCents: 700 }, ctx)) as { id: string };
+    const po = (await runCommand("create_purchase_order", { vendorId: a.id, note: "from planning", lines: [{ materialId: hop.id, qtyOrdered: 5 }] }, ctx)) as { id: string };
+    // A contract must still be the new vendor's.
+    await expect(runCommand("update_purchase_order", { poId: po.id, vendorId: a.id, lines: [{ materialId: malt.id, qtyOrdered: 3, contractId: bContract.id }] }, ctx)).rejects.toThrow(/contract/);
+    await runCommand("update_purchase_order", { poId: po.id, vendorId: bVendor.id, expectedOn: "2026-11-10", lines: [
+      { materialId: hop.id, qtyOrdered: 8, unitCostCents: 1500, expectedLotCode: "NZ-26" },
+      { materialId: malt.id, qtyOrdered: 3, contractId: bContract.id },
+    ] }, ctx);
+    const saved = (await runCommand("get_purchase_order", { poId: po.id }, ctx)) as {
+      vendor_id: string; expected_on: string; note: string; status: string;
+      lines: { material_id: string; qty_ordered: number; unit_cost_cents: number; contract_id: string | null; expected_lot_code: string | null }[];
+    };
+    expect(saved).toMatchObject({ vendor_id: bVendor.id, expected_on: "2026-11-10", note: "from planning", status: "draft" });
+    expect(saved.lines.map(({ material_id, qty_ordered, unit_cost_cents, contract_id, expected_lot_code }) => ({ material_id, qty_ordered, unit_cost_cents, contract_id, expected_lot_code }))
+      .sort((x, y) => x.qty_ordered - y.qty_ordered)).toEqual([
+      { material_id: malt.id, qty_ordered: 3, unit_cost_cents: 700, contract_id: bContract.id, expected_lot_code: null },
+      { material_id: hop.id, qty_ordered: 8, unit_cost_cents: 1500, contract_id: null, expected_lot_code: "NZ-26" },
+    ]);
+    await expect(runCommand("update_purchase_order", { poId: po.id, vendorId: bVendor.id, lines: [] }, ctx)).rejects.toThrow();
+    await runCommand("send_purchase_order", { poId: po.id, sentVia: "mailto" }, ctx);
+    await expect(runCommand("update_purchase_order", { poId: po.id, vendorId: bVendor.id, lines: [{ materialId: hop.id, qtyOrdered: 1 }] }, ctx)).rejects.toThrow(/purchase order is sent/);
+  });
 });
 
 // #614: readers such as get_recipe apply a material's current units to stored

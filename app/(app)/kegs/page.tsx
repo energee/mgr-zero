@@ -1,7 +1,8 @@
-// app/(app)/kegs/page.tsx — Keg fleet (screen record Keg fleet): every keg
-// pool with Edit → update_keg_pool, Add keg pool → create_keg_pool, and the
-// kegs each bin holds per pool × size from get_keg_fleet. Record keg event
-// → record_keg_event, or the reason it is unavailable. Links to Keg event
+// app/(app)/kegs/page.tsx — Keg fleet (screen record Keg fleet): Record keg
+// event → record_keg_event as the header action, or the reason it is
+// unavailable; every keg pool with Edit → update_keg_pool and the kegs each
+// bin holds per pool × size from get_keg_fleet; Add keg pool →
+// create_keg_pool below the pools. Links to Keg event
 // history and to the balance of each customer holding kegs. ?recordEvent=1
 // opens Record keg event. Warehouse and Admin.
 import { KegFleetView } from "@/components/mgr/views/keg-fleet";
@@ -64,7 +65,7 @@ export default async function KegsPage({ searchParams }: { searchParams: Promise
       })}
       createAction={<PoolForm vendors={vendors} />}
       poolActions={Object.fromEntries(fleet.pools.map((p) => [p.id, <PoolForm key={`${p.id}-${p.name}-${p.vendor_id}-${p.per_fill_cents}-${p.deposit_cents}-${p.active}`} pool={p} vendors={vendors} />]))}
-      eventForm={<div className="py-2"><KegEventForm autoOpen={recordEvent === "1"} pools={activePools} locations={locations} bins={bins} customers={customers} stock={fleet.rows} balances={fleet.balances} /></div>}
+      eventForm={<KegEventForm autoOpen={recordEvent === "1"} pools={activePools} locations={locations} bins={bins} customers={customers} stock={fleet.rows} balances={fleet.balances} />}
     />
   );
 }
