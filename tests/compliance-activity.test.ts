@@ -2,7 +2,7 @@
 // periods (every cadence) holding anything the compliance report reads, so the
 // Compliance list can mark an ended, unfiled, empty period No activity (#1209).
 import { beforeAll, describe, expect, it } from "vitest";
-import { insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedLocation } from "./helpers";
+import { ins, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import { periodRange, recentPeriods } from "@/lib/compliance-period";
 import "@/lib/commands/all";
@@ -36,6 +36,36 @@ describe("list_compliance_reports activePeriods", () => {
     const quarter = `${day.slice(0, 4)}-Q${Math.ceil(Number(day.slice(5, 7)) / 3)}`;
     const { activePeriods } = await list();
     expect(activePeriods).toEqual(expect.arrayContaining([last, quarter, day.slice(0, 4)]));
+    expect(activePeriods).not.toContain(before);
+  });
+
+  // #1607: the scan reads invoice months itself, keeping the export exclusion.
+  it("names a month holding only an invoice line, and not one holding only an export's invoice", async () => {
+    const brewery = await makeBrewery();
+    const staff = await makeStaffCtx(brewery.id);
+    const listed = () => runCommand("list_compliance_reports", {}, staff) as Promise<Listed>;
+    const [current, last, before] = recentPeriods((await listed()).today, "month");
+    const day = (key: string) => periodRange(key)!.periodStart;
+    const customer = await seedCustomer(brewery.id, { state: "NY" });
+    const { skuId } = await seedCatalog(brewery.id, { bblPerUnit: 0.5 });
+    const loc = await seedLocation(brewery.id);
+    const invoiceLine = async (issuedOn: string, shipmentId: string | null) => {
+      const invoice = await ins("invoices", { brewery_id: brewery.id, shipment_id: shipmentId, customer_id: customer.customerId, issued_on: issuedOn });
+      await ins("invoice_lines", { brewery_id: brewery.id, invoice_id: invoice.id, sku_id: skuId, kind: "sku", description: "Beer", qty: 1, unit_price_cents: 3600 });
+    };
+    // last month: an invoice line and no ledger row
+    await invoiceLine(day(last), null);
+    // the month before: only the invoice of a shipment exported to a country, removed this month
+    const order = await ins("orders", { brewery_id: brewery.id, kind: "wholesale", status: "shipped", customer_id: customer.customerId, ship_to_id: customer.shipToId, sale_channel_id: customer.saleChannelId, from_location_id: loc.id, created_by: staff.userId });
+    const shipment = await ins("shipments", { brewery_id: brewery.id, order_id: order.id, created_by: staff.userId });
+    const base = { brewery_id: brewery.id, sku_id: skuId, location_id: loc.id, bin_id: loc.binId, created_by: staff.userId, occurred_on: day(current) };
+    insertFixture("inventory_movements", [
+      { ...base, type: "opening_balance", qty: 2 },
+      { ...base, type: "sale_removal", qty: -1, ref: order.id, dest_country: "CA", sale_channel_id: customer.saleChannelId, tax_treatment: "export" },
+    ]);
+    await invoiceLine(day(before), shipment.id);
+    const { activePeriods } = await listed();
+    expect(activePeriods).toEqual(expect.arrayContaining([current, last]));
     expect(activePeriods).not.toContain(before);
   });
 });

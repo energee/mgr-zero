@@ -208,5 +208,6 @@
   "20261028231000_today_customer_name.sql": "95c69365b460d1e1b5a33b743783563f9b69b61e612468bcd147da60fea6ebf8",
   "20261028231100_pa_license_home.sql": "7c5c041141a25af1d8615cb6bea7dffcf55a1f811acc5504ec589a0fb5a7ee62",
   "20261028235900_delete_ship_to.sql": "2cb36eedbfd4df01716956164ec537b6eae24399cccdfa30182d77a6d03fab9e",
-  "20261029001000_ship_to_label_unique_drop_pa_license.sql": "736ad982ce5eb62cc57c08787329803bc0ebf554e9a65a1184eef3667d7a26c9"
+  "20261029001000_ship_to_label_unique_drop_pa_license.sql": "736ad982ce5eb62cc57c08787329803bc0ebf554e9a65a1184eef3667d7a26c9",
+  "20261029123000_compliance_active_months_bounded.sql": "650cc10c50914c7e266e9ff8ff81408b6d414bbe28317d399b5c4f24202a91b4"
 }
