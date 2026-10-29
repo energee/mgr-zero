@@ -1,30 +1,35 @@
-// tests/compliance-activity.test.ts — list_compliance_reports names the recent
-// periods (every cadence) holding anything the compliance report reads, so the
-// Compliance list can mark an ended, unfiled, empty period No activity (#1209).
+// tests/compliance-activity.test.ts — list_compliance_active_periods names the
+// recent periods (every cadence) holding anything the compliance report reads,
+// so the Compliance list can mark an ended, unfiled, empty period No activity
+// (#1209). list_compliance_reports leaves that scan out: Settings and a period
+// page read filings only (#1491).
 import { beforeAll, describe, expect, it } from "vitest";
 import { insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedLocation } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import { periodRange, recentPeriods } from "@/lib/compliance-period";
 import "@/lib/commands/all";
 
-type Listed = { today: string; activePeriods: string[] };
-
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
 let breweryId: string;
-const list = () => runCommand("list_compliance_reports", {}, ctx) as Promise<Listed>;
+const active = () => runCommand("list_compliance_active_periods", {}, ctx) as Promise<string[]>;
+const reports = () => runCommand("list_compliance_reports", {}, ctx) as Promise<Record<string, unknown> & { today: string }>;
 
 beforeAll(async () => {
   breweryId = (await makeBrewery()).id;
   ctx = await makeStaffCtx(breweryId);
 });
 
-describe("list_compliance_reports activePeriods", () => {
+describe("list_compliance_active_periods", () => {
   it("is empty for a brewery with no ledger rows", async () => {
-    expect((await list()).activePeriods).toEqual([]);
+    expect(await active()).toEqual([]);
+  });
+
+  it("is not part of list_compliance_reports", async () => {
+    expect(await reports()).not.toHaveProperty("activePeriods");
   });
 
   it("names the month, quarter and year of a movement, and not the empty month before it", async () => {
-    const { today } = await list();
+    const { today } = await reports();
     const [, last, before] = recentPeriods(today, "month");
     const day = periodRange(last)!.periodStart;
     const { skuId } = await seedCatalog(breweryId, { packageType: "can", bblPerUnit: 0.5 });
@@ -34,7 +39,7 @@ describe("list_compliance_reports activePeriods", () => {
       created_by: ctx.userId, qty: 4, type: "production_in", occurred_on: day,
     });
     const quarter = `${day.slice(0, 4)}-Q${Math.ceil(Number(day.slice(5, 7)) / 3)}`;
-    const { activePeriods } = await list();
+    const activePeriods = await active();
     expect(activePeriods).toEqual(expect.arrayContaining([last, quarter, day.slice(0, 4)]));
     expect(activePeriods).not.toContain(before);
   });

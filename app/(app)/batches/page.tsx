@@ -1,4 +1,6 @@
 // Batches and vessel reads remain at their existing authorized command boundary.
+// ?recipe=<recipe id> (the Recipe page's Schedule batch, #1581) opens New batch
+// on that recipe's current version.
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { BatchesView } from "@/components/mgr/views/batches";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -17,8 +19,8 @@ export const metadata = { title: navTitle("/batches") };
 type Brand = { id: string; name: string };
 type Recipe = { id: string; name: string; brand_id: string | null; latest_version_id: string | null; latest_version: number | null };
 
-export default async function BatchesPage() {
-  const brewery = await getActiveBrewery();
+export default async function BatchesPage({ searchParams }: { searchParams: Promise<{ recipe?: string }> }) {
+  const [{ recipe: linkedRecipe }, brewery] = await Promise.all([searchParams, getActiveBrewery()]);
   const ctx = await buildContext(brewery.id);
   const [batches, brands, recipes, vessels, gravity] = (await Promise.all([
     runCommand("list_batches", { readings: true }, ctx), runCommand("list_brands", {}, ctx),
@@ -26,8 +28,11 @@ export default async function BatchesPage() {
   ])) as [BatchListRow[], Brand[], Recipe[], BatchVessel[], { effective: GravityUnit }];
   const recipeVersions = recipes.flatMap(recipe =>
     recipe.latest_version_id ? [{ id: recipe.latest_version_id, label: recipe.name + " v" + recipe.latest_version, brandId: recipe.brand_id }] : []);
-  return <BatchesView model={toBatchesViewProps(batchesFromQuery(batches, vessels, { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}`, reading: id => `/cellar/${id}/reading?from=/batches` }, { unit: gravity.effective, timeZone: brewery.timeZone }))}
-    createAction={<NewBatchForm brands={brands} recipeVersions={recipeVersions} today={breweryDate(brewery.timeZone)} brandsHref={canRun(ctx, "upsert_brand") ? "/catalog" : null} />}
+  const today = breweryDate(brewery.timeZone);
+  // A link naming no listed recipe, or one without a version, opens nothing: the page reads as plain Batches.
+  const linkedVersionId = recipes.find(recipe => recipe.id === linkedRecipe)?.latest_version_id ?? undefined;
+  return <BatchesView model={toBatchesViewProps(batchesFromQuery(batches, vessels, { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}`, reading: id => `/cellar/${id}/reading?from=/batches` }, { unit: gravity.effective, timeZone: brewery.timeZone, today }))}
+    createAction={<NewBatchForm recipeVersionId={linkedVersionId} brands={brands} recipeVersions={recipeVersions} today={today} brandsHref={canRun(ctx, "upsert_brand") ? "/catalog" : null} />}
     workHrefs={workHrefsFor(brewery.roles)}
     newVesselHref={canRun(ctx, "upsert_vessel") ? "/cellar/vessels/new" : null}
   />;

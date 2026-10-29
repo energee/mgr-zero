@@ -1,6 +1,6 @@
 // app/(app)/vendors/page.tsx — More › Vendors: suppliers with their typed and
-// observed lead time (list_vendors_and_contracts), each editable in
-// vendor-form.tsx → upsert_vendor, and below them the Contracts list with the
+// observed lead time (list_vendors_and_contracts), each name opening its page
+// (vendors/[id]) and each editable in vendor-form.tsx → upsert_vendor, and below them the Contracts list with the
 // four drawdown numbers (committed · received · on order · available),
 // editable in contract-form.tsx → upsert_material_contract. ?q= narrows the
 // vendors (and so their contracts) by name, as Catalog's search does.
@@ -11,8 +11,8 @@ import { VendorsView } from "@/components/mgr/views/vendors";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { toContractsViewProps } from "@/lib/mgr/contracts-view";
-import { fmtVendorQty as fmt, toVendorsViewProps } from "@/lib/mgr/vendors-view";
+import { contractRowView, toContractsViewProps } from "@/lib/mgr/contracts-view";
+import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
 import "@/lib/commands/all";
 import { VendorForm, type Vendor } from "./vendor-form";
 import { ContractForm, type Contract } from "./contract-form";
@@ -55,6 +55,7 @@ export default async function VendorsPage({ searchParams }: { searchParams?: Pro
         rows: vendors.map((v) => ({ ...v, key: v.id })),
         filtered: Boolean(params.q),
       })}
+      linkRows
       createAction={<VendorForm />}
       controls={vendors.length || params.q ? <ListControls search={{ label: "Search vendors", value: params.q, keep: {}, path: "/vendors" }} /> : undefined}
       rowTrailing={(row) => {
@@ -65,13 +66,7 @@ export default async function VendorsPage({ searchParams }: { searchParams?: Pro
         <ContractsView
           model={toContractsViewProps({
             backHref: "/vendors",
-            rows: contracts.map((c) => ({
-              key: c.id,
-              title: `${c.vendor_name} · ${c.contract_no ?? c.material_name ?? "contract"}`,
-              detail: `${fmt(c.qty_committed)} committed · ${fmt(c.qty_received)} received · ${fmt(c.qty_on_order)} on order · ${fmt(c.qty_available)} available`,
-              verb: "Edit",
-              warning: c.qty_available <= 0,
-            })),
+            rows: contracts.map((c) => contractRowView(c, c.vendor_name)),
             filtered: Boolean(params.q),
           })}
           header={<div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">{E.group("Contracts")}<ContractForm vendors={options} materials={materials} /></div>}

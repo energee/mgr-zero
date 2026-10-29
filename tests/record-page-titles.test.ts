@@ -57,7 +57,7 @@ function requestBindings() {
     requirePagePermission: () => {}, canRun: () => true,
     optionalPageQuery: async () => undefined,
   };
-  for (const file of ["orders/order-data.ts", "invoices/invoice-data.ts", "customers/customer-data.ts", "recipes/recipe-data.ts", "locations/location-data.ts"]) {
+  for (const file of ["orders/order-data.ts", "invoices/invoice-data.ts", "customers/customer-data.ts", "recipes/recipe-data.ts", "locations/location-data.ts", "vendors/vendor-data.ts"]) {
     Object.assign(bindings, loadPage(`app/(app)/${file}`, bindings));
   }
   return { bindings, calls };
@@ -95,6 +95,7 @@ const RECORDS = [
   ["routes/[id]", "id", "list_routes"],
   ["settings/pos/sales/[id]", "id", "get_pos_sale"],
   ["transfers/[id]", "id", "get_stock_transfer"],
+  ["vendors/[id]", "id", "list_vendors_and_contracts"],
   ["work/deliveries/[id]", "id", "get_delivery_stop"],
   ["work/deliveries/[id]/return", "id", "get_delivery_stop"],
 ] as const;

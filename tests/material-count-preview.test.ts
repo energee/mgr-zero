@@ -38,6 +38,22 @@ it("previews split FEFO allocations and commits exactly those movements with sta
   expect(over.lines[0].adjustments.map(row => [row.lot_id, row.delta])).toEqual([[f.lots[2], 5]]);
 });
 
+// #1583: Count sheet sends every counted material at the bin in one preview and one record.
+it("previews and records several materials at one bin as one count", async () => {
+  const f = await fixture();
+  const salt = await runCommand("upsert_material", { name: "Sheet gypsum", category: "chemical", baseUom: "g", purchaseUom: "g", lotTracked: false }, f.ctx) as { id: string };
+  await seedMovement(f.b.id, { materialId: salt.id, locationId: f.wh.id, binId: f.wh.binId, qty: 100, type: "receipt", createdBy: f.ctx.userId });
+  const input = { ...f.input, lines: [...f.input.lines, { materialId: salt.id, qty: 90 }] };
+  const plan = await runCommand("get_material_count_preview", input, f.ctx) as Plan;
+  const adjustments = Object.fromEntries(plan.lines.map(line => [line.material_id, line.adjustments.map(row => [row.lot_id, row.delta])]));
+  expect(adjustments).toEqual({ [f.material.id]: [[f.lots[0], -10], [f.lots[1], -5]], [salt.id]: [[null, -10]] });
+  await runCommand("record_material_count", { ...input, revision: plan.revision }, f.ctx);
+  const counts = await admin.from("material_counts").select("id, material_count_lines(material_id)").eq("brewery_id", f.b.id);
+  if (counts.error) throw counts.error;
+  expect(counts.data).toHaveLength(1);
+  expect(new Set(counts.data[0].material_count_lines.map(line => line.material_id))).toEqual(new Set([f.material.id, salt.id]));
+});
+
 it("rejects changed stock and lot metadata without recording a count", async () => {
   const f = await fixture();
   const plan = await runCommand("get_material_count_preview", f.input, f.ctx) as Plan;

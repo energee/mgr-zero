@@ -33,6 +33,7 @@ import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { StaffRole } from "@/lib/commands/registry";
 import type { EmptyState } from "@/lib/mgr/empty-state";
+import { rowLinkPrefetch } from "@/lib/mgr/row-link-prefetch";
 import { cn } from "@/lib/utils";
 import { Alert02Icon, ArrowLeft01Icon, InformationCircleIcon, SquareLock01Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
@@ -236,6 +237,7 @@ export const E = {
    *  `href` makes it a link on a live page, `onClick` a button that acts in place; fixtures leave both out.
    *  `disabled` holds an in-place action while its command runs.
    *  `linkClassName` styles only live links, including opt-in whole-row covers.
+   *  A link to a record page is not prefetched (lib/mgr/row-link-prefetch.ts).
    *  Primary and destructive keep their 10% tint on hover: the tap row's hover wash already
    *  darkens underneath, and a deeper tint drops the text below AA (#1041). Dark mode drops
    *  that tint, at rest and on hover: it pulled the text below AA when hovered on every surface,
@@ -250,7 +252,7 @@ export const E = {
       tone === "success" && "bg-success text-success-foreground hover:bg-success/80 hover:text-success-foreground dark:hover:bg-success/80",
       tone === "attention" && "bg-attention text-attention-foreground hover:bg-attention/80 hover:text-attention-foreground dark:hover:bg-attention/80",
       tone === "info" && "bg-info text-info-foreground hover:bg-info/80 hover:text-info-foreground dark:hover:bg-info/80",
-    )}>{href ? <Link href={href}>{t}</Link> : t}</Button>
+    )}>{href ? <Link href={href} prefetch={rowLinkPrefetch(href)}>{t}</Link> : t}</Button>
   ),
   /** A status word. Not a button; `href` makes it a jump to the section that explains it. */
   status: (t: React.ReactNode, tone: "ok" | "w" | "" = "", href?: string) => {
@@ -581,10 +583,11 @@ export const E = {
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
   /** A row that opens something. `href` makes the whole row the link, as E.act
    *  and E.btn already do; `to` names the inventory destination when its label
-   *  is not that screen's name. Fixtures leave both out unless a route is shown. */
+   *  is not that screen's name. Fixtures leave both out unless a route is shown.
+   *  A link to a record page is not prefetched (lib/mgr/row-link-prefetch.ts). */
   nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement, href?: string, to?: string) => {
     const row = E.row(t, s, <span data-tap><DirectionIcon label="Open" /></span>, cls, icon);
-    return href ? <Link href={href} data-to={to} className="block">{row}</Link> : row;
+    return href ? <Link href={href} prefetch={rowLinkPrefetch(href)} data-to={to} className="block">{row}</Link> : row;
   },
   /** A document line: a material or SKU with its quantity and the fields that
    *  belong to it. No line wants an icon, so this fills that slot rather than

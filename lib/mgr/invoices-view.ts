@@ -19,13 +19,33 @@ export type InvoiceListMoney = {
 /** list_invoices' `status`: unpaid keeps only invoices still owing money. */
 export type InvoiceFilter = "unpaid";
 
-/** The register's Show choices. Live, each links to /invoices with it; a
- *  change starts at the newest page, so no cursor. The inventory's stay inert. */
-export function invoiceStatusOptions(linked: boolean): ScopeOption[] {
+/** /invoices with this customer and status; a filter change starts at the newest page, so no cursor. */
+export function invoicesHref(customerId: string | undefined, status: InvoiceFilter | undefined) {
+  const query = new URLSearchParams();
+  if (customerId) query.set("customerId", customerId);
+  if (status) query.set("status", status);
+  return `/invoices${query.size ? `?${query}` : ""}`;
+}
+
+/** The register's Show choices. Live, each links to /invoices with it, keeping
+ *  the customer filter. The inventory's stay inert. */
+export function invoiceStatusOptions(linked: boolean, customerId?: string): ScopeOption[] {
   return [
-    { value: "all", label: "All invoices", href: linked ? "/invoices" : undefined },
-    { value: "unpaid", label: "Unpaid", href: linked ? "/invoices?status=unpaid" : undefined },
+    { value: "all", label: "All invoices", href: linked ? invoicesHref(customerId, undefined) : undefined },
+    { value: "unpaid", label: "Unpaid", href: linked ? invoicesHref(customerId, "unpaid") : undefined },
   ];
+}
+
+/** What a customer owes: the sum of each list_invoices({ status: "unpaid" })
+ *  row's balance by the register's rule (invoiceBalanceCents). cents is null
+ *  when any balance is unknown, so the total never reads as $0.00 (#1585). */
+export function unpaidBalance(records: InvoiceListRecord[]): { cents: number | null; invoices: number } {
+  let cents: number | null = 0;
+  for (const inv of records) {
+    const balance = invoiceBalanceCents(inv, inv.total_cents);
+    cents = cents == null || balance == null ? null : cents + balance;
+  }
+  return { cents, invoices: records.length };
 }
 
 export type InvoiceListRow = {

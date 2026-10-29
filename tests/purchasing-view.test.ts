@@ -13,17 +13,19 @@ import { E, splitPinned } from "../components/mgr/e";
 import { MaterialView } from "../components/mgr/views/material";
 import { MaterialsOnHandView } from "../components/mgr/views/materials-on-hand";
 import { NewPoView } from "../components/mgr/views/new-po";
-import { PurchaseOrdersView } from "../components/mgr/views/purchase-orders";
+import { PurchaseOrderRows, PurchaseOrdersView } from "../components/mgr/views/purchase-orders";
 import { ReceiptView } from "../components/mgr/views/receipt";
 import { ReceiptFixture } from "../components/mgr/fixture-adapters";
 import { ReceivePoView } from "../components/mgr/views/receive-po";
 import { VendorView } from "../components/mgr/views/vendor";
 import { VendorsView } from "../components/mgr/views/vendors";
+import { VendorDetailView } from "../components/mgr/views/vendor-detail";
+import { toVendorDetailViewProps } from "../lib/mgr/vendor-detail-view";
 import {
   contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsOnHandList,
-  correctReceiptCountryMalt, draftPoCanSource, editPoCanSource, newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
+  correctReceiptCountryMalt, draftPoCanSource, editPoCanSource, newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorDetailYch, vendorYch, vendorsList,
 } from "../lib/mgr/fixtures/purchasing";
-import { toContractsViewProps } from "../lib/mgr/contracts-view";
+import { contractRowView, toContractsViewProps } from "../lib/mgr/contracts-view";
 import { toMaterialsOnHandViewProps, toMaterialsScopes } from "../lib/mgr/materials-on-hand-view";
 import { poDetailStatus, poListStatus, purchaseOrderNext, toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
 import { poLineDetail, poLineQty } from "../lib/mgr/receive-po-view";
@@ -63,6 +65,21 @@ describe("Purchase orders", () => {
     expect(markup).not.toMatch(/>Open</);
   });
 
+  // #1586: the vendor page draws its open orders with the list's own rows.
+  it("PurchaseOrderRows draws a draft's Mark sent act, a received order as a plain nav, and links on request", () => {
+    const rows = [
+      { key: "draft", title: "PO-0001 · Hop Co", detail: "Draft", verb: "Mark sent", tone: "info" as const, href: "/purchase-orders/draft" },
+      { key: "done", title: "PO-0002 · Hop Co", detail: "Received", href: "/purchase-orders/done" },
+    ];
+    const inert = htmlOf(createElement(PurchaseOrderRows, { rows }));
+    expect(inert).toMatch(/>Mark sent</);
+    expect(inert).toContain("PO-0002 · Hop Co");
+    expect(inert).not.toContain("href=");
+    const linked = htmlOf(createElement(PurchaseOrderRows, { rows, linkRows: true }));
+    expect(linked).toContain('href="/purchase-orders/draft"');
+    expect(linked).toContain('href="/purchase-orders/done"');
+  });
+
   it("each order status names its next action; received and cancelled have none (#996)", () => {
     expect(purchaseOrderNext("draft")).toEqual({ verb: "Mark sent", tone: "info" });
     expect(purchaseOrderNext("sent")).toEqual({ verb: "Receive", tone: "info" });
@@ -98,7 +115,7 @@ describe("Purchase orders", () => {
       { sent_via: "external", n: 1, avg_lead_days: 3.5 },
     ] };
     expect(toVendorsViewProps({ rows: [vendor] }).rows[0]).toEqual({
-      key: "v", name: "Hop Co", status: "Active", leadTime: "Not typed", contracts: 0,
+      key: "v", name: "Hop Co", status: "Active", leadTime: "Not typed", contracts: 0, href: "/vendors/v",
       observed: "0 days over 2 orders sent from a mail client · 3.5 days over 1 order sent outside MGR",
     });
     const typed = toVendorsViewProps({ rows: [{ ...vendor, active: false, lead_time_days: 1, observed: [], contracts: [{}] }] }).rows[0];
@@ -443,7 +460,7 @@ describe("Materials", () => {
   it("count keeps real bin identities, decimal input, explicit preview and nullable footer", () => {
     const pick = vi.spyOn(E, "pick");
     const html = htmlOf(createElement(CycleCountView, {
-      model: { material: "Actual material", qty: "0.5", units: ["kg"], unitIndex: 0, preview: "system 2 · variance −1.5", locationId: "loc-id", binId: "bin-id", locations: [{ id: "loc-id", name: "Actual location" }], bins: [{ id: "bin-id", name: "Actual bin" }] },
+      model: { lines: [{ key: "m", material: "Actual material", qty: "0.5", units: ["kg"], unitIndex: 0, preview: "system 2 · variance −1.5" }], locationId: "loc-id", binId: "bin-id", locations: [{ id: "loc-id", name: "Actual location" }], bins: [{ id: "bin-id", name: "Actual bin" }] },
       submitting: true, messages: "Count failed", footer: null,
     }));
     expect(pick).toHaveBeenCalledWith("Bin", "bin-id", expect.arrayContaining([{ value: "bin-id", label: "Actual bin" }]), expect.anything());
@@ -567,14 +584,40 @@ describe("Vendors", () => {
     expect((screen("Vendors").body as { props: { model: unknown } }).props.model).toEqual(toVendorsViewProps(vendorsList));
   });
 
-  // #1516 item 8: the shared RecordTable; there is no vendor page yet (#1586), so the name is plain text.
+  // #1516 item 8: the shared RecordTable, with Edit kept on each row (#1586 assumption A).
   it("draws vendors through RecordTable with Edit on each row", () => {
     const html = htmlOf(createElement(VendorsView, { model: toVendorsViewProps(vendorsList) }));
     expect(html).toContain("<table");
     for (const header of ["Vendor", "Status", "Lead time", "Observed lead time", "Contracts"]) expect(html).toContain(`>${header}<`);
     expect(html.match(/>Edit</g)).toHaveLength(vendorsList.rows!.length * 2);
-    expect(html).not.toMatch(/data-tap[^>]*>YCH</);
     expect(html).toContain(">7 days<");
+  });
+
+  // #1586: a vendor's name opens its page.
+  it("vendor names are inert taps to Vendor detail in inventory and links live", () => {
+    const html = htmlOf(createElement(VendorsView, { model: toVendorsViewProps(vendorsList) }));
+    expect(html).toMatch(/data-tap="true" data-to="Vendor detail"[^>]*>YCH</);
+    const live = htmlOf(createElement(VendorsView, { model: toVendorsViewProps(vendorsList), linkRows: true }));
+    for (const row of vendorsList.rows!) expect(live).toContain(`href="/vendors/${row.key}"`);
+    expect(live.match(/>Edit</g)).toHaveLength(vendorsList.rows!.length * 2);
+  });
+
+  // #1586: one vendor's page, drawn once for the inventory and the live route.
+  it("the Vendor detail inventory record is VendorDetailView over the fixture", () => {
+    const body = screen("Vendor detail").body as { type: unknown; props: { model: unknown } };
+    expect(body.type).toBe(VendorDetailView);
+    expect(body.props.model).toEqual(toVendorDetailViewProps(vendorDetailYch));
+    const html = htmlOf(body as ReactNode);
+    for (const heading of ["Contracts", "Open purchase orders", "Default materials"]) expect(html).toContain(`>${heading}</h2>`);
+    expect(html).toMatch(/committed · .* received · .* on order · .* available/);
+    expect(html).toContain(">PO-");
+    expect(html).toMatch(/>Edit</);
+  });
+
+  it("Vendor detail leaves out the open purchase orders section when orders are not read", () => {
+    const html = htmlOf(createElement(VendorDetailView, { model: toVendorDetailViewProps({ ...vendorDetailYch, purchaseOrders: null }) }));
+    expect(html).not.toContain("Open purchase orders");
+    expect(html).toContain(">Default materials</h2>");
   });
 
   it("the Vendor inventory record is VendorView", () => {
@@ -596,6 +639,25 @@ describe("Vendors", () => {
   it("the Contracts inventory record is ContractsView", () => {
     expect((screen("Contracts").body as { type: unknown }).type).toBe(ContractsView);
     expect((screen("Contracts").body as { props: { model: unknown } }).props.model).toEqual(toContractsViewProps(contractsList));
+  });
+
+  // #1586: the Vendors list and the vendor page build a contract row once.
+  it("contractRowView names the vendor only when given one, and only then offers Edit", () => {
+    const c = { id: "c", contract_no: "CITRA-2026", material_name: "Citra", qty_committed: 1000, qty_received: 262.5, qty_on_order: 100, qty_available: 637.5 };
+    expect(contractRowView(c, "YCH")).toEqual({
+      key: "c", title: "YCH · CITRA-2026", detail: "1,000 committed · 262.5 received · 100 on order · 637.5 available", verb: "Edit", warning: false,
+    });
+    expect(contractRowView({ ...c, contract_no: null })).toEqual({
+      key: "c", title: "Citra", detail: "1,000 committed · 262.5 received · 100 on order · 637.5 available", verb: undefined, warning: false,
+    });
+    expect(contractRowView({ ...c, contract_no: null, material_name: null, qty_available: 0 }, "YCH")).toMatchObject({ title: "YCH · contract", warning: true });
+  });
+
+  it("ContractsView draws no Edit for a row without a verb", () => {
+    const model = toContractsViewProps({ rows: [{ key: "c", title: "Citra", detail: "1 committed" }] });
+    const html = htmlOf(createElement(ContractsView, { model, header: E.group("Contracts") }));
+    expect(html).toContain("Citra");
+    expect(html).not.toContain("<button");
   });
 
   it("the Contract inventory record is ContractView", () => {
@@ -733,13 +795,13 @@ describe("New PO lines", () => {
 
 
 it("shows exact signed lot adjustments with base units before material-count confirmation", () => {
-  const markup = htmlOf(createElement(CycleCountView, { model: {
-    material: "Hops", qty: "45", units: ["lb"], unitIndex: 0, preview: "system 60 · variance -15",
+  const markup = htmlOf(createElement(CycleCountView, { model: { lines: [{
+    key: "hops", material: "Hops", qty: "45", units: ["lb"], unitIndex: 0, preview: "system 60 · variance -15",
     adjustments: [
       { key: "lot-1", lot: "S-24", expected: 10, counted: 0, delta: -10, unit: "lb" },
       { key: "lot-2", lot: "S-25", expected: 20, counted: 15, delta: -5, unit: "lb" },
     ],
-  }, footer: null }));
+  }] }, footer: null }));
   expect(markup).toContain("S-24");
   expect(markup).toContain("S-25");
   expect(markup).toContain("-10 lb");
@@ -749,10 +811,10 @@ it("shows exact signed lot adjustments with base units before material-count con
 
 
 it("preserves four-decimal base quantities in the exact count preview", () => {
-  const markup = renderToStaticMarkup(createElement(CycleCountView, { model: {
-    material: "Hops", qty: "1.0001", units: ["lb"], unitIndex: 0, preview: "system 1",
+  const markup = renderToStaticMarkup(createElement(CycleCountView, { model: { lines: [{
+    key: "hops", material: "Hops", qty: "1.0001", units: ["lb"], unitIndex: 0, preview: "system 1",
     adjustments: [{ key: "tiny", lot: "Lot tiny", expected: 1, counted: 1.0001, delta: 0.0001, unit: "lb" }],
-  } }));
+  }] } }));
   expect(markup).toContain("after 1.0001 lb");
   expect(markup).toContain("adjustment +0.0001 lb");
 });
