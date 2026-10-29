@@ -56,15 +56,6 @@ export function KegPoolFields({ value, vendors, editing = false, onChange, attem
   );
 }
 
-/** Keg fleet's header action: the live event form, else the inventory's
- *  fixture form; nothing while `eventUnavailable` names why it is withheld. */
-function recordEventAction(model: KegFleetViewModel, eventForm: ReactNode | undefined): ReactNode {
-  if (model.eventUnavailable) return null;
-  if (eventForm !== undefined) return eventForm;
-  if (model.eventForm && model.eventOptions) return <KegEventFixtureForm initialValue={model.eventForm} options={model.eventOptions} />;
-  return null;
-}
-
 export function KegFleetView({
   model,
   createAction,
@@ -79,10 +70,15 @@ export function KegFleetView({
   eventForm?: ReactNode;
   note?: ReactNode;
 }) {
+  // Recording an event is the daily verb, so it is the header action: the live
+  // form, else the inventory's fixture form, and nothing while eventUnavailable
+  // names why. Adding a pool is rare and sits below the pools (#1584).
+  const fixtureEvent = model.eventForm && model.eventOptions ? <KegEventFixtureForm initialValue={model.eventForm} options={model.eventOptions} /> : null;
+  const liveOrFixtureEvent = eventForm !== undefined ? eventForm : fixtureEvent;
+  const recordEvent = model.eventUnavailable ? null : liveOrFixtureEvent;
   return (
     <>
-      {/* Recording an event is the daily verb, so it is the header action; adding a pool is rare and sits below the pools (#1584). */}
-      {E.back("Beer", "Keg fleet", recordEventAction(model, eventForm), model.backHref)}
+      {E.back("Beer", "Keg fleet", recordEvent, model.backHref)}
       {model.eventUnavailable && E.gated("Record keg event", model.eventUnavailable)}
       {(model.shortages ?? []).map((shortage) => <div key={shortage}>{E.note(shortage)}</div>)}
       {model.pools ? <>
