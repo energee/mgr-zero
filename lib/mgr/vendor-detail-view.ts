@@ -54,14 +54,14 @@ const withEmpty = <Row>(rows: Row[], empty: EmptyState): Rows<Row> => ({ rows, e
 export function toVendorDetailViewProps(s: VendorDetailSnapshot): VendorDetailViewModel {
   const v = s.vendor;
   const row = toVendorsRow(v);
-  const facts: [string, string][] = [
-    ["Status", row.status],
-    ...(v.email ? [["Email", v.email] as [string, string]] : []),
-    ...(v.phone ? [["Phone", v.phone] as [string, string]] : []),
+  const facts: [string, string][] = [["Status", row.status]];
+  if (v.email) facts.push(["Email", v.email]);
+  if (v.phone) facts.push(["Phone", v.phone]);
+  facts.push(
     ["Terms", paymentTermLabel(v.payment_terms)],
     ["Lead time", row.leadTime],
     ["Observed lead time", row.observed ?? "No received orders yet"],
-  ];
+  );
   return {
     backHref: s.backHref,
     title: v.name,
