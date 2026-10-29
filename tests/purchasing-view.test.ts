@@ -407,7 +407,7 @@ describe("Materials", () => {
   it("count keeps real bin identities, decimal input, explicit preview and nullable footer", () => {
     const pick = vi.spyOn(E, "pick");
     const html = htmlOf(createElement(CycleCountView, {
-      model: { material: "Actual material", qty: "0.5", units: ["kg"], unitIndex: 0, preview: "system 2 · variance −1.5", locationId: "loc-id", binId: "bin-id", locations: [{ id: "loc-id", name: "Actual location" }], bins: [{ id: "bin-id", name: "Actual bin" }] },
+      model: { lines: [{ key: "m", material: "Actual material", qty: "0.5", units: ["kg"], unitIndex: 0, preview: "system 2 · variance −1.5" }], locationId: "loc-id", binId: "bin-id", locations: [{ id: "loc-id", name: "Actual location" }], bins: [{ id: "bin-id", name: "Actual bin" }] },
       submitting: true, messages: "Count failed", footer: null,
     }));
     expect(pick).toHaveBeenCalledWith("Bin", "bin-id", expect.arrayContaining([{ value: "bin-id", label: "Actual bin" }]), expect.anything());
@@ -697,13 +697,13 @@ describe("New PO lines", () => {
 
 
 it("shows exact signed lot adjustments with base units before material-count confirmation", () => {
-  const markup = htmlOf(createElement(CycleCountView, { model: {
-    material: "Hops", qty: "45", units: ["lb"], unitIndex: 0, preview: "system 60 · variance -15",
+  const markup = htmlOf(createElement(CycleCountView, { model: { lines: [{
+    key: "hops", material: "Hops", qty: "45", units: ["lb"], unitIndex: 0, preview: "system 60 · variance -15",
     adjustments: [
       { key: "lot-1", lot: "S-24", expected: 10, counted: 0, delta: -10, unit: "lb" },
       { key: "lot-2", lot: "S-25", expected: 20, counted: 15, delta: -5, unit: "lb" },
     ],
-  }, footer: null }));
+  }] }, footer: null }));
   expect(markup).toContain("S-24");
   expect(markup).toContain("S-25");
   expect(markup).toContain("-10 lb");
@@ -713,10 +713,10 @@ it("shows exact signed lot adjustments with base units before material-count con
 
 
 it("preserves four-decimal base quantities in the exact count preview", () => {
-  const markup = renderToStaticMarkup(createElement(CycleCountView, { model: {
-    material: "Hops", qty: "1.0001", units: ["lb"], unitIndex: 0, preview: "system 1",
+  const markup = renderToStaticMarkup(createElement(CycleCountView, { model: { lines: [{
+    key: "hops", material: "Hops", qty: "1.0001", units: ["lb"], unitIndex: 0, preview: "system 1",
     adjustments: [{ key: "tiny", lot: "Lot tiny", expected: 1, counted: 1.0001, delta: 0.0001, unit: "lb" }],
-  } }));
+  }] } }));
   expect(markup).toContain("after 1.0001 lb");
   expect(markup).toContain("adjustment +0.0001 lb");
 });

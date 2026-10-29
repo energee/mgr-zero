@@ -50,6 +50,8 @@ export type RecipeViewModel = {
   backLabel?: string;
   /** Where New recipe version goes on a cut version; the draft editor submits instead. */
   createHref?: string;
+  /** Where Schedule batch goes: Batches, with New batch open on this recipe's current version. Only a recipe with a version has one. */
+  scheduleHref?: string;
   /** A recipe with no version yet: drawn instead of the editor, so no number is invented. */
   empty?: EmptyState;
   title: string;
@@ -254,6 +256,7 @@ export function toRecipePageModel(
       ?? noMashText(ingredients.map((i) => i.stage)) ?? undefined;
   return {
     ...base,
+    scheduleHref: `/batches?recipe=${recipe.id}`,
     saved: formatDate(v.created_at, ctx.timeZone),
     historical: v.version !== s.versions[0],
     versions: s.versions.map((number) => ({ number, href: `?v=${number}`, selected: number === v.version, latest: number === s.versions[0] })),

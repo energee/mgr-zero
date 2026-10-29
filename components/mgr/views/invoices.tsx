@@ -3,6 +3,7 @@
 // recovered from display text. The document number is each row's one link; a
 // row without an href (the inventory) draws it as an inert tap. Filters and
 // invoices lead; healthy QuickBooks status follows. Eligible rows carry Record payment.
+// A customer filter (from the customer page's Open balance) names the customer with Clear.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { invoiceStatusOptions, type InvoiceFilter, type InvoiceListRow } from "@
 import { integrationUnavailableReason } from "@/lib/mgr/integration-availability";
 import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 import { QboSyncView } from "./accounting";
+import { CustomerScope } from "./customer-scope";
 import { RecordTable } from "./record-table";
 
 /** The current total, with the local subtotal under it when an accountant edited the invoice. */
@@ -69,12 +71,20 @@ function Register({ rows, recordPayment }: { rows: InvoiceListRow[]; recordPayme
   />;
 }
 
+/** What an empty register says, by its filters. */
+function emptyRegister(status: InvoiceFilter | undefined, customer: string | undefined) {
+  if (status) return E.blank({ title: customer ? `No unpaid invoices for ${customer}` : "No unpaid invoices", description: "Every invoice here is paid, settled, written off or voided." });
+  if (customer) return E.blank({ title: `No invoices for ${customer}`, description: "Invoices show here after you ship this customer an order." });
+  return E.blank({ title: "No invoices yet", description: "Invoices show here after you ship an order. You can then push them to QuickBooks or record payments in MGR." });
+}
+
 /** The staff Invoices register. `sync` is the manual sync control: the live
  *  page passes its QboSyncButton, the inventory a QboSyncView with fixture
  *  status; omitted, a static QboSyncView is drawn. `statusOptions` supplies
  *  linked live filters or inert fixture choices. `recordPayment` supplies
- *  the live payment form; omitted draws the inert button, null hides it. */
-export function InvoicesView({ rows, backHref, connection, sync, pagination, status, statusOptions = invoiceStatusOptions(false), recordPayment }: { pagination?: HistoryNavigationProps; rows: InvoiceListRow[]; backHref?: string; connection?: { connected: boolean; configured?: boolean; reconnect?: boolean; detail: string; connectHref?: string; canConnect: boolean }; sync?: ReactNode; status?: InvoiceFilter; statusOptions?: ScopeOption[]; recordPayment?: RecordPaymentSlot }) {
+ *  the live payment form; omitted draws the inert button, null hides it.
+ *  `customer` names the customer list_invoices was filtered to. */
+export function InvoicesView({ rows, backHref, connection, sync, pagination, status, statusOptions = invoiceStatusOptions(false), recordPayment, customer }: { pagination?: HistoryNavigationProps; rows: InvoiceListRow[]; backHref?: string; connection?: { connected: boolean; configured?: boolean; reconnect?: boolean; detail: string; connectHref?: string; canConnect: boolean }; sync?: ReactNode; status?: InvoiceFilter; statusOptions?: ScopeOption[]; recordPayment?: RecordPaymentSlot; customer?: { name: string; clearHref?: string } }) {
   let connectAction: ReactNode = null;
   if (connection && !connection.connected) {
     if (connection.configured === false) connectAction = E.act("Connect", "attention", undefined, undefined, true);
@@ -91,11 +101,10 @@ export function InvoicesView({ rows, backHref, connection, sync, pagination, sta
     {E.back("More", "Invoices", undefined, backHref)}
     {/* A missing connection is a next step, so it leads; a healthy status follows the rows. */}
     {connection && !connection.connected && quickbooks}
-    {(rows.length > 0 || status) && <ScopePick label="Show" value={status ?? "all"} options={statusOptions} />}
+    {(rows.length > 0 || status || customer) && <ScopePick label="Show" value={status ?? "all"} options={statusOptions} />}
+    {customer && <CustomerScope {...customer} to="Invoices" />}
     {connection && !connection.connected && connection.reconnect && E.info("Payment status may be stale until QuickBooks is reconnected and synced.")}
-    {rows.length ? <Register rows={rows} recordPayment={recordPayment} />
-      : status ? E.blank({ title: "No unpaid invoices", description: "Every invoice here is paid, settled, written off or voided." })
-      : E.blank({ title: "No invoices yet", description: "Invoices show here after you ship an order. You can then push them to QuickBooks or record payments in MGR." })}
+    {rows.length ? <Register rows={rows} recordPayment={recordPayment} /> : emptyRegister(status, customer?.name)}
     <HistoryNavigation {...pagination} />
     {(!connection || connection.connected) && quickbooks}
     <div>
