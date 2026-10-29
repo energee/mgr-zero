@@ -14,6 +14,9 @@ import { RevokePortalUserControl } from "@/components/mgr/views/revoke-portal-us
 import type { PortalUser } from "@/lib/commands/invites";
 import { shipToAddress } from "@/lib/mgr/ship-to-view";
 import { navTitle } from "@/lib/mgr/nav";
+import { invoicesHref, unpaidBalance, type InvoiceListRecord } from "@/lib/mgr/invoices-view";
+import type { HistoryPage, HistoryRow } from "@/lib/mgr/history-page";
+import type { Ctx } from "@/lib/commands/registry";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -25,17 +28,31 @@ type Customer = { id: string; name: string; alias: string | null; type: Customer
 type ShipTo = { id: string; label: string; country: string; address1: string | null; address2: string | null; city: string | null; state: string | null; zip: string | null; is_default: boolean };
 type SaleChannel = { id: string; name: string };
 
+/** Every unpaid invoice of the customer, page by page, so the open balance never sums a truncated list. */
+async function unpaidInvoices(customerId: string, ctx: Ctx) {
+  const rows: InvoiceListRecord[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await runCommand("list_invoices", { customerId, status: "unpaid", limit: 200, cursor }, ctx) as HistoryPage<InvoiceListRecord & HistoryRow>;
+    rows.push(...page.rows);
+    cursor = page.nextCursor ?? undefined;
+  } while (cursor);
+  return rows;
+}
+
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { brewery, ctx, snapshot } = await getCustomerPageData(id);
   const canWrite = brewery.roles.includes("admin") || brewery.roles.includes("sales");
   const { customer, shipTos } = snapshot as { customer: Customer; shipTos: ShipTo[] };
-  const [channels, portalUsers] = (await Promise.all([
+  // Open balance is Admin and Sales only, like the Invoices register's money (#1585).
+  const [channels, portalUsers, unpaid] = (await Promise.all([
     runCommand("list_sale_channels", {}, ctx),
     canWrite ? runCommand("list_customer_users", { customerId: id }, ctx) : [],
-  ])) as [SaleChannel[], PortalUser[]];
+    canWrite ? unpaidInvoices(id, ctx) : null,
+  ])) as [SaleChannel[], PortalUser[], InvoiceListRecord[] | null];
   return <CustomerDetailForm key={JSON.stringify(customer)} customerId={customer.id} canWrite={canWrite}
-    model={toCustomerViewProps({ customer, shipTos, channels, portalUsers, backHref: "/customers" })}
+    model={toCustomerViewProps({ customer, shipTos, channels, portalUsers, openBalance: unpaid ? unpaidBalance(unpaid) : undefined, backHref: "/customers" })}
     deleteAction={brewery.roles.includes("admin") ? <DeleteCommandButton control={DeleteCustomerControl} command="delete_customer" input={{ customerId: customer.id }} name={customer.name} redirect="/customers" /> : null}
     detail={{
       shipTos: shipTos.map(s => ({
@@ -51,6 +68,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       revokePortalUser: Object.fromEntries(portalUsers.map(u => [u.userId, <DeleteCommandButton key={u.userId} control={RevokePortalUserControl} command="revoke_customer_user" input={{ customerId: customer.id, userId: u.userId }} name={u.email} redirect={`/customers/${customer.id}`} />])),
       kegHref: `/kegs/customers/${customer.id}`,
       ordersHref: `/orders?customerId=${customer.id}`,
+      invoicesHref: invoicesHref(customer.id, "unpaid"),
       // canWrite is create_order's roles (admin, sales).
       newOrderHref: canWrite ? `/orders/new?customerId=${customer.id}` : undefined,
     }}

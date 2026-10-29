@@ -4,7 +4,6 @@
 // RecordTable whose order number is the one link to the order (no Customer
 // column while the scope line names the customer). Live passes
 // OrderForm as createAction and the adapter's hrefs; the inventory's stay inert.
-import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { ScopePick } from "@/components/mgr/scope-pick";
@@ -12,6 +11,7 @@ import type { OrdersListRowView, OrdersListViewModel } from "@/lib/mgr/orders-li
 import { ORDER_STATUSES } from "@/lib/mgr/order-status";
 import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
 import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
+import { CustomerScope } from "./customer-scope";
 import { RecordTable } from "./record-table";
 import { WorkKindTabs } from "./work-kind-tabs";
 
@@ -82,13 +82,7 @@ export function OrdersView({
       <div className="md:w-64">
         <ScopePick label="Status" value={model.status} options={model.statusOptions} />
       </div>
-      {model.customer && (
-        <p className="text-sm">
-          Customer: <strong className="font-medium wrap-anywhere">{model.customer.name}</strong> ·{" "}
-          {/* The shared 48px target on coarse pointers; the inventory's Clear stays inert. */}
-          <Link href={model.customer.clearHref ?? "#"} data-to="Orders" className="inline-flex min-h-6 items-center text-muted-foreground underline pointer-coarse:min-h-12">Clear</Link>
-        </p>
-      )}
+      {model.customer && <CustomerScope {...model.customer} to="Orders" />}
       {feedback}
       {listStatus ?? (model.empty ? E.blank(model.empty, undefined, emptyAction) : <Register rows={model.rows} scoped={Boolean(model.customer)} />)}
       <HistoryNavigation {...pagination} />

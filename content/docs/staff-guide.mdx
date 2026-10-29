@@ -458,6 +458,8 @@ The new-customer form and customer detail show **Tax treatment**. Choose **Inher
 
 On desktop, **Account details**, **Ship-tos**, and **Portal users** sit together, with **Trading terms** and **Customer activity** alongside them. Long customer names wrap in the page heading without shortening the saved name. **New ship-to** belongs to the Ship-tos section; **Delete customer** is separated below the account sections. The same sections stack on smaller screens.
 
+Admin and Sales also see **Open balance** under **Customer activity**: the customer's unpaid invoices added up, with how many there are, such as **$1,928.00 · 2 unpaid invoices**. Each invoice counts the balance the Invoices register shows for it: the QuickBooks balance, or the total less payments recorded in MGR for an invoice QuickBooks never received. If any of those balances is unknown, Open balance reads **Unknown**, never $0.00. A customer that owes nothing reads **No unpaid invoices**. Select it to open **Invoices** filtered to this customer and **Unpaid**.
+
 ### Delete an unused customer
 
 Admin can open a customer and select **Delete customer**. The confirmation names the customer and explains that its ship-to addresses will also be deleted. **Cancel** keeps everything. Confirming returns to Customers after deletion.
@@ -634,7 +636,7 @@ Select **Print** to open the browser print dialog. MGR hides the staff navigatio
 
 ## Invoices and credit memos [#invoices]
 
-Invoices show up to 50 records per page, newest first. **More** opens older invoices only when another one exists; **Newest** returns to the latest page. **Show** picks **All invoices** or **Unpaid**. Unpaid keeps only invoices that still owe money: not written off, voided or deleted in QuickBooks, and either holding a positive QuickBooks balance or, with no QuickBooks balance, not marked paid. With none left it says **No unpaid invoices**. The list comes before the QuickBooks status and **Sync QuickBooks**; when QuickBooks needs connecting, that row stays at the top.
+Invoices show up to 50 records per page, newest first. **More** opens older invoices only when another one exists; **Newest** returns to the latest page. **Show** picks **All invoices** or **Unpaid**. Unpaid keeps only invoices that still owe money: not written off, voided or deleted in QuickBooks, and either holding a positive QuickBooks balance or, with no QuickBooks balance, not marked paid. With none left it says **No unpaid invoices**. **Open balance** on a customer's page opens the list filtered to that customer: a **Customer** line names them, **Show** keeps them, and **Clear** returns to every customer. The list comes before the QuickBooks status and **Sync QuickBooks**; when QuickBooks needs connecting, that row stays at the top.
 
 With no invoices, the list explains that invoices appear after you ship an order. You can then push them to QuickBooks or record payments in MGR; a QuickBooks push is not required for an invoice to appear. **Email delivery status** is unavailable because MGR cannot tell whether QuickBooks emailed an invoice. That explanation stays below the locked row at normal text contrast.
 
