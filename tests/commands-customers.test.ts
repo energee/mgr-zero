@@ -36,6 +36,17 @@ describe("customer CRUD", () => {
     const plain = await runCommand("list_customers", {}, ctx) as Record<string, unknown>[];
     expect(plain.every(row => !("shipTos" in row))).toBe(true);
   });
+  it("refuses a ship-to label another of the customer's ship-tos uses, ignoring case and spaces, under Label (#1487)", async () => {
+    const cust = await runCommand("upsert_customer", { name: `Dock Bar ${crypto.randomUUID()}`, type: "retailer", state: "PA", saleChannelId: wholesale }, ctx) as { id: string };
+    const other = await runCommand("upsert_customer", { name: `Other Dock Bar ${crypto.randomUUID()}`, type: "retailer", state: "PA", saleChannelId: wholesale }, ctx) as { id: string };
+    const dock = await runCommand("upsert_ship_to", { customerId: cust.id, label: "QA test dock", state: "PA" }, ctx) as { id: string };
+    const message = "A ship-to labeled qa test dock already exists for this customer.";
+    await expect(runCommand("upsert_ship_to", { customerId: cust.id, label: " qa test dock ", state: "PA" }, ctx))
+      .rejects.toMatchObject({ status: 409, code: "conflict", message, issues: [{ path: ["label"], code: "duplicate", message }] });
+    // The ship-to keeps its own label on edit, and another customer may use it.
+    await runCommand("upsert_ship_to", { id: dock.id, customerId: cust.id, label: "QA test dock", state: "PA", zip: "15201" }, ctx);
+    await runCommand("upsert_ship_to", { customerId: other.id, label: "QA test dock", state: "PA" }, ctx);
+  });
   it("replays one customer mutation without creating a duplicate", async () => {
     const execution = {
       requestId: crypto.randomUUID(),

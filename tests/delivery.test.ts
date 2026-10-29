@@ -174,12 +174,13 @@ describe("save_route and list_routes", () => {
     },
     {
       name: "US destination with unrecorded street and postal code",
-      address: { label: "Dock", country: "US", address1: null, address2: null, city: "Phoenixville", state: "PA", zip: null },
+      // Each case adds a ship-to to one customer, so labels differ (ship_tos_customer_label_key).
+      address: { label: "Side dock", country: "US", address1: null, address2: null, city: "Phoenixville", state: "PA", zip: null },
       missing: true,
     },
     {
       name: "foreign destination with only its label and country",
-      address: { label: "Receiving", country: "JP", address1: null, address2: null, city: null, state: null, zip: null },
+      address: { label: "Back receiving", country: "JP", address1: null, address2: null, city: null, state: null, zip: null },
       missing: true,
     },
   ])("hands off the $name through the assigned driver's authorized stop query", async ({ address, missing }) => {

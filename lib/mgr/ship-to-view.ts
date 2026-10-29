@@ -9,6 +9,10 @@ import { submitReason } from "./submit-reason";
 export const US_ZIP = /^\d{5}(-\d{4})?$/;
 export const US_ZIP_CORRECTION = "Use a 5-digit ZIP code or ZIP+4, such as 15201 or 15201-1234.";
 
+/** The duplicate-label correction: the form shows it before Save, and
+ *  upsert_ship_to gives the same words when the unique index refuses (#1487). */
+export const shipToLabelTaken = (label: string) => `A ship-to labeled ${label.trim()} already exists for this customer.`;
+
 export type ShipToViewModel = {
   label: string;
   /** ISO code; the form draws State only for "US". */
@@ -34,8 +38,8 @@ export type ShipToSnapshot = {
   isDefault?: boolean;
   /** The ship-to being edited, so its own label is not a duplicate. */
   id?: string;
-  /** The customer's loaded ship-tos. Nothing in the database refuses a
-   *  duplicate label, so the form checks against these. */
+  /** The customer's loaded ship-tos, so the form can withhold Save for a
+   *  duplicate label before the database's unique index refuses it. */
   shipTos?: readonly { id: string; label: string }[];
 };
 
@@ -51,7 +55,7 @@ export function toShipToViewProps(s: ShipToSnapshot): ShipToViewModel {
     state: s.state ?? "",
     zip: s.zip ?? "",
     isDefault: Boolean(s.isDefault),
-    labelError: duplicate ? `A ship-to labeled ${duplicate.label.trim()} already exists for this customer.` : undefined,
+    labelError: duplicate ? shipToLabelTaken(duplicate.label) : undefined,
   };
 }
 
