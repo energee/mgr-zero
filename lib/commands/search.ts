@@ -46,7 +46,7 @@ const PAGE_READS: Record<SearchKind, readonly string[]> = {
   route: ["list_routes"], // /routes/[id]
   recipe: ["get_recipe", "list_materials", "get_gravity_unit", "list_water_profiles", "list_brands"], // /recipes/[id]
   vessel: ["list_vessels", "list_occupancies", "get_gravity_unit", "list_fermentation_readings"], // /cellar/vessels/[id]
-  vendor: ["list_vendors_and_contracts", "list_materials"], // /vendors
+  vendor: ["list_vendors_and_contracts", "list_materials"], // /vendors/[id]; its purchase order read is role-conditional
   ship_to: ["get_customer", "list_sale_channels"], // /customers/[id], which lists its ship-tos
   material: ["list_materials", "get_material_on_hand", "list_vendors", "list_locations", "list_bins"], // /materials
   keg_pool: ["get_keg_fleet", "list_locations", "list_bins", "list_customers", "list_vendors"], // /kegs
@@ -138,7 +138,7 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
     }
     case "vendor": {
       const rows = await unwrap(ctx.db.from("vendors").select("id, name").eq("brewery_id", b).regexIMatch("name", prefix).limit(LIMIT)) as Row[];
-      return rows.map((r) => hit(r.id as string, r.name as string, "Vendor", "/vendors"));
+      return rows.map((r) => hit(r.id as string, r.name as string, "Vendor", `/vendors/${r.id}`));
     }
     case "ship_to": {
       const rows = await unwrap(ctx.db.from("ship_tos").select("id, label, customer_id, customers(name)").eq("brewery_id", b).regexIMatch("label", prefix).limit(LIMIT)) as Row[];

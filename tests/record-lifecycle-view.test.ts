@@ -76,8 +76,8 @@ describe("record lifecycle availability (#1311)", () => {
   it("keeps inactive vendors visible and editable with a textual status", () => {
     const html = renderToStaticMarkup(createElement(VendorsView, { model: {
       rows: [
-        { key: "active", name: "Active supplier", status: "Active", leadTime: "7 days", observed: null, contracts: 0 },
-        { key: "inactive", name: "Inactive supplier", status: "Inactive", leadTime: "14 days", observed: null, contracts: 0 },
+        { key: "active", name: "Active supplier", status: "Active", leadTime: "7 days", observed: null, contracts: 0, href: "/vendors/active" },
+        { key: "inactive", name: "Inactive supplier", status: "Inactive", leadTime: "14 days", observed: null, contracts: 0, href: "/vendors/inactive" },
       ],
       materials: "", contracts: "",
     } }));

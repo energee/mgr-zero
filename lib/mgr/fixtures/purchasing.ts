@@ -10,6 +10,7 @@ import type { PurchaseOrdersSnapshot } from "@/lib/mgr/purchase-orders-view";
 import type { ReceiptViewModel } from "@/lib/mgr/receipt-view";
 import { CORRECTION_INFO, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
 import type { VendorViewModel } from "@/lib/mgr/vendor-view";
+import type { VendorDetailSnapshot } from "@/lib/mgr/vendor-detail-view";
 import type { VendorsSnapshot } from "@/lib/mgr/vendors-view";
 
 export const purchaseOrdersWarehouse: PurchaseOrdersSnapshot = {
@@ -178,6 +179,20 @@ export const vendorsList: VendorsSnapshot = {
   ],
   materials: "12 materials",
   contracts: "2 active commitments",
+};
+
+/** One vendor's page: the first Vendors row with its contract, a sent order
+ *  and two default materials, one of them inactive. */
+export const vendorDetailYch: VendorDetailSnapshot = {
+  vendor: {
+    ...vendorsList.rows![0], email: "orders@ych.example", phone: "509-555-0142", payment_terms: "net30",
+    contracts: [{ id: "ych-citra", contract_no: "Citra 2026", material_name: "Citra", qty_committed: 400, qty_received: 262, qty_on_order: 100, qty_available: 38 }],
+  },
+  purchaseOrders: [{ id: "po141", po_no: 141, status: "sent", closed_at: null, ordered_on: "2026-09-03", expected_on: "2026-09-10", lines_open: 1 }],
+  materials: [
+    { id: "citra", name: "Citra 2026", category: "hop", purchase_uom: "each", active: true },
+    { id: "mosaic", name: "Mosaic 2025", category: "hop", purchase_uom: "each", active: false },
+  ],
 };
 
 export const vendorYch: VendorViewModel = {
