@@ -212,7 +212,7 @@ import { priceGroupTwo, pricingGrid } from "@/lib/mgr/fixtures/pricing";
 import { channelExport, saleChannelsList } from "@/lib/mgr/fixtures/settings-catalog";
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
 import {
-  contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsOnHandList,
+  contractYchCitra, contractsList, countSheetShelf, cycleCountCans, materialCitra, materialsOnHandList,
   correctReceiptCountryMalt, newPoCountryMalt, newPoIncomplete, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
@@ -1776,7 +1776,7 @@ export const SCREENS: Screen[] = [
     job: "Set date and planned barrels; recipe and brand are intent, not commitments",
     reads: "get_brew_day · list_recipes · list_brands",
     writes: "schedule_batch [single planned-batch row; both the recipe version and the intended brand are nullable]",
-    states: [["permission", "brewer or admin required", 1], ["planned", "Schedule batch is the one verb"], ["no recipe yet", "date and barrels alone hold the slot"], ["no brand yet", "identity waits for packaging, which already requires one"], ["brew day", "Record brew day is its own screen"]],
+    states: [["permission", "brewer or admin required", 1], ["planned", "Schedule batch is the one verb"], ["no recipe yet", "date and barrels alone hold the slot"], ["no brand yet", "identity waits for packaging, which already requires one"], ["brew day", "Record brew day is its own screen"], ["from a recipe", "Recipe's Schedule batch opens this sheet with that recipe's current version and its brand chosen"]],
     spec: "The planned mode of brew day: date, planned barrels, and two optional statements of intent. Only date and barrels commit anything: they reserve the slot. The recipe version is already optional in the schema, and revision 2 makes the brand optional too, because identity is optional at brew and required at packaging, where every finished lot must already name a brand. Requiring either here enforces nothing the lot does not, and only forces the decision earlier than the business makes it. Keeping brand as intent is also what keeps the gap between what a batch was meant to be and what it shipped as worth querying, rather than rewriting history when a batch blends or turns into something else. Record brew day is a separate screen so this sheet has one primary.",
     body: <ScheduleBatchView model={scheduleBatchHazy} />,
   },
@@ -1998,12 +1998,12 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Beer",
     name: "Materials on hand",
-    to: { Edit: "Edit material" },
+    to: { Edit: "Edit material", "Count sheet": "Count sheet" },
     job: "See material quantities, edit a material, and start a count",
     reads: "list_materials · get_material_on_hand",
-    writes: "none [edits happen in Edit material, counts in Cycle count]",
+    writes: "none [edits happen in Edit material, counts in Cycle count and Count sheet]",
     states: [["inactive", "an inactive material stays listed, its Status Inactive"], ["empty", "add a material, then open Purchase orders to receive stock"]],
-    spec: "The Beer landing's Materials on hand row opens this list. Each row shows the material's type, on hand summed across bins in its base unit, whether its lots are tracked, and its status. Edit opens Edit material for that material's definition; Count opens Cycle count for its stock; Add material opens a blank definition. One list serves both, so there is no separate definitions list.",
+    spec: "The Beer landing's Materials on hand row opens this list. Each row shows the material's type, on hand summed across bins in its base unit, whether its lots are tracked, and its status. Edit opens Edit material for that material's definition; Count opens Cycle count for its stock; Count sheet opens one count over every listed material held in a bin; Add material opens a blank definition. One list serves both, so there is no separate definitions list.",
     body: <MaterialsOnHandView model={toMaterialsOnHandViewProps(materialsOnHandList)} controls={<ListControls search={{ label: "Search materials", value: "", keep: {} }} scopes={toMaterialsScopes({ category: "" })} />} />,
   },
   {
@@ -2031,6 +2031,20 @@ export const SCREENS: Screen[] = [
     states: [["permission", "warehouse or brewer required", 1], ["one lot", "the variance lands on it · nothing to choose"], ["several lots", "a shortage consumes earliest best-by first; an overage lands on the newest lot"], ["no best-by", "lots with none fall to receipt order behind those that have one"], ["split", "a shortage crossing two lots names both in the preview", 1], ["base units", "enter the material base quantity · roll conversion remains unavailable", 1]],
     spec: "A count is one number and a material may hold several lots, so the RPC has to decide which lot moves. A shortage consumes earliest best-by first, not earliest receipt: best-by is what a recall and an expiry sweep read, and consuming the freshest lot first would leave the oldest to expire on the shelf. An overage lands on the newest lot, since unrecorded stock is far likelier to be the delivery just counted in than one from six months ago. Preview count names each affected lot and signed base-unit adjustment before Record count. Changed stock or lot metadata requires another preview; an uncertain record response freezes the request for exact retry. The chosen lot is always named in the preview: a variance that silently splits across two lots is the one thing this sheet must not do quietly. All materials use their stored base units. Roll conversion remains gated and no manual lot editor is offered.",
     body: <><CycleCountView model={cycleCountCans} footer={null} />{E.pin(<CycleCountFooter />)}</>,
+  },
+  {
+    step: 7,
+    slice: 2,
+    group: "Global",
+    surface: "sheet",
+    name: "Count sheet",
+    to: { Material: "Entity picker", "Preview count": "Count sheet", "Record count": "Materials on hand" },
+    job: "Count every material held in one bin in one pass",
+    reads: "get_material_on_hand · get_material_count_preview",
+    writes: "record_material_count [one RPC: reviewed revision + count + every counted line + exact adjustment movements]",
+    states: [["permission", "warehouse or brewer required", 1], ["blank", "a line left blank is not counted and not recorded"], ["matching", "a line that matches still records, with no adjustment", 1], ["empty", "no listed material has stock in the bin", 1]],
+    spec: "Materials on hand's Count sheet opens this. Pick the location and bin; the sheet lists every material on the list with stock in that bin, by name. Type a count for each material you counted and leave the rest blank. One preview covers every counted line and names each line's lots and signed adjustments, then one Record count saves them as one count with the reviewed revision. Lot choice, the stale-preview refusal and the frozen retry are Cycle count's. A search or type filter on the list narrows the sheet too.",
+    body: <><CycleCountView model={countSheetShelf} footer={null} />{E.pin(<CycleCountFooter />)}</>,
   },
   {
     step: 7,
@@ -2135,11 +2149,11 @@ export const SCREENS: Screen[] = [
     tab: "More",
     name: "Recipe",
     // The Round choices rewrite the line's per bbl in place, so they stay on Recipe.
-    to: { "v4 (current)": "Recipe", v3: "Recipe", v2: "Recipe", v1: "Recipe", "Round to 19 × 50 lb": "Recipe", "Round to 20 × 50 lb": "Recipe", "Round to 1 × 44 lb": "Recipe", "Add ingredient": "Ingredient", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", Water: "Water" },
+    to: { "Schedule batch": "New batch", "v4 (current)": "Recipe", v3: "Recipe", v2: "Recipe", v1: "Recipe", "Round to 19 × 50 lb": "Recipe", "Round to 20 × 50 lb": "Recipe", "Round to 1 × 44 lb": "Recipe", "Add ingredient": "Ingredient", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", Water: "Water" },
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe · list_brands [the parent row's Brand picker] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
     writes: "create_recipe [mutable parent row] · set_recipe_brand [change the parent row's brand after creation] · create_recipe_version [one RPC: immutable version + ingredients + mash and fermentation schedules + water and additions, with assumption and process-spec columns on recipe_versions and per-ingredient extract snapshot on recipe_ingredients]",
-    states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"], ["no version", "a recipe without a version draws No version yet, says what a version records, and keeps New recipe version as the one action, no numbers"], ["draft", "New recipe version opens a copy of the current version; an unsaved draft is kept in this tab and restored with Start over"], ["frozen", "a saved version reads out as text; a change is the next version"], ["history", "Versions links select an older saved version; (current) returns to the latest; older versions have no write controls"]],
+    states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"], ["no version", "a recipe without a version draws No version yet, says what a version records, and keeps New recipe version as the one action, no numbers"], ["draft", "New recipe version opens a copy of the current version; an unsaved draft is kept in this tab and restored with Start over"], ["frozen", "a saved version reads out as text; a change is the next version"], ["history", "Versions links select an older saved version; (current) returns to the latest; older versions have no write controls"], ["schedule", "Schedule batch sits beside New recipe version once a version exists; it opens New batch on Batches with the current version and its brand chosen; an older version and a recipe without one do not offer it"]],
     spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. The page defaults to the newest version; Versions links beside Saved open an exact version with ?v=N, and (current) returns to the newest. Older versions are read-only; each batch's Brew day keeps the plan it was brewed from. A new parent takes a name, the brand it is meant to brew and a note; the brand names the style. New recipe opens this page with no version, and one save writes the parent and its first version. Versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: every quantity is per barrel, the batch names its size on Brew day, and Brew day already records knockout volume as its baseline. The scale chips that once previewed a 15 or 30 bbl bill are gone until a brewery's own batch sizes can feed them. Three note fields become one.",
     body: <RecipeView model={recipeHazyV4} parentForm={<NewRecipeFieldsView brands={recipeBrandOptions} values={{ name: "Hazy IPA", brandId: "hazy", note: "" }} />} />,
   },

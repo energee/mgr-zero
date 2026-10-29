@@ -104,6 +104,6 @@ export function BrewTimelineView({ model, busy = false, error, onChange, onRecor
         <IrreversibleSubmit label="Record brew day" reason={reason} submitting={busy} busy="Recording…" />
       </BrewFooter>
     </form>
-    <ChangePlanFold>{planActions}</ChangePlanFold>
+    <ChangePlanFold open={value.overdue}>{planActions}</ChangePlanFold>
   </>;
 }

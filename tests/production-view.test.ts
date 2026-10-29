@@ -22,6 +22,7 @@ import {
   runClosedHazy, scheduleBatchHazy, vesselFv3, vesselNew, cellarTransferPils, cellarAdditionCitra,
 } from "../lib/mgr/fixtures/production";
 import { toBatchesViewProps, batchesFromQuery, type BatchListRow } from "../lib/mgr/batches-view";
+import { CHANGE_PLAN_ID } from "../lib/mgr/brew-prep-view";
 import { brewTurnModel, canRecordBrewDay } from "../lib/mgr/brew-day-view";
 import { hasPackagingMaterials } from "../lib/mgr/packaging-actuals";
 import { PlanActions } from "../components/mgr/views/plan-actions";
@@ -163,6 +164,23 @@ describe("Batches view", () => {
     // The row link already opens the batch; no Brew button repeats it (#1512).
     expect(html).not.toMatch(/>Brew</);
   });
+  it("marks a planned batch dated before the brewery's day overdue and links it to its open Change plan (#1582)", () => {
+    const base: BatchListRow = { id: "late", batch_no: 3, planned_on: "2026-09-12", planned_bbl: 10, brewed_on: null, closed_at: null, cancelled_at: null, brand_name: null, recipe_name: null, vessel_name: null, active_occupancies: [] };
+    const rows = [base, { ...base, id: "today", planned_on: "2026-10-28" }, { ...base, id: "brewed", brewed_on: "2026-09-12" }, { ...base, id: "gone", cancelled_at: "2026-09-13" }];
+    const hrefs = { batch: (id: string) => `/batches/${id}`, vessel: (id: string) => `/cellar/vessels/${id}` };
+    const model = toBatchesViewProps(batchesFromQuery(rows, [], hrefs, { unit: "plato", timeZone: "UTC", today: "2026-10-28" }));
+    expect(model.planned[0]).toMatchObject({ key: "late", overdue: true, href: `/batches/late#${CHANGE_PLAN_ID}` });
+    expect(model.planned[1]).toMatchObject({ key: "today", href: "/batches/today" });
+    expect(model.planned[1].overdue).toBeUndefined();
+    expect(model.active[0].overdue).toBeUndefined();
+    expect(model.cancelled?.[0].overdue).toBeUndefined();
+    // No brewery day (the inventory's query fixtures): nothing is overdue.
+    expect(batchesFromQuery([base], [], hrefs).planned?.[0]).toMatchObject({ href: "/batches/late" });
+    const html = htmlOf(createElement(BatchesView, { model }));
+    // One overdue row, drawn once in the table and once in the phone list.
+    expect(html.match(/>Overdue</g)).toHaveLength(2);
+    expect(html).toContain(`href="/batches/late#${CHANGE_PLAN_ID}"`);
+  });
   it("explains vessel setup and keeps its empty note separate from the page empty state (#1303)", () => {
     const model = toBatchesViewProps({ ...batchesBrewer, vessels: [] });
     const html = htmlOf(createElement(BatchesView, { model, newVesselHref: null }));
@@ -237,8 +255,16 @@ describe("Brew day view", () => {
     const planActions = createElement(PlanActions, { plannedOn: "2026-10-22" });
     for (const html of [htmlOf(createElement(BrewPrepView, { model: brewPrepMineral, planActions })), htmlOf(createElement(BrewTimelineView, { model: brewTimelineMineral, planActions }))]) {
       for (const label of ["Reschedule or cancel", "Change plan", "Reschedule", "Cancel plan"]) expect(html).toContain(label);
-      expect(html.indexOf("<details class=\"rounded border p-3\"><summary")).toBeGreaterThan(html.lastIndexOf("</form>"));
+      expect(html.search(/<summary[^>]*>Reschedule or cancel/)).toBeGreaterThan(html.lastIndexOf("</form>"));
       expect(html.indexOf("Planned")).toBeLessThan(html.indexOf("<form"));
+      // On time, the fold stays closed.
+      expect(html).not.toMatch(/<details[^>]*\bopen[^>]*><summary[^>]*>Reschedule or cancel/);
+    }
+  });
+  it("opens Change plan on an overdue plan, at the anchor the Batches row links to (#1582)", () => {
+    const planActions = createElement(PlanActions, { plannedOn: "2026-10-22" });
+    for (const html of [htmlOf(createElement(BrewPrepView, { model: { ...brewPrepMineral, overdue: true }, planActions })), htmlOf(createElement(BrewTimelineView, { model: { ...brewTimelineMineral, overdue: true }, planActions }))]) {
+      expect(html).toMatch(new RegExp(`<details(?=[^>]*\\bid="${CHANGE_PLAN_ID}")(?=[^>]*\\bopen)[^>]*><summary[^>]*>Reschedule or cancel`));
     }
   });
   it("draws Cancel plan as a small control beside Reschedule, not a full-width button (#995)", () => {

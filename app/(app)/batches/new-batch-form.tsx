@@ -3,11 +3,15 @@
 // both optional statements of intent (identity is required at packaging,
 // not here). Schedule batch names what it still needs (scheduleBatchReason).
 // The date starts on the brewery's today, and picking a recipe fills in its
-// brand while none is chosen (#1508).
+// brand while none is chosen (#1508). `recipeVersionId` (the Recipe page's
+// Schedule batch link, #1581) opens the sheet on mount with that version and
+// its brand chosen; closing or saving drops the link from the URL, so New batch
+// opens blank again and a reload does not reopen it.
 "use client";
 
 import { brandLabel } from "@/lib/mgr/brand-view";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
@@ -17,18 +21,23 @@ import { brandAfterRecipePick, scheduleBatchReason } from "@/lib/mgr/schedule-ba
 type Brand = { id: string; name: string; alias?: string | null };
 type RecipeVersion = { id: string; label: string; brandId?: string | null };
 
-export function NewBatchForm({ brands, recipeVersions, today, brandsHref }: { brands: Brand[]; recipeVersions: RecipeVersion[]; today?: string; brandsHref: string | null }) {
-  const [intendedBrandId, setIntendedBrandId] = useState("");
-  const [recipeVersionId, setRecipeVersionId] = useState("");
+export function NewBatchForm({ brands, recipeVersions, today, brandsHref, recipeVersionId: linkedVersionId = "" }: { brands: Brand[]; recipeVersions: RecipeVersion[]; today?: string; brandsHref: string | null; recipeVersionId?: string }) {
+  const router = useRouter();
+  const linkedBrandId = brandAfterRecipePick("", recipeVersions.find(version => version.id === linkedVersionId)?.brandId);
+  const [intendedBrandId, setIntendedBrandId] = useState(linkedBrandId);
+  const [recipeVersionId, setRecipeVersionId] = useState(linkedVersionId);
   const [plannedOn, setPlannedOn] = useState(today ?? "");
   const [plannedBbl, setPlannedBbl] = useState("");
   const [note, setNote] = useState("");
+  const dropLink = () => { if (linkedVersionId) router.replace("/batches", { scroll: false }); };
   const form = useCommandForm("schedule_batch", {
+    defaultOpen: Boolean(linkedVersionId),
     build: () => ({
       intendedBrandId: intendedBrandId || undefined, recipeVersionId: recipeVersionId || undefined,
       plannedOn, plannedBbl: Number(plannedBbl), note: note || undefined,
     }),
-    reset: () => { setIntendedBrandId(""); setRecipeVersionId(""); setPlannedOn(today ?? ""); setPlannedBbl(""); setNote(""); },
+    reset: () => { setIntendedBrandId(linkedBrandId); setRecipeVersionId(linkedVersionId); setPlannedOn(today ?? ""); setPlannedBbl(""); setNote(""); },
+    onSuccess: dropLink,
   });
   const reason = scheduleBatchReason({ date: plannedOn, plannedBbl });
   const model = {
@@ -56,7 +65,7 @@ export function NewBatchForm({ brands, recipeVersions, today, brandsHref }: { br
     note: setNote,
   };
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="New batch" trigger={<Button size="sm">New batch</Button>}>
+    <CommandForm open={form.open} onOpenChange={open => { form.setOpen(open); if (!open) dropLink(); }} title="New batch" trigger={<Button size="sm">New batch</Button>}>
       <form onSubmit={event => { if (reason) { event.preventDefault(); return; } void form.submit(event); }} className="flex flex-col gap-4">
         <ScheduleBatchView
           model={model}
