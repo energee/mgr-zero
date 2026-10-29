@@ -146,10 +146,10 @@ describe("Finished goods view", () => {
     expect(html).not.toMatch(/Add SKU/);
   });
 
-  it("a reader who may neither record a movement nor create a SKU gets a bare title, with no empty action row (#1113)", () => {
-    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList), createAction: null, addSkuHref: null }));
+  it("a reader who may not record a movement, count the taproom or create a SKU gets a bare title, with no empty action row (#1113)", () => {
+    const html = htmlOf(createElement(FinishedGoodsView, { model: toFinishedGoodsViewProps(finishedGoodsList), createAction: null, countHref: null, addSkuHref: null }));
     expect(html).toMatch(/<div><div class="flex flex-col gap-1"><a[^>]*>.*?Beer<\/a><h1[^>]*>Finished goods<\/h1><\/div>/);
-    expect(html).not.toMatch(/Record movement|Add SKU/);
+    expect(html).not.toMatch(/Record movement|Record taproom count|Add SKU/);
   });
 
   it("the live page gates Add SKU in Catalog and the empty SKU picker's link on create_sku, one href for both (#1113)", () => {

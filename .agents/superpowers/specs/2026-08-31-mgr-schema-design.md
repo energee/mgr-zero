@@ -111,8 +111,9 @@ money cents.
 ## 2. Core (tenancy)
 
 ### `breweries` — unchanged
-`name, ttb_registry_no, pa_license_no, timezone default 'America/New_York', settings jsonb
-default '{}'`. Premises = brewery (one per). RLS: `staff_read` select `is_staff_of(id)`;
+`name, ttb_registry_no, timezone default 'America/New_York', settings jsonb
+default '{}'`. State license numbers live in `brewery_state_licenses`;
+`pa_license_no` was dropped (#1517, `20261029001000_ship_to_label_unique_drop_pa_license.sql`). Premises = brewery (one per). RLS: `staff_read` select `is_staff_of(id)`;
 `admin_update` update `has_staff_role(id, array['admin']::staff_role[])`. No `unique(id, brewery_id)` (it is the root).
 `one_way_keg_fee_cents int not null default 0 check (>= 0)`: the flat fee each
 one-way keg shipped carries instead of a deposit, set by admin-only
@@ -167,6 +168,8 @@ only for a US address, so outside the US only the label is required
 ship-to to its customer. idx `(customer_id)`. RLS: `staff_all`, `customer_own` select.
 `is_default boolean not null default false`; a partial unique index on
 `(brewery_id, customer_id) where is_default` permits at most one default.
+`ship_tos_customer_label_key` on `(brewery_id, customer_id, lower(btrim(label)))`
+gives each of a customer's ship-tos its own label (#1487).
 `upsert_ship_to` locks the customer before switching defaults and rejects address
 reassignment. Omitted default choice preserves an existing address; new addresses
 default to false. Defaults initialize new order forms only.

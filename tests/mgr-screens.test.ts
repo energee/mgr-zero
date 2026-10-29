@@ -443,7 +443,7 @@ describe("SCREENS", () => {
     const chevrons = new Map([
       ["Record movement", 1], ["Composer proposal", 1],
       ["Brew day", 3], ["Cycle count", 1],
-      ["Chat settings", 2], ["Package BOM", 1],
+      ["Chat settings", 2],
     ]);
     for (const s of SCREENS.filter((s) => !s.venue)) {
       const html = renderToStaticMarkup(createElement("div", null, s.body));

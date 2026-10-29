@@ -6,7 +6,7 @@ import { cents, CommandError, completeRows, countryCode, defineCommand, defineQu
 import { CUSTOMER_TYPES, PAYMENT_TERMS } from "@/lib/mgr/enums";
 import { escapeRegex } from "@/lib/escape-regex";
 import { hasAnyRole } from "@/lib/mgr/roles";
-import { US_ZIP } from "@/lib/mgr/ship-to-view";
+import { shipToLabelTaken, US_ZIP } from "@/lib/mgr/ship-to-view";
 import { qboUnmappedFilter, unmappedInput } from "./qbo";
 
 const roles = ["admin", "sales"] as const;
@@ -76,7 +76,13 @@ defineCommand({
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_customer: i.customerId, p_label: i.label,
     p_address1: i.address1 ?? null, p_address2: i.address2 ?? null, p_city: i.city ?? null, p_state: i.state ?? null,
     p_zip: i.zip ?? null, p_request_id: execution.requestId, p_is_default: i.isDefault ?? null, p_country: i.country,
-  })),
+  })).catch((error: unknown) => {
+    // ship_tos_customer_label_key refused the label (#1487): say so in the
+    // form's own words, under Label.
+    if (!(error instanceof CommandError) || error.issues?.[0]?.path[0] !== "label") throw error;
+    const message = shipToLabelTaken(i.label);
+    throw new CommandError(message, 409, "conflict", [{ path: ["label"], code: "duplicate", message }]);
+  }),
 });
 
 defineCommand({

@@ -1,11 +1,13 @@
 // components/mgr/views/sku.tsx — SKU sheet drawing, shared by the inventory
 // record, sku-form.tsx (create), SkuEditForm (edit) and pour-form.tsx (a pour, locked). The live forms
 // pass `controls` to take the fields over; everything visible is drawn here.
+// Help is a short description under its own field, never a standing note (#1518).
 "use client";
 
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { RegistryInput, RegistrySelect } from "@/components/mgr/views/registry-fields";
+import { RegistryInput } from "@/components/mgr/views/registry-fields";
+import { FieldDescription } from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
 import { batchShareError, pourOuncesError, type SkuViewModel } from "@/lib/mgr/sku-view";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
@@ -51,25 +53,26 @@ export function SkuView({
   const kind = model.kind ?? "packaged";
   // An inventory frame has no live fields to leave, so its errors show at once.
   const touched = useTouchedLines(!controls.upc);
+  const formatHelp = <FieldDescription id="sku-format-help">{model.volumeInfo}</FieldDescription>;
   return (
     <>
       {locked ? E.fld("Type", kind === "poured" ? "Pour" : "Packaged") : null}
       {kind === "poured" ? <PourFields model={model} controls={controls} /> : <>
       {locked
-        ? E.fld("Format", model.format)
-        : <RegistrySelect label="Format" value={model.format} options={model.formatOptions.map((name) => ({ value: name, label: name }))} onChange={controls.format} />}
+        ? <>{E.fld("Format", model.format)}{formatHelp}</>
+        : E.pick("Format", model.format, model.formatOptions.map((name) => ({ value: name, label: name })), { id: "sku-format", onChange: controls.format, "aria-describedby": "sku-format-help", description: formatHelp })}
       {activeRow !== undefined
         ? activeRow
         : E.row("Active", "available to price and sell",
           <Switch checked={controls.active ? model.active : undefined} defaultChecked={controls.active ? undefined : model.active} onCheckedChange={controls.active} aria-label="Active" />)}
       {fields}
       {E.edit("UPC (optional)", model.upc, "text", undefined, { id: "sku-upc", onChange: controls.upc, onBlur: () => touched.touch(UPC), error: touched.shown(UPC) ? upcError(model.upc) : undefined })}
-      {model.showKegPool ? <>{E.pick("Keg pool", model.kegPool ?? "", model.kegPoolOptions ?? [{ value: "", label: "None" }], { onChange: controls.kegPool })}{E.info("Wholesale orders charge this pool's deposit per keg. None charges no deposit.")}</> : null}
-      {model.batchSharePercent !== undefined ? <>
-        {E.edit("Batch package share (%)", model.batchSharePercent, "number", undefined, { id: "sku-batch-share", onChange: controls.batchSharePercent, onBlur: () => touched.touch(SHARE), error: touched.shown(SHARE) ? batchShareError(model.batchSharePercent) : undefined, min: 0, max: 100, step: "any" })}
-        {E.info("All SKU shares for a brand together may not exceed 100%. Clear to stop projecting packaging materials for this SKU.")}
-      </> : E.info("Edit the SKU after creation to set its batch package share for projected packaging materials.")}
-      {E.info(model.volumeInfo)}
+      {model.showKegPool ? E.pick("Keg pool", model.kegPool ?? "", model.kegPoolOptions ?? [{ value: "", label: "None" }], { id: "sku-keg-pool", onChange: controls.kegPool, "aria-describedby": "sku-keg-pool-help", description: <FieldDescription id="sku-keg-pool-help">Wholesale orders charge this pool&apos;s deposit per keg. None charges no deposit.</FieldDescription> }) : null}
+      {/* A new SKU has no share yet: the field appears on Edit SKU. */}
+      {model.batchSharePercent !== undefined ? <div className="flex min-w-0 flex-col gap-2">
+        {E.edit("Batch package share (%)", model.batchSharePercent, "number", undefined, { id: "sku-batch-share", "aria-describedby": "sku-batch-share-help", onChange: controls.batchSharePercent, onBlur: () => touched.touch(SHARE), error: touched.shown(SHARE) ? batchShareError(model.batchSharePercent) : undefined, min: 0, max: 100, step: "any" })}
+        <FieldDescription id="sku-batch-share-help">All SKU shares for a brand together may not exceed 100%. Clear to stop projecting packaging materials for this SKU.</FieldDescription>
+      </div> : null}
       </>}
       {messages}
       {footer !== undefined ? footer : E.btn("Save SKU")}

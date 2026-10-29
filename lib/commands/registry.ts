@@ -191,9 +191,9 @@ export const phone = z.string().trim().refine(
 // Maps a Supabase/PostgREST error to the public CommandError envelope. P0001 is
 // `raise exception` without an errcode, i.e. the domain rules our own RPCs
 // raise, so its message is the user-facing one. 23505 (unique violation) is a
-// 409; one on a name key also carries a `name` issue, so a form shows it under
-// its Name field (#1488). 22003 (numeric out of range) and 22023 (invalid
-// parameter) are 400s.
+// 409; one on a name or label key also carries a `name` or `label` issue, so a
+// form shows it under that field (#1488, #1487). 22003 (numeric out of range)
+// and 22023 (invalid parameter) are 400s.
 // These use fixed messages: raw text may name constraints, types or internal
 // arguments, so it is only logged (#422, #427, #1306). Anything unlisted is logged
 // here and surfaces as a generic 500 so raw Postgres text never reaches a
@@ -229,13 +229,15 @@ function rpcError(error: { message: string; code?: string; details?: string }): 
 }
 
 const NAME_TAKEN = "That name is already used. Choose a different name.";
+const LABEL_TAKEN = "That label is already used. Choose a different label.";
 
 // Postgres details read "Key (brewery_id, name)=(…) already exists." (or
-// btrim(name) for formats). Only the key's column list is read; the values are
-// never echoed.
+// btrim(name) for formats, lower(btrim(label)) for ship-tos). Only the key's
+// column list is read; the values are never echoed.
 function uniqueViolation(details = ""): CommandError {
   const columns = /^Key \((.*)\)=\(/.exec(details)?.[1] ?? "";
   if (/\bname\b/.test(columns)) return new CommandError(NAME_TAKEN, 409, "conflict", [{ path: ["name"], code: "duplicate", message: NAME_TAKEN }]);
+  if (/\blabel\b/.test(columns)) return new CommandError(LABEL_TAKEN, 409, "conflict", [{ path: ["label"], code: "duplicate", message: LABEL_TAKEN }]);
   return new CommandError("That already exists. Use a different name or value.", 409, "conflict");
 }
 

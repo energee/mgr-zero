@@ -42,7 +42,6 @@ describe("tenancy RLS", () => {
 describe("brewery column exposure", () => {
   const secrets = {
     ttb_registry_no: "TTB-SECRET-123",
-    pa_license_no: "PA-LIC-999",
     settings: { internal_note: "do not show customers" },
   };
   let brewery: { id: string; name: string };
@@ -81,7 +80,7 @@ describe("brewery column exposure", () => {
     if (otherCustomerError) throw otherCustomerError;
   });
 
-  it("lets staff read ttb_registry_no, pa_license_no, and settings", async () => {
+  it("lets staff read ttb_registry_no and settings", async () => {
     const db = await asUser(staff.email);
     const { data, error } = await db.from("breweries").select("*").eq("id", brewery.id).single();
     expect(error).toBeNull();

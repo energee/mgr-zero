@@ -53,7 +53,6 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
   const lines = data.lines.map((l) => ({ id: l.material_id, qty: String(l.qty_per_unit), onBreak: l.on_break }));
   const materialOptions = data.materials.map(m => ({ id: m.id, name: `${m.name} (${m.base_uom})${m.active ? "" : " · inactive"}` }));
   const bomModel = toPackageBomViewProps({
-    format: data.format,
     lines: data.lines.map((line) => ({
       material: data.materials.find((material) => material.id === line.material_id) ?? null,
       qty_per_unit: line.qty_per_unit,

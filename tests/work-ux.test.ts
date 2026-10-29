@@ -39,11 +39,14 @@ it("points Inventory at the supported taproom count without inventing a finished
   const model = toFinishedGoodsViewProps({ skus: [] });
   const live = renderToStaticMarkup(createElement(FinishedGoodsView, { model, countHref: "/taproom" }));
   expect(live).toMatch(/href="\/taproom"[^>]*>Record taproom count<\/a>/);
-  expect(live).toContain("For physical taproom stock");
+  // A header action, not a standing banner (#1518).
+  expect(live).not.toContain("For physical taproom stock");
+  expect(live).not.toContain('role="note"');
+  // It sits beside the other page actions, ahead of the list.
+  expect(live.indexOf("Record taproom count")).toBeLessThan(live.indexOf("Add SKU in Catalog"));
   const denied = renderToStaticMarkup(createElement(FinishedGoodsView, { model, countHref: null }));
   expect(denied).not.toContain("Record taproom count");
   const fixture = renderToStaticMarkup(createElement(FinishedGoodsView, { model }));
-  expect(fixture).toContain('href="#"');
-  expect(fixture).toContain('data-to="Weekly count"');
+  expect(fixture).toContain(">Record taproom count<");
   expect(fixture).not.toContain('href="/taproom"');
 });

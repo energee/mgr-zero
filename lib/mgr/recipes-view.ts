@@ -1,6 +1,6 @@
 // lib/mgr/recipes-view.ts — view-model for the Recipes list. Each row is a
-// recipe titled with its current version ("Hazy IPA v4"); a recipe with no
-// version yet says so and carries the warning class. `backHref`,
+// recipe's name, its current version number (null: no version yet) and its
+// brand (null: none yet), one RecordTable column each. `backHref`,
 // `createHref` and `waterProfilesHref` are the live destinations of the More
 // back, New recipe and the Water profiles row (where a version's source and
 // target come from); fixtures leave them unset so the inventory frame stays inert.
@@ -8,10 +8,10 @@
 import type { EmptyState } from "./empty-state";
 export type RecipesRowView = {
   key: string;
-  title: string;
-  detail: string;
-  warning?: boolean;
-  href?: string;
+  name: string;
+  version: number | null;
+  brand: string | null;
+  href: string;
 };
 
 export type RecipesViewModel = {
@@ -41,12 +41,6 @@ export function toRecipesViewProps(s: RecipesSnapshot): RecipesViewModel {
     createHref,
     waterProfilesHref,
     empty: recipes.length > 0 ? undefined : s.filtered ? NO_MATCH : NO_RECIPES,
-    rows: recipes.map((r) => {
-      const href = `/recipes/${r.id}`;
-      if (r.latest_version === null) {
-        return { key: r.id, title: r.name, detail: "No version yet", warning: true, href };
-      }
-      return { key: r.id, title: `${r.name} v${r.latest_version}`, detail: r.brand ?? "No brand yet", href };
-    }),
+    rows: recipes.map((r) => ({ key: r.id, name: r.name, version: r.latest_version, brand: r.brand ?? null, href: `/recipes/${r.id}` })),
   };
 }

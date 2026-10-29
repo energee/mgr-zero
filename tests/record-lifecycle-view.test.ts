@@ -76,14 +76,15 @@ describe("record lifecycle availability (#1311)", () => {
   it("keeps inactive vendors visible and editable with a textual status", () => {
     const html = renderToStaticMarkup(createElement(VendorsView, { model: {
       rows: [
-        { key: "active", title: "Active supplier", detail: "7 day lead", verb: "Edit" },
-        { key: "inactive", title: "Inactive supplier", detail: "14 day lead", verb: "Edit", disabled: true },
+        { key: "active", name: "Active supplier", status: "Active", leadTime: "7 days", observed: null, contracts: 0 },
+        { key: "inactive", name: "Inactive supplier", status: "Inactive", leadTime: "14 days", observed: null, contracts: 0 },
       ],
       materials: "", contracts: "",
     } }));
-    expect(html).toContain("Active · 7 day lead");
-    expect(html).toContain("Inactive · 14 day lead");
-    expect(html.match(/>Edit</g)).toHaveLength(2);
+    expect(html).toMatch(/Active supplier[\s\S]*?>Active<[\s\S]*?>7 days</);
+    expect(html).toMatch(/Inactive supplier[\s\S]*?>Inactive<[\s\S]*?>14 days</);
+    // Desk table and phone list each draw the row's Edit.
+    expect(html.match(/>Edit</g)).toHaveLength(4);
   });
 
   it.each([

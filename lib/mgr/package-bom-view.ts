@@ -1,5 +1,6 @@
 // lib/mgr/package-bom-view.ts — view-model for Package BOM. replace_format_bom
-// lines (material + qty per unit) paint the Format's packaging bill.
+// lines (material + qty per unit) paint the Format's packaging bill. The Format
+// page names the format itself, so the model carries only the lines.
 import type { EmptyState } from "./empty-state";
 export type PackageBomRowView = {
   key: string;
@@ -8,14 +9,11 @@ export type PackageBomRowView = {
 };
 
 export type PackageBomViewModel = {
-  format: string;
-  formatHref: string;
   rows: PackageBomRowView[];
   empty?: EmptyState;
 };
 
 export type PackageBomSnapshot = {
-  format: { id: string; name: string };
   lines: {
     id?: string;
     material: { id: string; name: string } | null;
@@ -24,10 +22,8 @@ export type PackageBomSnapshot = {
   }[];
 };
 
-export function toPackageBomViewProps({ format, lines }: PackageBomSnapshot): PackageBomViewModel {
+export function toPackageBomViewProps({ lines }: PackageBomSnapshot): PackageBomViewModel {
   return {
-    format: format.name,
-    formatHref: "/catalog",
     empty: lines.length === 0 ? { title: "No packaging tracked", description: "This format consumes no tracked packaging materials." } : undefined,
     rows: lines.map((line, i) => ({
       key: line.id ?? line.material?.id ?? String(i),
