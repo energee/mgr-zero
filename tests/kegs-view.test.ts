@@ -10,7 +10,7 @@ import { KegBalanceView } from "../components/mgr/views/keg-balance";
 import { KegEventFields, KegFleetView, KegPoolFields } from "../components/mgr/views/keg-fleet";
 import { KegHistoryView } from "../components/mgr/views/keg-history";
 import { KEG_EVENT_REASONS } from "../lib/mgr/enums";
-import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger } from "../lib/mgr/fixtures/kegs";
+import { kegBalanceRidgeline, kegFleet, kegHistoryLedger } from "../lib/mgr/fixtures/kegs";
 import { toKegBalanceViewProps } from "../lib/mgr/keg-balance-view";
 import { kegEventFieldErrors, kegEventReason, kegOnHand, kegPoolFieldErrors, kegShortageText, toKegFleetViewProps, withLocationBin, type KegPoolValue } from "../lib/mgr/keg-fleet-view";
 import { REASON_EFFECT, REASON_LABEL } from "../lib/mgr/keg-labels";
@@ -64,7 +64,7 @@ describe("Keg fleet", () => {
 
   it("#815 prints each saved location shortage with its pool and size", () => {
     const shortages = [{ pool: "Owned", keg_size: "half_bbl", location: "Warehouse", short: 2 }];
-    const model = toKegFleetViewProps({ ...kegFleetMicrostar, shortages: shortages.map(kegShortageText) });
+    const model = toKegFleetViewProps({ ...kegFleet, shortages: shortages.map(kegShortageText) });
     expect(model.shortages).toEqual(["Owned ½ bbl · Warehouse: 2 kegs short · record Acquired kegs to reconcile"]);
     expect(htmlOf(createElement(KegFleetView, { model }))).toContain(model.shortages![0]);
   });
@@ -78,7 +78,7 @@ describe("Keg fleet", () => {
     const body = screen("Keg fleet").body as { type: unknown; props: { model: unknown } };
     expect(isValidElement(screen("Keg fleet").body)).toBe(true);
     expect(body.type).toBe(KegFleetView);
-    expect(body.props.model).toEqual(toKegFleetViewProps(kegFleetMicrostar));
+    expect(body.props.model).toEqual(toKegFleetViewProps(kegFleet));
   });
 
   it("#1584 Record keg event is the header action and Add keg pool sits below the pools", () => {
@@ -89,15 +89,15 @@ describe("Keg fleet", () => {
     expect(live.indexOf("Add keg pool")).toBeGreaterThan(live.indexOf("Owned pool"));
     const unavailable = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps({ pools, navRows: [], eventUnavailable: "Recording a keg event needs a location." }), eventForm: null }));
     expect(unavailable.indexOf("Recording a keg event needs a location.")).toBeLessThan(unavailable.indexOf("Owned pool"));
-    const inventory = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps(kegFleetMicrostar) }));
+    const inventory = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps(kegFleet) }));
     expect(inventory.indexOf(">Record keg event<")).toBeLessThan(inventory.indexOf("Pool name"));
     expect(readFileSync("app/(app)/kegs/pool-form.tsx", "utf8")).toMatch(/<Button size="sm" variant="outline">\{pool \? "Edit" : "Add keg pool"\}<\/Button>/);
   });
 
   it("renders Record keg event without leaking live hrefs", () => {
-    const html = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps(kegFleetMicrostar) }));
+    const html = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps(kegFleet) }));
     expect(html).toMatch(/>Record keg event</);
-    expect(html).toMatch(/Microstar/);
+    expect(html).toMatch(/Kegline/);
     expect(html).not.toMatch(/href="\/kegs/);
     expect(html).not.toMatch(/href="\/inventory"/);
   });
@@ -105,7 +105,7 @@ describe("Keg fleet", () => {
   it("#974 Reason is a labeled select stating the chosen reason's effect, for each of the six manual reasons", () => {
     expect(Object.keys(REASON_EFFECT)).toEqual([...KEG_EVENT_REASONS]);
     for (const reason of KEG_EVENT_REASONS) {
-      const html = htmlOf(createElement(KegEventFields, { value: { ...kegFleetMicrostar.eventForm!, reason }, options: kegFleetMicrostar.eventOptions!, onChange: () => {} }));
+      const html = htmlOf(createElement(KegEventFields, { value: { ...kegFleet.eventForm!, reason }, options: kegFleet.eventOptions!, onChange: () => {} }));
       expect(html, reason).toMatch(/<label[^>]*for="keg-reason"[^>]*>Reason<\/label>/);
       const trigger = html.match(/<button[^>]*id="keg-reason"[^>]*>/)?.[0] ?? "";
       expect(trigger, reason).toContain('role="combobox"');
@@ -121,7 +121,7 @@ describe("Keg fleet", () => {
     const parent = activeTab(STAFF_NAV, "/kegs")!;
     expect(parent.label).toBe("Beer");
     expect(src("app/(app)/kegs/page.tsx")).toContain(`backHref: "${parent.href}"`);
-    const html = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps({ ...kegFleetMicrostar, backHref: parent.href }) }));
+    const html = htmlOf(createElement(KegFleetView, { model: toKegFleetViewProps({ ...kegFleet, backHref: parent.href }) }));
     expect(html).toMatch(new RegExp(`<a[^>]*href="${parent.href}"[^>]*>.*?Beer</a>`));
   });
 
@@ -133,7 +133,7 @@ describe("Keg fleet", () => {
     expect(page).toMatch(/<PoolForm\b/);
     expect(page).toMatch(/<KegEventForm\b/);
     expect(page).not.toMatch(/\bnote=/);
-    const html = htmlOf(createElement(KegEventFields, { value: kegFleetMicrostar.eventForm!, options: kegFleetMicrostar.eventOptions! }));
+    const html = htmlOf(createElement(KegEventFields, { value: kegFleet.eventForm!, options: kegFleet.eventOptions! }));
     expect(html.match(/Beer coming back with a keg/g)).toHaveLength(1);
   });
 });
@@ -164,20 +164,20 @@ describe("Customer keg balance", () => {
 
 describe("Record keg event", () => {
   it("#1401 renders the empty-keg helper as information, not a warning", () => {
-    const html = htmlOf(createElement(KegEventFields, { value: kegFleetMicrostar.eventForm!, options: kegFleetMicrostar.eventOptions! }));
+    const html = htmlOf(createElement(KegEventFields, { value: kegFleet.eventForm!, options: kegFleet.eventOptions! }));
     const notice = html.match(/<div[^>]*role="note"[^>]*>.*?Empty kegs only\..*?<\/div><\/div>/)?.[0];
     expect(notice).toContain("bg-info");
     expect(notice).not.toContain("bg-warning");
   });
 
   it.each(["1.5", "1e1", "0", "", "-1", "9007199254740992"])("#1381 rejects invalid keg count %s", (qty) => {
-    const value = { ...kegFleetMicrostar.eventForm!, poolId: "pool", locationId: "location", binId: "bin", customerId: "customer", qty };
+    const value = { ...kegFleet.eventForm!, poolId: "pool", locationId: "location", binId: "bin", customerId: "customer", qty };
     expect(kegEventReason(value)).toBeTruthy();
     expect(kegEventFieldErrors(value).qty).toBeTruthy();
   });
 
   it("#1381 accepts a whole positive count and preserves required choices", () => {
-    const value = { ...kegFleetMicrostar.eventForm!, poolId: "pool", locationId: "location", binId: "bin", customerId: "customer", qty: "3" };
+    const value = { ...kegFleet.eventForm!, poolId: "pool", locationId: "location", binId: "bin", customerId: "customer", qty: "3" };
     expect(kegEventReason(value)).toBeNull();
     expect(kegEventFieldErrors(value)).toEqual({});
     expect(kegEventReason({ ...value, binId: "" })).toBeTruthy();
@@ -185,8 +185,8 @@ describe("Record keg event", () => {
   });
 
   it("#1479 holds a count leaving the bin to the kegs it holds", () => {
-    const value = { ...kegFleetMicrostar.eventForm!, poolId: "pool", locationId: "location", binId: "cold", reason: "lost" as const, customerId: "", qty: "9" };
-    const options = { ...kegFleetMicrostar.eventOptions!, bins: [{ value: "cold", label: "Cold" }], onHand: 8 };
+    const value = { ...kegFleet.eventForm!, poolId: "pool", locationId: "location", binId: "cold", reason: "lost" as const, customerId: "", qty: "9" };
+    const options = { ...kegFleet.eventOptions!, bins: [{ value: "cold", label: "Cold" }], onHand: 8 };
     expect(kegEventFieldErrors(value, options).qty).toBe("Enter at most 8 kegs in Cold.");
     expect(kegEventReason(value, options)).toBe("Still needed: at most 8 kegs in Cold.");
     expect(kegEventFieldErrors({ ...value, qty: "8" }, options)).toEqual({});
@@ -199,8 +199,8 @@ describe("Record keg event", () => {
   });
 
   it("#1479 holds a count returned or lost at a customer to the kegs that customer holds", () => {
-    const value = { ...kegFleetMicrostar.eventForm!, poolId: "pool", locationId: "location", binId: "cold", reason: "returned" as const, customerId: "ridge", qty: "5" };
-    const options = { ...kegFleetMicrostar.eventOptions!, bins: [{ value: "cold", label: "Cold" }], customers: [{ value: "ridge", label: "Ridgeline" }], onHand: 4 };
+    const value = { ...kegFleet.eventForm!, poolId: "pool", locationId: "location", binId: "cold", reason: "returned" as const, customerId: "ridge", qty: "5" };
+    const options = { ...kegFleet.eventOptions!, bins: [{ value: "cold", label: "Cold" }], customers: [{ value: "ridge", label: "Ridgeline" }], onHand: 4 };
     expect(kegEventFieldErrors(value, options).qty).toBe("Enter at most 4 kegs at Ridgeline.");
     expect(kegEventReason(value, options)).toBe("Still needed: at most 4 kegs at Ridgeline.");
     expect(kegEventFieldErrors({ ...value, reason: "lost" }, options).qty).toBe("Enter at most 4 kegs at Ridgeline.");
@@ -210,7 +210,7 @@ describe("Record keg event", () => {
   it("#1479 counts on hand from the customer's balance when kegs come from a customer, else from the bin", () => {
     const stock = [{ pool_id: "p", keg_size: "half_bbl", bin_id: "cold", qty: 8 }];
     const balances = [{ customer_id: "ridge", pool_id: "p", keg_size: "half_bbl", qty: 4 }, { customer_id: "ridge", pool_id: "p", keg_size: "sixth_bbl", qty: 9 }];
-    const value = { ...kegFleetMicrostar.eventForm!, poolId: "p", kegSize: "half_bbl" as const, binId: "cold", customerId: "ridge", reason: "returned" as const };
+    const value = { ...kegFleet.eventForm!, poolId: "p", kegSize: "half_bbl" as const, binId: "cold", customerId: "ridge", reason: "returned" as const };
     expect(kegOnHand(value, stock, balances)).toBe(4);
     expect(kegOnHand({ ...value, reason: "lost" }, stock, balances)).toBe(4);
     expect(kegOnHand({ ...value, customerId: "other" }, stock, balances)).toBe(0);
@@ -229,7 +229,7 @@ describe("Record keg event", () => {
     expect(src("app/(app)/kegs/event-form.tsx")).toMatch(/options=\{\{[^}]*\bonHand\b/);
   });
   it("#1381 waits for blur or an attempt before drawing a fractional count error", () => {
-    const props = { value: { ...kegFleetMicrostar.eventForm!, qty: "1.5" }, options: kegFleetMicrostar.eventOptions!, onChange: () => {} };
+    const props = { value: { ...kegFleet.eventForm!, qty: "1.5" }, options: kegFleet.eventOptions!, onChange: () => {} };
     expect(htmlOf(createElement(KegEventFields, props))).not.toContain('id="keg-qty-error"');
     const html = htmlOf(createElement(KegEventFields, { ...props, attempted: true }));
     expect(html).toContain('id="keg-qty-error"');
@@ -237,7 +237,7 @@ describe("Record keg event", () => {
   });
   it("#1381 preserves the shared exponent reason without drawing it twice", () => {
     const html = htmlOf(createElement(KegEventFields, {
-      value: { ...kegFleetMicrostar.eventForm!, qty: "1e1" }, options: kegFleetMicrostar.eventOptions!, onChange: () => {}, attempted: true,
+      value: { ...kegFleet.eventForm!, qty: "1e1" }, options: kegFleet.eventOptions!, onChange: () => {}, attempted: true,
     }));
     expect(html.match(/data-slot="field-error"/g)).toHaveLength(1);
     expect(html).toContain('id="keg-qty-error"');
@@ -245,7 +245,7 @@ describe("Record keg event", () => {
 
 
   it("#1025 resets the bin when the location changes, in live and inventory alike", () => {
-    const value = kegFleetMicrostar.eventForm!;
+    const value = kegFleet.eventForm!;
     expect(withLocationBin(value, { ...value, locationId: "cold" }, () => "")).toMatchObject({ locationId: "cold", binId: "" });
     expect(withLocationBin(value, { ...value, locationId: "cold" }, (id) => `${id}-first`).binId).toBe("cold-first");
     expect(withLocationBin(value, { ...value, qty: "9" }, () => "")).toMatchObject({ binId: value.binId, qty: "9" });

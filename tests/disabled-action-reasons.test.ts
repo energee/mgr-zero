@@ -17,7 +17,7 @@ import { CycleCountView } from "../components/mgr/views/cycle-count";
 import { CellarMapView } from "../components/mgr/views/cellar-map";
 import { InviteView } from "../components/mgr/views/team-controls";
 import { brewPrepMineral, brewTimelineMineral } from "../lib/mgr/fixtures/production";
-import { cycleCountCans, receivePoCountryMalt } from "../lib/mgr/fixtures/purchasing";
+import { cycleCountCans, receivePoSent } from "../lib/mgr/fixtures/purchasing";
 import { ReceivePoView } from "../components/mgr/views/receive-po";
 import { toCellarMapViewProps } from "../lib/mgr/cellar-map-view";
 
@@ -168,9 +168,9 @@ describe("Oct 25 recheck: withheld actions say why (#1122)", () => {
 
   it("Cancel purchase order waits for a closure reason that is not blank", () => {
     for (const closureReason of ["", "   "]) {
-      describedButton(html(createElement(ReceivePoView, { model: { ...receivePoCountryMalt, closureReason } })), "Cancel purchase order", /^Still needed: a closure reason\.$/);
+      describedButton(html(createElement(ReceivePoView, { model: { ...receivePoSent, closureReason } })), "Cancel purchase order", /^Still needed: a closure reason\.$/);
     }
-    const ready = html(createElement(ReceivePoView, { model: receivePoCountryMalt })).match(/<button[^>]*>Cancel purchase order<\/button>/)?.[0];
+    const ready = html(createElement(ReceivePoView, { model: receivePoSent })).match(/<button[^>]*>Cancel purchase order<\/button>/)?.[0];
     expect(ready).toBeTruthy();
     expect(ready).not.toContain('disabled=""');
   });

@@ -17,14 +17,14 @@ export const purchaseOrdersWarehouse: PurchaseOrdersSnapshot = {
   title: "Purchase orders",
   subtitle: "warehouse default",
   rows: [
-    { key: "po142", title: "PO-0142 · Country Malt", detail: "Sent Sep 7, 2026 · expected Sep 10, 2026", verb: "Receive", tone: "info" },
-    { key: "po141", title: "PO-0141 · YCH", detail: "Partially received · 1 line still due", verb: "Receive", tone: "info", warning: true },
+    { key: "po142", title: "PO-0142 · Fictional Malt Supply", detail: "Sent Sep 7, 2026 · expected Sep 10, 2026", verb: "Receive", tone: "info" },
+    { key: "po141", title: "PO-0141 · Fictional Hop Supply", detail: "Partially received · 1 line still due", verb: "Receive", tone: "info", warning: true },
     { key: "po143", title: "PO-0143 · CanSource", detail: "Draft", verb: "Mark sent", tone: "info" },
   ],
 };
 
-export const newPoCountryMalt: NewPoViewModel = {
-  vendor: "Country Malt",
+export const newPoDraft: NewPoViewModel = {
+  vendor: "Fictional Malt Supply",
   expected: "2026-09-10",
   lines: [
     { key: "malt", materialId: "malt", title: "2-row · 55 lb bags", detail: "lot-tracked", qty: 40, cost: "$28.50", lot: "CM-26-4410" },
@@ -42,10 +42,10 @@ export const newPoIncomplete: NewPoViewModel = {
   lines: [{ key: "malt", materialId: "malt", title: "2-row · 55 lb bags", detail: "lot-tracked", qty: "-4", cost: "-3", lot: "" }],
 };
 
-export const receivePoCountryMalt: ReceivePoViewModel = {
+export const receivePoSent: ReceivePoViewModel = {
   state: "sent", closure: "cancel", closureReason: "Vendor cannot fulfil this order", locationId: "warehouse", binId: "shelf", receivedOn: "2026-09-10",
   locations: [{ id: "warehouse", name: "Warehouse" }], bins: [{ id: "shelf", name: "Shelf" }],
-  title: "PO-0142 · Country Malt",
+  title: "PO-0142 · Fictional Malt Supply",
   status: "Marked sent Sep 7, 2026 · expected Sep 10, 2026",
   lines: [
     {
@@ -85,9 +85,9 @@ export const editPoCanSource: NewPoViewModel = {
   ],
 };
 
-export const receiptPoCountryMalt: ReceiptViewModel = {
+export const receiptPoPartial: ReceiptViewModel = {
   correction: {},
-  bill: { receiptId: "receipt-country-malt", status: "not_posted", action: "post" },
+  bill: { receiptId: "receipt-malt-supply", status: "not_posted", action: "post" },
   title: "PO-0142 · receipt Sep 10, 2026", backTo: "PO-0142",
   status: "partially received",
   stillOwed: "1 Citra box · 44 lb",
@@ -101,14 +101,14 @@ export const receiptPoCountryMalt: ReceiptViewModel = {
 };
 
 export const receiptPoBillPending: ReceiptViewModel = {
-  ...receiptPoCountryMalt,
-  bill: { receiptId: "receipt-country-malt", requestId: "frozen-bill-request", status: "pending", action: "retry",
+  ...receiptPoPartial,
+  bill: { receiptId: "receipt-malt-supply", requestId: "frozen-bill-request", status: "pending", action: "retry",
     error: "QuickBooks did not return a confirmed Bill ID. Reconcile the original saved attempt." },
 };
 
 export const receiptPoBillPosted: ReceiptViewModel = {
-  ...receiptPoCountryMalt,
-  bill: { receiptId: "receipt-country-malt", requestId: "frozen-bill-request", status: "pushed", billId: "731" },
+  ...receiptPoPartial,
+  bill: { receiptId: "receipt-malt-supply", requestId: "frozen-bill-request", status: "pushed", billId: "731" },
   revisions: [{ label: "Original receipt" }],
   tape: [
     ["+2,200 lb 2-row · receipt", "lot CM-26-4410 · as expected"],
@@ -119,15 +119,15 @@ export const receiptPoBillPosted: ReceiptViewModel = {
 };
 
 export const receiptPoBillRejected: ReceiptViewModel = {
-  ...receiptPoCountryMalt,
-  bill: { receiptId: "receipt-country-malt", status: "push_failed", action: "corrected", mappingHref: "#",
+  ...receiptPoPartial,
+  bill: { receiptId: "receipt-malt-supply", status: "push_failed", action: "corrected", mappingHref: "#",
     error: "QuickBooks rejected the purchase account. Verify the exact account ID before posting a corrected Bill." },
 };
 
-export const correctReceiptCountryMalt: ReceivePoViewModel = {
+export const correctReceiptPo: ReceivePoViewModel = {
   title: "PO-0142 · correct receipt", state: "correction", status: "Received Sep 10, 2026",
   correctionReason: "Two malt bags were counted twice",
-  lines: receivePoCountryMalt.lines?.map(line => ({ ...line, qty: line.key === "malt" ? 40 : line.qty,
+  lines: receivePoSent.lines?.map(line => ({ ...line, qty: line.key === "malt" ? 40 : line.qty,
     detail: `originally counted ${line.qty} purchase units`, lotOptions: undefined, note: undefined })),
   tape: [["+2,200 lb 2-row · replacement preview", "Lot CM-26-4410"], ["+132 lb Citra · replacement preview", "Lot 2026-CIT-91"], ["+300 lb rice hulls · replacement preview", "untracked"]],
   info: CORRECTION_INFO,
@@ -137,8 +137,8 @@ export const correctReceiptCountryMalt: ReceivePoViewModel = {
 export const materialsOnHandList: MaterialsOnHandSnapshot = {
   rows: [
     { key: "cans", name: "Cans · 16 oz", category: "packaging", unit: "each", onHand: 3100, lotTracked: false, active: true },
-    { key: "citra", name: "Citra 2026 · YCH", category: "hop", unit: "lb", onHand: 262, lotTracked: true, active: true },
-    { key: "malt", name: "2-row 2026 · Country Malt", category: "malt", unit: "lb", onHand: 8800, lotTracked: true, active: true },
+    { key: "citra", name: "Citra 2026 · Fictional Hop Supply", category: "hop", unit: "lb", onHand: 262, lotTracked: true, active: true },
+    { key: "malt", name: "2-row 2026 · Fictional Malt Supply", category: "malt", unit: "lb", onHand: 8800, lotTracked: true, active: true },
     { key: "yeast", name: "Yeast · WLP066", category: "yeast", unit: "each", onHand: 0, lotTracked: true, active: false },
   ],
 };
@@ -179,10 +179,10 @@ export const materialCitra: MaterialViewModel = {
   purchaseUnitOptions: ["lb", "kg", "oz", "g", "each", "l", "gal", "ml"],
   unit: "lb",
   unitOptions: ["lb", "kg", "oz", "g", "each", "l", "gal", "ml"],
-  defaultVendorId: "ych",
+  defaultVendorId: "hop-supply",
   defaultVendorOptions: [
-    { id: "ych", label: "YCH" },
-    { id: "cm", label: "Country Malt" },
+    { id: "hop-supply", label: "Fictional Hop Supply" },
+    { id: "cm", label: "Fictional Malt Supply" },
   ],
   lotTracked: true,
   active: true,
@@ -191,8 +191,8 @@ export const materialCitra: MaterialViewModel = {
 /** list_vendors_and_contracts rows, as the live page passes them. */
 export const vendorsList: VendorsSnapshot = {
   rows: [
-    { key: "ych", name: "YCH", active: true, lead_time_days: 7, observed: [{ sent_via: "mailto", n: 4, avg_lead_days: 6.5 }], contracts: [{ id: "ych-citra" }] },
-    { key: "cm", name: "Country Malt", active: true, lead_time_days: 10, observed: [], contracts: [{ id: "cm-2row" }] },
+    { key: "hop-supply", name: "Fictional Hop Supply", active: true, lead_time_days: 7, observed: [{ sent_via: "mailto", n: 4, avg_lead_days: 6.5 }], contracts: [{ id: "hop-supply-citra" }] },
+    { key: "cm", name: "Fictional Malt Supply", active: true, lead_time_days: 10, observed: [], contracts: [{ id: "cm-2row" }] },
     { key: "can", name: "CanSource", active: false, lead_time_days: null, observed: [], contracts: [] },
   ],
   materials: "12 materials",
@@ -201,10 +201,10 @@ export const vendorsList: VendorsSnapshot = {
 
 /** One vendor's page: the first Vendors row with its contract, a sent order
  *  and two default materials, one of them inactive. */
-export const vendorDetailYch: VendorDetailSnapshot = {
+export const vendorDetail: VendorDetailSnapshot = {
   vendor: {
-    ...vendorsList.rows![0], email: "orders@ych.example", phone: "509-555-0142", payment_terms: "net30",
-    contracts: [{ id: "ych-citra", contract_no: "Citra 2026", material_name: "Citra", qty_committed: 400, qty_received: 262, qty_on_order: 100, qty_available: 38 }],
+    ...vendorsList.rows![0], email: "orders@hop-supply.example", phone: "509-555-0142", payment_terms: "net30",
+    contracts: [{ id: "hop-supply-citra", contract_no: "Citra 2026", material_name: "Citra", qty_committed: 400, qty_received: 262, qty_on_order: 100, qty_available: 38 }],
   },
   purchaseOrders: [{ id: "po141", po_no: 141, status: "sent", closed_at: null, ordered_on: "2026-09-03", expected_on: "2026-09-10", lines_open: 1 }],
   materials: [
@@ -213,9 +213,9 @@ export const vendorDetailYch: VendorDetailSnapshot = {
   ],
 };
 
-export const vendorYch: VendorViewModel = {
-  name: "YCH",
-  email: "orders@ych.example",
+export const vendorEdit: VendorViewModel = {
+  name: "Fictional Hop Supply",
+  email: "orders@hop-supply.example",
   phone: "509-555-0142",
   terms: "Net 30",
   termsOptions: ["Due on receipt", "Net 15", "Net 30"],
@@ -225,14 +225,14 @@ export const vendorYch: VendorViewModel = {
 
 export const contractsList: ContractsSnapshot = {
   rows: [
-    { key: "ych", title: "YCH · Citra 2026", detail: "400 committed · 262 received · 100 on order · 38 lb available", verb: "Edit", warning: true },
-    { key: "cm", title: "Country Malt · 2-row 2026", detail: "20,000 committed · 8,800 received · 0 on order · 11,200 lb available", verb: "Edit" },
+    { key: "hop-supply", title: "Fictional Hop Supply · Citra 2026", detail: "400 committed · 262 received · 100 on order · 38 lb available", verb: "Edit", warning: true },
+    { key: "cm", title: "Fictional Malt Supply · 2-row 2026", detail: "20,000 committed · 8,800 received · 0 on order · 11,200 lb available", verb: "Edit" },
   ],
 };
 
-export const contractYchCitra: ContractViewModel = {
-  vendorId: "ych",
-  vendorOptions: [{ id: "ych", label: "YCH" }],
+export const contractEdit: ContractViewModel = {
+  vendorId: "hop-supply",
+  vendorOptions: [{ id: "hop-supply", label: "Fictional Hop Supply" }],
   materialId: "citra",
   materialOptions: [{ id: "citra", label: "Citra 2026" }],
   quantity: "400",

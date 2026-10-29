@@ -30,7 +30,7 @@ export const todayWarehouse: TodayViewModel = {
     { key: "pick", title: "3 orders ready", detail: "quantities default to ordered", verb: "Pick", tone: "info", warning: true, icon: "package" },
     overduePick,
     { key: "restock", title: "Staged · ORD-0229", detail: "restock 3 Pils cases to Warehouse", verb: "Put back", tone: "attention", warning: true, icon: "package" },
-    { key: "po", title: "PO-0142 · Country Malt", detail: "arrives Thu", verb: "Receive", tone: "info", icon: "truck" },
+    { key: "po", title: "PO-0142 · Fictional Malt Supply", detail: "arrives Thu", verb: "Receive", tone: "info", icon: "truck" },
     { key: "route", title: "Next delivery · Ridgeline", detail: "your route · stop 1 of 3", verb: "Resume", tone: "info", icon: "route" },
   ],
 };

@@ -15,7 +15,7 @@ export const accountingExpired: AccountingViewModel = {
 export const quickBooksMappings: QboMappingSection[] = [
   { title: "Customers", rows: [{ id: "customer", label: "Oak and Barrel", kind: "customer", currentId: "184" }] },
   { title: "SKUs", rows: [{ id: "sku", label: "Pils · case", kind: "item", currentId: "307" }] },
-  { title: "Vendors", rows: [{ id: "vendor", label: "Country Malt", kind: "vendor", currentId: "512" }] },
+  { title: "Vendors", rows: [{ id: "vendor", label: "Fictional Malt Supply", kind: "vendor", currentId: "512" }] },
   { title: "Receipt Bills", rows: [{ id: "purchase_account", label: "Purchase account", kind: "purchase_account", currentId: "84", detail: "One brewery-wide QuickBooks account for receipt Bills" }] },
   { title: "Returnable-keg deposits", rows: [{ id: "deposit", label: "Deposit and refund item", kind: "deposit", detail: "One verified QuickBooks item for frozen keg charges and refunds" }] },
   { title: "One-way kegs", rows: [{ id: "one_way_fee", label: "One-way keg fee item", kind: "one_way_fee", detail: "One verified QuickBooks item for the non-refundable one-way keg fee" }] },

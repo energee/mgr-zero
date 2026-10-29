@@ -31,7 +31,7 @@ import { VesselDetailView } from "@/components/mgr/views/vessel-detail";
 import { VesselForm } from "@/app/(app)/batches/vessel-form";
 import { vesselFv3 } from "@/lib/mgr/fixtures/production";
 import { ContractView } from "@/components/mgr/views/contract";
-import { contractYchCitra } from "@/lib/mgr/fixtures/purchasing";
+import { contractEdit } from "@/lib/mgr/fixtures/purchasing";
 import { prepReason, timelineReason, type BrewIngredient, type BrewTimelineViewModel } from "@/lib/mgr/brew-prep-view";
 import { packagingCloseReason } from "@/lib/mgr/close-packaging-run-view";
 import { kegEventReason } from "@/lib/mgr/keg-fleet-view";
@@ -429,7 +429,7 @@ describe("line errors in the views", () => {
   });
 
   it("New contract's empty Vendor picker points at Add vendor on its page, its empty Material picker links Materials; each note is tied to its picker (#1123)", () => {
-    const markup = html(createElement(ContractView, { model: { ...contractYchCitra, vendorId: "", vendorOptions: [], materialId: "", materialOptions: [] } }));
+    const markup = html(createElement(ContractView, { model: { ...contractEdit, vendorId: "", vendorOptions: [], materialId: "", materialOptions: [] } }));
     const vendorEmpty = markup.match(/<p[^>]*id="([^"]+-empty)"[^>]*>No vendors yet\. Close this form and choose Add vendor\.<\/p>/)?.[1];
     const materialEmpty = markup.match(/<p[^>]*id="([^"]+-empty)"[^>]*>No materials yet\./)?.[1];
     expect(vendorEmpty).toBeTruthy();
@@ -439,7 +439,7 @@ describe("line errors in the views", () => {
     const link = markup.match(/<a [^>]*>Add a material<\/a>/)?.[0];
     expect(link).toContain('href="/materials"');
     expect(link).toContain('data-to="Materials on hand"');
-    expect(html(createElement(ContractView, { model: contractYchCitra }))).not.toMatch(/No vendors yet|No materials yet/);
+    expect(html(createElement(ContractView, { model: contractEdit }))).not.toMatch(/No vendors yet|No materials yet/);
   });
 
   it("a chosen location with no bins says so under its bin picker", () => {
@@ -490,8 +490,8 @@ describe("vendorReason (#1485)", () => {
   it("names a blank name and each bad optional field, or null when ready", () => {
     expect(vendorReason(blank)).toBe("Still needed: a vendor name.");
     expect(vendorReason({ ...blank, name: "  " })).toBe("Still needed: a vendor name.");
-    expect(vendorReason({ ...blank, name: "YCH" })).toBeNull();
-    expect(vendorReason({ name: "YCH", email: "nope", phone: "abc", leadDays: "-1" }))
+    expect(vendorReason({ ...blank, name: "Fictional Hop Supply" })).toBeNull();
+    expect(vendorReason({ name: "Fictional Hop Supply", email: "nope", phone: "abc", leadDays: "-1" }))
       .toBe("Still needed: a valid email, a valid phone number, and a lead time of zero or more whole days.");
   });
 });

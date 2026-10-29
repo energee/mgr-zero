@@ -5,7 +5,7 @@ export const workWarehouse: WorkSnapshot = {
   rows: [
     { key: "ord1", kind: "orders", title: "ORD-0231 · Ridgeline", detail: "submitted · ships today", verb: "Confirm", tone: "success", icon: "package" },
     { key: "ord2", kind: "orders", title: "ORD-0229 · Al’s Bar", detail: "picked · restock 3 Pils staged", verb: "Put back", tone: "attention", warning: true, icon: "package" },
-    { key: "po", kind: "POs", title: "PO-0142 · Country Malt", detail: "due today", verb: "Receive", tone: "info", icon: "truck" },
+    { key: "po", kind: "POs", title: "PO-0142 · Fictional Malt Supply", detail: "due today", verb: "Receive", tone: "info", icon: "truck" },
     { key: "route", kind: "routes", title: "Route A", detail: "3 stops · Thu", verb: "Resume", tone: "info", icon: "route" },
   ],
 };

@@ -5,7 +5,7 @@ import { SCREENS } from "../components/mgr/screens";
 import { ConfirmDeleteControl } from "../components/mgr/views/confirm-delete";
 import { VendorView } from "../components/mgr/views/vendor";
 import { VendorsView } from "../components/mgr/views/vendors";
-import { vendorYch } from "../lib/mgr/fixtures/purchasing";
+import { vendorEdit } from "../lib/mgr/fixtures/purchasing";
 import { canRun, getCommandDefinition, STAFF_ROLES, type Ctx } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -65,7 +65,7 @@ describe("record lifecycle availability (#1311)", () => {
 
   it.each([true, false])("an %s-active vendor uses the shared confirmation before requesting the opposite status", async active => {
     const onSetActive = vi.fn().mockResolvedValue(true);
-    const control = vendorConfirmation({ model: { ...vendorYch, active }, onSetActive });
+    const control = vendorConfirmation({ model: { ...vendorEdit, active }, onSetActive });
     expect(control).toBeDefined();
     expect(control?.title).toBe(active ? "Deactivate vendor" : "Reactivate vendor");
     expect(onSetActive).not.toHaveBeenCalled();
@@ -94,11 +94,11 @@ describe("record lifecycle availability (#1311)", () => {
     { leadDays: "2.5" },
     { leadDays: "1e3" },
   ])("holds status confirmation closed for invalid form fields %j", fields => {
-    const control = vendorConfirmation({ model: { ...vendorYch, ...fields, active: true } });
+    const control = vendorConfirmation({ model: { ...vendorEdit, ...fields, active: true } });
     expect(control?.reason).toBeTruthy();
   });
 
   it("does not offer a lifecycle action before a vendor has been saved", () => {
-    expect(vendorConfirmation({ model: { ...vendorYch, active: null } })).toBeUndefined();
+    expect(vendorConfirmation({ model: { ...vendorEdit, active: null } })).toBeUndefined();
   });
 });

@@ -22,8 +22,8 @@ import { VendorsView } from "../components/mgr/views/vendors";
 import { VendorDetailView } from "../components/mgr/views/vendor-detail";
 import { toVendorDetailViewProps } from "../lib/mgr/vendor-detail-view";
 import {
-  contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsOnHandList,
-  correctReceiptCountryMalt, draftPoCanSource, editPoCanSource, newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorDetailYch, vendorYch, vendorsList,
+  contractEdit, contractsList, cycleCountCans, materialCitra, materialsOnHandList,
+  correctReceiptPo, draftPoCanSource, editPoCanSource, newPoDraft, purchaseOrdersWarehouse, receiptPoPartial, receivePoSent, vendorDetail, vendorEdit, vendorsList,
 } from "../lib/mgr/fixtures/purchasing";
 import { contractRowView, toContractsViewProps } from "../lib/mgr/contracts-view";
 import { toMaterialsOnHandViewProps, toMaterialsScopes } from "../lib/mgr/materials-on-hand-view";
@@ -43,8 +43,8 @@ const src = (file: string) => readFileSync(file, "utf8");
 describe("Purchase orders", () => {
   it("Vendor, Material, Received into and Bin prompts are unavailable choices (#1388)", () => {
     const pick = vi.spyOn(E, "pick");
-    htmlOf(createElement(NewPoView, { model: newPoCountryMalt }));
-    htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }));
+    htmlOf(createElement(NewPoView, { model: newPoDraft }));
+    htmlOf(createElement(ReceivePoView, { model: receivePoSent }));
     const calls = [...pick.mock.calls];
     pick.mockRestore();
     for (const label of ["Vendor", "Material", "Received into", "Bin"]) {
@@ -142,7 +142,7 @@ describe("Purchase orders", () => {
   it("the New PO inventory record is NewPoView", () => {
     const body = screen("New PO").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(NewPoView);
-    expect(body.props.model).toEqual(newPoCountryMalt);
+    expect(body.props.model).toEqual(newPoDraft);
   });
 
   it("shares decimal counts, untracked lot omission, errors and disabled saving", () => {
@@ -162,7 +162,7 @@ describe("Purchase orders", () => {
     expect(html).toContain("disabled");
     expect(html).not.toContain("Expected lot");
     expect(html).not.toContain('href="/purchase-orders"');
-    expect(htmlOf(createElement(NewPoView, { model: newPoCountryMalt, footer: null }))).not.toContain("Save draft");
+    expect(htmlOf(createElement(NewPoView, { model: newPoDraft, footer: null }))).not.toContain("Save draft");
     const page = src("app/(app)/purchase-orders/new/page.tsx");
     expect(page.indexOf('requirePagePermission(ctx, "create_purchase_order"')).toBeLessThan(page.indexOf('runPageQuery("list_vendors_and_contracts"'));
   });
@@ -170,20 +170,20 @@ describe("Purchase orders", () => {
   it("the Receive PO inventory record is ReceivePoView", () => {
     const body = screen("Receive PO").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(ReceivePoView);
-    expect(body.props.model).toEqual(receivePoCountryMalt);
+    expect(body.props.model).toEqual(receivePoSent);
   });
 
   it("submits closure through its own form, so Enter in the reason never submits the receipt or send form", () => {
-    const html = htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }));
+    const html = htmlOf(createElement(ReceivePoView, { model: receivePoSent }));
     expect(html).toMatch(new RegExp(`<input[^>]*aria-label="Closure reason"[^>]*form="${CLOSURE_FORM_ID}"|<input[^>]*form="${CLOSURE_FORM_ID}"[^>]*aria-label="Closure reason"`));
     expect(html).toMatch(new RegExp(`<button[^>]*type="submit"[^>]*form="${CLOSURE_FORM_ID}"|<button[^>]*form="${CLOSURE_FORM_ID}"[^>]*type="submit"`));
   });
 
   it("renders reason-bearing closure controls on the shared receive view", () => {
-    const cancel = htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }));
+    const cancel = htmlOf(createElement(ReceivePoView, { model: receivePoSent }));
     expect(cancel).toContain("Cancel purchase order");
     expect(cancel).toContain("Closure reason");
-    const short = htmlOf(createElement(ReceivePoView, { model: { ...receivePoCountryMalt, state: "partially_received", closure: "short" } }));
+    const short = htmlOf(createElement(ReceivePoView, { model: { ...receivePoSent, state: "partially_received", closure: "short" } }));
     expect(short).toContain("Close short");
     expect(short).not.toContain("Cancel purchase order");
     const closed = htmlOf(createElement(ReceivePoView, { model: { title: "Closed PO", state: "received", status: "closed short · Vendor cancelled remainder" } }));
@@ -193,8 +193,8 @@ describe("Purchase orders", () => {
   });
 
   it("Receive purchase order and Correct receipt name what they wait for (#1485)", () => {
-    const lines = receivePoCountryMalt.lines!;
-    const receive = (patch: Partial<typeof receivePoCountryMalt>) => receiveReason({ ...receivePoCountryMalt, ...patch });
+    const lines = receivePoSent.lines!;
+    const receive = (patch: Partial<typeof receivePoSent>) => receiveReason({ ...receivePoSent, ...patch });
     expect(receive({})).toBeNull();
     // One -1 line among valid lines is named, never dropped from the receipt.
     expect(receive({ lines: lines.map(line => line.key === "hulls" ? { ...line, qty: "-1" } : line) })).toBe("Still needed: a count of zero or more for Rice hulls · 50 lb.");
@@ -210,15 +210,15 @@ describe("Purchase orders", () => {
       .toBe("Still needed: a location, a bin, a received day, and a lot code for 2-row · 55 lb bags.");
     // A lot-tracked line counted 0 needs no lot.
     expect(receive({ lines: lines.map(line => line.key === "malt" ? { ...line, qty: "0", lot: "" } : line) })).toBeNull();
-    const correct = (patch: Partial<typeof correctReceiptCountryMalt>) => receiveReason({ ...correctReceiptCountryMalt, ...patch });
+    const correct = (patch: Partial<typeof correctReceiptPo>) => receiveReason({ ...correctReceiptPo, ...patch });
     expect(correct({})).toBeNull();
-    expect(correct({ correctionReason: " ", lines: correctReceiptCountryMalt.lines!.map(line => line.key === "hulls" ? { ...line, qty: "" } : line) }))
+    expect(correct({ correctionReason: " ", lines: correctReceiptPo.lines!.map(line => line.key === "hulls" ? { ...line, qty: "" } : line) }))
       .toBe("Still needed: a correction reason and a count for Rice hulls · 50 lb.");
-    expect(receiveReason({ ...receivePoCountryMalt, state: "draft" })).toBeNull();
+    expect(receiveReason({ ...receivePoSent, state: "draft" })).toBeNull();
   });
 
   it("prints Receive's reason beside its own button, apart from the closure reason (#1485)", () => {
-    const html = htmlOf(createElement(ReceivePoView, { model: { ...receivePoCountryMalt, locationId: "" } }));
+    const html = htmlOf(createElement(ReceivePoView, { model: { ...receivePoSent, locationId: "" } }));
     const button = html.match(/<button[^>]*>Receive purchase order<\/button>/)?.[0];
     expect(button).toContain('disabled=""');
     const id = button?.match(/aria-describedby="([^"]+)"/)?.[1];
@@ -226,12 +226,12 @@ describe("Purchase orders", () => {
   });
 
   it("renders Receive purchase order without leaking live hrefs", () => {
-    expect(htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }))).toMatch(/>Receive purchase order</);
-    expect(htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }))).not.toMatch(/href="\/purchase-orders"/);
+    expect(htmlOf(createElement(ReceivePoView, { model: receivePoSent }))).toMatch(/>Receive purchase order</);
+    expect(htmlOf(createElement(ReceivePoView, { model: receivePoSent }))).not.toMatch(/href="\/purchase-orders"/);
   });
 
   it("draft receiving keeps counts read-only and only offers the send attestation", () => {
-    const html = htmlOf(createElement(ReceivePoView, { model: { ...receivePoCountryMalt, state: "draft" } }));
+    const html = htmlOf(createElement(ReceivePoView, { model: { ...receivePoSent, state: "draft" } }));
     expect(html).toContain("Mark sent");
     expect(html).toContain("nothing is emailed");
     expect(html).not.toContain("Receive purchase order");
@@ -261,14 +261,14 @@ describe("Purchase orders", () => {
     expect(html).toMatch(/<details[^>]*><summary[^>]*>Cancel purchase order<\/summary>/);
     expect(html).not.toMatch(/<details[^>]*open/);
     // Close short folds the same way after the receive verb.
-    const short = htmlOf(createElement(ReceivePoView, { model: { ...receivePoCountryMalt, state: "partially_received", closure: "short" } }));
+    const short = htmlOf(createElement(ReceivePoView, { model: { ...receivePoSent, state: "partially_received", closure: "short" } }));
     expect(short.indexOf(">Receive purchase order<")).toBeLessThan(short.indexOf("Closure reason"));
     expect(short).toMatch(/<summary[^>]*>Close remaining quantity<\/summary>/);
   });
 
   it("#1584 a draft links Edit draft to the shared New PO form; the inventory link stays inert", () => {
     expect(htmlOf(createElement(ReceivePoView, { model: draftPoCanSource }))).toMatch(/<a[^>]*href="#"[^>]*>Edit draft<\/a>/);
-    expect(htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }))).not.toContain("Edit draft");
+    expect(htmlOf(createElement(ReceivePoView, { model: receivePoSent }))).not.toContain("Edit draft");
     expect(screen("Edit PO").body).toEqual(createElement(NewPoView, { model: editPoCanSource }));
     const html = htmlOf(createElement(NewPoView, { model: editPoCanSource }));
     expect(html).toContain(">Edit PO-0143<");
@@ -284,7 +284,7 @@ describe("Purchase orders", () => {
     const body = screen("Receipt").body as { type: unknown; props: { children: { type: unknown; props: { model: unknown } } } };
     expect(body.type).toBe(ReceiptFixture);
     expect(body.props.children.type).toBe(ReceiptView);
-    expect(body.props.children.props.model).toEqual(receiptPoCountryMalt);
+    expect(body.props.children.props.model).toEqual(receiptPoPartial);
   });
 
 });
@@ -341,7 +341,7 @@ describe("receipt Bill presentation", () => {
     const bill = receiptBillPresentation({ ...receipt, qbo_bill_status: "pending", qbo_bill_receipt_id: "original", qbo_bill_request_id: "provider-request" }, { ...admin, mappingsReady: false });
     expect(bill).toMatchObject({ status: "pending", receiptId: "original", requestId: "provider-request", action: "retry" });
     expect(bill.mappingHref).toBeUndefined();
-    const html = htmlOf(createElement(ReceiptView, { model: { ...receiptPoCountryMalt, bill }, onPostBill: async () => true }));
+    const html = htmlOf(createElement(ReceiptView, { model: { ...receiptPoPartial, bill }, onPostBill: async () => true }));
     expect(html).toContain("Posting result unknown");
     expect(html).toContain("Retry exact Bill");
     expect(html).toContain("original provider request ID");
@@ -353,7 +353,7 @@ describe("receipt Bill presentation", () => {
     const bill = receiptBillPresentation(rejected, admin);
     expect(bill).toMatchObject({ status: "push_failed", receiptId: "latest", action: "corrected", mappingHref: admin.mappingHref });
     expect(receiptBillPresentation({ ...rejected, corrected_by_receipt_id: "newer" }, admin).action).toBeUndefined();
-    const html = htmlOf(createElement(ReceiptView, { model: { ...receiptPoCountryMalt, bill }, onPostBill: async () => true }));
+    const html = htmlOf(createElement(ReceiptView, { model: { ...receiptPoPartial, bill }, onPostBill: async () => true }));
     expect(html).toContain("Rejected by QuickBooks");
     expect(html).toContain("Post corrected Bill");
     expect(html).toContain('href="/settings/accounting/mappings"');
@@ -392,7 +392,7 @@ describe("receipt Bill presentation", () => {
     const bill = receiptBillPresentation({ ...receipt, qbo_bill_status: "pushed", qbo_bill_id: "731", qbo_bill_receipt_id: "original" }, admin);
     expect(bill.action).toBeUndefined();
     expect(bill.receiptId).toBe("original");
-    const html = htmlOf(createElement(ReceiptView, { model: { ...receiptPoCountryMalt, bill } }));
+    const html = htmlOf(createElement(ReceiptView, { model: { ...receiptPoPartial, bill } }));
     expect(html).toContain("Bill posted, adjust in QuickBooks");
     expect(html).toContain("Bill payments are managed only in QuickBooks");
     expect(html).not.toContain("Post Bill to QuickBooks");
@@ -596,7 +596,7 @@ describe("Vendors", () => {
   // #1586: a vendor's name opens its page.
   it("vendor names are inert taps to Vendor detail in inventory and links live", () => {
     const html = htmlOf(createElement(VendorsView, { model: toVendorsViewProps(vendorsList) }));
-    expect(html).toMatch(/data-tap="true" data-to="Vendor detail"[^>]*>YCH</);
+    expect(html).toMatch(/data-tap="true" data-to="Vendor detail"[^>]*>Fictional Hop Supply</);
     const live = htmlOf(createElement(VendorsView, { model: toVendorsViewProps(vendorsList), linkRows: true }));
     for (const row of vendorsList.rows!) expect(live).toContain(`href="/vendors/${row.key}"`);
     expect(live.match(/>Edit</g)).toHaveLength(vendorsList.rows!.length * 2);
@@ -606,7 +606,7 @@ describe("Vendors", () => {
   it("the Vendor detail inventory record is VendorDetailView over the fixture", () => {
     const body = screen("Vendor detail").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(VendorDetailView);
-    expect(body.props.model).toEqual(toVendorDetailViewProps(vendorDetailYch));
+    expect(body.props.model).toEqual(toVendorDetailViewProps(vendorDetail));
     const html = htmlOf(body as ReactNode);
     for (const heading of ["Contracts", "Open purchase orders", "Default materials"]) expect(html).toContain(`>${heading}</h2>`);
     expect(html).toMatch(/committed · .* received · .* on order · .* available/);
@@ -615,14 +615,14 @@ describe("Vendors", () => {
   });
 
   it("Vendor detail leaves out the open purchase orders section when orders are not read", () => {
-    const html = htmlOf(createElement(VendorDetailView, { model: toVendorDetailViewProps({ ...vendorDetailYch, purchaseOrders: null }) }));
+    const html = htmlOf(createElement(VendorDetailView, { model: toVendorDetailViewProps({ ...vendorDetail, purchaseOrders: null }) }));
     expect(html).not.toContain("Open purchase orders");
     expect(html).toContain(">Default materials</h2>");
   });
 
   it("the Vendor inventory record is VendorView", () => {
     expect((screen("Vendor").body as { type: unknown }).type).toBe(VendorView);
-    const html = htmlOf(createElement(VendorView, { model: vendorYch }));
+    const html = htmlOf(createElement(VendorView, { model: vendorEdit }));
     expect(html).toMatch(/>Save vendor</);
     expect(html).toMatch(/Phone/);
     expect(html).toContain("When Planning lists a material short and it resolves to this vendor, its buy-by date is the needed-by date less this lead time. Received orders show a separate observed average.");
@@ -644,13 +644,13 @@ describe("Vendors", () => {
   // #1586: the Vendors list and the vendor page build a contract row once.
   it("contractRowView names the vendor only when given one, and only then offers Edit", () => {
     const c = { id: "c", contract_no: "CITRA-2026", material_name: "Citra", qty_committed: 1000, qty_received: 262.5, qty_on_order: 100, qty_available: 637.5 };
-    expect(contractRowView(c, "YCH")).toEqual({
-      key: "c", title: "YCH · CITRA-2026", detail: "1,000 committed · 262.5 received · 100 on order · 637.5 available", verb: "Edit", warning: false,
+    expect(contractRowView(c, "Fictional Hop Supply")).toEqual({
+      key: "c", title: "Fictional Hop Supply · CITRA-2026", detail: "1,000 committed · 262.5 received · 100 on order · 637.5 available", verb: "Edit", warning: false,
     });
     expect(contractRowView({ ...c, contract_no: null })).toEqual({
       key: "c", title: "Citra", detail: "1,000 committed · 262.5 received · 100 on order · 637.5 available", verb: undefined, warning: false,
     });
-    expect(contractRowView({ ...c, contract_no: null, material_name: null, qty_available: 0 }, "YCH")).toMatchObject({ title: "YCH · contract", warning: true });
+    expect(contractRowView({ ...c, contract_no: null, material_name: null, qty_available: 0 }, "Fictional Hop Supply")).toMatchObject({ title: "Fictional Hop Supply · contract", warning: true });
   });
 
   it("ContractsView draws no Edit for a row without a verb", () => {
@@ -662,12 +662,12 @@ describe("Vendors", () => {
 
   it("the Contract inventory record is ContractView", () => {
     expect((screen("Contract").body as { type: unknown }).type).toBe(ContractView);
-    const html = htmlOf(createElement(ContractView, { model: contractYchCitra }));
+    const html = htmlOf(createElement(ContractView, { model: contractEdit }));
     expect(html).toMatch(/>Save contract</);
     expect(html).toMatch(/Contract number/);
     expect(html).toContain('aria-haspopup="dialog"');
     expect(html).toContain("Delete contract");
-    const creating = htmlOf(createElement(ContractView, { model: contractYchCitra, remove: null }));
+    const creating = htmlOf(createElement(ContractView, { model: contractEdit, remove: null }));
     expect(creating).not.toContain("Delete contract");
   });
 
@@ -679,7 +679,7 @@ describe("Vendors", () => {
   });
 
   it("waits to show contract errors in live controlled fields", () => {
-    const negativeModel = { ...contractYchCitra, unitCost: "-1" };
+    const negativeModel = { ...contractEdit, unitCost: "-1" };
     const controlled = htmlOf(createElement(ContractView, { model: negativeModel, controls: { quantity: () => {}, unitCost: () => {} } }));
     const controlledCost = /<input\b[^>]*id="[^"]+-cost"[^>]*>/.exec(controlled)?.[0];
     expect(controlledCost).toBeDefined();
@@ -692,7 +692,7 @@ describe("Vendors", () => {
     const descriptions = /aria-describedby="([^"]+)"/.exec(cost!)?.[1].split(/\s+/);
     expect(descriptions).toContain(errorId);
     expect(negativeCost).toMatch(/<button[^>]*disabled[^>]*>Save contract<\/button>/);
-    const exponentQuantity = htmlOf(createElement(ContractView, { model: { ...contractYchCitra, quantity: "1e3" } }));
+    const exponentQuantity = htmlOf(createElement(ContractView, { model: { ...contractEdit, quantity: "1e3" } }));
     const quantity = /<input\b[^>]*id="[^"]+-quantity"[^>]*>/.exec(exponentQuantity)?.[0];
     expect(quantity).toContain('aria-invalid="true"');
     expect(exponentQuantity).toMatch(/<button[^>]*disabled[^>]*>Save contract<\/button>/);
@@ -700,7 +700,7 @@ describe("Vendors", () => {
 
   it("the contract's inline field pairs render without a React key warning (E.inline owns the keys)", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    htmlOf(createElement(ContractView, { model: contractYchCitra }));
+    htmlOf(createElement(ContractView, { model: contractEdit }));
     const errors = error.mock.calls.flat().join(" ");
     error.mockRestore();
 
@@ -759,7 +759,7 @@ describe("New PO lines", () => {
     const noop = () => {};
     const remove = vi.fn();
     const model = {
-      backHref: "/purchase-orders", vendor: "vendor", vendors: [{ id: "vendor", name: "Country Malt" }],
+      backHref: "/purchase-orders", vendor: "vendor", vendors: [{ id: "vendor", name: "Fictional Malt Supply" }],
       materials: [{ id: "malt", name: "2-row", purchase_uom: "bag", lot_tracked: false }], expected: "",
       lines: [
         { key: "0", materialId: "malt", title: "2-row", detail: "", qty: "4", cost: "" },
@@ -781,8 +781,8 @@ describe("New PO lines", () => {
   });
 
   it("the inventory New PO draws Remove on its lines too, and none is flagged", () => {
-    const html = htmlOf(createElement(NewPoView, { model: newPoCountryMalt }));
-    expect(html.match(/>Remove</g)).toHaveLength(newPoCountryMalt.lines.length);
+    const html = htmlOf(createElement(NewPoView, { model: newPoDraft }));
+    expect(html.match(/>Remove</g)).toHaveLength(newPoDraft.lines.length);
     expect(html).not.toContain('aria-invalid="true"');
   });
 
@@ -834,7 +834,7 @@ it("receipt history uses frozen units and names and exposes explicit revision li
 });
 
 describe("past PO Expected date (#1489)", () => {
-  const html = (expected: string) => htmlOf(createElement(NewPoView, { model: { ...newPoCountryMalt, expected, today: "2026-10-23" } }));
+  const html = (expected: string) => htmlOf(createElement(NewPoView, { model: { ...newPoDraft, expected, today: "2026-10-23" } }));
   it("warns before the brewery's today without blocking Save draft", () => {
     expect(html("2026-10-03")).toContain("This expected date is in the past for your brewery. You can still save the PO.");
     expect(html("2026-10-24")).not.toContain("in the past");

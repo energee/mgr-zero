@@ -5,7 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { KegFleetView, KegEventFields, KegPoolFields } from "@/components/mgr/views/keg-fleet";
-import { kegFleetMicrostar } from "@/lib/mgr/fixtures/kegs";
+import { kegFleet } from "@/lib/mgr/fixtures/kegs";
 import { kegEventUnavailable, needsKegCustomer, toKegFleetViewProps, type KegPoolValue } from "@/lib/mgr/keg-fleet-view";
 import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
@@ -44,8 +44,8 @@ describe("Keg fleet shared fields", () => {
   });
 
   it("the inventory pool controls and shared event fields use the same labels as live", () => {
-    const inventory = html(createElement(KegFleetView, { model: toKegFleetViewProps(kegFleetMicrostar) }));
-    const event = html(createElement(KegEventFields, { value: kegFleetMicrostar.eventForm!, options: kegFleetMicrostar.eventOptions! }));
+    const inventory = html(createElement(KegFleetView, { model: toKegFleetViewProps(kegFleet) }));
+    const event = html(createElement(KegEventFields, { value: kegFleet.eventForm!, options: kegFleet.eventOptions! }));
     for (const label of ["Pool name", "Kind", "Vendor", "Per-fill cost ($)", "Deposit per keg ($)"]) expect(inventory).toContain(label);
     for (const label of ["Keg pool", "Size", "Bin", "Customer", "Kegs", "Note"]) expect(event).toContain(label);
   });
