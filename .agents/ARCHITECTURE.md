@@ -155,7 +155,7 @@ a gap to close, not a convention to trust.
    nonempty canonical array; authorization uses overlap with explicitly allowed
    roles, not a primary role. Cross-tenant FKs are composite so a row can't reference
    another brewery's data. Portal customers never `SELECT` the `breweries` base
-   table (`ttb_registry_no`, `pa_license_no`, `settings` stay staff-only); they
+   table (`ttb_registry_no`, `settings` stay staff-only); they
    read `portal_brewery` (`id`, `name`, `timezone`, `portal_fulfillment_location_id`).
    Staff and customers share one table grant, so the same holds for
    `invoices`, `order_events`, `shipments` and `deliveries` (#754): no customer

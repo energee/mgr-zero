@@ -41,14 +41,15 @@ describe("customer controls", () => {
     const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
     const input = { ...address, label: "Second", customerId: c.id, isDefault: true };
     const second = await runCommand("upsert_ship_to", input, ctx, execution) as { id: string };
-    const updated = await runCommand("upsert_ship_to", { ...address, id: second.id, customerId: c.id }, ctx) as { is_default: boolean };
+    // A customer's ship-to labels are unique (ship_tos_customer_label_key), so each keeps its own.
+    const updated = await runCommand("upsert_ship_to", { ...address, label: "Second", id: second.id, customerId: c.id }, ctx) as { is_default: boolean };
     expect(updated.is_default).toBe(true);
     await runCommand("upsert_ship_to", { ...address, id: first.id, customerId: c.id, isDefault: true }, ctx);
     expect(await runCommand("upsert_ship_to", input, ctx, execution)).toEqual(second);
     const { data, error } = await admin.from("ship_tos").select("id").eq("customer_id", c.id).eq("is_default", true);
     expect(error).toBeNull();
     expect(data).toEqual([{ id: first.id }]);
-    const plain = await runCommand("upsert_ship_to", { ...address, customerId: c.id }, ctx) as { is_default: boolean };
+    const plain = await runCommand("upsert_ship_to", { ...address, label: "Third", customerId: c.id }, ctx) as { is_default: boolean };
     expect(plain.is_default).toBe(false);
     await expect(runCommand("upsert_ship_to", { ...input, isDefault: false }, ctx, execution)).rejects.toThrow();
     const invalid = await ctx.db.rpc("upsert_ship_to", {
@@ -69,7 +70,7 @@ describe("customer controls", () => {
   it("direct RPC serializes concurrent defaults and rejects reassignment or another tenant without clearing the default", async () => {
     const c = await customer();
     const args = { p_brewery: breweryId, p_id: null, p_customer: c.id, p_label: "Concurrent", p_address1: address.address1, p_address2: null, p_city: address.city, p_state: address.state, p_zip: address.zip, p_is_default: true };
-    const results = await Promise.all(Array.from({ length: 4 }, () => ctx.db.rpc("upsert_ship_to", { ...args, p_request_id: crypto.randomUUID() })));
+    const results = await Promise.all(Array.from({ length: 4 }, (_, n) => ctx.db.rpc("upsert_ship_to", { ...args, p_label: `Concurrent ${n}`, p_request_id: crypto.randomUUID() })));
     results.forEach((r) => expect(r.error).toBeNull());
     const defaults = await admin.from("ship_tos").select("id").eq("customer_id", c.id).eq("is_default", true);
     expect(defaults.error).toBeNull();
@@ -89,7 +90,7 @@ describe("customer controls", () => {
     const loc = await admin.from("locations").insert({ brewery_id: breweryId, name: "Warehouse", uses: ["warehouse"] }).select().single();
     expect(loc.error).toBeNull();
     for (const [customerId, status] of [[a.id, "draft"], [a.id, "submitted"], [b.id, "draft"]] as const) {
-      const ship = await runCommand("upsert_ship_to", { ...address, customerId }, ctx) as { id: string };
+      const ship = await runCommand("upsert_ship_to", { ...address, label: `Main ${status}`, customerId }, ctx) as { id: string };
       assert(loc.data !== null);
       const row = await admin.from("orders").insert({ brewery_id: breweryId, kind: "wholesale", customer_id: customerId, ship_to_id: ship.id, from_location_id: loc.data.id, sale_channel_id: channel, created_by: ctx.userId, status });
       expect(row.error).toBeNull();
