@@ -4,7 +4,8 @@
 // record a movement, each active SKU's row ends with Record movement, the same
 // deep link as SKU detail's header button (#1507). The header holds
 // the page actions: live slots MovementForm as createAction beside Add SKU in
-// Catalog (#1113), and the movements ledger as footer.
+// Catalog (#1113) and Record taproom count (#1518), and the movements ledger
+// as footer.
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
@@ -41,7 +42,9 @@ export function FinishedGoodsView({
   /** Where Add SKU in Catalog goes; null hides it for a user who may not
    *  create a SKU. The inventory leaves it out and the button stays inert. */
   addSkuHref?: string | null;
-  /** Weekly count records taproom stock only. null hides the pointer when denied. */
+  /** Where the header's Record taproom count goes (Weekly count records
+   *  taproom stock only); null hides it when denied. The inventory leaves it
+   *  out and the button stays inert. */
   countHref?: string | null;
   /** Live: movements ledger. Inventory omits this. */
   footer?: ReactNode;
@@ -53,14 +56,13 @@ export function FinishedGoodsView({
 }) {
   const to = (href: string) => (linkRows ? href : "#");
   const record = createAction !== undefined ? createAction : E.btn("Record movement");
-  // A reader who may do neither gets a bare title, not an empty action row.
-  const actions = record || addSkuHref !== null
-    ? <div className="flex flex-col gap-2 md:flex-row">{record}{addSkuHref !== null && E.btn("Add SKU in Catalog", "g", addSkuHref)}</div>
+  // A reader who may do none of them gets a bare title, not an empty action row.
+  const actions = record || countHref !== null || addSkuHref !== null
+    ? <div className="flex flex-col gap-2 md:flex-row">{record}{countHref !== null && E.btn("Record taproom count", "g", countHref)}{addSkuHref !== null && E.btn("Add SKU in Catalog", "g", addSkuHref)}</div>
     : undefined;
   return (
     <>
       {E.back("Beer", "Finished goods", actions, model.backHref)}
-      {countHref !== null && E.info(<>For physical taproom stock, <Link href={countHref ?? "#"} data-to="Weekly count" className={RECORD_LINK}>Record taproom count</Link> in Weekly count.</>)}
       {model.valueLine !== undefined ? E.fld("Inventory value", model.valueLine) : null}
       {model.empty ? E.blank(model.empty) : <RecordTable
         // The action column needs no visible header: its button names the verb.

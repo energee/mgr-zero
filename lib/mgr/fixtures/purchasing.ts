@@ -114,12 +114,13 @@ export const correctReceiptCountryMalt: ReceivePoViewModel = {
   info: CORRECTION_INFO,
 };
 
+/** list_materials rows with on hand summed across bins, as the live page passes them. */
 export const materialsOnHandList: MaterialsOnHandSnapshot = {
   rows: [
-    { key: "cans", title: "Cans · 16 oz", detail: "3,100 each · 2 lots · best by none" },
-    { key: "citra", title: "Citra 2026 · YCH", detail: "262 lb · 1 lot · best by Aug 31, 2027" },
-    { key: "malt", title: "2-row 2026 · Country Malt", detail: "8,800 lb · 3 lots · best by Mar 15, 2027" },
-    { key: "yeast", title: "Yeast · WLP066", detail: "2 brinks · 2 lots · best by Sep 8, 2026", warning: true },
+    { key: "cans", name: "Cans · 16 oz", category: "packaging", unit: "each", onHand: 3100, lotTracked: false, active: true },
+    { key: "citra", name: "Citra 2026 · YCH", category: "hop", unit: "lb", onHand: 262, lotTracked: true, active: true },
+    { key: "malt", name: "2-row 2026 · Country Malt", category: "malt", unit: "lb", onHand: 8800, lotTracked: true, active: true },
+    { key: "yeast", name: "Yeast · WLP066", category: "yeast", unit: "each", onHand: 0, lotTracked: true, active: false },
   ],
 };
 
@@ -153,11 +154,12 @@ export const materialCitra: MaterialViewModel = {
   active: true,
 };
 
+/** list_vendors_and_contracts rows, as the live page passes them. */
 export const vendorsList: VendorsSnapshot = {
   rows: [
-    { key: "ych", title: "YCH", detail: "hops · 1 active contract", verb: "Edit" },
-    { key: "cm", title: "Country Malt", detail: "grain · 1 active contract", verb: "Edit" },
-    { key: "can", title: "CanSource", detail: "packaging · 3 materials", verb: "Edit" },
+    { key: "ych", name: "YCH", active: true, lead_time_days: 7, observed: [{ sent_via: "mailto", n: 4, avg_lead_days: 6.5 }], contracts: [{ id: "ych-citra" }] },
+    { key: "cm", name: "Country Malt", active: true, lead_time_days: 10, observed: [], contracts: [{ id: "cm-2row" }] },
+    { key: "can", name: "CanSource", active: false, lead_time_days: null, observed: [], contracts: [] },
   ],
   materials: "12 materials",
   contracts: "2 active commitments",

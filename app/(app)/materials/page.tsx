@@ -47,9 +47,7 @@ export default async function MaterialsPage({ searchParams }: { searchParams: Pr
         backHref: "/beer",
         purchaseOrdersHref: canRun(ctx, "list_purchase_orders") ? "/purchase-orders" : null,
         rows: materials.map((m) => ({
-          key: m.id,
-          title: m.name,
-          detail: `${m.category} · ${m.base_uom} · ${total(m.id).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${m.base_uom} on hand${m.lot_tracked ? " · lot-tracked" : ""}${m.active ? "" : " · inactive"}`,
+          key: m.id, name: m.name, category: m.category, unit: m.base_uom, onHand: total(m.id), lotTracked: m.lot_tracked, active: m.active,
         })),
         filtered: Boolean(params.q || params.category),
       })}

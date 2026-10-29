@@ -1,7 +1,11 @@
-// components/mgr/views/vendors.tsx — Vendors list. Live slots VendorForm rows
-// and the contracts footer; inventory draws Edit and Materials / Contracts navs.
-import { Fragment, type ReactNode } from "react";
+// components/mgr/views/vendors.tsx — Vendors list, drawn by the shared
+// RecordTable (#1516): name, status, typed and observed lead time, contract
+// count, then Edit. There is no vendor page yet (#1586), so the name is plain
+// text. Live slots VendorForm as each row's Edit and the contracts footer;
+// inventory draws Edit and the Materials / Contracts navs.
+import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { RecordTable } from "@/components/mgr/views/record-table";
 import type { VendorsRowView, VendorsViewModel } from "@/lib/mgr/vendors-view";
 
 export type { VendorsViewModel };
@@ -28,11 +32,19 @@ export function VendorsView({
       {controls}
       {model.empty
         ? E.blank(model.empty)
-        : model.rows.map((row) => (
-          <Fragment key={row.key}>
-            {E.row(row.title, `${row.disabled ? "Inactive" : "Active"} · ${row.detail}`, rowTrailing ? rowTrailing(row) : E.act(row.verb), row.disabled ? "dis" : "")}
-          </Fragment>
-        ))}
+        : <RecordTable
+          // The action column needs no visible header: its button names the verb.
+          headers={["Vendor", "Status", "Lead time", "Observed lead time", "Contracts", <span key="action" className="sr-only">Actions</span>]}
+          align={["l", "l", "l", "l", "r", "l"]}
+          rows={model.rows.map((row) => ({
+            key: row.key,
+            href: null,
+            cells: [
+              row.name, row.status, row.leadTime, row.observed, row.contracts,
+              <span key="action">{rowTrailing ? rowTrailing(row) : E.act("Edit")}</span>,
+            ],
+          }))}
+        />}
       {footer ?? (
         <>
           {E.nav("Materials", model.materials)}
