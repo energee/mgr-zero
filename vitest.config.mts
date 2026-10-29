@@ -118,7 +118,8 @@ const pureTests = [
   "tests/order-sheets-view.test.ts",
   "tests/upc.test.ts",
   "tests/sku-share-controls.test.ts",
-  "tests/keyboard-focus.test.ts"
+  "tests/keyboard-focus.test.ts",
+  "tests/material-count-sheet.test.ts"
 ];
 
 export default defineConfig({

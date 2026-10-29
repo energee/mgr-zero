@@ -212,7 +212,7 @@ import { priceGroupTwo, pricingGrid } from "@/lib/mgr/fixtures/pricing";
 import { channelExport, saleChannelsList } from "@/lib/mgr/fixtures/settings-catalog";
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
 import {
-  contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsOnHandList,
+  contractYchCitra, contractsList, countSheetShelf, cycleCountCans, materialCitra, materialsOnHandList,
   correctReceiptCountryMalt, newPoCountryMalt, newPoIncomplete, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
@@ -1997,12 +1997,12 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Beer",
     name: "Materials on hand",
-    to: { Edit: "Edit material" },
+    to: { Edit: "Edit material", "Count sheet": "Count sheet" },
     job: "See material quantities, edit a material, and start a count",
     reads: "list_materials · get_material_on_hand",
-    writes: "none [edits happen in Edit material, counts in Cycle count]",
+    writes: "none [edits happen in Edit material, counts in Cycle count and Count sheet]",
     states: [["inactive", "an inactive material stays listed, its Status Inactive"], ["empty", "add a material, then open Purchase orders to receive stock"]],
-    spec: "The Beer landing's Materials on hand row opens this list. Each row shows the material's type, on hand summed across bins in its base unit, whether its lots are tracked, and its status. Edit opens Edit material for that material's definition; Count opens Cycle count for its stock; Add material opens a blank definition. One list serves both, so there is no separate definitions list.",
+    spec: "The Beer landing's Materials on hand row opens this list. Each row shows the material's type, on hand summed across bins in its base unit, whether its lots are tracked, and its status. Edit opens Edit material for that material's definition; Count opens Cycle count for its stock; Count sheet opens one count over every listed material held in a bin; Add material opens a blank definition. One list serves both, so there is no separate definitions list.",
     body: <MaterialsOnHandView model={toMaterialsOnHandViewProps(materialsOnHandList)} controls={<ListControls search={{ label: "Search materials", value: "", keep: {} }} scopes={toMaterialsScopes({ category: "" })} />} />,
   },
   {
@@ -2030,6 +2030,20 @@ export const SCREENS: Screen[] = [
     states: [["permission", "warehouse or brewer required", 1], ["one lot", "the variance lands on it · nothing to choose"], ["several lots", "a shortage consumes earliest best-by first; an overage lands on the newest lot"], ["no best-by", "lots with none fall to receipt order behind those that have one"], ["split", "a shortage crossing two lots names both in the preview", 1], ["base units", "enter the material base quantity · roll conversion remains unavailable", 1]],
     spec: "A count is one number and a material may hold several lots, so the RPC has to decide which lot moves. A shortage consumes earliest best-by first, not earliest receipt: best-by is what a recall and an expiry sweep read, and consuming the freshest lot first would leave the oldest to expire on the shelf. An overage lands on the newest lot, since unrecorded stock is far likelier to be the delivery just counted in than one from six months ago. Preview count names each affected lot and signed base-unit adjustment before Record count. Changed stock or lot metadata requires another preview; an uncertain record response freezes the request for exact retry. The chosen lot is always named in the preview: a variance that silently splits across two lots is the one thing this sheet must not do quietly. All materials use their stored base units. Roll conversion remains gated and no manual lot editor is offered.",
     body: <><CycleCountView model={cycleCountCans} footer={null} />{E.pin(<CycleCountFooter />)}</>,
+  },
+  {
+    step: 7,
+    slice: 2,
+    group: "Global",
+    surface: "sheet",
+    name: "Count sheet",
+    to: { Material: "Entity picker", "Preview count": "Count sheet", "Record count": "Materials on hand" },
+    job: "Count every material held in one bin in one pass",
+    reads: "get_material_on_hand · get_material_count_preview",
+    writes: "record_material_count [one RPC: reviewed revision + count + every counted line + exact adjustment movements]",
+    states: [["permission", "warehouse or brewer required", 1], ["blank", "a line left blank is not counted and not recorded"], ["matching", "a line that matches still records, with no adjustment", 1], ["empty", "no listed material has stock in the bin", 1]],
+    spec: "Materials on hand's Count sheet opens this. Pick the location and bin; the sheet lists every material on the list with stock in that bin, by name. Type a count for each material you counted and leave the rest blank. One preview covers every counted line and names each line's lots and signed adjustments, then one Record count saves them as one count with the reviewed revision. Lot choice, the stale-preview refusal and the frozen retry are Cycle count's. A search or type filter on the list narrows the sheet too.",
+    body: <><CycleCountView model={countSheetShelf} footer={null} />{E.pin(<CycleCountFooter />)}</>,
   },
   {
     step: 7,
