@@ -52,7 +52,7 @@ export function noPeriodsYet(cadence: Cadence, booksOpenedOn: string, today: str
 /** One period row: filed (with its day and taxpaid barrels), needs amendment,
  *  not filed, or still in progress, in sentence case (#1144). An ended, unfiled
  *  period reads No activity when `active` is false: the report reads no row
- *  dated in it (list_compliance_reports activePeriods, #1209). It is still
+ *  dated in it (list_compliance_active_periods, #1209). It is still
  *  Not filed, because an empty period is filed too. The live page adds
  *  the href; inventory rows stay inert. A filing whose filed_at is unset still
  *  reads as filed; only its day is unknown. */

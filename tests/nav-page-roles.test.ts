@@ -28,7 +28,7 @@ const PAGE_QUERIES: Record<string, readonly string[]> = {
   "/purchase-orders": ["list_purchase_orders", "list_vendors", "list_vendors_and_contracts", "list_materials", "get_purchase_order", "list_locations", "list_bins", "get_material_on_hand"],
   "/planning": ["get_material_requirements"],
   "/routes": ["list_routes"],
-  "/compliance": ["list_compliance_reports", "list_lots", "generate_compliance_report", "get_compliance_registry", "trace_lot"],
+  "/compliance": ["list_compliance_reports", "list_compliance_active_periods", "list_lots", "generate_compliance_report", "get_compliance_registry", "trace_lot"],
   "/kegs": ["get_keg_fleet", "list_locations", "list_bins", "list_customers", "list_vendors", "list_keg_events", "list_keg_pools", "get_customer_keg_balance"],
   "/taproom": ["list_locations", "get_taproom_count_snapshot", "get_taproom_draft_projection", "list_taproom_counts", "get_taproom_count"],
   "/taproom/board": ["list_locations", "list_skus", "list_open_taps", "list_tap_history"],

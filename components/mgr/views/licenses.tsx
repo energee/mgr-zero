@@ -1,5 +1,6 @@
 // components/mgr/views/licenses.tsx — the brewery's state licenses. Live
-// slots LicenseForm per row and as the add sheet.
+// slots LicenseForm per row and as the add sheet. Add license sits in the
+// empty state when there is no license, and at the list's foot otherwise.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { rowAction } from "@/components/mgr/views/registry-fields";
@@ -16,6 +17,7 @@ export function LicensesView({
   actions?: Record<string, ReactNode>;
   addLicenses?: ReactNode;
 }) {
+  const addAction = addLicenses !== undefined ? addLicenses : E.btn("Add license", "g");
   return (
     <>
       {E.back("Compliance", "Licenses", undefined, model.backHref)}
@@ -24,8 +26,9 @@ export function LicensesView({
           {E.row(row.title, row.detail, rowAction(row, actions), row.warning ? "w" : "")}
         </Fragment>
       ))}
-      {model.licenses.length === 0 && E.blank("No licenses yet. Record your state licenses here so their numbers and expiry dates are in one place.")}
-      {addLicenses !== undefined ? addLicenses : E.btn("Add license", "g")}
+      {model.licenses.length === 0
+        ? E.blank("No licenses yet. Record your state licenses here so their numbers and expiry dates are in one place.", undefined, addAction)
+        : addAction}
     </>
   );
 }

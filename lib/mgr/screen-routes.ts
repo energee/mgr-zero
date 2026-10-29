@@ -178,6 +178,7 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Materials on hand", file: "app/(app)/materials/page.tsx" },
   { name: "Materials empty", file: "app/(app)/materials/page.tsx" },
   { name: "Cycle count", file: "app/(app)/materials/page.tsx" },
+  { name: "Count sheet", file: "app/(app)/materials/page.tsx" },
   { name: "Add material", file: "app/(app)/materials/page.tsx" },
   { name: "Edit material", file: "app/(app)/materials/page.tsx" },
   { name: "Vendors", file: "app/(app)/vendors/page.tsx" },

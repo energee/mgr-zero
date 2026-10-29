@@ -183,6 +183,18 @@ describe("toRecipePageModel", () => {
     expect(currentHtml).toContain('href="/recipes/r1/new"');
     expect(currentHtml).toContain("New recipe version");
   });
+  it("offers Schedule batch beside New recipe version on the current version only (#1581)", () => {
+    const current = toRecipePageModel(predicted, ctx);
+    expect(current.scheduleHref).toBe("/batches?recipe=r1");
+    const drawn = (model: typeof current) => renderToStaticMarkup(createElement(RecipeView, { model, readOnly: true }));
+    expect(drawn(current)).toContain('href="/batches?recipe=r1"');
+    expect(drawn(current)).toContain("Schedule batch");
+    expect(drawn(toRecipePageModel({ ...predicted, version: { ...version, version: 1 } }, ctx))).not.toContain("Schedule batch");
+    const empty = toRecipePageModel({ ...snapshot, version: null, ingredients: [], waterAdditions: [] }, ctx);
+    expect(empty.scheduleHref).toBeUndefined();
+    expect(drawn(empty)).not.toContain("Schedule batch");
+    expect(drawn(empty)).toContain("New recipe version");
+  });
   it("says which saved line had no extract potential instead of a prediction", () => {
     const model = toRecipePageModel({ ...snapshot, ingredients: [{ ...snapshot.ingredients[0], extract_snapshot: null }] }, ctx);
     expect(model.predicted).toBe("CMG White Wheat had no extract potential when this version was saved; set it under Materials, then create the next version.");

@@ -1,7 +1,7 @@
 // app/(app)/compliance/page.tsx — Compliance months (screen record Compliance
 // months): ?cadence=month|quarter|year picks the tab; the recent periods of
 // that cadence and every filed one, each with its filing state (periodRow;
-// activePeriods tells an empty ended period from one to review), the
+// list_compliance_active_periods tells an empty ended period from one to review), the
 // Licenses link, and a lot-code search (?q=, list_lots) whose matches each
 // start a trace; no lot is listed before a search (#1510). Sales and Admin.
 import { z } from "zod";
@@ -29,10 +29,11 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
   const cadence = CADENCES[on][0];
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [{ filings, today, booksOpenedOn, activePeriods }, lots] = (await Promise.all([
+  const [{ filings, today, booksOpenedOn }, activePeriods, lots] = (await Promise.all([
     runCommand("list_compliance_reports", {}, ctx),
+    runCommand("list_compliance_active_periods", {}, ctx),
     q ? runCommand("list_lots", { q }, ctx) : [],
-  ])) as [{ filings: Filing[]; today: string; booksOpenedOn: string | null; activePeriods: string[] }, LotRowOut[]];
+  ])) as [{ filings: Filing[]; today: string; booksOpenedOn: string | null }, string[], LotRowOut[]];
   const filed = new Map(filings.filter((f) => f.jurisdiction === JURISDICTION).flatMap((f) => {
     const key = periodKey(f.period_start, f.period_end);
     return key && cadenceOf(key) === cadence ? [[key, f] as const] : [];
