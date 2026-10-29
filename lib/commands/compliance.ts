@@ -278,8 +278,15 @@ defineCommand({
 
 const CADENCES: Cadence[] = ["month", "quarter", "year"];
 
+/** The brewery's today and books-opened date, read together. */
+async function todayAndBooksOpened(ctx: Ctx) {
+  const [today, brewery] = await Promise.all([breweryToday(ctx),
+    unwrap(ctx.db.from("breweries").select("books_opened_on").eq("id", ctx.breweryId).single())]);
+  return { today, booksOpenedOn: brewery?.books_opened_on ?? null };
+}
+
 defineQuery({
-  name: "list_compliance_reports", description: "Filed snapshots, newest period first, optionally one jurisdiction and period, plus the brewery's today and books-opened date for the month list, and activePeriods: the keys of the recent month, quarter and year periods holding any row the period report reads (a finished-goods movement, cellar removal or invoice line); a recent period not listed has no activity",
+  name: "list_compliance_reports", description: "Filed snapshots, newest period first, optionally one jurisdiction and period, plus the brewery's today and books-opened date for the month list; which recent periods hold activity is list_compliance_active_periods",
   roles: [...ROLES], input: period.partial(),
   handler: async (ctx, i) => {
     let q = ctx.db.from("report_filings").select("*, basis_amendments:report_basis_amendments(*, correction:reporting_basis_corrections(*))")
@@ -287,23 +294,31 @@ defineQuery({
     if (i.jurisdiction) q = q.eq("jurisdiction", i.jurisdiction);
     if (i.periodStart) q = q.eq("period_start", i.periodStart);
     if (i.periodEnd) q = q.eq("period_end", i.periodEnd);
-    const [filings, today, brewery] = await Promise.all([rows<Filing>(q), breweryToday(ctx),
-      unwrap(ctx.db.from("breweries").select("books_opened_on").eq("id", ctx.breweryId).single())]);
-    const booksOpenedOn = brewery?.books_opened_on ?? null;
+    const [filings, dates] = await Promise.all([rows<Filing>(q), todayAndBooksOpened(ctx)]);
+    return {
+      filings: filings.map(filing => {
+        const affected = (filing.basis_amendments ?? []).sort((a, b) => b.correction.corrected_at.localeCompare(a.correction.corrected_at));
+        return { ...filing, needs_amendment: affected.length > 0, basis_amendments: affected };
+      }),
+      ...dates,
+    };
+  },
+});
+
+// Its own query because the activity scan is the slowest compliance read, and
+// only the Compliance list needs it; Settings and a period page do not (#1491).
+defineQuery({
+  name: "list_compliance_active_periods", description: "The keys of the recent month, quarter and year periods holding any row the period report reads (a finished-goods movement, cellar removal or invoice line); a recent period not listed has no activity",
+  roles: [...ROLES], input: z.object({}),
+  handler: async (ctx) => {
+    const { today, booksOpenedOn } = await todayAndBooksOpened(ctx);
     // The periods the Compliance list shows (#1209); a period is active when one of its months holds report activity.
     const recent = CADENCES.flatMap((cadence) => recentPeriods(today, cadence, booksOpenedOn)).map((key) => ({ key, ...periodRange(key)! }));
     // The function returns '{}', never null, for a range with no activity.
     const months = recent.length === 0 ? [] : await unwrap(ctx.db.rpc("list_compliance_active_months", {
       p_brewery: ctx.breweryId, p_start: recent.map((p) => p.periodStart).sort()[0], p_end: today,
     })) as string[];
-    return {
-      filings: filings.map(filing => {
-        const affected = (filing.basis_amendments ?? []).sort((a, b) => b.correction.corrected_at.localeCompare(a.correction.corrected_at));
-        return { ...filing, needs_amendment: affected.length > 0, basis_amendments: affected };
-      }),
-      today, booksOpenedOn,
-      activePeriods: recent.filter((p) => months.some((m) => m >= p.periodStart && m <= p.periodEnd)).map((p) => p.key),
-    };
+    return recent.filter((p) => months.some((m) => m >= p.periodStart && m <= p.periodEnd)).map((p) => p.key);
   },
 });
 

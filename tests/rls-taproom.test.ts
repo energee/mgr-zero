@@ -263,7 +263,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   readNames.push("order_packaging_shortfall_rows");
   // list_invoices and get_invoice read the QuickBooks push facts through it (#1045).
   readNames.push("invoice_push_facts");
-  // list_compliance_reports reads which recent periods hold report activity (#1209).
+  // list_compliance_active_periods reads which recent periods hold report activity (#1209).
   readNames.push("list_compliance_active_months");
   // Team's pending invitations (#1204) return no rows to a caller without Admin.
   readNames.push("list_pending_invitations");

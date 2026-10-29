@@ -2258,7 +2258,7 @@ export const SCREENS: Screen[] = [
     name: "Compliance months",
     to: { "September 2026": "Period in progress", "August 2026": "Filed period needs amendment" },
     job: "Choose a monthly, quarterly, or annual reporting period and see whether its snapshot was filed",
-    reads: "list_compliance_reports · list_lots",
+    reads: "list_compliance_reports · list_compliance_active_periods · list_lots",
     writes: "none",
     states: [["not filed", "Not filed · Ready to review", 1], ["no activity", "an ended, unfiled period with no movement, cellar removal or invoice · Not filed · No activity", 1], ["in progress", "the current period: reviewable · In progress · File after the month ends"], ["filed", "the snapshot saved in MGR · Filed <date> · <bbl> taxpaid"], ["lot search", "a lot code lists the newest matching lots, each opening its trace; none before a search"], ["no lot match", "No lots match · check the code or clear the search", 1], ["no period yet", "every recent period starts before the books opened · names that date and the first period MGR can report"]],
     spec: "This is the shared destination for the Licenses back link, the period rows, and the lot trace. Monthly, Quarterly, and Annual tabs swap the list: the last three months, four calendar quarters, or two calendar years show, less any that start before the books-opened date, plus every filed period of that length. A tab left with no period says No monthly (quarterly, annual) period yet. Lot trace is a lot-code search: no lot is listed until a code is searched, then the 50 newest matches show. A TTB filing is exactly one calendar month, quarter, or year; the API takes other jurisdictions and ranges.",
