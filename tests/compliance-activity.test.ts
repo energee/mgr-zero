@@ -48,8 +48,8 @@ describe("list_compliance_active_periods", () => {
   it("names a month holding only an invoice line, and not one holding only an export's invoice", async () => {
     const brewery = await makeBrewery();
     const staff = await makeStaffCtx(brewery.id);
-    const listed = () => runCommand("list_compliance_reports", {}, staff) as Promise<Listed>;
-    const [current, last, before] = recentPeriods((await listed()).today, "month");
+    const { today } = await runCommand("list_compliance_reports", {}, staff) as { today: string };
+    const [current, last, before] = recentPeriods(today, "month");
     const day = (key: string) => periodRange(key)!.periodStart;
     const customer = await seedCustomer(brewery.id, { state: "NY" });
     const { skuId } = await seedCatalog(brewery.id, { bblPerUnit: 0.5 });
@@ -69,7 +69,7 @@ describe("list_compliance_active_periods", () => {
       { ...base, type: "sale_removal", qty: -1, ref: order.id, dest_country: "CA", sale_channel_id: customer.saleChannelId, tax_treatment: "export" },
     ]);
     await invoiceLine(day(before), shipment.id);
-    const { activePeriods } = await listed();
+    const activePeriods = await runCommand("list_compliance_active_periods", {}, staff) as string[];
     expect(activePeriods).toEqual(expect.arrayContaining([current, last]));
     expect(activePeriods).not.toContain(before);
   });
