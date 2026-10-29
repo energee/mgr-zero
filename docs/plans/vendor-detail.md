@@ -171,7 +171,7 @@ they run in order. Waves:
      - `ContractsRowView.verb` becomes optional.
      - Add `contractRowView(c: { id: string; contract_no: string | null; material_name: string | null; qty_committed: number; qty_received: number; qty_on_order: number; qty_available: number }, vendorName?: string): ContractsRowView`. It sets `verb: "Edit"` only when `vendorName` is given, because only the Vendors list mounts `ContractForm`.
    - In `ContractsView`, the fallback becomes `rowTrailing?.(row) ?? (row.verb ? E.act(row.verb) : null)`.
-   - `app/(app)/vendors/page.tsx` calls `contractRowView(c, v.name)` in place of its inline strings. Its output is unchanged.
+   - `app/(app)/vendors/page.tsx` calls `contractRowView(c, v.name)` instead of building the strings inline. Its output is unchanged.
    - Reuse: `fmtVendorQty` from `vendors-view.ts`.
    - Accept: vitest and tsc. `tests/contract-units.test.ts` stays green.
 
