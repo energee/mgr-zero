@@ -183,6 +183,8 @@ describe("POST /api/command bearer auth", () => {
     expect(json).toMatchObject({ ok: true, correlationId: expect.any(String) });
     expect(json.requestId).toBeUndefined();
     expect(Array.isArray(json.data)).toBe(true);
+    // #1490: the stages a hosted save splits into, durations only.
+    expect(res.headers.get("server-timing")).toMatch(/^auth;dur=[\d.]+, admission;dur=[\d.]+, command;dur=[\d.]+$/);
   });
 
   it("rejects a missing command request id without calling the handler", async () => {
@@ -263,6 +265,8 @@ describe("POST /api/command bearer auth", () => {
     const json = await res.json();
     expect(res.status).toBe(401);
     expect(json).toMatchObject({ ok: false, error: { message: "unauthenticated" }, correlationId: expect.any(String) });
+    // A failed stage is still timed; the stages after it never ran.
+    expect(res.headers.get("server-timing")).toMatch(/^auth;dur=[\d.]+$/);
   });
 
   it("rejects a malformed Authorization header", async () => {
@@ -308,6 +312,7 @@ describe("POST /api/command bearer auth", () => {
     const res = await POST(commandReq({ breweryId, name: "execution_metadata_probe", input: {}, requestId }, adminToken));
     expect(res.status).toBe(429);
     expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(res.headers.get("server-timing")).toMatch(/^auth;dur=[\d.]+, admission;dur=[\d.]+$/);
     await expect(res.json()).resolves.toMatchObject({ ok: false, error: { code: "rate_limited" }, requestId, correlationId: expect.any(String) });
     expect(executionHandler).not.toHaveBeenCalled();
     expect(sql(`select count(*) from private.command_requests where request_id='${requestId}'`)).toEqual(["0"]);

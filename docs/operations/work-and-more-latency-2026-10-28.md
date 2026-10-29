@@ -184,4 +184,5 @@ A hosted measurement is the next step.
 Time the same signed-in pages on live with the QA account.
 For one Ship and one page load, read the Vercel function duration and the Supabase request log for the same request.
 That splits cold start from database latency.
+Once deployed, the app's own stage timings give the same split; see "Stage timings" in [`pilot-latency-protocol.md`](pilot-latency-protocol.md).
 After that split, a bounded fix can target the measured stage.
