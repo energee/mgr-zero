@@ -124,16 +124,31 @@ export const materialsOnHandList: MaterialsOnHandSnapshot = {
   ],
 };
 
-export const cycleCountCans: CycleCountViewModel = {
+const cansLine: CycleCountViewModel["lines"][number] = {
+  key: "cans",
   material: "Cans · 16 oz",
   qty: "3050",
   unitIndex: 0,
   units: ["each"],
   preview: "system 3,100 · variance −50 · reviewed against current stock",
   adjustments: [{ key: "lot-0774", lot: "L-0774", expected: 3100, counted: 3050, delta: -50, unit: "each" }],
+};
+
+export const cycleCountCans: CycleCountViewModel = {
+  lines: [cansLine],
   locationId: "warehouse", binId: "shelf",
   locations: [{ id: "warehouse", name: "Warehouse" }],
   bins: [{ id: "shelf", name: "Shelf" }],
+};
+
+/** Count sheet at the warehouse shelf: two lines counted and previewed, one left blank (#1583). */
+export const countSheetShelf: CycleCountViewModel = {
+  ...cycleCountCans,
+  lines: [
+    cansLine,
+    { key: "gypsum", material: "Gypsum", qty: "", unitIndex: 0, units: ["g"], preview: "system 2,000 · not counted" },
+    { key: "lids", material: "Lids · 202", qty: "1200", unitIndex: 0, units: ["each"], preview: "system 1,200 · variance 0 · reviewed against current stock", adjustments: [] },
+  ],
 };
 
 export const materialCitra: MaterialViewModel = {

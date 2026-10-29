@@ -70,6 +70,7 @@ export const customerRidgeline: CustomerSnapshot = {
   ],
   kegs: { out: 38, depositCents: 114000 },
   orders: { open: 3, total: 42 },
+  openBalance: { cents: 192800, invoices: 2 },
 };
 
 /** Main ship-to sheet. */
