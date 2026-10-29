@@ -102,7 +102,7 @@ describe("hint roles", () => {
   it("keeps frozen counts and overdrawn packaging inputs assertive, not their previews", () => {
     const count = renderToStaticMarkup(createElement(CycleCountView, { model: cycleCountCans, frozen: true }));
     expect(cards(count, "alert")).toContain("No trustworthy response arrived");
-    expect(cards(count, "note")).toContain(cycleCountCans.preview);
+    expect(cards(count, "note")).toContain(cycleCountCans.lines[0].preview);
     for (const restoring of [false, true]) {
       const packaging = renderToStaticMarkup(createElement(PackagingMaterialActuals, {
         plan: { revision: "1", planned: [], sources: [], materials: [], lots: [] }, locations: [], bins: [], restoring,
