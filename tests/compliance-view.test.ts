@@ -165,6 +165,15 @@ describe("Licenses", () => {
     expect(form).toContain("Still needed: a state.");
   });
 
+  it("puts Add license in the empty state, and at the foot once a license exists (#1517, #1226)", () => {
+    const empty = htmlOf(createElement(LicensesView, { model: { licenses: [] } }));
+    expect(empty).toMatch(/data-slot="empty-content"[^>]*>(?:(?!<\/div>)[\s\S])*Add license/);
+    expect(empty.match(/Add license/g)).toHaveLength(1);
+    const listed = htmlOf(createElement(LicensesView, { model: toLicensesViewProps(licensesDemo) }));
+    expect(listed).not.toContain('data-slot="empty-content"');
+    expect(listed).toMatch(/PA brewery[\s\S]*Add license/);
+  });
+
   it("the Licenses inventory record is LicensesView: the brewery's licenses, no brand tab", () => {
     const body = screen("Licenses").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(LicensesView);
