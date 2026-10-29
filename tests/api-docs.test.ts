@@ -263,6 +263,13 @@ describe("HTTP API reference", () => {
     }
   });
 
+  // land-pr.sh commits what `bun run docs:api` regenerates after syncing main.
+  // An unstaged backlog left it with nothing to commit, so it exited 3 (#1601).
+  it("land-pr stages the backlog it regenerates", () => {
+    const stage = read("scripts/land-pr.sh").split("\n").find((line) => line.includes("git add -A supabase/migrations.lock.json"));
+    expect(stage).toContain(BACKLOG_PATH);
+  });
+
   // The matrix is what a developer building for one role reads instead of
   // checking 55 operations by hand.
   it("puts every available operation in the role matrix", () => {

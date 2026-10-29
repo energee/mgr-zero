@@ -82,7 +82,7 @@ fi
 bun run migrations:lock || exit 3
 bun run docs:api || exit 3
 if [ -n "$(git status --porcelain)" ]; then
-  git add -A supabase/migrations.lock.json content/docs || exit 3
+  git add -A supabase/migrations.lock.json content/docs .agents/superpowers/plans/2026-09-06-api-operations-backlog.md || exit 3
   git commit -q -m "chore: regenerate migration lock and API reference after syncing main${CLAUDE_SESSION_URL:+
 
 Claude-Session: $CLAUDE_SESSION_URL}" || exit 3
