@@ -1,4 +1,5 @@
-// Shared full-page purchase-order draft for the live app and screen inventory.
+// Shared full-page purchase-order draft for the live app and screen inventory:
+// New PO, and Edit PO for a draft not yet sent (#1584).
 "use client";
 import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
@@ -31,7 +32,7 @@ export function NewPoView({ model, controls = {}, messages, footer, submitting =
   const dateWarning = pastExpectedWarning(model.expected, model.today);
   const vendorOptions = [{ value: "", label: "Select vendor", disabled: true }, ...vendors.map(vendor => ({ value: vendor.id, label: vendor.name }))];
   return <>
-    {E.back("Purchase orders", "New PO", undefined, model.backHref)}
+    {E.back("Purchase orders", model.title ?? "New PO", undefined, model.backHref)}
     <fieldset disabled={submitting} className="flex min-w-0 flex-col gap-6">
       <FieldGroup className="grid gap-4 md:grid-cols-[2fr_1fr]">
         {E.pick("Vendor", model.vendor, vendorOptions, {

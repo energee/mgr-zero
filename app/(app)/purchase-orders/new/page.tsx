@@ -15,8 +15,8 @@ export default async function NewPurchaseOrderPage() {
   requirePagePermission(ctx, "create_purchase_order", "New PO");
   // Vendors with their contracts: a line prefills its cost from the one contract in force (#1507).
   const [vendors, materials] = await Promise.all([
-    runPageQuery("list_vendors_and_contracts", {}, ctx) as Promise<{ id: string; name: string; active: boolean; contracts: PoContract[] }[]>,
+    runPageQuery("list_vendors_and_contracts", {}, ctx) as Promise<{ id: string; name: string; active: boolean; lead_time_days: number | null; contracts: PoContract[] }[]>,
     runPageQuery("list_materials", {}, ctx) as Promise<{ id: string; name: string; purchase_uom: string; lot_tracked: boolean; default_vendor_id: string | null }[]>,
   ]);
-  return <NewPoForm vendors={vendors.filter(vendor => vendor.active).map(({ id, name }) => ({ id, name }))} contracts={vendors.flatMap(vendor => vendor.contracts)} materials={materials} today={breweryDate(brewery.timeZone)} />;
+  return <NewPoForm vendors={vendors.filter(vendor => vendor.active).map(({ id, name, lead_time_days }) => ({ id, name, lead_time_days }))} contracts={vendors.flatMap(vendor => vendor.contracts)} materials={materials} today={breweryDate(brewery.timeZone)} />;
 }

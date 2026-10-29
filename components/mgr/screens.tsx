@@ -214,7 +214,7 @@ import { channelExport, saleChannelsList } from "@/lib/mgr/fixtures/settings-cat
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
 import {
   contractYchCitra, contractsList, countSheetShelf, cycleCountCans, materialCitra, materialsOnHandList,
-  correctReceiptCountryMalt, newPoCountryMalt, newPoIncomplete, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorDetailYch, vendorYch, vendorsList,
+  correctReceiptCountryMalt, draftPoCanSource, editPoCanSource, newPoCountryMalt, newPoIncomplete, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorDetailYch, vendorYch, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
 import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
@@ -1929,7 +1929,7 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Work",
     name: "Purchase orders",
-    to: { "New PO": "New PO", "Mark sent": "Receive PO" },
+    to: { "New PO": "New PO", "Mark sent": "Draft PO" },
     job: "See draft, sent and partially received purchase orders",
     reads: "list_purchase_orders",
     writes: "none [creation and receiving happen on their own surfaces]",
@@ -1946,8 +1946,8 @@ export const SCREENS: Screen[] = [
     job: "Draft a vendor order: lines, cost, and the lot the vendor named",
     reads: "list_vendors_and_contracts · list_materials · get_material_requirements",
     writes: "create_purchase_order [one RPC: draft PO + all lines] · send_purchase_order [Save and mark sent]",
-    states: [["permission", "warehouse or admin required", 1], ["new", "vendor and one line required · every line needs a material and a quantity above zero · Remove drops a line"], ["from requirements", "Planning drafts the lines; the shortfall is the quantity"], ["contracted lot", "the vendor named a lot on the contract · it prefills receiving"], ["contract in force", "one contract for the vendor and material in force today · the line's cost starts at its price and the line draws it down · several leave it blank"], ["no lot named", "the ordinary case · receiving captures it off the package"], ["past date", "an Expected date before brewery-local today warns; Save draft still works"]],
-    spec: "A flat form: vendor and optional expected date, then material lines with visible quantity and unit-cost labels. Spacing groups related fields without cards, repeated section headings, line-number headings, a Draft badge, or instructional paragraphs. Material, quantity, and cost align on large screens; smaller screens stack material above the numeric fields, and the narrowest screens stack all three. Each line owns its Remove action and optional expected lot. Expected lot is advisory, creates no lot record, and only appears for lot-tracked materials. Receiving prefills from it; the actual package decides the received lot. Once a vendor is chosen, its default materials lead the material picker. Save draft retains its validation reason; Save and mark sent waits on the same fields, marks the saved draft sent from a mail client, and opens it. If marking fails, the error says the draft is saved and links it.",
+    states: [["permission", "warehouse or admin required", 1], ["new", "vendor and one line required · every line needs a material and a quantity above zero · Remove drops a line"], ["lead time", "picking a vendor sets Expected to today plus its typed lead time · blank when it has none · still editable"], ["from requirements", "Planning drafts the lines; the shortfall is the quantity"], ["contracted lot", "the vendor named a lot on the contract · it prefills receiving"], ["contract in force", "one contract for the vendor and material in force today · the line's cost starts at its price and the line draws it down · several leave it blank"], ["no lot named", "the ordinary case · receiving captures it off the package"], ["past date", "an Expected date before brewery-local today warns; Save draft still works"]],
+    spec: "A flat form: vendor and optional expected date (picking a vendor fills it with today plus the vendor's lead time), then material lines with visible quantity and unit-cost labels. Spacing groups related fields without cards, repeated section headings, line-number headings, a Draft badge, or instructional paragraphs. Material, quantity, and cost align on large screens; smaller screens stack material above the numeric fields, and the narrowest screens stack all three. Each line owns its Remove action and optional expected lot. Expected lot is advisory, creates no lot record, and only appears for lot-tracked materials. Receiving prefills from it; the actual package decides the received lot. Once a vendor is chosen, its default materials lead the material picker. Save draft retains its validation reason; Save and mark sent waits on the same fields, marks the saved draft sent from a mail client, and opens it. If marking fails, the error says the draft is saved and links it.",
     body: <NewPoView model={newPoCountryMalt} />,
   },
   {
@@ -1968,9 +1968,29 @@ export const SCREENS: Screen[] = [
     job: "Count what arrived; trigger derives receipt status",
     reads: "get_purchase_order · list_locations · list_bins · get_material_on_hand [the first open line's material: the receipt starts on the bin holding the most of it]",
     writes: "cancel_purchase_order [draft or sent without receipts; required reason releases remainder] · close_purchase_order_short [received stock retained; required reason releases remainder] · send_purchase_order [single row draft → sent; an attestation: Marked sent, never Delivered] · receive_purchase_order [one RPC: receipt + lines (counted, over or short) + lots with best_by + material movements] · Recent lot suggestions [SCHEMA-GATE: post-v1 scope; the purchase-order query does not return recent material lots]",
-    states: [["loading", "PO-line skeleton"], ["draft", "Send purchase order is the one active verb · counts wait, and the receive verb is not drawn", 1], ["prefilled", "the PO named a lot · the field opens on it and the ordinary receipt changes nothing"], ["no lot on the PO", "the field opens empty · recent lots for that material are offered", 1], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
-    spec: "Cancel purchase order requires a reason and no posted receipts. Close short requires a reason after a receipt; only the unreceived remainder is released, with actor and time retained. Closed orders leave Work and planning, refuse new receipts, and receipt corrections never reopen them. Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named so the ordinary receipt is a glance and no typing. When the PO named none the field opens empty and offers that material\u2019s recent lots, which is what keeps one vendor lot from becoming two records over a stray space. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. Punctuation or case alone never reads as one: the schema spec owns that comparison rule. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
+    states: [["loading", "PO-line skeleton"], ["draft", "Mark sent is the one active verb · Edit draft reopens the lines · counts wait, and the receive verb is not drawn", 1], ["prefilled", "the PO named a lot · the field opens on it and the ordinary receipt changes nothing"], ["no lot on the PO", "the field opens empty · recent lots for that material are offered", 1], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
+    spec: "Cancel purchase order and Close short fold behind their titles below the order's next verb. Cancel purchase order requires a reason and no posted receipts. Close short requires a reason after a receipt; only the unreceived remainder is released, with actor and time retained. Closed orders leave Work and planning, refuse new receipts, and receipt corrections never reopen them. Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named so the ordinary receipt is a glance and no typing. When the PO named none the field opens empty and offers that material\u2019s recent lots, which is what keeps one vendor lot from becoming two records over a stray space. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. Punctuation or case alone never reads as one: the schema spec owns that comparison rule. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
     body: <ReceivePoView model={receivePoCountryMalt} />,
+  },
+  {
+    step: 7, slice: 2, tab: "Work", name: "Draft PO",
+    to: { "Edit draft": "Edit PO", "Mark sent": "Receive PO", "Cancel purchase order": "Purchase orders" },
+    job: "Mark a draft sent, or fix its lines first",
+    reads: "get_purchase_order",
+    writes: "send_purchase_order [single row draft → sent; an attestation: Marked sent, never Delivered] · cancel_purchase_order [required reason]",
+    states: [["permission", "warehouse or admin", 1], ["draft", "Mark sent first · Edit draft opens Edit PO · Cancel purchase order folded below"]],
+    spec: "Receive PO for a draft. The lines read as ordered, How it went out picks the attestation, and Mark sent is the verb. Edit draft opens the same New PO form on the saved lines. Cancel purchase order is rare, so it folds behind its title after Mark sent and opens to its reason and button.",
+    body: <ReceivePoView model={draftPoCanSource} />,
+  },
+  {
+    step: 7, slice: 2, tab: "Work", name: "Edit PO",
+    to: { "Add line": "Edit PO", Remove: "Edit PO", "Save draft": "Draft PO", "Save and mark sent": "Receive PO" },
+    job: "Change a draft's vendor, expected date or lines before it is sent",
+    reads: "get_purchase_order · list_vendors_and_contracts · list_materials",
+    writes: "update_purchase_order [one RPC: draft header + all lines replaced] · send_purchase_order [Save and mark sent]",
+    states: [["permission", "warehouse or admin required", 1], ["draft", "opens on the saved vendor, expected date and lines"], ["sent", "a sent or closed order returns to its page", 1]],
+    spec: "The New PO form, titled with the draft's number and opened on what was saved. The same validation and verbs apply: Save draft returns to the draft, and Save and mark sent marks it sent and opens it. The note a draft carries is kept.",
+    body: <NewPoView model={editPoCanSource} />,
   },
   {
     step: 7,

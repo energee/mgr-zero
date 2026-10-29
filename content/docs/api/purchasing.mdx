@@ -448,6 +448,26 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_vendor_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "vendorId": "00000000-0000-0000-0000-000000000000", "qboVendorId": "string" } }'
 ```
 
+## update_purchase_order [#update_purchase_order]
+
+`command` · admin, warehouse
+
+Edit a draft purchase order before it is sent: its vendor, expected date and all its lines, replaced in one write; a contracted line takes the contract price unless one is typed; a sent order is refused
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `poId` | uuid | yes |
+| `vendorId` | uuid | yes |
+| `lines` | array of object | yes |
+| `expectedOn` | date (YYYY-MM-DD) | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_purchase_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "poId": "00000000-0000-0000-0000-000000000000", "vendorId": "00000000-0000-0000-0000-000000000000", "lines": [ { "materialId": "00000000-0000-0000-0000-000000000000", "qtyOrdered": 1 } ] } }'
+```
+
 ## upsert_material [#upsert_material]
 
 `command` · admin, warehouse, brewer

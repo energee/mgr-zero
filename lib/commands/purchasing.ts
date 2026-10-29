@@ -1,5 +1,5 @@
 // lib/commands/purchasing.ts — vendors, materials, contracts, purchase orders
-// (draft → mark sent → receive), drafting POs from planning gaps, and material
+// (draft → edit → mark sent → receive), drafting POs from planning gaps, and material
 // cycle counts. Lead time is the vendor's (spec 2026-09-07 §3); open balance,
 // observed lead time and contract drawdown are views, never stored (§2–§4);
 // marking a PO sent is an attestation, so no email leaves here (§1).
@@ -208,6 +208,12 @@ const poLine = z.object({
   expectedLotCode: z.string().trim().optional(),
 });
 
+/** PO lines as the create and update RPCs take them. */
+const poLinesJson = (lines: z.infer<typeof poLine>[]) => lines.map((l) => ({
+  material_id: l.materialId, qty_ordered: l.qtyOrdered, unit_cost_cents: l.unitCostCents ?? null,
+  contract_id: l.contractId ?? null, expected_lot_code: l.expectedLotCode ?? null,
+}));
+
 defineCommand({
   name: "create_purchase_order",
   description: "Draft a purchase order with all its lines in one write; a contracted line takes the contract price unless one is typed, and the expected lot is advisory",
@@ -215,11 +221,20 @@ defineCommand({
   roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_purchase_order", {
     p_brewery: ctx.breweryId, p_vendor: i.vendorId, p_expected_on: i.expectedOn ?? null, p_note: i.note ?? null,
-    p_lines: i.lines.map((l) => ({
-      material_id: l.materialId, qty_ordered: l.qtyOrdered, unit_cost_cents: l.unitCostCents ?? null,
-      contract_id: l.contractId ?? null, expected_lot_code: l.expectedLotCode ?? null,
-    })),
-    p_request_id: execution.requestId,
+    p_lines: poLinesJson(i.lines), p_request_id: execution.requestId,
+  })),
+});
+
+// Edit PO (#1584): the draft's lines are replaced whole, since nothing refers
+// to a draft's lines before it is sent; the note is kept.
+defineCommand({
+  name: "update_purchase_order",
+  description: "Edit a draft purchase order before it is sent: its vendor, expected date and all its lines, replaced in one write; a contracted line takes the contract price unless one is typed; a sent order is refused",
+  input: z.object({ poId: z.string().uuid(), vendorId: z.string().uuid(), expectedOn: isoDate.optional(), lines: z.array(poLine).min(1) }),
+  roles: [...PO_ROLES],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_purchase_order", {
+    p_brewery: ctx.breweryId, p_po: i.poId, p_vendor: i.vendorId, p_expected_on: i.expectedOn ?? null,
+    p_lines: poLinesJson(i.lines), p_request_id: execution.requestId,
   })),
 });
 

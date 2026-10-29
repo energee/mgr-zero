@@ -1,8 +1,9 @@
 // app/(app)/purchase-orders/[id]/page.tsx — one purchase order
 // (get_purchase_order): header, lines with ordered / received / still due
 // (derived from receipts, never stored), receipts so far, and the one next
-// action for its state (po-actions.tsx): Mark sent or Receive, plus reason-bearing
-// cancellation before receipts or short closure after receiving.
+// action for its state (po-actions.tsx): Mark sent (with Edit draft) or Receive,
+// then reason-bearing cancellation before receipts or short closure after
+// receiving, folded below it.
 import { cache } from "react";
 import { formatVariance, receiptHref, toPostedReceiptViewProps, type ReceiptSnapshot } from "@/lib/mgr/receipt-view";
 import { notFound } from "next/navigation";
@@ -80,6 +81,7 @@ export default async function PurchaseOrderPage({ params, searchParams }: Props)
   return <ReceiveForm key={`${po.status}:${po.receipts.length}`} poId={po.id} lines={po.lines} locations={locations} bins={bins} onHand={onHand} today={today} model={{
     title: `${poNo(po.po_no)} · ${po.vendor?.name ?? "—"}`,
     backHref: "/purchase-orders", state: po.status, status: poDetailStatus(po), note: po.note ?? undefined,
+    editHref: `/purchase-orders/${po.id}/edit`,
     closure: (OPEN_PO_STATUSES as readonly string[]).includes(po.status)
       ? po.receipts.length ? "short" : "cancel" : undefined,
     history: po.receipts.map(receipt => ({

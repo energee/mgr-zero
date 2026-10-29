@@ -23,7 +23,7 @@ import { VendorDetailView } from "../components/mgr/views/vendor-detail";
 import { toVendorDetailViewProps } from "../lib/mgr/vendor-detail-view";
 import {
   contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsOnHandList,
-  correctReceiptCountryMalt, newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorDetailYch, vendorYch, vendorsList,
+  correctReceiptCountryMalt, draftPoCanSource, editPoCanSource, newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorDetailYch, vendorYch, vendorsList,
 } from "../lib/mgr/fixtures/purchasing";
 import { contractRowView, toContractsViewProps } from "../lib/mgr/contracts-view";
 import { toMaterialsOnHandViewProps, toMaterialsScopes } from "../lib/mgr/materials-on-hand-view";
@@ -32,7 +32,7 @@ import { poLineDetail, poLineQty } from "../lib/mgr/receive-po-view";
 import { receiptBillPresentation, receiptBillRequest, toPostedReceiptViewProps, type ReceiptSnapshot } from "../lib/mgr/receipt-view";
 import { toVendorsViewProps } from "../lib/mgr/vendors-view";
 import { contractSubmitReason } from "../lib/mgr/contract-view";
-import { newPoReason } from "../lib/mgr/new-po-view";
+import { expectedFromLeadTime, newPoReason } from "../lib/mgr/new-po-view";
 import { CLOSURE_FORM_ID, receiveReason } from "../lib/mgr/receive-po-view";
 import { beginRecovery, discardRecovery } from "../lib/commands/recovery";
 
@@ -242,6 +242,42 @@ describe("Purchase orders", () => {
     expect(receiving).toContain("Best by");
     expect(receiving).toContain("Recent lots");
     expect(receiving).not.toContain('max="4"');
+  });
+
+  it("#1584 picking a vendor prefills Expected with today plus its lead time, or blank without one", () => {
+    expect(expectedFromLeadTime("2026-10-28", 7)).toBe("2026-11-04");
+    expect(expectedFromLeadTime("2026-12-30", 3)).toBe("2027-01-02");
+    expect(expectedFromLeadTime("2026-10-28", 0)).toBe("2026-10-28");
+    expect(expectedFromLeadTime("2026-10-28", null)).toBe("");
+    const form = src("app/(app)/purchase-orders/new-po-form.tsx");
+    expect(form).toMatch(/expectedFromLeadTime\(today, vendors\.find/);
+  });
+
+  it("#1584 a draft puts Mark sent before Cancel, which folds behind a disclosure", () => {
+    expect(screen("Draft PO").body).toEqual(createElement(ReceivePoView, { model: draftPoCanSource }));
+    const html = htmlOf(createElement(ReceivePoView, { model: draftPoCanSource }));
+    expect(html.indexOf(">Mark sent<")).toBeGreaterThan(-1);
+    expect(html.indexOf(">Mark sent<")).toBeLessThan(html.indexOf("Closure reason"));
+    expect(html).toMatch(/<details[^>]*><summary[^>]*>Cancel purchase order<\/summary>/);
+    expect(html).not.toMatch(/<details[^>]*open/);
+    // Close short folds the same way after the receive verb.
+    const short = htmlOf(createElement(ReceivePoView, { model: { ...receivePoCountryMalt, state: "partially_received", closure: "short" } }));
+    expect(short.indexOf(">Receive purchase order<")).toBeLessThan(short.indexOf("Closure reason"));
+    expect(short).toMatch(/<summary[^>]*>Close remaining quantity<\/summary>/);
+  });
+
+  it("#1584 a draft links Edit draft to the shared New PO form; the inventory link stays inert", () => {
+    expect(htmlOf(createElement(ReceivePoView, { model: draftPoCanSource }))).toMatch(/<a[^>]*href="#"[^>]*>Edit draft<\/a>/);
+    expect(htmlOf(createElement(ReceivePoView, { model: receivePoCountryMalt }))).not.toContain("Edit draft");
+    expect(screen("Edit PO").body).toEqual(createElement(NewPoView, { model: editPoCanSource }));
+    const html = htmlOf(createElement(NewPoView, { model: editPoCanSource }));
+    expect(html).toContain(">Edit PO-0143<");
+    expect(html).toContain("Save draft");
+    const page = src("app/(app)/purchase-orders/[id]/edit/page.tsx");
+    expect(page.indexOf('requirePagePermission(ctx, "update_purchase_order"')).toBeLessThan(page.indexOf('runPageQuery("get_purchase_order"'));
+    expect(page).toContain("<NewPoForm");
+    expect(src("app/(app)/purchase-orders/new-po-form.tsx")).toMatch(/"update_purchase_order"/);
+    expect(src("app/(app)/purchase-orders/[id]/page.tsx")).toMatch(/editHref: `\/purchase-orders\/\$\{po\.id\}\/edit`/);
   });
 
   it("the Receipt inventory adapter mounts the same ReceiptView as the live route", () => {

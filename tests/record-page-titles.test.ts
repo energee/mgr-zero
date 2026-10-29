@@ -89,6 +89,7 @@ const RECORDS = [
   ["orders/[id]/ship", "id", "get_order"],
   ["packaging/[id]", "id", "get_packaging_run"],
   ["purchase-orders/[id]", "id", "get_purchase_order"],
+  ["purchase-orders/[id]/edit", "id", "get_purchase_order"],
   ["recipes/[id]", "id", "get_recipe"],
   ["recipes/[id]/new", "id", "get_recipe"],
   ["routes/[id]", "id", "list_routes"],
