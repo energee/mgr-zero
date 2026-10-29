@@ -6,7 +6,8 @@
 // controlled, the schedule and ingredient rows open their sheets through
 // `slots`, the bottom button submits, and `controls.blockedReason` says what the
 // draft still lacks. Without `controls`, New recipe version sits in the
-// title row. parentForm draws the recipe's parent fields (name, brand and
+// title row, with Schedule batch (to New batch on Batches) beside it once a
+// version exists. parentForm draws the recipe's parent fields (name, brand and
 // note) at the top. Show totals at is a page-only batch size, never saved:
 // typed, each brew-day line shows its batch total in packs, and off the read
 // page each line not in whole packs offers "Round to N × size", down and up.
@@ -152,8 +153,14 @@ export function RecipeView({
       ) : null}
     </>
   );
-  // The draft submits at the bottom; every other surface (the live read page and the inventory frame alike) puts its one verb in the title row.
-  const verb = controls || model.historical ? undefined : E.btn("New recipe version", "p", model.createHref);
+  // The draft submits at the bottom; every other surface (the live read page and the inventory frame alike) puts its verbs in the title row:
+  // New recipe version, and once a version exists Schedule batch beside it (#1581).
+  let verb: ReactNode;
+  if (!controls && !model.historical) {
+    verb = model.empty
+      ? E.btn("New recipe version", "p", model.createHref)
+      : E.btns([["Schedule batch", "g", model.scheduleHref], ["New recipe version", "p", model.createHref]]);
+  }
   return (
     <>
       {E.back(model.backLabel ?? "Recipes", model.title, verb, model.backHref)}
