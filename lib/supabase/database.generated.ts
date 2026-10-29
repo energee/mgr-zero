@@ -371,14 +371,14 @@ isOneToOne: false
                   ]
                 },"breweries": {
                   Row: {
-                    "books_opened_on": string | null,"closed_at": string | null,"created_at": string,"customer_phone": string | null,"days_to_package": number,"fermentation_reading_due_hours": number,"gravity_unit": string,"id": string,"name": string,"one_way_keg_fee_cents": number,"pa_license_no": string | null,"portal_fulfillment_location_id": string | null,"settings": NonNullable<Json>,"timezone": string,"ttb_registry_no": string | null
+                    "books_opened_on": string | null,"closed_at": string | null,"created_at": string,"customer_phone": string | null,"days_to_package": number,"fermentation_reading_due_hours": number,"gravity_unit": string,"id": string,"name": string,"one_way_keg_fee_cents": number,"portal_fulfillment_location_id": string | null,"settings": NonNullable<Json>,"timezone": string,"ttb_registry_no": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name": string,"one_way_keg_fee_cents"?: number,"pa_license_no"?: string | null,"portal_fulfillment_location_id"?: string | null,"settings"?: NonNullable<Json>,"timezone"?: string,"ttb_registry_no"?: string | null
+                    "books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name": string,"one_way_keg_fee_cents"?: number,"portal_fulfillment_location_id"?: string | null,"settings"?: NonNullable<Json>,"timezone"?: string,"ttb_registry_no"?: string | null
                   }
                   Update: {
-                    "books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name"?: string,"one_way_keg_fee_cents"?: number,"pa_license_no"?: string | null,"portal_fulfillment_location_id"?: string | null,"settings"?: NonNullable<Json>,"timezone"?: string,"ttb_registry_no"?: string | null
+                    "books_opened_on"?: string | null,"closed_at"?: string | null,"created_at"?: string,"customer_phone"?: string | null,"days_to_package"?: number,"fermentation_reading_due_hours"?: number,"gravity_unit"?: string,"id"?: string,"name"?: string,"one_way_keg_fee_cents"?: number,"portal_fulfillment_location_id"?: string | null,"settings"?: NonNullable<Json>,"timezone"?: string,"ttb_registry_no"?: string | null
                   }
                   Relationships: [
                     {

@@ -192,6 +192,15 @@ describe("unwrap maps RPC SQLSTATEs to command errors", () => {
     expect(JSON.stringify(err)).not.toMatch(/QA test|bbl|0000/);
     log.mockRestore();
   });
+  it("23505 on a label key → 409 conflict that names the Label field, without the raw value (#1487)", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const details = "Key (brewery_id, customer_id, lower(btrim(label)))=(00000000-0000-4000-8000-000000000001, 00000000-0000-4000-8000-000000000002, qa test dock) already exists.";
+    const err = await unwrap(Promise.resolve({ data: null, error: { message: "duplicate key value violates unique constraint", code: "23505", details } })).catch((e: unknown) => e);
+    const message = "That label is already used. Choose a different label.";
+    expect(err).toMatchObject({ status: 409, code: "conflict", message, issues: [{ path: ["label"], code: "duplicate", message }] });
+    expect(JSON.stringify(err)).not.toMatch(/qa test|0000/);
+    log.mockRestore();
+  });
   it("23505 on another key keeps the generic conflict and no field issue", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     const err = await unwrap(Promise.resolve({ data: null, error: { message: "dup", code: "23505", details: "Key (brewery_id, rpc_name)=(x, y) already exists." } })).catch((e: unknown) => e);
