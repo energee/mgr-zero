@@ -112,6 +112,7 @@ const pureTests = [
   "tests/movement-form.test.ts",
   "tests/movement-receipt-labels.test.ts",
   "tests/purchasing-view.test.ts",
+  "tests/vendor-detail-view.test.ts",
   "tests/delivery-view.test.ts",
   "tests/transfers-view.test.ts",
   "tests/shipment-parity.test.ts",
