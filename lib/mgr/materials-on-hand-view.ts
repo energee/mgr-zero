@@ -1,14 +1,35 @@
 // lib/mgr/materials-on-hand-view.ts — view-model for Materials on hand, and
-// its Type pick (?category= narrows list_materials).
+// its Type pick (?category= narrows list_materials). Each material from
+// list_materials, with on hand summed across bins, becomes one RecordTable
+// row: name, type, on hand in its base unit, lots and status.
 import type { ListScope } from "@/components/mgr/list-controls";
 import type { EmptyState } from "./empty-state";
 import { MATERIAL_CATEGORIES } from "./enums";
 import { sentenceCase } from "./labels";
+
+/** One material as the page reads it: its definition and its summed on hand. */
+export type MaterialsOnHandMaterial = {
+  key: string;
+  name: string;
+  category: string;
+  /** The base unit on hand is counted in. */
+  unit: string;
+  onHand: number;
+  lotTracked: boolean;
+  active: boolean;
+};
+
 export type MaterialsOnHandRowView = {
   key: string;
-  title: string;
-  detail: string;
-  warning?: boolean;
+  name: string;
+  type: string;
+  /** "1,262.5 lb": thousands separated, at most two decimals, then the unit. */
+  onHand: string;
+  /** The on-hand figure the column sorts by. */
+  onHandQty: number;
+  /** "Tracked" for a lot-tracked material, else null (an empty cell). */
+  lots: string | null;
+  status: "Active" | "Inactive";
 };
 
 export type MaterialsOnHandViewModel = {
@@ -22,13 +43,25 @@ export type MaterialsOnHandSnapshot = {
   backHref?: string;
   /** Undefined keeps inventory navigation inert; null means the caller cannot open Purchase orders. */
   purchaseOrdersHref?: string | null;
-  rows?: MaterialsOnHandRowView[];
+  rows?: MaterialsOnHandMaterial[];
   /** A search or type is on, so an empty list means no match, not no materials. */
   filtered?: boolean;
 };
 
+function toRow(m: MaterialsOnHandMaterial): MaterialsOnHandRowView {
+  return {
+    key: m.key,
+    name: m.name,
+    type: sentenceCase(m.category),
+    onHand: `${m.onHand.toLocaleString("en-US", { maximumFractionDigits: 2 })} ${m.unit}`,
+    onHandQty: m.onHand,
+    lots: m.lotTracked ? "Tracked" : null,
+    status: m.active ? "Active" : "Inactive",
+  };
+}
+
 export function toMaterialsOnHandViewProps(s: MaterialsOnHandSnapshot): MaterialsOnHandViewModel {
-  const rows = s.rows ?? [];
+  const rows = (s.rows ?? []).map(toRow);
   const description = s.purchaseOrdersHref === null
     ? "Add a material, then ask an Admin or Warehouse teammate to order and receive it."
     : "Add a material, then receive a purchase order to put it on hand.";

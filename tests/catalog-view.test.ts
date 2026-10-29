@@ -531,7 +531,20 @@ describe("SKU view", () => {
     expect(saved).not.toContain("Use more than 0%");
     const creation = htmlOf(createElement(SkuView, { model: toSkuViewProps({ formats: skuHazyHalf.formats }) }));
     expect(creation).not.toContain('aria-label="Batch package share (%)"');
-    expect(creation).toContain("Edit the SKU after creation");
+    expect(creation).not.toContain("Edit the SKU after creation");
+  });
+
+  // Edit SKU help is a short description under its field, not a standing note (#1518).
+  it("describes share, format and keg pool under their fields, with no standing notes", () => {
+    const keg = htmlOf(createElement(SkuView, { model: toSkuViewProps(skuHazyHalf) }));
+    expect(keg).not.toContain('role="note"');
+    expect(keg).toMatch(/aria-describedby="sku-format-help"/);
+    expect(keg).toMatch(/id="sku-format-help"[^>]*>Volume and packaging come from the Format/);
+    expect(keg).toMatch(/aria-describedby="sku-batch-share-help"/);
+    expect(keg).toMatch(/id="sku-batch-share-help"[^>]*>All SKU shares for a brand together may not exceed 100%/);
+    expect(keg).toMatch(/id="sku-keg-pool-help"[^>]*>Wholesale orders charge this pool&#x27;s deposit per keg/);
+    const caseSku = htmlOf(createElement(SkuView, { model: { ...toSkuViewProps(skuHazyHalf), showKegPool: false } }));
+    expect(caseSku).not.toContain("deposit per keg");
   });
 
   it("renders Save SKU, Active, and the UPC", () => {
@@ -775,7 +788,6 @@ describe("Format view", () => {
 describe("Package BOM view", () => {
   it("maps replace_format_bom lines onto quantity rows", () => {
     const model = toPackageBomViewProps(packageBomCase);
-    expect(model.format).toBe("case · 24×16 oz");
     expect(model.rows.map((r) => [r.title, r.detail])).toEqual([
       ["16 oz can", "quantity 24 · consumed"],
       ["Can end", "quantity 24 · consumed"],
@@ -783,14 +795,20 @@ describe("Package BOM view", () => {
     ]);
   });
 
-  it("renders Format, Replace BOM, and the three materials", () => {
+  it("renders Replace BOM and the three materials", () => {
     const html = htmlOf(createElement(PackageBomView, { model: toPackageBomViewProps(packageBomCase) }));
     expect(html).toMatch(/>Replace BOM</);
     expect(html).toMatch(/16 oz can/);
     expect(html).toMatch(/Can end/);
     expect(html).toMatch(/Case tray/);
-    expect(html).toMatch(/case · 24×16 oz/);
     expect(html).not.toMatch(/→/);
+  });
+
+  // The Format page's header already names the format, and the row linked nowhere (#1517).
+  it("draws no Format row naming the page's own format", () => {
+    const html = htmlOf(createElement(PackageBomView, { model: toPackageBomViewProps(packageBomCase) }));
+    expect(html).not.toMatch(/>Format</);
+    expect(html).not.toContain("case · 24×16 oz");
   });
 
   it("footer null hides Replace BOM", () => {

@@ -28,7 +28,7 @@ import { toMaterialsOnHandViewProps, toMaterialsScopes } from "../lib/mgr/materi
 import { poDetailStatus, poListStatus, purchaseOrderNext, toPurchaseOrdersViewProps } from "../lib/mgr/purchase-orders-view";
 import { poLineDetail, poLineQty } from "../lib/mgr/receive-po-view";
 import { receiptBillPresentation, receiptBillRequest, toPostedReceiptViewProps, type ReceiptSnapshot } from "../lib/mgr/receipt-view";
-import { toVendorsViewProps, vendorLeadLine } from "../lib/mgr/vendors-view";
+import { toVendorsViewProps } from "../lib/mgr/vendors-view";
 import { contractSubmitReason } from "../lib/mgr/contract-view";
 import { newPoReason } from "../lib/mgr/new-po-view";
 import { CLOSURE_FORM_ID, receiveReason } from "../lib/mgr/receive-po-view";
@@ -93,11 +93,16 @@ describe("Purchase orders", () => {
   });
 
   it("a vendor's observed lead time reads as orders and how they were sent (#1501)", () => {
-    const vendor = { lead_time_days: null, contracts: [], observed: [
+    const vendor = { key: "v", name: "Hop Co", active: true, lead_time_days: null, contracts: [], observed: [
       { sent_via: "mailto", n: 2, avg_lead_days: 0 },
       { sent_via: "external", n: 1, avg_lead_days: 3.5 },
     ] };
-    expect(vendorLeadLine(vendor)).toBe("no lead time typed · observed 0 days over 2 orders sent from a mail client · observed 3.5 days over 1 order sent outside MGR · 0 contracts");
+    expect(toVendorsViewProps({ rows: [vendor] }).rows[0]).toEqual({
+      key: "v", name: "Hop Co", status: "Active", leadTime: "Not typed", contracts: 0,
+      observed: "0 days over 2 orders sent from a mail client · 3.5 days over 1 order sent outside MGR",
+    });
+    const typed = toVendorsViewProps({ rows: [{ ...vendor, active: false, lead_time_days: 1, observed: [], contracts: [{}] }] }).rows[0];
+    expect(typed).toMatchObject({ status: "Inactive", leadTime: "1 day", observed: null, contracts: 1 });
   });
 
   it("the Purchase orders inventory record is PurchaseOrdersView", () => {
@@ -361,11 +366,30 @@ describe("Materials", () => {
   // #1165: the definitions list was the same rows with Edit for Count, so each row now offers both.
   it("each Materials on hand row offers Edit beside Count, and no definitions list remains", () => {
     const html = htmlOf(createElement(MaterialsOnHandView, { model: toMaterialsOnHandViewProps(materialsOnHandList) }));
-    expect(html.match(/>Edit</g)).toHaveLength(materialsOnHandList.rows!.length);
-    expect(html.match(/>Edit<[\s\S]*?>Count</g)).toHaveLength(materialsOnHandList.rows!.length);
+    // RecordTable draws each record twice: the desk table and the phone list.
+    expect(html.match(/>Edit</g)).toHaveLength(materialsOnHandList.rows!.length * 2);
+    expect(html.match(/>Edit<[\s\S]*?>Count</g)).toHaveLength(materialsOnHandList.rows!.length * 2);
     expect(html).not.toContain("Material definitions");
     expect(SCREENS.find((s) => s.name === "Materials")).toBeUndefined();
     expect(src("app/(app)/materials/page.tsx")).not.toMatch(/definitions/);
+  });
+
+  // #1516 item 8: the shared RecordTable, its facts split into columns.
+  it("draws materials through RecordTable: type, on hand, lots and status", () => {
+    const model = toMaterialsOnHandViewProps({ rows: [
+      { key: "citra", name: "Citra", category: "hop", unit: "lb", onHand: 1262.5, lotTracked: true, active: true },
+      { key: "salt", name: "Gypsum", category: "chemical", unit: "g", onHand: 0, lotTracked: false, active: false },
+    ] });
+    expect(model.rows).toEqual([
+      { key: "citra", name: "Citra", type: "Hop", onHand: "1,262.5 lb", onHandQty: 1262.5, lots: "Tracked", status: "Active" },
+      { key: "salt", name: "Gypsum", type: "Chemical", onHand: "0 g", onHandQty: 0, lots: null, status: "Inactive" },
+    ]);
+    const html = htmlOf(createElement(MaterialsOnHandView, { model }));
+    expect(html).toContain("<table");
+    for (const header of ["Material", "Type", "On hand", "Lots", "Status"]) expect(html).toContain(`>${header}<`);
+    expect(html).toContain(">1,262.5 lb<");
+    // No material page exists, so the name is plain text, not a tap.
+    expect(html).not.toMatch(/data-tap[^>]*>Citra</);
   });
 
   it("the live page slots MaterialForm and CountForm into each row", () => {
@@ -505,6 +529,16 @@ describe("Vendors", () => {
   it("the Vendors inventory record is VendorsView", () => {
     expect((screen("Vendors").body as { type: unknown }).type).toBe(VendorsView);
     expect((screen("Vendors").body as { props: { model: unknown } }).props.model).toEqual(toVendorsViewProps(vendorsList));
+  });
+
+  // #1516 item 8: the shared RecordTable; there is no vendor page yet (#1586), so the name is plain text.
+  it("draws vendors through RecordTable with Edit on each row", () => {
+    const html = htmlOf(createElement(VendorsView, { model: toVendorsViewProps(vendorsList) }));
+    expect(html).toContain("<table");
+    for (const header of ["Vendor", "Status", "Lead time", "Observed lead time", "Contracts"]) expect(html).toContain(`>${header}<`);
+    expect(html.match(/>Edit</g)).toHaveLength(vendorsList.rows!.length * 2);
+    expect(html).not.toMatch(/data-tap[^>]*>YCH</);
+    expect(html).toContain(">7 days<");
   });
 
   it("the Vendor inventory record is VendorView", () => {

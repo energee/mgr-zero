@@ -12,7 +12,7 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toContractsViewProps } from "@/lib/mgr/contracts-view";
-import { fmtVendorQty as fmt, toVendorsViewProps, vendorLeadLine } from "@/lib/mgr/vendors-view";
+import { fmtVendorQty as fmt, toVendorsViewProps } from "@/lib/mgr/vendors-view";
 import "@/lib/commands/all";
 import { VendorForm, type Vendor } from "./vendor-form";
 import { ContractForm, type Contract } from "./contract-form";
@@ -52,13 +52,7 @@ export default async function VendorsPage({ searchParams }: { searchParams?: Pro
     <VendorsView
       model={toVendorsViewProps({
         backHref: "/more",
-        rows: vendors.map((v) => ({
-          key: v.id,
-          title: v.name,
-          detail: vendorLeadLine(v),
-          verb: "Edit",
-          disabled: !v.active,
-        })),
+        rows: vendors.map((v) => ({ ...v, key: v.id })),
         filtered: Boolean(params.q),
       })}
       createAction={<VendorForm />}

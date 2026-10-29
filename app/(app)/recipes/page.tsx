@@ -1,6 +1,6 @@
 // app/(app)/recipes/page.tsx — More › Recipes: recipes alphabetical
-// (list_recipes), each titled with its current version and opening its own
-// recipe page; the back goes to More, New recipe links to /recipes/new and
+// (list_recipes), each with its current version and brand, the name opening
+// its own recipe page; the back goes to More, New recipe links to /recipes/new and
 // the Water profiles row to /catalog/water-profiles?from=recipes, whose back
 // then returns here.
 // ?q= narrows list_recipes by name, as Catalog's search does.

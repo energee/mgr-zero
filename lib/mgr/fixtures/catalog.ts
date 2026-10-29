@@ -220,7 +220,6 @@ export const formatCan: FormatSnapshot = {
 
 /** Case packaging bill: 24 cans, 24 ends, 1 tray. */
 export const packageBomCase: PackageBomSnapshot = {
-  format: { id: FMT_CASE, name: "case · 24×16 oz" },
   lines: [
     { id: "bom-can", material: { id: "mat-can", name: "16 oz can" }, qty_per_unit: 24, on_break: "consumed" },
     { id: "bom-end", material: { id: "mat-end", name: "Can end" }, qty_per_unit: 24, on_break: "consumed" },

@@ -489,19 +489,30 @@ describe("Recipes view", () => {
     expect(body.props.model).toEqual(toRecipesViewProps(recipesList));
   });
 
-  it("maps live list_recipes onto rows titled with the current version, without inventing a style", () => {
+  it("maps live list_recipes onto Recipe, Version and Brand columns, without inventing a style", () => {
     const model = toRecipesViewProps({
       recipes: [
         { id: "r1", name: "Hazy IPA", brand: null, latest_version: 1 },
         { id: "r2", name: "Stout", brand: "Stout", latest_version: null },
       ],
     });
-    expect(model.rows[0]).toEqual({ key: "r1", title: "Hazy IPA v1", detail: "No brand yet", href: "/recipes/r1" });
-    expect(model.rows[1]).toMatchObject({ title: "Stout", detail: "No version yet", warning: true, href: "/recipes/r2" });
+    expect(model.rows[0]).toEqual({ key: "r1", name: "Hazy IPA", version: 1, brand: null, href: "/recipes/r1" });
+    expect(model.rows[1]).toEqual({ key: "r2", name: "Stout", version: null, brand: "Stout", href: "/recipes/r2" });
     const html = htmlOf(createElement(RecipesView, { model, linkRows: true }));
     expect(html).toContain('href="/recipes/r1"');
     expect(html).toContain('href="/recipes/r2"');
     expect(html).not.toContain(">Open<");
+  });
+
+  // #1516 item 8: the shared RecordTable, one line per recipe on the desk.
+  it("draws the recipes through RecordTable, a missing version in the warning style", () => {
+    const html = htmlOf(createElement(RecipesView, { model: toRecipesViewProps(recipesList) }));
+    expect(html).toContain("<table");
+    for (const header of ["Recipe", "Version", "Brand"]) expect(html).toMatch(new RegExp(`<th[^>]*>[\\s\\S]*?${header}[\\s\\S]*?</th>`));
+    expect(html).toContain(">v4<");
+    expect(html).toMatch(/class="text-warning-foreground"[^>]*>No version yet</);
+    expect(html).toContain("No brand yet");
+    expect(html).toMatch(/data-to="Recipe"[^>]*>Farmhouse saison</);
   });
 
   it("links Water profiles, the catalog a version picks its water from (#1140, #1205)", () => {
@@ -518,8 +529,8 @@ describe("Recipes view", () => {
 
   it("draws the inventory list through the live adapter, a recipe with no version included", () => {
     const { rows } = toRecipesViewProps(recipesList);
-    expect(rows.map((r) => r.detail)).toEqual(["Hazy IPA", "Pils", "No version yet"]);
-    expect(rows[2]).toMatchObject({ title: "Farmhouse saison", warning: true });
+    expect(rows.map((r) => r.brand)).toEqual(["Hazy IPA", "Pils", null]);
+    expect(rows[2]).toMatchObject({ name: "Farmhouse saison", version: null });
     expect(htmlOf(screen("Recipes").body)).not.toMatch(/15 bbl · updated/);
   });
 
