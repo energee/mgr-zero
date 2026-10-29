@@ -17,6 +17,9 @@ import { andList, submitReason } from "./submit-reason";
 
 export type BrewDayStage = (typeof BREW_DAY_STAGES)[number];
 
+/** The id of a planned batch's Reschedule or cancel fold; an overdue row on Batches links to it (#1582). */
+export const CHANGE_PLAN_ID = "change-plan";
+
 /** One brew-day ingredient: the recipe's plan in base units and what was pulled. */
 export type BrewIngredient = {
   key: string;
@@ -45,6 +48,8 @@ export type BrewPrepViewModel = {
   /** The batch's planned barrels and date, e.g. "22 bbl · Oct 22, 2026", and its note; shown on one line when set. */
   planned?: string;
   note?: string;
+  /** The planned date is before the brewery's day: Reschedule or cancel starts open (#1582). */
+  overdue?: boolean;
   vesselId: string;
   vessels: BrewDayVessel[];
   ingredients: BrewIngredient[];
@@ -70,6 +75,8 @@ export type BrewTimelineViewModel = {
   /** The batch's planned barrels and date, e.g. "22 bbl · Oct 22, 2026", and its note; each shows only when set. */
   planned?: string;
   note?: string;
+  /** The planned date is before the brewery's day: Reschedule or cancel starts open (#1582). */
+  overdue?: boolean;
   ingredients: BrewIngredient[];
   /** Stock a line without its exact source can be pulled from (get_brew_day_plan sources); with none, Edit offers no source pick. */
   sources?: BrewMaterialSource[];

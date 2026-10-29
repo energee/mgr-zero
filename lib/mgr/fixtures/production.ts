@@ -37,7 +37,7 @@ export const batchesBrewer: BatchesSnapshot = {
     { key: "fv4", name: "FV4", kind: "Fermenter", capacityBbl: 10, active: false },
   ],
   planned: [
-    { key: "b0416", batchNo: "B-0416", brand: "Hazy IPA", recipe: "Hazy IPA", plannedOn: "Sep 4, 2026", plannedBbl: 15, vessel: null },
+    { key: "b0416", batchNo: "B-0416", brand: "Hazy IPA", recipe: "Hazy IPA", plannedOn: "Sep 4, 2026", plannedBbl: 15, vessel: null, overdue: true },
     { key: "b0417", batchNo: "B-0417", brand: null, recipe: null, plannedOn: "Sep 8, 2026", plannedBbl: 10, vessel: null },
   ],
   active: [

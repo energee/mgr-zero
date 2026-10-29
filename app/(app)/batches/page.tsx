@@ -26,7 +26,7 @@ export default async function BatchesPage() {
   ])) as [BatchListRow[], Brand[], Recipe[], BatchVessel[], { effective: GravityUnit }];
   const recipeVersions = recipes.flatMap(recipe =>
     recipe.latest_version_id ? [{ id: recipe.latest_version_id, label: recipe.name + " v" + recipe.latest_version, brandId: recipe.brand_id }] : []);
-  return <BatchesView model={toBatchesViewProps(batchesFromQuery(batches, vessels, { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}`, reading: id => `/cellar/${id}/reading?from=/batches` }, { unit: gravity.effective, timeZone: brewery.timeZone }))}
+  return <BatchesView model={toBatchesViewProps(batchesFromQuery(batches, vessels, { batch: id => `/batches/${id}`, vessel: id => `/cellar/vessels/${id}`, reading: id => `/cellar/${id}/reading?from=/batches` }, { unit: gravity.effective, timeZone: brewery.timeZone, today: breweryDate(brewery.timeZone) }))}
     createAction={<NewBatchForm brands={brands} recipeVersions={recipeVersions} today={breweryDate(brewery.timeZone)} brandsHref={canRun(ctx, "upsert_brand") ? "/catalog" : null} />}
     workHrefs={workHrefsFor(brewery.roles)}
     newVesselHref={canRun(ctx, "upsert_vessel") ? "/cellar/vessels/new" : null}
