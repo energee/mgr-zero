@@ -175,6 +175,7 @@ import { TransferDetailView } from "@/components/mgr/views/transfer-detail";
 import { TransfersView } from "@/components/mgr/views/transfers";
 import { VendorView } from "@/components/mgr/views/vendor";
 import { VendorsView } from "@/components/mgr/views/vendors";
+import { VendorDetailView } from "@/components/mgr/views/vendor-detail";
 import { RemoveVesselControl, VesselDetailView } from "@/components/mgr/views/vessel-detail";
 import { CellarMapView } from "@/components/mgr/views/cellar-map";
 import { cellarMapBrewer } from "@/lib/mgr/fixtures/production";
@@ -213,7 +214,7 @@ import { channelExport, saleChannelsList } from "@/lib/mgr/fixtures/settings-cat
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
 import {
   contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsOnHandList,
-  correctReceiptCountryMalt, newPoCountryMalt, newPoIncomplete, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
+  correctReceiptCountryMalt, newPoCountryMalt, newPoIncomplete, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorDetailYch, vendorYch, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
 import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
@@ -298,6 +299,7 @@ import { toTodayViewProps } from "@/lib/mgr/today-view";
 import { toTransferDetailViewProps } from "@/lib/mgr/transfer-detail-view";
 import { toTransfersViewProps } from "@/lib/mgr/transfers-view";
 import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
+import { toVendorDetailViewProps } from "@/lib/mgr/vendor-detail-view";
 import { toWorkViewProps } from "@/lib/mgr/work-view";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
@@ -489,7 +491,7 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Search", job: "Find permitted pages and records",
     reads: "search_entities", writes: "none",
     states: [["first use", "Type a page name, record name, or document number."], ["empty", "No pages or records found · Try a page name, record name, or document number."], ["loading", "row-shaped skeletons"], ["offline", "cached matches only", 1], ["permission", "Results honor row access"], ["document number", "ORD-0231 matches exactly and sorts first"]],
-    spec: "Pages are matched by name from the same role-filtered shipped navigation as the shell and appear in their own Pages group, even while records load or fail; each shows its navigation entry's one-line description, the same line a More card shows. Before a term, the latest five opened records show as Recent, or, when there are none, a first-use hint names what to type. Entity pickers offer records only. One registered search across the entity kinds the caller's role can read; results are grouped by kind and arrow keys move between matches; filtering never widens what is permitted, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. A number without its prefix matches every numbered kind. A kind with no detail page, such as a vendor, opens its list page. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
+    spec: "Pages are matched by name from the same role-filtered shipped navigation as the shell and appear in their own Pages group, even while records load or fail; each shows its navigation entry's one-line description, the same line a More card shows. Before a term, the latest five opened records show as Recent, or, when there are none, a first-use hint names what to type. Entity pickers offer records only. One registered search across the entity kinds the caller's role can read; results are grouped by kind and arrow keys move between matches; filtering never widens what is permitted, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. A number without its prefix matches every numbered kind. A kind with no detail page, such as a material, opens its list page. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
     body: <SearchView model={searchPalette} />,
   },
   {
@@ -2043,6 +2045,19 @@ export const SCREENS: Screen[] = [
     states: [["permission", "warehouse or brewer required", 1], ["active", "available for purchase orders"], ["contract", "committed quantity summarized"], ["empty", "Add vendor is the only action"]],
     spec: "Materials, vendors and contracts are separate lists so each row has one predictable destination.",
     body: <VendorsView model={toVendorsViewProps(vendorsList)} controls={<ListControls search={{ label: "Search vendors", value: "", keep: {} }} />} />,
+  },
+  {
+    step: 7,
+    slice: 2,
+    tab: "More",
+    name: "Vendor detail",
+    to: { Edit: "Vendor", "Citra 2026": "Materials on hand", "Mosaic 2025": "Materials on hand" },
+    job: "See one supplier's terms, contracts, open orders and default materials",
+    reads: "list_vendors_and_contracts [vendorId] · list_purchase_orders [vendorId; admin or warehouse] · list_materials [defaultVendorId, inactive included]",
+    writes: "upsert_vendor [on Vendor]",
+    states: [["permission", "warehouse or brewer required", 1], ["brewer", "no open purchase orders section"], ["inactive", "status reads Inactive · history remains"], ["no contracts", "the Contracts section says so"], ["no open orders", "the open purchase orders section says so"], ["no default materials", "the Default materials section says so"]],
+    spec: "Edit stays on each Vendors row and is also here; both open the same Edit vendor sheet. Deactivate vendor stays inside that sheet rather than becoming its own button. Contracts are read-only here; Add and Edit contract stay in the Contracts list on Vendors. Default materials include inactive ones, marked Inactive, as Materials on hand shows them. Only open purchase orders are listed: draft, sent and partially received. Brewer cannot read purchase orders, so for Brewer the section is left out rather than shown empty.",
+    body: <VendorDetailView model={toVendorDetailViewProps(vendorDetailYch)} />,
   },
   {
     step: 7,

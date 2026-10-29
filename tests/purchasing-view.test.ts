@@ -19,9 +19,11 @@ import { ReceiptFixture } from "../components/mgr/fixture-adapters";
 import { ReceivePoView } from "../components/mgr/views/receive-po";
 import { VendorView } from "../components/mgr/views/vendor";
 import { VendorsView } from "../components/mgr/views/vendors";
+import { VendorDetailView } from "../components/mgr/views/vendor-detail";
+import { toVendorDetailViewProps } from "../lib/mgr/vendor-detail-view";
 import {
   contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsOnHandList,
-  correctReceiptCountryMalt, newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
+  correctReceiptCountryMalt, newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorDetailYch, vendorYch, vendorsList,
 } from "../lib/mgr/fixtures/purchasing";
 import { contractRowView, toContractsViewProps } from "../lib/mgr/contracts-view";
 import { toMaterialsOnHandViewProps, toMaterialsScopes } from "../lib/mgr/materials-on-hand-view";
@@ -562,6 +564,24 @@ describe("Vendors", () => {
     const live = htmlOf(createElement(VendorsView, { model: toVendorsViewProps(vendorsList), linkRows: true }));
     for (const row of vendorsList.rows!) expect(live).toContain(`href="/vendors/${row.key}"`);
     expect(live.match(/>Edit</g)).toHaveLength(vendorsList.rows!.length * 2);
+  });
+
+  // #1586: one vendor's page, drawn once for the inventory and the live route.
+  it("the Vendor detail inventory record is VendorDetailView over the fixture", () => {
+    const body = screen("Vendor detail").body as { type: unknown; props: { model: unknown } };
+    expect(body.type).toBe(VendorDetailView);
+    expect(body.props.model).toEqual(toVendorDetailViewProps(vendorDetailYch));
+    const html = htmlOf(body as ReactNode);
+    for (const heading of ["Contracts", "Open purchase orders", "Default materials"]) expect(html).toContain(`>${heading}</h2>`);
+    expect(html).toMatch(/committed · .* received · .* on order · .* available/);
+    expect(html).toContain(">PO-");
+    expect(html).toMatch(/>Edit</);
+  });
+
+  it("Vendor detail leaves out the open purchase orders section when orders are not read", () => {
+    const html = htmlOf(createElement(VendorDetailView, { model: toVendorDetailViewProps({ ...vendorDetailYch, purchaseOrders: null }) }));
+    expect(html).not.toContain("Open purchase orders");
+    expect(html).toContain(">Default materials</h2>");
   });
 
   it("the Vendor inventory record is VendorView", () => {

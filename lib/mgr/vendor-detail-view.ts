@@ -11,7 +11,7 @@ import { poListStatus, purchaseOrderNext, type PurchaseOrdersRowView } from "./p
 import { toVendorsRow, type VendorsVendor } from "./vendors-view";
 
 /** One list_vendors_and_contracts row, keyed by its id. */
-export type VendorRecord = VendorsVendor & {
+export type VendorRecord = Omit<VendorsVendor, "contracts"> & {
   email: string | null;
   phone: string | null;
   payment_terms: string;
