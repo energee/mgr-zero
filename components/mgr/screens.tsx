@@ -213,10 +213,10 @@ import { priceGroupTwo, pricingGrid } from "@/lib/mgr/fixtures/pricing";
 import { channelExport, saleChannelsList } from "@/lib/mgr/fixtures/settings-catalog";
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
 import {
-  contractYchCitra, contractsList, countSheetShelf, cycleCountCans, materialCitra, materialsOnHandList,
-  correctReceiptCountryMalt, draftPoCanSource, editPoCanSource, newPoCountryMalt, newPoIncomplete, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorDetailYch, vendorYch, vendorsList,
+  contractEdit, contractsList, countSheetShelf, cycleCountCans, materialCitra, materialsOnHandList,
+  correctReceiptPo, draftPoCanSource, editPoCanSource, newPoDraft, newPoIncomplete, purchaseOrdersWarehouse, receiptPoPartial, receivePoSent, vendorDetail, vendorEdit, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
-import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
+import { kegBalanceRidgeline, kegFleet, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
 import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
 import { planningDemo } from "@/lib/mgr/fixtures/planning";
 import { monthlyComplianceAmended, monthlyComplianceAugust, monthlyComplianceSeptember, monthlyComplianceUnbalanced } from "@/lib/mgr/fixtures/monthly-compliance";
@@ -1349,7 +1349,7 @@ export const SCREENS: Screen[] = [
   {
     step: 5, slice: 1, tab: "More", group: "QuickBooks Online",
     name: "QuickBooks mappings",
-    to: { "Oak and Barrel": "Map to QuickBooks", "Pils · case": "Map to QuickBooks", "Country Malt": "Map to QuickBooks", "Purchase account": "Map to QuickBooks", "Deposit and refund item": "Map to QuickBooks", "One-way keg fee item": "Map to QuickBooks" },
+    to: { "Oak and Barrel": "Map to QuickBooks", "Pils · case": "Map to QuickBooks", "Fictional Malt Supply": "Map to QuickBooks", "Purchase account": "Map to QuickBooks", "Deposit and refund item": "Map to QuickBooks", "One-way keg fee item": "Map to QuickBooks" },
     job: "Review verified customer, SKU, vendor, purchase account, deposit and one-way keg fee mappings for the connected company",
     reads: "get_qbo_connection · list_customers · list_skus · list_vendors [unmapped: no id in the connected company]",
     writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_vendor_mapping · set_qbo_purchase_account · set_qbo_deposit_mapping · set_qbo_one_way_fee_mapping",
@@ -1948,7 +1948,7 @@ export const SCREENS: Screen[] = [
     writes: "create_purchase_order [one RPC: draft PO + all lines] · send_purchase_order [Save and mark sent]",
     states: [["permission", "warehouse or admin required", 1], ["new", "vendor and one line required · every line needs a material and a quantity above zero · Remove drops a line"], ["lead time", "picking a vendor sets Expected to today plus its typed lead time · blank when it has none · still editable"], ["from requirements", "Planning drafts the lines; the shortfall is the quantity"], ["contracted lot", "the vendor named a lot on the contract · it prefills receiving"], ["contract in force", "one contract for the vendor and material in force today · the line's cost starts at its price and the line draws it down · several leave it blank"], ["no lot named", "the ordinary case · receiving captures it off the package"], ["past date", "an Expected date before brewery-local today warns; Save draft still works"]],
     spec: "A flat form: vendor and optional expected date (picking a vendor fills it with today plus the vendor's lead time), then material lines with visible quantity and unit-cost labels. Spacing groups related fields without cards, repeated section headings, line-number headings, a Draft badge, or instructional paragraphs. Material, quantity, and cost align on large screens; smaller screens stack material above the numeric fields, and the narrowest screens stack all three. Each line owns its Remove action and optional expected lot. Expected lot is advisory, creates no lot record, and only appears for lot-tracked materials. Receiving prefills from it; the actual package decides the received lot. Once a vendor is chosen, its default materials lead the material picker. Save draft retains its validation reason; Save and mark sent waits on the same fields, marks the saved draft sent from a mail client, and opens it. If marking fails, the error says the draft is saved and links it.",
-    body: <NewPoView model={newPoCountryMalt} />,
+    body: <NewPoView model={newPoDraft} />,
   },
   {
     step: 7, slice: 2, tab: "Work", name: "New PO incomplete",
@@ -1970,7 +1970,7 @@ export const SCREENS: Screen[] = [
     writes: "cancel_purchase_order [draft or sent without receipts; required reason releases remainder] · close_purchase_order_short [received stock retained; required reason releases remainder] · send_purchase_order [single row draft → sent; an attestation: Marked sent, never Delivered] · receive_purchase_order [one RPC: receipt + lines (counted, over or short) + lots with best_by + material movements] · Recent lot suggestions [SCHEMA-GATE: post-v1 scope; the purchase-order query does not return recent material lots]",
     states: [["loading", "PO-line skeleton"], ["draft", "Mark sent is the one active verb · Edit draft reopens the lines · counts wait, and the receive verb is not drawn", 1], ["prefilled", "the PO named a lot · the field opens on it and the ordinary receipt changes nothing"], ["no lot on the PO", "the field opens empty · recent lots for that material are offered", 1], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
     spec: "Cancel purchase order and Close short fold behind their titles below the order's next verb. Cancel purchase order requires a reason and no posted receipts. Close short requires a reason after a receipt; only the unreceived remainder is released, with actor and time retained. Closed orders leave Work and planning, refuse new receipts, and receipt corrections never reopen them. Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named so the ordinary receipt is a glance and no typing. When the PO named none the field opens empty and offers that material\u2019s recent lots, which is what keeps one vendor lot from becoming two records over a stray space. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. Punctuation or case alone never reads as one: the schema spec owns that comparison rule. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
-    body: <ReceivePoView model={receivePoCountryMalt} />,
+    body: <ReceivePoView model={receivePoSent} />,
   },
   {
     step: 7, slice: 2, tab: "Work", name: "Draft PO",
@@ -2003,7 +2003,7 @@ export const SCREENS: Screen[] = [
     writes: "post_receipt_bill [admin only; confirmation; one frozen Bill per receipt correction chain; pending retries query then replay the exact snapshot and provider request ID; definite rejection requires explicit newAttemptReason corrected]",
     states: [["permission", "warehouse or admin required; only admin can post Bills", 1], ["partial", "the PO is partially received · the remainder is named"], ["complete", "every line met expected · nothing is owed"], ["unmapped", "fix exact vendor and purchase account IDs in Accounting mappings", 1], ["unknown", "retry checks for the Bill first then resends the same snapshot and provider request ID if absent", 1], ["rejected", "fix mappings then explicitly Post corrected Bill", 1], ["posted", "Bill posted, adjust in QuickBooks; payments are QuickBooks-only"]],
     spec: "Post-commit of Receive PO. The tape is the receipt; status is derived. The remainder is the ordered quantity less everything counted so far, and it is the number a buyer chases a vendor with, so it is stated rather than left to be worked out from the tape. It is derived on read for the same reason status is: a stored balance would need its own correction path the moment a recount lands, and a recount is the ordinary way a miscount is fixed here.",
-    body: <ReceiptFixture><ReceiptView model={receiptPoCountryMalt} /></ReceiptFixture>,
+    body: <ReceiptFixture><ReceiptView model={receiptPoPartial} /></ReceiptFixture>,
   },
   {
     step: 7, slice: 2, tab: "Work", name: "Correct receipt",
@@ -2013,7 +2013,7 @@ export const SCREENS: Screen[] = [
     writes: "correct_purchase_receipt [exact material reversal and immutable replacement receipt in one transaction]",
     states: [["permission", "warehouse or admin", 1], ["ready", "reason and corrected counts"], ["blocked", "subsequent stock use or shared lot metadata prevents correction", 1], ["stale", "receipt already replaced; open its latest revision", 1], ["success", "replacement receipt and current balance"]],
     spec: "Reuse Receive PO fields with a required correction reason and the original receiving location. Preserve the original receipt, append exact reversal movements, and record replacement counted quantities and lot facts. Only the latest revision contributes to the PO balance. Used stock and shared lot metadata can prevent correction; no generic stock adjustment bypass is offered.",
-    body: <ReceivePoView model={correctReceiptCountryMalt} />,
+    body: <ReceivePoView model={correctReceiptPo} />,
   },
   {
     step: 7,
@@ -2092,7 +2092,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_vendor [on Vendor]",
     states: [["permission", "warehouse or brewer required", 1], ["brewer", "no open purchase orders section"], ["inactive", "status reads Inactive · history remains"], ["no contracts", "the Contracts section says so"], ["no open orders", "the open purchase orders section says so"], ["no default materials", "the Default materials section says so"]],
     spec: "Edit stays on each Vendors row and is also here; both open the same Edit vendor sheet. Deactivate vendor stays inside that sheet rather than becoming its own button. Contracts are read-only here; Add and Edit contract stay in the Contracts list on Vendors. Default materials include inactive ones, marked Inactive, as Materials on hand shows them. Only open purchase orders are listed: draft, sent and partially received. Brewer cannot read purchase orders, so for Brewer the section is left out rather than shown empty.",
-    body: <VendorDetailView model={toVendorDetailViewProps(vendorDetailYch)} />,
+    body: <VendorDetailView model={toVendorDetailViewProps(vendorDetail)} />,
   },
   {
     step: 7,
@@ -2135,7 +2135,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_vendor",
     states: [["permission", "admin, warehouse or brewer required", 1], ["new", "name required · status controls appear after saving"], ["active", "available for new purchase orders"], ["inactive", "not a New purchase order choice · existing links remain"], ["change status", "Deactivate vendor or Reactivate vendor confirms before saving form changes"]],
     spec: "Contracts remain separate records because a vendor may supply many materials. Lead time lives here rather than on the material: every observation of it is an ordered-to-received span keyed by the vendor, so the estimate sits where the evidence is. Planning reads it to date the buy-by of the slowest supplier a bill of materials resolves to.",
-    body: <VendorView model={vendorYch} />,
+    body: <VendorView model={vendorEdit} />,
   },
   {
     step: 7,
@@ -2163,7 +2163,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_material_contract · delete_material_contract",
     states: [["permission", "warehouse or brewer required", 1], ["new", "vendor, material and quantity required"], ["received", "received and on-order quantities are read-only"], ["dates", "an end before the start is named under Ends and blocks Save · a set date offers Clear"], ["on purchase orders", "Delete is refused; set an end date instead", 1]],
     spec: "This sheet owns the commitment and nothing else. Receipts and open releases both update progress, and neither is editable here: a quantity a buyer could type over would stop being evidence. Available is the commitment less what has arrived and less what is already ordered, which is the only one of the four numbers worth acting on. Delete confirms first and is refused once a purchase order uses the contract; set an end date instead.",
-    body: <ContractView model={contractYchCitra} />,
+    body: <ContractView model={contractEdit} />,
   },
   {
     step: 7,
@@ -2460,7 +2460,7 @@ export const SCREENS: Screen[] = [
     writes: "create_keg_pool · update_keg_pool · record_keg_event",
     states: [["negative shells", "pool, size and location below zero · record Acquired kegs to reconcile", 1], ["acquire", "qty into pool · no customer"], ["return empty", "customer required · deposit refund is a separate credit memo"], ["lost / found", "lost at a customer moves their balance · found never has a customer · no money"], ["retire", "cannot exceed what the bin holds · no customer"], ["unavailable", "no pool in service or no location · Record keg event says what is missing", 1]],
     spec: "Return empty is a keg event only; the deposit refund is a separate credit memo through Return shipment, which posts Returned only when the beer comes back in a full keg. The two stay separate records; Customer keg balance and Keg report flag a customer with a refunded deposit whose kegs on deposit disagree with kegs out plus kegs lost. No dirty/clean CIP status.",
-    body: <KegFleetView model={toKegFleetViewProps(kegFleetMicrostar)} />,
+    body: <KegFleetView model={toKegFleetViewProps(kegFleet)} />,
   },
   {
     step: 7,

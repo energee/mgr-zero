@@ -96,7 +96,7 @@ describe("Today view", () => {
       ["3 orders ready", "Pick"],
       ["ORD-0228 · Hillside Tavern", "Pick"],
       ["Staged · ORD-0229", "Put back"],
-      ["PO-0142 · Country Malt", "Receive"],
+      ["PO-0142 · Fictional Malt Supply", "Receive"],
       ["Next delivery · Ridgeline", "Resume"],
     ]);
     expect(model.date).toBe("Thu 9/3");

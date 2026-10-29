@@ -9,7 +9,7 @@ const contract = { id: "c1", contract_no: "CITRA-2026", material_name: "Citra", 
 const snapshot: VendorDetailSnapshot = {
   backHref: "/vendors",
   vendor: {
-    key: "ych", name: "YCH", active: true, lead_time_days: 7, email: "orders@ych.example", phone: "509-555-0142", payment_terms: "net30",
+    key: "hop-supply", name: "Fictional Hop Supply", active: true, lead_time_days: 7, email: "orders@hop-supply.example", phone: "509-555-0142", payment_terms: "net30",
     observed: [{ sent_via: "mailto", n: 4, avg_lead_days: 6.5 }],
     contracts: [contract],
   },
@@ -26,11 +26,11 @@ const snapshot: VendorDetailSnapshot = {
 describe("toVendorDetailViewProps", () => {
   it("lists the facts in order, terms as a label, and observed lead time from the Vendors row", () => {
     const model = toVendorDetailViewProps(snapshot);
-    expect(model.title).toBe("YCH");
+    expect(model.title).toBe("Fictional Hop Supply");
     expect(model.backHref).toBe("/vendors");
     expect(model.facts).toEqual([
       ["Status", "Active"],
-      ["Email", "orders@ych.example"],
+      ["Email", "orders@hop-supply.example"],
       ["Phone", "509-555-0142"],
       ["Terms", "Net 30"],
       ["Lead time", "7 days"],
