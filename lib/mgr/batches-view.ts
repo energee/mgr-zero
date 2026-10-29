@@ -81,7 +81,8 @@ export type BatchVessel = { id: string; name: string; kind: string; capacity_bbl
 export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[], hrefs?: { batch: (id: string) => string; vessel: (id: string) => string; reading?: (id: string) => string }, display: { unit: GravityUnit; timeZone: string; today?: string } = { unit: "plato", timeZone: "UTC" }): BatchesSnapshot {
   const snapshot: BatchesSnapshot = { title: "Batches", planned: [], active: [], completed: [], cancelled: [], vessels: vessels.map(vessel => ({ key: vessel.id, name: vessel.name, kind: sentenceCase(vessel.kind), capacityBbl: Number(vessel.capacity_bbl), active: vessel.active, href: hrefs?.vessel(vessel.id) })) };
   for (const batch of batches) {
-    const overdue = !batch.brewed_on && !batch.cancelled_at && !!display.today && batch.planned_on < display.today;
+    const group = (batch.cancelled_at ? snapshot.cancelled : batch.closed_at ? snapshot.completed : batch.brewed_on ? snapshot.active : snapshot.planned)!;
+    const overdue = group === snapshot.planned && !!display.today && batch.planned_on < display.today;
     const href = hrefs?.batch(batch.id);
     const row: BatchesRowView = {
       key: batch.id, batchNo: batNo(batch.batch_no), brand: batch.brand_name, recipe: batch.recipe_name,
@@ -95,7 +96,7 @@ export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[]
         href: hrefs?.reading?.(occupancy.id),
       }));
     }
-    (batch.cancelled_at ? snapshot.cancelled : batch.closed_at ? snapshot.completed : batch.brewed_on ? snapshot.active : snapshot.planned)!.push(row);
+    group.push(row);
   }
   return snapshot;
 }
