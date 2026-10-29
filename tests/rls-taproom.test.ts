@@ -240,7 +240,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     record_repack: [B,W,BIN,parentSku.id,1,SKU,6,R(),null], record_stock_transfer_pick: [submitted.id,[{line_id:transferLine.id,qty:1}],R()], record_submitted_order_occurrence: [f.order.id],
     cancel_batch: [B,plannedBatch.id,R()], set_recipe_brand: [B,f.recipe.id,BRAND,R()], reschedule_batch: [B,plannedBatch.id,day,R()],
     cancel_packaging_run: [B,readyRun.id,R()], reschedule_packaging_run: [B,readyRun.id,day,R()],
-    schedule_batch: [B,BRAND,f.version.id,day,2,null,R()], schedule_packaging_run: [B,BRAND,day,f.occupancy.id,[{sku_id:SKU,qty_planned:1}],R()], send_purchase_order: [B,draftPo.id,"external",R()],
+    schedule_batch: [B,BRAND,f.version.id,day,2,null,R()], schedule_packaging_run: [B,BRAND,day,f.occupancy.id,[{sku_id:SKU,qty_planned:1}],R()], send_purchase_order: [B,draftPo.id,"external",R()], update_purchase_order: [B,draftPo.id,VENDOR,day,[{material_id:MAT,qty_ordered:1}],R()],
     set_brewery_gravity_unit: [B,"sg",R()], set_brewery_quiet_hours: [B,I,"22:00","07:00",R()], set_portal_fulfillment_source: [B,W,R()], cancel_stock_transfer: [f.transfer.id,"Fixture",R()],
     set_qbo_customer_mapping: [B,f.customer.customerId,"qbo-customer",R()], set_qbo_item_mapping: [B,SKU,"qbo-item",R()],
     set_qbo_deposit_mapping: [B,"qbo-deposit",R()], set_qbo_one_way_fee_mapping: [B,"qbo-fee",R()], set_qbo_push_defaults: [B,true,true,R()], start_qbo_push: [B,f.invoice.id,"initial",R()], write_off_invoice: [B,f.invoice.id,"Fixture",R()],
@@ -263,7 +263,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   readNames.push("order_packaging_shortfall_rows");
   // list_invoices and get_invoice read the QuickBooks push facts through it (#1045).
   readNames.push("invoice_push_facts");
-  // list_compliance_reports reads which recent periods hold report activity (#1209).
+  // list_compliance_active_periods reads which recent periods hold report activity (#1209).
   readNames.push("list_compliance_active_months");
   // Team's pending invitations (#1204) return no rows to a caller without Admin.
   readNames.push("list_pending_invitations");

@@ -9,7 +9,7 @@ import { Fragment, useId, useState, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { TabBar } from "@/components/mgr/qty";
 import { Button } from "@/components/ui/button";
-import { isShort, needsSource, noStockNote, prepReason, pullDetail, pullTone, showsPacks, sourceChoices, type BrewDayStage, type BrewIngredient, type BrewPrepViewModel } from "@/lib/mgr/brew-prep-view";
+import { CHANGE_PLAN_ID, isShort, needsSource, noStockNote, prepReason, pullDetail, pullTone, showsPacks, sourceChoices, type BrewDayStage, type BrewIngredient, type BrewPrepViewModel } from "@/lib/mgr/brew-prep-view";
 import { vesselOptions } from "@/lib/mgr/brew-day-view";
 import { materialSourceKey } from "@/lib/mgr/material-source";
 import { BREW_DAY_STAGES } from "@/lib/mgr/recipe-process-view";
@@ -50,10 +50,11 @@ export function BrewFooter({ children }: { children: ReactNode }) {
 }
 
 /** Reschedule and Cancel plan (planActions), folded at the foot of both tabs so the day's work comes first. Callers draw
- *  it outside their form, so its date field never submits Done pulling or Record brew day. */
-export function ChangePlanFold({ children }: { children?: ReactNode }) {
+ *  it outside their form, so its date field never submits Done pulling or Record brew day. An overdue plan's fold starts
+ *  open, and its CHANGE_PLAN_ID anchor is where the Batches row lands, so clearing a stale plan is one tap away (#1582). */
+export function ChangePlanFold({ children, open }: { children?: ReactNode; open?: boolean }) {
   if (!children) return null;
-  return <details className="rounded border p-3"><summary className="cursor-pointer text-sm font-medium">Reschedule or cancel</summary><div className="mt-2">{children}</div></details>;
+  return <details id={CHANGE_PLAN_ID} open={open} className="scroll-m-20 rounded border p-3"><summary className="cursor-pointer text-sm font-medium">Reschedule or cancel</summary><div className="mt-2">{children}</div></details>;
 }
 
 /** The planned barrels and date, then the note, as one line under the tabs; nothing when neither is set. */
@@ -130,6 +131,6 @@ export function BrewPrepView({ model, onChange, onPrint, onSave, messages, planA
         {E.submit("Done pulling", { reason: reasonTap, submitting })}
       </BrewFooter>
     </form>
-    <ChangePlanFold>{planActions}</ChangePlanFold>
+    <ChangePlanFold open={value.overdue}>{planActions}</ChangePlanFold>
   </>;
 }

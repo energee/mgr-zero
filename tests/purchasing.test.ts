@@ -340,6 +340,34 @@ describe("purchase orders: draft, mark sent, receive", () => {
     const po = (await runCommand("create_purchase_order", { vendorId: vendor.id, lines: [{ materialId: hop.id, qtyOrdered: 20, unitCostCents: 1800 }] }, ctx)) as { id: string };
     expect(po.id).toBeTruthy();
   });
+
+  it("a draft's vendor, expected date and lines can be edited until it is sent; its note stays (#1584)", async () => {
+    const a = (await runCommand("upsert_vendor", { name: "Edit Vendor A" }, ctx)) as { id: string };
+    const bVendor = (await runCommand("upsert_vendor", { name: "Edit Vendor B" }, ctx)) as { id: string };
+    const hop = (await runCommand("upsert_material", { name: "Nelson", category: "hop", baseUom: "lb", purchaseUom: "lb" }, ctx)) as { id: string };
+    const malt = (await runCommand("upsert_material", { name: "Edit-lane pale malt", category: "malt", baseUom: "lb", purchaseUom: "lb" }, ctx)) as { id: string };
+    const bContract = (await runCommand("upsert_material_contract", { vendorId: bVendor.id, materialId: malt.id, qtyCommitted: 100, unitCostCents: 700 }, ctx)) as { id: string };
+    const po = (await runCommand("create_purchase_order", { vendorId: a.id, note: "from planning", lines: [{ materialId: hop.id, qtyOrdered: 5 }] }, ctx)) as { id: string };
+    // A contract must still be the new vendor's.
+    await expect(runCommand("update_purchase_order", { poId: po.id, vendorId: a.id, lines: [{ materialId: malt.id, qtyOrdered: 3, contractId: bContract.id }] }, ctx)).rejects.toThrow(/contract/);
+    await runCommand("update_purchase_order", { poId: po.id, vendorId: bVendor.id, expectedOn: "2026-11-10", lines: [
+      { materialId: hop.id, qtyOrdered: 8, unitCostCents: 1500, expectedLotCode: "NZ-26" },
+      { materialId: malt.id, qtyOrdered: 3, contractId: bContract.id },
+    ] }, ctx);
+    const saved = (await runCommand("get_purchase_order", { poId: po.id }, ctx)) as {
+      vendor_id: string; expected_on: string; note: string; status: string;
+      lines: { material_id: string; qty_ordered: number; unit_cost_cents: number; contract_id: string | null; expected_lot_code: string | null }[];
+    };
+    expect(saved).toMatchObject({ vendor_id: bVendor.id, expected_on: "2026-11-10", note: "from planning", status: "draft" });
+    expect(saved.lines.map(({ material_id, qty_ordered, unit_cost_cents, contract_id, expected_lot_code }) => ({ material_id, qty_ordered, unit_cost_cents, contract_id, expected_lot_code }))
+      .sort((x, y) => x.qty_ordered - y.qty_ordered)).toEqual([
+      { material_id: malt.id, qty_ordered: 3, unit_cost_cents: 700, contract_id: bContract.id, expected_lot_code: null },
+      { material_id: hop.id, qty_ordered: 8, unit_cost_cents: 1500, contract_id: null, expected_lot_code: "NZ-26" },
+    ]);
+    await expect(runCommand("update_purchase_order", { poId: po.id, vendorId: bVendor.id, lines: [] }, ctx)).rejects.toThrow();
+    await runCommand("send_purchase_order", { poId: po.id, sentVia: "mailto" }, ctx);
+    await expect(runCommand("update_purchase_order", { poId: po.id, vendorId: bVendor.id, lines: [{ materialId: hop.id, qtyOrdered: 1 }] }, ctx)).rejects.toThrow(/purchase order is sent/);
+  });
 });
 
 // #614: readers such as get_recipe apply a material's current units to stored
@@ -506,5 +534,59 @@ describe("material cycle count", () => {
     await recordCount({ locationId: wh.id, binId: wh.binId, lines: [{ materialId: hop.id, qty: 50 }] });
     const over = await admin.from("material_movements").select("lot_id, qty").eq("material_id", hop.id).eq("type", "count_adjustment").gt("qty", 0);
     expect(over.data).toEqual([{ lot_id: fresh, qty: 5 }]);
+  });
+});
+
+// #1586: the vendor page reads one vendor's records through the registered
+// lists, so each filter is a query input Postgres applies.
+describe("vendor filters for the vendor page (#1586)", () => {
+  /** A vendor with one contract and one received PO, in its own brewery's location. */
+  async function vendorWithHistory(own: typeof ctx, name: string, wh: { id: string; binId: string }) {
+    const vendor = await runCommand("upsert_vendor", { name }, own) as { id: string };
+    const material = await runCommand("upsert_material", { name: `${name} malt`, category: "malt", baseUom: "lb", purchaseUom: "lb", defaultVendorId: vendor.id }, own) as { id: string };
+    const contract = await runCommand("upsert_material_contract", { vendorId: vendor.id, materialId: material.id, qtyCommitted: 100 }, own) as { id: string };
+    const received = await runCommand("create_purchase_order", { vendorId: vendor.id, lines: [{ materialId: material.id, qtyOrdered: 5 }] }, own) as { id: string };
+    await runCommand("send_purchase_order", { poId: received.id, sentVia: "external" }, own);
+    const detail = await runCommand("get_purchase_order", { poId: received.id }, own) as { lines: { id: string }[] };
+    await runCommand("receive_purchase_order", { poId: received.id, locationId: wh.id, binId: wh.binId, lines: [{ poLineId: detail.lines[0].id, qtyCounted: 5 }] }, own);
+    const draft = await runCommand("create_purchase_order", { vendorId: vendor.id, lines: [{ materialId: material.id, qtyOrdered: 2 }] }, own) as { id: string };
+    return { vendor, material, contract, received, draft };
+  }
+
+  let own: typeof ctx;
+  let a: Awaited<ReturnType<typeof vendorWithHistory>>;
+  let other: Awaited<ReturnType<typeof vendorWithHistory>>;
+  beforeAll(async () => {
+    const brewery = await makeBrewery();
+    own = await makeStaffCtx(brewery.id, "warehouse");
+    const wh = await seedLocation(brewery.id);
+    a = await vendorWithHistory(own, "Alpha supply", wh);
+    other = await vendorWithHistory(own, "Beta supply", wh);
+  });
+
+  it("list_vendors_and_contracts vendorId returns that vendor with only its contracts and observed lead times", async () => {
+    const rows = await runCommand("list_vendors_and_contracts", { vendorId: a.vendor.id }, own) as { id: string; contracts: { id: string }[]; observed: { n: number }[] }[];
+    expect(rows.map((v) => v.id)).toEqual([a.vendor.id]);
+    expect(rows[0].contracts.map((c) => c.id)).toEqual([a.contract.id]);
+    expect(rows[0].observed.map((o) => o.n)).toEqual([1]);
+    expect(await runCommand("list_vendors_and_contracts", { vendorId: crypto.randomUUID() }, own)).toEqual([]);
+    await expect(runCommand("list_vendors_and_contracts", { vendorId: "not-a-uuid" }, own)).rejects.toMatchObject({ code: "invalid_input" });
+  });
+
+  it("list_purchase_orders vendorId returns only that vendor's orders, open unless includeClosed", async () => {
+    const ids = async (input: Record<string, unknown>) => ((await runCommand("list_purchase_orders", input, own)) as { id: string }[]).map((p) => p.id);
+    expect(await ids({ vendorId: a.vendor.id })).toEqual([a.draft.id]);
+    expect((await ids({ vendorId: a.vendor.id, includeClosed: true })).sort()).toEqual([a.draft.id, a.received.id].sort());
+    expect(await ids({ vendorId: other.vendor.id })).toEqual([other.draft.id]);
+    const brewer = await makeStaffCtx(own.breweryId, "brewer");
+    await expect(runCommand("list_purchase_orders", { vendorId: a.vendor.id }, brewer)).rejects.toMatchObject({ code: "permission_denied" });
+  });
+
+  it("list_materials defaultVendorId returns only that vendor's default materials, with inactive ones on request and q combined", async () => {
+    await runCommand("upsert_material", { name: "Alpha retired hop", category: "hop", baseUom: "lb", purchaseUom: "lb", defaultVendorId: a.vendor.id, active: false }, own);
+    const names = async (input: Record<string, unknown>) => ((await runCommand("list_materials", input, own)) as { name: string }[]).map((m) => m.name);
+    expect(await names({ defaultVendorId: a.vendor.id })).toEqual(["Alpha supply malt"]);
+    expect(await names({ defaultVendorId: a.vendor.id, includeInactive: true })).toEqual(["Alpha retired hop", "Alpha supply malt"]);
+    expect(await names({ defaultVendorId: a.vendor.id, includeInactive: true, q: "hop" })).toEqual(["Alpha retired hop"]);
   });
 });

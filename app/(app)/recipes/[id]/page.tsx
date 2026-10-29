@@ -3,6 +3,8 @@
 // get_recipe predicts (never stored) or why it predicted none. The page only
 // fetches and renders. New recipe version opens ./new, where
 // recipe-version-form.tsx makes every field live for create_recipe_version.
+// Schedule batch opens /batches?recipe=<id>, whose New batch sheet starts on
+// the current version (schedule_batch).
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { RecipeBrandPicker } from "./recipe-brand-picker";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";

@@ -1,5 +1,5 @@
-// lib/mgr/new-po-view.ts — view-model for New PO, its per-line field errors,
-// and what its Save draft still needs.
+// lib/mgr/new-po-view.ts — view-model for New PO and Edit PO, its per-line
+// field errors, its Expected prefill, and what its Save draft still needs.
 import { toCents } from "@/lib/mgr/money";
 import { numberNotationError } from "@/lib/mgr/quantity-input";
 import { submitReason } from "@/lib/mgr/submit-reason";
@@ -17,6 +17,8 @@ export type NewPoLineView = {
 
 export type NewPoViewModel = {
   backHref?: string;
+  /** The heading: "New PO" unless given; Edit PO names the draft (#1584). */
+  title?: string;
   /** Where vendors and materials are made, on a live page; the inventory leaves them inert. */
   vendorsHref?: string;
   materialsHref?: string;
@@ -28,6 +30,15 @@ export type NewPoViewModel = {
   today?: string;
   lines: NewPoLineView[];
 };
+
+/** Expected once a vendor is picked: the brewery's `today` plus the vendor's
+ *  typed lead time, or blank when it has none (#1584). Still editable. */
+export function expectedFromLeadTime(today: string, leadDays: number | null): string {
+  if (leadDays === null) return "";
+  const day = new Date(`${today}T00:00:00Z`);
+  day.setUTCDate(day.getUTCDate() + leadDays);
+  return day.toISOString().slice(0, 10);
+}
 
 /** A past Expected date still saves; the draft says so rather than saving it silently (#1489). */
 export function pastExpectedWarning(date: string, today?: string): string | undefined {

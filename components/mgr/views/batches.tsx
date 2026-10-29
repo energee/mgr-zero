@@ -30,7 +30,8 @@ function Occupancies({ readings }: { readings: BatchOccupancyView[] }) {
 /** One lifecycle group. A batch with readings lists its open occupancies in
  *  the vessel cell; any other batch shows the vessel names it has. A group
  *  where no batch has either draws no vessel column at all. The row itself
- *  is the link that opens the batch. */
+ *  is the link that opens the batch; an overdue plan's date is badged, the date last so
+ *  it never breaks (as on Invoices). */
 function GroupTable({ rows }: { rows: BatchesRowView[] }) {
   const vesselHead = rows.some(row => row.readings) ? "Vessel and latest reading" : rows.some(row => row.vessel) ? "Vessel" : null;
   return <RecordTable
@@ -44,7 +45,7 @@ function GroupTable({ rows }: { rows: BatchesRowView[] }) {
         row.batchNo,
         orMissing(row.brand, "No brand yet"),
         orMissing(row.recipe, "No recipe"),
-        row.plannedOn,
+        row.overdue ? <Fragment key="planned">{E.status("Overdue", "w")} {row.plannedOn}</Fragment> : row.plannedOn,
         row.plannedBbl,
         ...(vesselHead ? [row.readings ? <Occupancies key="vessel" readings={row.readings} /> : row.vessel] : []),
       ],

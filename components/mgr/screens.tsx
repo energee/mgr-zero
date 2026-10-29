@@ -175,6 +175,7 @@ import { TransferDetailView } from "@/components/mgr/views/transfer-detail";
 import { TransfersView } from "@/components/mgr/views/transfers";
 import { VendorView } from "@/components/mgr/views/vendor";
 import { VendorsView } from "@/components/mgr/views/vendors";
+import { VendorDetailView } from "@/components/mgr/views/vendor-detail";
 import { RemoveVesselControl, VesselDetailView } from "@/components/mgr/views/vessel-detail";
 import { CellarMapView } from "@/components/mgr/views/cellar-map";
 import { cellarMapBrewer } from "@/lib/mgr/fixtures/production";
@@ -212,8 +213,8 @@ import { priceGroupTwo, pricingGrid } from "@/lib/mgr/fixtures/pricing";
 import { channelExport, saleChannelsList } from "@/lib/mgr/fixtures/settings-catalog";
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
 import {
-  contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsOnHandList,
-  correctReceiptCountryMalt, newPoCountryMalt, newPoIncomplete, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
+  contractYchCitra, contractsList, countSheetShelf, cycleCountCans, materialCitra, materialsOnHandList,
+  correctReceiptCountryMalt, draftPoCanSource, editPoCanSource, newPoCountryMalt, newPoIncomplete, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorDetailYch, vendorYch, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger, kegReportOwned } from "@/lib/mgr/fixtures/kegs";
 import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
@@ -298,6 +299,7 @@ import { toTodayViewProps } from "@/lib/mgr/today-view";
 import { toTransferDetailViewProps } from "@/lib/mgr/transfer-detail-view";
 import { toTransfersViewProps } from "@/lib/mgr/transfers-view";
 import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
+import { toVendorDetailViewProps } from "@/lib/mgr/vendor-detail-view";
 import { toWorkViewProps } from "@/lib/mgr/work-view";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
@@ -489,7 +491,7 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Search", job: "Find permitted pages and records",
     reads: "search_entities", writes: "none",
     states: [["first use", "Type a page name, record name, or document number."], ["empty", "No pages or records found · Try a page name, record name, or document number."], ["loading", "row-shaped skeletons"], ["offline", "cached matches only", 1], ["permission", "Results honor row access"], ["document number", "ORD-0231 matches exactly and sorts first"]],
-    spec: "Pages are matched by name from the same role-filtered shipped navigation as the shell and appear in their own Pages group, even while records load or fail; each shows its navigation entry's one-line description, the same line a More card shows. Before a term, the latest five opened records show as Recent, or, when there are none, a first-use hint names what to type. Entity pickers offer records only. One registered search across the entity kinds the caller's role can read; results are grouped by kind and arrow keys move between matches; filtering never widens what is permitted, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. A number without its prefix matches every numbered kind. A kind with no detail page, such as a vendor, opens its list page. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
+    spec: "Pages are matched by name from the same role-filtered shipped navigation as the shell and appear in their own Pages group, even while records load or fail; each shows its navigation entry's one-line description, the same line a More card shows. Before a term, the latest five opened records show as Recent, or, when there are none, a first-use hint names what to type. Entity pickers offer records only. One registered search across the entity kinds the caller's role can read; results are grouped by kind and arrow keys move between matches; filtering never widens what is permitted, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. A number without its prefix matches every numbered kind. A kind with no detail page, such as a material, opens its list page. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
     body: <SearchView model={searchPalette} />,
   },
   {
@@ -1270,11 +1272,12 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Customer detail",
-    job: "Edit one customer and reach its ship-tos, prices, orders and keg balance",
-    reads: "get_customer · list_customer_users",
+    to: { "Open balance": "Invoices" },
+    job: "Edit one customer and reach its ship-tos, prices, orders, open balance and keg balance",
+    reads: "get_customer · list_customer_users · list_invoices",
     writes: "upsert_customer · invite_customer_user · revoke_customer_user · delete_customer [admin]",
     states: [["permission", "sales or admin required", 1], ["active", "may place orders"], ["inactive", "history remains"], ["license warning", "renewal needs review", 1]],
-    spec: "Desktop uses open sections without card borders or backgrounds, grouping account details, ship-tos and portal users in the main column, with trading terms and customer activity alongside. The sections stack at narrow widths. Account details and trading terms save together inline; deletion sits below a separate divider. Admin can confirm Delete customer for an unused account, including its ship-tos. Linked orders, invoices, keg records, portal access, invitations and QuickBooks identities block deletion. Portal users lists each buyer by email; Admin or Sales can confirm Remove access for one buyer, which ends their portal access at once and keeps their orders, invoices and sign-in account.",
+    spec: "Desktop uses open sections without card borders or backgrounds, grouping account details, ship-tos and portal users in the main column, with trading terms and customer activity alongside. The sections stack at narrow widths. Account details and trading terms save together inline; deletion sits below a separate divider. Admin can confirm Delete customer for an unused account, including its ship-tos. Linked orders, invoices, keg records, portal access, invitations and QuickBooks identities block deletion. Portal users lists each buyer by email; Admin or Sales can confirm Remove access for one buyer, which ends their portal access at once and keeps their orders, invoices and sign-in account. Customer activity shows Admin and Sales the Open balance: the sum of the customer's unpaid invoice balances by the Invoices register's rule, Unknown when any balance is unknown, never $0.00; it opens the Invoices register filtered to this customer and Unpaid.",
     body: <CustomerView model={toCustomerViewProps(customerRidgeline)} />,
   },
   {
@@ -1389,7 +1392,7 @@ export const SCREENS: Screen[] = [
     job: "The AR list: what is due, what QuickBooks changed underneath it, and the drill-in for one invoice",
     reads: "list_invoices · get_qbo_connection · get_qbo_sync_status",
     writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping · push_invoice_to_qbo · sync_qbo_payments · write_off_invoice [existing commands] · Open in QuickBooks [verified company-bound invoice destination] · email delivery status [SCHEMA-GATE: post-v1 scope; the invoice query returns no delivery state]",
-    states: [["overdue", "outstanding invoice due before brewery-local today", 1], ["connection health", "QuickBooks · token healthy · company 9341"], ["not turned on", "disabled Connect before navigation with the same reason as Accounting", 1], ["never connected", "no stale-payment or reconnect warning"], ["expired", "Reconnect before mapping, push or sync; Sync QuickBooks is hidden, Admin sees Connect, Sales sees Admin must connect", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "payment status is confirmed by QuickBooks Online sync, or paid in full by payments recorded in MGR"], ["needs mapping", "a failed push Admin or Sales can fix; the drill-in resolves each mapping", 1]],
+    states: [["customer", "a customer filter from Open balance adds a Customer line with Clear; Show keeps the customer"], ["overdue", "outstanding invoice due before brewery-local today", 1], ["connection health", "QuickBooks · token healthy · company 9341"], ["not turned on", "disabled Connect before navigation with the same reason as Accounting", 1], ["never connected", "no stale-payment or reconnect warning"], ["expired", "Reconnect before mapping, push or sync; Sync QuickBooks is hidden, Admin sees Connect, Sales sees Admin must connect", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "payment status is confirmed by QuickBooks Online sync, or paid in full by payments recorded in MGR"], ["needs mapping", "a failed push Admin or Sales can fix; the drill-in resolves each mapping", 1]],
     spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the manual sync reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; collected revenue is a read-side rule, remote state live and balance zero, expressed once in the reporting view; no CHECK refuses a historical payment-confirmation marker, because paid-then-voided is a real history the row must be able to hold. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. An outstanding invoice is overdue only when its due date is before brewery-local today, not on the due day itself. Credit memos, invoices whose balance is unknown (push result unknown, pushed to a previous company, or not yet synced), and settled, paid, written-off, voided or deleted invoices are never marked overdue. Inventory pins its clock. Rows also carry the due date, push failure and credit-memo status; payments come back through manual sync and are read-only, except on an invoice QuickBooks never received, which takes Record payment. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
     body: <InvoicesView rows={invoiceList} connection={{ connected: true, detail: "Connected · company 9341", canConnect: true }} sync={<QboSyncView status={invoicesSync} />} />,
   },
@@ -1775,7 +1778,7 @@ export const SCREENS: Screen[] = [
     job: "Set date and planned barrels; recipe and brand are intent, not commitments",
     reads: "get_brew_day · list_recipes · list_brands",
     writes: "schedule_batch [single planned-batch row; both the recipe version and the intended brand are nullable]",
-    states: [["permission", "brewer or admin required", 1], ["planned", "Schedule batch is the one verb"], ["no recipe yet", "date and barrels alone hold the slot"], ["no brand yet", "identity waits for packaging, which already requires one"], ["brew day", "Record brew day is its own screen"]],
+    states: [["permission", "brewer or admin required", 1], ["planned", "Schedule batch is the one verb"], ["no recipe yet", "date and barrels alone hold the slot"], ["no brand yet", "identity waits for packaging, which already requires one"], ["brew day", "Record brew day is its own screen"], ["from a recipe", "Recipe's Schedule batch opens this sheet with that recipe's current version and its brand chosen"]],
     spec: "The planned mode of brew day: date, planned barrels, and two optional statements of intent. Only date and barrels commit anything: they reserve the slot. The recipe version is already optional in the schema, and revision 2 makes the brand optional too, because identity is optional at brew and required at packaging, where every finished lot must already name a brand. Requiring either here enforces nothing the lot does not, and only forces the decision earlier than the business makes it. Keeping brand as intent is also what keeps the gap between what a batch was meant to be and what it shipped as worth querying, rather than rewriting history when a batch blends or turns into something else. Record brew day is a separate screen so this sheet has one primary.",
     body: <ScheduleBatchView model={scheduleBatchHazy} />,
   },
@@ -1926,7 +1929,7 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Work",
     name: "Purchase orders",
-    to: { "New PO": "New PO", "Mark sent": "Receive PO" },
+    to: { "New PO": "New PO", "Mark sent": "Draft PO" },
     job: "See draft, sent and partially received purchase orders",
     reads: "list_purchase_orders",
     writes: "none [creation and receiving happen on their own surfaces]",
@@ -1943,8 +1946,8 @@ export const SCREENS: Screen[] = [
     job: "Draft a vendor order: lines, cost, and the lot the vendor named",
     reads: "list_vendors_and_contracts · list_materials · get_material_requirements",
     writes: "create_purchase_order [one RPC: draft PO + all lines] · send_purchase_order [Save and mark sent]",
-    states: [["permission", "warehouse or admin required", 1], ["new", "vendor and one line required · every line needs a material and a quantity above zero · Remove drops a line"], ["from requirements", "Planning drafts the lines; the shortfall is the quantity"], ["contracted lot", "the vendor named a lot on the contract · it prefills receiving"], ["contract in force", "one contract for the vendor and material in force today · the line's cost starts at its price and the line draws it down · several leave it blank"], ["no lot named", "the ordinary case · receiving captures it off the package"], ["past date", "an Expected date before brewery-local today warns; Save draft still works"]],
-    spec: "A flat form: vendor and optional expected date, then material lines with visible quantity and unit-cost labels. Spacing groups related fields without cards, repeated section headings, line-number headings, a Draft badge, or instructional paragraphs. Material, quantity, and cost align on large screens; smaller screens stack material above the numeric fields, and the narrowest screens stack all three. Each line owns its Remove action and optional expected lot. Expected lot is advisory, creates no lot record, and only appears for lot-tracked materials. Receiving prefills from it; the actual package decides the received lot. Once a vendor is chosen, its default materials lead the material picker. Save draft retains its validation reason; Save and mark sent waits on the same fields, marks the saved draft sent from a mail client, and opens it. If marking fails, the error says the draft is saved and links it.",
+    states: [["permission", "warehouse or admin required", 1], ["new", "vendor and one line required · every line needs a material and a quantity above zero · Remove drops a line"], ["lead time", "picking a vendor sets Expected to today plus its typed lead time · blank when it has none · still editable"], ["from requirements", "Planning drafts the lines; the shortfall is the quantity"], ["contracted lot", "the vendor named a lot on the contract · it prefills receiving"], ["contract in force", "one contract for the vendor and material in force today · the line's cost starts at its price and the line draws it down · several leave it blank"], ["no lot named", "the ordinary case · receiving captures it off the package"], ["past date", "an Expected date before brewery-local today warns; Save draft still works"]],
+    spec: "A flat form: vendor and optional expected date (picking a vendor fills it with today plus the vendor's lead time), then material lines with visible quantity and unit-cost labels. Spacing groups related fields without cards, repeated section headings, line-number headings, a Draft badge, or instructional paragraphs. Material, quantity, and cost align on large screens; smaller screens stack material above the numeric fields, and the narrowest screens stack all three. Each line owns its Remove action and optional expected lot. Expected lot is advisory, creates no lot record, and only appears for lot-tracked materials. Receiving prefills from it; the actual package decides the received lot. Once a vendor is chosen, its default materials lead the material picker. Save draft retains its validation reason; Save and mark sent waits on the same fields, marks the saved draft sent from a mail client, and opens it. If marking fails, the error says the draft is saved and links it.",
     body: <NewPoView model={newPoCountryMalt} />,
   },
   {
@@ -1965,9 +1968,29 @@ export const SCREENS: Screen[] = [
     job: "Count what arrived; trigger derives receipt status",
     reads: "get_purchase_order · list_locations · list_bins · get_material_on_hand [the first open line's material: the receipt starts on the bin holding the most of it]",
     writes: "cancel_purchase_order [draft or sent without receipts; required reason releases remainder] · close_purchase_order_short [received stock retained; required reason releases remainder] · send_purchase_order [single row draft → sent; an attestation: Marked sent, never Delivered] · receive_purchase_order [one RPC: receipt + lines (counted, over or short) + lots with best_by + material movements] · Recent lot suggestions [SCHEMA-GATE: post-v1 scope; the purchase-order query does not return recent material lots]",
-    states: [["loading", "PO-line skeleton"], ["draft", "Send purchase order is the one active verb · counts wait, and the receive verb is not drawn", 1], ["prefilled", "the PO named a lot · the field opens on it and the ordinary receipt changes nothing"], ["no lot on the PO", "the field opens empty · recent lots for that material are offered", 1], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
-    spec: "Cancel purchase order requires a reason and no posted receipts. Close short requires a reason after a receipt; only the unreceived remainder is released, with actor and time retained. Closed orders leave Work and planning, refuse new receipts, and receipt corrections never reopen them. Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named so the ordinary receipt is a glance and no typing. When the PO named none the field opens empty and offers that material\u2019s recent lots, which is what keeps one vendor lot from becoming two records over a stray space. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. Punctuation or case alone never reads as one: the schema spec owns that comparison rule. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
+    states: [["loading", "PO-line skeleton"], ["draft", "Mark sent is the one active verb · Edit draft reopens the lines · counts wait, and the receive verb is not drawn", 1], ["prefilled", "the PO named a lot · the field opens on it and the ordinary receipt changes nothing"], ["no lot on the PO", "the field opens empty · recent lots for that material are offered", 1], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
+    spec: "Cancel purchase order and Close short fold behind their titles below the order's next verb. Cancel purchase order requires a reason and no posted receipts. Close short requires a reason after a receipt; only the unreceived remainder is released, with actor and time retained. Closed orders leave Work and planning, refuse new receipts, and receipt corrections never reopen them. Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named so the ordinary receipt is a glance and no typing. When the PO named none the field opens empty and offers that material\u2019s recent lots, which is what keeps one vendor lot from becoming two records over a stray space. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. Punctuation or case alone never reads as one: the schema spec owns that comparison rule. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
     body: <ReceivePoView model={receivePoCountryMalt} />,
+  },
+  {
+    step: 7, slice: 2, tab: "Work", name: "Draft PO",
+    to: { "Edit draft": "Edit PO", "Mark sent": "Receive PO", "Cancel purchase order": "Purchase orders" },
+    job: "Mark a draft sent, or fix its lines first",
+    reads: "get_purchase_order",
+    writes: "send_purchase_order [single row draft → sent; an attestation: Marked sent, never Delivered] · cancel_purchase_order [required reason]",
+    states: [["permission", "warehouse or admin", 1], ["draft", "Mark sent first · Edit draft opens Edit PO · Cancel purchase order folded below"]],
+    spec: "Receive PO for a draft. The lines read as ordered, How it went out picks the attestation, and Mark sent is the verb. Edit draft opens the same New PO form on the saved lines. Cancel purchase order is rare, so it folds behind its title after Mark sent and opens to its reason and button.",
+    body: <ReceivePoView model={draftPoCanSource} />,
+  },
+  {
+    step: 7, slice: 2, tab: "Work", name: "Edit PO",
+    to: { "Add line": "Edit PO", Remove: "Edit PO", "Save draft": "Draft PO", "Save and mark sent": "Receive PO" },
+    job: "Change a draft's vendor, expected date or lines before it is sent",
+    reads: "get_purchase_order · list_vendors_and_contracts · list_materials",
+    writes: "update_purchase_order [one RPC: draft header + all lines replaced] · send_purchase_order [Save and mark sent]",
+    states: [["permission", "warehouse or admin required", 1], ["draft", "opens on the saved vendor, expected date and lines"], ["sent", "a sent or closed order returns to its page", 1]],
+    spec: "The New PO form, titled with the draft's number and opened on what was saved. The same validation and verbs apply: Save draft returns to the draft, and Save and mark sent marks it sent and opens it. The note a draft carries is kept.",
+    body: <NewPoView model={editPoCanSource} />,
   },
   {
     step: 7,
@@ -1997,12 +2020,12 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Beer",
     name: "Materials on hand",
-    to: { Edit: "Edit material" },
+    to: { Edit: "Edit material", "Count sheet": "Count sheet" },
     job: "See material quantities, edit a material, and start a count",
     reads: "list_materials · get_material_on_hand",
-    writes: "none [edits happen in Edit material, counts in Cycle count]",
+    writes: "none [edits happen in Edit material, counts in Cycle count and Count sheet]",
     states: [["inactive", "an inactive material stays listed, its Status Inactive"], ["empty", "add a material, then open Purchase orders to receive stock"]],
-    spec: "The Beer landing's Materials on hand row opens this list. Each row shows the material's type, on hand summed across bins in its base unit, whether its lots are tracked, and its status. Edit opens Edit material for that material's definition; Count opens Cycle count for its stock; Add material opens a blank definition. One list serves both, so there is no separate definitions list.",
+    spec: "The Beer landing's Materials on hand row opens this list. Each row shows the material's type, on hand summed across bins in its base unit, whether its lots are tracked, and its status. Edit opens Edit material for that material's definition; Count opens Cycle count for its stock; Count sheet opens one count over every listed material held in a bin; Add material opens a blank definition. One list serves both, so there is no separate definitions list.",
     body: <MaterialsOnHandView model={toMaterialsOnHandViewProps(materialsOnHandList)} controls={<ListControls search={{ label: "Search materials", value: "", keep: {} }} scopes={toMaterialsScopes({ category: "" })} />} />,
   },
   {
@@ -2034,6 +2057,20 @@ export const SCREENS: Screen[] = [
   {
     step: 7,
     slice: 2,
+    group: "Global",
+    surface: "sheet",
+    name: "Count sheet",
+    to: { Material: "Entity picker", "Preview count": "Count sheet", "Record count": "Materials on hand" },
+    job: "Count every material held in one bin in one pass",
+    reads: "get_material_on_hand · get_material_count_preview",
+    writes: "record_material_count [one RPC: reviewed revision + count + every counted line + exact adjustment movements]",
+    states: [["permission", "warehouse or brewer required", 1], ["blank", "a line left blank is not counted and not recorded"], ["matching", "a line that matches still records, with no adjustment", 1], ["empty", "no listed material has stock in the bin", 1]],
+    spec: "Materials on hand's Count sheet opens this. Pick the location and bin; the sheet lists every material on the list with stock in that bin, by name. Type a count for each material you counted and leave the rest blank. One preview covers every counted line and names each line's lots and signed adjustments, then one Record count saves them as one count with the reviewed revision. Lot choice, the stale-preview refusal and the frozen retry are Cycle count's. A search or type filter on the list narrows the sheet too.",
+    body: <><CycleCountView model={countSheetShelf} footer={null} />{E.pin(<CycleCountFooter />)}</>,
+  },
+  {
+    step: 7,
+    slice: 2,
     tab: "More",
     name: "Vendors",
     to: { Edit: "Vendor" },
@@ -2043,6 +2080,19 @@ export const SCREENS: Screen[] = [
     states: [["permission", "warehouse or brewer required", 1], ["active", "available for purchase orders"], ["contract", "committed quantity summarized"], ["empty", "Add vendor is the only action"]],
     spec: "Materials, vendors and contracts are separate lists so each row has one predictable destination.",
     body: <VendorsView model={toVendorsViewProps(vendorsList)} controls={<ListControls search={{ label: "Search vendors", value: "", keep: {} }} />} />,
+  },
+  {
+    step: 7,
+    slice: 2,
+    tab: "More",
+    name: "Vendor detail",
+    to: { Edit: "Vendor", "Citra 2026": "Materials on hand", "Mosaic 2025": "Materials on hand" },
+    job: "See one supplier's terms, contracts, open orders and default materials",
+    reads: "list_vendors_and_contracts [vendorId] · list_purchase_orders [vendorId; admin or warehouse] · list_materials [defaultVendorId, inactive included]",
+    writes: "upsert_vendor [on Vendor]",
+    states: [["permission", "warehouse or brewer required", 1], ["brewer", "no open purchase orders section"], ["inactive", "status reads Inactive · history remains"], ["no contracts", "the Contracts section says so"], ["no open orders", "the open purchase orders section says so"], ["no default materials", "the Default materials section says so"]],
+    spec: "Edit stays on each Vendors row and is also here; both open the same Edit vendor sheet. Deactivate vendor stays inside that sheet rather than becoming its own button. Contracts are read-only here; Add and Edit contract stay in the Contracts list on Vendors. Default materials include inactive ones, marked Inactive, as Materials on hand shows them. Only open purchase orders are listed: draft, sent and partially received. Brewer cannot read purchase orders, so for Brewer the section is left out rather than shown empty.",
+    body: <VendorDetailView model={toVendorDetailViewProps(vendorDetailYch)} />,
   },
   {
     step: 7,
@@ -2134,11 +2184,11 @@ export const SCREENS: Screen[] = [
     tab: "More",
     name: "Recipe",
     // The Round choices rewrite the line's per bbl in place, so they stay on Recipe.
-    to: { "v4 (current)": "Recipe", v3: "Recipe", v2: "Recipe", v1: "Recipe", "Round to 19 × 50 lb": "Recipe", "Round to 20 × 50 lb": "Recipe", "Round to 1 × 44 lb": "Recipe", "Add ingredient": "Ingredient", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", Water: "Water" },
+    to: { "Schedule batch": "New batch", "v4 (current)": "Recipe", v3: "Recipe", v2: "Recipe", v1: "Recipe", "Round to 19 × 50 lb": "Recipe", "Round to 20 × 50 lb": "Recipe", "Round to 1 × 44 lb": "Recipe", "Add ingredient": "Ingredient", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", Water: "Water" },
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe · list_brands [the parent row's Brand picker] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
     writes: "create_recipe [mutable parent row] · set_recipe_brand [change the parent row's brand after creation] · create_recipe_version [one RPC: immutable version + ingredients + mash and fermentation schedules + water and additions, with assumption and process-spec columns on recipe_versions and per-ingredient extract snapshot on recipe_ingredients]",
-    states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"], ["no version", "a recipe without a version draws No version yet, says what a version records, and keeps New recipe version as the one action, no numbers"], ["draft", "New recipe version opens a copy of the current version; an unsaved draft is kept in this tab and restored with Start over"], ["frozen", "a saved version reads out as text; a change is the next version"], ["history", "Versions links select an older saved version; (current) returns to the latest; older versions have no write controls"]],
+    states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"], ["no version", "a recipe without a version draws No version yet, says what a version records, and keeps New recipe version as the one action, no numbers"], ["draft", "New recipe version opens a copy of the current version; an unsaved draft is kept in this tab and restored with Start over"], ["frozen", "a saved version reads out as text; a change is the next version"], ["history", "Versions links select an older saved version; (current) returns to the latest; older versions have no write controls"], ["schedule", "Schedule batch sits beside New recipe version once a version exists; it opens New batch on Batches with the current version and its brand chosen; an older version and a recipe without one do not offer it"]],
     spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. The page defaults to the newest version; Versions links beside Saved open an exact version with ?v=N, and (current) returns to the newest. Older versions are read-only; each batch's Brew day keeps the plan it was brewed from. A new parent takes a name, the brand it is meant to brew and a note; the brand names the style. New recipe opens this page with no version, and one save writes the parent and its first version. Versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: every quantity is per barrel, the batch names its size on Brew day, and Brew day already records knockout volume as its baseline. The scale chips that once previewed a 15 or 30 bbl bill are gone until a brewery's own batch sizes can feed them. Three note fields become one.",
     body: <RecipeView model={recipeHazyV4} parentForm={<NewRecipeFieldsView brands={recipeBrandOptions} values={{ name: "Hazy IPA", brandId: "hazy", note: "" }} />} />,
   },
@@ -2258,7 +2308,7 @@ export const SCREENS: Screen[] = [
     name: "Compliance months",
     to: { "September 2026": "Period in progress", "August 2026": "Filed period needs amendment" },
     job: "Choose a monthly, quarterly, or annual reporting period and see whether its snapshot was filed",
-    reads: "list_compliance_reports · list_lots",
+    reads: "list_compliance_reports · list_compliance_active_periods · list_lots",
     writes: "none",
     states: [["not filed", "Not filed · Ready to review", 1], ["no activity", "an ended, unfiled period with no movement, cellar removal or invoice · Not filed · No activity", 1], ["in progress", "the current period: reviewable · In progress · File after the month ends"], ["filed", "the snapshot saved in MGR · Filed <date> · <bbl> taxpaid"], ["lot search", "a lot code lists the newest matching lots, each opening its trace; none before a search"], ["no lot match", "No lots match · check the code or clear the search", 1], ["no period yet", "every recent period starts before the books opened · names that date and the first period MGR can report"]],
     spec: "This is the shared destination for the Licenses back link, the period rows, and the lot trace. Monthly, Quarterly, and Annual tabs swap the list: the last three months, four calendar quarters, or two calendar years show, less any that start before the books-opened date, plus every filed period of that length. A tab left with no period says No monthly (quarterly, annual) period yet. Lot trace is a lot-code search: no lot is listed until a code is searched, then the 50 newest matches show. A TTB filing is exactly one calendar month, quarter, or year; the API takes other jurisdictions and ranges.",

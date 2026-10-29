@@ -79,6 +79,7 @@ const pureTests = [
   "tests/record-table.test.ts",
   "tests/integration-connect-availability.test.ts",
   "tests/invoices-view.test.ts",
+  "tests/customer-open-balance.test.ts",
   "tests/accounting-view.test.ts",
   "tests/pos-ui.test.ts",
   "tests/e-hint-roles.test.ts",
@@ -112,13 +113,16 @@ const pureTests = [
   "tests/movement-form.test.ts",
   "tests/movement-receipt-labels.test.ts",
   "tests/purchasing-view.test.ts",
+  "tests/vendor-detail-view.test.ts",
   "tests/delivery-view.test.ts",
   "tests/transfers-view.test.ts",
   "tests/shipment-parity.test.ts",
   "tests/order-sheets-view.test.ts",
   "tests/upc.test.ts",
   "tests/sku-share-controls.test.ts",
-  "tests/keyboard-focus.test.ts"
+  "tests/keyboard-focus.test.ts",
+  "tests/material-count-sheet.test.ts",
+  "tests/row-link-prefetch.test.ts"
 ];
 
 export default defineConfig({

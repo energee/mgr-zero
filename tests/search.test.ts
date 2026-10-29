@@ -105,7 +105,7 @@ describe("search_entities", () => {
     const route = await ins("routes", { brewery_id: b.id, name: "Zest Loop", delivery_date: "2026-09-02" });
     const recipe = await ins("recipes", { brewery_id: b.id, name: "Zest Pils" });
     const vessel = await ins("vessels", { brewery_id: b.id, name: "Zest FV1", kind: "fermenter", capacity_bbl: 15 });
-    await ins("vendors", { brewery_id: b.id, name: "Zest Malt Co" });
+    const vendor = await ins("vendors", { brewery_id: b.id, name: "Zest Malt Co" });
     await ins("ship_tos", { brewery_id: b.id, customer_id: customerId, label: "Zest Dock", address1: "1", city: "P", state: "PA", zip: "19100" });
     await ins("materials", { brewery_id: b.id, name: "Zest hops", category: "hop", base_uom: "lb", purchase_uom: "lb" });
     await ins("keg_pools", { brewery_id: b.id, name: "Zest kegs", kind: "owned" });
@@ -115,7 +115,7 @@ describe("search_entities", () => {
     const hits = await search("zest");
     expect(Object.fromEntries(hits.map((h) => [h.kind, h.href]))).toEqual({
       route: `/routes/${route.id}`, recipe: `/recipes/${recipe.id}`, vessel: `/cellar/vessels/${vessel.id}`,
-      vendor: "/vendors", ship_to: `/customers/${customerId}`, material: "/materials", keg_pool: "/kegs",
+      vendor: `/vendors/${vendor.id}`, ship_to: `/customers/${customerId}`, material: "/materials", keg_pool: "/kegs",
       bin: `/locations/${location.id}`, license: "/compliance/licenses", water_profile: "/catalog/water-profiles",
     });
   });

@@ -118,6 +118,11 @@ describe("New transfer view", () => {
     expect(html).not.toMatch(/→/);
   });
 
+  it("#1584 draws no fractional-quantity info box; the quantity field's own validation says what it takes", () => {
+    const html = htmlOf(createElement(NewTransferView, { model: toNewTransferViewProps(newTransferDraft) }));
+    expect(html).not.toContain("Fractional quantities");
+  });
+
   it("draws no in-sheet title or back link; the dialog names it (#1120)", () => {
     const html = htmlOf(createElement(NewTransferView, { model: toNewTransferViewProps(newTransferDraft) }));
     expect(html).not.toMatch(/<h1\b|<a\b/);

@@ -7,6 +7,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace() {} }) }));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandForm: () => ({ open: true, setOpen() {}, submitting: false, error: null, submit() {} }) }));
 vi.mock("@/components/mgr/command-form", async (original) => {
   const real = await original<typeof import("@/components/mgr/command-form")>();

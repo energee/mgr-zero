@@ -37,7 +37,7 @@ export function PoolForm({ pool, vendors }: { pool?: Pool & { vendor_id: string 
   });
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title={pool ? "Edit keg pool" : "Add keg pool"}
-      trigger={<Button size="sm" variant={pool ? "outline" : "default"}>{pool ? "Edit" : "Add keg pool"}</Button>}>
+      trigger={<Button size="sm" variant="outline">{pool ? "Edit" : "Add keg pool"}</Button>}>
       <form onInvalidCapture={() => setAttempted(true)} onSubmit={(event) => {
         setAttempted(true);
         if (reason) { event.preventDefault(); event.stopPropagation(); }

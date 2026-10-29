@@ -7,6 +7,7 @@ import { sentenceCase } from "@/lib/mgr/labels";
 import { formatLatestReading, type VesselReading } from "./vessel-detail-view";
 import type { GravityUnit } from "./gravity-unit";
 import { formatDate } from "@/lib/date-format";
+import { CHANGE_PLAN_ID } from "./brew-prep-view";
 
 /** One open occupancy of a brewed batch: the tank, its latest reading line, and where Reading goes. */
 export type BatchOccupancyView = { key: string; vessel: string; reading: string; href?: string };
@@ -14,7 +15,9 @@ export type BatchOccupancyView = { key: string; vessel: string; reading: string;
 /** One batch. `brand` and `recipe` are null when the plan names none. `vessel`
  *  is the query's joined open-tank names. `readings` is set only for a brewed,
  *  unclosed batch; an empty list there means it has no open occupancy.
- *  `href` opens the batch. */
+ *  `overdue` marks a planned batch dated before the brewery's day. `href`
+ *  opens the batch; an overdue one lands on its open Reschedule or cancel
+ *  fold, so a stale plan is cleared from there (#1582). */
 export type BatchesRowView = {
   key: string;
   batchNo: string;
@@ -24,6 +27,7 @@ export type BatchesRowView = {
   plannedBbl: number;
   vessel: string | null;
   readings?: BatchOccupancyView[];
+  overdue?: boolean;
   href?: string;
 };
 
@@ -73,13 +77,17 @@ export function toBatchesViewProps(s: BatchesSnapshot): BatchesViewModel {
 export type BatchListRow = { id: string; batch_no: number | null; planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null; cancelled_at: string | null; brand_name: string | null; recipe_name: string | null; vessel_name: string | null; active_occupancies: { id: string; vessel_name: string; latest_reading?: VesselReading | null }[] };
 export type BatchVessel = { id: string; name: string; kind: string; capacity_bbl: number; active: boolean };
 
-export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[], hrefs?: { batch: (id: string) => string; vessel: (id: string) => string; reading?: (id: string) => string }, display: { unit: GravityUnit; timeZone: string } = { unit: "plato", timeZone: "UTC" }): BatchesSnapshot {
+/** `display.today` is the brewery's day (YYYY-MM-DD); without it no batch is marked overdue. */
+export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[], hrefs?: { batch: (id: string) => string; vessel: (id: string) => string; reading?: (id: string) => string }, display: { unit: GravityUnit; timeZone: string; today?: string } = { unit: "plato", timeZone: "UTC" }): BatchesSnapshot {
   const snapshot: BatchesSnapshot = { title: "Batches", planned: [], active: [], completed: [], cancelled: [], vessels: vessels.map(vessel => ({ key: vessel.id, name: vessel.name, kind: sentenceCase(vessel.kind), capacityBbl: Number(vessel.capacity_bbl), active: vessel.active, href: hrefs?.vessel(vessel.id) })) };
   for (const batch of batches) {
+    const group = (batch.cancelled_at ? snapshot.cancelled : batch.closed_at ? snapshot.completed : batch.brewed_on ? snapshot.active : snapshot.planned)!;
+    const overdue = group === snapshot.planned && !!display.today && batch.planned_on < display.today;
+    const href = hrefs?.batch(batch.id);
     const row: BatchesRowView = {
       key: batch.id, batchNo: batNo(batch.batch_no), brand: batch.brand_name, recipe: batch.recipe_name,
       plannedOn: formatDate(batch.planned_on), plannedBbl: Number(batch.planned_bbl), vessel: batch.vessel_name,
-      href: hrefs?.batch(batch.id),
+      overdue: overdue || undefined, href: href && overdue ? `${href}#${CHANGE_PLAN_ID}` : href,
     };
     if (batch.brewed_on && !batch.closed_at) {
       row.readings = batch.active_occupancies.map(occupancy => ({
@@ -88,7 +96,7 @@ export function batchesFromQuery(batches: BatchListRow[], vessels: BatchVessel[]
         href: hrefs?.reading?.(occupancy.id),
       }));
     }
-    (batch.cancelled_at ? snapshot.cancelled : batch.closed_at ? snapshot.completed : batch.brewed_on ? snapshot.active : snapshot.planned)!.push(row);
+    group.push(row);
   }
   return snapshot;
 }

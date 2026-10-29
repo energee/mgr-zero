@@ -266,13 +266,14 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, brewer
 
-Materials, alphabetical, with kind, units, lot tracking, default vendor, and extract potential; optionally only one kind, or those whose name contains q
+Materials, alphabetical, with kind, units, lot tracking, default vendor, and extract potential; optionally only one kind, one default vendor, or those whose name contains q
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `includeInactive` | boolean | no |
 | `q` | string | no |
 | `category` | malt or hop or yeast or adjunct or chemical or packaging or other | no |
+| `defaultVendorId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -285,11 +286,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse
 
-Open purchase orders (draft, sent, partially received) with vendor and what each still owes; includeClosed adds received and cancelled
+Open purchase orders (draft, sent, partially received) with vendor and what each still owes; includeClosed adds received and cancelled; optionally only one vendor's
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `includeClosed` | boolean | no |
+| `vendorId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -319,11 +321,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, brewer
 
-Vendors, alphabetical, with typed and observed lead time and each one's contracts and their drawdown (committed, received, on order, available); optionally only vendors whose name contains q
+Vendors, alphabetical, with typed and observed lead time and each one's contracts and their drawdown (committed, received, on order, available); optionally only one vendor, or vendors whose name contains q
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `q` | string | no |
+| `vendorId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -443,6 +446,26 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_vendor_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "vendorId": "00000000-0000-0000-0000-000000000000", "qboVendorId": "string" } }'
+```
+
+## update_purchase_order [#update_purchase_order]
+
+`command` · admin, warehouse
+
+Edit a draft purchase order before it is sent: its vendor, expected date and all its lines, replaced in one write; a contracted line takes the contract price unless one is typed; a sent order is refused
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `poId` | uuid | yes |
+| `vendorId` | uuid | yes |
+| `lines` | array of object | yes |
+| `expectedOn` | date (YYYY-MM-DD) | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_purchase_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "poId": "00000000-0000-0000-0000-000000000000", "vendorId": "00000000-0000-0000-0000-000000000000", "lines": [ { "materialId": "00000000-0000-0000-0000-000000000000", "qtyOrdered": 1 } ] } }'
 ```
 
 ## upsert_material [#upsert_material]

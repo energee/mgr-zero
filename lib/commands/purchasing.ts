@@ -1,5 +1,5 @@
 // lib/commands/purchasing.ts — vendors, materials, contracts, purchase orders
-// (draft → mark sent → receive), drafting POs from planning gaps, and material
+// (draft → edit → mark sent → receive), drafting POs from planning gaps, and material
 // cycle counts. Lead time is the vendor's (spec 2026-09-07 §3); open balance,
 // observed lead time and contract drawdown are views, never stored (§2–§4);
 // marking a PO sent is an attestation, so no email leaves here (§1).
@@ -112,18 +112,31 @@ defineQuery({
 
 // Vendors with their contracts nested, each contract carrying the four
 // drawdown numbers from contract_balances (committed, received, on order,
-// available) so Contracts and Contract read the same figures.
+// available) so Contracts and Contract read the same figures. vendorId narrows
+// all four reads to one vendor for its page (#1586).
 defineQuery({
-  name: "list_vendors_and_contracts", description: "Vendors, alphabetical, with typed and observed lead time and each one's contracts and their drawdown (committed, received, on order, available); optionally only vendors whose name contains q",
-  input: z.object({ q: z.string().trim().max(100).optional().describe("Only vendors whose name contains this text") }), roles: [...PURCHASING],
+  name: "list_vendors_and_contracts", description: "Vendors, alphabetical, with typed and observed lead time and each one's contracts and their drawdown (committed, received, on order, available); optionally only one vendor, or vendors whose name contains q",
+  input: z.object({
+    q: z.string().trim().max(100).optional().describe("Only vendors whose name contains this text"),
+    vendorId: z.string().uuid().optional().describe("Only this vendor"),
+  }), roles: [...PURCHASING],
   handler: async (ctx, i) => {
     let vendorQuery = ctx.db.from("vendors").select("id, name, email, phone, payment_terms, lead_time_days, active").eq("brewery_id", ctx.breweryId);
+    let contractQuery = ctx.db.from("material_contracts").select("id, vendor_id, material_id, contract_no, unit_cost_cents, starts_on, ends_on, materials(name)").eq("brewery_id", ctx.breweryId);
+    let balanceQuery = ctx.db.from("contract_balances").select("contract_id, qty_committed, qty_received, qty_on_order, qty_available").eq("brewery_id", ctx.breweryId);
+    let observedQuery = ctx.db.from("vendor_lead_times").select("vendor_id, sent_via, n, avg_lead_days, avg_first_lead_days, avg_late_days").eq("brewery_id", ctx.breweryId);
     if (i.q) vendorQuery = vendorQuery.regexIMatch("name", escapeRegex(i.q));
+    if (i.vendorId) {
+      vendorQuery = vendorQuery.eq("id", i.vendorId);
+      contractQuery = contractQuery.eq("vendor_id", i.vendorId);
+      balanceQuery = balanceQuery.eq("vendor_id", i.vendorId);
+      observedQuery = observedQuery.eq("vendor_id", i.vendorId);
+    }
     const [vendors, contracts, balances, observed] = await Promise.all([
       unwrap(vendorQuery.order("name")),
-      unwrap(ctx.db.from("material_contracts").select("id, vendor_id, material_id, contract_no, unit_cost_cents, starts_on, ends_on, materials(name)").eq("brewery_id", ctx.breweryId).order("created_at")),
-      unwrap(ctx.db.from("contract_balances").select("contract_id, qty_committed, qty_received, qty_on_order, qty_available").eq("brewery_id", ctx.breweryId)),
-      unwrap(ctx.db.from("vendor_lead_times").select("vendor_id, sent_via, n, avg_lead_days, avg_first_lead_days, avg_late_days").eq("brewery_id", ctx.breweryId)),
+      unwrap(contractQuery.order("created_at")),
+      unwrap(balanceQuery),
+      unwrap(observedQuery),
     ]);
     const balance = new Map((balances ?? []).map((b) => [b.contract_id as string, b]));
     const observedBy = Map.groupBy(observed ?? [], (o) => o.vendor_id as string);
@@ -149,14 +162,16 @@ defineQuery({
 });
 
 // Serves the Materials list, the recipe ingredient picker (extract_potential:
-// a null one contributes no gravity) and PO/count line pickers. Inactive
-// materials are hidden unless asked for: history keeps them, pickers do not.
+// a null one contributes no gravity), PO/count line pickers and the vendor
+// page's default materials (#1586). Inactive materials are hidden unless asked
+// for: history keeps them, pickers do not.
 defineQuery({
-  name: "list_materials", description: "Materials, alphabetical, with kind, units, lot tracking, default vendor, and extract potential; optionally only one kind, or those whose name contains q",
+  name: "list_materials", description: "Materials, alphabetical, with kind, units, lot tracking, default vendor, and extract potential; optionally only one kind, one default vendor, or those whose name contains q",
   input: z.object({
     includeInactive: z.boolean().optional(),
     q: z.string().trim().max(100).optional().describe("Only materials whose name contains this text"),
     category: z.enum(MATERIAL_CATEGORIES).optional().describe("Only materials of this kind"),
+    defaultVendorId: z.string().uuid().optional().describe("Only materials whose default vendor is this one"),
   }), roles: [...PURCHASING],
   handler: (ctx, i) => {
     let q = ctx.db.from("materials")
@@ -165,6 +180,7 @@ defineQuery({
     if (!i.includeInactive) q = q.eq("active", true);
     if (i.q) q = q.regexIMatch("name", escapeRegex(i.q));
     if (i.category) q = q.eq("category", i.category);
+    if (i.defaultVendorId) q = q.eq("default_vendor_id", i.defaultVendorId);
     return unwrap(q);
   },
 });
@@ -192,6 +208,12 @@ const poLine = z.object({
   expectedLotCode: z.string().trim().optional(),
 });
 
+/** PO lines as the create and update RPCs take them. */
+const poLinesJson = (lines: z.infer<typeof poLine>[]) => lines.map((l) => ({
+  material_id: l.materialId, qty_ordered: l.qtyOrdered, unit_cost_cents: l.unitCostCents ?? null,
+  contract_id: l.contractId ?? null, expected_lot_code: l.expectedLotCode ?? null,
+}));
+
 defineCommand({
   name: "create_purchase_order",
   description: "Draft a purchase order with all its lines in one write; a contracted line takes the contract price unless one is typed, and the expected lot is advisory",
@@ -199,11 +221,20 @@ defineCommand({
   roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_purchase_order", {
     p_brewery: ctx.breweryId, p_vendor: i.vendorId, p_expected_on: i.expectedOn ?? null, p_note: i.note ?? null,
-    p_lines: i.lines.map((l) => ({
-      material_id: l.materialId, qty_ordered: l.qtyOrdered, unit_cost_cents: l.unitCostCents ?? null,
-      contract_id: l.contractId ?? null, expected_lot_code: l.expectedLotCode ?? null,
-    })),
-    p_request_id: execution.requestId,
+    p_lines: poLinesJson(i.lines), p_request_id: execution.requestId,
+  })),
+});
+
+// Edit PO (#1584): the draft's lines are replaced whole, since nothing refers
+// to a draft's lines before it is sent; the note is kept.
+defineCommand({
+  name: "update_purchase_order",
+  description: "Edit a draft purchase order before it is sent: its vendor, expected date and all its lines, replaced in one write; a contracted line takes the contract price unless one is typed; a sent order is refused",
+  input: z.object({ poId: z.string().uuid(), vendorId: z.string().uuid(), expectedOn: isoDate.optional(), lines: z.array(poLine).min(1) }),
+  roles: [...PO_ROLES],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_purchase_order", {
+    p_brewery: ctx.breweryId, p_po: i.poId, p_vendor: i.vendorId, p_expected_on: i.expectedOn ?? null,
+    p_lines: poLinesJson(i.lines), p_request_id: execution.requestId,
   })),
 });
 
@@ -270,11 +301,15 @@ defineCommand({
 const PO_COLUMNS = "id, po_no, vendor_id, status, ordered_on, expected_on, sent_via, sent_by, note, created_at, closed_at, closed_by, close_reason";
 
 defineQuery({
-  name: "list_purchase_orders", description: "Open purchase orders (draft, sent, partially received) with vendor and what each still owes; includeClosed adds received and cancelled",
-  input: z.object({ includeClosed: z.boolean().optional() }), roles: [...PO_ROLES],
+  name: "list_purchase_orders", description: "Open purchase orders (draft, sent, partially received) with vendor and what each still owes; includeClosed adds received and cancelled; optionally only one vendor's",
+  input: z.object({
+    includeClosed: z.boolean().optional(),
+    vendorId: z.string().uuid().optional().describe("Only this vendor's orders"),
+  }), roles: [...PO_ROLES],
   handler: async (ctx, i) => {
     let q = ctx.db.from("purchase_orders").select(`${PO_COLUMNS}, vendors(name)`).eq("brewery_id", ctx.breweryId).order("created_at", { ascending: false });
     if (!i.includeClosed) q = q.in("status", OPEN_PO_STATUSES);
+    if (i.vendorId) q = q.eq("vendor_id", i.vendorId);
     const [pos, open] = await Promise.all([
       unwrap(q),
       unwrap(ctx.db.from("po_open_balances").select("po_id").eq("brewery_id", ctx.breweryId).gt("qty_open", 0)),

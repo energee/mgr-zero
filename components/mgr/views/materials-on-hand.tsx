@@ -2,8 +2,9 @@
 // shared RecordTable (#1516): name, type, on hand, lots and status, then Edit
 // (the material's definition) beside Count (stock at one bin). No material
 // page exists, so the name is plain text. The live page passes MaterialForm and
-// CountForm as rowEdit and rowCount; without them (the screen inventory) the
-// row draws plain Edit and Count buttons.
+// CountForm as rowEdit and rowCount, and CountForm as countSheet (every listed
+// material in one bin, #1583); without them (the screen inventory) the row and
+// header draw plain buttons.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { RecordTable } from "@/components/mgr/views/record-table";
@@ -16,6 +17,7 @@ export function MaterialsOnHandView({
   header,
   controls,
   createAction,
+  countSheet,
   rowEdit,
   rowCount,
 }: {
@@ -24,12 +26,17 @@ export function MaterialsOnHandView({
   /** The search strip (components/mgr/list-controls.tsx). */
   controls?: ReactNode;
   createAction?: ReactNode;
+  /** Count sheet beside Add material; drawn only when materials are listed. */
+  countSheet?: ReactNode;
   rowEdit?: (row: MaterialsOnHandRowView) => ReactNode;
   rowCount?: (row: MaterialsOnHandRowView) => ReactNode;
 }) {
   return (
     <>
-      {header ?? E.back("Beer", "Materials on hand", createAction !== undefined ? createAction : E.btn("Add material"), model.backHref)}
+      {header ?? E.back("Beer", "Materials on hand", <div className="flex flex-wrap gap-2">
+        {!model.empty && (countSheet !== undefined ? countSheet : E.btn("Count sheet", "g"))}
+        {createAction !== undefined ? createAction : E.btn("Add material")}
+      </div>, model.backHref)}
       {controls}
       {model.empty
         ? E.blank(model.empty, undefined, model.purchaseOrdersHref ? E.act("Purchase orders", "primary", model.purchaseOrdersHref) : undefined)

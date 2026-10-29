@@ -10,6 +10,7 @@ import type { PurchaseOrdersSnapshot } from "@/lib/mgr/purchase-orders-view";
 import type { ReceiptViewModel } from "@/lib/mgr/receipt-view";
 import { CORRECTION_INFO, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
 import type { VendorViewModel } from "@/lib/mgr/vendor-view";
+import type { VendorDetailSnapshot } from "@/lib/mgr/vendor-detail-view";
 import type { VendorsSnapshot } from "@/lib/mgr/vendors-view";
 
 export const purchaseOrdersWarehouse: PurchaseOrdersSnapshot = {
@@ -64,6 +65,24 @@ export const receivePoCountryMalt: ReceivePoViewModel = {
     ["+300 lb rice hulls · receipt", "not lot-tracked"],
   ],
   info: "2-row is over by 2 bags and Citra short 1 on a substituted lot; the PO becomes partially received.",
+};
+
+/** A draft PO: Mark sent and Edit draft lead; Cancel folds below (#1584). */
+export const draftPoCanSource: ReceivePoViewModel = {
+  state: "draft", closure: "cancel", title: "PO-0143 · CanSource", status: "Draft · expected Oct 30, 2026",
+  lines: [
+    { key: "cans", title: "Cans · 16 oz", detail: "ordered 3 pallets", qty: "3 pallets" },
+  ],
+};
+
+/** Edit PO on the same draft: the New PO form on its saved vendor and lines (#1584). */
+export const editPoCanSource: NewPoViewModel = {
+  title: "Edit PO-0143",
+  vendor: "CanSource",
+  expected: "2026-10-30",
+  lines: [
+    { key: "cans", materialId: "cans", title: "Cans · 16 oz", detail: "pallet · not lot-tracked", qty: 3, cost: "$1850.00" },
+  ],
 };
 
 export const receiptPoCountryMalt: ReceiptViewModel = {
@@ -124,16 +143,31 @@ export const materialsOnHandList: MaterialsOnHandSnapshot = {
   ],
 };
 
-export const cycleCountCans: CycleCountViewModel = {
+const cansLine: CycleCountViewModel["lines"][number] = {
+  key: "cans",
   material: "Cans · 16 oz",
   qty: "3050",
   unitIndex: 0,
   units: ["each"],
   preview: "system 3,100 · variance −50 · reviewed against current stock",
   adjustments: [{ key: "lot-0774", lot: "L-0774", expected: 3100, counted: 3050, delta: -50, unit: "each" }],
+};
+
+export const cycleCountCans: CycleCountViewModel = {
+  lines: [cansLine],
   locationId: "warehouse", binId: "shelf",
   locations: [{ id: "warehouse", name: "Warehouse" }],
   bins: [{ id: "shelf", name: "Shelf" }],
+};
+
+/** Count sheet at the warehouse shelf: two lines counted and previewed, one left blank (#1583). */
+export const countSheetShelf: CycleCountViewModel = {
+  ...cycleCountCans,
+  lines: [
+    cansLine,
+    { key: "gypsum", material: "Gypsum", qty: "", unitIndex: 0, units: ["g"], preview: "system 2,000 · not counted" },
+    { key: "lids", material: "Lids · 202", qty: "1200", unitIndex: 0, units: ["each"], preview: "system 1,200 · variance 0 · reviewed against current stock", adjustments: [] },
+  ],
 };
 
 export const materialCitra: MaterialViewModel = {
@@ -163,6 +197,20 @@ export const vendorsList: VendorsSnapshot = {
   ],
   materials: "12 materials",
   contracts: "2 active commitments",
+};
+
+/** One vendor's page: the first Vendors row with its contract, a sent order
+ *  and two default materials, one of them inactive. */
+export const vendorDetailYch: VendorDetailSnapshot = {
+  vendor: {
+    ...vendorsList.rows![0], email: "orders@ych.example", phone: "509-555-0142", payment_terms: "net30",
+    contracts: [{ id: "ych-citra", contract_no: "Citra 2026", material_name: "Citra", qty_committed: 400, qty_received: 262, qty_on_order: 100, qty_available: 38 }],
+  },
+  purchaseOrders: [{ id: "po141", po_no: 141, status: "sent", closed_at: null, ordered_on: "2026-09-03", expected_on: "2026-09-10", lines_open: 1 }],
+  materials: [
+    { id: "citra", name: "Citra 2026", category: "hop", purchase_uom: "each", active: true },
+    { id: "mosaic", name: "Mosaic 2025", category: "hop", purchase_uom: "each", active: false },
+  ],
 };
 
 export const vendorYch: VendorViewModel = {

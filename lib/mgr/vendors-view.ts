@@ -24,6 +24,8 @@ export type VendorsRowView = {
    *  sent (#1501), or null before any order is received. */
   observed: string | null;
   contracts: number;
+  /** The vendor's own page (#1586). */
+  href: string;
 };
 
 export type VendorsViewModel = {
@@ -48,7 +50,8 @@ export const fmtVendorQty = (n: number) => n.toLocaleString("en-US", { maximumFr
 
 const days = (n: number) => `${fmtVendorQty(n)} ${n === 1 ? "day" : "days"}`;
 
-function toRow(v: VendorsVendor): VendorsRowView {
+/** One vendor's row; the vendor page reads its status and lead times from it too. */
+export function toVendorsRow(v: VendorsVendor): VendorsRowView {
   const observed = v.observed.map((o) =>
     `${days(o.avg_lead_days)} over ${o.n} ${o.n === 1 ? "order" : "orders"} sent ${PO_SENT_VIA[o.sent_via] ?? o.sent_via}`);
   return {
@@ -58,11 +61,12 @@ function toRow(v: VendorsVendor): VendorsRowView {
     leadTime: v.lead_time_days === null ? "Not typed" : days(v.lead_time_days),
     observed: observed.length ? observed.join(" · ") : null,
     contracts: v.contracts.length,
+    href: `/vendors/${v.key}`,
   };
 }
 
 export function toVendorsViewProps(s: VendorsSnapshot): VendorsViewModel {
-  const rows = (s.rows ?? []).map(toRow);
+  const rows = (s.rows ?? []).map(toVendorsRow);
   return {
     backHref: s.backHref,
     rows,
