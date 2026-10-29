@@ -2,6 +2,7 @@ import type { Database } from "@/lib/supabase/database";
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { publicEnv } from "@/lib/env/public";
+import { serverTiming, timeStage, type Stages } from "@/lib/server-timing";
 
 // Next.js proxy (formerly `middleware`) refreshes Supabase cookies before routes
 // render. Both the request and response receive refreshed cookies so the current
@@ -29,7 +30,10 @@ export async function proxy(req: NextRequest) {
   // getClaims refreshes an expired session like getUser, but verifies the JWT
   // locally against the project's signing keys instead of calling Supabase Auth
   // on every navigation (it falls back to getUser for a symmetric-key project).
-  await supabase.auth.getClaims();
+  // Its time is the page load's session stage in Server-Timing (#1490).
+  const stages: Stages = {};
+  await timeStage(stages, "session", () => supabase.auth.getClaims());
+  res.headers.set("Server-Timing", serverTiming(stages));
   return res;
 }
 

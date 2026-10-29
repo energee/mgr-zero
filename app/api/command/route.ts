@@ -2,6 +2,8 @@
 // Commands require client-provided UUID request IDs; queries only receive a
 // server-generated correlation ID. Unexpected errors are logged and returned
 // as a generic 500; database errors are sanitized in registry.ts (unwrap).
+// Every response carries Server-Timing for the stages that ran: auth (session
+// or bearer context), admission and command (#1490).
 import { NextResponse } from "next/server";
 import { AdmissionError, requireAdmission } from "@/lib/commands/admission";
 import { buildContextFromBearer, buildRouteContext, isUuid } from "@/lib/commands/context";
@@ -19,6 +21,7 @@ import { z } from "zod";
 import "@/lib/commands/all"; // side-effect: registers every command
 import { MAX_COMMAND_BODY_BYTES } from "@/lib/commands/request-limits";
 import { readBoundedJson } from "@/lib/request-json";
+import { serverTiming, timeStage, type Stages } from "@/lib/server-timing";
 
 // null = no Authorization header (use the cookie session); "" = a header that
 // is present but malformed, which must fail closed as 401 rather than fall
@@ -61,6 +64,7 @@ const provenanceSchema = z.object({
 
 export async function POST(req: Request) {
   const correlationId = crypto.randomUUID();
+  const stages: Stages = {};
   let requestId: string | undefined;
 
   try {
@@ -98,19 +102,19 @@ export async function POST(req: Request) {
       throw new CommandError("omit breweryId for this command", 400, "invalid_request");
     }
     const token = bearerToken(req);
-    const ctx = token === null
-      ? await buildRouteContext(body.breweryId, expectedContext)
-      : await buildContextFromBearer(body.breweryId, token, expectedContext);
+    const ctx = await timeStage(stages, "auth", () => token === null
+      ? buildRouteContext(body.breweryId, expectedContext)
+      : buildContextFromBearer(body.breweryId, token, expectedContext));
     // COLA image reads admit only cache misses, inside the authorized handler.
     // Serving stored thumbnails must not exhaust the user's command budget.
-    if (body.name !== "get_cola_image") await requireAdmission(ctx.db);
+    if (body.name !== "get_cola_image") await timeStage(stages, "admission", () => requireAdmission(ctx.db));
     const response: CommandSuccess<unknown> = {
       ok: true,
-      data: await runCommand(body.name, body.input, ctx, execution),
+      data: await timeStage(stages, "command", () => runCommand(body.name, body.input, ctx, execution)),
       ...(execution ? { requestId: execution.requestId } : {}),
       correlationId,
     };
-    return NextResponse.json(response);
+    return NextResponse.json(response, { headers: { "Server-Timing": serverTiming(stages) } });
   } catch (e: unknown) {
     if (e instanceof CommandError) {
       const response: CommandFailure = {
@@ -121,7 +125,10 @@ export async function POST(req: Request) {
       };
       return NextResponse.json(response, {
         status: e.status,
-        headers: e instanceof AdmissionError ? { "Retry-After": String(e.retryAfter) } : undefined,
+        headers: {
+          "Server-Timing": serverTiming(stages),
+          ...(e instanceof AdmissionError ? { "Retry-After": String(e.retryAfter) } : {}),
+        },
       });
     }
     console.error("internal error:", e instanceof Error ? e.message : e);
@@ -131,6 +138,6 @@ export async function POST(req: Request) {
       ...(requestId === undefined ? {} : { requestId }),
       correlationId,
     };
-    return NextResponse.json(response, { status: 500 });
+    return NextResponse.json(response, { status: 500, headers: { "Server-Timing": serverTiming(stages) } });
   }
 }

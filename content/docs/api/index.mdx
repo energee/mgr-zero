@@ -105,6 +105,13 @@ server's. A command's response also echoes the `requestId` you submitted, so a
 queued write can be matched to its result without keeping the request body
 around.
 
+Every response also has a `Server-Timing` header with the time, in
+milliseconds, of each server stage that ran: `auth` (checking your token or
+session), `admission` (the rate limit) and `command` (the operation itself),
+for example `auth;dur=31.2, admission;dur=4.8, command;dur=52.0`. It carries
+durations only. Use it to tell server time from network time; do not parse it
+for results.
+
 Status codes and every `error.code` are on the [errors page](#errors).
 
 ### Calling it [#calling]

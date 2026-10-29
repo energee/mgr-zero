@@ -13,3 +13,13 @@ it("sets global same-origin-compatible security headers", async () => {
     ]),
   })]));
 });
+
+// #1491: the customer guides are built at deploy and skip the proxy, so no
+// server stage runs; the header says so instead of leaving the timing blank.
+it("marks the prerendered customer guides in Server-Timing", async () => {
+  const headers = await config.headers?.();
+  expect(headers).toEqual(expect.arrayContaining([{
+    source: "/docs/:path*",
+    headers: [{ key: "Server-Timing", value: "prerendered" }],
+  }]));
+});

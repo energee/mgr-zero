@@ -1,8 +1,10 @@
 // Staff server pages use the registry's permissions, including for bookmarked
-// detail URLs. API callers retain the ordinary CommandError response.
+// detail URLs. API callers retain the ordinary CommandError response. Each read
+// logs its time (lib/server-timing.ts), since a page cannot send Server-Timing.
 import { redirect } from "next/navigation";
 import { canRun, CommandError, getCommandDefinition, runCommand, type Ctx } from "@/lib/commands/registry";
 import { deniedHref } from "./denied";
+import { logServerTiming, timeStage, type Stages } from "@/lib/server-timing";
 
 export function requirePagePermission(ctx: Ctx, name: string, resource = name.replace(/^(get|list)_/, "").replace(/_/g, " ")) {
   const definition = getCommandDefinition(name);
@@ -11,9 +13,19 @@ export function requirePagePermission(ctx: Ctx, name: string, resource = name.re
   }
 }
 
+/** Runs one page read and logs its time under the command name (#1490). */
+async function timedRead(name: string, input: unknown, ctx: Ctx) {
+  const stages: Stages = {};
+  try {
+    return await timeStage(stages, name, () => runCommand(name, input, ctx));
+  } finally {
+    logServerTiming(stages);
+  }
+}
+
 export async function runPageQuery(name: string, input: unknown, ctx: Ctx) {
   requirePagePermission(ctx, name);
-  return runCommand(name, input, ctx);
+  return timedRead(name, input, ctx);
 }
 
 /** An enrichment read: permission still redirects, but a failed command
@@ -21,7 +33,7 @@ export async function runPageQuery(name: string, input: unknown, ctx: Ctx) {
 export async function optionalPageQuery<T>(name: string, input: unknown, ctx: Ctx): Promise<T | undefined> {
   requirePagePermission(ctx, name);
   try {
-    return await runCommand(name, input, ctx) as T;
+    return await timedRead(name, input, ctx) as T;
   } catch (e) {
     if (!(e instanceof CommandError)) throw e;
     console.error(name, e.message);

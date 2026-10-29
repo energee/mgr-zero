@@ -87,6 +87,44 @@ Also record, with the measured counts above:
 | Elapsed times | Every run in seconds; at least 5 warm runs per task |
 | Failures | Error text, timestamp, and whether a retry succeeded |
 
+## Stage timings
+
+The app reports where a request's server time went, so a slow hosted load or save can be split by stage ([#1490](https://github.com/energee/mgr-zero/issues/1490), [#1491](https://github.com/energee/mgr-zero/issues/1491)).
+Each stage is written in the standard Server-Timing form, `name;dur=ms`.
+Only stage names, command names and durations are written: never ids, secrets, inputs or query text.
+The code is `lib/server-timing.ts`.
+
+| Stage | Where it is reported | What it times |
+| --- | --- | --- |
+| `session` | `Server-Timing` header on every staff and portal page load and client navigation (`proxy.ts`) | The session refresh before the page renders |
+| `auth` | `Server-Timing` header on every `/api/command` response | Building the caller's context: session or bearer token, and membership |
+| `admission` | Same header | The per-account rate-limit check |
+| `command` | Same header | The command or query itself, including its RPC |
+| `shell` | Function log line | The staff layout's brewery, identity and membership reads (`app/(app)/layout.tsx`) |
+| `<command name>`, for example `trace_lot` | Function log line | One staff page read through `runPageQuery` or `optionalPageQuery`, including the layout's `get_gravity_unit` |
+| `prerendered` | `Server-Timing` header on `/docs` pages | No server stage: the page was built at deploy, so its time is delivery and parsing |
+
+A stage that fails is still timed.
+Stages after it are missing because they never ran.
+
+Server components cannot set response headers, so the shell and page reads go to the function log instead.
+Each is one JSON line: `{"event":"server_timing","timing":"trace_lot;dur=48.1"}`.
+The layout and the page render at the same time, so their stages overlap rather than add up.
+
+### Reading it
+
+1. **In the browser.** Open DevTools, Network, select the document or the `/api/command` request, then the Timing tab. "Server Timing" lists each stage. Or run `performance.getEntriesByType("navigation")[0].serverTiming` in the console for the page load.
+2. **In the function log.** Find the same request in the Vercel function logs and read its `server_timing` lines for `shell` and each page read. Reading hosted logs needs owner access.
+3. **Split the time.**
+   - Network and cold start: the browser's waiting time (time to first byte) minus the server stages.
+   - Session: the `session` stage.
+   - Page reads: the longest of `shell` and the page's read lines.
+   - Save: the `command` stage.
+
+A page load with a large gap between its time to first byte and its stages points at a cold start or the network.
+A large `command` or read stage points at that RPC.
+File each slow stage as its own fix, with its numbers.
+
 ## Results
 
 Fill one row per task per run set.

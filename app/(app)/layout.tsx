@@ -4,7 +4,8 @@ import { CommandRecovery } from "@/components/mgr/command-recovery";
 // entries removed, and a Me sheet with the
 // brewery, role, Chat, your gravity unit and sign-out, and the header Search sheet; the rail's collapsed state round-trips through
 // the sidebar_state cookie shadcn's Sidebar writes (lib/mgr/sidebar-state.ts).
-// Pages render inside the shell's main column.
+// Pages render inside the shell's main column. The shell's brewery, identity
+// and membership reads log their time as the `shell` stage (lib/server-timing.ts).
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { optionalPageQuery } from "@/lib/mgr/page-query";
@@ -25,9 +26,12 @@ import { CommandQueryProvider } from "@/components/mgr/query-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { onlyRoles } from "@/lib/mgr/roles";
 import { isChatConfigured } from "@/lib/env/server-parser";
+import { logServerTiming, timeStage, type Stages } from "@/lib/server-timing";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const [brewery, sidebarOpen, identity, memberships] = await Promise.all([getActiveBrewery(), sidebarOpenFromCookie(), getRequestIdentity(), getStaffMemberships()]);
+  const stages: Stages = {};
+  const [brewery, sidebarOpen, identity, memberships] = await timeStage(stages, "shell", () => Promise.all([getActiveBrewery(), sidebarOpenFromCookie(), getRequestIdentity(), getStaffMemberships()]));
+  logServerTiming(stages);
   const roleScope = brewery.roles.toSorted().join(",");
   // The Me sheet's gravity unit is an enrichment: a failed read leaves the sheet without it, not the app without a shell.
   const units = await optionalPageQuery<{ brewery: GravityUnit; mine: GravityUnit | null }>("get_gravity_unit", {}, await buildContext(brewery.id));

@@ -92,4 +92,11 @@ describe("Supabase proxy refresh", () => {
     expect(getClaims).toHaveBeenCalledTimes(1);
     expect(getUser).not.toHaveBeenCalled();
   });
+
+  // #1490: the session stage of a hosted page load, read in the browser's Server-Timing.
+  it("times the session refresh in a Server-Timing header", async () => {
+    const response = await proxy(new NextRequest("http://localhost:3000/inventory"));
+
+    expect(response.headers.get("server-timing")).toMatch(/^session;dur=[\d.]+$/);
+  });
 });
