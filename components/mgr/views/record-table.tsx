@@ -19,6 +19,7 @@ import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import { SortHead, useSortedRows } from "@/components/mgr/sort-head";
 import { cellSortValue, PRINTED_DATE, unwrapLazy, type SortValue } from "@/lib/mgr/table-sort";
+import { rowLinkPrefetch } from "@/lib/mgr/row-link-prefetch";
 import { cn } from "@/lib/utils";
 
 export type RecordTableRow = {
@@ -70,13 +71,14 @@ const ABOVE_COVER = "[&_a]:relative [&_a]:z-10 [&_button]:relative [&_button]:z-
 const said = (cell: ReactNode) => cell != null && cell !== false;
 
 /** The name as a link (live) or a tap (inventory); it covers its whole record.
- *  A live name without a link is plain text, so nothing looks tappable. */
+ *  A live name without a link is plain text, so nothing looks tappable.
+ *  A link to a record page is not prefetched (lib/mgr/row-link-prefetch.ts). */
 function name(row: RecordTableRow) {
   const cls = cn(RECORD_LINK, "after:absolute after:inset-0");
   return row.href === null
     ? <span className="font-medium wrap-anywhere">{row.cells[0]}</span>
     : row.href
-      ? <Link href={row.href} data-to={row.to} className={cls}>{row.cells[0]}</Link>
+      ? <Link href={row.href} prefetch={rowLinkPrefetch(row.href)} data-to={row.to} className={cls}>{row.cells[0]}</Link>
       : <Button variant="link" type="button" data-tap data-to={row.to} className={cn(cls, "h-auto p-0 text-foreground")}>{row.cells[0]}</Button>;
 }
 

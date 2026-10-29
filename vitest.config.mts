@@ -120,7 +120,8 @@ const pureTests = [
   "tests/upc.test.ts",
   "tests/sku-share-controls.test.ts",
   "tests/keyboard-focus.test.ts",
-  "tests/material-count-sheet.test.ts"
+  "tests/material-count-sheet.test.ts",
+  "tests/row-link-prefetch.test.ts"
 ];
 
 export default defineConfig({

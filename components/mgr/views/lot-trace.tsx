@@ -3,6 +3,7 @@
 import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
+import { rowLinkPrefetch } from "@/lib/mgr/row-link-prefetch";
 import type { LotTraceRecipientView, LotTraceViewModel } from "@/lib/mgr/lot-trace-view";
 
 export type { LotTraceViewModel };
@@ -46,7 +47,7 @@ export function LotTraceView({
         {model.movements.map((movement) => <div key={movement.id} id={`movement-${movement.id}`} className="border-b py-3">
           {E.row(movement.title, movement.detail, movement.trailing)}
           {movement.sourceHref && <Link className="underline" href={movement.sourceHref}>Source movement</Link>}
-          {movement.reference && <p>{movement.referenceHref ? <Link className="underline" href={movement.referenceHref}>{movement.reference}</Link> : movement.reference}</p>}
+          {movement.reference && <p>{movement.referenceHref ? <Link className="underline" href={movement.referenceHref} prefetch={rowLinkPrefetch(movement.referenceHref)}>{movement.reference}</Link> : movement.reference}</p>}
         </div>)}
       </> : null)}
       {E.info(model.note)}
@@ -56,7 +57,7 @@ export function LotTraceView({
 
 
 /** A live value links to its record; an inventory value (no href) is plain text. */
-const linked = (text: string, href?: string) => href ? <Link href={href} className="underline">{text}</Link> : text;
+const linked = (text: string, href?: string) => href ? <Link href={href} prefetch={rowLinkPrefetch(href)} className="underline">{text}</Link> : text;
 
 /** Shared recorded recipients, one labeled field per fact; trace screens do not draw a second shipment/customer block. */
 export function LotRecipients({ recipients, empty }: { recipients: LotTraceRecipientView[]; empty?: string }) {

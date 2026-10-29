@@ -4,6 +4,7 @@ import { HistoryNavigation, type HistoryNavigationProps } from "./history-naviga
 import Link from "next/link";
 import { Fragment } from "react";
 import { E } from "@/components/mgr/e";
+import { rowLinkPrefetch } from "@/lib/mgr/row-link-prefetch";
 import type { PortalOrdersViewModel } from "@/lib/mgr/portal-orders-view";
 
 export type { PortalOrdersViewModel };
@@ -26,7 +27,7 @@ export function PortalOrdersView({
         : model.rows.map((row) => (
           <Fragment key={row.key}>
             {row.verb
-              ? E.row(linkRows ? <Link href={row.href} className="underline underline-offset-4">{row.title}</Link> : row.title, row.detail, E.act(row.verb, "primary", linkRows ? row.actionHref : undefined), row.warning ? "w" : "")
+              ? E.row(linkRows ? <Link href={row.href} prefetch={rowLinkPrefetch(row.href)} className="underline underline-offset-4">{row.title}</Link> : row.title, row.detail, E.act(row.verb, "primary", linkRows ? row.actionHref : undefined), row.warning ? "w" : "")
               : E.nav(row.title, row.detail, row.warning ? "w" : "", undefined, linkRows ? row.href : undefined)}
           </Fragment>
         ))}
