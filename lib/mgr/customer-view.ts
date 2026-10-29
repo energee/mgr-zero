@@ -1,5 +1,6 @@
 // lib/mgr/customer-view.ts — view-model for Customer detail (get_customer).
 import { money } from "./money";
+import { plural } from "./plural";
 import { paymentTermLabel, sentenceCase } from "./labels";
 import { US_STATE_CODES } from "./enums";
 import { submitReason } from "./submit-reason";
@@ -41,6 +42,8 @@ export type CustomerViewModel = {
   portalUsers: { key: string; email: string }[];
   kegBalance: string;
   orders: string;
+  /** The Open balance line; null hides it (a role that may not read invoices). */
+  openBalance: string | null;
 };
 
 export type CustomerSnapshot = {
@@ -64,6 +67,8 @@ export type CustomerSnapshot = {
   portalUsers?: { userId: string; email: string }[];
   kegs?: { out: number; depositCents: number };
   orders?: { open: number; total: number };
+  /** unpaidBalance of the customer's unpaid invoices; only Admin and Sales get one. */
+  openBalance?: { cents: number | null; invoices: number };
   backHref?: string;
 };
 
@@ -74,6 +79,7 @@ export function toCustomerViewProps({
   portalUsers,
   kegs,
   orders,
+  openBalance,
   backHref,
 }: CustomerSnapshot): CustomerViewModel {
   const tax = customer.tax_treatment ? sentenceCase(customer.tax_treatment) : "Inherit sale channel";
@@ -97,5 +103,12 @@ export function toCustomerViewProps({
       ? `${kegs.out} out · ${money(kegs.depositCents)} deposits held`
       : "kegs out and deposits held",
     orders: orders ? `${orders.open} open · ${orders.total} total` : "orders",
+    openBalance: openBalance ? openBalanceText(openBalance) : null,
   };
+}
+
+/** "$600.00 · 2 unpaid invoices"; an unknown sum reads Unknown, never $0.00. */
+function openBalanceText({ cents, invoices }: { cents: number | null; invoices: number }) {
+  if (invoices === 0) return "No unpaid invoices";
+  return `${cents == null ? "Unknown" : money(cents)} · ${plural(invoices, "unpaid invoice")}`;
 }
