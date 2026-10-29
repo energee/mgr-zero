@@ -130,6 +130,12 @@ describe("POS UI truth", () => {
     expect(pos).not.toMatch(/>Open</);
   });
 
+  it("says what Point of sale does only until Square is connected (#1518)", () => {
+    const intro = "Publish what the taproom can sell";
+    expect(renderToStaticMarkup(createElement(PointOfSaleView, { model: { connected: false, merchant: "", state: "Not connected" } }))).toContain(intro);
+    expect(renderToStaticMarkup(createElement(PointOfSaleView, { model: { connected: true, merchant: "Demo", state: "Connected" } }))).not.toContain(intro);
+  });
+
   it("describes Square's own QuickBooks feed as taproom sales, not a second provider (#1151)", () => {
     // The connector note and its Accounting link sit on Point of sale itself; there is no separate sheet (#1518).
     const pos = renderToStaticMarkup(createElement(PointOfSaleView, { model: { connected: false, merchant: "", state: "Not connected" }, paths: { accounting: "/settings/accounting" } }));

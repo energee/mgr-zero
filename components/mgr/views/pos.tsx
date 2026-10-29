@@ -28,7 +28,8 @@ export function PosSyncActions({ busy = false, label = "Sync Square", feedback, 
 
 /** `connection` is the Connect Square control and `disconnect` the row's
  *  Disconnect; the app page passes working controls (a confirming dialog for
- *  Disconnect) and the inventory draws the plain views (#1509). */
+ *  Disconnect) and the inventory draws the plain views (#1509). The intro
+ *  note shows only until Square is connected (#1518). */
 export function PointOfSaleView({ model, sales = [], coverage = [], syncAction, connection, disconnect, paths }: {
   model: { connected: boolean; configured?: boolean; canDisconnect?: boolean; merchant: string; state: string; locations?: string; lastSync?: string; error?: string | null; oauthFailed?: boolean };
   sales?: PosSaleRow[]; coverage?: string[];
@@ -37,7 +38,7 @@ export function PointOfSaleView({ model, sales = [], coverage = [], syncAction, 
   const disconnectAction = disconnect ?? E.act("Disconnect", "destructive");
   return <>
     {E.back("Settings", "Point of sale", undefined, paths?.back)}
-    {E.info("Publish what the taproom can sell, and read Square sales as expected consumption. One provider is connected at a time.")}
+    {!model.connected && E.info("Publish what the taproom can sell, and read Square sales as expected consumption. One provider is connected at a time.")}
     {model.connected
       ? E.row(`Square · ${model.merchant}`, model.state, disconnectAction, "ok", SquareMark)
       : E.row("Square", model.state, model.canDisconnect ? disconnectAction : "", "w", SquareMark)}
