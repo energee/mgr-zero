@@ -1,13 +1,7 @@
-// components/mgr/qty.tsx — a typed quantity and the segmented bar that rides in
-// its unit addon. Both are shared by `E.qty`/`E.tabs` (components/mgr/e.tsx) and
-// by VolumeField (components/mgr/volume-field.tsx). The quantity draws its own
-// visible label, tied to the input by a generated id (#1115).
-//
-// It is its own module only to break an import cycle: e.tsx imports VolumeField
-// for `E.volume`, so VolumeField cannot import `E` back, and the composition
-// cannot simply live in e.tsx either — SCREENS is a module-level const, built at
-// import time, where Qty's useId() could never run. Screen authors
-// never import this directly; they use E.qty, E.tabs and E.volume.
+// components/mgr/qty.tsx — shared quantity controls and segmented tabs.
+// Views import Qty directly for a labeled quantity with a unit addon.
+// VolumeField composes Qty with TabBar for its unit choice; E.edit and E.stq
+// use StepQuantity, and E.tabs uses TabBar.
 "use client";
 import type { FieldControls } from "@/components/mgr/e";
 import { numberNotationError, stepQuantity } from "@/lib/mgr/quantity-input";
@@ -62,11 +56,8 @@ export function StepQuantity({ label, value, defaultValue, onChange, contextualL
 
 /** A typed quantity under its visible label: the OS keyboard is the keypad, so
  *  nothing here draws one. The label's generated id ties it to the input, so
- *  the visible text is the input's accessible name (#1115). No caller sits
- *  under a column header, so the label is always shown; add a hideLabel if
- *  one ever does. Defaults live in `E.qty`/`E.tabs`, the vocabulary screen
- *  authors call; every caller here passes label, on and cls, so repeating
- *  those defaults would only give them a second place to drift. */
+ *  the visible text is the input's accessible name (#1115). The label is
+ *  always shown; callers supply the label and optional validation wiring. */
 export function Qty({
   value,
   onChange,
@@ -81,7 +72,7 @@ export function Qty({
   unit?: ReactNode;
   label: string;
   id?: string;
-  /** From E.qty's `error` (#1121). */
+  /** Marks a caller-validated value; describedBy links its external message. */
   invalid?: AriaAttributes["aria-invalid"];
   describedBy?: string;
 }) {
@@ -98,7 +89,7 @@ export function Qty({
           the field's own border instead of letting it spill past. A clip, not a
           scroll: a unit set that outgrows the field puts an option out of reach. */}
       <InputGroup className="overflow-hidden">
-        {/* eslint-disable-next-line no-restricted-syntax -- Shared E volume primitive; native spinners are hidden. */}
+        {/* eslint-disable-next-line no-restricted-syntax -- Shared quantity primitive; native spinners are hidden. */}
         <InputGroupInput
           id={inputId}
           ref={input}

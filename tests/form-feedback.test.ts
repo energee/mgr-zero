@@ -1,11 +1,12 @@
 // tests/form-feedback.test.ts — the three shared form-feedback primitives:
 // a withheld submit names what is missing (#1122, #1128), an empty picker says
 // where to add the record (#1123), and a bad value is marked at its field
-// (#1121). Pure reason builders first, then the E controls' aria wiring.
+// (#1121). Pure reason builders first, then the shared controls' aria wiring.
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { E } from "@/components/mgr/e";
+import { Qty } from "@/components/mgr/qty";
 import { submitReason } from "@/lib/mgr/submit-reason";
 import { draftLineErrors, orderFormReadiness, orderLineError, orderLineErrors } from "@/lib/order-form-rules";
 import { scheduleBatchReason } from "@/lib/mgr/schedule-batch-view";
@@ -344,15 +345,14 @@ describe("field error", () => {
     }
   });
 
-  it("E.pick and E.qty mark the field and link their message", () => {
+  it("E.pick links its message and Qty accepts caller validation wiring", () => {
     const pick = html(E.pick("Customer", "", ["a"], { id: "c", error: "Choose a customer." }));
     expect(pick).toMatch(/aria-invalid="true"/);
     expect(pick).toMatch(/aria-describedby="c-error"/);
     expect(pick).toContain("Choose a customer.");
-    const qty = html(E.qty("-1", "bbl", "Quantity", "q", { error: "Enter a quantity above zero." }));
+    const qty = html(createElement(Qty, { value: "-1", unit: "bbl", label: "Quantity", id: "q", invalid: true, describedBy: "q-error" }));
     expect(qty).toMatch(/aria-invalid="true"/);
     expect(qty).toMatch(/aria-describedby="q-error"/);
-    expect(qty).toContain("Enter a quantity above zero.");
   });
 
   it("a date links its message from the picker", () => {

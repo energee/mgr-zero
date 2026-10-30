@@ -61,7 +61,8 @@ never copy it into a second place.
 | `lib/mgr/doc-icons.ts` | The one name → icon map the docs may use (page frontmatter via `lib/source.ts`, landing cards via `<DocIcon />`). |
 | `hooks/use-mobile.ts` | shadcn's Sidebar breakpoint hook on `useSyncExternalStore` (one shared MediaQueryList, 768px = Tailwind md). |
 | `components/mgr/{frame-persona,screen-width}.tsx` | Design-inventory chrome: the stand-alone frame drawn as the persona in the URL hash; the published inventory's sticky viewport control and the iframe embed it drives. |
-| `components/mgr/{date-picker,time-window-field,volume-field}.tsx` | The field components behind `E.edit(…, "date")`, `E.window`, and `E.volume`: calendar date (ISO yyyy-mm-dd), two-thumb time-of-day range, and a volume with a per-instance unit addon. |
+| `components/mgr/{date-picker,time-window-field,volume-field}.tsx` | Shared calendar date (ISO yyyy-mm-dd), two-thumb time-of-day range, and volume with a per-instance unit addon. `E.edit(…, "date")` uses DatePicker; screen views import TimeWindowField and VolumeField directly. |
+| `components/mgr/{qty,palette}.tsx` | Screen views import Qty for a labeled quantity with a unit addon and Palette for grouped search results. VolumeField composes Qty with TabBar; `E.edit` and `E.stq` use StepQuantity, and `E.tabs` uses TabBar. |
 | `components/mgr/user-avatar.tsx` | A person's photo for the design inventory only (no avatar column exists; fixtures in `public/mock/*.jpg`). |
 | `components/login-form.tsx` | The sign-in card for staff and customers (shadcn `login-03`, minus social login, sign-up and password reset — accounts are invitation-only). |
 | `components/ui/` | shadcn primitives. Don't hand-edit; re-add with the shadcn CLI. |

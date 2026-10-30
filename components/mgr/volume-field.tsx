@@ -1,6 +1,6 @@
-// components/mgr/volume-field.tsx — an atomic format's volume, behind E.volume
-// and the Format sheet: a Qty (components/mgr/qty.tsx) whose unit addon is a
-// TabBar of volume units, with the value and unit callbacks named apart.
+// components/mgr/volume-field.tsx — a volume field shared by screen views:
+// a Qty (components/mgr/qty.tsx) whose unit addon is a TabBar of volume units,
+// with the value and unit callbacks named apart.
 "use client";
 
 import { Qty, TabBar } from "@/components/mgr/qty";
