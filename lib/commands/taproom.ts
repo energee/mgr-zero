@@ -187,6 +187,7 @@ defineQuery({
         .eq("brewery_id", ctx.breweryId).order("customer_id").order("keg_pool_id").order("keg_size").range(start, start + PAGE_SIZE - 1)),
       refundRows(ctx),
     ]);
+    if (!aged) throw new Error("Keg aging report returned no data");
     const poolById = new Map((pools ?? []).map((p) => [p.id as string, p]));
     const customerName = new Map(aged.customerNames.map(c => [c.id, c.name]));
     const outBySize = new Map(aged.bySize.map(s => [`${s.pool_id}|${s.keg_size}`, s.qty]));

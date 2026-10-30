@@ -18,7 +18,9 @@ async function aging(events: Event[]) {
     created_at: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(), created_by: ctx.userId,
   })));
   if (result.error) throw result.error;
-  return { ctx, brewery, customers, report: await unwrap(ctx.db.rpc("get_keg_report_aging", { p_brewery: brewery.id })) };
+  const report = await unwrap(ctx.db.rpc("get_keg_report_aging", { p_brewery: brewery.id }));
+  if (!report) throw new Error("Keg aging report returned no data");
+  return { ctx, brewery, customers, report };
 }
 
 describe("database FIFO keg aging", () => {
