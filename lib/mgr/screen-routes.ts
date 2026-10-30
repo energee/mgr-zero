@@ -12,6 +12,7 @@ import "@/lib/commands/all";
 
 export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: string[] }[] = [
   { name: "Reverse movement", file: "app/(app)/inventory/reversal-form.tsx" },
+  { name: "Reattribute loss", file: "app/(app)/compliance/[period]/loss-review-form.tsx" },
   { name: "SKU detail", file: "app/(app)/inventory/[id]/page.tsx" },
   { name: "Invite staff", file: "app/(app)/settings/team/invite-form.tsx" },
   { name: "Team member", file: "app/(app)/settings/team/member-form.tsx" },
