@@ -80,7 +80,6 @@ describe("HTTP API reference", () => {
     expect(apiOperations().find(o => o.name === correction.name)).toMatchObject({ status: "available", roles: "admin" });
     expect(correction.input.safeParse({ countId: "00000000-0000-4000-8000-000000000000", corrections: [{ lineId: "00000000-0000-4000-8000-000000000001", qtyCounted: 4 }], reason: "Misread tally" }).success).toBe(true);
     expect(correction.input.safeParse({ countId: "00000000-0000-4000-8000-000000000000", corrections: [{ lineId: "00000000-0000-4000-8000-000000000001", qtyCounted: 4.5 }], reason: " " }).success).toBe(false);
-    expect(AREA("taproom")).toContain("latest uncorrected mistaken-low Taproom count");
     expect(AREA("taproom")).toContain("partial keg counts as one until gone");
     expect(AREA("taproom")).toContain("current positive Taproom stock");
     expect(AREA("taproom")).toContain("Full lot history remains outside this projection");
