@@ -75,7 +75,7 @@ describe("integration transport failure boundaries", () => {
     vi.spyOn(client, "findReceiptBill").mockRejectedValue(failure);
     const create = vi.spyOn(client, "createTransaction");
     await expect(postReceiptBill(ctx, receiptId, requestId, client)).rejects.toMatchObject({
-      status: 409, message: expect.stringContaining("Bill outcome is uncertain"),
+      status: 409, code: "conflict",
     });
     expect(create).not.toHaveBeenCalled();
     expect(boundary.recordBill).not.toHaveBeenCalled();
