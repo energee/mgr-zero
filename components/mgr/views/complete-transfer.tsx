@@ -6,8 +6,6 @@ import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { OrderQuantity } from "./new-order";
 import type { CompleteTransferViewModel } from "@/lib/mgr/complete-transfer-view";
 
-export type { CompleteTransferViewModel };
-
 export function CompleteTransferView({
   model,
   sources,

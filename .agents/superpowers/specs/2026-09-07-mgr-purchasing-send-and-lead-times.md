@@ -47,7 +47,7 @@ attestations:
 
 | `sent_via` | Screen copy |
 | --- | --- |
-| `direct` | "Delivered to orders@countrymalt.com · 9/7 2:14pm" |
+| `direct` | "Delivered to orders@malt-supplier.example · 9/7 2:14pm" |
 | `mailto` | "Marked sent by Dana · 9/7" |
 | `external` | "Marked sent by Dana · 9/7" |
 
@@ -63,7 +63,7 @@ deliverability for every tenant at once. Cost: DMARC alignment means some client
 "via", and the brewery's own domain does not vouch for the mail.
 
 **Upgrade (per brewery):** a verified sending domain, so mail is `From:
-logistics@lolev.beer`. Requires the brewery to add DKIM CNAMEs and an SPF include to
+logistics@brewery.example`. Requires the brewery to add DKIM CNAMEs and an SPF include to
 their own DNS. Offered in settings, never required.
 
 **No MX record is needed for either.** MX governs inbound mail. Sending needs SPF,
@@ -229,7 +229,7 @@ denominator: place a 100 lb release against 138 lb remaining and the screen stil
 138 until it lands. Place another and the contract is over-drawn with no warning at any
 point.
 
-    Citra 2026 · YCH — 400 committed · 262 received · 100 on order · 38 available
+    Citra 2026 · Fictional Hops Supply — 400 committed · 262 received · 100 on order · 38 available
 
 *Available* is what a buyer decides against; *received* is what accounting reconciles
 against. Both are needed and they answer different questions. The screen today answers
@@ -280,15 +280,15 @@ is a correction, not a restatement. `purchase_orders` is already indexed
 
 The screen's singular `Draft purchase order` button cannot be right. A worked example —
 a 200-case shortfall of Hazy IPA 16 oz, with cans, ends, quadpacks and trays from
-Lindenmeyr Munroe (3 days) and labels from Blue Label (7 days):
+Fictional Packaging Supply (3 days) and labels from Fictional Label Works (7 days):
 
 | material | base | per case | 200 cases | vendor |
 | --- | --- | --- | --- | --- |
-| Can · 16 oz | each | 24 | 4,800 | Lindenmeyr |
-| End · 202 | each | 24 | 4,800 | Lindenmeyr |
-| PakTech quadpack | each | 6 | 1,200 | Lindenmeyr |
-| Case tray · 24ct | each | 1 | 200 | Lindenmeyr |
-| Label · Hazy IPA 16 oz | each | 24 | 4,800 | Blue Label |
+| Can · 16 oz | each | 24 | 4,800 | Fictional Packaging Supply |
+| End · 202 | each | 24 | 4,800 | Fictional Packaging Supply |
+| PakTech quadpack | each | 6 | 1,200 | Fictional Packaging Supply |
+| Case tray · 24ct | each | 1 | 200 | Fictional Packaging Supply |
+| Label · Hazy IPA 16 oz | each | 24 | 4,800 | Fictional Label Works |
 
 Five materials, **two** draft POs, quantities rounded up to whole sleeves, bundles and
 rolls. The button becomes `Draft 2 purchase orders`.
@@ -300,7 +300,7 @@ per-SKU item is also the slowest and the least substitutable.
 ### The horizon is `max(lead_time)` across resolved vendors
 
 *"A gap nobody can still buy for is a report, not a plan."* For the run above the
-binding constraint is Blue Label's 7 days, not Lindenmeyr's 3. Past day 7 the row is
+binding constraint is Fictional Label Works' 7 days, not Fictional Packaging Supply's 3. Past day 7 the row is
 **partially unbuyable** — cans still orderable, labels not — and must draw that way
 rather than as uniformly actionable.
 
