@@ -38,10 +38,12 @@ export function ComposerPanelView({ children, open, onOpenChange, container }: {
   const panelId = useId();
   const askRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const revealedFocusRef = useRef<HTMLElement | null>(null);
   // Enter the portal while non-modal so Base UI restores its tab stops before trapping focus.
   const panelHasFocus = useSyncExternalStore(subscribeToFocus, () => panelRef.current?.contains(document.activeElement) ?? false, () => false);
 
   function changeOpen(nextOpen: boolean) {
+    revealedFocusRef.current = null;
     if (open === undefined) setInternalOpen(nextOpen);
     onOpenChange?.(nextOpen);
   }
@@ -51,6 +53,33 @@ export function ComposerPanelView({ children, open, onOpenChange, container }: {
     const frame = requestAnimationFrame(() => panelRef.current?.focus());
     return () => cancelAnimationFrame(frame);
   }, [chatOpen, isMobile, foregroundDialogOpen, panelHasFocus]);
+
+  useEffect(() => {
+    if (!chatOpen || isMobile || foregroundDialogOpen) return;
+    revealedFocusRef.current = null;
+    let frame = 0;
+    // Desktop stays nonmodal, but keyboard focus must never disappear under its overlay.
+    const revealFocusedControl = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const panel = panelRef.current;
+        const focused = document.activeElement;
+        if (!panel || !(focused instanceof HTMLElement) || panel.contains(focused)) return;
+        const bounds = focused.getBoundingClientRect();
+        const covering = document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
+        if (covering && panel.contains(covering)) {
+          revealedFocusRef.current = focused;
+          if (open === undefined) setInternalOpen(false);
+          onOpenChange?.(false);
+        }
+      });
+    };
+    document.addEventListener("focusin", revealFocusedControl);
+    return () => {
+      document.removeEventListener("focusin", revealFocusedControl);
+      cancelAnimationFrame(frame);
+    };
+  }, [chatOpen, isMobile, foregroundDialogOpen, open, onOpenChange]);
 
   return (
     <Dialog.Root open={chatOpen} onOpenChange={(nextOpen, details) => {
@@ -68,7 +97,7 @@ export function ComposerPanelView({ children, open, onOpenChange, container }: {
           ref={panelRef}
           data-mgr-composer=""
           initialFocus={foregroundDialogOpen ? false : panelRef}
-          finalFocus={foregroundDialogOpen ? false : askRef}
+          finalFocus={foregroundDialogOpen ? false : () => revealedFocusRef.current ?? askRef.current}
           className="fixed inset-y-0 right-0 flex w-full max-w-full min-h-0 flex-col overflow-hidden border-l bg-popover text-sm text-popover-foreground shadow-lg outline-none data-closed:hidden md:top-12 md:w-[min(32rem,calc(100vw-12rem))]"
         >
           <div className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-2">

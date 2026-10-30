@@ -33,12 +33,19 @@ try {
   assert.match(requiredMarker, /required/, "Required picker must have a visible label marker");
   const frame = ab("eval", `document.querySelector('a[target="_blank"][href^="/screens/frame/"]').href`).result;
   ab("open", frame);
+  ab("find", "role", "button", "click", "--name", "Ask MGR", "--exact");
+  ab("focus", 'input[aria-label="Brewery name"]');
+  const uncoveredOpen = ab("eval", "(async () => { const { promise, resolve } = Promise.withResolvers(); requestAnimationFrame(() => requestAnimationFrame(resolve)); await promise; return document.querySelector('button[aria-keyshortcuts]').getAttribute('aria-expanded'); })()").result;
+  assert.equal(uncoveredOpen, "true", "Uncovered page controls must remain usable beside desktop chat");
+  ab("focus", "#portal-warehouse");
+  wait("document.querySelector('button[aria-keyshortcuts]').getAttribute('aria-expanded') === 'false'");
+  wait("document.activeElement?.id === 'portal-warehouse'");
   ab("set", "viewport", "320", "256");
   wait("document.querySelector('#portal-warehouse')");
   assert(ab("eval", "document.documentElement.scrollWidth <= document.documentElement.clientWidth").result, "Settings must reflow at the 320 CSS-pixel viewport used for 400% zoom");
   assert(ab("eval", "Array.from(document.querySelectorAll('[data-mgr-page-scroll]')).every(x => x.scrollWidth <= x.clientWidth)").result, "Settings page content must not require horizontal scrolling");
   ab("set", "viewport", "1440", "1000");
-  console.log("Accessibility browser regression passed: select name and value, visible required marker, and 400% equivalent Settings reflow.");
+  console.log("Accessibility browser regression passed: select name and value, visible required marker, nonmodal unobscured desktop focus, and 400% equivalent Settings reflow.");
 } finally {
   ab("close");
 }

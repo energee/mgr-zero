@@ -38,15 +38,17 @@ try {
   wait("!document.querySelector('[cmdk-input]')");
   assert(ab("eval", "document.querySelector('.screen-box h1')?.textContent").result.includes("ORD-"));
 
-  chooseScreen("Record movement");
-  ab("eval", "Array.from(document.querySelectorAll('.screen-box [data-slot=item]')).find(x => x.textContent.includes('SKU / package')).click()");
+  chooseScreen("New order");
+  const frame = ab("eval", "document.querySelector('a[target=\"_blank\"][href^=\"/screens/frame/\"]').href").result;
+  ab("open", frame);
+  ab("find", "role", "button", "click", "--name", "Line 1 SKU");
   ab("fill", "[cmdk-input]", "Pils");
   wait("document.querySelectorAll('[cmdk-item]').length === 1");
   ab("press", "Enter");
-  wait(heading("Record movement"));
-  ab("eval", "Array.from(document.querySelectorAll('.screen-box [data-slot=item]')).find(x => x.textContent.includes('SKU / package')).click()");
-  ab("eval", "Array.from(document.querySelectorAll('[cmdk-item]')).find(x => x.textContent.includes('Stout · ⅙ bbl keg')).click()");
-  wait(heading("Record movement"));
+  wait("!document.querySelector('[cmdk-input]')");
+  ab("find", "role", "button", "click", "--name", "Line 1 SKU");
+  ab("find", "role", "option", "click", "--name", "Hazy IPA");
+  wait("!document.querySelector('[cmdk-input]')");
   console.log("Palette smoke passed: filtering, empty state, arrow keys, Enter, and click return.");
 } finally {
   ab("close");
