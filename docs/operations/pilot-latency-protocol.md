@@ -100,8 +100,8 @@ The code is `lib/server-timing.ts`.
 | `auth` | `Server-Timing` header on every `/api/command` response | Building the caller's context: session or bearer token, and membership |
 | `admission` | Same header | The per-account rate-limit check |
 | `command` | Same header | The command or query itself, including its RPC |
-| `shell` | Function log line | The staff layout's brewery, identity and membership reads (`app/(app)/layout.tsx`) |
-| `<command name>`, for example `trace_lot` | Function log line | One staff page read through `runPageQuery` or `optionalPageQuery`, including the layout's `get_gravity_unit` |
+| `shell` | Function log line | The staff layout's brewery, identity and membership reads, including brewery and personal gravity units (`app/(app)/layout.tsx`) |
+| `<command name>`, for example `trace_lot` | Function log line | One staff page read through `runPageQuery` or `optionalPageQuery`; the layout reuses its membership reads instead of calling `get_gravity_unit` |
 | `prerendered` | `Server-Timing` header on `/docs` pages | No server stage: the page was built at deploy, so its time is delivery and parsing |
 
 A stage that fails is still timed.
