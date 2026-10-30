@@ -28,9 +28,13 @@ async function fixture(): Promise<Fixture> {
   return { brewery, ctx, location, zone, today, utcDay, due };
 }
 
-async function shipment(f: Fixture, invoiceTiming: "now" | "on_delivery") {
+async function shipment(f: Fixture, invoiceTiming: "now" | "on_delivery", returnableKegs = false) {
   const customer = await seedCustomer(f.brewery.id);
-  const catalog = await seedCatalog(f.brewery.id, { bblPerUnit: 0.5 });
+  const catalog = await seedCatalog(f.brewery.id, { bblPerUnit: 0.5, ...(returnableKegs ? { packageType: "keg" } : {}) });
+  if (returnableKegs) {
+    const pool = await ins("keg_pools", { brewery_id: f.brewery.id, name: "Posting fleet", kind: "owned", deposit_cents: 2500 });
+    expect((await admin.from("skus").update({ container_source: "owned_fleet", keg_pool_id: pool.id }).eq("id", catalog.skuId)).error).toBeNull();
+  }
   await priceSku(f.brewery.id, { ...catalog, saleChannelId: customer.saleChannelId, cents: 1000 });
   await ins("inventory_movements", { brewery_id: f.brewery.id, sku_id: catalog.skuId,
     location_id: f.location.id, bin_id: f.location.binId, qty: 4, type: "opening_balance", created_by: f.ctx.userId });
@@ -46,7 +50,7 @@ async function shipment(f: Fixture, invoiceTiming: "now" | "on_delivery") {
   const result = await runCommand("ship_order", input, f.ctx, execution) as { invoice_id: string | null };
   expect(await runCommand("ship_order", input, f.ctx, execution)).toEqual(result);
   const sh = (await admin.from("shipments").select("id").eq("order_id", orderId).single()).data!;
-  return { ...customer, ...catalog, orderId, shipmentId: sh.id, invoiceId: result.invoice_id };
+  return { ...customer, ...catalog, orderId, shipmentId: sh.id, invoiceId: result.invoice_id, requestId };
 }
 
 it("dates shipment dollars, due date and QuickBooks on the same local day as removal volume", async () => {
@@ -78,6 +82,54 @@ it("dates shipment dollars, due date and QuickBooks on the same local day as rem
   expect(sql(`select concat_ws('|', i.issued_on, coalesce(i.due_on::text,'null'), m.occurred_on)
     from invoices i join inventory_movements m on m.ref=i.id and m.type='return_in'
     where i.id='${credit.invoice_id}'`, true)).toEqual([`${f.today}|null|${f.today}`]);
+});
+
+it("retains one post-lock posting instant for brewery-local invoices, stock and keg events", async () => {
+  const f = await fixture();
+  const shipped = await shipment(f, "now", true);
+  expect(sql(`select (sh.shipped_at > request.created_at
+      and sh.shipped_at=sh.created_at and sh.shipped_at=o.shipped_at
+      and sh.shipped_at=i.created_at and sh.shipped_at=m.created_at
+      and sh.shipped_at=k.at and sh.shipped_at=k.created_at
+      and i.issued_on=(sh.shipped_at at time zone b.timezone)::date
+      and m.occurred_on=i.issued_on)::text
+    from shipments sh join orders o on o.id=sh.order_id
+    join breweries b on b.id=sh.brewery_id
+    join invoices i on i.shipment_id=sh.id
+    join inventory_movements m on m.ref=o.id and m.type='sale_removal'
+    join keg_events k on k.shipment_id=sh.id and k.reason='shipped'
+    join private.command_requests request on request.request_id='${shipped.requestId}' and request.actor_id='${f.ctx.userId}'
+    where sh.id='${shipped.shipmentId}'`, true)).toEqual(["true"]);
+});
+
+it("keeps exact receipt quantities and actual cost together with brewery-local dates", async () => {
+  const f = await fixture();
+  const vendor = await runCommand("upsert_vendor", { name: "Precision supplier" }, f.ctx) as { id: string };
+  const material = await runCommand("upsert_material", { name: "Precision hops", category: "hop",
+    baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 2.5, lotTracked: true }, f.ctx) as { id: string };
+  const po = await runCommand("create_purchase_order", { vendorId: vendor.id,
+    lines: [{ materialId: material.id, qtyOrdered: 2, unitCostCents: 1000 }] }, f.ctx) as { id: string };
+  await runCommand("send_purchase_order", { poId: po.id, sentVia: "external" }, f.ctx);
+  const line = (await admin.from("purchase_order_lines").select("id").eq("po_id", po.id).single()).data!;
+  const input = { p_brewery: f.brewery.id, p_po: po.id, p_location: f.location.id,
+    p_bin: f.location.binId, p_received_on: null };
+  for (const [qty, error] of [[0.00001, /four decimals/], [0.0001, /too precise for the base unit/]] as const) {
+    const refused = await f.ctx.db.rpc("receive_purchase_order", { ...input, p_request_id: crypto.randomUUID(),
+      p_lines: [{ po_line_id: line.id, qty_counted: qty, lot_code: "PRECISE", unit_cost_cents: 1250 }] });
+    expect(refused.error?.message).toMatch(error);
+    expect(sql(`select count(*) from receipts where po_id='${po.id}'`, true)).toEqual(["0"]);
+  }
+  const request = { ...input, p_request_id: crypto.randomUUID(),
+    p_lines: [{ po_line_id: line.id, qty_counted: 1.2, lot_code: "PRECISE", unit_cost_cents: 1250 }] };
+  const received = await f.ctx.db.rpc("receive_purchase_order", request);
+  expect(received.error).toBeNull();
+  expect((await f.ctx.db.rpc("receive_purchase_order", request)).data).toEqual(received.data);
+  expect(JSON.parse(sql(`select json_build_array(rl.qty_counted,m.qty,rl.purchase_unit_cost_cents,m.unit_cost_cents,
+      r.received_on,rl.lot_received_on,pol.unit_cost_cents)::text
+    from receipts r join receipt_lines rl on rl.receipt_id=r.id
+    join material_movements m on m.id=rl.movement_id
+    join purchase_order_lines pol on pol.id=rl.po_line_id where r.po_id='${po.id}'`, true)[0]))
+    .toEqual([1.2, 3, 1250, 500, f.today, f.today, 1000]);
 });
 
 it("dates invoices created on delivery in the brewery timezone", async () => {

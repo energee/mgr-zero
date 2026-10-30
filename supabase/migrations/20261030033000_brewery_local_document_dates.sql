@@ -45,7 +45,7 @@ revoke all on function private.set_material_count_counted_on() from public, anon
 create trigger material_counts_set_counted_on before insert on public.material_counts
   for each row execute function private.set_material_count_counted_on();
 
--- Copied from 20261027160000_stock_shortfall_messages.sql; only automatic dates change.
+-- Preserve #1663's post-lock wall clock when deriving the brewery-local ship date.
 CREATE OR REPLACE FUNCTION private.ship_order_impl(p_order uuid, p_ship jsonb, p_carrier text, p_tracking text, p_invoice_timing text DEFAULT 'now'::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -54,6 +54,7 @@ AS $function$
 declare
   o public.orders; sp record; v_state text; v_country text; v_invoice uuid; v_shipment uuid;
   v_channel uuid; v_tax public.tax_treatment; v_sources jsonb; src record; v_line public.order_lines; v_available numeric; v_pool uuid; v_size public.keg_size;
+  v_posted_at timestamptz; v_posted_on date;
   v_drain jsonb; v_warnings jsonb := '[]'::jsonb; v_shells jsonb := '[]'::jsonb;
 begin
   o := private.lock_order(p_order, array['picked']::public.order_status[]);
@@ -77,9 +78,11 @@ begin
        (select 1 from public.order_lines where id = (e->>'line_id')::uuid and order_id = p_order)) then
     raise exception 'ship list must cover every order line exactly once';
   end if;
+  v_posted_at := clock_timestamp();
+  select (v_posted_at at time zone timezone)::date into v_posted_on from public.breweries where id = o.brewery_id;
   -- The one-way keg fee was frozen on each line at submit (ensure_order_deposit_lines).
-  insert into public.shipments (brewery_id, order_id, carrier, tracking, invoice_timing, created_by)
-  values (o.brewery_id, p_order, p_carrier, p_tracking, coalesce(p_invoice_timing, 'now'), auth.uid()) returning id into v_shipment;
+  insert into public.shipments (brewery_id, order_id, carrier, tracking, invoice_timing, created_by, shipped_at, created_at)
+  values (o.brewery_id, p_order, p_carrier, p_tracking, coalesce(p_invoice_timing, 'now'), auth.uid(), v_posted_at, v_posted_at) returning id into v_shipment;
   if o.kind = 'wholesale' then
     select state, country into v_state, v_country from public.ship_tos where id = o.ship_to_id;
     -- One lookup for the whole shipment: the channel a wholesale ship removes
@@ -100,8 +103,8 @@ begin
     -- on_delivery defers the invoice to confirm_delivery
     if coalesce(p_invoice_timing, 'now') = 'now'
        and exists (select 1 from jsonb_array_elements(p_ship) e where (e->>'qty_shipped')::numeric > 0) then
-    insert into public.invoices (brewery_id, kind, customer_id, shipment_id, issued_on)
-    values (o.brewery_id, 'invoice', o.customer_id, v_shipment, private.brewery_today(o.brewery_id))
+    insert into public.invoices (brewery_id, kind, customer_id, shipment_id, issued_on, created_at)
+    values (o.brewery_id, 'invoice', o.customer_id, v_shipment, v_posted_on, v_posted_at)
     returning id into v_invoice;
     end if;
   end if;
@@ -141,9 +144,9 @@ begin
       if o.kind = 'wholesale' then
         -- A foreign ship-to has no state (ship_tos_state_by_country), so
         -- exactly one of dest_state and dest_country is set.
-        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, lot_id, qty, type, sale_channel_id, tax_treatment, dest_state, dest_country, ref, created_by)
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, lot_id, qty, type, sale_channel_id, tax_treatment, dest_state, dest_country, ref, created_by, created_at, occurred_on)
         select o.brewery_id, v_line.sku_id, o.from_location_id, (e->>'bin_id')::uuid, (e->>'lot_id')::uuid, -(e->>'qty')::numeric,
-          'sale_removal', v_channel, v_tax, v_state, nullif(v_country, 'US'), p_order, auth.uid() from jsonb_array_elements(v_sources) e;
+          'sale_removal', v_channel, v_tax, v_state, nullif(v_country, 'US'), p_order, auth.uid(), v_posted_at, v_posted_on from jsonb_array_elements(v_sources) e;
         -- Automatic Shipped alone may overdraw shells: beer must still leave.
         select s.keg_pool_id, f.keg_size into v_pool, v_size
           from public.skus s join public.formats f on f.id=s.format_id and f.brewery_id=s.brewery_id
@@ -170,9 +173,9 @@ begin
                    sp.qty::integer-coalesce((select sum(qty) from taken),0) qty)
           select jsonb_agg(jsonb_build_object('bin_id',bin_id,'qty',qty)) into v_drain
             from (select bin_id,qty from taken union all select bin_id,qty from rest where qty>0) d;
-          insert into public.keg_events(brewery_id,pool_id,keg_size,location_id,bin_id,qty,reason,customer_id,shipment_id,note,created_by)
+          insert into public.keg_events(brewery_id,pool_id,keg_size,location_id,bin_id,qty,reason,customer_id,shipment_id,note,created_by,at,created_at)
             select o.brewery_id,v_pool,v_size,o.from_location_id,(d->>'bin_id')::uuid,(d->>'qty')::integer,'shipped',
-                   o.customer_id,v_shipment,private.doc_no('ORD',o.order_no),auth.uid()
+                   o.customer_id,v_shipment,private.doc_no('ORD',o.order_no),auth.uid(),v_posted_at,v_posted_at
               from jsonb_array_elements(v_drain) d;
         end if;
         if v_invoice is not null then
@@ -187,10 +190,10 @@ begin
           from public.order_lines ol where ol.id = sp.line_id and ol.one_way_fee_cents is not null;
         end if;
       else
-        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, lot_id, qty, type, ref, created_by)
-        select o.brewery_id, v_line.sku_id, o.from_location_id, (e->>'bin_id')::uuid, (e->>'lot_id')::uuid, -(e->>'qty')::numeric, 'taproom_transfer'::public.movement_type, p_order, auth.uid() from jsonb_array_elements(v_sources) e
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, lot_id, qty, type, ref, created_by, created_at, occurred_on)
+        select o.brewery_id, v_line.sku_id, o.from_location_id, (e->>'bin_id')::uuid, (e->>'lot_id')::uuid, -(e->>'qty')::numeric, 'taproom_transfer'::public.movement_type, p_order, auth.uid(), v_posted_at, v_posted_on from jsonb_array_elements(v_sources) e
         union all
-        select o.brewery_id, v_line.sku_id, o.to_location_id, (e->>'to_bin_id')::uuid, (e->>'lot_id')::uuid, (e->>'qty')::numeric, 'taproom_transfer'::public.movement_type, p_order, auth.uid() from jsonb_array_elements(v_sources) e;
+        select o.brewery_id, v_line.sku_id, o.to_location_id, (e->>'to_bin_id')::uuid, (e->>'lot_id')::uuid, (e->>'qty')::numeric, 'taproom_transfer'::public.movement_type, p_order, auth.uid(), v_posted_at, v_posted_on from jsonb_array_elements(v_sources) e;
       end if;
       update public.allocations set status = 'fulfilled'
         where source = 'order_line' and ref = sp.line_id and status = 'open';
@@ -214,7 +217,7 @@ begin
    where n.qty<0;
   -- anything picked but held back is staged on the floor: put it back
   update public.orders
-     set status = 'shipped', shipped_at = now(),
+     set status = 'shipped', shipped_at = v_posted_at,
          needs_restock = exists (
            select 1 from jsonb_array_elements(p_ship) e
            join public.order_lines ol on ol.id = (e->>'line_id')::uuid
@@ -375,14 +378,14 @@ begin
   return jsonb_build_object('invoice_id', v_cm);
 end $$;
 
--- Copied from 20260928110000_receipt_corrections.sql; only automatic dates change.
+-- Preserve #1641's exact quantities and #1638's actual purchase-unit cost.
 create or replace function public.receive_purchase_order(
   p_brewery uuid, p_po uuid, p_location uuid, p_bin uuid, p_received_on date, p_lines jsonb, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
   v_actor uuid; v_replay jsonb; v_po public.purchase_orders; v_receipt_id uuid; l jsonb;
   v_line public.purchase_order_lines; v_mat public.materials; v_counted numeric; v_expected numeric;
-  v_lot uuid; v_movement uuid;
+  v_lot uuid; v_movement uuid; v_cost numeric;
 begin
   v_actor := private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'receive_purchase_order', p_request_id,
@@ -395,8 +398,19 @@ begin
   for l in select * from jsonb_array_elements(p_lines) loop
     select * into v_line from public.purchase_order_lines where id = (l->>'po_line_id')::uuid and po_id = p_po;
     if v_line.id is null then raise exception 'line % is not on this purchase order', l->>'po_line_id'; end if;
+    v_cost := (l->>'unit_cost_cents')::numeric;
+    if v_cost is not null and (v_cost::text in ('NaN','Infinity','-Infinity') or v_cost<0 or v_cost>2147483647 or v_cost<>trunc(v_cost)) then
+      raise exception 'unit cost must be integer cents from 0 to 2147483647';
+    end if;
+    v_cost := coalesce(v_cost,v_line.unit_cost_cents);
     select * into v_mat from public.materials where id = v_line.material_id;
     v_counted := (l->>'qty_counted')::numeric;
+    if v_counted is null or v_counted::text in ('NaN','Infinity','-Infinity') or v_counted<0 or v_counted<>round(v_counted,4) then
+      raise exception 'counted quantities must be finite, nonnegative, and have at most four decimals';
+    end if;
+    if v_counted*v_mat.purchase_uom_factor<>round(v_counted*v_mat.purchase_uom_factor,4) then
+      raise exception 'counted quantity is too precise for the base unit';
+    end if;
     select qty_open into v_expected from public.po_open_balances where po_line_id = v_line.id;
     v_lot := null; v_movement := null;
     if v_mat.lot_tracked and v_counted > 0 then  -- #453: a zero count needs no lot
@@ -411,14 +425,14 @@ begin
       -- Cost per base unit, unrounded (#495): the purchase-unit price over the factor.
       insert into public.material_movements (brewery_id, material_id, location_id, bin_id, lot_id, qty, type, unit_cost_cents, created_by)
       values (p_brewery, v_mat.id, p_location, p_bin, v_lot, v_counted * v_mat.purchase_uom_factor, 'receipt',
-              v_line.unit_cost_cents / v_mat.purchase_uom_factor, v_actor)
+              v_cost / v_mat.purchase_uom_factor, v_actor)
       returning id into v_movement;
     end if;
     insert into public.receipt_lines (brewery_id, receipt_id, po_line_id, qty_expected, qty_counted, lot_id, movement_id,
       material_id, material_name, base_uom, purchase_uom, purchase_uom_factor, purchase_unit_cost_cents,
       lot_code, lot_received_on, lot_best_by, cost_recorded_at, cost_order_id)
     select p_brewery, v_receipt_id, v_line.id, v_expected, v_counted, v_lot, v_movement,
-      v_mat.id, v_mat.name, v_mat.base_uom, v_mat.purchase_uom, v_mat.purchase_uom_factor, v_line.unit_cost_cents,
+      v_mat.id, v_mat.name, v_mat.base_uom, v_mat.purchase_uom, v_mat.purchase_uom_factor, v_cost,
       ml.lot_code, ml.received_on, ml.best_by, now(), v_receipt_id
     from (select 1) singleton left join public.material_lots ml on ml.id=v_lot;
   end loop;
