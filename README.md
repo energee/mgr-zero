@@ -245,6 +245,13 @@ each lock change before merging; no automatic merge is configured.
 does not include Bun security updates, so keep running `bun audit --json`
 and `bun audit --prod --json` during dependency and release reviews.
 
+The owner-approved #1667 overrides pin `fast-uri` 3.1.9 and
+`systeminformation` 5.33.16 within their parents' compatible ranges, alongside
+the existing KaTeX pin. The final local audit reports one low-severity,
+dev-only `deepmerge` advisory with no published fix, and no production
+advisories. Keep its CLI-input restrictions and the separate hosted-install
+gate in the [release checklist](docs/operations/release-checklist.md#dependency-hygiene--2026-10-30-1667).
+
 The review marketplace is checked out separately at an immutable commit and
 passed as a local directory. The pinned action's
 [installer](https://github.com/anthropics/claude-code-action/blob/374f254f5efaf968abfe15d399fd90972e8138b9/base-action/src/install-plugins.ts)
