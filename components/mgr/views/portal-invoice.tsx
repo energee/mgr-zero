@@ -22,14 +22,17 @@ export function PortalInvoiceView({
   variant,
   question,
   footer,
+  paymentAction,
 }: {
   model: PortalInvoiceViewModel;
   /** Inventory Pay passes "pay". Omit on live unpaid (QBO parked) or paid. */
   variant?: PortalInvoiceVariant;
   /** Live: QuestionForm. Inventory default is the Question this invoice nav. */
   question?: ReactNode;
-  /** Live payment action. Pay inventory defaults to its simulated payment button. */
+  /** Optional extra footer content, separate from the shared payment action. */
   footer?: ReactNode;
+  /** Live POST broker; inventory leaves the payment control inert. */
+  paymentAction?: string;
 }) {
   const kind = model.kind === "credit_memo" ? "credit" : resolveVariant(variant, model.paid, model.payable);
   const questionNav = E.nav("Question this invoice", `sends a note to ${model.breweryName}`);
@@ -56,8 +59,11 @@ export function PortalInvoiceView({
       {kind === "pay" ? (
         <>
           {E.info("Pay by card or bank transfer through QuickBooks. You will not need an account.")}
-          {footer !== undefined ? footer : E.btn("Pay invoice", "p")}
-          {E.info("Opens QuickBooks in a new tab. This link keeps working; it is re-checked each time you open it.")}
+          <form method="post" action={paymentAction} target="_blank" rel="noreferrer" className="flex flex-col">
+            {E.btn("Pay invoice", "p", undefined, undefined, { type: paymentAction ? "submit" : "button" })}
+          </form>
+          {footer}
+          {E.info("Opens QuickBooks in a new tab after you choose Pay invoice. Availability is re-checked on every payment attempt.")}
         </>
       ) : null}
       {kind === "unavailable" ? (

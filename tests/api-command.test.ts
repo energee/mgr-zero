@@ -59,6 +59,27 @@ describe("POST /api/command bearer auth", () => {
     });
   });
 
+  it("enforces browser Origin and JSON media type before authenticated dispatch", async () => {
+    vi.stubEnv("APP_URL", "https://mgr.test");
+    try {
+      const foreign = commandReq({ breweryId, name: "list_brands", input: {} }, adminToken);
+      foreign.headers.set("origin", "https://attacker.invalid");
+      const deniedOrigin = await POST(foreign);
+      expect(deniedOrigin.status).toBe(403);
+      expect(await deniedOrigin.json()).toMatchObject({ ok: false, error: { code: "invalid_origin" }, correlationId: expect.any(String) });
+      const formBody = commandReq({ breweryId, name: "list_brands", input: {} }, adminToken);
+      formBody.headers.set("content-type", "text/plain");
+      const deniedType = await POST(formBody);
+      expect(deniedType.status).toBe(415);
+      expect(await deniedType.json()).toMatchObject({ ok: false, error: { code: "unsupported_media_type" }, correlationId: expect.any(String) });
+      const trusted = commandReq({ breweryId, name: "list_brands", input: {} }, adminToken);
+      trusted.headers.set("origin", "https://mgr.test");
+      expect((await POST(trusted)).status).toBe(200);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("returns schema field paths separately from its customer-facing summary", async () => {
     const res = await POST(commandReq({ breweryId, name: "search_entities", input: { q: "x".repeat(81) } }, adminToken));
     expect(res.status).toBe(400);

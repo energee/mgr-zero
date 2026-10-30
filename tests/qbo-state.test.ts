@@ -809,3 +809,17 @@ describe("who owns an invoice balance", () => {
     expect(invoiceBalanceCents({ ...neverPushed, qbo_invoice_id: "qbo-1042", qbo_balance_cents: 2500 }, 10000)).toBe(2500);
   });
 });
+
+it("shows the account email beside an editable QuickBooks sync operator name", async () => {
+  const f = await stateFixture();
+  const requestId = crypto.randomUUID();
+  const account = await admin.auth.admin.getUserById(f.ctx.userId);
+  expect((await f.ctx.db.auth.updateUser({ data: { full_name: "Owner (Admin)" } })).error).toBeNull();
+  await beginQboInvoiceSync(f.ctx, requestId);
+  const operator = `Owner (Admin) <${account.data.user!.email}>`;
+  expect(await runCommand("get_qbo_sync_status", {}, f.ctx)).toMatchObject({ latest: { operator } });
+  sql(`update private.qbo_invoice_sync_batches set failed_at=now() where actor_id='${f.ctx.userId}' and request_id='${requestId}'`);
+  expect(await runCommand("get_qbo_sync_status", {}, f.ctx)).toMatchObject({ latestFailure: { operator } });
+  sql(`update private.qbo_invoice_sync_batches set completed_at=now() where actor_id='${f.ctx.userId}' and request_id='${requestId}'`);
+  expect(await runCommand("get_qbo_sync_status", {}, f.ctx)).toMatchObject({ lastSuccess: { operator } });
+});

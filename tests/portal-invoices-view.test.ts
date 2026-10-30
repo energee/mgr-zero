@@ -250,6 +250,25 @@ describe("Portal invoice view", () => {
     expect(html).toMatch(/Question this invoice/);
   });
 
+  it("starts the payment handoff only through an explicit POST form, never a prefetched link", () => {
+    const html = htmlOf(createElement(PortalInvoiceView, {
+      model: toPortalInvoiceViewProps(portalInvoiceUnpaid), variant: "pay",
+      paymentAction: "/portal/invoices/actual-invoice/pay",
+    }));
+    expect(html).toContain('method="post"');
+    expect(html).toContain('action="/portal/invoices/actual-invoice/pay"');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain(">Pay invoice<");
+    expect(html).not.toContain('href="/portal/invoices/actual-invoice/pay"');
+    const inventory = htmlOf(createElement(PortalInvoiceView, {
+      model: toPortalInvoiceViewProps(portalInvoiceUnpaid), variant: "pay",
+    }));
+    expect(inventory).toContain(">Pay invoice<");
+    expect(inventory).toContain('method="post"');
+    expect(inventory).toContain('type="button"');
+    expect(inventory).not.toContain('action="/portal/invoices/actual-invoice/pay"');
+  });
+
   it("a question slot replaces the inventory Question nav", () => {
     const html = htmlOf(createElement(PortalInvoiceView, {
       model: toPortalInvoiceViewProps(portalInvoiceUnpaid),

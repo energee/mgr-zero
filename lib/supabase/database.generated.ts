@@ -567,13 +567,16 @@ isOneToOne: false
                   ]
                 },"chat_installations": {
                   Row: {
+                    "oauth_request_id": string | null,
                     "brewery_id": string,"created_at": string,"disabled_at": string | null,"disconnected_at": string | null,"display_label": string,"external_enterprise_id": string | null,"external_installation_id": string,"granted_capabilities": NonNullable<Json>,"id": string,"installed_at": string | null,"installer_user_id": string,"last_failure_code": string | null,"last_health_checked_at": string | null,"last_healthy_at": string | null,"oauth_consumed_at": string | null,"oauth_expires_at": string | null,"oauth_intent_hash": string | null,"oauth_intent_kind": string | null,"oauth_reconciled_at": string | null,"oauth_redirect_uri": string | null,"provider": string,"quiet_hours_end": string | null,"quiet_hours_start": string | null,"quiet_hours_timezone": string | null,"state": string,"token_store_key": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
+                    "oauth_request_id"?: string | null,
                     "brewery_id": string,"created_at"?: string,"disabled_at"?: string | null,"disconnected_at"?: string | null,"display_label": string,"external_enterprise_id"?: string | null,"external_installation_id": string,"granted_capabilities"?: NonNullable<Json>,"id"?: string,"installed_at"?: string | null,"installer_user_id": string,"last_failure_code"?: string | null,"last_health_checked_at"?: string | null,"last_healthy_at"?: string | null,"oauth_consumed_at"?: string | null,"oauth_expires_at"?: string | null,"oauth_intent_hash"?: string | null,"oauth_intent_kind"?: string | null,"oauth_reconciled_at"?: string | null,"oauth_redirect_uri"?: string | null,"provider": string,"quiet_hours_end"?: string | null,"quiet_hours_start"?: string | null,"quiet_hours_timezone"?: string | null,"state": string,"token_store_key": string,"updated_at"?: string
                   }
                   Update: {
+                    "oauth_request_id"?: string | null,
                     "brewery_id"?: string,"created_at"?: string,"disabled_at"?: string | null,"disconnected_at"?: string | null,"display_label"?: string,"external_enterprise_id"?: string | null,"external_installation_id"?: string,"granted_capabilities"?: NonNullable<Json>,"id"?: string,"installed_at"?: string | null,"installer_user_id"?: string,"last_failure_code"?: string | null,"last_health_checked_at"?: string | null,"last_healthy_at"?: string | null,"oauth_consumed_at"?: string | null,"oauth_expires_at"?: string | null,"oauth_intent_hash"?: string | null,"oauth_intent_kind"?: string | null,"oauth_reconciled_at"?: string | null,"oauth_redirect_uri"?: string | null,"provider"?: string,"quiet_hours_end"?: string | null,"quiet_hours_start"?: string | null,"quiet_hours_timezone"?: string | null,"state"?: string,"token_store_key"?: string,"updated_at"?: string
                   }
                   Relationships: [
@@ -587,13 +590,16 @@ isOneToOne: false
                   ]
                 },"chat_user_links": {
                   Row: {
+                    "external_display_name": string | null,
                     "brewery_id": string,"created_at": string,"disabled_at": string | null,"external_user_id": string,"id": string,"installation_id": string,"linked_at": string | null,"proof_consumed_at": string | null,"proof_expires_at": string | null,"proof_hash": string | null,"proof_issued_at": string | null,"provider": string,"state": string,"unlinked_at": string | null,"updated_at": string,"user_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
+                    "external_display_name"?: string | null,
                     "brewery_id": string,"created_at"?: string,"disabled_at"?: string | null,"external_user_id": string,"id"?: string,"installation_id": string,"linked_at"?: string | null,"proof_consumed_at"?: string | null,"proof_expires_at"?: string | null,"proof_hash"?: string | null,"proof_issued_at"?: string | null,"provider": string,"state": string,"unlinked_at"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
                   Update: {
+                    "external_display_name"?: string | null,
                     "brewery_id"?: string,"created_at"?: string,"disabled_at"?: string | null,"external_user_id"?: string,"id"?: string,"installation_id"?: string,"linked_at"?: string | null,"proof_consumed_at"?: string | null,"proof_expires_at"?: string | null,"proof_hash"?: string | null,"proof_issued_at"?: string | null,"provider"?: string,"state"?: string,"unlinked_at"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
                   Relationships: [
@@ -5249,7 +5255,7 @@ isOneToOne: false
 { Args: { "p_action": string,"p_delivery"?: string,"p_external_user_id": string,"p_installation": string }; Returns: string
                            },
 "issue_chat_link_proof":
-{ Args: { "p_external_user_id": string,"p_installation": string,"p_proof_hash": string }; Returns: Json
+{ Args: { "p_external_display_name": string,"p_external_user_id": string,"p_installation": string,"p_proof_hash": string }; Returns: Json
                            },
 "keg_bin_on_hand_rows":
 { Args: Record<PropertyKey, never>; Returns: {

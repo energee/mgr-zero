@@ -3,6 +3,7 @@ import { createRequestAuthContext } from "@/lib/auth/request-context";
 import { signInPath } from "@/lib/auth/password";
 import { CommandError, type Ctx } from "@/lib/commands/registry";
 import { QboOAuthClient, qboConfig, qboPaymentFailureCause, resolvePortalInvoicePayment } from "@/lib/qbo";
+import { assertTrustedOrigin } from "@/lib/request-json";
 
 const responseHeaders = {
   "Cache-Control": "private, no-cache, no-store, must-revalidate, max-age=0",
@@ -17,7 +18,13 @@ function unavailable(request: Request, invoiceId: string, reason: string) {
   });
 }
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    assertTrustedOrigin(request);
+  } catch (error) {
+    if (error instanceof CommandError) return new Response(error.message, { status: error.status, headers: responseHeaders });
+    throw error;
+  }
   const { id } = await params;
   const auth = createRequestAuthContext();
   const identity = await auth.getIdentity();

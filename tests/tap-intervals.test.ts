@@ -277,18 +277,20 @@ it("replays a committed legacy swap through the command boundary without applyin
   expect(state(f)).toEqual(before);
 });
 
-it("returns saved actor names or staff, never invented email handles or private profile fields", async () => {
+it("keeps the verified account email beside editable tap-history names", async () => {
   const f = await fixture();
   expect((await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: "  Dana Brewer  " } })).error).toBeNull();
+  const email = (await admin.auth.admin.getUserById(f.ctx.userId)).data.user!.email!;
+  const label = `Dana Brewer <${email}>`;
   const opened = await open(f);
   assert(opened !== null);
-  expect(await runCommand("list_open_taps", { locationId: f.location.id }, f.ctx)).toEqual(expect.arrayContaining([expect.objectContaining({ opened_by_label: "Dana Brewer" })]));
+  expect(await runCommand("list_open_taps", { locationId: f.location.id }, f.ctx)).toEqual(expect.arrayContaining([expect.objectContaining({ opened_by_label: label })]));
   expect((await f.ctx.db.rpc("kick_keg", close(f, opened.id))).error).toBeNull();
   const history = await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx);
-  expect(history).toEqual(expect.arrayContaining([expect.objectContaining({ opened_by_label: "Dana Brewer", closed_by_label: "Dana Brewer" })]));
-  expect(JSON.stringify(history)).not.toMatch(/email|password|metadata|@test.local/);
+  expect(history).toEqual(expect.arrayContaining([expect.objectContaining({ opened_by_label: label, closed_by_label: label })]));
+  expect(JSON.stringify(history)).not.toMatch(/password|metadata/);
   const conflict = await f.ctx.db.rpc("kick_keg", close(f, opened.id));
-  expect(conflict.error?.message).toContain("already closed by Dana Brewer at");
+  expect(conflict.error?.message).toContain(`already closed by ${label} at`);
   expect((await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: " " } })).error).toBeNull();
-  expect(await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx)).toEqual(expect.arrayContaining([expect.objectContaining({ opened_by_label: "staff", closed_by_label: "staff" })]));
+  expect(await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx)).toEqual(expect.arrayContaining([expect.objectContaining({ opened_by_label: email, closed_by_label: email })]));
 });

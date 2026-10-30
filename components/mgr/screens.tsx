@@ -1598,11 +1598,11 @@ export const SCREENS: Screen[] = [
     slice: 1,
     portal: "Invoices",
     name: "Pay invoice",
-    job: "One stable MGR link that resolves to QuickBooks at the moment it is clicked",
+    job: "Choose Pay invoice to request a fresh QuickBooks payment handoff",
     reads: "portal_invoice",
     writes: "none [Intuit takes the payment; confirmed payment status returns on the next manual sync]",
     states: [["payable", "Pay opens QuickBooks in a new tab"], ["no payments account", "the button never renders; brewery has no QuickBooks Payments", 1], ["not pushed yet", "no QuickBooks invoice id yet; Pay is absent, not disabled"], ["link unavailable", "Intuit returned none: the unavailable page, never a 500", 1], ["already paid", "Pay is gone; payment status was confirmed by sync"]],
-    spec: "The whole design is one rule: MGR owns the link, Intuit owns the destination. The payment action always uses /portal/invoices/:id/pay, an MGR URL that is permanent because it resolves late. Intuit’s InvoiceLink is read-only, is generated only for a pay-enabled invoice with a customer email, has no documented expiry, and is intermittently absent; fetching it seconds before the redirect makes every one of those someone else’s problem. It is never stored in a column, never serialised to the client, never put in an email. It is a bearer URL (anyone holding it can pay), so authorization runs on every click before any Intuit call is made, and the 404 for a customer requesting somebody else’s invoice must land before the fetch, not after.",
+    spec: "MGR owns the payment action; Intuit owns the destination. Pay invoice submits a POST to /portal/invoices/:id/pay and opens the handoff in a new tab. Viewing or prefetching a URL never spends admission or refreshes credentials. MGR authorizes the invoice before any Intuit call, requests a fresh InvoiceLink, then rechecks access and balance before redirecting. The bearer URL is never stored, serialized to the client, or put in an email. An absent link returns to Payment unavailable; a foreign invoice returns 404 before provider access.",
     body: <PortalInvoiceView model={toPortalInvoiceViewProps(portalInvoiceUnpaid)} variant="pay" />,
   },
   {
@@ -2693,7 +2693,7 @@ export const SCREENS: Screen[] = [
     reads: "get_chat_link_intent",
     writes: "consume_chat_link_proof [single-use]",
     states: [["ready", "both identities named"], ["expired", "return to MGR and request a new link", 1]],
-    spec: "The entry page names both identities and the brewery before consuming the single-use proof.",
+    spec: "The entry page names the MGR account and email, Slack display name and user id, workspace name and workspace id, and brewery before consuming the single-use proof.",
     body: <ChatLinkConsentView intent={chatLinkIntent} />,
   },
   {
