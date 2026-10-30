@@ -108,6 +108,7 @@ describe("taproom complete public RLS read boundary", () => {
       state_registrations: "get_compliance_registry", brewery_state_licenses: "get_compliance_registry",
       pos_sales: "list_pos_sales", pos_sale_expectations: "list_pos_sales", pos_sales_coverage: "list_pos_sales",
       pos_item_mappings: "list_pos_variations", pos_locations: "list_pos_locations",
+      pos_location_mapping_history: "retire_pos_location_mapping",
     };
     const clients = await Promise.all((["admin", "sales", "warehouse", "brewer"] as const).map(async role =>
       [role, await asUser((role === "admin" ? own.owner : await makeStaff(own.brewery.id, role)).email)] as const));
@@ -230,7 +231,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     portal_submit_quote: [B,f.customer.customerId,R(),null,R()],
     cancel_purchase_order: [B,draftPo.id,"Fixture",R()], close_purchase_order_short: [B,sentPo.id,"Fixture",R()],
     receive_purchase_order: [B,sentPo.id,W,BIN,day,[{po_line_id:sentLine.id,qty_counted:1}],R()],
-    correct_purchase_receipt: [B,receipt.id,"Wrong count",[{po_line_id:sentLine.id,qty_counted:1}],R()],
+    correct_purchase_receipt: [B,receipt.id,"Wrong count",[{po_line_id:sentLine.id,qty_counted:1}],R(),W,BIN],
     record_brew_day: [B,plannedBatch.id,emptyVessel.id,2,day,R(),[],{},true],
     save_batch_pulls: [B,plannedBatch.id,null,[],R()],
     correct_brew_record: [B,R(),"Test correction",1,[],{},true,R()],
@@ -248,6 +249,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     set_qbo_vendor_mapping: [B,VENDOR,"qbo-vendor",R()], set_qbo_purchase_account: [B,"qbo-account",R()],
     start_qbo_receipt_bill: [B,receipt.id,R(),null],
     set_pos_location_mapping: [B,"L1",f.taps[0].id,R()], set_pos_item_mapping: [B,"I1","V1",SKU,null,false,R()],
+    retire_pos_location_mapping: [B,"L1",R()], reorder_refused_delivery: [f.order.id,R()],
     set_personal_quiet_hours: [B,"22:00","07:00","America/New_York",R()], snooze_notification: [B,delivery,new Date(Date.now()+3600000).toISOString(),R()],
     generate_compliance_report: [B,"TTB",day,day], get_chat_integration_health: [B], list_chat_user_links: [B],
     get_square_connected: [B], list_compliance_active_months: [B,day,day],

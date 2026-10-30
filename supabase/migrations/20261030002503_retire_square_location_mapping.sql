@@ -20,6 +20,7 @@ create policy pos_location_mapping_history_staff on public.pos_location_mapping_
 revoke all on public.pos_location_mapping_history from public,anon,authenticated,service_role;
 grant select on public.pos_location_mapping_history to authenticated;
 create index pos_location_mapping_history_source_idx on public.pos_location_mapping_history(connection_id,external_location_id,ends_at);
+create index pos_location_mapping_history_brewery_idx on public.pos_location_mapping_history(brewery_id);
 
 create function public.retire_pos_location_mapping(p_brewery uuid,p_external_location text,p_request_id uuid) returns jsonb
 language plpgsql security definer set search_path='' as $$
