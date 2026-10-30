@@ -77,6 +77,15 @@ defineCommand({
 });
 
 defineCommand({
+  name: "set_order_pickup", description: "Set pickup or delivery on an unshipped wholesale order without changing lines, prices or allocations; pickups are invoiced when shipped and never routed",
+  roles: [...salesRoles],
+  input: z.object({ orderId: z.string().uuid(), pickup: z.boolean() }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_order_pickup", {
+    p_order: i.orderId, p_pickup: i.pickup, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
   name: "cancel_order", description: "Cancel an unshipped order and release its allocations",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1) }),

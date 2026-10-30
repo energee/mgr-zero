@@ -35,6 +35,15 @@ function submit(state: { qtys?: Record<string, string>; reason: string; added?: 
 }
 
 describe("order line edit submit boundaries", () => {
+  it("changes pickup independently of unsaved line edits and without replacing lines", () => {
+    const form = OrderLinesEditor({
+      orderId: "order", lines, editable: false, skus: [], warnings: [], onSaved: vi.fn(),
+      model: toOrderViewProps(orderConfirmedWholesale), pickup: { value: false },
+    });
+    form.props.children.props.pickup.onChange(true);
+    expect(harness.run).toHaveBeenCalledWith("set_order_pickup", { orderId: "order", pickup: true });
+  });
+
   it("holds blank reasons with the required message", () => {
     for (const reason of ["", "   ", "\t\r\n", "  ", "﻿　"]) submit({ reason });
     expect(harness.run).not.toHaveBeenCalled();

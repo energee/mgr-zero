@@ -82,18 +82,21 @@ type FormProps = {
 } & ViewProps;
 
 /** One edit of the saved lines; OrderLinesForm remounts it after each save. */
-export function OrderLinesEditor({ orderId, lines, editable, skus, warnings, onSaved, model, ...view }: FormProps & {
+export function OrderLinesEditor({ orderId, lines, editable, skus, warnings, onSaved, model, pickup, ...view }: FormProps & {
   /** The last save's ATP warnings, shown under the lines until the next change. */
   warnings: AtpWarning[];
   onSaved: (data: unknown) => void;
 }) {
   const edit = useLineQuantities(orderId, lines, onSaved);
+  const pickupAction = useCommandAction();
   const shown = { ...model, lines: model.lines.filter((l) => !edit.removed.includes(l.key)) };
   const lineActions = edit.changed ? <SaveLinesActions edit={edit} />
     : warnings.length > 0 ? <AtpWarnings warnings={warnings} skuNames={new Map(skus.map((sku) => [sku.id, sku.label]))} saved="Lines saved." />
     : undefined;
   return <form className="contents" onSubmit={edit.onSubmit}>
     <OrderView {...view} model={shown} quantities={edit.qtys} onQuantity={editable ? edit.setQty : undefined}
+      pickup={pickup ? { ...pickup, busy: pickupAction.busy, error: pickupAction.error,
+        onChange: (value) => { void pickupAction.run("set_order_pickup", { orderId, pickup: value }); } } : undefined}
       lineEdit={editable ? { skus, added: edit.added, onAdd: edit.addLine, onSku: edit.setSku, onRemove: edit.removeLine } : undefined}
       reason={edit.reason} onReason={edit.changed ? edit.setReason : undefined} lineActions={lineActions} />
   </form>;

@@ -18,6 +18,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import { OrderQuantity, OrderSkuPicker } from "./new-order";
 import { E } from "@/components/mgr/e";
+import { CommandFormMessage } from "@/components/mgr/command-form";
 import { FactsGrid } from "@/components/mgr/views/facts-grid";
 import { PriceSummary } from "@/components/mgr/views/price-summary";
 import { CancelOrderControl } from "./cancel-order";
@@ -74,6 +75,7 @@ export function OrderView({
   reason,
   onReason,
   lineActions,
+  pickup,
 }: {
   model: OrderViewModel;
   /** The state's verbs, primary first; drawn in the header after Put back when beer is staged. */
@@ -90,6 +92,8 @@ export function OrderView({
   onReason?: (value: string) => void;
   /** Save lines and Discard changes, or the saved lines' ATP warnings, drawn under the lines (and Reason). */
   lineActions?: ReactNode;
+  /** Present only when staff may change fulfillment before shipping; fixtures simulate the switch locally. */
+  pickup?: { value: boolean; onChange?: (value: boolean) => void; busy?: boolean; error?: string | null };
 }) {
   const orderedField = (line: { key: string; name: string; ordered?: string }) => onQuantity
     ? <div className="w-32 md:ml-auto"><OrderQuantity label={`${line.name} ordered`} value={quantities?.[line.key] ?? line.ordered ?? ""} onChange={(value) => onQuantity(line.key, value)} /></div>
@@ -142,6 +146,16 @@ export function OrderView({
         <section aria-labelledby="order-details" className="min-w-0">
           <h2 id="order-details" className={H2}>Order details</h2>
           <FactsGrid facts={model.facts} />
+          {pickup ? (
+            <div className="mt-4 flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span>Pickup</span>
+                {E.sw(pickup.value, "Pickup", pickup.onChange, pickup.busy)}
+              </div>
+              <p className="text-xs text-muted-foreground">Collected at the brewery. Invoiced when shipped; never put on a delivery route.</p>
+              <CommandFormMessage error={pickup.error} />
+            </div>
+          ) : null}
         </section>
         <PriceSummary model={model.summary} />
       </div>
