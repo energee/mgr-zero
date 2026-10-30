@@ -2544,11 +2544,23 @@ isOneToOne: false
       referencedRelation: "breweries"
       referencedColumns: ["id"]
     },{
-      foreignKeyName: "pos_sales_coverage_connection_id_external_location_id_loca_fkey"
-      columns: ["connection_id","external_location_id","location_id","brewery_id"]
+      foreignKeyName: "pos_sales_coverage_connection_tenant_fkey"
+      columns: ["connection_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "pos_connections"
+      referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "pos_sales_coverage_location_tenant_fkey"
+      columns: ["location_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "pos_sales_coverage_source_fkey"
+      columns: ["connection_id","external_location_id"]
 isOneToOne: false
       referencedRelation: "pos_locations"
-      referencedColumns: ["connection_id","external_location_id","location_id","brewery_id"]
+      referencedColumns: ["connection_id","external_location_id"]
     }
                   ]
                 },"price_group_barcodes": {
