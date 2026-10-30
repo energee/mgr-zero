@@ -554,11 +554,14 @@ export async function postReceiptBill(ctx: Ctx, receiptId: string, requestId: st
   if (isPast(tokens.accessExpiresAt)) tokens = await refreshQboCredentials(ctx, client, tokens);
   if (tokens.connectionId !== connectionId) throw new CommandError("QuickBooks connection changed", 409, "conflict");
   if (!start.mayPost) {
-    let found = await client.findReceiptBill(realmId, providerRequestId, requestBody, tokens.accessToken);
+    // A failed lookup cannot establish whether this earlier POST created a Bill.
+    let found = await client.findReceiptBill(realmId, providerRequestId, requestBody, tokens.accessToken)
+      .catch(() => { throw new CommandError(outcomeUnknown, 409, "conflict"); });
     if (!found.ok && found.status === 401) {
       tokens = await refreshQboCredentials(ctx, client, tokens);
       if (tokens.connectionId !== connectionId) throw new CommandError("QuickBooks connection changed", 409, "conflict");
-      found = await client.findReceiptBill(realmId, providerRequestId, requestBody, tokens.accessToken);
+      found = await client.findReceiptBill(realmId, providerRequestId, requestBody, tokens.accessToken)
+        .catch(() => { throw new CommandError(outcomeUnknown, 409, "conflict"); });
     }
     if (found.ok && found.remoteId) return record(found.remoteId, null, { Id: found.remoteId });
     if (!found.ok) throw new CommandError(outcomeUnknown, 409, "conflict");

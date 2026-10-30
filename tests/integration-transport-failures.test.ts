@@ -64,6 +64,22 @@ describe("integration transport failure boundaries", () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(boundary.recordBill).not.toHaveBeenCalled();
   });
+  it.each([
+    new Error("Bill reconciliation identity was ambiguous"),
+    new TypeError("provider network failed"),
+    new SyntaxError("provider returned malformed JSON"),
+  ])("keeps an earlier Bill outcome uncertain when reconciliation fails: %s", async (failure) => {
+    dbRpc.mockResolvedValue({ data: { receiptId, status: "pending", providerRequestId: requestId, requestBody: "{}",
+      realmId: "realm", connectionId, mayPost: false }, error: null });
+    const client = new QboOAuthClient(qboConfig, vi.fn());
+    vi.spyOn(client, "findReceiptBill").mockRejectedValue(failure);
+    const create = vi.spyOn(client, "createTransaction");
+    await expect(postReceiptBill(ctx, receiptId, requestId, client)).rejects.toMatchObject({
+      status: 409, message: expect.stringContaining("Bill outcome is uncertain"),
+    });
+    expect(create).not.toHaveBeenCalled();
+    expect(boundary.recordBill).not.toHaveBeenCalled();
+  });
   it("preserves the uncertain transport answer when recording that failure also fails", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     boundary.recordBill.mockRejectedValue(new Error("private record failure"));
