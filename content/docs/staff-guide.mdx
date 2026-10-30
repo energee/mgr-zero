@@ -693,6 +693,8 @@ Roles other than Admin and Sales see only **Not pushed** or **QuickBooks status 
 
 An uncertain invoice or credit-memo push is checked in its original QuickBooks company by document number before MGR sends it again. One matching document with the frozen customer and transaction date completes the saved push without creating another document. A failed lookup, invalid response, or conflicting or duplicate document number leaves the push pending instead of sending another copy.
 
+If QuickBooks voided a nonzero invoice before MGR recovered the push, MGR keeps that voided status when linking the existing document. Retry and later sync do not turn it back into a live invoice. Admin can then use the existing **Write off** action; an invoice originally issued for $0.00 is not treated as voided merely because its balance is zero.
+
 A lookup that stalls while connecting or reading its response times out. The push stays pending; retry it again rather than creating another invoice or credit memo.
 
 **Paid** is a payment status, not a settlement date. For an invoice in QuickBooks, MGR does not supply an actual payment date for one or multiple payments. An invoice paid in full by payments recorded in MGR is marked paid on the day its last payment was received, and **Payments** on the invoice lists each payment's received day. A partial cash payment remains due until the balance reaches zero; credit-only closure is **Settled**, not **Paid**. In the register, a balance closed with a mix of partial cash and credits shows **Settled** with the cash amount, not **Paid**. MGR does not display a settlement date for an invoice in QuickBooks.

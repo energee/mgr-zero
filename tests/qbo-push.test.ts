@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { Client } from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { completeQboOAuth, postReceiptBill, pushInvoiceToQbo, QboOAuthClient } from "@/lib/qbo";
+import { completeQboOAuth, postReceiptBill, pushInvoiceToQbo, QboOAuthClient, syncQboInvoices } from "@/lib/qbo";
 import {
   claimQboOAuth,
   completeQboOAuthStore,
@@ -108,6 +108,60 @@ describe("QuickBooks durable outbound push", () => {
     expect(saved).toEqual({ Id: "remote-1", SyncToken: "0", TotalAmt: 9.99, Balance: 9.99, TotalTax: 0 });
     expect(sql(`select status || ':' || qbo_entity_id from public.qbo_pushes where invoice_id='${f.invoice.id}'`))
       .toEqual(["pushed:remote-1"]);
+  });
+
+  it.each([
+    ["invoice", 333, "voided"], ["invoice", 0, "live"], ["credit_memo", 333, "live"],
+  ] as const)("preserves %s state after adopting a zeroed document from a lost push (%s cents)", async (kind, unitPrice, expectedState) => {
+    const f = await pushFixture(kind, "admin");
+    if (unitPrice === 0) {
+      expect((await admin.from("invoice_lines").update({ unit_price_cents: 0 })
+        .eq("invoice_id", f.invoice.id)).error).toBeNull();
+    }
+    const entityType = kind === "invoice" ? "Invoice" : "CreditMemo";
+    let remote: Record<string, unknown> | undefined;
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {
+      if (init?.method === "POST") {
+        remote = { ...JSON.parse(String(init.body)), Id: "void-before-recovery", SyncToken: "1",
+          TotalAmt: unitPrice * 3 / 100, Balance: unitPrice * 3 / 100, LinkedTxn: [] };
+        throw new TypeError("lost response after provider committed");
+      }
+      if (new URL(String(input)).pathname.endsWith("/query")) {
+        return Response.json({ QueryResponse: { [entityType]: [remote] } });
+      }
+      return Response.json({ [entityType]: remote });
+    });
+    const client = new QboOAuthClient(config, fetch);
+    const requestId = crypto.randomUUID();
+    await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, client)).rejects.toThrow("QuickBooks is unavailable");
+    assert(remote);
+    remote = { ...remote, SyncToken: "2", TotalAmt: 0, Balance: 0,
+      TxnTaxDetail: { TotalTax: 0 }, PrivateNote: "Voided by accountant; private details" };
+    const result = await pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, client);
+    expect(result).toMatchObject({ status: "pushed", remoteId: "void-before-recovery" });
+    const state = () => sql(`select qbo_remote_state from public.invoices where id='${f.invoice.id}'`);
+    expect(state()).toEqual([expectedState]);
+    const saved = JSON.parse(sql(`select response::text from public.qbo_pushes where invoice_id='${f.invoice.id}'`)[0]);
+    expect(saved).toMatchObject({ TotalAmt: 0, Balance: 0, PrivateNote: "Voided" });
+    expect(JSON.stringify(saved)).not.toContain("private details");
+
+    expect(await syncQboInvoices(f.ctx, crypto.randomUUID(), client))
+      .toMatchObject({ synced: 1, voided: expectedState === "voided" ? 1 : 0 });
+    expect(state()).toEqual([expectedState]);
+    expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual(["POST", "GET", "GET"]);
+    const noFetch = vi.fn<typeof globalThis.fetch>();
+    const replayClient = new QboOAuthClient(config, noFetch);
+    expect(await pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, replayClient)).toEqual(result);
+    if (expectedState === "voided") {
+      await runCommand("write_off_invoice", { invoiceId: f.invoice.id, reason: "Provider void confirmed" }, f.ctx);
+      expect(sql(`select written_off_at is not null from public.invoices where id='${f.invoice.id}'`)).toEqual(["t"]);
+      expect(await pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, replayClient)).toEqual(result);
+      expect(state()).toEqual(["voided"]);
+    } else {
+      await expect(runCommand("write_off_invoice", { invoiceId: f.invoice.id, reason: "Not a voided invoice" }, f.ctx))
+        .rejects.toThrow(/only an invoice/);
+    }
+    expect(noFetch).not.toHaveBeenCalled();
   });
 
   it("queries even an original frozen request replay, then resends only its exact body and key when absent", async () => {

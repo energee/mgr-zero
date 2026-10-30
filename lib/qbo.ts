@@ -640,17 +640,23 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
           .catch(() => { throw new Error("QuickBooks is unavailable"); });
       }
       if (!read.ok && !read.definitive) throw new Error("QuickBooks is unavailable");
+      const frozen = asObject(JSON.parse(target.requestBody));
+      const hadPositiveLine = Array.isArray(frozen?.Line) && frozen.Line.some(line => {
+        const amount = asObject(line)?.Amount;
+        return typeof amount === "number" && amount > 0;
+      });
       const pushedTotal = typeof target.pushedResponse?.TotalAmt === "number"
         ? Math.round(target.pushedResponse.TotalAmt * 100) : null;
+      const wasPositive = (pushedTotal !== null && pushedTotal > 0) || hadPositiveLine;
       const remoteState = entityType === "Invoice" && read.ok && /^Voided\b/i.test(read.privateNote) && read.totalCents === 0
-        && read.balanceCents === 0 && pushedTotal !== null && pushedTotal > 0 ? "voided" : read.ok ? "live" : "deleted";
+        && read.balanceCents === 0 && wasPositive ? "voided" : read.ok ? "live" : "deleted";
       observations.push({
         invoiceId: target.invoiceId, remoteId: target.remoteId, remoteState,
         syncToken: read.ok ? read.syncToken : null,
         taxCents: read.ok ? read.taxCents : null,
         totalCents: read.ok ? read.totalCents : null,
         balanceCents: read.ok ? read.balanceCents : null,
-        contentMatches: read.ok && meaningfulInvoiceContentMatches(JSON.parse(target.requestBody), read.content),
+        contentMatches: read.ok && meaningfulInvoiceContentMatches(frozen, read.content),
         cashCollectedCents: read.ok ? read.cashCollectedCents : 0,
         paidAt: read.ok ? read.paidAt : null,
       });
@@ -924,7 +930,11 @@ export class QboOAuthClient {
       || asObject(row.CustomerRef)?.value !== customer.value || row.TxnDate !== frozen.TxnDate) {
       throw new Error("QuickBooks reconciliation identity was ambiguous");
     }
-    return { ok: true as const, transaction: qboTransactionResult(row) };
+    const transaction = qboTransactionResult(row);
+    if (typeof row.PrivateNote === "string" && /^Voided\b/i.test(row.PrivateNote)) {
+      transaction.response.PrivateNote = "Voided";
+    }
+    return { ok: true as const, transaction };
   }
 
   async findReceiptBill(realmId: string, requestId: string, body: string, accessToken: string) {
