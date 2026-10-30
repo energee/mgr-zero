@@ -160,7 +160,8 @@ describe("pickup orders", () => {
     const { order_id: orderId } = await runCommand("create_order", {
       kind: "taproom_transfer", fromLocationId: whId, toLocationId: taproom.id, lines: [{ skuId, qty: 1 }],
     }, adminCtx) as { order_id: string };
-    await expect(runCommand("set_order_pickup", { orderId, pickup: true }, adminCtx)).rejects.toThrow(/only wholesale orders can be pickups/);
+    await expect(runCommand("set_order_pickup", { orderId, pickup: true }, adminCtx))
+      .rejects.toMatchObject({ status: 400, code: "invalid_input" });
     expect(await pickupOf(orderId)).toBe(false);
   });
 
