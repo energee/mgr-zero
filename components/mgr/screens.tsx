@@ -1429,7 +1429,7 @@ export const SCREENS: Screen[] = [
     step: 5, slice: 1, tab: "More", name: state.name,
     job: "Review the accounting actions available for this invoice state",
     reads: "get_invoice · get_qbo_connection", writes: "push_invoice_to_qbo · write_off_invoice",
-    to: { "Push to QuickBooks": "Push invoice to QuickBooks", "Write off": "Write off invoice" },
+    to: { "Push to QuickBooks": "Push invoice to QuickBooks", "Write off": "Write off invoice", Return: "Return and credit" },
     states: [[state.name, state.detail]],
     body: <InvoiceView
       model={toInvoiceViewProps({ ...invoiceFailedAls, mappings: undefined, hasPendingPush: state.hasPendingPush, wasPushedToQbo: state.remoteState === "deleted", invoice: { ...invoiceFailedAls.invoice, qbo_sync_status: state.remoteState === "deleted" ? "pushed" : "pending", qbo_invoice_id: state.remoteState === "deleted" ? "qbo-1039" : null, qbo_remote_state: state.remoteState } })}
