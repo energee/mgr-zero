@@ -300,6 +300,35 @@ describe("QuickBooks current invoice state", () => {
     expect((await stranger.ctx.db.rpc("get_qbo_sync_status", { p_brewery: f.brewery.id })).error).not.toBeNull();
   });
 
+  it("durably records a timed-out provider read without replacing successful invoice observations", async () => {
+    const f = await stateFixture();
+    const transport = vi.fn<typeof fetch>().mockResolvedValue(invoiceResponse());
+    const client = new QboOAuthClient(config, transport);
+    await syncQboInvoices(f.ctx, crypto.randomUUID(), client);
+    const before = await runCommand("get_qbo_sync_status", {}, f.ctx) as { lastSuccess: unknown };
+    const invoiceBefore = sql(`select qbo_remote_state || '|' || qbo_balance_cents from invoices where id='${f.invoice.id}'`);
+    const requestId = crypto.randomUUID();
+    transport.mockImplementation((_input, init) => {
+      const { promise, reject } = Promise.withResolvers<Response>();
+      init!.signal!.addEventListener("abort", () => reject(init!.signal!.reason), { once: true });
+      return promise;
+    });
+    const nativeTimeout = AbortSignal.timeout.bind(AbortSignal);
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation(ms => nativeTimeout(ms === 20_000 ? 10 : ms));
+    try {
+      await expect(syncQboInvoices(f.ctx, requestId, client)).rejects.toThrow("QuickBooks is unavailable");
+    } finally {
+      timeout.mockRestore();
+    }
+    expect(await runCommand("get_qbo_sync_status", {}, f.ctx)).toMatchObject({
+      lastSuccess: before.lastSuccess, latestFailure: { at: expect.any(String) }, retryRequestId: requestId,
+    });
+    expect(sql(`select qbo_remote_state || '|' || qbo_balance_cents from invoices where id='${f.invoice.id}'`)).toEqual(invoiceBefore);
+    transport.mockResolvedValue(invoiceResponse());
+    await expect(syncQboInvoices(f.ctx, requestId, client)).resolves.toMatchObject({ synced: 1 });
+    expect(await runCommand("get_qbo_sync_status", {}, f.ctx)).toMatchObject({ retryRequestId: null });
+  });
+
   it("stores sync confirmation rather than invoice modification time after cash payment", async () => {
     const f = await stateFixture();
     const transport = vi.fn<typeof globalThis.fetch>()

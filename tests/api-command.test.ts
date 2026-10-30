@@ -341,11 +341,11 @@ describe("POST /api/command bearer auth", () => {
   });
 
   it("serves stored COLA labels after the budget is spent, but still limits TTB fetches", async () => {
-    const ttbId = "23023001000185";
-    const url = "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Array.jpg&filetype=l";
+    const ttbId = "99001001000001";
+    const url = "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=SampleLabel.jpg&filetype=l";
     const dataUrl = "data:image/jpeg;base64,/9j/2Q==";
     const { brandId } = await seedCatalog(breweryId);
-    sql(`update public.breweries set ttb_registry_no='BR-PA-20553' where id='${breweryId}'`);
+    sql(`update public.breweries set ttb_registry_no='BR-PA-12345' where id='${breweryId}'`);
     const saved = await POST(commandReq({
       breweryId, name: "upsert_brand_approval", requestId: randomUUID(),
       input: { brandId, kind: "cola", ttbId, approvedOn: "2023-01-24", imageUrl: url },
@@ -360,7 +360,7 @@ describe("POST /api/command bearer auth", () => {
       await expect(cached.json()).resolves.toMatchObject({ ok: true, data: { dataUrl } });
       expect(sql(`select request_count from private.command_admissions where user_id='${adminId}'`)).toEqual(["120"]);
       const uncached = await POST(commandReq({
-        breweryId, name: "get_cola_image", input: { ttbId, url: url.replace("Array.jpg", "Other.jpg") },
+        breweryId, name: "get_cola_image", input: { ttbId, url: url.replace("SampleLabel.jpg", "Other.jpg") },
       }, adminToken));
       expect(uncached.status).toBe(429);
       expect(Number(uncached.headers.get("retry-after"))).toBeGreaterThan(0);

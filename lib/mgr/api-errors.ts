@@ -58,6 +58,8 @@ export const API_ERRORS: ApiError[] = [
     remedy: "Retry once with the same `requestId`. If it persists, quote the `correlationId` from the response." },
   { code: "invite_failed", status: 502, meaning: "The invitation was interrupted before membership completion was confirmed.",
     remedy: "Retry the identical input with the same `requestId`; the saved Auth identity is reused." },
+  { code: "square_order_invalid", status: 502, meaning: "Square returned malformed order data during sales sync. The failed page was not imported or recorded as covered; earlier completed pages remain saved.",
+    remedy: "Contact support to identify and correct the order using server diagnostics, then retry with the same `requestId`. Repeating an unchanged malformed page will not repair it." },
   { code: "upstream_unavailable", status: 502, meaning: "An outside service the operation reads did not answer: it timed out, errored, or changed its page. The message names the service (today: TTB's public COLA registry for `search_colas`).",
     remedy: "Retry later. A failed read is never reported as an empty result, so an empty list is a real no-match." },
   { code: "admission_unavailable", status: 503, meaning: "The authenticated admission check was unavailable, so the operation did not run.",

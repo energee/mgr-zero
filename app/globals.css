@@ -100,7 +100,10 @@
   --destructive: #B52D51;
   --destructive-foreground: #FFFFFF;
   --border: #E3E3DC;
-  --input: #E3E3DC;
+  /* Interactive boundaries stay distinct from decorative dividers. The input
+     alias also supplies stock shadcn borders and the unchecked Switch track. */
+  --control-border: #818278;
+  --input: var(--control-border);
   --ring: #6453B3;
   --radius: 0.375rem;
   --sidebar: #F4F4EF;
@@ -163,7 +166,8 @@
   --destructive: #ff7a70;
   --destructive-foreground: #191919;
   --border: #2a4478;
-  --input: #2a4478;
+  --control-border: #798fac;
+  --input: var(--control-border);
   --ring: #60a4ec;
   --sidebar: #0c1a35;
   --sidebar-foreground: #bebebe;
@@ -211,6 +215,19 @@
   h1, h2, h3, h4 {
     @apply font-heading;
   }
+}
+
+/* Keep the active option visible without changing the upstream primitives.
+   An inset outline survives the list's overflow clipping in both themes. */
+[cmdk-item][data-selected="true"]:not([data-disabled="true"]),
+[data-slot="select-item"][data-highlighted]:not([data-disabled]) {
+  background-color: color-mix(in srgb, var(--primary) 16%, var(--popover));
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+[cmdk-item][data-selected="true"] .text-muted-foreground {
+  color: var(--foreground);
 }
 
 /* Pointer size, not viewport, chooses target height (plan §5): every control
