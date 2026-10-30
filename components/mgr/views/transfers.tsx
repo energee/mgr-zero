@@ -4,8 +4,6 @@ import { E, ROW_LINK_COVER } from "@/components/mgr/e";
 import type { TransfersViewModel } from "@/lib/mgr/transfers-view";
 import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 
-export type { TransfersViewModel };
-
 export function TransfersView({
   model,
   createAction,

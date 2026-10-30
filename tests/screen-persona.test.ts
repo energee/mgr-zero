@@ -18,6 +18,12 @@ import { sentenceCase } from "../lib/mgr/labels";
 const by = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("persona", () => {
+  it.each(["admin", "sales", "warehouse"] as const)("shows confirmation email diagnostics only to permitted %s staff", role => {
+    for (const name of ["Order", "Order draft"]) {
+      const html = renderToStaticMarkup(createElement("div", null, asPersona(by(name), personaFor(role)).body));
+      expect(html.includes("Confirmation email")).toBe(role === "admin" || role === "sales");
+    }
+  });
   it.each(["admin", "warehouse", "sales", "brewer"] as const)("shows Inventory's taproom count pointer only to permitted %s staff", role => {
     const screen = asPersona(by("Finished goods"), personaFor(role));
     const html = renderToStaticMarkup(createElement("div", null, screen.body));
