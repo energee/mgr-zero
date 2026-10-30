@@ -748,6 +748,18 @@ const money = (value: unknown) => {
     ? String(row.amount) : null;
 };
 
+function invalidSquareOrder(externalOrderId: string | null, field: string): CommandError {
+  console.error("square sales order invalid:", {
+    orderId: externalOrderId?.slice(0, 192).replace(/[^A-Za-z0-9_-]/g, "_") ?? null,
+    field,
+  });
+  return new CommandError(
+    "Square returned an invalid order. The sales page was not imported; contact support before retrying.",
+    502,
+    "square_order_invalid",
+  );
+}
+
 function normalizeSquareOrders(
   rawOrders: unknown[], merchantId: string, locationIds: string[], window: { startsAt: string; endsAt: string },
 ) {
@@ -757,16 +769,25 @@ function normalizeSquareOrders(
     const order = raw && typeof raw === "object" ? raw as Record<string, unknown> : null;
     const externalOrderId = text(order?.id), externalLocationId = text(order?.location_id);
     const sourceVersion = finiteVersion(order?.version), soldAt = timestamp(order?.created_at), orderUpdatedAt = timestamp(order?.updated_at);
-    if (!externalOrderId || !externalLocationId || !locationIds.includes(externalLocationId) || sourceVersion === null
-      || !soldAt || !orderUpdatedAt || order?.state !== "COMPLETED" || Date.parse(soldAt) > Date.parse(orderUpdatedAt)
-      || Date.parse(orderUpdatedAt) < Date.parse(window.startsAt) || Date.parse(orderUpdatedAt) > Date.parse(window.endsAt)) throw unavailable();
+    if (!externalOrderId) throw invalidSquareOrder(null, "id");
+    if (!externalLocationId || !locationIds.includes(externalLocationId)) throw invalidSquareOrder(externalOrderId, "location_id");
+    if (sourceVersion === null) throw invalidSquareOrder(externalOrderId, "version");
+    if (!soldAt) throw invalidSquareOrder(externalOrderId, "created_at");
+    if (!orderUpdatedAt) throw invalidSquareOrder(externalOrderId, "updated_at");
+    if (order?.state !== "COMPLETED") throw invalidSquareOrder(externalOrderId, "state");
+    if (Date.parse(soldAt) > Date.parse(orderUpdatedAt)) throw invalidSquareOrder(externalOrderId, "created_at");
+    if (Date.parse(orderUpdatedAt) < Date.parse(window.startsAt) || Date.parse(orderUpdatedAt) > Date.parse(window.endsAt)) {
+      throw invalidSquareOrder(externalOrderId, "updated_at");
+    }
     const snapshot = { externalOrderId, sourceVersion, externalLocationId, soldAt, orderUpdatedAt };
     orders.push(snapshot);
     const identities = new Set<string>();
     const add = (rawLine: unknown, factKind: "sale" | "return", sourceOrderId: string | null) => {
       const row = rawLine && typeof rawLine === "object" ? rawLine as Record<string, unknown> : null;
       const externalLineId = text(row?.uid);
-      if (!externalLineId || identities.has(`${factKind}\0${externalLineId}`)) throw unavailable();
+      if (!externalLineId || identities.has(`${factKind}\0${externalLineId}`)) {
+        throw invalidSquareOrder(externalOrderId, factKind === "sale" ? "line_items.uid" : "returns.return_line_items.uid");
+      }
       identities.add(`${factKind}\0${externalLineId}`);
       const sourceQuantity = text(row?.quantity), externalVariationId = text(row?.catalog_object_id);
       const catalogVersion = finiteVersion(row?.catalog_version);
@@ -798,13 +819,15 @@ function normalizeSquareOrders(
       };
       facts.push({ ...fact, sourceHash: sha256(JSON.stringify({ merchantId, ...fact })) });
     };
-    if (order.line_items !== undefined && !Array.isArray(order.line_items)) throw unavailable();
+    if (order.line_items !== undefined && !Array.isArray(order.line_items)) throw invalidSquareOrder(externalOrderId, "line_items");
     for (const rawLine of order.line_items as unknown[] ?? []) add(rawLine, "sale", null);
-    if (order.returns !== undefined && !Array.isArray(order.returns)) throw unavailable();
+    if (order.returns !== undefined && !Array.isArray(order.returns)) throw invalidSquareOrder(externalOrderId, "returns");
     for (const rawReturn of order.returns as unknown[] ?? []) {
       const returned = rawReturn && typeof rawReturn === "object" ? rawReturn as Record<string, unknown> : null;
       const sourceOrderId = text(returned?.source_order_id);
-      if (returned?.return_line_items !== undefined && !Array.isArray(returned.return_line_items)) throw unavailable();
+      if (returned?.return_line_items !== undefined && !Array.isArray(returned.return_line_items)) {
+        throw invalidSquareOrder(externalOrderId, "returns.return_line_items");
+      }
       for (const rawLine of returned?.return_line_items as unknown[] ?? []) add(rawLine, "return", sourceOrderId);
     }
   }

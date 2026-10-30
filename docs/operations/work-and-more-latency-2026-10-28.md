@@ -13,9 +13,9 @@ This record does not fill that protocol's pilot authorization table.
 - **Local app cost is small.** Every timed page showed its main content within 0.32 s warm and 0.40 s on the first load after a restart.
 - **Local saves are fast.** Each save showed its result within 0.24 s cold and 0.21 s warm. The `/api/command` round trip was 0.08–0.10 s cold and 0.03–0.04 s warm.
 - **The RPCs are not the slow stage.** Each #1491 save RPC took 2–21 ms against the local database.
-- **Prefetch lengthens network idle but not the usable time.** Each Work page issues 48–68 prefetch requests. Blocking them roughly halved local network-idle time (median 0.39 s to 0.17 s). The time to main content did not change. So no prefetch fix is made.
-- **The live gap is in the hosted stages.** QA saw 4–6 s to network idle and 3–10 s saves on live. Local runs of the same work take a tenth of that. So the cost is hosted: cold starts, the network between Vercel and Supabase, and the hosted prefetch requests. This run could not split those stages. See "Not measured".
-- **No bounded fix is filed.** The owner's rule is one fix per concrete slow stage, with its numbers. No local stage was slow, and the hosted stages were not measured.
+- **Prefetch lengthened network idle in this run.** Each Work page issued 48–68 prefetch requests. Blocking them roughly halved local network-idle time (median 0.39 s to 0.17 s). The time to main content did not change. Later stage timing found contention from record-page prefetches; see "Follow-up evidence for #1490".
+- **The hosted cause is not established.** QA reported 4–6 s to network idle and 3–10 s saves on live. These local runs were faster, but that comparison alone cannot distinguish hosted cold starts, network latency, database cost or prefetch contention.
+- **No bounded fix was filed from this run.** The owner's rule is one fix per concrete slow stage, with its numbers. The later 2026-10-29 run identified separate causes and filed them; the signed-in hosted measurements remain open.
 
 ## Metric and limits (owner, 2026-10-28)
 
@@ -31,7 +31,7 @@ Network idle is not the page metric.
 So prefetch traffic after the page is usable is not a defect.
 Every local page and save below is within these limits.
 The live docs pages are too.
-Live signed-in pages and live saves are not yet measured against them.
+Live signed-in pages are not yet measured against them. Live saves are prohibited by the owner's read-only decision.
 
 ## Staff guide weight (owner, 2026-10-28)
 
@@ -55,6 +55,67 @@ These two #1491 items needed no decision, so they ship with this record.
 The Gateway catalog read took 207 ms on its first call here (423 models, 219 KB).
 The `@ai-sdk/gateway` provider already keeps the catalog in memory for 5 minutes per process.
 So the new cache helps only a fresh serverless instance, which is the "Settings first load 2.7 s" case in #1491.
+
+## Follow-up evidence for #1490 (2026-10-29)
+
+The [stage-timing run recorded on the issue](https://github.com/energee/mgr-zero/issues/1490#issuecomment-6489057290) completed the local comparison with `next build` and `next start`, not development-mode timings.
+It used the test stack at `127.0.0.1:54352`, schema `20261029001000`, and a fictional tenant with 20 SKUs, 30 customers and 30,400 ledger rows over two years.
+The browser was headless Chrome through `agent-browser`, 1365 × 900, on a MacBook Air M4 over loopback.
+These are previously recorded measurements, not a new run of this branch.
+
+### Local page results
+
+Seconds. Cold is the first load after `next start`; warm is the median of three loads.
+Main content is Largest Contentful Paint, the recorded proxy for usable time; it does not independently prove that every primary action was interactive at that instant.
+
+| Page | Cold first byte | Cold main content | Warm first byte | Warm main content |
+| --- | ---: | ---: | ---: | ---: |
+| Today (`/`) | 0.54 | 0.60 | 0.06 | 0.15 |
+| `/work` | 0.22 | 0.30 | 0.04 | 0.10 |
+| `/orders/new` | 0.10 | 0.14 | 0.03 | 0.20 |
+| `/orders/<id>` | 0.11 | 0.16 | 0.07 | 0.14 |
+| `/orders/<id>/confirm` | 0.10 | 0.14 | 0.06 | 0.10 |
+| `/routes/new` | 0.09 | 0.13 | 0.06 | 0.12 |
+| `/transfers` | 0.04 | 0.07 | 0.04 | 0.09 |
+| `/purchase-orders` | 0.04 | 0.08 | 0.04 | 0.09 |
+| `/purchase-orders/<id>` | 0.05 | 0.09 | 0.04 | 0.09 |
+| `/vendors` | 0.05 | 0.10 | 0.06 | 0.10 |
+| `/batches` | 0.04 | 0.08 | 0.03 | 0.08 |
+| `/packaging` | 0.05 | 0.09 | 0.06 | 0.11 |
+| `/pick` | 0.04 | 0.08 | 0.03 | 0.07 |
+| `/replenishment` | 0.12 | 0.16 | 0.17 | 0.22 |
+
+### Local command stages
+
+Seconds for the HTTP total; milliseconds for the `Server-Timing` stages.
+These totals end at the `/api/command` response, not at the refreshed screen.
+The earlier end-to-end save and refresh measurements remain in "Local saves (#1490)".
+
+| Command | Cold HTTP total | Cold auth / admission / command (ms) | Warm median HTTP total | Warm median auth / admission / command (ms) |
+| --- | ---: | --- | ---: | --- |
+| `confirm_order` | 0.208 | 44 / 16 / 42 | 0.046 | 8 / 7 / 28 |
+| `record_pick` | 0.094 | 33 / 20 / 32 | 0.027 | 9 / 5 / 10 |
+| `ship_order` | 0.075 | 17 / 15 / 35 | 0.036 | 7 / 6 / 16 |
+| `confirm_delivery` | 0.057 | 13 / 13 / 18 | 0.027 | 7 / 5 / 10 |
+| `receive_purchase_order` | 0.046 | 15 / 8 / 16 | 0.031 | 8 / 7 / 13 |
+| `upsert_ship_to` | 0.030 | 8 / 7 / 11 | 0.025 | 7 / 6 / 8 |
+
+### Concrete causes and disposition
+
+| Finding | Recorded evidence | Separate outcome |
+| --- | --- | --- |
+| Record-page prefetch runs metadata reads and competes with the next page's reads | About 1.2 s of extra reads on Today or Pick; reads during a burst were 3–5× slower | [#1606](https://github.com/energee/mgr-zero/issues/1606), now closed, implemented the owner's `prefetch={false}` choice in [#1610](https://github.com/energee/mgr-zero/pull/1610), preserving record metadata and real 404s. The follow-up measured zero record-page prefetches on all four sampled pages. |
+| Compliance activity scan ran on Settings and period pages that did not use it | Settings first byte 231 → 45 ms; its read 194 → 15 ms; period-page read 90 → 18 ms (five warm loads) | Fixed separately in [#1608](https://github.com/energee/mgr-zero/pull/1608). |
+| Compliance activity scan read the ledger twice across its history | `destination_state_facts` 55 ms plus `report_movements` 21 ms at 30,400 rows | Filed separately as [#1607](https://github.com/energee/mgr-zero/issues/1607), now closed. |
+
+### Remaining acceptance gate
+
+The owner's local measurement and per-cause filing requirements have recorded evidence.
+The hosted staff-page comparison still requires an owner-approved existing staff login.
+On 2026-10-30, an unauthenticated read-only `GET /work` returned HTTP 307 to `/login?next=%2Fwork`; that response is an access check, not a staff-page timing.
+No hosted signed-in timing, hosted stage attribution or all-pages performance pass is claimed here.
+Keep #1490 open until that read-only comparison is recorded and any resulting concrete causes are dispositioned.
+The 2026-10-29 comment's request to time live saves does not override the owner's explicit prohibition on hosted writes.
 
 ## Environment
 
@@ -123,7 +184,7 @@ Seconds. "Cold" is the first load of the route after a restart; "warm" is the me
 | `/docs/screens` | 0.20 | 0.59 | 0.32 | 1.82 | — | 15 | 1,223 |
 
 With prefetch off, the time to main content moved by less than run-to-run noise (median 0.13 s on, 0.10 s off, across the 13 Work pages).
-Prefetch therefore adds network traffic, not a usability delay.
+This comparison did not measure contention on a subsequent navigation. The later stage-timing run found that cost and tracked it separately in #1606.
 
 The lot trace page sent 1,090 KB of HTML for a lot with 155 shipments.
 It is the only app page here over 400 KB.
@@ -172,17 +233,19 @@ The rest of each local cold request is the Next handler warming up, which hosted
 
 ## Not measured
 
-- **Live signed-in pages.** No live staff credential was available to this run, so the 16 signed-in pages were not timed on live. The local numbers above stand in for app cost only.
-- **Live saves.** The owner ruled them out: they write real records.
-- **Hosted stage split.** Separating cold start, Vercel-to-Supabase network and RPC on live needs Vercel function logs or a Server-Timing header on the hosted app. Either is a hosted change, which is ask-first.
-- **Phone or throttled network.** All runs were on a laptop. A driver's phone on cellular will be slower than both columns.
+- **Live signed-in pages.** No live staff credential was available to this run, so the 16 signed-in pages were not timed on live. The local numbers above measure local app cost, not hosted performance.
+- **Live saves.** The owner ruled them out: they write real records. Do not run Ship, Delivered, Confirm, Receive PO or Save ship-to on hosted.
+- **Hosted stage split.** Reading existing response headers and authorized function logs is read-only. Deploying instrumentation or changing hosted settings is a separate action and is not authorized. Stage instrumentation subsequently merged in [#1596](https://github.com/energee/mgr-zero/pull/1596); its presence on a hosted response must be observed, not assumed from the merge.
+- **Phone or throttled network.** All runs were on a laptop. No driver's-phone or cellular result is claimed.
 
 ## What would close the gap
 
-The local and live numbers differ by about ten times.
-A hosted measurement is the next step.
-Time the same signed-in pages on live with the QA account.
-For one Ship and one page load, read the Vercel function duration and the Supabase request log for the same request.
-That splits cold start from database latency.
-Once deployed, the app's own stage timings give the same split; see "Stage timings" in [`pilot-latency-protocol.md`](pilot-latency-protocol.md).
-After that split, a bounded fix can target the measured stage.
+Use an owner-approved existing staff login to time the same signed-in pages on live.
+Record one first-browser load and at least three warm loads for every #1490 page: Today, Work, New order, Order detail, Confirm order, New route, Transfers, Purchase orders, PO detail, Vendors, Batches, Packaging, Pick and Replenishment.
+Record the main content and primary action becoming usable, first byte, payload size and any `session` response stage.
+A first-browser load is not proof of a serverless cold start.
+If existing function logs are accessible, correlate the page request with its `shell` and page-read stages.
+If headers or logs are unavailable, retain that evidence gap rather than infer the slow stage.
+Do not time a hosted save; save and refresh timing belongs on the seeded local stack.
+File any newly measured concrete cause as its own bounded fix.
+No deploy, hosted setting change or credential provisioning is part of this measurement.

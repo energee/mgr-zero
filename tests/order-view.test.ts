@@ -134,10 +134,10 @@ describe("Order view loop", () => {
 
   it("lists keg charges: each deposit, and the one-way fee per one-way keg line (frozen at submit)", () => {
     const lines = orderPickedRestock.lines.map((l) => l.id === "l-stout" ? { ...l, one_way_fee_cents: 1000 } : l);
-    const deposits = [{ order_line_id: "l-hazy", description: "Lolev kegs deposit", qty_ordered: 4, unit_price_cents: 3000, amount_cents: 12000 }];
+    const deposits = [{ order_line_id: "l-hazy", description: "Example Brewing kegs deposit", qty_ordered: 4, unit_price_cents: 3000, amount_cents: 12000 }];
     const model = toOrderViewProps({ ...orderPickedRestock, lines, deposits });
     expect(model.kegCharges).toEqual([
-      { key: "deposit-l-hazy", name: "Lolev kegs deposit · Hazy IPA · ½ bbl keg", detail: "4 × $30.00 · captured on the order", amount: "$120.00" },
+      { key: "deposit-l-hazy", name: "Example Brewing kegs deposit · Hazy IPA · ½ bbl keg", detail: "4 × $30.00 · captured on the order", amount: "$120.00" },
       { key: "fee-l-stout", name: "One-way keg fee · Stout · ⅙ bbl keg", detail: "2 × $10.00 · captured on the order", amount: "$20.00" },
     ]);
     expect(toOrderViewProps({ ...orderPickedRestock, lines: orderPickedRestock.lines.map(l => ({ ...l, one_way_fee_cents: null })), deposits: [] }).kegCharges).toEqual([]);
