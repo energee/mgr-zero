@@ -1,7 +1,6 @@
-// components/mgr/views/portal-invoice.tsx — Pay invoice, Payment unavailable,
-// and Paid invoice share this drawing. variant is presentation (pay /
-// unavailable / paid), not fixture vs live. Live unpaid is unavailable
-// (QBO Payments parked) and passes QuestionForm in question.
+// Pay invoice, Payment unavailable and Paid invoice share this drawing.
+// Live supplies the POST action and question form; inventory uses the same
+// payment control without an active submission target.
 import { type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { portalInvoiceStatusTone, type PortalInvoiceViewModel } from "@/lib/mgr/portal-invoice-view";
@@ -19,16 +18,13 @@ export function PortalInvoiceView({
   model,
   variant,
   question,
-  footer,
   paymentAction,
 }: {
   model: PortalInvoiceViewModel;
-  /** Inventory Pay passes "pay". Omit on live unpaid (QBO parked) or paid. */
+  /** Explicit payment outcome; otherwise derive the current document state. */
   variant?: PortalInvoiceVariant;
   /** Live: QuestionForm. Inventory default is the Question this invoice nav. */
   question?: ReactNode;
-  /** Optional extra footer content, separate from the shared payment action. */
-  footer?: ReactNode;
   /** Live POST broker; inventory leaves the payment control inert. */
   paymentAction?: string;
 }) {
@@ -60,7 +56,6 @@ export function PortalInvoiceView({
           <form method="post" action={paymentAction} target="_blank" rel="noreferrer" className="flex flex-col">
             {E.btn("Pay invoice", "p", undefined, undefined, { type: paymentAction ? "submit" : "button" })}
           </form>
-          {footer}
           {E.info("Opens QuickBooks in a new tab after you choose Pay invoice. Availability is re-checked on every payment attempt.")}
         </>
       ) : null}
@@ -68,10 +63,8 @@ export function PortalInvoiceView({
         <>
           {E.note(`Contact ${model.breweryName} to arrange payment. The invoice above is unchanged and still due.`)}
           {E.nav(model.breweryName, model.breweryPhone ?? "")}
-          {footer}
         </>
       ) : null}
-      {kind === "paid" || kind === "credit" ? footer : null}
       {questionSlot}
     </>
   );

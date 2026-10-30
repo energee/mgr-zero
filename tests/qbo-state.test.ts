@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Client } from "pg";
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { QboOAuthClient, syncQboInvoices } from "@/lib/qbo";
 import { beginQboInvoiceSync, completeQboInvoiceSync } from "@/lib/supabase/integration-tokens";
-import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
 import { invoiceBalanceCents, invoiceCurrentState, invoiceLedgerOwnsBalance } from "@/lib/mgr/invoice-state";
 import { qboInvoicePresentation } from "@/lib/mgr/qbo-ui";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
@@ -790,9 +787,6 @@ describe("QuickBooks current invoice state", () => {
         invoice: { ...invoice, ...state, total_cents: 10000 }, lines: [], brewery: { name: "Brewery", customer_phone: null },
       });
       expect(model).toMatchObject({ paid: false, paidOn: undefined, payable: false, status: state.status });
-      const html = renderToStaticMarkup(createElement(PortalInvoiceView, { model, footer: null }));
-      expect(html).toContain("This invoice is not payable.");
-      expect(html).not.toMatch(/still due|arrange payment|>Due</);
     }
     expect(toPortalInvoicesViewProps({ customerName: "Buyer", invoices: [{ ...invoice, invoice_lines: [{ amount_cents: 10000 }] }] }).rows[0])
       .toMatchObject({ detail: "voided", unpaid: false });

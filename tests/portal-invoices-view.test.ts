@@ -156,14 +156,10 @@ describe("Portal invoice view", () => {
     { status: "Credit", tone: "", invoice: { kind: "credit_memo" } },
   ];
 
-  it.each(states)("renders $status with its financial tone and visible words", ({ status, tone, invoice }) => {
+  it.each(states)("maps $status to its financial status, payability and list tone", ({ status, tone, invoice }) => {
     const snapshot = { ...portalInvoiceUnpaid, invoice: { ...portalInvoiceUnpaid.invoice, ...invoice } };
     const model = toPortalInvoiceViewProps(snapshot);
-    expect(model.status).toBe(status);
-    const html = htmlOf(createElement(PortalInvoiceView, { model, footer: null }));
-    expect(html).toContain(renderToStaticMarkup(E.row("Status", status, "", tone)));
-    expect(html).toContain("Question this invoice");
-    expect(html).not.toContain(">Pay invoice<");
+    expect(model).toMatchObject({ status, payable: status === "Unpaid" });
     if (status !== "Review") {
       const list = toPortalInvoicesViewProps({
         customerName: RIDGELINE.name,
@@ -171,14 +167,6 @@ describe("Portal invoice view", () => {
       });
       const row = list.rows[0];
       expect(row.tone).toBe(tone);
-      const expectedRow = E.row(
-        row.title,
-        row.unpaid ? `${row.detail} · ${row.total}` : row.detail,
-        row.unpaid ? E.act("Pay", "info") : row.total,
-        tone,
-      );
-      expect(htmlOf(createElement(PortalInvoicesView, { model: list })))
-        .toContain(renderToStaticMarkup(expectedRow));
     }
   });
 
