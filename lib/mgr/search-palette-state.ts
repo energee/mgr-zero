@@ -1,21 +1,12 @@
 import { STAFF_NAV, UNLISTED_NAV, navFor, shippedNav } from "@/lib/mgr/nav";
 import type { StaffRole } from "@/lib/commands/registry";
-import type { SearchHit, SearchKind } from "@/lib/commands/search";
 
-export function searchCacheKey(breweryId: string, kinds: SearchKind[] | undefined, term: string) {
-  return `mgr-search:${breweryId}:${kinds?.join(",") || "all"}:${term.trim().toLowerCase()}`;
+export function searchCacheKey(breweryId: string, term: string) {
+  return `mgr-search:${breweryId}:${term.trim().toLowerCase()}`;
 }
 
 export function searchLoading(term: string, answeredTerm: string, status: string) {
   return term !== "" && (status === "loading" || term !== answeredTerm);
-}
-
-export function restrictToOptions(hits: SearchHit[], options?: SearchHit[]) {
-  return options ? hits.filter((hit) => options.some((option) => option.kind === hit.kind && option.id === hit.id)) : hits;
-}
-
-export function excludeSeen(hits: SearchHit[], recent: SearchHit[] = []) {
-  return hits.filter((hit) => !recent.some((item) => item.kind === hit.kind && item.id === hit.id));
 }
 
 export function searchDestinations(roles: readonly StaffRole[], term: string) {
@@ -31,13 +22,11 @@ export type SearchStatus = "idle" | "loading" | "ready" | "error" | "offline";
 /**
  * What the palette says when it lists nothing: a first-use hint before any
  * term, a no-match note once a search finished empty, and nothing while one
- * loads, fails or is offline (the palette shows those states itself). Page
- * wording only when the palette searches pages (it was given roles); an entity
- * picker finds records.
+ * loads, fails or is offline (the palette shows those states itself).
  */
-export function searchEmptyMessage(term: string, status: SearchStatus, searchesPages: boolean) {
-  const what = searchesPages ? "a page name, record name, or document number" : "a record name or number";
+export function searchEmptyMessage(term: string, status: SearchStatus) {
+  const what = "a page name, record name, or document number";
   if (!term) return `Type ${what}.`;
   if (status !== "ready") return "";
-  return `${searchesPages ? "No pages or records found" : "No records found"} · Try ${what}.`;
+  return `No pages or records found · Try ${what}.`;
 }

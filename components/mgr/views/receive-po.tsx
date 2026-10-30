@@ -7,7 +7,6 @@ import { OrderQuantity } from "./new-order";
 import { CLOSURE_FORM_ID, receiveMode, receiveReason, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
 import { submitReason } from "@/lib/mgr/submit-reason";
 
-export type { ReceivePoViewModel };
 export type ReceivePoControls = {
   quantity?: (id: string, value: string) => void; lot?: (id: string, value: string) => void;
   bestBy?: (id: string, value: string) => void; location?: (id: string) => void;

@@ -17,9 +17,39 @@ describe("Order view loop", () => {
     const refused: OrderSnapshot = { ...orderConfirmedWholesale, order: { ...orderConfirmedWholesale.order, status: "shipped" },
       lines: orderConfirmedWholesale.lines.map((line, index) => ({ ...line, qty_refused: index === 0 ? 2 : 0 })) };
     const model = toOrderViewProps(refused);
-    expect(renderToStaticMarkup(createElement(OrderView, { model }))).toContain("Reorder refused beer");
+    expect(model.canReorderRefused).toBe(true);
     expect(toOrderViewProps({ ...refused, order: { ...refused.order, status: "confirmed" } }).canReorderRefused).toBe(false);
     expect(toOrderViewProps({ ...refused, lines: refused.lines.map(line => ({ ...line, qty_refused: 0 })) }).canReorderRefused).toBe(false);
+  });
+
+  it("shows every buyer confirmation outcome, with acceptance distinct from inbox delivery", () => {
+    const emailStatuses: OrderSnapshot["emailStatuses"] = [
+      { state: "pending", last_error: null },
+      { state: "pending", last_error: "provider_uncertain" },
+      { state: "pending", last_error: "provider_uncertain" },
+      { state: "sending", last_error: null },
+      { state: "accepted", last_error: null },
+      { state: "blocked", last_error: "provider_rejected" },
+      { state: "blocked", last_error: "retry_window_expired" },
+      { state: "blocked", last_error: "no_recipient" },
+      { state: "suppressed", last_error: "recipient_changed" },
+    ];
+    const model = toOrderViewProps({ ...orderConfirmedWholesale, emailStatuses });
+    const value = model.facts.find(fact => fact.label === "Confirmation email")?.value;
+    expect(value).toBe("1 × Queued · 2 × Retry pending: provider outcome uncertain · 1 × Sending · 1 × Accepted by provider (not proof of inbox delivery) · 1 × Blocked: provider rejected the email · 1 × Blocked: retry window expired; investigate before resending · 1 × Blocked: no linked portal buyer · 1 × Suppressed: buyer removed or email changed");
+    const html = renderToStaticMarkup(createElement(OrderView, { model }));
+    expect(html).toContain("Confirmation email");
+    expect(html).toContain("2 × Retry pending");
+    expect(html).toContain("Blocked: retry window expired");
+  });
+
+  it("distinguishes no recorded confirmation from unauthorized diagnostics and internal transfers", () => {
+    expect(toOrderViewProps({ ...orderConfirmedWholesale, emailStatuses: [] }).facts)
+      .toContainEqual({ label: "Confirmation email", value: "No confirmation email recorded", wide: true });
+    const hidden = toOrderViewProps({ ...orderConfirmedWholesale, emailStatuses: undefined });
+    expect(renderToStaticMarkup(createElement(OrderView, { model: hidden }))).not.toContain("Confirmation email");
+    const transfer = toOrderViewProps({ ...orderConfirmedWholesale, order: { ...orderConfirmedWholesale.order, kind: "taproom_transfer" }, emailStatuses: [] });
+    expect(transfer.facts.some(fact => fact.label === "Confirmation email")).toBe(false);
   });
 
   it("draws Ordered as the shared number field, plus Reason, when lines can be adjusted in place", () => {
@@ -143,10 +173,10 @@ describe("Order view loop", () => {
 
   it("lists keg charges: each deposit, and the one-way fee per one-way keg line (frozen at submit)", () => {
     const lines = orderPickedRestock.lines.map((l) => l.id === "l-stout" ? { ...l, one_way_fee_cents: 1000 } : l);
-    const deposits = [{ order_line_id: "l-hazy", description: "Lolev kegs deposit", qty_ordered: 4, unit_price_cents: 3000, amount_cents: 12000 }];
+    const deposits = [{ order_line_id: "l-hazy", description: "Example Brewing kegs deposit", qty_ordered: 4, unit_price_cents: 3000, amount_cents: 12000 }];
     const model = toOrderViewProps({ ...orderPickedRestock, lines, deposits });
     expect(model.kegCharges).toEqual([
-      { key: "deposit-l-hazy", name: "Lolev kegs deposit · Hazy IPA · ½ bbl keg", detail: "4 × $30.00 · captured on the order", amount: "$120.00" },
+      { key: "deposit-l-hazy", name: "Example Brewing kegs deposit · Hazy IPA · ½ bbl keg", detail: "4 × $30.00 · captured on the order", amount: "$120.00" },
       { key: "fee-l-stout", name: "One-way keg fee · Stout · ⅙ bbl keg", detail: "2 × $10.00 · captured on the order", amount: "$20.00" },
     ]);
     expect(toOrderViewProps({ ...orderPickedRestock, lines: orderPickedRestock.lines.map(l => ({ ...l, one_way_fee_cents: null })), deposits: [] }).kegCharges).toEqual([]);

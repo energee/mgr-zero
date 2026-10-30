@@ -9,8 +9,6 @@ import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import type { ReactNode } from "react";
 import { Fragment } from "react";
 
-export type { ReturnCreditViewModel };
-
 export function ReturnSourcesView({ groups, quantities = {}, onQuantity }: {
   groups: { key: string; name: string; sources: { id: string; label: string; shipped: number }[] }[];
   quantities?: Record<string, string>; onQuantity?: (id: string, value: string) => void;
