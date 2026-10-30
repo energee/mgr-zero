@@ -27,12 +27,6 @@ isOneToOne: false
       foreignKeyName: "allocations_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
 isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
-    },{
-      foreignKeyName: "allocations_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
       referencedRelation: "sku_prices"
       referencedColumns: ["sku_id","brewery_id"]
     },{
@@ -931,12 +925,6 @@ isOneToOne: false
       foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
 isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
-    },{
-      foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
       referencedRelation: "sku_prices"
       referencedColumns: ["sku_id","brewery_id"]
     },{
@@ -1001,12 +989,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "order_lines"
       referencedColumns: ["id","brewery_id"]
-    },{
-      foreignKeyName: "invoice_lines_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
     },{
       foreignKeyName: "invoice_lines_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
@@ -1737,12 +1719,6 @@ isOneToOne: false
       foreignKeyName: "order_lines_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
 isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
-    },{
-      foreignKeyName: "order_lines_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
       referencedRelation: "sku_prices"
       referencedColumns: ["sku_id","brewery_id"]
     },{
@@ -2017,12 +1993,6 @@ isOneToOne: false
       foreignKeyName: "packaging_run_outputs_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
 isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
-    },{
-      foreignKeyName: "packaging_run_outputs_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
       referencedRelation: "sku_prices"
       referencedColumns: ["sku_id","brewery_id"]
     },{
@@ -2245,12 +2215,6 @@ isOneToOne: false
       foreignKeyName: "pos_item_mappings_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
 isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
-    },{
-      foreignKeyName: "pos_item_mappings_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
       referencedRelation: "sku_prices"
       referencedColumns: ["sku_id","brewery_id"]
     },{
@@ -2441,12 +2405,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "pos_sales"
       referencedColumns: ["id","brewery_id"]
-    },{
-      foreignKeyName: "pos_sale_expectations_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
     },{
       foreignKeyName: "pos_sale_expectations_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
@@ -3283,12 +3241,6 @@ isOneToOne: false
       foreignKeyName: "stock_transfer_lines_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
 isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
-    },{
-      foreignKeyName: "stock_transfer_lines_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
       referencedRelation: "sku_prices"
       referencedColumns: ["sku_id","brewery_id"]
     },{
@@ -3391,12 +3343,6 @@ isOneToOne: false
       foreignKeyName: "tap_intervals_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
 isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
-    },{
-      foreignKeyName: "tap_intervals_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
       referencedRelation: "sku_prices"
       referencedColumns: ["sku_id","brewery_id"]
     },{
@@ -3455,12 +3401,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "inventory_movements"
       referencedColumns: ["id","brewery_id"]
-    },{
-      foreignKeyName: "taproom_count_lines_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
     },{
       foreignKeyName: "taproom_count_lines_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
@@ -3537,12 +3477,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "locations"
       referencedColumns: ["id","brewery_id"]
-    },{
-      foreignKeyName: "taproom_pars_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
     },{
       foreignKeyName: "taproom_pars_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
@@ -3772,13 +3706,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    {
-      foreignKeyName: "skus_brewery_id_fkey"
-      columns: ["brewery_id"]
-isOneToOne: false
-      referencedRelation: "breweries"
-      referencedColumns: ["id"]
-    }
+
                   ]
                 },"bin_move_stock": {
                   Row: {
@@ -3812,12 +3740,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "locations"
       referencedColumns: ["id","brewery_id"]
-    },{
-      foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
     },{
       foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
@@ -4070,12 +3992,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "lots"
       referencedColumns: ["id","brewery_id"]
-    },{
-      foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
     },{
       foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
@@ -4338,12 +4254,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "breweries"
       referencedColumns: ["id"]
-    },{
-      foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
     },{
       foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
@@ -4626,12 +4536,6 @@ isOneToOne: false
       foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
 isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
-    },{
-      foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
       referencedRelation: "sku_prices"
       referencedColumns: ["sku_id","brewery_id"]
     },{
@@ -4682,12 +4586,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "locations"
       referencedColumns: ["id","brewery_id"]
-    },{
-      foreignKeyName: "taproom_pars_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
     },{
       foreignKeyName: "taproom_pars_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]

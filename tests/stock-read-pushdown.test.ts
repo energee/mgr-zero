@@ -60,8 +60,8 @@ describe("filtered stock reads on a 50,000-movement ledger", () => {
         location_id: warehouse.id, bin_id: warehouse.binId, qty, type: "adjustment", created_by: staff.id })),
     ]);
     const allocations = await admin.from("allocations").insert([
-      { brewery_id: brewery.id, sku_id: target.skuId, qty: 4, source: "taproom_standing", ref: taproom.id },
-      { brewery_id: brewery.id, sku_id: reserved.skuId, qty: 2, source: "taproom_standing", ref: taproom.id },
+      { brewery_id: brewery.id, sku_id: target.skuId, qty: 4, source: "taproom_standing", ref: taproom.id, status: "open" },
+      { brewery_id: brewery.id, sku_id: reserved.skuId, qty: 2, source: "taproom_standing", ref: taproom.id, status: "open" },
       { brewery_id: brewery.id, sku_id: closed.skuId, qty: 20, source: "taproom_standing", ref: taproom.id, status: "released" },
     ]);
     expect(allocations.error).toBeNull();
