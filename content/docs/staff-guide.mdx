@@ -62,6 +62,8 @@ An admin sees **Set up** until the brewery has both a location and a brand. Once
 
 SKU fields in **New order** open their own picker. For a wholesale order with a customer chosen, it lists the active SKUs priced for that customer; otherwise it lists the brewery's SKUs. Typing filters that list by name. It always starts from that full list; it does not move SKUs you picked before to the top or save past searches.
 
+Screen readers announce a searchable picker's field name and its current choice together, including SKU and customer filters. Before you choose, they announce the field name and its selection prompt.
+
 When no active SKUs are available, **Select SKU** says **No active SKUs yet.** and offers **Add a SKU** in **Catalog**. **No matching SKUs** instead means that existing choices do not match the search; clear or change the search.
 
 Search accepts up to 80 characters; longer pasted text is shortened to fit.
@@ -197,6 +199,8 @@ Admin opens **Import** from **Settings** or the first-run checklist. See [Import
 Orders, Transfers, Batches, Packaging, Purchase orders, and Deliveries each carry their sidebar name as the page heading, with the Work tabs beneath it. The tabs use the same names. These tabs open the corresponding lists and include only areas your role may open. On a wider screen with the left rail open, the tabs are hidden, because the rail lists the same pages; collapse the rail to show them. On a phone the tabs may not all fit; the strip fades at the edge that hides more, and you can swipe it sideways. The strip opens scrolled so the current page's tab is in view.
 
 In-page tabs share a high-contrast outlined track. The selected tab has a neutral fill and outline instead of an accent-colored fill. Internal segment edges are straight; only the outer ends are rounded.
+
+Text fields, dropdowns, and outlined choice chips have contrasting borders in both light and dark appearance. An off switch keeps a visible track and thumb, so it does not disappear into the page.
 
 On the **Work** landing itself, chips filter the rows in place. **All** restores your role's default kinds. **Nothing in motion** means the selected filter has no matching rows. Work lists orders that need a next step, batches with an overdue fermentation reading, open purchase orders, and open delivery routes. Stock transfers and packaging runs are not listed on Work; their chips say so, and their own pages open from the tabs. A taproom transfer is an order, so it appears under **Orders**.
 
@@ -572,6 +576,8 @@ Every confirmation goes through this review. A submitted order's **Confirm** on 
 
 Confirming a wholesale order also queues a separate confirmation email for each buyer listed under that customer's **Portal users**. No portal users means no confirmation email. Emails describe the order as confirmed; later order edits do not rewrite them. Sending requires the brewery's hosted email setup. Delivery failures do not undo the confirmed order. MGR retries uncertain sends with the same saved message for up to 23 hours, then stops for investigation to avoid sending duplicates. Provider acceptance does not prove the email reached an inbox. Removed buyers and changed email addresses are checked before a pending message is sent; an email already accepted by the provider cannot be recalled.
 
+Admin and Sales can check **Confirmation email** under **Order details**. It counts the saved outcomes for all buyers: **Queued**, **Sending**, **Retry pending**, **Accepted by provider**, **Blocked**, or **Suppressed**. A blocked email explains whether there was no linked portal buyer, the provider rejected it, or the retry window expired. **No confirmation email recorded** is not proof that an email was sent. For **Retry pending** or **Blocked**, ask the person who manages your email setup to investigate; do not resend an uncertain email as a new message. Refresh the order to read the latest status. Warehouse does not see these diagnostics.
+
 <Screen name="Complete transfer" />
 
 A picked taproom transfer shows **Complete transfer** on its order page: the same step a wholesale order ships with, minus the invoice. Its page defaults each line to the picked quantity; adjust the amount if needed, assign source and destination bins, then complete the transfer. Like **Ship order**, **Complete transfer** names each line still without a source.
@@ -681,9 +687,11 @@ The **Payment** and **Accounting** columns use these labels:
 | **Before the books opened** | Accounting | A historical invoice that was never sent to QuickBooks. |
 | **Not pushed to QuickBooks** | Accounting | The invoice is waiting for its first push. |
 | **QuickBooks connection required** | Accounting | Connect QuickBooks before the push can run. |
-| **push result unknown** | Accounting | The last push may or may not have reached QuickBooks. When connected, retry resends the same request. When disconnected, reconnect first. |
+| **push result unknown** | Accounting | The last push may or may not have reached QuickBooks. When connected, retry first looks for the original document, then resends the same request only when no document is found. When disconnected, reconnect first. |
 
 Roles other than Admin and Sales see only **Not pushed** or **QuickBooks status available to Sales** in the Accounting column, unless the invoice is written off, voided, deleted, predates the books, or has payments recorded in MGR.
+
+An uncertain invoice or credit-memo push is checked in its original QuickBooks company by document number before MGR sends it again. One matching document with the frozen customer and transaction date completes the saved push without creating another document. A failed lookup, invalid response, or conflicting or duplicate document number leaves the push pending instead of sending another copy.
 
 **Paid** is a payment status, not a settlement date. For an invoice in QuickBooks, MGR does not supply an actual payment date for one or multiple payments. An invoice paid in full by payments recorded in MGR is marked paid on the day its last payment was received, and **Payments** on the invoice lists each payment's received day. A partial cash payment remains due until the balance reaches zero; credit-only closure is **Settled**, not **Paid**. In the register, a balance closed with a mix of partial cash and credits shows **Settled** with the cash amount, not **Paid**. MGR does not display a settlement date for an invoice in QuickBooks.
 
