@@ -688,9 +688,11 @@ The **Payment** and **Accounting** columns use these labels:
 | **Before the books opened** | Accounting | A historical invoice that was never sent to QuickBooks. |
 | **Not pushed to QuickBooks** | Accounting | The invoice is waiting for its first push. |
 | **QuickBooks connection required** | Accounting | Connect QuickBooks before the push can run. |
-| **push result unknown** | Accounting | The last push may or may not have reached QuickBooks. When connected, retry resends the same request. When disconnected, reconnect first. |
+| **push result unknown** | Accounting | The last push may or may not have reached QuickBooks. When connected, retry first looks for the original document, then resends the same request only when no document is found. When disconnected, reconnect first. |
 
 Roles other than Admin and Sales see only **Not pushed** or **QuickBooks status available to Sales** in the Accounting column, unless the invoice is written off, voided, deleted, predates the books, or has payments recorded in MGR.
+
+An uncertain invoice or credit-memo push is checked in its original QuickBooks company by document number before MGR sends it again. One matching document with the frozen customer and transaction date completes the saved push without creating another document. A failed lookup, invalid response, or conflicting or duplicate document number leaves the push pending instead of sending another copy.
 
 **Paid** is a payment status, not a settlement date. For an invoice in QuickBooks, MGR does not supply an actual payment date for one or multiple payments. An invoice paid in full by payments recorded in MGR is marked paid on the day its last payment was received, and **Payments** on the invoice lists each payment's received day. A partial cash payment remains due until the balance reaches zero; credit-only closure is **Settled**, not **Paid**. In the register, a balance closed with a mix of partial cash and credits shows **Settled** with the cash amount, not **Paid**. MGR does not display a settlement date for an invoice in QuickBooks.
 
