@@ -2,7 +2,7 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
-  
+
   "public": {
           Tables: {
             "allocations": {
@@ -3714,7 +3714,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"bin_on_hand": {
                   Row: {
@@ -3840,7 +3840,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"keg_bin_totals": {
                   Row: {
@@ -3946,7 +3946,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"keg_loss_rates": {
                   Row: {
@@ -4194,7 +4194,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"occupancy_volumes": {
                   Row: {
@@ -4240,7 +4240,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"order_line_cogs": {
                   Row: {
@@ -4340,7 +4340,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"portal_customers": {
                   Row: {
@@ -4348,7 +4348,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"portal_invoices": {
                   Row: {
@@ -4356,7 +4356,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"portal_keg_deposits": {
                   Row: {
@@ -4364,7 +4364,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"portal_order_events": {
                   Row: {
@@ -4372,7 +4372,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"portal_orders": {
                   Row: {
@@ -4380,7 +4380,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"portal_schedule": {
                   Row: {
@@ -4388,7 +4388,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"portal_shipments": {
                   Row: {
@@ -4396,7 +4396,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"portal_sku_prices": {
                   Row: {
@@ -4404,7 +4404,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"pos_unmapped_items": {
                   Row: {
@@ -4566,7 +4566,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"taproom_replenishment": {
                   Row: {
