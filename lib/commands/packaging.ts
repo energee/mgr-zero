@@ -164,6 +164,35 @@ defineCommand({
   })),
 });
 
+defineQuery({
+  name: "get_packaging_output_corrections",
+  description: "Reasoned output correction history for a closed packaging run, including the previous and replacement counts and tank draw",
+  input: z.object({ runId: z.string().uuid() }),
+  roles: ["admin", "brewer", "warehouse"],
+  handler: (ctx, i) => unwrap(ctx.db.rpc("get_packaging_output_corrections", { p_brewery: ctx.breweryId, p_run: i.runId })),
+});
+
+defineCommand({
+  name: "correct_packaging_run_outputs",
+  description: "Correct an unused closed run's output quantities and barrels drawn with exact production reversals and replacements; refuses downstream stock use, completed batches and filed periods",
+  input: z.object({
+    runId: z.string().uuid(),
+    previousCorrectionId: z.string().uuid().nullable().describe("Latest output correction ID; null for the first correction"),
+    reason: z.string().trim().min(1),
+    bblDrawn: z.number().nonnegative(),
+    outputs: z.array(z.object({ skuId: z.string().uuid(), qtyActual: z.number().nonnegative().max(9_999_999_999.99) })),
+    locationId: z.string().uuid(),
+    binId: z.string().uuid(),
+  }),
+  roles: ["admin", "brewer", "warehouse"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_packaging_run_outputs", {
+    p_brewery: ctx.breweryId, p_run: i.runId, p_previous: i.previousCorrectionId,
+    p_reason: i.reason, p_bbl_drawn: i.bblDrawn,
+    p_outputs: i.outputs.map(row => ({ sku_id: row.skuId, qty_actual: row.qtyActual })),
+    p_location: i.locationId, p_bin: i.binId, p_request_id: execution.requestId,
+  })),
+});
+
 // `record_repack`: breaking a composed unit (a case) into the units it is
 // made of. It is a shape change, never a production or a removal, so the
 // RPC writes both FG ledger rows under one `ref` and refuses to commit

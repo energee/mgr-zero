@@ -116,6 +116,166 @@ it("appends a correction and exact compensations without rewriting outputs or ta
   await expect(runCommand("correct_packaging_material_record", input, f.ctx)).rejects.toThrow("already corrected");
 });
 
+type OutputCorrectionFixture = { run: { id: string }; catalog: { skuId: string }; destination: { id: string; binId: string } };
+function correctedOutputs(f: OutputCorrectionFixture) {
+  return {
+    runId: f.run.id, previousCorrectionId: null as string | null, reason: "Counted 80, not 100",
+    bblDrawn: 0.08, outputs: [{ skuId: f.catalog.skuId, qtyActual: 80 }],
+    locationId: f.destination.id, binId: f.destination.binId,
+  };
+}
+
+it("corrects closed output stock, lot, batch packaged volume, compliance and tank draw together", async () => {
+  const f = await fixture();
+  await runCommand("close_packaging_run", { ...f.input, outputs: [{ skuId: f.catalog.skuId, qtyActual: 100 }] }, f.ctx);
+  const before = await runCommand("get_packaging_run", { runId: f.run.id }, f.ctx) as { lot: { id: string }; run: { closed_at: string } };
+  const materialBefore = await runCommand("get_packaging_material_record", { runId: f.run.id }, f.ctx);
+  const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+  const corrected = await runCommand("correct_packaging_run_outputs", correctedOutputs(f), f.ctx, execution) as { correction: { id: string } };
+  expect(await runCommand("correct_packaging_run_outputs", correctedOutputs(f), f.ctx, execution)).toEqual(corrected);
+  await expect(runCommand("correct_packaging_run_outputs", { ...correctedOutputs(f), bblDrawn: 0.081 }, f.ctx, execution)).rejects.toMatchObject({ code: "conflict" });
+  const after = await runCommand("get_packaging_run", { runId: f.run.id }, f.ctx) as {
+    lot: { id: string }; run: { closed_at: string; bbl_drawn: number }; outputs: { qty_actual: number }[];
+  };
+  expect(after.lot.id).toBe(before.lot.id);
+  expect(after.run).toMatchObject({ closed_at: before.run.closed_at, bbl_drawn: 0.08 });
+  expect(after.outputs).toEqual([expect.objectContaining({ qty_actual: 80 })]);
+  const ledger = await admin.from("inventory_movements").select("qty,bbl,type,compensates_id,occurred_on").eq("lot_id", before.lot.id);
+  expect(ledger.data).toHaveLength(3);
+  expect(ledger.data?.reduce((n, row) => n + row.qty, 0)).toBe(80);
+  expect(ledger.data?.find(row => row.compensates_id)).toMatchObject({ qty: -100, bbl: -0.1, type: "production_in", occurred_on: "2026-09-28" });
+  expect((await admin.from("lot_on_hand").select("qty").eq("lot_id", before.lot.id)).data).toEqual([expect.objectContaining({ qty: 80 })]);
+  const preview = await runCommand("get_batch_completion_preview", { batchId: f.batch.id }, f.ctx) as { packagedBbl: number; inTankBbl: number };
+  expect(Number(preview.packagedBbl)).toBe(0.08);
+  expect(Number(preview.inTankBbl)).toBe(0.92);
+  const owner = await makeStaffCtx(f.brewery.id, "admin");
+  const report = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: "2026-09-01", periodEnd: "2026-09-30" }, owner) as { figures: { packaged: number; balances: boolean } };
+  expect(report.figures.packaged).toBe(0.08);
+  expect(report.figures.balances).toBe(true);
+  expect(await runCommand("get_packaging_material_record", { runId: f.run.id }, f.ctx)).toEqual(materialBefore);
+  const history = await runCommand("get_packaging_output_corrections", { runId: f.run.id }, f.ctx) as {
+    corrections: { id: string; previous_bbl_drawn: number; replacement_bbl_drawn: number; previous_outputs: { qty_actual: number }[] }[];
+  };
+  expect(history.corrections).toEqual([expect.objectContaining({
+    id: corrected.correction.id, previous_bbl_drawn: 0.1, replacement_bbl_drawn: 0.08,
+    previous_outputs: [expect.objectContaining({ qty_actual: 100 })],
+  })]);
+});
+
+it("requires the current output revision and supports zero output followed by another correction", async () => {
+  const f = await fixture();
+  await runCommand("close_packaging_run", f.input, f.ctx);
+  const first = await runCommand("correct_packaging_run_outputs", correctedOutputs(f), f.ctx) as { correction: { id: string } };
+  await expect(runCommand("correct_packaging_run_outputs", correctedOutputs(f), f.ctx)).rejects.toThrow("already corrected");
+  const zero = await runCommand("correct_packaging_run_outputs", {
+    ...correctedOutputs(f), previousCorrectionId: first.correction.id, bblDrawn: 0, outputs: [],
+  }, f.ctx) as { correction: { id: string } };
+  const preview = await runCommand("get_batch_completion_preview", { batchId: f.batch.id }, f.ctx) as { packagedBbl: number };
+  expect(Number(preview.packagedBbl)).toBe(0);
+  await runCommand("correct_packaging_run_outputs", { ...correctedOutputs(f), previousCorrectionId: zero.correction.id }, f.ctx);
+  const history = await runCommand("get_packaging_output_corrections", { runId: f.run.id }, f.ctx) as { corrections: unknown[] };
+  expect(history.corrections).toHaveLength(3);
+  const material = await runCommand("get_packaging_material_record", { runId: f.run.id }, f.ctx) as { records: { id: string }[] };
+  await expect(runCommand("correct_packaging_material_record", { recordId: material.records[0].id, reason: "Unused tray", actuals: [f.actual] }, f.ctx)).resolves.toBeDefined();
+});
+
+it.each(["shipped", "adjusted", "completed batch", "filed report"])("refuses output correction after %s without ledger residue", async dependency => {
+  const f = await fixture();
+  await runCommand("close_packaging_run", f.input, f.ctx);
+  const lot = (await admin.from("lots").select("id").eq("packaging_run_id", f.run.id).single()).data!;
+  if (dependency === "completed batch") sql(`update public.batches set closed_at=now() where id='${f.batch.id}'`);
+  else if (dependency === "filed report") sql(`insert into public.report_filings(brewery_id,jurisdiction,period_start,period_end,figures,filed_at,filed_by) values('${f.brewery.id}','TTB','2026-09-01','2026-09-30','{}',now(),'${f.ctx.userId}')`);
+  else {
+    const channel = crypto.randomUUID();
+    if (dependency === "shipped") sql(`insert into public.sale_channels(id,brewery_id,name,tax_treatment) values('${channel}','${f.brewery.id}','Output correction shipment','taxable')`);
+    sql(`insert into public.inventory_movements(brewery_id,sku_id,location_id,bin_id,lot_id,qty,type,created_by,sale_channel_id,tax_treatment,dest_state)
+      values('${f.brewery.id}','${f.catalog.skuId}','${f.destination.id}','${f.destination.binId}','${lot.id}',-1,
+      '${dependency === "shipped" ? "sale_removal" : "adjustment"}','${f.ctx.userId}',
+      ${dependency === "shipped" ? `'${channel}','taxable','PA'` : "null,null,null"})`);
+  }
+  const before = (await admin.from("inventory_movements").select("id").eq("lot_id", lot.id)).data;
+  await expect(runCommand("correct_packaging_run_outputs", correctedOutputs(f), f.ctx)).rejects.toThrow(
+    dependency === "completed batch" || dependency === "filed report" ? dependency : "finished goods prevent",
+  );
+  expect((await admin.from("inventory_movements").select("id").eq("lot_id", lot.id)).data).toEqual(before);
+  expect(await runCommand("get_packaging_output_corrections", { runId: f.run.id }, f.ctx)).toEqual({ corrections: [] });
+});
+
+it("rolls back invalid output and draw corrections and denies foreign or unauthorized callers", async () => {
+  const f = await fixture();
+  await runCommand("close_packaging_run", f.input, f.ctx);
+  for (const invalid of [
+    { bblDrawn: 0.079 }, { bblDrawn: 1.001 },
+    { outputs: [{ skuId: f.catalog.skuId, qtyActual: 20 }, { skuId: f.catalog.skuId, qtyActual: 60 }] },
+    { outputs: [{ skuId: crypto.randomUUID(), qtyActual: 80 }] },
+  ]) await expect(runCommand("correct_packaging_run_outputs", { ...correctedOutputs(f), ...invalid }, f.ctx)).rejects.toThrow();
+  expect(await runCommand("get_packaging_output_corrections", { runId: f.run.id }, f.ctx)).toEqual({ corrections: [] });
+  const sales = await makeStaffCtx(f.brewery.id, "sales");
+  await expect(runCommand("correct_packaging_run_outputs", correctedOutputs(f), sales)).rejects.toMatchObject({ status: 403 });
+  const foreign = await makeStaffCtx((await makeBrewery()).id, "brewer");
+  await expect(runCommand("get_packaging_output_corrections", { runId: f.run.id }, foreign)).rejects.toThrow();
+  const denied = await foreign.db.rpc("correct_packaging_run_outputs", {
+    p_brewery: f.brewery.id, p_run: f.run.id, p_previous: null, p_reason: "Foreign",
+    p_bbl_drawn: 0.08, p_outputs: [], p_location: f.destination.id, p_bin: f.destination.binId, p_request_id: crypto.randomUUID(),
+  });
+  expect(denied.error).not.toBeNull();
+});
+
+it("refuses to restore beer into a source occupancy ended by a cellar transfer", async () => {
+  const f = await fixture();
+  await runCommand("close_packaging_run", f.input, f.ctx);
+  const run = (await admin.from("packaging_runs").select("occupancy_id").eq("id", f.run.id).single()).data!;
+  const owner = await makeStaffCtx(f.brewery.id, "admin");
+  const vessel = await runCommand("upsert_vessel", { name: "Transferred correction beer", kind: "brite", capacityBbl: 10 }, owner) as { id: string };
+  await runCommand("record_cellar_transfer", {
+    fromOccupancyId: run.occupancy_id!, toVesselId: vessel.id, volumeBbl: 0.9,
+  }, f.ctx);
+  const source = await admin.from("occupancy_volumes").select("bbl,ended_at").eq("occupancy_id", run.occupancy_id!).single();
+  expect(source.data).toMatchObject({ bbl: 0, ended_at: expect.any(String) });
+  const stock = (await admin.from("inventory_movements").select("id,qty").eq("ref", f.run.id)).data;
+  await expect(runCommand("correct_packaging_run_outputs", correctedOutputs(f), f.ctx)).rejects.toThrow(
+    "cannot reduce barrels drawn after the source tank was emptied",
+  );
+  expect((await admin.from("inventory_movements").select("id,qty").eq("ref", f.run.id)).data).toEqual(stock);
+  expect((await admin.from("occupancy_volumes").select("bbl,ended_at").eq("occupancy_id", run.occupancy_id!).single()).data).toEqual(source.data);
+  expect(await runCommand("get_packaging_output_corrections", { runId: f.run.id }, f.ctx)).toEqual({ corrections: [] });
+  await runCommand("correct_packaging_run_outputs", { ...correctedOutputs(f), bblDrawn: f.input.bblDrawn }, f.ctx);
+  expect((await admin.from("occupancy_volumes").select("bbl").eq("occupancy_id", run.occupancy_id!).single()).data).toEqual({ bbl: 0 });
+});
+
+it("refuses fractional keg corrections before quantity rounding", async () => {
+  const f = await fixture();
+  await runCommand("close_packaging_run", f.input, f.ctx);
+  sql(`update public.formats set package_type='keg',keg_size='half_bbl' where id='${f.catalog.formatId}'`);
+  await expect(runCommand("correct_packaging_run_outputs", {
+    ...correctedOutputs(f), outputs: [{ skuId: f.catalog.skuId, qtyActual: 80.0001 }],
+  }, f.ctx)).rejects.toThrow("whole number of kegs");
+  expect(await runCommand("get_packaging_output_corrections", { runId: f.run.id }, f.ctx)).toEqual({ corrections: [] });
+});
+
+it("rejects forged production reversals outside the correction graph", async () => {
+  const f = await fixture();
+  await runCommand("close_packaging_run", f.input, f.ctx);
+  expect(() => sql(`insert into public.inventory_movements(brewery_id,sku_id,location_id,bin_id,lot_id,qty,type,compensates_id,ref,created_by,occurred_on)
+    select brewery_id,sku_id,location_id,bin_id,lot_id,-qty,type,id,ref,created_by,occurred_on
+    from public.inventory_movements where ref='${f.run.id}' and type='production_in'`)).toThrow("invalid packaging output compensation");
+  for (const role of ["authenticated", "service_role"]) {
+    expect(() => sql(`begin; set local role ${role}; insert into public.packaging_output_corrections default values; rollback`)).toThrow("permission denied");
+  }
+});
+
+it("allows only one competing output correction of the same revision", async () => {
+  const f = await fixture();
+  await runCommand("close_packaging_run", f.input, f.ctx);
+  const results = await Promise.allSettled([
+    runCommand("correct_packaging_run_outputs", correctedOutputs(f), f.ctx),
+    runCommand("correct_packaging_run_outputs", { ...correctedOutputs(f), bblDrawn: 0.09 }, f.ctx),
+  ]);
+  expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
+  const history = await runCommand("get_packaging_output_corrections", { runId: f.run.id }, f.ctx) as { corrections: unknown[] };
+  expect(history.corrections).toHaveLength(1);
+});
+
 it("refuses material corrections once finished goods have downstream movements", async () => {
   const f = await fixture();
   await runCommand("close_packaging_run", f.input, f.ctx);
