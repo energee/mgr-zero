@@ -549,37 +549,40 @@ export async function postReceiptBill(ctx: Ctx, receiptId: string, requestId: st
   const record = (remoteId: string | null, error: string | null, response: Record<string, unknown>, definitiveRejection = false) => finishQboReceiptBill(ctx, {
     receiptId: start.receiptId, providerRequestId, remoteId, error, response, definitiveRejection,
   });
-  let definitiveRejection = false;
-  try {
-    let tokens = await readVersionedIntegrationTokens(ctx, "qbo");
-    if (tokens.connectionId !== connectionId) throw new CommandError("QuickBooks connection changed; reconcile the Bill in its original company", 409, "conflict");
-    if (isPast(tokens.accessExpiresAt)) tokens = await refreshQboCredentials(ctx, client, tokens);
-    if (tokens.connectionId !== connectionId) throw new CommandError("QuickBooks connection changed", 409, "conflict");
-    if (!start.mayPost) {
-      let found = await client.findReceiptBill(realmId, providerRequestId, requestBody, tokens.accessToken);
-      if (!found.ok && found.status === 401) {
-        tokens = await refreshQboCredentials(ctx, client, tokens);
-        if (tokens.connectionId !== connectionId) throw new CommandError("QuickBooks connection changed", 409, "conflict");
-        found = await client.findReceiptBill(realmId, providerRequestId, requestBody, tokens.accessToken);
-      }
-      if (found.ok && found.remoteId) return await record(found.remoteId, null, { Id: found.remoteId });
-      if (!found.ok) throw new CommandError(outcomeUnknown, 409, "conflict");
+  let tokens = await readVersionedIntegrationTokens(ctx, "qbo");
+  if (tokens.connectionId !== connectionId) throw new CommandError("QuickBooks connection changed; reconcile the Bill in its original company", 409, "conflict");
+  if (isPast(tokens.accessExpiresAt)) tokens = await refreshQboCredentials(ctx, client, tokens);
+  if (tokens.connectionId !== connectionId) throw new CommandError("QuickBooks connection changed", 409, "conflict");
+  if (!start.mayPost) {
+    let found = await client.findReceiptBill(realmId, providerRequestId, requestBody, tokens.accessToken);
+    if (!found.ok && found.status === 401) {
+      tokens = await refreshQboCredentials(ctx, client, tokens);
+      if (tokens.connectionId !== connectionId) throw new CommandError("QuickBooks connection changed", 409, "conflict");
+      found = await client.findReceiptBill(realmId, providerRequestId, requestBody, tokens.accessToken);
     }
-    // Intuit guarantees idempotence for the same company + requestid + content:
-    // https://developer.intuit.com/app/developer/qbo/docs/learn/learn-basic-field-definitions
-    // A retry with no query match replays these frozen bytes, never a new key.
-    const created = await client.createTransaction(realmId, "Bill", providerRequestId, requestBody, tokens.accessToken);
-    if (created.ok) return await record(created.remoteId, null, created.response);
-    definitiveRejection = created.definitive;
-    throw new CommandError(created.definitive
-      ? "QuickBooks rejected this Bill. Fix its vendor or purchase account in Accounting, then choose Post corrected Bill."
-      : outcomeUnknown, created.definitive ? 400 : 409, created.definitive ? "validation_error" : "conflict");
-  } catch (error) {
-    const message = error instanceof CommandError ? error.message : outcomeUnknown;
-    await record(null, message, {}, definitiveRejection);
-    if (error instanceof CommandError) throw error;
-    throw new CommandError(message, 409, "conflict");
+    if (found.ok && found.remoteId) return record(found.remoteId, null, { Id: found.remoteId });
+    if (!found.ok) throw new CommandError(outcomeUnknown, 409, "conflict");
   }
+  // Replays use the frozen company, request id and bytes, including after an uncertain POST.
+  // https://developer.intuit.com/app/developer/qbo/docs/learn/learn-basic-field-definitions
+  const created = await client.createTransaction(realmId, "Bill", providerRequestId, requestBody, tokens.accessToken).catch(async (error: unknown) => {
+    // Only a failure after starting the POST has an uncertain provider outcome.
+    // A failed diagnostic write must not replace that original transport failure.
+    await record(null, outcomeUnknown, {}).catch(() => {
+      console.error("qbo_receipt_bill_failure_record_failed", { receiptId: start.receiptId, providerRequestId });
+    });
+    if (error instanceof CommandError) throw error;
+    throw new CommandError(outcomeUnknown, 409, "conflict");
+  });
+  // Keep success recording outside the transport catch: a failed commit is not a rejection.
+  if (created.ok) return record(created.remoteId, null, created.response);
+  const message = created.definitive
+    ? "QuickBooks rejected this Bill. Fix its vendor or purchase account in Accounting, then choose Post corrected Bill."
+    : outcomeUnknown;
+  await record(null, message, {}, created.definitive).catch(() => {
+    console.error("qbo_receipt_bill_failure_record_failed", { receiptId: start.receiptId, providerRequestId });
+  });
+  throw new CommandError(message, created.definitive ? 400 : 409, created.definitive ? "validation_error" : "conflict");
 }
 
 export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOAuthClient) {

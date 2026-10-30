@@ -11,6 +11,13 @@ const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 // Every unlisted file stays in the guarded database project.
 const pureTests = [
   "tests/production-attention-experiment.test.ts",
+  "tests/integration-token-failures.test.ts",
+  "tests/integration-transport-failures.test.ts",
+  "tests/order-email-job.test.ts",
+  "tests/retention-prune-route.test.ts",
+  "tests/job-scheduler-workflow.test.ts",
+  "tests/doc-agent-watch.test.ts",
+  "tests/pos-lifecycle.test.ts",
   "tests/mgr-screens.test.ts",
   "tests/tap-coverage.test.ts",
   "tests/screen-links.test.ts",
