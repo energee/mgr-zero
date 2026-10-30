@@ -10,7 +10,7 @@ beer must still be put back after cancellation. Refused returns use
 so the join can start from refused lines instead of completed deliveries.
 Neither index changes queue visibility or return accounting.
 
-Both indexes ship in `20261030040000_today_pending_history_indexes.sql`,
+Both indexes ship in `20261030031050_today_pending_history_indexes.sql`,
 ordered after the existing main-branch migrations so normal migration pushes
 can apply them without out-of-order flags.
 
