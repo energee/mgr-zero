@@ -6,8 +6,6 @@ import { BeerIcon, DeliveryTruck01Icon, Invoice01Icon, Package01Icon, Route01Ico
 import { E } from "@/components/mgr/e";
 import type { TodayIcon, TodayViewModel } from "@/lib/mgr/today-view";
 
-export type { TodayViewModel };
-
 const ICON: Record<TodayIcon, typeof Package01Icon> = {
   package: Package01Icon, truck: DeliveryTruck01Icon, route: Route01Icon,
   thermo: ThermometerIcon, beer: BeerIcon, task: TaskDone01Icon, invoice: Invoice01Icon,
