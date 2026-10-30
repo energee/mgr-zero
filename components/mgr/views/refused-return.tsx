@@ -11,6 +11,16 @@ export type RefusedReturnModel = {
 };
 export type RefusedReturnEntry = { qty: number; binId: string; damaged: boolean };
 
+export function RefusedReturnStatusView({ invoiceNow = false, returnHref }: { invoiceNow?: boolean; returnHref?: string | null }) {
+  return <>
+    {invoiceNow ? <>
+      {E.hd("Refused beer to check in")}
+      {E.note("This shipment was invoiced at ship. Admin or Sales records Return and credit when the beer physically returns.")}
+      {returnHref !== null && E.btn("Return and credit", "p", returnHref)}
+    </> : E.status("No refused beer awaiting check-in", "ok")}
+  </>;
+}
+
 /** Check-in's starting entries (#1504): a line with one shipped source starts
  *  with the refused quantity that source can cover, in the location's only bin
  *  when it has just one. A line with several sources waits for the user. */

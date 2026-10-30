@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { SCREENS } from "@/components/mgr/screens";
 import { SCREEN_ROUTES } from "@/lib/mgr/screen-routes";
 import { localModule } from "./local-module";
+import auditedActionSlots from "./fixtures/screen-parity/action-slots.json";
 
 /** Existing bypasses. Remove a row when the live implementation mounts the view. */
 const KNOWN_VIEW_DEBT = [] as const;
@@ -71,11 +72,36 @@ function earlyLayoutReturns(path: string): string[] {
   return out;
 }
 
+/** Snapshot the presentation a whole footer/action slot replaces, not its command callbacks. */
+function slotComposition(node: ts.Node, file: ts.SourceFile): string[] {
+  const drawing: string[] = [];
+  function walk(child: ts.Node) {
+    if (ts.isJsxOpeningElement(child) || ts.isJsxSelfClosingElement(child)) drawing.push(child.tagName.getText(file));
+    if (ts.isJsxText(child) && child.text.trim()) drawing.push(child.text.trim());
+    if (ts.isCallExpression(child) && ts.isPropertyAccessExpression(child.expression) && child.expression.expression.getText(file) === "E") {
+      const label = child.arguments[0];
+      drawing.push(`${child.expression.getText(file)}${label && ts.isStringLiteral(label) ? `:${label.text}` : ""}`);
+    }
+    ts.forEachChild(child, walk);
+  }
+  if (ts.isJsxExpression(node) && node.expression && ts.isIdentifier(node.expression)) {
+    const name = node.expression.text;
+    let initializer: ts.Expression | undefined;
+    function find(child: ts.Node) {
+      if (ts.isVariableDeclaration(child) && ts.isIdentifier(child.name) && child.name.text === name) initializer = child.initializer;
+      ts.forEachChild(child, find);
+    }
+    find(file);
+    walk(initializer ?? node);
+  } else walk(node);
+  return drawing;
+}
+
 /** Follow function-component exports, not every sibling in an imported module.
  * Named-only entry files still need explicit route symbols to disambiguate them.
  * This discovery check does not prove prop/slot or surface configuration parity.
  */
-function mountedComponents(entry: string, bodyOverrides = new Set<string>()): Set<string> {
+function mountedComponents(entry: string, bodyOverrides = new Set<string>(), actionOverrides = new Set<string>()): Set<string> {
   const components = new Set<string>();
   const visited = new Set<string>();
 
@@ -148,6 +174,13 @@ function mountedComponents(entry: string, bodyOverrides = new Set<string>()): Se
           ts.isJsxAttribute(attribute) && attribute.name.getText(file) === BODY_SLOTS[name])) {
           bodyOverrides.add(`${name}.${BODY_SLOTS[name]}`);
         }
+        if (name.endsWith("View")) {
+          for (const attribute of node.attributes.properties) {
+            if (!ts.isJsxAttribute(attribute) || !/(?:footer|actions?)$/i.test(attribute.name.getText(file)) || !attribute.initializer) continue;
+            const drawing = slotComposition(attribute.initializer, file);
+            actionOverrides.add(`${relative(process.cwd(), path)}: ${name}.${attribute.name.getText(file)} = ${drawing.join(" > ") || "(binding)"}`);
+          }
+        }
         if (imported?.path) visit(imported.path, imported.imported);
         if (!imported) {
           const declaration = file.statements.find(statement =>
@@ -212,12 +245,28 @@ describe("screen/live component parity", () => {
   it("mounts the same named surface as the inventory frame", () => {
     const expectedSurface = { sheet: "CommandForm", entry: "EntrySurface", composer: "ComposerPanelView" } as const;
     const bypasses = mapped.flatMap((screen) => {
-      const surface = screen.name === "Me" || screen.name === "Portal Me"
-        ? "MeSheet"
-        : screen.surface && expectedSurface[screen.surface as keyof typeof expectedSurface];
-      if (!surface) return [];
+      let surface: string;
+      if (screen.name === "Me" || screen.name === "Portal Me") surface = "MeSheet";
+      else if (!screen.surface || screen.surface === "page") surface = screen.portal ? "PortalShell" : "AppShell";
+      else surface = expectedSurface[screen.surface];
       const file = routes.get(screen.name)!;
-      return mountedComponents(file).has(surface) ? [] : [`${screen.name}: ${surface} <- ${file}`];
+      const components = mountedComponents(file);
+      // Next composes pages with the layouts above the public route entry.
+      let directory = dirname(file);
+      while (directory !== "." && directory !== "app") {
+        const layout = join(directory, "layout.tsx");
+        if (existsSync(layout)) for (const component of mountedComponents(layout)) components.add(component);
+        directory = dirname(directory);
+      }
+      if (file.startsWith("components/") && surface === "AppShell") {
+        const layout = mountedComponents("app/(app)/layout.tsx");
+        const exports = sourceFile(file).statements.filter(ts.isFunctionDeclaration)
+          .filter(node => node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword));
+        if (exports.some(node => node.name && layout.has(node.name.text))) {
+          for (const component of layout) components.add(component);
+        }
+      }
+      return components.has(surface) ? [] : [`${screen.name}: ${surface} <- ${file}`];
     });
     expect(bypasses).toEqual(KNOWN_SURFACE_DEBT);
   });
@@ -247,5 +296,20 @@ describe("screen/live component parity", () => {
         .map(override => `${screen.name}: ${override} <- ${file}`);
     }).sort();
     expect(bypasses).toEqual(KNOWN_BODY_DEBT);
+  });
+
+  it("guards whole-footer and whole-action drawings across every mounted shared view", () => {
+    const slots = new Set<string>();
+    for (const route of SCREEN_ROUTES) {
+      for (const file of [route.file, ...(route.additionalFiles ?? [])]) mountedComponents(file, new Set(), slots);
+    }
+    // Existing bindings stay exact and reviewable; adding or redrawing one requires an audit.
+    expect([...slots].sort()).toEqual(auditedActionSlots);
+    const bypass = new Set<string>();
+    mountedComponents("tests/fixtures/screen-parity/action-bypass.tsx", new Set(), bypass);
+    expect([...bypass]).toEqual([
+      "tests/fixtures/screen-parity/action-bypass.tsx: ExampleView.footer = form > E.edit:Independent field > button > Save",
+      "tests/fixtures/screen-parity/action-bypass.tsx: ExampleView.action = table > tbody > tr > td > Independent table",
+    ]);
   });
 });

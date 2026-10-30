@@ -14,6 +14,16 @@ import type { StaffRole } from "@/lib/commands/registry";
 import { receiptPoBillPending, receiptPoBillPosted } from "@/lib/mgr/fixtures/purchasing";
 import { hasAnyRole } from "@/lib/mgr/roles";
 import type { WeeklyCountView } from "@/components/mgr/views/weekly-count";
+import type { EntryView } from "@/components/mgr/views/entry";
+
+/** Reset submission stays on this card, just as the live Auth response does. */
+export function ResetPasswordFixture({ children }: { children: ReactElement<ComponentProps<typeof EntryView>> }) {
+  const [sent, setSent] = useState(false);
+  return <div data-preview-action className="flex flex-col gap-2">{cloneElement(children, {
+    model: { ...children.props.model, info: sent ? "If that email is on an account, a reset link is on its way." : undefined },
+    action: () => setSent(true),
+  })}</div>;
+}
 
 /** Keeps the selected receipt and its current worksheet as distinct inventory states. */
 export function WeeklyCountFixture({ children }: { children: ReactElement<ComponentProps<typeof WeeklyCountView>> }) {

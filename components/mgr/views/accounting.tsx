@@ -3,7 +3,6 @@ import { useId, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QuickBooksMark } from "@/components/mgr/brand-icons";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { SubmitButton } from "@/components/mgr/submit-button";
 import { plural } from "@/lib/mgr/plural";
@@ -56,11 +55,11 @@ export function QboConnectionView({ configured = true, reconnect = false, busy =
  *  inventory, which passes no onChange, draws inert switches. */
 export function QboDefaultsView({ allowAch, allowCard, busy = false, disabled = false, error, onChange }: { allowAch: boolean; allowCard: boolean; busy?: boolean; disabled?: boolean; error?: string | null; onChange?: (ach: boolean, card: boolean) => void }) {
   const reasonId = useId();
-  const locked = { disabled: busy || disabled, "aria-describedby": disabled ? reasonId : undefined };
+  const accessibility = { "aria-describedby": disabled ? reasonId : undefined };
   return <div className="flex flex-col gap-3">
     {E.info("Each new invoice is pushed with these payment options. Turning both off means new invoices cannot be paid online; invoices pushed earlier keep theirs.")}
-    {E.row("Bank transfer (ACH)", `${allowAch ? "on" : "off"} · lowest fee`, <Switch aria-label="Bank transfer payments" checked={allowAch} onCheckedChange={ach => onChange?.(ach, allowCard)} {...locked} />, allowAch ? "ok" : "")}
-    {E.row("Card", `${allowCard ? "on" : "off"} · percentage fee applies`, <Switch aria-label="Card payments" checked={allowCard} onCheckedChange={card => onChange?.(allowAch, card)} {...locked} />, allowCard ? "ok" : "")}
+    {E.row("Bank transfer (ACH)", `${allowAch ? "on" : "off"} · lowest fee`, E.sw(allowAch, "Bank transfer payments", ach => onChange?.(ach, allowCard), busy || disabled, accessibility), allowAch ? "ok" : "")}
+    {E.row("Card", `${allowCard ? "on" : "off"} · percentage fee applies`, E.sw(allowCard, "Card payments", card => onChange?.(allowAch, card), busy || disabled, accessibility), allowCard ? "ok" : "")}
     {disabled && <p id={reasonId} className="text-sm text-muted-foreground">Connect or reconnect QuickBooks before saving payment options.</p>}
     <CommandFormMessage error={error} />
   </div>;

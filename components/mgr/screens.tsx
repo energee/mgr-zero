@@ -1,9 +1,11 @@
 import { NotFoundView } from "@/components/mgr/views/not-found";
 import { BatchCompletionFixture } from "@/components/mgr/fixtures/batch-completion";
 import { AccountInvitationsView } from "@/components/mgr/views/account-invitations";
+import { RouteErrorView } from "@/components/mgr/views/route-error";
+import { ReleaseAllocationView } from "@/components/mgr/views/replenishment-quantity";
 import { CommandRecoveryView } from "@/components/mgr/views/command-recovery";
 import { PackagingSourcePicker, PlanActions } from "@/components/mgr/views/plan-actions";
-import { RefusedReturnFormView } from "@/components/mgr/views/refused-return";
+import { RefusedReturnFormView, RefusedReturnStatusView } from "@/components/mgr/views/refused-return";
 import { InventoryDetailView } from "@/components/mgr/views/inventory-detail";
 import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // components/mgr/screens.tsx — the screen inventory and the source of truth
@@ -88,7 +90,7 @@ import { EntryView } from "@/components/mgr/views/entry";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
 import { FermentationReadingActionsView, FermentationReadingView, readingIdentity } from "@/components/mgr/views/fermentation-reading";
 import { FirstRunView } from "@/components/mgr/views/first-run";
-import { CatalogCategoriesFixture, FormatFixture, ReceiptFixture, WeeklyCountFixture } from "@/components/mgr/fixture-adapters";
+import { CatalogCategoriesFixture, FormatFixture, ReceiptFixture, ResetPasswordFixture, WeeklyCountFixture } from "@/components/mgr/fixture-adapters";
 import { FormatView } from "@/components/mgr/views/format";
 import { DeleteFormatControl } from "@/components/mgr/views/delete-format";
 import { FormatsView } from "@/components/mgr/views/formats";
@@ -463,8 +465,8 @@ export const SCREENS: Screen[] = [
     job: "Bartender landing: open the board, count, or review completed variance",
     reads: "list_locations · list_open_taps · list_taproom_counts · get_taproom_variance", writes: "none",
     states: [["no location", "no observed taproom facts; Taproom stock remains available"], ["role hidden", "no Work, Search, orders, invoices, or brewery quiet settings", 1], ["narrow surface", "three permitted exits with last observed facts"]],
-    spec: "Taproom Today uses only permitted taproom reads. It links the board, weekly count and four-week variance with last-opened, last-counted and report as-of facts. It does not invent an overdue count, shift schedule, or POS mapping action. Work, Search, business records and brewery quiet settings stay hidden.",
-    body: <TodayView model={toTodayViewProps(todayTaproom)} footer={E.note("Observed facts only. No fabricated overdue or shift policy; no Work, Search, orders or invoices.")} />,
+    spec: "Taproom Today uses only permitted taproom reads. It links the board, weekly count and four-week variance with last-opened, last-counted and report as-of facts. Observed facts only: no fabricated overdue or shift policy, Work, Search, orders or invoices.",
+    body: <TodayView model={toTodayViewProps(todayTaproom)} />,
   },
   {
     step: 1, slice: "all", tab: "Beer", name: "Beer", job: "Inventory, cellar, materials and kegs",
@@ -653,7 +655,7 @@ export const SCREENS: Screen[] = [
     writes: "supabase_auth_reset_password_for_email [platform]",
     states: [["sent", "Check your email"], ["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["error", "Did not load · Retry", 1]],
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: <EntryView model={resetPassword} />,
+    body: <ResetPasswordFixture><EntryView model={resetPassword} /></ResetPasswordFixture>,
   },
   {
     step: 2,
@@ -690,14 +692,14 @@ export const SCREENS: Screen[] = [
     group: "Entry",
     surface: "entry",
     name: "Portal forgot password",
-    to: { "Send reset link": "Portal set password", "Back to sign in": "Portal sign in" },
+    to: { "Back to sign in": "Portal sign in" },
     job: "Recover a buyer login without saying whether the email exists",
     reads: "none",
     writes: "supabase_auth_reset_password_for_email [platform]",
     states: DEFAULT_STATES,
     spec: "The sent state is this same screen with the info. Enumeration is never confirmed.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: <EntryView model={portalForgotPassword} />,
+    body: <ResetPasswordFixture><EntryView model={portalForgotPassword} /></ResetPasswordFixture>,
   },
   {
     step: 6,
@@ -1199,7 +1201,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Pars and allocation",
-    to: { "Create replenishment order": "Order" },
+    to: { "Create replenishment order": "Order", Release: "Release standing allocation" },
     job: "Replenish a taproom and review reservations across all locations",
     reads: "list_locations · list_skus · replenishment_suggestions · get_shortfalls · list_standing_allocations",
     writes: "create_replenishment_order · release_allocation · set_taproom_par · set_standing_allocation",
@@ -1800,7 +1802,7 @@ export const SCREENS: Screen[] = [
     slice: 4,
     tab: "Work",
     name: "Brew prep",
-    to: { "Malted Oats": "Edit material", "Briess Pilsen": "Edit material", "Chit Malt": "Edit material", "Rolled Oats": "Edit material", "Briess White Wheat": "Edit material", "Brewer’s Crystals": "Edit material", "Freestyle Nelson Sauvin 2026": "Edit material", "Choose lot": "Entity picker", "Done pulling": "Brew day timeline" },
+    to: { "Malted Oats": "Edit material", "Fieldstone Pilsen": "Edit material", "Chit Malt": "Edit material", "Rolled Oats": "Edit material", "Fieldstone White Wheat": "Edit material", "Brewer’s Crystals": "Edit material", "Freestyle Nelson Sauvin 2026": "Edit material", "Choose lot": "Entity picker", "Done pulling": "Brew day timeline" },
     job: "Pull a batch's brew-day ingredients before the brew, touching only exceptions",
     reads: "get_brew_day · get_brew_day_plan · list_vessels",
     writes: "save_batch_pulls [one RPC: replaces the batch's pulls and planned tank; moves no stock], reschedule_batch, cancel_batch",
@@ -1813,7 +1815,7 @@ export const SCREENS: Screen[] = [
     slice: 4,
     tab: "Work",
     name: "Brew day timeline",
-    to: { "Confirm all": "Brew day timeline", "Malted Oats": "Edit material", "Briess Pilsen": "Edit material", "Chit Malt": "Edit material", "Rolled Oats": "Edit material", "Briess White Wheat": "Edit material", "Brewer’s Crystals": "Edit material", "Freestyle Nelson Sauvin 2026": "Edit material", Gypsum: "Edit material" },
+    to: { "Confirm all": "Brew day timeline", "Malted Oats": "Edit material", "Fieldstone Pilsen": "Edit material", "Chit Malt": "Edit material", "Rolled Oats": "Edit material", "Fieldstone White Wheat": "Edit material", "Brewer’s Crystals": "Edit material", "Freestyle Nelson Sauvin 2026": "Edit material", Gypsum: "Edit material" },
     job: "Brew in process order, confirming each pulled ingredient and recording knockout once",
     reads: "get_brew_day · get_brew_day_plan · list_vessels",
     writes: "record_brew_day [existing command: confirmed actual sources + frozen sheet + knockout occupancy]",
@@ -2607,6 +2609,30 @@ export const SCREENS: Screen[] = [
     body: <ConfirmDeliveryView model={confirmDeliveryStop1} />,
   },
   {
+    step: 7, slice: 10, tab: "Work", name: "Delivery recorded",
+    job: "Read the saved receiving contact and outcome", reads: "get_delivery_stop", writes: "none",
+    states: [["partial", "accepted and refused quantities remain visible"]],
+    body: <ConfirmDeliveryView model={{ ...confirmDeliveryStop1, lines: confirmDeliveryStop1.lines.map(line => ({ ...line, qty: `${line.qty} accepted · 0 refused` })) }} readout={{ kind: "delivered", receivedBy: "Dana", outcome: "Delivered", transfer: false, invoice: "INV-0241", refused: false }} />,
+  },
+  {
+    step: 7, slice: 10, tab: "Work", name: "Delivery not departed",
+    job: "Wait for route departure", reads: "get_delivery_stop", writes: "none",
+    states: [["not departed", "no delivery action is offered"]],
+    body: <ConfirmDeliveryView model={confirmDeliveryStop1} readout={{ kind: "not_departed" }} />,
+  },
+  {
+    step: 7, slice: 10, tab: "Work", name: "Delivery other driver",
+    job: "Explain who may confirm this stop", reads: "get_delivery_stop", writes: "none",
+    states: [["permission", "assigned driver or admin only", 1]],
+    body: <ConfirmDeliveryView model={confirmDeliveryStop1} readout={{ kind: "not_assigned" }} />,
+  },
+  {
+    step: 7, slice: 10, tab: "Work", name: "Delivery transfer in transit",
+    job: "Read the stamped stop without claiming stock was received", reads: "get_delivery_stop", writes: "none",
+    states: [["delivered transfer", "stock remains in transit"]],
+    body: <ConfirmDeliveryView model={{ ...confirmDeliveryStop1, heading: "TRF-0004 · Storage", shipTo: undefined, invoiceTiming: "None · stock transfer", lines: [{ key: "hazy", title: "Hazy IPA · ½ bbl keg", qty: "4 accepted · 0 refused" }] }} readout={{ kind: "delivered", receivedBy: "Dana", outcome: "Delivered", transfer: true, invoice: "", refused: false }} />,
+  },
+  {
     step: 7, slice: 10, tab: "Work", name: "Check in refused beer",
     job: "Record refused beer physically returned to a bin",
     reads: "list_refused_returns + get_invoice_return_sources + list_locations + list_bins",
@@ -2614,6 +2640,32 @@ export const SCREENS: Screen[] = [
     states: [["permission", "warehouse or admin for on-delivery shipments; admin or sales uses Return and credit for invoice-now", 1], ["damage", "return and loss posted together"], ["retry", "same request replays"]],
     spec: "Refusal alone restores no stock. Check in actual received quantities against their shipped source lot. Outstanding returns remain visible after the route returns. Invoice-now refusals use Return and credit.",
     body: <RefusedReturnFormView model={{ title: "Check in · Ridgeline", locationId: "warehouse", locations: [{ value: "warehouse", label: "Warehouse" }], bins: [{ value: "cold", label: "Cold room", locationId: "warehouse" }], lines: [{ id: "hazy", name: "Hazy IPA · ½ bbl keg", outstanding: 2, sources: [{ id: "source", label: "HZ-041 · Cold room", shipped: 4 }] }] }} />,
+  },
+  {
+    step: 7, slice: 10, tab: "Work", name: "No refused beer",
+    job: "Confirm no physical returns are outstanding", reads: "list_refused_returns", writes: "none",
+    states: [["empty", "no check-in action"]],
+    body: <RefusedReturnStatusView />,
+  },
+  {
+    step: 7, slice: 10, tab: "Work", name: "Refused beer invoiced at ship",
+    job: "Use the invoice correction for beer already billed", reads: "list_refused_returns · get_delivery_stop", writes: "none",
+    to: { "Return and credit": "Return and credit" },
+    states: [["invoice now", "Admin or Sales records Return and credit"]],
+    body: <RefusedReturnStatusView invoiceNow />,
+  },
+  {
+    step: 7, slice: 10, tab: "Work", surface: "sheet", name: "Release standing allocation",
+    to: { "Release allocation": "Pars and allocation" },
+    job: "Confirm releasing a reservation without moving stock", reads: "list_standing_allocations", writes: "release_allocation",
+    states: [["ready", "release the named quantity"], ["error", "keep the confirmation open", 1]],
+    body: <ReleaseAllocationView sku="Hazy IPA · ½ bbl keg" qty={4} />,
+  },
+  {
+    step: 1, slice: "all", group: "Global", name: "Page load error",
+    job: "Retry a failed page without exposing internal error text", reads: "none", writes: "none",
+    states: [["reference", "report the reference when retry does not help"], ["no reference", "the generic message and retry remain"]],
+    body: <RouteErrorView reference="example-reference" />,
   },
   {
     step: 7,
