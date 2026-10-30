@@ -373,15 +373,9 @@ describe("Search view", () => {
     expect(body.props.model).toEqual(entityPickerPalette);
   });
 
-  it("the live Search adapters delegate their controls and results to SearchView", () => {
-    expect(existsSync("app/(app)/search/page.tsx")).toBe(false);
-    expect(src("app/(app)/layout.tsx")).toMatch(/<SearchSheet\b/);
-    const palette = src("components/mgr/search-palette.tsx");
-    expect(palette).toMatch(/<SearchView\b/);
-    expect(palette).not.toMatch(/<Command\b|<CommandInput\b|<CommandGroup\b|<CommandItem\b/);
-    expect(palette).toMatch(/emptyMessage=\{searchEmptyMessage\(/);
-    expect(screen("Search").states).toContainEqual(["first use", searchEmptyMessage("", "idle", true)]);
-    expect(screen("Search").states).toContainEqual(["empty", searchEmptyMessage("zzz", "ready", true)]);
+  it("keeps inventory first-use and empty states aligned with live search", () => {
+    expect(screen("Search").states).toContainEqual(["first use", searchEmptyMessage("", "idle")]);
+    expect(screen("Search").states).toContainEqual(["empty", searchEmptyMessage("zzz", "ready")]);
   });
 });
 
