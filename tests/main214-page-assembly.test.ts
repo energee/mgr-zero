@@ -32,7 +32,7 @@ async function query(name: string, input?: { basis?: string; missingPortalEmail?
     case "get_customer": return { customer, shipTos: [shipTo, { ...shipTo, id: "back", label: "Back door", is_default: false }] };
     case "list_customer_users": return [{ userId: "user", email: "jo@buyer.test", createdAt: "2026-09-01T00:00:00Z" }];
     // One unpaid pushed invoice with a QuickBooks balance: Open balance reads $250.00 (#1585).
-    case "list_invoices": return { rows: [{ id: "inv", kind: "invoice", qbo_invoice_id: "qbo", paid_at: null, qbo_balance_cents: 25000, has_pending_qbo_push: false, was_pushed_to_qbo: true, local_paid_cents: 0, total_cents: 25000 }], nextCursor: null };
+    case "list_invoices": return { rows: [{ id: "inv", kind: "invoice", qbo_invoice_id: "qbo", paid_at: null, qbo_balance_cents: 25000, has_pending_qbo_push: false, was_pushed_to_qbo: true, local_paid_cents: 0, local_credit_cents: 0, total_cents: 25000 }], nextCursor: null };
     case "list_customers": state.customerInput = input ?? {}; return [customer];
     case "list_locations": return [{ id: "location", name: "Cold room", uses: ["warehouse"] }];
     case "list_bins": return [{ id: "bin", name: "Cold" }];

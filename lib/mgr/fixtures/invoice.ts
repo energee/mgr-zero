@@ -59,6 +59,7 @@ export const invoiceFailedAls: InvoiceSnapshot = {
   hasPendingPush: false,
   wasPushedToQbo: false,
   localPaidCents: 0,
+  localCreditCents: 0,
 };
 
 /** INV-1039's accounting line, from the same authority the live page uses. */
@@ -84,6 +85,15 @@ export const invoiceLocalPartlyPaid: InvoiceSnapshot = {
   localPaidCents: 30000,
 };
 
+/** A return after full payment: $76 is owed back to the buyer, not due. */
+export const invoiceLocalCreditBalance: InvoiceSnapshot = {
+  ...invoiceLocalPartlyPaid,
+  invoice: { ...invoiceLocalPartlyPaid.invoice, paid_at: "2026-09-20T04:00:00Z" },
+  localPaidCents: 61500,
+  localCreditCents: 7600,
+  payments: [{ id: "pay-full", amount_cents: 61500, received_on: "2026-09-20", method: "check", reference: "1182", void: null }],
+};
+
 /** Accounting raised the QuickBooks total to $640 over $615 of frozen MGR lines. */
 export const invoiceEditedInQbo: InvoiceSnapshot = {
   ...invoiceFailedAls,
@@ -102,4 +112,5 @@ export const creditMemoAls: InvoiceSnapshot = {
   hasPendingPush: false,
   wasPushedToQbo: false,
   localPaidCents: 0,
+  localCreditCents: 0,
 };

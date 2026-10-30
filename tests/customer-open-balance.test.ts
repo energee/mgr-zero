@@ -13,7 +13,7 @@ import { toCustomerViewProps } from "../lib/mgr/customer-view";
 import { invoicesHref, invoiceStatusOptions, unpaidBalance, type InvoiceListRecord } from "../lib/mgr/invoices-view";
 
 const CUSTOMER = "00000000-0000-4000-8000-0000000000c1";
-const pushed: InvoiceListRecord = { id: "pushed", invoice_no: 1042, kind: "invoice", due_on: "2026-09-12", paid_at: null, qbo_sync_status: "pushed", qbo_sync_error: null, qbo_remote_state: "live", qbo_balance_cents: 30000, qbo_cash_collected_cents: 0, qbo_accountant_drift: false, written_off_at: null, subtotal_cents: 98000, total_cents: 98000, has_pending_qbo_push: false, qbo_invoice_id: "qbo-1042", local_paid_cents: 0, was_pushed_to_qbo: true, customers: { name: "Ridgeline" } };
+const pushed: InvoiceListRecord = { id: "pushed", invoice_no: 1042, kind: "invoice", due_on: "2026-09-12", paid_at: null, qbo_sync_status: "pushed", qbo_sync_error: null, qbo_remote_state: "live", qbo_balance_cents: 30000, qbo_cash_collected_cents: 0, qbo_accountant_drift: false, written_off_at: null, subtotal_cents: 98000, total_cents: 98000, has_pending_qbo_push: false, qbo_invoice_id: "qbo-1042", local_paid_cents: 0, local_credit_cents: 0, was_pushed_to_qbo: true, customers: { name: "Ridgeline" } };
 // QuickBooks never received it, so MGR's ledger owns the balance: total less payments recorded in MGR.
 const ledger: InvoiceListRecord = { ...pushed, id: "ledger", qbo_sync_status: "pending", qbo_invoice_id: null, was_pushed_to_qbo: false, qbo_balance_cents: null, total_cents: 50000, local_paid_cents: 20000 };
 // Pushed, but QuickBooks has not supplied a balance yet.

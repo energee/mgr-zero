@@ -40,7 +40,7 @@ type Question = { id: string; body: string; created_at: string; answered_at: str
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { brewery, ctx, snapshot } = await getInvoicePageData(id);
-  const { invoice, lines, payments, hasPendingPush, wasPushedToQbo, localPaidCents, quickbooksLink, lastPaymentMethod } = snapshot as { invoice: Invoice; lines: InvoiceLine[]; payments: InvoicePaymentRecord[]; hasPendingPush: boolean; wasPushedToQbo: boolean; localPaidCents: number; quickbooksLink: QboStaffInvoiceLink | null; lastPaymentMethod: PaymentMethod | null };
+  const { invoice, lines, payments, hasPendingPush, wasPushedToQbo, localPaidCents, localCreditCents, quickbooksLink, lastPaymentMethod } = snapshot as { invoice: Invoice; lines: InvoiceLine[]; payments: InvoicePaymentRecord[]; hasPendingPush: boolean; wasPushedToQbo: boolean; localPaidCents: number; localCreditCents: number; quickbooksLink: QboStaffInvoiceLink | null; lastPaymentMethod: PaymentMethod | null };
   const [questions, health] = (await Promise.all([
     canRun(ctx, "list_invoice_questions") ? runCommand("list_invoice_questions", { invoiceId: id }, ctx) : [],
     brewery.roles.includes("admin") || brewery.roles.includes("sales") ? runCommand("get_qbo_connection", {}, ctx) : null,
@@ -55,7 +55,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const presentation = qboInvoicePresentation({ kind: invoice.kind, roles: brewery.roles, connected: Boolean(health?.connected), syncStatus: invoice.qbo_sync_status, localPaidCents, hasPendingPush, syncError: invoice.qbo_sync_error, remoteState: invoice.qbo_remote_state, balanceCents: invoice.qbo_balance_cents, cashCollectedCents: invoice.qbo_cash_collected_cents, totalCents: invoice.qbo_total_cents, accountantDrift: invoice.qbo_accountant_drift, writtenOff: Boolean(invoice.written_off_at), missingMappings: Boolean(missingMappings) });
   const mappings = !credit && realm && (brewery.roles.includes("admin") || brewery.roles.includes("sales"))
     ? invoiceMappingRows(invoice.customers, lines, realm, health?.depositItemId, brewery.roles.includes("admin"), health?.oneWayFeeItemId) : undefined;
-  const model = toInvoiceViewProps({ invoice, lines, questions, mappings, payments, hasPendingPush, wasPushedToQbo, localPaidCents, backHref: "/invoices", timeZone: brewery.timeZone });
+  const model = toInvoiceViewProps({ invoice, lines, questions, mappings, payments, hasPendingPush, wasPushedToQbo, localPaidCents, localCreditCents, backHref: "/invoices", timeZone: brewery.timeZone });
   const recordPayment = model.paymentBalanceCents != null && canRun(ctx, "record_invoice_payment")
     ? <RecordPaymentForm invoiceId={invoice.id} balanceCents={model.paymentBalanceCents} today={breweryDate(brewery.timeZone)} quickbooksConnected={Boolean(health?.connected)} lastMethod={lastPaymentMethod} />
     : null;

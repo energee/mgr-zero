@@ -34,6 +34,7 @@ type LedgerInvoice = {
   has_pending_qbo_push: boolean;
   was_pushed_to_qbo: boolean;
   local_paid_cents: number;
+  local_credit_cents: number;
 };
 
 /** True when MGR's payment ledger, not QuickBooks, owns this invoice's balance
@@ -46,14 +47,14 @@ export function invoiceLedgerOwnsBalance(invoice: LedgerInvoice): boolean {
     && invoice.qbo_invoice_id == null
     && !invoice.has_pending_qbo_push
     && !invoice.was_pushed_to_qbo
-    && (invoice.paid_at == null || invoice.local_paid_cents > 0);
+    && (invoice.paid_at == null || invoice.local_paid_cents > 0 || invoice.local_credit_cents > 0);
 }
 
-/** The ledger's balance (total minus unvoided payments, never below zero) when
- *  the ledger owns it; otherwise QuickBooks' balance, which stays null when
- *  unknown and is never read as zero. */
+/** The ledger's signed balance: gross total minus live linked credits and
+ *  unvoided payments. Excess credit stays visible instead of becoming zero.
+ *  Otherwise QuickBooks owns the balance, which stays null when unknown. */
 export function invoiceBalanceCents(invoice: LedgerInvoice, totalCents: number): number | null {
-  if (invoiceLedgerOwnsBalance(invoice)) return Math.max(0, totalCents - invoice.local_paid_cents);
+  if (invoiceLedgerOwnsBalance(invoice)) return Math.max(0, totalCents) - invoice.local_credit_cents - invoice.local_paid_cents;
   return invoice.qbo_balance_cents ?? null;
 }
 

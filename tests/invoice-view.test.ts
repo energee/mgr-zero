@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { InvoiceView, RecordPaymentView } from "../components/mgr/views/invoice";
-import { creditMemoAls, invoiceEditedInQbo, invoiceFailedAls, invoiceLocalPartlyPaid, invoicePartlyPaid } from "../lib/mgr/fixtures/invoice";
+import { creditMemoAls, invoiceEditedInQbo, invoiceFailedAls, invoiceLocalCreditBalance, invoiceLocalPartlyPaid, invoicePartlyPaid } from "../lib/mgr/fixtures/invoice";
 import { ALS } from "../lib/mgr/fixtures/demo";
 import { invoiceMappingRows, invoicePaymentAmountError, invoicePaymentReason, toInvoiceViewProps } from "../lib/mgr/invoice-view";
 import { invoiceIsCreditable } from "../lib/mgr/invoice-state";
@@ -15,6 +15,30 @@ import { invoiceIsCreditable } from "../lib/mgr/invoice-state";
 const htmlOf = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(createElement("div", null, node));
 
 describe("Invoice view", () => {
+  it("nets linked credits, limits payment to the net, and identifies credit-only settlement", () => {
+    const snapshot = { ...invoiceFailedAls, localCreditCents: 7600 };
+    const model = toInvoiceViewProps(snapshot);
+    expect(model.paymentBalanceCents).toBe(53900);
+    expect(model.summary.settlement).toContainEqual({ label: "Credited in MGR", value: "$76.00" });
+    const settled = toInvoiceViewProps({ ...snapshot, localCreditCents: 61500, invoice: { ...snapshot.invoice, paid_at: "2026-10-20T04:00:00Z" } });
+    expect(settled.state.label).toBe("Settled");
+    expect(settled.paymentBalanceCents).toBeNull();
+  });
+
+  it("shows excess credit as money owed back, preserving gross total and cash received", () => {
+    const model = toInvoiceViewProps(invoiceLocalCreditBalance);
+    expect(model.state.label).toBe("Credit balance");
+    expect(model.summary.total).toMatchObject({ value: "$615.00" });
+    expect(model.summary.settlement).toEqual([
+      { label: "Credit balance", value: "$76.00", strong: true },
+      { label: "Paid in MGR", value: "$615.00" },
+      { label: "Credited in MGR", value: "$76.00" },
+    ]);
+    expect(model.paymentBalanceCents).toBeNull();
+    const html = htmlOf(createElement(InvoiceView, { model, recordPayment: null, paymentAction: null }));
+    expect(html).toContain("Credit balance");
+    expect(html).toContain("$76.00");
+  });
   it("checks mappings in the current realm, deduplicates SKUs, and gates unavailable fixes", () => {
     const customer = { name: "Actual customer", qbo_customer_id: "00227", qbo_realm_id: "current" };
     const line = { id: "line1", kind: "sku", sku_id: "sku1", description: "Actual SKU", skus: { name: "Actual SKU", qbo_item_id: "009", qbo_realm_id: "old" } };
@@ -175,6 +199,7 @@ describe("Invoice view", () => {
       hasPendingPush: false,
       wasPushedToQbo: false,
       localPaidCents: 0,
+      localCreditCents: 0,
     });
     expect(model.mappings).toBeUndefined();
     const html = htmlOf(createElement(InvoiceView, { model }));
