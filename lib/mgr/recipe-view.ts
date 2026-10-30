@@ -14,7 +14,7 @@ import { gravityBlockers, type GravityBlocker } from "@/lib/recipe-gravity";
 import { formatGravity, type GravityUnit } from "./gravity-unit";
 import { splitPacks, withPacks } from "./pack-qty";
 import { plural } from "./plural";
-import { fromTicks, isNumber, numberNotationError, toTicks } from "./quantity-input";
+import { fromTicks, isNumber, numberNotationError, percent, toTicks } from "./quantity-input";
 import { sentenceCase } from "./labels";
 import { submitReason } from "./submit-reason";
 import { READING_BOUNDS } from "@/lib/composer/offline-policy";
@@ -109,8 +109,6 @@ export type RecipeDraft = {
 
 /** A stored number as its field text: "" when absent, and Number() drops a numeric's trailing zeros. */
 const text = (n: number | string | null | undefined) => (n === null || n === undefined ? "" : String(Number(n)));
-/** A stored fraction as a percent: 0.725 gives "72.5". toPrecision(12) drops float noise (0.07 * 100); it never rounds to whole percents. */
-const percent = (f: number | string) => String(Number((Number(f) * 100).toPrecision(12)));
 
 /** The eight process numbers of a saved version as field text; the read page and the draft copy share it. */
 export function versionNumbers(v: SnapshotVersion): Record<RecipeNumberKey, string> {

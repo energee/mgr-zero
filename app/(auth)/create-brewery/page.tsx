@@ -1,7 +1,8 @@
+import { isUuid } from "@/lib/uuid";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { E } from "@/components/mgr/e";
-import { buildRouteContext, isUuid } from "@/lib/commands/context";
+import { buildRouteContext } from "@/lib/commands/context";
 import { CommandError, runCommand } from "@/lib/commands/registry";
 import { getRequestIdentity } from "@/lib/auth/request-context";
 import { getServerEnv } from "@/lib/env/server";

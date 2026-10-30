@@ -1,3 +1,4 @@
+import { PORTAL_BUYER } from "@/components/mgr/screens";
 // components/mgr/screen-frame.tsx — one screen record inside the surface it
 // actually ships in: the app or portal shell, a pinned-open CommandForm for a
 // sheet, a bare card for an entry screen, or the vendor's own chrome for a
@@ -20,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/mgr/icon";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
-import { PERSONAS, type Persona, PORTAL_BUYER } from "@/lib/mgr/demo-personas";
+import { PERSONAS, type Persona } from "@/lib/mgr/demo-personas";
 import { toUnitsViewProps } from "@/lib/mgr/units-view";
 import { unitsPlato } from "@/lib/mgr/fixtures/settings-catalog";
 

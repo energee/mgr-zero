@@ -9,6 +9,7 @@
 // the live page both pass toInvoiceViewProps(get_invoice-shaped data); the
 // live page supplies authorized actions through the slots (an explicit null
 // suppresses a slot; omitted draws the inert fixture control).
+import { plural } from "@/lib/mgr/plural";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
@@ -145,7 +146,7 @@ export function InvoiceView({
       <section aria-labelledby="invoice-lines" className="border-t pt-5">
         <div className="flex items-baseline justify-between gap-3">
           <h2 id="invoice-lines" className={H2}>Line items</h2>
-          <span className={LEGEND}>{model.lines.length} {model.lines.length === 1 ? "line" : "lines"}</span>
+          <span className={LEGEND}>{plural(model.lines.length, "line")}</span>
         </div>
         <div className="mt-2 hidden md:block">
           <Table>

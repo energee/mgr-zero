@@ -96,7 +96,7 @@ describe("Work chips", () => {
   it("name the screen each chip opens", async () => {
     const { renderToStaticMarkup } = await import("react-dom/server");
     const { createElement } = await import("react");
-    const { WORK_TABS } = await import("../components/mgr/screens");
+    const { WORK_TABS } = await import("../lib/mgr/work-view");
     for (const name of Object.values(WORK_TABS)) expect(by(name), name).toBeDefined();
     for (const name of ["Work", "Orders", "Transfers", "Batches", "Packaging runs", "Purchase orders", "Routes", "Pick sheet", "Pars and allocation"]) {
       const html = renderToStaticMarkup(createElement("div", null, by(name).body));

@@ -42,9 +42,9 @@ export function ReceivePoView({ model, controls = {}, messages, submitting = fal
         <DatePicker label="Received on" value={controls.receivedOn ? model.receivedOn ?? "" : undefined} defaultValue={model.receivedOn} onChange={controls.receivedOn} />
       </>}
       {(model.lines ?? []).map(line => <Fragment key={line.key}>
-        {receiving ? E.line(line.title, line.detail,
+        {receiving ? E.row(line.title, line.detail,
           <OrderQuantity label={`${line.title} counted`} value={line.qty} onChange={controls.quantity && (value => controls.quantity?.(line.key, value))} />,
-          line.warning ? "w" : line.ok ? "ok" : "",
+          line.warning ? "w" : line.ok ? "ok" : "", undefined,
           line.lot !== undefined ? <>
             {E.edit("Lot", line.lot, "text", line.lotOptions, { onChange: controls.lot ? value => controls.lot?.(line.key, value) : undefined, placeholder: "Lot code off the package", "aria-label": `${line.title} lot` })}
             <DatePicker label="Best by" value={controls.bestBy ? line.bestBy ?? "" : undefined} defaultValue={line.bestBy} onChange={controls.bestBy && (value => controls.bestBy?.(line.key, value))} />

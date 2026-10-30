@@ -10,7 +10,8 @@ const state = vi.hoisted(() => ({ roles: ["admin"], calls: [] as string[], custo
 vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery", roles: state.roles }) }));
 // The real command registry loads (the pages import @/lib/commands/all), so canRun
 // answers each role the way it does live.
-vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ breweryId: "brewery", roles: state.roles }), isUuid: () => true }));
+vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ breweryId: "brewery", roles: state.roles }) }));
+vi.mock("@/lib/uuid", () => ({ isUuid: () => true }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }), notFound() { throw new Error("not found"); } }));
 vi.mock("@/lib/commands/use-command-form", () => ({ useCommandAction: () => ({ busy: false, error: "", fieldErrors: {}, run() {} }), useCommandForm: () => ({ open: false, setOpen() {}, busy: false, error: "", fieldErrors: {}, submit() {} }) }));
 vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query }));

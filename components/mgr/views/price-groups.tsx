@@ -1,3 +1,4 @@
+import { TabBar } from "@/components/mgr/qty";
 // components/mgr/views/price-groups.tsx — Price groups grid, drawn once for
 // both surfaces: one tab per sale channel over that channel's table. Every
 // cell is an inline dollars field (PriceCellInput); emptying a priced one
@@ -77,7 +78,7 @@ export function PriceGroupsView({
         : <>
           {model.tabHrefs
             ? <LinkTabs items={model.tabHrefs} current={channel.name} className="w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none] md:w-fit" />
-            : E.tabs(model.tabs, model.tab, "w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none] md:w-fit")}
+            : <TabBar names={model.tabs} on={model.tab} cls="w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none] md:w-fit" />}
           <div className="min-w-0 shrink-0 overflow-x-auto">
             {E.tbl(
               ["Group", ...model.headers],

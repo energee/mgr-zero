@@ -12,11 +12,7 @@
 // answers the brewhouse's question: what still has to be brewed?
 import { z } from "zod";
 import { skuLabel } from "@/lib/mgr/finished-goods-view";
-import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, CommandError, type Ctx } from "./registry";
-
-// z.string().date() rather than a regex: api-schema.ts renders it as
-// "date (YYYY-MM-DD)" in /docs/api, as orders.ts and transfers.ts already do.
-export const isoDate = z.string().date();
+import { completeRows, defineCommand, defineQuery, inChunks, isoDate, PAGE_SIZE, unwrap, CommandError, type Ctx } from "./registry";
 
 const outputs = z.array(z.object({
   skuId: z.string().uuid(),
@@ -298,7 +294,7 @@ async function vesselNames(ctx: Ctx, occupancyIds: (string | null)[]) {
 // Planned units per run. Summed here rather than in a view: the number is a
 // convenience for the list, and packaging_run_outputs stays the truth. Runs go
 // 100 ids per read, and each read is paged past the 1000-row cap (#469).
-async function plannedQty(ctx: Ctx, runIds: string[]) {
+async function plannedUnitsByRun(ctx: Ctx, runIds: string[]) {
   if (runIds.length === 0) return new Map<string, number>();
   const rows = await inChunks(runIds, chunk => completeRows("Planned units", start => ctx.db.from("packaging_run_outputs")
     .select("run_id, qty_planned", { count: "exact" }).eq("brewery_id", ctx.breweryId).in("run_id", chunk).order("id").range(start, start + PAGE_SIZE - 1)));
@@ -322,7 +318,7 @@ defineQuery({
     const [brands, vessels, qty] = await Promise.all([
       brandNames(ctx, runs.map((r) => r.brand_id)),
       vesselNames(ctx, runs.map((r) => r.occupancy_id)),
-      plannedQty(ctx, runs.map((r) => r.id)),
+      plannedUnitsByRun(ctx, runs.map((r) => r.id)),
     ]);
 
     return runs.map((r) => ({

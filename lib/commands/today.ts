@@ -56,8 +56,7 @@ defineQuery({
     // grows without bound (inventory_movements), and this runs on every Today
     // render until setup finishes. LIMIT stops the planner at the first row or two.
     const has = async (table: "locations" | "brands" | "inventory_movements" | "brewery_users", min = 1) => {
-      const { data, error } = await ctx.db.from(table).select("brewery_id").eq("brewery_id", ctx.breweryId).limit(min);
-      if (error) throw error;
+      const data = await unwrap(ctx.db.from(table).select("brewery_id").eq("brewery_id", ctx.breweryId).limit(min));
       return (data?.length ?? 0) >= min;
     };
     const [hasLocation, hasBrand, hasMovement, hasStaff] = await Promise.all([has("locations"), has("brands"), has("inventory_movements"), has("brewery_users", 2)]);

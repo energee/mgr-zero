@@ -1,3 +1,4 @@
+import { sentenceCase } from "./labels";
 // lib/mgr/order-view.ts — the Order screen's view-model: one shape for the
 // inventory mock and for get_order. Mapping lives here so the page does not
 // compose a second E.* tree. It also owns the order's price summary: line
@@ -121,7 +122,6 @@ export type OrderSnapshot = {
   actorNames?: Record<string, string>;
 };
 
-const titled = (status: string) => status.charAt(0).toUpperCase() + status.slice(1);
 
 function lineChange(entries: unknown, skuNames: Map<string, string>): string {
   if (!entries) return "—";
@@ -283,7 +283,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
     events: events.map((e) => ({
       key: e.id,
       at: formatDateTime(e.created_at, timeZone),
-      event: titled(e.event.replace(/_/g, " ")),
+      event: sentenceCase(e.event),
       ...(actorNames ? { by: actorNames[e.actor] ?? "a user not on the team" } : {}),
       detail: e.event === "lines_adjusted"
         ? `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${typeof e.payload.reason === "string" && e.payload.reason.trim() ? ` (${e.payload.reason.trim()})` : ""}`

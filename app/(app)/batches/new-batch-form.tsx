@@ -9,7 +9,7 @@
 // opens blank again and a reload does not reopen it.
 "use client";
 
-import { brandLabel } from "@/lib/mgr/brand-view";
+import { nameWithAlias } from "@/lib/mgr/labels";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -46,7 +46,7 @@ export function NewBatchForm({ brands, recipeVersions, today, brandsHref, recipe
     recipeOptions: recipeVersions,
     brandId: intendedBrandId,
     brand: brands.find(({ id }) => id === intendedBrandId)?.name ?? "Not decided",
-    brandOptions: brands.map((b) => ({ id: b.id, label: brandLabel(b) })),
+    brandOptions: brands.map((b) => ({ id: b.id, label: nameWithAlias(b) })),
     plannedBbl,
     date: plannedOn,
     today,

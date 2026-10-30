@@ -1,3 +1,4 @@
+import { isUuid } from "@/lib/uuid";
 // app/(app)/vendors/vendor-data.ts — the one vendor read that the vendor page
 // and its metadata share within a request (#1586). list_vendors_and_contracts
 // narrowed to the id returns no row for a vendor the caller cannot see, which
@@ -5,7 +6,7 @@
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { getActiveBrewery } from "@/lib/brewery";
-import { buildContext, isUuid } from "@/lib/commands/context";
+import { buildContext } from "@/lib/commands/context";
 import { runPageQuery } from "@/lib/mgr/page-query";
 import type { VendorRecord } from "@/lib/mgr/vendor-detail-view";
 import type { Vendor } from "./vendor-form";

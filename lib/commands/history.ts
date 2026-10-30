@@ -1,3 +1,4 @@
+import { isUuid } from "@/lib/uuid";
 import { z } from "zod";
 
 /** Records per history page; also the API default. */
@@ -9,7 +10,7 @@ export const historyInput = {
   limit: z.number().int().min(1).max(200).default(HISTORY_PAGE_SIZE),
   cursor: z.string().refine(value => {
     const parts = value.split("~");
-    return parts.length === 2 && z.iso.datetime({ offset: true }).safeParse(parts[0]).success && z.uuid().safeParse(parts[1]).success;
+    return parts.length === 2 && z.iso.datetime({ offset: true }).safeParse(parts[0]).success && isUuid(parts[1]);
   }, "Expected created_at~id from the last displayed record").describe("Continue after the last displayed record: created_at~id, preserving the timestamp exactly").optional(),
 };
 

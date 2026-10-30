@@ -4,7 +4,7 @@
 import { z } from "zod";
 import { cents, CommandError, completeRows, countryCode, defineCommand, defineQuery, PAGE_SIZE, stateCode, unwrap } from "./registry";
 import { CUSTOMER_TYPES, PAYMENT_TERMS } from "@/lib/mgr/enums";
-import { escapeRegex } from "@/lib/escape-regex";
+import { quotedSearchPattern } from "@/lib/escape-regex";
 import { hasAnyRole } from "@/lib/mgr/roles";
 import { shipToLabelTaken, US_ZIP } from "@/lib/mgr/ship-to-view";
 import { qboUnmappedFilter, unmappedInput } from "./qbo";
@@ -115,9 +115,7 @@ defineQuery({
   // Paged past PostgREST's 1000-row cap (#475); id breaks name ties so pages never overlap.
   handler: async (ctx, i) => {
     if (i.missingPortalEmail && !hasAnyRole(ctx.roles, ["admin", "sales"])) throw new CommandError("permission denied", 403, "permission_denied");
-    // An unanchored imatch is a case-insensitive contains. A PostgREST or() value is double-quoted, so `"` and `\`
-    // (including escapeRegex's) are escaped again, as list_brands does.
-    const pattern = i.q && `"${escapeRegex(i.q).replace(/["\\]/g, (c) => `\\${c}`)}"`;
+    const pattern = i.q && quotedSearchPattern(i.q);
     const unmapped = i.unmapped ? await qboUnmappedFilter(ctx, "qbo_customer_id") : null;
     return completeRows("Customer list", start => {
     const columns = i.includeShipTos ? "*, sale_channels(name), shipTos:ship_tos(id, label, is_default)" : "*, sale_channels(name)";

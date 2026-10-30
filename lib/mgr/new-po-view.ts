@@ -1,7 +1,7 @@
 // lib/mgr/new-po-view.ts — view-model for New PO and Edit PO, its per-line
 // field errors, its Expected prefill, and what its Save draft still needs.
 import { toCents } from "@/lib/mgr/money";
-import { numberNotationError } from "@/lib/mgr/quantity-input";
+import { MATERIAL_QTY_MAX, numberNotationError, PG_INT_MAX } from "@/lib/mgr/quantity-input";
 import { submitReason } from "@/lib/mgr/submit-reason";
 import { isPastDay } from "@/lib/date-format";
 
@@ -55,10 +55,10 @@ export function poLineErrors(line: { qty: number | string; cost: string }): { qt
   const cost = Number(line.cost);
   let qtyError: string | undefined;
   if (line.qty !== "" && !(qty > 0)) qtyError = "Enter a quantity above zero.";
-  else if (qty > 9_999_999_999.9999) qtyError = "Enter a quantity no greater than 9,999,999,999.9999.";
+  else if (qty > MATERIAL_QTY_MAX) qtyError = "Enter a quantity no greater than 9,999,999,999.9999.";
   let costError: string | undefined;
   if (line.cost !== "" && !(cost >= 0)) costError = "Enter a cost of zero or more.";
-  else if ((toCents(line.cost) ?? 0) > 2_147_483_647) costError = "Enter a cost no greater than $21,474,836.47.";
+  else if ((toCents(line.cost) ?? 0) > PG_INT_MAX) costError = "Enter a cost no greater than $21,474,836.47.";
   return { ...(qtyError && { qty: qtyError }), ...(costError && { cost: costError }) };
 }
 

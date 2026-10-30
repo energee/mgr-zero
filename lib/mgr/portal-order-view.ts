@@ -1,5 +1,6 @@
 // lib/mgr/portal-order-view.ts — view-model for portal Order detail.
 // portal_order (order, lines, events, shipment.invoices) plus buyerStatus.
+import { plural } from "@/lib/mgr/plural";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { shipToAddress } from "./ship-to-view";
@@ -112,7 +113,7 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
       ? "The brewery adjusted this order. Quantities above are what ships."
       : undefined,
     shortageExplanation: shortLines.length
-      ? `The brewery shipped less than ordered.${shortReasons.length ? ` Reason: ${shortReasons.join("; ")}.` : " A shortage reason was not recorded."} The unshipped ${unshipped} ${unshipped === 1 ? "unit was" : "units were"} cancelled when this order closed; no units remain to ship.`
+      ? `The brewery shipped less than ordered.${shortReasons.length ? ` Reason: ${shortReasons.join("; ")}.` : " A shortage reason was not recorded."} The unshipped ${plural(unshipped, "unit was", "units were")} cancelled when this order closed; no units remain to ship.`
       : undefined,
     invoice: invoice
       ? {

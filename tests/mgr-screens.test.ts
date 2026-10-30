@@ -1,3 +1,4 @@
+import { ListControls } from "@/components/mgr/list-controls";
 // tests/mgr-screens.test.ts — the screen inventory (the source of truth for
 // MGR screens) is a typed record set:
 // every record carries its metadata, `states` is a caption (never rendered
@@ -898,7 +899,7 @@ describe("SCREENS", () => {
     const inp = r(E.inp("Address", "114 Bridge St"));
     expect(inp).toMatch(/<label[^>]*>Address<\/label>/);
     expect(inp).toContain('placeholder="114 Bridge St"');
-    const search = r(E.search("Search customers"));
+    const search = r(createElement(ListControls, { search: { label: "Search customers", value: "", keep: {} } }));
     expect(search).toMatch(/type="search"/);
     expect(search).not.toContain("<label");
     // No field is drawn label-beside-control any more.

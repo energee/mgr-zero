@@ -11,7 +11,7 @@
 import { DatePicker } from "@/components/mgr/date-picker";
 import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon";
 import { Palette, type PaletteGroup } from "@/components/mgr/palette";
-import { Qty, StepQuantity, TabBar } from "@/components/mgr/qty";
+import { Qty, StepQuantity } from "@/components/mgr/qty";
 import { SearchPick, type SearchPickOption } from "@/components/mgr/search-pick";
 import { SortTable } from "@/components/mgr/sort-table";
 import { SubmitButton, type SubmitButtonProps } from "@/components/mgr/submit-button";
@@ -28,7 +28,6 @@ import { Input } from "@/components/ui/input";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { StaffRole } from "@/lib/commands/registry";
@@ -41,8 +40,7 @@ import * as React from "react";
 import { Children, Fragment, isValidElement, type ReactNode } from "react";
 
 /** Selected outline toggle painted with the primary pair instead of the faint
- *  bg-muted wash, for choices that must read at a glance (Location Uses, #493).
- *  E.chips takes it as `bright`; components/ui/toggle.tsx stays stock shadcn. */
+ *  bg-muted wash, for choices that must read at a glance (Location Uses, #493). */
 export const BRIGHT_ON = "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground";
 
 /** Row modifiers from the wireframe: w = needs attention, ok = current, dis = gated. */
@@ -315,7 +313,7 @@ export const E = {
   arrow: (label: string | null = "to") => <DirectionIcon label={label} />,
   /** A typed quantity under its visible label: the OS keyboard is the keypad.
    *  unit renders as a trailing addon — plain text ("bbl"), chips, or a
-   *  segmented unit choice (`E.tabs` hugged with "w-fit"). The label, the
+   *  segmented unit choice hugged with "w-fit". The label, the
    *  field's clipping and addon padding live in components/mgr/qty.tsx,
    *  shared with `volume`. */
   qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string, controls?: FieldControls) => {
@@ -325,24 +323,10 @@ export const E = {
       {error.message}
     </>;
   },
-  /** A view switcher. E.tabs draws no TabsContent: the body below stands in
-   *  for the active panel. A filter that swaps the whole list (Work's kinds, an
-   *  order's states) is a tab bar too. A live in-place filter (WorkView) calls
-   *  `TabBar` with `panel` instead, so its tabs control real tabpanels.
-   *  Single-choice fields stay chips, except the unit a quantity is entered in:
-   *  that is a switcher on the number itself and rides inside the field as
-   *  `E.qty`'s addon (see `volume`).
-   *  Spans the column by default; pass width classes to hug ("w-fit", an input
-   *  addon) or to scroll a bar too long for the phone ("overflow-x-auto").
-   *  `to` names the screen a tab opens; the explorer walks there and hides tabs
-   *  the persona may not open. See components/mgr/qty.tsx for the a11y caveat. */
-  tabs: (names: string[], on = 0, cls = "w-full", to?: Record<string, string>) => (
-    <TabBar names={names} on={on} cls={cls} to={to} />
-  ),
-  chips: (arr: string[], on = 0, bright = false, controls?: { onChange: (index: number) => void; disabled?: boolean; label?: string }) => (
+  chips: (arr: string[], on = 0, controls?: { onChange: (index: number) => void; disabled?: boolean; label?: string }) => (
     <ToggleGroup type="single" {...(controls ? { value: arr[on], onValueChange: (value: string) => { if (value) controls.onChange(arr.indexOf(value)); }, disabled: controls.disabled, "aria-label": controls.label } : { defaultValue: arr[on] })} variant="outline" size="sm" className="flex-wrap justify-start">
       {arr.map((c) => (
-        <ToggleGroupItem key={c} value={c} className={cn(bright && BRIGHT_ON)}>{c}</ToggleGroupItem>
+        <ToggleGroupItem key={c} value={c}>{c}</ToggleGroupItem>
       ))}
     </ToggleGroup>
   ),
@@ -519,16 +503,6 @@ export const E = {
       ))}
     </dl>
   ),
-  stp: (arr: string[], cur: number) => (
-    <div className="flex items-center gap-1 text-xs">
-      {arr.map((s, i) => (
-        <React.Fragment key={s}>
-          <Badge variant={i === cur ? "default" : "outline"}>{s}</Badge>
-          {i < arr.length - 1 && <Separator className={cn("flex-1", i < cur && "bg-primary")} />}
-        </React.Fragment>
-      ))}
-    </div>
-  ),
   /** Status tiles. `actions` sit under a tile's facts; with an `href` too, the facts stay the link. */
   tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?, string?, React.ReactNode?][]) => (
     <ItemGroup className="grid grid-cols-2 gap-2 md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
@@ -575,10 +549,6 @@ export const E = {
       <Input placeholder={hint} aria-label={label} />
     </Field>
   ),
-  /** A search box: the one input whose placeholder is its whole label. A list
-   *  passes `name`, `defaultValue` and `maxLength` and wraps it in a GET form, plus `onChange`
-   *  to search as you type (components/mgr/list-controls.tsx); a drawing passes none. */
-  search: (t = "Search", controls?: { name: string; defaultValue: string; maxLength: number; onChange?: React.ChangeEventHandler<HTMLInputElement> }) => <Input type="search" placeholder={t} aria-label={t} {...controls} />,
   stq: (v: number, label = "Quantity", controls?: FieldControls & { value: string }) => <StepQuantity label={label} defaultValue={String(v)} min={controls ? controls.min : 0} step={controls ? controls.step : 1} {...controls} required={controls ? controls.required !== false : false} />,
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
   /** A row that opens something. `href` makes the whole row the link, as E.act
@@ -589,10 +559,6 @@ export const E = {
     const row = E.row(t, s, <span data-tap><DirectionIcon label="Open" /></span>, cls, icon);
     return href ? <Link href={href} prefetch={rowLinkPrefetch(href)} data-to={to} className="block">{row}</Link> : row;
   },
-  /** A document line: a material or SKU with its quantity and the fields that
-   *  belong to it. No line wants an icon, so this fills that slot rather than
-   *  every call site writing the hole. */
-  line: (t: React.ReactNode, s: React.ReactNode, n: React.ReactNode, cls: RowClass, fields: React.ReactNode) => E.row(t, s, n, cls, undefined, fields),
   sp: () => <div className="flex-1" />,
   comp: (roles: readonly StaffRole[] = ["admin"], container?: HTMLElement | null) => <ComposerDemo disabled={!roles.length} container={container} />,
 };

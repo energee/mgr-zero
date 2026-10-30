@@ -314,6 +314,7 @@ const SALT_OPTIONS: SaltMaterial[] = [
   { id: "gypsum", name: "Gypsum", salt: "gypsum" }, { id: "cacl", name: "Calcium chloride", salt: "calcium_chloride" }, { id: "epsom", name: "Epsom salt", salt: "epsom_salt" },
   { id: "lactic", name: "Lactic acid", salt: null }, { id: "phos", name: "Phosphoric acid", salt: null },
 ];
+/** The portal frames' buyer; staff frames use the selected staff persona. */
 export const PORTAL_BUYER = { name: "Jordan Lee", account: "Ridgeline Tap Room", email: "jordan@ridgelinetap.com" };
 
 export type Tab = "Today" | "Beer" | "Work" | "More";
@@ -392,10 +393,6 @@ export const INV = {
   creditMajor: "106",
   fee: "$9.48",
 } as const;
-
-// A rough remaining fill, wherever a keg comes off a tap.
-
-export { WORK_TABS } from "@/lib/mgr/work-view";
 
 // The states every screen can reach; a record with designed states lists its own instead.
 const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]];

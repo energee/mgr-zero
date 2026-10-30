@@ -13,7 +13,6 @@ import { KIND_LABEL } from "@/lib/mgr/keg-labels";
 import { kegPoolFieldErrors, type KegFleetViewModel, type KegOption, type KegPoolValue } from "@/lib/mgr/keg-fleet-view";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 
-export { KegEventFields } from "@/components/mgr/views/keg-event-form";
 export type { KegFleetViewModel };
 
 const KIND_OPTIONS = KEG_POOL_KINDS.map((value) => ({ value, label: KIND_LABEL[value] }));
