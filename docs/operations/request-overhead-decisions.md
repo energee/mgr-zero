@@ -43,6 +43,8 @@ Order detail starts independent header, line, event, shipment and deposit reads 
 
 Movement history uses the existing `created_at~id` cursor contract. It returns `{ rows, nextCursor }`; callers pass `nextCursor` to continue instead of scanning an ever-growing offset. The filtered Orders and movement history indexes match their descending timestamp/id order. Keg aging is reduced under caller RLS in PostgreSQL before the report crosses the REST boundary; FIFO, excess returns, losses and tenant isolation remain unchanged.
 
+The SKU-history index includes `qty` so tenant/SKU ledger sums remain index-only when the planner chooses it instead of the existing on-hand index. This preserves the portal-availability read path as well as the new cursor order.
+
 ### Foreign-key evidence, not a per-column index mandate
 
 Read-only `EXPLAIN (ANALYZE, BUFFERS)` on local test `:54352`, schema `20261029123000`, checked the audit's three named FK lookups. Each query selected `1` with the actual composite FK equality predicates and `LIMIT 1`; the referenced UUID was absent, so it exercised the no-match path.
@@ -54,7 +56,7 @@ Read-only `EXPLAIN (ANALYZE, BUFFERS)` on local test `:54352`, schema `202610291
 | `inventory_movements(location_id, brewery_id)` | Index-only scan on `movements_onhand_idx`; both equalities in `Index Cond`, no heap fetches | Reuse it; no new location-leading ledger index |
 | `inventory_movements(compensates_id, brewery_id)` | Index-only scan on the existing reversed-order unique key; both equalities in `Index Cond`, no heap fetches | Reuse it; no new compensation-leading index |
 
-The audit's per-column count is not evidence that every column needs its own leading index. A composite FK can use an existing index in a different equality-key order, and a nullable-reference lookup can use a safe `IS NOT NULL` partial index. Adding an index for every catalog absence would amplify writes without demonstrating a workload benefit. The regression checks the demonstrated FK equality prefixes in either order, accepts safe nullable-key predicates, and proves the existing location lookup remains index-backed. Other unmeasured FK-index proposals are intentionally retained pending concrete lookup plans and workload evidence, not silently treated as fixed.
+The audit's per-column count is not evidence that every column needs its own leading index. A composite FK can use an existing index in a different equality-key order, and a nullable-reference lookup can use a safe `IS NOT NULL` partial index. Adding an index for every catalog absence would amplify writes without demonstrating a workload benefit. The regression checks the demonstrated FK equality prefixes in either order and accepts safe nullable-key predicates. Exact planner choices depend on statistics and available indexes; the observed baseline location plan is evidence of existing index support, not a promise that every fixture chooses that index. Other unmeasured FK-index proposals are intentionally retained pending concrete lookup plans and workload evidence, not silently treated as fixed.
 
 Lot-trace timing and call-count follow-up remain tracked in [#1491](https://github.com/energee/mgr-zero/issues/1491). Its hosted read-only timing gate is not waived by the local query improvements here.
 

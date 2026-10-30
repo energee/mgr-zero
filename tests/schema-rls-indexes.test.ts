@@ -138,19 +138,6 @@ describe("RLS index and auth.uid() rules", () => {
 });
 
 describe("ledger sum indexes", () => {
-  it("the location FK lookup already uses the covering ledger index without a location-leading index", () => {
-    const plan = sql(`
-      set local enable_seqscan = off;
-      set local enable_bitmapscan = off;
-      set local enable_indexscan = off;
-      explain (costs off) select 1 from public.inventory_movements
-      where brewery_id = '00000000-0000-4000-8000-000000000000'
-        and location_id = '00000000-0000-4000-8000-000000000001' limit 1`).join("\n");
-    expect(plan).toContain("Index Only Scan using movements_onhand_idx");
-    expect(plan).toContain("Index Cond:");
-    expect(plan).toContain("location_id =");
-  });
-
   it("portal_availability sums both ledgers with index-only scans (#794)", () => {
     // Explains the function's own body, so a rewrite that stops leading with
     // brewery_id, or reads a column the index lacks, fails here. The test
@@ -160,13 +147,22 @@ describe("ledger sum indexes", () => {
     // back to a disabled node and the assertions fail. Index-only still means
     // heap fetches for pages vacuum has not yet marked all-visible.
     const body = sql(`select prosrc from pg_proc where proname = 'portal_availability'`).join("\n");
-    const plan = sql(`
+    const explained = sql(`
       set local enable_seqscan = off;
       set local enable_bitmapscan = off;
       set local enable_indexscan = off;
       set local enable_sort = off;
-      explain (costs off) ${body.replaceAll("p_customer", "'00000000-0000-4000-8000-000000000000'::uuid")}`).join("\n");
-    expect(plan).toContain("Index Only Scan using movements_onhand_idx on inventory_movements");
-    expect(plan).toContain("Index Only Scan using allocations_open_idx on allocations");
+      explain (format json, costs off) ${body.replaceAll("p_customer", "'00000000-0000-4000-8000-000000000000'::uuid")}`, true).join("\n");
+    type PlanNode = { "Node Type": string; "Relation Name"?: string; Plans?: PlanNode[] };
+    const plan = JSON.parse(explained) as { Plan: PlanNode }[];
+    function planNodes(node: PlanNode): PlanNode[] {
+      return [node, ...(node.Plans ?? []).flatMap(planNodes)];
+    }
+    const nodes = planNodes(plan[0].Plan);
+    for (const table of ["inventory_movements", "allocations"]) {
+      const scans = nodes.filter(node => node["Relation Name"] === table);
+      expect(scans.length, table).toBeGreaterThan(0);
+      expect(scans.every(node => node["Node Type"] === "Index Only Scan"), table).toBe(true);
+    }
   });
 });
