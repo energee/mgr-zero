@@ -19,7 +19,10 @@ export async function getActiveBrewery() {
 
   const picked = (await cookies()).get("brewery")?.value;
   const membership = memberships.find(({ breweryId }) => breweryId === picked) ?? memberships[0];
-  return { id: membership.breweryId, name: membership.breweryName, roles: membership.roles, timeZone: membership.timeZone };
+  return {
+    id: membership.breweryId, name: membership.breweryName, roles: membership.roles, timeZone: membership.timeZone,
+    gravityUnit: membership.gravityUnit, myGravityUnit: membership.myGravityUnit,
+  };
 }
 
 export async function requireAdminContext(label: string) {

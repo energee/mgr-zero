@@ -13,8 +13,6 @@ import { BrewFooter } from "./brew-prep";
 import { CancelOrderControl } from "./cancel-order";
 import { CancelOrderButton, OrderCancelRow } from "./order";
 
-export type { ConfirmOrderViewModel };
-
 export function ConfirmOrderView({
   model,
   footer,

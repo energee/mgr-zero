@@ -4,8 +4,9 @@ How the order-confirmation email worker is configured and scheduled, and how an 
 
 Wholesale confirmation queues mail for the customer's currently linked portal
 buyers. No linked buyers produces a blocked `no_recipient` record. Admin/Sales
-can read order email states through the [Orders API](/docs/api/orders). The
-status `accepted` means Resend accepted it, not that it reached an inbox.
+can read confirmation email states on the order screen and through the
+[Orders API](/docs/api/orders). The status `accepted` means Resend accepted it,
+not that it reached an inbox.
 
 The internal `POST /api/email/jobs/deliver` worker requires a bearer token
 matching `ORDER_EMAIL_JOB_SECRET`. It uses `RESEND_API_KEY` and
@@ -30,8 +31,12 @@ response exists. A validated opaque `deliveryId` identifies a leased delivery;
 logs never include recipients, message contents, credentials, raw provider
 payloads, or exception messages. The status API keeps its existing generic
 `provider_uncertain` / `provider_rejected` codes; detailed causes are operator
-logs, not customer-facing fields. Provider retries still return HTTP 200 with a
-retry count; fatal worker failures still return a generic HTTP 500.
+logs, not customer-facing fields. A batch with retries or blocked emails and no
+provider acceptances returns HTTP 503 with `ok: false` and the delivery counts.
+The hosted-jobs workflow's `curl --fail-with-body` fails that run, so the existing
+workflow watcher can report it. Empty and partially successful batches return
+HTTP 200; partial failures remain visible in the counts and on each order.
+Fatal worker failures return a generic HTTP 500.
 
 Use the log category to recover before the saved 23-hour cutoff:
 - `configuration` at the configuration stage: restore the worker's provider,

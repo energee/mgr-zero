@@ -3,8 +3,6 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { PutBackViewModel } from "@/lib/mgr/put-back-view";
 
-export type { PutBackViewModel };
-
 export function PutBackView({ model, footer }: { model: PutBackViewModel; footer?: ReactNode }) {
   return (
     <>
