@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useCommandState } from "cmdk";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { SEARCH_QUERY_MAX_LENGTH } from "@/lib/mgr/search-view";
 
@@ -25,13 +26,14 @@ export function Palette({ placeholder, groups, value, onValueChange, onSelect, e
         value={value?.slice(0, SEARCH_QUERY_MAX_LENGTH)}
         onValueChange={onValueChange ? next => onValueChange(next.slice(0, SEARCH_QUERY_MAX_LENGTH)) : undefined}
       />
+      <PaletteResultCount count={shouldFilter ? undefined : groups.reduce((total, group) => total + group.items.length, 0)} />
       <CommandList>
         {before}
         {emptyMessage && <CommandEmpty>{emptyMessage}</CommandEmpty>}
         {groups.map(({ heading, items }) => (
           <CommandGroup key={heading} heading={heading}>
             {items.map(([label, detail, to]) => (
-              <CommandItem key={`${label}:${to ?? detail}`} value={to ?? label} keywords={[label, heading, detail]} onSelect={onSelect ? () => onSelect(to ?? label) : undefined} data-slot="item" aria-label={label} data-to={to} className="min-h-12 cursor-pointer">
+              <CommandItem key={`${label}:${to ?? detail}`} value={to ?? label} keywords={[label, heading, detail]} onSelect={onSelect ? () => onSelect(to ?? label) : undefined} data-slot="item" data-to={to} className="min-h-12 cursor-pointer">
                 <div className="flex min-w-0 flex-col text-left">
                   <div data-slot="item-title">{label}</div>
                   <span className="text-xs text-muted-foreground">{detail}</span>
@@ -43,4 +45,9 @@ export function Palette({ placeholder, groups, value, onValueChange, onSelect, e
       </CommandList>
     </Command>
   );
+}
+
+function PaletteResultCount({ count }: { count?: number }) {
+  const filteredCount = useCommandState(state => state.filtered.count);
+  return <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{count ?? filteredCount} results</p>;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import Link from "next/link";
 import { useCommandContext } from "@/lib/brewery-provider";
 import { useRouter } from "next/navigation";
 import { CommandFormMessage } from "@/components/mgr/command-form";
@@ -54,8 +54,8 @@ export function PickForm({ snapshot }: { snapshot: PickSnapshot }) {
   }
   const model = toPickViewProps(snapshot, qtys);
   return <><form className="contents" onClickCapture={event => {
-    // The explicit order-back link abandons this working pick.
-    if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0 && snapshot.backHref && (event.target as Element).closest("a")?.getAttribute("href") === snapshot.backHref) {
+    // Only an unsaved pick needs abandonment cleanup; a saved pick can leave even if storage is unavailable.
+    if (!committed.current && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0 && snapshot.backHref && (event.target as Element).closest("a")?.getAttribute("href") === snapshot.backHref) {
       try { retire(); }
       catch { event.preventDefault(); setError("Working counts could not be discarded. Try again."); }
     }
@@ -66,7 +66,10 @@ export function PickForm({ snapshot }: { snapshot: PickSnapshot }) {
     void run("record_pick", { orderId: snapshot.order.id, picks: snapshot.lines.map(line => ({ lineId: line.id, qty: Number(qtys[line.id]) })) }, () => {
       committed.current = true; setSaved(true);
       try { retire(); }
-      catch { toast.error("Pick saved, but working counts could not be cleared. Reopen Pick to check the saved quantities."); }
+      catch {
+        setError("Pick saved, but working counts could not be cleared. Reopen Pick to check the saved quantities.");
+        return;
+      }
       router.push(pickDoneHref(snapshot.order, snapshot.lines, qtys));
     });
   }}>
@@ -79,7 +82,7 @@ export function PickForm({ snapshot }: { snapshot: PickSnapshot }) {
         catch { setDraftError("Working counts could not be kept. Stay on Pick and try again."); }
       }}
       onShort={setShortId}
-      onPrint={() => window.print()} submitting={busy || saved} disabled={needsCounts.length > 0} messages={<CommandFormMessage error={error ?? (needsCounts.length ? "Re-enter every line before saving." : draftError)} />} />
+      onPrint={() => window.print()} submitting={busy || saved} disabled={needsCounts.length > 0} messages={<><CommandFormMessage error={error ?? (needsCounts.length ? "Re-enter every line before saving." : draftError)} />{saved && error && <Link className="text-sm underline" href={pickDoneHref(snapshot.order, snapshot.lines, qtys)}>Continue to saved order</Link>}</>} />
   </form>
   {shortLine && <ShortPickForm key={shortLine.id} snapshot={{ order: snapshot.order, line: { ...shortLine, qty_picked: Number(qtys[shortLine.id]) }, locations: snapshot.locations }} onClose={() => setShortId(null)} />}
   </>;

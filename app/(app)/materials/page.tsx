@@ -53,7 +53,7 @@ export default async function MaterialsPage({ searchParams }: { searchParams: Pr
         })),
         filtered: Boolean(params.q || params.category),
       })}
-      controls={materials.length || params.q || params.category ? <ListControls
+      controls={materials.length || params.q || params.category ? <ListControls resultCount={materials.length}
         // Search carries the type along, including when typing replaces the URL.
         search={{ label: "Search materials", value: params.q, keep: Object.fromEntries(queryWith({ q: "" })), path: "/materials" }}
         scopes={toMaterialsScopes({ category: params.category, href: patch => hrefWith("/materials", patch) })} /> : undefined}

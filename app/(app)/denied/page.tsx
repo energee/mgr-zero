@@ -5,6 +5,9 @@ import { E } from "@/components/mgr/e";
 import { DeniedView } from "@/components/mgr/views/denied";
 import { getActiveBrewery } from "@/lib/brewery";
 import { deniedCopy } from "@/lib/mgr/denied";
+
+export const metadata = { title: "No access" };
+
 export default async function DeniedPage({ searchParams }: { searchParams: Promise<{ for?: string; needs?: string }> }) {
   const [{ for: resource = "this page", needs = "" }, brewery] = await Promise.all([searchParams, getActiveBrewery()]);
   const copy = deniedCopy({ resource, roles: brewery.roles, needs: needs.split(",").filter(Boolean) });

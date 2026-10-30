@@ -218,7 +218,7 @@ export const E = {
    *  its own: one would read as the hairline between rows and cut the line's
    *  fields away from it. */
   row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement, foot?: React.ReactNode) => (
-    <Item data-row data-gated={cls === "dis" || undefined} className={cn("relative rounded-none border-0 px-0", cls === "dis" ? "cursor-not-allowed opacity-50" : TAP_ROW)}>
+    <Item data-row data-gated={cls === "dis" || undefined} className={cn("relative rounded-none border-0 px-0", cls === "dis" ? "cursor-not-allowed" : TAP_ROW)}>
       {(icon || dotColor[cls]) && (
         <ItemMedia className={CENTER_MEDIA}>
           {icon ? <RowMedia icon={icon} cls={cls} /> : <Dot cls={cls} />}
@@ -393,8 +393,7 @@ export const E = {
     const { onChange, hideLabel, contextualLabels, error: _error, ...rest } = controls ?? {};
     const error = fieldError(controls);
     const attributes = { ...rest, "aria-invalid": error.invalid, "aria-describedby": error.describedBy };
-    // DatePicker draws its own Field and takes no invalid flag, so a date's error is its message alone.
-    if (type === "date") return <><DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} max={controls?.max === undefined ? undefined : String(controls.max)} aria-describedby={error.describedBy} />{error.message}</>;
+    if (type === "date") return <><DatePicker label={label} defaultValue={value} value={onChange ? value : undefined} onChange={onChange} disabled={controls?.disabled} required={controls?.required} name={controls?.name} max={controls?.max === undefined ? undefined : String(controls.max)} invalid={error.invalid} aria-describedby={error.describedBy} />{error.message}</>;
     // A whole number (a contract quantity, an overdue threshold) is counted,
     // not typed: the same −/+ stepper Weekly count uses.
     if (type === "number") {
@@ -442,8 +441,8 @@ export const E = {
   picks: (label: string, values: string[], options: (string | { value: string; label: string })[], controls?: { onChange?: (values: string[]) => void; disabled?: boolean; "aria-invalid"?: boolean; "aria-describedby"?: string; description?: ReactNode }) => (
     <Field data-disabled={controls?.disabled} data-invalid={controls?.["aria-invalid"]}>
       <FieldLabel>{label}</FieldLabel>
-      <ToggleGroup type="multiple" {...(controls?.onChange ? { value: values, onValueChange: controls.onChange } : { defaultValue: values })} disabled={controls?.disabled} aria-invalid={controls?.["aria-invalid"]} aria-describedby={controls?.["aria-describedby"]} variant="outline" size="sm" aria-label={label} className="flex-wrap justify-start">
-        {options.map(o => typeof o === "string" ? <ToggleGroupItem key={o} value={o} className={BRIGHT_ON}>{o}</ToggleGroupItem> : <ToggleGroupItem key={o.value} value={o.value} className={BRIGHT_ON}>{o.label}</ToggleGroupItem>)}
+      <ToggleGroup type="multiple" {...(controls?.onChange ? { value: values, onValueChange: controls.onChange } : { defaultValue: values })} disabled={controls?.disabled} aria-describedby={controls?.["aria-describedby"]} variant="outline" size="sm" aria-label={label} className="flex-wrap justify-start">
+        {options.map(o => typeof o === "string" ? <ToggleGroupItem key={o} value={o} aria-invalid={controls?.["aria-invalid"]} className={BRIGHT_ON}>{o}</ToggleGroupItem> : <ToggleGroupItem key={o.value} value={o.value} aria-invalid={controls?.["aria-invalid"]} className={BRIGHT_ON}>{o.label}</ToggleGroupItem>)}
       </ToggleGroup>
       {controls?.description}
     </Field>
@@ -456,7 +455,7 @@ export const E = {
     const emptyId = empty && controls?.id ? `${controls.id}-empty` : undefined;
     const error = fieldError(controls);
     return (
-    <Field data-disabled={controls?.disabled} data-invalid={error.invalid}>
+    <Field data-disabled={controls?.disabled} data-invalid={error.invalid} data-required={controls?.required}>
       {!controls?.hideLabel && <FieldLabel htmlFor={controls?.id}>{label}</FieldLabel>}
       <Select {...(controls?.onChange ? { value, onValueChange: (next) => controls.onChange?.(next === "__empty_field__" ? "" : next) } : { defaultValue: value })} disabled={controls?.disabled} required={controls?.required} name={controls?.name} form={controls?.form}>
         <SelectTrigger id={controls?.id} aria-label={controls?.["aria-label"] ?? label} aria-describedby={describedBy(error.describedBy, emptyId)} aria-invalid={error.invalid} className={controls?.forward ? "[&_svg:last-child]:hidden" : undefined}><SelectValue placeholder={options.find((o): o is { value: string; label: string } => typeof o !== "string" && o.value === "")?.label ?? controls?.placeholder}>{controls?.displayValue ?? options.map((o) => typeof o === "string" ? { value: o, label: o } : o).find((o) => o.value === value)?.label}</SelectValue>{controls?.forward ? <DirectionIcon label="Open" /> : null}</SelectTrigger>
@@ -508,26 +507,15 @@ export const E = {
    *  region, so a screen reader hears the change politely. E.info and E.note
    *  default to static notes; only explicit errors use their alert role. */
   polite: (t: React.ReactNode) => (t ? <p className="text-sm text-muted-foreground">{t}</p> : null),
-  /** Annotation chips; the gallery renders this under the frame, never inside it. */
-  states: (arr: [string, string, (0 | 1)?][]) => (
-    <dl className="flex flex-wrap gap-1.5">
-      {arr.map(([a, b, w]) => (
-        <Badge key={a} variant={w ? "secondary" : "outline"} className="font-normal">
-          <dt className="font-medium">{a}</dt>
-          <dd className="text-muted-foreground">{b}</dd>
-        </Badge>
-      ))}
-    </dl>
-  ),
   stp: (arr: string[], cur: number) => (
-    <div className="flex items-center gap-1 text-xs">
+    <ol aria-label="Import progress" className="flex items-center gap-1 text-xs">
       {arr.map((s, i) => (
-        <React.Fragment key={s}>
+        <li key={s} aria-current={i === cur ? "step" : undefined} className={cn("flex items-center gap-1", i < arr.length - 1 && "flex-1")}>
           <Badge variant={i === cur ? "default" : "outline"}>{s}</Badge>
           {i < arr.length - 1 && <Separator className={cn("flex-1", i < cur && "bg-primary")} />}
-        </React.Fragment>
+        </li>
       ))}
-    </div>
+    </ol>
   ),
   /** Status tiles. `actions` sit under a tile's facts; with an `href` too, the facts stay the link. */
   tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?, string?, React.ReactNode?][]) => (

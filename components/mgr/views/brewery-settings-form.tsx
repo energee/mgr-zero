@@ -3,7 +3,6 @@
 import { useId, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field";
-import { Label } from "@/components/ui/label";
 import { CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { phoneError } from "@/lib/mgr/phone";
 import { oneWayKegFeeError, brewerySettingsReason, refreshBrewerySettingsValues, type BrewerySettingsValues } from "@/lib/mgr/settings-view";
@@ -47,16 +46,15 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
           <FieldDescription id={`${id}-phone-help`}>Printed on the portal when online payment is unavailable. Leave empty for none.</FieldDescription>
         </div>
         <div className="flex min-w-0 flex-col gap-2">
-          {E.edit("One-way keg fee ($)", values.oneWayKegFee, "number", undefined, { onChange: (nextValue: string) => change("oneWayKegFee", nextValue), id: `${id}-oneWayKegFee`, min: 0, max: 21474836.47, step: 0.01, error: feeError, "aria-describedby": `${id}-oneWayKegFee-help` })}
+          {E.edit("One-way keg fee ($)", values.oneWayKegFee, "number", undefined, { contextualLabels: true, onChange: (nextValue: string) => change("oneWayKegFee", nextValue), id: `${id}-oneWayKegFee`, min: 0, max: 21474836.47, step: 0.01, error: feeError, "aria-describedby": `${id}-oneWayKegFee-help` })}
           <FieldDescription id={`${id}-oneWayKegFee-help`}>Charged for each one-way keg shipped. Blank or 0 means no fee.</FieldDescription>
         </div>
         <div className="flex min-w-0 flex-col gap-2 [&>[data-slot=button-group]]:w-full">
-          <Label htmlFor={`${id}-hours`}>Reading overdue after (hours)</Label>
-          {E.stq(Number(values.hours), "Reading overdue after (hours)", { id: `${id}-hours`, value: values.hours, onChange: value => change("hours", value), min: 1, max: 168, "aria-describedby": `${id}-hours-help` })}
+          {E.edit("Reading overdue after (hours)", values.hours, "number", undefined, { contextualLabels: true, required: true, id: `${id}-hours`, onChange: value => change("hours", value), min: 1, max: 168, step: 1, "aria-describedby": `${id}-hours-help` })}
           <FieldDescription id={`${id}-hours-help`}>Required: a whole number from 1 to 168. It cannot be blank or 0.</FieldDescription>
         </div>
         <div className="flex min-w-0 flex-col gap-2">
-          {E.edit("Days to package", values.daysToPackage, "number", undefined, { onChange: (value) => change("daysToPackage", value), id: `${id}-daysToPackage`, min: 1, max: 120, step: 1, required: true, "aria-describedby": `${id}-daysToPackage-help` })}
+          {E.edit("Days to package", values.daysToPackage, "number", undefined, { contextualLabels: true, onChange: (value) => change("daysToPackage", value), id: `${id}-daysToPackage`, min: 1, max: 120, step: 1, required: true, "aria-describedby": `${id}-daysToPackage-help` })}
           <FieldDescription id={`${id}-daysToPackage-help`}>Required: a whole number from 1 to 120. Expected days from brewing to packaging. Planning uses this for projected batch packaging materials.</FieldDescription>
         </div>
         <div className="flex min-w-0 flex-col gap-2 @min-[24rem]:col-span-2">

@@ -9,6 +9,8 @@ import { runCommand } from "@/lib/commands/registry";
 import { toPortalOrdersViewProps } from "@/lib/mgr/portal-orders-view";
 import "@/lib/commands/all";
 
+export const metadata = { title: "Orders" };
+
 type Order = {
   id: string;
   order_no: number | null;

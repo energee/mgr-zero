@@ -53,7 +53,7 @@ export default async function CompliancePage({ searchParams }: { searchParams: P
       }}
       linkRows
       cadenceHrefs={Object.fromEntries(CADENCES.map(([c, name]) => [name, `/compliance?cadence=${c}`]))}
-      controls={<ListControls search={{ label: "Search lot codes", value: q, keep: on > 0 ? { cadence } : {} }} />}
+      controls={<ListControls resultCount={q ? lots.length : undefined} search={{ label: "Search lot codes", value: q, keep: on > 0 ? { cadence } : {}, path: "/compliance" }} />}
     />
   );
 }

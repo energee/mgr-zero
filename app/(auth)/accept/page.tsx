@@ -9,6 +9,8 @@ import { inviteAudience, inviteLanding } from "@/lib/auth/invite";
 import { createServerClient } from "@/lib/supabase/server";
 import { acceptInvite } from "../actions";
 
+export const metadata = { title: "Accept invitation" };
+
 export default async function AcceptPage({ searchParams }: { searchParams: Promise<{ audience?: string; error?: string; name?: string }> }) {
   const { audience: rawAudience, error, name } = await searchParams;
   const audience = inviteAudience(rawAudience);

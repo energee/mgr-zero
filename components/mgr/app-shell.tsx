@@ -17,7 +17,7 @@ import { Icon } from "@/components/mgr/icon";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarHeader, SidebarInset,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem,
-  SidebarProvider, SidebarTrigger,
+  SidebarProvider, SidebarTrigger, useSidebar,
 } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { activeChild, activeTab, isUnder, navGroups, PORTAL_NAV, type NavItem } from "@/lib/mgr/nav";
@@ -73,7 +73,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
                       <SidebarMenuSub>
                         {navGroups(tab.children!).map(({ group, items: kids }) => (
                           <Fragment key={group ?? ""}>
-                            {group && <li className="px-2 pt-2 text-xs font-medium text-sidebar-foreground/70">{group}</li>}
+                            {group && <li className="px-2 pt-2 text-xs font-medium text-sidebar-foreground">{group}</li>}
                             {kids.map((c) => (
                               <SidebarMenuSubItem key={c.href}>
                                 <SidebarMenuSubButton asChild isActive={c === child}>
@@ -97,7 +97,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
           {/* One Ask MGR button fits beside the brand, so a phone header stays one row (#1512). */}
           <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
             {composer && <span className="max-w-48 truncate text-xs text-muted-foreground md:hidden">{brandMark}</span>}
-            <SidebarTrigger className="hidden md:inline-flex" />
+            <ShellSidebarTrigger />
             {composer ?? <span className="md:hidden">{brandMark}</span>}
           </div>
           {headerRight && <span className="flex shrink-0 items-center gap-1">{headerRight}</span>}
@@ -109,6 +109,11 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
     </SidebarProvider>
     </TooltipProvider>
   );
+}
+
+function ShellSidebarTrigger() {
+  const { open } = useSidebar();
+  return <SidebarTrigger aria-expanded={open} className="hidden md:inline-flex" />;
 }
 
 /** Phone navigation stays below chat (45) and modal forms (50). */

@@ -8,6 +8,8 @@ import { runCommand } from "@/lib/commands/registry";
 import { toComingUpViewProps, type ScheduleRow } from "@/lib/mgr/coming-up-view";
 import "@/lib/commands/all";
 
+export const metadata = { title: "Coming up" };
+
 export default async function ComingUpPage() {
   const { customer, ctx } = await getPortalContext();
   const rows = (await runCommand("portal_schedule", {}, ctx)) as ScheduleRow[];

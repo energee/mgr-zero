@@ -7,6 +7,8 @@ import { runCommand } from "@/lib/commands/registry";
 import { toPortalAccountViewProps, type PortalAccountSnapshot } from "@/lib/mgr/portal-account-view";
 import "@/lib/commands/all";
 
+export const metadata = { title: "Account" };
+
 export default async function PortalAccountPage() {
   const { customer, ctx } = await getPortalContext();
   const acct = (await runCommand("get_portal_account", {}, ctx)) as PortalAccountSnapshot;

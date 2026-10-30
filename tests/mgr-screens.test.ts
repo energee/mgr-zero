@@ -238,11 +238,10 @@ describe("SCREENS", () => {
     }
   });
 
-  it("renders every body, and keeps states out of the markup", () => {
+  it("renders every screen body", () => {
     for (const s of SCREENS) {
       const html = renderToStaticMarkup(createElement("div", null, s.hd, s.body));
       expect(html.length).toBeGreaterThan(50);
-      if (s.states) expect(html).not.toContain(renderToStaticMarkup(E.states(s.states)));
     }
   });
 

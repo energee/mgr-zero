@@ -10,6 +10,8 @@ import { runCommand } from "@/lib/commands/registry";
 import { toPortalInvoicesViewProps } from "@/lib/mgr/portal-invoices-view";
 import "@/lib/commands/all";
 
+export const metadata = { title: "Invoices" };
+
 type Invoice = { id: string; invoice_no: number | null; kind: "invoice" | "credit_memo"; due_on: string | null; paid_at: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_total_cents: number | null; qbo_balance_cents: number | null; written_off_at: string | null; invoice_lines: { amount_cents: number }[] };
 
 export default async function PortalInvoicesPage({ searchParams }: { searchParams: Promise<{ cursor?: string | string[] }> }) {

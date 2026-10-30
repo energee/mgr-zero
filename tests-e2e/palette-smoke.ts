@@ -23,9 +23,12 @@ try {
   ab("fill", "[cmdk-input]", "zzzz-no-match");
   wait("document.querySelector('[cmdk-empty]')?.textContent.includes('No matches')");
   ab("press", "Enter");
+  wait("Array.from(document.querySelectorAll('[role=status]')).some(x => x.textContent === '0 results')");
   assert(ab("eval", heading("Search")).result, "Enter with no matches must stay in Search");
   ab("fill", "[cmdk-input]", "Hazy");
   wait("document.querySelectorAll('[cmdk-item]').length === 2");
+  wait("Array.from(document.querySelectorAll('[role=status]')).some(x => x.textContent === '2 results')");
+  assert.match(ab("snapshot").snapshot, /option.*Hazy IPA.*ATP 11/, "Result names must include their visible label and detail");
   ab("press", "ArrowDown");
   wait("document.querySelector('[cmdk-item][aria-selected=true]')?.textContent.includes('ORD-0231')");
   ab("press", "ArrowUp");
@@ -42,7 +45,7 @@ try {
   ab("press", "Enter");
   wait(heading("Record movement"));
   ab("eval", "Array.from(document.querySelectorAll('.screen-box [data-slot=item]')).find(x => x.textContent.includes('SKU / package')).click()");
-  ab("click", '[cmdk-item][aria-label="Stout · ⅙ bbl keg"]');
+  ab("eval", "Array.from(document.querySelectorAll('[cmdk-item]')).find(x => x.textContent.includes('Stout · ⅙ bbl keg')).click()");
   wait(heading("Record movement"));
   console.log("Palette smoke passed: filtering, empty state, arrow keys, Enter, and click return.");
 } finally {

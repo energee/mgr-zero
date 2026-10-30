@@ -30,12 +30,13 @@ export function searchHref(path: string, keep: Record<string, string>, q: string
   return `${path}?${query}`;
 }
 
-export function ListControls({ search, scopes = [] }: {
+export function ListControls({ search, scopes = [], resultCount }: {
   /** `keep` carries the other params through a search, so it keeps the sort.
    *  `path` is the list's route; a live page passes it so typing searches.
    *  The inventory leaves it out (useRouter throws outside the app router). */
   search: ListSearch;
   scopes?: ListScope[];
+  resultCount?: number;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -49,6 +50,7 @@ export function ListControls({ search, scopes = [] }: {
           </div>
         ))}
       </div>
+      <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{resultCount === undefined ? "" : `${resultCount} results`}</p>
       {/* The no-match copy says "Clear the search"; this is how. The other params stay. */}
       {search.value && <Link href={searchHref("", search.keep, "")} className="w-fit text-sm text-muted-foreground underline">Clear search</Link>}
     </div>
