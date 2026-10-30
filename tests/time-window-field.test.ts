@@ -18,7 +18,6 @@ it.each([
     expect(thumb).toContain(`aria-valuetext="${times[index]}"`);
     const description = /aria-describedby="([^"]+)"/.exec(thumb)?.[1];
     expect(description).toBeDefined();
-    expect(html).toContain(`id="${description}"`);
     expect(html).toMatch(new RegExp(`id="${description}"[^>]*>${summary}<`));
   }
 });
