@@ -305,11 +305,11 @@ it("keeps the verified account email beside editable tap-history names", async (
   expect(conflict.error?.message).toContain("Dana Brewer");
   expect(conflict.error?.message).toContain(email);
   expect((await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: " " } })).error).toBeNull();
-  const renamedHistory = await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx) as { opened_by_label: string; closed_by_label: string }[];
-  for (const row of renamedHistory) {
-    for (const field of ["opened_by_label", "closed_by_label"] as const) {
-      expect(row[field]).toContain(email);
-      expect(row[field]).not.toContain("Dana Brewer");
-    }
+  const renamedHistory = await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx) as { id: string; opened_by_label: string; closed_by_label: string }[];
+  const renamedInterval = renamedHistory.find(row => row.id === opened.id);
+  assert(renamedInterval !== undefined);
+  for (const field of ["opened_by_label", "closed_by_label"] as const) {
+    expect(renamedInterval[field]).toContain(email);
+    expect(renamedInterval[field]).not.toContain("Dana Brewer");
   }
 });
