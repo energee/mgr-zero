@@ -15,13 +15,11 @@ const ICON: Record<TodayIcon, typeof Package01Icon> = {
 
 export function TodayView({
   model,
-  lead,
   footer,
   emptyAction,
   linkRows,
 }: {
   model: TodayViewModel;
-  lead?: ReactNode;
   footer?: ReactNode;
   emptyAction?: ReactNode;
   linkRows?: boolean;
@@ -33,7 +31,6 @@ export function TodayView({
       {/* A lone action spans the phone column, as E.btn does; two or more share a grid. */}
       {actions.length === 1 && E.btn(actions[0].label, "g", actions[0].href)}
       {actions.length > 1 && E.btns(actions.map((a) => [a.label, "g", a.href]))}
-      {lead}
       {model.empty
         ? (
           <>
