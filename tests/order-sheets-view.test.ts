@@ -335,6 +335,17 @@ describe("Return and credit view", () => {
     expect(model.tape[0]).toEqual(["+1 Hazy IPA · ½ bbl keg · return in", "Taproom"]);
     expect(model.tape.at(-1)).toEqual(["credit memo number · on commit", "−$150.00"]);
   });
+
+  it("sums individually rounded return credits using exact quantity hundredths", () => {
+    const model = toReturnCreditViewProps({
+      ...orderReturnCredit,
+      lines: [
+        { ...orderReturnCredit.lines[0], qty_returning: 1.15, unit_price_cents: 50 },
+        { ...orderReturnCredit.lines[0], id: "second", qty_returning: 0.33, unit_price_cents: 150 },
+      ],
+    });
+    expect(model.tape.at(-1)).toEqual(["credit memo number · on commit", "−$1.08"]);
+  });
   it("credits the beer and the refunded keg deposit in one memo, in whole kegs, with no stock for the deposit", () => {
     const model = toReturnCreditViewProps(orderReturnCredit);
     expect(model.title).toBe("Beer return");
