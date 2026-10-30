@@ -42,11 +42,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const { brewery, ctx, snapshot } = await getOrderPageData(id);
   const { order, lines, events, atp, deposits, shipment } = snapshot as { order: Order; lines: OrderLine[]; events: OrderEvent[]; atp: Atp[]; deposits: OrderSnapshot["deposits"]; shipment: { deliveries: { outcome: DeliveryOutcome | null }[]; invoices: NonNullable<OrderSnapshot["invoice"]>[] } | null };
-  const locations = await runCommand("list_locations", {}, ctx) as { id: string; name: string }[];
   const canSell = canRun(ctx, "confirm_order"), canFulfill = canRun(ctx, "record_pick");
   // Lines change in place where adjust_order_lines may run: Admin or Sales, confirmed or picked.
   const editable = canSell && (order.status === "confirmed" || order.status === "picked");
-  const [cogs, team, buyers, skuRows]: [OrderCogs | undefined, TeamMember[], PortalUser[], SkuRow[]] = await Promise.all([
+  const [locations, cogs, team, buyers, skuRows]: [{ id: string; name: string }[], OrderCogs | undefined, TeamMember[], PortalUser[], SkuRow[]] = await Promise.all([
+    runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string }[]>,
     // Cost and margin are for Admin and Sales (#810); only a shipped order has any.
     order.status === "shipped" && canRun(ctx, "get_order_cogs") ? runCommand("get_order_cogs", { orderId: id }, ctx) as Promise<OrderCogs> : Promise.resolve(undefined),
     // History names its actors. Portal buyers are named only for roles that may list them (Admin, Sales).

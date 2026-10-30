@@ -5130,6 +5130,9 @@ isOneToOne: false
               "kegs_out": number,"taproom_below_par": number
             }[]
                            },
+"get_keg_report_aging":
+{ Args: { "p_brewery": string }; Returns: Json
+                           },
 "get_brew_day_plan":
 { Args: { "p_batch": string,"p_brewery": string }; Returns: Json
                            },

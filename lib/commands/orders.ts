@@ -299,10 +299,9 @@ defineQuery({
   roles: [...readRoles],
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    const order = await unwrap(ctx.db.from("orders").select("*, customers(name), ship_tos(label, country, city, state)")
-      .eq("brewery_id", ctx.breweryId).eq("id", i.orderId).single());
-    if (!order) throw new CommandError("Order not found", 404, "not_found");
-    const [lines, events, shipment, deposits] = await Promise.all([
+    const [order, lines, events, shipment, deposits] = await Promise.all([
+      unwrap(ctx.db.from("orders").select("*, customers(name), ship_tos(label, country, city, state)")
+        .eq("brewery_id", ctx.breweryId).eq("id", i.orderId).single()),
       completeRows("Order lines", start => ctx.db.from("order_lines").select("*, skus(name, brands(name, alias), formats(name))", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId).order("sku_id").range(start, start + PAGE_SIZE - 1)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
@@ -311,6 +310,7 @@ defineQuery({
         .select("id, order_line_id, description, qty_ordered, unit_price_cents, amount_cents", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId).order("id").range(start, start + PAGE_SIZE - 1)),
     ]);
+    if (!order) throw new CommandError("Order not found", 404, "not_found");
     // Both aggregate views have one row per selected key. Restrict each request
     // to this order's SKUs in bounded batches so PostgREST's row cap cannot turn
     // an omitted balance into a false zero on the confirmation screen.
