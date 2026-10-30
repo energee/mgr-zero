@@ -211,5 +211,5 @@
   "20261029001000_ship_to_label_unique_drop_pa_license.sql": "736ad982ce5eb62cc57c08787329803bc0ebf554e9a65a1184eef3667d7a26c9",
   "20261029104000_update_draft_purchase_order.sql": "d92ac1d967ae2fa36ec3045ee8b740a2fd26cd2439b456495e85e0b34046c2ac",
   "20261029123000_compliance_active_months_bounded.sql": "650cc10c50914c7e266e9ff8ff81408b6d414bbe28317d399b5c4f24202a91b4",
-  "20261030021000_receive_purchase_order_precision.sql": "cca76a25b5aebc611f8f8ab23773858aa4a2134e7531977b3964ddeedd7105a9"
+  "20261030031110_receive_purchase_order_precision.sql": "cca76a25b5aebc611f8f8ab23773858aa4a2134e7531977b3964ddeedd7105a9"
 }
