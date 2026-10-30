@@ -248,7 +248,7 @@ Use it to time `/compliance/lots/<id>`, `/settings`, `/settings/import`,
 and the Monthly / Quarterly / Annual switch on `/compliance`.
 Select an existing lot through the live application; do not create a fixture on hosted.
 Record the first observation and repeated warm observations, plus the hosted deployment SHA.
-Read the page's `session` header and the matching `shell` and page-read function log lines where owner access permits.
+Split each observation into stages as in "Stage timings" in [`pilot-latency-protocol.md`](pilot-latency-protocol.md); the function log lines need owner access.
 Log access and reading existing headers do not authorize a deploy or a setting change.
 
 Keep the owner's 2026-10-27 boundary: hosted timing is read-only.
