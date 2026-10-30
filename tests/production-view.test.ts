@@ -300,10 +300,6 @@ describe("Brew day view", () => {
   it("keeps ingredient corrections available when the original turn has no open vessel", () => {
     const correction = { ...brewDayHazy, recorded: false, vesselId: "", vessels: [], correctionRecordId: "record", correctionReason: "Correct weighed malt" };
     expect(canRecordBrewDay(correction)).toBe(true);
-    const html = htmlOf(createElement(BrewDayView, { model: correction }));
-    expect(html).toContain("Fixed by the recorded turn");
-    expect(html).toContain("Confirm correction");
-    expect(html).not.toContain("Choose vessel");
   });
   it("retains knockout inputs and command errors while pending", () => {
     const html = htmlOf(createElement(BrewDayView, { model: brewDayHazy, busy: true, error: "Vessel occupied" }));

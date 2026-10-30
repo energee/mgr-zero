@@ -86,7 +86,7 @@ export function BrewDayView({ model, busy = false, error, onChange, onRecord, ac
       {E.ttl("Confirmed process observations")}
       {E.note("Leave observations blank when not measured. Recipe targets remain in the frozen plan.")}
       {processFields.map(([key, label]) => <Fragment key={key}>{E.edit(label, value.process?.[key] ?? "", "number", undefined, { disabled: busy, step: key.endsWith("Minutes") ? "1" : "any", onChange: next => change({ process: { ...value.process, [key]: next } }) })}</Fragment>)}
-      {ready && E.tape([[<>Knockout {value.initialBbl} bbl {E.arrow()} {vessel?.name}</>, "loss baseline"]])}
+      {ready && E.tape([[knockoutBaseline, "loss baseline"]])}
       <CommandFormMessage error={error} />
       <Button type="submit" data-variant="irreversible" className="w-full bg-irreversible text-irreversible-foreground hover:bg-irreversible/90 md:w-fit" disabled={busy || !ready}>{value.correctionRecordId ? "Confirm correction" : value.addingTurn ? "Record brew turn" : "Record brew day"}</Button>
     </form>}

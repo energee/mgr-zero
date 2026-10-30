@@ -2762,6 +2762,7 @@ export const SCREENS: Screen[] = [
     writes: "set_pos_location_mapping · retire_pos_location_mapping [Admin confirms retirement; historical sales keep their location, replacement mapping applies to later sales]",
     states: [["permission", "admin only", 1], ["mapped", "two locations ready"], ["unmapped", "sales cannot reconcile", 1], ["claimed", "an MGR location cannot be claimed twice", 1]],
     spec: "A provider location maps to exactly one MGR location, saved when it is picked; a failed save puts the pick back. Sales remain expected-consumption facts; the physical count owns depletion.",
+    to: { "Retire mapping": "Square locations" },
     body: <SquareLocationsView locations={[{ id: "taproom", name: "Taproom" }, { id: "warehouse", name: "Warehouse" }]} rows={[{ externalLocationId: "square-tap", name: "Square Taproom", detail: "active · available · Taproom", mgrLocationId: "taproom" }, { externalLocationId: "square-events", name: "Third location", detail: "active · available · needs mapping", mgrLocationId: "" }]} />,
   },
   {
