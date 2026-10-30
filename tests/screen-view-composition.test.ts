@@ -129,6 +129,16 @@ function mountedComponents(entry: string, bodyOverrides = new Set<string>(), act
       }
     }
 
+    for (const statement of file.statements) {
+      if (!ts.isExportDeclaration(statement) || !statement.moduleSpecifier || !ts.isStringLiteral(statement.moduleSpecifier)
+        || !statement.exportClause || !ts.isNamedExports(statement.exportClause)) continue;
+      const target = localModule(path, statement.moduleSpecifier.text);
+      if (!target) continue;
+      for (const element of statement.exportClause.elements) {
+        if (element.name.text === (exported ?? "default")) visit(target, element.propertyName?.text ?? element.name.text);
+      }
+    }
+
     // Follow mounted React.lazy default imports, not every component exported
     // by the deferred module.
     for (const statement of file.statements) {
@@ -283,6 +293,8 @@ describe("screen/live component parity", () => {
     expect(mountedComponents("tests/fixtures/screen-parity/unused-sibling.tsx")).not.toContain("ExampleView");
     expect(mountedComponents("tests/fixtures/screen-parity/lazy-delegated.tsx")).toContain("ExampleView");
     expect(mountedComponents("tests/fixtures/screen-parity/lazy-unused.tsx")).not.toContain("ExampleView");
+    expect(mountedComponents("tests/fixtures/screen-parity/reexported.tsx")).toContain("ExampleView");
+    expect(mountedComponents("tests/fixtures/screen-parity/unused-reexport.tsx")).not.toContain("ExampleView");
   });
 
   it("records audited whole-body slots even when the expected view is mounted", () => {
