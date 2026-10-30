@@ -2026,7 +2026,7 @@ export const SCREENS: Screen[] = [
     writes: "none [edits happen in Edit material, counts in Cycle count and Count sheet]",
     states: [["inactive", "an inactive material stays listed, its Status Inactive"], ["empty", "add a material, then open Purchase orders to receive stock"]],
     spec: "The Beer landing's Materials on hand row opens this list. Each row shows the material's type, on hand summed across bins in its base unit, whether its lots are tracked, and its status. Edit opens Edit material for that material's definition; Count opens Cycle count for its stock; Count sheet opens one count over every listed material held in a bin; Add material opens a blank definition. One list serves both, so there is no separate definitions list.",
-    body: <MaterialsOnHandView model={toMaterialsOnHandViewProps(materialsOnHandList)} controls={<ListControls resultCount={materialsOnHandList.rows.length} search={{ label: "Search materials", value: "", keep: {} }} scopes={toMaterialsScopes({ category: "" })} />} />,
+    body: <MaterialsOnHandView model={toMaterialsOnHandViewProps(materialsOnHandList)} controls={<ListControls resultCount={materialsOnHandList.rows?.length ?? 0} search={{ label: "Search materials", value: "", keep: {} }} scopes={toMaterialsScopes({ category: "" })} />} />,
   },
   {
     step: 7,
@@ -2079,7 +2079,7 @@ export const SCREENS: Screen[] = [
     writes: "none [creation and editing happen on Vendor]",
     states: [["permission", "warehouse or brewer required", 1], ["active", "available for purchase orders"], ["contract", "committed quantity summarized"], ["empty", "Add vendor is the only action"]],
     spec: "Materials, vendors and contracts are separate lists so each row has one predictable destination.",
-    body: <VendorsView model={toVendorsViewProps(vendorsList)} controls={<ListControls resultCount={vendorsList.rows.length} search={{ label: "Search vendors", value: "", keep: {} }} />} />,
+    body: <VendorsView model={toVendorsViewProps(vendorsList)} controls={<ListControls resultCount={vendorsList.rows?.length ?? 0} search={{ label: "Search vendors", value: "", keep: {} }} />} />,
   },
   {
     step: 7,
