@@ -5,8 +5,6 @@ import { E, ROW_LINK_COVER } from "@/components/mgr/e";
 import type { PurchaseOrdersRowView, PurchaseOrdersViewModel } from "@/lib/mgr/purchase-orders-view";
 import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 
-export type { PurchaseOrdersViewModel };
-
 export function PurchaseOrdersView({
   model,
   createAction,

@@ -15,7 +15,6 @@ import { DatePicker } from "@/components/mgr/date-picker";
 import { pastShipDateWarning, type NewOrderViewModel, type OrderOption } from "@/lib/mgr/new-order-view";
 import { Fragment } from "react";
 
-export type { NewOrderViewModel };
 export type NewOrderControls = {
   customer?: (value: string) => void; shipTo?: (value: string) => void;
   source?: (value: string) => void; destination?: (value: string) => void;

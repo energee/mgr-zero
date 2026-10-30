@@ -4,7 +4,8 @@
 import { expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
-vi.mock("react", async importOriginal => ({ ...await importOriginal<typeof import("react")>(), useState: () => [false, () => {}] }));
+import type * as ReactModule from "react";
+vi.mock("react", async importOriginal => ({ ...await importOriginal<typeof ReactModule>(), useState: () => [false, () => {}], useId: () => "search-pick-test" }));
 import { SearchPick } from "@/components/mgr/search-pick";
 import { E } from "@/components/mgr/e";
 

@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-31
 **Branch:** `vercel-production-readiness`
-**Worktree:** `/Users/tedslesinski/Repos/mgr2/.agents/worktrees/vercel-production-readiness`
+**Worktree:** `.agents/worktrees/vercel-production-readiness`
 **Audit source:** the confirmed SEC01–SEC16, OPS01–OPS12, DOC01–DOC13, and PERF01–PERF13 findings supplied for this remediation
 **Scope:** implementation plan only; no production deployment, hosted provisioning, or schema application is authorized by this document
 

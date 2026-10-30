@@ -2,6 +2,7 @@
 // Return shipment still needs (#1485).
 import { docNo } from "./doc-no";
 import { money } from "./money";
+import { orderLineCents } from "./order-view";
 import { isNumber, numberNotationError } from "./quantity-input";
 import { submitReason } from "./submit-reason";
 
@@ -107,14 +108,14 @@ export function toReturnCreditViewProps({
   const returnToOptions = locations.map(l => ({ id: l.id, label: l.id === order?.from_location_id ? `${l.name} · original fulfillment source` : l.name }));
   const destName = from?.name ?? "—";
   const inv = docNo("INV", invoice.invoice_no, "Invoice");
-  const creditCents = lines.reduce((n, l) => n + Math.round(Number(l.qty_returning) * Number(l.unit_price_cents)), 0);
+  const creditCents = lines.reduce((n, l) => n + orderLineCents(Number(l.qty_returning), Number(l.unit_price_cents)), 0);
   const tape: [string, string][] = [];
   for (const l of lines) {
     const qty = Number(l.qty_returning);
     if (qty <= 0) continue;
     const short = l.skus?.name ?? "Line";
     if (l.kind === "keg_deposit") {
-      tape.push([`${qty} ${short} · deposit refund`, money(-Math.round(qty * Number(l.unit_price_cents)))]);
+      tape.push([`${qty} ${short} · deposit refund`, money(-orderLineCents(qty, Number(l.unit_price_cents)))]);
       continue;
     }
     tape.push([`+${qty} ${short} · return in`, destName]);
