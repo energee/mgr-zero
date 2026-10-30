@@ -214,5 +214,5 @@
   "20261030002000_ledger_compliance_integrity.sql": "bd6f5802aea8854b37c21d11af7f85ddb803269ff3dd22b55b7120a9846fb419",
   "20261030002001_shipment_posting_clock.sql": "dcfeb5236fb37d21f4ed831808b595ee2cadd99d3a8b83dded011c0fef57a40d",
   "20261030031000_qbo_push_reconcile.sql": "72ef35bf69dbe8d46c9ea836097ffd8e4163fefdce2339a0a0ef700cb4f26511",
-  "20261030040000_today_pending_history_indexes.sql": "c90cb874e5cc99dbdd8469c6f7800d802d580831aa6b91eeb3445bd9cecaa0dd"
+  "20261030031050_today_pending_history_indexes.sql": "c90cb874e5cc99dbdd8469c6f7800d802d580831aa6b91eeb3445bd9cecaa0dd"
 }
