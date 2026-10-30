@@ -61,4 +61,11 @@ export const transferDetailSubmitted: TransferDetailSnapshot = {
     { id: "l1", name: SKU_HAZY.name, from_bin: "Walk-in", to_bin: "Cold", qty: 2, unit: "units" },
     { id: "l2", name: SKU_PILS.name, from_bin: "Walk-in", to_bin: "Cold", qty: 4, unit: "units" },
   ],
+  sources: [
+    { id: "l1", qty: 2, step: 0.01, sources: [{ lotId: "lot-hazy", name: SKU_HAZY.name, lotCode: "L-0081", qty: 12 }] },
+    { id: "l2", qty: 4, step: 0.01, sources: [
+      { lotId: "lot-pils", name: SKU_PILS.name, lotCode: "L-0082", qty: 8 },
+      { lotId: null, name: SKU_PILS.name, lotCode: null, qty: 2 },
+    ] },
+  ],
 };

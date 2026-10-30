@@ -9,6 +9,18 @@ export type TransferDetailLineView = {
   qty: string;
 };
 
+export type TransferSourceLine = {
+  id: string;
+  qty: number;
+  step: number;
+  sources: { lotId: string | null; name: string; lotCode: string | null; qty: number }[];
+};
+
+export type TransferReceiveLine = {
+  lineId: string;
+  sources: { lotId: string | null; qty: number }[];
+};
+
 export type TransferDetailViewModel = {
   backHref?: string;
   title: string;
@@ -17,6 +29,7 @@ export type TransferDetailViewModel = {
   status: string;
   note?: string;
   lines: TransferDetailLineView[];
+  sources?: TransferSourceLine[];
   received: boolean;
   /** Also when Cancel transfer is offered: until received or cancelled (#578). */
   nextVerb?: string;
@@ -42,6 +55,7 @@ export type TransferDetailSnapshot = {
     unit: string;
     qty_picked?: number | null;
   }[];
+  sources?: TransferSourceLine[];
   backHref?: string;
 };
 
@@ -51,7 +65,7 @@ function nextVerb(status: string): string | undefined {
   return undefined;
 }
 
-export function toTransferDetailViewProps({ transfer, lines, backHref }: TransferDetailSnapshot): TransferDetailViewModel {
+export function toTransferDetailViewProps({ transfer, lines, sources, backHref }: TransferDetailSnapshot): TransferDetailViewModel {
   const received = transfer.status === "received";
   return {
     backHref: backHref ?? "/transfers",
@@ -61,6 +75,7 @@ export function toTransferDetailViewProps({ transfer, lines, backHref }: Transfe
     status: sentenceCase(transfer.status),
     note: transfer.note ?? undefined,
     received,
+    sources,
     nextVerb: nextVerb(transfer.status),
     cancelReason: transfer.cancel_reason ?? undefined,
     lines: lines.map((l) => ({
@@ -76,3 +91,14 @@ export function toTransferDetailViewProps({ transfer, lines, backHref }: Transfe
  *  quantity when the line has a single source (nothing to split), else blank. */
 export const transferSourceQty = (typed: string | undefined, sourceCount: number, picked: number): string =>
   typed ?? (sourceCount === 1 ? String(picked) : "");
+
+/** Preserve source identity while omitting lots that contribute no stock. */
+export function transferReceiveSources(lines: TransferSourceLine[], quantities: Record<string, Record<string, string>>): TransferReceiveLine[] {
+  return lines.map(line => ({
+    lineId: line.id,
+    sources: line.sources.map(source => ({
+      lotId: source.lotId,
+      qty: Number(transferSourceQty(quantities[line.id]?.[source.lotId ?? ""], line.sources.length, line.qty)),
+    })).filter(source => source.qty > 0),
+  }));
+}

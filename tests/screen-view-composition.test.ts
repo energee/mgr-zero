@@ -34,6 +34,7 @@ const BODY_SLOTS: Record<string, string> = {
   BeerView: "navs",
   ClosePackagingRunView: "lead",
   KegFleetView: "list",
+  TransferDetailView: "footer",
 };
 const KNOWN_BODY_DEBT: string[] = [];
 
@@ -234,6 +235,15 @@ describe("screen/live component parity", () => {
     expect(mountedComponents("tests/fixtures/screen-parity/unused-sibling.tsx")).not.toContain("ExampleView");
     expect(mountedComponents("tests/fixtures/screen-parity/lazy-delegated.tsx")).toContain("ExampleView");
     expect(mountedComponents("tests/fixtures/screen-parity/lazy-unused.tsx")).not.toContain("ExampleView");
+  });
+
+  it("detects a transfer footer replacement even beside the shared document", () => {
+    const overrides = new Set<string>();
+    expect(mountedComponents("tests/fixtures/screen-parity/transfer-footer.tsx", overrides)).toContain("TransferDetailView");
+    expect([...overrides]).toEqual(["TransferDetailView.footer"]);
+    const liveOverrides = new Set<string>();
+    mountedComponents("app/(app)/transfers/[id]/page.tsx", liveOverrides);
+    expect([...liveOverrides]).not.toContain("TransferDetailView.footer");
   });
 
   it("records audited whole-body slots even when the expected view is mounted", () => {
