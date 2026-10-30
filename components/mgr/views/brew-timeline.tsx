@@ -27,8 +27,6 @@ import { packs } from "@/lib/mgr/pack-qty";
 import { processFields } from "./brew-day";
 import { BrewFooter, BrewTabs, ChangePlanFold, DetailParts, PackQuantity, PlannedLine, SourcePick } from "./brew-prep";
 
-export type { BrewTimelineViewModel };
-
 const processLabel = Object.fromEntries(processFields) as Record<string, string>;
 
 /** Closed stages show on desk anyway: the fold is a phone affordance. */
