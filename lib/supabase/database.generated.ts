@@ -5341,11 +5341,6 @@ isOneToOne: false
 "my_staff_brewery_ids":
 { Args: { "p_roles": (Database["public"]['Enums']["staff_role"])[] }; Returns: string[]
                            },
-"on_hand_rows":
-{ Args: Record<PropertyKey, never>; Returns: {
-              "brewery_id": string,"location_id": string,"qty": number,"sku_id": string
-            }[]
-                           },
 "order_packaging_shortfall_rows":
 { Args: Record<PropertyKey, never>; Returns: {
               "brewery_id": string,"needed_by": string,"sku_id": string,"units": number
@@ -5741,6 +5736,11 @@ isOneToOne: false
                            },
 "taproom_can":
 { Args: { "b": string,"t": string }; Returns: boolean
+                           },
+"taproom_on_hand_rows":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "brewery_id": string,"location_id": string,"qty": number,"sku_id": string
+            }[]
                            },
 "today_live_reasons":
 { Args: Record<PropertyKey, never>; Returns: (string)[]

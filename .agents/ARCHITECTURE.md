@@ -198,8 +198,12 @@ a gap to close, not a convention to trust.
    the taproom-location filter on `locations`, `bins` and `taproom_pars`.
    `tests/staff-roles-schema.test.ts` enforces it. `tests/rls-taproom.test.ts`
    checks sales, warehouse and brewer against each table's command role list.
-   Security-definer stock helpers (`on_hand_rows`, `keg_bin_on_hand_rows`) join the
-   caller's `brewery_users` rows once instead of calling a helper per ledger row (#756).
+   Staff `on_hand` balances aggregate the RLS-bound movement ledger directly so
+   brewery/SKU/location predicates push below aggregation (#1643). Only taproom-only
+   memberships use `taproom_on_hand_rows`, which exposes taproom-use location
+   quantities without granting raw history. Mixed-role memberships use the staff
+   branch once. `atp` sums movements and negative open allocations at SKU grain.
+   `keg_bin_on_hand_rows` still resolves memberships once per query (#756).
    *Enforced by:* RLS policies in migrations, proven by
    `tests/rls-tenancy.test.ts`, `tests/rls-portal-columns.test.ts` and `tests/rls-portal-order-columns.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
    to assert RLS on every table, `security_invoker` on every view,
