@@ -20,6 +20,53 @@ Ask MGR's hosted composer gate (#329) has its own runbook: [Ask MGR hosted verif
   disposition below; a nonzero scanner exit is not itself proof of a reachable
   application vulnerability.
 
+## Dependency hygiene — 2026-10-30 (#1667)
+
+The local maintenance change starts at `18df6c892`. It upgrades the existing
+`shadcn` dev dependency from 4.22.0 to 4.23.0 and its registry from 0.2.0 to
+0.2.1. The new MCP server dependency replaces the old SDK graph, removing
+`body-parser` from the lock. No direct dependency or override is added.
+
+After that upgrade, `bun audit --json` with Bun 1.3.10 exits 1 with six
+advisories across three dev-only packages. `bun audit --prod --json` exits 0
+with `{}`. The remaining paths are from `bun why`, not the old issue's
+ancestry summary:
+
+| Remaining lock / advisory | Path and disposition |
+| --- | --- |
+| `deepmerge@4.3.1`, [prototype poisoning](https://github.com/advisories/GHSA-gcqx-w48m-w2h4) (low) | `shadcn` directly and through `@shadcn/registry`. No application or script import was found. Do not accept untrusted objects into the CLI's merge API. An override or replacement remains ask-first. |
+| `fast-uri@3.1.8`, four URI-normalization advisories (two moderate, two low) | `shadcn` directly or through `@shadcn/registry` → `@dotenvx/dotenvx` → `conf` → `ajv` (also through `ajv-formats`). The audit names 3.1.9 as the fixed boundary. No application or script import was found; the existing lock remains unchanged by the shadcn update. |
+| `systeminformation@5.33.15`, [Windows services command injection](https://github.com/advisories/GHSA-3f7j-7jwc-fxfj) (high) | `shadcn` directly or through `@shadcn/registry` → `@dotenvx/dotenvx`. Fixed boundary: 5.33.16. The prerequisite is attacker-controlled service names reaching `services()` on Windows; no application or script import was found. The lock remains unchanged by the shadcn update. |
+
+This is not an advisory-free claim or release approval. Do not expose these
+tooling APIs to request input. Re-audit the eventual release SHA and retain
+the existing KaTeX override; no new override is authorized by this change.
+
+Weekly Bun version-update PRs are configured alongside the existing Actions
+updates. Bun security updates are not supported by Dependabot; audit remains
+a separate release check. The TypeScript compatibility tarball is deliberately
+retained, with its manual update procedure in the README.
+
+The rest of #1667 remains open:
+
+- **Frozen hosted install:** `vercel.json` is unchanged. Adding
+  `"installCommand": "bun install --frozen-lockfile"` needs separate owner
+  authorization for hosted configuration. The successful local frozen install
+  is not evidence of Vercel's configured install command.
+- **Provider icons:** local SVGs would remove the unused `@lobehub/ui` peer
+  tree, but require preserving upstream license notices and checking every
+  provider mark, including the Gemma override and monochrome dark-mode
+  rendering. The current deep SVG imports in `ai-model-icon.tsx` are retained.
+  This consideration is not a completed removal or owner-approved deferral.
+- **Icon/primitive consolidation:** Lucide remains in shadcn primitives and
+  `sort-head.tsx`; Hugeicons is the product wrapper. Radix primitives and Base
+  UI combobox/composer dialogs are active consumers, not unused packages.
+  Selecting and migrating a shared replacement remains unresolved; no
+  primitive is hand-edited as part of this dependency update.
+- **License policy:** `package.json` and `LICENSE` remain AGPL-3.0-only in the
+  public repository. The owner must decide whether to retain that policy
+  before any license or repository-visibility change.
+
 ## Dependency advisory disposition — 2026-10-16 (#934)
 
 Baseline inventory revision: `b74c620869b7fa98e61b588ab36e8b183d8b2708`.
