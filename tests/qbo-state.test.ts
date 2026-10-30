@@ -256,9 +256,9 @@ describe("QuickBooks current invoice state", () => {
     expect(success.lastSuccess.at).toBeTruthy();
     expect(success.lastSuccess.operator).toBeTruthy();
     expect(success.latestFailure).toBeNull();
-    // The operator reads as the staff member's full name, as other staff screens show it.
+    // An editable display name keeps the original account identity beside it.
     await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: "Pat Operator" } });
-    expect((await readStatus()).lastSuccess.operator).toBe("Pat Operator");
+    expect((await readStatus()).lastSuccess.operator).toBe(`Pat Operator <${success.lastSuccess.operator}>`);
     await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: "" } });
     const failedId = crypto.randomUUID();
     transport.mockRejectedValue(new Error("secret provider response"));

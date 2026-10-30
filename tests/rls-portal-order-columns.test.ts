@@ -89,7 +89,7 @@ describe("portal customers cannot read internal order and SKU columns", () => {
   });
 
   it("limits direct availability RPC ids to active prices on this customer's channel", async () => {
-    const location = await seedLocation(custCtx.breweryId);
+    const location = await seedLocation(custCtx.breweryId, { name: "Availability warehouse" });
     const unpriced = await seedCatalog(custCtx.breweryId, { product: "No price", sku: "Hidden unpriced", format: "unpriced case" });
     for (const id of [skuId, retiredSkuId, otherChannelSkuId, unpriced.skuId]) {
       await ins("inventory_movements", {
