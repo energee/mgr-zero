@@ -15,6 +15,15 @@ const wait = (expression: string) => ab("wait", "--fn", `Boolean(${expression})`
 const chooseScreen = (name: string) => ab("eval", `Array.from(document.querySelectorAll('[aria-label="Screens"] button')).find(x => x.textContent === ${JSON.stringify(name)}).click()`);
 const heading = (name: string) => `Array.from(document.querySelectorAll('.screen-box h2')).some(x => x.textContent === ${JSON.stringify(name)})`;
 
+// Standalone frames exercise the shared controls without the explorer's tap routing.
+function openFrame(name: string) {
+  ab("open", `${base}/docs/screens-explore`);
+  wait("document.querySelector('[aria-label=Screens] button')");
+  chooseScreen(name);
+  const href = ab("eval", `Array.from(document.querySelectorAll('a')).find(link => link.textContent === 'Frame alone').href`).result;
+  ab("open", href);
+}
+
 function luminance(rgb: number[]) {
   const [r, g, b] = rgb.map(value => {
     const channel = value / 255;
@@ -74,7 +83,7 @@ try {
   wait("!document.querySelector('[cmdk-input]')");
   assert(ab("eval", "document.querySelector('.screen-box h1')?.textContent").result.includes("ORD-"));
 
-  chooseScreen("New order");
+  openFrame("New order");
   ab("find", "role", "button", "click", "--name", "Line 1 SKU");
   ab("fill", "[cmdk-input]", "Pils");
   wait("document.querySelectorAll('[cmdk-item]').length === 1");
@@ -86,7 +95,9 @@ try {
   ab("click", "[cmdk-item]");
   wait("!document.querySelector('[cmdk-input]')");
   for (const mode of ["light", "dark"]) {
-    ab("eval", `document.documentElement.classList.toggle('dark', ${mode === "dark"})`);
+    ab("eval", `localStorage.setItem('theme', ${JSON.stringify(mode)}); document.documentElement.classList.toggle('dark', ${mode === "dark"})`);
+    ab("open", `${base}/docs/screens-explore`);
+    wait("document.querySelector('[aria-label=Screens] button')");
     chooseScreen("Search");
     ab("fill", "[cmdk-input]", "Hazy");
     wait("document.querySelectorAll('[cmdk-item]').length === 2");
@@ -96,7 +107,7 @@ try {
     checkHighlight('[cmdk-item][aria-selected="true"]');
     assert.equal(ab("eval", `Array.from(document.querySelectorAll('[cmdk-item][aria-selected=false]')).every(row => getComputedStyle(row).outlineStyle !== 'solid')`).result, true, "Inactive options must not keep the active outline");
 
-    chooseScreen("New order");
+    openFrame("New order");
     ab("find", "role", "button", "click", "--name", "Line 1 SKU");
     checkHighlight('[cmdk-item][aria-selected="true"]');
     ab("press", "ArrowDown");
@@ -104,8 +115,8 @@ try {
     ab("press", "Enter");
     wait("!document.querySelector('[cmdk-input]')");
 
-    chooseScreen("Edit material");
-    ab("eval", `document.querySelector('.screen-box [data-slot="select-trigger"]').focus()`);
+    openFrame("Edit material");
+    ab("focus", '[data-slot="select-trigger"][aria-label="Kind"]');
     ab("press", "ArrowDown");
     checkHighlight('[data-slot="select-item"][data-highlighted]');
     ab("press", "ArrowDown");
