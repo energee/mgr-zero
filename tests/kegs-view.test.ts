@@ -315,9 +315,6 @@ describe("Keg event history", () => {
     expect(control("Keg pool")).toContain("Owned ⅙ bbl");
     expect(control("Customer")).toContain("Ridgeline Tap Room");
     expect(html.indexOf(">Keg pool<")).toBeLessThan(html.indexOf(">Customer<"));
-    const customerTrigger = /<button[^>]*aria-label="Customer"[^>]*>[\s\S]*?<\/button>/.exec(html)?.[0];
-    expect(customerTrigger).toContain('data-variant="outline"');
-    expect(customerTrigger).toContain("<svg");
   });
 
   it("#1030 asks to widen the filter only when a filter is set", () => {

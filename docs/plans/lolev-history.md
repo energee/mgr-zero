@@ -5,11 +5,11 @@ Status: draft, awaiting approval. Branch `feat/lolev-history`, worktree
 
 ## Goal
 
-Bring about 183 finished Lolev batches (2024-08 → 2026-10) into MGR as real
-batch records — brew day, readings, packaged lots — without changing current
-on-hand stock, current "in process" volume, or any TTB report period the
-brewery will file. Tank history is not imported (it was not accurate in
-Lolev). Lolev orders are not imported.
+Bring finished legacy batches into MGR as real batch records — brew day,
+readings and packaged lots — without changing current on-hand stock,
+current "in process" volume or any TTB period the brewery will file.
+Do not synthesize tank history when the source cannot support it.
+Order history is a separate import.
 
 Two parts:
 
@@ -56,32 +56,26 @@ Tank history is out, so pick one:
 
 | | Choice | Effect |
 |---|---|---|
-| **R1 (recommended)** | One synthetic occupancy per historical batch in a single "Historical" vessel, brewed-on → closed-on, laid end to end so they never overlap | No schema change for readings or lots. The batch screens show a stay in "Historical", not a real tank. Overlapping Lolev batches are made sequential by shrinking each stay to fit; dates on readings stay true. The "Historical" vessel never carries a capacity or an open stay, so it never counts as in process. |
+| **R1 (recommended)** | One synthetic occupancy per historical batch in a single "Historical" vessel, brewed-on → closed-on, laid end to end so they never overlap | No schema change for readings or lots. The batch screens show a stay in "Historical", not a real tank. Overlapping legacy batches are made sequential by shrinking each stay to fit; dates on readings stay true. The "Historical" vessel never carries a capacity or an open stay, so it never counts as in process. |
 | **R2** | Make `occupancy_id` nullable on readings and runs, adding `batch_id` | Honest data, but touches every reader of those tables (cellar, Today, lot trace, completion) — a larger change. |
 
 The plan below assumes **R1**. If R2, tasks 5–7 grow and a schema task is added.
 
-## Source facts (2026-10-13 dump)
+## Source shape
 
-- batches 202 (114 `packaged`, 19 `active`, 69 with no state — older schema);
-  `date` on all; `initialVolume` on 164; `beer` on 200; `recipe` on 199.
-- brew-logs 128 (`brewDate`, `actualOG` on 124, knockout volume, boil times).
-- tests 804 (`time`, `temperature` 759, `ph` 465, `plato` 453; `batch` on 803).
-- packaging-sessions 149 (91 completed); products are
-  `{packagingFormat, quantity}` with no batch link.
-- finished-goods 164 (`batch` on 138, `packagingFormat`, `quantity`,
-  `productionDate`); **all at 0 remaining**.
+The private source contains batches, brew logs, readings and finished goods.
+Readings carry batch identity and observed values.
+Finished goods carry production date, format and quantity; prefer an explicit
+batch link over assumptions about packaging sessions.
+Keep dump dates, row counts, operational values and tenant mappings private.
 
 ## Scope rules
 
-- **Historical** = finished batches (`packaged`, or no state and not active).
-  The 19 `active` batches are current work: import them later through the
-  normal commands into real tanks (their own short pass), not here.
+- **Historical** means finished batches, not active production.
+  Import active work later through the normal commands into real tanks.
 - Readings attach only to historical batches.
-- Packaging comes from **finished-goods** rows (they carry the batch); a
-  finished good with no batch is skipped and reported. v1's Lolev sync found
-  the packaging-sessions module unused (`~/Repos/mgr/PROGRESS.md`, 2026-08-12),
-  which backs finished goods as the source.
+- Packaging comes from finished-goods rows with a batch reference.
+  Skip and report rows that cannot be linked to a historical batch.
 - One bad row never aborts the run: each batch imports on its own and a
   failure lands in the skipped list (v1 learned this, PROGRESS.md 2026-08-18).
 - Each lot is sold through on its production date (`depletion`), so on-hand is
@@ -89,10 +83,10 @@ The plan below assumes **R1**. If R2, tasks 5–7 grow and a schema task is adde
   (`removal_shape`, `00001_baseline.sql:665`): default the Taproom channel,
   `taxable` (the report's taxpaid removal). ponytail: same-day sell-through; real sell-out dates are unknown,
   and any pre-books date is invisible to reports.
-- Brands: history needs `brand_id` on runs and lots, so Lolev beers become
-  brands here (the deferred "beers → brands" pass folds in).
-- SKUs: a lot moves a SKU (brand × format). Lolev packaging formats map to MGR
-  formats by name; a missing format is a decision, not invented (see task 5).
+- Brands: history needs `brand_id` on runs and lots, so resolve legacy beers
+  to approved brands.
+- SKUs: map each source format to a known MGR format.
+  An unmatched format needs an owner decision, not an invented mapping.
 
 ## Tasks
 
@@ -140,7 +134,7 @@ The plan below assumes **R1**. If R2, tasks 5–7 grow and a schema task is adde
    the same day. Test (DB): no change to `on_hand` / `atp`, no change to a
    report for a period after `books_opened_on`, lot trace shows the batch.
    Depends: 6.
-8. **Run locally** — set `books_opened_on` on the dev "Lolev Beer" brewery,
+8. **Run locally** — set `books_opened_on` on the approved disposable brewery,
    dry run, real run, rerun writes nothing; compare a report before and after.
    Hosted stays ask-first. Depends: 7.
 
@@ -153,9 +147,8 @@ after 3 and 5.
 ## Open questions (defaults chosen; say if wrong)
 
 - **R1 vs R2** (above). Default R1.
-- **Books-opened date for Lolev Beer.** Default: the day after the last
-  historical batch closes, or the go-live date you give.
+- **Books-opened date.** Use the owner's approved cutover date.
 - **Sell-through date.** Default: same day as packaging.
 - **Sell-through channel and tax treatment.** Default: Taproom, `taxable`.
-- **Batches with no `initialVolume` (38).** Default: planned volume from the
+- **Batches with no `initialVolume`.** Default: planned volume from the
   recipe's batch size; skipped and reported if neither exists.

@@ -30,6 +30,12 @@ package-lock.json
 .DS_Store
 *.pem
 /.local/
+/.omp/
+*.xlsx
+*.csv
+*.bak
+*.key
+!tests/fixtures/**/*.csv
 
 # debug
 npm-debug.log*

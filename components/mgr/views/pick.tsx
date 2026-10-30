@@ -12,8 +12,6 @@ import { OrderQuantity } from "./new-order";
 import { startsGroup } from "@/lib/mgr/brand-lines";
 import type { PickViewModel } from "@/lib/mgr/pick-view";
 
-export type { PickViewModel };
-
 export function PickView({ model, footer, quantities, onQuantity, onShort, onPrint, messages, submitting = false, disabled = false }: {
   model: PickViewModel; footer?: ReactNode; quantities?: Record<string, string>;
   onQuantity?: (key: string, value: string) => void; onShort?: (key: string) => void;

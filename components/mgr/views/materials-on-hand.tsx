@@ -10,8 +10,6 @@ import { E } from "@/components/mgr/e";
 import { RecordTable } from "@/components/mgr/views/record-table";
 import type { MaterialsOnHandRowView, MaterialsOnHandViewModel } from "@/lib/mgr/materials-on-hand-view";
 
-export type { MaterialsOnHandViewModel };
-
 export function MaterialsOnHandView({
   model,
   header,

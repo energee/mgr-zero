@@ -110,6 +110,7 @@ describe("Work chips", () => {
 describe("reported explorer flows", () => {
   it.each([
     ["Portal set password", "Save password", "Shop"],
+    ["Driver", "Resume", "Confirm delivery"],
     ["Menu", "Warehouse", "Menu"],
     ["Order history", "ORD-0231", "Order detail"],
     ["Order detail", "Orders", "Order history"],

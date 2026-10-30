@@ -379,7 +379,7 @@ describe("line errors in the views", () => {
   it("a drawn order line marks both its SKU picker and its quantity, each linked to its own message", () => {
     const model = { ...toNewOrderViewProps(newOrderDraft), lines: [{ name: "", skuId: "", qty: "-2", warning: false }] };
     const markup = html(createElement(NewOrderView, { model }));
-    const skuControl = markup.match(/<[^>]*aria-label="Line 1 SKU"[^>]*>/)?.[0];
+    const skuControl = markup.match(/<button[^>]*aria-describedby="[^"]*-line-0-sku-error[^"]*"[^>]*>/)?.[0];
     const quantityControl = markup.match(/<[^>]*aria-label="Line 1 quantity"[^>]*>/)?.[0];
     const messageIds = [...markup.matchAll(/<[^>]*data-slot="field-error"[^>]*>/g)]
       .map(([tag]) => tag.match(/\bid="([^"]+)"/)?.[1]);
