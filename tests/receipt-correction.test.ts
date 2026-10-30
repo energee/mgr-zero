@@ -41,17 +41,37 @@ describe("immutable receipt correction", () => {
     await expect(runCommand("correct_purchase_receipt", input, f.ctx)).rejects.toThrow(/already|superseded|reload/i);
   });
 
-  it("refuses a consumed receipt without reversing stock or creating a revision", async () => {
+  it("corrects a consumed receipt without rewriting its consumption or allowing negative stock", async () => {
     const f = await received();
     const { data: line } = await admin.from("receipt_lines").select("lot_id").eq("receipt_id", f.receiptId).single();
     const used = await admin.from("material_movements").insert({ brewery_id: f.brewery.id, material_id: f.material.id,
       location_id: f.location.id, bin_id: f.location.binId, lot_id: line!.lot_id!, qty: -1, type: "consumption", created_by: f.ctx.userId });
     expect(used.error).toBeNull();
     await expect(runCommand("correct_purchase_receipt", {
-      receiptId: f.receiptId, reason: "Wrong count", lines: [{ poLineId: f.lineId, qtyCounted: 9, lotCode: "ORIGINAL" }],
-    }, f.ctx)).rejects.toThrow(/used|consum|subsequent|dependency/i);
+      receiptId: f.receiptId, reason: "Below amount already used", lines: [{ poLineId: f.lineId, qtyCounted: 0.1, lotCode: "ORIGINAL", bestBy: "2027-01-01" }],
+    }, f.ctx)).rejects.toThrow(/negative material stock/i);
     expect((await admin.from("receipts").select("id").eq("po_id", f.po.id)).data).toHaveLength(1);
-    expect(sql(`select sum(qty) from public.material_movements where material_id='${f.material.id}'`)).toEqual(["49.0000"]);
+    await runCommand("correct_purchase_receipt", {
+      receiptId: f.receiptId, reason: "Wrong count", lines: [{ poLineId: f.lineId, qtyCounted: 9, lotCode: "ORIGINAL", bestBy: "2027-01-01" }],
+    }, f.ctx);
+    expect((await admin.from("receipts").select("id").eq("po_id", f.po.id)).data).toHaveLength(2);
+    expect(sql(`select sum(qty) from public.material_movements where material_id='${f.material.id}'`)).toEqual(["44.0000"]);
+    expect(sql(`select qty from public.material_movements where material_id='${f.material.id}' and type='consumption'`)).toEqual(["-1.0000"]);
+  });
+
+  it("corrects the receiving bin while preserving the original receipt location", async () => {
+    const f = await received();
+    const destination = await seedLocation(f.brewery.id, { name: "Actual receiving location" });
+    const corrected = await runCommand("correct_purchase_receipt", {
+      receiptId: f.receiptId, reason: "Received in storage", locationId: destination.id, binId: destination.binId,
+      lines: [{ poLineId: f.lineId, qtyCounted: 10, lotCode: "ORIGINAL", bestBy: "2027-01-01" }],
+    }, f.ctx) as { receipt_id: string };
+    expect((await admin.from("receipts").select("location_id,bin_id").eq("id", f.receiptId).single()).data)
+      .toEqual({ location_id: f.location.id, bin_id: f.location.binId });
+    expect((await admin.from("receipts").select("location_id,bin_id").eq("id", corrected.receipt_id).single()).data)
+      .toEqual({ location_id: destination.id, bin_id: destination.binId });
+    expect(sql(`select sum(qty) from public.material_movements where material_id='${f.material.id}' and bin_id='${f.location.binId}'`)).toEqual(["0.0000"]);
+    expect(sql(`select sum(qty) from public.material_movements where material_id='${f.material.id}' and bin_id='${destination.binId}'`)).toEqual(["50.0000"]);
   });
 
   it("retains another receipt's contribution and permits a zero-count replacement", async () => {

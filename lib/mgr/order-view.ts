@@ -56,6 +56,7 @@ export type OrderViewModel = {
   putBackHref?: string;
   confirmHref?: string;
   editHref?: string;
+  canReorderRefused?: boolean;
   lines: OrderLineView[];
   /** The columns with something to say (#1506): Picked and Shipped once a line
    *  records them, Available while the order still waits on stock. */
@@ -97,6 +98,7 @@ export type OrderSnapshot = {
     qty_ordered: number;
     qty_picked: number | null;
     qty_shipped: number | null;
+    qty_refused?: number;
     unit_price_cents: number;
     short_reason?: string | null;
     /** Set at submit on a one-way keg line (order_lines.one_way_fee_cents). */
@@ -255,6 +257,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
     putBackHref: stagedOnOpenOrder(order.status, order.needs_restock) ? (backHref ? `/orders/${order.id}/restock` : "#") : undefined,
     editHref: order.status === "draft" ? (backHref ? `/orders/${order.id}/edit` : "#") : undefined,
     confirmHref: order.status === "submitted" ? (backHref ? `/orders/${order.id}/confirm` : "#") : undefined,
+    canReorderRefused: order.kind === "wholesale" && order.status === "shipped" && lines.some(line => Number(line.qty_refused ?? 0) > 0),
     columns: lineColumns(order.status, lines),
     lines: lines.map((l) => {
       const ordered = Number(l.qty_ordered);

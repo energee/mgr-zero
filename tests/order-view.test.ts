@@ -13,6 +13,15 @@ import { orderLineCents, toOrderViewProps, type OrderSnapshot } from "../lib/mgr
 const PAGE = "app/(app)/orders/[id]/page.tsx";
 
 describe("Order view loop", () => {
+  it("offers refused-beer recovery only when a shipped wholesale order has refused quantities", () => {
+    const refused: OrderSnapshot = { ...orderConfirmedWholesale, order: { ...orderConfirmedWholesale.order, status: "shipped" },
+      lines: orderConfirmedWholesale.lines.map((line, index) => ({ ...line, qty_refused: index === 0 ? 2 : 0 })) };
+    const model = toOrderViewProps(refused);
+    expect(renderToStaticMarkup(createElement(OrderView, { model }))).toContain("Reorder refused beer");
+    expect(toOrderViewProps({ ...refused, order: { ...refused.order, status: "confirmed" } }).canReorderRefused).toBe(false);
+    expect(toOrderViewProps({ ...refused, lines: refused.lines.map(line => ({ ...line, qty_refused: 0 })) }).canReorderRefused).toBe(false);
+  });
+
   it("draws Ordered as the shared number field, plus Reason, when lines can be adjusted in place", () => {
     const model = toOrderViewProps(orderConfirmedWholesale);
     const read = renderToStaticMarkup(createElement(OrderView, { model }));

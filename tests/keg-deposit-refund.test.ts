@@ -166,6 +166,38 @@ describe("keg deposit refund credit memo", () => {
     expect(events.data).toEqual([]);
   });
 
+  it("checks empty kegs in with the deposit refund atomically and replays once", async () => {
+    const invoiceId = await shipTwoKegs(f);
+    const deposit = await admin.from("invoice_lines").select("id").eq("invoice_id", invoiceId).eq("kind", "keg_deposit").single().throwOnError();
+    const requestId = crypto.randomUUID();
+    const input = { invoiceId, locationId: f.source.id, binId: f.source.binId, returnEmptyKegs: true, lines: [{ invoiceLineId: deposit.data!.id, qty: 1 }] };
+    const result = await runCommand("return_shipment", input, f.adminCtx, { requestId, correlationId: requestId });
+    expect(await runCommand("return_shipment", input, f.adminCtx, { requestId, correlationId: requestId })).toEqual(result);
+    expect((await admin.from("keg_customer_balances").select("qty").eq("customer_id", f.customer.customerId)).data).toEqual([{ qty: 1 }]);
+    expect((await admin.from("keg_events").select("qty,bin_id").eq("customer_id", f.customer.customerId).eq("reason", "returned")).data)
+      .toEqual([{ qty: 1, bin_id: f.source.binId }]);
+    expect(await balance(f)).toEqual({ kegs: 1, cents: 2500 });
+  });
+
+  it("refunds a deposit without asking for unused return facts or posting a shell return", async () => {
+    const invoiceId = await shipTwoKegs(f);
+    const deposit = await admin.from("invoice_lines").select("id").eq("invoice_id", invoiceId).eq("kind", "keg_deposit").single().throwOnError();
+    await runCommand("return_shipment", { invoiceId, lines: [{ invoiceLineId: deposit.data!.id, qty: 1 }] }, f.adminCtx);
+    expect((await admin.from("keg_events").select("id").eq("customer_id", f.customer.customerId).eq("reason", "returned")).data).toEqual([]);
+    expect(await balance(f)).toEqual({ kegs: 1, cents: 2500 });
+  });
+
+  it("rolls the refund back if the same empty kegs were already checked in", async () => {
+    const invoiceId = await shipTwoKegs(f);
+    const deposit = await admin.from("invoice_lines").select("id,keg_pool_id").eq("invoice_id", invoiceId).eq("kind", "keg_deposit").single().throwOnError();
+    await runCommand("record_keg_event", { poolId: deposit.data!.keg_pool_id, kegSize: "half_bbl", qty: 2, reason: "returned",
+      customerId: f.customer.customerId, locationId: f.source.id, binId: f.source.binId }, f.adminCtx);
+    await expect(runCommand("return_shipment", { invoiceId, returnEmptyKegs: true, locationId: f.source.id, binId: f.source.binId,
+      lines: [{ invoiceLineId: deposit.data!.id, qty: 1 }] }, f.adminCtx)).rejects.toThrow(/customer balance|already returned/i);
+    expect(await balance(f)).toEqual({ kegs: 2, cents: 5000 });
+    expect((await admin.from("invoice_lines").select("id").eq("credited_invoice_line_id", deposit.data!.id)).data).toEqual([]);
+  });
+
   it("refunds one keg's deposit as a keg_deposit_refund line and reduces the customer's deposit balance", async () => {
     const invoiceId = await shipTwoKegs(f);
     const deposit = (await admin.from("invoice_lines").select("id,keg_pool_id,keg_size,unit_price_cents").eq("invoice_id", invoiceId).eq("kind", "keg_deposit").single()).data!;

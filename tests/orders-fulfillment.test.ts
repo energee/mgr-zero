@@ -82,6 +82,24 @@ describe("pick and ship", () => {
       .toEqual(["created", "submitted", "confirmed", "picked", "shipped", "restocked"]);
   });
 
+  it("reorders only refused delivery quantities with the original PO and note as an editable draft", async () => {
+    const id = await confirmedOrder(4);
+    const line = await lineOf(id);
+    expect((await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 4 }], p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect((await staffDb.rpc("ship_order", { p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 4 }], p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect((await admin.from("orders").update({ po_number: "BUYER-123", note: "Deliver after lunch" }).eq("id", id)).error).toBeNull();
+    expect((await admin.from("order_lines").update({ qty_refused: 2 }).eq("id", line.id)).error).toBeNull();
+    const requestId = crypto.randomUUID();
+    const reordered = await staffDb.rpc("reorder_refused_delivery", { p_order: id, p_request_id: requestId });
+    expect(reordered.error).toBeNull();
+    expect(await staffDb.rpc("reorder_refused_delivery", { p_order: id, p_request_id: requestId })).toMatchObject({ data: reordered.data, error: null });
+    const result = reordered.data as { order_id: string };
+    expect((await admin.from("orders").select("status,po_number,note,customer_id,ship_to_id,from_location_id,requested_ship_date").eq("id", result.order_id).single()).data)
+      .toEqual({ status: "draft", po_number: "BUYER-123", note: "Deliver after lunch", customer_id: customerId, ship_to_id: shipToId, from_location_id: whId, requested_ship_date: null });
+    expect((await admin.from("order_lines").select("sku_id,qty_ordered,qty_picked,qty_shipped").eq("order_id", result.order_id)).data)
+      .toEqual([{ sku_id: skuId, qty_ordered: 2, qty_picked: null, qty_shipped: null }]);
+  });
+
   it("serializes distinct workers racing shipment and adjustment so only one transition wins", async () => {
     const [shipperDb, adjusterDb] = await Promise.all([asUser(staffEmail), asUser(staffEmail)]);
     for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -150,7 +168,7 @@ describe("pick and ship", () => {
     const { data: o } = await admin.from("orders").select().eq("id", id).single();
     expect(o!.status).toBe("shipped");
   });
-  it("adjust after pick sets needs_restock; re-pick clears it", async () => {
+  it("requires an explicit put-back event before a changed picked order can be picked again", async () => {
     const id = await confirmedOrder(10);
     const line = await lineOf(id);
     await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 10 }], p_request_id: crypto.randomUUID() });
@@ -166,7 +184,15 @@ describe("pick and ship", () => {
     expect(beforeRepick.error?.message).toMatch(/waiting for restock/);
     expect((await admin.from("shipments").select("id").eq("order_id", id)).data).toEqual([]);
     expect((await admin.from("inventory_movements").select("id").eq("ref", id)).data).toEqual([]);
-    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: l2.id, qty_picked: 6 }], p_request_id: crypto.randomUUID() });
+    const repick = await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: l2.id, qty_picked: 6 }], p_request_id: crypto.randomUUID() });
+    expect(repick.error?.message).toMatch(/put back/i);
+    expect((await lineOf(id)).qty_picked).toBe(10);
+    const restocked = await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() });
+    expect(restocked.error).toBeNull();
+    const picked = await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: l2.id, qty_picked: 6 }], p_request_id: crypto.randomUUID() });
+    expect(picked.error).toBeNull();
+    expect((await admin.from("order_events").select("payload").eq("order_id", id).eq("event", "restocked").single()).data?.payload)
+      .toMatchObject({ lines: [{ line_id: l2.id, qty: 4 }] });
     ({ data: o } = await admin.from("orders").select().eq("id", id).single());
     expect(o!.needs_restock).toBe(false);
     const afterRepick = await staffDb.rpc("ship_order", {
