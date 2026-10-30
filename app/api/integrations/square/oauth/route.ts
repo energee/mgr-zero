@@ -1,3 +1,4 @@
+import { integrationFailureCause } from "@/lib/integration-failure";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -23,7 +24,8 @@ export async function GET(request: Request) {
       store: { claim: claimSquareOAuth, complete: completeSquareOAuthStore, fail: failSquareOAuth },
     });
     destination.searchParams.set("connected", "1");
-  } catch {
+  } catch (error) {
+    console.error("square_oauth_callback_failed", integrationFailureCause(error, "oauth_complete"));
     destination.searchParams.set("error", "oauth");
   }
   return NextResponse.redirect(destination, 303);

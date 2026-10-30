@@ -39,6 +39,25 @@ ports 3000 and 3002, under `/auth/confirm`. Restart the relevant local Supabase
 stack after changing its redirect allowlist. Hosted Auth needs its own approved
 origin and invitation template when deployment is configured.
 
+## Integration failure diagnostics
+
+QuickBooks, Square, and Slack OAuth failures keep their existing generic browser
+errors. Server diagnostics record only `{ name, status, stage }`. `status` is the
+HTTP status when available, or `null` for network and local failures. `stage`
+identifies the local operation, such as `oauth_config`, `oauth_exchange`,
+`oauth_verify_realm`, `oauth_store`, or `invoice_sync_read_retry`.
+
+Search for `qbo_oauth_failed`, `qbo_oauth_callback_failed`,
+`square_oauth_failed`, `square_oauth_callback_failed`, or
+`slack_oauth_callback_failed` when a connection cannot finish. QuickBooks
+sanitization emits `qbo_unavailable`; Square transport and validation failures
+emit `square_provider_failed` or `square_unavailable`. A callback can emit both
+its specific operation failure and its final redirect failure.
+
+Messages, response bodies, stacks, callback URLs, OAuth codes and state, tokens,
+and bearer payment links are not included. Do not add them to support logs.
+
+
 ## Invitation delivery diagnostics
 
 Auth invitation sending uses the hosted Supabase project's SMTP settings, not

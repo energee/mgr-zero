@@ -25,6 +25,7 @@ import {
   type VersionedIntegrationTokens,
 } from "@/lib/supabase/integration-tokens";
 import { readQboEnv } from "@/lib/env/server-parser";
+import { integrationFailureCause } from "@/lib/integration-failure";
 
 const AUTHORIZE_URL = "https://appcenter.intuit.com/connect/oauth2";
 const TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
@@ -146,25 +147,12 @@ function parseTokens(value: unknown, receivedAt: string): QboTokens {
   };
 }
 
-export function sanitizeQboError(error: unknown) {
-  void error;
+export function sanitizeQboError(error: unknown, stage: string) {
+  console.error("qbo_unavailable", integrationFailureCause(error, stage));
   return "QuickBooks is unavailable";
 }
 
 const QBO_SETUP_UNAVAILABLE = "QuickBooks setup is unavailable";
-
-/**
- * The payment-failure log fields: enough cause for staff, never a provider body.
- * Only messages MGR writes itself (a CommandError, the missing-setup error) are
- * kept; any other error, which may carry tokens or a bearer link, logs its name.
- */
-export function qboPaymentFailureCause(error: unknown) {
-  if (error instanceof CommandError) {
-    return { name: error.name, status: error.status, code: error.code, message: error.message };
-  }
-  if (!(error instanceof Error)) return { name: typeof error };
-  return error.message === QBO_SETUP_UNAVAILABLE ? { name: error.name, message: error.message } : { name: error.name };
-}
 
 export function validateQboPaymentUrl(value: string, allowedHosts: ReadonlySet<string>) {
   try {
@@ -218,7 +206,7 @@ async function withQboRefreshLease<T>(
     // Logging and dropping a failed release is safe: the lease expires by itself
     // after 45 seconds, and throwing here would hide the refresh outcome.
     await releaseQboTokenRefresh(ctx, expected.connectionId, lease)
-      .catch((error: unknown) => console.error("qbo_refresh_lease_release_failed", qboPaymentFailureCause(error)));
+      .catch((error: unknown) => console.error("qbo_refresh_lease_release_failed", integrationFailureCause(error, "refresh_lease_release")));
   }
 }
 
@@ -239,7 +227,7 @@ async function refreshPortalInvoicePayment(
   const stored = await withQboRefreshLease(ctx, claim, async () => {
     const next = await client.refresh(claim.refreshToken).catch(async (error) => {
       if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, claim, invoiceId);
-      else console.error("qbo_payment_refresh_failed", qboPaymentFailureCause(error));
+      else console.error("qbo_payment_refresh_failed", integrationFailureCause(error, "payment_refresh"));
       // A failed provider refresh keeps the buyer on Payment unavailable.
       return null;
     });
@@ -316,9 +304,9 @@ export async function listQboRecords(ctx: Ctx, kind: "customer" | "item", client
   try {
     records = await read(tokens.accessToken);
   } catch (error) {
-    if (refreshed || !(error instanceof QboHttpError && error.status === 401)) throw new Error(sanitizeQboError(error));
+    if (refreshed || !(error instanceof QboHttpError && error.status === 401)) throw new Error(sanitizeQboError(error, "mapping_read"));
     tokens = await refreshQboCredentials(ctx, client, tokens);
-    records = await read(tokens.accessToken).catch((retryError: unknown) => { throw new Error(sanitizeQboError(retryError)); });
+    records = await read(tokens.accessToken).catch((retryError: unknown) => { throw new Error(sanitizeQboError(retryError, "mapping_read_retry")); });
   }
   return records.sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -348,7 +336,7 @@ export async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, ex
   const outcome = await withQboRefreshLease(ctx, current, async () => {
     const next = await client.refresh(current.refreshToken).catch(async (error) => {
       if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, current);
-      throw new Error(sanitizeQboError(error));
+      throw new Error(sanitizeQboError(error, "refresh"));
     });
     // Accepted window (#1073): if the process dies or the token request times
     // out after Intuit rotated the refresh token but before this CAS commits,
@@ -361,14 +349,14 @@ export async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, ex
       // Mark the connection for recovery so no caller refreshes with it. The
       // mark is a no-op when newer tokens were stored (the CAS committed but
       // its response was lost, or another caller won) or the connection changed.
-      console.error("qbo_refresh_store_failed", qboPaymentFailureCause(error));
+      console.error("qbo_refresh_store_failed", integrationFailureCause(error, "refresh_store"));
       await markQboAuthorizationFailed(ctx, current);
-      if (!(error instanceof CommandError) || error.status !== 409) throw new Error(sanitizeQboError(error));
+      if (!(error instanceof CommandError) || error.status !== 409) throw new Error(sanitizeQboError(error, "refresh_store"));
     }
   });
   if (outcome === "unavailable") throw new Error("QuickBooks is unavailable");
   const stored = await readVersionedIntegrationTokens(ctx, "qbo")
-    .catch((error) => { throw new Error(sanitizeQboError(error)); });
+    .catch((error) => { throw new Error(sanitizeQboError(error, "refresh_read")); });
   if (stored.connectionId !== current.connectionId || stored.credentialVersion <= current.credentialVersion) {
     throw new Error("QuickBooks is unavailable");
   }
@@ -392,18 +380,23 @@ export async function completeQboOAuth(input: {
   if (!claim || claim.breweryId !== input.selectedBreweryId) throw new Error("oauth state invalid");
   let tokens: QboTokens | null = null;
   let storing = false;
+  let stage = "oauth_exchange";
   try {
     tokens = await input.client.exchange(code);
+    stage = "oauth_hold";
     await input.store.hold(claim.intentId, input.actorId, realmId, tokens.refreshToken);
     if (tokens.grantedScopes?.some((scope) => !claim.requestedScopes.includes(scope))) {
       throw new Error("QuickBooks token response was invalid");
     }
+    stage = "oauth_verify_realm";
     const companyName = await input.client.verifyRealm(realmId, tokens.accessToken);
     storing = true;
+    stage = "oauth_store";
     return await input.store.complete(claim.intentId, input.actorId, realmId, {
       ...tokens, grantedScopes: tokens.grantedScopes ?? [...claim.requestedScopes],
     }, companyName);
   } catch (error) {
+    console.error("qbo_oauth_failed", integrationFailureCause(error, stage));
     // Tokens issued but never stored would stay live at Intuit; revoking the
     // refresh token revokes its access token too. But Intuit's revoke
     // disconnects the app from that QuickBooks company, so skip it when a
@@ -421,7 +414,7 @@ export async function completeQboOAuth(input: {
     // fail_qbo_oauth returns false once the intent left 'exchanging', and then
     // the stored credential is live, so revoke only when fail recorded it.
     if (tokens && storing && recorded) await revoke(tokens.refreshToken);
-    throw new Error(sanitizeQboError(error));
+    throw new Error("QuickBooks is unavailable");
   }
 }
 
@@ -439,8 +432,7 @@ export type QboOAuthReapStore = {
  * revoke keeps the token for the next daily run, until the reap marks it
  * giveUp (seven days); then it is discarded unrevoked. A failed realm lookup
  * or discard also keeps it. Each row's failure is logged and counted, and
- * never stops the other rows; qboPaymentFailureCause logs only the error name
- * for these plain errors, never a token or provider body.
+ * never stops the other rows; diagnostics omit messages and provider bodies.
  */
 export async function reapQboOAuthExchanges(store: QboOAuthReapStore, client: Pick<QboOAuthClient, "revoke">) {
   let done = 0;
@@ -450,14 +442,14 @@ export async function reapQboOAuthExchanges(store: QboOAuthReapStore, client: Pi
       if (!await store.realmInUse(held.realmId)) {
         await client.revoke(held.refreshToken).catch((error: unknown) => {
           if (!held.giveUp) throw error;
-          console.error("qbo_oauth_reap_revoke_abandoned", qboPaymentFailureCause(error));
+          console.error("qbo_oauth_reap_revoke_abandoned", integrationFailureCause(error, "oauth_reap_revoke"));
         });
       }
       await store.discard(held.intentId, held.refreshToken);
       done += 1;
     } catch (error) {
       failed += 1;
-      console.error("qbo_oauth_reap_failed", qboPaymentFailureCause(error));
+      console.error("qbo_oauth_reap_failed", integrationFailureCause(error, "oauth_reap"));
     }
   }
   return { done, failed };
@@ -503,7 +495,7 @@ export async function pushInvoiceToQbo(
   try {
     created = await client.createTransaction(start.realmId, start.entityType, start.providerRequestId, start.requestBody, tokens.accessToken);
   } catch (error) {
-    throw new Error(sanitizeQboError(error));
+    throw new Error(sanitizeQboError(error, "invoice_push"));
   }
   if (!created.ok && created.status === 401 && !refreshed) {
     tokens = await refreshQboCredentials(ctx, client, tokens);
@@ -511,7 +503,7 @@ export async function pushInvoiceToQbo(
     try {
       created = await client.createTransaction(start.realmId, start.entityType, start.providerRequestId, start.requestBody, tokens.accessToken);
     } catch (error) {
-      throw new Error(sanitizeQboError(error));
+      throw new Error(sanitizeQboError(error, "invoice_push_retry"));
     }
   }
   if (!created.ok) {
@@ -606,14 +598,15 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
       const entityType = target.entityType === undefined ? "Invoice" : target.entityType;
       if (entityType !== "Invoice" && entityType !== "CreditMemo") throw new Error("QuickBooks sync entity type was invalid");
       let read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache, entityType)
-        .catch(() => { throw new Error("QuickBooks is unavailable"); });
+        .catch((error: unknown) => { throw new Error(sanitizeQboError(error, "invoice_sync_read")); });
       if (!read.ok && read.status === 401) {
         tokens = await refreshQboCredentials(ctx, client, tokens);
         if (tokens.connectionId !== start.connectionId) throw new Error("QuickBooks is unavailable");
         read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache, entityType)
-          .catch(() => { throw new Error("QuickBooks is unavailable"); });
+          .catch((error: unknown) => { throw new Error(sanitizeQboError(error, "invoice_sync_read_retry")); });
       }
-      if (!read.ok && !read.definitive) throw new Error("QuickBooks is unavailable");
+      if (!read.ok && !read.definitive) throw new Error(sanitizeQboError(
+        new QboHttpError("QuickBooks invoice read failed", read.status), "invoice_sync_read"));
       const pushedTotal = typeof target.pushedResponse?.TotalAmt === "number"
         ? Math.round(target.pushedResponse.TotalAmt * 100) : null;
       const remoteState = entityType === "Invoice" && read.ok && /^Voided\b/i.test(read.privateNote) && read.totalCents === 0
@@ -639,7 +632,7 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
     try {
       await recordQboInvoiceSyncFailure(ctx, requestId);
     } catch (recordError) {
-      console.error(`qbo sync ${requestId} failure could not be recorded:`, recordError instanceof Error ? recordError.message : recordError);
+      console.error("qbo_sync_failure_record_failed", integrationFailureCause(recordError, "invoice_sync_failure_record"));
     }
     throw error;
   }
@@ -657,7 +650,9 @@ const cents = (value: unknown) => {
   return Number.isSafeInteger(result) ? result : null;
 };
 
-class QboInvalidGrantError extends Error {}
+class QboInvalidGrantError extends Error {
+  readonly status = 400;
+}
 /** A non-OK QuickBooks HTTP response; `status` lets callers branch (e.g. 401 -> refresh once and retry). Network failures are not wrapped and carry no status. */
 export class QboHttpError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
@@ -818,7 +813,7 @@ export class QboOAuthClient {
       headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
       redirect: "error",
     });
-    if (!response.ok) throw new Error("QuickBooks company verification failed");
+    if (!response.ok) throw new QboHttpError("QuickBooks company verification failed", response.status);
     const body = await response.json() as { CompanyInfo?: { Id?: unknown; CompanyName?: unknown } };
     if (typeof body.CompanyInfo?.Id !== "string" || !body.CompanyInfo.Id.trim()) {
       throw new Error("QuickBooks company verification failed");
@@ -834,7 +829,7 @@ export class QboOAuthClient {
       body: JSON.stringify({ token }),
       redirect: "error",
     });
-    if (!response.ok) throw new Error("QuickBooks revoke failed");
+    if (!response.ok) throw new QboHttpError("QuickBooks revoke failed", response.status);
   }
 
   async createTransaction(realmId: string, entityType: "Invoice" | "CreditMemo" | "Bill", requestId: string, body: string, accessToken: string) {
@@ -955,7 +950,7 @@ export class QboOAuthClient {
       headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
       redirect: "error",
     });
-    if (!response.ok) throw new Error("QuickBooks payment response was invalid");
+    if (!response.ok) throw new QboHttpError("QuickBooks payment response was invalid", response.status);
     const payload = await response.json() as { Payment?: Record<string, unknown> };
     const payment = payload?.Payment;
     const total = cents(payment?.TotalAmt);
@@ -1036,7 +1031,7 @@ export class QboOAuthClient {
         } },
       }),
     });
-    if (!response.ok) throw new Error("QuickBooks tax calculation unavailable");
+    if (!response.ok) throw new QboHttpError("QuickBooks tax calculation unavailable", response.status);
     const payload: unknown = await response.json().catch(() => null);
     if (!payload || typeof payload !== "object") throw new Error("QuickBooks tax calculation unavailable");
     const root = payload as Record<string, unknown>;
@@ -1100,7 +1095,7 @@ export class QboOAuthClient {
           throw new QboInvalidGrantError("QuickBooks token request failed");
         }
       }
-      throw new Error("QuickBooks token request failed");
+      throw new QboHttpError("QuickBooks token request failed", response.status);
     }
     return parseTokens(await response.json(), receivedAt);
   }

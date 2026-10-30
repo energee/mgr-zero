@@ -52,7 +52,14 @@ describe("QuickBooks OAuth transport", () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(null, { status: 200 }));
     await new QboOAuthClient(config, fetch).revoke("refresh-secret");
     expect(fetch.mock.calls[0][1]).toMatchObject({ method: "POST", body: JSON.stringify({ token: "refresh-secret" }) });
-    expect(sanitizeQboError(new Error("failed access-secret refresh-secret"))).toBe("QuickBooks is unavailable");
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      expect(sanitizeQboError(new Error("failed access-secret refresh-secret"), "test_transport")).toBe("QuickBooks is unavailable");
+      expect(log).toHaveBeenCalledWith("qbo_unavailable", { name: "Error", status: null, stage: "test_transport" });
+      expect(JSON.stringify(log.mock.calls)).not.toContain("secret");
+    } finally {
+      log.mockRestore();
+    }
   });
 });
 
@@ -360,7 +367,7 @@ describe("QuickBooks OAuth hold and reap (#1034)", () => {
         reap: async () => [held(1), held(2), held(3)], realmInUse: realmFree, discard,
       }, { revoke })).resolves.toEqual({ done: 2, failed: 1 });
       expect(discard.mock.calls.map(([intentId]) => intentId)).toEqual(["intent-1", "intent-3"]);
-      expect(error).toHaveBeenCalledWith("qbo_oauth_reap_failed", { name: "Error" });
+      expect(error).toHaveBeenCalledWith("qbo_oauth_reap_failed", { name: "Error", status: null, stage: "oauth_reap" });
     } finally {
       error.mockRestore();
     }

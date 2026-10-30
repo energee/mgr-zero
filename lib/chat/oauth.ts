@@ -10,6 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { hasAnyRole } from "@/lib/mgr/roles";
 import { chatCredentialHasOtherOwner, cleanupChatInstallation, failChatCredentialStore, serviceClient, withChatLifecycleLock } from "./jobs";
+import { integrationFailureCause } from "@/lib/integration-failure";
 
 export const PROVIDER = "slack";
 export const REQUIRED_SLACK_SCOPES = ["chat:write", "im:write", "groups:read"] as const;
@@ -138,8 +139,7 @@ async function completeSlackInstallLocked(db: SupabaseClient<Database>, request:
   try {
     await granted.persist();
   } catch (error) {
-    // Name and message only — the cause never carries a token into the log.
-    console.error("chat credential store failed:", error instanceof Error ? `${error.name}: ${error.message}` : "unknown");
+    console.error("slack_oauth_credential_store_failed", integrationFailureCause(error, "oauth_credential_store"));
     return failChatCredentialStore(intent.installation_id);
   }
   return { installationId: result.installation_id, breweryId: intent.brewery_id, replayed: result.replayed };

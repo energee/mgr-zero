@@ -4,11 +4,14 @@ import { createServerClient } from "@/lib/supabase/server";
 import { completeQboOAuth, qboConfig, QboOAuthClient } from "@/lib/qbo";
 import { claimQboOAuth, completeQboOAuthStore, failQboOAuth, holdQboOAuthTokens, qboOAuthExchangeState, qboRealmInUse } from "@/lib/supabase/integration-tokens";
 import { getActiveBrewery } from "@/lib/brewery";
+import { integrationFailureCause } from "@/lib/integration-failure";
 
 export async function GET(request: Request) {
   const destination = new URL("/settings/accounting", request.url);
+  let stage = "oauth_config";
   try {
     const config = qboConfig();
+    stage = "oauth_session";
     const db = await createServerClient();
     const { data } = await db.auth.getClaims();
     const actorId = data?.claims.sub;
@@ -26,6 +29,7 @@ export async function GET(request: Request) {
       if (first === "completed" || first === "exchanging") throw new DuplicateCallback(first);
       return null;
     };
+    stage = "oauth_complete";
     try {
       await completeQboOAuth({
         request, actorId, selectedBreweryId: activeBrewery.id, redirectUri: config.redirectUri,
@@ -39,7 +43,8 @@ export async function GET(request: Request) {
       if (error.firstState === "exchanging") return NextResponse.redirect(destination, 303);
     }
     destination.searchParams.set("connected", "1");
-  } catch {
+  } catch (error) {
+    console.error("qbo_oauth_callback_failed", integrationFailureCause(error, stage));
     destination.searchParams.set("error", "oauth");
   }
   return NextResponse.redirect(destination, 303);

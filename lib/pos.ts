@@ -4,6 +4,7 @@ import { oauthState, sha256 } from "@/lib/hash";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { hasAnyRole } from "@/lib/mgr/roles";
 import { readSquareEnv } from "@/lib/env/server-parser";
+import { integrationFailureCause } from "@/lib/integration-failure";
 import {
   advanceSquareCatalogSync,
   advanceSquareSalesSync,
@@ -206,12 +207,18 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
   };
 }
 
-const unavailable = () => new Error("Square is unavailable");
+const unavailable = (error: unknown = { name: "Error" }, stage = "response_validation") => {
+  console.error("square_unavailable", integrationFailureCause(error, stage));
+  return new Error("Square is unavailable");
+};
 const text = (value: unknown) => typeof value === "string" && value.trim() ? value : null;
 const finiteVersion = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
 
 class SquareProviderError extends Error {
-  constructor(readonly terminalAuthorization: boolean) { super("Square is unavailable"); }
+  constructor(readonly terminalAuthorization: boolean, readonly status: number, stage: string) {
+    super("Square is unavailable");
+    console.error("square_provider_failed", integrationFailureCause(this, stage));
+  }
 }
 
 class SquareCatalogReadError extends Error {
@@ -248,6 +255,14 @@ export class SquareClient {
     this.apiOrigin = config.environment === "sandbox" ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
   }
 
+  private async request(stage: string, url: string, init: RequestInit) {
+    try {
+      return await this.fetcher(url, init);
+    } catch (error) {
+      throw unavailable(error, stage);
+    }
+  }
+
   authorizeUrl(state: string) {
     const url = new URL("/oauth2/authorize", this.oauthOrigin);
     url.searchParams.set("client_id", this.config.applicationId);
@@ -259,7 +274,7 @@ export class SquareClient {
 
   private async token(body: Record<string, unknown>): Promise<SquareTokens> {
     const receivedAt = new Date().toISOString();
-    const response = await this.fetcher(`${this.oauthOrigin}/oauth2/token`, {
+    const response = await this.request("token_request", `${this.oauthOrigin}/oauth2/token`, {
       method: "POST",
       headers: { "Square-Version": SQUARE_VERSION, "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ client_id: this.config.applicationId, client_secret: this.config.applicationSecret, ...body }),
@@ -269,7 +284,7 @@ export class SquareClient {
     const refreshToken = text(data?.refresh_token);
     const accessExpiresAt = text(data?.expires_at);
     const merchantId = text(data?.merchant_id);
-    if (!response.ok) throw new SquareProviderError(terminalAuthorization(response.status, data));
+    if (!response.ok) throw new SquareProviderError(terminalAuthorization(response.status, data), response.status, "token_response");
     if (!accessToken || !refreshToken || !accessExpiresAt || !merchantId || !Number.isFinite(Date.parse(accessExpiresAt))) throw unavailable();
     return { accessToken, refreshToken, accessExpiresAt, merchantId, receivedAt };
   }
@@ -284,13 +299,13 @@ export class SquareClient {
   }
 
   private async revokeToken(target: { access_token: string; revoke_only_access_token: boolean } | { merchant_id: string }) {
-    const response = await this.fetcher(`${this.oauthOrigin}/oauth2/revoke`, {
+    const response = await this.request("revoke_request", `${this.oauthOrigin}/oauth2/revoke`, {
       method: "POST",
       headers: { "Square-Version": SQUARE_VERSION, Authorization: `Client ${this.config.applicationSecret}`, "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ client_id: this.config.applicationId, ...target }),
     });
     const data = await response.json().catch(() => null) as { success?: unknown } | null;
-    if (!response.ok || data?.success !== true) throw unavailable();
+    if (!response.ok || data?.success !== true) throw unavailable({ name: "Error", status: response.status }, "revoke_response");
   }
 
   revoke(accessToken: string) { return this.revokeToken({ access_token: accessToken, revoke_only_access_token: false }); }
@@ -302,12 +317,12 @@ export class SquareClient {
   revokeMerchant(merchantId: string) { return this.revokeToken({ merchant_id: merchantId }); }
 
   private async api(path: string, accessToken: string, init?: RequestInit) {
-    const response = await this.fetcher(`${this.apiOrigin}${path}`, {
+    const response = await this.request("api_request", `${this.apiOrigin}${path}`, {
       ...init,
       headers: { "Square-Version": SQUARE_VERSION, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
     });
     const data: unknown = await response.json().catch(() => null);
-    if (!response.ok) throw new SquareProviderError(terminalAuthorization(response.status, data));
+    if (!response.ok) throw new SquareProviderError(terminalAuthorization(response.status, data), response.status, "api_response");
     if (!data || typeof data !== "object") throw unavailable();
     return data as Record<string, unknown>;
   }
@@ -391,12 +406,12 @@ export class SquareClient {
   }
 
   async retrieveCatalogObject(accessToken: string, objectId: string) {
-    const response = await this.fetcher(`${this.apiOrigin}/v2/catalog/object/${encodeURIComponent(objectId)}?include_related_objects=false`, {
+    const response = await this.request("catalog_read_request", `${this.apiOrigin}/v2/catalog/object/${encodeURIComponent(objectId)}?include_related_objects=false`, {
       headers: { "Square-Version": SQUARE_VERSION, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
     });
     const data = await response.json().catch(() => null) as Record<string, unknown> | null;
     if (!response.ok) {
-      if (terminalAuthorization(response.status, data)) throw new SquareProviderError(true);
+      if (terminalAuthorization(response.status, data)) throw new SquareProviderError(true, response.status, "catalog_read_response");
       if (response.status === 404 || Array.isArray(data?.errors) && data.errors.some((entry) => !!entry
         && typeof entry === "object" && (entry as Record<string, unknown>).code === "NOT_FOUND")) {
         throw new SquareCatalogReadError("provider_missing");
@@ -404,21 +419,21 @@ export class SquareClient {
       if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) {
         throw new SquareCatalogReadError("provider_invalid");
       }
-      throw unavailable();
+      throw unavailable({ name: "Error", status: response.status }, "catalog_read_response");
     }
     if (!data?.object || typeof data.object !== "object") throw new SquareCatalogReadError("provider_invalid");
     return data.object as Record<string, unknown>;
   }
 
   async upsertCatalogObject(accessToken: string, requestBody: string) {
-    const response = await this.fetcher(`${this.apiOrigin}/v2/catalog/object`, {
+    const response = await this.request("catalog_write_request", `${this.apiOrigin}/v2/catalog/object`, {
       method: "POST",
       headers: { "Square-Version": SQUARE_VERSION, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
       body: requestBody,
     });
     const data = await response.json().catch(() => null) as Record<string, unknown> | null;
     if (!response.ok) {
-      if (terminalAuthorization(response.status, data)) throw new SquareProviderError(true);
+      if (terminalAuthorization(response.status, data)) throw new SquareProviderError(true, response.status, "catalog_write_response");
       const versionConflict = Array.isArray(data?.errors) && data.errors.some((entry) =>
         !!entry && typeof entry === "object" && (entry as Record<string, unknown>).code === "VERSION_MISMATCH");
       return { ok: false as const, versionConflict, definitive: versionConflict || (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) };
@@ -465,7 +480,7 @@ export async function publishSquareCatalogItem(
       if (isTerminalAuthorization(error)) {
         await markSquareAuthorizationFailed(ctx, start.connectionId, lease.credentialVersion);
       }
-      throw unavailable();
+      throw unavailable(error, "publication_refresh");
     }
     if (next.merchantId !== lease.merchantId) throw unavailable();
     await compareAndSwapSquareTokens(ctx, {
@@ -483,13 +498,13 @@ export async function publishSquareCatalogItem(
     } catch (error) {
       if (isTerminalAuthorization(error)) {
         await markSquareAuthorizationFailed(ctx, start.connectionId, lease.credentialVersion);
-        throw unavailable();
+        throw unavailable(error, "publication_read");
       }
       if (error instanceof SquareCatalogReadError) {
         await finishSquarePublication(ctx, start.attemptId, error.code, null);
         throw new CommandError("Square no longer has the selected catalog item", 409, "conflict");
       }
-      throw unavailable();
+      throw unavailable(error, "publication_read");
     }
     let prepared: ReturnType<typeof prepareSquareCatalogPublication>;
     try { prepared = prepareSquareCatalogPublication(start.source, current); }
@@ -512,7 +527,7 @@ export async function publishSquareCatalogItem(
     if (isTerminalAuthorization(error)) {
       await markSquareAuthorizationFailed(ctx, start.connectionId, lease.credentialVersion);
     }
-    throw unavailable();
+    throw unavailable(error, "publication_write");
   }
   if (!result.ok) {
     if (result.definitive) await finishSquarePublication(ctx, start.attemptId,
@@ -649,33 +664,29 @@ export async function completeSquareOAuth(input: {
   const claim = await input.store.claim(sha256(state), input.actorId, input.selectedBreweryId, input.redirectUri);
   if (!claim || claim.breweryId !== input.selectedBreweryId) throw new Error("oauth state invalid");
   let tokens: SquareTokens | null = null;
+  let stage = "oauth_exchange";
   try {
     tokens = await input.client.exchange(code);
+    stage = "oauth_verify_locations";
     const locations = await input.client.listLocations(tokens.accessToken, tokens.merchantId);
+    stage = "oauth_store";
     return await input.store.complete(claim.intentId, input.actorId, tokens, locations);
   } catch (error) {
-    // Why the callback fell through is the only way to tell a provider outage
-    // apart from a storage failure after a credential was already issued — the
-    // recovery branches below look identical from the outside. Name and status
-    // only: the caught value can carry a response body, and `tokens` is in scope.
-    console.error("square oauth callback failed:", {
-      name: (error as { name?: unknown })?.name ?? typeof error,
-      status: (error as { status?: unknown })?.status ?? null,
-      tokenIssued: tokens !== null,
-    });
+    console.error("square_oauth_failed", integrationFailureCause(error, stage));
     if (!tokens) {
       await input.store.fail(claim.intentId, input.actorId, "not_required", null).catch(() => undefined);
     } else {
       try {
         await input.store.fail(claim.intentId, input.actorId, "pending", tokens.merchantId);
-      } catch {
+      } catch (cleanupError) {
+        console.error("square_oauth_cleanup_failed", integrationFailureCause(cleanupError, "oauth_cleanup_record"));
         await input.store.fail(claim.intentId, input.actorId, "unresolved", tokens.merchantId).catch(() => undefined);
-        throw unavailable();
+        throw new Error("Square is unavailable");
       }
       const cleanup = await input.client.revokeAccessToken(tokens.accessToken).then(() => "confirmed" as const, () => "unresolved" as const);
       await input.store.fail(claim.intentId, input.actorId, cleanup, tokens.merchantId).catch(() => undefined);
     }
-    throw unavailable();
+    throw new Error("Square is unavailable");
   }
 }
 
@@ -694,15 +705,15 @@ export async function refreshSquareCredentials(
     next = await client.refresh(current.refreshToken);
   } catch (error) {
     if (isTerminalAuthorization(error)) await markSquareAuthorizationFailed(ctx, current.connectionId, current.credentialVersion);
-    throw unavailable();
+    throw unavailable(error, "refresh");
   }
   if (next.merchantId !== (syncStart?.merchantId ?? await getSquareMerchant(ctx))) throw unavailable();
   try {
     await compareAndSwapSquareTokens(ctx, current, next, secondsUntil(next.receivedAt, next.accessExpiresAt));
   } catch (error) {
-    if (syncStart || !(error instanceof CommandError) || error.status !== 409) throw unavailable();
+    if (syncStart || !(error instanceof CommandError) || error.status !== 409) throw unavailable(error, "refresh_store");
   }
-  const stored = await readVersionedIntegrationTokens(ctx, "square").catch(() => { throw unavailable(); });
+  const stored = await readVersionedIntegrationTokens(ctx, "square").catch((error: unknown) => { throw unavailable(error, "refresh_read"); });
   if (stored.connectionId !== current.connectionId || stored.credentialVersion <= current.credentialVersion) throw unavailable();
   if (!syncStart) return { tokens: stored };
   if (stored.credentialVersion !== current.credentialVersion + 1) throw unavailable();
@@ -711,7 +722,7 @@ export async function refreshSquareCredentials(
 
 async function getSquareMerchant(ctx: Ctx) {
   const { data, error } = await ctx.db.from("pos_connections").select("merchant_id").eq("brewery_id", ctx.breweryId).eq("provider", "square").eq("state", "connected").single();
-  if (error || typeof data?.merchant_id !== "string") throw unavailable();
+  if (error || typeof data?.merchant_id !== "string") throw unavailable(error, "merchant_read");
   return data.merchant_id;
 }
 
@@ -732,7 +743,7 @@ export async function syncSquareCatalog(ctx: Ctx, requestId: string, client: Squ
     facts = await syncSquareCatalogFacts(client, tokens.accessToken, start.merchantId);
   } catch (error) {
     if (isTerminalAuthorization(error)) await markSquareAuthorizationFailed(ctx, start.connectionId, tokens.credentialVersion);
-    throw unavailable();
+    throw unavailable(error, "catalog_sync");
   }
   return recordSquareCatalogSnapshot(ctx, start, facts);
 }
@@ -830,7 +841,7 @@ export async function syncSquareSales(ctx: Ctx, requestId: string, client: Squar
       locations = await client.listLocations(tokens.accessToken, start.merchantId);
     } catch (error) {
       if (isTerminalAuthorization(error)) await markSquareAuthorizationFailed(ctx, start.connectionId, tokens.credentialVersion);
-      throw unavailable();
+      throw unavailable(error, "sales_locations");
     }
     start = await recordSquareSalesLocations(ctx, start, locations);
   }
@@ -844,7 +855,7 @@ export async function syncSquareSales(ctx: Ctx, requestId: string, client: Squar
       page = await client.searchOrdersPage(tokens.accessToken, locationIds, start, start.cursor);
     } catch (error) {
       if (isTerminalAuthorization(error)) await markSquareAuthorizationFailed(ctx, start.connectionId, tokens.credentialVersion);
-      throw unavailable();
+      throw unavailable(error, "sales_orders");
     }
     const normalized = normalizeSquareOrders(page.orders, start.merchantId, locationIds, start);
     const stored = await recordSquareSalesPage(ctx, start, {
