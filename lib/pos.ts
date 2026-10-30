@@ -27,6 +27,7 @@ import {
 
 export const SQUARE_VERSION = "2026-08-19";
 export const SQUARE_SCOPES = ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"] as const;
+const SQUARE_REQUEST_TIMEOUT_MS = 20_000;
 
 export type SquareConfig = {
   applicationId: string;
@@ -248,6 +249,10 @@ export class SquareClient {
     this.apiOrigin = config.environment === "sandbox" ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
   }
 
+  private request(input: Parameters<typeof fetch>[0], init: RequestInit) {
+    return this.fetcher(input, { ...init, signal: AbortSignal.timeout(SQUARE_REQUEST_TIMEOUT_MS) });
+  }
+
   authorizeUrl(state: string) {
     const url = new URL("/oauth2/authorize", this.oauthOrigin);
     url.searchParams.set("client_id", this.config.applicationId);
@@ -259,7 +264,7 @@ export class SquareClient {
 
   private async token(body: Record<string, unknown>): Promise<SquareTokens> {
     const receivedAt = new Date().toISOString();
-    const response = await this.fetcher(`${this.oauthOrigin}/oauth2/token`, {
+    const response = await this.request(`${this.oauthOrigin}/oauth2/token`, {
       method: "POST",
       headers: { "Square-Version": SQUARE_VERSION, "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ client_id: this.config.applicationId, client_secret: this.config.applicationSecret, ...body }),
@@ -284,7 +289,7 @@ export class SquareClient {
   }
 
   private async revokeToken(target: { access_token: string; revoke_only_access_token: boolean } | { merchant_id: string }) {
-    const response = await this.fetcher(`${this.oauthOrigin}/oauth2/revoke`, {
+    const response = await this.request(`${this.oauthOrigin}/oauth2/revoke`, {
       method: "POST",
       headers: { "Square-Version": SQUARE_VERSION, Authorization: `Client ${this.config.applicationSecret}`, "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ client_id: this.config.applicationId, ...target }),
@@ -302,7 +307,7 @@ export class SquareClient {
   revokeMerchant(merchantId: string) { return this.revokeToken({ merchant_id: merchantId }); }
 
   private async api(path: string, accessToken: string, init?: RequestInit) {
-    const response = await this.fetcher(`${this.apiOrigin}${path}`, {
+    const response = await this.request(`${this.apiOrigin}${path}`, {
       ...init,
       headers: { "Square-Version": SQUARE_VERSION, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
     });
@@ -391,7 +396,7 @@ export class SquareClient {
   }
 
   async retrieveCatalogObject(accessToken: string, objectId: string) {
-    const response = await this.fetcher(`${this.apiOrigin}/v2/catalog/object/${encodeURIComponent(objectId)}?include_related_objects=false`, {
+    const response = await this.request(`${this.apiOrigin}/v2/catalog/object/${encodeURIComponent(objectId)}?include_related_objects=false`, {
       headers: { "Square-Version": SQUARE_VERSION, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
     });
     const data = await response.json().catch(() => null) as Record<string, unknown> | null;
@@ -411,7 +416,7 @@ export class SquareClient {
   }
 
   async upsertCatalogObject(accessToken: string, requestBody: string) {
-    const response = await this.fetcher(`${this.apiOrigin}/v2/catalog/object`, {
+    const response = await this.request(`${this.apiOrigin}/v2/catalog/object`, {
       method: "POST",
       headers: { "Square-Version": SQUARE_VERSION, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
       body: requestBody,

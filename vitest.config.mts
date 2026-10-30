@@ -72,6 +72,8 @@ const pureTests = [
   "tests/password-signout-outcome.test.ts",
   "tests/auth-actions.test.ts",
   "tests/qbo-pay-route.test.ts",
+  "tests/provider-timeouts.test.ts",
+  "tests/qbo-sync-status.test.ts",
   "tests/staff-login-return.test.ts",
   "tests/proxy.test.ts",
   "tests/server-timing.test.ts",
