@@ -125,6 +125,104 @@ A page load with a large gap between its time to first byte and its stages point
 A large `command` or read stage points at that RPC.
 File each slow stage as its own fix, with its numbers.
 
+### Ledger lock hypothesis (#1628)
+
+[#1628](https://github.com/energee/mgr-zero/issues/1628) asks whether
+table-wide inventory and keg ledger locks caused the slow hosted Ship in
+[#1490](https://github.com/energee/mgr-zero/issues/1490).
+The locks exist; their contribution to that request has not been measured.
+Do not replace them on that hypothesis alone.
+
+The owner's #1490 decision permits hosted reads, not hosted saves.
+Do not trigger Ship, create competing writes, run manual vacuum, or change
+`log_lock_waits` to reproduce a wait.
+Observe an independently occurring, authorized Ship or inspect existing
+Postgres lock-wait logs.
+
+#### Read-only capture
+
+Name the hosted project before connecting.
+Run the following in its SQL editor or an existing authorized database session.
+It reads current activity and settings without changing configuration.
+It omits SQL text, application inputs, tenant ids, and credentials.
+Store the result with the slow request's UTC timestamp and `command` stage.
+Repeat only during the short observation window; an empty snapshot is not
+evidence that no wait occurred earlier.
+
+```sql
+begin read only;
+select
+  clock_timestamp() as sampled_at,
+  current_database() as database,
+  current_setting('log_lock_waits') as log_lock_waits,
+  current_setting('deadlock_timeout') as deadlock_timeout,
+  coalesce((
+    select jsonb_agg(to_jsonb(activity))
+    from (
+      select
+        a.pid,
+        a.state,
+        a.backend_type,
+        a.wait_event_type,
+        a.wait_event,
+        a.query_start,
+        clock_timestamp() - a.query_start as elapsed,
+        pg_blocking_pids(a.pid) as blockers,
+        a.query ilike '%ship_order%' as ship_request,
+        l.relation::regclass::text as relation,
+        l.mode,
+        l.granted
+      from pg_stat_activity a
+      join pg_locks l on l.pid = a.pid
+      where a.pid <> pg_backend_pid()
+        and l.relation in (
+          'public.inventory_movements'::regclass,
+          'public.keg_events'::regclass
+        )
+      order by a.pid, l.relation, l.granted
+    ) activity
+  ), '[]'::jsonb) as ledger_activity;
+commit;
+```
+
+A blocked ledger request has `wait_event_type = 'Lock'` and an ungranted
+lock row; `blockers` identifies its blocking sessions.
+`backend_type` distinguishes an autovacuum worker from a client session.
+Find those pids in the same capture and inspect existing logs for the same
+time window if the blocker has already finished.
+Correlate the Ship request with the wait, its relation, the conflicting
+holder and the measured wait duration.
+The `ship_request` flag is only a query-name hint, not proof of correlation.
+Do not publish raw log statements containing request inputs.
+
+#### Observed evidence and decision gate
+
+Read-only inspection of hosted project `uogrvqmrbmolvtftotsf` on
+2026-10-30 at **05:22:39 UTC** returned:
+
+| Observation | Result |
+| --- | --- |
+| Database | `postgres` |
+| `log_lock_waits` | Already `on`; unchanged |
+| `deadlock_timeout` | `1s`; unchanged |
+| Current locks on the two ledgers from other sessions | None (`ledger_activity = []`) |
+| Hosted function definitions | The six functions named in #1628 still contain ledger table locks |
+
+This is an idle snapshot, not a slow-Ship measurement.
+It neither confirms nor rules out lock contention in #1490.
+No concurrency change, migration, or hosted write follows from it.
+
+Before changing locks, attach a naturally observed slow Ship's stage timing
+and corresponding lock-wait evidence to #1628.
+If confirmed, a single cutover must cover every ledger writer that relies
+on the current locks, not just Ship or the six audited functions.
+Use one shared brewery or stock-key lock convention and stable acquisition
+order.
+Prove same-stock oversell prevention, cross-brewery independence, and all
+affected inventory, keg, transfer, taproom, batch and correction workflows
+against the named local test database before owner review.
+The hosted measurement gate remains open; this runbook does not resolve #1628.
+
 ## Results
 
 Fill one row per task per run set.
