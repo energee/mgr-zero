@@ -13,7 +13,7 @@ describe("Invoice accounting actions", () => {
     [["push"], ["Push to QuickBooks"]],
     [["retry"], ["Retry exact push"]],
     [["repush", "write_off"], ["Re-push deleted invoice", "Write off"]],
-  ] satisfies [QboInvoiceAction[], string[]][])("offers only authorized actions %j", (actions, labels) => {
+  ] satisfies [QboInvoiceAction[], string[]][])("offers only authorized actions %j", (actions: QboInvoiceAction[], labels: string[]) => {
     const html = htmlOf(createElement(InvoiceAccountingActionsView, { invoiceLabel: "INV-42", actions, mappingHref: "/invoices/42/mapping" }));
     for (const label of labels) expect(html).toContain(`>${label}<`);
     expect(html.match(/<button\b/g)?.length ?? 0).toBe(labels.length - (actions.includes("fix_mapping") ? 1 : 0));
