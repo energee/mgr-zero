@@ -2261,16 +2261,54 @@ isOneToOne: false
       referencedColumns: ["id","brewery_id"]
     }
                   ]
-                },"pos_locations": {
+                },"pos_location_mapping_history": {
                   Row: {
-                    "available": boolean,"brewery_id": string,"connection_id": string,"external_location_id": string,"external_name": string | null,"external_status": string | null,"last_seen_at": string | null,"location_id": string | null
+                    "brewery_id": string,"connection_id": string,"ends_at": string,"external_location_id": string,"id": string,"location_id": string,"retired_by": string,"starts_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "available"?: boolean,"brewery_id": string,"connection_id": string,"external_location_id": string,"external_name"?: string | null,"external_status"?: string | null,"last_seen_at"?: string | null,"location_id"?: string | null
+                    "brewery_id": string,"connection_id": string,"ends_at": string,"external_location_id": string,"id"?: string,"location_id": string,"retired_by": string,"starts_at": string
                   }
                   Update: {
-                    "available"?: boolean,"brewery_id"?: string,"connection_id"?: string,"external_location_id"?: string,"external_name"?: string | null,"external_status"?: string | null,"last_seen_at"?: string | null,"location_id"?: string | null
+                    "brewery_id"?: string,"connection_id"?: string,"ends_at"?: string,"external_location_id"?: string,"id"?: string,"location_id"?: string,"retired_by"?: string,"starts_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "pos_location_mapping_history_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "pos_location_mapping_history_connection_id_brewery_id_fkey"
+      columns: ["connection_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "pos_connections"
+      referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "pos_location_mapping_history_connection_id_external_locati_fkey"
+      columns: ["connection_id","external_location_id"]
+isOneToOne: false
+      referencedRelation: "pos_locations"
+      referencedColumns: ["connection_id","external_location_id"]
+    },{
+      foreignKeyName: "pos_location_mapping_history_location_id_brewery_id_fkey"
+      columns: ["location_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","brewery_id"]
+    }
+                  ]
+                },"pos_locations": {
+                  Row: {
+                    "available": boolean,"brewery_id": string,"connection_id": string,"external_location_id": string,"external_name": string | null,"external_status": string | null,"last_seen_at": string | null,"location_id": string | null,"mapping_started_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "available"?: boolean,"brewery_id": string,"connection_id": string,"external_location_id": string,"external_name"?: string | null,"external_status"?: string | null,"last_seen_at"?: string | null,"location_id"?: string | null,"mapping_started_at"?: string
+                  }
+                  Update: {
+                    "available"?: boolean,"brewery_id"?: string,"connection_id"?: string,"external_location_id"?: string,"external_name"?: string | null,"external_status"?: string | null,"last_seen_at"?: string | null,"location_id"?: string | null,"mapping_started_at"?: string
                   }
                   Relationships: [
                     {
@@ -4956,7 +4994,7 @@ isOneToOne: false
 { Args: { "p_actuals": Json,"p_brewery": string,"p_reason": string,"p_record": string,"p_request_id": string }; Returns: Json
                            },
 "correct_purchase_receipt":
-{ Args: { "p_brewery": string,"p_lines": Json,"p_reason": string,"p_receipt": string,"p_request_id": string }; Returns: Json
+{ Args: { "p_bin"?: string,"p_brewery": string,"p_lines": Json,"p_location"?: string,"p_reason": string,"p_receipt": string,"p_request_id": string }; Returns: Json
                            },
 "correct_reporting_basis":
 { Args: { "p_books_opened_on": string,"p_brewery": string,"p_expected_books_opened_on": string,"p_reason": string,"p_request_id": string }; Returns: Json
@@ -5543,6 +5581,9 @@ isOneToOne: false
 "release_qbo_token_refresh":
 { Args: { "p_brewery": string,"p_connection": string,"p_lease": string }; Returns: undefined
                            },
+"reorder_refused_delivery":
+{ Args: { "p_order": string,"p_request_id": string }; Returns: Json
+                           },
 "replace_format_bom":
 { Args: { "p_brewery": string,"p_format": string,"p_lines": Json,"p_request_id": string }; Returns: Json
                            },
@@ -5567,6 +5608,9 @@ isOneToOne: false
 "resolve_short_pick":
 { Args: { "p_line": string,"p_order": string,"p_qty_picked": number,"p_reason": string,"p_request_id": string,"p_resolution": string }; Returns: Json
                            },
+"retire_pos_location_mapping":
+{ Args: { "p_brewery": string,"p_external_location": string,"p_request_id": string }; Returns: Json
+                           },
 "retry_chat_delivery":
 { Args: { "p_delivery": string,"p_error_code": string,"p_lease": string,"p_next_attempt_at": string }; Returns: undefined
                            },
@@ -5574,7 +5618,7 @@ isOneToOne: false
 { Args: { "p_request_id": string,"p_route": string }; Returns: Json
                            },
 "return_shipment":
-{ Args: { "p_invoice": string,"p_lines": Json,"p_location": string,"p_reason": string,"p_refused_delivery"?: string,"p_request_id": string }; Returns: Json
+{ Args: { "p_bin"?: string,"p_invoice": string,"p_lines": Json,"p_location": string,"p_reason": string,"p_refused_delivery"?: string,"p_request_id": string,"p_return_empty"?: boolean }; Returns: Json
                            },
 "reverse_inventory_movement":
 { Args: { "p_brewery": string,"p_movement": string,"p_note": string,"p_request_id": string }; Returns: Json
