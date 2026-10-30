@@ -177,6 +177,9 @@ committed migrations. After applying migrations to the disposable test stack,
 run `bun run types:database`. Pass a local disposable database URL as the first
 argument when using a separate stack. Do not generate from a hosted or stale
 application database. CI checks the generated file against its fresh stack.
+Generation removes disposable readiness RPC signatures and normalizes space/tab-only
+lines to empty lines; the rest of the generated file is emitted unchanged.
+Do not hand-edit the generated file. CI requires an exact regeneration match.
 
 `lib/supabase/database.ts` records facts the generator cannot infer: nullable
 RPC arguments, trigger-populated insert fields, and non-null stock views.
