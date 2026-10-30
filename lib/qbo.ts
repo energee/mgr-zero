@@ -102,6 +102,8 @@ export type QboPushStart = {
   connectionId?: string;
   status: "pending" | "pushed" | "push_failed";
   remoteId?: string;
+  /** Only the call that first freezes a push may POST without reconciliation. Never cached for replay. */
+  mayPost?: boolean;
   alreadyPushed?: boolean;
   alreadyFinished?: boolean;
   error?: string;
@@ -502,6 +504,24 @@ export async function pushInvoiceToQbo(
     tokens = await refreshQboCredentials(ctx, client, tokens);
     refreshed = true;
   }
+  if (!start.mayPost) {
+    let found = await client.findInvoice(start.realmId, start.entityType, start.requestBody, tokens.accessToken)
+      .catch((error: unknown) => { throw new Error(sanitizeQboError(error)); });
+    if (!found.ok && found.status === 401 && !refreshed) {
+      tokens = await refreshQboCredentials(ctx, client, tokens);
+      refreshed = true;
+      if (tokens.connectionId !== start.connectionId) throw new Error("QuickBooks is unavailable");
+      found = await client.findInvoice(start.realmId, start.entityType, start.requestBody, tokens.accessToken)
+        .catch((error: unknown) => { throw new Error(sanitizeQboError(error)); });
+    }
+    if (!found.ok) throw new Error("QuickBooks is unavailable");
+    if (found.transaction) {
+      return finishQboPush(ctx, {
+        pushId: start.pushId, finishRequestId: start.finishRequestId, status: "pushed",
+        remoteId: found.transaction.remoteId, error: null, response: found.transaction.response,
+      });
+    }
+  }
   let created: Awaited<ReturnType<QboOAuthClient["createTransaction"]>>;
   try {
     created = await client.createTransaction(start.realmId, start.entityType, start.providerRequestId, start.requestBody, tokens.accessToken);
@@ -668,6 +688,18 @@ class QboInvalidGrantError extends Error {}
 /** A non-OK QuickBooks HTTP response; `status` lets callers branch (e.g. 401 -> refresh once and retry). Network failures are not wrapped and carry no status. */
 export class QboHttpError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
+}
+
+/** Keep only accounting facts needed to finish a push, never provider secrets or links. */
+function qboTransactionResult(entity: unknown) {
+  const row = asObject(entity);
+  if (!row || typeof row.Id !== "string" || !row.Id.trim()) throw new Error("QuickBooks response was invalid");
+  const safe = Object.fromEntries(["Id", "SyncToken", "TotalAmt", "Balance"]
+    .filter((key) => typeof row[key] === "string" || (typeof row[key] === "number" && Number.isFinite(row[key])))
+    .map((key) => [key, row[key]]));
+  const tax = asObject(row.TxnTaxDetail);
+  if (tax && typeof tax.TotalTax === "number" && Number.isFinite(tax.TotalTax)) safe.TotalTax = tax.TotalTax;
+  return { ok: true as const, remoteId: row.Id, response: safe };
 }
 
 export class QboOAuthClient {
@@ -864,18 +896,35 @@ export class QboOAuthClient {
     const payload: unknown = await response.json();
     if (!payload || typeof payload !== "object") throw new Error("QuickBooks response was invalid");
     const entity = (payload as Record<string, unknown>)[entityType];
-    if (!entity || typeof entity !== "object" || typeof (entity as Record<string, unknown>).Id !== "string"
-      || !(entity as Record<string, unknown>).Id) throw new Error("QuickBooks response was invalid");
-    const row = entity as Record<string, unknown>;
-    const safe = Object.fromEntries(["Id", "SyncToken", "TotalAmt", "Balance"]
-      .filter((key) => typeof row[key] === "string" || (typeof row[key] === "number" && Number.isFinite(row[key])) )
-      .map((key) => [key, row[key]]));
-    const tax = row.TxnTaxDetail;
-    if (tax && typeof tax === "object" && typeof (tax as Record<string, unknown>).TotalTax === "number"
-      && Number.isFinite((tax as Record<string, unknown>).TotalTax)) {
-      safe.TotalTax = (tax as Record<string, unknown>).TotalTax;
+    return qboTransactionResult(entity);
+  }
+
+  /** Reconciles an uncertain frozen Invoice or CreditMemo before another POST. */
+  async findInvoice(realmId: string, entityType: "Invoice" | "CreditMemo", body: string, accessToken: string) {
+    const frozen = asObject(JSON.parse(body));
+    const customer = asObject(frozen?.CustomerRef);
+    if (!frozen || typeof frozen.DocNumber !== "string" || !/^\d+$/.test(frozen.DocNumber)
+      || !customer || typeof customer.value !== "string" || !customer.value
+      || typeof frozen.TxnDate !== "string") throw new Error("QuickBooks invoice identity was invalid");
+    const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/query`, this.config.apiBaseUrl);
+    url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
+    url.searchParams.set("query", `select * from ${entityType} where DocNumber = '${frozen.DocNumber}'`);
+    const response = await this.transport(url, {
+      method: "GET", headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }, redirect: "error",
+    });
+    if (!response.ok) return { ok: false as const, status: response.status };
+    const payload = asObject(await response.json());
+    const result = asObject(payload?.QueryResponse);
+    if (!result || payload?.Fault !== undefined || result.Fault !== undefined) throw new Error("QuickBooks reconciliation response was invalid");
+    const rows = result[entityType] === undefined ? [] : result[entityType];
+    if (!Array.isArray(rows)) throw new Error("QuickBooks reconciliation response was invalid");
+    if (rows.length === 0) return { ok: true as const, transaction: null };
+    const row = asObject(rows[0]);
+    if (rows.length !== 1 || !row || row.DocNumber !== frozen.DocNumber
+      || asObject(row.CustomerRef)?.value !== customer.value || row.TxnDate !== frozen.TxnDate) {
+      throw new Error("QuickBooks reconciliation identity was ambiguous");
     }
-    return { ok: true as const, remoteId: row.Id as string, response: safe };
+    return { ok: true as const, transaction: qboTransactionResult(row) };
   }
 
   async findReceiptBill(realmId: string, requestId: string, body: string, accessToken: string) {
