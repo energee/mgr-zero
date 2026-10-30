@@ -10,6 +10,10 @@ beer must still be put back after cancellation. Refused returns use
 so the join can start from refused lines instead of completed deliveries.
 Neither index changes queue visibility or return accounting.
 
+Both indexes ship in `20261030040000_today_pending_history_indexes.sql`,
+ordered after the existing main-branch migrations so normal migration pushes
+can apply them without out-of-order flags.
+
 The database regression in `tests/commands-today.test.ts` seeds 9,000 orders,
 lines, shipments and completed deliveries inside a rolled-back transaction.
 Two orders need restocking and one delivery has refused beer. After refreshing
