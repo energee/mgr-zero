@@ -7,6 +7,10 @@ import { OrdersView } from "@/components/mgr/views/orders-list";
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { PortalOrdersView } from "@/components/mgr/views/portal-orders";
 import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
+import { BatchesView } from "@/components/mgr/views/batches";
+import { toBatchesViewProps } from "@/lib/mgr/batches-view";
+import { PackagingRunsView } from "@/components/mgr/views/packaging-runs";
+import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
 
 it("offers More only with a next cursor and keeps filters and timestamp precision", () => {
   const rows = Array.from({ length: 50 }, (_, n) => ({ id: String(n), created_at: "2026-09-20T12:00:00.123456+00:00" }));
@@ -46,6 +50,31 @@ it("all four inventory/live views mount the same continuation control", () => {
     expect(html).toContain('href="/next"');
     expect(html).toContain('href="/newest"');
   }
+});
+
+it("pages one batch group without discarding the other group's cursor", () => {
+  const completed = historyPage({ rows: [], nextCursor: "older-completed" }, "/batches", "current-completed", { cancelledCursor: "current-cancelled", recipe: "recipe" }, "completedCursor");
+  const more = new URL(completed.pagination.moreHref!, "http://localhost");
+  expect(more.searchParams.get("completedCursor")).toBe("older-completed");
+  expect(more.searchParams.get("cancelledCursor")).toBe("current-cancelled");
+  expect(more.searchParams.get("recipe")).toBe("recipe");
+  const newest = new URL(completed.pagination.firstHref!, "http://localhost");
+  expect(newest.searchParams.has("completedCursor")).toBe(false);
+  expect(newest.searchParams.get("cancelledCursor")).toBe("current-cancelled");
+});
+
+it("keeps history navigation reachable on an empty last page for batches and packaging", () => {
+  const pagination = { firstHref: "/newest" };
+  const batches = renderToStaticMarkup(createElement(BatchesView, {
+    model: toBatchesViewProps({ title: "Batches" }),
+    completedPagination: pagination, cancelledPagination: pagination, cancelledOpen: true,
+  }));
+  expect(batches.split('href="/newest"')).toHaveLength(3);
+  expect(batches).toContain("<details open=");
+  const packaging = renderToStaticMarkup(createElement(PackagingRunsView, {
+    model: toPackagingRunsViewProps([], "UTC"), pagination,
+  }));
+  expect(packaging).toContain('href="/newest"');
 });
 
 it("reads only a well-formed single cursor from the URL; anything else opens the newest page", () => {

@@ -53,8 +53,8 @@ describe("record_historical_packaging_run", () => {
     const outputs = (await admin.from("packaging_run_outputs").select("qty_actual, movement_id").eq("run_id", result.run.id).throwOnError()).data!;
     expect(outputs).toEqual([{ qty_actual: 4.5, movement_id: null }]);
     expect((await admin.from("inventory_movements").select("id").eq("brewery_id", breweryId).throwOnError()).data).toEqual([]);
-    const runs = await runCommand("list_packaging_runs", {}, brewer) as { id: string; closed_at: string | null }[];
-    expect(runs.find((r) => r.id === result.run.id)!.closed_at).not.toBeNull();
+    const runs = await runCommand("list_packaging_history", {}, brewer) as { rows: { id: string; closed_at: string | null }[] };
+    expect(runs.rows.find((r) => r.id === result.run.id)!.closed_at).not.toBeNull();
   });
 
   it("refuses dates outside history, another brand's SKU, a bad quantity, a duplicate lot, and a non-admin", async () => {

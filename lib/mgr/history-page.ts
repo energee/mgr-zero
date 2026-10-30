@@ -11,10 +11,10 @@ export function pageCursor(value: unknown) {
 
 /** Links for one page a history query returned. More continues from the query's
  *  nextCursor; Newest links back to the first page and appears only when a cursor is open. */
-export function historyPage<T extends HistoryRow>(page: HistoryPage<T>, path: string, cursor: string | undefined, filters: Record<string, string | undefined> = {}) {
+export function historyPage<T extends HistoryRow>(page: HistoryPage<T>, path: string, cursor: string | undefined, filters: Record<string, string | undefined> = {}, cursorKey = "cursor") {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) if (value) params.set(key, value);
   const firstHref = cursor ? `${path}${params.size ? `?${params}` : ""}` : undefined;
-  if (page.nextCursor) params.set("cursor", page.nextCursor);
+  if (page.nextCursor) params.set(cursorKey, page.nextCursor);
   return { rows: page.rows, pagination: { moreHref: page.nextCursor ? `${path}?${params}` : undefined, firstHref } };
 }
