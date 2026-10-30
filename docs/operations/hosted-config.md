@@ -39,6 +39,31 @@ ports 3000 and 3002, under `/auth/confirm`. Restart the relevant local Supabase
 stack after changing its redirect allowlist. Hosted Auth needs its own approved
 origin and invitation template when deployment is configured.
 
+## Browser security headers
+
+`proxy.ts` creates a fresh script nonce for each HTML request and supplies the
+same CSP to Next's renderer and the browser. Framework scripts and the theme
+boot script carry that nonce. Production does not allow inline scripts without
+a nonce or `eval`; development permits `eval` for Next's debugger only.
+`frame-ancestors 'self'` preserves same-origin documentation embeds.
+
+Public guides and screen frames still perform no session refresh. Their HTML
+now renders per request because a prerendered script nonce would be reused.
+Nonce-bearing responses are private and non-cacheable. MDX content and valid
+documentation/frame paths are still compiled and enumerated at build time.
+
+`next.config.ts` denies unused camera, microphone, geolocation, payment, USB,
+display-capture, accelerometer, gyroscope, and magnetometer browser features
+through `Permissions-Policy`. It retains the global frame, MIME-sniffing, and
+referrer protections.
+
+After an owner-approved deployment, inspect `/login`, `/portal/login`, `/docs`,
+and a `/screens/frame/` document. Confirm each document has a matching CSP and
+script nonce, two loads use different nonces, inline scripts without a nonce
+are blocked, and login, theme switching, docs search, and embedded frames still
+work without CSP violations. Local proof does not establish hosted enforcement;
+deployment and this read-only hosted check remain owner-controlled.
+
 ## Invitation delivery diagnostics
 
 Auth invitation sending uses the hosted Supabase project's SMTP settings, not

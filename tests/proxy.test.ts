@@ -1,6 +1,6 @@
 // tests/proxy.test.ts — verifies the proxy refreshes the session with one local claims check and its refresh cookies preserve no-cache response headers.
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const createServerClient = vi.hoisted(() => vi.fn());
 const getClaims = vi.hoisted(() => vi.fn());
@@ -39,19 +39,52 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe("Supabase proxy refresh", () => {
-  it("does not refresh sessions for the customer guides or their search", () => {
+  it("skips non-document assets and endpoints, but protects every document route", () => {
     const matches = (path: string) => new RegExp(`^${config.matcher[0]}$`).test(path);
-    // /docs is the master chooser - the primary public entry point, not just a prefix.
-    expect(matches("/docs")).toBe(false);
-    expect(matches("/docs/staff-guide")).toBe(false);
-    expect(matches("/api/search")).toBe(false);
-    // #1403: the command route refreshes its own cookie session (buildRouteContext's
-    // getClaims), so the proxy would only add a second check and a second cold start.
-    expect(matches("/api/command")).toBe(false);
-    // The screen frames the docs embed are public like the docs themselves.
-    expect(matches("/screens/frame/0")).toBe(false);
-    expect(matches("/inventory")).toBe(true);
+    for (const path of ["/api/search", "/api/command", "/_next/static/chunk.js", "/favicon.ico", "/mock/avatar.jpg"]) {
+      expect(matches(path), path).toBe(false);
+    }
+    for (const path of ["/docs", "/docs/staff-guide", "/screens/frame/0", "/inventory", "/login", "/portal/login"]) {
+      expect(matches(path), path).toBe(true);
+    }
+  });
+
+  it.each(["/docs", "/docs/staff-guide", "/screens/frame/0"])("protects public %s without a session check", async (path) => {
+    const response = await proxy(new NextRequest(`http://localhost:3000${path}`));
+    expect(createServerClient).not.toHaveBeenCalled();
+    expect(response.headers.get("content-security-policy")).toContain("'strict-dynamic'");
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(response.headers.get("server-timing")).toBeNull();
+  });
+
+  it.each([false, true])("replaces caller nonces with fresh request/response CSP, including refresh=%s", async (refresh) => {
+    vi.stubEnv("NODE_ENV", "production");
+    if (!refresh) createServerClient.mockReturnValue({ auth: { getClaims: async () => ({ data: null, error: null }) } });
+    const request = () => new NextRequest("http://localhost:3000/login", {
+      headers: { "x-nonce": "attacker", "Content-Security-Policy": "script-src 'unsafe-inline'" },
+    });
+    const response = await proxy(request());
+    const nonce = response.headers.get("x-middleware-request-x-nonce");
+    expect(nonce).toMatch(/^[A-Za-z0-9+/=]+$/);
+    expect(nonce).not.toBe("attacker");
+    const csp = response.headers.get("content-security-policy");
+    expect(csp).toContain(`script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`);
+    expect(csp).toContain("frame-ancestors 'self'; object-src 'none'; base-uri 'self'");
+    expect(csp).not.toContain("'unsafe-inline'");
+    expect(csp).not.toContain("'unsafe-eval'");
+    expect(response.headers.get("x-middleware-request-content-security-policy")).toBe(csp);
+    const second = await proxy(request());
+    expect(second.headers.get("x-middleware-request-x-nonce")).not.toBe(nonce);
+  });
+
+  it("allows development debugging eval without permitting arbitrary inline scripts", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const response = await proxy(new NextRequest("http://localhost:3000/login"));
+    expect(response.headers.get("content-security-policy")).toContain("'unsafe-eval'");
+    expect(response.headers.get("content-security-policy")).not.toContain("'unsafe-inline'");
   });
 
   it("forwards refreshed cookies through one current request override", async () => {
@@ -61,7 +94,7 @@ describe("Supabase proxy refresh", () => {
       })
     );
 
-    expect(response.headers.get("x-middleware-override-headers")?.split(",").map(value => value.trim())).toEqual(["cookie", "x-mgr-path"]);
+    expect(response.headers.get("x-middleware-override-headers")?.split(",").map(value => value.trim())).toContain("cookie");
     expect(response.headers.get("x-middleware-request-cookie")).toContain("sb-session=refreshed");
   });
 

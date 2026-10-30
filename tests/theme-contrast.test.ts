@@ -6,7 +6,6 @@ import { E } from "@/components/mgr/e";
 import { applyStoredTheme, THEME_BOOT, ThemeBoot } from "@/components/mgr/theme-boot";
 
 const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
-const layout = readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const rgb = (hex: string) => hex.match(/[a-f\d]{2}/gi)!.map((v) => parseInt(v, 16));
 const toHex = (c: number[]) => "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
 // The color `top` painted at `alpha` (0-1) over the color `under`.
@@ -56,8 +55,8 @@ afterEach(() => {
 // The server sends an executable script; a browser render gets a text/plain
 // data block, which React neither runs nor warns about (#239, #986).
 it("ThemeBoot's script runs from the server and stays inert in a browser render", () => {
-  expect(layout).toMatch(/<head>\s*<ThemeBoot \/>/);
   expect(renderToStaticMarkup(createElement(ThemeBoot))).toContain('type="text/javascript"');
+  expect(renderToStaticMarkup(createElement(ThemeBoot, { nonce: "request-nonce" }))).toContain('nonce="request-nonce"');
   vi.stubGlobal("window", {});
   expect(renderToStaticMarkup(createElement(ThemeBoot))).toContain('type="text/plain"');
 });

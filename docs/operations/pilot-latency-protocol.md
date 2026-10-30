@@ -102,10 +102,13 @@ The code is `lib/server-timing.ts`.
 | `command` | Same header | The command or query itself, including its RPC |
 | `shell` | Function log line | The staff layout's brewery, identity and membership reads (`app/(app)/layout.tsx`) |
 | `<command name>`, for example `trace_lot` | Function log line | One staff page read through `runPageQuery` or `optionalPageQuery`, including the layout's `get_gravity_unit` |
-| `prerendered` | `Server-Timing` header on `/docs` pages | No server stage: the page was built at deploy, so its time is delivery and parsing |
 
 A stage that fails is still timed.
 Stages after it are missing because they never ran.
+
+Public `/docs` pages and `/screens/frame/` documents skip session refresh but
+render per request for a fresh CSP nonce. They no longer report `prerendered`;
+their HTML is not a deploy-time cache artifact.
 
 Server components cannot set response headers, so the shell and page reads go to the function log instead.
 Each is one JSON line: `{"event":"server_timing","timing":"trace_lot;dur=48.1"}`.
