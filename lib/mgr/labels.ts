@@ -48,7 +48,7 @@ export const BRAND_SORT_LABEL: Record<BrandSort, string> = { name: "Name", abv: 
 export const COLA_NOT_ON_FILE = "None on file";
 
 /** A record as staff see it: its name, then its staff-only alias when it has one
- *  ("Appaloosa · Animal #14", "Tavour · Nano Wine 'N Beer"). Brands and customers. */
+ *  ("Appaloosa · Animal #14", "Cedar Trading · Evergreen Beer"). Brands and customers. */
 export const nameWithAlias = (r: { name: string; alias?: string | null }) => (r.alias ? `${r.name} · ${r.alias}` : r.name);
 
 /** A stored country code as staff read it ("JP" → "Japan"); an unknown code prints as stored. */

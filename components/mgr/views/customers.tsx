@@ -5,8 +5,6 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { CustomersViewModel } from "@/lib/mgr/customers-view";
 
-export type { CustomersViewModel };
-
 export function CustomersView({
   model,
   createAction,
