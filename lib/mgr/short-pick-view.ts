@@ -11,7 +11,6 @@ export type ShortPickViewModel = {
   ordered: number;
   missing: number;
   resolveTitle: string;
-  chips: string[];
   verb: string;
 };
 
@@ -50,7 +49,6 @@ export function toShortPickViewProps({ order, line, locations }: ShortPickSnapsh
     ordered,
     missing,
     resolveTitle: `Resolve the missing ${missing}`,
-    chips: [`Adjust order to ${counted}`, `Keep ${missing} owed · staged`],
     verb: `Adjust order to ${counted}${line.unit ? ` ${line.unit}` : ""}`,
   };
 }

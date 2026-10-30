@@ -20,15 +20,14 @@ export function ShortPickForm({ snapshot, onClose }: { snapshot: ShortPickSnapsh
   const key = pickCountDraftKey(useCommandContext(), snapshot.order.id);
   const [qty, setQty] = useState(String(snapshot.line.qty_picked ?? 0));
   const [reason, setReason] = useState("");
-  const [resolution, setResolution] = useState(0);
   const { busy, error, run } = useCommandAction();
   const model = toShortPickViewProps({ ...snapshot, line: { ...snapshot.line, qty_picked: Number(qty) } });
-  const disabled = !reason.trim() || qty === "" || !Number.isFinite(Number(qty)) || Number(qty) < 0 || model.missing <= 0;
+  const disabled = !reason.trim() || qty === "" || !Number.isFinite(Number(qty)) || Number(qty) <= 0 || model.missing <= 0;
   return <CommandForm open onOpenChange={open => { if (!open) onClose(); }} title={model.title}>
     <form className="flex flex-col gap-2" onSubmit={event => {
       event.preventDefault();
       if (disabled || busy || committed.current) return;
-      void run("resolve_short_pick", { orderId: snapshot.order.id, lineId: snapshot.line.id, qtyPicked: Number(qty), reason, resolution: resolution === 0 ? "adjust_down" : "keep_owed" },
+      void run("resolve_short_pick", { orderId: snapshot.order.id, lineId: snapshot.line.id, qtyPicked: Number(qty), reason, resolution: "adjust_down" },
         () => {
           committed.current = true; setSaved(true);
           try { reconcileShortPick(sessionStorage, key, snapshot.line.id); }
@@ -37,7 +36,7 @@ export function ShortPickForm({ snapshot, onClose }: { snapshot: ShortPickSnapsh
         });
     }}>
       <ShortPickView model={model} countedValue={qty} onCounted={setQty} reasonValue={reason} onReason={setReason}
-        resolution={resolution} onResolution={setResolution} submitting={busy || saved} disabled={disabled || saved} messages={<CommandFormMessage error={error} />} />
+        submitting={busy || saved} disabled={disabled || saved} messages={<CommandFormMessage error={error} />} />
     </form>
   </CommandForm>;
 }

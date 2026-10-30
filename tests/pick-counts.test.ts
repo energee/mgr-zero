@@ -13,11 +13,11 @@ function storage() {
   return { getItem: (k: string) => values.get(k) ?? null, setItem: (k: string, v: string) => { values.set(k, v); }, removeItem: (k: string) => { values.delete(k); } };
 }
 
-it.each(["adjust_down", "keep_owed"])("keeps other unsaved counts after %s and repeated Short journeys", resolution => {
+it("keeps other unsaved counts after adjusting down and repeated Short journeys", () => {
   const tab = storage();
   savePickCounts(tab, key, lines, { short: "2", other: "6.5" });
   reconcileShortPick(tab, key, "short");
-  const updated = [{ ...lines[0], qty_ordered: resolution === "adjust_down" ? 2 : 5, qty_picked: 2 }, lines[1]];
+  const updated = [{ ...lines[0], qty_ordered: 2, qty_picked: 2 }, lines[1]];
   expect(readPickCounts(updated, tab.getItem(key))).toEqual({ short: "2", other: "6.5" });
   savePickCounts(tab, key, updated, { short: "1", other: "" });
   expect(readPickCounts(updated, tab.getItem(key))).toEqual({ short: "1", other: "" });
