@@ -4,9 +4,10 @@
 // proves they render exactly as before: no data-preview-action anywhere (#1025).
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
+import type * as ReactModule from "react";
 import { describe, expect, it, vi } from "vitest";
 const view = vi.hoisted(() => ({ mobile: false }));
-vi.mock("react", async importOriginal => ({ ...await importOriginal<typeof import("react")>(), useState: () => [false, () => {}], useRef: (current: unknown) => ({ current }) }));
+vi.mock("react", async importOriginal => ({ ...await importOriginal<typeof ReactModule>(), useState: () => [false, () => {}], useId: () => "preview-pick-test", useRef: (current: unknown) => ({ current }) }));
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: () => view.mobile }));
 import { CommandForm } from "@/components/mgr/command-form";
 import { SearchPick } from "@/components/mgr/search-pick";

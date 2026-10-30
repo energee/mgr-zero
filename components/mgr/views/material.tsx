@@ -7,8 +7,6 @@ import { sentenceCase } from "@/lib/mgr/labels";
 import type { ReactNode } from "react";
 import { Fragment } from "react";
 
-export type { MaterialViewModel };
-
 type Controls = Partial<Record<"name" | "kind" | "baseUnits" | "purchaseUnit" | "unit" | "defaultVendorId" | "extractPotential", (value: string) => void>> & {
   lotTracked?: (value: boolean) => void;
   active?: (value: boolean) => void;

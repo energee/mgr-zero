@@ -6,8 +6,6 @@ import { E } from "@/components/mgr/e";
 import { rowAction } from "@/components/mgr/views/registry-fields";
 import type { LicensesViewModel } from "@/lib/mgr/licenses-view";
 
-export type { LicensesViewModel };
-
 export function LicensesView({
   model,
   actions = {},

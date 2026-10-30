@@ -15,8 +15,6 @@ import { materialSourceKey } from "@/lib/mgr/material-source";
 import { BREW_DAY_STAGES } from "@/lib/mgr/recipe-process-view";
 import { sentenceCase } from "@/lib/mgr/labels";
 
-export type { BrewPrepViewModel };
-
 /** The batch detail's two tabs; each names the screen it opens in the explorer.
  *  Live passes `hrefs` (the batch page's `?tab=` links), so a tab opens its page; the inventory's tabs stay inert. */
 export function BrewTabs({ on, hrefs }: { on: 0 | 1; hrefs?: Record<string, string> }) {

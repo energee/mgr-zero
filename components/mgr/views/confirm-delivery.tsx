@@ -15,8 +15,6 @@ const REFUSAL_LABEL: Record<(typeof REFUSAL_REASONS)[number], string> = {
   customer_refused: "Customer refused", damaged: "Damaged in transit", wrong_item: "Wrong item", other: "Other",
 };
 
-export type { ConfirmDeliveryViewModel };
-
 export function ConfirmDeliveryView({
   model,
   action,

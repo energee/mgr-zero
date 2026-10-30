@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ rpc }) }));
 import { runOrderEmailBatch } from "@/lib/email/jobs";
+import { POST } from "@/app/api/email/jobs/deliver/route";
 
 const delivery = { id: crypto.randomUUID(), lease_token: crypto.randomUUID(), lease_expires_at: new Date(Date.now() + 600_000).toISOString(), retry_before: new Date(Date.now() + 82_800_000).toISOString(), payload: { from: "MGR <orders@example.test>", to: "buyer@example.test", subject: "Order confirmed", text: "Confirmed" } };
 beforeEach(() => {
@@ -58,7 +59,6 @@ describe("order email job", () => {
       rpc.mockResolvedValueOnce({ data: [delivery], error: null }).mockResolvedValueOnce(failure === "lease_lost" ? { data: false, error: null } : { data: null, error: { message: "buyer@example.test test-key Confirmed" } });
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ id: "provider-id" })));
     }
-    const { POST } = await import("@/app/api/email/jobs/deliver/route");
     const response = await POST(new Request("https://mgr.test/api/email/jobs/deliver", { method: "POST", headers: { authorization: "Bearer email-only" } }));
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ ok: false });
@@ -120,8 +120,43 @@ describe("order email job", () => {
 });
 
 describe("email job admission", () => {
+  it.each([
+    [401, 503, { accepted: 0, retry: 1, blocked: 0 }],
+    [403, 503, { accepted: 0, retry: 1, blocked: 0 }],
+    [429, 503, { accepted: 0, retry: 1, blocked: 0 }],
+    [503, 503, { accepted: 0, retry: 1, blocked: 0 }],
+    [422, 503, { accepted: 0, retry: 0, blocked: 1 }],
+    [200, 200, { accepted: 1, retry: 0, blocked: 0 }],
+  ])("reports provider HTTP %i to the scheduler as HTTP %i", async (providerStatus, expectedStatus, deliveries) => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubEnv("ORDER_EMAIL_JOB_SECRET", "email-only");
+    rpc.mockResolvedValueOnce({ data: [delivery], error: null }).mockResolvedValueOnce({ data: true, error: null });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ id: "provider-id" }, { status: providerStatus })));
+    const response = await POST(new Request("https://mgr.test/api/email/jobs/deliver", { method: "POST", headers: { authorization: "Bearer email-only" } }));
+    expect(response.status).toBe(expectedStatus);
+    expect(await response.json()).toEqual({ ok: expectedStatus === 200, deliveries });
+  });
+  it("alerts on a network-only failure without exposing provider details", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubEnv("ORDER_EMAIL_JOB_SECRET", "email-only");
+    rpc.mockResolvedValueOnce({ data: [delivery], error: null }).mockResolvedValueOnce({ data: true, error: null });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("buyer@example.test test-key")));
+    const response = await POST(new Request("https://mgr.test/api/email/jobs/deliver", { method: "POST", headers: { authorization: "Bearer email-only" } }));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ ok: false, deliveries: { accepted: 0, retry: 1, blocked: 0 } });
+  });
+  it("keeps a partially successful batch green while reporting retry counts", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubEnv("ORDER_EMAIL_JOB_SECRET", "email-only");
+    rpc.mockResolvedValueOnce({ data: [delivery, { ...delivery, id: crypto.randomUUID() }], error: null }).mockResolvedValue({ data: true, error: null });
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(Response.json({ id: "provider-id" }))
+      .mockResolvedValueOnce(Response.json({}, { status: 401 })));
+    const response = await POST(new Request("https://mgr.test/api/email/jobs/deliver", { method: "POST", headers: { authorization: "Bearer email-only" } }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, deliveries: { accepted: 1, retry: 1, blocked: 0 } });
+  });
   it("requires its own configured bearer secret before touching the outbox", async () => {
-    const { POST } = await import("@/app/api/email/jobs/deliver/route");
     const call = async (token: string) => (await POST(new Request("https://mgr.test/api/email/jobs/deliver", { method: "POST", headers: { authorization: `Bearer ${token}` } }))).status;
     vi.stubEnv("CHAT_JOB_SECRET", "chat-only");
     vi.stubEnv("ORDER_EMAIL_JOB_SECRET", "");
