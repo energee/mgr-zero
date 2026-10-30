@@ -138,7 +138,6 @@ Do not trigger Ship, create competing writes, run manual vacuum, or change
 `log_lock_waits` to reproduce a wait.
 Observe an independently occurring, authorized Ship or inspect existing
 Postgres lock-wait logs.
-Keep the existing locks until the evidence below confirms the cause.
 
 #### Read-only capture
 
