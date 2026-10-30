@@ -3,8 +3,6 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { ReturnRouteViewModel } from "@/lib/mgr/return-route-view";
 
-export type { ReturnRouteViewModel };
-
 export function ReturnRouteView({
   model,
   action,

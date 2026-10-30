@@ -177,11 +177,14 @@ export function validateQboPaymentUrl(value: string, allowedHosts: ReadonlySet<s
 }
 
 /**
- * The Intuit token request gives up after 20 seconds. The SQL refresh lease
+ * Every Intuit request gives up after 20 seconds. The SQL refresh lease
  * lasts 45 seconds, leaving 25 seconds for the store and release calls, so a
  * holder's lease does not run out during its Intuit call (#1032).
  */
-const QBO_TOKEN_TIMEOUT_MS = 20_000;
+const QBO_REQUEST_TIMEOUT_MS = 20_000;
+// Stop reading before the command route's 300-second limit, leaving room for
+// a refresh lease wait, reconciliation, or durable failure recording.
+const QBO_SYNC_TIMEOUT_MS = 180_000;
 /** How long a caller waits on another caller's refresh: past one 45-second lease, so a crashed holder's lease expires first. */
 const QBO_REFRESH_WAIT_MS = 50_000;
 const QBO_REFRESH_POLL_MS = 200;
@@ -588,6 +591,7 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
   }
   const start = await beginQboInvoiceSync(ctx, requestId);
   if ("replayResult" in start) return start.replayResult;
+  const deadline = AbortSignal.timeout(QBO_SYNC_TIMEOUT_MS);
   try {
     if (start.targets.length === 0) {
       return await completeQboInvoiceSync(ctx, {
@@ -602,15 +606,17 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
     const observations: QboInvoiceObservation[] = [];
     const paymentCache: QboPaymentCache = new Map();
     for (const target of start.targets) {
+      if (deadline.aborted) throw new Error("QuickBooks is unavailable");
       // Old batches froze invoices only. An explicit unknown type is not legacy.
       const entityType = target.entityType === undefined ? "Invoice" : target.entityType;
       if (entityType !== "Invoice" && entityType !== "CreditMemo") throw new Error("QuickBooks sync entity type was invalid");
-      let read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache, entityType)
+      let read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache, entityType, deadline)
         .catch(() => { throw new Error("QuickBooks is unavailable"); });
       if (!read.ok && read.status === 401) {
+        if (deadline.aborted) throw new Error("QuickBooks is unavailable");
         tokens = await refreshQboCredentials(ctx, client, tokens);
         if (tokens.connectionId !== start.connectionId) throw new Error("QuickBooks is unavailable");
-        read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache, entityType)
+        read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache, entityType, deadline)
           .catch(() => { throw new Error("QuickBooks is unavailable"); });
       }
       if (!read.ok && !read.definitive) throw new Error("QuickBooks is unavailable");
@@ -629,6 +635,7 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
         paidAt: read.ok ? read.paidAt : null,
       });
     }
+    if (deadline.aborted) throw new Error("QuickBooks is unavailable");
     return await completeQboInvoiceSync(ctx, {
       actorId: start.actorId, connectionId: start.connectionId, realmId: start.realmId,
       requestId, observations,
@@ -665,6 +672,12 @@ export class QboHttpError extends Error {
 
 export class QboOAuthClient {
   constructor(private readonly config: QboConfig, private readonly transport: typeof globalThis.fetch = globalThis.fetch) {}
+
+  private request(input: Parameters<typeof fetch>[0], init: RequestInit) {
+    const timeout = AbortSignal.timeout(QBO_REQUEST_TIMEOUT_MS);
+    const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+    return this.transport(input, { ...init, signal });
+  }
 
   get redirectUri() { return this.config.redirectUri; }
 
@@ -733,7 +746,7 @@ export class QboOAuthClient {
       const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/query`, this.config.apiBaseUrl);
       url.searchParams.set("query", `SELECT * FROM ${entity} WHERE ${where} STARTPOSITION ${start} MAXRESULTS ${QUERY_PAGE_SIZE}`);
       url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
-      const response = await this.transport(url, {
+      const response = await this.request(url, {
         method: "GET",
         headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
         redirect: "error",
@@ -787,7 +800,7 @@ export class QboOAuthClient {
     const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/customer`, this.config.apiBaseUrl);
     url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
     url.searchParams.set("requestid", requestId);
-    const response = await this.transport(url, {
+    const response = await this.request(url, {
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json", "Content-Type": "application/json" },
       body,
@@ -813,7 +826,7 @@ export class QboOAuthClient {
     const escapedRealm = encodeURIComponent(realmId);
     const url = new URL(`/v3/company/${escapedRealm}/companyinfo/${escapedRealm}`, this.config.apiBaseUrl);
     url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
-    const response = await this.transport(url, {
+    const response = await this.request(url, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
       redirect: "error",
@@ -828,7 +841,7 @@ export class QboOAuthClient {
   }
 
   async revoke(token: string) {
-    const response = await this.transport(REVOKE_URL, {
+    const response = await this.request(REVOKE_URL, {
       method: "POST",
       headers: { Authorization: this.basic(), Accept: "application/json", "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
@@ -841,7 +854,7 @@ export class QboOAuthClient {
     const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/${entityType.toLowerCase()}`, this.config.apiBaseUrl);
     url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
     url.searchParams.set("requestid", requestId);
-    const response = await this.transport(url, {
+    const response = await this.request(url, {
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json", "Content-Type": "application/json" },
       body,
@@ -871,7 +884,7 @@ export class QboOAuthClient {
     const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/query`, this.config.apiBaseUrl);
     url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
     url.searchParams.set("query", `select * from Bill where DocNumber = '${frozen.DocNumber}'`);
-    const response = await this.transport(url, {
+    const response = await this.request(url, {
       method: "GET", headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }, redirect: "error",
     });
     if (!response.ok) return { ok: false as const, status: response.status };
@@ -897,13 +910,15 @@ export class QboOAuthClient {
     accessToken: string,
     paymentCache: QboPaymentCache = new Map(),
     entityType: "Invoice" | "CreditMemo" = "Invoice",
+    signal?: AbortSignal,
   ): Promise<QboInvoiceRead> {
     const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/${entityType.toLowerCase()}/${encodeURIComponent(remoteId)}`, this.config.apiBaseUrl);
     url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
-    const response = await this.transport(url, {
+    const response = await this.request(url, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
       redirect: "error",
+      signal,
     });
     if (!response.ok) return { ok: false, status: response.status, definitive: response.status === 404 };
     const payload = await response.json() as Record<string, Record<string, unknown>>;
@@ -931,7 +946,7 @@ export class QboOAuthClient {
       const key = `${realmId}:${paymentId}`;
       let allocations = paymentCache.get(key);
       if (!allocations) {
-        allocations = this.readPaymentCashAllocations(realmId, paymentId, accessToken);
+        allocations = this.readPaymentCashAllocations(realmId, paymentId, accessToken, signal);
         paymentCache.set(key, allocations);
       }
       cashCollectedCents += (await allocations).get(remoteId) ?? 0;
@@ -947,13 +962,14 @@ export class QboOAuthClient {
     };
   }
 
-  private async readPaymentCashAllocations(realmId: string, paymentId: string, accessToken: string) {
+  private async readPaymentCashAllocations(realmId: string, paymentId: string, accessToken: string, signal?: AbortSignal) {
     const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/payment/${encodeURIComponent(paymentId)}`, this.config.apiBaseUrl);
     url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
-    const response = await this.transport(url, {
+    const response = await this.request(url, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
       redirect: "error",
+      signal,
     });
     if (!response.ok) throw new Error("QuickBooks payment response was invalid");
     const payload = await response.json() as { Payment?: Record<string, unknown> };
@@ -999,7 +1015,7 @@ export class QboOAuthClient {
     const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/invoice/${encodeURIComponent(remoteId)}`, this.config.apiBaseUrl);
     url.searchParams.set("include", "invoiceLink");
     url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
-    const response = await this.transport(url, {
+    const response = await this.request(url, {
       method: "GET",
       headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
       redirect: "error",
@@ -1015,7 +1031,7 @@ export class QboOAuthClient {
 
   async calculateSalesTax(input: QboTaxInput, accessToken: string) {
     if (!this.config.taxApiBaseUrl) throw new Error("QuickBooks tax calculation unavailable");
-    const response = await this.transport(this.config.taxApiBaseUrl, {
+    const response = await this.request(this.config.taxApiBaseUrl, {
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json", "Content-Type": "application/json" },
       redirect: "error",
@@ -1079,7 +1095,7 @@ export class QboOAuthClient {
   }
 
   private async token(body: URLSearchParams) {
-    const response = await this.transport(TOKEN_URL, {
+    const response = await this.request(TOKEN_URL, {
       method: "POST",
       headers: {
         Authorization: this.basic(), Accept: "application/json",
@@ -1088,7 +1104,6 @@ export class QboOAuthClient {
       },
       body,
       redirect: "error",
-      signal: AbortSignal.timeout(QBO_TOKEN_TIMEOUT_MS),
     });
     const receivedAt = new Date().toISOString();
     if (!response.ok) {

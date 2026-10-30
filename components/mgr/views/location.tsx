@@ -10,8 +10,6 @@ import type { LocationUse } from "@/lib/mgr/enums";
 import { LOCATION_USE_OPTIONS } from "@/lib/mgr/labels";
 import type { LocationViewModel } from "@/lib/mgr/location-view";
 
-export type { LocationViewModel };
-
 // create_location seeds these three bins; the location's Bins section (admin, warehouse) edits them.
 const BINS_NOTE = "Bins are the rooms and racks inside a location where stock sits. Every new location starts with Cold, Dry and Walk-in. Admin and Warehouse add, rename or remove bins on the location page.";
 
