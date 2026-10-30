@@ -419,6 +419,41 @@ describe("resolve_short_pick", () => {
     expect(alloc!.status).toBe("open");
   });
 
+  it("preserves staged quantities until put-back before another short-pick adjustment", async () => {
+    const id = await confirmedOrder(10);
+    const line = await lineOf(id);
+    expect((await staffDb.rpc("record_pick", {
+      p_order: id, p_picks: [{ line_id: line.id, qty_picked: 10 }], p_request_id: crypto.randomUUID(),
+    })).error).toBeNull();
+    expect((await staffDb.rpc("adjust_order_lines", {
+      p_order: id, p_lines: [{ sku_id: skuId, qty: 6 }], p_reason: "customer reduced order", p_request_id: crypto.randomUUID(),
+    })).error).toBeNull();
+    const beforeLine = await lineOf(id);
+    const beforeOrder = (await admin.from("orders").select().eq("id", id).single()).data;
+    const beforeAllocations = (await admin.from("allocations").select().eq("ref", line.id)).data;
+    const beforeEvents = (await admin.from("order_events").select().eq("order_id", id).order("created_at")).data;
+    expect(beforeOrder).toMatchObject({ status: "picked", needs_restock: true });
+    expect(beforeLine).toMatchObject({ qty_ordered: 6, qty_picked: 10 });
+
+    const request = {
+      p_order: id, p_line: line.id, p_qty_picked: 5, p_reason: "one damaged",
+      p_resolution: "adjust_down", p_request_id: crypto.randomUUID(),
+    };
+    const refused = await staffDb.rpc("resolve_short_pick", request);
+    expect(refused.error).not.toBeNull();
+    expect(await lineOf(id)).toEqual(beforeLine);
+    expect((await admin.from("orders").select().eq("id", id).single()).data).toEqual(beforeOrder);
+    expect((await admin.from("allocations").select().eq("ref", line.id)).data).toEqual(beforeAllocations);
+    expect((await admin.from("order_events").select().eq("order_id", id).order("created_at")).data).toEqual(beforeEvents);
+
+    expect((await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect((await staffDb.rpc("resolve_short_pick", request)).error).toBeNull();
+    expect(await lineOf(id)).toMatchObject({ qty_ordered: 5, qty_picked: 5, short_reason: "one damaged" });
+    expect((await admin.from("allocations").select("qty,status").eq("ref", line.id).single()).data).toEqual({ qty: 5, status: "open" });
+    expect((await admin.from("order_events").select("payload").eq("order_id", id).eq("event", "restocked").single()).data?.payload)
+      .toMatchObject({ lines: [{ line_id: line.id, qty: 4 }] });
+  });
+
   it("rejects keep_owed without changing the line, allocation, status, or event history", async () => {
     const id = await confirmedOrder(10);
     const line = await lineOf(id);
