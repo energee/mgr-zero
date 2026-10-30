@@ -5,7 +5,8 @@ import { historyInput, historyResult, newestFirst, type HistoryRow } from "./his
 import { z } from "zod";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { defineCommand, defineQuery, unwrap, CommandError, Ctx } from "./registry";
-import type { QboTaxInput } from "@/lib/qbo";
+import { qboConfig, QboOAuthClient, QboHttpError, refreshQboCredentials, qboPaymentFailureCause } from "@/lib/qbo";
+import { readPortalQuoteTax, finishPortalQuoteTax } from "@/lib/supabase/integration-tokens";
 import type { Database } from "@/lib/supabase/database";
 
 const expectedIdentity = z.object({ actorId: z.string().uuid(), customerId: z.string().uuid() }).optional();
@@ -21,7 +22,7 @@ const quoteInput = z.object({
   shipToId: z.string().uuid(), poNumber: z.string().optional(), note: z.string().optional(),
   requestedShipDate: z.string().date().nullable().optional(), lines: quoteLines,
 });
-type PortalTaxClient = { calculateSalesTax(input: QboTaxInput, accessToken: string): Promise<number> };
+type PortalTaxClient = Pick<QboOAuthClient, "calculateSalesTax" | "refresh">;
 
 // Buyer invoice columns every portal invoice read needs (portal_invoices, #754).
 const INVOICE_ROW = "id, invoice_no, kind, paid_at, qbo_remote_state, qbo_total_cents, qbo_balance_cents, written_off_at";
@@ -45,16 +46,25 @@ export async function quotePortalOrder(ctx: Ctx, i: z.infer<typeof quoteInput>, 
   const { taxReady, ...pending } = start;
   if (taxReady !== true || start.taxStatus === "calculated" || typeof start.quoteId !== "string") return pending;
   try {
-    const { readPortalQuoteTax, finishPortalQuoteTax } = await import("@/lib/supabase/integration-tokens");
     const claim = await readPortalQuoteTax(ctx, start.quoteId);
     if (!claim) return pending;
     if (!client) {
-      const { qboConfig, QboOAuthClient } = await import("@/lib/qbo");
       client = new QboOAuthClient(qboConfig());
     }
-    const taxCents = await client.calculateSalesTax(claim.input, claim.accessToken);
-    return finishPortalQuoteTax(ctx, start.quoteId, claim.connectionId, taxCents);
-  } catch {
+    let taxCents: number;
+    try {
+      taxCents = await client.calculateSalesTax(claim.input, claim.accessToken);
+    } catch (error) {
+      if (!(error instanceof QboHttpError) || error.status !== 401) throw error;
+      console.error("portal_quote_tax_unauthorized", qboPaymentFailureCause(error));
+      const tokens = await refreshQboCredentials(ctx, client, undefined, start.quoteId);
+      if (tokens.connectionId !== claim.connectionId) throw new Error("QuickBooks connection changed");
+      taxCents = await client.calculateSalesTax(claim.input, tokens.accessToken);
+    }
+    return await finishPortalQuoteTax(ctx, start.quoteId, claim.connectionId, taxCents);
+  } catch (error) {
+    console.error("portal_quote_tax_failed", qboPaymentFailureCause(error));
+    // Tax is optional at review; the final invoice supplies tax if calculation fails.
     return pending;
   }
 }
