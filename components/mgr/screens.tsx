@@ -95,6 +95,7 @@ import { FormatsView } from "@/components/mgr/views/formats";
 import { WaterProfilesView } from "@/components/mgr/views/water-profiles";
 import { WaterProfileView } from "@/components/mgr/views/water-profile";
 import { InvoiceView, RecordPaymentView, VoidPaymentView } from "@/components/mgr/views/invoice";
+import { InvoiceAccountingActionsView, PushInvoiceView, WriteOffInvoiceView } from "@/components/mgr/views/invoice-accounting";
 import { KegBalanceView } from "@/components/mgr/views/keg-balance";
 import { KegFleetView } from "@/components/mgr/views/keg-fleet";
 import { KegReportView } from "@/components/mgr/views/keg-report";
@@ -241,6 +242,7 @@ import { toFinishedGoodsViewProps } from "@/lib/mgr/finished-goods-view";
 import { toFormatViewProps } from "@/lib/mgr/format-view";
 import { toFormatsViewProps } from "@/lib/mgr/formats-view";
 import { toWaterProfileFields, toWaterProfilesViewProps } from "@/lib/mgr/water-profiles-view";
+import { qboPushConfirmation } from "@/lib/mgr/qbo-ui";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
 import { toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
@@ -1414,10 +1416,49 @@ export const SCREENS: Screen[] = [
     to: { "Pils · case": "Fix mapping", Return: "Return and credit", "Record payment": "Record payment", Void: "Void payment" },
     job: "Review one invoice, resolve its mappings and push it, or record its payments in MGR",
     reads: "get_qbo_connection · get_invoice · list_invoice_questions",
-    writes: "push_invoice_to_qbo · resolve_invoice_question · record_invoice_payment · void_invoice_payment",
+    writes: "push_invoice_to_qbo · write_off_invoice · resolve_invoice_question · record_invoice_payment · void_invoice_payment",
     states: [["permission", "sales or admin required", 1], ["unmapped", "push stays unavailable", 1], ["ready", "every customer and item is mapped"], ["pushed", "QuickBooks owns later accounting edits"], ["buyer question", "the note is read here, and answered off-system", 1], ["partly paid", "the summary shows the balance and the cash received, from QuickBooks or from payments recorded in MGR"], ["paid in MGR", "payments recorded in MGR reach the total; paid on the day the last one was received"], ["payments block push", "an unvoided payment in MGR: no Push and no mapping rows", 1], ["no payment due", "a $0.00 invoice QuickBooks never received takes no payment and is never overdue"], ["edited in QuickBooks", "Current invoice total beside the Frozen MGR line subtotal; the lines stay as frozen", 1], ["no balance", "an unknown balance reads Unknown, never $0.00", 1], ["credit memo", "a signed Credit memo total, no balance due and no Return"]],
     spec: "Read as a document: number, state and customer, then Issued and Due beside the one price summary (before the lines on the phone). The summary groups the stored line amounts by line kind; its total is the QuickBooks total when there is one, and the balance comes from QuickBooks, or from MGR's payment ledger for an invoice QuickBooks never received. Payments lists what was recorded in MGR, voided ones with their reasons; Record payment appears only where that ledger owns the balance, and Void is the only correction. QuickBooks status is said once, with only the mappings that need action. The drill-in is also where a buyer's question lands: the portal writes it, the sales Today row points here, and marking it answered is what clears that row. Nothing about the invoice changes; the reply happens in a phone call or an email, which is why the verb says answered rather than replied. Return closes the page because it corrects a shipment and is not the next step.",
-    body: <InvoiceView model={toInvoiceViewProps(invoiceFailedAls)} quickbooks={{ detail: invoiceFailedAlsAccounting.detail }} staffLink={{ href: null, reason: "This invoice has not been successfully pushed to QuickBooks." }} />,
+    body: <InvoiceView model={toInvoiceViewProps(invoiceFailedAls)} quickbooks={{ detail: invoiceFailedAlsAccounting.detail }} accountingActions={<InvoiceAccountingActionsView invoiceLabel="INV-1039" actions={invoiceFailedAlsAccounting.actions} />} staffLink={{ href: null, reason: "This invoice has not been successfully pushed to QuickBooks." }} />,
+  },
+  ...([
+    { name: "Invoice ready to push", detail: "ready to push", actions: ["push", "write_off"], remoteState: "live", hasPendingPush: false },
+    { name: "Invoice push result unknown", detail: "push result unknown · retry uses the same request", actions: ["retry"], remoteState: "live", hasPendingPush: true },
+    { name: "Invoice deleted in QuickBooks", detail: "deleted in QuickBooks", actions: ["repush", "write_off"], remoteState: "deleted", hasPendingPush: false },
+  ] as const).map((state): Screen => ({
+    step: 5, slice: 1, tab: "More", name: state.name,
+    job: "Review the accounting actions available for this invoice state",
+    reads: "get_invoice · get_qbo_connection", writes: "push_invoice_to_qbo · write_off_invoice",
+    to: { "Push to QuickBooks": "Push invoice to QuickBooks", "Write off": "Write off invoice" },
+    states: [[state.name, state.detail]],
+    body: <InvoiceView
+      model={toInvoiceViewProps({ ...invoiceFailedAls, mappings: undefined, hasPendingPush: state.hasPendingPush, wasPushedToQbo: state.remoteState === "deleted", invoice: { ...invoiceFailedAls.invoice, qbo_sync_status: state.remoteState === "deleted" ? "pushed" : "pending", qbo_invoice_id: state.remoteState === "deleted" ? "qbo-1039" : null, qbo_remote_state: state.remoteState } })}
+      correction={state.remoteState === "deleted" ? null : undefined}
+      quickbooks={{ detail: state.detail }}
+      accountingActions={<InvoiceAccountingActionsView invoiceLabel="INV-1039" actions={[...state.actions]} />}
+    />,
+  })),
+  ...([
+    { name: "Push invoice to QuickBooks", action: "push" },
+    { name: "Retry exact push", action: "retry" },
+    { name: "Push corrected invoice", action: "corrected_push" },
+    { name: "Re-push deleted invoice", action: "repush" },
+  ] as const).map((state): Screen => ({
+    step: 5, slice: 1, tab: "More", surface: "sheet", name: state.name, sheetTitle: qboPushConfirmation(state.action, "INV-1039").title,
+    job: "Confirm the exact QuickBooks invoice operation before sending",
+    reads: "get_invoice · get_qbo_connection", writes: "push_invoice_to_qbo",
+    to: { [qboPushConfirmation(state.action, "INV-1039").confirmLabel]: "Invoice" },
+    states: [["confirm", "Review which request will be sent"], ["sending", "Sending…; duplicate submission disabled"], ["error", "The refusal remains in the confirmation dialog", 1]],
+    body: <PushInvoiceView action={state.action} invoiceLabel="INV-1039" />,
+  })),
+  {
+    step: 5, slice: 1, tab: "More", surface: "sheet", name: "Write off invoice",
+    job: "Record an invoice as written off in MGR with a required reason",
+    reads: "get_invoice", writes: "write_off_invoice",
+    to: { "Confirm write-off": "Invoice" },
+    states: [["permission", "Admin only", 1], ["reason missing", "Confirm write-off stays unavailable", 1], ["writing off", "Writing off…; duplicate submission disabled"], ["error", "Keep the reason and show the refusal", 1]],
+    spec: "A write-off changes only MGR's local status. It does not change QuickBooks, record cash, or create a credit. Reason is required and limited to 500 characters.",
+    body: <WriteOffInvoiceView />,
   },
   {
     step: 5,

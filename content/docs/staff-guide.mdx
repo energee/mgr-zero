@@ -701,6 +701,13 @@ For received materials, Admin also maps each **Vendor** by its exact QuickBooks 
 
 While connected, invoice detail lists only the mappings that need action for the current QuickBooks company: a missing customer, SKU, keg-deposit, or one-way keg fee mapping. A mapped customer or item is not listed. An invoice with a payment recorded in MGR that is not voided lists none, and neither does an invoice from before the books opened, which is never pushed. The rows have no link of their own: the invoice's one **Fix mapping** action opens the mapping list. A missing deposit or fee mapping requires Admin in Accounting. An old company's ID is not a match. Missing local records show **Mapping unavailable**. The QuickBooks status, buyer questions, and permitted confirmation actions remain visible alongside these rows. The balance is in the price summary.
 
+The invoice offers only the accounting actions available in its current state. **Push to QuickBooks** creates the first document. **Retry exact push** resends the saved request without rebuilding it. After fixing a rejected mapping, **Push corrected invoice** starts a corrected attempt. **Re-push deleted invoice** creates it again only after sync confirmed deletion. Each action opens a confirmation explaining that operation before anything is sent; a failed request stays in that dialog with its error.
+
+<Screen name="Push invoice to QuickBooks" />
+<Screen name="Retry exact push" />
+<Screen name="Push corrected invoice" />
+<Screen name="Re-push deleted invoice" />
+
 When a buyer asks about an invoice from the portal, the question appears under **Buyer questions** on the invoice with their words and the day they asked, and as an **Answer** row on Today for Admin and Sales. Reply by phone or email, then select **Mark answered**; that clears the Today row and nothing on the invoice changes.
 
 Returns preserve the selected shipment lot and its original recorded volume even if the format definition later changes. A damaged return writes that same volume back out as loss atomically.
@@ -726,6 +733,10 @@ Some invoices with no QuickBooks number still cannot take a payment, and keep an
 - An invoice pushed to a previous QuickBooks company. Push it to the current company, and record its payment in QuickBooks.
 
 Paid, written-off and historical invoices take no payment, nor does a $0.00 invoice, which reads **No payment due**. Credit memos take no payment, and a credit memo does not lower the balance of the invoice it credits. An invoice that will never be paid, including one a credit memo credits in full, stays **Overdue** past its due day until payments cover its total or Admin writes it off. On an invoice that can take a payment, Admin sees **Write off** under **QuickBooks and accounting**; enter a reason of up to 500 characters and select **Confirm write-off**. The invoice then reads **Written off** and is no longer overdue. A partly paid invoice can be written off for the rest of its balance: its payments stay as they are and can still be voided, but it takes no new payment. A write-off records who acted and when inside MGR; it records no cash and creates no credit. MGR has no void for an invoice QuickBooks never received.
+
+The **Write off invoice** dialog keeps **Confirm write-off** unavailable until a nonblank reason is entered. It shows a sending state while saving and keeps the reason visible if saving fails. This is a local status change only: it does not change QuickBooks, record cash, or create a credit.
+
+<Screen name="Write off invoice" />
 
 ### Return beer and correct the invoice
 
