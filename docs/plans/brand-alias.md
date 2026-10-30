@@ -4,18 +4,16 @@ Status: plan, awaiting approval. Branch `feat/brand-alias`, PR to `main`.
 
 ## Why
 
-Two gaps surfaced while reviewing the Lolev import on /batches (2026-10-14):
+Two import gaps need product support. Examples below are fictional.
 
 1. **An informal name.** A beer can carry a series number and a real name:
-   Lolev's "Animal #14 Appaloosa". The user wants the brand **name** to be the
-   beer's name ("Appaloosa") and an **alias** for the series number
-   ("Animal #14"). That means one optional alias per brand, shown to staff only.
+   For example, "Series #1 Meadow Pale" needs the brand **name** "Meadow Pale"
+   and the staff-only **alias** "Series #1".
    (Prior plans that ban command-name "aliases" such as `create_product` are
    unrelated: this is a brand field.)
 2. **A recipe's brand cannot be set after creation.** `recipes.brand_id` exists
-   (nullable), but only `create_recipe` writes it; there is no update. The import
-   never set it, so all 169 Lolev recipes are unlinked, and staff cannot fix a
-   wrong or missing link.
+   (nullable), but only `create_recipe` writes it; there is no update.
+   Staff cannot fix a wrong or missing link after an import.
 
 ## Decisions (user, 2026-10-14)
 
@@ -23,18 +21,13 @@ Two gaps surfaced while reviewing the Lolev import on /batches (2026-10-14):
   portal, Square, the public menu, or SKU, QBO or invoice names.
 - Name = the beer's real name; alias = the series number.
 
-| Lolev beer | Brand name | Alias | Description note |
-|---|---|---|---|
-| Animal #14 Appaloosa | Appaloosa | Animal #14 | |
-| Animal #15 Ocelot | Ocelot | Animal #15 | |
-| Animal #16 Dalmatian | Dalmatian | Animal #16 | |
-| Animal #17 Coven Collab | Stygian Owl | Animal #17 | Coven collab |
-| Animal #18 Vulture Eskerhart Collab | Vulture | Animal #18 | Eskerhart collab |
-| Animal #19 Azvex Collab | Peregrine Falcon | Animal #19 | Azvex collab |
-| Rock/Mineral #1 Opal | Sapphire | Rock/Mineral #1 | |
+| Fictional source name | Brand name | Alias | Description note |
+| --- | --- | --- | --- |
+| Series #1 Meadow Pale | Meadow Pale | Series #1 | |
+| Series #2 Summit Collab | Summit IPA | Series #2 | Collaboration |
 
-Beers with only a number ("Animal #20", "Reptile #3") keep their name and get
-no alias. The renames are import data (local, git-ignored), not this PR.
+A beer with only a series number keeps its name and gets no alias.
+Actual tenant mappings remain local and git-ignored.
 
 ## What reads a brand name (mapped read-only, spot-checked)
 
@@ -137,12 +130,11 @@ so no policy change is needed. Task 1 keeps a test that a customer reads no alia
 
 ## Import (local only, git-ignored; after merge)
 
-1. Rename the 7 brands and set their aliases, through `upsert_brand`, from the
-   table above.
+1. Set approved names and aliases through `upsert_brand` using private mappings.
 2. Link recipes to brands:
-   - Lolev `recipe.beer` where set (43);
-   - otherwise the single beer its batches were brewed as (126);
-   - recipes brewed as several beers (6) stay unlinked and are reported.
+   - use a source recipe's explicit beer reference where present;
+   - otherwise use the single beer its batches were brewed as;
+   - report ambiguous recipes without inventing a brand link.
 
 ## Open question (default chosen; say if wrong)
 

@@ -27,8 +27,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { OrderLineView, OrderViewModel } from "@/lib/mgr/order-view";
 import { cn } from "@/lib/utils";
 
-export type { OrderViewModel };
-
 /** Adding and removing lines in place. An added line's quantity lives in OrderView's `quantities`, by its key. */
 export type OrderLineEdit = {
   /** The SKUs an added line picks from. */
