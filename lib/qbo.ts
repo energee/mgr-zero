@@ -909,7 +909,7 @@ export class QboOAuthClient {
     const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/query`, this.config.apiBaseUrl);
     url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
     url.searchParams.set("query", `select * from ${entityType} where DocNumber = '${frozen.DocNumber}'`);
-    const response = await this.transport(url, {
+    const response = await this.request(url, {
       method: "GET", headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }, redirect: "error",
     });
     if (!response.ok) return { ok: false as const, status: response.status };

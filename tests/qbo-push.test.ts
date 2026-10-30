@@ -1,7 +1,8 @@
 import { assert } from "vitest";
 import { createHash } from "node:crypto";
+import { createServer } from "node:http";
 import { Client } from "pg";
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { completeQboOAuth, postReceiptBill, pushInvoiceToQbo, QboOAuthClient } from "@/lib/qbo";
 import {
   claimQboOAuth,
@@ -1373,5 +1374,47 @@ describe("QuickBooks receipt Bills", () => {
     expect(noFetch).not.toHaveBeenCalled();
     expect(receiptBillAttempts(f.brewery.id)).toEqual(frozen);
     expect(remote.posts).toHaveLength(1);
+  });
+});
+
+describe("QuickBooks pending transaction lookup deadlines", () => {
+  const nativeTimeout = AbortSignal.timeout.bind(AbortSignal);
+  let origin: string;
+  let stallBody = false;
+  const server = createServer((_request, response) => {
+    if (stallBody) {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.write('{"QueryResponse":');
+    }
+    // Otherwise leave headers pending to exercise native fetch cancellation.
+  });
+
+  beforeAll(async () => {
+    const { promise, resolve } = Promise.withResolvers<void>();
+    server.listen(0, "127.0.0.1", resolve);
+    await promise;
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("test server has no TCP address");
+    origin = `http://127.0.0.1:${address.port}`;
+  });
+  afterEach(() => vi.restoreAllMocks());
+  afterAll(async () => {
+    server.closeAllConnections();
+    const { promise, resolve, reject } = Promise.withResolvers<void>();
+    server.close(error => error ? reject(error) : resolve());
+    await promise;
+  });
+
+  it.each([
+    ["Invoice", "headers"], ["Invoice", "body"], ["CreditMemo", "headers"], ["CreditMemo", "body"],
+  ] as const)("aborts a %s reconciliation lookup with stalled %s", async (entityType, stalled) => {
+    stallBody = stalled === "body";
+    // Exercise the real native fetch abort without waiting the production 20 seconds.
+    vi.spyOn(AbortSignal, "timeout").mockImplementation(() => nativeTimeout(50));
+    const client = new QboOAuthClient({ ...config, apiBaseUrl: origin });
+    const body = JSON.stringify({ DocNumber: "42", CustomerRef: { value: "customer-42" }, TxnDate: "2026-10-30" });
+    await expect(client.findInvoice("realm", entityType, body, "access")).rejects.toMatchObject({
+      name: stalled === "body" ? expect.stringMatching(/^(Abort|Timeout)Error$/) : "TimeoutError",
+    });
   });
 });
