@@ -4,8 +4,6 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { DriverRouteViewModel } from "@/lib/mgr/driver-route-view";
 
-export type { DriverRouteViewModel };
-
 export function DriverRouteView({
   model,
   action,

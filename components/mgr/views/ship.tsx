@@ -7,8 +7,6 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { OrderQuantity } from "./new-order";
 import type { ShipViewModel } from "@/lib/mgr/ship-view";
 
-export type { ShipViewModel };
-
 export function ShipView({ model, sources, footer, tape, invoiceTiming, quantities, onQuantity, reasons, onReason, carrier = "", tracking = "", onCarrier, onTracking, onInvoiceTiming, messages, submitting = false, reason }: {
   model: ShipViewModel; sources?: ReactNode; footer?: ReactNode;
   tape?: [ReactNode, ReactNode?][]; invoiceTiming?: number;

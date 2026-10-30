@@ -24,8 +24,6 @@ import type { QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
 import { invoicePaymentAmountError, type InvoicePaymentValue, type InvoicePaymentView, type InvoiceQuestionView, type InvoiceViewModel } from "@/lib/mgr/invoice-view";
 import { cn } from "@/lib/utils";
 
-export type { InvoiceViewModel };
-
 const H2 = "text-base font-semibold";
 const LEGEND = "text-xs text-muted-foreground";
 const NUMBER_COLUMNS = [["Quantity", "qty"], ["Unit price", "unitPrice"]] as const;
