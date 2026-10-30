@@ -44,10 +44,11 @@ export async function quotePortalOrder(ctx: Ctx, i: z.infer<typeof quoteInput>, 
   })) as Record<string, unknown>;
   const { taxReady, ...pending } = start;
   if (taxReady !== true || start.taxStatus === "calculated" || typeof start.quoteId !== "string") return pending;
+  // The provider-free registry/docs loader must not import the server-only credential boundary.
+  const { readPortalQuoteTax, finishPortalQuoteTax } = await import("@/lib/supabase/integration-tokens");
+  const claim = await readPortalQuoteTax(ctx, start.quoteId);
+  if (!claim) return pending;
   try {
-    const { readPortalQuoteTax, finishPortalQuoteTax } = await import("@/lib/supabase/integration-tokens");
-    const claim = await readPortalQuoteTax(ctx, start.quoteId);
-    if (!claim) return pending;
     if (!client) {
       const { qboConfig, QboOAuthClient } = await import("@/lib/qbo");
       client = new QboOAuthClient(qboConfig());

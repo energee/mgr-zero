@@ -1,11 +1,12 @@
 // tests/doc-agent-watch.test.ts — the doc agents fail loudly and re-audit on a clock.
 // Dreaming failed 13 days running (9/29–10/11) on one allowlist line and nobody saw it.
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { parse as load } from "yaml";
 
 const read = (path: string) => readFileSync(path, "utf8");
-type Workflow = { on: Record<string, { workflows?: string[]; types?: string[] } | null>; jobs: Record<string, { if?: string; permissions?: Record<string, string> }> };
+type Workflow = { on: Record<string, { workflows?: string[]; types?: string[] } | null>; jobs: Record<string, { if?: string; permissions?: Record<string, string>; steps?: { run?: string }[] }> };
 
 describe("doc agent watch", () => {
   const source = read(".github/workflows/doc-agent-watch.yml");
@@ -16,10 +17,6 @@ describe("doc agent watch", () => {
     const names = ["dreaming", "documentation-agent", "http-api-agent", "hosted-jobs"].map((f) => (load(read(`.github/workflows/${f}.yml`)) as { name: string }).name);
     expect(watch.on.workflow_run?.workflows).toEqual(names);
     expect(watch.on.workflow_run?.types).toEqual(["completed"]);
-    // Doc agent titles are unchanged so their already-open issues still match.
-    expect(source).toContain('if [ "$NAME" = "hosted jobs" ]; then title="Hosted jobs failing"; else title="Doc agent failing: $NAME"; fi');
-    // hosted jobs runs every 5 minutes: an open issue gets no comment per failure.
-    expect(source).toMatch(/elif \[ "\$NAME" = "hosted jobs" \]; then echo [^\n]*\n\s*else gh issue comment/);
   });
 
   it("opens an issue on a run that did not succeed, and when dreaming goes stale", () => {
@@ -28,8 +25,32 @@ describe("doc agent watch", () => {
     expect(source).toContain("--grep='^dream:'");
     // One open issue per problem: a daily failure must not file thirteen.
     expect(source.match(/gh issue list --state open/g)).toHaveLength(2);
-    expect(watch.jobs["failed-run"].permissions).toEqual({ issues: "write" });
+    expect(watch.jobs["failed-run"].permissions).toEqual({ issues: "write", actions: "read" });
     expect(watch.jobs["stale-dream"].permissions).toEqual({ contents: "read", issues: "write" });
+  });
+
+  it("alerts for a different failed hosted worker while leaving repeat failures quiet", () => {
+    const script = watch.jobs["failed-run"].steps![0].run!;
+    const fakeGh = `
+      gh() {
+        case "$1 $2" in
+          "api --paginate") printf '%s\\n' "$FAILED_JOBS" ;;
+          "issue list") if [[ "$*" == *"$EXISTING_TITLE"* ]]; then echo 1598; fi ;;
+          "issue create") echo "CREATE $*" ;;
+          "issue comment") echo "COMMENT $*" ;;
+          *) return 2 ;;
+        esac
+      }
+    `;
+    const result = spawnSync("bash", ["-e", "-c", fakeGh + script], {
+      encoding: "utf8",
+      env: { ...process.env, NAME: "hosted jobs", GH_REPO: "test/repo", RUN_ID: "42", URL: "https://example.test/run/42",
+        CONCLUSION: "failure", FAILED_JOBS: "order-email\nretention", EXISTING_TITLE: "Hosted job failing: order-email" },
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("hosted job order-email issue #1598 already open; not commenting");
+    expect(result.stdout).toContain("CREATE issue create --title Hosted job failing: retention");
+    expect(result.stdout).not.toContain("COMMENT");
   });
 
   it("re-audits the guides and the API reference weekly, skipping an unchanged main", () => {
