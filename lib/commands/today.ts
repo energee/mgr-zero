@@ -8,7 +8,7 @@ import { defineQuery, unwrap, type StaffRole, STAFF_ROLES } from "./registry";
 import { hasAnyRole } from "@/lib/mgr/roles";
 
 export type TodayItem = {
-  reason: "submitted_order" | "pick_due" | "ship_due" | "restock_due" | "delivery_next" | "refused_return" | "fermentation_reading_overdue" | "invoice_question";
+  reason: "submitted_order" | "pick_due" | "ship_due" | "restock_due" | "delivery_next" | "refused_return" | "refused_credit" | "fermentation_reading_overdue" | "invoice_question";
   subjectType: "order" | "delivery" | "occupancy" | "invoice";
   subjectId: string;
   sourceVersion: string;
@@ -30,7 +30,7 @@ type Row = {
 
 defineQuery({
   name: "get_today",
-  description: "Role-filtered work that is assigned, due, or overdue right now (submitted orders, picks, shipments and restocks due, the next delivery stop, fermentation readings overdue, buyer questions about invoices)",
+  description: "Role-filtered work that is assigned, due, or overdue right now (submitted orders, picks, shipments and restocks due, the next delivery stop, refused beer awaiting check-in or Return and credit, fermentation readings overdue, buyer questions about invoices)",
   input: z.object({ now: z.string().datetime({ offset: true }).optional() }),
   roles: STAFF_ROLES,
   aiExposed: true,
