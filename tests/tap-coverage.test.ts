@@ -42,7 +42,7 @@ function taps(s: Screen, html: string): [string, string | null, string | null][]
     const t = /data-slot="item-title"[^>]*>([\s\S]*?)<\/div>/.exec(item);
     // Every switch in the inventory sits in a row's action slot, so a chunk
     // holding one is a toggle row: its title acts in place and is not a tap.
-    if (!t || /role="switch"/.test(item) || /<select\b/.test(t[1])) continue;
+    if (!t || /role="switch"/.test(item) || /<select\b|<button\b[^>]*aria-labelledby=/.test(t[1])) continue;
     // RecordTable's href=null names are plain text, not whole-record links.
     const attributes = item.slice(0, item.indexOf(">"));
     if (!/\bdata-row\b/.test(attributes) && !/<(?:a|button)\b/.test(t[1])) continue;
@@ -90,6 +90,12 @@ it("uses a picker's field label for navigation instead of its selected value", (
   const screen = SCREENS.find(s => s.name === "New PO")!;
   const picker = '<button aria-labelledby="material-label material-value"><span id="material-label" hidden>Material</span><span id="material-value">Citra · hop</span></button>';
   expect(taps(screen, picker)).toEqual([["Material", null, null]]);
+});
+
+it("does not treat a searchable picker inside a row title as record navigation", () => {
+  const screen = SCREENS.find(s => s.name === "New order")!;
+  const picker = '<button aria-labelledby="sku-label sku-value"><span id="sku-label" hidden>Line 1 SKU</span><span id="sku-value">Hazy IPA · ½ bbl keg</span></button>';
+  expect(taps(screen, `<div data-slot="item"><div data-slot="item-title">${picker}</div></div>`)).toEqual([]);
 });
 
 it("does not treat a plain record name as navigation but still follows record links", () => {
