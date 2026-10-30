@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import pg from "pg";
 import { DB, admin, channelId, ins, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
 import type { ChatProviderTransport } from "@/lib/chat/provider";
-import { SLACK_CAPABILITIES } from "@/lib/chat/slack-transport";
+import { SLACK_CAPABILITIES, SlackTransport } from "@/lib/chat/slack-transport";
 import { authorizeJob } from "@/lib/jobs/auth";
 import { cleanupChatState, runChatCallbackBatch, runChatDeliveryBatch, runChatScan } from "@/lib/chat/jobs";
 import { runCommand } from "@/lib/commands/registry";
@@ -345,6 +345,54 @@ describe("delivery batch", () => {
     expect((await admin.from("notification_deliveries").select("state, last_error_code").eq("id", digest.id).single()).data).toEqual({ state: "terminal", last_error_code: "shared_channel" });
     expect((await admin.from("notification_destinations").select("state").eq("id", channel.id).single()).data?.state).toBe("blocked");
     validation = { ok: true };
+  });
+
+  it.each([
+    { code: "network", error: new Error("ETIMEDOUT"), day: "01" },
+    { code: "ratelimited", error: { code: "slack_webapi_rate_limited_error", retryAfter: 7 }, day: "02" },
+    { code: "internal_error", error: { data: { error: "internal_error" } }, day: "03" },
+    { code: "invalid_auth", error: { data: { error: "invalid_auth" } }, day: "04" },
+  ])("handles $code during channel validation without blocking the destination", async ({ code, error, day }) => {
+    await drain();
+    const channel = await runCommand("set_notification_destination", { installationId: inst.id, externalDestinationId: `C-validation-${code}` }, adminCtx) as { id: string };
+    await submittedOrder();
+    const now = new Date(`2036-10-${day}T12:30:00Z`);
+    await runChatScan({ now, db: admin });
+    const digest = (await admin.from("notification_deliveries").select().eq("destination_id", channel.id).single()).data!;
+    await drain();
+    expect((await admin.from("notification_deliveries").update({ state: "queued", next_attempt_at: now.toISOString() }).eq("id", digest.id)).error).toBeNull();
+    const provider: SlackClientLike = {
+      conversationsInfo: vi.fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue({ is_private: true, is_archived: false, is_member: true, is_shared: false, is_ext_shared: false, is_pending_ext_shared: false }),
+      postMessage: vi.fn(async ({ channel }) => ({ channel, ts: "validation-recovered" })),
+      updateMessage: vi.fn(async () => undefined),
+      publishHome: vi.fn(async () => undefined),
+    };
+    const slack = new SlackTransport(() => provider, { mgrBaseUrl: "https://mgr.test" });
+    const result = await runChatDeliveryBatch({ now, db: admin, transport: slack });
+    expect(provider.postMessage).not.toHaveBeenCalled();
+    expect((await admin.from("notification_destinations").select("state, blocked_reason").eq("id", channel.id).single()).data).toEqual({ state: "active", blocked_reason: null });
+    const delivery = (await admin.from("notification_deliveries").select().eq("id", digest.id).single()).data!;
+    expect(delivery.last_error_code).toBe(code);
+    if (code === "invalid_auth") {
+      expect(result).toMatchObject({ terminal: 1, retried: 0 });
+      expect(delivery.state).toBe("terminal");
+      expect((await admin.from("chat_installations").select("state, last_failure_code").eq("id", inst.id).single()).data).toEqual({ state: "needs_reauthorization", last_failure_code: code });
+      expect((await admin.from("chat_installations").update({ state: "active", last_failure_code: null }).eq("id", inst.id)).error).toBeNull();
+    } else {
+      expect(result).toMatchObject({ retried: 1, terminal: 0 });
+      expect(delivery.state).toBe("retrying");
+      const delay = Date.parse(delivery.next_attempt_at) - now.getTime();
+      if (code === "ratelimited") expect(delay).toBe(7000);
+      else {
+        expect(delay).toBeGreaterThanOrEqual(2 ** delivery.attempt_count * 1000);
+        expect(delay).toBeLessThanOrEqual(2 ** delivery.attempt_count * 1250);
+      }
+      expect((await runChatDeliveryBatch({ now: new Date(delivery.next_attempt_at), db: admin, transport: slack })).sent).toBe(1);
+      expect(provider.postMessage).toHaveBeenCalledOnce();
+      expect((await admin.from("notification_deliveries").select("state").eq("id", digest.id).single()).data?.state).toBe("sent");
+    }
   });
 
   it.each(["snooze", "admin change", "retry"])("defers personal %s work through current quiet hours without hiding Home", async (kind) => {

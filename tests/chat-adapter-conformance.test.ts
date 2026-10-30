@@ -74,6 +74,27 @@ function conformance(name: string, make: (fake: Fake) => ChatProviderTransport) 
 
 conformance("Slack", (fake) => new SlackTransport(() => fake.client, { mgrBaseUrl: "https://mgr.test" }));
 
+describe("Slack destination validation failures", () => {
+  it.each([
+    ["timeout", new Error("ETIMEDOUT")],
+    ["rate limit", Object.assign(new Error("rate limited"), { code: "slack_webapi_rate_limited_error", retryAfter: 7 })],
+    ["server error", Object.assign(new Error("server error"), { data: { error: "internal_error" } })],
+  ])("propagates the original %s failure for delivery retry", async (_label, error) => {
+    const fake = fakeClient({});
+    vi.mocked(fake.client.conversationsInfo).mockRejectedValueOnce(error);
+    const transport = new SlackTransport(() => fake.client, { mgrBaseUrl: "https://mgr.test" });
+    await expect(transport.validateDestination({ installationId: "T1", destinationId: "C1" })).rejects.toBe(error);
+    expect(fake.posts).toEqual([]);
+  });
+
+  it.each(["invalid_auth", "token_revoked", "account_inactive", "token_expired", "not_authed"])("preserves permanent %s for installation reauthorization", async (code) => {
+    const fake = fakeClient({});
+    vi.mocked(fake.client.conversationsInfo).mockRejectedValueOnce({ data: { error: code } });
+    const transport = new SlackTransport(() => fake.client, { mgrBaseUrl: "https://mgr.test" });
+    await expect(transport.validateDestination({ installationId: "T1", destinationId: "C1" })).resolves.toEqual({ ok: false, reason: code });
+  });
+});
+
 describe("Slack error classification", () => {
   it("retries rate limits and transient failures with the provider delay, and stops on permanent auth/destination errors", () => {
     expect(classifySlackError(Object.assign(new Error("ratelimited"), { data: { error: "ratelimited" }, retryAfter: 7 }))).toEqual({ retryable: true, code: "ratelimited", retryAfterMs: 7000 });
