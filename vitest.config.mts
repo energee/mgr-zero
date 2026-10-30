@@ -82,6 +82,7 @@ const pureTests = [
   "tests/customer-open-balance.test.ts",
   "tests/accounting-view.test.ts",
   "tests/invoice-accounting-view.test.ts",
+  "tests/qbo-controls.test.ts",
   "tests/invoice-view.test.ts",
   "tests/api-docs.test.ts",
   "tests/pos-ui.test.ts",
