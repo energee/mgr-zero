@@ -161,6 +161,7 @@ describe("portal order quote", () => {
     const { config, connectionId } = await enableTax(f);
     const result = await f.ctx.db.rpc("portal_quote_order", {
       p_brewery: f.brewery.id, p_customer: f.customer.customerId, p_ship_to: f.customer.shipToId,
+      p_note: null, p_po: null, p_requested: null,
       p_lines: [{ sku_id: f.catalog.skuId, qty: 2 }], p_request_id: crypto.randomUUID(),
     });
     expect(result.error).toBeNull();
@@ -207,6 +208,7 @@ describe("portal order quote", () => {
     const { config } = await enableTax(f);
     const result = await f.ctx.db.rpc("portal_quote_order", {
       p_brewery: f.brewery.id, p_customer: f.customer.customerId, p_ship_to: f.customer.shipToId,
+      p_note: null, p_po: null, p_requested: null,
       p_lines: [{ sku_id: f.catalog.skuId, qty: 2 }], p_request_id: crypto.randomUUID(),
     });
     expect(result.error).toBeNull();
