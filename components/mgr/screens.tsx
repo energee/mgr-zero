@@ -450,12 +450,12 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 1, slice: "all", tab: "Today", name: "Driver",
-    to: { "Route A": "Driver route" },
+    to: { Resume: "Confirm delivery" },
     job: "Driver landing: the next stop and nothing else",
     reads: "get_today [delivery rows require route.driver_user_id = caller or admin]", writes: "none",
     states: [["empty", "No route today"], ["offline", "stop list cached · Delivered waits", 1], ["permission", "warehouse membership + assigned route", 1]],
-    spec: "Resume opens Confirm delivery for the next incomplete stop. Route A opens Driver route (all stops, the load, Return). No Pick/Receive rows.",
-    body: <TodayView model={toTodayViewProps(todayDriver)} lead={E.btn("Resume · Stop 1 of 3")} footer={E.nav("Route A", "departed 8:10 · return open")} />,
+    spec: "The next delivery row comes from a get_today-shaped delivery_next item. Resume opens Confirm delivery for that stop. The full stop list, load, departure and Return belong on Driver route, not Today.",
+    body: <TodayView model={toTodayViewProps(todayDriver)} />,
   },
   {
     step: 1, slice: "all", tab: "Today", name: "Taproom",

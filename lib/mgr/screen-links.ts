@@ -56,7 +56,6 @@ export const TAPS: [string | RegExp, string][] = [
   ["Transfer", "Cellar transfer"],
   ["Addition", "Cellar addition"],
   [/^Stop \d+ ·/, "Confirm delivery"],
-  [/^Resume · Stop/, "Confirm delivery"],
   ["Swap", "Swap keg"],
   ["Kick", "Kick keg"],
   ["Tap", "Swap keg"],

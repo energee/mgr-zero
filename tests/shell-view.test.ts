@@ -195,6 +195,24 @@ describe("Today view", () => {
     expect(readFileSync("app/(app)/page.tsx", "utf8")).toContain("actions: todayActions(brewery.roles)");
   });
 
+  it("draws the driver inventory from the same next-stop facts as live Today (#1654)", () => {
+    const model = toTodayViewProps({
+      date: "Thu 9/3",
+      timeZone: "America/New_York",
+      now: new Date("2026-09-03T16:00:00Z"),
+      items: [{
+        reason: "delivery_next", subjectType: "delivery", subjectId: "stop-1", sourceVersion: "1",
+        safeLabel: "Route A · stop 1", customerName: null, detail: "next stop", dueAt: "2026-09-03T04:00:00Z",
+        href: "/work/deliveries/stop-1", recipientRoles: ["admin", "warehouse"], assignedUserId: "driver-1",
+      }],
+    });
+    expect(model.rows).toHaveLength(1);
+    expect(model.rows[0]).toMatchObject({ title: "Route A · stop 1", detail: "next stop", verb: "Resume", warning: false });
+    // Navigation destinations are inert in the inventory; the drawing must otherwise match.
+    expect(htmlOf(screen("Driver").body)).toBe(htmlOf(createElement(TodayView, { model })));
+    expect(htmlOf(createElement(TodayView, { model, linkRows: true }))).toMatch(/<a[^>]*href="\/work\/deliveries\/stop-1"[^>]*>Resume<\/a>/);
+  });
+
   it.each([
     ["Today", TodayView, todayWarehouse],
     ["Today empty", TodayView, todayEmpty],
