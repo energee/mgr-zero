@@ -54,6 +54,7 @@ function checkHighlight(selector: string) {
       offset: parseFloat(active.outlineOffset),
       ring: rgb(active.outlineColor), fill: rgb(active.backgroundColor),
       text: rgb(active.color),
+      details: Array.from(row.querySelectorAll('.text-muted-foreground'), detail => rgb(getComputedStyle(detail).color)),
       surface: rgb(getComputedStyle(document.documentElement).getPropertyValue('--popover')),
     };
   })()`).result;
@@ -61,6 +62,9 @@ function checkHighlight(selector: string) {
   assert(contrast(style.ring, style.fill) >= 3, "Outline must contrast with the active fill");
   assert(contrast(style.ring, style.surface) >= 3, "Outline must contrast with the surrounding list");
   assert(contrast(style.text, style.fill) >= 4.5, "Active option text must remain readable");
+  for (const detail of style.details) {
+    assert(contrast(detail, style.fill) >= 4.5, "Active option descriptions must remain readable");
+  }
 }
 
 try {

@@ -215,11 +215,15 @@
 
 /* Keep the active option visible without changing the upstream primitives.
    An inset outline survives the list's overflow clipping in both themes. */
-[data-slot="command-item"][data-selected="true"]:not([data-disabled="true"]),
+[cmdk-item][data-selected="true"]:not([data-disabled="true"]),
 [data-slot="select-item"][data-highlighted]:not([data-disabled]) {
   background-color: color-mix(in srgb, var(--primary) 16%, var(--popover));
   outline: 2px solid var(--ring);
   outline-offset: -2px;
+}
+
+[cmdk-item][data-selected="true"] .text-muted-foreground {
+  color: var(--foreground);
 }
 
 /* Pointer size, not viewport, chooses target height (plan §5): every control
