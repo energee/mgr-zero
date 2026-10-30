@@ -284,7 +284,6 @@ export const INERT: (string | RegExp)[] = [
   "Print pick sheet",
   "Print trace",
   "Publish changes",
-  "Push invoice to QuickBooks Online",
   "Queued",
   "QuickBooks Payments",
   "Reason",
