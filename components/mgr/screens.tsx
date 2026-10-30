@@ -111,6 +111,7 @@ import { LocationsView } from "@/components/mgr/views/locations";
 import { MeView } from "@/components/mgr/views/me";
 import { MoreView } from "@/components/mgr/views/more";
 import { MonthlyComplianceView, PeriodBeforeBooksView } from "@/components/mgr/views/monthly-compliance";
+import { ReattributeLossView } from "@/components/mgr/views/reattribute-loss";
 import { NewOrderView } from "@/components/mgr/views/new-order";
 import { EditDraftOrderView } from "@/components/mgr/views/edit-draft-order";
 import { editDraftOrder } from "@/lib/mgr/fixtures/edit-draft-order";
@@ -2319,7 +2320,7 @@ export const SCREENS: Screen[] = [
     slice: 6,
     tab: "More",
     name: "Monthly compliance",
-    to: { Confirm: "Monthly compliance", "Reattribute loss": "Monthly compliance" },
+    to: { Confirm: "Monthly compliance", "Reattribute loss": "Reattribute loss" },
     job: "Generate from ledgers, review, then record in MGR a filing made with TTB outside it",
     reads: "list_compliance_reports · generate_compliance_report · get_loss_review",
     writes: "file_compliance_report · reattribute_loss",
@@ -2328,8 +2329,18 @@ export const SCREENS: Screen[] = [
     body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAugust)} />,
   },
   {
+    step: 7, slice: 6, tab: "More", surface: "sheet", name: "Reattribute loss",
+    to: { "Save reattribution": "Monthly compliance" },
+    job: "Choose how much of a cellar loss belongs on another TTB line",
+    reads: "get_loss_review",
+    writes: "reattribute_loss",
+    states: [["no target", "the exact whole remainder is filled in · Target is unchosen · Save names the missing target"], ["sample", "a two-letter destination state is required"], ["partial", "a positive amount with up to eight decimal places cannot exceed the exact remainder"], ["uncertain", "fields and request ID stay frozen · Retry unchanged reattribution recovers the result"], ["saved", "Loss reattribution saved · refresh the remaining amount"], ["permission", "sales or admin required", 1]],
+    spec: "Shares the live command form and E fields. No target is selected by default: Sample, Taproom, and Destruction post to different TTB lines. Samples require a destination state. Corrections append history in the period they are saved, without changing earlier filed snapshots.",
+    body: <ReattributeLossView loss={monthlyComplianceAugust.losses[0]} />,
+  },
+  {
     step: 7, slice: 6, tab: "More", name: "Report does not balance",
-    to: { "Reattribute loss": "Report does not balance" },
+    to: { "Reattribute loss": "Reattribute loss" },
     job: "See why a period's filing cannot be recorded yet, and what to check",
     reads: "list_compliance_reports · generate_compliance_report · get_loss_review",
     writes: "reattribute_loss",
@@ -2339,7 +2350,7 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 7, slice: 6, tab: "More", name: "Filed period needs amendment",
-    to: { "Reattribute loss": "Filed period needs amendment" },
+    to: { "Reattribute loss": "Reattribute loss" },
     job: "Review an original filed snapshot and the recorded basis correction that requires an external amendment",
     reads: "list_compliance_reports · get_loss_review",
     writes: "reattribute_loss",
@@ -2362,6 +2373,7 @@ export const SCREENS: Screen[] = [
     slice: 6,
     tab: "More",
     name: "Period in progress",
+    to: { "Reattribute loss": "Reattribute loss" },
     job: "Review the current period from the ledger before it can be filed",
     reads: "list_compliance_reports · generate_compliance_report · get_loss_review",
     writes: "reattribute_loss",

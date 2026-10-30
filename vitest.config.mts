@@ -27,6 +27,7 @@ const pureTests = [
   "tests/settings-view.test.ts",
   "tests/monthly-compliance-view.test.ts",
   "tests/compliance-more-copy.test.ts",
+  "tests/reattribute-loss-view.test.ts",
   "tests/compliance-view.test.ts",
   "tests/more-consistency.test.ts",
   "tests/price-group-suggestion.test.ts",
