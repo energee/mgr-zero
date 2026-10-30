@@ -12,6 +12,19 @@ import { beforeBooksState, toMonthlyComplianceViewProps } from "../lib/mgr/month
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 
 describe("compliance period status (#1310)", () => {
+  it("distinguishes period-end quantities from legacy saved tank balances", () => {
+    const current = toMonthlyComplianceViewProps(monthlyComplianceAugust);
+    expect(current.inProcessAsOf).toBe("Aug 31, 2026");
+    const currentHtml = htmlOf(createElement(MonthlyComplianceView, { model: current }));
+    expect(currentHtml).toContain("Shows beer remaining in tanks at the end of Aug 31, 2026");
+    expect(currentHtml).not.toContain("not at the end of the period");
+    const legacyReport = { ...monthlyComplianceAmended.report, figures: { ...monthlyComplianceAmended.report.figures, inProcessAsOf: undefined } };
+    const legacy = toMonthlyComplianceViewProps({ ...monthlyComplianceAmended, report: legacyReport });
+    expect(legacy.inProcessAsOf).toBeUndefined();
+    const legacyHtml = htmlOf(createElement(MonthlyComplianceView, { model: legacy }));
+    expect(legacyHtml).toContain("Shows what was in tanks at filing, not at the end of the period.");
+  });
+
   it.each([
     ["2026-08-01", "2026-08-31", "Past"],
     ["2026-09-01", "2026-09-30", "Current"],
@@ -20,14 +33,19 @@ describe("compliance period status (#1310)", () => {
     ["2025-01-01", "2025-12-31", "Past"],
     ["2030-01-01", "2030-12-31", "Upcoming"],
   ])("labels %s through %s as %s independently of report balance", (periodStart, periodEnd, status) => {
-    const report = { figures: { ...monthlyComplianceAugust.report.figures, periodStart, periodEnd }, warnings: [] };
+    const report = { figures: { ...monthlyComplianceAugust.report.figures, periodStart, periodEnd, inProcessAsOf: status === "Past" ? periodEnd : undefined }, warnings: [] };
     const model = toMonthlyComplianceViewProps({ ...monthlyComplianceAugust, today: "2026-09-30", report });
     expect(model.periodStatus).toBe(status);
     const html = htmlOf(createElement(MonthlyComplianceView, { model }));
     expect(html).toContain(`>${status}</span>`);
     expect(html).toContain("Live figures");
     expect(html).toContain("not a saved filing");
-    if (status !== "Past") expect(html).not.toContain("Save filed snapshot");
+    if (status !== "Past") {
+      expect(html).not.toContain("Save filed snapshot");
+      expect(model.inProcessAsOf).toBeUndefined();
+      expect(html).toContain("in tanks now, not at the end of the period.");
+      expect(html).not.toContain("Shows beer remaining in tanks at the end of");
+    }
     if (status === "Upcoming") expect(html).toContain("This period has not started");
   });
 
