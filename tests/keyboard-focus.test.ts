@@ -65,7 +65,7 @@ describe.each([
 
   it("exposes the header as a banner and the sidebar menu as primary navigation", () => {
     expect(html).toMatch(/<header[^>]*role="banner"/);
-    const primaryNavigation = html.match(/<nav aria-label="Primary">.*?<\/nav>/s)?.[0];
+    const primaryNavigation = html.match(/<nav aria-label="Primary">[\s\S]*?<\/nav>/)?.[0];
     expect(primaryNavigation).toContain(`href="${items[0].href}"`);
     expect(primaryNavigation).toContain(items[0].label);
   });
