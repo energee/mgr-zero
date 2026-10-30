@@ -45,6 +45,15 @@ try {
   assert(ab("eval", "document.documentElement.scrollWidth <= document.documentElement.clientWidth").result, "Settings must reflow at the 320 CSS-pixel viewport used for 400% zoom");
   assert(ab("eval", "Array.from(document.querySelectorAll('[data-mgr-page-scroll]')).every(x => x.scrollWidth <= x.clientWidth)").result, "Settings page content must not require horizontal scrolling");
   ab("set", "viewport", "1440", "1000");
+  ab("open", `${base}/docs/screens-explore`);
+  wait("document.querySelector('[aria-label=Screens] button')");
+  chooseScreen("Format");
+  wait("document.querySelector('[role=radiogroup][aria-label=\"Size of one container unit\"]')");
+  ab("find", "role", "radio", "click", "--name", "bbl", "--exact");
+  wait("document.querySelector('[role=radio][value=bbl]')?.getAttribute('aria-checked') === 'true'");
+  assert.equal(ab("eval", "document.querySelector('[aria-label=Screens] [aria-selected=true]')?.textContent").result, "Format", "A unit choice must not navigate the explorer");
+  ab("press", "ArrowLeft");
+  wait("document.querySelector('[role=radio][value=gal]')?.getAttribute('aria-checked') === 'true'");
   console.log("Accessibility browser regression passed: select name and value, visible required marker, nonmodal unobscured desktop focus, and 400% equivalent Settings reflow.");
 } finally {
   ab("close");

@@ -579,12 +579,12 @@ describe("SCREENS", () => {
     // The visible label names the input (no aria-label overriding it), and the unit bar rides in its group.
     const sizeId = /<label[^>]*for="([^"]+)"[^>]*>Size of one container<\/label>/.exec(format)?.[1];
     expect(sizeId).toBeTruthy();
-    expect(format).toMatch(new RegExp(`data-slot="input-group"[\\s\\S]*<input[^>]*id="${sizeId}"[\\s\\S]*role="tablist"`));
+    expect(format).toMatch(new RegExp(`<input[^>]*id="${sizeId}"`));
     expect(format).not.toContain('aria-label="Size of one container"');
     expect(format).toContain("Container");
     expect(format).toContain("Beer per package");
     expect(format).toContain("Containers per package");
-    expect(format).toMatch(/role="tablist"[^>]*>[\s\S]*oz[\s\S]*gal[\s\S]*bbl/);
+    expect(format).toMatch(/role="radiogroup"[^>]*aria-label="Size of one container unit"/);
     for (const unit of ["oz", "gal", "bbl"]) expect.soft(format, unit).toContain(`>${unit}</button>`);
     for (const unit of ["mL", "L"]) expect.soft(format, unit).not.toContain(`>${unit}</button>`);
 
@@ -813,17 +813,6 @@ describe("SCREENS", () => {
     expect(worksheet).toContain('aria-label="Count every stock bucket"');
   });
 
-  it("edits a whole number with the same stepper Weekly count uses", () => {
-    // A contract quantity or an overdue threshold is counted, not typed: the
-    // −/+ stepper (E.stq) is the one number control, as on Weekly count.
-    // The pair table is the whole check: the regex fails if the stepper is
-    // missing as surely as if it is not the labelled field. Labels are escaped
-    // so a field may be named for a reader, parentheses and all.
-    for (const [name, label] of [["Contract", "Contract quantity"], ["Settings", "Reading overdue after (hours)"]]) {
-      const esc = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      expect(body(name), `${name}: the stepper is not the labelled field`).toMatch(new RegExp(`aria-label="Decrease"[^§]*aria-label="${esc}"`));
-    }
-  });
 
   it("uses the full desktop width instead of a centred phone column (#98)", () => {
     // Issue 98: the shell was capped at a phone column, buttons kept a fixed

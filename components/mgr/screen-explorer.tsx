@@ -133,7 +133,7 @@ export function ScreenExplorer() {
     // Native fields and their labels edit the shared form, never navigate its row.
     if ((e.target as HTMLElement).closest("input, select, textarea, label")) return;
     const el = (e.target as HTMLElement).closest<HTMLElement>("a, button, [data-slot=item]");
-    if (!el || el.matches("[data-slot=toggle-group-item]")) return;
+    if (!el || el.matches("[data-slot=toggle-group-item], [role=radio]")) return;
     // Shared previews and Work's filter tabs own their controls, not explorer
     // navigation. Work's rows sit in the filter's tabpanel and still navigate.
     if (el.closest("[data-chat-preview], [data-work-filter] [role=tablist], [data-preview-action]")
