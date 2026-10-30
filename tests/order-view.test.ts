@@ -13,6 +13,36 @@ import { orderLineCents, toOrderViewProps, type OrderSnapshot } from "../lib/mgr
 const PAGE = "app/(app)/orders/[id]/page.tsx";
 
 describe("Order view loop", () => {
+  it("shows every buyer confirmation outcome, with acceptance distinct from inbox delivery", () => {
+    const emailStatuses: OrderSnapshot["emailStatuses"] = [
+      { state: "pending", last_error: null },
+      { state: "pending", last_error: "provider_uncertain" },
+      { state: "pending", last_error: "provider_uncertain" },
+      { state: "sending", last_error: null },
+      { state: "accepted", last_error: null },
+      { state: "blocked", last_error: "provider_rejected" },
+      { state: "blocked", last_error: "retry_window_expired" },
+      { state: "blocked", last_error: "no_recipient" },
+      { state: "suppressed", last_error: "recipient_changed" },
+    ];
+    const model = toOrderViewProps({ ...orderConfirmedWholesale, emailStatuses });
+    const value = model.facts.find(fact => fact.label === "Confirmation email")?.value;
+    expect(value).toBe("1 × Queued · 2 × Retry pending: provider outcome uncertain · 1 × Sending · 1 × Accepted by provider (not proof of inbox delivery) · 1 × Blocked: provider rejected the email · 1 × Blocked: retry window expired; investigate before resending · 1 × Blocked: no linked portal buyer · 1 × Suppressed: buyer removed or email changed");
+    const html = renderToStaticMarkup(createElement(OrderView, { model }));
+    expect(html).toContain("Confirmation email");
+    expect(html).toContain("2 × Retry pending");
+    expect(html).toContain("Blocked: retry window expired");
+  });
+
+  it("distinguishes no recorded confirmation from unauthorized diagnostics and internal transfers", () => {
+    expect(toOrderViewProps({ ...orderConfirmedWholesale, emailStatuses: [] }).facts)
+      .toContainEqual({ label: "Confirmation email", value: "No confirmation email recorded", wide: true });
+    const hidden = toOrderViewProps({ ...orderConfirmedWholesale, emailStatuses: undefined });
+    expect(renderToStaticMarkup(createElement(OrderView, { model: hidden }))).not.toContain("Confirmation email");
+    const transfer = toOrderViewProps({ ...orderConfirmedWholesale, order: { ...orderConfirmedWholesale.order, kind: "taproom_transfer" }, emailStatuses: [] });
+    expect(transfer.facts.some(fact => fact.label === "Confirmation email")).toBe(false);
+  });
+
   it("draws Ordered as the shared number field, plus Reason, when lines can be adjusted in place", () => {
     const model = toOrderViewProps(orderConfirmedWholesale);
     const read = renderToStaticMarkup(createElement(OrderView, { model }));
