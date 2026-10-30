@@ -2,7 +2,7 @@
 
 Staff recording a brand's COLA type the TTB ID by hand today. TTB's public
 COLA registry can be searched by the brewery's permit (the TTB registry number
-on /settings, `breweries.ttb_registry_no`, e.g. `BR-PA-20553`). This adds a
+on /settings, `breweries.ttb_registry_no`, e.g. `BR-PA-12345`). This adds a
 **Find COLA** list to the Brand approval sheet: MGR searches TTB by that
 permit, shows the brewery's COLAs whose fanciful name matches the brand, and
 picking one fills the TTB ID, serial and approval date. Saving still goes through
@@ -18,7 +18,7 @@ picking one fills the TTB ID, serial and approval date. Saving still goes throug
   serial, completed date, fanciful name, brand name, origin code, origin,
   class code, class. `Total Matching Records: N`. Next page:
   `GET publicPageAdvancedCola.do?action=page&pgfcn=nextset` with the same
-  session cookie. BR-PA-20553 → 144 records, 8 pages, all collected.
+  session cookie. The synthetic fixture exercises a first page with more results available.
 - TLS: ttbonline.gov omits its intermediate (Entrust OV TLS Issuing RSA CA 2,
   expires 2027-12-10). Node/Bun `fetch` fails `UNABLE_TO_VERIFY_LEAF_SIGNATURE`;
   passing `[...tls.rootCertificates, intermediate]` as `ca` succeeds with
@@ -97,6 +97,5 @@ No migration. No new dependency (`node:https` and `node:tls` are stdlib).
 ## Open questions
 
 1. Resolved: the sheet records the approval date (see Date fill).
-2. Bulk: a one-off script matching all 144 Lolev COLAs to brands by fanciful
-   name would fill most brands at once. Out of scope here; separate PR if
-   wanted.
+2. Bulk: a one-off script could match a brewery's COLAs to brands by fanciful
+   name. Out of scope here; keep tenant-specific registry captures private.

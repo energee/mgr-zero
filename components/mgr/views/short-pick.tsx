@@ -10,8 +10,6 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { OrderQuantity } from "./new-order";
 import type { ShortPickViewModel } from "@/lib/mgr/short-pick-view";
 
-export type { ShortPickViewModel };
-
 export function ShortPickView({ model, footer, reason, reasonValue = "", onReason, resolution = 0, onResolution, countedValue, onCounted, messages, submitting = false, disabled = false }: {
   model: ShortPickViewModel; footer?: ReactNode; reason?: ReactNode;
   reasonValue?: string; onReason?: (value: string) => void;

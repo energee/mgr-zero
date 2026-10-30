@@ -3,8 +3,6 @@ import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { ReverseMovementViewModel } from "@/lib/mgr/reverse-movement-view";
 
-export type { ReverseMovementViewModel };
-
 export function ReverseMovementView({
   model,
   note,
