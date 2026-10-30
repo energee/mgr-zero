@@ -274,7 +274,7 @@ const receiptCountLine = z.object({
 
 defineCommand({
   name: "correct_purchase_receipt",
-  description: "Correct an unused purchase receipt with a reason: preserve the original facts, reverse its exact movements, and append replacement counts, actual unit costs and lot facts atomically",
+  description: "Correct a purchase receipt with a reason: preserve the original facts, reverse its exact movements, and append replacement counts, actual unit costs and lot facts atomically without negative stock",
   input: z.object({ receiptId: z.string().uuid(), reason: z.string().trim().min(1), lines: z.array(receiptCountLine).min(1) }),
   roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_purchase_receipt", {

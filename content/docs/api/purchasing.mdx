@@ -17,8 +17,9 @@ optional `unitCostCents`: integer cents per purchase unit from 0 to 2147483647.
 Omitting it keeps the ordered price on receive or the frozen receipt price on
 correction. Supplying it records the actual receipt price and derives the
 movement's cost per base unit using the receipt conversion. It does not rewrite
-the sent PO or an original receipt. Correction still requires a reason and
-unused stock; post the latest priced receipt's Bill after a missing cost is fixed.
+the sent PO or an original receipt. Correction still requires a reason and must
+preserve nonnegative stock and lot provenance; post the latest priced receipt's
+Bill after a missing cost is fixed.
 
 An order that will not arrive in full is closed with a reason. A draft or sent
 order with no receipts is cancelled (`cancel_purchase_order`); one with at
@@ -112,7 +113,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Correct an unused purchase receipt with a reason: preserve the original facts, reverse its exact movements, and append replacement counts, actual unit costs and lot facts atomically
+Correct a purchase receipt with a reason: preserve the original facts, reverse its exact movements, and append replacement counts, actual unit costs and lot facts atomically without negative stock
 
 | Field | Type | Required |
 | --- | --- | --- |

@@ -230,7 +230,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     portal_submit_quote: [B,f.customer.customerId,R(),null,R()],
     cancel_purchase_order: [B,draftPo.id,"Fixture",R()], close_purchase_order_short: [B,sentPo.id,"Fixture",R()],
     receive_purchase_order: [B,sentPo.id,W,BIN,day,[{po_line_id:sentLine.id,qty_counted:1}],R()],
-    correct_purchase_receipt: [B,receipt.id,"Wrong count",[{po_line_id:sentLine.id,qty_counted:1}],R()],
+    correct_purchase_receipt: [B,receipt.id,"Wrong count",[{po_line_id:sentLine.id,qty_counted:1}],R(),null,null],
     record_brew_day: [B,plannedBatch.id,emptyVessel.id,2,day,R(),[],{},true],
     save_batch_pulls: [B,plannedBatch.id,null,[],R()],
     correct_brew_record: [B,R(),"Test correction",1,[],{},true,R()],

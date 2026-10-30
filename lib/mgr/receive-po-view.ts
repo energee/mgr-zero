@@ -52,7 +52,7 @@ export const poLineDetail = (line: PoLineAmounts) =>
   `ordered ${poLineQty(line.qty_ordered, line.material)} · received ${poLineQty(line.qty_received, line.material)} · still due ${poLineQty(line.qty_open, line.material)}${line.expected_lot_code ? ` · PO lot ${line.expected_lot_code}` : ""}`;
 
 /** What a receipt correction does, shown on the live form and its inventory frame. */
-export const CORRECTION_INFO = "The original receipt remains in history. Its stock is reversed and the corrected count is posted at the original receiving bin. Subsequent stock use or shared lot changes can prevent correction.";
+export const CORRECTION_INFO = "The original receipt remains in history. Its stock is reversed and the corrected count is posted at the original receiving bin. Negative stock or changed shared lot provenance can prevent correction.";
 
 /** The one mode a Receive PO state puts the form in: mark a draft sent,
  *  count a new receipt, correct a posted one, or only show the order. */

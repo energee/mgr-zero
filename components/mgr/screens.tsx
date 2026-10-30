@@ -2008,11 +2008,11 @@ export const SCREENS: Screen[] = [
   {
     step: 7, slice: 2, tab: "Work", name: "Correct receipt",
     to: { "Correct receipt": "Receipt" },
-    job: "Correct an unused receipt without erasing its original facts",
+    job: "Correct a receipt without erasing its original facts",
     reads: "get_purchase_order [frozen receipt quantities, units and lot facts]",
     writes: "correct_purchase_receipt [exact material reversal and immutable replacement receipt with corrected counts, unit costs and lot facts in one transaction]",
-    states: [["permission", "warehouse or admin", 1], ["ready", "reason and corrected counts"], ["blocked", "subsequent stock use or shared lot metadata prevents correction", 1], ["stale", "receipt already replaced; open its latest revision", 1], ["success", "replacement receipt and current balance"]],
-    spec: "Reuse Receive PO fields with a required correction reason and the original receiving location. Unit cost ($) starts on the frozen receipt price; an optional replacement price changes this receipt only, never the sent order. Preserve the original receipt, append exact reversal movements, and record replacement counted quantities, costs and lot facts. Only the latest revision contributes to the PO balance. Used stock and shared lot metadata can prevent correction; no generic stock adjustment bypass is offered.",
+    states: [["permission", "warehouse or admin", 1], ["ready", "reason and corrected counts"], ["blocked", "negative stock or shared lot provenance prevents correction", 1], ["stale", "receipt already replaced; open its latest revision", 1], ["success", "replacement receipt and current balance"]],
+    spec: "Reuse Receive PO fields with a required correction reason and the original receiving location. Unit cost ($) starts on the frozen receipt price; an optional replacement price changes this receipt only, never the sent order. Preserve the original receipt, append exact reversal movements, and record replacement counted quantities, costs and lot facts. Only the latest revision contributes to the PO balance. Corrections cannot leave negative stock or rewrite used/shared lot provenance; no generic stock adjustment bypass is offered.",
     body: <ReceivePoView model={correctReceiptPo} />,
   },
   {
