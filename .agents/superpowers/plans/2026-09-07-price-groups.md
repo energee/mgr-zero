@@ -35,7 +35,7 @@ tests), TypeScript, vitest, Fumadocs MDX for the customer guides, bun.
 
   A fresh worktree has an empty `node_modules` and no env file. Before the
   first run: `bun install --frozen-lockfile` and `cp
-  /Users/tedslesinski/Repos/mgr-zero/.env.local .env.local` (three suites read
+  ../../../.env.local .env.local` (three suites read
   `NEXT_PUBLIC_SUPABASE_URL` at import). Do not commit `.env.local`.
 - **The word "tier" is retired** (spec D8). After Task 1, `tier` must not
   appear in `components/mgr/screens.tsx`, `lib/mgr/nav.ts`,
