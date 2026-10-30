@@ -1,13 +1,15 @@
 // lib/mgr/receive-po-view.ts — view-model for Receive PO (inventory), and
 // what Receive purchase order or Correct receipt still needs (#1485).
-import { isNumber } from "./quantity-input";
+import { isNumber, numberNotationError } from "./quantity-input";
 import { submitReason } from "./submit-reason";
+import { poLineErrors } from "./new-po-view";
 
 export type ReceivePoLineView = {
   key: string;
   title: string;
   detail: string;
   qty: number | string;
+  cost?: string;
   warning?: boolean;
   ok?: boolean;
   lot?: string;
@@ -87,6 +89,9 @@ export function receiveReason(model: ReceivePoViewModel): string | null {
       if (mode === "correct") missing.push(`a count for ${line.title}`);
     } else if (!isCount(qty)) missing.push(`a count of zero or more for ${line.title}`);
     else if (line.lot !== undefined && Number(qty) > 0 && !line.lot.trim()) missing.push(`a lot code for ${line.title}`);
+    if ((mode === "correct" || isCount(qty)) && line.cost && (numberNotationError(line.cost) || poLineErrors({ qty: 1, cost: line.cost }).cost)) {
+      missing.push(`a unit cost from $0 to $21,474,836.47 for ${line.title}`);
+    }
   }
   // A 0 records a short line beside a received one; a receipt of only zeros records nothing (#1485).
   if (mode === "receive" && !lines.some(line => isCount(String(line.qty)) && Number(line.qty) > 0)) missing.push("a count above zero on at least one line");

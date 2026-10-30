@@ -12,6 +12,14 @@ A purchase order is drafted (optionally from computed material requirements),
 sent to a vendor, then received. Receiving is what writes material stock, so an
 unreceived PO never inflates what a packaging run believes it has.
 
+Each line of `receive_purchase_order` and `correct_purchase_receipt` accepts
+optional `unitCostCents`: integer cents per purchase unit from 0 to 2147483647.
+Omitting it keeps the ordered price on receive or the frozen receipt price on
+correction. Supplying it records the actual receipt price and derives the
+movement's cost per base unit using the receipt conversion. It does not rewrite
+the sent PO or an original receipt. Correction still requires a reason and
+unused stock; post the latest priced receipt's Bill after a missing cost is fixed.
+
 An order that will not arrive in full is closed with a reason. A draft or sent
 order with no receipts is cancelled (`cancel_purchase_order`); one with at
 least one receipt is closed short (`close_purchase_order_short`), which keeps
@@ -104,7 +112,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Correct an unused purchase receipt with a reason: preserve the original facts, reverse its exact movements, and append replacement counts and lot facts atomically
+Correct an unused purchase receipt with a reason: preserve the original facts, reverse its exact movements, and append replacement counts, actual unit costs and lot facts atomically
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -357,7 +365,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Count what arrived against a sent purchase order at one bin: receipt, lines (over or short both allowed), lots read off the package, and receipt movements in one write; status derives from the counts
+Count what arrived against a sent purchase order at one bin: receipt, lines with optional actual unit costs (over or short both allowed), lots read off the package, and receipt movements in one write; status derives from the counts
 
 | Field | Type | Required |
 | --- | --- | --- |
