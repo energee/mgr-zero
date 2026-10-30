@@ -52,6 +52,7 @@ try {
   ab("find", "role", "radio", "click", "--name", "bbl", "--exact");
   wait("document.querySelector('[role=radio][value=bbl]')?.getAttribute('aria-checked') === 'true'");
   assert.equal(ab("eval", "document.querySelector('[aria-label=Screens] [aria-selected=true]')?.textContent").result, "Format", "A unit choice must not navigate the explorer");
+  assert.equal(ab("eval", "document.activeElement?.getAttribute('role')").result, "radio", "Selecting a unit must retain radio focus for arrow-key navigation");
   ab("press", "ArrowLeft");
   wait("document.querySelector('[role=radio][value=gal]')?.getAttribute('aria-checked') === 'true'");
   console.log("Accessibility browser regression passed: select name and value, visible required marker, nonmodal unobscured desktop focus, and 400% equivalent Settings reflow.");

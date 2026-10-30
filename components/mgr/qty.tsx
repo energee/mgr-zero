@@ -116,7 +116,10 @@ export function Qty({
             addon's default inline-end pr-2 would only double up as dead space past
             the last unit. A plain-text unit ("bbl", "SG · prior 1.021") has no
             inset of its own and keeps the padding. */}
-        {unit ? <InputGroupAddon align="inline-end" className="has-[>[data-slot=tabs]]:pr-0">{unit}</InputGroupAddon> : null}
+        {unit ? <InputGroupAddon align="inline-end" className="has-[>[data-slot=tabs]]:pr-0" onClick={event => {
+          // Radix radios bubble a click from their hidden form input; keep focus on the chosen radio.
+          if (!(event.target as HTMLElement).closest("button, input")) input.current?.focus();
+        }}>{unit}</InputGroupAddon> : null}
       </InputGroup>
       {notationError && <FieldError id={notation.errorId}>{notationError}</FieldError>}
     </Field>
