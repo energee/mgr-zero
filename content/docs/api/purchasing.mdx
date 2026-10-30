@@ -12,6 +12,12 @@ A purchase order is drafted (optionally from computed material requirements),
 sent to a vendor, then received. Receiving is what writes material stock, so an
 unreceived PO never inflates what a packaging run believes it has.
 
+`receive_purchase_order` and `correct_purchase_receipt` require finite,
+nonnegative counts with at most four decimal places in purchase units.
+The count multiplied by the receipt's purchase-unit conversion must also fit
+four decimal places in base units. An overprecise count is refused atomically,
+not rounded independently in the receipt and material ledger.
+
 An order that will not arrive in full is closed with a reason. A draft or sent
 order with no receipts is cancelled (`cancel_purchase_order`); one with at
 least one receipt is closed short (`close_purchase_order_short`), which keeps

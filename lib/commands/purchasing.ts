@@ -267,7 +267,7 @@ defineCommand({
 });
 
 const receiptCountLine = z.object({
-  poLineId: z.string().uuid(), qtyCounted: z.number().nonnegative(),
+  poLineId: z.string().uuid(), qtyCounted: z.number().nonnegative().multipleOf(0.0001),
   lotCode: z.string().trim().optional(), bestBy: isoDate.optional(),
 });
 
