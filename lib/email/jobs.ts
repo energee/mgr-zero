@@ -31,13 +31,18 @@ export async function runOrderEmailBatch() {
     category = "malformed_response";
     const leases = leasesSchema.parse(leased.data);
     const result = { accepted: 0, retry: 0, blocked: 0 };
+    let leaseLost = false;
     for (const lease of leases) {
       deliveryId = lease.id;
       stage = "send";
       category = "lease_expired";
       let providerId: string | null = null;
       let error: string | null = null;
-      if (Date.now() >= Date.parse(lease.lease_expires_at)) throw new Error("Order email lease expired before send");
+      if (Date.now() >= Date.parse(lease.lease_expires_at)) {
+        console.error("Order email delivery failure", { stage, category, deliveryId });
+        leaseLost = true;
+        continue;
+      }
       if (Date.now() >= Date.parse(lease.retry_before)) {
         error = "retry_window_expired";
         console.error("Order email delivery failure", { stage, category: "retry_window_expired", deliveryId });
@@ -63,10 +68,21 @@ export async function runOrderEmailBatch() {
       });
       if (recorded.error) throw recorded.error;
       category = "lease_lost";
-      if (!recorded.data) throw new Error("Order email lease no longer owned");
+      if (!recorded.data) {
+        console.error("Order email delivery failure", { stage, category, deliveryId });
+        leaseLost = true;
+        continue;
+      }
       if (providerId) result.accepted++;
       else if (error === "provider_uncertain") result.retry++;
       else result.blocked++;
+    }
+    // Finish independent deliveries before returning a failed job for any lost lease.
+    if (leaseLost) {
+      stage = "batch";
+      category = "lease_lost";
+      deliveryId = undefined;
+      throw new Error("Order email batch lost a lease");
     }
     return result;
   } catch (e) {
