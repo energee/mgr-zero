@@ -6,6 +6,20 @@ import { ImportView } from "../components/mgr/views/import";
 import { IMPORT_FIELDS, validateImportRows, type ImportKind } from "../lib/import-csv";
 import { importPreview } from "../lib/mgr/fixtures/import";
 
+it("announces only the current step as Import advances and returns to earlier steps", () => {
+  const labels = ["Upload", "Match columns", "Review", "Import"];
+  for (const step of [0, 1, 2, 1, 2, 3, 0]) {
+    const html = renderToStaticMarkup(createElement(ImportView, { model: { ...importPreview, step } }));
+    const progress = html.match(/<ol\b[^>]*aria-label="Import progress"[^>]*>([\s\S]*?)<\/ol>/)?.[1];
+    expect(progress).toBeDefined();
+    const items = [...progress!.matchAll(/<li\b([^>]*)>([\s\S]*?)<\/li>/g)];
+    expect(items.map(([, attributes, content]) => ({
+      label: content.replace(/<[^>]+>/g, ""),
+      current: /\baria-current="step"/.test(attributes),
+    }))).toEqual(labels.map((label, index) => ({ label, current: index === step })));
+  }
+});
+
 it("keeps missing mappings and preview cells empty rather than undefined", () => {
   const pick = vi.spyOn(E, "pick");
   const edit = vi.spyOn(E, "edit");

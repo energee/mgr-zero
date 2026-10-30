@@ -80,7 +80,7 @@ try {
   wait('document.querySelector("[aria-label=Screens] button")');
   evaluate('Array.from(document.querySelectorAll("[aria-label=Screens] button")).find(button => button.textContent.trim() === "Composer answer").click()');
   wait('document.querySelector("[aria-label=Screens] [aria-selected=true]")?.textContent.trim() === "Composer answer"');
-  browser("find", "role", "button", "click", "--name", "Ask MGR", "--exact");
+  wait(`getComputedStyle(${panel}).display !== "none"`);
   browser("fill", prompt, "Keep this explorer draft");
   browser("set", "viewport", "1024", "800");
   assert.equal(evaluate(`(() => { const box = document.querySelector(".screen-box").getBoundingClientRect(); const chat = ${panel}.getBoundingClientRect(); return chat.left >= box.left && chat.right <= box.right; })()`), true, "Chat must fit the explorer's containing block, not only the outer viewport");

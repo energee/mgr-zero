@@ -21,13 +21,6 @@ it("announces the current list result count politely", () => {
   expect(html).toMatch(/role="status" aria-live="polite" aria-atomic="true"[^>]*>0 results<\/p>/);
 });
 
-it("marks the current import step in an ordered list", () => {
-  const html = renderToStaticMarkup(E.stp(["Upload", "Review", "Import"], 1));
-  expect(html).toMatch(/^<ol /);
-  expect(html.match(/aria-current="step"/g)).toHaveLength(1);
-  expect(html).toMatch(/<li[^>]*aria-current="step"[^>]*><span[^>]*>Review<\/span>/);
-});
-
 it("marks invalid multi-select choices instead of their group", () => {
   const html = renderToStaticMarkup(E.picks("Uses", [], ["Warehouse", "Taproom"], { "aria-invalid": true }));
   expect(html).not.toMatch(/role="group"[^>]*aria-invalid/);

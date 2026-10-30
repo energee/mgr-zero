@@ -507,16 +507,6 @@ export const E = {
    *  region, so a screen reader hears the change politely. E.info and E.note
    *  default to static notes; only explicit errors use their alert role. */
   polite: (t: React.ReactNode) => (t ? <p className="text-sm text-muted-foreground">{t}</p> : null),
-  stp: (arr: string[], cur: number) => (
-    <ol aria-label="Import progress" className="flex items-center gap-1 text-xs">
-      {arr.map((s, i) => (
-        <li key={s} aria-current={i === cur ? "step" : undefined} className={cn("flex items-center gap-1", i < arr.length - 1 && "flex-1")}>
-          <Badge variant={i === cur ? "default" : "outline"}>{s}</Badge>
-          {i < arr.length - 1 && <Separator className={cn("flex-1", i < cur && "bg-primary")} />}
-        </li>
-      ))}
-    </ol>
-  ),
   /** Status tiles. `actions` sit under a tile's facts; with an `href` too, the facts stay the link. */
   tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?, string?, React.ReactNode?][]) => (
     <ItemGroup className="grid grid-cols-2 gap-2 md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">

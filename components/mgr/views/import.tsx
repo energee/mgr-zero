@@ -4,6 +4,8 @@ import { E } from "@/components/mgr/e";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Attachment, AttachmentContent, AttachmentDescription, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { IMPORT_FIELDS, IMPORT_FIELD_LABELS, IMPORT_KINDS, IMPORT_ROW_CAP_LABEL, canReviewImport, importTemplateCsv, importTemplateName, readyImportRows, validateImportRows, type ImportKind, type ImportLookups, type ImportOutcome, type ImportResult } from "@/lib/import-csv";
 import { downloadCsv } from "@/lib/download-csv";
@@ -70,7 +72,14 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
   if (fileRejected) fileState = "error";
   return <>
     {E.back("Settings", "Import", undefined, model.backHref)}
-    {E.stp(["Upload", "Match columns", "Review", "Import"], step)}
+    <ol aria-label="Import progress" className="flex items-center gap-1 text-xs">
+      {["Upload", "Match columns", "Review", "Import"].map((label, index) => (
+        <li key={label} aria-current={index === step ? "step" : undefined} className={index < 3 ? "flex flex-1 items-center gap-1" : "flex items-center gap-1"}>
+          <Badge variant={index === step ? "default" : "outline"}>{label}</Badge>
+          {index < 3 && <Separator className={index < step ? "flex-1 bg-primary" : "flex-1"} />}
+        </li>
+      ))}
+    </ol>
     <FieldSet disabled={step !== 0 || busy} className="min-w-0 gap-0">
       <FieldLegend variant="label">What are you importing?</FieldLegend>
       <ToggleGroup type="single" value={kind} onValueChange={value => { if (value) onKind?.(value as ImportKind); }} variant="outline" size="sm" className="flex-wrap justify-start">
