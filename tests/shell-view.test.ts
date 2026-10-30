@@ -2,7 +2,7 @@
 // Team, Permission denied, First-run, and entry inventory adapters plus HTML.
 // Views own no sample data. Live CommandForm / MeSheet / LoginForm / Entry
 // cards stay wrappers.
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
