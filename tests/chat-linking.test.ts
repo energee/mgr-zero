@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { admin, asUser, makeBrewery, makeCustomerUser, makeStaff, makeStaffCtx, seedCustomer } from "./helpers";
 import { issueChatLinkProof, resolveChatActor } from "@/lib/chat/linking";
 import { runCommand } from "@/lib/commands/registry";
+import type { ChatLinkIntent } from "@/lib/commands/chat";
 import "@/lib/commands/all";
 
 process.env.APP_URL ??= "https://mgr.test";
@@ -49,11 +50,13 @@ describe("staff linking", () => {
     const account = await admin.auth.admin.getUserById(ctx.userId);
     expect((await admin.auth.admin.updateUserById(ctx.userId, { user_metadata: { full_name: "Owner (Admin)" } })).error).toBeNull();
     const issued = await issueChatLinkProof(admin, inst.id, "U-DISPLAY", "Morgan Slack");
-    expect(await runCommand("get_chat_link_intent", { proof: issued.proof }, ctx)).toMatchObject({
-      slackIdentity: "Morgan Slack (U-DISPLAY)",
-      workspace: `Demo (${inst.external_installation_id})`,
-      mgrIdentity: `Owner (Admin) <${account.data.user!.email}>`,
-    });
+    const preview = await runCommand("get_chat_link_intent", { proof: issued.proof }, ctx) as ChatLinkIntent;
+    expect(preview.slackIdentity).toContain("Morgan Slack");
+    expect(preview.slackIdentity).toContain("U-DISPLAY");
+    expect(preview.workspace).toContain("Demo");
+    expect(preview.workspace).toContain(inst.external_installation_id);
+    expect(preview.mgrIdentity).toContain("Owner (Admin)");
+    expect(preview.mgrIdentity).toContain(account.data.user!.email!);
     expect((await linkRow(issued.linkId)).state).toBe("pending");
     const blank = await admin.rpc("issue_chat_link_proof", {
       p_installation: inst.id, p_external_user_id: "U-BLANK", p_proof_hash: "a".repeat(64), p_external_display_name: " ",

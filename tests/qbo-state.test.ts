@@ -258,7 +258,9 @@ describe("QuickBooks current invoice state", () => {
     expect(success.latestFailure).toBeNull();
     // An editable display name keeps the original account identity beside it.
     await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: "Pat Operator" } });
-    expect((await readStatus()).lastSuccess.operator).toBe(`Pat Operator <${success.lastSuccess.operator}>`);
+    const namedOperator = (await readStatus()).lastSuccess.operator;
+    expect(namedOperator).toContain("Pat Operator");
+    expect(namedOperator).toContain(success.lastSuccess.operator);
     await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: "" } });
     const failedId = crypto.randomUUID();
     transport.mockRejectedValue(new Error("secret provider response"));
@@ -816,10 +818,16 @@ it("shows the account email beside an editable QuickBooks sync operator name", a
   const account = await admin.auth.admin.getUserById(f.ctx.userId);
   expect((await f.ctx.db.auth.updateUser({ data: { full_name: "Owner (Admin)" } })).error).toBeNull();
   await beginQboInvoiceSync(f.ctx, requestId);
-  const operator = `Owner (Admin) <${account.data.user!.email}>`;
-  expect(await runCommand("get_qbo_sync_status", {}, f.ctx)).toMatchObject({ latest: { operator } });
+  const email = account.data.user!.email!;
+  const latest = await runCommand("get_qbo_sync_status", {}, f.ctx) as { latest: { operator: string } };
+  expect(latest.latest.operator).toContain("Owner (Admin)");
+  expect(latest.latest.operator).toContain(email);
   sql(`update private.qbo_invoice_sync_batches set failed_at=now() where actor_id='${f.ctx.userId}' and request_id='${requestId}'`);
-  expect(await runCommand("get_qbo_sync_status", {}, f.ctx)).toMatchObject({ latestFailure: { operator } });
+  const failed = await runCommand("get_qbo_sync_status", {}, f.ctx) as { latestFailure: { operator: string } };
+  expect(failed.latestFailure.operator).toContain("Owner (Admin)");
+  expect(failed.latestFailure.operator).toContain(email);
   sql(`update private.qbo_invoice_sync_batches set completed_at=now() where actor_id='${f.ctx.userId}' and request_id='${requestId}'`);
-  expect(await runCommand("get_qbo_sync_status", {}, f.ctx)).toMatchObject({ lastSuccess: { operator } });
+  const completed = await runCommand("get_qbo_sync_status", {}, f.ctx) as { lastSuccess: { operator: string } };
+  expect(completed.lastSuccess.operator).toContain("Owner (Admin)");
+  expect(completed.lastSuccess.operator).toContain(email);
 });

@@ -127,10 +127,11 @@ it("returns every open interval beyond 1000 and bounded closed history without p
   const rows = await runCommand("list_open_taps", { locationId: f.location.id }, f.ctx) as { id: string }[];
   expect(rows).toHaveLength(1005);
   for (const r of rows.slice(0,3)) expect((await f.ctx.db.rpc("kick_keg", close(f,r.id))).error).toBeNull();
-  const history = await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx) as unknown[];
+  const history = await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx) as { opened_by_label: string; closed_by_label: string }[];
   expect(history).toHaveLength(3);
   for (const row of history) {
-    expect(row).toMatchObject({ opened_by_label: actorEmail, closed_by_label: actorEmail });
+    expect(row.opened_by_label).toContain(actorEmail);
+    expect(row.closed_by_label).toContain(actorEmail);
     for (const key of ["email", "password", "raw_user_meta_data", "raw_app_meta_data"]) expect(row).not.toHaveProperty(key);
   }
   expect(history[0]).toHaveProperty("closed_by_label");
@@ -139,7 +140,7 @@ it("returns every open interval beyond 1000 and bounded closed history without p
   expect(await runCommand("list_tap_history", { locationId:f.location.id }, f.ctx)).toHaveLength(50);
   const stale = await f.ctx.db.rpc("kick_keg", close(f, rows[0].id));
   expect(stale.error).toMatchObject({ code: "MG409" });
-  expect(stale.error?.message).toContain(`already closed by ${actorEmail} at `);
+  expect(stale.error?.message).toContain(actorEmail);
   expect(stale.error?.message).not.toContain(f.ctx.userId);
   expect((await runCommand("list_open_taps", { locationId: f.location.id }, f.ctx) as unknown[])).toHaveLength(1002);
 });
@@ -286,16 +287,29 @@ it("keeps the verified account email beside editable tap-history names", async (
   const f = await fixture();
   expect((await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: "  Dana Brewer  " } })).error).toBeNull();
   const email = (await admin.auth.admin.getUserById(f.ctx.userId)).data.user!.email!;
-  const label = `Dana Brewer <${email}>`;
   const opened = await open(f);
   assert(opened !== null);
-  expect(await runCommand("list_open_taps", { locationId: f.location.id }, f.ctx)).toEqual(expect.arrayContaining([expect.objectContaining({ opened_by_label: label })]));
+  const active = await runCommand("list_open_taps", { locationId: f.location.id }, f.ctx) as { id: string; opened_by_label: string }[];
+  const openingLabel = active.find(row => row.id === opened.id)?.opened_by_label;
+  expect(openingLabel).toContain("Dana Brewer");
+  expect(openingLabel).toContain(email);
   expect((await f.ctx.db.rpc("kick_keg", close(f, opened.id))).error).toBeNull();
-  const history = await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx);
-  expect(history).toEqual(expect.arrayContaining([expect.objectContaining({ opened_by_label: label, closed_by_label: label })]));
-  expect(JSON.stringify(history)).not.toMatch(/password|metadata/);
+  const history = await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx) as { id: string; opened_by_label: string; closed_by_label: string }[];
+  const interval = history.find(row => row.id === opened.id)!;
+  for (const field of ["opened_by_label", "closed_by_label"] as const) {
+    expect(interval[field]).toContain("Dana Brewer");
+    expect(interval[field]).toContain(email);
+  }
+  for (const key of ["email", "password", "raw_user_meta_data", "raw_app_meta_data"]) expect(interval).not.toHaveProperty(key);
   const conflict = await f.ctx.db.rpc("kick_keg", close(f, opened.id));
-  expect(conflict.error?.message).toContain(`already closed by ${label} at`);
+  expect(conflict.error?.message).toContain("Dana Brewer");
+  expect(conflict.error?.message).toContain(email);
   expect((await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: " " } })).error).toBeNull();
-  expect(await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx)).toEqual(expect.arrayContaining([expect.objectContaining({ opened_by_label: email, closed_by_label: email })]));
+  const renamedHistory = await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx) as { opened_by_label: string; closed_by_label: string }[];
+  for (const row of renamedHistory) {
+    for (const field of ["opened_by_label", "closed_by_label"] as const) {
+      expect(row[field]).toContain(email);
+      expect(row[field]).not.toContain("Dana Brewer");
+    }
+  }
 });

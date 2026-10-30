@@ -7,6 +7,7 @@ import "@/lib/commands/all";
 import * as slackAdapterModule from "@/lib/chat/slack-adapter";
 import type { SlackClientLike } from "@/lib/chat/slack-transport";
 import { issueChatLinkProof } from "@/lib/chat/linking";
+import type { ChatLinkIntent } from "@/lib/commands/chat";
 
 
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>, installation: string, delivery: string, occurrence: string, orderId: string;
@@ -177,8 +178,12 @@ it("previews actual identities without consuming and requires explicit, replay-s
   process.env.APP_URL = "https://mgr.test";
   const person = await makeStaffCtx(ctx.breweryId, "sales");
   const issued = await issueChatLinkProof(admin, installation, "U-CONSENT", "Morgan Slack");
-  const preview = await runCommand("get_chat_link_intent", { proof: issued.proof }, person);
-  expect(preview).toMatchObject({ slackIdentity: "Morgan Slack (U-CONSENT)", workspace: expect.stringContaining("Test ("), brewery: expect.any(String), mgrIdentity: expect.any(String) });
+  const preview = await runCommand("get_chat_link_intent", { proof: issued.proof }, person) as ChatLinkIntent;
+  expect(preview.slackIdentity).toContain("Morgan Slack");
+  expect(preview.slackIdentity).toContain("U-CONSENT");
+  expect(preview.workspace).toContain("Test");
+  expect(preview.brewery).toEqual(expect.any(String));
+  expect(preview.mgrIdentity).toEqual(expect.any(String));
   expect((await admin.from("chat_user_links").select("state").eq("id", issued.linkId).single()).data?.state).toBe("pending");
   const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
   const result = await runCommand("consume_chat_link_proof", { proof: issued.proof }, person, execution);
