@@ -53,7 +53,8 @@ export function PortalInvoiceView({
       {kind === "pay" ? (
         <>
           {E.info("Pay by card or bank transfer through QuickBooks. You will not need an account.")}
-          <form method="post" action={paymentAction} target="_blank" rel="noreferrer" className="flex flex-col">
+          {/* Keep Origin on the same-origin POST; the broker response removes the external referrer. */}
+          <form method="post" action={paymentAction} target="_blank" rel="noopener" className="flex flex-col">
             {E.btn("Pay invoice", "p", undefined, undefined, { type: paymentAction ? "submit" : "button" })}
           </form>
           {E.info("Opens QuickBooks in a new tab after you choose Pay invoice. Availability is re-checked on every payment attempt.")}
