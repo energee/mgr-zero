@@ -60,12 +60,12 @@ match" with a Clear link instead of "No brands yet".
 Each task starts by writing its failing test. 1–3 can run in parallel; 4
 needs 1–3; 5 needs 4.
 
-1. **Move `escapeLike`** to `lib/escape-like.ts` and import it in `lib/commands/search.ts`.
-   Test: `tests/escape-like.test.ts` (`%`, `_` and `\` are escaped). Accept: vitest green; `search.test.ts` still green.
+1. **Share quoted literal search** through `quotedSearchPattern` in `lib/escape-regex.ts` for the Catalog and Customers PostgREST OR filters.
+   Test: `tests/escape-regex.test.ts` covers regex metacharacters, quotes, and backslashes; `%` and `_` stay literal under `imatch`.
 2. **`listParams` + `hrefWith`** in `lib/mgr/list-params.ts`.
    Test: `tests/list-params.test.ts` (defaults, a bad enum falls back, an array param takes the first value, `hrefWith` drops defaults and empty values, order is stable). Accept: vitest, tsc.
 3. **`list_brands` inputs** in `lib/commands/catalog.ts`.
-   Test: add cases to `tests/commands-catalog.test.ts` (DB-backed): q matches name and alias and escapes `%`; each sort orders rows; category narrows; empty input matches today's output. Accept: vitest on `mgr_test`; `bun run docs:api` regenerates `content/docs/api/catalog.mdx`.
+   Test: add cases to `tests/commands-catalog.test.ts` (DB-backed): q matches name and alias and treats `%` literally; each sort orders rows; category narrows; empty input matches today's output. Accept: vitest on `mgr_test`; `bun run docs:api` regenerates `content/docs/api/catalog.mdx`.
 4. **Named search input, `ListControls`, and the Catalog page.**
    `components/mgr/list-controls.tsx`, `lib/mgr/catalog-view.ts` (`filtered` and the empty copy), `components/mgr/views/catalog.tsx` (a `controls` slot above the rows), `app/(app)/catalog/page.tsx` (reads `searchParams` via `listParams`, passes them to `list_brands`), and the Catalog record in `components/mgr/screens.tsx`, which draws the controls with fixture state.
    Test: add cases to `tests/catalog-view.test.ts` (the filtered empty state) and the screen-only proof list. Rendering is checked visually with `/browse`.

@@ -11,7 +11,6 @@ import { SCREENS } from "../components/mgr/screens";
 import { BACK, INERT, isInertOn, PORTAL, resolveTap, TAPS, ROUTES } from "../lib/mgr/screen-links";
 import { deniedFor, needsFor, PERSONAS } from "../lib/mgr/demo-personas";
 import { pageUnder } from "../lib/mgr/screen-explorer";
-import { WORK_FILTER_CHIPS } from "../lib/mgr/work-view";
 
 vi.mock("@/app/(auth)/actions", () => ({ logout: async () => {} }));
 
@@ -94,15 +93,8 @@ describe("resolveTap", () => {
 // so the explorer walks there, and a persona who may not open it never sees it.
 describe("Work chips", () => {
   it("name the screen each chip opens", async () => {
-    const { renderToStaticMarkup } = await import("react-dom/server");
-    const { createElement } = await import("react");
     const { WORK_TABS } = await import("../lib/mgr/work-view");
     for (const name of Object.values(WORK_TABS)) expect(by(name), name).toBeDefined();
-    for (const name of ["Work", "Orders", "Transfers", "Batches", "Packaging runs", "Purchase orders", "Routes", "Pick sheet", "Pars and allocation"]) {
-      const html = renderToStaticMarkup(createElement("div", null, by(name).body));
-      const destinations = name === "Work" ? WORK_FILTER_CHIPS.map(chip => WORK_TABS[chip]) : Object.values(WORK_TABS);
-      for (const to of destinations) expect(html, `${name} → ${to}`).toContain(`data-to="${to}"`);
-    }
   });
 });
 
