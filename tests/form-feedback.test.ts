@@ -1,11 +1,12 @@
 // tests/form-feedback.test.ts — the three shared form-feedback primitives:
 // a withheld submit names what is missing (#1122, #1128), an empty picker says
 // where to add the record (#1123), and a bad value is marked at its field
-// (#1121). Pure reason builders first, then the E controls' aria wiring.
+// (#1121). Pure reason builders first, then the shared controls' aria wiring.
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { E } from "@/components/mgr/e";
+import { NewPoView } from "@/components/mgr/views/new-po";
 import { submitReason } from "@/lib/mgr/submit-reason";
 import { draftLineErrors, orderFormReadiness, orderLineError, orderLineErrors } from "@/lib/order-form-rules";
 import { scheduleBatchReason } from "@/lib/mgr/schedule-batch-view";
@@ -344,15 +345,20 @@ describe("field error", () => {
     }
   });
 
-  it("E.pick and E.qty mark the field and link their message", () => {
+  it("E.pick marks the field and links its message", () => {
     const pick = html(E.pick("Customer", "", ["a"], { id: "c", error: "Choose a customer." }));
     expect(pick).toMatch(/aria-invalid="true"/);
     expect(pick).toMatch(/aria-describedby="c-error"/);
     expect(pick).toContain("Choose a customer.");
-    const qty = html(E.qty("-1", "bbl", "Quantity", "q", { error: "Enter a quantity above zero." }));
-    expect(qty).toMatch(/aria-invalid="true"/);
-    expect(qty).toMatch(/aria-describedby="q-error"/);
-    expect(qty).toContain("Enter a quantity above zero.");
+  });
+
+  it("a PO line quantity (E.edit number) marks itself and links its own message", () => {
+    const markup = html(createElement(NewPoView, { model: { vendor: "", expected: "", lines: [{ key: "a", title: "Material", detail: "", qty: "-4", cost: "" }] } }));
+    const input = markup.match(/<input\b[^>]*aria-label="Line 1 quantity"[^>]*>/)?.[0];
+    expect(input).toContain('aria-invalid="true"');
+    const errorId = input?.match(/\baria-describedby="([^"]+)"/)?.[1].split(" ").find(id => id.endsWith("-error"));
+    expect(errorId).toBeDefined();
+    expect(markup).toMatch(new RegExp(`id="${errorId}"[^>]*>Enter a quantity above zero\\.<`));
   });
 
   it("a date links its message from the picker", () => {
