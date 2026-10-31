@@ -344,6 +344,7 @@ it("reads restock and refused-return work without scanning a 9,000-order history
       "Relation Name"?: string;
       "Node Type": string;
       "Actual Rows": number;
+      "Actual Loops": number;
       "Rows Removed by Filter"?: number;
       Plans?: PlanNode[];
     };
@@ -356,9 +357,12 @@ it("reads restock and refused-return work without scanning a 9,000-order history
       const explained = await client.query(`explain (analyze, buffers, format json) ${query}`, [b.id, reason]);
       const plan = nodes(explained.rows[0]["QUERY PLAN"][0].Plan);
       expect(plan.map(node => node["Index Name"])).toContain(index);
-      // No scan of either history table may visit the whole 9,000-row fixture.
-      for (const node of plan.filter(node => ["orders", "order_lines"].includes(node["Relation Name"] ?? ""))) {
-        expect(node["Actual Rows"] + (node["Rows Removed by Filter"] ?? 0)).toBeLessThan(9000);
+      // No scan of any history table may visit the whole 9,000-row fixture.
+      // EXPLAIN reports rows per loop, so multiply by the loop count.
+      const history = ["orders", "order_lines", "shipments", "deliveries"];
+      for (const node of plan.filter(node => history.includes(node["Relation Name"] ?? ""))) {
+        const visited = (node["Actual Rows"] + (node["Rows Removed by Filter"] ?? 0)) * node["Actual Loops"];
+        expect(visited).toBeLessThan(9000);
       }
       const actual = await client.query(query, [b.id, reason]);
       const expected = await client.query(`select
