@@ -77,12 +77,12 @@ describe("ship_order short reason", () => {
 
   it("keeps an unchanged short-pick reason and replaces a changed one", async () => {
     const kept = await pickedOrder(10, 10);
-    await runCommand("resolve_short_pick", { orderId: kept.orderId, lineId: kept.lineId, qtyPicked: 7, reason: "short in pick face", resolution: "keep_owed" }, ctx);
+    await runCommand("resolve_short_pick", { orderId: kept.orderId, lineId: kept.lineId, qtyPicked: 7, reason: "short in pick face", resolution: "adjust_down" }, ctx);
     await runCommand("ship_order", { orderId: kept.orderId, ship: [{ lineId: kept.lineId, qty: 6, shortReason: "short in pick face" }] }, ctx);
     expect(await reasonOf(kept.lineId)).toBe("short in pick face");
 
     const changed = await pickedOrder(10, 10);
-    await runCommand("resolve_short_pick", { orderId: changed.orderId, lineId: changed.lineId, qtyPicked: 7, reason: "short in pick face", resolution: "keep_owed" }, ctx);
+    await runCommand("resolve_short_pick", { orderId: changed.orderId, lineId: changed.lineId, qtyPicked: 7, reason: "short in pick face", resolution: "adjust_down" }, ctx);
     await runCommand("ship_order", { orderId: changed.orderId, ship: [{ lineId: changed.lineId, qty: 6, shortReason: "one keg dented" }] }, ctx);
     expect(await reasonOf(changed.lineId)).toBe("one keg dented");
   });

@@ -1,16 +1,17 @@
-// components/mgr/views/transfer-detail.tsx — Transfer detail. Live slots
-// TransferActions as footer; inventory draws the next verb from status, and
-// Cancel transfer beside it until the transfer is received or cancelled.
+// Transfer detail owns the complete document, including its shared actions.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { TransferDetailViewModel } from "@/lib/mgr/transfer-detail-view";
+import { TransferActionsView, type TransferActionBindings } from "@/components/mgr/views/transfer-actions";
 
 export function TransferDetailView({
   model,
   footer,
+  actions,
 }: {
   model: TransferDetailViewModel;
   footer?: ReactNode;
+  actions?: TransferActionBindings;
 }) {
   return (
     <>
@@ -31,8 +32,7 @@ export function TransferDetailView({
             ? (
               <>
                 {E.sp()}
-                {E.btn(model.nextVerb)}
-                {E.btn("Cancel transfer", "g")}
+                <TransferActionsView lines={model.sources ?? []} {...actions} />
               </>
             )
             : null}
