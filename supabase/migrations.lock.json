@@ -212,5 +212,6 @@
   "20261029104000_update_draft_purchase_order.sql": "d92ac1d967ae2fa36ec3045ee8b740a2fd26cd2439b456495e85e0b34046c2ac",
   "20261029123000_compliance_active_months_bounded.sql": "650cc10c50914c7e266e9ff8ff81408b6d414bbe28317d399b5c4f24202a91b4",
   "20261030032500_packaging_output_corrections.sql": "9386c767f0031c0d10496e155815e781385d6c5a2599d97dc9f16237f87b810b",
-  "20261030032501_preserve_bidirectional_count_correction.sql": "0d496e5ce428efc9b233cb57de2062b23b7cd4d735f235643bdf508ab5ef8741"
+  "20261030032501_preserve_bidirectional_count_correction.sql": "0d496e5ce428efc9b233cb57de2062b23b7cd4d735f235643bdf508ab5ef8741",
+  "20261030032502_packaging_output_applied_snapshot.sql": "aa3729dfb25e2e56a9aaac897e2d0e1deba6628a9d13b8b603703d43365f1015"
 }

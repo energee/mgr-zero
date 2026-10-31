@@ -162,6 +162,49 @@ it("corrects closed output stock, lot, batch packaged volume, compliance and tan
   })]);
 });
 
+it("freezes every applied replacement quantity after rounding and omitted-output zeroing", async () => {
+  const f = await fixture();
+  const format = await admin.from("formats").insert({
+    brewery_id: f.brewery.id, name: "Second output", basis: "packaged", package_type: "can", bbl_per_unit: 0.001,
+  }).select("id").single();
+  if (format.error) throw format.error;
+  const sku = await admin.from("skus").insert({
+    brewery_id: f.brewery.id, brand_id: f.catalog.brandId, format_id: format.data.id, name: "Second package",
+  }).select("id").single();
+  if (sku.error) throw sku.error;
+  await runCommand("update_packaging_run", {
+    runId: f.run.id, outputs: [{ skuId: f.catalog.skuId, qtyPlanned: 100 }, { skuId: sku.data.id, qtyPlanned: 10 }],
+  }, f.ctx);
+  const plan = await runCommand("get_packaging_close_plan", { runId: f.run.id }, f.ctx) as { revision: string };
+  await runCommand("close_packaging_run", {
+    ...f.input, planRevision: plan.revision, bblDrawn: 0.11,
+    outputs: [{ skuId: f.catalog.skuId, qtyActual: 100 }, { skuId: sku.data.id, qtyActual: 10 }],
+  }, f.ctx);
+  const input = { ...correctedOutputs(f), outputs: [{ skuId: f.catalog.skuId, qtyActual: 80.004 }] };
+  const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+  const corrected = await runCommand("correct_packaging_run_outputs", input, f.ctx, execution) as {
+    correction: { id: string; replacement_outputs: { sku_id: string; qty_actual: number }[] };
+  };
+  const applied = (await admin.from("packaging_run_outputs").select("sku_id,qty_actual").eq("run_id", f.run.id).order("sku_id")).data;
+  const expected = [{ sku_id: f.catalog.skuId, qty_actual: 80 }, { sku_id: sku.data.id, qty_actual: 0 }]
+    .sort((a, b) => a.sku_id.localeCompare(b.sku_id));
+  expect(applied).toEqual(expected);
+  expect(corrected.correction.replacement_outputs).toEqual(expected);
+  expect(await runCommand("correct_packaging_run_outputs", input, f.ctx, execution)).toEqual(corrected);
+  await expect(runCommand("correct_packaging_run_outputs", {
+    ...input, outputs: [{ skuId: f.catalog.skuId, qtyActual: 80 }],
+  }, f.ctx, execution)).rejects.toMatchObject({ code: "conflict" });
+  const zero = await runCommand("correct_packaging_run_outputs", {
+    ...input, previousCorrectionId: corrected.correction.id, bblDrawn: 0, outputs: [],
+  }, f.ctx) as { correction: { id: string; replacement_outputs: { sku_id: string; qty_actual: number }[] } };
+  expect(zero.correction.replacement_outputs).toEqual(expected.map(row => ({ ...row, qty_actual: 0 })));
+  const history = await runCommand("get_packaging_output_corrections", { runId: f.run.id }, f.ctx) as {
+    corrections: { id: string; replacement_outputs: { sku_id: string; qty_actual: number }[] }[];
+  };
+  expect(history.corrections.find(row => row.id === corrected.correction.id)?.replacement_outputs).toEqual(expected);
+  expect((await runCommand("get_batch_completion_preview", { batchId: f.batch.id }, f.ctx) as { packagedBbl: number }).packagedBbl).toBe(0);
+});
+
 it("requires the current output revision and supports zero output followed by another correction", async () => {
   const f = await fixture();
   await runCommand("close_packaging_run", f.input, f.ctx);
