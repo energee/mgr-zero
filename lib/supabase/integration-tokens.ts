@@ -5,6 +5,7 @@ import { canRun, CommandError, unwrap, type Ctx } from "@/lib/commands/registry"
 import { isUuid } from "@/lib/commands/context";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
+import type { QboTokens, QboTaxInput } from "@/lib/qbo";
 
 export type IntegrationProvider = "qbo" | "square";
 
@@ -585,21 +586,31 @@ export async function disconnectSquare(ctx: Ctx, connectionId: string, revoke: (
   return finished as { disconnected: true; remoteRevocationState: "confirmed" | "unresolved" };
 }
 
-export async function markQboAuthorizationFailed(ctx: Ctx, expected: VersionedIntegrationTokens, invoiceId?: string) {
-  const { error } = await createAdminClient().rpc("mark_qbo_authorization_failed", {
+export async function markQboAuthorizationFailed(ctx: Ctx, expected: VersionedIntegrationTokens, invoiceId?: string, quoteId?: string, quoteLease?: string) {
+  const args = {
     p_brewery: ctx.breweryId, p_connection: expected.connectionId, p_actor: ctx.userId,
-    p_expected_version: expected.credentialVersion, p_customer: ctx.customerId ?? null, p_invoice: invoiceId ?? null,
-  });
+    p_expected_version: expected.credentialVersion,
+  };
+  const { error } = quoteId
+    ? await createAdminClient().rpc("mark_portal_quote_tax_authorization_failed", {
+      ...args, p_customer: ctx.customerId!, p_quote: quoteId, p_lease: quoteLease,
+    })
+    : await createAdminClient().rpc("mark_qbo_authorization_failed", {
+      ...args, p_customer: ctx.customerId ?? null, p_invoice: invoiceId ?? null,
+    });
   if (error) throw new Error("QuickBooks authorization health could not be updated");
 }
 
-export async function compareAndSwapQboTokens(ctx: Ctx, expected: VersionedIntegrationTokens, next: import("@/lib/qbo").QboTokens) {
-  const { data, error } = await createAdminClient().rpc("cas_integration_tokens", {
-    p_brewery: ctx.breweryId, p_provider: "qbo", p_connection: expected.connectionId, p_actor: ctx.userId,
+export async function compareAndSwapQboTokens(ctx: Ctx, expected: VersionedIntegrationTokens, next: QboTokens, quoteId?: string, quoteLease?: string) {
+  const args = {
+    p_brewery: ctx.breweryId, p_connection: expected.connectionId, p_actor: ctx.userId,
     p_expected_version: expected.credentialVersion, p_access_token: next.accessToken, p_refresh_token: next.refreshToken,
     p_received_at: next.receivedAt,
     p_access_seconds: next.accessExpiresIn, p_refresh_seconds: next.refreshExpiresIn, p_hard_seconds: next.refreshHardExpiresIn,
-  });
+  };
+  const { data, error } = quoteId
+    ? await createAdminClient().rpc("cas_portal_quote_tax_tokens", { ...args, p_customer: ctx.customerId!, p_quote: quoteId, p_lease: quoteLease! })
+    : await createAdminClient().rpc("cas_integration_tokens", { ...args, p_provider: "qbo" });
   if (error) throw new Error("QuickBooks token refresh storage failed");
   if (data !== true) throw new CommandError("QuickBooks connection changed; retry with the current connection", 409, "conflict");
 }
@@ -610,14 +621,16 @@ export async function compareAndSwapQboTokens(ctx: Ctx, expected: VersionedInteg
  * "superseded": newer credentials are stored; re-read them instead of refreshing.
  * "unavailable": the connection is no longer connected or this actor may not
  * store a refresh, so the caller must not send the refresh token to Intuit.
- * A portal caller passes the invoice whose payment claim authorizes it.
+ * A portal caller passes the invoice or quote whose live claim authorizes it.
  */
-export async function leaseQboTokenRefresh(ctx: Ctx, expected: VersionedIntegrationTokens, lease: string, invoiceId?: string) {
-  const { data, error } = await createAdminClient().rpc("lease_qbo_token_refresh", {
+export async function leaseQboTokenRefresh(ctx: Ctx, expected: VersionedIntegrationTokens, lease: string, invoiceId?: string, quoteId?: string) {
+  const args = {
     p_brewery: ctx.breweryId, p_connection: expected.connectionId, p_actor: ctx.userId,
     p_expected_version: expected.credentialVersion, p_lease: lease,
-    p_customer: ctx.customerId ?? undefined, p_invoice: invoiceId,
-  });
+  };
+  const { data, error } = quoteId
+    ? await createAdminClient().rpc("lease_portal_quote_tax_refresh", { ...args, p_customer: ctx.customerId!, p_quote: quoteId })
+    : await createAdminClient().rpc("lease_qbo_token_refresh", { ...args, p_customer: ctx.customerId ?? undefined, p_invoice: invoiceId });
   if (error || (data !== "leased" && data !== "held" && data !== "superseded" && data !== "unavailable")) {
     throw new Error("QuickBooks refresh lease is unavailable");
   }
@@ -784,17 +797,33 @@ export async function completeQboInvoiceSync(ctx: Ctx, input: {
   return data as QboInvoiceSyncResult;
 }
 
-export async function readPortalQuoteTax(ctx: Ctx, quoteId: string) {
+/**
+ * A live buyer quote's tax input with the credential it was read under, or
+ * null when the quote has no tax to calculate. The credential version lets a
+ * 401 refresh exactly that credential, so overlapping quotes refresh once.
+ */
+export async function readPortalQuoteTax(ctx: Ctx, quoteId: string): Promise<(VersionedIntegrationTokens & { input: QboTaxInput }) | null> {
   if (!ctx.customerId) throw new CommandError("not a portal customer", 403);
-  const { data, error } = await createAdminClient().rpc("read_portal_quote_tax", {
+  const { data, error } = await createAdminClient().rpc("read_portal_quote_tax_tokens", {
     p_brewery: ctx.breweryId, p_customer: ctx.customerId, p_quote: quoteId, p_actor: ctx.userId,
   }).maybeSingle();
   if (error) throw new Error("Portal quote tax lookup failed");
   if (!data) return null;
-  const row = data as { connection_id?: unknown; access_token?: unknown; tax_input?: unknown };
-  if (typeof row.connection_id !== "string" || typeof row.access_token !== "string"
-    || !row.tax_input || typeof row.tax_input !== "object") throw new Error("Portal quote tax response was invalid");
-  return { connectionId: row.connection_id, accessToken: row.access_token, input: row.tax_input as import("@/lib/qbo").QboTaxInput };
+  if (!isTokenRow(data) || typeof data.connection_id !== "string"
+    || !data.tax_input || typeof data.tax_input !== "object") throw new Error("Portal quote tax response was invalid");
+  return {
+    connectionId: data.connection_id, accessToken: data.access_token, refreshToken: data.refresh_token,
+    credentialVersion: data.credential_version, accessExpiresAt: data.access_expires_at,
+    refreshExpiresAt: data.refresh_expires_at, refreshHardExpiresAt: data.refresh_hard_expires_at,
+    input: data.tax_input as QboTaxInput,
+  };
+}
+
+/** The live quote's credential for a refresh; a quote that is no longer live has none. */
+export async function readPortalQuoteTaxTokens(ctx: Ctx, quoteId: string): Promise<VersionedIntegrationTokens> {
+  const claim = await readPortalQuoteTax(ctx, quoteId);
+  if (!claim) throw new Error("QuickBooks tax credentials unavailable");
+  return claim;
 }
 
 export async function finishPortalQuoteTax(ctx: Ctx, quoteId: string, connectionId: string, taxCents: number) {

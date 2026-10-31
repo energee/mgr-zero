@@ -309,15 +309,23 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
       ...lines.filter((l) => l.one_way_fee_cents).map((l) => ({ key: `fee-${l.id}`, name: `One-way keg fee · ${l.skus?.name ?? "Line"}`,
         detail: `${Number(l.qty_ordered)} × ${money(l.one_way_fee_cents!)} · captured on the order`, amount: money(orderLineCents(l.qty_ordered, l.one_way_fee_cents!)) })),
     ],
-    events: events.map((e) => ({
-      key: e.id,
-      at: formatDateTime(e.created_at, timeZone),
-      event: titled(e.event.replace(/_/g, " ")),
-      ...(actorNames ? { by: actorNames[e.actor] ?? "a user not on the team" } : {}),
-      detail: e.event === "lines_adjusted"
-        ? `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${typeof e.payload.reason === "string" && e.payload.reason.trim() ? ` (${e.payload.reason.trim()})` : ""}`
-        : e.event === "reorder_created" ? docNo("ORD", typeof e.payload.order_no === "number" ? e.payload.order_no : null, "Draft")
-        : typeof e.payload.reason === "string" ? e.payload.reason.trim() : "",
-    })),
+    events: events.map((e) => {
+      const reason = typeof e.payload.reason === "string" ? e.payload.reason.trim() : "";
+      let detail = reason;
+      if (e.event === "lines_adjusted") {
+        detail = `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${reason ? ` (${reason})` : ""}`;
+      } else if (e.event === "pickup_changed") {
+        detail = e.payload.pickup ? "Delivery to pickup" : "Pickup to delivery";
+      } else if (e.event === "reorder_created") {
+        detail = docNo("ORD", typeof e.payload.order_no === "number" ? e.payload.order_no : null, "Draft");
+      }
+      return {
+        key: e.id,
+        at: formatDateTime(e.created_at, timeZone),
+        event: titled(e.event.replace(/_/g, " ")),
+        ...(actorNames ? { by: actorNames[e.actor] ?? "a user not on the team" } : {}),
+        detail,
+      };
+    }),
   };
 }

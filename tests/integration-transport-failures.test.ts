@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CommandError, type Ctx } from "@/lib/commands/registry";
 import "@/lib/commands/qbo";
 import type * as IntegrationTokens from "@/lib/supabase/integration-tokens";
-const boundary = vi.hoisted(() => ({ tokens: vi.fn(), recordBill: vi.fn(), beginPublication: vi.fn(), leasePublication: vi.fn(), finishPublication: vi.fn(), readTax: vi.fn() }));
+const boundary = vi.hoisted(() => ({ tokens: vi.fn(), recordBill: vi.fn(), beginPublication: vi.fn(), leasePublication: vi.fn(), finishPublication: vi.fn(), readTax: vi.fn(), finishTax: vi.fn() }));
 vi.mock("@/lib/supabase/integration-tokens", async (original) => ({
   ...await original<typeof IntegrationTokens>(),
   readVersionedIntegrationTokens: boundary.tokens, finishQboReceiptBill: boundary.recordBill,
   beginSquarePublication: boundary.beginPublication, leaseSquarePublication: boundary.leasePublication, finishSquarePublication: boundary.finishPublication,
-  readPortalQuoteTax: boundary.readTax,
+  readPortalQuoteTax: boundary.readTax, finishPortalQuoteTax: boundary.finishTax,
 }));
 import { completeSquareOAuth, publishSquareCatalogItem, SquareClient, type SquarePublicationSource } from "@/lib/pos";
 import { postReceiptBill, QboOAuthClient } from "@/lib/qbo";
@@ -108,10 +108,24 @@ describe("integration transport failure boundaries", () => {
     const failure = new Error("Portal quote tax lookup failed");
     dbRpc.mockResolvedValue({ data: { taxReady: true, quoteId: crypto.randomUUID(), taxStatus: "pending" }, error: null });
     boundary.readTax.mockRejectedValue(failure);
-    const client = { calculateSalesTax: vi.fn() };
+    const client = new QboOAuthClient(qboConfig, vi.fn());
+    const calculate = vi.spyOn(client, "calculateSalesTax");
     await expect(quotePortalOrder({ ...ctx, roles: ["customer"], customerId: crypto.randomUUID() }, {
       shipToId: crypto.randomUUID(), lines: [{ skuId: crypto.randomUUID(), qty: 1 }],
     }, requestId, client)).rejects.toBe(failure);
-    expect(client.calculateSalesTax).not.toHaveBeenCalled();
+    expect(calculate).not.toHaveBeenCalled();
+  });
+  it("surfaces a quote tax store failure instead of returning a tax-pending answer", async () => {
+    const failure = new Error("quote tax reconciliation is unavailable");
+    const quoteId = crypto.randomUUID();
+    dbRpc.mockResolvedValue({ data: { taxReady: true, quoteId, taxStatus: "pending" }, error: null });
+    boundary.readTax.mockResolvedValue({ connectionId, accessToken: "access", input: {} });
+    boundary.finishTax.mockRejectedValue(failure);
+    const client = new QboOAuthClient(qboConfig, vi.fn());
+    vi.spyOn(client, "calculateSalesTax").mockResolvedValue(100);
+    await expect(quotePortalOrder({ ...ctx, roles: ["customer"], customerId: crypto.randomUUID() }, {
+      shipToId: crypto.randomUUID(), lines: [{ skuId: crypto.randomUUID(), qty: 1 }],
+    }, requestId, client)).rejects.toBe(failure);
+    expect(boundary.finishTax).toHaveBeenCalledWith(expect.anything(), quoteId, connectionId, 100);
   });
 });

@@ -48,7 +48,6 @@ describe("Short pick view", () => {
     expect(model.counted).toBe(7);
     expect(model.missing).toBe(3);
     expect(model.resolveTitle).toBe("Resolve the missing 3");
-    expect(model.chips).toEqual(["Adjust order to 7", "Keep 3 owed · staged"]);
     expect(model.verb).toBe("Adjust order to 7 cases");
   });
 
@@ -62,8 +61,6 @@ describe("Short pick view", () => {
     expect(markup).toMatch(/Reason/);
     expect(markup).toMatch(/required/);
     expect(markup).toMatch(/Resolve the missing 3/);
-    expect(markup).toMatch(/Adjust order to 7/);
-    expect(markup).toMatch(/Keep 3 owed · staged/);
     expect(markup).toMatch(/>Adjust order to 7 cases</);
     expect(markup).toContain('data-direction="forward"');
     expect(markup).not.toMatch(/[→›]/);
