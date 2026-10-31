@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { admin, asUser, insertFixture, makeBrewery, makeStaff, seedCatalog, seedLocation, sql } from "./helpers";
 
 type PlanNode = {
@@ -67,6 +67,15 @@ describe("filtered stock reads on a 50,000-movement ledger", () => {
     expect(allocations.error).toBeNull();
     sql("analyze public.inventory_movements; analyze public.allocations", true);
   }, 120_000);
+
+  // The shared test database resets only when migrations change, so the bulk
+  // ledger would otherwise grow by 50,000 rows on every run.
+  afterAll(() => {
+    sql(`delete from public.inventory_movements
+      where sku_id in (select id from public.skus where brewery_id = '${brewery.id}' and name = 'Bulk');
+      delete from public.skus where brewery_id = '${brewery.id}' and name = 'Bulk';
+      delete from public.brands where brewery_id = '${brewery.id}' and name like 'Bulk %'`, true);
+  }, 60_000);
 
   it("preserves location totals, zero balances and reservations without movements", async () => {
     const stock = await db.from("on_hand").select("location_id, qty", { count: "exact" })
