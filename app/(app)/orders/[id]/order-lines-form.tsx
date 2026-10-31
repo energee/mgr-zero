@@ -89,14 +89,17 @@ export function OrderLinesEditor({ orderId, lines, editable, skus, warnings, onS
 }) {
   const edit = useLineQuantities(orderId, lines, onSaved);
   const pickupAction = useCommandAction();
+  // Held here and flipped on success: busy clears before the save's refresh
+  // lands, and a click in that window must send the new value, not the old prop.
+  const [pickupOn, setPickupOn] = useState(pickup?.value ?? false);
   const shown = { ...model, lines: model.lines.filter((l) => !edit.removed.includes(l.key)) };
   const lineActions = edit.changed ? <SaveLinesActions edit={edit} />
     : warnings.length > 0 ? <AtpWarnings warnings={warnings} skuNames={new Map(skus.map((sku) => [sku.id, sku.label]))} saved="Lines saved." />
     : undefined;
   return <form className="contents" onSubmit={edit.onSubmit}>
     <OrderView {...view} model={shown} quantities={edit.qtys} onQuantity={editable ? edit.setQty : undefined}
-      pickup={pickup ? { ...pickup, busy: pickupAction.busy, error: pickupAction.error,
-        onChange: (value) => { void pickupAction.run("set_order_pickup", { orderId, pickup: value }); } } : undefined}
+      pickup={pickup ? { value: pickupOn, busy: pickupAction.busy, error: pickupAction.error,
+        onChange: (value) => { void pickupAction.run("set_order_pickup", { orderId, pickup: value }, () => setPickupOn(value)); } } : undefined}
       lineEdit={editable ? { skus, added: edit.added, onAdd: edit.addLine, onSku: edit.setSku, onRemove: edit.removeLine } : undefined}
       reason={edit.reason} onReason={edit.changed ? edit.setReason : undefined} lineActions={lineActions} />
   </form>;
