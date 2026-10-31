@@ -5157,6 +5157,9 @@ isOneToOne: false
 "get_chat_settings_installation":
 { Args: { "p_actor": string,"p_brewery": string,"p_installation": string }; Returns: Json
                            },
+"get_keg_report_aging":
+{ Args: { "p_brewery": string }; Returns: Json
+                           },
 "get_loss_review":
 { Args: { "p_brewery": string,"p_end": string,"p_start": string }; Returns: Json
                            },
