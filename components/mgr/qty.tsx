@@ -1,5 +1,7 @@
-// A labeled quantity and segmented control, composed by VolumeField.
-// Price groups use TabBar directly for their channel tabs.
+// components/mgr/qty.tsx — shared quantity controls and segmented tabs.
+// Views import Qty directly for a labeled quantity with a unit addon.
+// VolumeField composes Qty with TabBar for its unit choice; E.edit and E.stq
+// use StepQuantity. Price groups import TabBar directly for channel tabs.
 "use client";
 import type { FieldControls } from "@/components/mgr/e";
 import { numberNotationError, stepQuantity } from "@/lib/mgr/quantity-input";
@@ -11,7 +13,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useEffect, useId, useRef, useState, type AriaAttributes, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
 
 /** Keep the lexical error on the input as well as on screen, including uncontrolled fixtures. */
 function useNumberNotation(input: RefObject<HTMLInputElement | null>, value: string | undefined, initialValue = "") {
@@ -52,30 +54,24 @@ export function StepQuantity({ label, value, defaultValue, onChange, contextualL
   </ButtonGroup>{notationError && <FieldError id={notation.errorId}>{notationError}</FieldError>}</div>;
 }
 
-/** A typed quantity whose visible label is tied to its input by a generated id. */
+/** A typed quantity under its visible label: the OS keyboard is the keypad, so
+ *  nothing here draws one. The label's generated id ties it to the input, so
+ *  the visible text is the input's accessible name (#1115). The label is
+ *  always shown. The field draws its own number-notation error under the input. */
 export function Qty({
   value,
   onChange,
   unit,
   label,
-  id,
-  invalid,
-  describedBy,
 }: {
   value: string;
   onChange?: (value: string) => void;
   unit?: ReactNode;
   label: string;
-  id?: string;
-  /** The caller's validation state, alongside local number-notation validation. */
-  invalid?: AriaAttributes["aria-invalid"];
-  describedBy?: string;
 }) {
-  const generatedId = useId();
-  const inputId = id ?? generatedId;
+  const inputId = useId();
   const input = useRef<HTMLInputElement>(null);
   const notation = useNumberNotation(input, onChange ? value : undefined, value);
-  const notationError = invalid ? undefined : notation.error;
   return (
     <Field>
       <FieldLabel htmlFor={inputId}>{label}</FieldLabel>
@@ -84,7 +80,7 @@ export function Qty({
           the field's own border instead of letting it spill past. A clip, not a
           scroll: a unit set that outgrows the field puts an option out of reach. */}
       <InputGroup className="overflow-hidden">
-        {/* eslint-disable-next-line no-restricted-syntax -- Shared E volume primitive; native spinners are hidden. */}
+        {/* eslint-disable-next-line no-restricted-syntax -- Shared quantity primitive; native spinners are hidden. */}
         <InputGroupInput
           id={inputId}
           ref={input}
@@ -94,8 +90,8 @@ export function Qty({
           value={onChange ? value : undefined}
           defaultValue={onChange ? undefined : value}
           onChange={(event) => { notation.changed(event.target.value); onChange?.(event.target.value); }}
-          aria-invalid={Boolean(notation.error) || invalid}
-          aria-describedby={[describedBy, notationError ? notation.errorId : undefined].filter(Boolean).join(" ") || undefined}
+          aria-invalid={Boolean(notation.error) || undefined}
+          aria-describedby={notation.error ? notation.errorId : undefined}
           className="text-2xl font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
         {/* pr-0 for a unit switcher: a TabsList insets itself (p-[3px]), so the
@@ -104,7 +100,7 @@ export function Qty({
             inset of its own and keeps the padding. */}
         {unit ? <InputGroupAddon align="inline-end" className="has-[>[data-slot=tabs]]:pr-0">{unit}</InputGroupAddon> : null}
       </InputGroup>
-      {notationError && <FieldError id={notation.errorId}>{notationError}</FieldError>}
+      {notation.error && <FieldError id={notation.errorId}>{notation.error}</FieldError>}
     </Field>
   );
 }

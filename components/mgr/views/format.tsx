@@ -11,8 +11,6 @@ import { VolumeField } from "@/components/mgr/volume-field";
 import { type formatControls, formatSizing, type FormatViewModel } from "@/lib/mgr/format-view";
 import { validFormatRows } from "@/lib/format-edit-rules";
 
-export type { FormatViewModel };
-
 type Controls = Partial<ReturnType<typeof formatControls>>;
 const NO_ROWS: FormatRow[] = [{ id: "", qty: "1" }];
 

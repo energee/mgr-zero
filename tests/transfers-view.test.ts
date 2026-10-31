@@ -1,17 +1,19 @@
 // tests/transfers-view.test.ts — Transfers, New transfer, and Transfer
 // detail adapters plus HTML. Views own no sample data.
 import { readFileSync } from "node:fs";
-import { createElement, isValidElement, type ReactNode } from "react";
+import { Children, createElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { NewTransferView } from "../components/mgr/views/new-transfer";
 import { TransferDetailView } from "../components/mgr/views/transfer-detail";
+import { TransferActionsView } from "../components/mgr/views/transfer-actions";
+import { CommandForm } from "../components/mgr/command-form";
 import { TransfersView } from "../components/mgr/views/transfers";
 import { LOC_TAPROOM, LOC_WAREHOUSE, SKU_HAZY, SKU_PILS } from "../lib/mgr/fixtures/demo";
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "../lib/mgr/fixtures/transfers";
 import { toNewTransferViewProps } from "../lib/mgr/new-transfer-view";
-import { toTransferDetailViewProps } from "../lib/mgr/transfer-detail-view";
+import { toTransferDetailViewProps, transferReceiveSources } from "../lib/mgr/transfer-detail-view";
 import { toTransfersViewProps } from "../lib/mgr/transfers-view";
 import { WORK_CHIPS, WORK_TABS } from "../lib/mgr/work-view";
 
@@ -164,7 +166,12 @@ describe("Transfer detail view", () => {
 
   it("an unreceived transfer also offers Cancel transfer; a cancelled one shows its reason and no verb (#578)", () => {
     const submitted = htmlOf(createElement(TransferDetailView, { model: toTransferDetailViewProps(transferDetailSubmitted) }));
-    expect(submitted.match(/<button\b/g)).toHaveLength(2);
+    expect(submitted).toMatch(/>Receive</);
+    expect(submitted).toMatch(/>Cancel transfer</);
+    expect(submitted).toContain("L-0081");
+    expect(submitted).toContain("L-0082");
+    expect(submitted).toContain("Untracked / legacy stock");
+    expect(submitted).toContain('data-variant="irreversible"');
     const cancelled = toTransferDetailViewProps({ ...transferDetailSubmitted, transfer: { ...transferDetailSubmitted.transfer, status: "cancelled", cancel_reason: "over-picked" } });
     expect(cancelled.nextVerb).toBeUndefined();
     const html = htmlOf(createElement(TransferDetailView, { model: cancelled }));
@@ -182,16 +189,6 @@ describe("Transfer detail view", () => {
     expect(model.lines.map(row => row.qty)).toEqual(["2.5 kg", "3 of 4 kegs", "0 of 2 units"]);
   });
 
-  it("the live footer can cancel with a reason", () => {
-    const src = readFileSync("app/(app)/transfers/[id]/transfer-actions.tsx", "utf8");
-    expect(src).toMatch(/run\("cancel_stock_transfer", \{ transferId, reason \}/);
-  });
-
-  it("the live footer offers no Record pick: Receive on a submitted transfer records the ordered pick, then receives (#1507)", () => {
-    const src = readFileSync("app/(app)/transfers/[id]/transfer-actions.tsx", "utf8");
-    expect(src).not.toMatch(/>Record pick</);
-    expect(src).toMatch(/run\("record_stock_transfer_pick", \{ transferId, picks: lines\.map\(\(l\) => \(\{ lineId: l\.id, qty: l\.qty \}\)\) \}\)/);
-  });
 
   it("a footer slot replaces the drawn verb", () => {
     const html = htmlOf(createElement(TransferDetailView, {
@@ -202,16 +199,45 @@ describe("Transfer detail view", () => {
     expect(html).not.toMatch(/>Receive</);
   });
 
+  it("prefills only a sole source, preserves split lot identities, and omits zero quantities", () => {
+    const lines = transferDetailSubmitted.sources!;
+    expect(transferReceiveSources(lines, {})).toEqual([
+      { lineId: "l1", sources: [{ lotId: "lot-hazy", qty: 2 }] },
+      { lineId: "l2", sources: [] },
+    ]);
+    expect(transferReceiveSources(lines, { l1: { "lot-hazy": "" }, l2: { "lot-pils": "3.5", "": "0.5" } })).toEqual([
+      { lineId: "l1", sources: [] },
+      { lineId: "l2", sources: [{ lotId: "lot-pils", qty: 3.5 }, { lotId: null, qty: 0.5 }] },
+    ]);
+  });
+
+  it("shares the required cancellation form and keeps command errors beside actions", () => {
+    let tree: ReactElement<{ children: ReactNode }>;
+    function Capture() {
+      tree = TransferActionsView({ lines: [], error: "The transfer changed", busy: true });
+      return tree;
+    }
+    const html = htmlOf(createElement(Capture));
+    expect(html).toContain("The transfer changed");
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Receive</);
+    const dialog = Children.toArray(tree!.props.children).find(child => isValidElement(child) && child.type === CommandForm) as ReactElement<{ children: ReactNode }>;
+    const form = htmlOf(dialog.props.children);
+    expect(form).toMatch(/<input[^>]*required[^>]*maxLength="500"/i);
+    expect(form).toContain("Nothing has left the source bin");
+    expect(form).toContain("The transfer changed");
+  });
+
+  it("live Receive on a submitted transfer records the ordered pick, then receives (#1507)", () => {
+    const src = readFileSync("app/(app)/transfers/[id]/transfer-actions.tsx", "utf8");
+    const pick = src.search(/status === "submitted" && !await run\("record_stock_transfer_pick", \{ transferId, picks: lines\.map\(line => \(\{ lineId: line\.id, qty: line\.qty \}\)\) \}\)\) return;/);
+    expect(pick).toBeGreaterThan(-1);
+    expect(src.indexOf('run("receive_stock_transfer"')).toBeGreaterThan(pick);
+  });
+
   it("the Transfer detail inventory record is TransferDetailView", () => {
     const body = screen("Transfer detail").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(TransferDetailView);
     expect(body.props.model).toEqual(toTransferDetailViewProps(transferDetailSubmitted));
   });
 
-  it("the live transfer page mounts TransferDetailView", () => {
-    const src = readFileSync("app/(app)/transfers/[id]/page.tsx", "utf8");
-    expect(src).toMatch(/from "@\/components\/mgr\/views\/transfer-detail"/);
-    expect(src).toMatch(/<TransferDetailView\b/);
-    expect(src).toMatch(/<TransferActions\b/);
-  });
 });

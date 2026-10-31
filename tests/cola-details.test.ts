@@ -10,9 +10,9 @@ vi.mock("@/lib/ttb/colas", async (original) => ({
   ...(await original<typeof ColaClient>()), getColaDetails: vi.fn(), getColaImage: vi.fn(),
 }));
 
-const ttbId = "23023001000185";
-const url = "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Array.jpg&filetype=l";
-const details: ColaDetails = { ttbId, permit: "BR-PA-20553", status: "APPROVED", approvedOn: "2023-01-24", images: [{ url, label: "Brand (front) or keg collar" }] };
+const ttbId = "99001001000001";
+const url = "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=SampleLabel.jpg&filetype=l";
+const details: ColaDetails = { ttbId, permit: "BR-PA-12345", status: "APPROVED", approvedOn: "2023-01-24", images: [{ url, label: "Brand (front) or keg collar" }] };
 beforeEach(() => vi.clearAllMocks());
 
 async function breweryWithPermit() {
@@ -85,7 +85,7 @@ describe("get_cola_image", () => {
     vi.mocked(getColaImage).mockResolvedValueOnce({ dataUrl: "data:image/jpeg;base64,/9j/2Q==" });
     expect(await runCommand("get_cola_image", { ttbId, url }, staff)).toMatchObject({ dataUrl: expect.stringContaining("data:image/jpeg") });
     expect(getColaImage).toHaveBeenCalledWith(ttbId, url, details.permit);
-    await expect(runCommand("get_cola_image", { ttbId, url: url.replace("Array.jpg", "Other.jpg") }, staff)).rejects.toMatchObject({ status: 404 });
+    await expect(runCommand("get_cola_image", { ttbId, url: url.replace("SampleLabel.jpg", "Other.jpg") }, staff)).rejects.toMatchObject({ status: 404 });
     const other = await breweryWithPermit();
     await expect(runCommand("get_cola_image", { ttbId, url }, await makeStaffCtx(other.id, role))).rejects.toMatchObject({ status: 404 });
   });

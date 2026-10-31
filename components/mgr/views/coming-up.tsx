@@ -4,8 +4,6 @@ import { Fragment } from "react";
 import { E } from "@/components/mgr/e";
 import type { ComingUpViewModel } from "@/lib/mgr/coming-up-view";
 
-export type { ComingUpViewModel };
-
 export function ComingUpView({ model, linkRows }: { model: ComingUpViewModel; linkRows?: boolean }) {
   return (
     <>

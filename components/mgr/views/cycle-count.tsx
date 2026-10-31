@@ -9,8 +9,6 @@ import { Qty, TabBar } from "@/components/mgr/qty";
 import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import type { CycleCountViewModel } from "@/lib/mgr/cycle-count-view";
 
-export type { CycleCountViewModel };
-
 export function CycleCountFooter({ retry = false, ...props }: { formId?: string; submitting?: boolean; disabled?: boolean; retry?: boolean }) {
   return <IrreversibleSubmit label={retry ? "Retry unchanged count" : "Record count"} busy="Recording…" {...props} />;
 }

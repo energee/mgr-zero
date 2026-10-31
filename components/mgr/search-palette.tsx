@@ -1,12 +1,11 @@
-// components/mgr/search-palette.tsx — the live Search sheet and Entity picker:
-// one field over the registered search_entities query, results grouped by
-// kind, arrow keys between matches, Enter or a tap opens the hit. `kinds`
-// narrows it to a picker (SKUs only); `onPick` turns a hit into a choice
-// instead of a navigation. The explorer's fixture palette stays palette.tsx.
+// components/mgr/search-palette.tsx — the live Search sheet: role-visible pages
+// and registered search_entities results, grouped by kind. Arrow keys move
+// between matches; Enter or a tap opens the destination. SearchView also draws
+// the explorer's fixture palette.
 "use client";
 
 import { useRouter } from "next/navigation";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,7 +16,7 @@ import { useBrewery } from "@/lib/brewery-provider";
 import { command } from "@/lib/commands/client";
 import type { StaffRole } from "@/lib/commands/registry";
 import type { SearchHit, SearchKind } from "@/lib/commands/search";
-import { excludeSeen, restrictToOptions, searchCacheKey, searchDestinations, searchEmptyMessage, searchLoading, type SearchStatus } from "@/lib/mgr/search-palette-state";
+import { searchCacheKey, searchDestinations, searchEmptyMessage, searchLoading, type SearchStatus } from "@/lib/mgr/search-palette-state";
 
 const HEADING: Record<SearchKind, string> = {
   sku: "SKUs", order: "Orders", invoice: "Invoices", material_lot: "Ingredient lots", lot: "Lots", customer: "Customers", po: "Purchase orders", batch: "Batches",
@@ -34,31 +33,40 @@ export function SearchCacheProvider({ children }: { children: React.ReactNode })
   return <SearchCache.Provider value={cache}>{children}</SearchCache.Provider>;
 }
 
-export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHits, heading, sub, roles, onNavigate }: { roles?: readonly StaffRole[]; onNavigate?: (href: string) => void; placeholder?: string; kinds?: SearchKind[]; onPick?: (hit: SearchHit) => void; initialHits?: SearchHit[]; heading?: string; sub?: string }) {
+export function SearchSheet({ roles }: { roles: readonly StaffRole[] }) {
+  const [isOpen, setIsOpen] = useState(false);
   const breweryId = useBrewery();
   const cache = useContext(SearchCache)!;
   const router = useRouter();
-  const navigate = onNavigate ?? router.push;
   const [q, setQ] = useState("");
   // Associate results with their term so an in-flight query cannot show old matches.
   const [res, setRes] = useState<{ term: string; hits: SearchHit[] }>({ term: "", hits: [] });
   const [status, setStatus] = useState<SearchStatus>("idle");
   const [error, setError] = useState("");
   const term = q.trim();
-  // kinds is compared by identity, so an inline array from a caller would re-fire
-  // the debounce every render; the effect depends on its content instead.
-  const kindKey = kinds?.join(",") ?? "";
-  const recentKey = `mgr-search-recent:${breweryId}:${kindKey || "all"}`;
+  const recentKey = `mgr-search-recent:${breweryId}`;
   const [recent, setRecent] = useState<SearchHit[]>(() => cache.get(recentKey) ?? []);
+  const changeOpen = (open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+      setQ("");
+      setRes({ term: "", hits: [] });
+      setStatus("idle");
+      setError("");
+    }
+  };
+  const navigate = (href: string) => {
+    changeOpen(false);
+    router.push(href);
+  };
   useEffect(() => {
     if (!term) return;
     let live = true;
     const t = setTimeout(() => {
       setStatus("loading");
       setError("");
-      const kinds = kindKey ? kindKey.split(",") as SearchKind[] : undefined;
-      const cacheKey = searchCacheKey(breweryId, kinds, term);
-      command(breweryId, "search_entities", { q: term, kinds })
+      const cacheKey = searchCacheKey(breweryId, term);
+      command(breweryId, "search_entities", { q: term })
         .then((data) => {
           if (!live) return;
           const hits = data as SearchHit[];
@@ -75,22 +83,18 @@ export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHi
         });
     }, 200);
     return () => { live = false; clearTimeout(t); };
-  }, [term, kindKey, breweryId, cache]);
+  }, [term, breweryId, cache]);
   const loading = searchLoading(term, res.term, status);
   const currentStatus = !term ? "idle" : loading ? "loading" : status;
-  const visibleRecent = restrictToOptions(recent, initialHits);
-  const hits = loading || currentStatus === "error" ? [] : term
-    ? restrictToOptions(res.hits, initialHits)
-    : excludeSeen(initialHits ?? [], visibleRecent);
+  const hits = loading || currentStatus === "error" ? [] : res.hits;
   const open = (hit: SearchHit) => {
     const next = [hit, ...recent.filter((r) => r.kind !== hit.kind || r.id !== hit.id)].slice(0, 5);
     cache.set(recentKey, next);
     setRecent(next);
-    if (onPick) onPick(hit);
-    else navigate(hit.href);
+    navigate(hit.href);
   };
-  const pages = roles ? searchDestinations(roles, term) : [];
-  const shown = !term ? visibleRecent : hits;
+  const pages = searchDestinations(roles, term);
+  const shown = !term ? recent : hits;
   const byKey = new Map(shown.map(hit => [`${hit.kind}:${hit.id}`, hit]));
   const groups = Map.groupBy(shown, hit => !term ? "recent" : hit.kind);
   const viewGroups: SearchViewModel["groups"] = Array.from(groups, ([kind, items]) => ({
@@ -108,32 +112,14 @@ export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHi
     {currentStatus === "offline" && <p role="status" className="px-3 py-2 text-sm text-muted-foreground">Offline · {hits.length ? "cached matches only" : "no cached matches"}</p>}
     {currentStatus === "error" && <p role="alert" className="px-3 py-2 text-sm text-destructive">Search failed · {error}</p>}
   </>;
-  return <SearchView model={{ placeholder, heading, sub, groups: viewGroups }}
+  return <CommandForm open={isOpen} onOpenChange={changeOpen} title="Search" trigger={<Button variant="ghost" size="sm" aria-label="Search"><Icon icon={Search01Icon} />Search</Button>}>
+    <SearchView model={{ placeholder: "Search", groups: viewGroups }}
     value={q} onValueChange={setQ} shouldFilter={false} before={before}
-    emptyMessage={searchEmptyMessage(term, currentStatus, Boolean(roles))}
+    emptyMessage={searchEmptyMessage(term, currentStatus)}
     onSelect={key => {
       const page = pages.find(page => `page:${page.href}` === key);
       if (page) { navigate(page.href); return; }
       const hit = byKey.get(key); if (hit) open(hit);
-    }} />;
-}
-
-export function SearchSheet({ roles }: { roles: readonly StaffRole[] }) {
-  const [open, setOpen] = useState(false);
-  const router = useRouter();
-  return <CommandForm open={open} onOpenChange={setOpen} title="Search" trigger={<Button variant="ghost" size="sm" aria-label="Search"><Icon icon={Search01Icon} />Search</Button>}><SearchPalette roles={roles} onNavigate={(href) => { setOpen(false); router.push(href); }} /></CommandForm>;
-}
-
-export function SkuPicker({ value, options, onChange, label = "Select SKU" }: { value: string; options: { id: string; label: string }[]; onChange: (id: string) => void; label?: string }) {
-  const [open, setOpen] = useState(false);
-  const selected = options.find((option) => option.id === value);
-  const hits = useMemo<SearchHit[]>(
-    () => options.map((option) => ({ kind: "sku", id: option.id, label: option.label, detail: "SKU", href: "/catalog", exact: false })),
-    [options],
-  );
-  return (
-    <CommandForm open={open} onOpenChange={setOpen} title="Select SKU" trigger={<Button type="button" variant="outline" className="min-h-9 flex-1 justify-start font-normal">{selected?.label ?? label}</Button>}>
-      <SearchPalette placeholder="Search SKUs" kinds={["sku"]} initialHits={hits} onPick={(hit) => { onChange(hit.id); setOpen(false); }} />
-    </CommandForm>
-  );
+    }} />
+  </CommandForm>;
 }

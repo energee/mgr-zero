@@ -454,6 +454,9 @@ describe("portal commands", () => {
     const own = await seedCatalog(b.id, { product: "Badge", sku: "Badge" });
     const low = await seedCatalog(b.id, { product: "Badge low", sku: "Badge low" });
     const allocOnly = await seedCatalog(b.id, { product: "Badge alloc only", sku: "Badge alloc only" });
+    for (const catalog of [own, low, allocOnly]) {
+      await priceSku(b.id, { saleChannelId, brandId: catalog.brandId, formatId: catalog.formatId, cents: 3600 });
+    }
     const outsider = await seedCustomer((await makeBrewery()).id);
     const rows = sql(`begin;
       insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, bbl, type, created_by)

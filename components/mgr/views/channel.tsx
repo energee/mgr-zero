@@ -7,8 +7,6 @@ import type { ChannelViewModel } from "@/lib/mgr/channel-view";
 import { TAX_TREATMENTS, type TaxTreatment } from "@/lib/mgr/tax-treatments";
 import { submitReason } from "@/lib/mgr/submit-reason";
 
-export type { ChannelViewModel };
-
 export function ChannelView({
   model,
   controls = {},

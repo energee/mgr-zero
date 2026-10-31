@@ -20,7 +20,7 @@ type OpenRoute = { id: string; name: string | null; delivery_date: string; depar
 export type WorkRow = { kind: WorkKind; id: string; label: string; detail: string; href: string; verb: string; tone: "info" | "attention" | "success"; dueAt: string | null };
 
 const KIND: Record<TodayItem["reason"], WorkKind> = {
-  submitted_order: "orders", pick_due: "orders", ship_due: "orders", restock_due: "orders", delivery_next: "routes", refused_return: "routes", fermentation_reading_overdue: "batches", invoice_question: "orders",
+  submitted_order: "orders", pick_due: "orders", ship_due: "orders", restock_due: "orders", delivery_next: "routes", refused_return: "routes", refused_credit: "orders", fermentation_reading_overdue: "batches", invoice_question: "orders",
 };
 /** Each role's default Work chips; explicit chip choices are remembered on the client. */
 const DEFAULT_WORK_KINDS: Record<StaffRole, readonly WorkKind[]> = {

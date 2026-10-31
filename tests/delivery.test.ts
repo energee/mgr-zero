@@ -10,6 +10,8 @@ import { ConfirmDeliveryView } from "@/components/mgr/views/confirm-delivery";
 import type { ShipToSnapshot } from "@/lib/mgr/ship-to-view";
 import { DB, admin, channelId, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, priceSku, sql } from "./helpers";
 import { runCommand, type StaffRole } from "@/lib/commands/registry";
+import type { TodayItem } from "@/lib/commands/today";
+import type { WorkRow } from "@/lib/commands/landings";
 import "@/lib/commands/all";
 
 let b: { id: string };
@@ -484,6 +486,24 @@ describe("route edges", () => {
     const { data: billed } = await admin.from("invoice_lines").select("id, qty").eq("invoice_id", detail.invoice.id).eq("kind", "sku").single();
     expect(billed!.qty).toBe(4);
     expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, adminCtx)).toMatchObject([{ outstanding_qty: 2 }]);
+    const sales = await makeStaffCtx(b.id, "sales");
+    const warehouse = await makeStaffCtx(b.id, "warehouse");
+    const creditHref = `/invoices/${detail.invoice.id}/return?refusedDeliveryId=${stop!.id}`;
+    const refusalTask = async (ctx: typeof adminCtx) => (await runCommand("get_today", {}, ctx) as TodayItem[])
+      .filter(item => item.subjectId === stop!.id);
+    const expectedTask = {
+      reason: "refused_credit", subjectType: "delivery", subjectId: stop!.id,
+      href: creditHref,
+      recipientRoles: ["admin", "sales"], dueAt: null,
+    };
+    expect(await refusalTask(sales)).toEqual([expect.objectContaining(expectedTask)]);
+    expect(await refusalTask(adminCtx)).toEqual([expect.objectContaining(expectedTask)]);
+    expect(await refusalTask(warehouse)).toEqual([]);
+    expect(await runCommand("list_work", {}, sales)).toContainEqual(expect.objectContaining({
+      kind: "orders", id: stop!.id, href: creditHref,
+    }));
+    await runCommand("return_route", { routeId }, adminCtx);
+    expect(await refusalTask(sales)).toEqual([expect.objectContaining(expectedTask)]);
     // An accepted unit returned later is distinct from the two refused units.
     const acceptedInput = { invoiceId: detail.invoice.id, locationId: whId, reason: "unsold", lines: [{ invoiceLineId: billed!.id, qty: 1 }] };
     const acceptedRequest = crypto.randomUUID();
@@ -492,6 +512,7 @@ describe("route edges", () => {
     sql(`update private.command_requests set payload_hash=extensions.digest(jsonb_build_object('invoice','${detail.invoice.id}'::uuid,'lines',jsonb_build_array(jsonb_build_object('invoice_line_id','${billed!.id}','qty',1)),'location','${whId}'::uuid,'reason','unsold')::text,'sha256') where actor_id='${adminCtx.userId}' and request_id='${acceptedRequest}'`);
     expect(await runCommand("return_shipment", acceptedInput, adminCtx, { requestId: acceptedRequest, correlationId: acceptedRequest })).toEqual(acceptedResult);
     expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, adminCtx)).toMatchObject([{ outstanding_qty: 2 }]);
+    expect(await refusalTask(sales)).toEqual([expect.objectContaining(expectedTask)]);
     const input = { invoiceId: detail.invoice.id, refusedDeliveryId: stop!.id, locationId: whId, reason: "unsold", lines: [{ invoiceLineId: billed!.id, qty: 2 }] };
     await expect(runCommand("return_shipment", { ...input, refusedDeliveryId: crypto.randomUUID() }, adminCtx)).rejects.toThrow(/closed refused delivery/i);
     const otherShipment = await shipment(1, "now");
@@ -499,12 +520,17 @@ describe("route edges", () => {
     await expect(runCommand("return_shipment", { ...input, invoiceId: otherInvoice!.id }, adminCtx)).rejects.toThrow(/does not belong to this invoice/i);
     const foreignStaff = await makeStaffCtx((await makeBrewery()).id, "admin");
     await expect(runCommand("return_shipment", input, foreignStaff)).rejects.toThrow();
+    expect(await refusalTask(foreignStaff)).toEqual([]);
+    await expect(runCommand("return_shipment", input, warehouse)).rejects.toMatchObject({ status: 403, code: "permission_denied" });
     await expect(runCommand("return_shipment", { ...input, lines: [{ invoiceLineId: billed!.id, qty: 3 }] }, adminCtx)).rejects.toThrow(/outstanding refusal/i);
     const requestId = crypto.randomUUID();
-    const result = await runCommand("return_shipment", input, adminCtx, { requestId, correlationId: requestId });
-    expect(await runCommand("return_shipment", input, adminCtx, { requestId, correlationId: requestId })).toEqual(result);
-    await expect(runCommand("return_shipment", { ...input, refusedDeliveryId: undefined }, adminCtx, { requestId, correlationId: requestId })).rejects.toThrow(/different payload/i);
+    const result = await runCommand("return_shipment", input, sales, { requestId, correlationId: requestId });
+    expect(await runCommand("return_shipment", input, sales, { requestId, correlationId: requestId })).toEqual(result);
+    await expect(runCommand("return_shipment", { ...input, refusedDeliveryId: undefined }, sales, { requestId, correlationId: requestId })).rejects.toThrow(/different payload/i);
     expect(await runCommand("list_refused_returns", { deliveryId: stop!.id }, adminCtx)).toEqual([]);
+    expect(await refusalTask(sales)).toEqual([]);
+    expect(await refusalTask(adminCtx)).toEqual([]);
+    expect((await runCommand("list_work", {}, sales) as WorkRow[]).filter(row => row.href === creditHref)).toEqual([]);
   });
 
   it.each(["now", "on_delivery"] as const)("does not deadlock %s refusal check-in with an accepted return", async (invoiceTiming) => {

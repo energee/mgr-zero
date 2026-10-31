@@ -5,20 +5,17 @@
 // Target sizing under a coarse pointer lives in app/globals.css, so nothing
 // here sets heights. Views import shadcn parts from @/components/ui directly.
 // E holds only MGR vocabulary that adds behavior or domain meaning to them:
-// status tones, quantity and volume fields, searchPick, the irr/del button
-// kinds. Never add an E helper that only wraps a single shadcn part, and
+// status tones, numeric steppers, searchPick, and the irr/del button kinds.
+// Never add an E helper that only wraps a single shadcn part, and
 // retire an existing one when its callers are next touched (#909).
 import { DatePicker } from "@/components/mgr/date-picker";
 import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon";
-import { Palette, type PaletteGroup } from "@/components/mgr/palette";
-import { Qty, StepQuantity } from "@/components/mgr/qty";
+import { StepQuantity } from "@/components/mgr/qty";
 import { SearchPick, type SearchPickOption } from "@/components/mgr/search-pick";
 import { SortTable } from "@/components/mgr/sort-table";
 import { SubmitButton, type SubmitButtonProps } from "@/components/mgr/submit-button";
-import { TimeWindowField } from "@/components/mgr/time-window-field";
 import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
 import { ComposerDemo } from "@/components/mgr/composer-demo";
-import { VolumeField } from "@/components/mgr/volume-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -91,7 +88,6 @@ const CENTER_MEDIA = "group-has-data-[slot=item-description]/item:translate-y-0 
  *  cancelling an order, breaking an integration, discarding queued work, kicking a keg. */
 type BtnBase = "p" | "g" | "ghost" | "irr" | "del";
 type BtnKind = BtnBase | `${BtnBase} disabled`;
-type VolumeUnit = "oz" | "gal" | "bbl" | "mL" | "L";
 
 /** A row is a tap target when its trailing slot declares `data-tap`: the Open
  *  chevron (E.nav) or a verb (E.act). A switch or a stepper there is its own
@@ -159,7 +155,6 @@ const emptyNote = (empty: PickEmpty, id?: string) => (
 );
 
 export const E = {
-  palette: (placeholder: string, groups: PaletteGroup[]) => <Palette placeholder={placeholder} groups={groups} />,
   /** Page title. `action` is a list-create button (New order, New customer):
    *  full-width under the title on the phone, on the title row from md up. */
   hd: (t: React.ReactNode, r: React.ReactNode = "", action?: React.ReactNode) => {
@@ -267,14 +262,14 @@ export const E = {
    *  a column flex item with width:auto still stretches). Entry cards override
    *  back to full-width because they stay a phone-width column on the desk.
    *  `data-to` names the screen a link opens when its label is not that screen's name, as on E.back. */
-  btn: (t: React.ReactNode, k: BtnKind = "p", href?: string, onClick?: () => void, attributes?: { "data-preview-action"?: boolean; "data-to"?: string }) => {
+  btn: (t: React.ReactNode, k: BtnKind = "p", href?: string, onClick?: () => void, attributes?: { type?: "button" | "submit"; "data-preview-action"?: boolean; "data-to"?: string }) => {
     const [kind, disabled] = k.split(" ") as [BtnBase, string?];
     return (
       <Button
         {...attributes}
         variant={kind === "g" ? "outline" : kind === "ghost" ? "ghost" : kind === "del" ? "destructive" : "default"}
         disabled={Boolean(disabled)}
-        type={onClick ? "button" : undefined}
+        type={attributes?.type ?? (onClick ? "button" : undefined)}
         onClick={onClick}
         asChild={Boolean(href) && !disabled}
         className={cn(
@@ -311,18 +306,6 @@ export const E = {
   ),
   /** A forward arrow read as "to"; null draws it decorative (aria-hidden). */
   arrow: (label: string | null = "to") => <DirectionIcon label={label} />,
-  /** A typed quantity under its visible label: the OS keyboard is the keypad.
-   *  unit renders as a trailing addon — plain text ("bbl"), chips, or a
-   *  segmented unit choice hugged with "w-fit". The label, the
-   *  field's clipping and addon padding live in components/mgr/qty.tsx,
-   *  shared with `volume`. */
-  qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string, controls?: FieldControls) => {
-    const error = fieldError({ ...controls, id });
-    return <>
-      <Qty value={value} unit={unit} label={label} id={id} onChange={controls?.onChange} invalid={error.invalid} describedBy={error.describedBy} />
-      {error.message}
-    </>;
-  },
   chips: (arr: string[], on = 0, controls?: { onChange: (index: number) => void; disabled?: boolean; label?: string }) => (
     <ToggleGroup type="single" {...(controls ? { value: arr[on], onValueChange: (value: string) => { if (value) controls.onChange(arr.indexOf(value)); }, disabled: controls.disabled, "aria-label": controls.label } : { defaultValue: arr[on] })} variant="outline" size="sm" className="flex-wrap justify-start">
       {arr.map((c) => (
@@ -330,8 +313,6 @@ export const E = {
       ))}
     </ToggleGroup>
   ),
-  /** An atomic format's volume: a qty whose unit addon is the per-instance unit choice. */
-  volume: (value: string, units: VolumeUnit[], on = 0) => <VolumeField value={value} units={units} on={on} />,
   /** Commit; CommandForm lifts this out of the scroll region so the verb stays on the phone.
    *  Stacked on the phone, right-aligned on the desk — same as CommandFormFooter. */
   pin: (t: React.ReactNode) => (
@@ -417,8 +398,6 @@ export const E = {
    *  Keyed by the grid, and fixed in order, exactly as in cols. */
   inline: (...fields: [React.ReactNode, React.ReactNode, React.ReactNode?]) =>
     fieldGrid(fields, fields.length === 3 ? "grid-cols-3" : "grid-cols-2"),
-  /** A time-of-day window as one two-thumb range: start and end are 24-hour "hh:mm". */
-  window: (label: string, start: string, end: string) => <TimeWindowField label={label} start={start} end={end} />,
   /** Several picked values at once: a location is often a taproom and storage
    *  and a warehouse, so the control has to admit more than one answer. Picked
    *  values fill bright (#493): the outline on-state alone reads as faint grey.
@@ -492,17 +471,6 @@ export const E = {
    *  region, so a screen reader hears the change politely. E.info and E.note
    *  default to static notes; only explicit errors use their alert role. */
   polite: (t: React.ReactNode) => (t ? <p className="text-sm text-muted-foreground">{t}</p> : null),
-  /** Annotation chips; the gallery renders this under the frame, never inside it. */
-  states: (arr: [string, string, (0 | 1)?][]) => (
-    <dl className="flex flex-wrap gap-1.5">
-      {arr.map(([a, b, w]) => (
-        <Badge key={a} variant={w ? "secondary" : "outline"} className="font-normal">
-          <dt className="font-medium">{a}</dt>
-          <dd className="text-muted-foreground">{b}</dd>
-        </Badge>
-      ))}
-    </dl>
-  ),
   /** Status tiles. `actions` sit under a tile's facts; with an `href` too, the facts stay the link. */
   tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?, string?, React.ReactNode?][]) => (
     <ItemGroup className="grid grid-cols-2 gap-2 md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
@@ -541,14 +509,6 @@ export const E = {
       </Empty>
     );
   },
-  /** A blank labeled input. The label sits over the control like every other
-   *  field (shadcn Field default); `hint` is the placeholder, never the label. */
-  inp: (label: string, hint?: string) => (
-    <Field>
-      <FieldLabel>{label}</FieldLabel>
-      <Input placeholder={hint} aria-label={label} />
-    </Field>
-  ),
   stq: (v: number, label = "Quantity", controls?: FieldControls & { value: string }) => <StepQuantity label={label} defaultValue={String(v)} min={controls ? controls.min : 0} step={controls ? controls.step : 1} {...controls} required={controls ? controls.required !== false : false} />,
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
   /** A row that opens something. `href` makes the whole row the link, as E.act

@@ -1,7 +1,7 @@
 # C3 specification review
 
 - Target: `231afee6282c9a4e14447f05084f088c3990fc89..55006ca3dbb1841a19d6deb19a6336e6d6743f1e`
-- Checkout: `/Users/tedslesinski/Repos/mgr-zero/.agents/worktrees/composer`
+- Checkout: `.agents/worktrees/composer`
 - Review mode: read-only; no database, browser session, source edit, push, or PR action
 - Disposition: **CHANGES REQUIRED**
 
