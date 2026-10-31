@@ -84,10 +84,12 @@ describe("order line edit submit boundaries", () => {
 function pickupSwitch(local?: boolean) {
   harness.values = [{ line: "5", gone: "1" }, "", [], [], ...(local === undefined ? [] : [local])];
   harness.setters = [];
-  return OrderLinesEditor({
+  const form = OrderLinesEditor({
     orderId: "order", lines, editable: true, skus: [], warnings: [], onSaved: vi.fn(),
     model: toOrderViewProps(orderConfirmedWholesale), pickup: { value: true },
-  }).props.children.props.pickup as { value: boolean; onChange: (value: boolean) => void };
+  });
+  // The form draws OrderView first, then the reorder message.
+  return form.props.children[0].props.pickup as { value: boolean; onChange: (value: boolean) => void };
 }
 
 describe("order pickup switch", () => {

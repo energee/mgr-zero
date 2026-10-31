@@ -10,6 +10,8 @@
 "use client";
 
 import { useState, type ComponentProps, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { OrderView } from "@/components/mgr/views/order";
@@ -92,6 +94,8 @@ export function OrderLinesEditor({ orderId, lines, editable, skus, warnings, onS
   // Held here and flipped on success: busy clears before the save's refresh
   // lands, and a click in that window must send the new value, not the old prop.
   const [pickupOn, setPickupOn] = useState(pickup?.value ?? false);
+  const router = useRouter();
+  const reorder = useCommandAction();
   const shown = { ...model, lines: model.lines.filter((l) => !edit.removed.includes(l.key)) };
   const lineActions = edit.changed ? <SaveLinesActions edit={edit} />
     : warnings.length > 0 ? <AtpWarnings warnings={warnings} skuNames={new Map(skus.map((sku) => [sku.id, sku.label]))} saved="Lines saved." />
@@ -100,8 +104,13 @@ export function OrderLinesEditor({ orderId, lines, editable, skus, warnings, onS
     <OrderView {...view} model={shown} quantities={edit.qtys} onQuantity={editable ? edit.setQty : undefined}
       pickup={pickup ? { value: pickupOn, busy: pickupAction.busy, error: pickupAction.error,
         onChange: (value) => { void pickupAction.run("set_order_pickup", { orderId, pickup: value }, () => setPickupOn(value)); } } : undefined}
+      reordering={reorder.busy} onReorderRefused={() => void reorder.run("reorder_refused_delivery", { orderId }, data => {
+        const result = z.object({ order_id: z.string().uuid() }).parse(data);
+        router.push(`/orders/${result.order_id}/edit`);
+      })}
       lineEdit={editable ? { skus, added: edit.added, onAdd: edit.addLine, onSku: edit.setSku, onRemove: edit.removeLine } : undefined}
       reason={edit.reason} onReason={edit.changed ? edit.setReason : undefined} lineActions={lineActions} />
+    <CommandFormMessage error={reorder.error} />
   </form>;
 }
 

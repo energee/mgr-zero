@@ -46,6 +46,21 @@ describe("test database schema guard", () => {
     expect(await stripIdentityTypes(expected)).toBe(expected);
   });
 
+  it("canonicalizes whitespace-only generated lines without changing view metadata", async () => {
+    const prefix = `export type Database = {
+  public: {
+    Views: { atp: { Row: { qty: number | null }; Relationships: [`;
+    const suffix = `    ] } }
+    Functions: {}
+  }
+}
+`;
+    const generated = `${prefix}\n${" ".repeat(20)}\n\t \t\n${suffix}`;
+    const expected = `${prefix}\n\n\n${suffix}`;
+    expect(await stripIdentityTypes(generated)).toBe(expected);
+    expect(await stripIdentityTypes(expected)).toBe(expected);
+  });
+
   // A plain psql apply records neither migration history nor the identity this
   // guard checks, so land-pr's database tests would always fail the guard.
   it("lands PRs against a test-db.sh build held under the exclusive lock", () => {

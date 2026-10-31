@@ -1,13 +1,15 @@
 // lib/mgr/receive-po-view.ts — view-model for Receive PO (inventory), and
 // what Receive purchase order or Correct receipt still needs (#1485).
-import { isNumber } from "./quantity-input";
+import { isNumber, numberNotationError } from "./quantity-input";
 import { submitReason } from "./submit-reason";
+import { poLineErrors } from "./new-po-view";
 
 export type ReceivePoLineView = {
   key: string;
   title: string;
   detail: string;
   qty: number | string;
+  cost?: string;
   warning?: boolean;
   ok?: boolean;
   lot?: string;
@@ -50,7 +52,7 @@ export const poLineDetail = (line: PoLineAmounts) =>
   `ordered ${poLineQty(line.qty_ordered, line.material)} · received ${poLineQty(line.qty_received, line.material)} · still due ${poLineQty(line.qty_open, line.material)}${line.expected_lot_code ? ` · PO lot ${line.expected_lot_code}` : ""}`;
 
 /** What a receipt correction does, shown on the live form and its inventory frame. */
-export const CORRECTION_INFO = "The original receipt remains in history. Its stock is reversed and the corrected count is posted at the original receiving bin. Subsequent stock use or shared lot changes can prevent correction.";
+export const CORRECTION_INFO = "The original receipt remains in history. Its stock is compensated and the corrected count posts in the selected receiving bin. Used stock can be corrected if balances stay nonnegative; used lot identities and shared lot facts stay fixed.";
 
 /** The one mode a Receive PO state puts the form in: mark a draft sent,
  *  count a new receipt, correct a posted one, or only show the order. */
@@ -75,11 +77,11 @@ export function receiveReason(model: ReceivePoViewModel): string | null {
   if (mode !== "receive" && mode !== "correct") return null;
   const missing: string[] = [];
   if (mode === "correct" && !model.correctionReason?.trim()) missing.push("a correction reason");
-  if (mode === "receive") {
+  if (mode === "receive" || model.locations !== undefined) {
     if (!model.locationId) missing.push("a location");
     if (!model.binId) missing.push("a bin");
-    if (!model.receivedOn) missing.push("a received day");
   }
+  if (mode === "receive" && !model.receivedOn) missing.push("a received day");
   const lines = model.lines ?? [];
   for (const line of lines) {
     const qty = String(line.qty);
@@ -87,6 +89,9 @@ export function receiveReason(model: ReceivePoViewModel): string | null {
       if (mode === "correct") missing.push(`a count for ${line.title}`);
     } else if (!isCount(qty)) missing.push(`a count of zero or more for ${line.title}`);
     else if (line.lot !== undefined && Number(qty) > 0 && !line.lot.trim()) missing.push(`a lot code for ${line.title}`);
+    if ((mode === "correct" || isCount(qty)) && line.cost && (numberNotationError(line.cost) || poLineErrors({ qty: 1, cost: line.cost }).cost)) {
+      missing.push(`a unit cost from $0 to $21,474,836.47 for ${line.title}`);
+    }
   }
   // A 0 records a short line beside a received one; a receipt of only zeros records nothing (#1485).
   if (mode === "receive" && !lines.some(line => isCount(String(line.qty)) && Number(line.qty) > 0)) missing.push("a count above zero on at least one line");

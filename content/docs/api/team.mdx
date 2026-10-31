@@ -10,8 +10,9 @@ roles never grant customer-portal membership. Revoking a brewery membership
 ends its access without deleting the history that member wrote.
 
 `list_team_members` returns `{ userId, name, email, roles, createdAt }` for each
-member. `name` is the saved Auth profile full name, or the full email address
-when no nonblank name is saved. Profile names are display-only and never grant permissions.
+member. `name` is the saved Auth profile full name with the account email beside
+it, as `Profile name <email>`, or the full email address alone when no nonblank
+name is saved. Profile names are display-only and never grant permissions.
 `update_staff_role` replaces a member's roles with the nonempty `roles` array
 in its input; duplicate values are removed and the response uses enum order.
 Removing `admin` is a demotion even when other roles remain, and is refused
@@ -532,7 +533,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Staff roster for the brewery: user id, name (email when no profile name is saved), email and roles
+Staff roster for the brewery: user id, name as `Profile name <email>` (the email alone when no profile name is saved), email and roles
 
 Takes no input.
 
@@ -616,6 +617,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "resend_account_invitation", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "inviteId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+## retire_pos_location_mapping [#retire_pos_location_mapping]
+
+`command` · admin
+
+Retire one Square location's current MGR mapping and menu; preserve historical sales attribution and release the MGR location for a corrected mapping
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `posLocationId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "retire_pos_location_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string" } }'
 ```
 
 ## revoke_account_invitation [#revoke_account_invitation]
@@ -782,7 +800,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Map one observed Square location to one unclaimed MGR location; a pre-history remap clears its menu, and observed history prevents remapping
+Map one observed Square location to one unclaimed MGR location; an unobserved remap clears its menu. Retire an observed mapping first to preserve historical attribution before replacing it
 
 | Field | Type | Required |
 | --- | --- | --- |

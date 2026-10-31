@@ -7,6 +7,7 @@ import { sql } from "./helpers";
 const AUTHENTICATED_RPCS = [
   "consume_command_admission()",
   "get_beer_overview_aggregates(uuid)",
+  "get_keg_report_aging(uuid)",
   "get_saved_cola_image_permit(uuid,text,text)",
   "get_stored_cola_label_image(uuid,text,text)",
   "trace_lot_sources(uuid,uuid)",
@@ -23,7 +24,7 @@ const AUTHENTICATED_RPCS = [
   "list_tap_history(uuid,uuid)",
   "get_taproom_count_snapshot(uuid,uuid)", "get_taproom_print_labels(uuid,uuid,text)", "get_taproom_count(uuid,uuid)", "list_taproom_counts(uuid,uuid)",
   "record_taproom_count(uuid,uuid,date,text,jsonb,uuid)", "correct_taproom_count(uuid,uuid,jsonb,text,uuid)",
-  "taproom_can(uuid,text)", "staff_brewery_rows()", "keg_bin_on_hand_rows()", "on_hand_rows()",
+  "taproom_can(uuid,text)", "staff_brewery_rows()", "keg_bin_on_hand_rows()", "taproom_on_hand_rows()",
   "order_packaging_shortfall_rows()",
   "pos_order_versions()",
   "get_chat_integration_health(uuid)",
@@ -151,7 +152,7 @@ const AUTHENTICATED_RPCS = [
   "portal_quote_order(uuid,uuid,uuid,date,text,text,jsonb,uuid)",
   "portal_submit_quote(uuid,uuid,uuid,uuid,uuid)",
   "receive_purchase_order(uuid,uuid,uuid,uuid,date,jsonb,uuid)",
-  "correct_purchase_receipt(uuid,uuid,text,jsonb,uuid)",
+  "correct_purchase_receipt(uuid,uuid,text,jsonb,uuid,uuid,uuid)",
   "receive_stock_transfer(uuid,jsonb,uuid)",
   "record_batch_addition(uuid,uuid,uuid,ingredient_stage,uuid,numeric,text,uuid)",
   "record_brew_day(uuid,uuid,uuid,numeric,date,uuid,jsonb,jsonb,boolean)",
@@ -179,7 +180,8 @@ const AUTHENTICATED_RPCS = [
   "replace_format_bom(uuid,uuid,jsonb,uuid)",
   "replace_format_components(uuid,uuid,jsonb,uuid)",
   "resolve_short_pick(uuid,uuid,numeric,text,text,uuid)",
-  "return_shipment(uuid,jsonb,uuid,text,uuid,uuid)",
+  "return_shipment(uuid,jsonb,uuid,text,uuid,uuid,boolean,uuid)",
+  "reorder_refused_delivery(uuid,uuid)",
   "reverse_inventory_movement(uuid,uuid,text,uuid)",
   "cancel_batch(uuid,uuid,uuid)",
   "reschedule_batch(uuid,uuid,date,uuid)",
@@ -196,6 +198,7 @@ const AUTHENTICATED_RPCS = [
   "set_portal_fulfillment_source(uuid,uuid,uuid)",
   "set_pos_item_mapping(uuid,text,text,uuid,uuid,boolean,uuid)",
   "set_pos_location_mapping(uuid,text,uuid,uuid)",
+  "retire_pos_location_mapping(uuid,text,uuid)",
   "set_pos_price_override(uuid,text,uuid,uuid,integer,uuid)",
   "set_pos_website_publication(uuid,text,uuid,uuid,boolean,uuid)",
   "set_channel_price(uuid,uuid,uuid,uuid,integer,uuid)",
@@ -261,6 +264,13 @@ it("grants the caller-RLS Beer aggregate only to authenticated callers", () => {
   expect(sql(`select r.role from pg_proc p
     cross join (values ('anon'),('authenticated'),('service_role')) r(role)
     where p.pronamespace = 'public'::regnamespace and p.proname = 'get_beer_overview_aggregates'
+      and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual(["authenticated"]);
+});
+
+it("grants caller-RLS keg aging only to authenticated callers", () => {
+  expect(sql(`select r.role from pg_proc p
+    cross join (values ('anon'),('authenticated'),('service_role')) r(role)
+    where p.pronamespace = 'public'::regnamespace and p.proname = 'get_keg_report_aging'
       and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual(["authenticated"]);
 });
 

@@ -2,7 +2,7 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
-  
+
   "public": {
           Tables: {
             "allocations": {
@@ -23,12 +23,6 @@ export type Database = {
 isOneToOne: false
       referencedRelation: "breweries"
       referencedColumns: ["id"]
-    },{
-      foreignKeyName: "allocations_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
     },{
       foreignKeyName: "allocations_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
@@ -567,14 +561,14 @@ isOneToOne: false
                   ]
                 },"chat_installations": {
                   Row: {
-                    "brewery_id": string,"created_at": string,"disabled_at": string | null,"disconnected_at": string | null,"display_label": string,"external_enterprise_id": string | null,"external_installation_id": string,"granted_capabilities": NonNullable<Json>,"id": string,"installed_at": string | null,"installer_user_id": string,"last_failure_code": string | null,"last_health_checked_at": string | null,"last_healthy_at": string | null,"oauth_consumed_at": string | null,"oauth_expires_at": string | null,"oauth_intent_hash": string | null,"oauth_intent_kind": string | null,"oauth_reconciled_at": string | null,"oauth_redirect_uri": string | null,"provider": string,"quiet_hours_end": string | null,"quiet_hours_start": string | null,"quiet_hours_timezone": string | null,"state": string,"token_store_key": string,"updated_at": string
+                    "brewery_id": string,"created_at": string,"disabled_at": string | null,"disconnected_at": string | null,"display_label": string,"external_enterprise_id": string | null,"external_installation_id": string,"granted_capabilities": NonNullable<Json>,"id": string,"installed_at": string | null,"installer_user_id": string,"last_failure_code": string | null,"last_health_checked_at": string | null,"last_healthy_at": string | null,"oauth_consumed_at": string | null,"oauth_expires_at": string | null,"oauth_intent_hash": string | null,"oauth_intent_kind": string | null,"oauth_reconciled_at": string | null,"oauth_redirect_uri": string | null,"oauth_request_id": string | null,"provider": string,"quiet_hours_end": string | null,"quiet_hours_start": string | null,"quiet_hours_timezone": string | null,"state": string,"token_store_key": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "brewery_id": string,"created_at"?: string,"disabled_at"?: string | null,"disconnected_at"?: string | null,"display_label": string,"external_enterprise_id"?: string | null,"external_installation_id": string,"granted_capabilities"?: NonNullable<Json>,"id"?: string,"installed_at"?: string | null,"installer_user_id": string,"last_failure_code"?: string | null,"last_health_checked_at"?: string | null,"last_healthy_at"?: string | null,"oauth_consumed_at"?: string | null,"oauth_expires_at"?: string | null,"oauth_intent_hash"?: string | null,"oauth_intent_kind"?: string | null,"oauth_reconciled_at"?: string | null,"oauth_redirect_uri"?: string | null,"provider": string,"quiet_hours_end"?: string | null,"quiet_hours_start"?: string | null,"quiet_hours_timezone"?: string | null,"state": string,"token_store_key": string,"updated_at"?: string
+                    "brewery_id": string,"created_at"?: string,"disabled_at"?: string | null,"disconnected_at"?: string | null,"display_label": string,"external_enterprise_id"?: string | null,"external_installation_id": string,"granted_capabilities"?: NonNullable<Json>,"id"?: string,"installed_at"?: string | null,"installer_user_id": string,"last_failure_code"?: string | null,"last_health_checked_at"?: string | null,"last_healthy_at"?: string | null,"oauth_consumed_at"?: string | null,"oauth_expires_at"?: string | null,"oauth_intent_hash"?: string | null,"oauth_intent_kind"?: string | null,"oauth_reconciled_at"?: string | null,"oauth_redirect_uri"?: string | null,"oauth_request_id"?: string | null,"provider": string,"quiet_hours_end"?: string | null,"quiet_hours_start"?: string | null,"quiet_hours_timezone"?: string | null,"state": string,"token_store_key": string,"updated_at"?: string
                   }
                   Update: {
-                    "brewery_id"?: string,"created_at"?: string,"disabled_at"?: string | null,"disconnected_at"?: string | null,"display_label"?: string,"external_enterprise_id"?: string | null,"external_installation_id"?: string,"granted_capabilities"?: NonNullable<Json>,"id"?: string,"installed_at"?: string | null,"installer_user_id"?: string,"last_failure_code"?: string | null,"last_health_checked_at"?: string | null,"last_healthy_at"?: string | null,"oauth_consumed_at"?: string | null,"oauth_expires_at"?: string | null,"oauth_intent_hash"?: string | null,"oauth_intent_kind"?: string | null,"oauth_reconciled_at"?: string | null,"oauth_redirect_uri"?: string | null,"provider"?: string,"quiet_hours_end"?: string | null,"quiet_hours_start"?: string | null,"quiet_hours_timezone"?: string | null,"state"?: string,"token_store_key"?: string,"updated_at"?: string
+                    "brewery_id"?: string,"created_at"?: string,"disabled_at"?: string | null,"disconnected_at"?: string | null,"display_label"?: string,"external_enterprise_id"?: string | null,"external_installation_id"?: string,"granted_capabilities"?: NonNullable<Json>,"id"?: string,"installed_at"?: string | null,"installer_user_id"?: string,"last_failure_code"?: string | null,"last_health_checked_at"?: string | null,"last_healthy_at"?: string | null,"oauth_consumed_at"?: string | null,"oauth_expires_at"?: string | null,"oauth_intent_hash"?: string | null,"oauth_intent_kind"?: string | null,"oauth_reconciled_at"?: string | null,"oauth_redirect_uri"?: string | null,"oauth_request_id"?: string | null,"provider"?: string,"quiet_hours_end"?: string | null,"quiet_hours_start"?: string | null,"quiet_hours_timezone"?: string | null,"state"?: string,"token_store_key"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -587,14 +581,14 @@ isOneToOne: false
                   ]
                 },"chat_user_links": {
                   Row: {
-                    "brewery_id": string,"created_at": string,"disabled_at": string | null,"external_user_id": string,"id": string,"installation_id": string,"linked_at": string | null,"proof_consumed_at": string | null,"proof_expires_at": string | null,"proof_hash": string | null,"proof_issued_at": string | null,"provider": string,"state": string,"unlinked_at": string | null,"updated_at": string,"user_id": string | null
+                    "brewery_id": string,"created_at": string,"disabled_at": string | null,"external_display_name": string | null,"external_user_id": string,"id": string,"installation_id": string,"linked_at": string | null,"proof_consumed_at": string | null,"proof_expires_at": string | null,"proof_hash": string | null,"proof_issued_at": string | null,"provider": string,"state": string,"unlinked_at": string | null,"updated_at": string,"user_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "brewery_id": string,"created_at"?: string,"disabled_at"?: string | null,"external_user_id": string,"id"?: string,"installation_id": string,"linked_at"?: string | null,"proof_consumed_at"?: string | null,"proof_expires_at"?: string | null,"proof_hash"?: string | null,"proof_issued_at"?: string | null,"provider": string,"state": string,"unlinked_at"?: string | null,"updated_at"?: string,"user_id"?: string | null
+                    "brewery_id": string,"created_at"?: string,"disabled_at"?: string | null,"external_display_name"?: string | null,"external_user_id": string,"id"?: string,"installation_id": string,"linked_at"?: string | null,"proof_consumed_at"?: string | null,"proof_expires_at"?: string | null,"proof_hash"?: string | null,"proof_issued_at"?: string | null,"provider": string,"state": string,"unlinked_at"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
                   Update: {
-                    "brewery_id"?: string,"created_at"?: string,"disabled_at"?: string | null,"external_user_id"?: string,"id"?: string,"installation_id"?: string,"linked_at"?: string | null,"proof_consumed_at"?: string | null,"proof_expires_at"?: string | null,"proof_hash"?: string | null,"proof_issued_at"?: string | null,"provider"?: string,"state"?: string,"unlinked_at"?: string | null,"updated_at"?: string,"user_id"?: string | null
+                    "brewery_id"?: string,"created_at"?: string,"disabled_at"?: string | null,"external_display_name"?: string | null,"external_user_id"?: string,"id"?: string,"installation_id"?: string,"linked_at"?: string | null,"proof_consumed_at"?: string | null,"proof_expires_at"?: string | null,"proof_hash"?: string | null,"proof_issued_at"?: string | null,"provider"?: string,"state"?: string,"unlinked_at"?: string | null,"updated_at"?: string,"user_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -931,12 +925,6 @@ isOneToOne: false
       foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
 isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
-    },{
-      foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
       referencedRelation: "sku_prices"
       referencedColumns: ["sku_id","brewery_id"]
     },{
@@ -1001,12 +989,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "order_lines"
       referencedColumns: ["id","brewery_id"]
-    },{
-      foreignKeyName: "invoice_lines_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
     },{
       foreignKeyName: "invoice_lines_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
@@ -1737,12 +1719,6 @@ isOneToOne: false
       foreignKeyName: "order_lines_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
 isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
-    },{
-      foreignKeyName: "order_lines_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
       referencedRelation: "sku_prices"
       referencedColumns: ["sku_id","brewery_id"]
     },{
@@ -2017,12 +1993,6 @@ isOneToOne: false
       foreignKeyName: "packaging_run_outputs_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
 isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
-    },{
-      foreignKeyName: "packaging_run_outputs_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
       referencedRelation: "sku_prices"
       referencedColumns: ["sku_id","brewery_id"]
     },{
@@ -2245,12 +2215,6 @@ isOneToOne: false
       foreignKeyName: "pos_item_mappings_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
 isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
-    },{
-      foreignKeyName: "pos_item_mappings_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
       referencedRelation: "sku_prices"
       referencedColumns: ["sku_id","brewery_id"]
     },{
@@ -2261,16 +2225,54 @@ isOneToOne: false
       referencedColumns: ["id","brewery_id"]
     }
                   ]
-                },"pos_locations": {
+                },"pos_location_mapping_history": {
                   Row: {
-                    "available": boolean,"brewery_id": string,"connection_id": string,"external_location_id": string,"external_name": string | null,"external_status": string | null,"last_seen_at": string | null,"location_id": string | null
+                    "brewery_id": string,"connection_id": string,"ends_at": string,"external_location_id": string,"id": string,"location_id": string,"retired_by": string,"starts_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "available"?: boolean,"brewery_id": string,"connection_id": string,"external_location_id": string,"external_name"?: string | null,"external_status"?: string | null,"last_seen_at"?: string | null,"location_id"?: string | null
+                    "brewery_id": string,"connection_id": string,"ends_at": string,"external_location_id": string,"id"?: string,"location_id": string,"retired_by": string,"starts_at": string
                   }
                   Update: {
-                    "available"?: boolean,"brewery_id"?: string,"connection_id"?: string,"external_location_id"?: string,"external_name"?: string | null,"external_status"?: string | null,"last_seen_at"?: string | null,"location_id"?: string | null
+                    "brewery_id"?: string,"connection_id"?: string,"ends_at"?: string,"external_location_id"?: string,"id"?: string,"location_id"?: string,"retired_by"?: string,"starts_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "pos_location_mapping_history_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "pos_location_mapping_history_connection_id_brewery_id_fkey"
+      columns: ["connection_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "pos_connections"
+      referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "pos_location_mapping_history_connection_id_external_locati_fkey"
+      columns: ["connection_id","external_location_id"]
+isOneToOne: false
+      referencedRelation: "pos_locations"
+      referencedColumns: ["connection_id","external_location_id"]
+    },{
+      foreignKeyName: "pos_location_mapping_history_location_id_brewery_id_fkey"
+      columns: ["location_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","brewery_id"]
+    }
+                  ]
+                },"pos_locations": {
+                  Row: {
+                    "available": boolean,"brewery_id": string,"connection_id": string,"external_location_id": string,"external_name": string | null,"external_status": string | null,"last_seen_at": string | null,"location_id": string | null,"mapping_started_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "available"?: boolean,"brewery_id": string,"connection_id": string,"external_location_id": string,"external_name"?: string | null,"external_status"?: string | null,"last_seen_at"?: string | null,"location_id"?: string | null,"mapping_started_at"?: string
+                  }
+                  Update: {
+                    "available"?: boolean,"brewery_id"?: string,"connection_id"?: string,"external_location_id"?: string,"external_name"?: string | null,"external_status"?: string | null,"last_seen_at"?: string | null,"location_id"?: string | null,"mapping_started_at"?: string
                   }
                   Relationships: [
                     {
@@ -2445,12 +2447,6 @@ isOneToOne: false
       foreignKeyName: "pos_sale_expectations_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
 isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
-    },{
-      foreignKeyName: "pos_sale_expectations_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
       referencedRelation: "sku_prices"
       referencedColumns: ["sku_id","brewery_id"]
     },{
@@ -2506,11 +2502,23 @@ isOneToOne: false
       referencedRelation: "breweries"
       referencedColumns: ["id"]
     },{
-      foreignKeyName: "pos_sales_coverage_connection_id_external_location_id_loca_fkey"
-      columns: ["connection_id","external_location_id","location_id","brewery_id"]
+      foreignKeyName: "pos_sales_coverage_connection_tenant_fkey"
+      columns: ["connection_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "pos_connections"
+      referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "pos_sales_coverage_location_tenant_fkey"
+      columns: ["location_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "locations"
+      referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "pos_sales_coverage_source_fkey"
+      columns: ["connection_id","external_location_id"]
 isOneToOne: false
       referencedRelation: "pos_locations"
-      referencedColumns: ["connection_id","external_location_id","location_id","brewery_id"]
+      referencedColumns: ["connection_id","external_location_id"]
     }
                   ]
                 },"price_group_barcodes": {
@@ -3283,12 +3291,6 @@ isOneToOne: false
       foreignKeyName: "stock_transfer_lines_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
 isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
-    },{
-      foreignKeyName: "stock_transfer_lines_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
       referencedRelation: "sku_prices"
       referencedColumns: ["sku_id","brewery_id"]
     },{
@@ -3391,12 +3393,6 @@ isOneToOne: false
       foreignKeyName: "tap_intervals_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
 isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
-    },{
-      foreignKeyName: "tap_intervals_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
       referencedRelation: "sku_prices"
       referencedColumns: ["sku_id","brewery_id"]
     },{
@@ -3455,12 +3451,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "inventory_movements"
       referencedColumns: ["id","brewery_id"]
-    },{
-      foreignKeyName: "taproom_count_lines_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
     },{
       foreignKeyName: "taproom_count_lines_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
@@ -3537,12 +3527,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "locations"
       referencedColumns: ["id","brewery_id"]
-    },{
-      foreignKeyName: "taproom_pars_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
     },{
       foreignKeyName: "taproom_pars_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
@@ -3772,13 +3756,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    {
-      foreignKeyName: "skus_brewery_id_fkey"
-      columns: ["brewery_id"]
-isOneToOne: false
-      referencedRelation: "breweries"
-      referencedColumns: ["id"]
-    }
+
                   ]
                 },"bin_move_stock": {
                   Row: {
@@ -3786,7 +3764,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"bin_on_hand": {
                   Row: {
@@ -3812,12 +3790,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "locations"
       referencedColumns: ["id","brewery_id"]
-    },{
-      foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
     },{
       foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
@@ -3918,7 +3890,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"keg_bin_totals": {
                   Row: {
@@ -4024,7 +3996,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"keg_loss_rates": {
                   Row: {
@@ -4070,12 +4042,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "lots"
       referencedColumns: ["id","brewery_id"]
-    },{
-      foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
     },{
       foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
@@ -4278,7 +4244,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"occupancy_volumes": {
                   Row: {
@@ -4324,7 +4290,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"order_line_cogs": {
                   Row: {
@@ -4338,12 +4304,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "breweries"
       referencedColumns: ["id"]
-    },{
-      foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
     },{
       foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
@@ -4430,7 +4390,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"portal_customers": {
                   Row: {
@@ -4438,7 +4398,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"portal_invoices": {
                   Row: {
@@ -4446,7 +4406,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"portal_keg_deposits": {
                   Row: {
@@ -4454,7 +4414,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"portal_order_events": {
                   Row: {
@@ -4462,7 +4422,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"portal_orders": {
                   Row: {
@@ -4470,7 +4430,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"portal_schedule": {
                   Row: {
@@ -4478,7 +4438,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"portal_shipments": {
                   Row: {
@@ -4486,7 +4446,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"portal_sku_prices": {
                   Row: {
@@ -4494,7 +4454,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"pos_unmapped_items": {
                   Row: {
@@ -4626,12 +4586,6 @@ isOneToOne: false
       foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
 isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
-    },{
-      foreignKeyName: "inventory_movements_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
       referencedRelation: "sku_prices"
       referencedColumns: ["sku_id","brewery_id"]
     },{
@@ -4662,7 +4616,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Relationships: [
-                    
+
                   ]
                 },"taproom_replenishment": {
                   Row: {
@@ -4682,12 +4636,6 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "locations"
       referencedColumns: ["id","brewery_id"]
-    },{
-      foreignKeyName: "taproom_pars_sku_id_brewery_id_fkey"
-      columns: ["sku_id","brewery_id"]
-isOneToOne: false
-      referencedRelation: "atp"
-      referencedColumns: ["sku_id","brewery_id"]
     },{
       foreignKeyName: "taproom_pars_sku_id_brewery_id_fkey"
       columns: ["sku_id","brewery_id"]
@@ -4956,7 +4904,7 @@ isOneToOne: false
 { Args: { "p_actuals": Json,"p_brewery": string,"p_reason": string,"p_record": string,"p_request_id": string }; Returns: Json
                            },
 "correct_purchase_receipt":
-{ Args: { "p_brewery": string,"p_lines": Json,"p_reason": string,"p_receipt": string,"p_request_id": string }; Returns: Json
+{ Args: { "p_bin"?: string,"p_brewery": string,"p_lines": Json,"p_location"?: string,"p_reason": string,"p_receipt": string,"p_request_id": string }; Returns: Json
                            },
 "correct_reporting_basis":
 { Args: { "p_books_opened_on": string,"p_brewery": string,"p_expected_books_opened_on": string,"p_reason": string,"p_request_id": string }; Returns: Json
@@ -5157,6 +5105,9 @@ isOneToOne: false
 "get_chat_settings_installation":
 { Args: { "p_actor": string,"p_brewery": string,"p_installation": string }; Returns: Json
                            },
+"get_keg_report_aging":
+{ Args: { "p_brewery": string }; Returns: Json
+                           },
 "get_loss_review":
 { Args: { "p_brewery": string,"p_end": string,"p_start": string }; Returns: Json
                            },
@@ -5249,7 +5200,7 @@ isOneToOne: false
 { Args: { "p_action": string,"p_delivery"?: string,"p_external_user_id": string,"p_installation": string }; Returns: string
                            },
 "issue_chat_link_proof":
-{ Args: { "p_external_user_id": string,"p_installation": string,"p_proof_hash": string }; Returns: Json
+{ Args: { "p_external_display_name": string,"p_external_user_id": string,"p_installation": string,"p_proof_hash": string }; Returns: Json
                            },
 "keg_bin_on_hand_rows":
 { Args: Record<PropertyKey, never>; Returns: {
@@ -5340,11 +5291,6 @@ isOneToOne: false
                            },
 "my_staff_brewery_ids":
 { Args: { "p_roles": (Database["public"]['Enums']["staff_role"])[] }; Returns: string[]
-                           },
-"on_hand_rows":
-{ Args: Record<PropertyKey, never>; Returns: {
-              "brewery_id": string,"location_id": string,"qty": number,"sku_id": string
-            }[]
                            },
 "order_packaging_shortfall_rows":
 { Args: Record<PropertyKey, never>; Returns: {
@@ -5543,6 +5489,9 @@ isOneToOne: false
 "release_qbo_token_refresh":
 { Args: { "p_brewery": string,"p_connection": string,"p_lease": string }; Returns: undefined
                            },
+"reorder_refused_delivery":
+{ Args: { "p_order": string,"p_request_id": string }; Returns: Json
+                           },
 "replace_format_bom":
 { Args: { "p_brewery": string,"p_format": string,"p_lines": Json,"p_request_id": string }; Returns: Json
                            },
@@ -5567,6 +5516,9 @@ isOneToOne: false
 "resolve_short_pick":
 { Args: { "p_line": string,"p_order": string,"p_qty_picked": number,"p_reason": string,"p_request_id": string,"p_resolution": string }; Returns: Json
                            },
+"retire_pos_location_mapping":
+{ Args: { "p_brewery": string,"p_external_location": string,"p_request_id": string }; Returns: Json
+                           },
 "retry_chat_delivery":
 { Args: { "p_delivery": string,"p_error_code": string,"p_lease": string,"p_next_attempt_at": string }; Returns: undefined
                            },
@@ -5574,7 +5526,7 @@ isOneToOne: false
 { Args: { "p_request_id": string,"p_route": string }; Returns: Json
                            },
 "return_shipment":
-{ Args: { "p_invoice": string,"p_lines": Json,"p_location": string,"p_reason": string,"p_refused_delivery"?: string,"p_request_id": string }; Returns: Json
+{ Args: { "p_bin"?: string,"p_invoice": string,"p_lines": Json,"p_location": string,"p_reason": string,"p_refused_delivery"?: string,"p_request_id": string,"p_return_empty"?: boolean }; Returns: Json
                            },
 "reverse_inventory_movement":
 { Args: { "p_brewery": string,"p_movement": string,"p_note": string,"p_request_id": string }; Returns: Json
@@ -5744,6 +5696,11 @@ isOneToOne: false
                            },
 "taproom_can":
 { Args: { "b": string,"t": string }; Returns: boolean
+                           },
+"taproom_on_hand_rows":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "brewery_id": string,"location_id": string,"qty": number,"sku_id": string
+            }[]
                            },
 "today_live_reasons":
 { Args: Record<PropertyKey, never>; Returns: (string)[]
