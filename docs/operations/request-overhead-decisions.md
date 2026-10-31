@@ -45,7 +45,7 @@ Movement history uses the existing `created_at~id` cursor contract. It returns `
 
 The SKU-history index includes `qty` so tenant/SKU ledger sums remain index-only when the planner chooses it instead of the existing on-hand index. This preserves the portal-availability read path as well as the new cursor order.
 
-The two branch-owned performance migrations follow main's integration-failure migration (`20261030031030`). Their SQL is unchanged; `20261030031031` adds the report aggregate and indexes, and `20261030031032` retains the covering `qty` column.
+The branch-owned performance migration `20261030031031` follows main's integration-failure migration (`20261030031030`). It adds the report aggregate and indexes, and drops the baseline `movements_created_idx`, whose `(brewery_id, created_at)` prefix the new `movements_history_idx` covers.
 
 ### Foreign-key evidence, not a per-column index mandate
 

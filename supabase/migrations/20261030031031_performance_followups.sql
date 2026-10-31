@@ -1,7 +1,12 @@
 -- #1664: filtered order history and cursor-based movement history.
 create index orders_status_history_idx on public.orders (brewery_id, status, created_at desc, id desc);
 create index movements_history_idx on public.inventory_movements (brewery_id, created_at desc, id desc);
-create index movements_sku_history_idx on public.inventory_movements (brewery_id, sku_id, created_at desc, id desc);
+-- movements_history_idx covers every read of the baseline (brewery_id, created_at) index.
+drop index public.movements_created_idx;
+-- The SKU history prefix is also eligible for tenant/SKU ledger sums. Keep
+-- those reads index-only if the planner chooses it instead of on-hand's index.
+create index movements_sku_history_idx on public.inventory_movements
+  (brewery_id, sku_id, created_at desc, id desc) include (qty);
 
 -- The named channel/vendor FK lookups scanned their tenant's rows, and the
 -- vendor-filtered PO list uses the same equality predicates. Do not add an

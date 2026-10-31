@@ -87,6 +87,20 @@ describe("RLS index and auth.uid() rules", () => {
     ]));
   });
 
+  it("no inventory_movements index is a key prefix of another", () => {
+    // Every ledger insert maintains each index; a prefix index serves no read
+    // the longer one cannot (direction aside, a btree scans both ways). A
+    // unique prefix still enforces its constraint, so the primary key stays.
+    const prefixes = sql(`
+      select a.indexrelid::regclass || ' < ' || b.indexrelid::regclass
+      from pg_index a join pg_index b on a.indrelid = b.indrelid and a.indexrelid <> b.indexrelid
+      where a.indrelid = 'public.inventory_movements'::regclass and not a.indisunique
+        and a.indpred is null and b.indpred is null and a.indnkeyatts < b.indnkeyatts
+        and (a.indkey::int2[])[0:a.indnkeyatts - 1] = (b.indkey::int2[])[0:a.indnkeyatts - 1]
+      order by 1`);
+    expect(prefixes).toEqual([]);
+  });
+
   it("the open-allocation covering index retains its exact partial predicate", () => {
     const predicate = sql(`
       select pg_get_expr(i.indpred, i.indrelid)
