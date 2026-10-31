@@ -76,10 +76,10 @@ describe("get_brand_recipe_cost", () => {
     const mosaic = { id: await seedMaterial(ctx.breweryId, { name: "Mosaic pellets", category: "hop", uom: "g" }) };
     await unwrap(admin.from("materials").update({ purchase_uom: "lb", purchase_uom_factor: 453.5924 }).eq("id", mosaic.id));
     const vendor = await runCommand("upsert_vendor", { name: "Gram hop supplier" }, buyer) as { id: string };
-    const po = await runCommand("create_purchase_order", { vendorId: vendor.id, lines: [{ materialId: mosaic.id, qtyOrdered: 1, unitCostCents: 1000 }] }, buyer) as { id: string };
+    const po = await runCommand("create_purchase_order", { vendorId: vendor.id, lines: [{ materialId: mosaic.id, qtyOrdered: 10, unitCostCents: 1000 }] }, buyer) as { id: string };
     await runCommand("send_purchase_order", { poId: po.id, sentVia: "external" }, buyer);
     const { lines } = await runCommand("get_purchase_order", { poId: po.id }, buyer) as { lines: { id: string }[] };
-    await runCommand("receive_purchase_order", { poId: po.id, locationId: wh.id, binId: wh.binId, lines: [{ poLineId: lines[0].id, qtyCounted: 1 }] }, buyer);
+    await runCommand("receive_purchase_order", { poId: po.id, locationId: wh.id, binId: wh.binId, lines: [{ poLineId: lines[0].id, qtyCounted: 10 }] }, buyer);
     const [movement] = await unwrap(admin.from("material_movements").select("unit_cost_cents").eq("material_id", mosaic.id).eq("type", "receipt")) as { unit_cost_cents: number }[];
     expect(Number(movement.unit_cost_cents)).toBeCloseTo(2.2046, 4);
     // 1000 g per barrel costs $22.05, not the $20.00 a whole-cent gram implied.

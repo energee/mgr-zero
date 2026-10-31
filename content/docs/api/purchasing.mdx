@@ -21,6 +21,15 @@ reason `upsert_material` keeps `purchaseUomFactor` to four decimal places
 (the `materials` table checks it too), so a whole-unit count always converts
 exactly.
 
+Each line of `receive_purchase_order` and `correct_purchase_receipt` accepts
+optional `unitCostCents`: integer cents per purchase unit from 0 to 2147483647.
+Omitting it keeps the ordered price on receive or the frozen receipt price on
+correction. Supplying it records the actual receipt price and derives the
+movement's cost per base unit using the receipt conversion. It does not rewrite
+the sent PO or an original receipt. Correction still requires a reason and must
+preserve nonnegative stock and lot provenance; post the latest priced receipt's
+Bill after a missing cost is fixed.
+
 An order that will not arrive in full is closed with a reason. A draft or sent
 order with no receipts is cancelled (`cancel_purchase_order`); one with at
 least one receipt is closed short (`close_purchase_order_short`), which keeps
@@ -113,7 +122,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Correct a purchase receipt with a reason and receiving bin: preserve the original facts and downstream lot provenance, compensate its movements, and append replacement counts while preventing negative stock
+Correct a purchase receipt with a reason and receiving bin: preserve the original facts and downstream lot provenance, compensate its movements, and append replacement counts and actual unit costs while preventing negative stock
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -368,7 +377,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Count what arrived against a sent purchase order at one bin: receipt, lines (over or short both allowed), lots read off the package, and receipt movements in one write; status derives from the counts
+Count what arrived against a sent purchase order at one bin: receipt, lines with optional actual unit costs (over or short both allowed), lots read off the package, and receipt movements in one write; status derives from the counts
 
 | Field | Type | Required |
 | --- | --- | --- |

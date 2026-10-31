@@ -9,6 +9,7 @@ import { submitReason } from "@/lib/mgr/submit-reason";
 
 export type ReceivePoControls = {
   quantity?: (id: string, value: string) => void; lot?: (id: string, value: string) => void;
+  cost?: (id: string, value: string) => void;
   bestBy?: (id: string, value: string) => void; location?: (id: string) => void;
   reason?: (value: string) => void; closureReason?: (value: string) => void;
   bin?: (id: string) => void; receivedOn?: (value: string) => void; sentVia?: (value: string) => void;
@@ -44,11 +45,17 @@ export function ReceivePoView({ model, controls = {}, messages, submitting = fal
         {receiving ? E.line(line.title, line.detail,
           <OrderQuantity label={`${line.title} counted`} value={line.qty} onChange={controls.quantity && (value => controls.quantity?.(line.key, value))} />,
           line.warning ? "w" : line.ok ? "ok" : "",
-          line.lot !== undefined ? <>
-            {E.edit("Lot", line.lot, "text", line.lotOptions, { onChange: controls.lot ? value => controls.lot?.(line.key, value) : undefined, placeholder: "Lot code off the package", "aria-label": `${line.title} lot` })}
-            <DatePicker label="Best by" value={controls.bestBy ? line.bestBy ?? "" : undefined} defaultValue={line.bestBy} onChange={controls.bestBy && (value => controls.bestBy?.(line.key, value))} />
-            {line.note && E.note(line.note)}
-          </> : null,
+          <>
+            {E.edit("Unit cost ($)", line.cost ?? "", "number", undefined, {
+              onChange: controls.cost ? value => controls.cost?.(line.key, value) : undefined,
+              min: 0, step: "0.01", placeholder: "Optional", "aria-label": `${line.title} unit cost`,
+            })}
+            {line.lot !== undefined && <>
+              {E.edit("Lot", line.lot, "text", line.lotOptions, { onChange: controls.lot ? value => controls.lot?.(line.key, value) : undefined, placeholder: "Lot code off the package", "aria-label": `${line.title} lot` })}
+              <DatePicker label="Best by" value={controls.bestBy ? line.bestBy ?? "" : undefined} defaultValue={line.bestBy} onChange={controls.bestBy && (value => controls.bestBy?.(line.key, value))} />
+              {line.note && E.note(line.note)}
+            </>}
+          </>,
         ) : E.row(line.title, line.detail, String(line.qty))}
       </Fragment>)}
       {mode === "draft" && <>
