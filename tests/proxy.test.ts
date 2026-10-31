@@ -1,4 +1,6 @@
 // tests/proxy.test.ts — verifies the proxy refreshes the session with one local claims check and its refresh cookies preserve no-cache response headers.
+import "next/dist/server/node-environment-baseline";
+import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -42,21 +44,33 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("Supabase proxy refresh", () => {
-  it("skips non-document assets and endpoints, but protects every document route", () => {
-    const matches = (path: string) => new RegExp(`^${config.matcher[0]}$`).test(path);
-    for (const path of ["/api/search", "/api/command", "/_next/static/chunk.js", "/favicon.ico", "/mock/avatar.jpg"]) {
-      expect(matches(path), path).toBe(false);
-    }
-    for (const path of ["/docs", "/docs/staff-guide", "/screens/frame/0", "/inventory", "/login", "/portal/login"]) {
-      expect(matches(path), path).toBe(true);
+  it.each([
+    "/api/search", "/api/command", "/_next/image", "/favicon.ico", "/icon.svg",
+  ])("skips the non-document endpoint %s", (url) => {
+    expect(unstable_doesMiddlewareMatch({ config, url })).toBe(false);
+  });
+
+  it.each(["script", "style", "image", "font"])("skips %s subresources without bypassing document requests", (destination) => {
+    expect(unstable_doesMiddlewareMatch({
+      config, url: "/_next/static/chunk.js", headers: { "sec-fetch-dest": destination },
+    })).toBe(false);
+  });
+
+  it.each([
+    "/docs", "/docs/staff-guide", "/screens/frame/0", "/inventory", "/login", "/portal/login",
+    "/missing.js", "/missing.html", "/docs/missing.js", "/api/search-missing",
+    "/favicon.ico-missing", "/_next/static/missing.js", "/mock/missing.jpg",
+  ])("protects potential HTML at %s regardless of its suffix", (url) => {
+    for (const destination of [undefined, "document", "iframe", "empty"]) {
+      const headers = destination ? { "sec-fetch-dest": destination } : undefined;
+      expect(unstable_doesMiddlewareMatch({ config, url, headers })).toBe(true);
     }
   });
 
-  it.each(["/docs", "/docs/staff-guide", "/screens/frame/0"])("protects public %s without a session check", async (path) => {
+  it.each(["/docs", "/docs/staff-guide", "/screens/frame/0", "/mock/missing.jpg", "/_next/static/missing.js"])("protects public %s without a session check", async (path) => {
     const response = await proxy(new NextRequest(`http://localhost:3000${path}`));
     expect(createServerClient).not.toHaveBeenCalled();
     expect(response.headers.get("content-security-policy")).toContain("'strict-dynamic'");
-    expect(response.headers.get("cache-control")).toContain("no-store");
     expect(response.headers.get("server-timing")).toBeNull();
   });
 
@@ -71,8 +85,14 @@ describe("Supabase proxy refresh", () => {
     expect(nonce).toMatch(/^[A-Za-z0-9+/=]+$/);
     expect(nonce).not.toBe("attacker");
     const csp = response.headers.get("content-security-policy");
-    expect(csp).toContain(`script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`);
-    expect(csp).toContain("frame-ancestors 'self'; object-src 'none'; base-uri 'self'");
+    const directives = new Map(csp!.split(";").map((directive) => {
+      const [name, ...sources] = directive.trim().split(/\s+/);
+      return [name, sources] as const;
+    }));
+    expect(directives.get("script-src")).toEqual(expect.arrayContaining([`'nonce-${nonce}'`, "'strict-dynamic'"]));
+    expect(directives.get("frame-ancestors")).toEqual(["'self'"]);
+    expect(directives.get("object-src")).toEqual(["'none'"]);
+    expect(directives.get("base-uri")).toEqual(["'self'"]);
     expect(csp).not.toContain("'unsafe-inline'");
     expect(csp).not.toContain("'unsafe-eval'");
     expect(response.headers.get("x-middleware-request-content-security-policy")).toBe(csp);

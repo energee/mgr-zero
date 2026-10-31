@@ -49,8 +49,14 @@ a nonce or `eval`; development permits `eval` for Next's debugger only.
 
 Public guides and screen frames still perform no session refresh. Their HTML
 now renders per request because a prerendered script nonce would be reused.
-Nonce-bearing responses are private and non-cacheable. MDX content and valid
-documentation/frame paths are still compiled and enumerated at build time.
+Next's renderer keeps dynamic HTML private and non-cacheable; the proxy does
+not override route-owned caching. The published menu feed retains its public
+200/304 cache policy. MDX content and valid documentation/frame paths are still
+compiled and enumerated at build time.
+
+Document requests receive a nonce even when an unknown URL ends in a static
+file suffix. Browser script, style, image and font requests skip the proxy,
+as do the exact search, command, image-optimizer and icon endpoints.
 
 `next.config.ts` denies unused camera, microphone, geolocation, payment, USB,
 display-capture, accelerometer, gyroscope, and magnetometer browser features

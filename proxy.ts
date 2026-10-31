@@ -17,11 +17,12 @@ export async function proxy(req: NextRequest) {
   req.headers.set("x-mgr-path", req.nextUrl.pathname + req.nextUrl.search);
   let res = NextResponse.next({ request: { headers: req.headers } });
   res.headers.set("Content-Security-Policy", csp);
-  res.headers.set("Cache-Control", "private, no-cache, no-store, must-revalidate, max-age=0");
 
-  // Public docs and inventory frames need fresh script nonces, not Auth.
+  // Public guides, frames and asset paths need no session refresh. Unknown
+  // asset paths can still render HTML, so they receive the document CSP above.
   const pathname = req.nextUrl.pathname;
-  if (pathname === "/docs" || pathname.startsWith("/docs/") || pathname.startsWith("/screens/frame/")) return res;
+  if (pathname === "/docs" || pathname.startsWith("/docs/") || pathname.startsWith("/screens/frame/") ||
+      pathname.startsWith("/mock/") || pathname.startsWith("/_next/static/")) return res;
   const supabase = createServerClient<Database>(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
     cookies: {
       getAll: () => req.cookies.getAll(),
@@ -49,9 +50,12 @@ export async function proxy(req: NextRequest) {
   return res;
 }
 
-// Static files need neither a script nonce nor a session refresh. The command
-// and search endpoints still skip the proxy: neither renders a document, and
+// A suffix does not identify a resource: unknown .js URLs can render HTML 404s.
+// Skip browser subresources and exact non-document endpoints, not navigations.
 // /api/command refreshes its own session.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/search|api/command$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|html)$).*)"],
+  matcher: [{
+    source: "/((?!_next/image$|favicon\\.ico$|icon\\.svg$|api/search$|api/command$).*)",
+    missing: [{ type: "header", key: "sec-fetch-dest", value: "(?:font|image|script|style)" }],
+  }],
 };

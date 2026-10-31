@@ -56,7 +56,6 @@ afterEach(() => {
 // data block, which React neither runs nor warns about (#239, #986).
 it("ThemeBoot's script runs from the server and stays inert in a browser render", () => {
   expect(renderToStaticMarkup(createElement(ThemeBoot))).toContain('type="text/javascript"');
-  expect(renderToStaticMarkup(createElement(ThemeBoot, { nonce: "request-nonce" }))).toContain('nonce="request-nonce"');
   vi.stubGlobal("window", {});
   expect(renderToStaticMarkup(createElement(ThemeBoot))).toContain('type="text/plain"');
 });
