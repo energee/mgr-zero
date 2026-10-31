@@ -749,7 +749,7 @@ export const SCREENS: Screen[] = [
     writes: "update_staff_role · revoke_staff",
     states: [["permission", "admin only", 1], ["last admin", "keep at least one member with Admin", 1], ["no roles", "choose at least one role", 1], ["self", "remove refused", 1]],
     spec: "Choose one or more roles. Each adds its permissions; Admin already includes every staff permission. Removing Admin is a demotion even when another role remains and is refused for the last admin. Invitations still grant one role. The live form opens only for another member; removing membership leaves their sign-in account.",
-    body: <TeamMemberView name="Dave Chen" email="dave@demobrewing.com" avatar="/mock/dave.jpg" savedRoles={["brewer"]} />,
+    body: <TeamMemberView name="Dave Chen <dave@demobrewing.com>" avatar="/mock/dave.jpg" savedRoles={["brewer"]} />,
   },
   {
     step: 2,

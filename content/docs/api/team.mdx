@@ -10,8 +10,9 @@ roles never grant customer-portal membership. Revoking a brewery membership
 ends its access without deleting the history that member wrote.
 
 `list_team_members` returns `{ userId, name, email, roles, createdAt }` for each
-member. `name` is the saved Auth profile full name, or the full email address
-when no nonblank name is saved. Profile names are display-only and never grant permissions.
+member. `name` is the saved Auth profile full name with the account email beside
+it, as `Profile name <email>`, or the full email address alone when no nonblank
+name is saved. Profile names are display-only and never grant permissions.
 `update_staff_role` replaces a member's roles with the nonempty `roles` array
 in its input; duplicate values are removed and the response uses enum order.
 Removing `admin` is a demotion even when other roles remain, and is refused
@@ -532,7 +533,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Staff roster for the brewery: user id, name (email when no profile name is saved), email and roles
+Staff roster for the brewery: user id, name as `Profile name <email>` (the email alone when no profile name is saved), email and roles
 
 Takes no input.
 
