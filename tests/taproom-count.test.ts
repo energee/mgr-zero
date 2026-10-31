@@ -553,11 +553,13 @@ it("replays exactly, rejects changed reuse and revoked Admin, and serializes two
   const correction = { countId: root.id, corrections: [{ lineId: root.lines[0].id, qtyCounted: 4 }], reason: "Found two kegs" };
   const requestId = crypto.randomUUID(); const execution = { requestId, correlationId: crypto.randomUUID() };
   const first = await runCommand("correct_taproom_count", correction, adminCtx, execution);
+  assert(typeof first === "object" && first !== null && "effective_id" in first);
+  assert(typeof first.effective_id === "string");
   expect(await runCommand("correct_taproom_count", correction, adminCtx, { requestId, correlationId: crypto.randomUUID() })).toEqual(first);
   await expect(runCommand("correct_taproom_count", { ...correction, reason: "Changed reason" }, adminCtx,
     { requestId, correlationId: crypto.randomUUID() })).rejects.toMatchObject({ status: 409 });
-  await expect(runCommand("correct_taproom_count", correction, adminCtx)).rejects.toThrow(/already corrected/);
-  await expect(runCommand("correct_taproom_count", { ...correction, countId: (first as { effective_id: string }).effective_id }, adminCtx)).rejects.toThrow(/original count/);
+  await expect(runCommand("correct_taproom_count", correction, adminCtx)).rejects.toMatchObject({ status: 409, code: "conflict" });
+  await expect(runCommand("correct_taproom_count", { ...correction, countId: first.effective_id }, adminCtx)).rejects.toMatchObject({ status: 409, code: "conflict" });
   expect((await admin.from("taproom_counts").select("id").eq("corrects_count_id", root.id)).data).toHaveLength(1);
 
   expect((await admin.from("brewery_users").update({ roles: ["warehouse"] }).eq("brewery_id", f.brewery.id).eq("user_id", adminCtx.userId)).error).toBeNull();
@@ -578,11 +580,13 @@ it("replays exactly, rejects changed reuse and revoked Admin, and serializes two
     await b.query("begin"); await b.query("select set_config('request.jwt.claim.sub',$1,true)", [racer.userId]); await b.query("set local role authenticated");
     const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
     pending = b.query("select public.correct_taproom_count($1,$2,$3::jsonb,$4,$5)", [...values, crypto.randomUUID()]);
+    const settled = Promise.allSettled([pending]);
     await expect.poll(async () => (await a.query("select wait_event_type from pg_stat_activity where pid=$1", [pid])).rows[0]?.wait_event_type).toBe("Lock");
-    await a.query("commit"); await expect(pending).rejects.toThrow(/already corrected/);
+    await a.query("commit");
+    expect(await settled).toMatchObject([{ status: "rejected", reason: { code: "MG409" } }]);
     assert(raceRoot !== null);
     expect((await admin.from("taproom_counts").select("id").eq("corrects_count_id", raceRoot.id)).data).toHaveLength(1);
-  } finally { await a.query("rollback"); await b.query("rollback"); await Promise.all([a.end(), b.end()]); if (pending) await pending.catch(() => undefined); }
+  } finally { await a.query("rollback"); await b.query("rollback"); await Promise.all([a.end(), b.end()]); if (pending) await Promise.allSettled([pending]); }
 });
 
 it("rejects incomplete or corrupted correction graphs at transaction commit", async () => {

@@ -168,8 +168,8 @@ export async function runChatCallbackBatch({ limit = 25, now = new Date(), db = 
 const LEASE_SAFETY_MS = 5_000;
 
 // Leases due deliveries, re-checks everything from server state, then sends or
-// updates. Persists only provider ids and redacted codes. Only provider-send
-// failures are classified and retried; a failure to record an outcome is
+// updates. Persists only provider ids and redacted codes. Provider-send and
+// destination-validation failures are classified and retried; a failure to record an outcome is
 // logged and never resends or aborts the rest of the batch. One lease call
 // stamps every row with the same expiry, so once the lease is nearly spent the
 // batch stops; the rows it did not reach are left untouched and counted as

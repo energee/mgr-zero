@@ -302,7 +302,7 @@ describe("delivery batch", () => {
     await admin.from("chat_installations").update({ state: "active", last_failure_code: null }).eq("id", inst.id);
   });
 
-  it("logs a reauthorization flag that could not be recorded instead of hiding it", async () => {
+  it("keeps a delivery terminal without retrying when its reauthorization flag cannot be recorded", async () => {
     await drain();
     const id = await submittedOrder();
     const [, other] = await deliveriesOf(id);
@@ -316,8 +316,8 @@ describe("delivery batch", () => {
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
       failNext = Object.assign(new Error("invalid_auth"), { data: { error: "invalid_auth" } });
-      await runChatDeliveryBatch({ limit: 1, now: new Date("2036-09-06T00:00:00Z"), transport, db: db as typeof admin });
-      expect(logged).toHaveBeenCalledWith(expect.stringMatching(/reauthorization flag \(invalid_auth\) could not be recorded/), "database error");
+      const result = await runChatDeliveryBatch({ limit: 1, now: new Date("2036-09-06T00:00:00Z"), transport, db: db as typeof admin });
+      expect(result).toMatchObject({ terminal: 1, retried: 0 });
     } finally {
       logged.mockRestore();
     }
