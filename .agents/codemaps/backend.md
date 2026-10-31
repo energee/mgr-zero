@@ -1,4 +1,4 @@
-<!-- Generated: 2026-10-30 | Commit: 18df6c892 | Tracked files scanned: 1845 -->
+<!-- Generated: 2026-10-31 | Commit: b8cb91afd | Tracked files scanned: 1878 -->
 # Backend
 
 ## HTTP routes
@@ -28,18 +28,18 @@ GET  /portal/invoices/[id]/pay           → app/(portal)/portal/invoices/[id]/p
 ## Areas (file → commands+queries)
 ```
 catalog.ts     29  products, SKUs, formats, locations, bins
-orders.ts      31  order lifecycle, allocations, pick/ship, invoices, credit memos
+orders.ts      32  order lifecycle, allocations, pick/ship, invoices, credit memos
 production.ts  28  recipes, batches, vessels, cellar, fermentation, completion
 taproom.ts     21  keg pools/events, taproom counts, tap intervals, variance
 purchasing.ts  21  vendors, materials, contracts, POs, receipts, counts
-pos.ts         19  Square connect, mappings, catalog publish, sales
+pos.ts         20  Square connect, mappings, catalog publish, sales
 chat.ts        17  staff chat linking, notification settings
 inventory.ts   16  movement ledger at bin grain
 packaging.ts   15  packaging runs: schedule/start/close/repack
 compliance.ts  19  TTB reports, lot trace, filings, COLA search
 portal.ts      13  customer-role commands only
 qbo.ts         17  QuickBooks connect, mapping, invoice push, payments, receipt bills
-settings.ts    11  brewery settings, setup checklist
+settings.ts    11  gravity unit, brewery profile, AI model, operating defaults, books opened on, one-way keg fee
 customers.ts   11  customers, ship-tos, price lists
 delivery.ts     8  routes: save/depart/leave/return
 invites.ts     12  staff/customer memberships, roles, invitations
@@ -53,10 +53,10 @@ landings.ts 2 | today.ts 2 | search.ts 1 | import.ts 1 | tenancy.ts 1
 `lib/supabase/{provision,invites,public-menu,integration-tokens,cola-label-images}.ts`.
 
 ## Large server modules
-lib/qbo.ts (1211, QBO transport) · lib/pos.ts (856, Square transport) ·
-lib/supabase/integration-tokens.ts (850, credential CAS) · lib/chat/jobs.ts (437) ·
+lib/qbo.ts (1281, QBO transport) · lib/pos.ts (883, Square transport) ·
+lib/supabase/integration-tokens.ts (870, credential CAS) · lib/chat/jobs.ts (438) ·
 lib/composer/outbox.ts (363, offline command outbox in localStorage)
 
 ## Generated
-`lib/supabase/database.generated.ts` (5973 lines, `bun run types:database`) ·
+`lib/supabase/database.generated.ts` (5930 lines, `bun run types:database`) ·
 `content/docs/api/*.mdx` blocks (`bun run docs:api`, from `lib/mgr/api-operations.ts`).

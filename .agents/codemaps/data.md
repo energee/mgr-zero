@@ -1,11 +1,11 @@
-<!-- Generated: 2026-10-30 | Commit: 18df6c892 | Tracked files scanned: 1845 -->
+<!-- Generated: 2026-10-31 | Commit: b8cb91afd | Tracked files scanned: 1878 -->
 # Data
 
 Supabase Postgres. Table design: `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md`;
 reasons: `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`. Types: `lib/supabase/database.generated.ts`.
 
 ## Shape
-- Generated public API types: 103 tables, 50 views, 30 enum types, 323 functions. Private helpers and ledgers are outside these generated types.
+- Generated public API types: 104 tables, 50 views, 30 enum types, 326 functions. Private helpers and ledgers are outside these generated types.
 - App roles: SELECT only under RLS. Writes: idempotent `security definer` RPCs,
   `search_path=''`, actor/tenant/role derived in DB, canonical request hash.
 - Ledger: `private.command_requests`; budget: `private.command_admissions`.
@@ -30,7 +30,7 @@ production  recipes recipe_versions recipe_ingredients recipe_water_additions wa
 packaging   packaging_runs packaging_run_outputs packaging_run_consumptions
             packaging_material_actuals packaging_material_records
 kegs/tap    keg_pools keg_events tap_intervals taproom_counts taproom_count_lines taproom_pars
-pos         pos_connections pos_locations pos_item_mappings pos_sales
+pos         pos_connections pos_locations pos_location_mapping_history pos_item_mappings pos_sales
             pos_sale_expectations pos_sales_coverage pos_menus pos_menu_lines
             pos_catalog_items pos_catalog_variations pos_catalog_ownership
 compliance  report_filings report_basis_amendments reporting_basis_corrections
@@ -57,12 +57,12 @@ keg_{customer_balances,deposit_balances,fleet_totals,loss_rates} · invoice_tota
 occupancy_volumes, vessel_contents · po_open_balances, vendor_lead_times · route_loads
 portal_* (customer-scoped projections) · staff_brewery, portal_brewery
 
-## Migration history (212)
+## Migration history (233)
 ```
 00001_baseline.sql                 original schema (closed to edits since #285)
 2026-09   90 files                 hosted catch-up, slices, chat, POS, compliance
-2026-10  121 files                 latest 2026-10-29: draft PO editing and bounded
-                                   active-month compliance reads
+2026-10  142 files                 latest 2026-10-30: integrity and workflow fixes
+                                   (ledger, QBO push, Square mapping, receipts)
 ```
 Rules: never edit a committed file; `bun run migrations:lock` after adding;
 timestamp later than every file on main (`scripts/check-migration-order.ts`).

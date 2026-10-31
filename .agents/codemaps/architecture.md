@@ -1,4 +1,4 @@
-<!-- Generated: 2026-10-30 | Commit: 18df6c892 | Tracked files scanned: 1845 -->
+<!-- Generated: 2026-10-31 | Commit: b8cb91afd | Tracked files scanned: 1878 -->
 # Architecture
 
 Multi-tenant brewery operations SaaS. Single Next.js App Router app plus Supabase
@@ -37,11 +37,11 @@ Website ─▶ GET /api/public/menus/[publicId] ─▶ lib/supabase/public-menu.
 | Layer | Path | Size |
 |---|---|---|
 | Pages | `app/` | 106 pages, 4 layouts |
-| Commands | `lib/commands/` | 38 files, 306 commands/queries |
-| Screen views | `components/mgr/views/`, `lib/mgr/*-view.ts` | 168 views + 119 adapters |
+| Commands | `lib/commands/` | 38 files, 308 commands/queries |
+| Screen views | `components/mgr/views/`, `lib/mgr/*-view.ts` | 170 views + 119 adapters |
 | UI primitives | `components/ui/` (shadcn, don't hand-edit) | 31 files |
-| Schema | `supabase/migrations/` | 212 immutable files, hash-locked |
-| Proof | `tests/` (pure + real local Supabase), `tests-e2e/` | 509 test files + 12 runtime scripts |
+| Schema | `supabase/migrations/` | 233 immutable files, hash-locked |
+| Proof | `tests/` (pure + real local Supabase), `tests-e2e/` | 519 test files + 13 runtime scripts |
 
 ## Roles
 Staff: admin, sales, warehouse, brewer, taproom (`lib/mgr/enums.ts`); memberships hold a role set.

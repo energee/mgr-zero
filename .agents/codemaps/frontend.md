@@ -1,4 +1,4 @@
-<!-- Generated: 2026-10-30 | Commit: 18df6c892 | Tracked files scanned: 1845 -->
+<!-- Generated: 2026-10-31 | Commit: b8cb91afd | Tracked files scanned: 1878 -->
 # Frontend
 
 ## Route groups (106 pages)
@@ -14,7 +14,7 @@ app/layout.tsx           tokens, fonts, theme boot (app/globals.css)
 ## Staff areas, (app)/ (pages)
 ```
 settings 13  accounting, chat, pos, import, team, channels
-orders 9     [id]/{complete,confirm,pick,restock,ship,short-pick}, new
+orders 9     list, [id], [id]/{complete,confirm,edit,pick,restock,ship}, new
 catalog 5 · compliance 5 · invoices 4 · kegs 4 · purchase-orders 4 · recipes 4
 cellar 3 · routes 3 · taproom 3 · work 3
 batches 2 · customers 2 · inventory 2 · locations 2 · menu 2 · packaging 2 · transfers 2 · vendors 2
@@ -38,13 +38,13 @@ Missing ids: `lib/mgr/not-found.ts` `orNotFound()`.
 components/ui/           31  shadcn primitives (CLI-managed)
 components/mgr/          48  top-level files: app-shell, command-form, e.tsx (E.* vocab),
                              search-palette, composer-conversation, me-sheet, qty
-components/mgr/views/   168  shared screen drawings (live pages + inventory)
+components/mgr/views/   170  shared screen drawings (live pages + inventory)
 lib/mgr/*-view.ts       119  pure payload adapters for those views
 lib/mgr/fixtures/        46  inventory snapshots
 ```
 
 ## Screen inventory (source of truth for screens)
-`components/mgr/screens.tsx` (3298 lines) → `/docs/screens`,
+`components/mgr/screens.tsx` (3352 lines) → `/docs/screens`,
 `/docs/screens-explore` (`screen-explorer.tsx`), `/docs/integrations` (`venue.tsx`).
 Taps: `lib/mgr/screen-links.ts`. Route anchors: `lib/mgr/screen-routes.ts`.
 Personas: `lib/mgr/demo-personas.ts`, `components/mgr/demo-screens.tsx`.
