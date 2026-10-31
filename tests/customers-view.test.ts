@@ -198,14 +198,14 @@ it("keeps Accounting Review in the shared filtered customer inventory", () => {
 // docs/plans/lolev-orders.md task 3: a country pick, a state only for US, and
 // a staff-only alias on the customer and ship-to forms.
 describe("country and alias", () => {
-  const jp = { ...customerRidgeline, customer: { ...customerRidgeline.customer, name: "Unusual Holdings", country: "JP", state: null, alias: "Tokyo" } };
+  const jp = { ...customerRidgeline, customer: { ...customerRidgeline.customer, name: "Maple Imports", country: "JP", state: null, alias: "Tokyo" } };
 
   it("the list titles a customer with its alias and reads its country when it is not the US", () => {
     const model = toCustomersViewProps({ customers: [
-      { ...customersList.customers[0], alias: "Nano Wine" },
+      { ...customersList.customers[0], alias: "Evergreen" },
       { ...customersList.customers[1], country: "JP", state: null },
     ] });
-    expect(model.rows[0]?.title).toBe(`${RIDGELINE.name} · Nano Wine`);
+    expect(model.rows[0]?.title).toBe(`${RIDGELINE.name} · Evergreen`);
     expect(model.rows[0]?.detail).toBe("Retailer · PA · 2 portal users");
     expect(model.rows[1]?.detail).toBe("Retailer · Japan · brewery remits");
   });

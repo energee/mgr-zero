@@ -88,6 +88,38 @@ describe("request authentication", () => {
       code: "not_member",
     });
   });
+
+  it.each([
+    ["plato", null],
+    ["sg", null],
+    ["plato", "sg"],
+    ["sg", "plato"],
+  ] as const)("loads shell gravity choices with memberships and refreshes saved preferences (%s, %s)", async (breweryUnit, mine) => {
+    const brewery = await makeBrewery();
+    const staff = await makeStaff(brewery.id);
+    sql(`update breweries set gravity_unit='${breweryUnit}' where id='${brewery.id}'`);
+    const nativeFetch = globalThis.fetch;
+    const reads: string[] = [];
+    const countingFetch: typeof globalThis.fetch = async (input, init) => {
+      const value = input instanceof URL ? input.href : typeof input === "string" ? input : input.url;
+      const path = new URL(value).pathname;
+      if (path.startsWith("/rest/v1/")) reads.push(path);
+      return nativeFetch(input, init);
+    };
+    request.db = await signInAs(staff.email, countingFetch);
+    reads.length = 0;
+
+    expect(await getActiveBrewery()).toMatchObject({ id: brewery.id, gravityUnit: breweryUnit, myGravityUnit: null });
+    expect(reads.toSorted()).toEqual(["/rest/v1/brewery_users", "/rest/v1/staff_brewery"]);
+
+    await runCommand("set_my_gravity_unit", { unit: mine }, await buildContext(brewery.id));
+    reads.length = 0;
+    expect(await getActiveBrewery()).toMatchObject({ id: brewery.id, gravityUnit: breweryUnit, myGravityUnit: mine });
+    expect(reads.toSorted()).toEqual(["/rest/v1/brewery_users", "/rest/v1/staff_brewery"]);
+
+    await runCommand("set_my_gravity_unit", { unit: null }, await buildContext(brewery.id));
+    expect(await getActiveBrewery()).toMatchObject({ gravityUnit: breweryUnit, myGravityUnit: null });
+  });
   it("composes one identity validation and one staff membership query for command route context", async () => {
     const brewery = await makeBrewery();
     const staff = await makeStaff(brewery.id);

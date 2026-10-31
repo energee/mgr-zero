@@ -1,6 +1,27 @@
 <!-- Performance baseline for production-readiness bundle decisions and future comparisons. -->
 # Performance baseline
 
+## Today and Work history indexes
+
+The restock queue uses `orders_needs_restock_idx` on `orders (brewery_id)`
+for rows with `needs_restock`. It includes cancelled orders because staged
+beer must still be put back after cancellation. Refused returns use
+`order_lines_refused_idx` on `order_lines (order_id)` for `qty_refused > 0`,
+so the join can start from refused lines instead of completed deliveries.
+Neither index changes queue visibility or return accounting.
+
+Both indexes ship in `20261030031050_today_pending_history_indexes.sql`,
+ordered after the existing main-branch migrations so normal migration pushes
+can apply them without out-of-order flags.
+
+The database regression in `tests/commands-today.test.ts` seeds 9,000 orders,
+lines, shipments and completed deliveries inside a rolled-back transaction.
+Two orders need restocking and one delivery has refused beer. After refreshing
+planner statistics, it runs `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` over both
+`private.today_candidates` reasons and checks the partial-index paths and
+returned work. Run it on the named local test database (`:54352`) through the
+repository test harness; it is not hosted performance evidence.
+
 ⤳ skill: nextjs
 
 ## Scope and method

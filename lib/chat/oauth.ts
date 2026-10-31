@@ -12,7 +12,7 @@ import { hasAnyRole } from "@/lib/mgr/roles";
 import { chatCredentialHasOtherOwner, cleanupChatInstallation, failChatCredentialStore, serviceClient, withChatLifecycleLock } from "./jobs";
 
 export const PROVIDER = "slack";
-export const REQUIRED_SLACK_SCOPES = ["chat:write", "im:write", "groups:read"] as const;
+export const REQUIRED_SLACK_SCOPES = ["chat:write", "im:write", "groups:read", "users:read"] as const;
 const CHAT_ENV = ["APP_URL", "SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "CHAT_SDK_ENCRYPTION_KEY", "CHAT_STATE_DATABASE_URL"] as const;
 
 /** Whether Slack installation can run: every Slack env var is set. Distinct from
@@ -68,7 +68,7 @@ function authorizeUrl(state: string, redirectUri: string) {
 
 async function beginIntent(ctx: Ctx, redirectUri: string, installationId: string | null, requestId: string) {
   if (!hasAnyRole(ctx.roles, ["admin"])) throw new CommandError("permission denied: brewery admin required", 403);
-  const state = oauthState(requestId, ctx.userId);
+  const state = oauthState();
   const url = authorizeUrl(state, redirectUri);
   const name = installationId === null ? "begin_chat_installation" : "begin_chat_reauthorization";
   const common = { p_brewery: ctx.breweryId, p_request_id: requestId, p_redirect_uri: redirectUri, p_state_hash: sha256(state) };

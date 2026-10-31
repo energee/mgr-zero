@@ -20,8 +20,6 @@ import { CommandFormMessage } from "@/components/mgr/command-form";
 import { isNumber } from "@/lib/mgr/quantity-input";
 import { batchTotalText, packRounding, RECIPE_NUMBERS, type RecipeIngredientView, type RecipeNumberKey, type RecipeScheduleView, type RecipeViewModel } from "@/lib/mgr/recipe-view";
 
-export type { RecipeViewModel };
-
 export type RecipeControls = {
   set: (key: RecipeNumberKey | "notes", value: string) => void;
   onSubmit: () => void;

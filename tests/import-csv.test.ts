@@ -166,12 +166,12 @@ describe("importRowKey", () => {
 describe("country and alias columns", () => {
   const channel = crypto.randomUUID();
   it("a customer row takes country and alias; state is required only for US", () => {
-    expect(validateImportRow("customers", { name: "Odyssey", type: "distributor", country: "CN", alias: "china", saleChannelId: channel })).toEqual([]);
-    expect(validateImportRow("customers", { name: "Sarene", type: "distributor", saleChannelId: channel })).toEqual(["State is required"]);
-    expect(validateImportRow("customers", { name: "Sarene", type: "distributor", country: "US", saleChannelId: channel })).toEqual(["State is required"]);
-    expect(validateImportRow("customers", { name: "Sarene", type: "distributor", state: "PA", saleChannelId: channel })).toEqual([]);
-    expect(validateImportRow("customers", { name: "Odyssey", type: "distributor", country: "XX", saleChannelId: channel }).join(" ")).toMatch(/Country/);
-    expect(validateImportRow("customers", { name: "Odyssey", type: "distributor", country: "CN", state: "PA", saleChannelId: channel }).join(" ")).toMatch(/State/);
+    expect(validateImportRow("customers", { name: "River", type: "distributor", country: "CN", alias: "china", saleChannelId: channel })).toEqual([]);
+    expect(validateImportRow("customers", { name: "Cedar Distribution", type: "distributor", saleChannelId: channel })).toEqual(["State is required"]);
+    expect(validateImportRow("customers", { name: "Cedar Distribution", type: "distributor", country: "US", saleChannelId: channel })).toEqual(["State is required"]);
+    expect(validateImportRow("customers", { name: "Cedar Distribution", type: "distributor", state: "PA", saleChannelId: channel })).toEqual([]);
+    expect(validateImportRow("customers", { name: "River", type: "distributor", country: "XX", saleChannelId: channel }).join(" ")).toMatch(/Country/);
+    expect(validateImportRow("customers", { name: "River", type: "distributor", country: "CN", state: "PA", saleChannelId: channel }).join(" ")).toMatch(/State/);
   });
   it("a foreign ship-to row needs only its customer and label", () => {
     const customerId = crypto.randomUUID();

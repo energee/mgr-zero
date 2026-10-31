@@ -18,6 +18,12 @@ import { sentenceCase } from "../lib/mgr/labels";
 const by = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("persona", () => {
+  it.each(["admin", "sales", "warehouse"] as const)("shows confirmation email diagnostics only to permitted %s staff", role => {
+    for (const name of ["Order", "Order draft"]) {
+      const html = renderToStaticMarkup(createElement("div", null, asPersona(by(name), personaFor(role)).body));
+      expect(html.includes("Confirmation email")).toBe(role === "admin" || role === "sales");
+    }
+  });
   it.each(["admin", "warehouse", "sales", "brewer"] as const)("shows Inventory's taproom count pointer only to permitted %s staff", role => {
     const screen = asPersona(by("Finished goods"), personaFor(role));
     const html = renderToStaticMarkup(createElement("div", null, screen.body));
@@ -57,7 +63,7 @@ describe("persona", () => {
     const team = renderToStaticMarkup(createElement("div", null, by("Team").body));
     for (const p of PERSONAS) {
       expect(team, `${p.name} is not on Team`).toContain(p.name);
-      expect(team, `${p.name} has another role on Team`).toContain(`${p.handle.slice(1)}@demobrewing.com · ${p.roles.map(sentenceCase).join(", ")}`);
+      expect(team, `${p.name} has another role on Team`).toMatch(new RegExp(`${p.name} &lt;${p.handle.slice(1)}@demobrewing\\.com&gt;</div><p[^>]*>${p.roles.map(sentenceCase).join(", ")}</p>`));
       if (p.avatar) expect(team, `${p.name}'s face differs on Team`).toContain(p.avatar);
     }
   });

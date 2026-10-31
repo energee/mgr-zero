@@ -7,8 +7,6 @@ import { E } from "@/components/mgr/e";
 import { rowLinkPrefetch } from "@/lib/mgr/row-link-prefetch";
 import type { PortalOrdersViewModel } from "@/lib/mgr/portal-orders-view";
 
-export type { PortalOrdersViewModel };
-
 export function PortalOrdersView({
   model,
   pagination,

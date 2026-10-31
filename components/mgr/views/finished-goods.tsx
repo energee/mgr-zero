@@ -12,8 +12,6 @@ import { E } from "@/components/mgr/e";
 import { RECORD_LINK, RecordTable } from "@/components/mgr/views/record-table";
 import type { FinishedGoodsRowView, FinishedGoodsViewModel } from "@/lib/mgr/finished-goods-view";
 
-export type { FinishedGoodsViewModel };
-
 /** The Available figure. Negative stock is red and also says Shortfall in
  *  words, so color is never the only signal; that word links to replenishment. */
 function Available({ row, shortfallHref }: { row: FinishedGoodsRowView; shortfallHref: string }) {

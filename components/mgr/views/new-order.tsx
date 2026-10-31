@@ -15,7 +15,6 @@ import { DatePicker } from "@/components/mgr/date-picker";
 import { pastShipDateWarning, type NewOrderViewModel, type OrderOption } from "@/lib/mgr/new-order-view";
 import { Fragment } from "react";
 
-export type { NewOrderViewModel };
 export type NewOrderControls = {
   customer?: (value: string) => void; shipTo?: (value: string) => void;
   source?: (value: string) => void; destination?: (value: string) => void;
@@ -56,9 +55,9 @@ export function LineErrorMessages({ id, errors }: { id: string; errors: Pick<Lin
   return errors.sku ? <FieldError id={lineErrorIds(id, errors).sku}>{errors.sku}</FieldError> : null;
 }
 
-/** A wholesale order the customer collects; it is never put on a route. Shared by New order and Edit draft. */
+/** A wholesale order the customer collects; it is never put on a route. Shared by New order, Edit draft and the Order page. */
 export function PickupSwitch({ on, onChange, disabled = false }: { on: boolean; onChange?: (value: boolean) => void; disabled?: boolean }) {
-  return <fieldset disabled={disabled}>{E.row("Pickup", "The customer collects it, so it never goes on a route", E.sw(on, "Pickup", onChange))}</fieldset>;
+  return <fieldset disabled={disabled}>{E.row("Pickup", "The customer collects it, so it is invoiced when shipped and never goes on a route", E.sw(on, "Pickup", onChange))}</fieldset>;
 }
 
 /** SKU request feedback is shared by the line list and its picker surface.

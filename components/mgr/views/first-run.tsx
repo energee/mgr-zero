@@ -6,8 +6,6 @@ import { E } from "@/components/mgr/e";
 import type { FirstRunViewModel } from "@/lib/mgr/first-run-view";
 import { LocationFields } from "./location";
 
-export type { FirstRunViewModel };
-
 export function FirstRunView({
   model,
   steps,

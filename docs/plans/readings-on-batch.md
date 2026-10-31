@@ -12,7 +12,7 @@ Two tables need a tank stay before they can hold a row:
 occupancy'`, `20261012120100…:13`). It writes leftover beer off as a loss and
 closes at `now()`.
 
-Lolev history (`docs/plans/lolev-history.md`) has batches but no reliable tanks
+Example Brewing history (`docs/plans/lolev-history.md`) has batches but no reliable tanks
 (decision: tank history is not imported). It also has no packaged lots
 (decision 2026-10-13: finished goods start in MGR at the packaging-run
 cutover). Pushing history through today's path would therefore need a
@@ -241,7 +241,7 @@ eyeball check on one imported batch, `/simplify`, and the PR.
 
 Parallelism: 1 → {2, 3, 4, 6} in parallel → 5 → 7.
 
-Dev stack (holds the Lolev import): apply with `psql` only, never `supabase db reset`.
+Dev stack (holds the Example Brewing import): apply with `psql` only, never `supabase db reset`.
 
 ## Effect on `docs/plans/lolev-history.md` (local import, not this PR)
 
@@ -249,10 +249,10 @@ Dev stack (holds the Lolev import): apply with `psql` only, never `supabase db r
 - **Task 6:** `schedule_batch`, then readings batch-only, then
   `record_historical_batch`. There is no "Historical" vessel (R1 dropped), and
   the brew-log OG, volume and process go in `p_process` / `p_knockout_bbl`.
-- **Task 7:** readings only. Each Lolev test gets a deterministic request id
+- **Task 7:** readings only. Each Example Brewing test gets a deterministic request id
   from its Mongo id, so a rerun replays. The packaging-run, lot and depletion
   half is gone.
-- The 19 active batches are still a separate pass into real tanks.
+- Active batches remain a separate pass into real tanks.
 
 ## v1 cross-check (2026-10-14)
 
@@ -265,7 +265,7 @@ optional tank and the composite FK are new in v2. Lessons adopted:
   v1's 32 °F floor rejected cold-crash readings.
 - Sort by `at`, never insert order, because history sits beside live readings.
   The new index is `(batch_id, at)`.
-- Import (lolev-history): use a deterministic request id per Lolev test and
+- Import (lolev-history): use a deterministic request id per Example Brewing test and
   keep its `time`. Reject a reading with no `batch` rather than invent one (v1
   `src/integrations/mongodb/sync.ts:966`).
 

@@ -5,8 +5,6 @@ import { type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { WaterProfilesViewModel } from "@/lib/mgr/water-profiles-view";
 
-export type { WaterProfilesViewModel };
-
 export function WaterProfilesView({ model, createAction, profileActions }: { model: WaterProfilesViewModel; createAction?: ReactNode; profileActions?: Record<string, ReactNode> }) {
   return (
     <>

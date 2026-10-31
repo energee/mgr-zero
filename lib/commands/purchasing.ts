@@ -49,7 +49,9 @@ defineCommand({
     baseUom: z.enum(UOMS),
     purchaseUom: z.enum(UOMS),
     // Omitted on an edit keeps the factor the material had (#589); a new material defaults to 1.
-    purchaseUomFactor: z.number().positive().optional(),
+    // Four decimals, like a receipt count: receive_purchase_order refuses a count × factor
+    // past four base-unit decimals, so 453.59237 g per lb would refuse every whole-lb receipt.
+    purchaseUomFactor: z.number().positive().multipleOf(0.0001, "Base units per purchase unit takes at most four decimal places.").optional(),
     lotTracked: z.boolean().optional(),
     defaultVendorId: z.string().uuid().optional(),
     reorderPoint: z.number().nonnegative().optional(),
@@ -267,25 +269,27 @@ defineCommand({
 });
 
 const receiptCountLine = z.object({
-  poLineId: z.string().uuid(), qtyCounted: z.number().nonnegative(),
+  poLineId: z.string().uuid(), qtyCounted: z.number().nonnegative().multipleOf(0.0001, "A count takes at most four decimal places."),
   lotCode: z.string().trim().optional(), bestBy: isoDate.optional(),
+  unitCostCents: cents.optional().describe("Actual cost per purchase unit; omitted keeps the PO price on receive or the frozen receipt price on correction"),
 });
 
 defineCommand({
   name: "correct_purchase_receipt",
-  description: "Correct an unused purchase receipt with a reason: preserve the original facts, reverse its exact movements, and append replacement counts and lot facts atomically",
-  input: z.object({ receiptId: z.string().uuid(), reason: z.string().trim().min(1), lines: z.array(receiptCountLine).min(1) }),
+  description: "Correct a purchase receipt with a reason and receiving bin: preserve the original facts and downstream lot provenance, compensate its movements, and append replacement counts and actual unit costs while preventing negative stock",
+  input: z.object({ receiptId: z.string().uuid(), reason: z.string().trim().min(1), locationId: z.string().uuid().optional(), binId: z.string().uuid().optional(), lines: z.array(receiptCountLine).min(1) }),
   roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_purchase_receipt", {
     p_brewery: ctx.breweryId, p_receipt: i.receiptId, p_reason: i.reason,
-    p_lines: i.lines.map(l => ({ po_line_id: l.poLineId, qty_counted: l.qtyCounted, lot_code: l.lotCode ?? null, best_by: l.bestBy ?? null })),
+    p_location: i.locationId ?? null, p_bin: i.binId ?? null,
+    p_lines: i.lines.map(l => ({ po_line_id: l.poLineId, qty_counted: l.qtyCounted, ...(l.unitCostCents === undefined ? {} : { unit_cost_cents: l.unitCostCents }), lot_code: l.lotCode ?? null, best_by: l.bestBy ?? null })),
     p_request_id: execution.requestId,
   })),
 });
 
 defineCommand({
   name: "receive_purchase_order",
-  description: "Count what arrived against a sent purchase order at one bin: receipt, lines (over or short both allowed), lots read off the package, and receipt movements in one write; status derives from the counts",
+  description: "Count what arrived against a sent purchase order at one bin: receipt, lines with optional actual unit costs (over or short both allowed), lots read off the package, and receipt movements in one write; status derives from the counts",
   input: z.object({
     poId: z.string().uuid(), locationId: z.string().uuid(), binId: z.string().uuid(), receivedOn: isoDate.optional(),
     lines: z.array(receiptCountLine).min(1),
@@ -293,7 +297,7 @@ defineCommand({
   roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("receive_purchase_order", {
     p_brewery: ctx.breweryId, p_po: i.poId, p_location: i.locationId, p_bin: i.binId, p_received_on: i.receivedOn ?? null,
-    p_lines: i.lines.map((l) => ({ po_line_id: l.poLineId, qty_counted: l.qtyCounted, lot_code: l.lotCode ?? null, best_by: l.bestBy ?? null })),
+    p_lines: i.lines.map((l) => ({ po_line_id: l.poLineId, qty_counted: l.qtyCounted, ...(l.unitCostCents === undefined ? {} : { unit_cost_cents: l.unitCostCents }), lot_code: l.lotCode ?? null, best_by: l.bestBy ?? null })),
     p_request_id: execution.requestId,
   })),
 });
@@ -333,7 +337,7 @@ defineQuery({
       unwrap(ctx.db.from("purchase_orders").select(`${PO_COLUMNS}, vendors(name, email, qbo_vendor_id, qbo_realm_id)`).eq("brewery_id", ctx.breweryId).eq("id", i.poId).maybeSingle()),
       unwrap(ctx.db.from("purchase_order_lines").select("id, material_id, qty_ordered, unit_cost_cents, contract_id, expected_lot_code, materials(name, purchase_uom, purchase_uom_factor, base_uom, lot_tracked)").eq("brewery_id", ctx.breweryId).eq("po_id", i.poId)),
       unwrap(ctx.db.from("po_open_balances").select("po_line_id, qty_received, qty_open").eq("po_id", i.poId)),
-      unwrap(ctx.db.from("receipts").select("id, received_on, received_by, note, corrects_receipt_id, correction_reason, location_id, bin_id, qbo_bill_id, qbo_bill_request_id, qbo_bill_status, qbo_bill_error, receipt_lines(po_line_id, qty_expected, qty_counted, variance, lot_id, material_id, material_name, base_uom, purchase_uom, purchase_uom_factor, lot_code, lot_received_on, lot_best_by)").eq("po_id", i.poId).order("received_on")),
+      unwrap(ctx.db.from("receipts").select("id, received_on, received_by, note, corrects_receipt_id, correction_reason, location_id, bin_id, qbo_bill_id, qbo_bill_request_id, qbo_bill_status, qbo_bill_error, receipt_lines(po_line_id, qty_expected, qty_counted, variance, lot_id, material_id, material_name, base_uom, purchase_uom, purchase_uom_factor, purchase_unit_cost_cents, lot_code, lot_received_on, lot_best_by)").eq("po_id", i.poId).order("received_on")),
     ]);
     if (!po) throw new CommandError("purchase order not found", 404, "not_found");
     const balance = new Map((balances ?? []).map((b) => [b.po_line_id as string, b]));
@@ -368,6 +372,7 @@ defineQuery({
         const line = lineById.get(count.po_line_id);
         const received = Number(balance.get(count.po_line_id)?.qty_received ?? 0);
         return { ...line, qty_counted: Number(count.qty_counted), recorded_best_by: count.lot_best_by,
+          unit_cost_cents: count.purchase_unit_cost_cents,
           // Open before this receipt: its own count is added back.
           qty_received: received, qty_open: Math.max(Number(line?.qty_ordered ?? 0) - (received - Number(count.qty_counted)), 0),
           expected_lot_code: count.lot_code,

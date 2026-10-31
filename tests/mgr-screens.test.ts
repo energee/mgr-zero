@@ -1,8 +1,8 @@
 // tests/mgr-screens.test.ts — the screen inventory (the source of truth for
 // MGR screens) is a typed record set:
 // every record carries its metadata, `states` is a caption (never rendered
-// into the body), and each body renders through the E vocabulary without
-// throwing. Rendering uses react-dom/server, so no DOM is needed.
+// into the body), and each shared body renders without throwing.
+// Rendering uses react-dom/server, so no DOM is needed.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -14,6 +14,7 @@ import { VenueFrame } from "../components/mgr/venue";
 import { AppShell } from "../components/mgr/app-shell";
 import { ScreenFrame } from "../components/mgr/screen-frame";
 import { DatePicker } from "../components/mgr/date-picker";
+import { VolumeField } from "../components/mgr/volume-field";
 import { BatchesView } from "../components/mgr/views/batches";
 import { BrewDayView } from "../components/mgr/views/brew-day";
 import { batchesFromQuery, toBatchesViewProps } from "../lib/mgr/batches-view";
@@ -242,8 +243,11 @@ describe("SCREENS", () => {
     for (const s of SCREENS) {
       const html = renderToStaticMarkup(createElement("div", null, s.hd, s.body));
       expect(html.length).toBeGreaterThan(50);
-      if (s.states) expect(html).not.toContain(renderToStaticMarkup(E.states(s.states)));
     }
+    const screen: Screen = { ...SCREENS[0], states: [["Caption only", "Not part of the screen body"]] };
+    const frame = renderToStaticMarkup(createElement(ScreenFrame, { screen }));
+    expect(frame).not.toContain("Caption only");
+    expect(frame).not.toContain("Not part of the screen body");
   });
 
   it("keeps inventory screen names unique", () => {
@@ -359,7 +363,7 @@ describe("SCREENS", () => {
       "Add", "Add stop", "Add to route", "Adjust", "Assign", "Cancel plan", "Reschedule", "Change", "Check", "Check in", "Choose lot", "Choose who gets it", "Close", "Confirm", "Confirm all", "Connect", "Count", "Create",
       "Deliver", "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Edit SKU", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Mark sent", "Open", "Open format",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record movement", "Record opening count", "Record return", "Release", "Reload", "Remove", "Reorder", "Re-push",
-      "Resolve", "Resume", "Retry", "Return", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Set vendor", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
+      "Resolve", "Resume", "Retry", "Return", "Return and credit", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Set vendor", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
       "Unlink", "Use", "Write off", "Fix registration", "Forgot password?", "Import CSV", "Invite staff", "Invite portal user",
     ]);
     for (const screen of SCREENS) {
@@ -481,6 +485,8 @@ describe("SCREENS", () => {
     }
     expect(body("Team")).toContain("Maria Alvarez");
     expect(body("Team")).toContain("maria@demobrewing.com");
+    // The `Name <email>` title already carries the email; no row repeats it beneath.
+    expect(body("Team member")).not.toMatch(/data-slot="item-description"[^>]*>[^<]*dave@demobrewing\.com/);
     // Pending acceptance is not exposed by the live roster.
     expect(body("Team")).not.toContain("pending");
   });
@@ -522,6 +528,9 @@ describe("SCREENS", () => {
     expect(render(E.face({ name: "Maria Alvarez" }))).toContain(">MA<");
     expect(render(E.face({ name: "Ted" }))).toContain(">T<");
     expect(render(E.face({ name: "wes@demobrewing.com" }))).toContain(">W<");
+    // list_team_members titles a named member `Name <email>` (#1659).
+    expect(render(E.face({ name: "Maria Alvarez <maria@demobrewing.com>" }))).toContain(">MA<");
+    expect(render(E.face({ name: "Ted <ted@demobrewing.com>" }))).toContain(">T<");
     expect(render(E.face({ name: "Maria Alvarez" }))).not.toContain("<img");
     // Every other call keeps its photo: no name and no path is the signed-in user.
     expect(render(E.face())).toContain('src="/mock/maria.jpg"');
@@ -533,7 +542,7 @@ describe("SCREENS", () => {
     // The gallery shell signs in as admin (screen-frame.tsx) so every surface is
     // reachable, so the person the screens name has to be that admin.
     expect(body("Me")).toMatch(/Maria Alvarez[\s\S]*admin/);
-    expect(body("Team")).toMatch(/Maria Alvarez[\s\S]*maria@demobrewing\.com · Admin[\s\S]*you/);
+    expect(body("Team")).toMatch(/Maria Alvarez &lt;maria@demobrewing\.com&gt;[\s\S]*Admin[\s\S]*you/);
     // Team member acts on someone else; removing yourself is the self state.
     expect(body("Team member")).not.toMatch(/Maria|@maria/);
 
@@ -589,7 +598,7 @@ describe("SCREENS", () => {
     for (const unit of ["oz", "gal", "bbl"]) expect.soft(format, unit).toContain(`>${unit}</button>`);
     for (const unit of ["mL", "L"]) expect.soft(format, unit).not.toContain(`>${unit}</button>`);
 
-    const metric = renderToStaticMarkup(createElement("div", null, E.volume("500", ["mL", "L"])));
+    const metric = renderToStaticMarkup(createElement(VolumeField, { value: "500", units: ["mL", "L"], on: 0 }));
     expect(metric).toContain(">mL</button>");
     expect(metric).toContain(">L</button>");
     expect(metric).not.toContain(">bbl</button>");
@@ -895,7 +904,7 @@ describe("SCREENS", () => {
   it("labels every field over its control and marks only nav and verb rows as taps", () => {
     const r = (n: unknown) => renderToStaticMarkup(createElement("div", null, n as never));
     // A blank input carries a real label; the example is the placeholder.
-    const inp = r(E.inp("Address", "114 Bridge St"));
+    const inp = r(E.edit("Address", "", "text", undefined, { placeholder: "114 Bridge St" }));
     expect(inp).toMatch(/<label[^>]*>Address<\/label>/);
     expect(inp).toContain('placeholder="114 Bridge St"');
     const search = r(E.search("Search customers"));

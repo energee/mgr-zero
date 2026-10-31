@@ -5,7 +5,7 @@
 // "use client" module because e.tsx is imported by server-rendered pages.
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { CommandForm } from "@/components/mgr/command-form";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -20,7 +20,7 @@ export type SearchPickOption = { value: string; label: string };
  *  retained value missing from `options` still shows `selectedLabel`. */
 export function SearchPick({ value, label, options, onChange, title, placeholder, searchPlaceholder, noMatchMessage, emptyMessage = noMatchMessage, selectedLabel, feedback, optionsReady = true, errorId, invalid, id, disabled, previewAction, outlined }: {
   value: string;
-  /** The trigger's accessible name. */
+  /** Field label announced before the trigger's current value or placeholder. */
   label: string;
   options: SearchPickOption[];
   onChange?: (value: string) => void;
@@ -48,14 +48,19 @@ export function SearchPick({ value, label, options, onChange, title, placeholder
   outlined?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const labelId = useId();
+  // A self-reference would read a caller's <label htmlFor={id}> instead of the
+  // button's contents. Name the visible value directly so both are announced.
+  const valueId = `${labelId}-value`;
   return <CommandForm title={title} open={open} onOpenChange={setOpen} previewAction={previewAction}
     trigger={
       <Button type="button" id={id} disabled={disabled} variant={outlined ? "outline" : "ghost"}
         className={cn("max-w-full whitespace-normal text-left", outlined
           ? "h-8 w-fit justify-between gap-1.5 border-input bg-transparent py-2 pr-2 pl-2.5 font-normal shadow-none dark:bg-input/30 dark:hover:bg-input/50"
           : "h-auto min-h-11 justify-start")}
-        aria-label={label} aria-describedby={errorId} aria-invalid={invalid || undefined} data-preview-action={previewAction || undefined}>
-        {options.find(option => option.value === value)?.label ?? (value && selectedLabel ? selectedLabel : placeholder)}
+        aria-labelledby={`${labelId} ${valueId}`} aria-describedby={errorId} aria-invalid={invalid || undefined} data-preview-action={previewAction || undefined}>
+        <span id={labelId} hidden>{label}</span>
+        <span id={valueId}>{options.find(option => option.value === value)?.label ?? (value && selectedLabel ? selectedLabel : placeholder)}</span>
         {outlined && <Icon icon={ArrowDown01Icon} className="shrink-0 text-muted-foreground" />}
       </Button>
     }>

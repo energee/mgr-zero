@@ -7,8 +7,6 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { PackageBomViewModel } from "@/lib/mgr/package-bom-view";
 
-export type { PackageBomViewModel };
-
 export function PackageBomView({
   model,
   createAction,

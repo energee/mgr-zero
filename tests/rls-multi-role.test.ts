@@ -26,6 +26,7 @@ const policies: PolicyCase[] = [
   }))),
   { table: "brewery_users", policy: "member_read", group: "members" },
   { table: "chat_installations", policy: "chat_installations_admin_read", group: "admin" },
+  { table: "pos_location_mapping_history", policy: "pos_location_mapping_history_staff", group: "admin" },
   { table: "chat_user_links", policy: "chat_user_links_self_read", group: "self" },
   { table: "notification_preferences", policy: "notification_preferences_self_read", group: "self" },
   { table: "notification_destinations", policy: "notification_destinations_personal_read", group: "personal" },
@@ -114,11 +115,11 @@ describe("all staff-dependent RLS policies preserve multi-role union (#797)", { 
     } finally { await connection.query("reset role"); }
   }
 
-  it("classifies all 97 live staff policies and all four separate portal policies", () => {
+  it("classifies all 98 live staff policies and all four separate portal policies", () => {
     const actual = sql(`select tablename||':'||policyname from pg_policies where schemaname='public'
       and coalesce(qual,'')||coalesce(with_check,'') ~ '(staff_roles?\\(|has_staff_role|is_staff_of|my_staff_brewery_ids|taproom_can)' order by 1`);
-    expect(policies).toHaveLength(97);
-    expect(new Set(policies.map(test => `${test.table}:${test.policy}`)).size).toBe(97);
+    expect(policies).toHaveLength(98);
+    expect(new Set(policies.map(test => `${test.table}:${test.policy}`)).size).toBe(98);
     expect(actual).toEqual(policies.map(test => `${test.table}:${test.policy}`).sort());
     expect(sql(`select tablename||':'||policyname from pg_policies where schemaname='public'
       and not (coalesce(qual,'')||coalesce(with_check,'') ~ '(staff_roles?\\(|has_staff_role|is_staff_of|my_staff_brewery_ids|taproom_can)') order by 1`))

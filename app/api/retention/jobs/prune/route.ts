@@ -16,7 +16,8 @@ export async function POST(request: Request) {
       { reap: reapStaleQboOAuthExchanges, realmInUse: qboRealmInUse, discard: discardQboOAuthTokens },
       new QboOAuthClient(qboConfig()),
     ) : null;
-    return NextResponse.json({ ok: true, pruned, qboReap });
+    const ok = !qboReap || qboReap.failed === 0;
+    return NextResponse.json({ ok, pruned, qboReap }, { status: ok ? 200 : 500 });
   } catch (e) {
     console.error(e instanceof Error ? e.message : e);
     return NextResponse.json({ ok: false }, { status: 500 });

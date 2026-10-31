@@ -76,6 +76,7 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
   rejected; built by #797, PR #968); Style is its own per-brewery table; portal customers may read a
   brand + expected-week projection of planned batches through a gated view,
   never `batches` itself.
+- Purchasing follow-ups (2026-10-29, #1601, #1612): only a draft PO is editable, by replacing its lines whole through `update_purchase_order` (note kept; create and update share `private.insert_purchase_order_lines`). A PO's closure (Cancel / Close short) folds behind a disclosure below the order's next verb. Vendor reads filter in Postgres through `vendorId` / `defaultVendorId` inputs on existing list commands, not a new query (plan `docs/plans/vendor-detail.md`).
 - **Purchasing design decided (2026-09-07, PR #173):**
   `.agents/superpowers/specs/2026-09-07-mgr-purchasing-send-and-lead-times.md`.
   Sending a PO stays one `draft → sent` transition — transport (direct /

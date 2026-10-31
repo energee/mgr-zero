@@ -6,8 +6,6 @@ import { E } from "@/components/mgr/e";
 import { ScopePick } from "@/components/mgr/scope-pick";
 import type { KegHistoryViewModel } from "@/lib/mgr/keg-history-view";
 
-export type { KegHistoryViewModel };
-
 export function KegHistoryView({ model }: { model: KegHistoryViewModel }) {
   return (
     <>

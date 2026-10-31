@@ -6,8 +6,6 @@ import { Fragment } from "react";
 import { E } from "@/components/mgr/e";
 import type { PortalInvoicesViewModel } from "@/lib/mgr/portal-invoices-view";
 
-export type { PortalInvoicesViewModel };
-
 export function PortalInvoicesView({
   model,
   pagination,

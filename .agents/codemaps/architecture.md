@@ -1,4 +1,4 @@
-<!-- Generated: 2026-10-16 | Commit: 239c3929 | Files scanned: 1541 | Token estimate: ~600 -->
+<!-- Generated: 2026-10-31 | Commit: b8cb91afd | Tracked files scanned: 1878 -->
 # Architecture
 
 Multi-tenant brewery operations SaaS. Single Next.js App Router app plus Supabase
@@ -20,7 +20,7 @@ browser ──proxy.ts (session refresh, customer→/portal)──┐
          lib/commands/<area>.ts handler
             read: ctx.db (RLS-bound) │ write: security-definer RPC + requestId
                         ▼
-        Postgres: public tables (read-only to app roles), private.*, ~486 functions
+        Postgres: public tables (read-only to app roles), private.* helpers and ledgers
 ```
 
 ## Side channels
@@ -36,15 +36,15 @@ Website ─▶ GET /api/public/menus/[publicId] ─▶ lib/supabase/public-menu.
 ## Boundaries
 | Layer | Path | Size |
 |---|---|---|
-| Pages | `app/` | 113 pages, 3 layouts |
-| Commands | `lib/commands/` | 37 files, ~282 commands/queries |
-| Screen views | `components/mgr/views/`, `lib/mgr/*-view.ts` | 154 + 162 files |
+| Pages | `app/` | 106 pages, 4 layouts |
+| Commands | `lib/commands/` | 38 files, 308 commands/queries |
+| Screen views | `components/mgr/views/`, `lib/mgr/*-view.ts` | 170 views + 119 adapters |
 | UI primitives | `components/ui/` (shadcn, don't hand-edit) | 31 files |
-| Schema | `supabase/migrations/` | 142 immutable files, hash-locked |
-| Proof | `tests/` (real local Supabase), `tests-e2e/` | 387 + 6 |
+| Schema | `supabase/migrations/` | 233 immutable files, hash-locked |
+| Proof | `tests/` (pure + real local Supabase), `tests-e2e/` | 519 test files + 13 runtime scripts |
 
 ## Roles
-Staff: admin, sales, warehouse, brewer, taproom (`lib/commands/registry.ts:11`).
+Staff: admin, sales, warehouse, brewer, taproom (`lib/mgr/enums.ts`); memberships hold a role set.
 Customer: portal-only, via `lib/commands/portal.ts`.
 
 ## Deploy

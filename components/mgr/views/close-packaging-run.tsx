@@ -11,8 +11,6 @@ import { IrreversibleSubmit } from "@/components/mgr/irreversible-submit";
 import { emptyPackagingActual, patchActual, removeActual, type PackagingActualDraft } from "@/lib/mgr/packaging-actuals";
 import { onlyBinIn, packagingCloseReason, type PackagingCloseFieldsModel, type ClosePackagingRunViewModel } from "@/lib/mgr/close-packaging-run-view";
 
-export type { ClosePackagingRunViewModel };
-
 export function ClosePackagingRunView({
   model,
   action,

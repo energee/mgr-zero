@@ -3,8 +3,8 @@
 // base units per purchase unit, so a 50 lb sack has factor 50). Brew prep and
 // the brew-day timeline both show "4 × 50 lb + 20 lb" and take packs plus loose
 // pounds back. Each product rounds to ticks so 4.4 sacks is exactly 220 lb; the
-// factor itself is never rounded, since the column keeps 6 decimals and the
-// receipt ledger multiplies by all of them.
+// factor itself is never rounded: materials keeps it to the same 4 decimals
+// (a check constraint) and the receipt ledger multiplies by all of them.
 import { fromTicks, toTicks } from "./quantity-input";
 
 /** Whole packs in `qty` and the base units left over; fromPacks(packs, loose) gives `qty` back exactly. */

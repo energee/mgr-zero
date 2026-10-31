@@ -1,24 +1,24 @@
-<!-- Generated: 2026-10-16 | Commit: 239c3929 | Files scanned: 1541 | Token estimate: ~740 -->
+<!-- Generated: 2026-10-31 | Commit: b8cb91afd | Tracked files scanned: 1878 -->
 # Frontend
 
-## Route groups (113 pages)
+## Route groups (106 pages)
 ```
 app/layout.tsx           tokens, fonts, theme boot (app/globals.css)
-├─ (app)/   94 pages     staff; layout mounts AppShell + brewery provider
+├─ (app)/   86 pages     staff; layout mounts AppShell + brewery provider
 ├─ (auth)/  10 pages     login, accept, invitations, reset, create-brewery, portal/login
-├─ (portal)/ 7 pages     customer shop/cart, orders, invoices, account, coming-up
+├─ (portal)/ 8 pages     customer shop/cart, orders, invoices, account, coming-up, not-found catch-all
 ├─ (docs)/docs/[[...slug]]  Fumadocs over content/docs/*.mdx
 └─ (frames)/screens/frame/[s]  one inventory screen full-viewport, static
 ```
 
 ## Staff areas, (app)/ (pages)
 ```
-settings 21  accounting, chat, pos, import, team, units, channels
-orders 11    [id]/{adjust,complete,confirm,edit,pick,restock,ship,short-pick}, new
-catalog 5 · compliance 5 · invoices 4 · kegs 4 · recipes 4
-cellar 3 · locations 3 · purchase-orders 3 · routes 3 · taproom 3 · work 3
-batches 2 · customers 2 · inventory 2 · menu 2 · packaging 2 · transfers 2
-beer · denied · materials · more · pick · planning · pricing · replenishment · vendors
+settings 13  accounting, chat, pos, import, team, channels
+orders 9     list, [id], [id]/{complete,confirm,edit,pick,restock,ship}, new
+catalog 5 · compliance 5 · invoices 4 · kegs 4 · purchase-orders 4 · recipes 4
+cellar 3 · routes 3 · taproom 3 · work 3
+batches 2 · customers 2 · inventory 2 · locations 2 · menu 2 · packaging 2 · transfers 2 · vendors 2
+home · [...missing] · beer · denied · materials · more · pick · planning · pricing · replenishment
 ```
 Tabs + rail: `lib/mgr/nav.ts` (role-filtered), `lib/mgr/sidebar-state.ts`.
 
@@ -36,15 +36,15 @@ Missing ids: `lib/mgr/not-found.ts` `orNotFound()`.
 ## Component layers
 ```
 components/ui/           31  shadcn primitives (CLI-managed)
-components/mgr/          38  composites: app-shell, command-form, e.tsx (E.* vocab),
+components/mgr/          48  top-level files: app-shell, command-form, e.tsx (E.* vocab),
                              search-palette, composer-conversation, me-sheet, qty
-components/mgr/views/   154  shared screen drawings (live pages + inventory)
-lib/mgr/*-view.ts       115  pure payload adapters for those views
-lib/mgr/fixtures/        44  inventory snapshots
+components/mgr/views/   170  shared screen drawings (live pages + inventory)
+lib/mgr/*-view.ts       119  pure payload adapters for those views
+lib/mgr/fixtures/        46  inventory snapshots
 ```
 
 ## Screen inventory (source of truth for screens)
-`components/mgr/screens.tsx` (3077 lines) → `/docs/screens`,
+`components/mgr/screens.tsx` (3352 lines) → `/docs/screens`,
 `/docs/screens-explore` (`screen-explorer.tsx`), `/docs/integrations` (`venue.tsx`).
 Taps: `lib/mgr/screen-links.ts`. Route anchors: `lib/mgr/screen-routes.ts`.
 Personas: `lib/mgr/demo-personas.ts`, `components/mgr/demo-screens.tsx`.

@@ -127,7 +127,7 @@ from them:
      - An empty fermentation schedule reads "No stages yet".
      - The water title is "Water".
      - The Saved date is in the brewery's zone.
-     - A CMG White Wheat-style missing extract gives the saved-version text and no Predicted.
+     - A missing extract gives the saved-version warning instead of Predicted.
      - A gallon mash line gives the unit text.
      - The draft text is present tense.
    - Add `toRecipePageModel(s: RecipeSnapshot, ctx: { materials: RecipeMaterial[]; profiles: { id: string; name: string }[]; unit: GravityUnit; timeZone: string }): RecipeViewModel` to `lib/mgr/recipe-view.ts`, after `toRecipesViewProps`. The page stays a fetch and a render.
@@ -225,7 +225,7 @@ from them:
      - On success, `toast.success("Brand saved")` (the `ai-model-settings-form.tsx` pattern; Sonner's polite live region).
      - Add `E.info("Saves when you pick. Batches already scheduled keep their brand.")`. No pre-fill promise.
    - Leave the regex at `page.tsx:47` alone; it keeps process scalars out of the Water rows.
-   - Accept: tsc, lint, vitest; `/browse` on a Lolev-imported recipe.
+   - Accept: tsc, lint, vitest; `/browse` on a Example Brewing-imported recipe.
 
 10. **Copy-forward draft and kept draft (QW1, QW3 draft, QW11, QW18, decision 6).** Needs: 3, 4, 5, 8.
     - Test first, two parts:
@@ -276,7 +276,7 @@ from them:
       - Material uses `E.searchPick` with the placeholder "Choose a material".
       - Options read `name`, plus ` · category` only when a category is present (the `cellar-addition.tsx:31` pattern).
       - `IngredientMaterial` gains `category?: string`. `sheetMaterials` (`recipe-version-form.tsx:82`) passes it. Give the `screens.tsx` Ingredient fixture categories.
-      - `useId()` links `FieldLabel htmlFor` to `E.qty`'s 4th argument. The label reads "Quantity per bbl (<unit>)" (the `volume-field.tsx` pattern).
+      - `useId()` links `FieldLabel htmlFor` to the `id` control of `E.edit(…, "number")`. The label reads "Quantity per bbl (<unit>)" (the `volume-field.tsx` pattern).
       - Do not touch the timing field: PR D turns it into a Day for dry hop.
     - In `lib/mgr/screen-links.ts`, add an inert rule for the Ingredient material trigger, like `/^Line \d+ SKU$/` at :255. Otherwise "Material" resolves to the Material screen. Inventory rows without `onEdit` keep a plain "Edit", so the existing `to` keys still resolve.
     - Fallback: if the nested dialog fails the phone-width browse check, ship `E.pick` with a `{ value: "", label: "Choose a material" }` first option (the `water.tsx:62` pattern) and report it.
@@ -364,7 +364,7 @@ bunx vitest run tests/mgr-screens.test.ts tests/tap-coverage.test.ts tests/scree
 Then run `/browse` (session `feat-recipe-page-usability`) at phone and desk
 width:
 
-- `/recipes/<lolev id>`: headings, read-out, Saved, the verb on the title row, no price-group row, no empty list, and a blocker reason on a CMG White Wheat version.
+- `/recipes/<id>`: headings, read-out, Saved, the verb on the title row, no price-group row, no empty list, and a blocker reason when an ingredient lacks extract potential.
 - `/recipes/<id>/new`: the draft is seeded from the version. Leaving and returning restores it. Start over works. An untouched visit shows no notice. Saving clears it.
 - The ingredient sheet: material search inside the sheet; the label and unit.
 - A schedule sheet: a row tap opens the editor; a keyboard move keeps focus.

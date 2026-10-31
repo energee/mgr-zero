@@ -4,7 +4,6 @@ import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import type { LocationsViewModel } from "@/lib/mgr/locations-view";
 
-export type { LocationsViewModel };
 export function LocationsInventoryLink({ href = "#" }: { href?: string }) {
   return <Link href={href} data-to="Finished goods" className="text-xs text-muted-foreground underline underline-offset-2">See finished goods across all locations</Link>;
 }

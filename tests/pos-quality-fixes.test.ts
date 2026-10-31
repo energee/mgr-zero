@@ -55,7 +55,7 @@ describe("Square quality-review lifecycle fences", () => {
     expect(fetch).toHaveBeenCalledTimes(3);
     expect(fetch.mock.calls[2][0]).toBe("https://connect.squareupsandbox.com/oauth2/revoke");
     expect(JSON.parse(String(fetch.mock.calls[2][1]?.body))).toEqual({
-      client_id: "sandbox-app", access_token: "issued-access-secret", revoke_only_access_token: true,
+      client_id: "sandbox-app", merchant_id: "merchant-1",
     });
     expect(fail.mock.calls).toEqual([
       ["intent-1", "actor-1", "pending", "merchant-1"],
@@ -98,29 +98,34 @@ describe("Square quality-review lifecycle fences", () => {
     expect(claim.error).toBeNull();
     const intentId = (claim.data as Array<{ intent_id: string }>)[0].intent_id;
 
-    let release!: () => void;
-    const revoke = vi.fn(() => new Promise<void>((resolve) => { release = resolve; }));
+    const { promise: revoked, resolve: release } = Promise.withResolvers<void>();
+    const revoke = vi.fn(() => revoked);
     const requestId = crypto.randomUUID();
     const pending = disconnectSquare(ctx, connection.connectionId, revoke, requestId);
-    await vi.waitFor(() => expect(revoke).toHaveBeenCalledWith({ accessToken: "old-access" }));
-    expect((await admin.from("pos_connections").select("state,remote_revocation_state").eq("id", connection.connectionId).single()).data)
-      .toEqual({ state: "recovery_required", remote_revocation_state: "pending" });
-    const retryRevoke = vi.fn();
-    await expect(disconnectSquare(ctx, connection.connectionId, retryRevoke, requestId)).rejects.toMatchObject({ status: 409 });
-    expect(retryRevoke).not.toHaveBeenCalled();
+    try {
+      await vi.waitFor(() => expect(revoke).toHaveBeenCalledWith({ accessToken: "old-access" }));
+      expect((await admin.from("pos_connections").select("state,remote_revocation_state").eq("id", connection.connectionId).single()).data)
+        .toEqual({ state: "recovery_required", remote_revocation_state: "pending" });
+      const retryRevoke = vi.fn();
+      await expect(disconnectSquare(ctx, connection.connectionId, retryRevoke, requestId)).rejects.toMatchObject({ status: 409 });
+      expect(retryRevoke).not.toHaveBeenCalled();
 
-    const adoption = await admin.rpc("complete_square_oauth", { p_intent: intentId, p_actor: ctx.userId,
-      p_merchant_id: connection.merchantId, p_merchant_label: "replacement", p_access_token: "new-access",
-      p_refresh_token: "new-refresh", p_access_expires_at: "2030-01-01T00:00:00Z",
-      p_granted_scopes: ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"], p_locations: [],
-    });
-    expect(adoption.error).not.toBeNull();
-    await failSquareOAuth(intentId, ctx.userId, "pending", connection.merchantId);
-    await failSquareOAuth(intentId, ctx.userId, "confirmed", connection.merchantId);
-    expect(sql(`select cleanup_state from private.square_oauth_intents where id='${intentId}'`)).toEqual(["confirmed"]);
-    expect((await admin.from("brewery_users").update({ roles: ["warehouse"] }).eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error)
-      .toBeNull();
-    release();
+      const adoption = await admin.rpc("complete_square_oauth", { p_intent: intentId, p_actor: ctx.userId,
+        p_merchant_id: connection.merchantId, p_merchant_label: "replacement", p_access_token: "new-access",
+        p_refresh_token: "new-refresh", p_access_expires_at: "2030-01-01T00:00:00Z",
+        p_granted_scopes: ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"], p_locations: [],
+      });
+      expect(adoption.error).not.toBeNull();
+      await expect(failSquareOAuth(intentId, ctx.userId, "pending", connection.merchantId))
+        .rejects.toThrow("Square recovery state could not be recorded");
+      await failSquareOAuth(intentId, ctx.userId, "unresolved", connection.merchantId);
+      expect(sql(`select cleanup_state from private.square_oauth_intents where id='${intentId}'`)).toEqual(["unresolved"]);
+      expect((await admin.from("brewery_users").update({ roles: ["warehouse"] }).eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error)
+        .toBeNull();
+    } finally {
+      release();
+      await pending;
+    }
     await expect(pending).resolves.toEqual({ disconnected: true, remoteRevocationState: "confirmed" });
     expect((await admin.from("brewery_users").update({ roles: ["admin"] }).eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error)
       .toBeNull();
@@ -145,7 +150,7 @@ describe("Square quality-review lifecycle fences", () => {
       .toEqual(["new-access"]);
   });
 
-  it("preserves another brewery's healthy connection while cleaning up an unadopted duplicate-seller token", async () => {
+  it("refuses seller-wide cleanup when another brewery still owns that authorization", async () => {
     const owner = await makeBrewery();
     const ownerConnection = await connected(owner.id);
     const contender = await makeBrewery();
@@ -161,13 +166,13 @@ describe("Square quality-review lifecycle fences", () => {
       p_granted_scopes: ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"], p_locations: [],
     });
     expect(adoption.error).not.toBeNull();
-    await failSquareOAuth(intentId, ctx.userId, "pending", ownerConnection.merchantId);
-    expect(sql(`select cleanup_state from private.square_oauth_intents where id='${intentId}'`)).toEqual(["pending"]);
+    await expect(failSquareOAuth(intentId, ctx.userId, "pending", ownerConnection.merchantId)).rejects.toThrow("Square recovery state could not be recorded");
+    await failSquareOAuth(intentId, ctx.userId, "unresolved", ownerConnection.merchantId);
+    expect(sql(`select cleanup_state from private.square_oauth_intents where id='${intentId}'`)).toEqual(["unresolved"]);
     expect((await admin.from("pos_connections").select("state,remote_revocation_state,credential_version,last_error")
       .eq("id", ownerConnection.connectionId).single()).data).toEqual({ state: "connected",
       remote_revocation_state: "not_requested", credential_version: 1, last_error: null });
     expect(sql(`select access_token from private.integration_tokens where brewery_id='${owner.id}' and provider='square'`)).toEqual(["old-access"]);
-    await failSquareOAuth(intentId, ctx.userId, "confirmed", ownerConnection.merchantId);
     expect((await admin.from("pos_connections").select("state,remote_revocation_state").eq("id", ownerConnection.connectionId).single()).data)
       .toEqual({ state: "connected", remote_revocation_state: "not_requested" });
 
@@ -178,6 +183,30 @@ describe("Square quality-review lifecycle fences", () => {
     await failSquareOAuth(fallbackIntent, ctx.userId, "unresolved", ownerConnection.merchantId);
     expect(sql(`select exchange_state,cleanup_state from private.square_oauth_intents where id='${fallbackIntent}'`))
       .toEqual(["recovery_required|unresolved"]);
+  });
+
+  it("holds seller adoption behind a full OAuth cleanup reservation until revocation finishes", async () => {
+    const merchantId = `cleanup-${crypto.randomUUID()}`;
+    const pendingIntent = async () => {
+      const brewery = await makeBrewery();
+      const ctx = await makeStaffCtx(brewery.id, "admin");
+      const oauth = new URL((await beginSquareOAuth(ctx, new SquareClient(config, vi.fn()), "connect", crypto.randomUUID())).authorizeUrl);
+      const claim = await admin.rpc("claim_square_oauth", { p_state_hash: hash(oauth.searchParams.get("state")!),
+        p_actor: ctx.userId, p_brewery: brewery.id, p_redirect_uri: config.redirectUri });
+      expect(claim.error).toBeNull();
+      return { ctx, intentId: (claim.data as Array<{ intent_id: string }>)[0].intent_id };
+    };
+    const failed = await pendingIntent();
+    const adoption = await pendingIntent();
+    await failSquareOAuth(failed.intentId, failed.ctx.userId, "pending", merchantId);
+    const complete = () => admin.rpc("complete_square_oauth", {
+      p_intent: adoption.intentId, p_actor: adoption.ctx.userId, p_merchant_id: merchantId, p_merchant_label: "Seller",
+      p_access_token: "new-access", p_refresh_token: "new-refresh", p_access_expires_at: "2030-01-01T00:00:00Z",
+      p_granted_scopes: ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"], p_locations: [],
+    });
+    expect((await complete()).error?.code).toBe("MG409");
+    await failSquareOAuth(failed.intentId, failed.ctx.userId, "confirmed", merchantId);
+    expect((await complete()).error).toBeNull();
   });
 
   it("replaces a seller without inheriting its unobserved menu configuration", async () => {

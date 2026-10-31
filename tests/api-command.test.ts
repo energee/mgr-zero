@@ -59,6 +59,27 @@ describe("POST /api/command bearer auth", () => {
     });
   });
 
+  it("enforces browser Origin and JSON media type before authenticated dispatch", async () => {
+    vi.stubEnv("APP_URL", "https://mgr.test");
+    try {
+      const foreign = commandReq({ breweryId, name: "list_brands", input: {} }, adminToken);
+      foreign.headers.set("origin", "https://attacker.invalid");
+      const deniedOrigin = await POST(foreign);
+      expect(deniedOrigin.status).toBe(403);
+      expect(await deniedOrigin.json()).toMatchObject({ ok: false, error: { code: "invalid_origin" }, correlationId: expect.any(String) });
+      const formBody = commandReq({ breweryId, name: "list_brands", input: {} }, adminToken);
+      formBody.headers.set("content-type", "text/plain");
+      const deniedType = await POST(formBody);
+      expect(deniedType.status).toBe(415);
+      expect(await deniedType.json()).toMatchObject({ ok: false, error: { code: "unsupported_media_type" }, correlationId: expect.any(String) });
+      const trusted = commandReq({ breweryId, name: "list_brands", input: {} }, adminToken);
+      trusted.headers.set("origin", "https://mgr.test");
+      expect((await POST(trusted)).status).toBe(200);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("returns schema field paths separately from its customer-facing summary", async () => {
     const res = await POST(commandReq({ breweryId, name: "search_entities", input: { q: "x".repeat(81) } }, adminToken));
     expect(res.status).toBe(400);
@@ -320,11 +341,11 @@ describe("POST /api/command bearer auth", () => {
   });
 
   it("serves stored COLA labels after the budget is spent, but still limits TTB fetches", async () => {
-    const ttbId = "23023001000185";
-    const url = "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Array.jpg&filetype=l";
+    const ttbId = "99001001000001";
+    const url = "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=SampleLabel.jpg&filetype=l";
     const dataUrl = "data:image/jpeg;base64,/9j/2Q==";
     const { brandId } = await seedCatalog(breweryId);
-    sql(`update public.breweries set ttb_registry_no='BR-PA-20553' where id='${breweryId}'`);
+    sql(`update public.breweries set ttb_registry_no='BR-PA-12345' where id='${breweryId}'`);
     const saved = await POST(commandReq({
       breweryId, name: "upsert_brand_approval", requestId: randomUUID(),
       input: { brandId, kind: "cola", ttbId, approvedOn: "2023-01-24", imageUrl: url },
@@ -339,7 +360,7 @@ describe("POST /api/command bearer auth", () => {
       await expect(cached.json()).resolves.toMatchObject({ ok: true, data: { dataUrl } });
       expect(sql(`select request_count from private.command_admissions where user_id='${adminId}'`)).toEqual(["120"]);
       const uncached = await POST(commandReq({
-        breweryId, name: "get_cola_image", input: { ttbId, url: url.replace("Array.jpg", "Other.jpg") },
+        breweryId, name: "get_cola_image", input: { ttbId, url: url.replace("SampleLabel.jpg", "Other.jpg") },
       }, adminToken));
       expect(uncached.status).toBe(429);
       expect(Number(uncached.headers.get("retry-after"))).toBeGreaterThan(0);

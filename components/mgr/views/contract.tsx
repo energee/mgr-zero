@@ -13,7 +13,6 @@ import { numberNotationError } from "@/lib/mgr/quantity-input";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import { contractDateError, contractSubmitReason, type ContractViewModel } from "@/lib/mgr/contract-view";
 import { noMaterialsPick } from "@/lib/mgr/materials-view";
-export type { ContractViewModel };
 
 type Controls = Partial<Record<
   "vendorId" | "materialId" | "quantity" | "starts" | "ends" | "unitCost" | "contractNo",

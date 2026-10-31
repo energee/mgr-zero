@@ -7,8 +7,6 @@ import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import type { ShipmentDoneViewModel } from "@/lib/mgr/shipment-done-view";
 
-export type { ShipmentDoneViewModel };
-
 export function ShipmentDoneView({
   model,
   tape,

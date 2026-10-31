@@ -9,8 +9,6 @@ import { E } from "@/components/mgr/e";
 import { BREWERY_UNITS, MINE_UNITS, type UnitsViewModel } from "@/lib/mgr/units-view";
 import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 
-export type { UnitsViewModel };
-
 const NOT_CHANGED = "Readings are not changed.";
 
 /** `part` picks the brewery default (admin, in Settings) or your own choice (Me). */

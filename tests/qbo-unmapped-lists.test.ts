@@ -25,7 +25,7 @@ beforeAll(async () => {
   await seedCatalog(breweryId, { product: "Stout", sku: "Stout case" });
   sql(`update public.skus set qbo_item_id = '7', qbo_realm_id = '${realm}' where id = '${sku.skuId}'`);
   await admin.from("vendors").insert([
-    { brewery_id: breweryId, name: "Country Malt", qbo_vendor_id: "5", qbo_realm_id: realm },
+    { brewery_id: breweryId, name: "Fieldstone Malt", qbo_vendor_id: "5", qbo_realm_id: realm },
     { brewery_id: breweryId, name: "Hop Farm" },
   ]).throwOnError();
 });
@@ -51,7 +51,7 @@ describe("unmapped QuickBooks lists (#1515)", () => {
   it("treats every row as unmapped when no company is connected", async () => {
     sql(`update public.qbo_connections set state = 'disconnected' where brewery_id = '${breweryId}'`);
     try {
-      expect(names(await runCommand("list_vendors", { unmapped: true }, owner))).toEqual(["Country Malt", "Hop Farm"]);
+      expect(names(await runCommand("list_vendors", { unmapped: true }, owner))).toEqual(["Fieldstone Malt", "Hop Farm"]);
     } finally {
       sql(`update public.qbo_connections set state = 'connected' where brewery_id = '${breweryId}'`);
     }

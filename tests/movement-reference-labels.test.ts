@@ -33,7 +33,7 @@ it("resolves actual source tables for movement history and lot trace without nam
     { ...base, type: "loss", qty: -1, ref: delivery.id },
     { ...base, type: "destruction", qty: -1, ref: count.id },
   ]);
-  const movements = await runCommand("list_movements", { skuId: catalog.skuId }, ctx) as { ref: string; ref_label: string | null; lots: { code: string } }[];
+  const { rows: movements } = await runCommand("list_movements", { skuId: catalog.skuId }, ctx) as { rows: { ref: string; ref_label: string | null; lots: { code: string } }[] };
   const labels = new Map(movements.map(row => [row.ref, row.ref_label]));
   expect(labels.get(run.id)).toBe("RUN-0001");
   expect(labels.get(order.id)).toBe("ORD-0001");

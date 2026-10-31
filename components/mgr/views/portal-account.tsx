@@ -5,8 +5,6 @@ import { Fragment } from "react";
 import { E } from "@/components/mgr/e";
 import type { PortalAccountViewModel } from "@/lib/mgr/portal-account-view";
 
-export type { PortalAccountViewModel };
-
 export function PortalAccountView({ model }: { model: PortalAccountViewModel }) {
   return (
     <>

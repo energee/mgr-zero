@@ -6,8 +6,6 @@ import { registrationSubmitReason, type StateRegistrationViewModel } from "@/lib
 import { UsStateField } from "@/components/mgr/us-state-field";
 import { Button } from "@/components/ui/button";
 
-export type { StateRegistrationViewModel };
-
 type Controls = Partial<Record<"state" | "registrationNo" | "expiresOn", (value: string) => void>>;
 
 export function StateRegistrationView({ model, controls = {}, locked = false, messages, footer, submitting = false, onCancel, stateError }: {

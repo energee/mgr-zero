@@ -2,6 +2,7 @@
 // portal_order (order, lines, events, shipment.invoices) plus buyerStatus.
 import { docNo } from "./doc-no";
 import { money } from "./money";
+import { orderLineCents } from "./order-view";
 import { shipToAddress } from "./ship-to-view";
 import { buyerStatus } from "./order-status";
 import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment } from "./invoice-state";
@@ -104,7 +105,7 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
         key: l.id,
         name: l.skus?.name ?? "Item",
         detail: shipped !== null ? `ordered ${ordered} · shipped ${shipped}${l.qty_refused ? ` · refused ${l.qty_refused} · accepted ${shipped - l.qty_refused}` : ""}` : `ordered ${ordered}`,
-        amount: money(Number(l.unit_price_cents) * qty),
+        amount: money(orderLineCents(qty, Number(l.unit_price_cents))),
         warning: Boolean(l.qty_refused) || (shipped !== null && shipped < ordered),
       };
     }),

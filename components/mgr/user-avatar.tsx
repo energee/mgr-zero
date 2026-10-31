@@ -1,23 +1,18 @@
-// components/mgr/user-avatar.tsx — a person's photo, for the design inventory
-// only. There is no avatar column in the schema (see
-// .agents/superpowers/specs/2026-08-31-mgr-schema-design.md), so the real app
-// header keeps the UserCircle icon; the published inventory passes this in so a screen shows a face where a face will go.
-// public/mock/*.jpg are fixtures named for the person, not product assets:
-// a new face is a file plus a `src`, never another component.
+// Design-inventory avatars only; the live app has no avatar column and keeps
+// its UserCircle icon. public/mock/*.jpg are generated geometric portraits,
+// not photographs of staff or customers.
 //
-// No photo falls back to initials. They sit *under* the image rather than
-// swapping for it on error, so the fallback costs no client JS and the
-// pre-rendered inventory keeps a real src in its markup: shadcn's Avatar wraps
-// Radix, which resolves the image after hydration and server-renders the
-// fallback alone. Decorative throughout: every caller names the person beside it.
+// Initials sit under the image so a missing asset needs no client-side fallback.
+// Decorative throughout: every caller names the person beside it.
 import { cn } from "@/lib/utils";
 
-/** The signed-in staff fixture. The one place the gallery's default face is named. */
+/** The signed-in staff fixture's generated avatar. */
 export const MARIA = "/mock/maria.jpg";
 
-/** "Maria Alvarez" is MA, one name is its first letter, an address uses the local part. */
+/** "Maria Alvarez" is MA, one name is its first letter, an address uses the local part,
+ *  and a `Name <email>` identity label uses the name. */
 export function initialsOf(name: string) {
-  const words = name.split("@")[0].split(/[\s._-]+/).filter(Boolean);
+  const words = name.replace(/\s*<[^>]*>$/, "").split("@")[0].split(/[\s._-]+/).filter(Boolean);
   if (words.length === 0) return "";
   const letters = words.length > 1 ? words[0][0] + words[words.length - 1][0] : words[0][0];
   return letters.toUpperCase();

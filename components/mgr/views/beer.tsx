@@ -2,8 +2,6 @@ import { Fragment } from "react";
 import { E } from "@/components/mgr/e";
 import type { BeerViewModel } from "@/lib/mgr/beer-view";
 
-export type { BeerViewModel };
-
 export function BeerView({
   model,
   linkRows,

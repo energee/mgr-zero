@@ -2,7 +2,7 @@
 // Team, Permission denied, First-run, and entry inventory adapters plus HTML.
 // Views own no sample data. Live CommandForm / MeSheet / LoginForm / Entry
 // cards stay wrappers.
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -195,6 +195,24 @@ describe("Today view", () => {
     expect(readFileSync("app/(app)/page.tsx", "utf8")).toContain("actions: todayActions(brewery.roles)");
   });
 
+  it("draws the driver inventory from the same next-stop facts as live Today (#1654)", () => {
+    const model = toTodayViewProps({
+      date: "Thu 9/3",
+      timeZone: "America/New_York",
+      now: new Date("2026-09-03T16:00:00Z"),
+      items: [{
+        reason: "delivery_next", subjectType: "delivery", subjectId: "stop-1", sourceVersion: "1",
+        safeLabel: "Route A · stop 1", customerName: null, detail: "next stop", dueAt: "2026-09-03T04:00:00Z",
+        href: "/work/deliveries/stop-1", recipientRoles: ["admin", "warehouse"], assignedUserId: "driver-1",
+      }],
+    });
+    expect(model.rows).toHaveLength(1);
+    expect(model.rows[0]).toMatchObject({ title: "Route A · stop 1", detail: "next stop", verb: "Resume", warning: false });
+    // Navigation destinations are inert in the inventory; the drawing must otherwise match.
+    expect(htmlOf(screen("Driver").body)).toBe(htmlOf(createElement(TodayView, { model })));
+    expect(htmlOf(createElement(TodayView, { model, linkRows: true }))).toMatch(/<a[^>]*href="\/work\/deliveries\/stop-1"[^>]*>Resume<\/a>/);
+  });
+
   it.each([
     ["Today", TodayView, todayWarehouse],
     ["Today empty", TodayView, todayEmpty],
@@ -373,15 +391,9 @@ describe("Search view", () => {
     expect(body.props.model).toEqual(entityPickerPalette);
   });
 
-  it("the live Search adapters delegate their controls and results to SearchView", () => {
-    expect(existsSync("app/(app)/search/page.tsx")).toBe(false);
-    expect(src("app/(app)/layout.tsx")).toMatch(/<SearchSheet\b/);
-    const palette = src("components/mgr/search-palette.tsx");
-    expect(palette).toMatch(/<SearchView\b/);
-    expect(palette).not.toMatch(/<Command\b|<CommandInput\b|<CommandGroup\b|<CommandItem\b/);
-    expect(palette).toMatch(/emptyMessage=\{searchEmptyMessage\(/);
-    expect(screen("Search").states).toContainEqual(["first use", searchEmptyMessage("", "idle", true)]);
-    expect(screen("Search").states).toContainEqual(["empty", searchEmptyMessage("zzz", "ready", true)]);
+  it("keeps inventory first-use and empty states aligned with live search", () => {
+    expect(screen("Search").states).toContainEqual(["first use", searchEmptyMessage("", "idle")]);
+    expect(screen("Search").states).toContainEqual(["empty", searchEmptyMessage("zzz", "ready")]);
   });
 });
 

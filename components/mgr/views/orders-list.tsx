@@ -15,8 +15,6 @@ import { CustomerScope } from "./customer-scope";
 import { RecordTable } from "./record-table";
 import { WorkKindTabs } from "./work-kind-tabs";
 
-export type { OrdersListViewModel };
-
 const muted = (text: string) => <span key={text} className="text-muted-foreground">{text}</span>;
 
 /** Lifecycle status, and staged restock as a second worded badge so color is never the only signal. */

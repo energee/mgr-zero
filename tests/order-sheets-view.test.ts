@@ -48,7 +48,6 @@ describe("Short pick view", () => {
     expect(model.counted).toBe(7);
     expect(model.missing).toBe(3);
     expect(model.resolveTitle).toBe("Resolve the missing 3");
-    expect(model.chips).toEqual(["Adjust order to 7", "Keep 3 owed · staged"]);
     expect(model.verb).toBe("Adjust order to 7 cases");
   });
 
@@ -62,8 +61,6 @@ describe("Short pick view", () => {
     expect(markup).toMatch(/Reason/);
     expect(markup).toMatch(/required/);
     expect(markup).toMatch(/Resolve the missing 3/);
-    expect(markup).toMatch(/Adjust order to 7/);
-    expect(markup).toMatch(/Keep 3 owed · staged/);
     expect(markup).toMatch(/>Adjust order to 7 cases</);
     expect(markup).toContain('data-direction="forward"');
     expect(markup).not.toMatch(/[→›]/);
@@ -277,12 +274,12 @@ describe("Shipment done view", () => {
     // Two short pools at one location must read differently: pool and size are named.
     const warnings = [
       { pool: "Owned", keg_size: "half_bbl", location: "Warehouse", short: 2 },
-      { pool: "Microstar", keg_size: "sixth_bbl", location: "Warehouse", short: 2 },
+      { pool: "Kegline", keg_size: "sixth_bbl", location: "Warehouse", short: 2 },
     ];
     const model = toShipmentDoneViewProps({ ...orderShipmentDone, warnings });
     expect(model.warnings).toEqual([
       "Owned ½ bbl · Warehouse: 2 kegs short · record Acquired kegs to reconcile",
-      "Microstar ⅙ bbl · Warehouse: 2 kegs short · record Acquired kegs to reconcile",
+      "Kegline ⅙ bbl · Warehouse: 2 kegs short · record Acquired kegs to reconcile",
     ]);
     const markup = html(createElement(ShipmentDoneView, { model }));
     for (const warning of model.warnings) expect(markup).toContain(warning);
@@ -335,6 +332,17 @@ describe("Return and credit view", () => {
     expect(model.tape[0]).toEqual(["+1 Hazy IPA · ½ bbl keg · return in", "Taproom"]);
     expect(model.tape.at(-1)).toEqual(["credit memo number · on commit", "−$150.00"]);
   });
+
+  it("sums individually rounded return credits using exact quantity hundredths", () => {
+    const model = toReturnCreditViewProps({
+      ...orderReturnCredit,
+      lines: [
+        { ...orderReturnCredit.lines[0], qty_returning: 1.15, unit_price_cents: 50 },
+        { ...orderReturnCredit.lines[0], id: "second", qty_returning: 0.33, unit_price_cents: 150 },
+      ],
+    });
+    expect(model.tape.at(-1)).toEqual(["credit memo number · on commit", "−$1.08"]);
+  });
   it("credits the beer and the refunded keg deposit in one memo, in whole kegs, with no stock for the deposit", () => {
     const model = toReturnCreditViewProps(orderReturnCredit);
     expect(model.title).toBe("Beer return");
@@ -361,9 +369,19 @@ describe("Return and credit view", () => {
     expect(markup).toMatch(/Return to/);
     expect(markup).toMatch(/−\$30\.00/);
     expect(markup).toMatch(/INV-1042/);
-    expect(markup).toMatch(/Keg fleet/);
     expect(markup).toMatch(/>Return shipment</);
     expect(markup).toContain('data-variant="irreversible"');
+  });
+
+  it("omits beer disposition and destination for a deposit-only refund until empty-keg check-in is selected", () => {
+    const model = toReturnCreditViewProps({ ...orderReturnCredit, lines: orderReturnCredit.lines.filter(line => line.kind === "keg_deposit"), reason: "" });
+    const refund = html(createElement(ReturnCreditView, { model }));
+    expect(refund).not.toContain('aria-label="Reason"');
+    expect(refund).not.toContain("Return to");
+    expect(refund).toContain("Check in empty kegs with this refund");
+    expect(model.tape.at(-1)).toEqual(["credit memo number · on commit", "−$30.00"]);
+    const checkIn = html(createElement(ReturnCreditView, { model, returnEmptyKegs: true, bins: [{ id: "cold", name: "Cold" }] }));
+    expect(checkIn).toContain("Return to bin");
   });
 });
 
@@ -396,8 +414,12 @@ describe("Return shipment names what it waits for (#1485)", () => {
 
   it("lists every missing choice in form order", () => {
     expect(returnCreditReason({ lines, quantities: {}, reason: "", locationId: "", binMissing: false }))
-      .toBe("Still needed: a quantity to return, a reason, and a return location.");
+      .toBe("Still needed: a quantity to return.");
     expect(returnCreditReason({ ...ready, binMissing: true })).toBe("Still needed: a return bin.");
+    expect(returnCreditReason({ ...ready, reason: "", locationId: "" })).toBe("Still needed: a reason and a return location.");
+    expect(returnCreditReason({ lines, quantities: { keg: "1" }, reason: "", locationId: "", binMissing: true })).toBeNull();
+    expect(returnCreditReason({ lines, quantities: { keg: "1" }, reason: "", locationId: "", binMissing: true, returnEmptyKegs: true }))
+      .toBe("Still needed: a return location and a return bin.");
   });
 
   it("prints the reason beside the withheld button and a bad quantity under its field", () => {

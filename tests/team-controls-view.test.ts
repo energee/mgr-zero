@@ -15,7 +15,7 @@ function elements(node: ReactNode): Element[] {
 function member(props: Partial<ComponentProps<typeof TeamMemberView>> = {}) {
   let tree: ReactNode;
   function Harness() {
-    return tree = TeamMemberView({ name: "Actual Brewer", email: "actual@example.com", savedRoles: ["brewer"], ...props });
+    return tree = TeamMemberView({ name: "Actual Brewer <actual@example.com>", savedRoles: ["brewer"], ...props });
   }
   const html = renderToStaticMarkup(createElement(Harness));
   return { html, nodes: elements(tree) };
@@ -113,7 +113,7 @@ it("reports a sent invitation in a neutral status line that matches the dialog n
 });
 
 it("locks both membership actions during either pending write and retains errors", () => {
-  const html = renderToStaticMarkup(createElement(TeamMemberView, { name: "Actual Brewer", email: "actual@example.com", savedRoles: ["brewer"], removing: true, error: "Cannot remove the last admin" }));
+  const html = renderToStaticMarkup(createElement(TeamMemberView, { name: "Actual Brewer <actual@example.com>", savedRoles: ["brewer"], removing: true, error: "Cannot remove the last admin" }));
   expect(html).toContain("Cannot remove the last admin");
   expect(html).toContain("ends this brewery membership");
   // Remove opens the confirm sheet; its trigger is held while either write runs.

@@ -7,9 +7,9 @@
 # GitHub may delay or skip a scheduled run under load; the next run catches up.
 # Needs repository variable MGR_URL (production origin, no trailing slash) and
 # secrets ORDER_EMAIL_JOB_SECRET and RETENTION_JOB_SECRET matching Vercel.
-# Jobs skip while MGR_URL is unset (not yet deployed); once set, a failed call
-# fails the run so GitHub notifies. A redirect fails too: --fail ignores 3xx, and
-# Vercel Deployment Protection answers 302 to its sign-in page.
+# Missing MGR_URL fails the scheduled job rather than hiding an unconfigured worker.
+# A failed call fails the run so GitHub notifies. A redirect fails too:
+# --fail ignores 3xx, and Vercel Deployment Protection answers 302.
 name: hosted jobs
 
 on:
@@ -25,7 +25,7 @@ env:
 
 jobs:
   order-email:
-    if: vars.MGR_URL != '' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '*/5 * * * *')
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '*/5 * * * *'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -33,10 +33,11 @@ jobs:
         env:
           SECRET: ${{ secrets.ORDER_EMAIL_JOB_SECRET }}
         run: |
+          [ -n "$MGR_URL" ] || { echo "::error::MGR_URL repository variable is required"; exit 1; }
           curl -sS --fail-with-body --location --max-redirs 0 --max-time 240 -X POST "$MGR_URL/api/email/jobs/deliver" -H "Authorization: Bearer $SECRET"
 
   retention:
-    if: vars.MGR_URL != '' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '17 7 * * *')
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 7 * * *'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -44,4 +45,5 @@ jobs:
         env:
           SECRET: ${{ secrets.RETENTION_JOB_SECRET }}
         run: |
+          [ -n "$MGR_URL" ] || { echo "::error::MGR_URL repository variable is required"; exit 1; }
           curl -sS --fail-with-body --location --max-redirs 0 --max-time 240 -X POST "$MGR_URL/api/retention/jobs/prune" -H "Authorization: Bearer $SECRET"

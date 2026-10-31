@@ -5,6 +5,7 @@
 // drawings (Maria, "Invoices"); nothing under app/ imports this.
 import { cloneElement, type ReactElement, type ComponentProps } from "react";
 import { OrdersView } from "@/components/mgr/views/orders-list";
+import { OrderView } from "@/components/mgr/views/order";
 import { BatchesView } from "@/components/mgr/views/batches";
 import { CellarMapView } from "@/components/mgr/views/cellar-map";
 import { VesselDetailView } from "@/components/mgr/views/vessel-detail";
@@ -39,6 +40,11 @@ export function asPersona(screen: Screen, persona: Persona, refused?: string): S
     // createAction: undefined keeps OrdersView's default New order button; null hides it.
     const body = screen.body as ReactElement<ComponentProps<typeof OrdersView>>;
     return { ...screen, body: cloneElement(body, { model, createAction: canWrite ? undefined : null }) };
+  }
+  if ((screen.name === "Order" || screen.name === "Order draft") && !hasAnyRole(persona.roles, ["admin", "sales"])) {
+    const body = screen.body as ReactElement<ComponentProps<typeof OrderView>>;
+    const model = { ...body.props.model, facts: body.props.model.facts.filter(fact => fact.label !== "Confirmation email") };
+    return { ...screen, body: cloneElement(body, { model }) };
   }
   // Vessels are admin-managed: null hides Add vessel and New vessel; a brewer reads the facts.
   if (!hasAnyRole(persona.roles, ["admin"])) {

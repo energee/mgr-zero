@@ -4,6 +4,7 @@ import { unwrap, type StaffRole } from "@/lib/commands/registry";
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase/server";
+import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 
 export interface RequestIdentity {
   userId: string;
@@ -17,6 +18,8 @@ export interface StaffMembership {
   roles: StaffRole[];
   /** breweries.timezone (IANA): every timestamp on a staff page prints in it (#442). */
   timeZone: string;
+  gravityUnit: GravityUnit;
+  myGravityUnit: GravityUnit | null;
 }
 
 export interface CustomerMembership {
@@ -29,6 +32,7 @@ export interface CustomerMembership {
 type StaffMembershipRow = {
   brewery_id: string;
   roles: StaffMembership["roles"];
+  gravity_unit: GravityUnit | null;
 };
 
 type CustomerMembershipRow = {
@@ -95,16 +99,20 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
     // returns only the caller's breweries without an id filter; both reads run
     // at once instead of the second waiting on the first's ids.
     const [{ data, error }, { data: breweries, error: breweryError }] = await Promise.all([
-      db.from("brewery_users").select("brewery_id, roles").eq("user_id", requestIdentity.userId).returns<StaffMembershipRow[]>(),
-      db.from("staff_brewery").select("id, name, timezone"),
+      db.from("brewery_users").select("brewery_id, roles, gravity_unit").eq("user_id", requestIdentity.userId).returns<StaffMembershipRow[]>(),
+      db.from("staff_brewery").select("id, name, timezone, gravity_unit"),
     ]);
     if (error) throw error;
     if (breweryError) throw breweryError;
     const breweryRows = new Map((breweries ?? []).map((brewery) => [brewery.id, brewery]));
-    return (data ?? []).map(({ brewery_id, roles }) => {
+    return (data ?? []).map(({ brewery_id, roles, gravity_unit }) => {
       const brewery = breweryRows.get(brewery_id);
       if (!brewery?.name || !brewery.timezone) throw new Error("staff membership brewery is unavailable");
-      return { breweryId: brewery_id, breweryName: brewery.name, roles, timeZone: brewery.timezone };
+      return {
+        breweryId: brewery_id, breweryName: brewery.name, roles, timeZone: brewery.timezone,
+        gravityUnit: (brewery.gravity_unit ?? "plato") as GravityUnit,
+        myGravityUnit: gravity_unit,
+      };
     });
   })());
   const getCustomerMemberships = () => (customerMemberships ??= (async () => {

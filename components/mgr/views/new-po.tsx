@@ -10,7 +10,6 @@ import { pastExpectedWarning, poLineErrors, type NewPoViewModel } from "@/lib/mg
 import { noMaterialsPick } from "@/lib/mgr/materials-view";
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 
-export type { NewPoViewModel };
 export type NewPoControls = {
   vendor?: (value: string) => void; expected?: (value: string) => void;
   material?: (index: number, value: string) => void; quantity?: (index: number, value: string) => void;

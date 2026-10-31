@@ -115,12 +115,12 @@ describe("inventory commands", () => {
     expect(await runCommand("get_inventory_sku", { skuId: sku.id }, ctx)).toMatchObject({
       id: sku.id, name: "Archive IPA case", active: false,
     });
-    expect(await runCommand("list_movements", { skuId: sku.id, limit: 50, offset: 0 }, ctx)).toEqual([
+    expect(await runCommand("list_movements", { skuId: sku.id, limit: 50 }, ctx)).toEqual({ rows: [
       expect.objectContaining({
         sku_id: sku.id, qty: 3, type: "opening_balance",
         locations: { name: "Historical warehouse" }, bins: { name: "Historical rack" },
       }),
-    ]);
+    ], nextCursor: null });
     await expect(runCommand("delete_bin", { binId: bin.id }, ctx))
       .rejects.toThrow(/recorded stock|at least one bin/i);
 
