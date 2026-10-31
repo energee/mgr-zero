@@ -108,10 +108,11 @@ describe("integration transport failure boundaries", () => {
     const failure = new Error("Portal quote tax lookup failed");
     dbRpc.mockResolvedValue({ data: { taxReady: true, quoteId: crypto.randomUUID(), taxStatus: "pending" }, error: null });
     boundary.readTax.mockRejectedValue(failure);
-    const client = { calculateSalesTax: vi.fn() };
+    const client = new QboOAuthClient(qboConfig, vi.fn());
+    const calculate = vi.spyOn(client, "calculateSalesTax");
     await expect(quotePortalOrder({ ...ctx, roles: ["customer"], customerId: crypto.randomUUID() }, {
       shipToId: crypto.randomUUID(), lines: [{ skuId: crypto.randomUUID(), qty: 1 }],
     }, requestId, client)).rejects.toBe(failure);
-    expect(client.calculateSalesTax).not.toHaveBeenCalled();
+    expect(calculate).not.toHaveBeenCalled();
   });
 });

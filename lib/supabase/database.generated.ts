@@ -4824,6 +4824,9 @@ isOneToOne: false
 "cas_portal_qbo_payment_tokens":
 { Args: { "p_access_seconds": number,"p_access_token": string,"p_actor": string,"p_brewery": string,"p_connection": string,"p_customer": string,"p_expected_version": number,"p_granted_scopes": (string)[],"p_hard_seconds": number,"p_invoice": string,"p_realm_id": string,"p_received_at": string,"p_refresh_seconds": number,"p_refresh_token": string,"p_remote_invoice_id": string }; Returns: boolean
                            },
+"cas_portal_quote_tax_tokens":
+{ Args: { "p_access_seconds": number,"p_access_token": string,"p_actor": string,"p_brewery": string,"p_connection": string,"p_customer": string,"p_expected_version": number,"p_hard_seconds": number,"p_lease": string,"p_quote": string,"p_received_at": string,"p_refresh_seconds": number,"p_refresh_token": string }; Returns: boolean
+                           },
 "chat_assert_job":
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },
@@ -5267,6 +5270,9 @@ isOneToOne: false
 "lease_order_emails":
 { Args: { "p_from": string }; Returns: Json
                            },
+"lease_portal_quote_tax_refresh":
+{ Args: { "p_actor": string,"p_brewery": string,"p_connection": string,"p_customer": string,"p_expected_version": number,"p_lease": string,"p_quote": string }; Returns: string
+                           },
 "lease_qbo_token_refresh":
 { Args: { "p_actor": string,"p_brewery": string,"p_connection": string,"p_customer"?: string,"p_expected_version": number,"p_invoice"?: string,"p_lease": string }; Returns: string
                            },
@@ -5322,6 +5328,9 @@ isOneToOne: false
                            },
 "mark_chat_installation_reauthorization":
 { Args: { "p_failure_code": string,"p_installation": string }; Returns: undefined
+                           },
+"mark_portal_quote_tax_authorization_failed":
+{ Args: { "p_actor": string,"p_brewery": string,"p_connection": string,"p_customer": string,"p_expected_version": number,"p_lease"?: string,"p_quote": string }; Returns: boolean
                            },
 "mark_qbo_authorization_failed":
 { Args: { "p_actor": string,"p_brewery": string,"p_connection": string,"p_customer"?: string,"p_expected_version": number,"p_invoice"?: string }; Returns: boolean
@@ -5456,17 +5465,8 @@ isOneToOne: false
                            },
 "read_portal_quote_tax_tokens":
 { Args: { "p_actor": string,"p_brewery": string,"p_customer": string,"p_quote": string }; Returns: {
-              "access_token": string,"refresh_token": string,"connection_id": string,"credential_version": number,"access_expires_at": string,"refresh_expires_at": string,"refresh_hard_expires_at": string
+              "access_expires_at": string,"access_token": string,"connection_id": string,"credential_version": number,"refresh_expires_at": string,"refresh_hard_expires_at": string,"refresh_token": string
             }[]
-                           },
-"lease_portal_quote_tax_refresh":
-{ Args: { "p_actor": string,"p_brewery": string,"p_customer": string,"p_quote": string,"p_connection": string,"p_expected_version": number,"p_lease": string }; Returns: string
-                           },
-"cas_portal_quote_tax_tokens":
-{ Args: { "p_actor": string,"p_brewery": string,"p_customer": string,"p_quote": string,"p_connection": string,"p_expected_version": number,"p_access_token": string,"p_refresh_token": string,"p_received_at": string,"p_access_seconds": number,"p_refresh_seconds": number,"p_hard_seconds": number,"p_lease": string }; Returns: boolean
-                           },
-"mark_portal_quote_tax_authorization_failed":
-{ Args: { "p_actor": string,"p_brewery": string,"p_customer": string,"p_quote": string,"p_connection": string,"p_expected_version": number,"p_lease"?: string }; Returns: boolean
                            },
 "reap_qbo_oauth_exchanges":
 { Args: Record<PropertyKey, never>; Returns: {
