@@ -1105,7 +1105,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Insert: {
-                    "brewery_id": string,"created_at"?: string,"customer_id": string,"due_on"?: string | null,"id"?: string,"invoice_no"?: number | null,"issued_on"?: string,"kind"?: Database["public"]['Enums']["invoice_kind"],"paid_at"?: string | null,"qbo_accountant_drift"?: boolean,"qbo_balance_cents"?: number | null,"qbo_cash_collected_cents"?: number,"qbo_idempotency_key"?: string,"qbo_invoice_id"?: string | null,"qbo_remote_state"?: Database["public"]['Enums']["qbo_remote_state"],"qbo_settled_at"?: string | null,"qbo_sync_error"?: string | null,"qbo_sync_generation"?: number,"qbo_sync_status"?: Database["public"]['Enums']["qbo_sync_status"],"qbo_sync_token"?: string | null,"qbo_tax_cents"?: number | null,"qbo_total_cents"?: number | null,"refused_delivery_id"?: string | null,"shipment_id"?: string | null,"written_off_at"?: string | null,"written_off_by"?: string | null,"written_off_reason"?: string | null
+                    "brewery_id": string,"created_at"?: string,"customer_id": string,"due_on"?: string | null,"id"?: string,"invoice_no"?: number | null,"issued_on": string,"kind"?: Database["public"]['Enums']["invoice_kind"],"paid_at"?: string | null,"qbo_accountant_drift"?: boolean,"qbo_balance_cents"?: number | null,"qbo_cash_collected_cents"?: number,"qbo_idempotency_key"?: string,"qbo_invoice_id"?: string | null,"qbo_remote_state"?: Database["public"]['Enums']["qbo_remote_state"],"qbo_settled_at"?: string | null,"qbo_sync_error"?: string | null,"qbo_sync_generation"?: number,"qbo_sync_status"?: Database["public"]['Enums']["qbo_sync_status"],"qbo_sync_token"?: string | null,"qbo_tax_cents"?: number | null,"qbo_total_cents"?: number | null,"refused_delivery_id"?: string | null,"shipment_id"?: string | null,"written_off_at"?: string | null,"written_off_by"?: string | null,"written_off_reason"?: string | null
                   }
                   Update: {
                     "brewery_id"?: string,"created_at"?: string,"customer_id"?: string,"due_on"?: string | null,"id"?: string,"invoice_no"?: number | null,"issued_on"?: string,"kind"?: Database["public"]['Enums']["invoice_kind"],"paid_at"?: string | null,"qbo_accountant_drift"?: boolean,"qbo_balance_cents"?: number | null,"qbo_cash_collected_cents"?: number,"qbo_idempotency_key"?: string,"qbo_invoice_id"?: string | null,"qbo_remote_state"?: Database["public"]['Enums']["qbo_remote_state"],"qbo_settled_at"?: string | null,"qbo_sync_error"?: string | null,"qbo_sync_generation"?: number,"qbo_sync_status"?: Database["public"]['Enums']["qbo_sync_status"],"qbo_sync_token"?: string | null,"qbo_tax_cents"?: number | null,"qbo_total_cents"?: number | null,"refused_delivery_id"?: string | null,"shipment_id"?: string | null,"written_off_at"?: string | null,"written_off_by"?: string | null,"written_off_reason"?: string | null
@@ -1377,7 +1377,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Insert: {
-                    "bin_id": string,"brewery_id": string,"counted_by": string,"counted_on"?: string,"created_at"?: string,"id"?: string,"location_id": string,"note"?: string | null
+                    "bin_id": string,"brewery_id": string,"counted_by": string,"counted_on": string,"created_at"?: string,"id"?: string,"location_id": string,"note"?: string | null
                   }
                   Update: {
                     "bin_id"?: string,"brewery_id"?: string,"counted_by"?: string,"counted_on"?: string,"created_at"?: string,"id"?: string,"location_id"?: string,"note"?: string | null
@@ -2827,7 +2827,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Insert: {
-                    "bin_id"?: string | null,"brewery_id": string,"correction_reason"?: string | null,"corrects_receipt_id"?: string | null,"created_at"?: string,"id"?: string,"location_id"?: string | null,"note"?: string | null,"po_id": string,"qbo_bill_error"?: string | null,"qbo_bill_id"?: string | null,"qbo_bill_request_id"?: string | null,"qbo_bill_status"?: string | null,"received_by": string,"received_on"?: string
+                    "bin_id"?: string | null,"brewery_id": string,"correction_reason"?: string | null,"corrects_receipt_id"?: string | null,"created_at"?: string,"id"?: string,"location_id"?: string | null,"note"?: string | null,"po_id": string,"qbo_bill_error"?: string | null,"qbo_bill_id"?: string | null,"qbo_bill_request_id"?: string | null,"qbo_bill_status"?: string | null,"received_by": string,"received_on": string
                   }
                   Update: {
                     "bin_id"?: string | null,"brewery_id"?: string,"correction_reason"?: string | null,"corrects_receipt_id"?: string | null,"created_at"?: string,"id"?: string,"location_id"?: string | null,"note"?: string | null,"po_id"?: string,"qbo_bill_error"?: string | null,"qbo_bill_id"?: string | null,"qbo_bill_request_id"?: string | null,"qbo_bill_status"?: string | null,"received_by"?: string,"received_on"?: string
