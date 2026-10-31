@@ -269,14 +269,14 @@ export const E = {
    *  a column flex item with width:auto still stretches). Entry cards override
    *  back to full-width because they stay a phone-width column on the desk.
    *  `data-to` names the screen a link opens when its label is not that screen's name, as on E.back. */
-  btn: (t: React.ReactNode, k: BtnKind = "p", href?: string, onClick?: () => void, attributes?: { "data-preview-action"?: boolean; "data-to"?: string }) => {
+  btn: (t: React.ReactNode, k: BtnKind = "p", href?: string, onClick?: () => void, attributes?: { type?: "button" | "submit"; "data-preview-action"?: boolean; "data-to"?: string }) => {
     const [kind, disabled] = k.split(" ") as [BtnBase, string?];
     return (
       <Button
         {...attributes}
         variant={kind === "g" ? "outline" : kind === "ghost" ? "ghost" : kind === "del" ? "destructive" : "default"}
         disabled={Boolean(disabled)}
-        type={onClick ? "button" : undefined}
+        type={attributes?.type ?? (onClick ? "button" : undefined)}
         onClick={onClick}
         asChild={Boolean(href) && !disabled}
         className={cn(

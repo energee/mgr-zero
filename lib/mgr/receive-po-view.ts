@@ -52,7 +52,7 @@ export const poLineDetail = (line: PoLineAmounts) =>
   `ordered ${poLineQty(line.qty_ordered, line.material)} · received ${poLineQty(line.qty_received, line.material)} · still due ${poLineQty(line.qty_open, line.material)}${line.expected_lot_code ? ` · PO lot ${line.expected_lot_code}` : ""}`;
 
 /** What a receipt correction does, shown on the live form and its inventory frame. */
-export const CORRECTION_INFO = "The original receipt remains in history. Its stock is reversed and the corrected count is posted at the original receiving bin. Negative stock or changed shared lot provenance can prevent correction.";
+export const CORRECTION_INFO = "The original receipt remains in history. Its stock is compensated and the corrected count posts in the selected receiving bin. Used stock can be corrected if balances stay nonnegative; used lot identities and shared lot facts stay fixed.";
 
 /** The one mode a Receive PO state puts the form in: mark a draft sent,
  *  count a new receipt, correct a posted one, or only show the order. */
@@ -77,11 +77,11 @@ export function receiveReason(model: ReceivePoViewModel): string | null {
   if (mode !== "receive" && mode !== "correct") return null;
   const missing: string[] = [];
   if (mode === "correct" && !model.correctionReason?.trim()) missing.push("a correction reason");
-  if (mode === "receive") {
+  if (mode === "receive" || model.locations !== undefined) {
     if (!model.locationId) missing.push("a location");
     if (!model.binId) missing.push("a bin");
-    if (!model.receivedOn) missing.push("a received day");
   }
+  if (mode === "receive" && !model.receivedOn) missing.push("a received day");
   const lines = model.lines ?? [];
   for (const line of lines) {
     const qty = String(line.qty);

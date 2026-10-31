@@ -300,3 +300,80 @@ describe("today candidates (shared projection) and internal scan", () => {
     expect(error?.message).toMatch(/permission denied|not find the function/i);
   });
 });
+
+it("reads restock and refused-return work without scanning a 9,000-order history (#1645)", async () => {
+  const client = await sql.connect();
+  try {
+    await client.query("begin");
+    // Two years of closed deliveries, with only two restocks and one refusal.
+    // Roll back the bulk fixture so other suites do not inherit its history.
+    await client.query(`create temp table today_history on commit drop as
+      select n, gen_random_uuid() order_id, gen_random_uuid() shipment_id,
+        gen_random_uuid() delivery_id
+      from generate_series(1, 9000) n`);
+    await client.query(`insert into public.orders
+      (id, brewery_id, status, customer_id, ship_to_id, from_location_id,
+       sale_channel_id, created_by, needs_restock, created_at, shipped_at)
+      select order_id, $1, case when n = 1 then 'cancelled'::public.order_status
+        else 'shipped'::public.order_status end, $2, $3, $4,
+        (select sale_channel_id from public.customers where id = $2), $5, n <= 2,
+        now() - (n % 730) * interval '1 day', now() - (n % 730) * interval '1 day'
+      from today_history`, [b.id, customerId, shipToId, whId, adminCtx.userId]);
+    await client.query(`insert into public.order_lines
+      (brewery_id, order_id, sku_id, qty_ordered, qty_picked, qty_shipped,
+       unit_price_cents, qty_refused)
+      select $1, order_id, $2, 2, 2, 2, 12000, case when n = 3 then 1 else 0 end
+      from today_history`, [b.id, skuId]);
+    await client.query(`insert into public.shipments
+      (id, brewery_id, order_id, created_by, invoice_timing)
+      select shipment_id, $1, order_id, $2, 'on_delivery' from today_history`,
+    [b.id, adminCtx.userId]);
+    const route = await client.query(`insert into public.routes
+      (brewery_id, name, delivery_date, departed_at, returned_at)
+      values ($1, 'Completed history', current_date, now(), now()) returning id`, [b.id]);
+    await client.query(`insert into public.deliveries
+      (id, brewery_id, route_id, shipment_id, stop_no, delivered_at, outcome)
+      select delivery_id, $1, $2, shipment_id, n, now(),
+        case when n = 3 then 'partial' else 'delivered' end from today_history`,
+    [b.id, route.rows[0].id]);
+    await client.query(`analyze public.orders; analyze public.order_lines;
+      analyze public.shipments; analyze public.deliveries`);
+
+    type PlanNode = {
+      "Index Name"?: string;
+      "Relation Name"?: string;
+      "Node Type": string;
+      "Actual Rows": number;
+      "Actual Loops": number;
+      "Rows Removed by Filter"?: number;
+      Plans?: PlanNode[];
+    };
+    const nodes = (node: PlanNode): PlanNode[] => [node, ...(node.Plans ?? []).flatMap(nodes)];
+    for (const [reason, index] of [
+      ["restock_due", "orders_needs_restock_idx"],
+      ["refused_return", "order_lines_refused_idx"],
+    ]) {
+      const query = "select * from private.today_candidates where brewery_id = $1 and reason = $2";
+      const explained = await client.query(`explain (analyze, buffers, format json) ${query}`, [b.id, reason]);
+      const plan = nodes(explained.rows[0]["QUERY PLAN"][0].Plan);
+      expect(plan.map(node => node["Index Name"])).toContain(index);
+      // No scan of any history table may visit the whole 9,000-row fixture.
+      // EXPLAIN reports rows per loop, so multiply by the loop count.
+      const history = ["orders", "order_lines", "shipments", "deliveries"];
+      for (const node of plan.filter(node => history.includes(node["Relation Name"] ?? ""))) {
+        const visited = (node["Actual Rows"] + (node["Rows Removed by Filter"] ?? 0)) * node["Actual Loops"];
+        expect(visited).toBeLessThan(9000);
+      }
+      const actual = await client.query(query, [b.id, reason]);
+      const expected = await client.query(`select
+        case when $1 = 'restock_due' then order_id else delivery_id end::text subject_id
+        from today_history where case when $1 = 'restock_due' then n <= 2 else n = 3 end`, [reason]);
+      const fixtureIds = new Set(expected.rows.map(row => row.subject_id));
+      expect(actual.rows.filter(row => fixtureIds.has(row.subject_id)).map(row => row.subject_id).sort())
+        .toEqual([...fixtureIds].sort());
+    }
+  } finally {
+    await client.query("rollback");
+    client.release();
+  }
+});
