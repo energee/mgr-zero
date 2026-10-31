@@ -211,5 +211,6 @@
   "20261029001000_ship_to_label_unique_drop_pa_license.sql": "736ad982ce5eb62cc57c08787329803bc0ebf554e9a65a1184eef3667d7a26c9",
   "20261029104000_update_draft_purchase_order.sql": "d92ac1d967ae2fa36ec3045ee8b740a2fd26cd2439b456495e85e0b34046c2ac",
   "20261029123000_compliance_active_months_bounded.sql": "650cc10c50914c7e266e9ff8ff81408b6d414bbe28317d399b5c4f24202a91b4",
-  "20261030033000_brewery_local_document_dates.sql": "196f6d13961699ee0c57a8b30acbf63c1f79be7c5361577e984ea4f7437312e2"
+  "20261030033000_brewery_local_document_dates.sql": "196f6d13961699ee0c57a8b30acbf63c1f79be7c5361577e984ea4f7437312e2",
+  "20261030033001_receipt_lots_keep_saved_date.sql": "1ec8c82cc5805a0e9ece765aaa142a6715bd1de492e3cfa06925fefe95ca74c4"
 }

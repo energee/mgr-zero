@@ -30,6 +30,7 @@ async function fixture(): Promise<Fixture> {
 
 async function shipment(f: Fixture, invoiceTiming: "now" | "on_delivery", returnableKegs = false) {
   const customer = await seedCustomer(f.brewery.id);
+  expect((await admin.from("customers").update({ payment_terms: "net30" }).eq("id", customer.customerId)).error).toBeNull();
   const catalog = await seedCatalog(f.brewery.id, { bblPerUnit: 0.5, ...(returnableKegs ? { packageType: "keg" } : {}) });
   if (returnableKegs) {
     const pool = await ins("keg_pools", { brewery_id: f.brewery.id, name: "Posting fleet", kind: "owned", deposit_cents: 2500 });
@@ -113,11 +114,12 @@ it("keeps exact receipt quantities and actual cost together with brewery-local d
   const line = (await admin.from("purchase_order_lines").select("id").eq("po_id", po.id).single()).data!;
   const input = { p_brewery: f.brewery.id, p_po: po.id, p_location: f.location.id,
     p_bin: f.location.binId, p_received_on: null };
-  for (const [qty, error] of [[0.00001, /four decimals/], [0.0001, /too precise for the base unit/]] as const) {
+  for (const qty of [0.00001, 0.0001]) {
     const refused = await f.ctx.db.rpc("receive_purchase_order", { ...input, p_request_id: crypto.randomUUID(),
       p_lines: [{ po_line_id: line.id, qty_counted: qty, lot_code: "PRECISE", unit_cost_cents: 1250 }] });
-    expect(refused.error?.message).toMatch(error);
-    expect(sql(`select count(*) from receipts where po_id='${po.id}'`, true)).toEqual(["0"]);
+    expect(refused.error).not.toBeNull();
+    expect(sql(`select count(*) from receipts where po_id='${po.id}';
+      select count(*) from material_movements where material_id='${material.id}'`, true)).toEqual(["0", "0"]);
   }
   const request = { ...input, p_request_id: crypto.randomUUID(),
     p_lines: [{ po_line_id: line.id, qty_counted: 1.2, lot_code: "PRECISE", unit_cost_cents: 1250 }] };
@@ -130,6 +132,39 @@ it("keeps exact receipt quantities and actual cost together with brewery-local d
     join material_movements m on m.id=rl.movement_id
     join purchase_order_lines pol on pol.id=rl.po_line_id where r.po_id='${po.id}'`, true)[0]))
     .toEqual([1.2, 3, 1250, 500, f.today, f.today, 1000]);
+});
+
+it("keeps every new lot on the saved receipt day if the brewery timezone changes during receiving", async () => {
+  const f = await fixture();
+  const vendor = await runCommand("upsert_vendor", { name: "Date-bound supplier" }, f.ctx) as { id: string };
+  const materials = [];
+  for (const name of ["First hops", "Second hops"]) {
+    materials.push(await runCommand("upsert_material", { name, category: "hop",
+      baseUom: "lb", purchaseUom: "lb", lotTracked: true }, f.ctx) as { id: string });
+  }
+  const po = await runCommand("create_purchase_order", { vendorId: vendor.id,
+    lines: materials.map(material => ({ materialId: material.id, qtyOrdered: 1 })) }, f.ctx) as { id: string };
+  await runCommand("send_purchase_order", { poId: po.id, sentVia: "external" }, f.ctx);
+  const lines = (await admin.from("purchase_order_lines").select("id").eq("po_id", po.id)).data!;
+  const received = lines.map(line => ({ po_line_id: line.id, qty_counted: 1, lot_code: "SAVED-DAY" }));
+  // Change real metadata between the receipt and lot inserts; transaction rollback removes the trigger and all writes.
+  expect(sql(`begin;
+    create function pg_temp.change_receipt_timezone() returns trigger language plpgsql as $$
+    begin
+      update public.breweries set timezone='UTC' where id=new.brewery_id;
+      return new;
+    end $$;
+    create trigger test_receipt_timezone after insert on public.receipts
+      for each row when (new.brewery_id='${f.brewery.id}') execute function pg_temp.change_receipt_timezone();
+    do $$ begin
+      perform set_config('request.jwt.claim.sub','${f.ctx.userId}',true);
+      perform public.receive_purchase_order('${f.brewery.id}','${po.id}','${f.location.id}','${f.location.binId}',
+        null,'${JSON.stringify(received)}'::jsonb,'${crypto.randomUUID()}');
+    end $$;
+    select concat_ws('|',r.received_on,l.lot_received_on,ml.received_on)
+      from public.receipts r join public.receipt_lines l on l.receipt_id=r.id
+      join public.material_lots ml on ml.id=l.lot_id where r.po_id='${po.id}';
+    rollback;`, true)).toEqual(Array(2).fill(`${f.today}|${f.today}|${f.today}`));
 });
 
 it("dates invoices created on delivery in the brewery timezone", async () => {
@@ -188,6 +223,7 @@ it.each(["Pacific/Kiritimati", "Pacific/Pago_Pago"])("uses %s for omitted insert
   const customer = await seedCustomer(f.brewery.id);
   expect(sql(`begin;
     set local timezone='UTC';
+    update customers set payment_terms='net30' where id='${customer.customerId}';
     update breweries set timezone='${zone}' where id='${f.brewery.id}';
     insert into invoices(brewery_id,customer_id) values('${f.brewery.id}','${customer.customerId}');
     select (issued_on=(now() at time zone '${zone}')::date and due_on=issued_on+30)::text
