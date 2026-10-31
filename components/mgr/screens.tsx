@@ -95,6 +95,7 @@ import { FormatsView } from "@/components/mgr/views/formats";
 import { WaterProfilesView } from "@/components/mgr/views/water-profiles";
 import { WaterProfileView } from "@/components/mgr/views/water-profile";
 import { InvoiceView, RecordPaymentView, VoidPaymentView } from "@/components/mgr/views/invoice";
+import { InvoiceAccountingActionsView, PushInvoiceView, WriteOffInvoiceView } from "@/components/mgr/views/invoice-accounting";
 import { KegBalanceView } from "@/components/mgr/views/keg-balance";
 import { KegFleetView } from "@/components/mgr/views/keg-fleet";
 import { KegReportView } from "@/components/mgr/views/keg-report";
@@ -111,6 +112,7 @@ import { LocationsView } from "@/components/mgr/views/locations";
 import { MeView } from "@/components/mgr/views/me";
 import { MoreView } from "@/components/mgr/views/more";
 import { MonthlyComplianceView, PeriodBeforeBooksView } from "@/components/mgr/views/monthly-compliance";
+import { ReattributeLossView } from "@/components/mgr/views/reattribute-loss";
 import { NewOrderView } from "@/components/mgr/views/new-order";
 import { EditDraftOrderView } from "@/components/mgr/views/edit-draft-order";
 import { editDraftOrder } from "@/lib/mgr/fixtures/edit-draft-order";
@@ -241,6 +243,7 @@ import { toFinishedGoodsViewProps } from "@/lib/mgr/finished-goods-view";
 import { toFormatViewProps } from "@/lib/mgr/format-view";
 import { toFormatsViewProps } from "@/lib/mgr/formats-view";
 import { toWaterProfileFields, toWaterProfilesViewProps } from "@/lib/mgr/water-profiles-view";
+import { qboPushConfirmation } from "@/lib/mgr/qbo-ui";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
 import { toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
@@ -450,12 +453,12 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 1, slice: "all", tab: "Today", name: "Driver",
-    to: { "Route A": "Driver route" },
+    to: { Resume: "Confirm delivery" },
     job: "Driver landing: the next stop and nothing else",
     reads: "get_today [delivery rows require route.driver_user_id = caller or admin]", writes: "none",
     states: [["empty", "No route today"], ["offline", "stop list cached · Delivered waits", 1], ["permission", "warehouse membership + assigned route", 1]],
-    spec: "Resume opens Confirm delivery for the next incomplete stop. Route A opens Driver route (all stops, the load, Return). No Pick/Receive rows.",
-    body: <TodayView model={toTodayViewProps(todayDriver)} lead={E.btn("Resume · Stop 1 of 3")} footer={E.nav("Route A", "departed 8:10 · return open")} />,
+    spec: "The next delivery row comes from a get_today-shaped delivery_next item. Resume opens Confirm delivery for that stop. The full stop list, load, departure and Return belong on Driver route, not Today.",
+    body: <TodayView model={toTodayViewProps(todayDriver)} />,
   },
   {
     step: 1, slice: "all", tab: "Today", name: "Taproom",
@@ -992,7 +995,7 @@ export const SCREENS: Screen[] = [
     name: "Order",
     to: { "Record pick": "Pick", Ship: "Ship and invoice", "Put back": "Put back", "Edit draft": "Edit draft", "Cancel order": "Orders" },
     job: "The staff home for one order: state, next action, lines, events, restock",
-    reads: "get_order · get_atp · get_order_cogs",
+    reads: "get_order · get_atp · get_order_cogs · get_order_email_status [Admin/Sales: confirmation email states]",
     writes: "submit_order · adjust_order_lines [picked: an added or raised line sends the order back to confirmed for a re-pick; staged excess sets needs_restock] · cancel_order [needs_restock while quantities are staged]",
     states: [["draft", "Edit draft corrects headers and lines; Submit advances the order"], ["confirmed / picked", "Admin and Sales change, add (Add line) and remove (✕) lines in place with a required Reason; restock rows appear when picked qty exceeds ordered; a save leaving a SKU below zero available still saves: Lines saved · Available is below zero for … under the lines"], ["changed after pick", "count only the added or raised lines · the rest is already staged", 1], ["shipped", "read-only tape · Return shipment is the correction · Cost line for Admin and Sales: frozen lot cost, returns netted, margin on the order-line prices; units without a receipt cost are counted and the margin is withheld"], ["shipped · stop delivered", "the route stamped the stop; the order stays shipped · read-only, Return shipment still corrects"], ["stale", "another user changed a line · refresh", 1], ["permission", "sales or admin to adjust and see Cost; warehouse reads", 1]],
     spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse. Adjusting down, shipping short and cancelling all set the restock flag; Put back is what clears it. Shipped is the last lifecycle state: Confirm delivery on the route stamps the stop, not the order, and no verb here sets it. Ship opens Ship and invoice rather than committing here. Cancel is destructive and asks for confirm. Every transition appends an order event row in the same RPC. A submitted order has no direct Confirm here: Review and confirm opens Confirm order, so stock and source warnings show before commit (#713). Lines change in place, not on a separate page: Ordered is a number field, ✕ removes a line, and Add line appends one that picks its SKU; any change asks for a Reason and saves the full line set in one RPC. On a picked order an added or raised line is unpicked work: the order returns to confirmed with that line uncounted and a changed-after-pick marker, and Ship stays hidden until Pick counts it.",
@@ -1009,7 +1012,7 @@ export const SCREENS: Screen[] = [
     writes: "submit_order · cancel_order",
     states: [["draft", "Edit draft and Submit available to Admin and Sales"]],
     spec: "Draft variant of Order. The picked/restock frame remains separate; Edit draft opens the shared saved-order editor.",
-    body: <OrderView model={toOrderViewProps({ ...orderPickedRestock, order: { ...orderPickedRestock.order, status: "draft", needs_restock: false }, lines: orderPickedRestock.lines.map(line => ({ ...line, qty_picked: null, qty_shipped: null, one_way_fee_cents: null })), deposits: [], events: [], atp: [] })} actions={E.btn("Submit")} />,
+    body: <OrderView model={toOrderViewProps({ ...orderPickedRestock, emailStatuses: [], order: { ...orderPickedRestock.order, status: "draft", needs_restock: false }, lines: orderPickedRestock.lines.map(line => ({ ...line, qty_picked: null, qty_shipped: null, one_way_fee_cents: null })), deposits: [], events: [], atp: [] })} actions={E.btn("Submit")} />,
   },
   {
     step: 5,
@@ -1414,10 +1417,49 @@ export const SCREENS: Screen[] = [
     to: { "Pils · case": "Fix mapping", Return: "Return and credit", "Record payment": "Record payment", Void: "Void payment" },
     job: "Review one invoice, resolve its mappings and push it, or record its payments in MGR",
     reads: "get_qbo_connection · get_invoice · list_invoice_questions",
-    writes: "push_invoice_to_qbo · resolve_invoice_question · record_invoice_payment · void_invoice_payment",
+    writes: "push_invoice_to_qbo · write_off_invoice · resolve_invoice_question · record_invoice_payment · void_invoice_payment",
     states: [["permission", "sales or admin required", 1], ["unmapped", "push stays unavailable", 1], ["ready", "every customer and item is mapped"], ["pushed", "QuickBooks owns later accounting edits"], ["buyer question", "the note is read here, and answered off-system", 1], ["partly paid", "the summary shows the balance and the cash received, from QuickBooks or from payments recorded in MGR"], ["paid in MGR", "payments recorded in MGR reach the total; paid on the day the last one was received"], ["payments block push", "an unvoided payment in MGR: no Push and no mapping rows", 1], ["no payment due", "a $0.00 invoice QuickBooks never received takes no payment and is never overdue"], ["edited in QuickBooks", "Current invoice total beside the Frozen MGR line subtotal; the lines stay as frozen", 1], ["no balance", "an unknown balance reads Unknown, never $0.00", 1], ["credit memo", "a signed Credit memo total, no balance due and no Return"]],
     spec: "Read as a document: number, state and customer, then Issued and Due beside the one price summary (before the lines on the phone). The summary groups the stored line amounts by line kind; its total is the QuickBooks total when there is one, and the balance comes from QuickBooks, or from MGR's payment ledger for an invoice QuickBooks never received. Payments lists what was recorded in MGR, voided ones with their reasons; Record payment appears only where that ledger owns the balance, and Void is the only correction. QuickBooks status is said once, with only the mappings that need action. The drill-in is also where a buyer's question lands: the portal writes it, the sales Today row points here, and marking it answered is what clears that row. Nothing about the invoice changes; the reply happens in a phone call or an email, which is why the verb says answered rather than replied. Return closes the page because it corrects a shipment and is not the next step.",
-    body: <InvoiceView model={toInvoiceViewProps(invoiceFailedAls)} quickbooks={{ detail: invoiceFailedAlsAccounting.detail }} staffLink={{ href: null, reason: "This invoice has not been successfully pushed to QuickBooks." }} />,
+    body: <InvoiceView model={toInvoiceViewProps(invoiceFailedAls)} quickbooks={{ detail: invoiceFailedAlsAccounting.detail }} accountingActions={<InvoiceAccountingActionsView invoiceLabel="INV-1039" actions={invoiceFailedAlsAccounting.actions} />} staffLink={{ href: null, reason: "This invoice has not been successfully pushed to QuickBooks." }} />,
+  },
+  ...([
+    { name: "Invoice ready to push", detail: "ready to push", actions: ["push", "write_off"], remoteState: "live", hasPendingPush: false },
+    { name: "Invoice push result unknown", detail: "push result unknown · retry uses the same request", actions: ["retry"], remoteState: "live", hasPendingPush: true },
+    { name: "Invoice deleted in QuickBooks", detail: "deleted in QuickBooks", actions: ["repush", "write_off"], remoteState: "deleted", hasPendingPush: false },
+  ] as const).map((state): Screen => ({
+    step: 5, slice: 1, tab: "More", name: state.name,
+    job: "Review the accounting actions available for this invoice state",
+    reads: "get_invoice · get_qbo_connection", writes: "push_invoice_to_qbo · write_off_invoice",
+    to: { "Push to QuickBooks": "Push invoice to QuickBooks", "Write off": "Write off invoice", Return: "Return and credit" },
+    states: [[state.name, state.detail]],
+    body: <InvoiceView
+      model={toInvoiceViewProps({ ...invoiceFailedAls, mappings: undefined, hasPendingPush: state.hasPendingPush, wasPushedToQbo: state.remoteState === "deleted", invoice: { ...invoiceFailedAls.invoice, qbo_sync_status: state.remoteState === "deleted" ? "pushed" : "pending", qbo_invoice_id: state.remoteState === "deleted" ? "qbo-1039" : null, qbo_remote_state: state.remoteState } })}
+      correction={state.remoteState === "deleted" ? null : undefined}
+      quickbooks={{ detail: state.detail }}
+      accountingActions={<InvoiceAccountingActionsView invoiceLabel="INV-1039" actions={[...state.actions]} />}
+    />,
+  })),
+  ...([
+    { name: "Push invoice to QuickBooks", action: "push" },
+    { name: "Retry exact push", action: "retry" },
+    { name: "Push corrected invoice", action: "corrected_push" },
+    { name: "Re-push deleted invoice", action: "repush" },
+  ] as const).map((state): Screen => ({
+    step: 5, slice: 1, tab: "More", surface: "sheet", name: state.name, sheetTitle: qboPushConfirmation(state.action, "INV-1039").title,
+    job: "Confirm the exact QuickBooks invoice operation before sending",
+    reads: "get_invoice · get_qbo_connection", writes: "push_invoice_to_qbo",
+    to: { [qboPushConfirmation(state.action, "INV-1039").confirmLabel]: "Invoice" },
+    states: [["confirm", "Review which request will be sent"], ["sending", "Sending…; duplicate submission disabled"], ["error", "The refusal remains in the confirmation dialog", 1]],
+    body: <PushInvoiceView action={state.action} invoiceLabel="INV-1039" />,
+  })),
+  {
+    step: 5, slice: 1, tab: "More", surface: "sheet", name: "Write off invoice",
+    job: "Record an invoice as written off in MGR with a required reason",
+    reads: "get_invoice", writes: "write_off_invoice",
+    to: { "Confirm write-off": "Invoice" },
+    states: [["permission", "Admin only", 1], ["reason missing", "Confirm write-off stays unavailable", 1], ["writing off", "Writing off…; duplicate submission disabled"], ["error", "Keep the reason and show the refusal", 1]],
+    spec: "A write-off changes only MGR's local status. It does not change QuickBooks, record cash, or create a credit. Reason is required and limited to 500 characters.",
+    body: <WriteOffInvoiceView />,
   },
   {
     step: 5,
@@ -1800,7 +1842,7 @@ export const SCREENS: Screen[] = [
     slice: 4,
     tab: "Work",
     name: "Brew prep",
-    to: { "Malted Oats": "Edit material", "Briess Pilsen": "Edit material", "Chit Malt": "Edit material", "Rolled Oats": "Edit material", "Briess White Wheat": "Edit material", "Brewer’s Crystals": "Edit material", "Freestyle Nelson Sauvin 2026": "Edit material", "Choose lot": "Entity picker", "Done pulling": "Brew day timeline" },
+    to: { "Malted Oats": "Edit material", "Fieldstone Pilsen": "Edit material", "Chit Malt": "Edit material", "Rolled Oats": "Edit material", "Fieldstone White Wheat": "Edit material", "Brewer’s Crystals": "Edit material", "Valley Hops Nelson Sauvin 2026": "Edit material", "Choose lot": "Entity picker", "Done pulling": "Brew day timeline" },
     job: "Pull a batch's brew-day ingredients before the brew, touching only exceptions",
     reads: "get_brew_day · get_brew_day_plan · list_vessels",
     writes: "save_batch_pulls [one RPC: replaces the batch's pulls and planned tank; moves no stock], reschedule_batch, cancel_batch",
@@ -1813,7 +1855,7 @@ export const SCREENS: Screen[] = [
     slice: 4,
     tab: "Work",
     name: "Brew day timeline",
-    to: { "Confirm all": "Brew day timeline", "Malted Oats": "Edit material", "Briess Pilsen": "Edit material", "Chit Malt": "Edit material", "Rolled Oats": "Edit material", "Briess White Wheat": "Edit material", "Brewer’s Crystals": "Edit material", "Freestyle Nelson Sauvin 2026": "Edit material", Gypsum: "Edit material" },
+    to: { "Confirm all": "Brew day timeline", "Malted Oats": "Edit material", "Fieldstone Pilsen": "Edit material", "Chit Malt": "Edit material", "Rolled Oats": "Edit material", "Fieldstone White Wheat": "Edit material", "Brewer’s Crystals": "Edit material", "Valley Hops Nelson Sauvin 2026": "Edit material", Gypsum: "Edit material" },
     job: "Brew in process order, confirming each pulled ingredient and recording knockout once",
     reads: "get_brew_day · get_brew_day_plan · list_vessels",
     writes: "record_brew_day [existing command: confirmed actual sources + frozen sheet + knockout occupancy]",
@@ -2319,7 +2361,7 @@ export const SCREENS: Screen[] = [
     slice: 6,
     tab: "More",
     name: "Monthly compliance",
-    to: { Confirm: "Monthly compliance", "Reattribute loss": "Monthly compliance" },
+    to: { Confirm: "Monthly compliance", "Reattribute loss": "Reattribute loss" },
     job: "Generate from ledgers, review, then record in MGR a filing made with TTB outside it",
     reads: "list_compliance_reports · generate_compliance_report · get_loss_review",
     writes: "file_compliance_report · reattribute_loss",
@@ -2328,8 +2370,18 @@ export const SCREENS: Screen[] = [
     body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAugust)} />,
   },
   {
+    step: 7, slice: 6, tab: "More", surface: "sheet", name: "Reattribute loss",
+    to: { "Save reattribution": "Monthly compliance" },
+    job: "Choose how much of a cellar loss belongs on another TTB line",
+    reads: "get_loss_review",
+    writes: "reattribute_loss",
+    states: [["no target", "the exact whole remainder is filled in · Target is unchosen · Save names the missing target"], ["sample", "a two-letter destination state is required"], ["partial", "a positive amount with up to eight decimal places cannot exceed the exact remainder"], ["uncertain", "fields and request ID stay frozen · Retry unchanged reattribution recovers the result"], ["saved", "Loss reattribution saved · refresh the remaining amount"], ["permission", "sales or admin required", 1]],
+    spec: "Shares the live command form and E fields. No target is selected by default: Sample, Taproom, and Destruction post to different TTB lines. Samples require a destination state. Corrections append history in the period they are saved, without changing earlier filed snapshots.",
+    body: <ReattributeLossView loss={monthlyComplianceAugust.losses[0]} />,
+  },
+  {
     step: 7, slice: 6, tab: "More", name: "Report does not balance",
-    to: { "Reattribute loss": "Report does not balance" },
+    to: { "Reattribute loss": "Reattribute loss" },
     job: "See why a period's filing cannot be recorded yet, and what to check",
     reads: "list_compliance_reports · generate_compliance_report · get_loss_review",
     writes: "reattribute_loss",
@@ -2339,7 +2391,7 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 7, slice: 6, tab: "More", name: "Filed period needs amendment",
-    to: { "Reattribute loss": "Filed period needs amendment" },
+    to: { "Reattribute loss": "Reattribute loss" },
     job: "Review an original filed snapshot and the recorded basis correction that requires an external amendment",
     reads: "list_compliance_reports · get_loss_review",
     writes: "reattribute_loss",
@@ -2362,6 +2414,7 @@ export const SCREENS: Screen[] = [
     slice: 6,
     tab: "More",
     name: "Period in progress",
+    to: { "Reattribute loss": "Reattribute loss" },
     job: "Review the current period from the ledger before it can be filed",
     reads: "list_compliance_reports · generate_compliance_report · get_loss_review",
     writes: "reattribute_loss",
@@ -2620,7 +2673,7 @@ export const SCREENS: Screen[] = [
     slice: 8,
     group: "Desk",
     name: "Planning",
-    to: { "Can labels": "Edit material", "Quadpack carriers": "Edit material", "Hazy ATP negative Sep 9, 2026": "Pars and allocation", "Create purchase order": "New PO", "Set vendor": "Materials on hand", "Hop bags": "Edit material", "Lindenmeyr Munroe": "Vendor", "Blue Label": "Vendor" },
+    to: { "Can labels": "Edit material", "Quadpack carriers": "Edit material", "Hazy ATP negative Sep 9, 2026": "Pars and allocation", "Create purchase order": "New PO", "Set vendor": "Materials on hand", "Hop bags": "Edit material", "Fictional Packaging Supply": "Vendor", "Fictional Label Works": "Vendor" },
     job: "See demand gaps by vendor and create each vendor's purchase order, without priority state",
     reads: "get_material_requirements",
     writes: "draft_purchase_order_from_requirements [one RPC: one draft PO per resolved vendor + lines; the buy-by date is needed-by less the vendor's lead time]",

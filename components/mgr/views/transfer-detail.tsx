@@ -5,8 +5,6 @@ import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { TransferDetailViewModel } from "@/lib/mgr/transfer-detail-view";
 
-export type { TransferDetailViewModel };
-
 export function TransferDetailView({
   model,
   footer,

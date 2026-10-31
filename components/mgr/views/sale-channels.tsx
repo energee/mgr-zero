@@ -6,8 +6,6 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { SaleChannelsRowView, SaleChannelsViewModel } from "@/lib/mgr/sale-channels-view";
 
-export type { SaleChannelsViewModel };
-
 export function SaleChannelsView({
   model,
   backLabel = "Settings",

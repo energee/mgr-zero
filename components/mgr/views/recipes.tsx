@@ -10,8 +10,6 @@ import { RecordTable } from "@/components/mgr/views/record-table";
 import type { RecipesViewModel } from "@/lib/mgr/recipes-view";
 import { WATER_PROFILES_CAPTION } from "@/lib/mgr/water-profiles-view";
 
-export type { RecipesViewModel };
-
 export function RecipesView({ model, controls, linkRows }: {
   model: RecipesViewModel;
   /** The search strip (components/mgr/list-controls.tsx). */

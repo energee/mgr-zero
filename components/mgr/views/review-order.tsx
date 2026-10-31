@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button";
 import { OrderQuantity } from "./new-order";
 import type { ReviewOrderViewModel } from "@/lib/mgr/review-order-view";
 
-export type { ReviewOrderViewModel };
-
 export function ReviewOrderView({ model, onQuantity, onBack, onPlace, messages, locked = false, disabled = false, submitting = false, footer }: {
   model: ReviewOrderViewModel; onQuantity?: (id: string, value: string) => void;
   onBack?: () => void; onPlace?: () => void; messages?: ReactNode;

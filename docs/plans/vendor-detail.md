@@ -81,9 +81,9 @@ brewery-wide `po_open_balances` read, so the vendor filter adds no round trip.
 - A **New PO** link with the vendor already chosen.
 - Material detail pages. Material rows on the vendor page stay plain text, as
   on Materials on hand.
-- Renaming the existing purchasing fixtures (YCH, Country Malt) to fictional
-  names. The new fixture extends `vendorsList` so the Vendors → Vendor detail
-  tap stays consistent. The real-name fixtures are existing debt.
+- The separate privacy refresh owns fixture-name sanitation.
+  This feature extends `vendorsList` so the Vendors → Vendor detail tap stays
+  consistent with the existing fictional data.
 - Moving the Contracts list off `/vendors`.
 
 ## Files touched

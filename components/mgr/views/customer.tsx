@@ -16,8 +16,6 @@ import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import { DeleteCustomerControl } from "./delete-customer";
 import { RevokePortalUserControl } from "./revoke-portal-user";
 
-export type { CustomerEditValues, CustomerViewModel };
-
 const TERMS_OPTIONS = PAYMENT_TERMS.map(value => ({ value, label: PAYMENT_TERM_LABEL[value] }));
 const TAX_OPTIONS = [{ value: "", label: "Inherit sale channel" }, ...TAX_TREATMENTS.map(value => ({ value, label: sentenceCase(value) }))];
 
