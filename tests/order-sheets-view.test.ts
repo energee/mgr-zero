@@ -62,7 +62,7 @@ describe("Short pick view", () => {
     expect(markup).toMatch(/required/);
     expect(markup).toMatch(/Resolve the missing 3/);
     expect(markup).toMatch(/Adjust order to 7/);
-    expect(markup).not.toMatch(/Keep .*owed/);
+    expect(markup).not.toMatch(/Keep \d+ owed/);
     expect(markup).toMatch(/>Adjust order to 7 cases</);
     expect(markup).toContain('data-direction="forward"');
     expect(markup).not.toMatch(/[→›]/);

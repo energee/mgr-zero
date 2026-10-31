@@ -24,11 +24,11 @@ beforeAll(async () => {
   await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 100, type: "opening_balance", created_by: staffId });
 });
 
-async function confirmedOrder(qty = 10) {
+async function confirmedOrder(qty = 10, sku = skuId) {
   const { data, error } = await staffDb.rpc("create_order", {
     p_brewery: b.id, p_kind: "wholesale", p_customer: customerId, p_ship_to: shipToId,
     p_from_location: whId, p_to_location: null, p_requested: null, p_po: null, p_note: null,
-    p_lines: [{ sku_id: skuId, qty }],
+    p_lines: [{ sku_id: sku, qty }],
     p_request_id: crypto.randomUUID(),
   });
   expect(error).toBeNull();
@@ -636,19 +636,22 @@ describe("return_shipment", () => {
 describe("release_allocation and get_shortfalls", () => {
   it("get_shortfalls lists negative-ATP skus; release_allocation frees the reservation", async () => {
     const ctx = { db: staffDb, userId: staffId, breweryId: b.id, roles: ["admin" as const] };
-    const id = await confirmedOrder(1000); // opening balance is 100
+    const shortfallSku = await seedCatalog(b.id, { product: "Shortfall", sku: "Shortfall keg", packageType: "keg", bblPerUnit: 0.5, format: "Shortfall keg format" });
+    await priceSku(b.id, { saleChannelId, brandId: shortfallSku.brandId, formatId: shortfallSku.formatId, cents: 12000 });
+    await ins("inventory_movements", { brewery_id: b.id, sku_id: shortfallSku.skuId, location_id: whId, bin_id: whBinId, qty: 1, type: "opening_balance", created_by: staffId });
+    const id = await confirmedOrder(2, shortfallSku.skuId);
     const line = await lineOf(id);
     const { data: alloc } = await admin.from("allocations").select("id").eq("ref", line.id).single();
     const short = await runCommand("get_shortfalls", {}, ctx) as { skuId: string; skuName: string; atp: number }[];
-    const row = short.find((s) => s.skuId === skuId);
+    const row = short.find((s) => s.skuId === shortfallSku.skuId);
     expect(row).toBeDefined();
     expect(row!.atp).toBeLessThan(0);
-    expect(row!.skuName).toBe("IPA 1/2bbl");
+    expect(row!.skuName).toBe("Shortfall keg");
     await runCommand("release_allocation", { allocationId: alloc!.id }, ctx);
     const { data: a2 } = await admin.from("allocations").select("status").eq("id", alloc!.id).single();
     expect(a2!.status).toBe("released");
     const after = await runCommand("get_shortfalls", {}, ctx) as { skuId: string }[];
-    expect(after.some((s) => s.skuId === skuId)).toBe(false);
+    expect(after.some((s) => s.skuId === shortfallSku.skuId)).toBe(false);
     await expect(runCommand("release_allocation", { allocationId: alloc!.id }, ctx)).rejects.toThrow(/not open/);
   });
 });
