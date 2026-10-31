@@ -626,7 +626,7 @@ export async function syncSquareCatalogFacts(client: SquareClient, accessToken: 
 
 export async function beginSquareOAuth(ctx: Ctx, client: SquareClient, providerIntent: "connect" | "reconnect", requestId: string = randomUUID()) {
   if (!hasAnyRole(ctx.roles, ["admin"])) throw new CommandError("permission denied: brewery admin required", 403);
-  const state = oauthState(requestId, ctx.userId);
+  const state = oauthState();
   await unwrap(ctx.db.rpc("begin_square_oauth", {
     p_brewery: ctx.breweryId, p_redirect_uri: client.config.redirectUri, p_state_hash: sha256(state),
     p_provider_intent: providerIntent, p_request_id: requestId, p_requested_scopes: [...SQUARE_SCOPES],

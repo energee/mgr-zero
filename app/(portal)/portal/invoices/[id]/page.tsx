@@ -2,7 +2,6 @@
 // for the signed-in customer (portal_invoice). The permanent MGR Pay route
 // rechecks ownership, balance and QuickBooks state before redirecting.
 import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
-import { Button } from "@/components/ui/button";
 import { getPortalContext } from "@/lib/portal";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
@@ -30,12 +29,11 @@ export default async function PortalInvoicePage({ params, searchParams }: { para
   // The Pay route redirects here with ?payment=unavailable when QuickBooks
   // returns no link; the invoice then renders as unavailable.
   const payable = model.payable && !failedPayment;
-  const payment = payable ? <Button asChild><a href={`/portal/invoices/${snapshot.invoice.id}/pay`} target="_blank" rel="noreferrer">Pay invoice</a></Button> : null;
   return (
     <PortalInvoiceView
       model={model}
       variant={payable ? "pay" : !model.paid && model.status === "Unpaid" ? "unavailable" : undefined}
-      footer={payment}
+      paymentAction={payable ? `/portal/invoices/${snapshot.invoice.id}/pay` : undefined}
       question={<QuestionForm invoiceId={snapshot.invoice.id} label={`${model.title} · ${model.total}`} breweryName={model.breweryName} />}
     />
   );

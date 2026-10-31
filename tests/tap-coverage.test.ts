@@ -13,7 +13,14 @@ import { area, SCREENS, type Screen } from "../components/mgr/screens";
 import { isInertOn, resolveTap } from "../lib/mgr/screen-links";
 import { ScreenFrame } from "../components/mgr/screen-frame";
 
-const text = (h: string) => h.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+// React escapes these characters in SSR; the live explorer reads decoded textContent.
+const text = (h: string) => h.replace(/<[^>]+>/g, "")
+  .replace(/&#x27;/g, "'")
+  .replace(/&quot;/g, '"')
+  .replace(/&lt;/g, "<")
+  .replace(/&gt;/g, ">")
+  .replace(/&amp;/g, "&")
+  .replace(/\s+/g, " ").trim();
 const INERT_ATTR = /role="tab"|role="switch"|toggle-group-item|sidebar-trigger|select-trigger|sidebar-menu-button|data-gated|data-preview-action/;
 const INERT_LABEL = /^[−+]$/;
 // The explorer's own rule, so the coverage report matches what a tap does:

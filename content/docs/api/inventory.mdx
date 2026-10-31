@@ -17,6 +17,8 @@ On-hand is the sum of movements per SKU and location. Available-to-promise is
 on-hand minus open allocations: the number a salesperson should be shown before
 promising stock.
 
+`list_movements` returns `{ rows, nextCursor }`, newest first by recorded timestamp and ID. Its default page has 50 rows (maximum 200). Continue with the returned `nextCursor`, preserving the timestamp exactly; omit it to read the newest page. Keep `skuId` and `movementId` unchanged when continuing a filtered history. Offset paging is no longer supported.
+
 A stock transfer moves finished goods, materials, or empty kegs between two of
 the brewery's locations, bin to bin, without an order or an invoice.
 `create_stock_transfer` refuses a transfer whose source and destination
@@ -300,14 +302,14 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Paginated immutable movements with location/bin/lot labels, resolved source document ref_label and ref_kind (order, run, transfer, invoice, delivery or count; both null without a visible source document), and reversal links; movementId selects an original and its exact compensation
+Immutable movements newest-first as &#123; rows, nextCursor &#125;, with location/bin/lot labels, resolved source document ref_label and ref_kind, and reversal links; movementId selects an original and its exact compensation
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `skuId` | uuid | no |
 | `movementId` | uuid | no |
 | `limit` | integer | no |
-| `offset` | integer | no |
+| `cursor` | string | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
