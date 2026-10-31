@@ -46,6 +46,11 @@ hosts or paths. Inspect `site_url` and `uri_allow_list` through the read-only
 Management API before release; a local allowlist is not evidence of hosted
 configuration. Changing hosted settings remains owner-authorized work.
 
+`APP_URL` is that one public origin, and Slack links and portal payment
+redirects use it too. The `/api/command` and `/api/chat` Origin check accepts
+the origin the request was sent to as well as `APP_URL`, so a Vercel preview
+host passes it without an `APP_URL` of its own.
+
 Read-only inspection on 2026-10-30 for #1659 used
 `supabase config diff --project-ref uogrvqmrbmolvtftotsf --output-format json`.
 The remote Site URL was `https://mgr-zero-mgr8.vercel.app/`.
