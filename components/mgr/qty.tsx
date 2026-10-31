@@ -1,13 +1,5 @@
-// components/mgr/qty.tsx — a typed quantity and the segmented bar that rides in
-// its unit addon. Both are shared by `E.qty`/`E.tabs` (components/mgr/e.tsx) and
-// by VolumeField (components/mgr/volume-field.tsx). The quantity draws its own
-// visible label, tied to the input by a generated id (#1115).
-//
-// It is its own module only to break an import cycle: e.tsx imports VolumeField
-// for `E.volume`, so VolumeField cannot import `E` back, and the composition
-// cannot simply live in e.tsx either — SCREENS is a module-level const, built at
-// import time, where Qty's useId() could never run. Screen authors
-// never import this directly; they use E.qty, E.tabs and E.volume.
+// A labeled quantity and segmented control, composed by VolumeField.
+// Price groups use TabBar directly for their channel tabs.
 "use client";
 import type { FieldControls } from "@/components/mgr/e";
 import { numberNotationError, stepQuantity } from "@/lib/mgr/quantity-input";
@@ -60,13 +52,7 @@ export function StepQuantity({ label, value, defaultValue, onChange, contextualL
   </ButtonGroup>{notationError && <FieldError id={notation.errorId}>{notationError}</FieldError>}</div>;
 }
 
-/** A typed quantity under its visible label: the OS keyboard is the keypad, so
- *  nothing here draws one. The label's generated id ties it to the input, so
- *  the visible text is the input's accessible name (#1115). No caller sits
- *  under a column header, so the label is always shown; add a hideLabel if
- *  one ever does. Defaults live in `E.qty`/`E.tabs`, the vocabulary screen
- *  authors call; every caller here passes label, on and cls, so repeating
- *  those defaults would only give them a second place to drift. */
+/** A typed quantity whose visible label is tied to its input by a generated id. */
 export function Qty({
   value,
   onChange,
@@ -81,7 +67,7 @@ export function Qty({
   unit?: ReactNode;
   label: string;
   id?: string;
-  /** From E.qty's `error` (#1121). */
+  /** The caller's validation state, alongside local number-notation validation. */
   invalid?: AriaAttributes["aria-invalid"];
   describedBy?: string;
 }) {

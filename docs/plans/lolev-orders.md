@@ -328,7 +328,7 @@ on the `mgr_test` stack (`scripts/test-db.sh`). Every migration task ends with
    - Customer detail and ship-to form: an `E.pick` country (default United
      States), state shown only for US, an `Alias` `E.edit` ("Staff only"), as
      the brand view does (`components/mgr/views/brand.tsx:75`). The customer
-     list shows `name · alias` (reuse `brandLabel`'s shape, `lib/mgr/brand-view.ts:13`).
+     list shows `name · alias` through `nameWithAlias` in `lib/mgr/labels.ts`.
    - Inventory and live share the views (`.agents/skills/screen-parity/SKILL.md`).
    - Staff guide: customers (country, optional address, alias).
    - Deps: 2.
