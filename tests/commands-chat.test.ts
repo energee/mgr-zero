@@ -7,6 +7,7 @@ import "@/lib/commands/all";
 import * as slackAdapterModule from "@/lib/chat/slack-adapter";
 import type { SlackClientLike } from "@/lib/chat/slack-transport";
 import { issueChatLinkProof } from "@/lib/chat/linking";
+import type { ChatLinkIntent } from "@/lib/commands/chat";
 
 
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>, installation: string, delivery: string, occurrence: string, orderId: string;
@@ -176,9 +177,13 @@ describe("live Chat settings", () => {
 it("previews actual identities without consuming and requires explicit, replay-safe consent", async () => {
   process.env.APP_URL = "https://mgr.test";
   const person = await makeStaffCtx(ctx.breweryId, "sales");
-  const issued = await issueChatLinkProof(admin, installation, "U-CONSENT");
-  const preview = await runCommand("get_chat_link_intent", { proof: issued.proof }, person);
-  expect(preview).toMatchObject({ slackIdentity: "U-CONSENT", brewery: expect.any(String), mgrIdentity: expect.any(String) });
+  const issued = await issueChatLinkProof(admin, installation, "U-CONSENT", "Morgan Slack");
+  const preview = await runCommand("get_chat_link_intent", { proof: issued.proof }, person) as ChatLinkIntent;
+  expect(preview.slackIdentity).toContain("Morgan Slack");
+  expect(preview.slackIdentity).toContain("U-CONSENT");
+  expect(preview.workspace).toContain("Test");
+  expect(preview.brewery).toEqual(expect.any(String));
+  expect(preview.mgrIdentity).toEqual(expect.any(String));
   expect((await admin.from("chat_user_links").select("state").eq("id", issued.linkId).single()).data?.state).toBe("pending");
   const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
   const result = await runCommand("consume_chat_link_proof", { proof: issued.proof }, person, execution);
@@ -271,7 +276,7 @@ it("reads own saved preferences before linking and after unlinking without expos
   await runCommand("set_personal_quiet_hours", { start: "22:00", end: "07:00", timezone: "America/New_York" }, person);
   const saved = { preferences: expect.arrayContaining([{ reason: "submitted_order", enabled: false }]), quietStart: "22:00:00", quietEnd: "07:00:00", timezone: "America/New_York", link: null };
   expect(await runCommand("get_notification_preferences", {}, person)).toMatchObject(saved);
-  const proof = await issueChatLinkProof(admin, installation, "U-PRESERVED-PREFS");
+  const proof = await issueChatLinkProof(admin, installation, "U-PRESERVED-PREFS", "Morgan Slack");
   await runCommand("consume_chat_link_proof", { proof: proof.proof }, person);
   await runCommand("unlink_chat_user", { linkId: proof.linkId }, person);
   expect(await runCommand("get_notification_preferences", {}, person)).toMatchObject(saved);

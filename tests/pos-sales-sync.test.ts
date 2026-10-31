@@ -449,10 +449,69 @@ describe("Square durable sales sync", () => {
       return response({ orders: [saleOrder({ id: "OUTSIDE", updatedAt: new Date(Date.parse(end) + 1).toISOString(),
         lines: [line("outside", "V1", "1")] })] });
     });
-    await expect(syncSquareSales(f.ctx, requestId, new SquareClient(config, fetcher))).rejects.toThrow("Square is unavailable");
+    await expect(syncSquareSales(f.ctx, requestId, new SquareClient(config, fetcher)))
+      .rejects.toMatchObject({ status: 502, code: "square_order_invalid" });
     expect(sql(`select count(*) from public.pos_sales where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
     expect(sql(`select pages from private.square_sales_syncs where brewery_id='${f.brewery.id}' and request_id='${requestId}'`)).toEqual(["0"]);
     expect(sql(`select count(*) from public.pos_sales_coverage where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
+  });
+
+  it.each<{ name: string; patch: Order; field: string }>([
+    { name: "missing order id", patch: { id: null }, field: "id" },
+    { name: "missing location", patch: { location_id: null }, field: "location_id" },
+    { name: "unrequested location", patch: { location_id: "OTHER" }, field: "location_id" },
+    { name: "invalid version", patch: { version: -1 }, field: "version" },
+    { name: "invalid sale time", patch: { created_at: "invalid" }, field: "created_at" },
+    { name: "invalid update time", patch: { updated_at: "invalid" }, field: "updated_at" },
+    { name: "sale after update", patch: { created_at: "2099-01-01T00:00:00Z" }, field: "created_at" },
+    { name: "incomplete order", patch: { state: "OPEN" }, field: "state" },
+    { name: "duplicate sale uid", patch: { line_items: [line("same", "V1", "1"), line("same", "V1", "2")] }, field: "line_items.uid" },
+    { name: "missing sale uid", patch: { line_items: [{ quantity: "1" }] }, field: "line_items.uid" },
+    { name: "non-array sales", patch: { line_items: {} }, field: "line_items" },
+    { name: "non-array returns", patch: { returns: {} }, field: "returns" },
+    { name: "non-array return lines", patch: { returns: [{ return_line_items: {} }] }, field: "returns.return_line_items" },
+    { name: "duplicate return uid", patch: { returns: [{ source_order_id: "SOURCE",
+      return_line_items: [returned("same", "source", "1"), returned("same", "source", "1")] }] }, field: "returns.return_line_items.uid" },
+    { name: "missing return uid", patch: { returns: [{ return_line_items: [{ quantity: "1" }] }] }, field: "returns.return_line_items.uid" },
+  ])("diagnoses $name without importing the page and resumes after correction", async ({ patch, field }) => {
+    const f = await fixture();
+    const requestId = crypto.randomUUID();
+    const updatedAt = new Date(Date.now() - 60_000).toISOString();
+    const valid = saleOrder({ id: "VALID", updatedAt, lines: [line("valid", "V1", "1")] });
+    const orderId = `BAD\n${"X".repeat(200)}`;
+    const malformed = { ...saleOrder({ id: orderId, updatedAt }), ...patch, note: "provider-private-marker" };
+    const diagnostic = vi.spyOn(console, "error").mockImplementation(() => {});
+    const bodies: Record<string, unknown>[] = [];
+    const fetcher = squareFetch(f.merchantId, (body) => {
+      bodies.push(body);
+      return response({ orders: [valid, malformed] });
+    });
+    try {
+      await expect(syncSquareSales(f.ctx, requestId, new SquareClient(config, fetcher)))
+        .rejects.toMatchObject({
+          status: 502, code: "square_order_invalid", message: expect.not.stringMatching(/BAD|provider-private-marker/),
+        });
+      expect(diagnostic).toHaveBeenCalledWith("square sales order invalid:", {
+        orderId: patch.id === null ? null : `BAD_${"X".repeat(188)}`,
+        field,
+      });
+      expect(JSON.stringify(diagnostic.mock.calls)).not.toContain("provider-private-marker");
+    } finally {
+      diagnostic.mockRestore();
+    }
+    expect(sql(`select count(*) from public.pos_sales where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
+    expect(sql(`select pages::text||':'||coalesce(cursor,'none') from private.square_sales_syncs
+      where brewery_id='${f.brewery.id}' and request_id='${requestId}'`)).toEqual(["0:none"]);
+    expect(sql(`select count(*) from public.pos_sales_coverage where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
+    const corrected = squareFetch(f.merchantId, (body) => {
+      bodies.push(body);
+      return response({ orders: [valid] });
+    });
+    await expect(syncSquareSales(f.ctx, requestId, new SquareClient(config, corrected)))
+      .resolves.toMatchObject({ complete: true, acceptedFacts: 1, pages: 1 });
+    expect(bodies[1]).toEqual(bodies[0]);
+    expect(sql(`select external_order_id from public.pos_sales where brewery_id='${f.brewery.id}'`)).toEqual(["VALID"]);
+    expect(sql(`select count(*) from public.inventory_movements where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
   });
 
   it("treats an omitted orders field as an observed empty page and still rejects malformed orders", async () => {

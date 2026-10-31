@@ -22,8 +22,6 @@ export function MoveStockFields({ value, options, onChange }: {
   );
 }
 
-export type { LocationBinsViewModel };
-
 export function LocationBinsView({
   model,
   createAction,

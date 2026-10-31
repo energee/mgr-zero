@@ -35,19 +35,15 @@ describe("shared order-entry controls", () => {
     expect(short).toHaveBeenCalledWith(model.lines[0].key); expect(print).toHaveBeenCalledOnce();
   });
 
-  it("binds one short-pick resolution and preserves errors, busy state and a suppressed footer", () => {
-    const resolution = vi.fn(), counted = vi.fn(), reason = vi.fn();
+  it("binds the short-pick count and reason and preserves errors, busy state and a suppressed footer", () => {
+    const counted = vi.fn(), reason = vi.fn();
     const model = toShortPickViewProps(orderShortPick);
-    const node = ShortPickView({ model, onResolution: resolution, onCounted: counted, onReason: reason, resolution: 1, messages: "command failed", submitting: true });
+    const node = ShortPickView({ model, onCounted: counted, onReason: reason, messages: "command failed", submitting: true });
     const nodes = elements(node);
-    const chips = nodes.find(node => node.props.onValueChange)!;
-    invoke(chips, "onValueChange", ""); expect(resolution).not.toHaveBeenCalled();
-    invoke(chips, "onValueChange", "0"); expect(resolution).toHaveBeenCalledWith(0);
     invoke(nodes.find(node => node.props.label === "Counted")!, "onChange", "0.5");
     invoke(nodes.find(node => node.props["aria-label"] === "Reason")!, "onChange", { target: { value: "damage" } });
     expect(counted).toHaveBeenCalledWith("0.5"); expect(reason).toHaveBeenCalledWith("damage");
     expect(nodes.find(node => node.props.type === "submit")!.props.disabled).toBe(true);
-    expect(renderToStaticMarkup(node)).toContain("remain owed");
     expect(renderToStaticMarkup(node)).toContain("command failed");
     expect(elements(ShortPickView({ model, footer: null })).some(node => node.props.type === "submit")).toBe(false);
   });

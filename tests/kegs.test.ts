@@ -16,7 +16,7 @@ let storage: Awaited<ReturnType<typeof seedLocation>>;
 beforeAll(async () => {
   b = await makeBrewery();
   ctx = await makeStaffCtx(b.id, "warehouse");
-  const { data, error } = await admin.from("vendors").insert({ brewery_id: b.id, name: "Microstar" }).select("id").single();
+  const { data, error } = await admin.from("vendors").insert({ brewery_id: b.id, name: "Kegline" }).select("id").single();
   if (error) throw error;
   vendorId = data.id;
   taproom = await seedLocation(b.id, { name: "Taproom", uses: ["taproom"] });
@@ -27,7 +27,7 @@ const event = (i: Record<string, unknown>) => runCommand("record_keg_event", i, 
 
 describe("keg pools and location-grain events", () => {
   it("two locations of the same pool×size are independent balances", async () => {
-    const pool = (await runCommand("create_keg_pool", { name: "Microstar", kind: "leased", vendorId }, ctx)) as { id: string; kind: string };
+    const pool = (await runCommand("create_keg_pool", { name: "Kegline", kind: "leased", vendorId }, ctx)) as { id: string; kind: string };
     expect(pool.kind).toBe("leased");
     await event({ poolId: pool.id, kegSize: "sixth_bbl", qty: 36, reason: "acquired", locationId: taproom.id, binId: taproom.binId });
     await event({ poolId: pool.id, kegSize: "sixth_bbl", qty: 40, reason: "acquired", locationId: storage.id, binId: storage.binId });
@@ -45,8 +45,8 @@ describe("keg pools and location-grain events", () => {
     expect(fleet.pools.map((p) => p.id)).toContain(pool.id);
     expect(fleet.rows.filter((r) => r.pool_id === pool.id).map((r) => r.qty).sort()).toEqual([36, 40]);
 
-    const updated = (await runCommand("update_keg_pool", { poolId: pool.id, name: "Microstar (leased)", active: false }, ctx)) as { name: string; active: boolean };
-    expect(updated).toMatchObject({ name: "Microstar (leased)", active: false });
+    const updated = (await runCommand("update_keg_pool", { poolId: pool.id, name: "Kegline (leased)", active: false }, ctx)) as { name: string; active: boolean };
+    expect(updated).toMatchObject({ name: "Kegline (leased)", active: false });
   });
 
   it("refuses shipped without a customer, a customer on found, and a bin outside the location", async () => {

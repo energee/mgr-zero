@@ -9,8 +9,6 @@ import type { BatchesRowView, BatchesViewModel, BatchOccupancyView, BatchVesselV
 import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 
-export type { BatchesViewModel };
-
 /** A brand or recipe the plan does not name, said in muted words instead of a blank. */
 const orMissing = (value: string | null, missing: string) => value ?? <span key={missing} className="text-muted-foreground">{missing}</span>;
 

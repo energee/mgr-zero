@@ -23,6 +23,17 @@ const overduePick: TodayRowView = {
   href: undefined,
 };
 
+/** Invoice-now refusals go straight to Sales' return-and-credit task. */
+const refusedCredit: TodayRowView = {
+  ...toTodayViewProps({ date: DATE, items: [{
+    reason: "refused_credit", subjectType: "delivery", subjectId: "refused-1", sourceVersion: "1",
+    safeLabel: "Refused beer to return and credit", customerName: null, detail: "Hillside Tavern · 2 units",
+    dueAt: null, href: "/invoices/inv-1043/return?refusedDeliveryId=refused-1",
+    recipientRoles: ["admin", "sales"], assignedUserId: null,
+  }] }).rows[0],
+  href: undefined,
+};
+
 export const todayWarehouse: TodayViewModel = {
   date: DATE,
   actions: actions("warehouse"),
@@ -48,6 +59,7 @@ export const todaySales: TodayViewModel = {
   rows: [
     { key: "ord1", title: "ORD-0231 · Ridgeline", detail: "submitted · ships Sep 3, 2026", verb: "Confirm", tone: "success", warning: true, icon: "package" },
     { key: "ord2", title: "ORD-0235 · Teresa’s", detail: "submitted · ships Sep 4, 2026", verb: "Confirm", tone: "success", icon: "package" },
+    refusedCredit,
     { key: "pils", title: "Pils · 16 oz case", detail: "Not enough Pils for 2 orders", verb: "Choose who gets it", tone: "attention", warning: true },
     { key: "hazy", title: "Hazy IPA · ½ bbl", detail: "11 ready · fine" },
     { key: "oh", title: "Al’s Bar · OH", detail: "Al’s Bar can’t receive Stout in OH", verb: "Fix registration", tone: "attention", warning: true },
@@ -66,14 +78,16 @@ export const todayBrewer: TodayViewModel = {
   ],
 };
 
-export const todayDriver: TodayViewModel = {
+export const todayDriver: TodayViewModel = toTodayViewProps({
   date: DATE,
-  rows: [
-    { key: "s1", title: "Stop 1 · Ridgeline Tap Room", detail: "4 Hazy halves · 6 Pils cases", trailing: "next", warning: true },
-    { key: "s2", title: "Stop 2 · Al’s Bar", detail: "2 Stout sixths · later" },
-    { key: "s3", title: "Stop 3 · Teresa’s", detail: "8 Hazy halves · 12 Pils cases · later" },
-  ],
-};
+  timeZone: DEMO_TIME_ZONE,
+  now: new Date("2026-09-03T16:00:00Z"),
+  items: [{
+    reason: "delivery_next", subjectType: "delivery", subjectId: "stop-1", sourceVersion: "1",
+    safeLabel: "Route A · stop 1", customerName: null, detail: "next stop", dueAt: "2026-09-03T04:00:00Z",
+    href: "#", recipientRoles: ["admin", "warehouse"], assignedUserId: "driver-1",
+  }],
+});
 
 export const todayTaproom: TodayViewModel = {
   date: DATE,

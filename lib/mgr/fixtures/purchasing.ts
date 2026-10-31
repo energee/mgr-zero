@@ -50,14 +50,16 @@ export const receivePoSent: ReceivePoViewModel = {
   lines: [
     {
       key: "malt", title: "2-row · 55 lb bags", detail: "expected 40 · lot from the PO", qty: 42, warning: true,
+      cost: "28.50",
       lot: "CM-26-4410", lotOptions: ["CM-26-4410", "CM-26-4288", "CM-25-9910"], bestBy: "2027-03-31",
     },
     {
       key: "citra", title: "Citra · 44 lb boxes", detail: "expected 4 · lot from the PO", qty: 3, warning: true,
+      cost: "",
       lot: "2026-CIT-91", lotOptions: ["2026-CIT-77", "2026-CIT-91", "2025-CIT-40"], bestBy: "2027-08-31",
       note: "Substituted: the PO named 2026-CIT-77. The box decides; the receipt records both.",
     },
-    { key: "hulls", title: "Rice hulls · 50 lb", detail: "expected 6 · not lot-tracked", qty: 6, ok: true },
+    { key: "hulls", title: "Rice hulls · 50 lb", detail: "expected 6 · not lot-tracked", qty: 6, cost: "0.62", ok: true },
   ],
   tape: [
     ["+2,310 lb 2-row · receipt", "lot CM-26-4410 · over 2 bags"],
@@ -127,6 +129,8 @@ export const receiptPoBillRejected: ReceiptViewModel = {
 export const correctReceiptPo: ReceivePoViewModel = {
   title: "PO-0142 · correct receipt", state: "correction", status: "Received Sep 10, 2026",
   correctionReason: "Two malt bags were counted twice",
+  locationId: receivePoSent.locationId, binId: receivePoSent.binId, receivedOn: receivePoSent.receivedOn,
+  locations: receivePoSent.locations, bins: receivePoSent.bins,
   lines: receivePoSent.lines?.map(line => ({ ...line, qty: line.key === "malt" ? 40 : line.qty,
     detail: `originally counted ${line.qty} purchase units`, lotOptions: undefined, note: undefined })),
   tape: [["+2,200 lb 2-row · replacement preview", "Lot CM-26-4410"], ["+132 lb Citra · replacement preview", "Lot 2026-CIT-91"], ["+300 lb rice hulls · replacement preview", "untracked"]],

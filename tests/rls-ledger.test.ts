@@ -63,16 +63,18 @@ describe("ledger integrity + RLS", () => {
 
 // #756: is_staff_of/staff_role each run private.request_scope_allows, whose
 // exception block is a subtransaction. Called once per ledger row they made
-// on_hand ~80x slower at 50k movements; the stock helpers resolve the
+// on_hand ~80x slower at 50k movements; the definer stock helpers resolve the
 // caller's staff memberships once, as a set, instead.
 describe("stock helpers resolve staff membership once per query", () => {
-  for (const fn of ["on_hand_rows", "keg_bin_on_hand_rows"]) {
+  for (const fn of ["taproom_on_hand_rows", "keg_bin_on_hand_rows"]) {
     it(`${fn} calls no per-row role helper`, () => {
       const body = sql(`select pg_get_functiondef('public.${fn}'::regproc)`, true).join("\n");
       expect(body).not.toMatch(/is_staff_of|staff_role\(/);
     });
   }
+});
 
+describe("stock reads preserve each membership's authorization", () => {
   // The role is read per brewery: taproom in A sees only A's taproom stock,
   // brewer in B sees all of B's; a brewery-scoped request sees only that brewery.
   it("applies each membership's own role and the request brewery scope", async () => {

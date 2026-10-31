@@ -7,8 +7,6 @@ import type { BinViewModel } from "@/lib/mgr/bin-view";
 import { submitReason } from "@/lib/mgr/submit-reason";
 import { ConfirmDeleteControl } from "./confirm-delete";
 
-export type { BinViewModel };
-
 /** What delete_bin refuses (supabase/migrations/20260923220000_delete_bin_keeps_pos_menu.sql):
  *  the last bin, a bin with any recorded movement, and a bin a POS menu uses. */
 const REMOVE_RULE = "A location keeps at least one bin. A bin that has ever recorded stock cannot be removed; rename it instead. A bin a POS menu uses cannot be removed until the menu uses another bin.";

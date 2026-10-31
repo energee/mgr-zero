@@ -10,7 +10,6 @@
 // and durable physical counts are implemented below.
 import { z } from "zod";
 import { cents, completeRows, defineCommand, defineQuery, PAGE_SIZE, unwrap, type Ctx } from "./registry";
-import { kegAging, type KegLedgerEvent } from "@/lib/keg-aging";
 import { kegDepositRows, type DepositBalanceRow, type KegBalanceRow } from "@/lib/keg-deposits";
 import { KEG_SIZES, KEG_POOL_KINDS, KEG_EVENT_REASONS } from "@/lib/mgr/enums";
 
@@ -166,49 +165,33 @@ defineQuery({
 });
 
 // The Keg report (issue #278): utilization per pool × size — kegs at
-// customers over the fleet from keg_fleet_totals — and FIFO aging of what
-// customers still hold (lib/keg-aging.ts). Deposits are the pool's deposit per
+// customers over the fleet from keg_fleet_totals — and database-owned FIFO
+// aging of what customers still hold. Deposits are the pool's deposit per
 // unreturned keg, not what was invoiced; the balance page has that.
 // Mismatches are every customer × pool × size with a refunded deposit whose
 // kegs on deposit disagree with kegs out plus kegs lost (#577, kegDepositRows).
-const AGE_BUCKETS = [{ id: "0-30", max: 30 }, { id: "31-60", max: 60 }, { id: "61-90", max: 90 }, { id: "90+", max: Infinity }] as const;
+const AGE_BUCKETS = ["0-30", "31-60", "61-90", "90+"] as const;
 defineQuery({
   name: "get_keg_report", description: "Keg fleet utilization per pool and size, unreturned kegs by age bucket with deposits at risk, the customers holding kegs over 90 days, customers whose kegs on deposit disagree with their kegs out, and how many pools are in service",
   input: z.object({}), roles: ROLES,
   handler: async (ctx) => {
-    const [pools, totals, events, customers, kegs, deposits, refunded] = await Promise.all([
+    const [pools, totals, aged, kegs, deposits, refunded] = await Promise.all([
       listPools(ctx),
       completeRows("Keg report totals", start => ctx.db.from("keg_fleet_totals").select("pool_id, keg_size, qty", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).order("pool_id").order("keg_size").range(start, start + PAGE_SIZE - 1)),
-      // Every event, oldest first, paged past PostgREST's 1000-row cap (#455);
-      // kegAging re-sorts by instant, and this order breaks same-instant ties.
-      completeRows("Keg report", start => ctx.db.from("keg_events").select("customer_id, pool_id, keg_size, qty, reason, at", { count: "exact" })
-        .eq("brewery_id", ctx.breweryId).not("customer_id", "is", null).in("reason", ["shipped", "returned", "lost"])
-        .order("at").order("created_at").order("id").range(start, start + PAGE_SIZE - 1)),
-      completeRows("Keg report customers", start => ctx.db.from("customers").select("id, name", { count: "exact" })
-        .eq("brewery_id", ctx.breweryId).order("id").range(start, start + PAGE_SIZE - 1)),
-      // Brewery-wide balances for the mismatch list, paged like the events above;
-      // each view has one row per customer × pool × size, so that order is total.
+      unwrap(ctx.db.rpc("get_keg_report_aging", { p_brewery: ctx.breweryId })),
+      // Each balance view has one row per customer × pool × size.
       completeRows("Keg report", start => ctx.db.from("keg_customer_balances").select("customer_id, pool_id, keg_size, qty", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).order("customer_id").order("pool_id").order("keg_size").range(start, start + PAGE_SIZE - 1)),
       completeRows("Keg report", start => ctx.db.from("keg_deposit_balances").select("customer_id, keg_pool_id, keg_size, kegs_on_deposit, deposit_cents", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).order("customer_id").order("keg_pool_id").order("keg_size").range(start, start + PAGE_SIZE - 1)),
       refundRows(ctx),
     ]);
+    if (!aged) throw new Error("Keg aging report returned no data");
     const poolById = new Map((pools ?? []).map((p) => [p.id as string, p]));
-    const customerName = new Map((customers ?? []).map((c) => [c.id as string, c.name as string]));
-    const outBySize = new Map<string, number>();
-    const aging = AGE_BUCKETS.map((b) => ({ bucket: b.id, kegs: 0, deposit_cents: 0 }));
-    const byCustomer = new Map<string, { over_90: number; oldest_at: string | null }>();
-    for (const a of kegAging((events ?? []) as KegLedgerEvent[], new Date())) {
-      outBySize.set(`${a.pool_id}|${a.keg_size}`, (outBySize.get(`${a.pool_id}|${a.keg_size}`) ?? 0) + a.qty);
-      const bucket = aging[AGE_BUCKETS.findIndex((b) => a.days <= b.max)];
-      bucket.kegs += a.qty; bucket.deposit_cents += a.qty * Number(poolById.get(a.pool_id)?.deposit_cents ?? 0);
-      const c = byCustomer.get(a.customer_id) ?? { over_90: 0, oldest_at: null };
-      if (a.days > 90) c.over_90 += a.qty;
-      if (!c.oldest_at || a.shipped_at < c.oldest_at) c.oldest_at = a.shipped_at;
-      byCustomer.set(a.customer_id, c);
-    }
+    const customerName = new Map(aged.customerNames.map(c => [c.id, c.name]));
+    const outBySize = new Map(aged.bySize.map(s => [`${s.pool_id}|${s.keg_size}`, s.qty]));
+    const aging = AGE_BUCKETS.map(bucket => aged.aging.find(a => a.bucket === bucket) ?? { bucket, kegs: 0, deposit_cents: 0 });
     const bySize = (totals ?? []).map((t) => ({
       pool_id: t.pool_id as string, pool_name: poolById.get(t.pool_id as string)?.name ?? "", keg_size: t.keg_size as string,
       out: outBySize.get(`${t.pool_id}|${t.keg_size}`) ?? 0, total: Number(t.qty),
@@ -217,10 +200,9 @@ defineQuery({
     return {
       fleet: { out, total, utilization: total ? out / total : null }, bySize, aging,
       activePools: (pools ?? []).filter((p) => p.active).length,
-      customers: [...byCustomer].map(([customer_id, c]) => ({ customer_id, name: customerName.get(customer_id) ?? "", ...c }))
-        .sort((a, b) => b.over_90 - a.over_90 || a.name.localeCompare(b.name)),
+      customers: aged.customers.sort((a, b) => b.over_90 - a.over_90 || a.name.localeCompare(b.name)),
       mismatches: kegDepositRows((kegs ?? []) as KegBalanceRow[], (deposits ?? []) as DepositBalanceRow[], {
-        lost: ((events ?? []) as KegLedgerEvent[]).filter((e) => e.reason === "lost") as KegBalanceRow[], refunded,
+        lost: aged.lost, refunded,
       }).filter((r) => r.mismatch)
         .map((r) => ({ customer_id: r.customer_id, name: customerName.get(r.customer_id) ?? "", pool_id: r.pool_id, pool_name: poolById.get(r.pool_id)?.name ?? "", keg_size: r.keg_size, kegs_out: r.kegs_out, kegs_on_deposit: r.kegs_on_deposit }))
         .sort((a, b) => a.name.localeCompare(b.name) || a.pool_name.localeCompare(b.pool_name) || a.keg_size.localeCompare(b.keg_size)),
@@ -263,7 +245,7 @@ defineCommand({
   })),
 });
 defineCommand({
-  name: "correct_taproom_count", description: "Admin-only replacement for the latest uncorrected mistaken-low Taproom count. Send only increased root-line quantities plus a reason; the original stays immutable and exact frozen compensation/replacement entries preserve reporting",
+  name: "correct_taproom_count", description: "Admin-only replacement for the latest uncorrected Taproom count. Send changed root-line quantities in either direction plus a reason; the original stays immutable and linked depletion entries preserve reporting",
   input: z.object({ countId: z.string().uuid(), corrections: z.array(z.object({ lineId: z.string().uuid(), qtyCounted: z.number().int().nonnegative() })).min(1), reason: z.string().trim().min(1) }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_taproom_count", {

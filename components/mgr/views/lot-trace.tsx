@@ -6,8 +6,6 @@ import { E } from "@/components/mgr/e";
 import { rowLinkPrefetch } from "@/lib/mgr/row-link-prefetch";
 import type { LotTraceRecipientView, LotTraceViewModel } from "@/lib/mgr/lot-trace-view";
 
-export type { LotTraceViewModel };
-
 export function LotTraceView({
   model,
   tape,
