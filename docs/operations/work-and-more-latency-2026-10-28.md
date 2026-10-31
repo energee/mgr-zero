@@ -249,3 +249,71 @@ If headers or logs are unavailable, retain that evidence gap rather than infer t
 Do not time a hosted save; save and refresh timing belongs on the seeded local stack.
 File any newly measured concrete cause as its own bounded fix.
 No deploy, hosted setting change or credential provisioning is part of this measurement.
+
+## #1491 read-only follow-up (2026-10-30)
+
+The [2026-10-29 issue comment](https://github.com/energee/mgr-zero/issues/1491#issuecomment-6489057530)
+records newer local production-build measurements with stage timings.
+All pages showed main content within 0.60 s on their first load and 0.26 s warm.
+The four #1491 saves took 0.026–0.040 s cold and 0.022–0.035 s warm through `/api/command`.
+The Compliance period switch took 0.08–0.19 s before the activity-query fix.
+The reported four-second dev-mode switch did not reproduce in that production build.
+These are the prior run's results, not new local measurements.
+
+The bounded fixes have already landed:
+
+| Cause | Outcome |
+| --- | --- |
+| Guide frame controls mounted before they were visible | [#1587](https://github.com/energee/mgr-zero/pull/1587) defers mounting until near the viewport, without splitting the guide. |
+| Lot trace waited for its lot read before starting other independent reads | #1576 starts those reads together. |
+| Settings read the Gateway model catalog on each render | #1576 caches successful catalog reads for one hour. |
+| Settings unnecessarily ran the Compliance activity scan | [#1608](https://github.com/energee/mgr-zero/pull/1608) separates the activity query from the report list. |
+| Record-link prefetch repeated metadata reads | [#1606](https://github.com/energee/mgr-zero/issues/1606) is closed. |
+| The Compliance activity scan read the ledger twice and over its whole history | [#1607](https://github.com/energee/mgr-zero/issues/1607) is closed. |
+
+### Public hosted pages
+
+Read-only browser timing on `https://mgr-zero.vercel.app`, 2026-10-30
+05:25:44–05:26:27 UTC, used a dedicated `fix-issue-1491` agent-browser session
+and headless Chrome 156.0.0.0 on this macOS arm64 workstation.
+No network or CPU throttling was applied.
+The first guide navigation used a fresh browser session.
+The first inventory navigation reused that session, so neither is a claim of a cold hosted function.
+Each page then had three repeated document navigations in the same session.
+The hosted deployment SHA was not established.
+`vercel inspect https://mgr-zero.vercel.app --json` refused with `forbidden` / `Not authorized`.
+That also leaves matching hosted function-log access unproved.
+
+The Navigation Timing entry supplies first byte and body sizes.
+A buffered Largest Contentful Paint observer supplies main-content timing.
+LCP is a main-content proxy; it does not prove that every interactive control is ready.
+The numbers below are seconds, with each warm observation retained.
+
+| Page | First: first byte | First: LCP | Warm first byte, all three | Warm LCP, all three | Warm LCP median | Encoded / decoded bytes |
+| --- | ---: | ---: | --- | --- | ---: | ---: |
+| `/docs/staff-guide` | 0.091 | 1.536 | 0.025, 0.018, 0.015 | 0.312, 0.260, 0.232 | 0.260 | 287,652 / 1,162,904 |
+| `/docs/screens` | 0.015 | 0.380 | 0.015, 0.014, 0.020 | 0.268, 0.212, 0.368 | 0.268 | 176,943 / 1,219,741 |
+
+Every navigation exposed only `prerendered;dur=0` in `Server-Timing`.
+These public-page LCP observations are below two seconds.
+They do not measure the session, page-read, or save stages of a signed-in route.
+No new slow stage was established, so this follow-up makes no speculative application change.
+
+### Remaining #1491 acceptance gate
+
+Opening `/settings` in that isolated session redirected to
+`/login?next=%2Fsettings` and showed the Sign in form.
+The browser credential vault had no saved profiles.
+No credentials were submitted, no sign-in email was requested, and no hosted save was attempted.
+
+#1491 stays open pending an approved hosted staff session.
+Use it to time `/compliance/lots/<id>`, `/settings`, `/settings/import`,
+and the Monthly / Quarterly / Annual switch on `/compliance`.
+Select an existing lot through the live application; do not create a fixture on hosted.
+Record the first observation and repeated warm observations, plus the hosted deployment SHA.
+Split each observation into stages as in "Stage timings" in [`pilot-latency-protocol.md`](pilot-latency-protocol.md); the function log lines need owner access.
+Log access and reading existing headers do not authorize a deploy or a setting change.
+
+Keep the owner's 2026-10-27 boundary: hosted timing is read-only.
+The local Import, contract, channel, and license save timings above do not authorize repeating those saves on hosted.
+Only a measured slow stage should produce a separate bounded fix.

@@ -17,6 +17,7 @@ import {
   leaseQboTokenRefresh,
   markQboAuthorizationFailed,
   readPortalInvoicePayment,
+  readPortalQuoteTaxTokens,
   getQboHealth,
   readVersionedIntegrationTokens,
   releaseQboTokenRefresh,
@@ -157,10 +158,12 @@ const QBO_SETUP_UNAVAILABLE = "QuickBooks setup is unavailable";
 
 /**
  * The payment-failure log fields: enough cause for staff, never a provider body.
- * Only messages MGR writes itself (a CommandError, the missing-setup error) are
- * kept; any other error, which may carry tokens or a bearer link, logs its name.
+ * Only messages MGR writes itself (a QboHttpError, a CommandError, the
+ * missing-setup error) are kept; any other error, which may carry tokens or a
+ * bearer link, logs its name.
  */
 export function qboPaymentFailureCause(error: unknown) {
+  if (error instanceof QboHttpError) return { name: error.name, status: error.status, message: error.message };
   if (error instanceof CommandError) {
     return { name: error.name, status: error.status, code: error.code, message: error.message };
   }
@@ -200,25 +203,26 @@ const QBO_REFRESH_POLL_MS = 200;
  * "superseded" and re-reads them instead of refreshing. "unavailable" means
  * the connection left 'connected' (for example the holder hit invalid_grant)
  * or this actor may not store a refresh, so it must not call Intuit at all.
- * A portal caller passes the invoice whose payment claim authorizes it.
+ * A portal caller passes the invoice or quote whose live claim authorizes it.
  */
 async function withQboRefreshLease<T>(
   ctx: Ctx,
   expected: VersionedIntegrationTokens,
-  refresh: () => Promise<T>,
+  refresh: (lease: string) => Promise<T>,
   invoiceId?: string,
+  quoteId?: string,
 ): Promise<T | "superseded" | "unavailable"> {
   const lease = randomUUID();
   const deadline = Date.now() + QBO_REFRESH_WAIT_MS;
   for (;;) {
-    const state = await leaseQboTokenRefresh(ctx, expected, lease, invoiceId);
+    const state = await leaseQboTokenRefresh(ctx, expected, lease, invoiceId, quoteId);
     if (state === "superseded" || state === "unavailable") return state;
     if (state === "leased") break;
     if (Date.now() >= deadline) throw new Error("QuickBooks is unavailable");
     await sleep(QBO_REFRESH_POLL_MS);
   }
   try {
-    return await refresh();
+    return await refresh(lease);
   } finally {
     // Logging and dropping a failed release is safe: the lease expires by itself
     // after 45 seconds, and throwing here would hide the refresh outcome.
@@ -343,16 +347,21 @@ function isPast(value: string | null) {
 }
 
 /** Refreshes the stored QuickBooks credential through its compare-and-swap; returns the persisted winner. */
-export async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, expected?: VersionedIntegrationTokens) {
-  const current = expected ?? await readVersionedIntegrationTokens(ctx, "qbo");
+export async function refreshQboCredentials(
+  ctx: Ctx,
+  client: Pick<QboOAuthClient, "refresh">,
+  expected?: VersionedIntegrationTokens,
+  quoteId?: string,
+) {
+  const current = expected ?? await (quoteId ? readPortalQuoteTaxTokens(ctx, quoteId) : readVersionedIntegrationTokens(ctx, "qbo"));
   if (isPast(current.refreshExpiresAt) || isPast(current.refreshHardExpiresAt)) {
-    await markQboAuthorizationFailed(ctx, current);
+    await markQboAuthorizationFailed(ctx, current, undefined, quoteId);
     throw new Error("QuickBooks is unavailable");
   }
   // A "superseded" lease means another caller stored newer tokens; the read below returns them.
-  const outcome = await withQboRefreshLease(ctx, current, async () => {
+  const outcome = await withQboRefreshLease(ctx, current, async (lease) => {
     const next = await client.refresh(current.refreshToken).catch(async (error) => {
-      if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, current);
+      if (error instanceof QboInvalidGrantError) await markQboAuthorizationFailed(ctx, current, undefined, quoteId, lease);
       throw new Error(sanitizeQboError(error));
     });
     // Accepted window (#1073): if the process dies or the token request times
@@ -360,19 +369,19 @@ export async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, ex
     // the stored token is retired. The next refresh gets invalid_grant and
     // marks the connection for recovery, so an Admin reconnects.
     try {
-      await compareAndSwapQboTokens(ctx, current, next);
+      await compareAndSwapQboTokens(ctx, current, next, quoteId, lease);
     } catch (error) {
       // Intuit has answered, so the stored refresh token may now be retired.
       // Mark the connection for recovery so no caller refreshes with it. The
       // mark is a no-op when newer tokens were stored (the CAS committed but
       // its response was lost, or another caller won) or the connection changed.
       console.error("qbo_refresh_store_failed", qboPaymentFailureCause(error));
-      await markQboAuthorizationFailed(ctx, current);
+      await markQboAuthorizationFailed(ctx, current, undefined, quoteId, lease);
       if (!(error instanceof CommandError) || error.status !== 409) throw new Error(sanitizeQboError(error));
     }
-  });
+  }, undefined, quoteId);
   if (outcome === "unavailable") throw new Error("QuickBooks is unavailable");
-  const stored = await readVersionedIntegrationTokens(ctx, "qbo")
+  const stored = await (quoteId ? readPortalQuoteTaxTokens(ctx, quoteId) : readVersionedIntegrationTokens(ctx, "qbo"))
     .catch((error) => { throw new Error(sanitizeQboError(error)); });
   if (stored.connectionId !== current.connectionId || stored.credentialVersion <= current.credentialVersion) {
     throw new Error("QuickBooks is unavailable");
@@ -694,9 +703,15 @@ const cents = (value: unknown) => {
 };
 
 class QboInvalidGrantError extends Error {}
-/** A non-OK QuickBooks HTTP response; `status` lets callers branch (e.g. 401 -> refresh once and retry). Network failures are not wrapped and carry no status. */
+/**
+ * A non-OK QuickBooks HTTP response; `status` lets callers branch (e.g. 401 -> refresh once and retry). Network failures are not wrapped and carry no status.
+ * The message is always MGR's own fixed text, never the provider body, because failure logs keep it.
+ */
 export class QboHttpError extends Error {
-  constructor(message: string, readonly status: number) { super(message); }
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "QboHttpError";
+  }
 }
 
 /** Keep only accounting facts needed to finish a push, never provider secrets or links. */
@@ -1135,7 +1150,7 @@ export class QboOAuthClient {
         } },
       }),
     });
-    if (!response.ok) throw new Error("QuickBooks tax calculation unavailable");
+    if (!response.ok) throw new QboHttpError("QuickBooks tax calculation unavailable", response.status);
     const payload: unknown = await response.json().catch(() => null);
     if (!payload || typeof payload !== "object") throw new Error("QuickBooks tax calculation unavailable");
     const root = payload as Record<string, unknown>;

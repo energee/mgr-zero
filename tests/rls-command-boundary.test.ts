@@ -571,6 +571,13 @@ describe("registered staff mutation role × RPC matrix", () => {
       },
     },
     {
+      command: "set_order_pickup", rpc: "set_order_pickup", allowed: ["admin", "sales"],
+      input: async () => {
+        const orderId = await submittedOrder();
+        return { command: { orderId, pickup: true }, rpc: { p_order: orderId, p_pickup: true } };
+      },
+    },
+    {
       command: "cancel_order", rpc: "cancel_order", allowed: ["admin", "sales"],
       input: async () => {
         const orderId = await draftOrder();
@@ -658,8 +665,8 @@ describe("registered staff mutation role × RPC matrix", () => {
         const orderId = await confirmedOrder();
         const lineId = await orderLine(orderId);
         return {
-          command: { orderId, lineId, qtyPicked: 0, reason: "short", resolution: "keep_owed" },
-          rpc: { p_order: orderId, p_line: lineId, p_qty_picked: 0, p_reason: "short", p_resolution: "keep_owed" },
+          command: { orderId, lineId, qtyPicked: 0.5, reason: "short", resolution: "adjust_down" },
+          rpc: { p_order: orderId, p_line: lineId, p_qty_picked: 0.5, p_reason: "short", p_resolution: "adjust_down" },
         };
       },
     },

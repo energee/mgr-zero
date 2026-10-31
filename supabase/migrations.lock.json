@@ -233,5 +233,8 @@
   "20261030031130_taproom_bidirectional_count_correction.sql": "b07d06ee8edd6f584f740a5fd3b957622f9d21a4e0587925f0ce6981ef52a0b1",
   "20261030031141_preserve_receipt_workflow_invariants.sql": "6c976afcd0c3c60ada466bf62c5b74cddf08e824fd114efd618ac8ed04f8c5ae",
   "20261030031150_today_refused_credit.sql": "f80acd0385ccb60efc2a90e9a4d8787404d22d0aa151362bcd4ffdc10eb36b3a",
+  "20261030031200_set_order_pickup.sql": "4c4f9e838290b5a60a01fbb36a67b0aa10a8963dfbf9bcb1893c5e727aa85664",
+  "20261030031210_remove_keep_owed.sql": "fd0665c3a161e2c4a13d654c7c247ce6a3fe35474af476a762added3f9033bc7",
+  "20261030031220_portal_quote_tax_refresh.sql": "71c6c844debcc7bc1575558a5a5f3f65f2528c9f01cb4181bf875c6624092b07",
   "20261030031230_qbo_reconciled_void_state.sql": "1c18ae33bc28386ac64447db7515e18d5bd5db43410fcd21be8e6da7a560e833"
 }
