@@ -518,7 +518,17 @@ describe("post-merge HTTP API maintainer", () => {
     expect(validate).not.toContain("lib/mgr/api-operations");
   });
 
-  const fixtureScreen = '/** Existing block comment\n * Preserve its context. */\nexport const SCREENS = [{\n    reads: "get_order", writes: "none",\n}];\nexport const screen = SCREENS[0];\n';
+  const fixtureScreen = [
+    "/** Existing block comment",
+    " * Preserve its context. */",
+    "export const SCREENS = [",
+    '  ...["Generated"].map((name) => ({ name, reads: "get_invoice", writes: "none [generated]" })),',
+    "{",
+    '    reads: "get_order", writes: "none",',
+    "}];",
+    "export const screen = SCREENS[1];",
+    "",
+  ].join("\n");
 
   // Execute the real validation shell, including Bun imports, in an isolated
   // repository. No model, provider, credentials or application database involved.
@@ -587,6 +597,8 @@ describe("post-merge HTTP API maintainer", () => {
     ["removed annotation property", "components/mgr/screens.tsx", fixtureScreen.replace(' writes: "none",', "")],
     ["added annotation property", "components/mgr/screens.tsx", fixtureScreen.replace('writes: "none",', 'writes: "none", reads: "get_atp",')],
     ["new screen record", "components/mgr/screens.tsx", fixtureScreen.replace("}];", '}, { reads: "get_atp", writes: "none" }];')],
+    ["changed generated annotation", "components/mgr/screens.tsx", fixtureScreen.replace('"get_invoice"', '"get_atp"')],
+    ["generated spread payload", "components/mgr/screens.tsx", fixtureScreen.replace('...["Generated"]', '...(await Bun.write("payload-executed", "yes"), ["Generated"])')],
     ["non-screen reads property", "components/mgr/screens.tsx", `${fixtureScreen}export const other = { reads: "not an annotation" };\n`],
     ["changed comment", "components/mgr/screens.tsx", fixtureScreen.replace("Preserve its context.", "Changed comment.")],
     ["validator replacement", "scripts/validate-api-agent-screens.ts", 'await Bun.write("payload-executed", "yes");\n'],
@@ -604,10 +616,11 @@ describe("post-merge HTTP API maintainer", () => {
     ["get_order · get_atp [view]", "submit_order"],
     ["", "none"],
     ["get_order [*/ literal /*]", "none"],
-  ])("accepts literal annotation changes and stages deterministic output: %s", (reads, writes) => {
+  ])("permits literal annotation edits around unchanged generated screens: %s", (reads, writes) => {
     validateEdit((put) => put("components/mgr/screens.tsx", fixtureScreen.replace('"get_order"', JSON.stringify(reads)).replace('"none"', JSON.stringify(writes))), (repo, result) => {
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
       expect(existsSync(join(repo, "generator-ran"))).toBe(true);
+      expect(readFileSync(join(repo, ".git", "output"), "utf8")).toContain("changed=true");
       const patch = readFileSync(join(repo, "api-reference.patch"), "utf8");
       expect(patch).toContain(`+    reads: ${JSON.stringify(reads)}, writes: ${JSON.stringify(writes)},`);
       expect(patch).toContain("+Generated backlog");

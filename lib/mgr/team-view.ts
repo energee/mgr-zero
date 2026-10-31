@@ -12,11 +12,11 @@ export type TeamRowView = {
   src?: string;
 };
 
-/** Use the saved profile name, with the RPC's email fallback when absent;
- *  the detail repeats the email only beneath a real name (#1501). */
-export function toTeamMemberRow(member: Pick<TeamMember, "userId" | "name" | "email" | "roles">, currentUserId?: string): TeamRowView {
-  const roles = staffRolesLabel(member.roles);
-  return { key: member.userId, title: member.name, detail: member.name === member.email ? roles : `${member.email} · ${roles}`, you: member.userId === currentUserId };
+/** The RPC's name is `Profile name <email>`, or the email alone when no name is
+ *  saved (#1659), so the title identifies the account and the detail is only
+ *  the roles. */
+export function toTeamMemberRow(member: Pick<TeamMember, "userId" | "name" | "roles">, currentUserId?: string): TeamRowView {
+  return { key: member.userId, title: member.name, detail: staffRolesLabel(member.roles), you: member.userId === currentUserId };
 }
 
 /** One pending invitation: the email, then "Role · Sent <day>". */
