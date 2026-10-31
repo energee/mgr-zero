@@ -93,11 +93,12 @@ describe("credential-safe integration diagnostics", () => {
     expect(JSON.stringify(log.mock.calls)).not.toContain("secret");
   });
 
-  it("logs a Square network failure and keeps the public error generic", async () => {
+  it("logs a Square network failure without replacing the transport error", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const fetch = vi.fn<typeof globalThis.fetch>().mockRejectedValue(new TypeError("DNS provider-secret"));
+    const failure = new TypeError("DNS provider-secret");
+    const fetch = vi.fn<typeof globalThis.fetch>().mockRejectedValue(failure);
     await expect(new SquareClient(squareConfig, fetch).listLocations("access-secret", "merchant-secret"))
-      .rejects.toBeInstanceOf(Error);
+      .rejects.toBe(failure);
     expect(log).toHaveBeenCalledWith("square_unavailable", { name: "TypeError", status: null, stage: "api_request" });
     expect(JSON.stringify(log.mock.calls)).not.toContain("secret");
   });

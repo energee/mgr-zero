@@ -260,7 +260,8 @@ export class SquareClient {
     try {
       return await this.fetcher(url, { ...init, signal: AbortSignal.timeout(SQUARE_REQUEST_TIMEOUT_MS) });
     } catch (error) {
-      throw unavailable(error, stage);
+      console.error("square_unavailable", integrationFailureCause(error, stage));
+      throw error;
     }
   }
 

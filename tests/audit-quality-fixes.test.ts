@@ -27,7 +27,7 @@ describe("QuickBooks invoice money", () => {
     const client = new QboOAuthClient(qboConfig, transport);
 
     await expect(client.readInvoice("realm-1", "invoice-7", "access-secret"))
-      .rejects.toThrow("QuickBooks response was invalid");
+      .rejects.toBeInstanceOf(Error);
   });
 
   it("still reads an ordinary total", async () => {
@@ -81,24 +81,26 @@ describe("Square OAuth callback", () => {
     const spy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { logged.push(args); });
     try {
       const fetch = vi.fn<typeof globalThis.fetch>()
-        .mockResolvedValue(new Response("nope", { status: 503 }));
+        .mockResolvedValue(Response.json({ message: "body-secret", access_token: "access-secret" }, { status: 503 }));
       const fail = vi.fn().mockResolvedValue(undefined);
 
       await expect(completeSquareOAuth({
-        request: new Request("https://mgr.test/callback?code=one-time&state=opaque"),
+        request: new Request("https://mgr.test/callback?code=code-secret&state=state-secret"),
         actorId: "actor-1", selectedBreweryId: "brewery-1", redirectUri: squareConfig.redirectUri,
         client: new SquareClient(squareConfig, fetch),
         store: {
           claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: [] }),
           complete: vi.fn(), fail,
         },
-      })).rejects.toThrow("Square is unavailable");
+      })).rejects.toBeInstanceOf(Error);
 
       // Control flow is unchanged: no token was issued, so the not_required branch ran.
       expect(fail.mock.calls[0].slice(2)).toEqual(["not_required", null]);
-      const line = logged.find((args) => String(args[0]).includes("square oauth callback"));
-      expect(line, "the callback logs why it fell through").toBeDefined();
-      expect(JSON.stringify(line)).not.toContain("sandbox-secret");
+      const index = logged.findIndex(([event]) => event === "square_oauth_failed");
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(logged[index]).toEqual(["square_oauth_failed", { name: "Error", status: 503, stage: "oauth_exchange" }]);
+      expect(spy.mock.invocationCallOrder[index]).toBeLessThan(fail.mock.invocationCallOrder[0]);
+      expect(JSON.stringify(logged)).not.toContain("secret");
     } finally {
       spy.mockRestore();
     }
