@@ -579,10 +579,10 @@ it("replays exactly, rejects changed reuse and revoked Admin, and serializes two
     await b.query("begin"); await b.query("select set_config('request.jwt.claim.sub',$1,true)", [racer.userId]); await b.query("set local role authenticated");
     const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
     pending = b.query("select public.correct_taproom_count($1,$2,$3::jsonb,$4,$5)", [...values, crypto.randomUUID()]);
-    // Observe the rejection before releasing the transaction that blocks it.
-    const rejected = expect(pending).rejects.toMatchObject({ code: "MG409" });
+    // Observe B's outcome before A's commit releases its lock.
+    const settled = Promise.allSettled([pending]);
     await expect.poll(async () => (await a.query("select wait_event_type from pg_stat_activity where pid=$1", [pid])).rows[0]?.wait_event_type).toBe("Lock");
-    await a.query("commit"); await rejected;
+    await a.query("commit"); expect(await settled).toMatchObject([{ status: "rejected", reason: { code: "MG409" } }]);
     assert(raceRoot !== null);
     expect((await admin.from("taproom_counts").select("id").eq("corrects_count_id", raceRoot.id)).data).toHaveLength(1);
   } finally { await a.query("rollback"); await b.query("rollback"); await Promise.all([a.end(), b.end()]); if (pending) await pending.catch(() => undefined); }
