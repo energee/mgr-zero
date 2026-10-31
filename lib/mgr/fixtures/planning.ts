@@ -4,14 +4,14 @@ export const planningDemo: PlanningSnapshot = {
   requirements: [{
     material_id: "can-labels", material_name: "Can labels", base_uom: "each", purchase_uom: "roll",
     required: 960, projected: 480, on_hand: 120, on_order: 0, short: 840, purchase_units_short: 2,
-    needed_by: "2026-09-21", vendor_id: "blue-label", vendor_name: "Blue Label",
+    needed_by: "2026-09-21", vendor_id: "fictional-labels", vendor_name: "Fictional Label Works",
     lead_time_days: 7, buy_by: "2026-09-14", out_of_reach: false,
   }, {
     // Needed before today: the adapter leads it with "overdue" (#993, #1037).
     // Its buy-by date has passed too, so it is out of reach and not drafted.
     material_id: "quadpack-carriers", material_name: "Quadpack carriers", base_uom: "each", purchase_uom: "case",
     required: 240, projected: 0, on_hand: 60, on_order: 0, short: 180, purchase_units_short: 1,
-    needed_by: "2026-09-04", vendor_id: "lindenmeyr", vendor_name: "Lindenmeyr Munroe",
+    needed_by: "2026-09-04", vendor_id: "fictional-packaging", vendor_name: "Fictional Packaging Supply",
     lead_time_days: 3, buy_by: "2026-09-01", out_of_reach: true,
   }, {
     // No contract and no default vendor: grouped last, with Set vendor (#1516).
@@ -27,8 +27,8 @@ export const planningDemo: PlanningSnapshot = {
     { key: "hazy", title: "Hazy ATP negative Sep 9, 2026", detail: "open named shortfall" },
   ],
   drafts: [
-    { key: "lindenmeyr", title: "Lindenmeyr Munroe", detail: "cans, ends, trays · 3 day lead", quantity: "3 lines" },
-    { key: "blue-label", title: "Blue Label", detail: "labels · 7 day lead · past the buy-by date", quantity: "out of reach", warning: true },
+    { key: "fictional-packaging", title: "Fictional Packaging Supply", detail: "cans, ends, trays · 3 day lead", quantity: "3 lines" },
+    { key: "fictional-labels", title: "Fictional Label Works", detail: "labels · 7 day lead · past the buy-by date", quantity: "out of reach", warning: true },
   ],
-  info: "Labels can no longer arrive for the week of Sep 7, 2026, so that line is left out. The three Lindenmeyr lines still draft.",
+  info: "Labels can no longer arrive for the week of Sep 7, 2026, so that line is left out. The three packaging-supply lines still draft.",
 };

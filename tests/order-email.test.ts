@@ -93,6 +93,28 @@ it("freezes sender and recipient across uncertain retries, then prevents duplica
   expect(await lease(deliveryId)).toBeUndefined();
 });
 
+it("backs off uncertain sends exponentially, caps at one hour, and never extends the dedupe window", async () => {
+  const { deliveryId } = await confirmed();
+  for (const minutes of [5, 10, 20, 40, 60, 60]) {
+    const attempt = (await lease(deliveryId))!;
+    expect((await rawDatabase(admin).rpc("finish_order_email", {
+      p_delivery: deliveryId, p_lease: attempt.lease_token, p_provider_id: null, p_error: "provider_uncertain",
+    })).data).toBe(true);
+    const [delay] = sql(`select round(extract(epoch from (next_attempt_at-clock_timestamp()))/60)::text
+      from private.order_email_deliveries where id='${deliveryId}'`, true);
+    expect(Number(delay)).toBe(minutes);
+    expect(await lease(deliveryId)).toBeUndefined();
+    sql(`update private.order_email_deliveries set next_attempt_at=now() where id='${deliveryId}'`);
+  }
+  const last = (await lease(deliveryId))!;
+  sql(`update private.order_email_deliveries set first_attempt_at=now()-interval '22 hours 50 minutes' where id='${deliveryId}'`);
+  expect((await rawDatabase(admin).rpc("finish_order_email", {
+    p_delivery: deliveryId, p_lease: last.lease_token, p_provider_id: null, p_error: "provider_uncertain",
+  })).data).toBe(true);
+  expect(sql(`select (next_attempt_at=first_attempt_at+interval '23 hours')::text
+    from private.order_email_deliveries where id='${deliveryId}'`, true)).toEqual(["true"]);
+});
+
 it("blocks uncertainty beyond the provider dedupe window", async () => {
   const { deliveryId } = await confirmed();
   await lease(deliveryId);

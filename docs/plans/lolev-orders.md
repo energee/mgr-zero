@@ -1,15 +1,14 @@
-# Lolev orders: customers, export, pickups, one-way kegs, history
+# Historical orders: customers, export, pickups, one-way kegs
 
 Status: plan, awaiting approval. Branch `docs/lolev-orders-plan` for the plan;
 implementation on `feat/lolev-orders`, PR to `main`.
 
 ## Why
 
-The user wants Lolev's orders in MGR (2026-10-15). The orders are not in the
-Lolev dump: its `orders` collection holds 39 rows ending 2025-07. They are in
-the Google Sheet export `~/Downloads/Beer orders (2).xlsx`, one tab per canning
-week. `Pricing - Beer.csv` is that sheet's price tab. `import-lolev.ts
---prices` already loads it.
+Import customer orders from a private spreadsheet export rather than assuming
+the legacy application's order collection is complete.
+Keep source workbooks, price files and tenant-specific mappings outside the
+public repository. The local import runner already supports price loading.
 
 Five things the orders need, which MGR does not have today:
 
@@ -27,32 +26,30 @@ A customer alias is the sixth gap: `customers` has no alias. The brand alias
 ## Decisions (user, 2026-10-15)
 
 Customers:
-- Only the customers with orders are imported (16, below). The other ~825
-  Lolev customers are not.
-- Every Sarene block or record is one customer.
-- One customer per company. The sheet's country and color suffixes are dropped.
-- Each customer has one optional staff-only **alias**, like `brands.alias`
-  (example: Tavour = "Nano Wine 'N Beer").
+- Import only customers with orders.
+- Treat each distributor's regional blocks as one customer where appropriate.
+- Keep one customer per company, without spreadsheet country or color suffixes.
+- Each customer has one optional staff-only **alias**, like `brands.alias`.
+  A fictional example is Cedar Trading = "Evergreen Beer".
 - Every customer has a **country**. A US customer also has a state. Street,
   city and zip are optional until known.
 
 Export:
-- The seven international customers are on the built-in `Export` channel
+- International customers use the built-in `Export` channel
   (`tax_treatment = 'export'`, `00001_baseline.sql:588`).
-- Export prices are the Wholesale sixtel and case prices. The Export half cell
-  stays empty, so an export half cannot be ordered.
+- Export prices are configured independently for each supported format.
+  Leave an unsupported format's price empty so it cannot be ordered.
 
 Kegs:
 - The only one-way keg is the sixtel. It is a format of its own (staff guide,
   one-way kegs; `tests/one-way-keg.test.ts`), priced in its own cells, today
   equal to the returnable sixtel on each channel.
-- **Each one-way sixtel shipped carries a $10 fee, never refunded.** The fee
-  follows the format, not the channel.
-- Returnable halves and sixtels are primarily on **Microstar** (user,
-  2026-10-15, after first saying Lolev kegs; v1 agrees). A **$30 deposit**,
-  both sizes, every pool. A new returnable SKU goes on Microstar; an existing
-  SKU keeps the pool the packaging pass gave it. The pool lives on the SKU,
-  so a customer on another pool gets its own formats when needed.
+- Each one-way keg shipment carries the configured non-refundable fee.
+  The fee follows the format, not the channel.
+- A returnable SKU keeps its configured keg pool.
+  A customer using another pool needs the corresponding SKU.
+  Tenant fee amounts, deposits and lessor assignments stay in private import
+  configuration, not this plan.
 - In history, export sixtels were one-way and domestic sixtels returnable.
 
 Orders:
@@ -61,58 +58,30 @@ Orders:
 - **One order per customer per pickup date** (user, 2026-10-15). Every block a
   customer picks up that day merges into it, and lines of the same brand and
   format add up. A block with no pickup date takes its tab's can date.
-- Sarene's tabs from 2-12-25 to 3-11-26 hold East, West and Totals blocks;
-  Totals equals East + West in all 23 such tabs, so Totals is the order and
-  East and West are skipped.
+- Where a source contains regional blocks plus a combined total, verify the
+  reconciliation and import the combined total only.
 - Some tabs have no `price tier` column, which shifts the quantity columns
   left. The export reads each block's columns by header name.
-- `books_opened_on` moves to **2026-10-15**. Orders picked up before it are
-  **historical**: an order and an invoice at the grid price, with no stock,
-  no finished goods, no TTB month, and never pushed to QuickBooks. Orders on
-  or after it are live.
+- Orders picked up before `books_opened_on` are **historical**: an order and
+  an invoice at the configured grid price, with no stock, no finished goods,
+  no TTB month, and never pushed to QuickBooks.
+  Orders on or after that date are live.
 - Every order line gets a SKU. A missing brand × format SKU is created with
   `create_sku`'s defaults.
 
-Beers: the 141 sheet names map to brands. 85 match exactly, 21 match by name
-plus series number, and 19 were mapped by the user. 16 new brands are needed
-(Vindobona, DDH Lupula, DDH Rubico, and 13 placeholders). `Luminis Brassarie
-Collab` is renamed `Luminis`, with the alias `Brasserie DB Collab`. The full
-map is the import's input (Import, below).
+Map spreadsheet beer names to brands using names and aliases.
+Keep the tenant's actual mapping, roster, destinations, prices, source dates
+and aggregate volumes in private operator files.
 
-## Source (`Beer orders (2).xlsx`, 2026-10-14)
+## Source shape
 
-- 74 week tabs, 4-24-24 to 11-25-26, plus `Price Tiers` and `Collabs`.
-- **To 1-22-25 (13 tabs):** one grid with `east-*` and `west-*` columns. Each
-  tab is one Sarene order.
-- **From 2-12-25 (61 tabs):** one block per customer, headed `can date |
-  pickup date | <customer> | type | price tier | half | sixtel | case`. The
-  `In House` and `Customer TOTALS` blocks are not orders.
-- **Result (dry run, 2026-10-15):** 217 orders, 190 historical and 27 live,
-  1,276 lines, every beer and customer mapped. Units: 989 halves, 1,844
-  returnable sixtels, 1,065 one-way sixtels (all export), 15,858 cases; 422
-  brand × format SKUs. One cell reads `Check Invoice` (Sixth City, 2-11-26);
-  the import reports it and uses the can date.
+The import accepts weekly tabs with either a combined regional grid or
+customer blocks headed `can date | pickup date | customer | type | price tier |
+half | sixtel | case`.
+Internal totals are not orders.
+Resolve columns by header name because optional columns can shift quantities.
+Report ambiguous date cells rather than silently inventing a pickup date.
 
-| Customer | Destination | Channel | History | Live |
-| --- | --- | --- | --- | --- |
-| Sarene | US · PA | Wholesale | 107 | 7 |
-| Sixth City | US · OH | Wholesale | 33 | 7 |
-| Lake Beverage | US · NY | Wholesale | 14 | 0 |
-| Tavour (alias Nano Wine 'N Beer) | US · WA | Wholesale | 5 | 4 |
-| Allied Craft Distribution | US · VA | Wholesale | 2 | 2 |
-| Proof Wines & Spirits | US · SC | Wholesale | 3 | 0 |
-| One Stop Brew Shop | US · NY | Wholesale | 0 | 2 |
-| Crafted Imports | US · NY | Wholesale | 2 | 0 |
-| Majestic Bar and Grille | US · PA | Resale | 1 (Lolev dump) | 0 |
-| Odyssey Club | China | Export | 30 | 6 |
-| Interbeer | Netherlands | Export | 29 | 4 |
-| Brew Export | United Kingdom | Export | 12 | 0 |
-| Hops Express | Hong Kong | Export | 11 | 0 |
-| Unusual Holdings | Japan | Export | 5 | 0 |
-| Coolship International | South Korea | Export | 4 | 2 |
-| DGB Import | Norway | Export | 4 | 0 |
-
-In the source, export customers ordered only sixtels and cases, never a half.
 
 ## Schema — `20261016100000_customer_country_alias.sql`
 
@@ -214,7 +183,7 @@ alter table public.order_lines add column one_way_fee_cents int
   check (one_way_fee_cents is null or one_way_fee_cents > 0);
 ```
 
-One fee for the brewery (Lolev: 1000). A one-way keg is a SKU whose format is
+One fee is configured for the brewery. A one-way keg is a SKU whose format is
 a keg (`formats.package_type = 'keg'`) with `container_source is null`
 (`tests/one-way-keg.test.ts:41`; `one_way_material` is never written).
 
@@ -258,9 +227,8 @@ like `record_historical_batch` (`20261014100300_history_without_tanks.sql:73`):
   the grid price frozen at import.
 
 `start_qbo_push` refuses a `not_synced` invoice ("historical invoices are not
-sent to QuickBooks"). Every Lolev block is a pickup, so `pickup = true` also
-keeps the 261 historical shipments out of the routes screen's unrouted list
-(`lib/commands/delivery.ts:57-60` lists every shipment with no delivery).
+sent to QuickBooks"). Mark a historical pickup explicitly so the routes screen
+does not list its shipment as unrouted (`lib/commands/delivery.ts:57-60`).
 
 The staff presentation must name the new status, or it falls through to
 "pushed to QuickBooks" (`lib/mgr/qbo-ui.ts:95`). `qboInvoicePresentation`
@@ -420,30 +388,19 @@ they also run one after the other.
 A new `--orders` pass in `scripts/import-lolev.ts`, with the mapping in
 `lib/import/lolev.ts`, through `runCommand` as the other passes do:
 
-1. **Setup.** `set_books_opened_on` 2026-10-15 (refused if a period before it
-   is filed). The `$30` deposit on each keg pool (`update_keg_pool`; the
-   pools exist from the catalog pass). The `$10`
-   one-way fee. The one-way sixtel format and shell material. The Export
-   cells (Wholesale sixtel and case per tier) and the one-way sixtel cells
-   (= the returnable sixtel cell, per channel and tier).
-2. **Beers.** Rename `Luminis Brassarie Collab` → `Luminis`, alias
-   `Brasserie DB Collab`. Create the 16 new brands on the tier the sheet's
-   `price tier` column gives. The sheet-name → brand map is a table in
-   `lib/import/lolev.ts`, reviewed by the user.
-3. **Customers.** The 16 above, with country, state, alias, channel; one
-   ship-to each, label `Main`, country and state only (no street) unless
-   known.
-4. **SKUs.** For each brand × format a line needs: `create_sku` with defaults
-   (Half and Sixtel on Microstar unless the SKU exists; one-way Sixtel and
-   Case with no pool).
-5. **History.** One `record_historical_order` per block picked up before
-   2026-10-15, lines at the grid price for the customer's channel, the
-   brand's price group and the format. The 13 pre-2-12-25 tabs are one
-   Sarene order each (east and west summed). Majestic's one order comes from
-   the Lolev dump.
-6. **Live.** One `create_order` (pickup, submitted) per block on or after
-   2026-10-15. Placeholder beers have SKUs but no stock, so ATP warns; the
-   orders do not confirm until the beer is packaged.
+1. **Setup.** Set the approved `books_opened_on`, deposits, non-refundable
+   fee, formats and channel prices from private configuration.
+   Refuse a books date that would exclude an already filed period.
+2. **Beers.** Apply the owner-reviewed private name/alias mapping and create
+   unmatched approved brands at their source price group.
+3. **Customers.** Import country, state, alias and channel for each approved
+   customer. Add a ship-to with known address fields only.
+4. **SKUs.** Create each required brand × format with its approved keg pool.
+   Do not overwrite the pool of an existing SKU.
+5. **History.** Use `record_historical_order` before `books_opened_on`.
+   Consolidate verified regional totals without importing them twice.
+6. **Live.** Use `create_order` on or after `books_opened_on`.
+   Leave orders submitted until staff confirm available stock.
 7. **Reported, not imported:** `In House` and `Customer TOTALS` blocks, empty
    blocks, any line with no price cell (for example an Export half), the
    `Check Invo` cell.
@@ -466,81 +423,43 @@ Import safety, from v1's import of the same workbook
 v1 imported this workbook too. Nothing conflicts with a v1 decision. The
 findings:
 
-- **Historical orders.** v1 left about 200 pre-cutover orders `packed`, then
-  moved them to `cancelled`, so that "fulfilling them would fabricate keg
-  inventory transactions" (`cancel_historical_beer_orders.py:1-10`). v1
-  rejected a historical-fulfillment bypass (issue #425). v2 keeps the goal
-  (no fabricated stock) with a different state: shipped and invoiced, no
-  movements. A cancelled order hides the sale from customer history and
-  sales, which the user wants (invoices, 2026-10-15).
+- **Historical orders.** Fulfilling old orders through the live workflow
+  would fabricate inventory transactions.
+  Keep their customer-visible sale history without writing stock movements.
 - **Notification noise.** Cancelling those orders sent one high-priority
   broadcast per order to every user (`PROGRESS.md:401`).
   `record_historical_order` sends no order, invoice or chat notification.
   Task 7 tests that no notification row is written.
-- **Customer names.** v1 kept suffixes ("Sixth City - Ohio",
-  `reconcile_beer_orders.py:38-63`). v2 keeps the name and moves the place to
-  country and state, per the user. v1's alias table agrees with the user's
-  grouping ("china" → Odyssey Club, the Sarenes together).
-- **Keg pools differ.** v1 put distribution keg lines on Microstar and the
-  internal rule on KegFleet (v1 `scripts/migration/README.md:80`). The user
-  confirmed Microstar on 2026-10-15.
+- **Customer names.** Keep the company name and move destination suffixes to
+  country and state. Preserve a staff-only alias where the source uses a
+  different trading name.
+- **Keg pools.** Reconcile imported pool assignments with the owner rather
+  than inheriting a legacy default.
 - **QuickBooks customer push.** v1 sends `Country` with the address
   (`src/integrations/quickbooks/sync-utils.ts:220-227`). v2's customer
   push must send the country and allow no state. Task 1 tests it.
 
-## Appendix: beer names decided by the user (2026-10-15)
+## Brand mapping
 
-The import matches a sheet name to a brand by name or alias first, then by
-name plus series number. "Amphibian" in the sheet is MGR's "Dart Frog" series,
-and "Rock/Mineral" is "Mineral". Misspellings are corrected to MGR's
-spelling. These were mapped by hand:
+Match a sheet name to a brand by name or alias first, then by series number.
+Have the owner resolve misspellings, renamed brands and unmatched rows.
+Keep that mapping outside the public repository.
 
-| Sheet name | MGR brand |
-| --- | --- |
-| DDH Taupo | DDH Taupō |
-| Taupo II, Taupo III | Taupō II |
-| Double Lupula Eggers | Double Lupula |
-| Double Priam | Double Priam UHA |
-| Origen III - Ultra Hopped Ale | Origen III |
-| Rubico III - Ultra Hopped Ale | Rubico III |
-| Tides III | Tides II |
-| Blue Axureus Amphibian #1 | Blue Azureus |
-| Amphibian #4 | Mint Golden |
-| Amphibian #5 | Dart Frog #5 |
-| Saphire (changed from Opal) | Sapphire |
-| Bluejay | Blue Jay |
-| Luminis Braserie Collab | Luminis (renamed; alias Brasserie DB Collab) |
-| Wet Hop West Coast IPA | Mosaic WC IPA Fresh Hop |
-| Pumpkin Stout | Sever |
-| Zues | Zeus |
-| Hudson Edo | Edo |
-| Sonnen ll | Sonnen II |
-| Bad Bones TBD Double or Tripple UHA | Bonebreaker |
-| Vindobana | Vindobona (new brand) |
-
-New brands: DDH Lupula, DDH Rubico, Vindobona, and placeholders under the
-sheet's names, for the user to rename once brewed: Amphibian #6, Amphibian #7,
-Animal #31 to #34, Reptile #6, Mineral #7, Mineral #8, TBD UHA, TBD Triple
-UHA, BDB x Bad Bones x Offscript (an unnamed pale ale), and ONE DROP COLLAB
-Sour.
 
 ## Open questions (defaults chosen; say if wrong)
 
-- **Historical invoices read paid.** Default: `paid_at` = pickup day, so none
-  shows as owed or overdue. The alternative is unpaid, which would flag 261
-  overdue invoices to staff and buyers.
-- **Price on a historical line.** Default: today's grid price for the
-  customer's channel and the brand's tier. The sheet has no prices, and the
-  Lolev dump's are all $0.
-- **One brewery-wide one-way fee.** Default: a single setting, $10. A fee per
-  format or channel is not needed while the sixtel is the only one-way keg.
-- **Historical orders' deposits and fees.** Default: none recorded. Those kegs
-  are already settled outside MGR; recording deposits would put $30 per keg
-  on each customer's keg balance.
+- **Historical invoices read paid.** Default: `paid_at` = pickup day, so
+  historical imports do not create artificial overdue balances.
+- **Price on a historical line.** Default: the configured grid price for the
+  customer's channel and brand tier; reconcile privately if the source lacks prices.
+- **One brewery-wide one-way fee.** Default: a single configurable setting.
+  No per-channel or per-format fee model is needed for this import.
+- **Historical orders' deposits and fees.** Default: none recorded when
+  already settled outside MGR; importing them would create artificial balances.
 - **Live orders' state.** Default: submitted, not confirmed, so staff confirm
   each week as they do today.
 - **Country list.** Default: the full ISO alpha-2 list, shown by name ("Japan"),
   stored as the code.
-- **Unverified (user, "I think"):** all seven international customers are
-  untaxpaid exports. Check against export paperwork before the first live
-  export order ships; history is unaffected either way.
+- **Export classification.** Verify each international customer's treatment
+  against export paperwork before the first live export shipment.
+  Historical imports remain outside filed periods.

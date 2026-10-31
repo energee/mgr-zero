@@ -4,7 +4,7 @@ Status: approved 2026-10-14; built on this branch. Branch `feat/price-group-barc
 
 ## Why
 
-Lolev's price sheet ("Pricing - Beer.csv", 2026-10-14) gives each price tier one
+Example Brewing's price sheet ("Pricing - Beer.csv", 2026-10-14) gives each price tier one
 UPC. The can label carries it, and the buyer may use it for any format; kegs
 may carry one later (user, 2026-10-14). MGR has nowhere to keep it.
 `skus.upc` is the only UPC column, and its unique index (`skus_upc_uidx`) stops

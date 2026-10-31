@@ -6,8 +6,6 @@ import { ScopePick } from "@/components/mgr/scope-pick";
 import type { RoutesViewModel } from "@/lib/mgr/routes-view";
 import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 
-export type { RoutesViewModel };
-
 export function RoutesView({ model, createAction, workHrefs }: {
   model: RoutesViewModel; createAction?: ReactNode; workHrefs?: Record<string, string>;
 }) {

@@ -78,14 +78,16 @@ export const todayBrewer: TodayViewModel = {
   ],
 };
 
-export const todayDriver: TodayViewModel = {
+export const todayDriver: TodayViewModel = toTodayViewProps({
   date: DATE,
-  rows: [
-    { key: "s1", title: "Stop 1 · Ridgeline Tap Room", detail: "4 Hazy halves · 6 Pils cases", trailing: "next", warning: true },
-    { key: "s2", title: "Stop 2 · Al’s Bar", detail: "2 Stout sixths · later" },
-    { key: "s3", title: "Stop 3 · Teresa’s", detail: "8 Hazy halves · 12 Pils cases · later" },
-  ],
-};
+  timeZone: DEMO_TIME_ZONE,
+  now: new Date("2026-09-03T16:00:00Z"),
+  items: [{
+    reason: "delivery_next", subjectType: "delivery", subjectId: "stop-1", sourceVersion: "1",
+    safeLabel: "Route A · stop 1", customerName: null, detail: "next stop", dueAt: "2026-09-03T04:00:00Z",
+    href: "#", recipientRoles: ["admin", "warehouse"], assignedUserId: "driver-1",
+  }],
+});
 
 export const todayTaproom: TodayViewModel = {
   date: DATE,
