@@ -1,12 +1,20 @@
 -- #1634: a live buyer quote authorizes credential refresh, never staff access.
 -- Reads and new leases require a live claim. A holder may finish its refresh
 -- after quote expiry, using its random lease capability and immutable identity.
+-- The store and the failure mark therefore bind the lease as well as the
+-- credential version: unlike cas_integration_tokens and
+-- cas_portal_qbo_payment_tokens, which re-check a live staff role or payment
+-- claim at store time, an expired quote has no live claim left to check.
+--
+-- One read serves the tax call and its refresh: the tax input comes with the
+-- credential version it was read under, so a 401 refreshes that version, and
+-- a refresh another quote already stored is re-read, not repeated at Intuit.
 create function public.read_portal_quote_tax_tokens(p_brewery uuid, p_customer uuid, p_quote uuid, p_actor uuid)
 returns table(connection_id uuid, access_token text, refresh_token text, credential_version bigint,
-  access_expires_at timestamptz, refresh_expires_at timestamptz, refresh_hard_expires_at timestamptz)
+  access_expires_at timestamptz, refresh_expires_at timestamptz, refresh_hard_expires_at timestamptz, tax_input jsonb)
 language sql stable security definer set search_path to '' as $function$
   select claim.connection_id, t.access_token, t.refresh_token, t.credential_version,
-    c.access_expires_at, c.refresh_expires_at, c.refresh_hard_expires_at
+    c.access_expires_at, c.refresh_expires_at, c.refresh_hard_expires_at, claim.tax_input
   from public.read_portal_quote_tax(p_brewery,p_customer,p_quote,p_actor) claim
   join private.integration_tokens t on t.brewery_id=p_brewery and t.provider='qbo' and t.connection_id=claim.connection_id
   join public.qbo_connections c on c.brewery_id=p_brewery and c.id=claim.connection_id;

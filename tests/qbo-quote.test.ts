@@ -133,12 +133,7 @@ describe("portal order quote", () => {
         }
         if (outcome === "network") throw new Error("Bearer tax-access provider-secret");
         if (outcome === "tax_500") return new Response("provider-secret", { status: 500 });
-        if (new Headers(init?.headers).get("Authorization") === "Bearer rotated-access" && outcome === "success") {
-          return new Response(JSON.stringify({ data: { indirectTaxCalculateSaleTransactionTax: { taxCalculation: {
-            taxTotals: { totalTaxAmountExcludingShipping: { value: "1.00", currency: "USD" } },
-            shipping: { taxAmount: { value: "0.00", currency: "USD" } },
-          } } } }), { status: 200 });
-        }
+        if (new Headers(init?.headers).get("Authorization") === "Bearer rotated-access" && outcome === "success") return calculatedTax();
         return new Response("provider-secret", { status: 401 });
       });
       const quote = await quotePortalOrder(f.ctx, quoteInput(f), crypto.randomUUID(), new QboOAuthClient(config, fetch));
@@ -225,6 +220,39 @@ describe("portal order quote", () => {
       expect.objectContaining({ refreshToken: "winner-refresh" }), expect.objectContaining({ refreshToken: "winner-refresh" }),
     ]);
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes once when two overlapping quotes fail on the same stale token", async () => {
+    const f = await setup();
+    const { config } = await enableTax(f);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    // Both quotes read the stale credential before either refreshes: the first
+    // 401 waits for the second to arrive, and the second 401 waits for the first
+    // quote to finish, so the second refresh starts after the credential rotated.
+    const bothStale = Promise.withResolvers<void>();
+    const firstDone = Promise.withResolvers<void>();
+    let stale = 0, refreshes = 0;
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (url, init) => {
+      if (String(url).includes("/tokens/bearer")) {
+        refreshes += 1;
+        return new Response(JSON.stringify({ access_token: `rotated-access-${refreshes}`, refresh_token: `rotated-refresh-${refreshes}`, expires_in: 3600 }), { status: 200 });
+      }
+      if (new Headers(init?.headers).get("Authorization") !== "Bearer tax-access") return calculatedTax();
+      stale += 1;
+      if (stale === 1) await bothStale.promise;
+      else { bothStale.resolve(); await firstDone.promise; }
+      return new Response("provider-secret", { status: 401 });
+    });
+    const client = new QboOAuthClient(config, fetch);
+    const quotes = [1, 2].map(() => quotePortalOrder(f.ctx, quoteInput(f), crypto.randomUUID(), client));
+    await Promise.race(quotes);
+    firstDone.resolve();
+    expect(await Promise.all(quotes)).toEqual([
+      expect.objectContaining({ taxStatus: "calculated", taxCents: 100 }),
+      expect.objectContaining({ taxStatus: "calculated", taxCents: 100 }),
+    ]);
+    expect(stale).toBe(2);
+    expect(refreshes).toBe(1);
   });
 
   it.each([200, 400])("finalizes an authorized refresh when the quote expires during provider response %s", async (status) => {
@@ -359,6 +387,11 @@ async function enableTax(f: {
     apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com", taxApiBaseUrl: "https://qb-sandbox.api.intuit.com/graphql",
   } };
 }
+
+const calculatedTax = () => new Response(JSON.stringify({ data: { indirectTaxCalculateSaleTransactionTax: { taxCalculation: {
+  taxTotals: { totalTaxAmountExcludingShipping: { value: "1.00", currency: "USD" } },
+  shipping: { taxAmount: { value: "0.00", currency: "USD" } },
+} } } }), { status: 200 });
 
 const quoteInput = (f: Awaited<ReturnType<typeof setup>>) => ({
   shipToId: f.customer.shipToId, requestedShipDate: "2026-10-10",

@@ -48,29 +48,28 @@ export async function quotePortalOrder(ctx: Ctx, i: z.infer<typeof quoteInput>, 
   const { readPortalQuoteTax, finishPortalQuoteTax } = await import("@/lib/supabase/integration-tokens");
   const claim = await readPortalQuoteTax(ctx, start.quoteId);
   if (!claim) return pending;
+  const { qboConfig, QboOAuthClient, QboHttpError, refreshQboCredentials, qboPaymentFailureCause } = await import("@/lib/qbo");
+  let taxCents: number;
   try {
-    const { qboConfig, QboOAuthClient, QboHttpError, refreshQboCredentials, qboPaymentFailureCause } = await import("@/lib/qbo");
-    if (!client) {
-      client = new QboOAuthClient(qboConfig());
-    }
-    let taxCents: number;
+    if (!client) client = new QboOAuthClient(qboConfig());
     try {
       taxCents = await client.calculateSalesTax(claim.input, claim.accessToken);
     } catch (error) {
       if (!(error instanceof QboHttpError) || error.status !== 401) throw error;
       console.error("portal_quote_tax_unauthorized", qboPaymentFailureCause(error));
-      const tokens = await refreshQboCredentials(ctx, client, undefined, start.quoteId);
-      if (tokens.connectionId !== claim.connectionId) throw new Error("QuickBooks connection changed");
+      // Refresh the credential that failed; if another quote already replaced it, this re-reads that one.
+      const tokens = await refreshQboCredentials(ctx, client, claim, start.quoteId);
       taxCents = await client.calculateSalesTax(claim.input, tokens.accessToken);
     }
-    return await finishPortalQuoteTax(ctx, start.quoteId, claim.connectionId, taxCents);
   } catch (error) {
-    const { qboPaymentFailureCause } = await import("@/lib/qbo");
     console.error("portal_quote_tax_failed", qboPaymentFailureCause(error));
     // No tax or estimated total is asserted; submission revalidates the quote,
     // and the final invoice supplies tax when optional calculation is unavailable.
     return pending;
   }
+  // Only the provider call falls back to "Tax pending". A failed store reaches
+  // the caller: the buyer must not review a quote whose stored tax differs.
+  return finishPortalQuoteTax(ctx, start.quoteId, claim.connectionId, taxCents);
 }
 
 defineCommand({

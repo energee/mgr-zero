@@ -5465,7 +5465,7 @@ isOneToOne: false
                            },
 "read_portal_quote_tax_tokens":
 { Args: { "p_actor": string,"p_brewery": string,"p_customer": string,"p_quote": string }; Returns: {
-              "access_expires_at": string,"access_token": string,"connection_id": string,"credential_version": number,"refresh_expires_at": string,"refresh_hard_expires_at": string,"refresh_token": string
+              "access_expires_at": string,"access_token": string,"connection_id": string,"credential_version": number,"refresh_expires_at": string,"refresh_hard_expires_at": string,"refresh_token": string,"tax_input": Json
             }[]
                            },
 "reap_qbo_oauth_exchanges":
