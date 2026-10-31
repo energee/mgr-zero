@@ -215,5 +215,5 @@
   "20261030002001_shipment_posting_clock.sql": "dcfeb5236fb37d21f4ed831808b595ee2cadd99d3a8b83dded011c0fef57a40d",
   "20261030031000_qbo_push_reconcile.sql": "72ef35bf69dbe8d46c9ea836097ffd8e4163fefdce2339a0a0ef700cb4f26511",
   "20261030031030_integration_failure_handling.sql": "d745ca7b05e5178a22ed3e6e473003f9773fa0740ba65a9258cd7983842c1460",
-  "20261030031130_taproom_bidirectional_count_correction.sql": "11c5c8b281242106b4ae34e7d60ac026b3096c5cef181645a0006107785f2fa2"
+  "20261030031130_taproom_bidirectional_count_correction.sql": "b07d06ee8edd6f584f740a5fd3b957622f9d21a4e0587925f0ce6981ef52a0b1"
 }

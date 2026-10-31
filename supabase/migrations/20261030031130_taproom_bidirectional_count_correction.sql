@@ -256,7 +256,10 @@ begin
     'counted_by',h.counted_by,'created_at',h.created_at,'prior_count_id',h.prior_count_id,
     'corrected_at',h.corrected_at,'corrected_by',h.corrected_by,'correction_reason',h.correction_reason,
     'correction_eligible',h.corrected_at is null
-      and exists(select 1 from private.taproom_effective_counts shortage where shortage.brewery_id=h.brewery_id and shortage.root_id=h.root_id and shortage.qty_before>0 and (shortage.movement_type='depletion' or shortage.movement_id is null))
+      -- A sold line can always be raised; a matching line can be lowered only while its bucket still holds stock.
+      and exists(select 1 from private.taproom_effective_counts l where l.brewery_id=h.brewery_id and l.root_id=h.root_id
+        and (l.movement_type='depletion' or (l.movement_id is null and l.qty_counted>0
+          and private.bin_stock_on_hand(l.brewery_id,l.bin_id,l.sku_id,null,null,null,l.lot_id)>0)))
       and not exists(select 1 from private.taproom_effective_counts newer
       where newer.brewery_id=h.brewery_id and newer.location_id=h.location_id and newer.root_id<>h.root_id
         and (newer.observed_at,newer.root_id)>(h.observed_at,h.root_id)),

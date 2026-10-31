@@ -383,6 +383,21 @@ it("#1639 refuses a lower correction when subsequent stock use cannot cover its 
   expect(state(f)).toEqual(before);
 });
 
+it("#1639 offers Correct count only while some line can still change", async () => {
+  const matched = await fixture();
+  const matching = await matched.ctx.db.rpc("record_taproom_count", await args(matched));
+  expect(matching.error).toBeNull(); assert(matching.data !== null);
+  expect(matching.data.correction_eligible).toBe(true);
+  await movement(matched, -7);
+  expect(await runCommand("get_taproom_count", { countId: matching.data.id }, matched.ctx)).toMatchObject({ correction_eligible: false });
+  const short = await fixture();
+  const input = await args(short); input.p_lines[0].qty_counted = 5;
+  const shortage = await short.ctx.db.rpc("record_taproom_count", input);
+  expect(shortage.error).toBeNull(); assert(shortage.data !== null);
+  await movement(short, -5);
+  expect(await runCommand("get_taproom_count", { countId: shortage.data.id }, short.ctx)).toMatchObject({ correction_eligible: true });
+});
+
 it("revalidates a committed correction when a root line is appended", async () => {
   const f = await fixture(); const adminCtx = await makeStaffCtx(f.brewery.id, "admin");
   const input = await args(f); input.p_lines[0].qty_counted = 2;
