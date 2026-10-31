@@ -61,6 +61,19 @@ describe("vendors, materials, contracts", () => {
     expect(await runCommand("list_vendors", {}, ctx)).toEqual([{ id: vendor.id, name: "Fictional Hops Cooperative", active: true, lead_time_days: 10, qbo_vendor_id: null, qbo_realm_id: null }]);
   });
 
+  it("keeps base units per purchase unit to four decimals at the table, so a whole-unit count always converts exactly", async () => {
+    const hop = { name: "Mosaic pellets", category: "hop", baseUom: "g", purchaseUom: "lb" } as const;
+    const mosaic = (await runCommand("upsert_material", { ...hop, purchaseUomFactor: 453.5924 }, ctx)) as { id: string; purchase_uom_factor: number };
+    expect(mosaic.purchase_uom_factor).toBe(453.5924);
+    // Past the command's own check: the column refuses a fifth decimal from any writer.
+    const { error } = await ctx.db.rpc("upsert_material", {
+      p_brewery: ctx.breweryId, p_material: mosaic.id, p_name: hop.name, p_category: hop.category, p_base_uom: hop.baseUom,
+      p_purchase_uom: hop.purchaseUom, p_purchase_uom_factor: 453.59237, p_lot_tracked: null, p_default_vendor: null,
+      p_reorder_point: null, p_active: null, p_extract_potential: null, p_request_id: crypto.randomUUID(),
+    });
+    expect(error?.message).toMatch(/materials_purchase_uom_factor_four_decimals/);
+  });
+
   it("list_vendors_and_contracts and list_materials q match the name in the query, with % and _ literal (#994)", async () => {
     const own = await makeStaffCtx((await makeBrewery()).id, "warehouse");
     for (const name of ["Hops 100% Direct", "Malt_Co", "MaltyCo"]) await runCommand("upsert_vendor", { name }, own);
@@ -134,6 +147,46 @@ describe("vendors, materials, contracts", () => {
 
 
 describe("purchase orders: draft, mark sent, receive", () => {
+  it.each([
+    { factor: 50, rejected: 0.33333, accepted: 0.3333, message: /four decimals/ },
+    { factor: 0.3333, rejected: 0.0001, accepted: 1, message: /too precise.*base unit/ },
+  ])("keeps receipt counts and stock exact with conversion factor $factor", async ({ factor, rejected, accepted, message }) => {
+    const own = await makeStaffCtx((await makeBrewery()).id, "warehouse");
+    const wh = await seedLocation(own.breweryId);
+    const vendor = await runCommand("upsert_vendor", { name: "Precision supplier" }, own) as { id: string };
+    const material = await runCommand("upsert_material", {
+      name: "Precision malt", category: "malt", baseUom: "lb", purchaseUom: "each",
+      purchaseUomFactor: factor, lotTracked: true,
+    }, own) as { id: string };
+    const po = await runCommand("create_purchase_order", {
+      vendorId: vendor.id, lines: [{ materialId: material.id, qtyOrdered: 2, unitCostCents: 100 }],
+    }, own) as { id: string };
+    await runCommand("send_purchase_order", { poId: po.id, sentVia: "external" }, own);
+    const detail = await runCommand("get_purchase_order", { poId: po.id }, own) as { lines: { id: string }[] };
+    const lineId = detail.lines[0].id;
+    const requestId = crypto.randomUUID();
+    const receive = (qty: number) => own.db.rpc("receive_purchase_order", {
+      p_brewery: own.breweryId, p_po: po.id, p_location: wh.id, p_bin: wh.binId,
+      p_received_on: "2026-09-19", p_lines: [{ po_line_id: lineId, qty_counted: qty, lot_code: "PRECISE" }],
+      p_request_id: requestId,
+    });
+    const invalid = await receive(rejected);
+    expect(invalid.error?.message).toMatch(message);
+    expect(sql(`select count(*) from public.receipts where po_id='${po.id}'`)).toEqual(["0"]);
+    expect(sql(`select count(*) from public.material_lots where material_id='${material.id}'`)).toEqual(["0"]);
+    expect(sql(`select count(*) from public.material_movements where material_id='${material.id}'`)).toEqual(["0"]);
+    expect(sql(`select qty_received,qty_open from public.po_open_balances where po_line_id='${lineId}'`)).toEqual(["0|2.0000"]);
+    expect(sql(`select status from public.purchase_orders where id='${po.id}'`)).toEqual(["sent"]);
+    const posted = await receive(accepted);
+    expect(posted.error).toBeNull();
+    expect((await receive(accepted)).data).toEqual(posted.data);
+    expect(sql(`select rl.qty_counted=${accepted},m.qty=rl.qty_counted*rl.purchase_uom_factor,
+      b.qty_received=rl.qty_counted,b.qty_open=2-rl.qty_counted
+      from public.receipt_lines rl join public.material_movements m on m.id=rl.movement_id
+      join public.po_open_balances b on b.po_line_id=rl.po_line_id where rl.po_line_id='${lineId}'`)).toEqual(["t|t|t|t"]);
+    expect(sql(`select count(*) from public.receipts where po_id='${po.id}'`)).toEqual(["1"]);
+  });
+
   it("records an overreceipt once and makes the missing damage/disposition contract explicit", async () => {
     const wh = await seedLocation(b.id, { name: "Overreceipt dock" });
     const vendor = await runCommand("upsert_vendor", { name: "Variance supplier" }, ctx) as { id: string };
