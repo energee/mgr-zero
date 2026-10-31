@@ -60,6 +60,7 @@ const AUTHENTICATED_RPCS = [
   "update_keg_pool(uuid,uuid,text,uuid,integer,integer,boolean,uuid)",
   "create_keg_pool(uuid,text,keg_pool_kind,uuid,integer,integer,uuid)",
   "adjust_order_lines(uuid,jsonb,text,uuid)",
+  "set_order_pickup(uuid,boolean,uuid)",
   "begin_chat_installation(uuid,text,text,text,uuid)",
   "begin_chat_reauthorization(uuid,uuid,text,text,uuid)",
   "begin_qbo_oauth(uuid,text,text,text,uuid,text[])",

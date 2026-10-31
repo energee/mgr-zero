@@ -5599,6 +5599,9 @@ isOneToOne: false
 "set_one_way_keg_fee":
 { Args: { "p_brewery": string,"p_fee_cents": number,"p_request_id": string }; Returns: Json
                            },
+"set_order_pickup":
+{ Args: { "p_order": string,"p_pickup": boolean,"p_request_id": string }; Returns: Json
+                           },
 "set_personal_notification_destination":
 { Args: { "p_brewery": string,"p_personal_destination": string,"p_reason": string,"p_request_id": string }; Returns: Json
                            },
