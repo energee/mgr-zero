@@ -237,7 +237,7 @@ it("retains purchase and base quantity precision when an actual receipt cost is 
   const f = await received(0);
   const vendor = await runCommand("upsert_vendor", { name: "Precise invoice supplier" }, f.ctx) as { id: string };
   const material = await runCommand("upsert_material", {
-    name: "Precise invoice hops", category: "hop", baseUom: "g", purchaseUom: "lb", purchaseUomFactor: 453.59237,
+    name: "Precise invoice hops", category: "hop", baseUom: "lb", purchaseUom: "kg", purchaseUomFactor: 2.2046,
   }, f.ctx) as { id: string };
   const po = await runCommand("create_purchase_order", { vendorId: vendor.id, lines: [{ materialId: material.id, qtyOrdered: 20 }] }, f.ctx) as { id: string };
   await runCommand("send_purchase_order", { poId: po.id, sentVia: "external" }, f.ctx);
@@ -247,10 +247,11 @@ it("retains purchase and base quantity precision when an actual receipt cost is 
     p_lines: [{ po_line_id: detail.lines[0].id, qty_counted: 0.33333, unit_cost_cents: 1000 }], p_request_id: crypto.randomUUID(),
   };
   expect((await f.ctx.db.rpc("receive_purchase_order", input)).error?.message).toMatch(/four decimals/i);
-  expect((await f.ctx.db.rpc("receive_purchase_order", { ...input, p_lines: [{ ...input.p_lines[0], qty_counted: 1 }] })).error?.message).toMatch(/too precise for the base unit/i);
+  // 1.2345 kg is 2.72157870 lb: both inputs have four decimals, the base quantity does not.
+  expect((await f.ctx.db.rpc("receive_purchase_order", { ...input, p_lines: [{ ...input.p_lines[0], qty_counted: 1.2345 }] })).error?.message).toMatch(/too precise for the base unit/i);
   expect((await admin.from("receipts").select("id").eq("po_id", po.id)).data).toHaveLength(0);
   const posted = await f.ctx.db.rpc("receive_purchase_order", { ...input, p_lines: [{ ...input.p_lines[0], qty_counted: 10 }] });
   expect(posted.error).toBeNull();
   const receiptId = receiptResult.parse(posted.data).receipt_id;
-  expect(sql(`select rl.qty_counted,rl.purchase_unit_cost_cents,m.qty from public.receipt_lines rl join public.material_movements m on m.id=rl.movement_id where rl.receipt_id='${receiptId}'`)[0].split("|").map(Number)).toEqual([10, 1000, 4535.9237]);
+  expect(sql(`select rl.qty_counted,rl.purchase_unit_cost_cents,m.qty from public.receipt_lines rl join public.material_movements m on m.id=rl.movement_id where rl.receipt_id='${receiptId}'`)[0].split("|").map(Number)).toEqual([10, 1000, 22.046]);
 });
