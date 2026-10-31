@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { z } from "zod";
 import { admin, closePgSessions, makeBrewery, makeStaffCtx, pgSession, seedLocation, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 afterEach(closePgSessions);
+const receiptResult = z.object({ receipt_id: z.string().uuid() });
 
 async function received(qty = 10) {
   const brewery = await makeBrewery();
@@ -41,16 +43,81 @@ describe("immutable receipt correction", () => {
     await expect(runCommand("correct_purchase_receipt", input, f.ctx)).rejects.toThrow(/already|superseded|reload/i);
   });
 
-  it("refuses a consumed receipt without reversing stock or creating a revision", async () => {
+  it("corrects a consumed receipt without rewriting its consumption or allowing negative stock", async () => {
     const f = await received();
     const { data: line } = await admin.from("receipt_lines").select("lot_id").eq("receipt_id", f.receiptId).single();
     const used = await admin.from("material_movements").insert({ brewery_id: f.brewery.id, material_id: f.material.id,
       location_id: f.location.id, bin_id: f.location.binId, lot_id: line!.lot_id!, qty: -1, type: "consumption", created_by: f.ctx.userId });
     expect(used.error).toBeNull();
     await expect(runCommand("correct_purchase_receipt", {
-      receiptId: f.receiptId, reason: "Wrong count", lines: [{ poLineId: f.lineId, qtyCounted: 9, lotCode: "ORIGINAL" }],
-    }, f.ctx)).rejects.toThrow(/used|consum|subsequent|dependency/i);
+      receiptId: f.receiptId, reason: "Below amount already used", lines: [{ poLineId: f.lineId, qtyCounted: 0.1, lotCode: "ORIGINAL", bestBy: "2027-01-01" }],
+    }, f.ctx)).rejects.toThrow(/negative material stock/i);
     expect((await admin.from("receipts").select("id").eq("po_id", f.po.id)).data).toHaveLength(1);
+    await runCommand("correct_purchase_receipt", {
+      receiptId: f.receiptId, reason: "Wrong count", lines: [{ poLineId: f.lineId, qtyCounted: 9, lotCode: "ORIGINAL", bestBy: "2027-01-01" }],
+    }, f.ctx);
+    expect((await admin.from("receipts").select("id").eq("po_id", f.po.id)).data).toHaveLength(2);
+    expect(sql(`select sum(qty) from public.material_movements where material_id='${f.material.id}'`)).toEqual(["44.0000"]);
+    expect(sql(`select qty from public.material_movements where material_id='${f.material.id}' and type='consumption'`)).toEqual(["-1.0000"]);
+  });
+
+  it("corrects the receiving bin while preserving the original receipt location", async () => {
+    const f = await received();
+    const destination = await seedLocation(f.brewery.id, { name: "Actual receiving location" });
+    const corrected = await runCommand("correct_purchase_receipt", {
+      receiptId: f.receiptId, reason: "Received in storage", locationId: destination.id, binId: destination.binId,
+      lines: [{ poLineId: f.lineId, qtyCounted: 10, lotCode: "ORIGINAL", bestBy: "2027-01-01" }],
+    }, f.ctx) as { receipt_id: string };
+    expect((await admin.from("receipts").select("location_id,bin_id").eq("id", f.receiptId).single()).data)
+      .toEqual({ location_id: f.location.id, bin_id: f.location.binId });
+    expect((await admin.from("receipts").select("location_id,bin_id").eq("id", corrected.receipt_id).single()).data)
+      .toEqual({ location_id: destination.id, bin_id: destination.binId });
+    expect(sql(`select sum(qty) from public.material_movements where material_id='${f.material.id}' and bin_id='${f.location.binId}'`)).toEqual(["0.0000"]);
+    expect(sql(`select sum(qty) from public.material_movements where material_id='${f.material.id}' and bin_id='${destination.binId}'`)).toEqual(["50.0000"]);
+  });
+
+  it("preserves actual cost and destination through the single correction RPC and exact replay", async () => {
+    const f = await received();
+    const destination = await seedLocation(f.brewery.id, { name: "Correct receiving warehouse" });
+    const input = {
+      p_brewery: f.brewery.id, p_receipt: f.receiptId, p_reason: "Invoice and receiving bin corrected",
+      p_lines: [{ po_line_id: f.lineId, qty_counted: 10, unit_cost_cents: 1251, lot_code: "ORIGINAL", best_by: "2027-01-01" }],
+      p_request_id: crypto.randomUUID(), p_location: destination.id, p_bin: destination.binId,
+    };
+    const first = await f.ctx.db.rpc("correct_purchase_receipt", input);
+    expect(first.error).toBeNull();
+    const corrected = receiptResult.parse(first.data);
+    expect((await f.ctx.db.rpc("correct_purchase_receipt", input)).data).toEqual(first.data);
+    const conflicting = await f.ctx.db.rpc("correct_purchase_receipt", { ...input, p_lines: [{ ...input.p_lines[0], unit_cost_cents: 1252 }] });
+    expect(conflicting.error).not.toBeNull();
+    expect(sql(`select location_id,bin_id from public.receipts where id='${corrected.receipt_id}'`)).toEqual([`${destination.id}|${destination.binId}`]);
+    expect(sql(`select rl.purchase_unit_cost_cents,m.unit_cost_cents,m.qty from public.receipt_lines rl join public.material_movements m on m.id=rl.movement_id where rl.receipt_id='${corrected.receipt_id}'`)[0].split("|").map(Number)).toEqual([1251, 250.2, 50]);
+    expect(sql(`select sum(qty) from public.material_movements where material_id='${f.material.id}' and bin_id='${f.location.binId}'`)).toEqual(["0.0000"]);
+    expect(sql(`select sum(qty) from public.material_movements where material_id='${f.material.id}' and bin_id='${destination.binId}'`)).toEqual(["50.0000"]);
+    expect(sql(`select purchase_unit_cost_cents from public.receipt_lines where receipt_id='${f.receiptId}'`)).toEqual(["250"]);
+  });
+
+  it("allows a safe same-bin price correction after use but refuses moving consumed stock or another tenant's bin", async () => {
+    const f = await received();
+    const { data: line } = await admin.from("receipt_lines").select("lot_id").eq("receipt_id", f.receiptId).single();
+    const used = await admin.from("material_movements").insert({ brewery_id: f.brewery.id, material_id: f.material.id,
+      location_id: f.location.id, bin_id: f.location.binId, lot_id: line!.lot_id!, qty: -1, type: "consumption", created_by: f.ctx.userId });
+    expect(used.error).toBeNull();
+    const input = {
+      p_brewery: f.brewery.id, p_receipt: f.receiptId, p_reason: "Invoice price corrected",
+      p_lines: [{ po_line_id: f.lineId, qty_counted: 10, unit_cost_cents: 1251, lot_code: "ORIGINAL", best_by: "2027-01-01" }],
+      p_request_id: crypto.randomUUID(), p_location: f.location.id, p_bin: f.location.binId,
+    };
+    const corrected = await f.ctx.db.rpc("correct_purchase_receipt", input);
+    expect(corrected.error).toBeNull();
+    const receiptId = receiptResult.parse(corrected.data).receipt_id;
+    const destination = await seedLocation(f.brewery.id, { name: "Other receiving warehouse" });
+    const moved = await f.ctx.db.rpc("correct_purchase_receipt", { ...input, p_receipt: receiptId, p_request_id: crypto.randomUUID(), p_location: destination.id, p_bin: destination.binId });
+    expect(moved.error?.message).toMatch(/negative material stock/i);
+    const foreign = await seedLocation((await makeBrewery()).id, { name: "Foreign receiving warehouse" });
+    const denied = await f.ctx.db.rpc("correct_purchase_receipt", { ...input, p_receipt: receiptId, p_request_id: crypto.randomUUID(), p_location: foreign.id, p_bin: foreign.binId });
+    expect(denied.error?.message).toMatch(/receiving bin in this brewery/i);
+    expect((await admin.from("receipts").select("id").eq("po_id", f.po.id)).data).toHaveLength(2);
     expect(sql(`select sum(qty) from public.material_movements where material_id='${f.material.id}'`)).toEqual(["49.0000"]);
   });
 
@@ -175,4 +242,39 @@ it("corrects a new zero receipt but refuses missing historical conversion facts"
     receiptId: legacy.receiptId, reason: "Unknown old units", lines: [{ poLineId: legacy.lineId, qtyCounted: 1, lotCode: "UNKNOWN" }],
   }, legacy.ctx)).rejects.toThrow(/historical.*conversion/i);
   expect((await admin.from("receipts").select("id").eq("po_id", legacy.po.id)).data).toHaveLength(1);
+});
+
+// A pre-#680 receipt froze no receiving location and, with no count, no
+// movement to read one from: the correction names that gap, not a bin chooser
+// the form never showed.
+it("refuses a historical receipt with no frozen receiving location as historical, not as a missing bin", async () => {
+  const legacy = await received(0);
+  sql(`update public.receipts set location_id=null,bin_id=null where id='${legacy.receiptId}'`);
+  await expect(runCommand("correct_purchase_receipt", {
+    receiptId: legacy.receiptId, reason: "One bag was overlooked", lines: [{ poLineId: legacy.lineId, qtyCounted: 1, lotCode: "FOUND" }],
+  }, legacy.ctx)).rejects.toThrow(/historical receipt has no frozen receiving location/i);
+  expect((await admin.from("receipts").select("id").eq("po_id", legacy.po.id)).data).toHaveLength(1);
+});
+
+it("retains purchase and base quantity precision when an actual receipt cost is supplied", async () => {
+  const f = await received(0);
+  const vendor = await runCommand("upsert_vendor", { name: "Precise invoice supplier" }, f.ctx) as { id: string };
+  const material = await runCommand("upsert_material", {
+    name: "Precise invoice hops", category: "hop", baseUom: "lb", purchaseUom: "kg", purchaseUomFactor: 2.2046,
+  }, f.ctx) as { id: string };
+  const po = await runCommand("create_purchase_order", { vendorId: vendor.id, lines: [{ materialId: material.id, qtyOrdered: 20 }] }, f.ctx) as { id: string };
+  await runCommand("send_purchase_order", { poId: po.id, sentVia: "external" }, f.ctx);
+  const detail = await runCommand("get_purchase_order", { poId: po.id }, f.ctx) as { lines: { id: string }[] };
+  const input = {
+    p_brewery: f.brewery.id, p_po: po.id, p_location: f.location.id, p_bin: f.location.binId, p_received_on: "2026-09-20",
+    p_lines: [{ po_line_id: detail.lines[0].id, qty_counted: 0.33333, unit_cost_cents: 1000 }], p_request_id: crypto.randomUUID(),
+  };
+  expect((await f.ctx.db.rpc("receive_purchase_order", input)).error?.message).toMatch(/four decimals/i);
+  // 1.2345 kg is 2.72157870 lb: both inputs have four decimals, the base quantity does not.
+  expect((await f.ctx.db.rpc("receive_purchase_order", { ...input, p_lines: [{ ...input.p_lines[0], qty_counted: 1.2345 }] })).error?.message).toMatch(/too precise for the base unit/i);
+  expect((await admin.from("receipts").select("id").eq("po_id", po.id)).data).toHaveLength(0);
+  const posted = await f.ctx.db.rpc("receive_purchase_order", { ...input, p_lines: [{ ...input.p_lines[0], qty_counted: 10 }] });
+  expect(posted.error).toBeNull();
+  const receiptId = receiptResult.parse(posted.data).receipt_id;
+  expect(sql(`select rl.qty_counted,rl.purchase_unit_cost_cents,m.qty from public.receipt_lines rl join public.material_movements m on m.id=rl.movement_id where rl.receipt_id='${receiptId}'`)[0].split("|").map(Number)).toEqual([10, 1000, 22.046]);
 });

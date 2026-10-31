@@ -297,6 +297,10 @@ describe("Brew day view", () => {
     expect(html).not.toContain("14.6");
     expect(src("app/(app)/batches/[id]/page.tsx")).toContain("Boolean(batch.brewed_on || occupancy)");
   });
+  it("keeps ingredient corrections available when the original turn has no open vessel", () => {
+    const correction = { ...brewDayHazy, recorded: false, vesselId: "", vessels: [], correctionRecordId: "record", correctionReason: "Correct weighed malt" };
+    expect(canRecordBrewDay(correction)).toBe(true);
+  });
   it("retains knockout inputs and command errors while pending", () => {
     const html = htmlOf(createElement(BrewDayView, { model: brewDayHazy, busy: true, error: "Vessel occupied" }));
     expect(html).toContain("Vessel occupied");

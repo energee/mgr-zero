@@ -19,7 +19,7 @@ import type { ChatProviderTransport, ProviderMessageRef } from "./provider";
 import { issueChatLinkProof } from "./linking";
 import { chatStatePool, chatLifecycleClient } from "./state";
 import { SlackTransport, classifySlackError } from "./slack-transport";
-import { slackClientFor, slackPrivateChannels } from "./slack-adapter";
+import { slackClientFor, slackPrivateChannels, slackUserDisplayName } from "./slack-adapter";
 
 let client: SupabaseClient<Database> | undefined;
 export function serviceClient(): SupabaseClient<Database> {
@@ -123,7 +123,7 @@ export async function runChatScan({ now = new Date(), db = serviceClient() }: De
 
 // App Home opens: publish the link screen (issuing a fresh single-use proof)
 // or, for an actively linked user, a fresh scan's current active items.
-export async function runChatCallbackBatch({ limit = 25, now = new Date(), db = serviceClient(), transport = slackTransport() }: Deps & { limit?: number } = {}) {
+export async function runChatCallbackBatch({ limit = 25, now = new Date(), db = serviceClient(), transport = slackTransport(), userDisplayName = slackUserDisplayName }: Deps & { limit?: number; userDisplayName?: typeof slackUserDisplayName } = {}) {
   const claimed = (await unwrap(db.rpc("claim_chat_callback_receipts", { p_limit: limit, p_now: now.toISOString() }))) as
     { id: string; brewery_id: string; installation_id: string; external_installation_id: string; external_user_id: string; callback_kind: string }[];
   let processed = 0, failed = 0;
@@ -134,7 +134,8 @@ export async function runChatCallbackBatch({ limit = 25, now = new Date(), db = 
       if (r.callback_kind !== "app_home_opened" || !r.external_user_id) { await done("ignored"); continue; }
       const items = (await unwrap(db.rpc("get_chat_home_items", { p_installation: r.installation_id, p_external_user_id: r.external_user_id }))) as Occurrence[] | null;
       if (items === null) {
-        const proof = await issueChatLinkProof(db, r.installation_id, r.external_user_id);
+        const name = await userDisplayName(r.external_installation_id, r.external_user_id);
+        const proof = await issueChatLinkProof(db, r.installation_id, r.external_user_id, name);
         await transport.publishHome({ installationId: r.external_installation_id, externalUserId: r.external_user_id, items: [], linkUrl: proof.url });
       } else {
         await unwrap(db.rpc("scan_chat_notification_occurrences", { p_brewery: r.brewery_id, p_now: now.toISOString() }));
