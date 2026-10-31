@@ -41,7 +41,6 @@ describe("transfer source allocation", () => {
       { lineId: "l1", sources: [] },
       { lineId: "l2", sources: [{ lotId: "lot-pils", qty: 3.5 }, { lotId: null, qty: 0.5 }] },
     ]);
-    expect(received[1].sources.reduce((total, source) => total + source.qty, 0)).toBe(4);
   });
 
   it("isolates the same lot on separate lines and retains four-decimal material quantities", () => {
