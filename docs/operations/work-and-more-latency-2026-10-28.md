@@ -264,7 +264,7 @@ The bounded fixes have already landed:
 
 | Cause | Outcome |
 | --- | --- |
-| Guide frame controls mounted before they were visible | [#1576](https://github.com/energee/mgr-zero/pull/1576) defers mounting until near the viewport, without splitting the guide. |
+| Guide frame controls mounted before they were visible | [#1587](https://github.com/energee/mgr-zero/pull/1587) defers mounting until near the viewport, without splitting the guide. |
 | Lot trace waited for its lot read before starting other independent reads | #1576 starts those reads together. |
 | Settings read the Gateway model catalog on each render | #1576 caches successful catalog reads for one hour. |
 | Settings unnecessarily ran the Compliance activity scan | [#1608](https://github.com/energee/mgr-zero/pull/1608) separates the activity query from the report list. |
@@ -299,7 +299,7 @@ These public-page LCP observations are below two seconds.
 They do not measure the session, page-read, or save stages of a signed-in route.
 No new slow stage was established, so this follow-up makes no speculative application change.
 
-### Remaining acceptance gate
+### Remaining #1491 acceptance gate
 
 Opening `/settings` in that isolated session redirected to
 `/login?next=%2Fsettings` and showed the Sign in form.
