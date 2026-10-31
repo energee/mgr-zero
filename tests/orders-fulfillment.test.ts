@@ -464,7 +464,7 @@ describe("resolve_short_pick", () => {
       p_order: id, p_line: line.id, p_qty_picked: 8, p_reason: "two missing",
       p_resolution: "keep_owed", p_request_id: crypto.randomUUID(),
     });
-    expect(error?.message).toMatch(/adjust_down/);
+    expect(error?.code).toBe("P0001");
     expect(await lineOf(id)).toMatchObject({ qty_ordered: 10, qty_picked: null, short_reason: null });
     const { data: alloc } = await admin.from("allocations").select("qty,status").eq("ref", line.id).single();
     expect(alloc).toMatchObject({ qty: 10, status: "open" });

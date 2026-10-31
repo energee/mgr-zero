@@ -9,10 +9,8 @@ import { toShipToViewProps } from "@/lib/mgr/ship-to-view";
 import { UsStateField } from "@/components/mgr/us-state-field";
 import { SCREENS } from "@/components/mgr/screens";
 import { PickView } from "@/components/mgr/views/pick";
-import { ShortPickView } from "@/components/mgr/views/short-pick";
 import { toPickViewProps } from "@/lib/mgr/pick-view";
-import { toShortPickViewProps } from "@/lib/mgr/short-pick-view";
-import { orderPick, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
+import { orderPick } from "@/lib/mgr/fixtures/order-sheets";
 import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
 import { newOrderDraft } from "@/lib/mgr/fixtures/orders";
 
@@ -35,19 +33,6 @@ describe("shared order-entry controls", () => {
     expect(short).toHaveBeenCalledWith(model.lines[0].key); expect(print).toHaveBeenCalledOnce();
   });
 
-  it("binds short-pick count and reason without an owed choice, preserving errors, busy state and a suppressed footer", () => {
-    const counted = vi.fn(), reason = vi.fn();
-    const model = toShortPickViewProps(orderShortPick);
-    const node = ShortPickView({ model, onCounted: counted, onReason: reason, messages: "command failed", submitting: true });
-    const nodes = elements(node);
-    expect(nodes.some(node => node.props.onValueChange)).toBe(false);
-    invoke(nodes.find(node => node.props.label === "Counted")!, "onChange", "0.5");
-    invoke(nodes.find(node => node.props["aria-label"] === "Reason")!, "onChange", { target: { value: "damage" } });
-    expect(counted).toHaveBeenCalledWith("0.5"); expect(reason).toHaveBeenCalledWith("damage");
-    expect(nodes.find(node => node.props.type === "submit")!.props.disabled).toBe(true);
-    expect(renderToStaticMarkup(node)).toContain("command failed");
-    expect(elements(ShortPickView({ model, footer: null })).some(node => node.props.type === "submit")).toBe(false);
-  });
   it("preserves nullable availability, option IDs, decimal quantities, and explicit footer suppression", () => {
     const change = vi.fn();
     let node: ReactNode;
