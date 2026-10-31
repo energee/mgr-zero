@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { rpc } = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ rpc }) }));
 import { runOrderEmailBatch } from "@/lib/email/jobs";
+import { POST } from "@/app/api/email/jobs/deliver/route";
 
 const delivery = { id: crypto.randomUUID(), lease_token: crypto.randomUUID(), lease_expires_at: new Date(Date.now() + 600_000).toISOString(), retry_before: new Date(Date.now() + 82_800_000).toISOString(), payload: { from: "MGR <orders@example.test>", to: "buyer@example.test", subject: "Order confirmed", text: "Confirmed" } };
 beforeEach(() => {
@@ -58,25 +59,33 @@ describe("order email job", () => {
       rpc.mockResolvedValueOnce({ data: [delivery], error: null }).mockResolvedValueOnce(failure === "lease_lost" ? { data: false, error: null } : { data: null, error: { message: "buyer@example.test test-key Confirmed" } });
       vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ id: "provider-id" })));
     }
-    const { POST } = await import("@/app/api/email/jobs/deliver/route");
     const response = await POST(new Request("https://mgr.test/api/email/jobs/deliver", { method: "POST", headers: { authorization: "Bearer email-only" } }));
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ ok: false });
-    expect(log.mock.calls).toEqual([["Order email delivery failure", {
+    const rowLog = ["Order email delivery failure", {
       stage: failure === "configuration" ? "configuration" : failure === "lease" || failure === "lease_payload" ? "lease" : "record_result",
       category: failure === "configuration" ? "configuration" : failure === "lease_payload" ? "malformed_response" : failure === "lease_lost" ? "lease_lost" : "database",
       ...(failure === "record_result" || failure === "lease_lost" ? { deliveryId: delivery.id } : {}),
-    }]]);
+    }];
+    expect(log.mock.calls).toEqual(failure === "lease_lost"
+      ? [rowLog, ["Order email delivery failure", { stage: "batch", category: "lease_lost" }]]
+      : [rowLog]);
   });
-  it("refuses an expired lease without sending or recording a new outcome", async () => {
+  it.each(["expired", "lost"] as const)("continues the remaining deliveries after a lease is %s, then fails the job", async (failure) => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
-    rpc.mockResolvedValueOnce({ data: [{ ...delivery, lease_expires_at: new Date(Date.now() - 1).toISOString() }], error: null });
-    const fetch = vi.fn();
+    const stale = { ...delivery, id: crypto.randomUUID(), ...(failure === "expired" ? { lease_expires_at: new Date(Date.now() - 1).toISOString() } : {}) };
+    rpc.mockResolvedValueOnce({ data: [stale, delivery], error: null });
+    if (failure === "lost") rpc.mockResolvedValueOnce({ data: false, error: null });
+    rpc.mockResolvedValueOnce({ data: true, error: null });
+    const fetch = vi.fn().mockImplementation(async () => Response.json({ id: "provider-id" }));
     vi.stubGlobal("fetch", fetch);
-    await expect(runOrderEmailBatch()).rejects.toThrow("Order email lease expired before send");
-    expect(fetch).not.toHaveBeenCalled();
-    expect(rpc).toHaveBeenCalledTimes(1);
-    expect(log.mock.calls).toEqual([["Order email delivery failure", { stage: "send", category: "lease_expired", deliveryId: delivery.id }]]);
+    await expect(runOrderEmailBatch()).rejects.toThrow("Order email batch lost a lease");
+    expect(fetch).toHaveBeenCalledTimes(failure === "expired" ? 1 : 2);
+    expect(rpc).toHaveBeenLastCalledWith("finish_order_email", expect.objectContaining({ p_delivery: delivery.id, p_provider_id: "provider-id" }));
+    expect(log.mock.calls).toEqual([
+      ["Order email delivery failure", { stage: failure === "expired" ? "send" : "record_result", category: failure === "expired" ? "lease_expired" : "lease_lost", deliveryId: stale.id }],
+      ["Order email delivery failure", { stage: "batch", category: "lease_lost" }],
+    ]);
   });
   it("records provider acceptance against only its opaque lease", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -120,8 +129,43 @@ describe("order email job", () => {
 });
 
 describe("email job admission", () => {
+  it.each([
+    [401, 503, { accepted: 0, retry: 1, blocked: 0 }],
+    [403, 503, { accepted: 0, retry: 1, blocked: 0 }],
+    [429, 503, { accepted: 0, retry: 1, blocked: 0 }],
+    [503, 503, { accepted: 0, retry: 1, blocked: 0 }],
+    [422, 503, { accepted: 0, retry: 0, blocked: 1 }],
+    [200, 200, { accepted: 1, retry: 0, blocked: 0 }],
+  ])("reports provider HTTP %i to the scheduler as HTTP %i", async (providerStatus, expectedStatus, deliveries) => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubEnv("ORDER_EMAIL_JOB_SECRET", "email-only");
+    rpc.mockResolvedValueOnce({ data: [delivery], error: null }).mockResolvedValueOnce({ data: true, error: null });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ id: "provider-id" }, { status: providerStatus })));
+    const response = await POST(new Request("https://mgr.test/api/email/jobs/deliver", { method: "POST", headers: { authorization: "Bearer email-only" } }));
+    expect(response.status).toBe(expectedStatus);
+    expect(await response.json()).toEqual({ ok: expectedStatus === 200, deliveries });
+  });
+  it("alerts on a network-only failure without exposing provider details", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubEnv("ORDER_EMAIL_JOB_SECRET", "email-only");
+    rpc.mockResolvedValueOnce({ data: [delivery], error: null }).mockResolvedValueOnce({ data: true, error: null });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("buyer@example.test test-key")));
+    const response = await POST(new Request("https://mgr.test/api/email/jobs/deliver", { method: "POST", headers: { authorization: "Bearer email-only" } }));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ ok: false, deliveries: { accepted: 0, retry: 1, blocked: 0 } });
+  });
+  it("keeps a partially successful batch green while reporting retry counts", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubEnv("ORDER_EMAIL_JOB_SECRET", "email-only");
+    rpc.mockResolvedValueOnce({ data: [delivery, { ...delivery, id: crypto.randomUUID() }], error: null }).mockResolvedValue({ data: true, error: null });
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(Response.json({ id: "provider-id" }))
+      .mockResolvedValueOnce(Response.json({}, { status: 401 })));
+    const response = await POST(new Request("https://mgr.test/api/email/jobs/deliver", { method: "POST", headers: { authorization: "Bearer email-only" } }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, deliveries: { accepted: 1, retry: 1, blocked: 0 } });
+  });
   it("requires its own configured bearer secret before touching the outbox", async () => {
-    const { POST } = await import("@/app/api/email/jobs/deliver/route");
     const call = async (token: string) => (await POST(new Request("https://mgr.test/api/email/jobs/deliver", { method: "POST", headers: { authorization: `Bearer ${token}` } }))).status;
     vi.stubEnv("CHAT_JOB_SECRET", "chat-only");
     vi.stubEnv("ORDER_EMAIL_JOB_SECRET", "");

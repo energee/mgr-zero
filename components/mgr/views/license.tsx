@@ -7,8 +7,6 @@ import { UsStateField } from "@/components/mgr/us-state-field";
 import { licenseSubmitReason, type LicenseViewModel } from "@/lib/mgr/license-view";
 import { RegistryDate, RegistryInput, RegistrySelect } from "@/components/mgr/views/registry-fields";
 
-export type { LicenseViewModel };
-
 type Controls = Partial<Record<"state" | "kind" | "licenseNo" | "expiresOn", (value: string) => void>>;
 
 export function LicenseView({ model, controls = {}, locked = false, messages, footer, submitting = false, onCancel, remove }: {

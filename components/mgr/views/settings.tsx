@@ -19,8 +19,6 @@ import { FieldSeparator } from "@/components/ui/field";
 import { ReportingBasisView } from "@/components/mgr/views/reporting-basis";
 import { GravityUnitControls } from "@/components/mgr/views/units";
 
-export type { SettingsViewModel };
-
 export function SettingsView({
   model,
   breweryForm,

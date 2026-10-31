@@ -27,8 +27,6 @@ import type { BrandViewModel } from "@/lib/mgr/brand-view";
 import type { PriceGroupSuggestion } from "@/lib/mgr/price-group-suggestion";
 import { submitReason } from "@/lib/mgr/submit-reason";
 
-export type { BrandViewModel };
-
 export type BrandControls = Partial<Record<"name" | "alias" | "style" | "abv" | "category" | "priceGroup" | "description" | "hops", (value: string) => void>>;
 
 const asOptions = (names: string[]) => names.map((name) => ({ value: name, label: name }));

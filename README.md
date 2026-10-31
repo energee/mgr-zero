@@ -301,6 +301,16 @@ Operator procedures live in `docs/operations/`:
 
 ## Design evidence
 
-Screen redesigns keep their mockups and before/after captures in `docs/design/`:
+Screen redesigns keep their mockups and rendered synthetic captures in `docs/design/`:
 
-- [New purchase order form](docs/design/purchase-order-new/README.md) — flat form wireframes, rendered before/after screenshots, and verification notes.
+- [New purchase order form](docs/design/purchase-order-new/README.md) — flat form wireframes, synthetic screenshots, and verification notes.
+
+Public fixtures use fictional customers, suppliers and permit `BR-PA-12345`.
+The COLA HTML fixture is generated sample data, not a downloaded brewery roster.
+`public/mock/*.jpg` are generated geometric avatars, not photographs.
+Keep tenant workbooks, CSV exports, backups, keys and local agent state untracked.
+The refreshed packaging screenshot shows seeded Demo Brewing's empty live page;
+COLA screenshots show that tenant's live brand page and approval editor.
+Their lookup response is a browser-only synthetic fixture; the generated labels
+are served from the local tenant's saved-image cache. No TTB request was made.
+These captures do not establish an actual TTB approval or erase Git history.

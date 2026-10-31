@@ -30,35 +30,35 @@ describe("schema: lead time and PO status derivation", () => {
 
 describe("vendors, materials, contracts", () => {
   it("creates and edits a vendor, a material with a default vendor, and a contract; the list joins them", async () => {
-    const ych = (await runCommand("upsert_vendor", { name: "YCH", email: "orders@ych.example", leadTimeDays: 14 }, ctx)) as { id: string; lead_time_days: number };
-    expect(ych.lead_time_days).toBe(14);
-    const renamed = (await runCommand("upsert_vendor", { id: ych.id, name: "YCH Hops", leadTimeDays: 10, paymentTerms: "net15" }, ctx)) as { name: string; payment_terms: string };
-    expect(renamed).toMatchObject({ name: "YCH Hops", payment_terms: "net15" });
+    const vendor = (await runCommand("upsert_vendor", { name: "Fictional Hops Supply", email: "orders@hops.example", leadTimeDays: 14 }, ctx)) as { id: string; lead_time_days: number };
+    expect(vendor.lead_time_days).toBe(14);
+    const renamed = (await runCommand("upsert_vendor", { id: vendor.id, name: "Fictional Hops Cooperative", leadTimeDays: 10, paymentTerms: "net15" }, ctx)) as { name: string; payment_terms: string };
+    expect(renamed).toMatchObject({ name: "Fictional Hops Cooperative", payment_terms: "net15" });
 
     const citra = (await runCommand("upsert_material", {
-      name: "Citra", category: "hop", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 44, lotTracked: true, defaultVendorId: ych.id,
+      name: "Citra", category: "hop", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 44, lotTracked: true, defaultVendorId: vendor.id,
     }, ctx)) as { id: string; default_vendor_id: string; purchase_uom_factor: number };
-    expect(citra.default_vendor_id).toBe(ych.id);
+    expect(citra.default_vendor_id).toBe(vendor.id);
 
     const contract = (await runCommand("upsert_material_contract", {
-      vendorId: ych.id, materialId: citra.id, qtyCommitted: 400, unitCostCents: 1250, contractNo: "Citra 2026",
+      vendorId: vendor.id, materialId: citra.id, qtyCommitted: 400, unitCostCents: 1250, contractNo: "Citra 2026",
     }, ctx)) as { id: string };
 
     const vendors = (await runCommand("list_vendors_and_contracts", {}, ctx)) as {
       id: string; name: string; lead_time_days: number;
       contracts: { id: string; material_id: string; qty_committed: number; qty_received: number; qty_on_order: number; qty_available: number }[];
     }[];
-    expect(vendors.map((v) => v.name)).toEqual(["YCH Hops"]);
+    expect(vendors.map((v) => v.name)).toEqual(["Fictional Hops Cooperative"]);
     expect(vendors[0].contracts).toEqual([{
-      id: contract.id, vendor_id: ych.id, material_id: citra.id, material_name: "Citra", contract_no: "Citra 2026", unit_cost_cents: 1250,
+      id: contract.id, vendor_id: vendor.id, material_id: citra.id, material_name: "Citra", contract_no: "Citra 2026", unit_cost_cents: 1250,
       starts_on: null, ends_on: null, qty_committed: 400, qty_received: 0, qty_on_order: 0, qty_available: 400,
     }]);
 
     const materials = (await runCommand("list_materials", {}, ctx)) as { id: string; default_vendor_id: string; purchase_uom_factor: number; lot_tracked: boolean }[];
-    expect(materials.find((m) => m.id === citra.id)).toMatchObject({ default_vendor_id: ych.id, purchase_uom_factor: 44, lot_tracked: true });
+    expect(materials.find((m) => m.id === citra.id)).toMatchObject({ default_vendor_id: vendor.id, purchase_uom_factor: 44, lot_tracked: true });
 
     // Pickers read the thin list, not the contract report.
-    expect(await runCommand("list_vendors", {}, ctx)).toEqual([{ id: ych.id, name: "YCH Hops", active: true, lead_time_days: 10, qbo_vendor_id: null, qbo_realm_id: null }]);
+    expect(await runCommand("list_vendors", {}, ctx)).toEqual([{ id: vendor.id, name: "Fictional Hops Cooperative", active: true, lead_time_days: 10, qbo_vendor_id: null, qbo_realm_id: null }]);
   });
 
   it("list_vendors_and_contracts and list_materials q match the name in the query, with % and _ literal (#994)", async () => {
@@ -201,7 +201,7 @@ describe("purchase orders: draft, mark sent, receive", () => {
 
   it("draft → sent (mailto) → partial receipt → received; open balance and status derive from counts", async () => {
     const wh = await seedLocation(b.id);
-    const vendor = (await runCommand("upsert_vendor", { name: "Country Malt", leadTimeDays: 7 }, ctx)) as { id: string };
+    const vendor = (await runCommand("upsert_vendor", { name: "Fieldstone Malt", leadTimeDays: 7 }, ctx)) as { id: string };
     const malt = (await runCommand("upsert_material", { name: "2-row", category: "malt", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 55, lotTracked: true }, ctx)) as { id: string };
     const hulls = (await runCommand("upsert_material", { name: "Rice hulls", category: "adjunct", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 50 }, ctx)) as { id: string };
 
@@ -270,7 +270,7 @@ describe("purchase orders: draft, mark sent, receive", () => {
     const list = (await runCommand("list_purchase_orders", {}, ctx)) as { id: string }[];
     expect(list.map((p) => p.id)).not.toContain(po.id);            // received POs leave the open list
     const all = (await runCommand("list_purchase_orders", { includeClosed: true }, ctx)) as { id: string; vendor_name: string; status: string }[];
-    expect(all.find((p) => p.id === po.id)).toMatchObject({ vendor_name: "Country Malt", status: "received" });
+    expect(all.find((p) => p.id === po.id)).toMatchObject({ vendor_name: "Fieldstone Malt", status: "received" });
   });
 
   it("a contracted line must be the PO vendor's contract for that material; a receipt needs a counted line; a cancelled draft is legal", async () => {
@@ -435,7 +435,7 @@ describe("planning: draft purchase orders from material gaps", () => {
     // Dates relative to today (UTC, like the database's current_date), so buy-by never drifts into the past.
     const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
     const brewer = await makeStaffCtx(b.id, "admin");
-    const cm = (await runCommand("upsert_vendor", { name: "Country Malt Group", leadTimeDays: 5 }, ctx)) as { id: string };
+    const cm = (await runCommand("upsert_vendor", { name: "Fieldstone Malt Group", leadTimeDays: 5 }, ctx)) as { id: string };
     const pale = (await runCommand("upsert_material", { name: "Pale malt", category: "malt", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 55, defaultVendorId: cm.id }, ctx)) as { id: string };
     const wheat = (await runCommand("upsert_material", { name: "Wheat malt", category: "malt", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 55, defaultVendorId: cm.id }, ctx)) as { id: string };
     const orphan = (await runCommand("upsert_material", { name: "Mystery yeast", category: "yeast", baseUom: "each", purchaseUom: "each" }, ctx)) as { id: string };
@@ -463,7 +463,7 @@ describe("planning: draft purchase orders from material gaps", () => {
       vendor_id: string | null; vendor_name: string | null; lead_time_days: number | null; contract_id: string | null; purchase_units_short: number;
       buy_by: string | null; out_of_reach: boolean;
     }[];
-    expect(reqs.find((r) => r.material_id === pale.id)).toMatchObject({ required: 600, on_hand: 130, on_order: 0, short: 470, needed_by: day(30), vendor_id: cm.id, vendor_name: "Country Malt Group", lead_time_days: 5, purchase_units_short: 9, buy_by: day(25), out_of_reach: false });
+    expect(reqs.find((r) => r.material_id === pale.id)).toMatchObject({ required: 600, on_hand: 130, on_order: 0, short: 470, needed_by: day(30), vendor_id: cm.id, vendor_name: "Fieldstone Malt Group", lead_time_days: 5, purchase_units_short: 9, buy_by: day(25), out_of_reach: false });
     expect(reqs.find((r) => r.material_id === orphan.id)).toMatchObject({ short: 2, vendor_id: null, buy_by: null, out_of_reach: false });
     expect(reqs.find((r) => r.material_id === hulls.id)).toMatchObject({ vendor_id: slow.id, buy_by: day(-60), out_of_reach: true });
 
