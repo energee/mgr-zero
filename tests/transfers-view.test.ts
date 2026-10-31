@@ -227,6 +227,13 @@ describe("Transfer detail view", () => {
     expect(form).toContain("The transfer changed");
   });
 
+  it("live Receive on a submitted transfer records the ordered pick, then receives (#1507)", () => {
+    const src = readFileSync("app/(app)/transfers/[id]/transfer-actions.tsx", "utf8");
+    const pick = src.search(/status === "submitted" && !await run\("record_stock_transfer_pick", \{ transferId, picks: lines\.map\(line => \(\{ lineId: line\.id, qty: line\.qty \}\)\) \}\)\) return;/);
+    expect(pick).toBeGreaterThan(-1);
+    expect(src.indexOf('run("receive_stock_transfer"')).toBeGreaterThan(pick);
+  });
+
   it("the Transfer detail inventory record is TransferDetailView", () => {
     const body = screen("Transfer detail").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(TransferDetailView);
