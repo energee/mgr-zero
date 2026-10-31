@@ -35,6 +35,7 @@ export function CreditMemoForm({ invoiceId, invoiceNo, shipmentId, refusedDelive
   const [qtys, setQtys] = useState<Record<string, string>>({});
   const [locationId, setLocationId] = useState("");
   const [reason, setReason] = useState<"damaged" | "wrong_item" | "unsold" | "">("");
+  const [returnEmptyKegs, setReturnEmptyKegs] = useState(false);
   const { busy, error, run } = useCommandAction();
   const beerLines = lines.filter(line => line.kind === "sku");
   const returningBeer = beerLines.some(line => Number(qtys[line.id]) > 0);
@@ -42,18 +43,20 @@ export function CreditMemoForm({ invoiceId, invoiceNo, shipmentId, refusedDelive
     invoice: { invoice_no: invoiceNo }, refusedDeliveryId, locations, returnLocationId: locationId, reason, backHref: `/invoices/${invoiceId}`,
     lines: lines.map(line => ({ id: line.id, qty_shipped: line.qty, qty_returnable: refusedQuantities && line.kind === "sku" ? refusedQuantities[line.skuId] ?? 0 : undefined, qty_returning: Number(qtys[line.id] ?? 0), unit_price_cents: line.unitPriceCents, skus: { name: line.label }, kind: line.kind })),
   });
-  const blockedReason = returnCreditReason({ lines: model.lines, quantities: qtys, reason, locationId, binMissing: shipmentId !== null && returningBeer && !binId });
+  const checkInEmpty = returnEmptyKegs && !returningBeer;
+  const blockedReason = returnCreditReason({ lines: model.lines, quantities: qtys, reason, locationId, returnEmptyKegs: checkInEmpty, binMissing: (shipmentId !== null || checkInEmpty) && !binId });
   return <form className="contents" onSubmit={event => {
     event.preventDefault();
     if (busy || blockedReason) return;
-    void run("return_shipment", { invoiceId, refusedDeliveryId, locationId, reason, lines: buildReturnLines(lines, qtys, sources, sourceQtys, binId, shipmentId) },
+    void run("return_shipment", { invoiceId, refusedDeliveryId, locationId: locationId || undefined, reason: returningBeer ? reason : undefined, returnEmptyKegs: checkInEmpty, binId: checkInEmpty ? binId : undefined, lines: buildReturnLines(lines, qtys, sources, sourceQtys, binId, shipmentId) },
       () => router.push(`/invoices/${invoiceId}`));
   }}>
     <ReturnCreditView model={model} quantities={qtys} onQuantity={(id, value) => setQtys(prev => ({ ...prev, [id]: value }))}
       onReason={index => setReason(RETURN_REASONS[index]?.id ?? "")}
       onReturnTo={id => { setLocationId(id); setBinId(""); }}
-      bins={shipmentId === null ? undefined : bins.filter(bin => bin.location_id === locationId)} binId={binId} onBin={setBinId}
-      sources={shipmentId === null ? null : <ReturnSourcesView groups={beerLines.map(line => ({
+      returnEmptyKegs={checkInEmpty} onReturnEmptyKegs={setReturnEmptyKegs}
+      bins={shipmentId === null && !checkInEmpty ? undefined : bins.filter(bin => bin.location_id === locationId)} binId={binId} onBin={setBinId}
+      sources={shipmentId === null || !returningBeer ? null : <ReturnSourcesView groups={beerLines.filter(line => Number(qtys[line.id]) > 0).map(line => ({
         key: line.id, name: line.label, sources: sources.filter(source => source.sku_id === line.skuId).map(source => ({
           id: source.id, label: `${source.lots?.code ?? "Untracked / legacy stock"} · shipped from ${source.bins?.name ?? "—"}`, shipped: -Number(source.qty),
         })),

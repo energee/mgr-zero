@@ -452,7 +452,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Record picked quantities per line; order becomes picked
+Record picked quantities per line after any pending put-back; order becomes picked once all lines are counted
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -522,7 +522,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Resolve one line counted below ordered: adjust the order down to the count, or keep the remainder owed
+Resolve one line counted below ordered after any pending put-back: adjust the order down to the count, or keep the remainder owed
 
 | Field | Type | Required |
 | --- | --- | --- |
