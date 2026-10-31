@@ -2,17 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
+import { CommandForm } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
 import { QboConnectionView, QboDefaultsView, DisconnectQuickBooksView, QboSyncView } from "@/components/mgr/views/accounting";
 import { QboMappingView, QboMappingSheetView, type QboMappingKind, type QboPicker } from "@/components/mgr/views/qbo-mapping";
+import { InvoiceAccountingActionsView } from "@/components/mgr/views/invoice-accounting";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 import type { QboSyncStatus } from "@/lib/mgr/accounting-view";
-import { qboMappingVersion, qboPushConfirmation, type QboInvoiceAction, type QboRemoteCreateAction } from "@/lib/mgr/qbo-ui";
-import { submitReason } from "@/lib/mgr/submit-reason";
+import { qboMappingVersion, type QboInvoiceAction, type QboRemoteCreateAction } from "@/lib/mgr/qbo-ui";
 import { toast } from "sonner";
 
 export function QboConnectionAction({ configured, reconnect = false }: { configured: boolean; reconnect?: boolean }) {
@@ -103,30 +100,11 @@ export function QboInvoiceActions({ invoiceId, invoiceLabel, actions }: { invoic
   const [reason, setReason] = useState("");
   const [pendingPush, setPendingPush] = useState<QboRemoteCreateAction | null>(null);
   const writeOff = useCommandForm("write_off_invoice", { build: () => ({ invoiceId, reason }), reset: () => setReason("") });
-  const confirmation = pendingPush ? qboPushConfirmation(pendingPush, invoiceLabel) : null;
   const push = async (action: QboRemoteCreateAction) => {
     const newAttemptReason = action === "corrected_push" ? "corrected" : action === "repush" ? "remote_deleted" : undefined;
     if (await commandAction.run("push_invoice_to_qbo", { invoiceId, ...(newAttemptReason ? { newAttemptReason } : {}) }, undefined, { target: invoiceId })) setPendingPush(null);
   };
-  return <div className="flex flex-wrap justify-end gap-2">
-    {actions.includes("fix_mapping") && <Button variant="outline" asChild><a href={`/invoices/${invoiceId}/mapping`}>Fix mapping</a></Button>}
-    {actions.includes("push") && <Button type="button" onClick={() => setPendingPush("push")}>Push to QuickBooks</Button>}
-    {actions.includes("retry") && <Button type="button" onClick={() => setPendingPush("retry")}>Retry exact push</Button>}
-    {actions.includes("corrected_push") && <Button type="button" onClick={() => setPendingPush("corrected_push")}>Push corrected invoice</Button>}
-    {actions.includes("repush") && <Button type="button" onClick={() => setPendingPush("repush")}>Re-push deleted invoice</Button>}
-    {confirmation && <CommandForm open onOpenChange={(open) => { if (!open) { setPendingPush(null); commandAction.setError(null); } }} title={confirmation.title}>
-      <div className="flex flex-col gap-3">
-        <p className="text-sm text-muted-foreground">{confirmation.detail}</p>
-        <CommandFormMessage error={commandAction.error} />
-        <CommandFormFooter><Button type="button" disabled={commandAction.busy} onClick={() => void push(pendingPush!)}>{commandAction.busy ? "Sending…" : confirmation.confirmLabel}</Button></CommandFormFooter>
-      </div>
-    </CommandForm>}
-    {actions.includes("write_off") && <CommandForm open={writeOff.open} onOpenChange={writeOff.setOpen} title="Write off invoice" trigger={<Button variant="destructive">Write off</Button>}>
-      <form className="flex flex-col gap-3" onSubmit={writeOff.submit}>
-        <p className="text-sm text-muted-foreground">This records a local status and reason. It does not change QuickBooks, record cash, or create a credit.</p>
-        <Label htmlFor="qbo-write-off-reason">Reason</Label><Input id="qbo-write-off-reason" value={reason} onChange={e => setReason(e.target.value)} required maxLength={500} />
-        <CommandFormMessage error={writeOff.error} /><CommandFormFooter>{E.submit("Confirm write-off", { variant: "destructive", submitting: writeOff.submitting, busy: "Writing off…", reason: submitReason(reason.trim() ? [] : ["a reason"]) })}</CommandFormFooter>
-      </form>
-    </CommandForm>}
-  </div>;
+  return <InvoiceAccountingActionsView invoiceLabel={invoiceLabel} actions={actions} mappingHref={`/invoices/${invoiceId}/mapping`}
+    push={{ pending: pendingPush, onPending: next => { setPendingPush(next); commandAction.setError(null); }, busy: commandAction.busy, error: commandAction.error, onConfirm: action => void push(action) }}
+    writeOff={{ open: writeOff.open, onOpenChange: writeOff.setOpen, reason, onReasonChange: setReason, busy: writeOff.submitting, error: writeOff.error, onSubmit: writeOff.submit }} />;
 }

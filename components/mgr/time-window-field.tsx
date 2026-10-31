@@ -15,6 +15,7 @@ const STEP = 30;
 const TICK_OFFSETS = [0, MINUTES_PER_DAY / 2, MINUTES_PER_DAY];
 
 export function TimeWindowField({ label, start, end, onChange, disabled = false, step = STEP }: { label: string; start: string; end: string; onChange?: (start: string, end: string) => void; disabled?: boolean; step?: number }) {
+  const descriptionId = React.useId();
   // The anchor is fixed by the window this field was given (anchorFor): a
   // monotonic track can only draw a span that does not cross its own ends, so
   // use noon or midnight when possible, otherwise start at the window's start.
@@ -27,7 +28,7 @@ export function TimeWindowField({ label, start, end, onChange, disabled = false,
     <Field>
       <div className="flex items-baseline justify-between gap-4">
         <FieldLabel className="whitespace-nowrap">{label}</FieldLabel>
-        <FieldDescription className="text-right">{formatWindow(from, to)}</FieldDescription>
+        <FieldDescription id={descriptionId} className="text-right">{formatWindow(from, to)}</FieldDescription>
       </div>
       <Slider
         value={range}
@@ -40,6 +41,8 @@ export function TimeWindowField({ label, start, end, onChange, disabled = false,
         // Radix puts role="slider" on each thumb, so a label on the root names
         // neither of them: without these both ends read as an anonymous slider.
         thumbLabels={[`${label} start`, `${label} end`]}
+        thumbValueTexts={[formatClock(from), formatClock(to)]}
+        thumbDescribedBy={descriptionId}
         className="mt-1"
       />
       <div className="flex justify-between text-xs text-muted-foreground">

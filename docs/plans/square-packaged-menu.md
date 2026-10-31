@@ -27,7 +27,7 @@ the Case SKU, and the menu exposes it as 4-packs.
 One migration, `20261022060000_square_four_pack_menu.sql`, then
 `bun run migrations:lock`. Every task starts with its named failing test.
 
-1. **Compose a Case that has its own volume.** Lolev's Case is typed at
+1. **Compose a Case that has its own volume.** Example Brewing's Case is typed at
    0.09677419 bbl = 6 × Four Pack's 0.01612903; `replace_format_components`
    only composes an untyped parent. Accept a typed parent when its volume
    equals the children's total.

@@ -59,41 +59,43 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
               label, so Today and Beer read as different kinds of thing. Children
               are sub-items indented under their tab. */}
           <SidebarGroup>
-            <SidebarMenu>
-              {items.map((tab) => {
-                const leaf = !tab.children?.length;
-                const tabActive = tab.label === current && (leaf || isUnder(pathname, tab.href));
-                const child = tab.label === current ? activeChild(tab, pathname) : undefined;
-                return (
-                  <SidebarMenuItem key={tab.label}>
-                    <SidebarMenuButton asChild tooltip={tab.label} isActive={tabActive}>
-                      <Link href={tab.href} aria-current={tabActive ? "page" : undefined}>{tab.icon && <Icon icon={tab.icon} />}<span>{tab.label}</span></Link>
-                    </SidebarMenuButton>
-                    {!leaf && (
-                      <SidebarMenuSub>
-                        {navGroups(tab.children!).map(({ group, items: kids }) => (
-                          <Fragment key={group ?? ""}>
-                            {group && <li className="px-2 pt-2 text-xs font-medium text-sidebar-foreground/70">{group}</li>}
-                            {kids.map((c) => (
-                              <SidebarMenuSubItem key={c.href}>
-                                <SidebarMenuSubButton asChild isActive={c === child}>
-                                  <Link href={c.href} aria-current={c === child ? "page" : undefined}>{c.label}</Link>
-                                </SidebarMenuSubButton>
-                              </SidebarMenuSubItem>
-                            ))}
-                          </Fragment>
-                        ))}
-                      </SidebarMenuSub>
-                    )}
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
+            <nav aria-label="Primary">
+              <SidebarMenu>
+                {items.map((tab) => {
+                  const leaf = !tab.children?.length;
+                  const tabActive = tab.label === current && (leaf || isUnder(pathname, tab.href));
+                  const child = tab.label === current ? activeChild(tab, pathname) : undefined;
+                  return (
+                    <SidebarMenuItem key={tab.label}>
+                      <SidebarMenuButton asChild tooltip={tab.label} isActive={tabActive}>
+                        <Link href={tab.href} aria-current={tabActive ? "page" : undefined}>{tab.icon && <Icon icon={tab.icon} />}<span>{tab.label}</span></Link>
+                      </SidebarMenuButton>
+                      {!leaf && (
+                        <SidebarMenuSub>
+                          {navGroups(tab.children!).map(({ group, items: kids }) => (
+                            <Fragment key={group ?? ""}>
+                              {group && <li className="px-2 pt-2 text-xs font-medium text-sidebar-foreground/70">{group}</li>}
+                              {kids.map((c) => (
+                                <SidebarMenuSubItem key={c.href}>
+                                  <SidebarMenuSubButton asChild isActive={c === child}>
+                                    <Link href={c.href} aria-current={c === child ? "page" : undefined}>{c.label}</Link>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              ))}
+                            </Fragment>
+                          ))}
+                        </SidebarMenuSub>
+                      )}
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </nav>
           </SidebarGroup>
         </SidebarContent>
       </Sidebar>
-      <SidebarInset id="main" tabIndex={-1} className="h-full min-h-0 min-w-0 overflow-hidden outline-none print:h-auto print:overflow-visible">
-        <header className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b px-2 py-2 md:h-12 md:py-0">
+      <SidebarInset className="h-full min-h-0 min-w-0 overflow-hidden print:h-auto print:overflow-visible">
+        <header role="banner" className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b px-2 py-2 md:h-12 md:py-0">
           {/* One Ask MGR button fits beside the brand, so a phone header stays one row (#1512). */}
           <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
             {composer && <span className="max-w-48 truncate text-xs text-muted-foreground md:hidden">{brandMark}</span>}
@@ -103,7 +105,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
           {headerRight && <span className="flex shrink-0 items-center gap-1">{headerRight}</span>}
         </header>
         {/* SidebarInset is already the <main> landmark; only page content scrolls. */}
-        <div data-mgr-page-scroll="" className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4 md:px-8 md:py-6 print:overflow-visible">{children}</div>
+        <div id="main" tabIndex={-1} data-mgr-page-scroll="" className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4 outline-none md:px-8 md:py-6 print:overflow-visible">{children}</div>
         <TabBar items={items} active={current} className="md:hidden" />
       </SidebarInset>
     </SidebarProvider>

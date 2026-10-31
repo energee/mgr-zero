@@ -101,6 +101,14 @@ describe("Order detail view", () => {
     expect(model.adjusted).toBeUndefined();
   });
 
+  it("rounds fractional line cents half up rather than exposing binary float rounding", () => {
+    const model = toPortalOrderViewProps({
+      ...portalOrderShipped,
+      lines: [{ ...portalOrderShipped.lines[0], qty_ordered: 1.15, qty_shipped: 1.15, unit_price_cents: 50 }],
+    });
+    expect(model.lines[0].amount).toBe("$0.58");
+  });
+
   it("names a foreign ship-to's country and never prints a missing part as null", () => {
     const model = toPortalOrderViewProps({ ...portalOrderShipped, order: { ...portalOrderShipped.order, ship_tos: { label: "Main", country: "JP", city: null, state: null } } });
     expect(model.shipTo).toBe("Main · Japan");

@@ -77,6 +77,15 @@ defineCommand({
 });
 
 defineCommand({
+  name: "set_order_pickup", description: "Set pickup or delivery on an unshipped wholesale order without changing lines, prices or allocations; pickups are invoiced when shipped and never routed",
+  roles: [...salesRoles],
+  input: z.object({ orderId: z.string().uuid(), pickup: z.boolean() }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_order_pickup", {
+    p_order: i.orderId, p_pickup: i.pickup, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
   name: "cancel_order", description: "Cancel an unshipped order and release its allocations",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1) }),
@@ -91,11 +100,11 @@ defineCommand({
 });
 
 defineCommand({
-  name: "resolve_short_pick", description: "Resolve one line counted below ordered: adjust the order down to the count, or keep the remainder owed",
+  name: "resolve_short_pick", description: "Resolve one line counted below ordered after any pending put-back by adjusting the order down to the count; the missing quantity is cancelled, not backordered",
   roles: [...warehouseRoles],
   input: z.object({
     orderId: z.string().uuid(), lineId: z.string().uuid(), qtyPicked: z.number().nonnegative(),
-    reason: z.string().trim().min(1), resolution: z.enum(["adjust_down", "keep_owed"]),
+    reason: z.string().trim().min(1), resolution: z.literal("adjust_down"),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("resolve_short_pick", {
     p_order: i.orderId, p_line: i.lineId, p_qty_picked: i.qtyPicked, p_reason: i.reason, p_resolution: i.resolution, p_request_id: execution.requestId,
@@ -121,7 +130,7 @@ defineCommand({
 const pickLines = z.array(z.object({ lineId: z.string().uuid(), qty: z.number().nonnegative() })).min(1);
 
 defineCommand({
-  name: "record_pick", description: "Record picked quantities per line; order becomes picked",
+  name: "record_pick", description: "Record picked quantities per line after any pending put-back; order becomes picked once all lines are counted",
   roles: [...warehouseRoles],
   input: z.object({ orderId: z.string().uuid(), picks: pickLines }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_pick", {
@@ -202,16 +211,24 @@ defineQuery({
 });
 
 defineCommand({
-  name: "return_shipment", description: "Full returnable kegs coming back with beer also post Returned shells; deposit-only refunds do not. Return shipped beer: credit memo at the invoiced price + return_in at the destination; a damaged return is also written to loss in the same transaction",
+  name: "return_shipment", description: "Return shipped beer at invoice prices and its destination, posting damaged beer to loss and full-keg shells as Returned. Deposit-only refunds need no location or reason; returnEmptyKegs optionally checks empties into locationId and binId with the refund atomically",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({
-    invoiceId: z.string().uuid(), refusedDeliveryId: z.string().uuid().optional(), locationId: z.string().uuid(), reason: z.enum(["damaged", "wrong_item", "unsold"]),
+    invoiceId: z.string().uuid(), refusedDeliveryId: z.string().uuid().optional(), locationId: z.string().uuid().optional(), reason: z.enum(["damaged", "wrong_item", "unsold"]).optional(),
+    returnEmptyKegs: z.boolean().default(false), binId: z.string().uuid().optional(),
     lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01), sources: z.array(z.object({ movementId: z.string().uuid(), binId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01) })).optional() })).min(1),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("return_shipment", {
     p_invoice: i.invoiceId, p_lines: i.lines.map(l => ({ invoice_line_id: l.invoiceLineId, qty: l.qty, ...(l.sources === undefined ? {} : { sources: l.sources.map(a => ({ movement_id: a.movementId, bin_id: a.binId, qty: a.qty })) }) })),
-    p_refused_delivery: i.refusedDeliveryId, p_location: i.locationId, p_reason: i.reason, p_request_id: execution.requestId,
+    p_refused_delivery: i.refusedDeliveryId, p_location: i.locationId ?? null, p_reason: i.reason ?? null, p_return_empty: i.returnEmptyKegs, p_bin: i.binId ?? null, p_request_id: execution.requestId,
   })),
+});
+
+defineCommand({
+  name: "reorder_refused_delivery", description: "Create one editable draft for a shipped order's refused quantities, preserving customer, ship-to, fulfillment source, pickup, customer PO and note; capture current prices; a second reorder of the same order is refused",
+  roles: [...salesRoles],
+  input: z.object({ orderId: z.string().uuid() }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("reorder_refused_delivery", { p_order: i.orderId, p_request_id: execution.requestId })),
 });
 
 defineCommand({
@@ -299,10 +316,9 @@ defineQuery({
   roles: [...readRoles],
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    const order = await unwrap(ctx.db.from("orders").select("*, customers(name), ship_tos(label, country, city, state)")
-      .eq("brewery_id", ctx.breweryId).eq("id", i.orderId).single());
-    if (!order) throw new CommandError("Order not found", 404, "not_found");
-    const [lines, events, shipment, deposits] = await Promise.all([
+    const [order, lines, events, shipment, deposits] = await Promise.all([
+      unwrap(ctx.db.from("orders").select("*, customers(name), ship_tos(label, country, city, state)")
+        .eq("brewery_id", ctx.breweryId).eq("id", i.orderId).single()),
       completeRows("Order lines", start => ctx.db.from("order_lines").select("*, skus(name, brands(name, alias), formats(name))", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId).order("sku_id").range(start, start + PAGE_SIZE - 1)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
@@ -311,6 +327,7 @@ defineQuery({
         .select("id, order_line_id, description, qty_ordered, unit_price_cents, amount_cents", { count: "exact" })
         .eq("brewery_id", ctx.breweryId).eq("order_id", i.orderId).order("id").range(start, start + PAGE_SIZE - 1)),
     ]);
+    if (!order) throw new CommandError("Order not found", 404, "not_found");
     // Both aggregate views have one row per selected key. Restrict each request
     // to this order's SKUs in bounded batches so PostgREST's row cap cannot turn
     // an omitted balance into a false zero on the confirmation screen.

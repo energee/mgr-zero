@@ -13,8 +13,6 @@ import { batchShareError, pourOuncesError, type SkuViewModel } from "@/lib/mgr/s
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import { upcError } from "@/lib/mgr/upc";
 
-export type { SkuViewModel };
-
 // Field slots for useTouchedLines: an error shows once its live field is left.
 const UPC = 0;
 const SHARE = 1;

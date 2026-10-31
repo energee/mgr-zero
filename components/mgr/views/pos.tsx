@@ -85,26 +85,34 @@ function useSavedPick<Row>(row: Row, saved: string, onSave?: (row: Row, value: s
   return [value, pick] as const;
 }
 
-function LocationMappingRow({ row, locations, onSave }: {
+function LocationMappingRow({ row, locations, onSave, onRetire, busy }: {
   row: PosLocationRow; locations: { id: string; name: string }[];
   onSave?: (row: PosLocationRow, locationId: string) => Promise<boolean>;
+  onRetire?: (row: PosLocationRow) => Promise<boolean>;
+  busy?: boolean;
 }) {
   const [locationId, pick] = useSavedPick(row, row.mgrLocationId, onSave);
   return <div className="flex flex-col gap-3 rounded-lg border p-3">
     {E.hd(row.name, row.detail)}
     <SelectField id={`pos-location-${row.externalLocationId}`} label="MGR location" value={locationId}
       options={locations.map(location => ({ value: location.id, label: location.name }))} onChange={pick} />
+    {row.mgrLocationId && <details>
+      <summary className="cursor-pointer text-sm">Retire mapping</summary>
+      {E.info("Keep existing sales at their saved location. Remove this menu and release the mapping so an Admin can map it correctly for future sales.")}
+      {E.btn("Retire mapping", busy ? "del disabled" : "del", undefined, () => void onRetire?.(row))}
+    </details>}
   </div>;
 }
 
-export function SquareLocationsView({ rows, locations, busy, error, onSave }: {
+export function SquareLocationsView({ rows, locations, busy, error, onSave, onRetire }: {
   rows: PosLocationRow[]; locations: { id: string; name: string }[]; busy?: boolean; error?: string | null;
   /** Resolves false when the save failed. */
   onSave?: (row: PosLocationRow, locationId: string) => Promise<boolean>;
+  onRetire?: (row: PosLocationRow) => Promise<boolean>;
 }) {
   return <>
-    {E.info("Locations come from Square. Each can map to one MGR location; a location with observed sales history cannot be remapped.")}
-    {rows.length ? rows.map(row => <LocationMappingRow key={row.externalLocationId} row={row} locations={locations} onSave={onSave} />) : E.blank("Sync Square to load locations")}
+    {E.info("Locations come from Square. Each can map to one MGR location. Retire a mistaken mapping before replacing it; historical sales stay at their saved location.")}
+    {rows.length ? rows.map(row => <LocationMappingRow key={`${row.externalLocationId}:${row.mgrLocationId}`} row={row} locations={locations} onSave={onSave} onRetire={onRetire} busy={busy} />) : E.blank("Sync Square to load locations")}
     <SettingsSaveStatus busy={busy} />
     <CommandFormMessage error={error ?? null} />
   </>;

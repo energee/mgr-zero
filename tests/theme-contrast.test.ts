@@ -23,10 +23,14 @@ const contrast = (x: string, y: string) => {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 };
 
-// The hex color tokens declared in one globals.css block (":root" or ".dark").
+// Hex colors and direct color aliases in one theme block (":root" or ".dark").
 const tokensOf = (mode: string) => {
   const block = css.slice(css.indexOf(`${mode} {`)).split("}")[0];
-  return Object.fromEntries([...block.matchAll(/--([\w-]+):\s*(#[a-f\d]{6})/gi)].map((m) => [m[1], m[2]]));
+  const tokens = Object.fromEntries([...block.matchAll(/--([\w-]+):\s*(#[a-f\d]{6})/gi)].map((m) => [m[1], m[2]]));
+  for (const [, name, target] of block.matchAll(/--([\w-]+):\s*var\(--([\w-]+)\)/g)) {
+    tokens[name] = tokens[target];
+  }
+  return tokens;
 };
 
 for (const mode of [":root", ".dark"]) {
@@ -45,6 +49,19 @@ for (const mode of [":root", ".dark"]) {
       for (const surface of ["background", "card", "popover"]) {
         expect(contrast(tokens[role], tokens[surface]), `${role} on ${surface}`).toBeGreaterThanOrEqual(4.5);
       }
+    }
+  });
+
+  it(`${mode} control borders and the unchecked Switch meet non-text contrast`, () => {
+    for (const surface of ["background", "card", "popover"]) {
+      for (const role of ["control-border", "input"]) {
+        expect(contrast(tokens[role], tokens[surface]), `${role} on ${surface}`).toBeGreaterThanOrEqual(3);
+      }
+      // Stock Switch uses an 80% input fill and a foreground thumb in dark mode.
+      const track = mode === ".dark" ? over(tokens.input, 0.8, tokens[surface]) : tokens.input;
+      const thumb = mode === ".dark" ? tokens.foreground : tokens.background;
+      expect(contrast(track, tokens[surface]), `unchecked track on ${surface}`).toBeGreaterThanOrEqual(3);
+      expect(contrast(thumb, track), `unchecked thumb on ${surface}`).toBeGreaterThanOrEqual(3);
     }
   });
 }

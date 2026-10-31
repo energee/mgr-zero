@@ -11,8 +11,6 @@ import { shipToReason, shipToZipError, type ShipToViewModel } from "@/lib/mgr/sh
 import type { ReactNode } from "react";
 import { Fragment, useId } from "react";
 
-export type { ShipToViewModel };
-
 export function ShipToView({
   model,
   footer,

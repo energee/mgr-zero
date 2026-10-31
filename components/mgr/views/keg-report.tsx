@@ -5,8 +5,6 @@
 import { E } from "@/components/mgr/e";
 import type { KegReportViewModel } from "@/lib/mgr/keg-report-view";
 
-export type { KegReportViewModel };
-
 export function KegReportView({ model }: { model: KegReportViewModel }) {
   return (
     <>

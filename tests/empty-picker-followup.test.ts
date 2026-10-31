@@ -1,8 +1,9 @@
 // #1123: remaining empty pickers expose recovery without making optional intent required.
 import { createElement } from "react";
+import type * as ReactModule from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
-vi.mock("react", async original => ({ ...await original<typeof import("react")>(), useState: () => [false, () => {}] }));
+vi.mock("react", async original => ({ ...await original<typeof ReactModule>(), useState: () => [false, () => {}], useId: () => "empty-pick-test" }));
 import { OrderSkuPicker } from "@/components/mgr/views/new-order";
 import { ScheduleBatchView } from "@/components/mgr/views/schedule-batch";
 import { WaterAdditionView } from "@/components/mgr/views/water";

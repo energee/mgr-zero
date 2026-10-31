@@ -7,8 +7,6 @@ import { PendingInvitationActionsView } from "@/components/mgr/views/team-contro
 import type { TeamViewModel, TeamRowView } from "@/lib/mgr/team-view";
 import { Button } from "@/components/ui/button";
 
-export type { TeamViewModel };
-
 export function TeamRosterRowView({ row }: { row: TeamRowView }) {
   const avatar = E.face({ src: row.src, name: row.title });
   return row.you ? E.row(row.title, row.detail, "you", "", avatar) : E.nav(row.title, row.detail, "", avatar);

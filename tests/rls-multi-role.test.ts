@@ -26,6 +26,7 @@ const policies: PolicyCase[] = [
   }))),
   { table: "brewery_users", policy: "member_read", group: "members" },
   { table: "chat_installations", policy: "chat_installations_admin_read", group: "admin" },
+  { table: "pos_location_mapping_history", policy: "pos_location_mapping_history_staff", group: "admin" },
   { table: "chat_user_links", policy: "chat_user_links_self_read", group: "self" },
   { table: "notification_preferences", policy: "notification_preferences_self_read", group: "self" },
   { table: "notification_destinations", policy: "notification_destinations_personal_read", group: "personal" },

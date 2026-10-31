@@ -124,10 +124,10 @@ describe("customer name direct RPC boundary (#1306)", () => {
 
 describe("customer alias", () => {
   it("saves, clears when an edit omits it, and refuses a blank", async () => {
-    const { data, error } = await upsertCustomer({ p_state: "WA", p_alias: "Nano Wine 'N Beer" });
+    const { data, error } = await upsertCustomer({ p_state: "WA", p_alias: "Evergreen 'N Beer" });
     expect(error).toBeNull();
     const saved = data as Customer;
-    expect(saved.alias).toBe("Nano Wine 'N Beer");
+    expect(saved.alias).toBe("Evergreen 'N Beer");
     const edited = await upsertCustomer({ p_id: saved.id, p_name: saved.name, p_state: "WA" });
     expect(edited.error).toBeNull();
     expect((edited.data as Customer).alias).toBeNull();

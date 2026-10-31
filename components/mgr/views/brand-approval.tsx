@@ -11,8 +11,6 @@ import { FieldDescription } from "@/components/ui/field";
 import { ColaLabelChoices } from "@/components/mgr/views/cola-label-choices";
 import { ColaLabelImageView } from "@/components/mgr/views/cola-label-image";
 
-export type { BrandApprovalViewModel };
-
 type Controls = Partial<Record<"kind" | "number" | "serialNumber" | "approvedOn", (value: string) => void>> & {
   /** Runs search_colas for the brand; absent in the inventory, so the button is inert. */
   findCola?: () => void;

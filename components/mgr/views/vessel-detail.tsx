@@ -6,8 +6,6 @@ import { vesselCapacityError, type VesselDetailViewModel } from "@/lib/mgr/vesse
 import { ConfirmDeleteControl } from "./confirm-delete";
 import { VESSEL_CAPACITY_MIN, VESSEL_CAPACITY_MAX } from "@/lib/vessel-capacity";
 
-export type { VesselDetailViewModel };
-
 /** Confirm, then delete one vessel (delete_vessel); one with batch history is retired instead. */
 export function RemoveVesselControl({ vessel, ...rest }: { vessel: string; busy?: boolean; error?: string | null; onDelete?: () => Promise<boolean> }) {
   return <ConfirmDeleteControl title="Delete vessel" {...rest}

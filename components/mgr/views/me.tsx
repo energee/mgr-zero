@@ -7,8 +7,6 @@ import { GravityUnitControls } from "@/components/mgr/views/units";
 import { navAbout } from "@/lib/mgr/nav";
 import type { MeViewModel } from "@/lib/mgr/me-view";
 
-export type { MeViewModel };
-
 export function MeView({ model, footer, switchAction, avatar, chatHref, units }: {
   model: MeViewModel;
   footer?: ReactNode;

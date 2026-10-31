@@ -7,8 +7,6 @@ import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import type { QuestionInvoiceViewModel } from "@/lib/mgr/question-invoice-view";
 
-export type { QuestionInvoiceViewModel };
-
 /** raise_invoice_question caps body at 2,000; the textarea cuts a longer paste, so the counter says so. */
 const MAX_BODY = 2000;
 

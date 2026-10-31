@@ -17,8 +17,8 @@ import {
 const fixture = readFileSync("tests/fixtures/ttb-cola-results.html", "utf8");
 
 function row(ttbId: string, serial: string, completed: string, fanciful: string): string {
-  return `<tr class="lt"><td><a href="x">${ttbId}</a></td><td>BR-PA-20553</td>
-    <td>${serial}</td><td>${completed}</td><td>${fanciful}</td><td>LOLEV BEER</td>
+  return `<tr class="lt"><td><a href="x">${ttbId}</a></td><td>BR-PA-12345</td>
+    <td>${serial}</td><td>${completed}</td><td>${fanciful}</td><td>EXAMPLE BREWING</td>
     <td>39</td><td>PENNSYLVANIA</td><td>901</td><td>BEER</td></tr>`;
 }
 
@@ -30,16 +30,16 @@ function page(total: number, rows: string[], next: boolean): string {
 describe("parseColaPage", () => {
   it("reads the saved results page", () => {
     const { total, rows, hasNext } = parseColaPage(fixture);
-    expect(total).toBe(144);
+    expect(total).toBe(64);
     expect(rows).toHaveLength(20);
     expect(hasNext).toBe(true);
     expect(rows[0]).toEqual({
-      ttbId: "23023001000185",
-      permit: "BR-PA-20553",
-      serial: "230001",
-      completedOn: "2023-01-24",
-      fancifulName: "ARRAY",
-      brandName: "LOLEV BEER",
+      ttbId: "99001001000001",
+      permit: "BR-PA-12345",
+      serial: "000001",
+      completedOn: "2026-01-15",
+      fancifulName: "SAMPLE 1",
+      brandName: "EXAMPLE BREWING",
       classCode: "901",
       className: "BEER",
     });
@@ -58,8 +58,8 @@ describe("matchColas", () => {
   const rows = parseColaPage(fixture).rows;
 
   it("matches fanciful or brand name, ignoring case", () => {
-    expect(matchColas(rows, "waves").map((r) => r.fancifulName)).toContain("WAVES");
-    expect(matchColas(rows, "lolev")).toHaveLength(rows.length);
+    expect(matchColas(rows, "sample 3").map((r) => r.fancifulName)).toContain("SAMPLE 3");
+    expect(matchColas(rows, "example")).toHaveLength(rows.length);
     expect(matchColas(rows, "no such beer")).toEqual([]);
   });
 
@@ -72,7 +72,7 @@ describe("matchColas", () => {
 describe("searchColasByPermit", () => {
   it("pages with the session cookie until the total, newest first", async () => {
     const calls: { url: string; method: string; body?: string; cookie?: string }[] = [];
-    const result = await searchColasByPermit("BR-PA-20553", async (url, init) => {
+    const result = await searchColasByPermit("BR-PA-12345", async (url, init) => {
       calls.push({ url, ...init });
       if (init.method === "POST") {
         return {
@@ -87,7 +87,7 @@ describe("searchColasByPermit", () => {
     expect(result.map((r: ColaRecord) => r.ttbId)).toEqual(["2", "3", "1"]);
     expect(result[0].serial).toBeNull();
     expect(calls[0].method).toBe("POST");
-    expect(calls[0].body).toContain("searchCriteria.permitId=BR-PA-20553");
+    expect(calls[0].body).toContain("searchCriteria.permitId=BR-PA-12345");
     expect(calls[1].method).toBe("GET");
     expect(calls[1].url).toContain("pgfcn=nextset");
     expect(calls[1].cookie).toBe("JSESSIONID=abc123");
@@ -95,7 +95,7 @@ describe("searchColasByPermit", () => {
 
   it("throws when paging stops before the total", async () => {
     await expect(
-      searchColasByPermit("BR-PA-20553", async (_url, init) =>
+      searchColasByPermit("BR-PA-12345", async (_url, init) =>
         init.method === "POST"
           ? { status: 200, setCookie: [], body: page(3, [row("1", "1", "01/01/2023", "A")], true) }
           : { status: 200, setCookie: [], body: page(3, [], false) },
@@ -107,7 +107,7 @@ describe("searchColasByPermit", () => {
     vi.useFakeTimers({ now: new Date(2026, 9, 14, 12) });
     try {
       let body = "";
-      await searchColasByPermit("BR-PA-20553", async (_url, init) => {
+      await searchColasByPermit("BR-PA-12345", async (_url, init) => {
         body = init.body ?? "";
         return { status: 200, setCookie: [], body: page(0, [], false) };
       });
@@ -122,20 +122,20 @@ describe("searchColasByPermit", () => {
   it("surfaces TTB's error message", async () => {
     const errorPage = `<ul class="errorList"><li>The current Date Completed range is greater than 15 year(s).</li></ul>`;
     await expect(
-      searchColasByPermit("BR-PA-20553", async () => ({ status: 200, setCookie: [], body: errorPage })),
+      searchColasByPermit("BR-PA-12345", async () => ({ status: 200, setCookie: [], body: errorPage })),
     ).rejects.toThrow(/greater than 15 year/);
   });
 
   it("throws on a non-200 response", async () => {
     await expect(
-      searchColasByPermit("BR-PA-20553", async () => ({ status: 500, setCookie: [], body: "" })),
+      searchColasByPermit("BR-PA-12345", async () => ({ status: 500, setCookie: [], body: "" })),
     ).rejects.toThrow(/500/);
   });
 });
 
-const ttbId = "23023001000185";
-const imageUrl = "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Array.jpg&filetype=l";
-function detail(status = "APPROVED", permit = "BR-PA-20553"): string {
+const ttbId = "99001001000001";
+const imageUrl = "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=SampleLabel.jpg&filetype=l";
+function detail(status = "APPROVED", permit = "BR-PA-12345"): string {
   return `<table><tr><td><strong>TTB ID: </strong><a href="#"><img alt="help"></a>${ttbId}</td></tr>
     <tr><td><strong>Status: </strong>&nbsp;${status}</td></tr>
     <tr><td><strong>Approval Date:</strong>&nbsp;01/24/2023</td></tr></table>
@@ -143,12 +143,12 @@ function detail(status = "APPROVED", permit = "BR-PA-20553"): string {
     <tr><td> </td></tr><tr><td>${permit}</td></tr><tr><td>Applicant</td></tr></table>`;
 }
 const printable = `<div class="label">TTB ID</div><div class="data">${ttbId}</div>
-  <img src="/colasonline/publicViewAttachment.do?filename=Array.jpg&filetype=l" alt="Label Image: Brand (front) or keg collar">`;
+  <img src="/colasonline/publicViewAttachment.do?filename=SampleLabel.jpg&filetype=l" alt="Label Image: Brand (front) or keg collar">`;
 
 describe("COLA detail parsing", () => {
   it("reads the actual detail fields, including the principal permit, not other permits", () => {
     expect(parseColaDetails(detail(), ttbId)).toEqual({
-      ttbId, permit: "BR-PA-20553", status: "APPROVED", approvedOn: "2023-01-24", images: [],
+      ttbId, permit: "BR-PA-12345", status: "APPROVED", approvedOn: "2023-01-24", images: [],
     });
   });
 
@@ -161,7 +161,7 @@ describe("COLA detail parsing", () => {
   it("rejects missing fields, a different record, and upstream errors", () => {
     expect(() => parseColaDetails("<html>Error</html>", ttbId)).toThrow(/TTB ID/);
     expect(() => parseColaDetails(detail(), "99999999999999")).toThrow(/TTB ID/);
-    expect(() => parseColaDetails(detail().replace("BR-PA-20553", ""), ttbId)).toThrow(/permit/i);
+    expect(() => parseColaDetails(detail().replace("BR-PA-12345", ""), ttbId)).toThrow(/permit/i);
   });
 
   it("does not substitute applicant text or another permit when the principal permit cell is blank", () => {
@@ -178,10 +178,10 @@ describe("COLA detail parsing", () => {
       <img src="/colasonline/publicViewAttachment.do?filename=..%2Fsecret.jpg&filetype=l" alt="Label Image: traversal">
       <img src="/colasonline/publicViewAttachment.do?filename=evil.jpg&filetype=x" alt="Label Image: wrong type">
       <img src="images/logo.gif" alt="TTB logo">
-      <img src="/colasonline/publicViewAttachment.do?filename=Dom1 Final.jpg&amp;filetype=l" alt="Label Image: Back &amp; side">`;
+      <img src="/colasonline/publicViewAttachment.do?filename=Back Label.jpg&amp;filetype=l" alt="Label Image: Back &amp; side">`;
     expect(parseColaImages(printable + extra, ttbId)).toEqual([
       { url: imageUrl, label: "Brand (front) or keg collar" },
-      { url: "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Dom1%20Final.jpg&filetype=l", label: "Back & side" },
+      { url: "https://ttbonline.gov/colasonline/publicViewAttachment.do?filename=Back%20Label.jpg&filetype=l", label: "Back & side" },
     ]);
     expect(() => parseColaImages(printable, "99999999999999")).toThrow(/TTB ID/);
   });
@@ -191,10 +191,10 @@ describe("COLA detail parsing", () => {
     for (const unsafe of [
       imageUrl.replace("ttbonline.gov", "ttbonline.gov.evil.test"),
       imageUrl.replace("https:", "http:"),
-      imageUrl.replace("Array.jpg", "..%2fArray.jpg"),
-      imageUrl.replace("Array.jpg", "%5cArray.jpg"),
+      imageUrl.replace("SampleLabel.jpg", "..%2fSampleLabel.jpg"),
+      imageUrl.replace("SampleLabel.jpg", "%5cSampleLabel.jpg"),
       imageUrl + "&url=https://evil.test",
-      imageUrl.replace("Array.jpg", "bad%zz.jpg"),
+      imageUrl.replace("SampleLabel.jpg", "bad%zz.jpg"),
     ]) expect(isColaImageUrl(unsafe), unsafe).toBe(false);
   });
 });
@@ -205,7 +205,7 @@ describe("COLA detail retrieval", () => {
       status: 200, setCookie: ["JSESSIONID=detail; Path=/colasonline"],
       body: init.cookie ? printable : detail(),
     }));
-    expect(await getColaDetails(ttbId, request)).toMatchObject({ permit: "BR-PA-20553", status: "APPROVED", images: [{ url: imageUrl, label: "Brand (front) or keg collar" }] });
+    expect(await getColaDetails(ttbId, request)).toMatchObject({ permit: "BR-PA-12345", status: "APPROVED", images: [{ url: imageUrl, label: "Brand (front) or keg collar" }] });
     expect(request.mock.calls[1][0]).toBe(`https://ttbonline.gov/colasonline/viewColaDetails.do?action=publicFormDisplay&ttbid=${ttbId}`);
     expect(request.mock.calls[1][1].cookie).toBe("JSESSIONID=detail");
   });
@@ -232,10 +232,10 @@ describe("COLA detail retrieval", () => {
       };
       return { status: 200, setCookie: ["JSESSIONID=fresh"], body: url.includes("publicFormDisplay") ? printable : detail() };
     });
-    expect(await getColaImage(ttbId, imageUrl, "BR-PA-20553", request)).toEqual({ dataUrl: "data:image/jpeg;base64,/9j/2Q==" });
+    expect(await getColaImage(ttbId, imageUrl, "BR-PA-12345", request)).toEqual({ dataUrl: "data:image/jpeg;base64,/9j/2Q==" });
     await expect(getColaImage(ttbId, imageUrl, "BR-PA-OTHER", request)).rejects.toThrow(/permit/i);
-    const nonmember = imageUrl.replace("Array.jpg", "Other.jpg");
-    await expect(getColaImage(ttbId, nonmember, "BR-PA-20553", request)).rejects.toThrow(/not.*label/i);
+    const nonmember = imageUrl.replace("SampleLabel.jpg", "Other.jpg");
+    await expect(getColaImage(ttbId, nonmember, "BR-PA-12345", request)).rejects.toThrow(/not.*label/i);
     expect(request.mock.calls.some(([url]) => url === nonmember)).toBe(false);
   });
 
@@ -248,12 +248,12 @@ describe("COLA detail retrieval", () => {
       open--;
       return { status: 200, setCookie: [], body: "", image: { bytes: Buffer.from([0xff, 0xd8, 0xff, 0xd9]), contentType: "image/jpeg" } };
     };
-    await Promise.all(Array.from({ length: 12 }, () => getColaImage(ttbId, imageUrl, "BR-PA-20553", request)));
+    await Promise.all(Array.from({ length: 12 }, () => getColaImage(ttbId, imageUrl, "BR-PA-12345", request)));
     expect(most).toBe(4);
   });
 
   it("rejects HTML masquerading as an image", async () => {
-    await expect(getColaImage(ttbId, imageUrl, "BR-PA-20553", async (url) => ({
+    await expect(getColaImage(ttbId, imageUrl, "BR-PA-12345", async (url) => ({
       status: 200, setCookie: [], body: url === imageUrl ? "<html>TTB error</html>" : url.includes("publicFormDisplay") ? printable : detail(),
     }))).rejects.toThrow(/image/i);
   });
@@ -266,7 +266,7 @@ describe("COLA detail retrieval", () => {
       { bytes: Buffer.from([0xff, 0xd8, 0xff]), contentType: "text/html" },
     ];
     for (const image of images) {
-      await expect(getColaImage(ttbId, imageUrl, "BR-PA-20553", async (url) => ({
+      await expect(getColaImage(ttbId, imageUrl, "BR-PA-12345", async (url) => ({
         status: 200, setCookie: [], body: url.includes("publicFormDisplay") ? printable : detail(),
         ...(url === imageUrl ? { image } : {}),
       }))).rejects.toThrow(/image/i);

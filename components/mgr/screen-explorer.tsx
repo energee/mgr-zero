@@ -146,7 +146,10 @@ export function ScreenExplorer() {
     if (el.closest("[data-gated]")) return e.preventDefault();
     const link = el.closest("a");
     if (link?.matches('[href^="https://"]')) return;
-    const label = el.getAttribute("aria-label") ?? (el.matches("[data-slot=item]") ? el.querySelector("[data-slot=item-title]")?.textContent : null) ?? el.textContent ?? "";
+    // A labelled picker includes its current value after the field name; only
+    // the field name participates in inventory navigation.
+    const labelId = el.getAttribute("aria-labelledby")?.split(/\s+/)[0];
+    const label = (labelId ? el.ownerDocument.getElementById(labelId)?.textContent : null) ?? el.getAttribute("aria-label") ?? (el.matches("[data-slot=item]") ? el.querySelector("[data-slot=item-title]")?.textContent : null) ?? el.textContent ?? "";
     const to = el.getAttribute("data-to");
     if (isInertOn(current[1], label, to)) return e.preventDefault();
     const group = el.closest("[data-slot=sidebar-group-label]") && screenByName(label.trim());

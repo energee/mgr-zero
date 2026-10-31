@@ -6,8 +6,6 @@ import { BeerIcon, DeliveryTruck01Icon, Invoice01Icon, Package01Icon, Route01Ico
 import { E } from "@/components/mgr/e";
 import type { TodayIcon, TodayViewModel } from "@/lib/mgr/today-view";
 
-export type { TodayViewModel };
-
 const ICON: Record<TodayIcon, typeof Package01Icon> = {
   package: Package01Icon, truck: DeliveryTruck01Icon, route: Route01Icon,
   thermo: ThermometerIcon, beer: BeerIcon, task: TaskDone01Icon, invoice: Invoice01Icon,
@@ -15,13 +13,11 @@ const ICON: Record<TodayIcon, typeof Package01Icon> = {
 
 export function TodayView({
   model,
-  lead,
   footer,
   emptyAction,
   linkRows,
 }: {
   model: TodayViewModel;
-  lead?: ReactNode;
   footer?: ReactNode;
   emptyAction?: ReactNode;
   linkRows?: boolean;
@@ -33,7 +29,6 @@ export function TodayView({
       {/* A lone action spans the phone column, as E.btn does; two or more share a grid. */}
       {actions.length === 1 && E.btn(actions[0].label, "g", actions[0].href)}
       {actions.length > 1 && E.btns(actions.map((a) => [a.label, "g", a.href]))}
-      {lead}
       {model.empty
         ? (
           <>

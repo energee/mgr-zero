@@ -6,8 +6,6 @@ import { E } from "@/components/mgr/e";
 import { TabBar } from "@/components/mgr/qty";
 import { filterWorkRows, WORK_LABELS, workEmpty, type WorkViewModel } from "@/lib/mgr/work-view";
 
-export type { WorkViewModel };
-
 const ICON = { package: Package01Icon, truck: DeliveryTruck01Icon, route: Route01Icon, thermometer: ThermometerIcon };
 
 export function WorkView({

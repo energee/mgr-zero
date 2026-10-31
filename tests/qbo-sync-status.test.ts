@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Ctx } from "@/lib/commands/registry";
 const boundary = vi.hoisted(() => ({ beginQboInvoiceSync: vi.fn(), completeQboInvoiceSync: vi.fn(), recordQboInvoiceSyncFailure: vi.fn(), readVersionedIntegrationTokens: vi.fn() }));
 vi.mock("@/lib/supabase/integration-tokens", () => boundary);
@@ -11,6 +11,7 @@ beforeEach(() => {
   boundary.beginQboInvoiceSync.mockResolvedValue({ actorId: "actor", connectionId: "connection", realmId: "realm", targets: [{ invoiceId: "invoice", remoteId: "remote", requestBody: "{}" }] });
   boundary.readVersionedIntegrationTokens.mockResolvedValue({ connectionId: "connection", accessToken: "token" });
 });
+afterEach(() => vi.restoreAllMocks());
 it("records a safe failure for the frozen request without applying a partial read", async () => {
   vi.spyOn(client, "readInvoice").mockRejectedValue(new Error("provider secret token"));
   await expect(syncQboInvoices(ctx, requestId, client)).rejects.toThrow("QuickBooks is unavailable");
@@ -54,4 +55,59 @@ it("keeps the original failure when its failure record cannot be saved", async (
   boundary.recordQboInvoiceSyncFailure.mockRejectedValue(new Error("database unavailable"));
   vi.spyOn(console, "error").mockImplementation(() => {});
   await expect(syncQboInvoices(ctx, requestId, client)).rejects.toMatchObject({ message: "QuickBooks connection changed", status: 409 });
+});
+
+it("records failure and stops before another invoice when the total read budget expires", async () => {
+  const deadline = new AbortController();
+  vi.spyOn(AbortSignal, "timeout").mockReturnValue(deadline.signal);
+  boundary.beginQboInvoiceSync.mockResolvedValue({ actorId: "actor", connectionId: "connection", realmId: "realm", targets: [
+    { invoiceId: "first", remoteId: "one", requestBody: "{}" },
+    { invoiceId: "second", remoteId: "two", requestBody: "{}" },
+  ] });
+  const read = vi.spyOn(client, "readInvoice").mockImplementation(async () => {
+    deadline.abort(new DOMException("sync timed out", "TimeoutError"));
+    return { ok: true, syncToken: "1", taxCents: 0, totalCents: 100, balanceCents: 100,
+      cashCollectedCents: 0, paidAt: null, privateNote: "", content: {} };
+  });
+  await expect(syncQboInvoices(ctx, requestId, client)).rejects.toThrow("QuickBooks is unavailable");
+  expect(read).toHaveBeenCalledTimes(1);
+  expect(boundary.completeQboInvoiceSync).not.toHaveBeenCalled();
+  expect(boundary.recordQboInvoiceSyncFailure).toHaveBeenCalledWith(ctx, requestId);
+});
+
+it("does not reconcile when the total budget expires during the final invoice read", async () => {
+  const deadline = new AbortController();
+  vi.spyOn(AbortSignal, "timeout").mockReturnValue(deadline.signal);
+  vi.spyOn(client, "readInvoice").mockImplementation(async () => {
+    deadline.abort();
+    return { ok: true, syncToken: "1", taxCents: 0, totalCents: 100, balanceCents: 100,
+      cashCollectedCents: 0, paidAt: null, privateNote: "", content: {} };
+  });
+  await expect(syncQboInvoices(ctx, requestId, client)).rejects.toThrow("QuickBooks is unavailable");
+  expect(boundary.completeQboInvoiceSync).not.toHaveBeenCalled();
+  expect(boundary.recordQboInvoiceSyncFailure).toHaveBeenCalledWith(ctx, requestId);
+});
+
+it("keeps a timed-out sync recoverable with the same frozen request", async () => {
+  const deadline = new AbortController();
+  vi.spyOn(AbortSignal, "timeout").mockImplementation(ms => ms === 180_000 ? deadline.signal : new AbortController().signal);
+  const transport = vi.fn<typeof fetch>().mockImplementationOnce((_input, init) => {
+    const { promise, reject } = Promise.withResolvers<Response>();
+    init!.signal!.addEventListener("abort", () => reject(init!.signal!.reason), { once: true });
+    queueMicrotask(() => deadline.abort(new DOMException("sync timed out", "TimeoutError")));
+    return promise;
+  });
+  const retryClient = new QboOAuthClient({ clientId: "id", clientSecret: "secret", redirectUri: "https://example.test", apiBaseUrl: "https://example.test" }, transport);
+  await expect(syncQboInvoices(ctx, requestId, retryClient)).rejects.toThrow("QuickBooks is unavailable");
+  expect(boundary.recordQboInvoiceSyncFailure).toHaveBeenCalledWith(ctx, requestId);
+  expect(boundary.completeQboInvoiceSync).not.toHaveBeenCalled();
+
+  vi.mocked(AbortSignal.timeout).mockImplementation(() => new AbortController().signal);
+  transport.mockResolvedValue(Response.json({ Invoice: { Id: "remote", SyncToken: "1", TotalAmt: 1, Balance: 1 } }));
+  const result = { synced: 1, paid: 0, voided: 0, deleted: 0, drifted: 0 };
+  boundary.completeQboInvoiceSync.mockResolvedValue(result);
+  await expect(syncQboInvoices(ctx, requestId, retryClient)).resolves.toEqual(result);
+  boundary.beginQboInvoiceSync.mockResolvedValue({ replayResult: result });
+  await expect(syncQboInvoices(ctx, requestId, retryClient)).resolves.toEqual(result);
+  expect(transport).toHaveBeenCalledTimes(2);
 });

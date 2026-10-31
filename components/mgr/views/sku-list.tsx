@@ -5,8 +5,6 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { SkuListViewModel } from "@/lib/mgr/sku-list-view";
 
-export type { SkuListViewModel };
-
 export function SkuListView({
   model,
   createAction,

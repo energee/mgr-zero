@@ -181,3 +181,16 @@ export async function slackPrivateChannels(installationId: string): Promise<{ id
   } while (cursor);
   return channels.sort((a, b) => a.name.localeCompare(b.name));
 }
+
+/** Read the profile in the same workspace whose bot owns the link proof. */
+export async function slackUserDisplayName(installationId: string, userId: string): Promise<string> {
+  const installation = await outgoingInstallation(installationId);
+  if (!installation) throw new Error("installation_not_found");
+  const slack = slackAdapter();
+  const response = await slack.withBotToken(installation.botToken,
+    () => slack.webClient.users.info({ token: installation.botToken, user: userId }));
+  const user = response.user;
+  const name = user?.profile?.display_name?.trim() || user?.real_name?.trim() || user?.name?.trim();
+  if (user?.id !== userId || !name) throw new Error("Slack user identity unavailable");
+  return name;
+}

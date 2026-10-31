@@ -66,9 +66,12 @@ export default async function PurchaseOrderPage({ params, searchParams }: Props)
   const { receipt, correctReceipt } = await searchParams;
   const { ctx, po, receiptModel } = await getPurchaseOrderPageData(id, receipt, correctReceipt);
   if (correctReceipt && po.correction_receipt) {
+    const [locations, bins] = await Promise.all([
+      runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx),
+    ]) as [Location[], Bin[]];
     return <ReceiveForm key={correctReceipt} poId={po.id} correctionReceiptId={correctReceipt}
-      lines={po.correction_lines} locations={[]} bins={[]} onHand={[]} today={po.correction_receipt.received_on}
-      model={{ title: `${poNo(po.po_no)} · correct receipt`, state: "correction", status: `Received ${formatDate(po.correction_receipt.received_on)}`, backHref: receiptHref(`/purchase-orders/${po.id}`, correctReceipt) }} />;
+      lines={po.correction_lines} locations={locations} bins={bins} onHand={[]} today={po.correction_receipt.received_on}
+      model={{ title: `${poNo(po.po_no)} · correct receipt`, state: "correction", locationId: po.correction_receipt.location_id ?? "", binId: po.correction_receipt.bin_id ?? "", status: `Received ${formatDate(po.correction_receipt.received_on)}`, backHref: receiptHref(`/purchase-orders/${po.id}`, correctReceipt) }} />;
   }
   if (receiptModel) return <ReceiptBillAdapter model={receiptModel} />;
   // Receive starts on the bin holding the most of the PO's first open material.

@@ -7,8 +7,6 @@ import type { ReactNode } from "react";
 import { Fragment, useId } from "react";
 import { ConfirmDeleteControl } from "./confirm-delete";
 
-export type { VendorViewModel };
-
 export function VendorView({
   model,
   controls = {},

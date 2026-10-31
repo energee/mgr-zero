@@ -11,11 +11,17 @@ function Slider({
   min = 0,
   max = 100,
   thumbLabels,
+  thumbValueTexts,
+  thumbDescribedBy,
   ...props
 }: React.ComponentProps<typeof SliderPrimitive.Root> & {
   /** One accessible name per thumb. Radix puts role="slider" on the thumbs, so a
    *  label on the root names none of them; a range needs one name per end. */
   thumbLabels?: string[]
+  /** Human-readable values when the numeric position is not meaningful on its own. */
+  thumbValueTexts?: string[]
+  /** A shared description read with either thumb. */
+  thumbDescribedBy?: string
 }) {
   const _values = React.useMemo(
     () =>
@@ -54,6 +60,8 @@ function Slider({
           data-slot="slider-thumb"
           key={index}
           aria-label={thumbLabels?.[index]}
+          aria-valuetext={thumbValueTexts?.[index]}
+          aria-describedby={thumbDescribedBy}
           className="relative block size-3 shrink-0 rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
         />
       ))}

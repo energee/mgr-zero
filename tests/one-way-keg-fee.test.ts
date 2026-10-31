@@ -114,6 +114,25 @@ describe("one-way keg fee", () => {
     expect((await invoiceLines(s.invoiceId!)).map(l => l.kind)).toEqual(["sku"]);
   });
 
+  it("keeps a zero fee captured at submit when an adjustment follows a fee increase", async () => {
+    const f = await setup(0);
+    const { order_id: orderId } = await runCommand("create_order", {
+      kind: "wholesale", customerId: f.customer.customerId, shipToId: f.customer.shipToId, fromLocationId: f.wh.id,
+      lines: [{ skuId: f.oneWaySku, qty: 1 }],
+    }, f.adminCtx) as { order_id: string };
+    await runCommand("submit_order", { orderId }, f.adminCtx);
+    await runCommand("set_one_way_keg_fee", { feeCents: 1500 }, f.adminCtx);
+    await runCommand("adjust_order_lines", { orderId, reason: "Buyer requested another keg", lines: [{ skuId: f.oneWaySku, qty: 2 }] }, f.adminCtx);
+    const line = (await admin.from("order_lines").select("id, one_way_fee_cents").eq("order_id", orderId).single()).data!;
+    expect(line.one_way_fee_cents).toBeNull();
+    await runCommand("confirm_order", { orderId }, f.adminCtx);
+    await runCommand("record_pick", { orderId, picks: [{ lineId: line.id, qty: 2 }] }, f.adminCtx);
+    const shipped = await runCommand("ship_order", { orderId, ship: [{ lineId: line.id, qty: 2 }] }, f.adminCtx) as { invoice_id: string };
+    expect((await invoiceLines(shipped.invoice_id)).map(l => l.kind)).toEqual(["sku"]);
+    const later = await ship(f, [{ skuId: f.oneWaySku, qty: 1 }]);
+    expect((await invoiceLines(later.invoiceId!)).filter(l => l.kind === "one_way_keg_fee").map(l => l.unit_price_cents)).toEqual([1500]);
+  });
+
   it("bills shipped less refused on delivery, at the fee frozen at submit", async () => {
     const f = await setup(1000);
     const s = await ship(f, [{ skuId: f.oneWaySku, qty: 3 }], "on_delivery");

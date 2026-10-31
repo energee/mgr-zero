@@ -4,8 +4,6 @@ import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { PortalMeViewModel } from "@/lib/mgr/portal-me-view";
 
-export type { PortalMeViewModel };
-
 export function PortalMeView({
   model,
   footer,

@@ -10,8 +10,6 @@ import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { routeReason, toggleRouteStop, type RouteViewModel } from "@/lib/mgr/route-view";
 
-export type { RouteViewModel };
-
 type Controls = Partial<Record<"date" | "driverId" | "vehicle" | "name", (value: string) => void>> & { selection?: (value: Record<string, number>) => void };
 
 export function RouteView({ model, controls, busy = false, error, onSave, onDepart }: {

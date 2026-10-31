@@ -14,8 +14,6 @@ import type { ReactNode } from "react";
 import { Fragment, useId, useState, type FormEvent } from "react";
 import { useFormStatus } from "react-dom";
 
-export type { EntryViewModel };
-
 const INPUT_NAMES: Record<string, string> = {
   Email: "email", "Your name": "name",
   "Current password": "currentPassword", "Confirm new password": "confirmPassword",

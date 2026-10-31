@@ -1,10 +1,6 @@
-// app/(app)/transfers/[id]/page.tsx — one stock transfer: header, lines with
-// from/to bins, and the next verb (transfer-actions.tsx): Record pick,
-// Receive, or Cancel transfer. Receiving posts the paired ledger rows; the
-// page then shows what moved. A cancelled transfer shows its reason. Same movements as Complete transfer, no invoice.
+// Transfer detail reads authorized data and binds its shared document/actions.
 import { cache } from "react";
 import type { BinMoveStock } from "@/lib/commands/inventory";
-import { TransferDetailView } from "@/components/mgr/views/transfer-detail";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
@@ -45,9 +41,8 @@ export default async function TransferPage({ params }: { params: Promise<{ id: s
     if (line.materials) return { name: line.materials.name, unit: line.materials.base_uom };
     return { name: line.keg_pools ? `${line.keg_pools.name} · ${line.keg_size?.replace("_", " ")}` : "Line", unit: "kegs" };
   };
-  const done = transfer.status === "received" || transfer.status === "cancelled";
   return (
-    <TransferDetailView
+    <TransferActions
       model={toTransferDetailViewProps({
         transfer: {
           id: transfer.id,
@@ -67,9 +62,17 @@ export default async function TransferPage({ params }: { params: Promise<{ id: s
           qty_picked: l.qty_picked === null ? null : Number(l.qty_picked),
         })),
       })}
-      footer={done ? undefined : (
-        <TransferActions stock={stock} transferId={transfer.id} status={transfer.status} lines={lines.map((l) => ({ id: l.id, skuId: l.sku_id, materialId: l.material_id, fromBinId: l.from_bin_id, qty: Number(l.qty), qtyPicked: l.qty_picked === null ? null : Number(l.qty_picked) }))} />
-      )}
+      stock={stock}
+      transferId={transfer.id}
+      status={transfer.status}
+      lines={lines.map((line) => ({
+        id: line.id,
+        skuId: line.sku_id,
+        materialId: line.material_id,
+        fromBinId: line.from_bin_id,
+        qty: Number(line.qty),
+        qtyPicked: line.qty_picked === null ? null : Number(line.qty_picked),
+      }))}
     />
   );
 }

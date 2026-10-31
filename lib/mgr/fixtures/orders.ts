@@ -38,6 +38,7 @@ const line = (
 /** Picked wholesale order after a line was adjusted down (Order + Put back). */
 export const orderPickedRestock: OrderSnapshot = {
   timeZone: DEMO_TIME_ZONE,
+  emailStatuses: [{ state: "pending", last_error: "provider_uncertain" }],
   order: {
     id: ORDER_229,
     order_no: 229,

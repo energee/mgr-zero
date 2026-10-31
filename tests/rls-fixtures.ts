@@ -24,6 +24,7 @@ export const matrix = {
   shipments: "deny", invoices: "deny", invoice_questions: "deny", invoice_lines: "deny", invoice_payments: "deny", invoice_payment_voids: "deny", keg_events: "deny",
   stock_transfers: "deny", stock_transfer_lines: "deny", qbo_connections: "deny", qbo_pushes: "deny", qbo_customer_snapshots: "deny", qbo_customer_decisions: "deny", pos_connections: "deny",
   pos_locations: "tenant", pos_item_mappings: "tenant", pos_catalog_variations: "deny", pos_catalog_items: "deny", pos_catalog_ownership: "deny", pos_menus: "deny", pos_menu_lines: "deny", pos_sales: "deny", pos_sale_expectations: "deny", pos_sales_coverage: "deny", brand_approvals: "cola", cola_label_images: "deny",
+  pos_location_mapping_history: "deny",
   state_registrations: "deny", brewery_state_licenses: "deny", report_filings: "deny", routes: "deny",
   reporting_basis_corrections: "deny", report_basis_amendments: "deny",
   deliveries: "deny", chat_installations: "deny", chat_user_links: "self", notification_destinations: "self",
@@ -57,6 +58,7 @@ const privilegedRead: Partial<Record<Table, true>> = {
   invoice_payments: true, invoice_payment_voids: true,
   cola_label_images: true,
   packaging_output_corrections: true,
+  pos_location_mapping_history: true,
 };
 export const day = "2026-09-08";
 export const now = "2026-09-08T12:00:00Z";
@@ -154,7 +156,9 @@ export async function fixtures() {
   await put("qbo_customer_snapshots", { realm_id: realm, qbo_customer_id: "Q1", display_name: "Fixture QB customer", active: true, sync_token: "0", qbo_updated_at: now, read_at: now });
   await put("qbo_customer_decisions", { realm_id: realm, qbo_customer_id: "Q1", customer_id: customer.customerId, decision: "not_a_match", decided_by: owner.id });
   const pos = await put("pos_connections", { merchant_id: `merchant-${brewery.id}` });
-  await put("pos_locations", { connection_id: pos.id, external_location_id: "L1", location_id: taps[0].id });
+  await put("pos_locations", { connection_id: pos.id, external_location_id: "L1", location_id: taps[0].id, mapping_started_at: "2026-09-01T00:00:00Z" });
+  sql(`insert into public.pos_location_mapping_history(brewery_id,connection_id,external_location_id,location_id,starts_at,ends_at,retired_by)
+    values('${brewery.id}','${pos.id}','L1','${wh.id}','2026-08-01T00:00:00Z','2026-09-01T00:00:00Z','${owner.id}')`, true);
   const poured = await put("formats", { brand_id: cat.brandId, name: "Pint", basis: "poured", ounces: 16 });
   const menu = await put("pos_menus", { connection_id: pos.id, external_location_id: "L1", location_id: taps[0].id, bin_id: taps[0].binId, sale_channel_id: customer.saleChannelId });
   await put("pos_menu_lines", { menu_id: menu.id, format_id: poured.id, brand_id: cat.brandId, price_override_cents: 700 });
@@ -164,7 +168,8 @@ export async function fixtures() {
   await put("pos_item_mappings", { connection_id: pos.id, external_item_id: "I1", external_variation_id: "V1", sku_id: cat.skuId });
   const sale = await put("pos_sales", { connection_id: pos.id, external_order_id: "O1", external_line_id: "S1", external_item_id: "I1", external_variation_id: "V1", external_location_id: "L1", sold_at: now, qty: 1 });
   sql(`select private.reconcile_pos_sale('${brewery.id}','${sale.id}')`);
-  await put("pos_sales_coverage", { connection_id: pos.id, external_location_id: "L1", location_id: taps[0].id, starts_at: "2026-09-01T00:00:00Z", ends_at: now, complete: true });
+  sql(`insert into public.pos_sales_coverage(brewery_id,connection_id,external_location_id,location_id,starts_at,ends_at,complete)
+    values('${brewery.id}','${pos.id}','L1','${taps[0].id}','2026-09-01T00:00:00Z','${now}',true)`, true);
   await put("brand_approvals", { brand_id: cat.brandId, kind: "cola", ttb_id: "26001001000999" });
   await put("brand_approvals", { brand_id: cat.brandId, kind: "formula", ttb_id: "PRIVATE-FORMULA" });
   // Written only by store_cola_label_image, which no role here can reach for this unsaved label.

@@ -20,11 +20,11 @@ export type ResolvedChatActor = {
   roles: StaffRole[];
 };
 
-export async function issueChatLinkProof(db: SupabaseClient<Database>, installationId: string, externalUserId: string) {
+export async function issueChatLinkProof(db: SupabaseClient<Database>, installationId: string, externalUserId: string, externalDisplayName: string) {
   const base = readAppUrl();
   const proof = randomBytes(32).toString("base64url");
   const data = await unwrap(db.rpc("issue_chat_link_proof", {
-    p_installation: installationId, p_external_user_id: externalUserId, p_proof_hash: sha256(proof),
+    p_installation: installationId, p_external_user_id: externalUserId, p_proof_hash: sha256(proof), p_external_display_name: externalDisplayName,
   }));
   const { link_id, expires_at } = data as { link_id: string; expires_at: string };
   return { proof, linkId: link_id, expiresAt: expires_at, url: `${base}/settings/chat/link?proof=${encodeURIComponent(proof)}` };

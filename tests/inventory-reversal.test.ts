@@ -79,13 +79,13 @@ it("reads scoped inventory metadata, names, and linked history even at zero stoc
   const sales = await makeStaffCtx(ctx.breweryId, "sales");
   expect(await runCommand("get_inventory_sku", { skuId: catalog.skuId }, sales)).toMatchObject({ id: catalog.skuId });
   expect(await runCommand("get_on_hand", { skuId: catalog.skuId }, sales)).toEqual([expect.objectContaining({ qty: 0, locations: { name: "WH" } })]);
-  expect(await runCommand("list_movements", { skuId: catalog.skuId, movementId: original.id }, sales)).toEqual(expect.arrayContaining([
+  expect(await runCommand("list_movements", { skuId: catalog.skuId, movementId: original.id }, sales)).toMatchObject({ rows: expect.arrayContaining([
     expect.objectContaining({ id: original.id, reversed_by: correction.id, bins: { name: "Cold" } }),
     expect.objectContaining({ id: correction.id, compensates_id: original.id }),
-  ]));
+  ]), nextCursor: null });
   const other = await makeStaffCtx((await makeBrewery()).id);
   await expect(runCommand("get_inventory_sku", { skuId: catalog.skuId }, other)).rejects.toThrow(/not found/i);
-  expect(await runCommand("list_movements", { skuId: catalog.skuId }, other)).toEqual([]);
+  expect(await runCommand("list_movements", { skuId: catalog.skuId }, other)).toEqual({ rows: [], nextCursor: null });
 });
 
 it("refuses structural forgeries and rolls rejected requests back", async () => {
