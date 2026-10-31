@@ -1711,14 +1711,14 @@ isOneToOne: false
                   ]
                 },"order_lines": {
                   Row: {
-                    "brewery_id": string,"id": string,"one_way_fee_cents": number | null,"order_id": string,"qty_ordered": number,"qty_picked": number | null,"qty_refused": number,"qty_shipped": number | null,"short_reason": string | null,"sku_id": string,"unit_price_cents": number
+                    "brewery_id": string,"id": string,"one_way_fee_captured": boolean,"one_way_fee_cents": number | null,"order_id": string,"qty_ordered": number,"qty_picked": number | null,"qty_refused": number,"qty_shipped": number | null,"short_reason": string | null,"sku_id": string,"unit_price_cents": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "brewery_id": string,"id"?: string,"one_way_fee_cents"?: number | null,"order_id": string,"qty_ordered": number,"qty_picked"?: number | null,"qty_refused"?: number,"qty_shipped"?: number | null,"short_reason"?: string | null,"sku_id": string,"unit_price_cents": number
+                    "brewery_id": string,"id"?: string,"one_way_fee_captured"?: boolean,"one_way_fee_cents"?: number | null,"order_id": string,"qty_ordered": number,"qty_picked"?: number | null,"qty_refused"?: number,"qty_shipped"?: number | null,"short_reason"?: string | null,"sku_id": string,"unit_price_cents": number
                   }
                   Update: {
-                    "brewery_id"?: string,"id"?: string,"one_way_fee_cents"?: number | null,"order_id"?: string,"qty_ordered"?: number,"qty_picked"?: number | null,"qty_refused"?: number,"qty_shipped"?: number | null,"short_reason"?: string | null,"sku_id"?: string,"unit_price_cents"?: number
+                    "brewery_id"?: string,"id"?: string,"one_way_fee_captured"?: boolean,"one_way_fee_cents"?: number | null,"order_id"?: string,"qty_ordered"?: number,"qty_picked"?: number | null,"qty_refused"?: number,"qty_shipped"?: number | null,"short_reason"?: string | null,"sku_id"?: string,"unit_price_cents"?: number
                   }
                   Relationships: [
                     {
@@ -5156,6 +5156,9 @@ isOneToOne: false
                            },
 "get_chat_settings_installation":
 { Args: { "p_actor": string,"p_brewery": string,"p_installation": string }; Returns: Json
+                           },
+"get_keg_report_aging":
+{ Args: { "p_brewery": string }; Returns: Json
                            },
 "get_loss_review":
 { Args: { "p_brewery": string,"p_end": string,"p_start": string }; Returns: Json

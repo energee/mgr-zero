@@ -307,13 +307,15 @@ it("corrects the latest mistaken-low count with frozen compensating and replacem
     lines: [{ qty_before: 7, qty_counted: 4, bbl: -1.5 }],
   });
   expect(corrected.effective_id).not.toBe(root.id);
-  expect((await admin.from("inventory_movements")
+  const posted = (await admin.from("inventory_movements")
     .select("qty,bbl,type,compensates_id,correction_source_id,ref,sale_channel_id,tax_treatment,package_type,bin_id,sku_id,lot_id")
-    .eq("brewery_id", f.brewery.id).eq("type", "depletion").order("created_at")).data).toEqual([
+    .eq("brewery_id", f.brewery.id).eq("type", "depletion")).data;
+  expect(posted).toHaveLength(3);
+  expect(posted).toEqual(expect.arrayContaining([
       expect.objectContaining({ qty: -5, bbl: -2.5, type: "depletion", compensates_id: null, correction_source_id: null, ref: root.id }),
       expect.objectContaining({ qty: 5, bbl: 2.5, type: "depletion", compensates_id: root.lines[0].movement_id, correction_source_id: null, ref: corrected.effective_id }),
       expect.objectContaining({ qty: -3, bbl: -1.5, type: "depletion", compensates_id: null, correction_source_id: root.lines[0].movement_id, ref: corrected.effective_id }),
-    ]);
+    ]));
   const frozen = (await admin.from("inventory_movements").select("sale_channel_id,tax_treatment,package_type,bin_id,sku_id,lot_id").eq("ref", corrected.effective_id)).data!;
   expect(frozen).toEqual([originalMovement, originalMovement]);
   expect(sql(`select sum(qty)::numeric::float8 from public.inventory_movements where brewery_id='${f.brewery.id}' and location_id='${f.location.id}'`)).toEqual(["4"]);

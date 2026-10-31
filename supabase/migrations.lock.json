@@ -211,5 +211,10 @@
   "20261029001000_ship_to_label_unique_drop_pa_license.sql": "736ad982ce5eb62cc57c08787329803bc0ebf554e9a65a1184eef3667d7a26c9",
   "20261029104000_update_draft_purchase_order.sql": "d92ac1d967ae2fa36ec3045ee8b740a2fd26cd2439b456495e85e0b34046c2ac",
   "20261029123000_compliance_active_months_bounded.sql": "650cc10c50914c7e266e9ff8ff81408b6d414bbe28317d399b5c4f24202a91b4",
+  "20261030002000_ledger_compliance_integrity.sql": "bd6f5802aea8854b37c21d11af7f85ddb803269ff3dd22b55b7120a9846fb419",
+  "20261030002001_shipment_posting_clock.sql": "dcfeb5236fb37d21f4ed831808b595ee2cadd99d3a8b83dded011c0fef57a40d",
+  "20261030031000_qbo_push_reconcile.sql": "72ef35bf69dbe8d46c9ea836097ffd8e4163fefdce2339a0a0ef700cb4f26511",
+  "20261030031030_integration_failure_handling.sql": "d745ca7b05e5178a22ed3e6e473003f9773fa0740ba65a9258cd7983842c1460",
+  "20261030031031_performance_followups.sql": "5f4c66cd0f14d3623bad857e679da6c7f14fafb4171093f502d64a65d47d142e",
   "20261030032000_invoice_credit_balances.sql": "a0a9be724980ee42c23c2687b3031d3d248d1c1f1e8e9d39fe68524a516811c6"
 }

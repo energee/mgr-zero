@@ -17,8 +17,6 @@ export const processFields = [["preBoilBbl", "Pre-boil barrels"], ["boilMinutes"
 
 import { PlanCancelled } from "./plan-actions";
 
-export type { BrewDayViewModel };
-
 /** `actions` are a recorded batch's cellar verbs for its open occupancy (Reading, Transfer, Addition,
  *  Complete batch), drawn first so the batch page is not a dead end (#1508). */
 export function BrewDayView({ model, busy = false, error, onChange, onRecord, actions }: {

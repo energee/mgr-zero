@@ -13,8 +13,6 @@ import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import type { PriceGroupsChannelView, PriceGroupsRowView, PriceGroupsViewModel } from "@/lib/mgr/price-groups-view";
 
-export type { PriceGroupsViewModel };
-
 /** One price cell: "$" and a decimal field, "—" when unpriced. Enter or leaving the input commits (live only). */
 export function PriceCellInput({ label, value, onChange, onCommit, disabled, error, status }: {
   /** Names the cell for assistive tech: group · format on channel. */

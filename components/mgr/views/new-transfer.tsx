@@ -15,8 +15,6 @@ import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import { orderLineError } from "@/lib/order-form-rules";
 import { LineErrorMessages, lineErrorIds } from "./new-order";
 
-export type { NewTransferViewModel };
-
 export type NewTransferControls = {
   from?: (value: string) => void;
   fromBin?: (value: string) => void;

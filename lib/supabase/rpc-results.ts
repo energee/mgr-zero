@@ -23,6 +23,13 @@ export type TaproomCount = {
 type InvoicePaymentResult = { paymentId: string; invoiceId: string; balanceCents: number };
 
 export type RpcResults = {
+  get_keg_report_aging: {
+    aging: { bucket: string; kegs: number; deposit_cents: number }[];
+    bySize: { pool_id: string; keg_size: string; qty: number }[];
+    customers: { customer_id: string; name: string; over_90: number; oldest_at: string }[];
+    customerNames: { id: string; name: string }[];
+    lost: { customer_id: string; pool_id: string; keg_size: string; qty: number }[];
+  };
   create_order: { order_id: string };
   create_stock_transfer: { transfer_id: string };
   import_csv_row: { status: string };

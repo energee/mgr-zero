@@ -6,8 +6,6 @@ import { type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { portalInvoiceStatusTone, type PortalInvoiceViewModel } from "@/lib/mgr/portal-invoice-view";
 
-export type { PortalInvoiceViewModel };
-
 export type PortalInvoiceVariant = "pay" | "unavailable" | "paid";
 type ResolvedPortalInvoiceVariant = PortalInvoiceVariant | "nonpayable";
 
