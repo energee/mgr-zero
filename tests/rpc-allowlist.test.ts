@@ -7,6 +7,7 @@ import { sql } from "./helpers";
 const AUTHENTICATED_RPCS = [
   "consume_command_admission()",
   "get_beer_overview_aggregates(uuid)",
+  "get_keg_report_aging(uuid)",
   "get_saved_cola_image_permit(uuid,text,text)",
   "get_stored_cola_label_image(uuid,text,text)",
   "trace_lot_sources(uuid,uuid)",
@@ -262,6 +263,13 @@ it("grants the caller-RLS Beer aggregate only to authenticated callers", () => {
   expect(sql(`select r.role from pg_proc p
     cross join (values ('anon'),('authenticated'),('service_role')) r(role)
     where p.pronamespace = 'public'::regnamespace and p.proname = 'get_beer_overview_aggregates'
+      and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual(["authenticated"]);
+});
+
+it("grants caller-RLS keg aging only to authenticated callers", () => {
+  expect(sql(`select r.role from pg_proc p
+    cross join (values ('anon'),('authenticated'),('service_role')) r(role)
+    where p.pronamespace = 'public'::regnamespace and p.proname = 'get_keg_report_aging'
       and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual(["authenticated"]);
 });
 

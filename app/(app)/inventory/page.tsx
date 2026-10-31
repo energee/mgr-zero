@@ -23,6 +23,7 @@ import { formatDateTime } from "@/lib/date-format";
 import { movementFormInstanceKey } from "@/lib/composer/state";
 import { movementInput, type MovementInput, type MovementKind } from "@/lib/commands/movement-input";
 import { navTitle } from "@/lib/mgr/nav";
+import { historyPage, pageCursor, type HistoryPage } from "@/lib/mgr/history-page";
 
 export const metadata = { title: navTitle("/inventory") };
 
@@ -34,21 +35,22 @@ type BinOnHandRow = { sku_id: string; location_id: string; bin_id: string; qty: 
 type AtpRow = { sku_id: string; qty: string };
 type Movement = { bin_id: string; bbl: string; dest_state: string | null; sale_channel_id: string | null; ref_label: string | null; lots: { code: string } | null; id: string; created_at: string; type: string; qty: string; sku_id: string; location_id: string; note: string | null };
 
-type InventorySearch = { page?: string; recordMovement?: string; movementHandoff?: string; skuId?: string; locationId?: string; binId?: string; lotId?: string; qty?: string; type?: string; saleChannelId?: string; destState?: string; note?: string };
+type InventorySearch = { cursor?: string; recordMovement?: string; movementHandoff?: string; skuId?: string; locationId?: string; binId?: string; lotId?: string; qty?: string; type?: string; saleChannelId?: string; destState?: string; note?: string };
 const movementKinds = new Set<string>(movementInput.shape.type.options);
 
 export default async function InventoryPage({ searchParams }: { searchParams: Promise<InventorySearch> }) {
   const params = await searchParams;
-  const { page: rawPage, recordMovement } = params;
-  const page = /^\d{1,6}$/.test(rawPage ?? "") ? Math.max(0, Number(rawPage) - 1) : 0;
+  const { recordMovement } = params;
+  const cursor = pageCursor(params.cursor);
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   requirePagePermission(ctx, "get_atp", "Finished goods");
-  const [skus, locations, bins, channels, onHand, atp, movements, value] = (await Promise.all([
+  const [skus, locations, bins, channels, onHand, atp, records, value] = (await Promise.all([
     runCommand("list_skus", {}, ctx), runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx), runCommand("list_sale_channels", {}, ctx),
-    runCommand("get_bin_on_hand", {}, ctx), runCommand("get_atp", {}, ctx), runCommand("list_movements", { limit: 51, offset: page * 50 }, ctx),
+    runCommand("get_bin_on_hand", {}, ctx), runCommand("get_atp", {}, ctx), runCommand("list_movements", { cursor }, ctx),
     canRun(ctx, "get_inventory_value") ? runCommand("get_inventory_value", {}, ctx) : undefined,
-  ])) as [Sku[], Location[], Bin[], SaleChannel[], BinOnHandRow[], AtpRow[], Movement[], InventoryValue | undefined];
+  ])) as [Sku[], Location[], Bin[], SaleChannel[], BinOnHandRow[], AtpRow[], HistoryPage<Movement>, InventoryValue | undefined];
+  const { rows: movements, pagination } = historyPage(records, "/inventory", cursor);
   const skuById = new Map(skus.map((s) => [s.id, s]));
   const locationById = new Map(locations.map((l) => [l.id, l.name]));
   const locationName = (id: string) => locationById.get(id) ?? "—";
@@ -82,10 +84,10 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           {E.ttl("Movements")}
           {movements.length === 0
             ? E.blank("No movements recorded yet")
-            : movements.slice(0, 50).map((m) => (
+            : movements.map((m) => (
               <div key={m.id}>{E.row(`${Number(m.qty) > 0 ? "+" : ""}${m.qty} ${skuLabel(skuById.get(m.sku_id) ?? { name: "—" })}`, `${sentenceCase(m.type)} · ${locationName(m.location_id)} · ${bins.find(b => b.id === m.bin_id)?.name ?? "—"}${m.lots?.code ? ` · ${m.lots.code}` : ""} · ${m.bbl} bbl${m.dest_state ? ` · ${m.dest_state}` : ""}${m.sale_channel_id ? ` · ${channels.find(c => c.id === m.sale_channel_id)?.name ?? "—"}` : ""}${m.note ? ` · ${m.note}` : ""}`, <span>{formatDateTime(m.created_at, brewery.timeZone)}{m.ref_label ? ` · ${m.ref_label}` : ""}</span>, Number(m.qty) < 0 ? "w" : "ok")}</div>
             ))}
-          <div className="flex gap-2">{page > 0 && E.btn("Newer movements", "g", `/inventory?page=${page}`)}{movements.length > 50 && E.btn("Older movements", "g", `/inventory?page=${page + 2}`)}</div>
+          <div className="flex gap-2">{pagination.firstHref && E.btn("Newest movements", "g", pagination.firstHref)}{pagination.moreHref && E.btn("Older movements", "g", pagination.moreHref)}</div>
         </>
       }
     />
