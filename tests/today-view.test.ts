@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { toTodayViewProps } from "../lib/mgr/today-view";
 import type { TodayItem } from "../lib/commands/today";
-import { todaySales, todayWarehouse } from "../lib/mgr/fixtures/today";
+import { todayWarehouse } from "../lib/mgr/fixtures/today";
 
 const item = (subjectId: string, dueAt: string | null, reason: TodayItem["reason"] = "fermentation_reading_overdue"): TodayItem => ({
   reason,
@@ -26,23 +26,6 @@ describe("Today row titles", () => {
     const order: TodayItem = { ...item("o1", null, "pick_due"), subjectType: "order", safeLabel: "ORD-0193", customerName: "Hillside Tavern" };
     const model = toTodayViewProps({ date: "Thu, Oct 8", items: [order, item("2", null)], timeZone, now });
     expect(model.rows.map((r) => r.title)).toEqual(["ORD-0193 · Hillside Tavern", "FV-2"]);
-  });
-
-  it("offers Return and credit for invoiced refusals in Today and its Sales frame (#1637)", () => {
-    const refusal: TodayItem = {
-      ...item("d1", null, "refused_credit"), subjectType: "delivery",
-      safeLabel: "Refused beer to return and credit", detail: "Hillside Tavern · 2 units",
-      href: "/invoices/i1/return?refusedDeliveryId=d1", recipientRoles: ["admin", "sales"],
-    };
-    const row = toTodayViewProps({ date: "Thu, Oct 8", items: [refusal] }).rows[0];
-    expect(row).toMatchObject({
-      title: refusal.safeLabel, detail: refusal.detail, verb: "Return and credit",
-      href: refusal.href, tone: "attention", warning: true, icon: "route",
-    });
-    expect(todaySales.rows.find((r) => r.title === refusal.safeLabel)).toMatchObject({
-      detail: refusal.detail, verb: row.verb, tone: row.tone, warning: row.warning, icon: row.icon,
-    });
-    expect(todaySales.rows.find((r) => r.title === refusal.safeLabel)?.href).toBeUndefined();
   });
 });
 

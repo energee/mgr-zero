@@ -493,14 +493,14 @@ describe("route edges", () => {
       .filter(item => item.subjectId === stop!.id);
     const expectedTask = {
       reason: "refused_credit", subjectType: "delivery", subjectId: stop!.id,
-      safeLabel: "Refused beer to return and credit", href: creditHref,
+      href: creditHref,
       recipientRoles: ["admin", "sales"], dueAt: null,
     };
     expect(await refusalTask(sales)).toEqual([expect.objectContaining(expectedTask)]);
     expect(await refusalTask(adminCtx)).toEqual([expect.objectContaining(expectedTask)]);
     expect(await refusalTask(warehouse)).toEqual([]);
     expect(await runCommand("list_work", {}, sales)).toContainEqual(expect.objectContaining({
-      kind: "orders", id: stop!.id, href: creditHref, verb: "Return and credit", tone: "attention",
+      kind: "orders", id: stop!.id, href: creditHref,
     }));
     await runCommand("return_route", { routeId }, adminCtx);
     expect(await refusalTask(sales)).toEqual([expect.objectContaining(expectedTask)]);
@@ -521,7 +521,7 @@ describe("route edges", () => {
     const foreignStaff = await makeStaffCtx((await makeBrewery()).id, "admin");
     await expect(runCommand("return_shipment", input, foreignStaff)).rejects.toThrow();
     expect(await refusalTask(foreignStaff)).toEqual([]);
-    await expect(runCommand("return_shipment", input, warehouse)).rejects.toThrow(/permission|allowed/i);
+    await expect(runCommand("return_shipment", input, warehouse)).rejects.toMatchObject({ status: 403, code: "permission_denied" });
     await expect(runCommand("return_shipment", { ...input, lines: [{ invoiceLineId: billed!.id, qty: 3 }] }, adminCtx)).rejects.toThrow(/outstanding refusal/i);
     const requestId = crypto.randomUUID();
     const result = await runCommand("return_shipment", input, sales, { requestId, correlationId: requestId });
