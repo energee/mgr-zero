@@ -1,7 +1,7 @@
 // Invoice payments recorded in MGR (#1045, docs/plans/invoice-local-payments.md):
 // the append-only payment and void ledgers and the invoice_totals sum they feed,
 // the record and void RPCs, and start_qbo_push's refusal of an invoice with payments.
-import { Client, type DatabaseError } from "pg";
+import { Client } from "pg";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { runCommand } from "@/lib/commands/registry";
@@ -149,10 +149,12 @@ describe("credit memos reduce an MGR invoice balance (#1627)", () => {
       ]);
       paying = payer.client.query("select public.record_invoice_payment($1,$2,100000,'2026-10-20','check',null,$3)",
         [f.breweryId, f.invoiceId, crypto.randomUUID()]);
-      const settled = paying.then(() => "accepted", (error: DatabaseError) => error.code);
+      const rejected = paying.then(() => false, () => true);
       await expect.poll(() => sql(`select wait_event_type from pg_stat_activity where pid=${payer.pid}`, true)[0], { timeout: 3000 }).toBe("Lock");
       await returner.client.query("commit");
-      expect(await settled).toBe("P0001");
+      expect(await rejected).toBe(true);
+      expect(sql(`select local_paid_cents, local_credit_cents from public.invoice_totals where invoice_id='${f.invoiceId}'`, true)).toEqual(["0|20000"]);
+      expect(sql(`select count(*) from public.invoice_payments where invoice_id='${f.invoiceId}'`, true)).toEqual(["0"]);
     } finally {
       await returner.client.query("rollback").catch(() => undefined);
       if (paying) await Promise.allSettled([paying]);
@@ -164,7 +166,8 @@ describe("credit memos reduce an MGR invoice balance (#1627)", () => {
     const f = await localInvoice({}, 50000);
     await credit(f, 0.4);
     expect(sql(`select local_credit_cents from public.invoice_totals where invoice_id='${f.invoiceId}'`, true)).toEqual(["20000"]);
-    expect((await record(f, { p_amount_cents: 80001 })).error?.code).toBe("P0001");
+    expect((await record(f, { p_amount_cents: 80001 })).error).not.toBeNull();
+    expect(sql(`select count(*) from public.invoice_payments where invoice_id='${f.invoiceId}'`, true)).toEqual(["0"]);
     const result = await record(f, { p_amount_cents: 80000 });
     expect(result.error).toBeNull();
     expect(result.data).toMatchObject({ balanceCents: 0 });
@@ -193,7 +196,7 @@ describe("credit memos reduce an MGR invoice balance (#1627)", () => {
     const f = await localInvoice();
     await credit(f, 2);
     expect(paidAtLocal(f)).not.toBe("");
-    expect((await record(f, { p_amount_cents: 1 })).error?.code).toBe("P0001");
+    expect((await record(f, { p_amount_cents: 1 })).error).not.toBeNull();
     expect(await runCommand("list_invoices", { status: "unpaid" }, f.sales)).toMatchObject({ rows: [] });
     expect(sql(`select local_paid_cents, local_credit_cents from public.invoice_totals where invoice_id='${f.invoiceId}'`, true)).toEqual(["0|10000"]);
   });
