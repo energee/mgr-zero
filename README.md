@@ -61,7 +61,14 @@ bunx supabase status -o env | node scripts/supabase-env.mjs > .env.local
 ```
 
 The mapper converts the Supabase CLI's local key labels into the application's
-modern environment contract; nothing else is needed in `.env.local`.
+modern environment contract; nothing else is needed in `.env.local` to sign in
+with a password and use the app. `APP_URL` is optional locally: it is the
+public MGR origin (for example `http://localhost:3000`) that passwordless
+sign-in and password-reset emails, Slack, and portal invoice payment build
+their links from, so set it before using those. Browser calls to
+`/api/command` and `/api/chat` pass the Origin check when their Origin matches
+the host the request was sent to, so a second dev port or a Vercel preview
+host needs no matching `APP_URL`.
 `/api/command` refuses excess requests with `429 rate_limited` and a
 `Retry-After` header.
 
@@ -177,6 +184,9 @@ committed migrations. After applying migrations to the disposable test stack,
 run `bun run types:database`. Pass a local disposable database URL as the first
 argument when using a separate stack. Do not generate from a hosted or stale
 application database. CI checks the generated file against its fresh stack.
+Generation removes disposable readiness RPC signatures and normalizes space/tab-only
+lines to empty lines; the rest of the generated file is emitted unchanged.
+Do not hand-edit the generated file. CI requires an exact regeneration match.
 
 `lib/supabase/database.ts` records facts the generator cannot infer: nullable
 RPC arguments, trigger-populated insert fields, and non-null stock views.

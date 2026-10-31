@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { historyInput, historyResult, newestFirst } from "./history";
 import { defineCommand, defineQuery, unwrap, completeRows, inChunks, PAGE_SIZE, Ctx, CommandExecution, CommandError, STAFF_ROLES } from "./registry";
 import { stockLine } from "./stock-line";
 import { qboUnmappedFilter, unmappedInput } from "./qbo";
@@ -188,25 +189,26 @@ export async function movementReferences(ctx: Ctx, references: (string | null)[]
 }
 
 defineQuery({
-  name: "list_movements", description: "Paginated immutable movements with location/bin/lot labels, resolved source document ref_label and ref_kind (order, run, transfer, invoice, delivery or count; both null without a visible source document), and reversal links; movementId selects an original and its exact compensation",
-  input: z.object({ skuId: z.string().uuid().optional(), movementId: z.string().uuid().optional(), limit: z.number().int().min(1).max(200).default(50), offset: z.number().int().nonnegative().default(0) }),
+  name: "list_movements", description: "Immutable movements newest-first as { rows, nextCursor }, with location/bin/lot labels, resolved source document ref_label and ref_kind, and reversal links; movementId selects an original and its exact compensation",
+  input: z.object({ skuId: z.string().uuid().optional(), movementId: z.string().uuid().optional(), ...historyInput }),
   roles: [...readRoles],
   handler: async (ctx, i) => {
     let q = ctx.db.from("inventory_movements").select("*, locations(name), bins(name), lots!inventory_movements_lot_fk(code)").eq("brewery_id", ctx.breweryId)
-      .order("created_at", { ascending: false }).order("id", { ascending: false }).range(i.offset, i.offset + i.limit - 1);
+      .limit(i.limit + 1);
     if (i.skuId) q = q.eq("sku_id", i.skuId);
     if (i.movementId) q = q.or(`id.eq.${i.movementId},compensates_id.eq.${i.movementId}`);
-    const rows = (await unwrap(q)) ?? [];
-    if (!rows.length) return [];
+    const page = historyResult((await unwrap(newestFirst(q, i.cursor))) ?? [], i.limit);
+    const rows = page.rows;
+    if (!rows.length) return page;
     const [corrections, references] = await Promise.all([
       unwrap(ctx.db.from("inventory_movements").select("id, compensates_id")
         .eq("brewery_id", ctx.breweryId).in("compensates_id", rows.map(r => r.id))),
       movementReferences(ctx, rows.map(row => row.ref)),
     ]);
-    return rows.map(row => {
+    return { ...page, rows: rows.map(row => {
       const reference = references.get(row.ref ?? "");
       return { ...row, ref_label: reference?.ref_label ?? null, ref_kind: reference?.ref_kind ?? null, reversed_by: corrections?.find(c => c.compensates_id === row.id)?.id ?? null };
-    });
+    }) };
   },
 });
 

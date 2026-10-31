@@ -13,7 +13,7 @@ function ComplianceFigures({ model, inProcessDetail, warnings = [] }: { model: C
     {E.tbl(["Class", "Begin", "In", "Out", "End"], model.lines, ["l", "r", "r", "r", "r"], { sortable: false })}
     {E.info("Every package class balances: Begin + In − Out = End, in barrels. Cellar removals are included once in the removal totals below. Zeros print 0.00.")}
     {warnings.map((warning) => <Fragment key={warning}>{E.note(warning)}</Fragment>)}
-    {E.row("Beer in process", inProcessDetail, model.inProcess)}
+    {E.row("Beer in process", model.inProcessAsOf ? `Shows beer remaining in tanks at the end of ${model.inProcessAsOf}, in the brewery's time zone.` : inProcessDetail, model.inProcess)}
     {E.row("Packaged", "Shows production added to finished goods.", model.packaged)}
     {model.removals.map((row) => <Fragment key={row.key}>{row.key === "loss" ? E.fld(row.title, row.bbl) : E.row(row.title, "", row.bbl)}</Fragment>)}
     {model.cellarRemovals.length ? <>{E.info("Cellar removals breakdown is explanatory and is already included once in the filing removal totals above. Do not add it again.")}{model.cellarRemovals.map((row) => <Fragment key={row.key}>{E.fld(`${row.title} · already counted above`, row.bbl)}</Fragment>)}</> : null}
