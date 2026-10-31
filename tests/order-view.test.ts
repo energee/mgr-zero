@@ -13,6 +13,26 @@ import { orderLineCents, toOrderViewProps, type OrderSnapshot } from "../lib/mgr
 const PAGE = "app/(app)/orders/[id]/page.tsx";
 
 describe("Order view loop", () => {
+  it("shows the shared pickup switch only when supplied, with its saved value, busy state and failure", () => {
+    const model = toOrderViewProps(orderConfirmedWholesale);
+    const read = renderToStaticMarkup(createElement(OrderView, { model }));
+    expect(read).not.toContain('aria-label="Pickup"');
+    const editable = renderToStaticMarkup(createElement(OrderView, { model, pickup: { value: true, busy: true, error: "Order is shipped" } }));
+    expect(editable).toContain('aria-label="Pickup"');
+    expect(editable).toContain('aria-checked="true"');
+    expect(editable).toContain("disabled");
+    expect(editable).toContain("Order is shipped");
+    expect(editable).toContain("The customer collects it, so it is invoiced when shipped and never goes on a route");
+  });
+
+  it.each([true, false])("describes a pickup change to %s in order history", pickup => {
+    const model = toOrderViewProps({
+      ...orderConfirmedWholesale,
+      events: [{ id: "pickup", event: "pickup_changed", actor: "staff", payload: { before: !pickup, pickup }, created_at: "2026-10-30T12:00:00Z" }],
+    });
+    expect(model.events[0]).toMatchObject({ event: "Pickup changed", detail: pickup ? "Delivery to pickup" : "Pickup to delivery" });
+  });
+
   it("offers refused-beer recovery only when a shipped wholesale order has refused quantities", () => {
     const refused: OrderSnapshot = { ...orderConfirmedWholesale, order: { ...orderConfirmedWholesale.order, status: "shipped" },
       lines: orderConfirmedWholesale.lines.map((line, index) => ({ ...line, qty_refused: index === 0 ? 2 : 0 })) };

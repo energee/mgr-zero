@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { QboOAuthClient } from "@/lib/qbo";
+import { QboHttpError, QboOAuthClient, qboPaymentFailureCause } from "@/lib/qbo";
 
 const config = {
   clientId: "client", clientSecret: "secret", redirectUri: "https://mgr.test/qbo",
@@ -42,6 +42,16 @@ describe("QuickBooks sales-tax calculation", () => {
       ));
       await expect(client.calculateSalesTax(input, "access-secret")).resolves.toBe(29);
     }
+  });
+
+  it.each([401, 403, 503])("preserves HTTP %s for retry decisions without retaining the provider body", async (status) => {
+    const client = new QboOAuthClient(config, vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      new Response("Bearer access-secret provider failure", { status }),
+    ));
+    const error = await client.calculateSalesTax(input, "access-secret").catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(QboHttpError);
+    expect(error).toMatchObject({ status, message: "QuickBooks tax calculation unavailable" });
+    expect(qboPaymentFailureCause(error)).toEqual({ name: "QboHttpError", status, message: "QuickBooks tax calculation unavailable" });
   });
 
   it("refuses HTTP, GraphQL, malformed, foreign-currency, and fractional-cent results", async () => {

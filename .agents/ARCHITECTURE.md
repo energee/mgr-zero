@@ -224,6 +224,12 @@ a gap to close, not a convention to trust.
    verifies the current actor and role before Auth, and the completion RPC
    rechecks them. Auth identity is bound by a private trigger in Auth's own
    transaction; no client-supplied user id can create membership.
+   Portal quote tax refresh uses the service-only `read_portal_quote_tax_tokens`,
+   `lease_portal_quote_tax_refresh`, `cas_portal_quote_tax_tokens`, and
+   `mark_portal_quote_tax_authorization_failed` RPCs. Reads and new leases require
+   an unexpired pending quote, customer membership, and the original connected
+   company. A refresh holder may store rotated credentials or mark recovery after
+   quote expiry using its random lease capability and immutable quote identity.
    `lib/chat/jobs.ts` is the one internal-job owner: it serves chat provider
    webhooks and scheduled jobs where no user exists, may call only the named
    `service_role` chat RPCs (`scan_chat_*`, `lease_chat_deliveries`,
