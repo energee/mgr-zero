@@ -23,6 +23,15 @@ order that is below zero. Setting a standing allocation returns
 SKU below zero; a release never warns. These are soft warnings. The write still
 succeeds, because the brewery, not the API, decides whether to oversell.
 
+`resolve_short_pick` adjusts one line counted below ordered, so send a count above
+zero and below the line's ordered quantity. A zero count is refused with
+`bad_request` and the message `adjust the order lines to drop a line entirely`.
+A count at or above ordered is refused with `bad_request` as `line is not short`.
+A blank reason is rejected with `invalid_input`. An order that is not confirmed or
+picked is refused, and so is a line whose staged beer still waits for put-back.
+On success the line and its allocation shrink to the count, and the missing
+quantity is cancelled, not carried as an owed remainder.
+
 Shipping is one transaction: inventory movements, allocation fulfilment and
 (unless deferred) the invoice, returning `{ order_id, invoice_id }`.
 `invoiceTiming: "on_delivery"` ships without invoicing yet — `invoice_id`
