@@ -1099,15 +1099,15 @@ describe("QuickBooks receipt Bills", () => {
     const remote = syntheticReceiptBills();
     remote.state.loseNextResponse = true;
     const client = new QboOAuthClient(config, remote.fetch);
-    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client)).rejects.toThrow(/uncertain/i);
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client)).rejects.toMatchObject({ status: 409, code: "conflict" });
     const frozen = receiptBillAttempts(f.brewery.id);
     const bill = remote.bills.get("bill-1")!;
     const originalMarker = bill.PrivateNote;
     bill.PrivateNote = "A different payable happens to have the same document number";
-    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client)).rejects.toThrow(/uncertain/i);
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client)).rejects.toMatchObject({ status: 409, code: "conflict" });
     bill.PrivateNote = originalMarker;
     remote.bills.set("ambiguous-bill", { ...bill, Id: "ambiguous-bill" });
-    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client)).rejects.toThrow(/uncertain/i);
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client)).rejects.toMatchObject({ status: 409, code: "conflict" });
     expect(remote.posts).toHaveLength(1);
     expect(receiptBillAttempts(f.brewery.id)).toEqual(frozen);
     expect((await admin.from("receipts").select("qbo_bill_status,qbo_bill_id").eq("id", f.receiptId).single()).data)
@@ -1115,8 +1115,9 @@ describe("QuickBooks receipt Bills", () => {
     for (const malformed of [{}, { QueryResponse: [] }, { QueryResponse: { Bill: {} } }]) {
       const malformedFetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify(malformed), { status: 200 }));
       await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), new QboOAuthClient(config, malformedFetch)))
-        .rejects.toThrow(/uncertain/i);
+        .rejects.toMatchObject({ status: 409, code: "conflict" });
       expect(malformedFetch.mock.calls.map(([, init]) => init?.method)).toEqual(["GET"]);
+      expect(receiptBillAttempts(f.brewery.id)).toEqual(frozen);
     }
     remote.bills.delete("ambiguous-bill");
     await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client))
