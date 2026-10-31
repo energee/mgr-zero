@@ -224,6 +224,15 @@ it("corrects a new zero receipt but refuses missing historical conversion facts"
   expect((await admin.from("receipts").select("id").eq("po_id", legacy.po.id)).data).toHaveLength(1);
 });
 
+it("refuses a receipt with no frozen receiving location instead of asking for a bin", async () => {
+  const f = await received(0);
+  sql(`update public.receipts set location_id=null,bin_id=null where id='${f.receiptId}'`);
+  await expect(runCommand("correct_purchase_receipt", {
+    receiptId: f.receiptId, reason: "Nothing arrived", lines: [{ poLineId: f.lineId, qtyCounted: 0 }],
+  }, f.ctx)).rejects.toThrow(/no frozen receiving location/i);
+  expect((await admin.from("receipts").select("id").eq("po_id", f.po.id)).data).toHaveLength(1);
+});
+
 it("retains purchase and base quantity precision when an actual receipt cost is supplied", async () => {
   const f = await received(0);
   const vendor = await runCommand("upsert_vendor", { name: "Precise invoice supplier" }, f.ctx) as { id: string };

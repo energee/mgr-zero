@@ -1,3 +1,5 @@
+-- #1638: record an actual purchase-unit price when receiving or correcting a receipt.
+-- Omission preserves the existing price; sent PO prices and original receipt facts stay unchanged.
 -- Preserve exact quantities and the single destination-aware correction boundary
 -- alongside actual receipt costs, whether this lands alone or after #1641/#1662.
 create or replace function public.receive_purchase_order(
@@ -61,7 +63,8 @@ begin
   return private.complete_command_request(p_request_id, jsonb_build_object('receipt_id', v_receipt_id, 'po_id', p_po, 'status', v_po.status));
 end $$;
 
-drop function public.correct_purchase_receipt(uuid,uuid,text,jsonb,uuid);
+-- #1662 drops this five-argument overload too, so it may already be gone.
+drop function if exists public.correct_purchase_receipt(uuid,uuid,text,jsonb,uuid);
 create or replace function public.correct_purchase_receipt(
   p_brewery uuid, p_receipt uuid, p_reason text, p_lines jsonb, p_request_id uuid, p_location uuid default null, p_bin uuid default null
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -118,11 +121,11 @@ begin
   v_bin := coalesce(v_original.bin_id,v_bin);
   v_location := coalesce(p_location,v_location);
   v_bin := coalesce(p_bin,v_bin);
-  if not exists(select 1 from public.bins where id=v_bin and location_id=v_location and brewery_id=p_brewery) then
-    raise exception 'choose a receiving bin in this brewery location';
-  end if;
   if v_location is null or v_bin is null then
     raise exception 'historical receipt has no frozen receiving location; correction is unavailable';
+  end if;
+  if not exists(select 1 from public.bins where id=v_bin and location_id=v_location and brewery_id=p_brewery) then
+    raise exception 'choose a receiving bin in this brewery location';
   end if;
   insert into public.receipts(brewery_id,po_id,received_on,received_by,corrects_receipt_id,correction_reason,location_id,bin_id)
     values(p_brewery,v_po.id,v_original.received_on,v_actor,p_receipt,v_reason,v_location,v_bin)
