@@ -1,8 +1,10 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { createElement } from "react";
 import ts from "typescript";
 import { E } from "@/components/mgr/e";
+import { Qty } from "@/components/mgr/qty";
 
 // Exact control exceptions, never a whole-file exemption.
 const allowlist: { file: string; match: string; reason: string }[] = [
@@ -87,7 +89,7 @@ it("keeps blank numbers, constraints, and accessible names in the shared stepper
 });
 
 it("explains exponent notation on both numeric primitives", () => {
-  for (const field of [E.edit("Amount", "1e3", "number"), E.qty("1e3", "units", "Quantity")]) {
+  for (const field of [E.edit("Amount", "1e3", "number"), createElement(Qty, { value: "1e3", unit: "units", label: "Quantity" })]) {
     const html = renderToStaticMarkup(field);
     expect(html).toContain('data-slot="field-error"');
     expect(html).toContain('aria-invalid="true"');

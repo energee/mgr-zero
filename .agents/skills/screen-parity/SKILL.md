@@ -39,10 +39,12 @@ rewrite. Read the installed Next.js guides before changing framework code.
 
 ## Controls, entry point, and conversion
 
-**Reuse E first.** Before creating or changing an interface, read
+**Reuse shared controls first.** Before creating or changing an interface, read
 `components/mgr/e.tsx` and reuse its controls inside the shared view: `E.pick`
-for selects, `E.edit` for fields (including the numeric stepper), `E.sw` for
-on/off settings, and `E.volume` for beer volume. Use existing E layouts and
+for selects, `E.edit` for fields (including the numeric stepper), and `E.sw`
+for on/off settings. Import `Qty`, `VolumeField`, `TimeWindowField`, and
+`Palette` directly from their `components/mgr/` modules for quantities, beer
+volume, time windows, and grouped search results. Use existing E layouts and
 actions too. If a control needs controlled state or a missing option, extend
 the shared primitive rather than drawing a local replacement. Preserve labels,
 bounds, required/disabled state, and callbacks.

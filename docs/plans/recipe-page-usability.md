@@ -276,7 +276,7 @@ from them:
       - Material uses `E.searchPick` with the placeholder "Choose a material".
       - Options read `name`, plus ` · category` only when a category is present (the `cellar-addition.tsx:31` pattern).
       - `IngredientMaterial` gains `category?: string`. `sheetMaterials` (`recipe-version-form.tsx:82`) passes it. Give the `screens.tsx` Ingredient fixture categories.
-      - `useId()` links `FieldLabel htmlFor` to `E.qty`'s 4th argument. The label reads "Quantity per bbl (<unit>)" (the `volume-field.tsx` pattern).
+      - `useId()` links `FieldLabel htmlFor` to the `id` control of `E.edit(…, "number")`. The label reads "Quantity per bbl (<unit>)" (the `volume-field.tsx` pattern).
       - Do not touch the timing field: PR D turns it into a Day for dry hop.
     - In `lib/mgr/screen-links.ts`, add an inert rule for the Ingredient material trigger, like `/^Line \d+ SKU$/` at :255. Otherwise "Material" resolves to the Material screen. Inventory rows without `onEdit` keep a plain "Edit", so the existing `to` keys still resolve.
     - Fallback: if the nested dialog fails the phone-width browse check, ship `E.pick` with a `{ value: "", label: "Choose a material" }` first option (the `water.tsx:62` pattern) and report it.
