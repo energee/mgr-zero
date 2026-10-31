@@ -67,10 +67,10 @@ vi.mock("@/lib/qbo", async (importOriginal) => {
   };
 });
 
-import { GET } from "@/app/(portal)/portal/invoices/[id]/pay/route";
+import { POST } from "@/app/(portal)/portal/invoices/[id]/pay/route";
 
 const paymentUrl = "https://connect.intuit.com/pay/bearer-secret";
-const pay = (id = "invoice-1") => GET(new Request(`https://mgr.test/portal/invoices/${id}/pay`), {
+const pay = (id = "invoice-1") => POST(new Request(`https://mgr.test/portal/invoices/${id}/pay`, { method: "POST" }), {
   params: Promise.resolve({ id }),
 });
 
@@ -99,6 +99,16 @@ describe("portal invoice Pay route", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     setup();
+  });
+
+  it("rejects a cross-site POST before spending admission or calling QuickBooks", async () => {
+    process.env.APP_URL = "https://mgr.test";
+    const response = await POST(new Request("https://mgr.test/portal/invoices/invoice-1/pay", {
+      method: "POST", headers: { origin: "https://attacker.invalid" },
+    }), { params: Promise.resolve({ id: "invoice-1" }) });
+    expect(response.status).toBe(403);
+    expect(state.admission).not.toHaveBeenCalled();
+    expect(state.transport).not.toHaveBeenCalled();
   });
 
   it("returns to the shared invoice failure surface without a bearer link", async () => {

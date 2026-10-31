@@ -102,16 +102,35 @@ describe("taproom count controlled state", () => {
     expect(beginCorrectionAttempt(saved, "00000000-0000-4000-8000-000000000014")).toBe(saved);
   });
 
-  it("requires a reason and at least one whole increase within the recorded quantity", () => {
+  it("requires a reason and at least one whole changed quantity within recorded stock", () => {
     const line = { id: "00000000-0000-4000-8000-000000000011", sku_name: "Hazy half", bin_name: "Cold", lot_id: null, lot_code: null, qty_before: 7, qty_counted: 2 };
     let state = correctionStateFromReceipt("00000000-0000-4000-8000-000000000010", [line]);
     expect(() => beginCorrectionAttempt(state, crypto.randomUUID())).toThrow(/reason/);
     state = updateCorrectionReason(state, "Tally error");
-    expect(() => beginCorrectionAttempt(state, crypto.randomUUID())).toThrow(/increase/);
-    for (const [quantity, message] of [["1", /cannot reduce/], ["7.5", /whole/], ["8", /recorded stock/]] as const) {
+    expect(() => beginCorrectionAttempt(state, crypto.randomUUID())).toThrow(/change/);
+    for (const [quantity, message] of [["-1", /whole/], ["7.5", /whole/], ["8", /recorded stock/]] as const) {
       const changed = updateCorrectionQuantity(state, line.id, quantity);
       expect(() => beginCorrectionAttempt(changed, crypto.randomUUID())).toThrow(message);
     }
+  });
+
+  it("#1639 freezes decreased and formerly matching lines alongside increases", () => {
+    let state = correctionStateFromReceipt("count", [
+      { id: "high", sku_name: "Keg", bin_name: "Cold", lot_id: null, lot_code: null, qty_before: 7, qty_counted: 5, movement_type: "depletion" },
+      { id: "matching", sku_name: "Case", bin_name: "Shelf", lot_id: null, lot_code: null, qty_before: 5, qty_counted: 5, movement_type: null },
+      { id: "low", sku_name: "Keg", bin_name: "Cold", lot_id: null, lot_code: null, qty_before: 7, qty_counted: 2, movement_type: "depletion" },
+    ]);
+    state = updateCorrectionQuantity(state, "high", "3");
+    state = updateCorrectionQuantity(state, "matching", "0");
+    state = updateCorrectionQuantity(state, "low", "4");
+    state = updateCorrectionReason(state, "Rechecked the tally");
+    const started = beginCorrectionAttempt(state, "request");
+    expect(started.attempt).toMatchObject({ payload: { corrections: [
+      { lineId: "high", qtyCounted: 3 }, { lineId: "matching", qtyCounted: 0 }, { lineId: "low", qtyCounted: 4 },
+    ] } });
+    const unknown = failCorrectionAttempt(started, "unknown", "No response");
+    expect(updateCorrectionQuantity(unknown, "high", "1")).toBe(unknown);
+    expect(beginCorrectionAttempt(unknown, "different").attempt).toEqual(started.attempt);
   });
 
   it("keeps exact bucket identity and the original revision through edits and a separate projection refresh", () => {

@@ -372,9 +372,19 @@ describe("Return and credit view", () => {
     expect(markup).toMatch(/Return to/);
     expect(markup).toMatch(/−\$30\.00/);
     expect(markup).toMatch(/INV-1042/);
-    expect(markup).toMatch(/Keg fleet/);
     expect(markup).toMatch(/>Return shipment</);
     expect(markup).toContain('data-variant="irreversible"');
+  });
+
+  it("omits beer disposition and destination for a deposit-only refund until empty-keg check-in is selected", () => {
+    const model = toReturnCreditViewProps({ ...orderReturnCredit, lines: orderReturnCredit.lines.filter(line => line.kind === "keg_deposit"), reason: "" });
+    const refund = html(createElement(ReturnCreditView, { model }));
+    expect(refund).not.toContain('aria-label="Reason"');
+    expect(refund).not.toContain("Return to");
+    expect(refund).toContain("Check in empty kegs with this refund");
+    expect(model.tape.at(-1)).toEqual(["credit memo number · on commit", "−$30.00"]);
+    const checkIn = html(createElement(ReturnCreditView, { model, returnEmptyKegs: true, bins: [{ id: "cold", name: "Cold" }] }));
+    expect(checkIn).toContain("Return to bin");
   });
 });
 
@@ -407,8 +417,12 @@ describe("Return shipment names what it waits for (#1485)", () => {
 
   it("lists every missing choice in form order", () => {
     expect(returnCreditReason({ lines, quantities: {}, reason: "", locationId: "", binMissing: false }))
-      .toBe("Still needed: a quantity to return, a reason, and a return location.");
+      .toBe("Still needed: a quantity to return.");
     expect(returnCreditReason({ ...ready, binMissing: true })).toBe("Still needed: a return bin.");
+    expect(returnCreditReason({ ...ready, reason: "", locationId: "" })).toBe("Still needed: a reason and a return location.");
+    expect(returnCreditReason({ lines, quantities: { keg: "1" }, reason: "", locationId: "", binMissing: true })).toBeNull();
+    expect(returnCreditReason({ lines, quantities: { keg: "1" }, reason: "", locationId: "", binMissing: true, returnEmptyKegs: true }))
+      .toBe("Still needed: a return location and a return bin.");
   });
 
   it("prints the reason beside the withheld button and a bad quantity under its field", () => {

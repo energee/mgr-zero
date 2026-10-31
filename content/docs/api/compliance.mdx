@@ -23,6 +23,15 @@ once, as a removal under that treatment (`taxable` for the default channel:
 taxpaid removals for consumption on premises). The cellar
 breakdown is explanatory and must not be added to `figures.removals`.
 
+For an ended period, `figures.inProcess` is beer remaining in tanks at the end
+of `periodEnd` in the brewery's time zone, reconstructed from dated brew turns,
+transfers, tank adjustments and packaging draws. Packaging draws count on the
+lot's Packaged-on date. New ended-period reports include `figures.inProcessAsOf`,
+the ISO period-end date. Current and upcoming periods instead show the live
+balance to date and omit that field; this is not a forecast of their period end.
+Older saved filings and correction records without that field retain their
+original filing-time or correction-time tank quantities; they are never rewritten.
+
 `search_colas` reads TTB's public COLA registry live, under the brewery's TTB
 registry number from Settings; nothing it returns is stored. It answers
 `{ permit, rows }`, each row carrying `ttbId`, `serial` (or `null`),
