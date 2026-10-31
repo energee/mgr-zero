@@ -156,11 +156,27 @@ describe("record_historical_batch", () => {
     expect(await historical({ batchId: a }, owner, requestId)).toEqual(first);
   });
 
-  it("correct_brew_record refuses a historical record (it is closed)", async () => {
+  it("corrects a historical process without reopening beer or changing its volume", async () => {
     const a = await schedule();
     await historical({ batchId: a });
     const record = (await runCommand("get_brew_record", { batchId: a }, brewer) as { records: { id: string }[] }).records[0];
+    const batchBefore = await admin.from("batches").select("brewed_on,closed_at").eq("id", a).single().throwOnError();
+    const materialBefore = await admin.from("material_movements").select("id,qty").eq("brewery_id", breweryId).order("id").throwOnError();
+    const volumeBefore = await admin.from("volume_adjustments").select("id,bbl").eq("brewery_id", breweryId).order("id").throwOnError();
     await expect(runCommand("correct_brew_record", { recordId: record.id, reason: "typo", initialBbl: 9, actuals: [], confirmEmpty: true }, owner))
-      .rejects.toThrow(/closed batch or occupancy cannot be corrected/);
+      .rejects.toMatchObject({ status: 400, code: "bad_request" });
+    const process = { boilMinutes: 60, knockoutTempF: 67 };
+    const corrected = await runCommand("correct_brew_record", {
+      recordId: record.id, reason: "Correct historical temperature", initialBbl: 9.5, actuals: [], confirmEmpty: true, process,
+    }, owner) as { record: { corrects_id: string; occupancy_id: string | null; initial_bbl: number; volume_adjustment_id: string | null; process: typeof process } };
+    expect(corrected.record).toMatchObject({ corrects_id: record.id, occupancy_id: null, initial_bbl: 9.5, volume_adjustment_id: null, process });
+    const original = await admin.from("brew_records").select("initial_bbl,process").eq("id", record.id).single().throwOnError();
+    expect(original.data).toEqual({ initial_bbl: 9.5, process: { boilMinutes: 60, knockoutTempF: 68 } });
+    const batchAfter = await admin.from("batches").select("brewed_on,closed_at").eq("id", a).single().throwOnError();
+    expect(batchAfter.data).toEqual(batchBefore.data);
+    const materialAfter = await admin.from("material_movements").select("id,qty").eq("brewery_id", breweryId).order("id").throwOnError();
+    const volumeAfter = await admin.from("volume_adjustments").select("id,bbl").eq("brewery_id", breweryId).order("id").throwOnError();
+    expect(materialAfter.data).toEqual(materialBefore.data);
+    expect(volumeAfter.data).toEqual(volumeBefore.data);
   });
 });

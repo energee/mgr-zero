@@ -14,6 +14,7 @@ import { navTitle } from "@/lib/mgr/nav";
 import { periodLabel, periodRange } from "@/lib/compliance-period";
 import { recipePageTitle } from "@/lib/mgr/recipe-view";
 import { noMembershipModel, portalStaffOnlyModel } from "@/lib/mgr/entry-view";
+import { historyPage, pageCursor } from "@/lib/mgr/history-page";
 
 const ROOT = join(__dirname, "..");
 const MISSING = "afffffff-ffff-4fff-8fff-ffffffffffff";
@@ -42,6 +43,7 @@ function requestBindings() {
     if (name === "list_routes") return { routes: [] };
     if (name === "get_compliance_registry") return { brands: [] };
     if (name === "get_gravity_unit") return { effective: "plato" };
+    if (name === "list_movements") return { rows: [], nextCursor: null };
     if (name === "portal_catalog") return [];
     if (name === "get_portal_account") return { shipTos: [], membership: { userId: "actor" }, fulfillmentSource: null };
     if (name.startsWith("list_")) return [];
@@ -49,7 +51,7 @@ function requestBindings() {
   };
   const ctx = { roles: ["admin"], userId: "actor", breweryId: "brewery" };
   const bindings: Record<string, unknown> = {
-    cache, notFound, redirect, orNotFound, isUuid, navTitle, periodLabel, periodRange, recipePageTitle,
+    cache, notFound, redirect, orNotFound, isUuid, navTitle, periodLabel, periodRange, recipePageTitle, historyPage, pageCursor,
     getActiveBrewery: async () => ({ id: "brewery", roles: ["admin"], timeZone: "UTC" }),
     buildContext: async () => ctx,
     getPortalContext: async () => ({ customer: { customerId: "customer" }, ctx }),

@@ -5,8 +5,6 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { PortalOrderViewModel } from "@/lib/mgr/portal-order-view";
 
-export type { PortalOrderViewModel };
-
 export function PortalOrderView({
   model,
   footer,

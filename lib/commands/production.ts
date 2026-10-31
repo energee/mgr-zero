@@ -368,7 +368,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "correct_brew_record", description: "Correct an unused brew record with linked material reversals, replacement actuals and a measurement delta",
+  name: "correct_brew_record", description: "Correct a brew turn's ingredients and process after later additions, transfers or packaging using linked material compensation and replacement actuals; volume changes require an open occupancy with sufficient volume and unfiled books",
   input: z.object({ recordId: z.string().uuid(), reason: z.string().trim().min(1), initialBbl: z.number().positive().multipleOf(0.001),
     actuals: z.array(brewActual), process: brewProcess.default({}), confirmEmpty: z.boolean().default(false) }),
   roles: ["admin", "brewer"],

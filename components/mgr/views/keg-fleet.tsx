@@ -14,7 +14,6 @@ import { kegPoolFieldErrors, type KegFleetViewModel, type KegOption, type KegPoo
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 
 export { KegEventFields } from "@/components/mgr/views/keg-event-form";
-export type { KegFleetViewModel };
 
 const KIND_OPTIONS = KEG_POOL_KINDS.map((value) => ({ value, label: KIND_LABEL[value] }));
 
