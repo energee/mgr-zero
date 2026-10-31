@@ -508,6 +508,16 @@ describe("post-merge HTTP API maintainer", () => {
     expect(workflow).not.toMatch(/allowedTools[^\n]*Edit\(lib\/mgr\/api-operations\.ts\)/);
   });
 
+  it("validates paths and literal annotations before importing the maintained sources", () => {
+    const workflow = read(".github/workflows/http-api-agent.yml");
+    const validate = parse(workflow).jobs.maintain.steps.find((step: { id?: string }) => step.id === "validate").run as string;
+    const render = validate.indexOf("bun run docs:api");
+    expect(validate.indexOf("unexpected=")).toBeLessThan(render);
+    expect(validate.indexOf("bun scripts/validate-api-agent-screens.ts")).toBeLessThan(render);
+    expect(validate).toContain("content/docs/api/[a-z-]+\\.mdx");
+    expect(validate).not.toContain("lib/mgr/api-operations");
+  });
+
   const fixtureScreen = [
     "/** Existing block comment",
     " * Preserve its context. */",
@@ -611,7 +621,10 @@ describe("post-merge HTTP API maintainer", () => {
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
       expect(existsSync(join(repo, "generator-ran"))).toBe(true);
       expect(readFileSync(join(repo, ".git", "output"), "utf8")).toContain("changed=true");
-      expect(existsSync(join(repo, "api-reference.patch"))).toBe(true);
+      const patch = readFileSync(join(repo, "api-reference.patch"), "utf8");
+      expect(patch).toContain(`+    reads: ${JSON.stringify(reads)}, writes: ${JSON.stringify(writes)},`);
+      expect(patch).toContain("+Generated backlog");
+      expect(readFileSync(join(repo, "content/docs/api/orders.mdx"), "utf8")).toBe(`# Orders\n${reads}\n${writes}\n`);
     });
   });
 
