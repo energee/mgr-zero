@@ -435,7 +435,7 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 1, slice: "all", tab: "Today", name: "Sales",
-    to: { "Pils · 16 oz case": "Pars and allocation", Open: "Invoice", "Al\u2019s Bar \u00b7 OH": "State registration" },
+    to: { "Pils · 16 oz case": "Pars and allocation", Open: "Invoice", "Al\u2019s Bar \u00b7 OH": "State registration", "Refused beer to return and credit": "Return and credit" },
     job: "Sales landing: submitted orders to confirm and beer that is short",
     reads: "get_today [sales role filter] · get_shortfalls · list_invoice_questions", writes: "none",
     states: [["empty", "Nothing waiting · New order stays"], ["role hidden", "no Pick/Receive; no blank gaps"], ["buyer question", "a portal question lands here, because nothing else in MGR would show it"]],
