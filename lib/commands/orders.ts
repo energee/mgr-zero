@@ -100,11 +100,11 @@ defineCommand({
 });
 
 defineCommand({
-  name: "resolve_short_pick", description: "Resolve one line counted below ordered after any pending put-back: adjust the order down to the count, or keep the remainder owed",
+  name: "resolve_short_pick", description: "Resolve one line counted below ordered after any pending put-back by adjusting the order down to the count; the missing quantity is cancelled, not backordered",
   roles: [...warehouseRoles],
   input: z.object({
     orderId: z.string().uuid(), lineId: z.string().uuid(), qtyPicked: z.number().nonnegative(),
-    reason: z.string().trim().min(1), resolution: z.enum(["adjust_down", "keep_owed"]),
+    reason: z.string().trim().min(1), resolution: z.literal("adjust_down"),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("resolve_short_pick", {
     p_order: i.orderId, p_line: i.lineId, p_qty_picked: i.qtyPicked, p_reason: i.reason, p_resolution: i.resolution, p_request_id: execution.requestId,

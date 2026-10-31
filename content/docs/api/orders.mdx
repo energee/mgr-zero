@@ -522,7 +522,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Resolve one line counted below ordered after any pending put-back: adjust the order down to the count, or keep the remainder owed
+Resolve one line counted below ordered after any pending put-back by adjusting the order down to the count; the missing quantity is cancelled, not backordered
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -530,7 +530,7 @@ Resolve one line counted below ordered after any pending put-back: adjust the or
 | `lineId` | uuid | yes |
 | `qtyPicked` | number | yes |
 | `reason` | string | yes |
-| `resolution` | adjust_down or keep_owed | yes |
+| `resolution` | adjust_down | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
