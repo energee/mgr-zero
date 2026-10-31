@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
 import { transferReceiveSources, transferSourceQty, type TransferReceiveLine, type TransferSourceLine } from "@/lib/mgr/transfer-detail-view";
+import { submitReason } from "@/lib/mgr/submit-reason";
 
 export type TransferActionBindings = {
   busy?: boolean;
@@ -17,6 +18,8 @@ export function TransferActionsView({ lines, busy = false, error, onReceive, onC
   const [quantities, setQuantities] = useState<Record<string, Record<string, string>>>({});
   const [cancelOpen, setCancelOpen] = useState(false);
   const [reason, setReason] = useState("");
+  const trimmedReason = reason.trim();
+  const reasonMissing = !trimmedReason;
 
   function changeCancelOpen(next: boolean) {
     setCancelOpen(next);
@@ -46,13 +49,13 @@ export function TransferActionsView({ lines, busy = false, error, onReceive, onC
         <form data-preview-action className="flex flex-col gap-4" onSubmit={async event => {
           event.preventDefault();
           event.stopPropagation();
-          if (busy) return;
-          if (!onCancel || await onCancel(reason)) changeCancelOpen(false);
+          if (busy || reasonMissing) return;
+          if (onCancel && await onCancel(trimmedReason)) changeCancelOpen(false);
         }}>
           {E.edit("Reason", reason, "text", undefined, { required: true, maxLength: 500, disabled: busy, onChange: setReason })}
           <p className="text-sm text-muted-foreground">Nothing has left the source bin, so no stock moves.</p>
           <CommandFormMessage error={error} />
-          <CommandFormFooter>{E.submit("Cancel transfer", { variant: "destructive", submitting: busy, busy: "Cancelling…" })}</CommandFormFooter>
+          <CommandFormFooter>{E.submit("Cancel transfer", { variant: "destructive", submitting: busy, busy: "Cancelling…", reason: submitReason(reasonMissing ? ["a reason"] : []) })}</CommandFormFooter>
         </form>
       </CommandForm>
       {!cancelOpen && <CommandFormMessage error={error} />}

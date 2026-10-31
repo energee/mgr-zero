@@ -14,6 +14,22 @@ import type { StaffRole } from "@/lib/commands/registry";
 import { receiptPoBillPending, receiptPoBillPosted } from "@/lib/mgr/fixtures/purchasing";
 import { hasAnyRole } from "@/lib/mgr/roles";
 import type { WeeklyCountView } from "@/components/mgr/views/weekly-count";
+import type { TransferDetailView } from "@/components/mgr/views/transfer-detail";
+
+/** Receive and cancellation stay local while using the same transfer drawing. */
+export function TransferDetailFixture({ children }: { children: ReactElement<ComponentProps<typeof TransferDetailView>> }) {
+  const [model, setModel] = useState(children.props.model);
+  return cloneElement(children, {
+    model,
+    actions: {
+      onReceive: () => setModel(previous => ({ ...previous, status: "Received", received: true, nextVerb: undefined })),
+      onCancel: async reason => {
+        setModel(previous => ({ ...previous, status: "Cancelled", cancelReason: reason, nextVerb: undefined }));
+        return true;
+      },
+    },
+  });
+}
 
 /** Keeps the selected receipt and its current worksheet as distinct inventory states. */
 export function WeeklyCountFixture({ children }: { children: ReactElement<ComponentProps<typeof WeeklyCountView>> }) {
