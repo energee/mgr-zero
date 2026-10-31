@@ -22,7 +22,7 @@ describe("Order view loop", () => {
     expect(editable).toContain('aria-checked="true"');
     expect(editable).toContain("disabled");
     expect(editable).toContain("Order is shipped");
-    expect(editable).toContain("Invoiced when shipped; never put on a delivery route.");
+    expect(editable).toContain("The customer collects it, so it is invoiced when shipped and never goes on a route");
   });
 
   it.each([true, false])("describes a pickup change to %s in order history", pickup => {

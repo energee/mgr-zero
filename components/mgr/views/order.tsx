@@ -16,7 +16,7 @@
 // SKU: the live page adds, removes and adjusts lines in place
 // (order-lines-form.tsx, #1503).
 import type { ComponentProps, ReactNode } from "react";
-import { OrderQuantity, OrderSkuPicker } from "./new-order";
+import { OrderQuantity, OrderSkuPicker, PickupSwitch } from "./new-order";
 import { E } from "@/components/mgr/e";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { FactsGrid } from "@/components/mgr/views/facts-grid";
@@ -145,12 +145,8 @@ export function OrderView({
           <h2 id="order-details" className={H2}>Order details</h2>
           <FactsGrid facts={model.facts} />
           {pickup ? (
-            <div className="mt-4 flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-4 text-sm">
-                <span>Pickup</span>
-                {E.sw(pickup.value, "Pickup", pickup.onChange, pickup.busy)}
-              </div>
-              <p className="text-xs text-muted-foreground">Collected at the brewery. Invoiced when shipped; never put on a delivery route.</p>
+            <div className="mt-4">
+              <PickupSwitch on={pickup.value} onChange={pickup.onChange} disabled={pickup.busy} />
               <CommandFormMessage error={pickup.error} />
             </div>
           ) : null}
