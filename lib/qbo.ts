@@ -158,11 +158,12 @@ const QBO_SETUP_UNAVAILABLE = "QuickBooks setup is unavailable";
 
 /**
  * The payment-failure log fields: enough cause for staff, never a provider body.
- * Only messages MGR writes itself (a CommandError, the missing-setup error) are
- * kept; any other error, which may carry tokens or a bearer link, logs its name.
+ * Only messages MGR writes itself (a QboHttpError, a CommandError, the
+ * missing-setup error) are kept; any other error, which may carry tokens or a
+ * bearer link, logs its name.
  */
 export function qboPaymentFailureCause(error: unknown) {
-  if (error instanceof QboHttpError) return { name: error.name, status: error.status };
+  if (error instanceof QboHttpError) return { name: error.name, status: error.status, message: error.message };
   if (error instanceof CommandError) {
     return { name: error.name, status: error.status, code: error.code, message: error.message };
   }
@@ -699,9 +700,15 @@ const cents = (value: unknown) => {
 };
 
 class QboInvalidGrantError extends Error {}
-/** A non-OK QuickBooks HTTP response; `status` lets callers branch (e.g. 401 -> refresh once and retry). Network failures are not wrapped and carry no status. */
+/**
+ * A non-OK QuickBooks HTTP response; `status` lets callers branch (e.g. 401 -> refresh once and retry). Network failures are not wrapped and carry no status.
+ * The message is always MGR's own fixed text, never the provider body, because failure logs keep it.
+ */
 export class QboHttpError extends Error {
-  constructor(message: string, readonly status: number) { super(message); }
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "QboHttpError";
+  }
 }
 
 /** Keep only accounting facts needed to finish a push, never provider secrets or links. */

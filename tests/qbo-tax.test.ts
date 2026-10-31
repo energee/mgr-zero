@@ -51,7 +51,7 @@ describe("QuickBooks sales-tax calculation", () => {
     const error = await client.calculateSalesTax(input, "access-secret").catch((cause: unknown) => cause);
     expect(error).toBeInstanceOf(QboHttpError);
     expect(error).toMatchObject({ status, message: "QuickBooks tax calculation unavailable" });
-    expect(qboPaymentFailureCause(error)).toEqual({ name: "Error", status });
+    expect(qboPaymentFailureCause(error)).toEqual({ name: "QboHttpError", status, message: "QuickBooks tax calculation unavailable" });
   });
 
   it("refuses HTTP, GraphQL, malformed, foreign-currency, and fractional-cent results", async () => {
