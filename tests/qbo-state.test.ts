@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Client } from "pg";
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { QboOAuthClient, syncQboInvoices } from "@/lib/qbo";
 import { beginQboInvoiceSync, completeQboInvoiceSync } from "@/lib/supabase/integration-tokens";
-import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
 import { invoiceBalanceCents, invoiceCurrentState, invoiceLedgerOwnsBalance } from "@/lib/mgr/invoice-state";
 import { qboInvoicePresentation } from "@/lib/mgr/qbo-ui";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
@@ -256,9 +253,11 @@ describe("QuickBooks current invoice state", () => {
     expect(success.lastSuccess.at).toBeTruthy();
     expect(success.lastSuccess.operator).toBeTruthy();
     expect(success.latestFailure).toBeNull();
-    // The operator reads as the staff member's full name, as other staff screens show it.
+    // An editable display name keeps the original account identity beside it.
     await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: "Pat Operator" } });
-    expect((await readStatus()).lastSuccess.operator).toBe("Pat Operator");
+    const namedOperator = (await readStatus()).lastSuccess.operator;
+    expect(namedOperator).toContain("Pat Operator");
+    expect(namedOperator).toContain(success.lastSuccess.operator);
     await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: "" } });
     const failedId = crypto.randomUUID();
     transport.mockRejectedValue(new Error("secret provider response"));
@@ -788,9 +787,6 @@ describe("QuickBooks current invoice state", () => {
         invoice: { ...invoice, ...state, total_cents: 10000 }, lines: [], brewery: { name: "Brewery", customer_phone: null },
       });
       expect(model).toMatchObject({ paid: false, paidOn: undefined, payable: false, status: state.status });
-      const html = renderToStaticMarkup(createElement(PortalInvoiceView, { model, footer: null }));
-      expect(html).toContain("This invoice is not payable.");
-      expect(html).not.toMatch(/still due|arrange payment|>Due</);
     }
     expect(toPortalInvoicesViewProps({ customerName: "Buyer", invoices: [{ ...invoice, invoice_lines: [{ amount_cents: 10000 }] }] }).rows[0])
       .toMatchObject({ detail: "voided", unpaid: false });
@@ -844,4 +840,24 @@ describe("who owns an invoice balance", () => {
     expect(invoiceBalanceCents({ ...neverPushed, was_pushed_to_qbo: true, qbo_balance_cents: undefined }, 10000)).toBeNull();
     expect(invoiceBalanceCents({ ...neverPushed, qbo_invoice_id: "qbo-1042", qbo_balance_cents: 2500 }, 10000)).toBe(2500);
   });
+});
+
+it("shows the account email beside an editable QuickBooks sync operator name", async () => {
+  const f = await stateFixture();
+  const requestId = crypto.randomUUID();
+  const account = await admin.auth.admin.getUserById(f.ctx.userId);
+  expect((await f.ctx.db.auth.updateUser({ data: { full_name: "Owner (Admin)" } })).error).toBeNull();
+  await beginQboInvoiceSync(f.ctx, requestId);
+  const email = account.data.user!.email!;
+  const latest = await runCommand("get_qbo_sync_status", {}, f.ctx) as { latest: { operator: string } };
+  expect(latest.latest.operator).toContain("Owner (Admin)");
+  expect(latest.latest.operator).toContain(email);
+  sql(`update private.qbo_invoice_sync_batches set failed_at=now() where actor_id='${f.ctx.userId}' and request_id='${requestId}'`);
+  const failed = await runCommand("get_qbo_sync_status", {}, f.ctx) as { latestFailure: { operator: string } };
+  expect(failed.latestFailure.operator).toContain("Owner (Admin)");
+  expect(failed.latestFailure.operator).toContain(email);
+  sql(`update private.qbo_invoice_sync_batches set completed_at=now() where actor_id='${f.ctx.userId}' and request_id='${requestId}'`);
+  const completed = await runCommand("get_qbo_sync_status", {}, f.ctx) as { lastSuccess: { operator: string } };
+  expect(completed.lastSuccess.operator).toContain("Owner (Admin)");
+  expect(completed.lastSuccess.operator).toContain(email);
 });

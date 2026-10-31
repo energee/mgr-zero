@@ -128,6 +128,7 @@ describe("reported explorer flows", () => {
     ["Disconnect QuickBooks", "Disconnect QuickBooks", "Accounting"],
     ["Disconnect Slack", "Disconnect Slack", "Chat disconnected"],
     ["Disconnect Square", "Disconnect Square", "Point of sale"],
+    ["Square locations", "Retire mapping", "Square locations"],
     ["Point of sale", "Open Accounting", "Accounting"],
   ])("%s: %s → %s", (screen, tap, target) => {
     expect(resolveTap(by(screen), tap)).toBe(target);

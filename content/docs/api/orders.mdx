@@ -23,6 +23,15 @@ order that is below zero. Setting a standing allocation returns
 SKU below zero; a release never warns. These are soft warnings. The write still
 succeeds, because the brewery, not the API, decides whether to oversell.
 
+`resolve_short_pick` adjusts one line counted below ordered, so send a count above
+zero and below the line's ordered quantity. A zero count is refused with
+`bad_request` and the message `adjust the order lines to drop a line entirely`.
+A count at or above ordered is refused with `bad_request` as `line is not short`.
+A blank reason is rejected with `invalid_input`. An order that is not confirmed or
+picked is refused, and so is a line whose staged beer still waits for put-back.
+On success the line and its allocation shrink to the count, and the missing
+quantity is cancelled, not carried as an owed remainder.
+
 Shipping is one transaction: inventory movements, allocation fulfilment and
 (unless deferred) the invoice, returning `{ order_id, invoice_id }`.
 `invoiceTiming: "on_delivery"` ships without invoicing yet — `invoice_id`
@@ -452,7 +461,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Record picked quantities per line; order becomes picked
+Record picked quantities per line after any pending put-back; order becomes picked once all lines are counted
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -522,7 +531,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Resolve one line counted below ordered: adjust the order down to the count, or keep the remainder owed
+Resolve one line counted below ordered after any pending put-back by adjusting the order down to the count; the missing quantity is cancelled, not backordered
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -530,13 +539,31 @@ Resolve one line counted below ordered: adjust the order down to the count, or k
 | `lineId` | uuid | yes |
 | `qtyPicked` | number | yes |
 | `reason` | string | yes |
-| `resolution` | adjust_down or keep_owed | yes |
+| `resolution` | adjust_down | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "resolve_short_pick", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "orderId": "00000000-0000-0000-0000-000000000000", "lineId": "00000000-0000-0000-0000-000000000000", "qtyPicked": 1, "reason": "string", "resolution": "adjust_down" } }'
+```
+
+## set_order_pickup [#set_order_pickup]
+
+`command` · admin, sales
+
+Set pickup or delivery on an unshipped wholesale order without changing lines, prices or allocations; pickups are invoiced when shipped and never routed
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `orderId` | uuid | yes |
+| `pickup` | boolean | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_order_pickup", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "orderId": "00000000-0000-0000-0000-000000000000", "pickup": true } }'
 ```
 
 ## set_standing_allocation [#set_standing_allocation]

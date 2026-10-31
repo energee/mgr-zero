@@ -245,7 +245,7 @@ defineCommand({
   })),
 });
 defineCommand({
-  name: "correct_taproom_count", description: "Admin-only replacement for the latest uncorrected mistaken-low Taproom count. Send only increased root-line quantities plus a reason; the original stays immutable and exact frozen compensation/replacement entries preserve reporting",
+  name: "correct_taproom_count", description: "Admin-only replacement for the latest uncorrected Taproom count. Send changed root-line quantities in either direction plus a reason; the original stays immutable and linked depletion entries preserve reporting",
   input: z.object({ countId: z.string().uuid(), corrections: z.array(z.object({ lineId: z.string().uuid(), qtyCounted: z.number().int().nonnegative() })).min(1), reason: z.string().trim().min(1) }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_taproom_count", {
