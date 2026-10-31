@@ -132,6 +132,7 @@ export type InvoiceSnapshot = {
   hasPendingPush: boolean;
   wasPushedToQbo: boolean;
   localPaidCents: number;
+  localCreditCents: number;
 };
 
 /** The mappings an invoice still needs in `realm`. The invoice's one Fix mapping action
@@ -165,22 +166,28 @@ const KIND_GROUPS: [label: string, kinds: string[]][] = [
 ];
 const kindGroup = (kind: string) => KIND_GROUPS.find(([, kinds]) => kinds.includes(kind))?.[0] ?? "Adjustments";
 
-/** Renames the snapshot's push and payment facts to the names invoice-state.ts reads. */
-const toLedgerFacts = ({ invoice, hasPendingPush, wasPushedToQbo, localPaidCents }: InvoiceSnapshot) => ({
-  ...invoice, has_pending_qbo_push: hasPendingPush, was_pushed_to_qbo: wasPushedToQbo, local_paid_cents: localPaidCents,
+/** Renames the snapshot's push, payment and credit facts for invoice-state.ts. */
+const toLedgerFacts = ({ invoice, hasPendingPush, wasPushedToQbo, localPaidCents, localCreditCents }: InvoiceSnapshot) => ({
+  ...invoice, has_pending_qbo_push: hasPendingPush, was_pushed_to_qbo: wasPushedToQbo, local_paid_cents: localPaidCents, local_credit_cents: localCreditCents,
 });
 
 function invoiceState(snapshot: InvoiceSnapshot, totalCents: number): InvoiceViewModel["state"] {
   const { invoice } = snapshot;
   if (invoice.kind === "credit_memo") return { label: "Credit memo", tone: "ok" };
   const state = invoiceCurrentState(invoice);
-  if (state === "paid") return { label: "Paid", tone: "ok" };
   if (state === "written_off") return { label: "Written off", tone: "ok" };
   if (state === "voided") return { label: "Voided", tone: "w" };
   if (state === "deleted") return { label: "Deleted in QuickBooks", tone: "w" };
+  const facts = toLedgerFacts(snapshot);
+  const balance = invoiceBalanceCents(facts, totalCents);
+  if (invoiceLedgerOwnsBalance(facts)) {
+    if (balance != null && balance < 0) return { label: "Credit balance", tone: "ok" };
+    if (snapshot.localCreditCents > 0 && balance === 0) return { label: "Settled", tone: "ok" };
+  }
+  if (state === "paid") return { label: "Paid", tone: "ok" };
   if (invoiceIsSettledWithoutPayment(invoice)) return { label: "Settled", tone: "ok" };
   // All lines priced at zero: settled, never overdue, and takes no payment.
-  if (invoiceLedgerOwnsBalance(toLedgerFacts(snapshot)) && totalCents <= 0) return { label: "No payment due", tone: "ok" };
+  if (invoiceLedgerOwnsBalance(facts) && totalCents <= 0) return { label: "No payment due", tone: "ok" };
   // The two sources never both hold money: MGR refuses a payment on a QuickBooks
   // invoice, and start_qbo_push refuses an invoice with payments.
   const partlyPaid = snapshot.localPaidCents > 0
@@ -214,12 +221,14 @@ function invoiceSummary(snapshot: InvoiceSnapshot, localCents: number, totalCent
   else if (invoice.qbo_tax_cents != null && invoice.qbo_tax_cents > 0) rows.push({ label: "Tax (QuickBooks)", value: money(invoice.qbo_tax_cents) });
   const state = invoiceCurrentState(invoice);
   const cash = invoice.qbo_cash_collected_cents ?? 0;
-  const balance = invoiceBalanceCents(toLedgerFacts(snapshot), totalCents);
+  const facts = toLedgerFacts(snapshot);
+  const balance = invoiceBalanceCents(facts, totalCents);
   const showSettlement = state === "unpaid" || (state === "paid" && balance != null);
   const settlement = showSettlement ? [
-    { label: "Outstanding balance", value: balance == null ? "Unknown" : money(balance), strong: true },
+    { label: balance != null && balance < 0 ? "Credit balance" : "Outstanding balance", value: balance == null ? "Unknown" : money(Math.abs(balance)), strong: true },
     ...(cash > 0 ? [{ label: "Cash received in QuickBooks", value: money(cash) }] : []),
     ...(snapshot.localPaidCents > 0 ? [{ label: "Paid in MGR", value: money(snapshot.localPaidCents) }] : []),
+    ...(invoiceLedgerOwnsBalance(facts) && snapshot.localCreditCents > 0 ? [{ label: "Credited in MGR", value: money(snapshot.localCreditCents) }] : []),
   ] : undefined;
   return {
     rows,
@@ -237,9 +246,10 @@ function invoiceSummary(snapshot: InvoiceSnapshot, localCents: number, totalCent
  *  balance. Otherwise null. The invoice page and the Invoices register both
  *  ask here (#1506), so the two never offer Record payment differently. */
 export function invoicePaymentBalanceCents(invoice: Parameters<typeof invoiceLedgerOwnsBalance>[0] & { written_off_at?: string | null }, totalCents: number): number | null {
+  const balance = invoiceBalanceCents(invoice, totalCents);
   const takes = invoiceLedgerOwnsBalance(invoice) && !invoice.written_off_at && invoice.paid_at == null
-    && totalCents > invoice.local_paid_cents;
-  return takes ? totalCents - invoice.local_paid_cents : null;
+    && balance != null && balance > 0;
+  return takes ? balance : null;
 }
 
 const paymentView = (p: InvoicePaymentRecord): InvoicePaymentView => ({

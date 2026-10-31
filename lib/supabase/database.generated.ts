@@ -3866,7 +3866,7 @@ isOneToOne: false
                   ]
                 },"invoice_totals": {
                   Row: {
-                    "brewery_id": string | null,"collected_cents": number | null,"customer_id": string | null,"invoice_id": string | null,"kind": Database["public"]['Enums']["invoice_kind"] | null,"local_paid_cents": number | null,"paid_at": string | null,"qbo_balance_cents": number | null,"qbo_sync_status": Database["public"]['Enums']["qbo_sync_status"] | null,"qbo_tax_cents": number | null,"qbo_total_cents": number | null,"subtotal_cents": number | null
+                    "brewery_id": string | null,"collected_cents": number | null,"customer_id": string | null,"invoice_id": string | null,"kind": Database["public"]['Enums']["invoice_kind"] | null,"local_credit_cents": number | null,"local_paid_cents": number | null,"paid_at": string | null,"qbo_balance_cents": number | null,"qbo_sync_status": Database["public"]['Enums']["qbo_sync_status"] | null,"qbo_tax_cents": number | null,"qbo_total_cents": number | null,"subtotal_cents": number | null
                   }
                   ComputedFields: never
                   Relationships: [

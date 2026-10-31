@@ -6,8 +6,20 @@ import { InvoicesView } from "../components/mgr/views/invoices";
 import { QboStaffInvoiceLinkView } from "../components/mgr/views/accounting";
 import { invoiceStatusOptions, toInvoiceListRow, type InvoiceListRecord } from "../lib/mgr/invoices-view";
 
-const invoice: InvoiceListRecord = { id: "actual", invoice_no: 1042, kind: "invoice", due_on: "2026-09-12", paid_at: null, qbo_sync_status: "pushed", qbo_sync_error: null, qbo_remote_state: "live", qbo_balance_cents: 0, qbo_cash_collected_cents: 0, qbo_accountant_drift: false, written_off_at: null, subtotal_cents: 98000, total_cents: 104000, has_pending_qbo_push: false, qbo_invoice_id: "qbo-1042", local_paid_cents: 0, was_pushed_to_qbo: false, customers: { name: "Actual customer" } };
+const invoice: InvoiceListRecord = { id: "actual", invoice_no: 1042, kind: "invoice", due_on: "2026-09-12", paid_at: null, qbo_sync_status: "pushed", qbo_sync_error: null, qbo_remote_state: "live", qbo_balance_cents: 0, qbo_cash_collected_cents: 0, qbo_accountant_drift: false, written_off_at: null, subtotal_cents: 98000, total_cents: 104000, has_pending_qbo_push: false, qbo_invoice_id: "qbo-1042", local_paid_cents: 0, local_credit_cents: 0, was_pushed_to_qbo: false, customers: { name: "Actual customer" } };
 
+it("nets local credit without hiding excess or calling it overdue", () => {
+  const ledger = { ...invoice, qbo_invoice_id: null, was_pushed_to_qbo: false, qbo_balance_cents: null, local_credit_cents: 20000 };
+  const partial = toInvoiceListRow(ledger, ["sales"], false, "UTC");
+  expect(partial.balance.cents).toBe(84000);
+  expect(partial.paymentBalanceCents).toBe(84000);
+  const settled = toInvoiceListRow({ ...ledger, local_paid_cents: 84000, paid_at: "2026-10-20T00:00:00Z" }, ["sales"], false, "UTC");
+  expect(settled.overdue).toBe(false);
+  const excess = toInvoiceListRow({ ...ledger, local_paid_cents: 104000, paid_at: "2026-10-20T00:00:00Z" }, ["sales"], false, "UTC");
+  expect(excess.balance.cents).toBe(-20000);
+  expect(excess.paymentBalanceCents).toBeNull();
+  expect(excess.overdue).toBe(false);
+});
 it("keeps structured identity, money, payment, and accounting facts separate", () => {
   const row = toInvoiceListRow(invoice, ["admin"], true, "America/New_York");
   expect(row.document.number).toBe("INV-1042");

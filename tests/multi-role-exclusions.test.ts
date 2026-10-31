@@ -59,7 +59,7 @@ vi.mock("@/lib/mgr/page-query", async importOriginal => ({
       };
       case "get_invoice": return {
         invoice: { id: "invoice", kind: "invoice", invoice_no: 797, issued_on: "2026-10-16", due_on: null, paid_at: null, qbo_sync_status: "pending", qbo_remote_state: "live", customers: null },
-        lines: [], payments: [], hasPendingPush: false, wasPushedToQbo: false, localPaidCents: 0, quickbooksLink: null,
+        lines: [], payments: [], hasPendingPush: false, wasPushedToQbo: false, localPaidCents: 0, localCreditCents: 0, quickbooksLink: null,
       };
       case "list_invoice_questions": return [];
       case "get_qbo_connection": return { connected: false, state: "disconnected", realmLabel: null };

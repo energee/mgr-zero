@@ -773,7 +773,7 @@ describe("QuickBooks current invoice state", () => {
     };
     expect(toInvoiceViewProps({
       invoice: { ...invoice, qbo_invoice_id: "qbo-1" }, lines: [], questions: [], timeZone: "America/New_York",
-      payments: [], hasPendingPush: false, wasPushedToQbo: true, localPaidCents: 0,
+      payments: [], hasPendingPush: false, wasPushedToQbo: true, localPaidCents: 0, localCreditCents: 0,
     })).toMatchObject({ state: { label: "Voided", tone: "w" } });
     expect(toPortalInvoiceViewProps({
       invoice: { ...invoice, total_cents: 10000 }, lines: [], brewery: { name: "Brewery", customer_phone: null },
@@ -797,7 +797,7 @@ describe("QuickBooks current invoice state", () => {
 describe("who owns an invoice balance", () => {
   const neverPushed = {
     kind: "invoice" as const, qbo_invoice_id: null, paid_at: null, qbo_balance_cents: null,
-    has_pending_qbo_push: false, was_pushed_to_qbo: false, local_paid_cents: 0,
+    has_pending_qbo_push: false, was_pushed_to_qbo: false, local_paid_cents: 0, local_credit_cents: 0,
   };
 
   it.each([
@@ -821,6 +821,13 @@ describe("who owns an invoice balance", () => {
 
   it("subtracts payments from the total when the ledger owns the balance", () => {
     expect(invoiceBalanceCents({ ...neverPushed, local_paid_cents: 3000 }, 10000)).toBe(7000);
+  });
+
+  it("subtracts live linked credit and retains excess after cash was collected", () => {
+    expect(invoiceBalanceCents({ ...neverPushed, local_credit_cents: 2000 }, 10000)).toBe(8000);
+    expect(invoiceBalanceCents({ ...neverPushed, local_credit_cents: 2000, local_paid_cents: 10000 }, 10000)).toBe(-2000);
+    expect(invoiceBalanceCents({ ...neverPushed, qbo_invoice_id: "qbo", local_credit_cents: 2000, qbo_balance_cents: 7000 }, 10000)).toBe(7000);
+    expect(invoiceLedgerOwnsBalance({ ...neverPushed, paid_at: "2026-10-20T00:00:00Z", local_credit_cents: 10000 })).toBe(true);
   });
 
   it("gives a ledger-owned $0.00 invoice a zero balance, never a negative one (Design 4)", () => {

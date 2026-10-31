@@ -3,10 +3,11 @@
 // the record and void RPCs, and start_qbo_push's refusal of an invoice with payments.
 import { Client } from "pg";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { PAYMENT_METHODS } from "@/lib/mgr/enums";
-import { admin, DB, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, sql } from "./helpers";
+import { admin, DB, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
 
 /** A $100.00 invoice QuickBooks never received, with a Sales member to act on it. */
 async function localInvoice(invoice: Record<string, unknown> = {}, unitPriceCents = 5000) {
@@ -15,8 +16,8 @@ async function localInvoice(invoice: Record<string, unknown> = {}, unitPriceCent
   const { skuId } = await seedCatalog(breweryId);
   const { customerId } = await seedCustomer(breweryId);
   const row = await ins("invoices", { brewery_id: breweryId, customer_id: customerId, kind: "invoice", ...invoice });
-  await ins("invoice_lines", { brewery_id: breweryId, invoice_id: row.id, sku_id: skuId, description: "IPA", qty: 2, unit_price_cents: unitPriceCents });
-  return { breweryId, staffId: sales.userId, invoiceId: row.id, sales };
+  const line = await ins("invoice_lines", { brewery_id: breweryId, invoice_id: row.id, sku_id: skuId, description: "IPA", qty: 2, unit_price_cents: unitPriceCents });
+  return { breweryId, staffId: sales.userId, invoiceId: row.id, invoiceLineId: line.id, sales };
 }
 
 /** Inserts one payment with privileged SQL (authenticated has no insert grant) and returns its id. */
@@ -98,6 +99,129 @@ function voidRpc(f: Fixture, paymentId: string, input: Record<string, unknown> =
 /** The invoice's paid_at as the brewery-local (America/New_York) wall time, or "" when unpaid. */
 const paidAtLocal = (f: Fixture) =>
   sql(`select coalesce((paid_at at time zone 'America/New_York')::text,'') from public.invoices where id='${f.invoiceId}'`, true)[0] ?? "";
+
+/** Credits the original frozen line through the real Sales command. */
+async function credit(f: Fixture, qty: number) {
+  const location = await seedLocation(f.breweryId, { name: `Returns ${crypto.randomUUID()}` });
+  const result = await runCommand("create_credit_memo", {
+    invoiceId: f.invoiceId, locationId: location.id, reason: "Beer returned",
+    lines: [{ invoiceLineId: f.invoiceLineId, qty }],
+  }, f.sales);
+  return z.object({ invoice_id: z.string().uuid() }).parse(result);
+}
+
+describe("credit memos reduce an MGR invoice balance (#1627)", () => {
+  it("nets a linked keg-deposit refund without treating it as cash", async () => {
+    const f = await localInvoice();
+    const pool = await ins("keg_pools", { brewery_id: f.breweryId, name: "Deposit pool", kind: "owned" });
+    const deposit = await ins("invoice_lines", {
+      brewery_id: f.breweryId, invoice_id: f.invoiceId, kind: "keg_deposit", keg_pool_id: pool.id,
+      keg_size: "half_bbl", qty: 1, unit_price_cents: 3000, description: "Keg deposit",
+    });
+    await credit({ ...f, invoiceLineId: deposit.id }, 1);
+    const payment = await record(f, { p_amount_cents: 10000 });
+    expect(payment.error).toBeNull();
+    expect(payment.data).toMatchObject({ balanceCents: 0 });
+    expect(await runCommand("get_invoice", { invoiceId: f.invoiceId }, f.sales)).toMatchObject({ localCreditCents: 3000, localPaidCents: 10000 });
+  });
+
+  it("keeps the credit visible to Warehouse but not another brewery", async () => {
+    const f = await localInvoice();
+    await credit(f, 1);
+    const warehouse = await makeStaffCtx(f.breweryId, "warehouse");
+    expect(await runCommand("get_invoice", { invoiceId: f.invoiceId }, warehouse)).toMatchObject({ localCreditCents: 5000 });
+    const other = await localInvoice();
+    const read = await other.sales.db.from("invoice_totals").select("local_credit_cents").eq("invoice_id", f.invoiceId);
+    expect(read.error).toBeNull();
+    expect(read.data).toEqual([]);
+  });
+
+  it("serializes a payment against a credit and caps it at the newly reduced balance", async () => {
+    const f = await localInvoice({}, 50000);
+    const location = await seedLocation(f.breweryId);
+    const returner = await sessionAs(f.staffId);
+    const payer = await sessionAs(f.staffId);
+    let paying: Promise<unknown> | undefined;
+    try {
+      await returner.client.query("begin");
+      await returner.client.query("select public.create_credit_memo($1,$2::jsonb,$3,'Returned',$4)", [
+        f.invoiceId, JSON.stringify([{ invoice_line_id: f.invoiceLineId, qty: 0.4 }]), location.id, crypto.randomUUID(),
+      ]);
+      paying = payer.client.query("select public.record_invoice_payment($1,$2,100000,'2026-10-20','check',null,$3)",
+        [f.breweryId, f.invoiceId, crypto.randomUUID()]);
+      const rejected = paying.then(() => false, () => true);
+      await expect.poll(() => sql(`select wait_event_type from pg_stat_activity where pid=${payer.pid}`, true)[0], { timeout: 3000 }).toBe("Lock");
+      await returner.client.query("commit");
+      expect(await rejected).toBe(true);
+      expect(sql(`select local_paid_cents, local_credit_cents from public.invoice_totals where invoice_id='${f.invoiceId}'`, true)).toEqual(["0|20000"]);
+      expect(sql(`select count(*) from public.invoice_payments where invoice_id='${f.invoiceId}'`, true)).toEqual(["0"]);
+    } finally {
+      await returner.client.query("rollback").catch(() => undefined);
+      if (paying) await Promise.allSettled([paying]);
+      await Promise.all([returner.client.end(), payer.client.end()]);
+    }
+  });
+
+  it("accepts $800 after a $200 credit on $1,000 and removes the settled invoice from unpaid AR", async () => {
+    const f = await localInvoice({}, 50000);
+    await credit(f, 0.4);
+    expect(sql(`select local_credit_cents from public.invoice_totals where invoice_id='${f.invoiceId}'`, true)).toEqual(["20000"]);
+    expect((await record(f, { p_amount_cents: 80001 })).error).not.toBeNull();
+    expect(sql(`select count(*) from public.invoice_payments where invoice_id='${f.invoiceId}'`, true)).toEqual(["0"]);
+    const result = await record(f, { p_amount_cents: 80000 });
+    expect(result.error).toBeNull();
+    expect(result.data).toMatchObject({ balanceCents: 0 });
+    expect(paidAtLocal(f)).not.toBe("");
+    expect(await runCommand("list_invoices", { status: "unpaid" }, f.sales)).toMatchObject({ rows: [] });
+    expect(await runCommand("get_invoice", { invoiceId: f.invoiceId }, f.sales)).toMatchObject({ localCreditCents: 20000, localPaidCents: 80000 });
+    expect((await runCommand("list_invoices", {}, f.sales)) as { rows: unknown[] }).toMatchObject({
+      rows: expect.arrayContaining([expect.objectContaining({ id: f.invoiceId, local_credit_cents: 20000, subtotal_cents: 100000 })]),
+    });
+  });
+
+  it("settles when the credit follows the partial payment, and reopens when that payment is voided", async () => {
+    const f = await localInvoice({}, 50000);
+    const payment = await record(f, { p_amount_cents: 80000 });
+    await credit(f, 0.2);
+    expect(paidAtLocal(f)).toBe("");
+    await credit(f, 0.2);
+    expect(paidAtLocal(f)).not.toBe("");
+    const voided = await voidRpc(f, payment.data!.paymentId);
+    expect(voided.error).toBeNull();
+    expect(voided.data).toMatchObject({ balanceCents: 80000 });
+    expect(paidAtLocal(f)).toBe("");
+  });
+
+  it("closes a full credit without cash and refuses another payment", async () => {
+    const f = await localInvoice();
+    await credit(f, 2);
+    expect(paidAtLocal(f)).not.toBe("");
+    expect((await record(f, { p_amount_cents: 1 })).error).not.toBeNull();
+    expect(await runCommand("list_invoices", { status: "unpaid" }, f.sales)).toMatchObject({ rows: [] });
+    expect(sql(`select local_paid_cents, local_credit_cents from public.invoice_totals where invoice_id='${f.invoiceId}'`, true)).toEqual(["0|10000"]);
+  });
+
+  it("retains the excess after a paid invoice is credited, and void math uses the credited total", async () => {
+    const f = await localInvoice({}, 50000);
+    const payment = await record(f, { p_amount_cents: 100000 });
+    await credit(f, 0.4);
+    expect(await runCommand("get_invoice", { invoiceId: f.invoiceId }, f.sales)).toMatchObject({ localPaidCents: 100000, localCreditCents: 20000 });
+    const voided = await voidRpc(f, payment.data!.paymentId);
+    expect(voided.error).toBeNull();
+    expect(voided.data).toMatchObject({ balanceCents: 80000 });
+    expect(paidAtLocal(f)).toBe("");
+  });
+
+  it("ignores a voided or deleted memo and restores its credit when live again", async () => {
+    const f = await localInvoice();
+    const memo = await credit(f, 2);
+    for (const state of ["voided", "deleted", "live"] as const) {
+      await admin.from("invoices").update({ qbo_remote_state: state }).eq("id", memo.invoice_id).throwOnError();
+      expect(sql(`select local_credit_cents from public.invoice_totals where invoice_id='${f.invoiceId}'`, true)).toEqual([state === "live" ? "10000" : "0"]);
+      expect(Boolean(paidAtLocal(f))).toBe(state === "live");
+    }
+  });
+});
 
 /** Adds a QuickBooks connection and one push of the invoice with `status`, as the database owner. */
 async function pushOf(f: Fixture, status: "pending" | "pushed") {
