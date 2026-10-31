@@ -800,8 +800,8 @@ omitted field and clear one only when you send it as `null`.
 
 ### History paging [#history-paging]
 
-`list_orders`, `list_invoices`, `portal_orders`, and `portal_invoices` return
-`{ rows, nextCursor }`, with rows ordered by `created_at` and `id`, both
+`list_orders`, `list_invoices`, `list_movements`, `portal_orders`, and
+`portal_invoices` return `{ rows, nextCursor }`, with rows ordered by `created_at` and `id`, both
 descending. `nextCursor` is null on the last page. Otherwise pass it back as
 `cursor`, unchanged and with the same filters, to read the next page. New
 records appear when restarting from the newest page.
