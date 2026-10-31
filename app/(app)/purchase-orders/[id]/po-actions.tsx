@@ -33,7 +33,7 @@ export function ReceiveForm({ poId, lines, locations, bins, onHand, today, model
   const [bestBy, setBestBy] = useState<Record<string, string>>(Object.fromEntries(open.map(line => [line.id, line.recorded_best_by ?? ""])));
   const [reason, setReason] = useState("");
   const [closureReason, setClosureReason] = useState("");
-  const [start] = useState(() => countDefaultBin(onHand, locations, bins));
+  const [start] = useState(() => correcting ? { locationId: model.locationId ?? "", binId: model.binId ?? "" } : countDefaultBin(onHand, locations, bins));
   const [locationId, setLocationId] = useState(start.locationId);
   const binsHere = bins.filter(bin => bin.location_id === locationId);
   const [binId, setBinId] = useState(start.binId);
@@ -66,7 +66,7 @@ export function ReceiveForm({ poId, lines, locations, bins, onHand, today, model
     if (!receiving || receiveReason(view)) return;
     const countedLines = counted.map(line => ({ poLineId: line.id, qtyCounted: Number(counts[line.id]), lotCode: lots[line.id]?.trim() || undefined, bestBy: bestBy[line.id] || undefined }));
     void run(correcting ? "correct_purchase_receipt" : "receive_purchase_order", correcting
-      ? { receiptId: correctionReceiptId, reason, lines: countedLines }
+      ? { receiptId: correctionReceiptId, reason, locationId, binId, lines: countedLines }
       : { poId, locationId, binId, receivedOn, lines: countedLines }, data => {
       const receiptId = (data as { receipt_id?: string }).receipt_id;
       if (receiptId) router.push(receiptHref(`/purchase-orders/${poId}`, receiptId));

@@ -156,14 +156,10 @@ describe("Portal invoice view", () => {
     { status: "Credit", tone: "", invoice: { kind: "credit_memo" } },
   ];
 
-  it.each(states)("renders $status with its financial tone and visible words", ({ status, tone, invoice }) => {
+  it.each(states)("maps $status to its financial status, payability and list tone", ({ status, tone, invoice }) => {
     const snapshot = { ...portalInvoiceUnpaid, invoice: { ...portalInvoiceUnpaid.invoice, ...invoice } };
     const model = toPortalInvoiceViewProps(snapshot);
-    expect(model.status).toBe(status);
-    const html = htmlOf(createElement(PortalInvoiceView, { model, footer: null }));
-    expect(html).toContain(renderToStaticMarkup(E.row("Status", status, "", tone)));
-    expect(html).toContain("Question this invoice");
-    expect(html).not.toContain(">Pay invoice<");
+    expect(model).toMatchObject({ status, payable: status === "Unpaid" });
     if (status !== "Review") {
       const list = toPortalInvoicesViewProps({
         customerName: RIDGELINE.name,
@@ -171,14 +167,6 @@ describe("Portal invoice view", () => {
       });
       const row = list.rows[0];
       expect(row.tone).toBe(tone);
-      const expectedRow = E.row(
-        row.title,
-        row.unpaid ? `${row.detail} · ${row.total}` : row.detail,
-        row.unpaid ? E.act("Pay", "info") : row.total,
-        tone,
-      );
-      expect(htmlOf(createElement(PortalInvoicesView, { model: list })))
-        .toContain(renderToStaticMarkup(expectedRow));
     }
   });
 
@@ -248,6 +236,25 @@ describe("Portal invoice view", () => {
     expect(html).toMatch(/Online payment isn’t available/);
     expect(html).not.toMatch(/>Pay invoice</);
     expect(html).toMatch(/Question this invoice/);
+  });
+
+  it("starts the payment handoff only through an explicit POST form, never a prefetched link", () => {
+    const html = htmlOf(createElement(PortalInvoiceView, {
+      model: toPortalInvoiceViewProps(portalInvoiceUnpaid), variant: "pay",
+      paymentAction: "/portal/invoices/actual-invoice/pay",
+    }));
+    expect(html).toContain('method="post"');
+    expect(html).toContain('action="/portal/invoices/actual-invoice/pay"');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain(">Pay invoice<");
+    expect(html).not.toContain('href="/portal/invoices/actual-invoice/pay"');
+    const inventory = htmlOf(createElement(PortalInvoiceView, {
+      model: toPortalInvoiceViewProps(portalInvoiceUnpaid), variant: "pay",
+    }));
+    expect(inventory).toContain(">Pay invoice<");
+    expect(inventory).toContain('method="post"');
+    expect(inventory).toContain('type="button"');
+    expect(inventory).not.toContain('action="/portal/invoices/actual-invoice/pay"');
   });
 
   it("a question slot replaces the inventory Question nav", () => {

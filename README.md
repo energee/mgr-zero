@@ -61,7 +61,14 @@ bunx supabase status -o env | node scripts/supabase-env.mjs > .env.local
 ```
 
 The mapper converts the Supabase CLI's local key labels into the application's
-modern environment contract; nothing else is needed in `.env.local`.
+modern environment contract; nothing else is needed in `.env.local` to sign in
+with a password and use the app. `APP_URL` is optional locally: it is the
+public MGR origin (for example `http://localhost:3000`) that passwordless
+sign-in and password-reset emails, Slack, and portal invoice payment build
+their links from, so set it before using those. Browser calls to
+`/api/command` and `/api/chat` pass the Origin check when their Origin matches
+the host the request was sent to, so a second dev port or a Vercel preview
+host needs no matching `APP_URL`.
 `/api/command` refuses excess requests with `429 rate_limited` and a
 `Retry-After` header.
 

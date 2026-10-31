@@ -33,12 +33,12 @@ export function ReceivePoView({ model, controls = {}, messages, submitting = fal
     {model.note && E.fld("Note", model.note)}
     <fieldset disabled={submitting} className="flex flex-col gap-3">
       {correcting && E.edit("Correction reason", model.correctionReason ?? "", "text", undefined, { onChange: controls.reason, required: true })}
-      {mode === "receive" && model.locations && <>
+      {receiving && model.locations && <>
         <div className="grid grid-cols-2 gap-2">
           {E.pick("Received into", String(model.locationId ?? ""), [{ value: "", label: "Select location", disabled: true }, ...(model.locations.map(location => ({ value: location.id, label: location.name })))], { onChange: controls.location, required: true })}
           {E.pick("Bin", String(model.binId ?? ""), [{ value: "", label: "Select bin", disabled: true }, ...(model.bins?.map(bin => ({ value: bin.id, label: bin.name })) ?? [])], { onChange: controls.bin, required: true })}
         </div>
-        <DatePicker label="Received on" value={controls.receivedOn ? model.receivedOn ?? "" : undefined} defaultValue={model.receivedOn} onChange={controls.receivedOn} />
+        {correcting ? E.fld("Received on", model.receivedOn ?? "—") : <DatePicker label="Received on" value={controls.receivedOn ? model.receivedOn ?? "" : undefined} defaultValue={model.receivedOn} onChange={controls.receivedOn} />}
       </>}
       {(model.lines ?? []).map(line => <Fragment key={line.key}>
         {receiving ? E.line(line.title, line.detail,

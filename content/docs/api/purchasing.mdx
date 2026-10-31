@@ -104,13 +104,15 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Correct an unused purchase receipt with a reason: preserve the original facts, reverse its exact movements, and append replacement counts and lot facts atomically
+Correct a purchase receipt with a reason and receiving bin: preserve the original facts and downstream lot provenance, compensate its movements, and append replacement counts while preventing negative stock
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `receiptId` | uuid | yes |
 | `reason` | string | yes |
 | `lines` | array of object | yes |
+| `locationId` | uuid | no |
+| `binId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
