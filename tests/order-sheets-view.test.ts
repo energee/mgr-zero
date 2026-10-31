@@ -51,6 +51,20 @@ describe("Short pick view", () => {
     expect(model.verb).toBe("Adjust order to 7 cases");
   });
 
+  it("the drawing still shows the preview arrow and Adjust order to 7 cases", () => {
+    const markup = html(createElement(ShortPickView, { model: toShortPickViewProps(orderShortPick) }));
+    // The sheet carries the title; the body draws no back link to Pick.
+    expect(markup).not.toMatch(/ORD-0231 · short line/);
+    expect(markup).not.toMatch(/<a /);
+    expect(markup).toMatch(/Ridgeline Tap Room · Warehouse/);
+    expect(markup).toMatch(/ordered 10/);
+    expect(markup).toMatch(/Reason/);
+    expect(markup).toMatch(/required/);
+    expect(markup).toMatch(/Resolve the missing 3/);
+    expect(markup).toMatch(/>Adjust order to 7 cases</);
+    expect(markup).toContain('data-direction="forward"');
+    expect(markup).not.toMatch(/[→›]/);
+  });
 });
 
 describe("Pick view", () => {
