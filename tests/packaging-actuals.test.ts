@@ -209,7 +209,7 @@ it("requires the current output revision and supports zero output followed by an
   const f = await fixture();
   await runCommand("close_packaging_run", f.input, f.ctx);
   const first = await runCommand("correct_packaging_run_outputs", correctedOutputs(f), f.ctx) as { correction: { id: string } };
-  await expect(runCommand("correct_packaging_run_outputs", correctedOutputs(f), f.ctx)).rejects.toThrow("already corrected");
+  await expect(runCommand("correct_packaging_run_outputs", correctedOutputs(f), f.ctx)).rejects.toMatchObject({ status: 409, code: "conflict" });
   const zero = await runCommand("correct_packaging_run_outputs", {
     ...correctedOutputs(f), previousCorrectionId: first.correction.id, bblDrawn: 0, outputs: [],
   }, f.ctx) as { correction: { id: string } };
@@ -237,9 +237,7 @@ it.each(["shipped", "adjusted", "completed batch", "filed report"])("refuses out
       ${dependency === "shipped" ? `'${channel}','taxable','PA'` : "null,null,null"})`);
   }
   const before = (await admin.from("inventory_movements").select("id").eq("lot_id", lot.id)).data;
-  await expect(runCommand("correct_packaging_run_outputs", correctedOutputs(f), f.ctx)).rejects.toThrow(
-    dependency === "completed batch" || dependency === "filed report" ? dependency : "finished goods prevent",
-  );
+  await expect(runCommand("correct_packaging_run_outputs", correctedOutputs(f), f.ctx)).rejects.toMatchObject({ status: 400, code: "bad_request" });
   expect((await admin.from("inventory_movements").select("id").eq("lot_id", lot.id)).data).toEqual(before);
   expect(await runCommand("get_packaging_output_corrections", { runId: f.run.id }, f.ctx)).toEqual({ corrections: [] });
 });
@@ -264,6 +262,34 @@ it("rolls back invalid output and draw corrections and denies foreign or unautho
   expect(denied.error).not.toBeNull();
 });
 
+it("rejects a rounded tank overdraw atomically while retaining valid sub-precision input", async () => {
+  const f = await fixture();
+  await runCommand("close_packaging_run", f.input, f.ctx);
+  const before = await runCommand("get_packaging_run", { runId: f.run.id }, f.ctx) as { lot: { id: string } };
+  const ledger = await admin.from("inventory_movements").select("*").eq("lot_id", before.lot.id).order("id");
+  expect(ledger.error).toBeNull();
+  expect(ledger.data).toHaveLength(1);
+  const preview = await runCommand("get_batch_completion_preview", { batchId: f.batch.id }, f.ctx);
+  const requests = sql(`select count(*) from private.command_requests where brewery_id='${f.brewery.id}'`);
+  const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+  for (const bblDrawn of [1.0005, 1.0005001]) {
+    await expect(runCommand("correct_packaging_run_outputs", {
+      ...correctedOutputs(f), bblDrawn,
+    }, f.ctx, execution)).rejects.toMatchObject({ status: 400, code: "bad_request" });
+    expect(await runCommand("get_packaging_run", { runId: f.run.id }, f.ctx)).toEqual(before);
+    expect((await admin.from("inventory_movements").select("*").eq("lot_id", before.lot.id).order("id")).data).toEqual(ledger.data);
+    expect(await runCommand("get_batch_completion_preview", { batchId: f.batch.id }, f.ctx)).toEqual(preview);
+    expect(await runCommand("get_packaging_output_corrections", { runId: f.run.id }, f.ctx)).toEqual({ corrections: [] });
+    expect(sql(`select count(*) from private.command_requests where brewery_id='${f.brewery.id}'`)).toEqual(requests);
+  }
+  const corrected = await runCommand("correct_packaging_run_outputs", {
+    ...correctedOutputs(f), bblDrawn: 1.0004,
+  }, f.ctx, execution) as { run: { bbl_drawn: number } };
+  expect(corrected.run.bbl_drawn).toBe(1);
+  expect(await runCommand("get_batch_completion_preview", { batchId: f.batch.id }, f.ctx))
+    .toMatchObject({ packagedBbl: 0.08, inTankBbl: 0 });
+});
+
 it("refuses to restore beer into a source occupancy ended by a cellar transfer", async () => {
   const f = await fixture();
   await runCommand("close_packaging_run", f.input, f.ctx);
@@ -276,9 +302,7 @@ it("refuses to restore beer into a source occupancy ended by a cellar transfer",
   const source = await admin.from("occupancy_volumes").select("bbl,ended_at").eq("occupancy_id", run.occupancy_id!).single();
   expect(source.data).toMatchObject({ bbl: 0, ended_at: expect.any(String) });
   const stock = (await admin.from("inventory_movements").select("id,qty").eq("ref", f.run.id)).data;
-  await expect(runCommand("correct_packaging_run_outputs", correctedOutputs(f), f.ctx)).rejects.toThrow(
-    "cannot reduce barrels drawn after the source tank was emptied",
-  );
+  await expect(runCommand("correct_packaging_run_outputs", correctedOutputs(f), f.ctx)).rejects.toMatchObject({ status: 400, code: "bad_request" });
   expect((await admin.from("inventory_movements").select("id,qty").eq("ref", f.run.id)).data).toEqual(stock);
   expect((await admin.from("occupancy_volumes").select("bbl,ended_at").eq("occupancy_id", run.occupancy_id!).single()).data).toEqual(source.data);
   expect(await runCommand("get_packaging_output_corrections", { runId: f.run.id }, f.ctx)).toEqual({ corrections: [] });
@@ -292,19 +316,34 @@ it("refuses fractional keg corrections before quantity rounding", async () => {
   sql(`update public.formats set package_type='keg',keg_size='half_bbl' where id='${f.catalog.formatId}'`);
   await expect(runCommand("correct_packaging_run_outputs", {
     ...correctedOutputs(f), outputs: [{ skuId: f.catalog.skuId, qtyActual: 80.0001 }],
-  }, f.ctx)).rejects.toThrow("whole number of kegs");
+  }, f.ctx)).rejects.toMatchObject({ status: 400, code: "bad_request" });
   expect(await runCommand("get_packaging_output_corrections", { runId: f.run.id }, f.ctx)).toEqual({ corrections: [] });
 });
 
 it("rejects forged production reversals outside the correction graph", async () => {
   const f = await fixture();
   await runCommand("close_packaging_run", f.input, f.ctx);
-  expect(() => sql(`insert into public.inventory_movements(brewery_id,sku_id,location_id,bin_id,lot_id,qty,type,compensates_id,ref,created_by,occurred_on)
-    select brewery_id,sku_id,location_id,bin_id,lot_id,-qty,type,id,ref,created_by,occurred_on
-    from public.inventory_movements where ref='${f.run.id}' and type='production_in'`)).toThrow("invalid packaging output compensation");
+  sql(`do $$ begin
+    begin
+      insert into public.inventory_movements(brewery_id,sku_id,location_id,bin_id,lot_id,qty,type,compensates_id,ref,created_by,occurred_on)
+        select brewery_id,sku_id,location_id,bin_id,lot_id,-qty,type,id,ref,created_by,occurred_on
+        from public.inventory_movements where ref='${f.run.id}' and type='production_in';
+      raise exception using errcode='ZX001',message='Forged output reversal was accepted';
+    exception when sqlstate 'P0001' then null;
+    end;
+  end $$`);
   for (const role of ["authenticated", "service_role"]) {
-    expect(() => sql(`begin; set local role ${role}; insert into public.packaging_output_corrections default values; rollback`)).toThrow("permission denied");
+    sql(`do $$ begin
+      begin
+        set local role ${role};
+        insert into public.packaging_output_corrections default values;
+        raise exception using errcode='ZX001',message='Direct history insert was accepted';
+      exception when insufficient_privilege then null;
+      end;
+    end $$`);
   }
+  expect((await admin.from("inventory_movements").select("id").eq("ref", f.run.id)).data).toHaveLength(1);
+  expect(await runCommand("get_packaging_output_corrections", { runId: f.run.id }, f.ctx)).toEqual({ corrections: [] });
 });
 
 it("allows only one competing output correction of the same revision", async () => {
