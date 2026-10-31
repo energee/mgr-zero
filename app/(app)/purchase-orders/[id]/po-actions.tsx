@@ -10,10 +10,12 @@ import { fromPacks } from "@/lib/mgr/pack-qty";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { countDefaultBin } from "@/lib/mgr/cycle-count-view";
 import { discardRecovery } from "@/lib/commands/recovery";
+import { dollarsInput, toCents } from "@/lib/mgr/money";
 
 export type PoLine = {
   id: string; material_id: string; qty_ordered: number; qty_received: number; qty_open: number; expected_lot_code: string | null;
   qty_counted?: number; recorded_best_by?: string | null;
+  unit_cost_cents?: number | null;
   material: { name: string; purchase_uom: string; purchase_uom_factor: number | null; base_uom: string | null; lot_tracked: boolean } | null;
 };
 type Location = { id: string; name: string };
@@ -31,9 +33,10 @@ export function ReceiveForm({ poId, lines, locations, bins, onHand, today, model
   const [counts, setCounts] = useState<Record<string, string>>(Object.fromEntries(open.map(line => [line.id, String(line.qty_counted ?? line.qty_open)])));
   const [lots, setLots] = useState<Record<string, string>>(Object.fromEntries(open.map(line => [line.id, line.expected_lot_code ?? ""])));
   const [bestBy, setBestBy] = useState<Record<string, string>>(Object.fromEntries(open.map(line => [line.id, line.recorded_best_by ?? ""])));
+  const [costs, setCosts] = useState<Record<string, string>>(Object.fromEntries(open.map(line => [line.id, dollarsInput(line.unit_cost_cents)])));
   const [reason, setReason] = useState("");
   const [closureReason, setClosureReason] = useState("");
-  const [start] = useState(() => countDefaultBin(onHand, locations, bins));
+  const [start] = useState(() => correcting ? { locationId: model.locationId ?? "", binId: model.binId ?? "" } : countDefaultBin(onHand, locations, bins));
   const [locationId, setLocationId] = useState(start.locationId);
   const binsHere = bins.filter(bin => bin.location_id === locationId);
   const [binId, setBinId] = useState(start.binId);
@@ -48,6 +51,7 @@ export function ReceiveForm({ poId, lines, locations, bins, onHand, today, model
       key: line.id, title: line.material?.name ?? `Line ${line.id}`,
       detail: correcting ? `originally counted ${line.qty_counted} ${line.material?.purchase_uom ?? "purchase units"}` : poLineDetail(line),
       qty: receiving ? counts[line.id] ?? "" : poLineQty(line.qty_ordered, line.material),
+      cost: costs[line.id] ?? "",
       lot: line.material?.lot_tracked ? lots[line.id] ?? "" : undefined, bestBy: bestBy[line.id],
       warning: receiving && counts[line.id] !== "" && Number(counts[line.id]) !== line.qty_open,
     })),
@@ -64,9 +68,9 @@ export function ReceiveForm({ poId, lines, locations, bins, onHand, today, model
     if (busy) return;
     if (mode === "draft") { void run("send_purchase_order", { poId, sentVia: via }); return; }
     if (!receiving || receiveReason(view)) return;
-    const countedLines = counted.map(line => ({ poLineId: line.id, qtyCounted: Number(counts[line.id]), lotCode: lots[line.id]?.trim() || undefined, bestBy: bestBy[line.id] || undefined }));
+    const countedLines = counted.map(line => ({ poLineId: line.id, qtyCounted: Number(counts[line.id]), unitCostCents: toCents(costs[line.id] ?? ""), lotCode: lots[line.id]?.trim() || undefined, bestBy: bestBy[line.id] || undefined }));
     void run(correcting ? "correct_purchase_receipt" : "receive_purchase_order", correcting
-      ? { receiptId: correctionReceiptId, reason, lines: countedLines }
+      ? { receiptId: correctionReceiptId, reason, locationId, binId, lines: countedLines }
       : { poId, locationId, binId, receivedOn, lines: countedLines }, data => {
       const receiptId = (data as { receipt_id?: string }).receipt_id;
       if (receiptId) router.push(receiptHref(`/purchase-orders/${poId}`, receiptId));
@@ -74,6 +78,7 @@ export function ReceiveForm({ poId, lines, locations, bins, onHand, today, model
   }}>
     <ReceivePoView model={view} controls={{
       quantity: (id, value) => setCounts(prev => ({ ...prev, [id]: value })),
+      cost: (id, value) => setCosts(prev => ({ ...prev, [id]: value })),
       lot: (id, value) => setLots(prev => ({ ...prev, [id]: value })),
       bestBy: (id, value) => setBestBy(prev => ({ ...prev, [id]: value })),
       location: value => { setLocationId(value); setBinId(bins.find(bin => bin.location_id === value)?.id ?? ""); },

@@ -485,6 +485,8 @@ describe("SCREENS", () => {
     }
     expect(body("Team")).toContain("Maria Alvarez");
     expect(body("Team")).toContain("maria@demobrewing.com");
+    // The `Name <email>` title already carries the email; no row repeats it beneath.
+    expect(body("Team member")).not.toMatch(/data-slot="item-description"[^>]*>[^<]*dave@demobrewing\.com/);
     // Pending acceptance is not exposed by the live roster.
     expect(body("Team")).not.toContain("pending");
   });
@@ -526,6 +528,9 @@ describe("SCREENS", () => {
     expect(render(E.face({ name: "Maria Alvarez" }))).toContain(">MA<");
     expect(render(E.face({ name: "Ted" }))).toContain(">T<");
     expect(render(E.face({ name: "wes@demobrewing.com" }))).toContain(">W<");
+    // list_team_members titles a named member `Name <email>` (#1659).
+    expect(render(E.face({ name: "Maria Alvarez <maria@demobrewing.com>" }))).toContain(">MA<");
+    expect(render(E.face({ name: "Ted <ted@demobrewing.com>" }))).toContain(">T<");
     expect(render(E.face({ name: "Maria Alvarez" }))).not.toContain("<img");
     // Every other call keeps its photo: no name and no path is the signed-in user.
     expect(render(E.face())).toContain('src="/mock/maria.jpg"');
@@ -537,7 +542,7 @@ describe("SCREENS", () => {
     // The gallery shell signs in as admin (screen-frame.tsx) so every surface is
     // reachable, so the person the screens name has to be that admin.
     expect(body("Me")).toMatch(/Maria Alvarez[\s\S]*admin/);
-    expect(body("Team")).toMatch(/Maria Alvarez[\s\S]*maria@demobrewing\.com · Admin[\s\S]*you/);
+    expect(body("Team")).toMatch(/Maria Alvarez &lt;maria@demobrewing\.com&gt;[\s\S]*Admin[\s\S]*you/);
     // Team member acts on someone else; removing yourself is the self state.
     expect(body("Team member")).not.toMatch(/Maria|@maria/);
 

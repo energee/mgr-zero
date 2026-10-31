@@ -72,6 +72,8 @@ export function OrderView({
   reason,
   onReason,
   lineActions,
+  onReorderRefused,
+  reordering = false,
 }: {
   model: OrderViewModel;
   /** The state's verbs, primary first; drawn in the header after Put back when beer is staged. */
@@ -88,6 +90,8 @@ export function OrderView({
   onReason?: (value: string) => void;
   /** Save lines and Discard changes, or the saved lines' ATP warnings, drawn under the lines (and Reason). */
   lineActions?: ReactNode;
+  onReorderRefused?: () => void;
+  reordering?: boolean;
 }) {
   const orderedField = (line: { key: string; name: string; ordered?: string }) => onQuantity
     ? <div className="w-32 md:ml-auto"><OrderQuantity label={`${line.name} ordered`} value={quantities?.[line.key] ?? line.ordered ?? ""} onChange={(value) => onQuantity(line.key, value)} /></div>
@@ -109,6 +113,7 @@ export function OrderView({
       {actions}
       {model.confirmHref ? E.btn("Review and confirm", "p", model.confirmHref) : null}
       {model.editHref ? E.btn("Edit draft", "g", model.editHref) : null}
+      {model.canReorderRefused ? E.btn("Reorder refused beer", reordering ? "g disabled" : "g", undefined, onReorderRefused) : null}
     </>
   );
   return (
