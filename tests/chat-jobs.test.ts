@@ -352,9 +352,10 @@ describe("delivery batch", () => {
     { code: "ratelimited", error: { code: "slack_webapi_rate_limited_error", retryAfter: 7 }, day: "02" },
     { code: "internal_error", error: { data: { error: "internal_error" } }, day: "03" },
     { code: "invalid_auth", error: { data: { error: "invalid_auth" } }, day: "04" },
+    { code: "network", error: { code: "slack_webapi_http_error", statusCode: 503 }, day: "05" },
   ])("handles $code during channel validation without blocking the destination", async ({ code, error, day }) => {
     await drain();
-    const channel = await runCommand("set_notification_destination", { installationId: inst.id, externalDestinationId: `C-validation-${code}` }, adminCtx) as { id: string };
+    const channel = await runCommand("set_notification_destination", { installationId: inst.id, externalDestinationId: `C-validation-${day}` }, adminCtx) as { id: string };
     await submittedOrder();
     const now = new Date(`2036-10-${day}T12:30:00Z`);
     await runChatScan({ now, db: admin });

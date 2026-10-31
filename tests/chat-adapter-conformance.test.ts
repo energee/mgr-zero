@@ -79,6 +79,7 @@ describe("Slack destination validation failures", () => {
     ["timeout", new Error("ETIMEDOUT")],
     ["rate limit", Object.assign(new Error("rate limited"), { code: "slack_webapi_rate_limited_error", retryAfter: 7 })],
     ["server error", Object.assign(new Error("server error"), { data: { error: "internal_error" } })],
+    ["HTTP 503", Object.assign(new Error("server unavailable"), { code: "slack_webapi_http_error", statusCode: 503 })],
   ])("propagates the original %s failure for delivery retry", async (_label, error) => {
     const fake = fakeClient({});
     vi.mocked(fake.client.conversationsInfo).mockRejectedValueOnce(error);
