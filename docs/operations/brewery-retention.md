@@ -17,8 +17,9 @@ connect for the brewery is still in progress the token is left for a later
 run. A failed revoke keeps the token for the
 next daily run; after seven days it is discarded unrevoked. The response
 reports `qboReap: { done, failed }`, where one row's failure never stops the
-others. Without the QuickBooks variables (`QBO_CLIENT_ID` and the rest) the
-reap is skipped and `qboReap` is `null`.
+others. Any failed row makes the response HTTP 500 with `ok: false`, retaining
+the counts so the scheduler reports partial failure. Without the QuickBooks
+variables (`QBO_CLIENT_ID` and the rest) the reap is skipped and `qboReap` is `null`.
 
 Closing a brewery and exporting its records are admin-run, with a direct
 service-role `DATABASE_URL`:

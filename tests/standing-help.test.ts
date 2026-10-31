@@ -130,8 +130,8 @@ describe("raw values tidied (#1518)", () => {
 
   it("a recipe note drops the source system's raw import id", () => {
     const ctx = { materials: [], profiles: [], unit: "plato" as const, timeZone: "America/New_York" };
-    const snapshot = { recipe: { id: "r", name: "Pale", brand_id: null, note: "Imported from Lolev recipe 6720f0d218f96be7c48988bf" }, versions: [], version: null, ingredients: [], waterAdditions: [], ogPlato: null, fgPlato: null, abv: null };
-    expect(toRecipePageModel(snapshot, ctx).recipeNote).toBe("Imported from Lolev recipe");
+    const snapshot = { recipe: { id: "r", name: "Pale", brand_id: null, note: "Imported from Example Brewing recipe 0123456789abcdef01234567" }, versions: [], version: null, ingredients: [], waterAdditions: [], ogPlato: null, fgPlato: null, abv: null };
+    expect(toRecipePageModel(snapshot, ctx).recipeNote).toBe("Imported from Example Brewing recipe");
     expect(toRecipePageModel({ ...snapshot, recipe: { ...snapshot.recipe, note: "House pale" } }, ctx).recipeNote).toBe("House pale");
   });
 });

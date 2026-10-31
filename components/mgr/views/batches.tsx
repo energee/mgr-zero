@@ -8,8 +8,6 @@ import { RecordTable } from "@/components/mgr/views/record-table";
 import type { BatchesRowView, BatchesViewModel, BatchOccupancyView, BatchVesselView } from "@/lib/mgr/batches-view";
 import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 
-export type { BatchesViewModel };
-
 /** A brand or recipe the plan does not name, said in muted words instead of a blank. */
 const orMissing = (value: string | null, missing: string) => value ?? <span key={missing} className="text-muted-foreground">{missing}</span>;
 

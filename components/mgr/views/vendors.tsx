@@ -9,8 +9,6 @@ import { E } from "@/components/mgr/e";
 import { RecordTable } from "@/components/mgr/views/record-table";
 import type { VendorsRowView, VendorsViewModel } from "@/lib/mgr/vendors-view";
 
-export type { VendorsViewModel };
-
 export function VendorsView({
   model,
   header,

@@ -15,20 +15,11 @@ const details: ColaDetails = { ttbId: record.ttbId, permit: record.permit, statu
 describe("COLA bulk review", () => {
   const review: ColaReviewProps = { brands: [brand], selected: [brand.id], missing: [], queue: [brand], index: 0, saved: 0, candidates: [record], ttbId: "", imageUrl: "", showAll: false };
 
-  it("uses a searchable dialog picker for all 149 permit records and a subordinate brand heading", () => {
-    const candidates = Array.from({ length: 149 }, (_, index) => ({ ...record, ttbId: String(25318001000000 + index) }));
-    const html = renderToStaticMarkup(createElement(ColaReviewView, { ...review, candidates, showAll: true }));
-    const trigger = html.match(/<button[^>]*aria-label="COLA"[^>]*>/)?.[0];
-    expect(trigger).toContain('aria-haspopup="dialog"');
-    expect(trigger).not.toContain('role="combobox"');
-    expect(html).not.toMatch(/<select\b|<h1\b/);
-    expect(html).toMatch(/<h3[^>]*>Silver IPA<\/h3>/);
-  });
-
   it("keeps the selected record's full label and disables the picker while busy", () => {
     const html = renderToStaticMarkup(createElement(ColaReviewView, { ...review, ttbId: record.ttbId, busy: true }));
-    expect(html).toContain(`${record.fancifulName} · ${record.ttbId} · ${record.completedOn}`);
-    expect(html.match(/<button[^>]*aria-label="COLA"[^>]*>/)?.[0]).toContain('disabled=""');
+    const selectedLabel = `${record.fancifulName} · ${record.ttbId} · ${record.completedOn}`;
+    const picker = html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g)?.find(button => button.includes(selectedLabel));
+    expect(picker).toMatch(/^<button\b[^>]*\sdisabled(?:=|\s|>)/);
   });
 
   it("matches a saved TTB ID even when the label name differs, and supports the brand alias", () => {

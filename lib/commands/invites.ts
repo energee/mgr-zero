@@ -23,7 +23,7 @@ defineCommand({
 export type TeamMember = { userId: string; email: string; name: string; roles: StaffRole[]; createdAt: string };
 
 defineQuery({
-  name: "list_team_members", description: "Staff roster for the brewery: user id, name (email when no profile name is saved), email and roles",
+  name: "list_team_members", description: "Staff roster for the brewery: user id, name as `Profile name <email>` (the email alone when no profile name is saved), email and roles",
   input: z.object({}), roles: ["admin", "sales", "warehouse"],
   handler: async (ctx): Promise<TeamMember[]> => {
     // A table-returning RPC returns an array, including [] for an empty roster.

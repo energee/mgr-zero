@@ -58,7 +58,7 @@ export function WeeklyCountView({ model, draft, correction, onWorksheet }: { mod
         {E.ttl("Recent saved counts")}
         <p className="text-sm text-muted-foreground">Newest 50 at this taproom.</p>
         {model.history.length === 0 ? E.blank("No saved counts yet") : model.history.map(count => <div key={count.key}>{E.nav(`Weekly count · ${count.date}`, count.detail, "", undefined, count.href)}</div>)}
-        {E.info("Admin only: correct the latest count once, for sold quantities counted too low. Corrections appear in history; the original stays in the audit trail.")}
+        {E.info("Admin only: correct the latest count once, for sold quantities counted too low or too high. Corrections appear in history; the original stays in the audit trail.")}
       </div>
     </>}
   </>;
@@ -164,13 +164,13 @@ export function WeeklyCountCorrectionView({ state: controlledState, open: contro
     </CommandFormFooter>}
   >
     <form id={formId} onSubmit={event => { event.preventDefault(); onSubmit?.(event); }} className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">Increase only the quantities that were counted too low. Recorded stock and the original count stay unchanged in the audit trail.</p>
+      <p className="text-sm text-muted-foreground">Correct quantities counted too low or too high, from zero through the recorded stock before the count. The original count stays unchanged in the audit trail.</p>
       {state.lines.map((line, index) => <div key={line.id} className="grid gap-2 rounded-xl border p-3 md:grid-cols-[1fr_8rem] md:items-end">
         <div>
           <p className="font-medium">{line.sku_name ?? "Saved SKU"}</p>
           <p className="text-sm text-muted-foreground">{line.bin_name ?? "Saved bin"} · saved row {index + 1} · {line.lot_id ? `tracked lot ${line.lot_code}` : "untracked stock"} · counted {line.qty_counted} · recorded before {line.qty_before}</p>
         </div>
-        {E.edit("Corrected units", line.quantity, "number", undefined, { onChange: (nextValue: string) => { const value = nextValue; if (onQuantity) onQuantity(line.id, value); else setInternalState(current => updateCorrectionQuantity(current, line.id, value)); }, id: `correction-${state.countId}-${index}`, disabled: locked || line.movement_type === "destruction" || line.qty_counted === line.qty_before, min: line.qty_counted, max: line.qty_before, step: "1", inputMode: "numeric" })}
+        {E.edit("Corrected units", line.quantity, "number", undefined, { onChange: (nextValue: string) => { const value = nextValue; if (onQuantity) onQuantity(line.id, value); else setInternalState(current => updateCorrectionQuantity(current, line.id, value)); }, id: `correction-${state.countId}-${index}`, disabled: locked || line.movement_type === "destruction" || line.qty_before === 0, min: 0, max: line.qty_before, step: "1", inputMode: "numeric" })}
         {line.movement_type === "destruction" && <p className="text-sm text-muted-foreground">Destroyed shortages cannot be corrected.</p>}
       </div>)}
       <div className="flex flex-col gap-1">

@@ -32,6 +32,11 @@ const nextConfig: NextConfig = {
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       { key: "Permissions-Policy", value: "accelerometer=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()" },
     ],
+  }, {
+    // The global referrer policy is overwritten at the wire by this dedicated
+    // broker rule, before a payment provider can receive a redirect.
+    source: "/portal/invoices/:id/pay",
+    headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
   }],
 };
 

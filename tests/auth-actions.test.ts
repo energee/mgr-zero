@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as Registry from "@/lib/commands/registry";
 
 const auth = vi.hoisted(() => ({ signInWithOtp: vi.fn(), signInWithPassword: vi.fn(), resetPasswordForEmail: vi.fn(), updateUser: vi.fn(), getUser: vi.fn(), getClaims: vi.fn(), signOut: vi.fn() }));
@@ -19,12 +19,15 @@ vi.mock("@/lib/auth/request-context", async (original) => ({
 }));
 vi.mock("next/headers", () => ({
   cookies: async () => cookieStore,
-  headers: async () => new Headers({ origin: "https://mgr.example" }),
+  headers: async () => new Headers({ origin: "https://attacker.invalid" }),
 }));
 vi.mock("next/navigation", () => ({ redirect }));
 
 import { emailLogin, login, savePassword, sendReset } from "@/app/(auth)/actions";
 import { PASSWORD_SAVED_COOKIE } from "@/lib/auth/password";
+
+vi.stubEnv("APP_URL", "https://mgr.example");
+afterAll(() => vi.unstubAllEnvs());
 
 describe("passwordless sign-in", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -36,7 +39,7 @@ describe("passwordless sign-in", () => {
     expect(auth.signInWithOtp).not.toHaveBeenCalled();
   });
 
-  it("emails an existing account a same-origin confirmation link", async () => {
+  it("emails an existing account a configured-origin link regardless of request Origin", async () => {
     const form = new FormData();
     form.set("email", "maria@example.com");
 

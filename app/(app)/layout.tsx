@@ -7,9 +7,6 @@ import { CommandRecovery } from "@/components/mgr/command-recovery";
 // Pages render inside the shell's main column. The shell's brewery, identity
 // and membership reads log their time as the `shell` stage (lib/server-timing.ts).
 import { getActiveBrewery } from "@/lib/brewery";
-import { buildContext } from "@/lib/commands/context";
-import { optionalPageQuery } from "@/lib/mgr/page-query";
-import type { GravityUnit } from "@/lib/mgr/gravity-unit";
 import { GravityUnitForm } from "./settings/gravity-unit-form";
 import "@/lib/commands/all";
 import { getRequestIdentity, getStaffMemberships } from "@/lib/auth/request-context";
@@ -33,8 +30,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [brewery, sidebarOpen, identity, memberships] = await timeStage(stages, "shell", () => Promise.all([getActiveBrewery(), sidebarOpenFromCookie(), getRequestIdentity(), getStaffMemberships()]));
   logServerTiming(stages);
   const roleScope = brewery.roles.toSorted().join(",");
-  // The Me sheet's gravity unit is an enrichment: a failed read leaves the sheet without it, not the app without a shell.
-  const units = await optionalPageQuery<{ brewery: GravityUnit; mine: GravityUnit | null }>("get_gravity_unit", {}, await buildContext(brewery.id));
   return (
     <SearchCacheProvider key={`${identity?.userId}:${brewery.id}:${roleScope}`}>
       <BreweryProvider id={brewery.id} actorId={identity!.userId}>
@@ -56,7 +51,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                   }}
                   switchAction={switchBrewery}
                   chatHref="/settings/chat"
-                  units={units ? <GravityUnitForm part="mine" brewery={units.brewery} mine={units.mine} /> : null}
+                  units={<GravityUnitForm part="mine" brewery={brewery.gravityUnit} mine={brewery.myGravityUnit} />}
                   footer={<MeSheetActions guide="/docs/staff-guide" />}
                 />
               </MeSheet>

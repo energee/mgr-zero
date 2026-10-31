@@ -285,7 +285,7 @@ describe("registry sheets", () => {
   });
 
   it("Use takes a COLA's TTB ID, serial (a missing one as blank) and TTB's approval date", () => {
-    const record = { ttbId: "25318001000034", permit: "BR-PA-20553", serial: "260135", completedOn: "2026-02-02", fancifulName: "STOUT", brandName: "LOLEV", classCode: "901", className: "BEER" };
+    const record = { ttbId: "25318001000034", permit: "BR-PA-12345", serial: "260135", completedOn: "2026-02-02", fancifulName: "STOUT", brandName: "EXAMPLE BREWING", classCode: "901", className: "BEER" };
     expect(colaChoice(record)).toEqual({ ttbId: "25318001000034", serialNumber: "260135", approvedOn: "2026-02-02" });
     expect(colaChoice({ ...record, serial: null })).toEqual({ ttbId: "25318001000034", serialNumber: "", approvedOn: "2026-02-02" });
   });
@@ -298,8 +298,11 @@ describe("registry sheets", () => {
     expect(html).toContain(`${first.ttbId} · serial ${first.serial} · ${first.className}`);
     expect(html).toContain(formatDate(first.completedOn));
     expect(html.match(/>Use<\/button>/g) ?? []).toHaveLength(brandApprovalStout.colas!.rows.length);
-    const none = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, colas: { permit: "BR-PA-20553", rows: [] } } }));
-    expect(none).toContain("No COLAs on TTB under BR-PA-20553 match Stout.");
+    const none = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, colas: { permit: "BR-PA-12345", rows: [] } } }));
+    const noMatchNotice = none.match(/<div[^>]*role="note"[^>]*>[\s\S]*?<\/div>/)?.[0];
+    expect(noMatchNotice).toContain("BR-PA-12345");
+    expect(noMatchNotice).toContain(brandApprovalStout.brand);
+    expect(none.match(/>Use<\/button>/g) ?? []).toEqual([]);
     const searching = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, colas: undefined, searching: true } }));
     expect(searching).toMatch(/<button[^>]*disabled[^>]*>Searching TTB…<\/button>/);
     const formula = htmlOf(createElement(BrandApprovalView, { model: { ...brandApprovalStout, kind: "formula" } }));

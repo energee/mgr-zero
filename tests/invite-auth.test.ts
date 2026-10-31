@@ -35,7 +35,7 @@ describe("invite acceptance", () => {
   });
 
   it("derives the displayed destination from membership", async () => {
-    const staff = [{ breweryId: "brewery", breweryName: "Demo Brewing", roles: ["warehouse" as const], timeZone: "America/New_York" }];
+    const staff = [{ breweryId: "brewery", breweryName: "Demo Brewing", roles: ["warehouse" as const], timeZone: "America/New_York", gravityUnit: "plato" as const, myGravityUnit: null }];
     expect(await inviteLanding(auth(staff), "staff")).toMatchObject({ name: "Demo Brewing", roles: ["warehouse"] });
     expect(await inviteLanding(auth(staff), "customer")).toBeUndefined();
     const customer = [{ breweryId: "brewery", breweryName: "Demo Brewing", customerId: "customer", customerName: "Bar" }];

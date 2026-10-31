@@ -18,7 +18,7 @@ export const monthlyComplianceAugust: MonthlyComplianceSnapshot = {
         { class: "can", begin: 12.6, in: 18, out: 14.9, end: 15.7 },
         { class: "bottle", begin: 0, in: 0, out: 0, end: 0 },
       ],
-      inProcess: 120.4, packaged: 48.5,
+      inProcess: 120.4, inProcessAsOf: "2026-08-31", packaged: 48.5,
       removals: { taxable: 41.2, export: 6.9, loss: 0.05741935 },
       cellarRemovals: { loss: 0.05741935 },
       stateTransactions: [
@@ -37,7 +37,7 @@ export const monthlyComplianceSeptember: MonthlyComplianceSnapshot = {
   ...monthlyComplianceAugust,
   monthLabel: "September 2026",
   losses: [],
-  report: { ...monthlyComplianceAugust.report, figures: { ...monthlyComplianceAugust.report.figures, periodStart: "2026-09-01", periodEnd: "2026-09-30" } },
+  report: { ...monthlyComplianceAugust.report, figures: { ...monthlyComplianceAugust.report.figures, periodStart: "2026-09-01", periodEnd: "2026-09-30", inProcessAsOf: undefined } },
 };
 
 /** August that does not balance (#1143), so Save is withheld. Its warnings are

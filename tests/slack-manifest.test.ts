@@ -8,13 +8,13 @@ const run = (appUrl: string) => spawnSync("bunx", ["tsx", "scripts/render-slack-
 });
 
 describe("Slack app manifest", () => {
-  it("renders the reviewed callbacks and only the three approved bot scopes", () => {
+  it("renders the callbacks and bot permissions including link-consent profile lookup", () => {
     expect(run("https://preview.mgrbrew.com/")).toMatchObject({ status: 0, stdout: ".local/slack-app-manifest.yml\n", stderr: "" });
     const manifest = readFileSync(".local/slack-app-manifest.yml", "utf8");
     expect(manifest).toContain("https://preview.mgrbrew.com/api/chat/slack/oauth");
     expect(manifest.match(/https:\/\/preview\.mgrbrew\.com\/api\/webhooks\/slack/g)).toHaveLength(2);
     const botScopes = manifest.match(/    bot:\n((?:      - .+\n)+)/)?.[1];
-    expect(botScopes?.match(/^      - ([\w:]+)$/gm)?.map((line) => line.slice(8))).toEqual(["chat:write", "im:write", "groups:read"]);
+    expect(botScopes?.match(/^      - ([\w:]+)$/gm)?.map((line) => line.slice(8))).toEqual(["chat:write", "im:write", "groups:read", "users:read"]);
   });
 
   it.each([
