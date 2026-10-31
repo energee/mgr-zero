@@ -9,13 +9,14 @@ import "@/lib/commands/all";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand, CommandError } from "@/lib/commands/registry";
 import { z } from "zod";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createRequestAuthContext, homePath } from "@/lib/auth/request-context";
 import { acceptInviteErrorPath, inviteAudience, inviteLanding, signInDestination } from "@/lib/auth/invite";
 import { passwordReturnHref } from "@/lib/mgr/entry-view";
 import { hasRecentRecovery, PASSWORD_SAVED_COOKIE, passwordChangeErrors, signInPath } from "@/lib/auth/password";
 import { createServerClient, verifyCurrentPassword } from "@/lib/supabase/server";
+import { readAppUrl } from "@/lib/env/server-parser";
 
 export type LoginState = { email?: string; error?: string };
 export type ResetState = LoginState & { sent?: boolean };
@@ -47,7 +48,7 @@ export async function emailLogin(form: FormData) {
   const email = z.string().email().safeParse(form.get("email"));
   if (!email.success) redirect(`/login?error=email${returnQuery}`);
   const db = await createServerClient();
-  const origin = (await headers()).get("origin") ?? "";
+  const origin = new URL(readAppUrl()).origin;
   await db.auth.signInWithOtp({
     email: email.data,
     options: { shouldCreateUser: false, emailRedirectTo: `${origin}/auth/confirm?${new URLSearchParams({ next: destination })}` },
@@ -65,7 +66,7 @@ export async function logout() {
 export async function sendReset(_previous: ResetState, form: FormData): Promise<ResetState> {
   const email = String(form.get("email") ?? "");
   const db = await createServerClient();
-  const origin = (await headers()).get("origin") ?? "";
+  const origin = new URL(readAppUrl()).origin;
   const next = form.get("portal") ? "/password?portal=1" : "/password";
   const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo: `${origin}/auth/confirm?${new URLSearchParams({ next })}` });
   if (error) return { email, error: "The reset link could not be requested. Try again." };

@@ -273,11 +273,12 @@ const receiptCountLine = z.object({
 
 defineCommand({
   name: "correct_purchase_receipt",
-  description: "Correct an unused purchase receipt with a reason: preserve the original facts, reverse its exact movements, and append replacement counts and lot facts atomically",
-  input: z.object({ receiptId: z.string().uuid(), reason: z.string().trim().min(1), lines: z.array(receiptCountLine).min(1) }),
+  description: "Correct a purchase receipt with a reason and receiving bin: preserve the original facts and downstream lot provenance, compensate its movements, and append replacement counts while preventing negative stock",
+  input: z.object({ receiptId: z.string().uuid(), reason: z.string().trim().min(1), locationId: z.string().uuid().optional(), binId: z.string().uuid().optional(), lines: z.array(receiptCountLine).min(1) }),
   roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_purchase_receipt", {
     p_brewery: ctx.breweryId, p_receipt: i.receiptId, p_reason: i.reason,
+    p_location: i.locationId ?? null, p_bin: i.binId ?? null,
     p_lines: i.lines.map(l => ({ po_line_id: l.poLineId, qty_counted: l.qtyCounted, lot_code: l.lotCode ?? null, best_by: l.bestBy ?? null })),
     p_request_id: execution.requestId,
   })),

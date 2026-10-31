@@ -10,6 +10,8 @@
 "use client";
 
 import { useState, type ComponentProps, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { OrderView } from "@/components/mgr/views/order";
@@ -88,14 +90,21 @@ export function OrderLinesEditor({ orderId, lines, editable, skus, warnings, onS
   onSaved: (data: unknown) => void;
 }) {
   const edit = useLineQuantities(orderId, lines, onSaved);
+  const router = useRouter();
+  const reorder = useCommandAction();
   const shown = { ...model, lines: model.lines.filter((l) => !edit.removed.includes(l.key)) };
   const lineActions = edit.changed ? <SaveLinesActions edit={edit} />
     : warnings.length > 0 ? <AtpWarnings warnings={warnings} skuNames={new Map(skus.map((sku) => [sku.id, sku.label]))} saved="Lines saved." />
     : undefined;
   return <form className="contents" onSubmit={edit.onSubmit}>
     <OrderView {...view} model={shown} quantities={edit.qtys} onQuantity={editable ? edit.setQty : undefined}
+      reordering={reorder.busy} onReorderRefused={() => void reorder.run("reorder_refused_delivery", { orderId }, data => {
+        const result = z.object({ order_id: z.string().uuid() }).parse(data);
+        router.push(`/orders/${result.order_id}/edit`);
+      })}
       lineEdit={editable ? { skus, added: edit.added, onAdd: edit.addLine, onSku: edit.setSku, onRemove: edit.removeLine } : undefined}
       reason={edit.reason} onReason={edit.changed ? edit.setReason : undefined} lineActions={lineActions} />
+    <CommandFormMessage error={reorder.error} />
   </form>;
 }
 

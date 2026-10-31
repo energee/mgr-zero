@@ -28,15 +28,20 @@ describe("team", () => {
     await expect(roster(sales)).resolves.toBeTruthy();
   });
 
-  it("returns the saved full name, falling back to email only when no name is saved", async () => {
+  it("shows the account email beside an editable profile name, including an impersonated role", async () => {
     const member = await makeStaff(b.id, "warehouse");
-    const update = await admin.auth.admin.updateUserById(member.id, { user_metadata: { full_name: "  Morgan Brewer  " } });
+    const update = await admin.auth.admin.updateUserById(member.id, { user_metadata: { full_name: "  Owner (Admin)  " } });
     expect(update.error).toBeNull();
     const named = (await roster()).find((row) => row.userId === member.id);
-    expect(named).toMatchObject({ name: "Morgan Brewer", email: member.email });
+    expect(named?.name).toContain("Owner (Admin)");
+    expect(named?.name).toContain(member.email);
+    expect(named?.email).toBe(member.email);
     const direct = await adminCtx.db.rpc("list_team_members", { p_brewery: b.id });
     expect(direct.error).toBeNull();
-    expect(direct.data?.find((row) => row.user_id === member.id)).toMatchObject({ name: "Morgan Brewer", email: member.email });
+    const directMember = direct.data?.find((row) => row.user_id === member.id);
+    expect(directMember?.name).toContain("Owner (Admin)");
+    expect(directMember?.name).toContain(member.email);
+    expect(directMember?.email).toBe(member.email);
     for (const fullName of [null, "", "   "]) {
       expect((await admin.auth.admin.updateUserById(member.id, { user_metadata: { full_name: fullName } })).error).toBeNull();
       expect((await roster()).find((row) => row.userId === member.id)).toMatchObject({ name: member.email, email: member.email });

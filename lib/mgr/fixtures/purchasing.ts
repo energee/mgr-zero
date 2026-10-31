@@ -127,6 +127,8 @@ export const receiptPoBillRejected: ReceiptViewModel = {
 export const correctReceiptPo: ReceivePoViewModel = {
   title: "PO-0142 · correct receipt", state: "correction", status: "Received Sep 10, 2026",
   correctionReason: "Two malt bags were counted twice",
+  locationId: receivePoSent.locationId, binId: receivePoSent.binId, receivedOn: receivePoSent.receivedOn,
+  locations: receivePoSent.locations, bins: receivePoSent.bins,
   lines: receivePoSent.lines?.map(line => ({ ...line, qty: line.key === "malt" ? 40 : line.qty,
     detail: `originally counted ${line.qty} purchase units`, lotOptions: undefined, note: undefined })),
   tape: [["+2,200 lb 2-row · replacement preview", "Lot CM-26-4410"], ["+132 lb Citra · replacement preview", "Lot 2026-CIT-91"], ["+300 lb rice hulls · replacement preview", "untracked"]],
