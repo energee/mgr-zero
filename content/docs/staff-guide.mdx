@@ -691,7 +691,7 @@ The **Payment** and **Accounting** columns use these labels:
 
 Roles other than Admin and Sales see only **Not pushed** or **QuickBooks status available to Sales** in the Accounting column, unless the invoice is written off, voided, deleted, predates the books, or has payments recorded in MGR.
 
-An uncertain invoice or credit-memo push is checked in its original QuickBooks company by document number before MGR sends it again. One matching document with the frozen customer and transaction date completes the saved push without creating another document. A failed lookup, invalid response, or conflicting or duplicate document number leaves the push pending instead of sending another copy.
+An uncertain invoice or credit-memo push is checked in its original QuickBooks company by document number before MGR sends it again. One document matching the frozen customer, dates, item descriptions, items, quantities, prices, amounts, and payment options completes the saved push without creating another document. A failed lookup, invalid response, changed document, or duplicate document number leaves the push pending instead of sending another copy.
 
 If QuickBooks voided a nonzero invoice before MGR recovered the push, MGR keeps that voided status when linking the existing document. Retry and later sync do not turn it back into a live invoice. Admin can then use the existing **Write off** action; an invoice originally issued for $0.00 is not treated as voided merely because its balance is zero.
 

@@ -930,8 +930,27 @@ export class QboOAuthClient {
       || asObject(row.CustomerRef)?.value !== customer.value || row.TxnDate !== frozen.TxnDate) {
       throw new Error("QuickBooks reconciliation identity was ambiguous");
     }
+    const isVoided = entityType === "Invoice" && typeof row.PrivateNote === "string"
+      && /^Voided\b/i.test(row.PrivateNote) && row.TotalAmt === 0 && row.Balance === 0
+      && Array.isArray(frozen.Line) && frozen.Line.some(line => {
+        const amount = asObject(line)?.Amount;
+        return typeof amount === "number" && amount > 0;
+      });
+    // QuickBooks zeros a voided Invoice's line money and quantities. Compare
+    // that exact transformation; every other frozen fact must still match.
+    const expected = isVoided ? {
+      ...frozen, Line: (frozen.Line as Record<string, unknown>[]).map(line =>
+        line.DetailType === "SalesItemLineDetail" ? {
+          ...line, Amount: 0, SalesItemLineDetail: {
+            ...asObject(line.SalesItemLineDetail), Qty: 0, UnitPrice: 0,
+          },
+        } : line),
+    } : frozen;
+    if (!meaningfulInvoiceContentMatches(expected, meaningfulInvoiceContent(row))) {
+      throw new Error("QuickBooks reconciliation content did not match");
+    }
     const transaction = qboTransactionResult(row);
-    if (typeof row.PrivateNote === "string" && /^Voided\b/i.test(row.PrivateNote)) {
+    if (isVoided) {
       transaction.response.PrivateNote = "Voided";
     }
     return { ok: true as const, transaction };

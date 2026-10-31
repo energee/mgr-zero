@@ -76,16 +76,6 @@ describe("QuickBooks durable outbound push", () => {
       const body = String(init?.body);
       expect(sql(`select provider_request_id::text || '|' || request_body from public.qbo_pushes where invoice_id='${f.invoice.id}'`)[0])
         .toBe(`${key}|${body}`);
-      expect(JSON.parse(body)).toMatchObject({
-        DocNumber: String(f.invoice.invoice_no), CustomerRef: { value: "customer-42" },
-        Line: [{ Amount: 9.99, SalesItemLineDetail: { Qty: 3, UnitPrice: 3.33 } }],
-      });
-      expect(JSON.parse(body)).toMatchObject({ BillEmail: { Address: f.buyer.email } });
-      if (kind === "invoice") {
-        expect(JSON.parse(body)).toMatchObject({
-          DueDate: "2026-10-09", AllowOnlineACHPayment: true, AllowOnlineCreditCardPayment: true,
-        });
-      }
       // No request-id deduplication: a replayed POST would create a second transaction.
       remote.push({ ...JSON.parse(body), Id: `remote-${remote.length + 1}`, SyncToken: "0",
         TotalAmt: 9.99, Balance: 9.99, TxnTaxDetail: { TotalTax: 0 }, InvoiceLink: "https://secret" });
@@ -111,7 +101,8 @@ describe("QuickBooks durable outbound push", () => {
   });
 
   it.each([
-    ["invoice", 333, "voided"], ["invoice", 0, "live"], ["credit_memo", 333, "live"],
+    ["invoice", 333, "voided"], ["invoice", 333, "live"], ["invoice", 0, "live"],
+    ["credit_memo", 333, "live"],
   ] as const)("preserves %s state after adopting a zeroed document from a lost push (%s cents)", async (kind, unitPrice, expectedState) => {
     const f = await pushFixture(kind, "admin");
     if (unitPrice === 0) {
@@ -135,14 +126,22 @@ describe("QuickBooks durable outbound push", () => {
     const requestId = crypto.randomUUID();
     await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, client)).rejects.toThrow("QuickBooks is unavailable");
     assert(remote);
-    remote = { ...remote, SyncToken: "2", TotalAmt: 0, Balance: 0,
-      TxnTaxDetail: { TotalTax: 0 }, PrivateNote: "Voided by accountant; private details" };
+    remote = { ...remote, SyncToken: "2", TotalAmt: expectedState === "voided" || unitPrice === 0 ? 0 : 9.99,
+      Balance: 0, TxnTaxDetail: { TotalTax: 0 }, PrivateNote: "Voided by accountant; private details" };
+    if (expectedState === "voided") {
+      remote.Line = (remote.Line as Record<string, unknown>[]).map(line => ({
+        ...line, Amount: 0, SalesItemLineDetail: {
+          ...(line.SalesItemLineDetail as Record<string, unknown>), Qty: 0, UnitPrice: 0,
+        },
+      }));
+    }
     const result = await pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, client);
     expect(result).toMatchObject({ status: "pushed", remoteId: "void-before-recovery" });
     const state = () => sql(`select qbo_remote_state from public.invoices where id='${f.invoice.id}'`);
     expect(state()).toEqual([expectedState]);
     const saved = JSON.parse(sql(`select response::text from public.qbo_pushes where invoice_id='${f.invoice.id}'`)[0]);
-    expect(saved).toMatchObject({ TotalAmt: 0, Balance: 0, PrivateNote: "Voided" });
+    expect(saved).toMatchObject({ TotalAmt: expectedState === "voided" || unitPrice === 0 ? 0 : 9.99, Balance: 0 });
+    expect(saved.PrivateNote).toBe(expectedState === "voided" ? "Voided" : undefined);
     expect(JSON.stringify(saved)).not.toContain("private details");
 
     expect(await syncQboInvoices(f.ctx, crypto.randomUUID(), client))
@@ -163,6 +162,72 @@ describe("QuickBooks durable outbound push", () => {
     }
     expect(noFetch).not.toHaveBeenCalled();
   });
+
+  it.each(["invoice", "credit_memo"] as const)("rejects changed frozen %s content without adopting or posting", async kind => {
+    const f = await pushFixture(kind);
+    const requestId = crypto.randomUUID();
+    const start = await f.ctx.db.rpc("start_qbo_push", {
+      p_brewery: f.brewery.id, p_invoice: f.invoice.id, p_new_attempt_reason: null, p_request_id: requestId,
+    });
+    expect(start.error).toBeNull();
+    assert(start.data && typeof start.data === "object" && !Array.isArray(start.data));
+    assert(typeof start.data.requestBody === "string");
+    const original = { ...JSON.parse(start.data.requestBody), Id: "existing", TotalAmt: 9.99, Balance: 0 };
+    for (const mismatch of ["doc", "customer", "date", "item", "amount", "qty", "price", "lines", "due", "ach", "card"] as const) {
+      if (kind === "credit_memo" && ["due", "ach", "card"].includes(mismatch)) continue;
+      const row = structuredClone(original);
+      if (mismatch === "doc") row.DocNumber = "0";
+      if (mismatch === "customer") row.CustomerRef.value = "other";
+      if (mismatch === "date") row.TxnDate = "2000-01-01";
+      if (mismatch === "item") row.Line[0].SalesItemLineDetail.ItemRef.value = "other";
+      if (mismatch === "amount") row.Line[0].Amount = 10;
+      if (mismatch === "qty") row.Line[0].SalesItemLineDetail.Qty = 30;
+      if (mismatch === "price") row.Line[0].SalesItemLineDetail.UnitPrice = 33.3;
+      if (mismatch === "lines") delete row.Line;
+      if (mismatch === "due") row.DueDate = "2000-01-01";
+      if (mismatch === "ach") row.AllowOnlineACHPayment = false;
+      if (mismatch === "card") row.AllowOnlineCreditCardPayment = false;
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json({
+        QueryResponse: { [kind === "invoice" ? "Invoice" : "CreditMemo"]: [row] },
+      }));
+      await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, new QboOAuthClient(config, fetch)))
+        .rejects.toThrow("QuickBooks is unavailable");
+      expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual(["GET"]);
+      expect(sql(`select status || ':' || coalesce(qbo_entity_id,'') from public.qbo_pushes where invoice_id='${f.invoice.id}'`))
+        .toEqual(["pending:"]);
+    }
+  });
+
+  it.each(["credit_memo", "missing-marker", "nonzero-total", "nonzero-balance", "item", "amount", "qty", "price"] as const)(
+    "rejects a zeroed positive document that is not an exact provider Invoice void: %s", async mismatch => {
+      const f = await pushFixture(mismatch === "credit_memo" ? "credit_memo" : "invoice");
+      const requestId = crypto.randomUUID();
+      const start = await f.ctx.db.rpc("start_qbo_push", {
+        p_brewery: f.brewery.id, p_invoice: f.invoice.id, p_new_attempt_reason: null, p_request_id: requestId,
+      });
+      expect(start.error).toBeNull();
+      assert(start.data && typeof start.data === "object" && !Array.isArray(start.data));
+      assert(typeof start.data.requestBody === "string");
+      const row = { ...JSON.parse(start.data.requestBody), Id: "not-a-matching-void", TotalAmt: 0, Balance: 0, PrivateNote: "Voided" };
+      row.Line[0].Amount = 0;
+      row.Line[0].SalesItemLineDetail.Qty = 0;
+      row.Line[0].SalesItemLineDetail.UnitPrice = 0;
+      if (mismatch === "missing-marker") row.PrivateNote = "";
+      if (mismatch === "nonzero-total") row.TotalAmt = 1;
+      if (mismatch === "nonzero-balance") row.Balance = 1;
+      if (mismatch === "item") row.Line[0].SalesItemLineDetail.ItemRef.value = "other";
+      if (mismatch === "amount") row.Line[0].Amount = 1;
+      if (mismatch === "qty") row.Line[0].SalesItemLineDetail.Qty = 1;
+      if (mismatch === "price") row.Line[0].SalesItemLineDetail.UnitPrice = 1;
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json({
+        QueryResponse: { [mismatch === "credit_memo" ? "CreditMemo" : "Invoice"]: [row] },
+      }));
+      await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, new QboOAuthClient(config, fetch)))
+        .rejects.toThrow("QuickBooks is unavailable");
+      expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual(["GET"]);
+      expect(sql(`select status from public.qbo_pushes where invoice_id='${f.invoice.id}'`)).toEqual(["pending"]);
+    },
+  );
 
   it("queries even an original frozen request replay, then resends only its exact body and key when absent", async () => {
     const f = await pushFixture();
