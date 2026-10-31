@@ -110,7 +110,8 @@ describe("callback batch (App Home)", () => {
     for (const user of ["U-sales", "U-stranger"]) {
       await admin.rpc("record_chat_callback_receipt", { p_provider: "slack", p_external_installation_id: inst.external_installation_id, p_callback_id: `Ev-${user}-${Date.now()}`, p_callback_kind: "app_home_opened", p_external_user_id: user, p_payload_hash: "0".repeat(64) });
     }
-    const result = await runChatCallbackBatch({ limit: 10, now: new Date(NOW), transport, db: admin });
+    const userDisplayName = vi.fn(async () => "Morgan Slack");
+    const result = await runChatCallbackBatch({ limit: 10, now: new Date(NOW), transport, db: admin, userDisplayName });
     expect(result.processed).toBeGreaterThanOrEqual(2); // the claim is global; other suites may leave receipts
     const linked = calls.homes.find((h) => h.externalUserId === "U-sales")!;
     expect(linked.linkUrl).toBeUndefined();
@@ -121,9 +122,32 @@ describe("callback batch (App Home)", () => {
     const stranger = calls.homes.find((h) => h.externalUserId === "U-stranger")!;
     expect(stranger.linkUrl).toMatch(/^https:\/\/mgr\.test\/settings\/chat\/link\?proof=/);
     expect((await admin.from("chat_user_links").select("state").eq("installation_id", inst.id).eq("external_user_id", "U-stranger").single()).data?.state).toBe("pending");
+    expect(userDisplayName).toHaveBeenCalledWith(inst.external_installation_id, "U-stranger");
+    expect((await admin.from("chat_user_links").select("external_display_name").eq("installation_id", inst.id).eq("external_user_id", "U-stranger").single()).data?.external_display_name).toBe("Morgan Slack");
     const receipts = (await admin.from("chat_callback_receipts").select("disposition").eq("installation_id", inst.id)).data!;
     expect(receipts.every((r) => r.disposition === "processed")).toBe(true);
     expect((await runChatCallbackBatch({ limit: 10, now: new Date(NOW), transport, db: admin })).processed).toBe(0);
+  });
+
+  it("does not issue a consent proof when Slack profile lookup fails", async () => {
+    const user = `U-no-profile-${crypto.randomUUID()}`;
+    await admin.rpc("record_chat_callback_receipt", {
+      p_provider: "slack", p_external_installation_id: inst.external_installation_id,
+      p_callback_id: `Ev-${crypto.randomUUID()}`, p_callback_kind: "app_home_opened",
+      p_external_user_id: user, p_payload_hash: "0".repeat(64),
+    });
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await runChatCallbackBatch({
+        now: new Date(NOW), transport, db: admin,
+        userDisplayName: async () => { throw new Error("missing_scope"); },
+      });
+      expect(result.failed).toBeGreaterThanOrEqual(1);
+      expect((await admin.from("chat_user_links").select("id").eq("installation_id", inst.id).eq("external_user_id", user)).data).toEqual([]);
+      expect(calls.homes.some(home => home.externalUserId === user)).toBe(false);
+    } finally {
+      quiet.mockRestore();
+    }
   });
 });
 

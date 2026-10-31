@@ -54,7 +54,7 @@ export function ChatSettingsView({ health, timezone, readingDueHours, configured
     {oauthError && E.note("Slack connection was cancelled or could not finish. Try again; your existing settings remain available.", "alert")}
     {installed && E.info("Slack authorization completed. Choose a private operations channel below.")}
     {E.row(connected ? `Slack · ${installation.workspace}` : "Slack", connected ? installation.state.replaceAll("_", " ") : "Not connected", connected ? E.act("Disconnect", "destructive", disconnectHref) : "", connected && installation.state === "active" ? "ok" : "w", SlackMark)}
-    <details><summary>Connection permissions</summary>{E.fld("Required scopes", "chat:write · im:write · groups:read")}{connected && E.fld("Granted scopes", installation.scopes.join(" · ") || "None recorded; reauthorize Slack")}</details>
+    <details><summary>Connection permissions</summary>{E.fld("Required scopes", "chat:write · im:write · groups:read · users:read")}{connected && E.fld("Granted scopes", installation.scopes.join(" · ") || "None recorded; reauthorize Slack")}</details>
     {installation?.lastError && E.note(`Last provider error: ${installation.lastError.replaceAll("_", " ")}`, "alert")}
     {installation?.state === "disconnected" && installation.lastError === "credential_delete_failed" && E.btn("Retry credential cleanup", "g", disconnectHref)}
     {(!connected || installation.state !== "active") && (connection !== undefined ? connection : <ChatConnectionView configured={configured} reauthorize={Boolean(connected)} />)}
