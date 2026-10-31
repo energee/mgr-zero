@@ -5,8 +5,7 @@ import { historyInput, historyResult, newestFirst, type HistoryRow } from "./his
 import { z } from "zod";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { defineCommand, defineQuery, unwrap, CommandError, Ctx } from "./registry";
-import { qboConfig, QboOAuthClient, QboHttpError, refreshQboCredentials, qboPaymentFailureCause } from "@/lib/qbo";
-import { readPortalQuoteTax, finishPortalQuoteTax } from "@/lib/supabase/integration-tokens";
+import type { QboOAuthClient } from "@/lib/qbo";
 import type { Database } from "@/lib/supabase/database";
 
 const expectedIdentity = z.object({ actorId: z.string().uuid(), customerId: z.string().uuid() }).optional();
@@ -45,9 +44,12 @@ export async function quotePortalOrder(ctx: Ctx, i: z.infer<typeof quoteInput>, 
   })) as Record<string, unknown>;
   const { taxReady, ...pending } = start;
   if (taxReady !== true || start.taxStatus === "calculated" || typeof start.quoteId !== "string") return pending;
+  // The provider-free registry/docs loader must not import the server-only credential boundary.
+  const { readPortalQuoteTax, finishPortalQuoteTax } = await import("@/lib/supabase/integration-tokens");
+  const claim = await readPortalQuoteTax(ctx, start.quoteId);
+  if (!claim) return pending;
   try {
-    const claim = await readPortalQuoteTax(ctx, start.quoteId);
-    if (!claim) return pending;
+    const { qboConfig, QboOAuthClient, QboHttpError, refreshQboCredentials, qboPaymentFailureCause } = await import("@/lib/qbo");
     if (!client) {
       client = new QboOAuthClient(qboConfig());
     }
@@ -63,8 +65,10 @@ export async function quotePortalOrder(ctx: Ctx, i: z.infer<typeof quoteInput>, 
     }
     return await finishPortalQuoteTax(ctx, start.quoteId, claim.connectionId, taxCents);
   } catch (error) {
+    const { qboPaymentFailureCause } = await import("@/lib/qbo");
     console.error("portal_quote_tax_failed", qboPaymentFailureCause(error));
-    // Tax is optional at review; the final invoice supplies tax if calculation fails.
+    // No tax or estimated total is asserted; submission revalidates the quote,
+    // and the final invoice supplies tax when optional calculation is unavailable.
     return pending;
   }
 }

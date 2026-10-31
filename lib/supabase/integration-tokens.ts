@@ -135,7 +135,8 @@ async function requireVisibleConnection(ctx: Ctx, provider: IntegrationProvider)
     ? ctx.db.from("qbo_connections").select("id").eq("brewery_id", ctx.breweryId).maybeSingle()
     : ctx.db.from("pos_connections").select("id").eq("brewery_id", ctx.breweryId).eq("provider", provider).maybeSingle();
   const { data, error } = await query;
-  if (error || !isConnectionRow(data)) {
+  if (error) throw new Error("Integration connection lookup failed");
+  if (!isConnectionRow(data)) {
     throw new CommandError("integration connection is not available for this brewery", 403);
   }
   return data.id;
@@ -157,7 +158,9 @@ export async function readVersionedIntegrationTokens(ctx: Ctx, provider: Integra
       p_actor: ctx.userId,
     })
     .maybeSingle();
-  if (error || !isTokenRow(data)) throw new CommandError("integration tokens are not available", 404);
+  if (error) throw new Error("Integration token lookup failed");
+  if (!data) throw new CommandError("integration tokens are not available", 404);
+  if (!isTokenRow(data)) throw new Error("Integration token response was invalid");
   return {
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
@@ -173,9 +176,12 @@ export async function claimQboOAuth(stateHash: string, actorId: string, breweryI
   const { data, error } = await createAdminClient().rpc("claim_qbo_oauth", {
     p_state_hash: stateHash, p_actor: actorId, p_brewery: breweryId, p_redirect_uri: redirectUri,
   }).maybeSingle();
-  if (error || !data) return null;
+  if (error) throw new Error("QuickBooks OAuth claim failed");
+  if (!data) return null;
   const row = data as { intent_id: string; brewery_id: string; provider_intent: "connect" | "reconnect"; requested_scopes: unknown };
-  if (!Array.isArray(row.requested_scopes) || row.requested_scopes.some((scope) => typeof scope !== "string")) return null;
+  if (!Array.isArray(row.requested_scopes) || row.requested_scopes.some((scope) => typeof scope !== "string")) {
+    throw new Error("QuickBooks OAuth claim response was invalid");
+  }
   return {
     intentId: row.intent_id, breweryId: row.brewery_id,
     providerIntent: row.provider_intent, requestedScopes: row.requested_scopes,
@@ -247,9 +253,12 @@ export async function claimSquareOAuth(stateHash: string, actorId: string, brewe
   const { data, error } = await createAdminClient().rpc("claim_square_oauth", {
     p_state_hash: stateHash, p_actor: actorId, p_brewery: breweryId, p_redirect_uri: redirectUri,
   }).maybeSingle();
-  if (error || !data) return null;
+  if (error) throw new Error("Square OAuth claim failed");
+  if (!data) return null;
   const row = data as { intent_id: string; brewery_id: string; provider_intent: "connect" | "reconnect"; requested_scopes: unknown };
-  if (!Array.isArray(row.requested_scopes) || row.requested_scopes.some((scope) => typeof scope !== "string")) return null;
+  if (!Array.isArray(row.requested_scopes) || row.requested_scopes.some((scope) => typeof scope !== "string")) {
+    throw new Error("Square OAuth claim response was invalid");
+  }
   return { intentId: row.intent_id, breweryId: row.brewery_id, providerIntent: row.provider_intent, requestedScopes: row.requested_scopes };
 }
 
@@ -321,7 +330,8 @@ export async function advanceSquareCatalogSync(
     p_brewery: ctx.breweryId, p_connection: start.connectionId, p_actor: start.actorId, p_request_id: start.requestId,
     p_expected_version: start.credentialVersion, p_next_version: nextCredentialVersion,
   });
-  if (error || data !== true) throw new CommandError("Square connection changed", 409, "conflict");
+  if (error) throw new Error("Square catalog sync advance failed");
+  if (data !== true) throw new CommandError("Square connection changed", 409, "conflict");
   return { ...start, credentialVersion: nextCredentialVersion };
 }
 
@@ -376,7 +386,8 @@ export async function advanceSquareSalesSync(ctx: Ctx, start: SquareSalesSyncSta
     p_brewery: ctx.breweryId, p_connection: start.connectionId, p_actor: start.actorId, p_request_id: start.requestId,
     p_expected_version: start.credentialVersion, p_next_version: nextCredentialVersion,
   });
-  if (error || data !== true) throw new CommandError("Square connection changed", 409, "conflict");
+  if (error) throw new Error("Square sales sync advance failed");
+  if (data !== true) throw new CommandError("Square connection changed", 409, "conflict");
   return { ...start, credentialVersion: nextCredentialVersion };
 }
 
@@ -563,7 +574,11 @@ export async function disconnectSquare(ctx: Ctx, connectionId: string, revoke: (
   const target: SquareRevokeTarget | null = typeof row?.access_token === "string" ? { accessToken: row.access_token }
     : typeof row?.merchant_id === "string" ? { merchantId: row.merchant_id } : null;
   let revoked = false;
-  if (target) revoked = await revoke(target).then(() => true, () => false);
+  if (target) revoked = await revoke(target).then(() => true, () => {
+    // Provider errors may contain credentials; log only the operation and local identity.
+    console.error("square_disconnect_revoke_failed", { connectionId, requestId });
+    return false;
+  });
   const { data: finished, error: finishError } = await admin.rpc("finish_square_disconnect", {
     p_brewery: ctx.breweryId, p_connection: connectionId, p_actor: ctx.userId, p_request_id: requestId, p_revoked: revoked,
   });
@@ -664,7 +679,10 @@ export async function disconnectQbo(ctx: Ctx, connectionId: string, revoke: (tok
   }
   const token = typeof row?.refresh_token === "string" ? row.refresh_token : null;
   let revoked = false;
-  if (token) revoked = await revoke(token).then(() => true, () => false);
+  if (token) revoked = await revoke(token).then(() => true, () => {
+    console.error("qbo_disconnect_revoke_failed", { connectionId, requestId });
+    return false;
+  });
   const { data: finished, error: finishError } = await admin.rpc("finish_qbo_disconnect", {
     p_brewery: ctx.breweryId, p_connection: connectionId, p_actor: ctx.userId, p_request_id: requestId, p_revoked: revoked,
   });
@@ -784,10 +802,11 @@ export async function readPortalQuoteTax(ctx: Ctx, quoteId: string) {
   const { data, error } = await createAdminClient().rpc("read_portal_quote_tax", {
     p_brewery: ctx.breweryId, p_customer: ctx.customerId, p_quote: quoteId, p_actor: ctx.userId,
   }).maybeSingle();
-  if (error) throw new Error("QuickBooks tax credentials unavailable");
-  const row = data as { connection_id?: unknown; access_token?: unknown; tax_input?: unknown } | null;
-  if (typeof row?.connection_id !== "string" || typeof row.access_token !== "string"
-    || !row.tax_input || typeof row.tax_input !== "object") return null;
+  if (error) throw new Error("Portal quote tax lookup failed");
+  if (!data) return null;
+  const row = data as { connection_id?: unknown; access_token?: unknown; tax_input?: unknown };
+  if (typeof row.connection_id !== "string" || typeof row.access_token !== "string"
+    || !row.tax_input || typeof row.tax_input !== "object") throw new Error("Portal quote tax response was invalid");
   return { connectionId: row.connection_id, accessToken: row.access_token, input: row.tax_input as QboTaxInput };
 }
 
