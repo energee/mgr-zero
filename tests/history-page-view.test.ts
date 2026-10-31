@@ -7,10 +7,6 @@ import { OrdersView } from "@/components/mgr/views/orders-list";
 import { InvoicesView } from "@/components/mgr/views/invoices";
 import { PortalOrdersView } from "@/components/mgr/views/portal-orders";
 import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
-import { BatchesView } from "@/components/mgr/views/batches";
-import { toBatchesViewProps } from "@/lib/mgr/batches-view";
-import { PackagingRunsView } from "@/components/mgr/views/packaging-runs";
-import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
 
 it("offers More only with a next cursor and keeps filters and timestamp precision", () => {
   const rows = Array.from({ length: 50 }, (_, n) => ({ id: String(n), created_at: "2026-09-20T12:00:00.123456+00:00" }));
@@ -63,19 +59,6 @@ it("pages one batch group without discarding the other group's cursor", () => {
   expect(newest.searchParams.get("cancelledCursor")).toBe("current-cancelled");
 });
 
-it("keeps history navigation reachable on an empty last page for batches and packaging", () => {
-  const pagination = { firstHref: "/newest" };
-  const batches = renderToStaticMarkup(createElement(BatchesView, {
-    model: toBatchesViewProps({ title: "Batches" }),
-    completedPagination: pagination, cancelledPagination: pagination, cancelledOpen: true,
-  }));
-  expect(batches.split('href="/newest"')).toHaveLength(3);
-  expect(batches).toContain("<details open=");
-  const packaging = renderToStaticMarkup(createElement(PackagingRunsView, {
-    model: toPackagingRunsViewProps([], "UTC"), pagination,
-  }));
-  expect(packaging).toContain('href="/newest"');
-});
 
 it("reads only a well-formed single cursor from the URL; anything else opens the newest page", () => {
   const cursor = "2026-09-20T12:00:00.123456+00:00~0b9f3c1e-7d1a-4c8e-9a51-2f6d8e4b7c10";

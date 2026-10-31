@@ -12,6 +12,10 @@ const completedIds = Array.from({ length: 55 }, () => crypto.randomUUID()).sort(
 const cancelledIds = Array.from({ length: 55 }, () => crypto.randomUUID()).sort().reverse();
 const closedRunIds = Array.from({ length: 55 }, () => crypto.randomUUID()).sort().reverse();
 const cancelledRunIds = Array.from({ length: 55 }, () => crypto.randomUUID()).sort().reverse();
+const foreignCompletedId = crypto.randomUUID();
+const foreignCancelledId = crypto.randomUUID();
+const foreignClosedRunId = crypto.randomUUID();
+const foreignCancelledRunId = crypto.randomUUID();
 
 beforeAll(async () => {
   ctx = await makeStaffCtx((await makeBrewery()).id, "admin");
@@ -43,8 +47,15 @@ beforeAll(async () => {
   await admin.from("packaging_run_outputs").insert([...closedRunIds, ...cancelledRunIds].map(run_id => ({ brewery_id: ctx.breweryId, run_id, sku_id: catalog.skuId, qty_planned: 12 }))).throwOnError();
   // Another tenant has matching lifecycle facts but must never enter these pages.
   const otherCatalog = await seedCatalog(other.breweryId);
-  await admin.from("batches").insert({ brewery_id: other.breweryId, created_by: other.userId, planned_on: plan.plannedOn, planned_bbl: 10, brewed_on: plan.plannedOn, closed_at: "2026-10-03T12:00:00Z" }).throwOnError();
-  await runCommand("schedule_packaging_run", { brandId: otherCatalog.brandId, plannedOn: plan.plannedOn, outputs: [] }, other);
+  const foreign = { brewery_id: other.breweryId, created_by: other.userId, planned_on: plan.plannedOn, created_at: common.created_at };
+  await admin.from("batches").insert([
+    { ...foreign, id: foreignCompletedId, intended_brand_id: otherCatalog.brandId, planned_bbl: 10, brewed_on: plan.plannedOn, closed_at: "2026-10-03T12:00:00Z", cancelled_at: null },
+    { ...foreign, id: foreignCancelledId, planned_bbl: 10, brewed_on: null, closed_at: null, cancelled_at: "2026-10-03T12:00:00Z" },
+  ]).throwOnError();
+  await admin.from("packaging_runs").insert([
+    { ...foreign, id: foreignClosedRunId, brand_id: otherCatalog.brandId, batch_id: foreignCompletedId, started_at: "2026-10-02T12:00:00Z", closed_at: "2026-10-03T12:00:00Z", cancelled_at: null },
+    { ...foreign, id: foreignCancelledRunId, brand_id: otherCatalog.brandId, started_at: null, closed_at: null, cancelled_at: "2026-10-03T12:00:00Z" },
+  ]).throwOnError();
 });
 
 it("keeps current batch work separate from imported history and embeds the recipe and latest reading", async () => {
@@ -59,14 +70,16 @@ it("keeps current batch work separate from imported history and embeds the recip
 
 it("pages completed and cancelled batches independently without timestamp-tie gaps or tenant leaks", async () => {
   for (const [status, ids] of [["completed", completedIds], ["cancelled", cancelledIds]] as const) {
-    const first = await runCommand("list_batch_history", { status }, ctx) as HistoryPage<Batch>;
+    const first = await runCommand("list_batch_history", { status, limit: 50 }, ctx) as HistoryPage<Batch>;
     expect(first.rows.map(row => row.id)).toEqual(ids.slice(0, 50));
     expect(first.nextCursor).toBe(`${first.rows[49].created_at}~${first.rows[49].id}`);
-    const next = await runCommand("list_batch_history", { status, cursor: first.nextCursor }, ctx) as HistoryPage<Batch>;
+    const next = await runCommand("list_batch_history", { status, limit: 50, cursor: first.nextCursor }, ctx) as HistoryPage<Batch>;
     expect(next.rows.map(row => row.id)).toEqual(ids.slice(50));
     expect(next.nextCursor).toBeNull();
     expect([...first.rows, ...next.rows].every(row => row.active_occupancies.length === 0)).toBe(true);
     expect(first.rows[0]).toMatchObject(status === "completed" ? { brand_name: "History pils", recipe_name: "History recipe" } : { brand_name: null, recipe_name: null });
+    const foreignPage = await runCommand("list_batch_history", { status }, other) as HistoryPage<Batch>;
+    expect(foreignPage.rows.map(row => row.id)).toEqual([status === "completed" ? foreignCompletedId : foreignCancelledId]);
     const denied = await runCommand("list_batch_history", { status }, { ...ctx, breweryId: other.breweryId }) as HistoryPage<Batch>;
     expect(denied.rows).toEqual([]);
   }
@@ -78,18 +91,40 @@ it("keeps every upcoming run visible while paging only finished runs with their 
   const listed: Run[] = [];
   let cursor: string | undefined;
   do {
-    const page = await runCommand("list_packaging_history", { cursor }, ctx) as HistoryPage<Run>;
+    const page = await runCommand("list_packaging_history", { cursor, limit: 50 }, ctx) as HistoryPage<Run>;
     expect(page.rows.length).toBeLessThanOrEqual(50);
     listed.push(...page.rows);
     cursor = page.nextCursor ?? undefined;
   } while (cursor);
   expect(listed.map(row => row.id)).toEqual(expected);
   expect(listed.every(row => (row.closed_at || row.cancelled_at) && row.brand_name === "History pils" && row.qty_planned === 12)).toBe(true);
+  const foreignPage = await runCommand("list_packaging_history", {}, other) as HistoryPage<Run>;
+  expect(foreignPage.rows.map(row => row.id)).toEqual([foreignClosedRunId, foreignCancelledRunId].sort().reverse());
   expect((await runCommand("list_packaging_history", {}, { ...ctx, breweryId: other.breweryId }) as HistoryPage<Run>).rows).toEqual([]);
   for (const [name, input] of [["list_batch_history", { status: "completed" }], ["list_packaging_history", {}]] as const) {
     for (const invalid of [{ cursor: "bad),brewery_id.not.is.null" }, { limit: 0 }, { limit: 201 }]) {
       await expect(runCommand(name, { ...input, ...invalid }, ctx)).rejects.toMatchObject({ code: "invalid_input" });
     }
     await expect(runCommand(name, input, { ...ctx, roles: ["sales"] })).rejects.toMatchObject({ code: "permission_denied" });
+  }
+});
+
+it("preserves sub-millisecond boundaries when advancing batch and packaging history", async () => {
+  const precise = await makeStaffCtx((await makeBrewery()).id, "admin");
+  const catalog = await seedCatalog(precise.breweryId);
+  const ids = Array.from({ length: 3 }, () => crypto.randomUUID()).sort();
+  const times = ["2026-09-20T12:00:00.123457+00:00", "2026-09-20T12:00:00.123456+00:00", "2026-09-20T12:00:00.123455+00:00"];
+  const common = { brewery_id: precise.breweryId, created_by: precise.userId, planned_on: "2026-10-01", cancelled_at: "2026-10-03T12:00:00Z", closed_at: null };
+  await admin.from("batches").insert(ids.map((id, index) => ({ ...common, id, created_at: times[index], planned_bbl: 10, brewed_on: null }))).throwOnError();
+  await admin.from("packaging_runs").insert(ids.map((id, index) => ({ ...common, id, created_at: times[index], brand_id: catalog.brandId, started_at: null }))).throwOnError();
+  for (const [name, input] of [["list_batch_history", { status: "cancelled" }], ["list_packaging_history", {}]] as const) {
+    let cursor: string | undefined;
+    for (let index = 0; index < ids.length; index++) {
+      const page = await runCommand(name, { ...input, limit: 1, cursor }, precise) as HistoryPage<HistoryRow>;
+      expect(page.rows.map(row => row.id)).toEqual([ids[index]]);
+      expect(page.rows[0].created_at).toBe(times[index]);
+      expect(page.nextCursor).toBe(index < ids.length - 1 ? `${times[index]}~${ids[index]}` : null);
+      cursor = page.nextCursor ?? undefined;
+    }
   }
 });

@@ -59,8 +59,8 @@ describe("history lists page past 1000 rows (#759)", () => {
   it("list_batches({ open: true }) returns every brewed open batch and no closed or unbrewed one", async () => {
     const batches = many(n => ({ id: id(n), planned_on: day(0), brewed_on: day(0), closed_at: null, cancelled_at: null, intended_brand_id: null, recipe_version_id: null }));
     batches.push(
-      { brewery_id: breweryId, id: id(5000), planned_on: day(0), brewed_on: day(0), closed_at: `${day(1)}T00:00:00Z`, intended_brand_id: null, recipe_version_id: null },
-      { brewery_id: breweryId, id: id(5001), planned_on: day(0), brewed_on: null, closed_at: null, intended_brand_id: null, recipe_version_id: null },
+      { brewery_id: breweryId, id: id(5000), planned_on: day(0), brewed_on: day(0), closed_at: `${day(1)}T00:00:00Z`, cancelled_at: null, intended_brand_id: null, recipe_version_id: null },
+      { brewery_id: breweryId, id: id(5001), planned_on: day(0), brewed_on: null, closed_at: null, cancelled_at: null, intended_brand_id: null, recipe_version_id: null },
     );
     expectAllOnce(await runCommand("list_batches", { open: true }, context({ batches }, "brewer")) as Row[]);
   });
