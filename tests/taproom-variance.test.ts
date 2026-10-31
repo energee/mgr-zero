@@ -112,6 +112,60 @@ it("absent/incomplete empty coverage is null; completed zero-sales observation c
   expect((await report(f)).rows).toMatchObject([{ expected_bbl: 0, actual_bbl: 2, variance_bbl: -2 }]);
 });
 
+it("retains historical coverage and unresolved sale attribution after an Admin retires and replaces a mapping", async () => {
+  const f = await fixture();
+  const first = await count(f, -14, null, 0);
+  await count(f, -7, first);
+  await coverage(f, -14, -7);
+  await sale(f, -10, 1, { external_item_id: "unknown-before-count" });
+  await sale(f, -3, 1, { external_item_id: "unknown-after-count" });
+  const before = await report(f);
+  expect(before.periods.at(-1)).toMatchObject({ coverage_complete: true, unmapped_lines: 1, expected_bbl: null });
+  expect((await draft(f)).unmapped_lines).toBe(1);
+  const owner = await makeStaffCtx(f.brewery.id, "admin");
+  const replacement = await seedLocation(f.brewery.id, { name: "Corrected taproom", uses: ["taproom"] });
+  expect((await admin.from("pos_connections").update({ state: "connected" }).eq("id", f.connection.id)).error).toBeNull();
+  await runCommand("retire_pos_location_mapping", { posLocationId: "L" }, owner);
+  await runCommand("set_pos_location_mapping", { posLocationId: "L", mgrLocationId: replacement.id }, owner);
+  const after = await report(f);
+  expect(after.rows).toEqual(before.rows);
+  expect(after.periods).toEqual(before.periods);
+  const projection = await draft(f);
+  expect(projection.unmapped_lines).toBe(1);
+  expect(projection.coverage_sources).toEqual([expect.objectContaining({ connection_id: f.connection.id, external_location_id: "L" })]);
+});
+
+it.each([false, true])("requires coverage only while a source maps to the counted location, retaining real gaps (gap=%s)", async gap => {
+  const f = await fixture();
+  const owner = await makeStaffCtx(f.brewery.id, "admin");
+  const other = await seedLocation(f.brewery.id, { name: "Other taproom", uses: ["taproom"] });
+  expect((await admin.from("pos_connections").update({ state: "connected" }).eq("id", f.connection.id)).error).toBeNull();
+  await runCommand("retire_pos_location_mapping", { posLocationId: "L" }, owner);
+  await runCommand("set_pos_location_mapping", { posLocationId: "L", mgrLocationId: other.id }, owner);
+  // Place the synthetic transition in the past so both count windows are deterministic.
+  sql(`update public.pos_location_mapping_history set ends_at='${stamp(f, -7)}'
+      where connection_id='${f.connection.id}' and external_location_id='L';
+    update public.pos_locations set mapping_started_at='${stamp(f, -7)}'
+      where connection_id='${f.connection.id}' and external_location_id='L'`, true);
+  expect((await admin.from("pos_locations").insert({ brewery_id: f.brewery.id, connection_id: f.connection.id,
+    external_location_id: "L2", location_id: f.location.id, mapping_started_at: stamp(f, gap ? -3 : -7) })).error).toBeNull();
+  sql(`insert into public.pos_sales_coverage(brewery_id,connection_id,external_location_id,location_id,starts_at,ends_at,complete)
+    values('${f.brewery.id}','${f.connection.id}','L2','${f.location.id}','${stamp(f, -6)}','${stamp(f, 1)}',true)`, true);
+  const first = await count(f, -6, null, 0);
+  const beforeCount = await draft(f);
+  expect(beforeCount.coverage_complete).toBe(!gap);
+  expect(beforeCount.expected_bbl).toBe(gap ? null : 0);
+  expect(beforeCount.coverage_sources).toEqual([expect.objectContaining({ external_location_id: "L2", complete: true })]);
+  await count(f, -1, first);
+  const completed = await report(f);
+  expect(completed.periods.at(-1)).toMatchObject({ coverage_complete: !gap, expected_bbl: gap ? null : 0 });
+  if (!gap) expect(completed.rows).toMatchObject([{ expected_bbl: 0, actual_bbl: 2, variance_bbl: -2 }]);
+  else expect(completed.rows).toEqual([]);
+  const afterCount = await draft(f);
+  expect(afterCount).toMatchObject({ coverage_complete: true, expected_bbl: 0 });
+  expect(afterCount.coverage_sources).toEqual([expect.objectContaining({ external_location_id: "L2", complete: true })]);
+});
+
 it("freezes poured and packaged volume, replays once, and late reconciled facts change only expected", async () => {
   const f = await fixture(); const a = await count(f, -14, null, 0); await count(f, -7, a);
   await coverage(f); await interval(f, -20, null);

@@ -46,7 +46,7 @@ async function race(first: Write, second: Write, roles: StaffRole[] = ["admin"])
 
   expect(await admins(brewery)).toBe(1);
   expect(outcome.ok).toBe(false);
-  if (!outcome.ok) expect(outcome.error.message).toMatch(/keep at least one admin/);
+  if (!outcome.ok) expect(outcome.error.message).toMatch(/permission denied|keep at least one admin/);
 }
 
 describe("last admin under concurrency (#458)", { concurrent: false }, () => {
@@ -89,4 +89,53 @@ describe("last admin under concurrency (#458)", { concurrent: false }, () => {
       await race(first, second, ["admin", "sales"]);
     });
   }
+
+  it("rejects a demoted administrator's waiting change to an unrelated member", async () => {
+    const brewery = (await makeBrewery()).id;
+    const owner = await makeStaffCtx(brewery);
+    const demoted = await makeStaffCtx(brewery);
+    const target = await makeStaffCtx(brewery, "warehouse");
+    const first = await staffSession(owner.userId);
+    const second = await staffSession(demoted.userId);
+    const observer = await pgSession();
+    const pid = (await second.query("select pg_backend_pid() pid")).rows[0].pid;
+    await demote(first, brewery, demoted.userId);
+    let settled = false;
+    const pending = demote(second, brewery, target.userId).then(
+      () => ({ ok: true as const }),
+      (error: Error) => ({ ok: false as const, error }),
+    ).finally(() => { settled = true; });
+    await expect.poll(async () => settled
+      || (await observer.query("select wait_event_type from pg_stat_activity where pid=$1", [pid])).rows[0]?.wait_event_type === "Lock",
+    { timeout: 5000 }).toBe(true);
+    expect(settled).toBe(false);
+    await first.query("commit");
+    const outcome = await pending;
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) expect(outcome.error.message).toMatch(/permission denied/);
+    await second.query("rollback");
+    expect((await observer.query("select roles::text[] roles from public.brewery_users where brewery_id=$1 and user_id=$2", [brewery, target.userId])).rows)
+      .toEqual([{ roles: ["warehouse"] }]);
+  });
+
+  it("holds an invitation caller's permission until its transaction commits", async () => {
+    const brewery = (await makeBrewery()).id;
+    const inviter = await makeStaffCtx(brewery);
+    const owner = await makeStaffCtx(brewery);
+    const first = await staffSession(inviter.userId);
+    const second = await staffSession(owner.userId);
+    const observer = await pgSession();
+    const pid = (await second.query("select pg_backend_pid() pid")).rows[0].pid;
+    await first.query("select public.claim_invite_request($1,$2,'staff','sales',null,$3)",
+      [brewery, `pending-${crypto.randomUUID()}@test.local`, crypto.randomUUID()]);
+    let settled = false;
+    const pending = demote(second, brewery, inviter.userId).finally(() => { settled = true; });
+    await expect.poll(async () => settled
+      || (await observer.query("select wait_event_type from pg_stat_activity where pid=$1", [pid])).rows[0]?.wait_event_type === "Lock",
+    { timeout: 5000 }).toBe(true);
+    expect(settled).toBe(false);
+    await first.query("commit");
+    await pending;
+    await second.query("commit");
+  });
 });

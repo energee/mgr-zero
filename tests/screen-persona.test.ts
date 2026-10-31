@@ -63,7 +63,7 @@ describe("persona", () => {
     const team = renderToStaticMarkup(createElement("div", null, by("Team").body));
     for (const p of PERSONAS) {
       expect(team, `${p.name} is not on Team`).toContain(p.name);
-      expect(team, `${p.name} has another role on Team`).toContain(`${p.handle.slice(1)}@demobrewing.com · ${p.roles.map(sentenceCase).join(", ")}`);
+      expect(team, `${p.name} has another role on Team`).toMatch(new RegExp(`${p.name} &lt;${p.handle.slice(1)}@demobrewing\\.com&gt;</div><p[^>]*>${p.roles.map(sentenceCase).join(", ")}</p>`));
       if (p.avatar) expect(team, `${p.name}'s face differs on Team`).toContain(p.avatar);
     }
   });

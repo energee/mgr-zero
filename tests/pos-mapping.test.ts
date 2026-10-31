@@ -136,6 +136,43 @@ describe("Square explicit mapping", () => {
     await expect(call("L1", two.id)).rejects.toMatchObject({ status: 409, message: expect.stringContaining("history") });
   });
 
+  it("retires a mistaken mapping and preserves old and late-arriving historical sales across its replacement", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id, "admin");
+    const warehouse = await makeStaffCtx(brewery.id, "warehouse");
+    const connectionId = await connected(brewery.id);
+    const old = await seedLocation(brewery.id, { name: "Mistaken taproom" });
+    const corrected = await seedLocation(brewery.id, { name: "Correct taproom" });
+    const catalog = await seedCatalog(brewery.id);
+    expect((await admin.from("pos_catalog_variations").insert({ brewery_id: brewery.id, connection_id: connectionId, external_item_id: "I", external_variation_id: "V", external_item_name: "Test beer", external_variation_name: "Each", source_version: 1 })).error).toBeNull();
+    expect((await admin.from("pos_locations").insert({ brewery_id: brewery.id, connection_id: connectionId, external_location_id: "L1" })).error).toBeNull();
+    await runCommand("set_pos_location_mapping", { posLocationId: "L1", mgrLocationId: old.id }, ctx);
+    expect((await admin.from("pos_sales_coverage").insert({ brewery_id: brewery.id, connection_id: connectionId, external_location_id: "L1", location_id: old.id, starts_at: "2026-09-01T00:00:00Z", ends_at: "2026-09-02T00:00:00Z", complete: true })).error).toBeNull();
+    await expect(runCommand("retire_pos_location_mapping", { posLocationId: "L1" }, warehouse)).rejects.toMatchObject({ status: 403 });
+    const requestId = crypto.randomUUID();
+    const result = await runCommand("retire_pos_location_mapping", { posLocationId: "L1" }, ctx, { requestId, correlationId: requestId });
+    expect(await runCommand("retire_pos_location_mapping", { posLocationId: "L1" }, ctx, { requestId, correlationId: requestId })).toEqual(result);
+    await runCommand("set_pos_location_mapping", { posLocationId: "L1", mgrLocationId: corrected.id }, ctx);
+    expect((await admin.from("pos_sales").insert([
+      { brewery_id: brewery.id, connection_id: connectionId, external_order_id: "LATE-OLD", external_line_id: "1", external_item_id: "I", external_variation_id: "V", external_location_id: "L1", sold_at: "2026-09-01T12:00:00Z", qty: 1 },
+      { brewery_id: brewery.id, connection_id: connectionId, external_order_id: "NEW", external_line_id: "1", external_item_id: "I", external_variation_id: "V", external_location_id: "L1", sold_at: "2030-01-01T12:00:00Z", qty: 1 },
+    ])).error).toBeNull();
+    await runCommand("set_pos_item_mapping", { externalItemId: "I", externalVariationId: "V", skuId: catalog.skuId, disposition: "mapped" }, ctx);
+    expect((await admin.from("pos_sale_expectations").select("location_id").eq("brewery_id", brewery.id)).data)
+      .toEqual(expect.arrayContaining([{ location_id: old.id }, { location_id: corrected.id }]));
+    const listing = await runCommand("list_pos_sales", {}, warehouse) as { sales: { externalOrderId: string; locationName: string }[] };
+    expect(listing.sales).toEqual(expect.arrayContaining([
+      expect.objectContaining({ externalOrderId: "LATE-OLD", locationName: "Mistaken taproom" }),
+      expect.objectContaining({ externalOrderId: "NEW", locationName: "Correct taproom" }),
+    ]));
+    sql(`insert into public.pos_sales_coverage(brewery_id,connection_id,external_location_id,location_id,starts_at,ends_at,complete)
+      select '${brewery.id}','${connectionId}','L1','${corrected.id}',mapping_started_at-interval '1 hour',mapping_started_at+interval '1 hour',true
+      from public.pos_locations where connection_id='${connectionId}' and external_location_id='L1'`);
+    expect(sql(`select location_id from public.pos_sales_coverage where connection_id='${connectionId}' and ends_at>'2026-10-01' order by starts_at`))
+      .toEqual([old.id, corrected.id]);
+    expect((await admin.from("inventory_movements").select("id").eq("brewery_id", brewery.id)).data).toEqual([]);
+  });
+
   it("explicitly clears an unobserved menu when its Square location is remapped", async () => {
     const brewery = await makeBrewery();
     const ctx = await makeStaffCtx(brewery.id, "admin");

@@ -144,6 +144,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_routes", "input": {} }'
 ```
 
+## reorder_refused_delivery [#reorder_refused_delivery]
+
+`command` · admin, sales
+
+Create one editable draft for a shipped order's refused quantities, preserving customer, ship-to, fulfillment source, pickup, customer PO and note; capture current prices; a second reorder of the same order is refused
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `orderId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "reorder_refused_delivery", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "orderId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 ## return_route [#return_route]
 
 `command` · admin, warehouse
@@ -165,21 +182,23 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Full returnable kegs coming back with beer also post Returned shells; deposit-only refunds do not. Return shipped beer: credit memo at the invoiced price + return_in at the destination; a damaged return is also written to loss in the same transaction
+Return shipped beer at invoice prices and its destination, posting damaged beer to loss and full-keg shells as Returned. Deposit-only refunds need no location or reason; returnEmptyKegs optionally checks empties into locationId and binId with the refund atomically
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `invoiceId` | uuid | yes |
-| `locationId` | uuid | yes |
-| `reason` | damaged or wrong_item or unsold | yes |
 | `lines` | array of object | yes |
 | `refusedDeliveryId` | uuid | no |
+| `locationId` | uuid | no |
+| `reason` | damaged or wrong_item or unsold | no |
+| `returnEmptyKegs` | boolean | no |
+| `binId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "return_shipment", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "invoiceId": "00000000-0000-0000-0000-000000000000", "locationId": "00000000-0000-0000-0000-000000000000", "reason": "damaged", "lines": [ { "invoiceLineId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "return_shipment", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "invoiceId": "00000000-0000-0000-0000-000000000000", "lines": [ { "invoiceLineId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
 ```
 
 ## save_route [#save_route]

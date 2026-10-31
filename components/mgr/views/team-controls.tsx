@@ -62,15 +62,16 @@ export function PendingInvitationActionsView({ email, onResend, onCancel, busy =
   </div>;
 }
 
-export function TeamMemberView({ name, email, avatar, savedRoles, roles, onRolesChange, onSubmit, onRemove, saving = false, removing = false, error }: {
-  name: string; email: string; avatar?: string; savedRoles: StaffRole[]; roles?: StaffRole[]; onRolesChange?: (value: StaffRole[]) => void;
+/** `name` is list_team_members' identity label, which already carries the email. */
+export function TeamMemberView({ name, avatar, savedRoles, roles, onRolesChange, onSubmit, onRemove, saving = false, removing = false, error }: {
+  name: string; avatar?: string; savedRoles: StaffRole[]; roles?: StaffRole[]; onRolesChange?: (value: StaffRole[]) => void;
   onSubmit?: FormEventHandler<HTMLFormElement>; onRemove?: () => Promise<boolean>; saving?: boolean; removing?: boolean; error?: string | null;
 }) {
   const [draftRoles, setRoles] = useState(savedRoles), busy = saving || removing, value = roles ?? draftRoles;
   const unchanged = value.length === savedRoles.length && value.every(role => savedRoles.includes(role));
   const empty = value.length === 0;
   return <>
-    {E.row(name, email, "", "", E.face({ src: avatar, name }))}
+    {E.row(name, "", "", "", E.face({ src: avatar, name }))}
     <form onSubmit={event => { event.preventDefault(); if (!busy && !empty && !unchanged) onSubmit?.(event); }} className="flex flex-col gap-4">
       {E.picks("Roles", STAFF_ROLES.filter(role => value.includes(role)), ROLE_OPTIONS, {
         onChange: next => { const selected = STAFF_ROLES.filter(role => next.includes(role)); setRoles(selected); onRolesChange?.(selected); },
