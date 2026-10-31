@@ -56,6 +56,7 @@ export type OrderViewModel = {
   putBackHref?: string;
   confirmHref?: string;
   editHref?: string;
+  /** A shipped wholesale order with refused quantities offers Reorder once: a reorder_created event retires it (#1662). */
   canReorderRefused?: boolean;
   lines: OrderLineView[];
   /** The columns with something to say (#1506): Picked and Shipped once a line
@@ -281,7 +282,8 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
     putBackHref: stagedOnOpenOrder(order.status, order.needs_restock) ? (backHref ? `/orders/${order.id}/restock` : "#") : undefined,
     editHref: order.status === "draft" ? (backHref ? `/orders/${order.id}/edit` : "#") : undefined,
     confirmHref: order.status === "submitted" ? (backHref ? `/orders/${order.id}/confirm` : "#") : undefined,
-    canReorderRefused: order.kind === "wholesale" && order.status === "shipped" && lines.some(line => Number(line.qty_refused ?? 0) > 0),
+    canReorderRefused: order.kind === "wholesale" && order.status === "shipped" && lines.some(line => Number(line.qty_refused ?? 0) > 0)
+      && !events.some((e) => e.event === "reorder_created"),
     columns: lineColumns(order.status, lines),
     lines: lines.map((l) => {
       const ordered = Number(l.qty_ordered);
@@ -314,6 +316,7 @@ export function toOrderViewProps({ order, lines, events, atp, locations, deliver
       ...(actorNames ? { by: actorNames[e.actor] ?? "a user not on the team" } : {}),
       detail: e.event === "lines_adjusted"
         ? `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${typeof e.payload.reason === "string" && e.payload.reason.trim() ? ` (${e.payload.reason.trim()})` : ""}`
+        : e.event === "reorder_created" ? docNo("ORD", typeof e.payload.order_no === "number" ? e.payload.order_no : null, "Draft")
         : typeof e.payload.reason === "string" ? e.payload.reason.trim() : "",
     })),
   };

@@ -216,7 +216,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "reorder_refused_delivery", description: "Create an editable draft for a shipped order's refused quantities, preserving customer, ship-to, fulfillment source, pickup, customer PO and note; capture current prices",
+  name: "reorder_refused_delivery", description: "Create one editable draft for a shipped order's refused quantities, preserving customer, ship-to, fulfillment source, pickup, customer PO and note; capture current prices; a second reorder of the same order is refused",
   roles: [...salesRoles],
   input: z.object({ orderId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("reorder_refused_delivery", { p_order: i.orderId, p_request_id: execution.requestId })),

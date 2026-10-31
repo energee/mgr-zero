@@ -20,6 +20,11 @@ describe("Order view loop", () => {
     expect(model.canReorderRefused).toBe(true);
     expect(toOrderViewProps({ ...refused, order: { ...refused.order, status: "confirmed" } }).canReorderRefused).toBe(false);
     expect(toOrderViewProps({ ...refused, lines: refused.lines.map(line => ({ ...line, qty_refused: 0 })) }).canReorderRefused).toBe(false);
+    // Once reordered, the history names the draft and the verb is gone.
+    const reordered = toOrderViewProps({ ...refused, events: [...refused.events,
+      { id: "e9", event: "reorder_created", actor: "Ted", payload: { order_id: "o-2", order_no: 12 }, created_at: "2026-09-03T10:00:00.000Z" }] });
+    expect(reordered.canReorderRefused).toBe(false);
+    expect(reordered.events.at(-1)).toMatchObject({ event: "Reorder created", detail: "ORD-0012" });
   });
 
   it("shows every buyer confirmation outcome, with acceptance distinct from inbox delivery", () => {

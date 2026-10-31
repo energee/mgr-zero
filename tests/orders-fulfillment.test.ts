@@ -109,10 +109,16 @@ describe("pick and ship", () => {
     expect(reordered.error).toBeNull();
     expect(await db.rpc("reorder_refused_delivery", { p_order: original.order_id, p_request_id: requestId })).toMatchObject({ data: reordered.data, error: null });
     const result = reordered.data as { order_id: string };
-    expect((await admin.from("orders").select("status,po_number,note,customer_id,ship_to_id,from_location_id,requested_ship_date").eq("id", result.order_id).single()).data)
-      .toEqual({ status: "draft", po_number: "BUYER-123", note: "Deliver after lunch", customer_id: customer.customerId, ship_to_id: customer.shipToId, from_location_id: source.id, requested_ship_date: null });
+    const draft = (await admin.from("orders").select("order_no,status,po_number,note,customer_id,ship_to_id,from_location_id,requested_ship_date").eq("id", result.order_id).single()).data!;
+    expect(draft).toMatchObject({ status: "draft", po_number: "BUYER-123", note: "Deliver after lunch", customer_id: customer.customerId, ship_to_id: customer.shipToId, from_location_id: source.id, requested_ship_date: null });
     expect((await admin.from("order_lines").select("sku_id,qty_ordered,qty_picked,qty_shipped").eq("order_id", result.order_id)).data)
       .toEqual([{ sku_id: catalog.skuId, qty_ordered: 2, qty_picked: null, qty_shipped: null }]);
+    // The source order names its draft, and a second reorder is refused rather than creating another.
+    expect((await admin.from("order_events").select("event,payload").eq("order_id", original.order_id).order("created_at")).data?.at(-1))
+      .toEqual({ event: "reorder_created", payload: { order_id: result.order_id, order_no: draft.order_no } });
+    const again = await db.rpc("reorder_refused_delivery", { p_order: original.order_id, p_request_id: crypto.randomUUID() });
+    expect(again.error?.message).toMatch(/already reordered/i);
+    expect((await admin.from("orders").select("id").eq("customer_id", customer.customerId)).data).toHaveLength(2);
   });
 
   it("serializes distinct workers racing shipment and adjustment so only one transition wins", async () => {

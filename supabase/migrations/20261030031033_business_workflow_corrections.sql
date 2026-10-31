@@ -138,11 +138,12 @@ begin
   v_bin := coalesce(v_original.bin_id,v_bin);
   v_location := coalesce(p_location,v_location);
   v_bin := coalesce(p_bin,v_bin);
-  if not exists(select 1 from public.bins where id=v_bin and location_id=v_location and brewery_id=p_brewery) then
-    raise exception 'choose a receiving bin in this brewery location';
-  end if;
+  -- A pre-#680 receipt froze no destination: name that gap before the bin lookup, which a null bin would fail as a wrong choice.
   if v_location is null or v_bin is null then
     raise exception 'historical receipt has no frozen receiving location; correction is unavailable';
+  end if;
+  if not exists(select 1 from public.bins where id=v_bin and location_id=v_location and brewery_id=p_brewery) then
+    raise exception 'choose a receiving bin in this brewery location';
   end if;
   insert into public.receipts(brewery_id,po_id,received_on,received_by,corrects_receipt_id,correction_reason,location_id,bin_id)
     values(p_brewery,v_po.id,v_original.received_on,v_actor,p_receipt,v_reason,v_location,v_bin)

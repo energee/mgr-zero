@@ -196,3 +196,15 @@ it("corrects a new zero receipt but refuses missing historical conversion facts"
   }, legacy.ctx)).rejects.toThrow(/historical.*conversion/i);
   expect((await admin.from("receipts").select("id").eq("po_id", legacy.po.id)).data).toHaveLength(1);
 });
+
+// A pre-#680 receipt froze no receiving location and, with no count, no
+// movement to read one from: the correction names that gap, not a bin chooser
+// the form never showed.
+it("refuses a historical receipt with no frozen receiving location as historical, not as a missing bin", async () => {
+  const legacy = await received(0);
+  sql(`update public.receipts set location_id=null,bin_id=null where id='${legacy.receiptId}'`);
+  await expect(runCommand("correct_purchase_receipt", {
+    receiptId: legacy.receiptId, reason: "One bag was overlooked", lines: [{ poLineId: legacy.lineId, qtyCounted: 1, lotCode: "FOUND" }],
+  }, legacy.ctx)).rejects.toThrow(/historical receipt has no frozen receiving location/i);
+  expect((await admin.from("receipts").select("id").eq("po_id", legacy.po.id)).data).toHaveLength(1);
+});
