@@ -27,8 +27,20 @@ describe("Slack OAuth callback diagnostics", () => {
     callbacks.origin.mockImplementation(() => { throw new Error("APP_URL provider-secret"); });
     const response = await GET(request());
     expect(response.status).toBe(500);
-    expect(await response.text()).toBe("APP_URL is not configured");
+    expect(await response.text()).not.toContain("secret");
     expect(console.error).toHaveBeenCalledExactlyOnceWith("slack_oauth_callback_failed", {
+      name: "Error", status: null, stage: "oauth_config",
+    });
+    expect(callbacks.complete).not.toHaveBeenCalled();
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
+  });
+
+  it("classifies adapter setup failures before the OAuth exchange", async () => {
+    callbacks.port.mockImplementation(() => { throw new Error("SLACK_CLIENT_SECRET missing-secret"); });
+    const response = await GET(request());
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("https://mgr.test/settings/chat?error=oauth_failed");
+    expect(console.error).toHaveBeenCalledWith("slack_oauth_callback_failed", {
       name: "Error", status: null, stage: "oauth_config",
     });
     expect(callbacks.complete).not.toHaveBeenCalled();
@@ -48,7 +60,7 @@ describe("Slack OAuth callback diagnostics", () => {
   });
 
   it("logs provider status while preserving the generic failure redirect", async () => {
-    callbacks.complete.mockRejectedValue(Object.assign(new Error("token-secret"), { status: 400, body: "body-secret" }));
+    callbacks.complete.mockRejectedValue(Object.assign(new Error("token-secret"), { statusCode: 400, body: "body-secret" }));
     const response = await GET(request());
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe("https://mgr.test/settings/chat?error=oauth_failed");

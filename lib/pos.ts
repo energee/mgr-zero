@@ -434,6 +434,7 @@ export class SquareClient {
     const data = await response.json().catch(() => null) as Record<string, unknown> | null;
     if (!response.ok) {
       if (terminalAuthorization(response.status, data)) throw new SquareProviderError(true, response.status, "catalog_write_response");
+      console.error("square_provider_failed", integrationFailureCause({ name: "Error", status: response.status }, "catalog_write_response"));
       const versionConflict = Array.isArray(data?.errors) && data.errors.some((entry) =>
         !!entry && typeof entry === "object" && (entry as Record<string, unknown>).code === "VERSION_MISMATCH");
       return { ok: false as const, versionConflict, definitive: versionConflict || (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) };
@@ -482,7 +483,7 @@ export async function publishSquareCatalogItem(
       }
       throw unavailable(error, "publication_refresh");
     }
-    if (next.merchantId !== lease.merchantId) throw unavailable();
+    if (next.merchantId !== lease.merchantId) throw unavailable(undefined, "publication_refresh");
     await compareAndSwapSquareTokens(ctx, {
       accessToken: lease.accessToken, refreshToken: lease.refreshToken, connectionId: start.connectionId,
       credentialVersion: lease.credentialVersion, accessExpiresAt: lease.accessExpiresAt,
@@ -533,7 +534,7 @@ export async function publishSquareCatalogItem(
     if (result.definitive) await finishSquarePublication(ctx, start.attemptId,
       result.versionConflict ? "version_mismatch" : "provider_rejected", null);
     if (result.versionConflict) throw new CommandError("Square changed this item; retry after loading its current version", 409, "conflict");
-    throw result.definitive ? new CommandError("Square rejected this publication", 400) : unavailable();
+    throw result.definitive ? new CommandError("Square rejected this publication", 400) : unavailable(undefined, "publication_write");
   }
   return finishSquarePublication(ctx, start.attemptId, null, {
     catalogObject: result.catalogObject,
@@ -707,16 +708,16 @@ export async function refreshSquareCredentials(
     if (isTerminalAuthorization(error)) await markSquareAuthorizationFailed(ctx, current.connectionId, current.credentialVersion);
     throw unavailable(error, "refresh");
   }
-  if (next.merchantId !== (syncStart?.merchantId ?? await getSquareMerchant(ctx))) throw unavailable();
+  if (next.merchantId !== (syncStart?.merchantId ?? await getSquareMerchant(ctx))) throw unavailable(undefined, "refresh");
   try {
     await compareAndSwapSquareTokens(ctx, current, next, secondsUntil(next.receivedAt, next.accessExpiresAt));
   } catch (error) {
     if (syncStart || !(error instanceof CommandError) || error.status !== 409) throw unavailable(error, "refresh_store");
   }
   const stored = await readVersionedIntegrationTokens(ctx, "square").catch((error: unknown) => { throw unavailable(error, "refresh_read"); });
-  if (stored.connectionId !== current.connectionId || stored.credentialVersion <= current.credentialVersion) throw unavailable();
+  if (stored.connectionId !== current.connectionId || stored.credentialVersion <= current.credentialVersion) throw unavailable(undefined, "refresh_read");
   if (!syncStart) return { tokens: stored };
-  if (stored.credentialVersion !== current.credentialVersion + 1) throw unavailable();
+  if (stored.credentialVersion !== current.credentialVersion + 1) throw unavailable(undefined, "refresh_read");
   return { tokens: stored, syncStart: await advanceSquareCatalogSync(ctx, syncStart, stored.credentialVersion) };
 }
 

@@ -23,8 +23,12 @@ export async function GET(request: Request) {
     // fails because the first one claimed the state; if the first is still
     // exchanging or already completed, the replay is not a failure (#1034).
     const claim = async (stateHash: string, actor: string, breweryId: string, redirectUri: string) => {
+      stage = "oauth_claim";
       const claimed = await claimQboOAuth(stateHash, actor, breweryId, redirectUri);
-      if (claimed) return claimed;
+      if (claimed) {
+        stage = "oauth_complete";
+        return claimed;
+      }
       const first = await qboOAuthExchangeState(stateHash, actor, breweryId);
       if (first === "completed" || first === "exchanging") throw new DuplicateCallback(first);
       return null;

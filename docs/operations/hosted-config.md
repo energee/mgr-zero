@@ -42,10 +42,12 @@ origin and invitation template when deployment is configured.
 ## Integration failure diagnostics
 
 QuickBooks, Square, and Slack OAuth failures keep their existing generic browser
-errors. Server diagnostics record only `{ name, status, stage }`. `status` is the
-HTTP status when available, or `null` for network and local failures. `stage`
-identifies the local operation, such as `oauth_config`, `oauth_exchange`,
-`oauth_verify_realm`, `oauth_store`, or `invoice_sync_read_retry`.
+errors. Server diagnostics record only `{ name, status, stage }`. `status` is an
+integer provider HTTP status (including Slack SDK `statusCode`) or an existing
+local command status. Failures without either use `null`. `stage` identifies
+the local operation, such as `oauth_config`, `oauth_claim`, `oauth_exchange`,
+`oauth_verify_realm`, `oauth_store`, or `invoice_sync_read_retry`. A plain
+database claim error has no HTTP status.
 
 Search for `qbo_oauth_failed`, `qbo_oauth_callback_failed`,
 `square_oauth_failed`, `square_oauth_callback_failed`, or
@@ -56,7 +58,6 @@ its specific operation failure and its final redirect failure.
 
 Messages, response bodies, stacks, callback URLs, OAuth codes and state, tokens,
 and bearer payment links are not included. Do not add them to support logs.
-
 
 ## Invitation delivery diagnostics
 

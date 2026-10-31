@@ -46,6 +46,9 @@ describe("Square OAuth callback", () => {
     expect(response.headers.get("location")).toBe("https://mgr.test/settings/pos?error=oauth");
     expect(lifecycle.claim).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith("square_oauth_callback_failed", {
+      name: "Error", status: null, stage: "oauth_session",
+    });
   });
 
   it("rejects invalid durable state before provider fetch", async () => {
@@ -80,6 +83,17 @@ describe("Square OAuth callback", () => {
       [{ id: "location-1", name: "Taproom", status: "ACTIVE" }],
     );
     expect(lifecycle.fail).not.toHaveBeenCalled();
+  });
+
+  it("classifies missing configuration before claiming OAuth state", async () => {
+    vi.stubEnv("SQUARE_APPLICATION_SECRET", undefined);
+    const response = await GET(new Request("https://mgr.test/api/integrations/square/oauth?code=code-secret"));
+    expect(response.headers.get("location")).toBe("https://mgr.test/settings/pos?error=oauth");
+    expect(console.error).toHaveBeenCalledWith("square_oauth_callback_failed", {
+      name: "Error", status: null, stage: "oauth_config",
+    });
+    expect(lifecycle.claim).not.toHaveBeenCalled();
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
   });
 
   it("logs provider failures with status and stage but no callback credentials", async () => {

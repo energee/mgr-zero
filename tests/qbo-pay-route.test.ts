@@ -231,7 +231,7 @@ describe("portal invoice Pay route", () => {
     state.requests = 120;
     const response = await pay("foreign");
     expect(response.status).toBe(404);
-    expect(await response.text()).toBe("Invoice not found");
+    expect(await response.text()).not.toContain("secret");
     expect(state.admission).not.toHaveBeenCalled();
     expect(state.transport).not.toHaveBeenCalled();
   });

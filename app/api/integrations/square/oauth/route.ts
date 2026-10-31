@@ -8,8 +8,10 @@ import { claimSquareOAuth, completeSquareOAuthStore, failSquareOAuth } from "@/l
 
 export async function GET(request: Request) {
   const destination = new URL("/settings/pos", request.url);
+  let stage = "oauth_config";
   try {
     const config = squareConfig();
+    stage = "oauth_session";
     const db = await createServerClient();
     const { data } = await db.auth.getClaims();
     const actorId = data?.claims.sub;
@@ -18,6 +20,7 @@ export async function GET(request: Request) {
     if (typeof actorId !== "string" || !activeBrewery.roles.includes("admin") || (picked && picked !== activeBrewery.id)) {
       throw new Error("oauth state invalid");
     }
+    stage = "oauth_complete";
     await completeSquareOAuth({
       request, actorId, selectedBreweryId: activeBrewery.id, redirectUri: config.redirectUri,
       client: new SquareClient(config),
@@ -25,7 +28,7 @@ export async function GET(request: Request) {
     });
     destination.searchParams.set("connected", "1");
   } catch (error) {
-    console.error("square_oauth_callback_failed", integrationFailureCause(error, "oauth_complete"));
+    console.error("square_oauth_callback_failed", integrationFailureCause(error, stage));
     destination.searchParams.set("error", "oauth");
   }
   return NextResponse.redirect(destination, 303);

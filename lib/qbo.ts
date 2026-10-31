@@ -492,18 +492,20 @@ export async function pushInvoiceToQbo(
     refreshed = true;
   }
   let created: Awaited<ReturnType<QboOAuthClient["createTransaction"]>>;
+  let stage = "invoice_push";
   try {
     created = await client.createTransaction(start.realmId, start.entityType, start.providerRequestId, start.requestBody, tokens.accessToken);
   } catch (error) {
-    throw new Error(sanitizeQboError(error, "invoice_push"));
+    throw new Error(sanitizeQboError(error, stage));
   }
   if (!created.ok && created.status === 401 && !refreshed) {
     tokens = await refreshQboCredentials(ctx, client, tokens);
     if (tokens.connectionId !== start.connectionId) throw new Error("QuickBooks is unavailable");
+    stage = "invoice_push_retry";
     try {
       created = await client.createTransaction(start.realmId, start.entityType, start.providerRequestId, start.requestBody, tokens.accessToken);
     } catch (error) {
-      throw new Error(sanitizeQboError(error, "invoice_push_retry"));
+      throw new Error(sanitizeQboError(error, stage));
     }
   }
   if (!created.ok) {
@@ -514,7 +516,7 @@ export async function pushInvoiceToQbo(
       });
       throw new CommandError("QuickBooks rejected the invoice; fix the mapping and choose corrected", 400);
     }
-    throw new Error("QuickBooks is unavailable");
+    throw new Error(sanitizeQboError({ name: "Error", status: created.status }, stage));
   }
   return finishQboPush(ctx, {
     pushId: start.pushId, finishRequestId: start.finishRequestId, status: "pushed",
@@ -597,16 +599,17 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
       // Old batches froze invoices only. An explicit unknown type is not legacy.
       const entityType = target.entityType === undefined ? "Invoice" : target.entityType;
       if (entityType !== "Invoice" && entityType !== "CreditMemo") throw new Error("QuickBooks sync entity type was invalid");
+      let stage = "invoice_sync_read";
       let read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache, entityType)
-        .catch((error: unknown) => { throw new Error(sanitizeQboError(error, "invoice_sync_read")); });
+        .catch((error: unknown) => { throw new Error(sanitizeQboError(error, stage)); });
       if (!read.ok && read.status === 401) {
         tokens = await refreshQboCredentials(ctx, client, tokens);
         if (tokens.connectionId !== start.connectionId) throw new Error("QuickBooks is unavailable");
+        stage = "invoice_sync_read_retry";
         read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache, entityType)
-          .catch((error: unknown) => { throw new Error(sanitizeQboError(error, "invoice_sync_read_retry")); });
+          .catch((error: unknown) => { throw new Error(sanitizeQboError(error, stage)); });
       }
-      if (!read.ok && !read.definitive) throw new Error(sanitizeQboError(
-        new QboHttpError("QuickBooks invoice read failed", read.status), "invoice_sync_read"));
+      if (!read.ok && !read.definitive) throw new Error(sanitizeQboError({ name: "Error", status: read.status }, stage));
       const pushedTotal = typeof target.pushedResponse?.TotalAmt === "number"
         ? Math.round(target.pushedResponse.TotalAmt * 100) : null;
       const remoteState = entityType === "Invoice" && read.ok && /^Voided\b/i.test(read.privateNote) && read.totalCents === 0

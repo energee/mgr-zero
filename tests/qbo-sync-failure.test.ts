@@ -13,7 +13,7 @@ vi.mock("@/lib/supabase/integration-tokens", async (importOriginal) => ({
   compareAndSwapQboTokens: async () => undefined,
 }));
 
-import { QboOAuthClient, syncQboInvoices } from "@/lib/qbo";
+import { pushInvoiceToQbo, QboOAuthClient, syncQboInvoices } from "@/lib/qbo";
 
 const credentials = {
   connectionId: "connection-1", credentialVersion: 1, accessToken: "access-secret", refreshToken: "refresh-secret",
@@ -21,7 +21,7 @@ const credentials = {
 };
 const ctx = { roles: ["admin"] } as Ctx;
 
-describe("QuickBooks invoice sync failure diagnostics", () => {
+describe("QuickBooks invoice failure diagnostics", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     store.begin.mockResolvedValue({
@@ -45,7 +45,7 @@ describe("QuickBooks invoice sync failure diagnostics", () => {
       });
     }
     read.mockRejectedValueOnce(new TypeError("DNS access-secret refresh-secret"));
-    await expect(syncQboInvoices(ctx, "request-1", client)).rejects.toThrow("QuickBooks is unavailable");
+    await expect(syncQboInvoices(ctx, "request-1", client)).rejects.toBeInstanceOf(Error);
     expect(console.error).toHaveBeenCalledWith("qbo_unavailable", {
       name: "TypeError", status: null, stage: retry ? "invoice_sync_read_retry" : "invoice_sync_read",
     });
@@ -54,12 +54,38 @@ describe("QuickBooks invoice sync failure diagnostics", () => {
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
   });
 
-  it("logs a non-definitive HTTP response before returning unavailable", async () => {
+  it.each([false, true])("logs a non-definitive HTTP response after refresh=%s", async (retry) => {
     const client = new QboOAuthClient({ clientId: "id", clientSecret: "secret", redirectUri: "https://mgr.test/oauth", apiBaseUrl: "https://mgr.test" });
-    vi.spyOn(client, "readInvoice").mockResolvedValue({ ok: false, status: 503, definitive: false });
-    await expect(syncQboInvoices(ctx, "request-1", client)).rejects.toThrow("QuickBooks is unavailable");
+    const read = vi.spyOn(client, "readInvoice").mockResolvedValue({ ok: false, status: 503, definitive: false });
+    if (retry) {
+      read.mockResolvedValueOnce({ ok: false, status: 401, definitive: false });
+      store.read.mockResolvedValueOnce(credentials).mockResolvedValue({ ...credentials, credentialVersion: 2 });
+      vi.spyOn(client, "refresh").mockResolvedValue({
+        accessToken: "next-access-secret", refreshToken: "next-refresh-secret", receivedAt: new Date().toISOString(),
+        accessExpiresIn: 3600, refreshExpiresIn: null, refreshHardExpiresIn: null, grantedScopes: null,
+      });
+    }
+    await expect(syncQboInvoices(ctx, "request-1", client)).rejects.toBeInstanceOf(Error);
     expect(console.error).toHaveBeenCalledWith("qbo_unavailable", {
-      name: "Error", status: 503, stage: "invoice_sync_read",
+      name: "Error", status: 503, stage: retry ? "invoice_sync_read_retry" : "invoice_sync_read",
     });
+  });
+
+  it("logs a retryable push HTTP status without recording a definitive rejection", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: {
+      pushId: "push-1", providerRequestId: "provider-1", finishRequestId: "finish-1",
+      requestBody: "{}", entityType: "Invoice", realmId: "realm-1", connectionId: "connection-1", mayPost: true,
+    }, error: null });
+    const pushCtx = { ...ctx, db: { rpc } } as unknown as Ctx;
+    const client = new QboOAuthClient(
+      { clientId: "id", clientSecret: "secret", redirectUri: "https://mgr.test/oauth", apiBaseUrl: "https://mgr.test" },
+      vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json({ token: "body-secret" }, { status: 503 })),
+    );
+    await expect(pushInvoiceToQbo(pushCtx, "invoice-1", "request-1", client)).rejects.toBeInstanceOf(Error);
+    expect(console.error).toHaveBeenCalledWith("qbo_unavailable", {
+      name: "Error", status: 503, stage: "invoice_push",
+    });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
   });
 });

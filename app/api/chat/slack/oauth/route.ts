@@ -19,8 +19,11 @@ export async function GET(request: Request) {
   let stage = "oauth_session";
   try {
     const db = await createServerClient();
+    stage = "oauth_config";
+    const port = slackOAuthPort();
+    const redirectUri = slackRedirectUri();
     stage = "oauth_complete";
-    await completeSlackInstall(db, request, slackOAuthPort(), slackRedirectUri());
+    await completeSlackInstall(db, request, port, redirectUri);
     return NextResponse.redirect(`${base}/settings/chat?installed=1`, 303);
   } catch (error) {
     console.error("slack_oauth_callback_failed", integrationFailureCause(error, stage));
