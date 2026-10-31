@@ -88,6 +88,22 @@ describe("portal customers cannot read internal order and SKU columns", () => {
     expect(prices.data![0]).not.toHaveProperty("qbo_item_id");
   });
 
+  it("limits direct availability RPC ids to active prices on this customer's channel", async () => {
+    const location = await seedLocation(custCtx.breweryId, { name: "Availability warehouse" });
+    const unpriced = await seedCatalog(custCtx.breweryId, { product: "No price", sku: "Hidden unpriced", format: "unpriced case" });
+    for (const id of [skuId, retiredSkuId, otherChannelSkuId, unpriced.skuId]) {
+      await ins("inventory_movements", {
+        brewery_id: custCtx.breweryId, location_id: location.id, bin_id: location.binId,
+        sku_id: id, qty: 30, type: "opening_balance", created_by: staffId,
+      });
+    }
+    const result = await customerDb.rpc("portal_availability", { p_customer: custCtx.customerId });
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual([{ sku_id: skuId, badge: "in" }]);
+    const otherCustomer = await seedCustomer(custCtx.breweryId, { name: "Not my account" });
+    expect((await customerDb.rpc("portal_availability", { p_customer: otherCustomer.customerId })).data).toEqual([]);
+  });
+
   it("portal commands return no internal columns and still serve the buyer", async () => {
     const { rows } = await runCommand("portal_orders", {}, custCtx) as { rows: Record<string, unknown>[] };
     expect(rows.map((r) => r.id)).toEqual([orderId]);

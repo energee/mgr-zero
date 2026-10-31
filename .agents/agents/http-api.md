@@ -134,6 +134,10 @@ only `content/docs/api/*.mdx` and literal `reads`/`writes` annotations in
   leave the generated blocks alone; they will be correct. Screen comments,
   property names, record structure and formatting must remain byte-for-byte
   unchanged: the workflow parses both sources and masks only those literal values.
+  Generated spreads and their factory bodies are read-only. The validator keeps
+  their exact bytes without importing or evaluating the screen module. If a
+  generated frame's `reads`/`writes` needs renaming, report the frame and the
+  change you would make in your closing summary instead of editing the spread.
 - **`lib/commands/` is read-only to you there.** A registry `description` or
   `roles` that reads badly as documentation (step 2) is still worth finding —
   name it and the fix you would make in your closing summary, so it reaches the

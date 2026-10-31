@@ -817,6 +817,7 @@ async function receiptBillFixture(options: {
   vendorMapping?: boolean;
   accountMapping?: boolean;
   unitCostCents?: number | null;
+  receiveUnitCostCents?: number;
 } = {}) {
   const brewery = await makeBrewery();
   const ctx = await makeStaffCtx(brewery.id, ["sales", "admin"]);
@@ -835,7 +836,7 @@ async function receiptBillFixture(options: {
   const lineId = detail.lines[0].id;
   const receipt = await runCommand("receive_purchase_order", {
     poId: po.id, locationId: location.id, binId: location.binId, receivedOn: "2026-09-20",
-    lines: [{ poLineId: lineId, qtyCounted: 3 }],
+    lines: [{ poLineId: lineId, qtyCounted: 3, unitCostCents: options.receiveUnitCostCents }],
   }, ctx) as { receipt_id: string };
   const realm = `receipt-realm-${crypto.randomUUID()}`;
   const connection = await admin.from("qbo_connections").insert({
@@ -1304,6 +1305,36 @@ describe("QuickBooks receipt Bills", () => {
     await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), client))
       .resolves.toMatchObject({ status: "pushed", remoteId: "bill-1" });
     expect(remote.posts).toHaveLength(1);
+  });
+
+  it("records an invoice price on a sent unpriced PO while receiving and freezes that price for the Bill", async () => {
+    const f = await receiptBillFixture({ unitCostCents: null, receiveUnitCostCents: 1251 });
+    const { data, error } = await admin.from("receipt_lines").select("purchase_unit_cost_cents, material_movements(unit_cost_cents)").eq("receipt_id", f.receiptId).single();
+    expect(error).toBeNull();
+    expect(data).toMatchObject({ purchase_unit_cost_cents: 1251, material_movements: { unit_cost_cents: 250.2 } });
+    const remote = syntheticReceiptBills();
+    await expect(postReceiptBill(f.ctx, f.receiptId, crypto.randomUUID(), new QboOAuthClient(config, remote.fetch)))
+      .resolves.toMatchObject({ status: "pushed" });
+    expect((JSON.parse(remote.posts[0].body) as ReceiptBillBody).Line[0].Amount).toBe(37.53);
+    expect((await admin.from("purchase_order_lines").select("unit_cost_cents").eq("id", f.lineId).single()).data?.unit_cost_cents).toBeNull();
+  });
+
+  it.each([{ original: null, corrected: 1251 }, { original: 333, corrected: 0 }])("corrects receipt price $original to $corrected without rewriting the original or duplicating stock", async ({ original, corrected: cost }) => {
+    const f = await receiptBillFixture({ unitCostCents: original });
+    const requestId = crypto.randomUUID();
+    const input = { receiptId: f.receiptId, reason: "Vendor invoice price arrived", lines: [{ poLineId: f.lineId, qtyCounted: 3, unitCostCents: cost }] };
+    const execution = { requestId, correlationId: requestId };
+    const corrected = await runCommand("correct_purchase_receipt", input, f.ctx, execution) as { receipt_id: string };
+    expect(await runCommand("correct_purchase_receipt", input, f.ctx, execution)).toEqual(corrected);
+    await expect(runCommand("correct_purchase_receipt", { ...input, lines: [{ ...input.lines[0], unitCostCents: cost + 1 }] }, f.ctx, execution)).rejects.toThrow(/request|different|conflict/i);
+    expect((await admin.from("receipt_lines").select("purchase_unit_cost_cents").eq("receipt_id", f.receiptId).single()).data?.purchase_unit_cost_cents).toBe(original);
+    const detail = await runCommand("get_purchase_order", { poId: f.po.id, correctionReceiptId: corrected.receipt_id }, f.ctx) as { correction_lines: { unit_cost_cents: number }[] };
+    expect(detail.correction_lines[0].unit_cost_cents).toBe(cost);
+    expect(sql(`select sum(qty) from public.material_movements where material_id='${f.material.id}'`)).toEqual(["15.0000"]);
+    const remote = syntheticReceiptBills();
+    await expect(postReceiptBill(f.ctx, corrected.receipt_id, crypto.randomUUID(), new QboOAuthClient(config, remote.fetch)))
+      .resolves.toMatchObject({ status: "pushed" });
+    expect((JSON.parse(remote.posts[0].body) as ReceiptBillBody).Line[0].Amount).toBe(cost * 3 / 100);
   });
 
   it("uses the single purchase account for every counted material and skips uncounted uncosted lines", async () => {
