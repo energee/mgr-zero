@@ -225,5 +225,6 @@
   "20261030031039_square_history_variance_sources.sql": "a4848bbca9e0544c9ac11724074b696eb62e7669da9bfdfd9e47f3616eae5526",
   "20261030031040_tenancy_identity_and_team_authority.sql": "379ba35f19f48e8fd0f53c6900d7c911814bcddedc51a14001dd52a19247f8c9",
   "20261030031041_server_random_oauth_state.sql": "e8a713d35dc80b25a6f42e9b5460584abf09bb82d9f04b1150f11fb9321456f5",
-  "20261030031042_slack_link_display_identity.sql": "5fde2a02974323fa940a3d30758f1af2ad2314d1f7b9511c9729a4edf5afe30b"
+  "20261030031042_slack_link_display_identity.sql": "5fde2a02974323fa940a3d30758f1af2ad2314d1f7b9511c9729a4edf5afe30b",
+  "20261030031050_today_pending_history_indexes.sql": "c90cb874e5cc99dbdd8469c6f7800d802d580831aa6b91eeb3445bd9cecaa0dd"
 }
