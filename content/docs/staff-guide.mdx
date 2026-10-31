@@ -695,7 +695,14 @@ The **Payment** and **Accounting** columns use these labels:
 
 Roles other than Admin and Sales see only **Not pushed** or **QuickBooks status available to Sales** in the Accounting column, unless the invoice is written off, voided, deleted, predates the books, or has payments recorded in MGR.
 
-An uncertain invoice or credit-memo push is checked in its original QuickBooks company by document number before MGR sends it again. One document matching the frozen customer, dates, item descriptions, items, quantities, prices, amounts, and payment options completes the saved push without creating another document. A failed lookup, invalid response, changed document, or duplicate document number leaves the push pending instead of sending another copy.
+An uncertain invoice or credit-memo push is checked in its original QuickBooks company by document number before MGR sends it again. One document matching the frozen customer, dates, item descriptions, items, quantities, prices, amounts, and payment options completes the saved push without creating another document. When no document has that number, MGR sends its saved copy. A failed lookup or invalid response leaves the push pending instead of sending another copy; retry later.
+
+A conflicting document also leaves the push pending, and MGR never links it or sends a second copy. The retry says what conflicts:
+
+- "QuickBooks already has invoice 1042 with different lines, due date, or payment options."
+- "QuickBooks already has invoice 1042 for a different customer or date, or more than once."
+
+To finish the push, change the QuickBooks document to match MGR, or delete it in QuickBooks, then retry. A matching document is linked. Once no document has the number, MGR sends its saved copy. Voiding the document does not clear the conflict, except for an invoice whose only differences were amounts, quantities, or prices.
 
 If QuickBooks voided a nonzero invoice before MGR recovered the push, MGR keeps that voided status when linking the existing document. Retry and later sync do not turn it back into a live invoice. Admin can then use the existing **Write off** action; an invoice originally issued for $0.00 is not treated as voided merely because its balance is zero.
 

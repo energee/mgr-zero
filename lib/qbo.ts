@@ -505,14 +505,15 @@ export async function pushInvoiceToQbo(
     refreshed = true;
   }
   if (!start.mayPost) {
+    // A CommandError is MGR's own conflict advice; any other lookup failure may carry provider text.
     let found = await client.findInvoice(start.realmId, start.entityType, start.requestBody, tokens.accessToken)
-      .catch((error: unknown) => { throw new Error(sanitizeQboError(error)); });
+      .catch((error: unknown) => { throw error instanceof CommandError ? error : new Error(sanitizeQboError(error)); });
     if (!found.ok && found.status === 401 && !refreshed) {
       tokens = await refreshQboCredentials(ctx, client, tokens);
       refreshed = true;
       if (tokens.connectionId !== start.connectionId) throw new Error("QuickBooks is unavailable");
       found = await client.findInvoice(start.realmId, start.entityType, start.requestBody, tokens.accessToken)
-        .catch((error: unknown) => { throw new Error(sanitizeQboError(error)); });
+        .catch((error: unknown) => { throw error instanceof CommandError ? error : new Error(sanitizeQboError(error)); });
     }
     if (!found.ok) throw new Error("QuickBooks is unavailable");
     if (found.transaction) {
@@ -647,15 +648,11 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
       }
       if (!read.ok && !read.definitive) throw new Error("QuickBooks is unavailable");
       const frozen = asObject(JSON.parse(target.requestBody));
-      const hadPositiveLine = Array.isArray(frozen?.Line) && frozen.Line.some(line => {
-        const amount = asObject(line)?.Amount;
-        return typeof amount === "number" && amount > 0;
-      });
       const pushedTotal = typeof target.pushedResponse?.TotalAmt === "number"
         ? Math.round(target.pushedResponse.TotalAmt * 100) : null;
-      const wasPositive = (pushedTotal !== null && pushedTotal > 0) || hadPositiveLine;
-      const remoteState = entityType === "Invoice" && read.ok && /^Voided\b/i.test(read.privateNote) && read.totalCents === 0
-        && read.balanceCents === 0 && wasPositive ? "voided" : read.ok ? "live" : "deleted";
+      const wasPositive = (pushedTotal !== null && pushedTotal > 0) || hasPositiveLine(frozen);
+      const remoteState = entityType === "Invoice" && read.ok && hasVoidMarker(read.privateNote, read.totalCents, read.balanceCents)
+        && wasPositive ? "voided" : read.ok ? "live" : "deleted";
       observations.push({
         invoiceId: target.invoiceId, remoteId: target.remoteId, remoteState,
         syncToken: read.ok ? read.syncToken : null,
@@ -911,7 +908,12 @@ export class QboOAuthClient {
     return qboTransactionResult(entity);
   }
 
-  /** Reconciles an uncertain frozen Invoice or CreditMemo before another POST. */
+  /**
+   * Reconciles an uncertain frozen Invoice or CreditMemo before another POST.
+   * No row lets the caller send the frozen copy; one exactly matching row is
+   * adopted. A conflicting document throws a 409 telling staff to fix or
+   * delete it in QuickBooks, because MGR never adopts it or posts a second copy.
+   */
   async findInvoice(realmId: string, entityType: "Invoice" | "CreditMemo", body: string, accessToken: string) {
     const frozen = asObject(JSON.parse(body));
     const customer = asObject(frozen?.CustomerRef);
@@ -932,16 +934,13 @@ export class QboOAuthClient {
     if (!Array.isArray(rows)) throw new Error("QuickBooks reconciliation response was invalid");
     if (rows.length === 0) return { ok: true as const, transaction: null };
     const row = asObject(rows[0]);
-    if (rows.length !== 1 || !row || row.DocNumber !== frozen.DocNumber
-      || asObject(row.CustomerRef)?.value !== customer.value || row.TxnDate !== frozen.TxnDate) {
-      throw new Error("QuickBooks reconciliation identity was ambiguous");
+    if (!row || row.DocNumber !== frozen.DocNumber) throw new Error("QuickBooks reconciliation response was invalid");
+    const document = `${entityType === "Invoice" ? "invoice" : "credit memo"} ${frozen.DocNumber}`;
+    if (rows.length !== 1 || asObject(row.CustomerRef)?.value !== customer.value || row.TxnDate !== frozen.TxnDate) {
+      throw new CommandError(`QuickBooks already has ${document} for a different customer or date, or more than once. Fix or delete the conflicting copy in QuickBooks, then retry.`, 409, "conflict");
     }
-    const isVoided = entityType === "Invoice" && typeof row.PrivateNote === "string"
-      && /^Voided\b/i.test(row.PrivateNote) && row.TotalAmt === 0 && row.Balance === 0
-      && Array.isArray(frozen.Line) && frozen.Line.some(line => {
-        const amount = asObject(line)?.Amount;
-        return typeof amount === "number" && amount > 0;
-      });
+    const isVoided = entityType === "Invoice" && hasVoidMarker(row.PrivateNote, row.TotalAmt, row.Balance)
+      && hasPositiveLine(frozen);
     // QuickBooks zeros a voided Invoice's line money and quantities. Compare
     // that exact transformation; every other frozen fact must still match.
     const expected = isVoided ? {
@@ -953,7 +952,7 @@ export class QboOAuthClient {
         } : line),
     } : frozen;
     if (!meaningfulInvoiceContentMatches(expected, meaningfulInvoiceContent(row))) {
-      throw new Error("QuickBooks reconciliation content did not match");
+      throw new CommandError(`QuickBooks already has ${document} with different lines, due date, or payment options. Change it in QuickBooks to match MGR, or delete it there, then retry.`, 409, "conflict");
     }
     const transaction = qboTransactionResult(row);
     if (isVoided) {
@@ -1268,6 +1267,19 @@ function customerFault(payload: unknown) {
   const first = Array.isArray(errors) ? asObject(errors[0]) : null;
   const text = (v: unknown, max: number) => typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null;
   return { code: text(first?.code, 20), message: text(first?.Message, 200) };
+}
+
+/** True when the frozen request charged money on a line; an invoice issued for $0.00 never did. */
+function hasPositiveLine(invoice: Record<string, unknown> | null) {
+  return Array.isArray(invoice?.Line) && invoice.Line.some(line => {
+    const amount = asObject(line)?.Amount;
+    return typeof amount === "number" && amount > 0;
+  });
+}
+
+/** QuickBooks voids an Invoice by zeroing its total and balance and starting its private note with "Voided". */
+function hasVoidMarker(privateNote: unknown, total: unknown, balance: unknown) {
+  return typeof privateNote === "string" && /^Voided\b/i.test(privateNote) && total === 0 && balance === 0;
 }
 
 function meaningfulInvoiceContent(invoice: Record<string, unknown>) {

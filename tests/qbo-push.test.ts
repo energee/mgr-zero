@@ -24,6 +24,11 @@ const config = {
   apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com",
 };
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
+// The actionable 409s a pending push raises when QuickBooks holds a conflicting document.
+const changedDocument = (document: string) => ({ status: 409, code: "conflict",
+  message: `QuickBooks already has ${document} with different lines, due date, or payment options. Change it in QuickBooks to match MGR, or delete it there, then retry.` });
+const conflictingDocument = (document: string) => ({ status: 409, code: "conflict",
+  message: `QuickBooks already has ${document} for a different customer or date, or more than once. Fix or delete the conflicting copy in QuickBooks, then retry.` });
 
 async function pushFixture(kind: "invoice" | "credit_memo" = "invoice", role: "admin" | "sales" = "sales") {
   const brewery = await makeBrewery();
@@ -76,6 +81,16 @@ describe("QuickBooks durable outbound push", () => {
       const body = String(init?.body);
       expect(sql(`select provider_request_id::text || '|' || request_body from public.qbo_pushes where invoice_id='${f.invoice.id}'`)[0])
         .toBe(`${key}|${body}`);
+      expect(JSON.parse(body)).toMatchObject({
+        DocNumber: String(f.invoice.invoice_no), CustomerRef: { value: "customer-42" },
+        Line: [{ Amount: 9.99, SalesItemLineDetail: { Qty: 3, UnitPrice: 3.33 } }],
+      });
+      expect(JSON.parse(body)).toMatchObject({ BillEmail: { Address: f.buyer.email } });
+      if (kind === "invoice") {
+        expect(JSON.parse(body)).toMatchObject({
+          DueDate: "2026-10-09", AllowOnlineACHPayment: true, AllowOnlineCreditCardPayment: true,
+        });
+      }
       // No request-id deduplication: a replayed POST would create a second transaction.
       remote.push({ ...JSON.parse(body), Id: `remote-${remote.length + 1}`, SyncToken: "0",
         TotalAmt: 9.99, Balance: 9.99, TxnTaxDetail: { TotalTax: 0 }, InvoiceLink: "https://secret" });
@@ -190,8 +205,11 @@ describe("QuickBooks durable outbound push", () => {
       const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json({
         QueryResponse: { [kind === "invoice" ? "Invoice" : "CreditMemo"]: [row] },
       }));
-      await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, new QboOAuthClient(config, fetch)))
-        .rejects.toThrow("QuickBooks is unavailable");
+      const document = `${kind === "invoice" ? "invoice" : "credit memo"} ${f.invoice.invoice_no}`;
+      // A row for another document number is an invalid answer, not a conflict staff can fix.
+      await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, new QboOAuthClient(config, fetch))).rejects.toMatchObject(
+        mismatch === "doc" ? { message: "QuickBooks is unavailable" }
+          : mismatch === "customer" || mismatch === "date" ? conflictingDocument(document) : changedDocument(document));
       expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual(["GET"]);
       expect(sql(`select status || ':' || coalesce(qbo_entity_id,'') from public.qbo_pushes where invoice_id='${f.invoice.id}'`))
         .toEqual(["pending:"]);
@@ -223,7 +241,7 @@ describe("QuickBooks durable outbound push", () => {
         QueryResponse: { [mismatch === "credit_memo" ? "CreditMemo" : "Invoice"]: [row] },
       }));
       await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, new QboOAuthClient(config, fetch)))
-        .rejects.toThrow("QuickBooks is unavailable");
+        .rejects.toMatchObject(changedDocument(`${mismatch === "credit_memo" ? "credit memo" : "invoice"} ${f.invoice.invoice_no}`));
       expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual(["GET"]);
       expect(sql(`select status from public.qbo_pushes where invoice_id='${f.invoice.id}'`)).toEqual(["pending"]);
     },
@@ -311,7 +329,8 @@ describe("QuickBooks durable outbound push", () => {
       });
       // A different command request must reconcile the same pending snapshot too.
       await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, fetch)))
-        .rejects.toThrow("QuickBooks is unavailable");
+        .rejects.toMatchObject(["duplicate", "customer", "date"].includes(failure)
+          ? conflictingDocument(`invoice ${f.invoice.invoice_no}`) : { message: "QuickBooks is unavailable" });
       expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual(["GET"]);
       expect(sql(`select status from public.qbo_pushes where invoice_id='${f.invoice.id}'`)).toEqual(["pending"]);
     },
