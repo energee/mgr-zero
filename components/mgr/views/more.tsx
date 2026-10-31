@@ -6,8 +6,6 @@ import { E } from "@/components/mgr/e";
 import { QuickBooksMark } from "@/components/mgr/brand-icons";
 import type { MoreViewModel } from "@/lib/mgr/more-view";
 
-export type { MoreViewModel };
-
 export function MoreView({
   model,
   linkRows,

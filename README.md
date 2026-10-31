@@ -61,7 +61,14 @@ bunx supabase status -o env | node scripts/supabase-env.mjs > .env.local
 ```
 
 The mapper converts the Supabase CLI's local key labels into the application's
-modern environment contract; nothing else is needed in `.env.local`.
+modern environment contract; nothing else is needed in `.env.local` to sign in
+with a password and use the app. `APP_URL` is optional locally: it is the
+public MGR origin (for example `http://localhost:3000`) that passwordless
+sign-in and password-reset emails, Slack, and portal invoice payment build
+their links from, so set it before using those. Browser calls to
+`/api/command` and `/api/chat` pass the Origin check when their Origin matches
+the host the request was sent to, so a second dev port or a Vercel preview
+host needs no matching `APP_URL`.
 `/api/command` refuses excess requests with `429 rate_limited` and a
 `Retry-After` header.
 
@@ -177,6 +184,9 @@ committed migrations. After applying migrations to the disposable test stack,
 run `bun run types:database`. Pass a local disposable database URL as the first
 argument when using a separate stack. Do not generate from a hosted or stale
 application database. CI checks the generated file against its fresh stack.
+Generation removes disposable readiness RPC signatures and normalizes space/tab-only
+lines to empty lines; the rest of the generated file is emitted unchanged.
+Do not hand-edit the generated file. CI requires an exact regeneration match.
 
 `lib/supabase/database.ts` records facts the generator cannot infer: nullable
 RPC arguments, trigger-populated insert fields, and non-null stock views.
@@ -301,6 +311,16 @@ Operator procedures live in `docs/operations/`:
 
 ## Design evidence
 
-Screen redesigns keep their mockups and before/after captures in `docs/design/`:
+Screen redesigns keep their mockups and rendered synthetic captures in `docs/design/`:
 
-- [New purchase order form](docs/design/purchase-order-new/README.md) — flat form wireframes, rendered before/after screenshots, and verification notes.
+- [New purchase order form](docs/design/purchase-order-new/README.md) — flat form wireframes, synthetic screenshots, and verification notes.
+
+Public fixtures use fictional customers, suppliers and permit `BR-PA-12345`.
+The COLA HTML fixture is generated sample data, not a downloaded brewery roster.
+`public/mock/*.jpg` are generated geometric avatars, not photographs.
+Keep tenant workbooks, CSV exports, backups, keys and local agent state untracked.
+The refreshed packaging screenshot shows seeded Demo Brewing's empty live page;
+COLA screenshots show that tenant's live brand page and approval editor.
+Their lookup response is a browser-only synthetic fixture; the generated labels
+are served from the local tenant's saved-image cache. No TTB request was made.
+These captures do not establish an actual TTB approval or erase Git history.

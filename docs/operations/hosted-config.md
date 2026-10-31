@@ -39,6 +39,29 @@ ports 3000 and 3002, under `/auth/confirm`. Restart the relevant local Supabase
 stack after changing its redirect allowlist. Hosted Auth needs its own approved
 origin and invitation template when deployment is configured.
 
+Passwordless and password-recovery emails use the configured `APP_URL`, never
+the incoming request's Origin. Hosted Auth's Site URL and redirect allowlist
+must use the approved exact origin and `/auth/confirm` callback, without wildcard
+hosts or paths. Inspect `site_url` and `uri_allow_list` through the read-only
+Management API before release; a local allowlist is not evidence of hosted
+configuration. Changing hosted settings remains owner-authorized work.
+
+`APP_URL` is that one public origin, and Slack links and portal payment
+redirects use it too. The `/api/command` and `/api/chat` Origin check accepts
+the origin the request was sent to as well as `APP_URL`, so a Vercel preview
+host passes it without an `APP_URL` of its own.
+
+Read-only inspection on 2026-10-30 for #1659 used
+`supabase config diff --project-ref uogrvqmrbmolvtftotsf --output-format json`.
+The remote Site URL was `https://mgr-zero-mgr8.vercel.app/`.
+The remote redirect allowlist contained exact root and `/auth/confirm` URLs,
+but also `https://mgr-zero-mgr8.vercel.app/**`,
+`https://mgr-*-zero-mgr8.vercel.app`, and
+`https://mgr-*-zero-mgr8.vercel.app/**`. The no-wildcard acceptance remains
+open: the owner must approve the required exact callback origins and remove
+the wildcard entries. This inspection changed no hosted settings.
+
+
 ## Integration failure diagnostics
 
 QuickBooks, Square, and Slack OAuth failures keep their existing generic browser
@@ -55,6 +78,10 @@ Search for `qbo_oauth_failed`, `qbo_oauth_callback_failed`,
 sanitization emits `qbo_unavailable`; Square transport and validation failures
 emit `square_provider_failed` or `square_unavailable`. A callback can emit both
 its specific operation failure and its final redirect failure.
+Bill provider and failure-record diagnostics use `qbo_receipt_bill_failed` and
+`qbo_receipt_bill_failure_record_failed`; quote tax diagnostics use
+`portal_quote_tax_unauthorized` and `portal_quote_tax_failed`. Their stages
+distinguish the initial read, credential refresh, retry, and failure recording.
 
 Messages, response bodies, stacks, callback URLs, OAuth codes and state, tokens,
 and bearer payment links are not included. Do not add them to support logs.

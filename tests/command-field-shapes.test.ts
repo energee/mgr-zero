@@ -13,6 +13,29 @@ function fieldRejects(command: string, field: string, value: string): boolean {
 }
 
 describe("field shapes are validated (#491)", () => {
+  it.each(["receive_purchase_order", "correct_purchase_receipt"])("%s accepts counts only to four decimal places", (command) => {
+    const input = command === "receive_purchase_order"
+      ? { poId: crypto.randomUUID(), locationId: crypto.randomUUID(), binId: crypto.randomUUID() }
+      : { receiptId: crypto.randomUUID(), reason: "Recounted the delivery" };
+    const schema = getCommandDefinition(command)!.input;
+    for (const qtyCounted of [0, 0.0001, 0.3333, 4.4, 10]) {
+      expect(schema.safeParse({ ...input, lines: [{ poLineId: crypto.randomUUID(), qtyCounted }] }).success).toBe(true);
+    }
+    for (const qtyCounted of [0.33333, 0.00001, -1, Infinity, NaN]) {
+      expect(schema.safeParse({ ...input, lines: [{ poLineId: crypto.randomUUID(), qtyCounted }] }).success).toBe(false);
+    }
+    const overprecise = schema.safeParse({ ...input, lines: [{ poLineId: crypto.randomUUID(), qtyCounted: 0.33333 }] });
+    expect(overprecise.error?.issues.map((issue) => issue.message)).toEqual(["A count takes at most four decimal places."]);
+  });
+
+  it("upsert_material accepts base units per purchase unit only to four decimal places, and says so", () => {
+    const schema = getCommandDefinition("upsert_material")!.input;
+    const hop = { name: "Mosaic pellets", category: "hop", baseUom: "g", purchaseUom: "lb" };
+    expect(schema.safeParse({ ...hop, purchaseUomFactor: 453.5924 }).success).toBe(true);
+    const overprecise = schema.safeParse({ ...hop, purchaseUomFactor: 453.59237 });
+    expect(overprecise.error?.issues.map((issue) => issue.message)).toEqual(["Base units per purchase unit takes at most four decimal places."]);
+  });
+
   it.each([
     ["upsert_customer", "state"], ["upsert_ship_to", "state"], ["upsert_brewery_state_license", "state"], ["upsert_state_registration", "state"],
   ])("%s rejects a two-letter code that is not a US state, accepts a real one", (command, field) => {

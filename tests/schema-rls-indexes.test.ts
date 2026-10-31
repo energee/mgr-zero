@@ -49,6 +49,66 @@ describe("RLS index and auth.uid() rules", () => {
     expect(missing).toEqual([]);
   });
 
+  it("the demonstrated FK lookups have usable equality prefixes, in either key order", () => {
+    const covered = sql(`
+      select fk.conname || '|' || exists (
+        select 1 from pg_index i
+        where i.indrelid = fk.conrelid and i.indisvalid and i.indisready
+          and i.indnkeyatts >= cardinality(fk.conkey)
+          and array(select i.indkey[n] from generate_series(0, cardinality(fk.conkey) - 1) n) @> fk.conkey
+          and (i.indpred is null or pg_get_expr(i.indpred, i.indrelid) = any (
+            select format('(%I IS NOT NULL)', a.attname) from pg_attribute a
+            where a.attrelid = fk.conrelid and a.attnum = any(fk.conkey)))
+      )
+      from pg_constraint fk join pg_class c on c.oid = fk.conrelid
+      where c.relnamespace = 'public'::regnamespace and fk.conname = any(array[
+        'orders_sale_channel_id_brewery_id_fkey', 'purchase_orders_vendor_id_brewery_id_fkey',
+        'inventory_movements_compensates_id_brewery_id_fkey', 'inventory_movements_correction_source_id_brewery_id_fkey',
+        'inventory_movements_source_movement_id_brewery_id_fkey', 'inventory_movements_sale_channel_id_brewery_id_fkey'
+      ]) order by 1`);
+    expect(covered).toHaveLength(6);
+    expect(covered.filter(row => !row.endsWith("|true"))).toEqual([]);
+  });
+
+  it("filtered order and movement history indexes preserve descending timestamp and id order", () => {
+    const indexes = sql(`
+      select c.relname || ':' || string_agg(a.attname ||
+        case when (i.indoption[(k.ord - 1)::int] & 1) = 1 then ' desc' else ' asc' end, ',' order by k.ord)
+      from pg_index i join pg_class c on c.oid = i.indrelid
+      cross join lateral unnest(i.indkey) with ordinality k(attnum, ord)
+      join pg_attribute a on a.attrelid = c.oid and a.attnum = k.attnum
+      where c.relnamespace = 'public'::regnamespace and i.indisvalid and i.indisready
+        and i.indpred is null and k.ord <= i.indnkeyatts
+      group by i.indexrelid, c.relname`);
+    expect(indexes).toEqual(expect.arrayContaining([
+      "orders:brewery_id asc,status asc,created_at desc,id desc",
+      "inventory_movements:brewery_id asc,created_at desc,id desc",
+      "inventory_movements:brewery_id asc,sku_id asc,created_at desc,id desc",
+    ]));
+  });
+
+  it("no inventory_movements index is a key prefix of another", () => {
+    // Every ledger insert maintains each index; a prefix index serves no read
+    // the longer one cannot (direction aside, a btree scans both ways). A
+    // unique prefix still enforces its constraint, so the primary key stays.
+    const prefixes = sql(`
+      select a.indexrelid::regclass || ' < ' || b.indexrelid::regclass
+      from pg_index a join pg_index b on a.indrelid = b.indrelid and a.indexrelid <> b.indexrelid
+      where a.indrelid = 'public.inventory_movements'::regclass and not a.indisunique
+        and a.indpred is null and b.indpred is null and a.indnkeyatts < b.indnkeyatts
+        and (a.indkey::int2[])[0:a.indnkeyatts - 1] = (b.indkey::int2[])[0:a.indnkeyatts - 1]
+      order by 1`);
+    expect(prefixes).toEqual([]);
+  });
+
+  it("the open-allocation covering index retains its exact partial predicate", () => {
+    const predicate = sql(`
+      select pg_get_expr(i.indpred, i.indrelid)
+      from pg_index i where i.indexrelid = 'public.allocations_open_idx'::regclass
+        and i.indisvalid and i.indisready`);
+    expect(predicate).toEqual(["(status = 'open'::allocation_status)"]);
+  });
+
   it("no two indexes on a table have the same definition", () => {
     // A unique index serves the same reads as a plain one, so UNIQUE and the
     // name are stripped before comparing. INCLUDE is stripped too: a second
@@ -101,13 +161,22 @@ describe("ledger sum indexes", () => {
     // back to a disabled node and the assertions fail. Index-only still means
     // heap fetches for pages vacuum has not yet marked all-visible.
     const body = sql(`select prosrc from pg_proc where proname = 'portal_availability'`).join("\n");
-    const plan = sql(`
+    const explained = sql(`
       set local enable_seqscan = off;
       set local enable_bitmapscan = off;
       set local enable_indexscan = off;
       set local enable_sort = off;
-      explain (costs off) ${body.replaceAll("p_customer", "'00000000-0000-4000-8000-000000000000'::uuid")}`).join("\n");
-    expect(plan).toContain("Index Only Scan using movements_onhand_idx on inventory_movements");
-    expect(plan).toContain("Index Only Scan using allocations_open_idx on allocations");
+      explain (format json, costs off) ${body.replaceAll("p_customer", "'00000000-0000-4000-8000-000000000000'::uuid")}`, true).join("\n");
+    type PlanNode = { "Node Type": string; "Relation Name"?: string; Plans?: PlanNode[] };
+    const plan = JSON.parse(explained) as { Plan: PlanNode }[];
+    function planNodes(node: PlanNode): PlanNode[] {
+      return [node, ...(node.Plans ?? []).flatMap(planNodes)];
+    }
+    const nodes = planNodes(plan[0].Plan);
+    for (const table of ["inventory_movements", "allocations"]) {
+      const scans = nodes.filter(node => node["Relation Name"] === table);
+      expect(scans.length, table).toBeGreaterThan(0);
+      expect(scans.every(node => node["Node Type"] === "Index Only Scan"), table).toBe(true);
+    }
   });
 });

@@ -8,7 +8,6 @@ import { DatePicker } from "@/components/mgr/date-picker";
 import { OrderQuantity } from "./new-order";
 import { brandAnchor, type ShopViewModel } from "@/lib/mgr/shop-view";
 
-export type { ShopViewModel };
 export type ShopControls = {
   quantity?: (id: string, value: string) => void;
   shipTo?: (id: string) => void; requestedDate?: (value: string) => void;

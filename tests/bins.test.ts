@@ -149,14 +149,14 @@ describe("bins", () => {
     expect(noBin.error?.code).toBe("23502");
   });
 
-  it("the keg list reads back per pool × size × location: Microstar 36 here, 40 in storage", async () => {
+  it("the keg list reads back per pool × size × location: Kegline 36 here, 40 in storage", async () => {
     const wh = (await runCommand("create_location", { name: "Keg WH", uses: ["warehouse"] }, ctx)) as Row;
     const st = (await runCommand("create_location", { name: "Keg storage", uses: ["storage"] }, ctx)) as Row;
     const [binW] = (await runCommand("list_bins", { locationId: wh.id }, ctx)) as Row[];
     const [binS] = (await runCommand("list_bins", { locationId: st.id }, ctx)) as Row[];
-    const { data: vendor } = await admin.from("vendors").insert({ brewery_id: ctx.breweryId, name: "Microstar" }).select().single();
+    const { data: vendor } = await admin.from("vendors").insert({ brewery_id: ctx.breweryId, name: "Kegline" }).select().single();
     const { data: pool } = await admin.from("keg_pools").insert({
-      brewery_id: ctx.breweryId, name: "Microstar", kind: "pay_per_fill", vendor_id: vendor!.id, per_fill_cents: 900,
+      brewery_id: ctx.breweryId, name: "Kegline", kind: "pay_per_fill", vendor_id: vendor!.id, per_fill_cents: 900,
     }).select().single();
     for (const [bin, loc, qty] of [[binW, wh, 36], [binS, st, 40]] as const) {
       const { error } = await admin.from("keg_events").insert({

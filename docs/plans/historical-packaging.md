@@ -4,9 +4,9 @@ Status: plan, awaiting approval. Branch `feat/historical-packaging`, PR to `main
 
 ## Why
 
-Lolev history (`docs/plans/lolev-history.md`, `docs/plans/readings-on-batch.md`)
-gives MGR 183 historical batches with no tank. The user wants their packaging
-for the record (2026-10-14: "just for historical purposes", no depletion).
+Historical batches (`docs/plans/lolev-history.md`,
+`docs/plans/readings-on-batch.md`) need packaging records without inventing
+stock or tank stays.
 
 The live path cannot carry it:
 
@@ -21,15 +21,13 @@ Change: a run may name its batch directly, and a new
 and a lot. It writes **no stock movement** and has no tank. It is allowed only
 before `books_opened_on`, for a batch closed by `record_historical_batch`.
 
-## Source (2026-10-13 dump)
+## Source shape
 
-- 164 finished goods, 138 naming a batch: 131 on historical batches, 6 on
-  active ones, 1 on a deleted batch.
-- Grouping by (batch, production date) gives about 72 runs.
-- Formats: all 164 reference Lolev `formats`. Case 39, Kegfleet Half 37,
-  Microstar Half 28, Kegfleet Sixtel 20, Microstar Sixtel 18, Half 15,
-  Lolev Half 7. Each maps to an imported MGR format (Case, Half, Sixtel). The
-  keg owner (Lolev, Kegfleet, Microstar) maps to the keg pool on the SKU.
+The private finished-goods source may contain missing, active or deleted batch
+references. Report those rows instead of inventing historical links.
+Group valid rows by batch and production date.
+Map each format and keg owner to an approved MGR format and SKU pool.
+Source counts, lessor assignments and tenant mappings stay private.
 
 ## What reads runs and lots today
 
@@ -153,50 +151,44 @@ Parallelism: 1 → {2, 3} → 4 → 5.
 ## Import (local only, git-ignored; after merge)
 
 1. **SKUs.** A brand × format SKU per pair the finished goods need, through
-   `create_sku` with the keg pool (Lolev, Kegfleet, Microstar) for kegs.
+   `create_sku` with the approved keg pool for kegs.
    Deterministic request ids.
 2. **Runs.** One `record_historical_packaging_run` per (historical batch,
    production date), with outputs summed per SKU and the generated lot code
    `L-<batch_no>-<yyyymmdd>`, which is unique by construction (one run per batch
    per day).
 3. **Skips, reported:**
-   - finished goods with no batch (26);
-   - finished goods on an active batch (6), whose packaging is live work in MGR;
-   - the deleted batch (1);
+   - finished goods with no batch;
+   - finished goods on an active batch, whose packaging is live work in MGR;
+   - deleted batches;
    - a batch with no brand.
 
 ## v1 cross-check (2026-10-14)
 
-No conflict or repeat. v1's Lolev sync created **real** stock for packaging
-sessions (`~/Repos/mgr/src/integrations/mongodb/sync.ts:1010`), then removed
-that from the sync because the module was unused (`PROGRESS.md:307`). Lessons
-adopted:
+The legacy sync created real stock for packaging sessions, then removed
+that path when the source module proved unused.
+Lessons adopted:
 
 - **No movement for history.** v1 kegs "counted at packaging and never
   uncounted" over-reported stock (`PROGRESS.md:529`). That supports writing no
   movements here.
-- **Lot codes collide.** v1 had to de-duplicate with `-dupN` (migration 00149).
-  Checked in the 2026-10-13 dump: Lolev `lotNumber` has 6 distinct values over
-  20 rows, so lot codes are generated (see the open question below).
-- **Fractional quantities.** v1 made quantities numeric for values like 70.5
-  (00288). The dump has 6 such (4.5, 2.5, 2.3…), and `qty_actual numeric(12,2)`
-  takes them as is. The RPC test covers a fractional quantity.
+- **Lot codes collide.** Generate unique codes rather than trusting repeated
+  or missing source lot numbers.
+- **Fractional quantities.** Preserve supported fractional values in
+  `qty_actual numeric(12,2)`. The RPC test covers a fractional quantity.
 - **Brand resolution failed most often in v1** (`sync.ts:1033`, 166 lines). The
   import reports no-brand skips by count, and falls back from the batch's
   `intended_brand_id` to its recipe's brand before skipping.
-- **Keg owner on the SKU.** That is safe while these SKUs carry no movements.
-  Lolev's per-owner SKUs stay historical-only. If live packaging later needs a
-  Kegfleet/Microstar SKU, it uses the same SKU, which is intended.
+- **Keg owner on the SKU.** Preserve the approved pool while importing records
+  without stock. Later live packaging may reuse the same SKU.
 
 ## Open questions (defaults chosen; say if wrong)
 
-- **One run per (batch, production date).** Default: yes. Lolev's
-  packaging-session link is missing on some rows.
-- **Lot code.** Default: **always generated**, `L-<batch_no>-<yyyymmdd>`. Lolev's
-  `lotNumber` is on only 20 rows, and it has just 6 distinct values (one repeats
-  5 times, per v1's lesson below), so it cannot be a unique lot code. It goes in
-  the run note instead.
-- **Keg pool per SKU.** Default: a separate SKU per owner (Kegfleet Half vs
-  Microstar Half), because the pool lives on the SKU.
-- **Finished goods with no batch (26).** Default: skipped. Without a batch there
-  is nothing to attach the run to.
+- **One run per (batch, production date).** Default: yes, without relying on
+  incomplete packaging-session links.
+- **Lot code.** Default: always generated as `L-<batch_no>-<yyyymmdd>`.
+  Keep any source lot number in the run note.
+- **Keg pool per SKU.** Default: a separate SKU per owner because the pool
+  lives on the SKU.
+- **Finished goods with no batch.** Default: skipped because there is no
+  historical batch to attach the run to.

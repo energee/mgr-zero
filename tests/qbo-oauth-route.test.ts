@@ -71,7 +71,7 @@ describe("QuickBooks OAuth callback route", () => {
     expect(lifecycle.fail).toHaveBeenCalledWith("intent-1", "actor-1");
     expect(JSON.stringify([...response.headers])).not.toMatch(/access-secret|refresh-secret|secret-code/);
     expect(console.error).toHaveBeenCalledWith("qbo_oauth_failed", {
-      name: "Error", status: 403, stage: "oauth_verify_realm",
+      name: "QboHttpError", status: 403, stage: "oauth_verify_realm",
     });
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toMatch(/access-secret|refresh-secret|secret-code/);
   });
@@ -225,7 +225,7 @@ describe("QuickBooks OAuth callback route", () => {
     const response = await GET(new Request("https://mgr.test/api/integrations/qbo/oauth?code=code-secret&state=state-secret&realmId=realm-1"));
     expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?error=oauth");
     expect(console.error).toHaveBeenCalledWith("qbo_oauth_failed", {
-      name: "Error", status, stage: "oauth_exchange",
+      name: "QboHttpError", status, stage: "oauth_exchange",
     });
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
   });

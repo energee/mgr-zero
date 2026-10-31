@@ -67,7 +67,7 @@ describe("credential-safe integration diagnostics", () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const publicError = sanitizeQboError(new QboHttpError("access-secret provider body", status), "mapping_read");
     expect(publicError).not.toContain("secret");
-    expect(log).toHaveBeenCalledExactlyOnceWith("qbo_unavailable", { name: "Error", status, stage: "mapping_read" });
+    expect(log).toHaveBeenCalledExactlyOnceWith("qbo_unavailable", { name: "QboHttpError", status, stage: "mapping_read" });
     expect(JSON.stringify(log.mock.calls)).not.toContain("secret");
   });
 

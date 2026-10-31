@@ -39,5 +39,14 @@ reauthorize each workspace; old encrypted installation tokens cannot be read
 with a new key. The scheduled chat-state cleanup endpoint is
 `POST /api/chat/jobs/cleanup`, authenticated with `CHAT_JOB_SECRET`.
 
+The manifest requests `users:read` to show the Slack person's display name,
+user id, workspace name, and workspace id before linking. Existing workspaces
+need an owner-approved manifest update and administrator reauthorization to
+grant it. No hosted permission change is performed by applying the code or
+database migration. Until the profile lookup succeeds, Home does not issue
+a link proof. Older pending links without a display name must be restarted
+from Slack Home.
+
+
 Measured delivery and scan capacity against the 60 s delivery lease are in
 [worker capacity, 2026-10-23](worker-capacity-local-2026-10-23.md).

@@ -180,7 +180,7 @@ describe("list_channel_prices past the 1000-row cap", () => {
 // and only a US one needs a state; outside the US the address is optional.
 describe("country, alias and search", () => {
   const parse = (command: string, value: Record<string, unknown>) => getCommandDefinition(command)!.input.safeParse(value);
-  const customer = { name: "Odyssey Club", type: "distributor", saleChannelId: crypto.randomUUID() };
+  const customer = { name: "River Club", type: "distributor", saleChannelId: crypto.randomUUID() };
   it("upsert_customer takes a country without a state, needs a state for US, and refuses an unknown code", () => {
     expect(parse("upsert_customer", { ...customer, country: "CN" }).success).toBe(true);
     expect(parse("upsert_customer", { ...customer, country: "US" }).success).toBe(false);
@@ -204,18 +204,18 @@ describe("country, alias and search", () => {
   });
   it("saves a foreign customer and ship-to with an alias; list_customers q matches the name or the alias", async () => {
     const tag = crypto.randomUUID().slice(0, 8);
-    const c = await runCommand("upsert_customer", { name: `Tavour ${tag}`, alias: `Nano Wine ${tag}`, type: "retailer", state: "WA", saleChannelId: wholesale }, ctx) as { id: string; alias: string };
-    expect(c.alias).toBe(`Nano Wine ${tag}`);
-    const jp = await runCommand("upsert_customer", { name: `Unusual ${tag}`, type: "distributor", country: "JP", saleChannelId: wholesale }, ctx) as { id: string; country: string; state: string | null };
+    const c = await runCommand("upsert_customer", { name: `Cedar Trading ${tag}`, alias: `Evergreen ${tag}`, type: "retailer", state: "WA", saleChannelId: wholesale }, ctx) as { id: string; alias: string };
+    expect(c.alias).toBe(`Evergreen ${tag}`);
+    const jp = await runCommand("upsert_customer", { name: `Maple ${tag}`, type: "distributor", country: "JP", saleChannelId: wholesale }, ctx) as { id: string; country: string; state: string | null };
     expect(jp).toMatchObject({ country: "JP", state: null });
     const st = await runCommand("upsert_ship_to", { customerId: jp.id, label: "Main", country: "JP" }, ctx) as { country: string; city: string | null };
     expect(st).toMatchObject({ country: "JP", city: null });
     const ids = async (q: string) => (await runCommand("list_customers", { q }, ctx) as { id: string }[]).map(r => r.id);
-    expect(await ids(`nano wine ${tag}`)).toEqual([c.id]);
-    expect(await ids(`Tavour ${tag}`)).toEqual([c.id]);
+    expect(await ids(`evergreen ${tag}`)).toEqual([c.id]);
+    expect(await ids(`Cedar Trading ${tag}`)).toEqual([c.id]);
     expect(await ids(tag)).toEqual([c.id, jp.id]);
     expect(await ids(`${tag}%`)).toEqual([]);
-    expect(await ids(`Tavour_${tag}`)).toEqual([]);
+    expect(await ids(`Cedar Trading_${tag}`)).toEqual([]);
   });
   it("list_customers q treats * as literal text in the name and the alias (#1029)", async () => {
     const tag = crypto.randomUUID().slice(0, 8);

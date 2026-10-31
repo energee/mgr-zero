@@ -103,12 +103,14 @@ describe("actual brew-day record (#622)", () => {
     expect((await admin.from("volume_adjustments").select("bbl,reason").eq("occupancy_id", original.occupancy.id).throwOnError()).data).toEqual([{ bbl: -0.2, reason: "measurement" }]);
   });
 
-  it("refuses correction after a later addition and never posts a partial reversal", async () => {
+  it("corrects brew actuals after a later addition without reversing that addition", async () => {
     const f = await plannedBrew();
     const original = await runCommand("record_brew_day", f.input, f.brewer) as { record: { id: string }; occupancy: { id: string } };
     await runCommand("record_batch_addition", { occupancyId: original.occupancy.id, materialId: f.materialId, stage: "dry_hop", lotId: f.lot.id, qty: 1 }, f.brewer);
-    await expect(runCommand("correct_brew_record", { recordId: original.record.id, reason: "Wrong amount", initialBbl: 2, actuals: f.input.actuals }, f.brewer)).rejects.toThrow(/later addition/i);
-    expect((await admin.from("material_movements").select("id").eq("brewery_id", f.brewery.id).not("compensates_id", "is", null).throwOnError()).data).toEqual([]);
+    await runCommand("correct_brew_record", { recordId: original.record.id, reason: "Wrong amount", initialBbl: 2, actuals: [{ ...f.input.actuals[0], qty: 100 }] }, f.brewer);
+    expect((await admin.from("material_movements").select("qty").eq("brewery_id", f.brewery.id).eq("type", "consumption").throwOnError()).data)
+      .toEqual(expect.arrayContaining([{ qty: -115 }, { qty: -1 }, { qty: -100 }]));
+    expect(sql(`select sum(qty) from public.material_movements where brewery_id='${f.brewery.id}'`)).toEqual(["99.0000"]);
   });
 
   it("rolls back correction compensation when replacement stock or vessel capacity fails", async () => {
@@ -121,7 +123,7 @@ describe("actual brew-day record (#622)", () => {
     expect((await admin.from("material_movements").select("id").eq("brewery_id", f.brewery.id).not("compensates_id", "is", null).throwOnError()).data).toEqual([]);
   });
 
-  it.each(["transfer", "packaging", "closed occupancy", "filed report"])("refuses correction after %s", async dependency => {
+  it.each(["transfer", "packaging", "closed occupancy", "filed report"])("corrects ingredients and process without rewriting beer after %s", async dependency => {
     const f = await plannedBrew();
     const original = await runCommand("record_brew_day", f.input, f.brewer) as { record: { id: string }; occupancy: { id: string } };
     if (dependency === "transfer") {
@@ -135,8 +137,12 @@ describe("actual brew-day record (#622)", () => {
     } else {
       await ins("report_filings", { brewery_id: f.brewery.id, jurisdiction: "TTB", period_start: "2026-10-01", period_end: "2026-10-31", figures: {}, filed_at: "2026-11-01T12:00:00Z", filed_by: f.brewer.userId });
     }
-    await expect(runCommand("correct_brew_record", { recordId: original.record.id, reason: "Recount", initialBbl: 2, actuals: f.input.actuals }, f.brewer)).rejects.toThrow(/transfer|packaging|closed|filed report/i);
-    expect((await admin.from("brew_records").select("id").eq("batch_id", f.batch.id).throwOnError()).data).toHaveLength(1);
+    if (dependency === "closed occupancy" || dependency === "filed report") {
+      await expect(runCommand("correct_brew_record", { recordId: original.record.id, reason: "Changed volume", initialBbl: 1.8, actuals: f.input.actuals }, f.brewer)).rejects.toThrow(/open batch|filed report/i);
+    }
+    await runCommand("correct_brew_record", { recordId: original.record.id, reason: "Recount", initialBbl: 2, actuals: [{ ...f.input.actuals[0], qty: 100 }], process: { knockoutTempF: 67 } }, f.brewer);
+    expect((await admin.from("brew_records").select("id").eq("batch_id", f.batch.id).throwOnError()).data).toHaveLength(2);
+    expect((await admin.from("volume_adjustments").select("id").eq("occupancy_id", original.occupancy.id).throwOnError()).data).toEqual([]);
   });
 
   it("keeps brew records and corrections within the authorized brewery", async () => {

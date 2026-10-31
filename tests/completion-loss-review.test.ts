@@ -82,6 +82,26 @@ function expectSqlState(statement: string, state: string) {
 }
 
 describe("completion loss review", () => {
+  it("rejects invented destination codes for cellar samples and loss reattribution at the database boundary", async () => {
+    const isolatedBreweryId = (await makeBrewery()).id;
+    const isolatedAdmin = await makeStaffCtx(isolatedBreweryId, "admin");
+    const isolatedBrewer = await makeStaffCtx(isolatedBreweryId, "brewer");
+    const isolatedLocation = await seedLocation(isolatedBreweryId);
+    const completed = await exactCompletion({
+      breweryId: isolatedBreweryId, adminCtx: isolatedAdmin, brewerCtx: isolatedBrewer, location: isolatedLocation, fixtureDate,
+    });
+    const result = await isolatedAdmin.db.rpc("reattribute_loss", {
+      p_brewery: isolatedBreweryId, p_adjustment: completed.adjustmentId, p_bbl: "0.01",
+      p_classification: "sample", p_destination_state: "ZZ", p_request_id: crypto.randomUUID(),
+    });
+    expect(result.error?.message).toMatch(/volume_reclassifications_destination_state/);
+    const occupancyId = sql(`select occupancy_id::text from volume_adjustments where id='${completed.adjustmentId}'`, true)[0];
+    expectSqlState(`insert into public.volume_adjustments
+      (brewery_id, occupancy_id, bbl, reason, removal_class, dest_state, created_by)
+      values ('${isolatedBreweryId}', '${occupancyId}', -0.01, 'loss', 'sample', 'ZZ', '${isolatedAdmin.userId}')`, "23514");
+    expect(sql(`select count(*) from volume_adjustment_reclassifications where source_adjustment_id='${completed.adjustmentId}'`, true)).toEqual(["0"]);
+  });
+
   it("lists a future-started completion in its actual posting period", async () => {
     const futureBrewery = await makeBrewery();
     const futureAdmin = await makeStaffCtx(futureBrewery.id, "admin");

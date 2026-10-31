@@ -18,10 +18,10 @@ A brewery tracks kegs like this:
 
     keg fleet   1/6  28
     keg fleet   1/2  20
-    Microstar   1/6  36  (40 in storage)
-    Microstar   1/2  12  (32 in storage)
-    Lolev       1/6   3
-    Lolev       1/2   7
+    Kegline   1/6  36  (40 in storage)
+    Kegline   1/2  12  (32 in storage)
+    Example Brewing       1/6   3
+    Example Brewing       1/2   7
     One way     1/6  11
 
 Pool × size is already the ledger grain — `keg_events (pool_id, keg_size, qty, reason)`
@@ -150,8 +150,8 @@ required `binId`. There is no default to fall back to, so the column is required
 boundary too; the Record movement form preselects the location's first bin. The two
 existing tests that call `record_movement` name a bin.
 
-The opening list then reads as balances per pool × size × location — `Microstar /
-sixth_bbl / Warehouse = 36` and `Microstar / sixth_bbl / Storage = 40`, two real rows
+The opening list then reads as balances per pool × size × location — `Kegline /
+sixth_bbl / Warehouse = 36` and `Kegline / sixth_bbl / Storage = 40`, two real rows
 summing to 76. The parenthetical stops being a note in someone's head.
 
 ### Why `not null` on all of them
@@ -322,8 +322,8 @@ replenishment page picks a bin) that belongs with pars work, not with "where thi
 
 Two smaller notes:
 
-- **Lolev** — another brewery's empties held in your building — has no clean home. It would
-  be a `keg_pools` row of `kind = 'leased'` with Lolev as a `vendor`, which works but reads
+- **Example Brewing** — another brewery's empties held in your building — has no clean home. It would
+  be a `keg_pools` row of `kind = 'leased'` with Example Brewing as a `vendor`, which works but reads
   oddly, since nothing is leased *to* you. Out of scope here; flagged so it is not
   rediscovered.
 - **One-way kegs** (`One way 1/6 11`) still cannot appear on the keg fleet screen. The `skus`
@@ -363,7 +363,7 @@ Per AGENTS.md, every behaviour starts with a failing vitest against the real dat
   deleting the last bin is refused; deleting a bin with non-zero stock is refused; renaming
   the last bin succeeds.
 - **Balances:** two pools × two sizes × two locations produce four independent on-hand rows
-  that sum correctly, and the `Microstar 36 / 40` case reads back as written.
+  that sum correctly, and the `Kegline 36 / 40` case reads back as written.
 - **Volume neutrality:** a transfer of finished goods leaves total `bbl` unchanged and posts
   no removal.
 - **Same-location rejection:** `stock_transfers` with equal from/to is rejected; the same
@@ -376,5 +376,5 @@ Screens are verified by eye per AGENTS.md step 4, not by test.
 
 ## Open questions
 
-None blocking. The two flagged items — Lolev-style foreign kegs, and one-way kegs on the
+None blocking. The two flagged items — Example Brewing-style foreign kegs, and one-way kegs on the
 fleet screen — are separate decisions that do not gate any phase here.

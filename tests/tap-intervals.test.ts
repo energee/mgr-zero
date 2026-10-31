@@ -121,20 +121,26 @@ it("rejects foreign locations, nonkeg SKUs, invalid fills and direct DML, preser
 
 it("returns every open interval beyond 1000 and bounded closed history without private user fields", async () => {
   const f = await fixture();
+  const actorEmail = (await admin.auth.admin.getUserById(f.ctx.userId)).data.user!.email!;
   sql(`insert into public.tap_intervals(brewery_id,location_id,label,nominal_bbl,opening_fill,not_in_inventory,opened_by)
     select '${f.brewery.id}','${f.location.id}','Guest '||i,.5,1,true,'${f.ctx.userId}' from generate_series(1,1005) i`);
   const rows = await runCommand("list_open_taps", { locationId: f.location.id }, f.ctx) as { id: string }[];
   expect(rows).toHaveLength(1005);
   for (const r of rows.slice(0,3)) expect((await f.ctx.db.rpc("kick_keg", close(f,r.id))).error).toBeNull();
-  const history = await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx) as unknown[];
-  expect(history).toHaveLength(3); expect(JSON.stringify(history)).not.toMatch(/email|password|metadata|@test.local/);
+  const history = await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx) as { opened_by_label: string; closed_by_label: string }[];
+  expect(history).toHaveLength(3);
+  for (const row of history) {
+    expect(row.opened_by_label).toContain(actorEmail);
+    expect(row.closed_by_label).toContain(actorEmail);
+    for (const key of ["email", "password", "raw_user_meta_data", "raw_app_meta_data"]) expect(row).not.toHaveProperty(key);
+  }
   expect(history[0]).toHaveProperty("closed_by_label");
   sql(`insert into public.tap_intervals(brewery_id,location_id,label,nominal_bbl,opening_fill,not_in_inventory,opened_by,closed_at,closed_by,closing_fill,close_reason)
     select '${f.brewery.id}','${f.location.id}','Closed '||i,.5,1,true,'${f.ctx.userId}',now(),'${f.ctx.userId}',0,'Empty' from generate_series(1,55) i`);
   expect(await runCommand("list_tap_history", { locationId:f.location.id }, f.ctx)).toHaveLength(50);
   const stale = await f.ctx.db.rpc("kick_keg", close(f, rows[0].id));
   expect(stale.error).toMatchObject({ code: "MG409" });
-  expect(stale.error?.message).toMatch(/already closed by staff at /i);
+  expect(stale.error?.message).toContain(actorEmail);
   expect(stale.error?.message).not.toContain(f.ctx.userId);
   expect((await runCommand("list_open_taps", { locationId: f.location.id }, f.ctx) as unknown[])).toHaveLength(1002);
 });
@@ -277,18 +283,33 @@ it("replays a committed legacy swap through the command boundary without applyin
   expect(state(f)).toEqual(before);
 });
 
-it("returns saved actor names or staff, never invented email handles or private profile fields", async () => {
+it("keeps the verified account email beside editable tap-history names", async () => {
   const f = await fixture();
   expect((await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: "  Dana Brewer  " } })).error).toBeNull();
+  const email = (await admin.auth.admin.getUserById(f.ctx.userId)).data.user!.email!;
   const opened = await open(f);
   assert(opened !== null);
-  expect(await runCommand("list_open_taps", { locationId: f.location.id }, f.ctx)).toEqual(expect.arrayContaining([expect.objectContaining({ opened_by_label: "Dana Brewer" })]));
+  const active = await runCommand("list_open_taps", { locationId: f.location.id }, f.ctx) as { id: string; opened_by_label: string }[];
+  const openingLabel = active.find(row => row.id === opened.id)?.opened_by_label;
+  expect(openingLabel).toContain("Dana Brewer");
+  expect(openingLabel).toContain(email);
   expect((await f.ctx.db.rpc("kick_keg", close(f, opened.id))).error).toBeNull();
-  const history = await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx);
-  expect(history).toEqual(expect.arrayContaining([expect.objectContaining({ opened_by_label: "Dana Brewer", closed_by_label: "Dana Brewer" })]));
-  expect(JSON.stringify(history)).not.toMatch(/email|password|metadata|@test.local/);
+  const history = await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx) as { id: string; opened_by_label: string; closed_by_label: string }[];
+  const interval = history.find(row => row.id === opened.id)!;
+  for (const field of ["opened_by_label", "closed_by_label"] as const) {
+    expect(interval[field]).toContain("Dana Brewer");
+    expect(interval[field]).toContain(email);
+  }
+  for (const key of ["email", "password", "raw_user_meta_data", "raw_app_meta_data"]) expect(interval).not.toHaveProperty(key);
   const conflict = await f.ctx.db.rpc("kick_keg", close(f, opened.id));
-  expect(conflict.error?.message).toContain("already closed by Dana Brewer at");
+  expect(conflict.error?.message).toContain("Dana Brewer");
+  expect(conflict.error?.message).toContain(email);
   expect((await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: " " } })).error).toBeNull();
-  expect(await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx)).toEqual(expect.arrayContaining([expect.objectContaining({ opened_by_label: "staff", closed_by_label: "staff" })]));
+  const renamedHistory = await runCommand("list_tap_history", { locationId: f.location.id }, f.ctx) as { id: string; opened_by_label: string; closed_by_label: string }[];
+  const renamedInterval = renamedHistory.find(row => row.id === opened.id);
+  assert(renamedInterval !== undefined);
+  for (const field of ["opened_by_label", "closed_by_label"] as const) {
+    expect(renamedInterval[field]).toContain(email);
+    expect(renamedInterval[field]).not.toContain("Dana Brewer");
+  }
 });
