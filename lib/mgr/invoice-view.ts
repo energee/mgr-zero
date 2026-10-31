@@ -166,7 +166,7 @@ const KIND_GROUPS: [label: string, kinds: string[]][] = [
 ];
 const kindGroup = (kind: string) => KIND_GROUPS.find(([, kinds]) => kinds.includes(kind))?.[0] ?? "Adjustments";
 
-/** Renames the snapshot's push and payment facts to the names invoice-state.ts reads. */
+/** Renames the snapshot's push, payment and credit facts for invoice-state.ts. */
 const toLedgerFacts = ({ invoice, hasPendingPush, wasPushedToQbo, localPaidCents, localCreditCents }: InvoiceSnapshot) => ({
   ...invoice, has_pending_qbo_push: hasPendingPush, was_pushed_to_qbo: wasPushedToQbo, local_paid_cents: localPaidCents, local_credit_cents: localCreditCents,
 });

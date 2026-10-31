@@ -40,7 +40,8 @@ type LedgerInvoice = {
 /** True when MGR's payment ledger, not QuickBooks, owns this invoice's balance
  *  (#1045, docs/plans/invoice-local-payments.md): an invoice QuickBooks never
  *  identified, with no pending push, never pushed to any company, and not
- *  marked paid outside the ledger, as a historical import is.
+ *  marked paid outside the ledger, as a historical import is. A closure by
+ *  payments or linked credits remains ledger-owned.
  *  record_invoice_payment refuses the same invoices. */
 export function invoiceLedgerOwnsBalance(invoice: LedgerInvoice): boolean {
   return invoice.kind === "invoice"

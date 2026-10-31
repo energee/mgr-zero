@@ -118,8 +118,8 @@ begin
   values (p_brewery, p_payment, btrim(p_reason), v_actor);
   select subtotal_cents - local_credit_cents, local_paid_cents into v_total, v_paid
     from public.invoice_totals where invoice_id = v_inv.id and brewery_id = p_brewery;
-  -- record_invoice_payment refuses an invoice already paid, so on an invoice
-  -- with payments only the ledger set paid_at; below the total it clears.
+  -- A void reopens the invoice only when cash plus linked credits no longer
+  -- covers its frozen total.
   if v_paid < v_total then
     update public.invoices set paid_at = null where id = v_inv.id and brewery_id = p_brewery;
   end if;

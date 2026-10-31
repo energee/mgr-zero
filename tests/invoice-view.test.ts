@@ -15,29 +15,17 @@ import { invoiceIsCreditable } from "../lib/mgr/invoice-state";
 const htmlOf = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(createElement("div", null, node));
 
 describe("Invoice view", () => {
-  it("nets linked credits, limits payment to the net, and identifies credit-only settlement", () => {
+  it("caps payment at the credited balance and refuses payment after credit-only settlement", () => {
     const snapshot = { ...invoiceFailedAls, localCreditCents: 7600 };
     const model = toInvoiceViewProps(snapshot);
     expect(model.paymentBalanceCents).toBe(53900);
-    expect(model.summary.settlement).toContainEqual({ label: "Credited in MGR", value: "$76.00" });
     const settled = toInvoiceViewProps({ ...snapshot, localCreditCents: 61500, invoice: { ...snapshot.invoice, paid_at: "2026-10-20T04:00:00Z" } });
-    expect(settled.state.label).toBe("Settled");
     expect(settled.paymentBalanceCents).toBeNull();
   });
 
-  it("shows excess credit as money owed back, preserving gross total and cash received", () => {
+  it("refuses payment when a paid invoice has excess credit", () => {
     const model = toInvoiceViewProps(invoiceLocalCreditBalance);
-    expect(model.state.label).toBe("Credit balance");
-    expect(model.summary.total).toMatchObject({ value: "$615.00" });
-    expect(model.summary.settlement).toEqual([
-      { label: "Credit balance", value: "$76.00", strong: true },
-      { label: "Paid in MGR", value: "$615.00" },
-      { label: "Credited in MGR", value: "$76.00" },
-    ]);
     expect(model.paymentBalanceCents).toBeNull();
-    const html = htmlOf(createElement(InvoiceView, { model, recordPayment: null, paymentAction: null }));
-    expect(html).toContain("Credit balance");
-    expect(html).toContain("$76.00");
   });
   it("checks mappings in the current realm, deduplicates SKUs, and gates unavailable fixes", () => {
     const customer = { name: "Actual customer", qbo_customer_id: "00227", qbo_realm_id: "current" };

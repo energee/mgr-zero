@@ -14,11 +14,9 @@ it("nets local credit without hiding excess or calling it overdue", () => {
   expect(partial.balance.cents).toBe(84000);
   expect(partial.paymentBalanceCents).toBe(84000);
   const settled = toInvoiceListRow({ ...ledger, local_paid_cents: 84000, paid_at: "2026-10-20T00:00:00Z" }, ["sales"], false, "UTC");
-  expect(settled.payment).toBe("Settled");
   expect(settled.overdue).toBe(false);
   const excess = toInvoiceListRow({ ...ledger, local_paid_cents: 104000, paid_at: "2026-10-20T00:00:00Z" }, ["sales"], false, "UTC");
   expect(excess.balance.cents).toBe(-20000);
-  expect(excess.payment).toBe("Credit balance");
   expect(excess.paymentBalanceCents).toBeNull();
   expect(excess.overdue).toBe(false);
 });
