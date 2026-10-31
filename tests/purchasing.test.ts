@@ -61,6 +61,19 @@ describe("vendors, materials, contracts", () => {
     expect(await runCommand("list_vendors", {}, ctx)).toEqual([{ id: vendor.id, name: "Fictional Hops Cooperative", active: true, lead_time_days: 10, qbo_vendor_id: null, qbo_realm_id: null }]);
   });
 
+  it("keeps base units per purchase unit to four decimals at the table, so a whole-unit count always converts exactly", async () => {
+    const hop = { name: "Mosaic pellets", category: "hop", baseUom: "g", purchaseUom: "lb" } as const;
+    const mosaic = (await runCommand("upsert_material", { ...hop, purchaseUomFactor: 453.5924 }, ctx)) as { id: string; purchase_uom_factor: number };
+    expect(mosaic.purchase_uom_factor).toBe(453.5924);
+    // Past the command's own check: the column refuses a fifth decimal from any writer.
+    const { error } = await ctx.db.rpc("upsert_material", {
+      p_brewery: ctx.breweryId, p_material: mosaic.id, p_name: hop.name, p_category: hop.category, p_base_uom: hop.baseUom,
+      p_purchase_uom: hop.purchaseUom, p_purchase_uom_factor: 453.59237, p_lot_tracked: null, p_default_vendor: null,
+      p_reorder_point: null, p_active: null, p_extract_potential: null, p_request_id: crypto.randomUUID(),
+    });
+    expect(error?.message).toMatch(/materials_purchase_uom_factor_four_decimals/);
+  });
+
   it("list_vendors_and_contracts and list_materials q match the name in the query, with % and _ literal (#994)", async () => {
     const own = await makeStaffCtx((await makeBrewery()).id, "warehouse");
     for (const name of ["Hops 100% Direct", "Malt_Co", "MaltyCo"]) await runCommand("upsert_vendor", { name }, own);

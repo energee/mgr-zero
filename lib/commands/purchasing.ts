@@ -49,7 +49,9 @@ defineCommand({
     baseUom: z.enum(UOMS),
     purchaseUom: z.enum(UOMS),
     // Omitted on an edit keeps the factor the material had (#589); a new material defaults to 1.
-    purchaseUomFactor: z.number().positive().optional(),
+    // Four decimals, like a receipt count: receive_purchase_order refuses a count × factor
+    // past four base-unit decimals, so 453.59237 g per lb would refuse every whole-lb receipt.
+    purchaseUomFactor: z.number().positive().multipleOf(0.0001, "Base units per purchase unit takes at most four decimal places.").optional(),
     lotTracked: z.boolean().optional(),
     defaultVendorId: z.string().uuid().optional(),
     reorderPoint: z.number().nonnegative().optional(),
@@ -267,7 +269,7 @@ defineCommand({
 });
 
 const receiptCountLine = z.object({
-  poLineId: z.string().uuid(), qtyCounted: z.number().nonnegative().multipleOf(0.0001),
+  poLineId: z.string().uuid(), qtyCounted: z.number().nonnegative().multipleOf(0.0001, "A count takes at most four decimal places."),
   lotCode: z.string().trim().optional(), bestBy: isoDate.optional(),
 });
 

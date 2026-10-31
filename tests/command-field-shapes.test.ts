@@ -24,6 +24,16 @@ describe("field shapes are validated (#491)", () => {
     for (const qtyCounted of [0.33333, 0.00001, -1, Infinity, NaN]) {
       expect(schema.safeParse({ ...input, lines: [{ poLineId: crypto.randomUUID(), qtyCounted }] }).success).toBe(false);
     }
+    const overprecise = schema.safeParse({ ...input, lines: [{ poLineId: crypto.randomUUID(), qtyCounted: 0.33333 }] });
+    expect(overprecise.error?.issues.map((issue) => issue.message)).toEqual(["A count takes at most four decimal places."]);
+  });
+
+  it("upsert_material accepts base units per purchase unit only to four decimal places, and says so", () => {
+    const schema = getCommandDefinition("upsert_material")!.input;
+    const hop = { name: "Mosaic pellets", category: "hop", baseUom: "g", purchaseUom: "lb" };
+    expect(schema.safeParse({ ...hop, purchaseUomFactor: 453.5924 }).success).toBe(true);
+    const overprecise = schema.safeParse({ ...hop, purchaseUomFactor: 453.59237 });
+    expect(overprecise.error?.issues.map((issue) => issue.message)).toEqual(["Base units per purchase unit takes at most four decimal places."]);
   });
 
   it.each([

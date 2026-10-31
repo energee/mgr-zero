@@ -54,3 +54,11 @@ begin
   select * into v_po from public.purchase_orders where id = p_po;
   return private.complete_command_request(p_request_id, jsonb_build_object('receipt_id', v_receipt_id, 'po_id', p_po, 'status', v_po.status));
 end $$;
+
+-- The guard above refuses a count × factor past four decimals, so a factor with a
+-- fifth decimal (453.59237 g per lb) would refuse every whole-unit receipt. Keep the
+-- factor to four decimals for every writer; upsert_material's input says the same.
+-- Validated, not NOT VALID: pre-release, hosted holds no production materials, and a
+-- stray five-decimal factor should stop the push rather than keep refusing receipts.
+alter table public.materials add constraint materials_purchase_uom_factor_four_decimals
+  check (purchase_uom_factor = round(purchase_uom_factor, 4));
