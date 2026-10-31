@@ -1336,7 +1336,7 @@ For orders, MGR projects only the open order quantity not covered by finished go
 <Screen name="Team" />
 <Screen name="Team member" />
 
-Admin opens **Team** from **Settings**. Each member shows their saved name, with email and roles beneath, listed in this order: Admin, Sales, Warehouse, Brewer, Taproom. When no name is saved, their full email address identifies them instead, and only the roles appear beneath it. Your own row is marked **you**. Open another member's row to change their **Roles** and **Save roles**, or **Remove** them and confirm, which ends their membership at this brewery and leaves their sign-in account alone. MGR keeps at least one member with Admin: removing Admin from the last admin is refused even if that person keeps another role. The last admin cannot be removed, and nobody can remove themselves.
+Admin opens **Team** from **Settings**. Each member shows their saved name with their account email beside it, and their roles beneath, listed in this order: Admin, Sales, Warehouse, Brewer, Taproom. When no name is saved, their full email address alone identifies them. Your own row is marked **you**. Open another member's row to change their **Roles** and **Save roles**, or **Remove** them and confirm, which ends their membership at this brewery and leaves their sign-in account alone. MGR keeps at least one member with Admin: removing Admin from the last admin is refused even if that person keeps another role. The last admin cannot be removed, and nobody can remove themselves.
 
 **Invite staff** opens the same form as the first-run checklist: enter **Email**, choose one **Role**, and **Send invite**. **Send invite** stays unavailable, with *Still needed: a valid email address*, while the email is blank, incomplete, or too long; leaving **Email** marks it with what to enter. Invitations grant one role; after acceptance, an admin can add more from **Team member**. After the dialog closes, the page shows **Invite sent** for a new address, and the recipient sets up their login from the email. An address with an existing MGR sign-in is sent no email, and the page shows **Invitation pending** instead, since that recipient must accept it themselves (see [Accept an invitation](#getting-started)). The roster shows memberships only; pending invitations are listed below it. After an uncertain response, use **Retry saved request** to finish the original invitation. Its email and role remain frozen until recovery, including after reloading the same browser tab. A definitive first rejection allows corrected details in a new request; a successful invite clears the form. Successful recovery from the shared notice reloads the page to clear stale form fields. Only an invitation still in progress for that email at this brewery refuses it, with **invitation already requested**; another brewery's invitation never blocks yours. An invitation interrupted before its email was sent stops blocking after 15 minutes, so you can send it again then. Existing accounts receive a pending consent invitation and appear in the roster only after accepting, within seven days. They see it in [Invitations](/invitations) the next time they sign in, or can open that address themselves; no new password is needed. Non-admin staff are sent to **No access** if they open Team's address directly.
 
@@ -1493,6 +1493,19 @@ Choose **My timezone** from the searchable timezone picker when setting personal
 To connect or reauthorize a workspace, finish while signed in as the same MGR administrator who started the connection. That person must still be an administrator. If another administrator takes over, they must start a new connection attempt from Chat settings rather than finish the earlier link.
 
 To link, open the MGR app in Slack, go to its **Home** tab, and choose **Link MGR account**. Sign in to MGR if asked. Before anything changes, MGR shows the brewery, your current MGR name and email, and the Slack workspace and user identity. Choose **Link these accounts** only when both identities are yours. MGR never links by matching email, profile name, or workspace domain. A missing, expired, used, or wrong-brewery link must be restarted from the MGR app's **Home** tab in Slack. Until an admin connects Slack for your brewery, My notification preferences says so in place of these steps.
+
+The Slack consent screen shows the Slack display name and user id beside the
+workspace name and workspace id. If Slack cannot supply the person's profile,
+no link is offered; ask an administrator to reauthorize the connection's profile
+permission, then reopen Slack Home. MGR names in Team, tap history, and QuickBooks
+sync status include the account email beside any editable profile name. A profile
+name is not proof of an administrator role.
+
+Retrying a pending QuickBooks, Square, or Slack connection issues a fresh
+authorization link for that same attempt. Use the newest link; earlier links
+stop working. Retrying does not extend the ten-minute expiry. A finished or
+expired attempt must be started again.
+
 
 Linked App Home shows a role-filtered **Today** queue with up to 20 current items, the same work your MGR Today tab shows for your role. Admin sees all live items; Sales sees submitted orders to review and buyer questions about invoices; Warehouse sees confirmed orders whose requested ship date is due or that have no ship date, orders with staged beer to put back, and their own next stop when they're a route's assigned driver; Brewer sees overdue fermentation readings. Select **Open** on an item to view its order in MGR. With no current work, App Home says **You’re caught up**.
 

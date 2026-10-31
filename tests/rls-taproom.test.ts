@@ -354,7 +354,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     prepare_square_publication: [B,R(),f.taproom.id,"{}",null,null],
     finish_square_publication: [B,R(),f.taproom.id,null,{}],
     finish_square_menu_publication: [B,R(),f.taproom.id],
-    assert_chat_admin: [B], issue_chat_link_proof: [I,"U-PENDING","fixture-proof"], resolve_chat_actor: ["slack",B,f.taproom.id],
+    assert_chat_admin: [B], issue_chat_link_proof: [I,"U-PENDING","fixture-proof","Morgan Slack"], resolve_chat_actor: ["slack",B,f.taproom.id],
     scan_chat_today_candidates: [B,now], chat_quiet_release: [now,"22:00","07:00","America/New_York"], chat_upsert_occurrences: [B,now,f.order.id],
     chat_fanout_deliveries: [B,now,f.occurrence.id], scan_chat_notification_occurrences: [B,now], lease_chat_deliveries: [1,60,now], chat_take_lease: [delivery,now],
     complete_chat_delivery: [delivery,now,"fixture-conversation","fixture-message"], retry_chat_delivery: [delivery,now,now,"network"], suppress_chat_delivery: [delivery,now,"suppressed","fixture"],

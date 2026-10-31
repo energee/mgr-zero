@@ -222,5 +222,8 @@
   "20261030031036_retire_square_location_mapping.sql": "d2857bc0e27bc759316bf98abc76a0bb6859914ab5a57b20880bf49256628aaa",
   "20261030031037_square_mapping_epochs.sql": "0b12935ef46295d93ff4ca91c06b72ad5e3ce09c51727c9072f0e03614e0faf5",
   "20261030031038_square_coverage_history_identity.sql": "605c532e03ac600d2d1f830767909b67e0c136a07feeb1559fdff80d6e1486ac",
-  "20261030031039_square_history_variance_sources.sql": "a4848bbca9e0544c9ac11724074b696eb62e7669da9bfdfd9e47f3616eae5526"
+  "20261030031039_square_history_variance_sources.sql": "a4848bbca9e0544c9ac11724074b696eb62e7669da9bfdfd9e47f3616eae5526",
+  "20261030031040_tenancy_identity_and_team_authority.sql": "379ba35f19f48e8fd0f53c6900d7c911814bcddedc51a14001dd52a19247f8c9",
+  "20261030031041_server_random_oauth_state.sql": "e8a713d35dc80b25a6f42e9b5460584abf09bb82d9f04b1150f11fb9321456f5",
+  "20261030031042_slack_link_display_identity.sql": "5fde2a02974323fa940a3d30758f1af2ad2314d1f7b9511c9729a4edf5afe30b"
 }
