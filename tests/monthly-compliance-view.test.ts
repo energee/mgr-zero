@@ -20,14 +20,16 @@ describe("compliance period status (#1310)", () => {
     ["2025-01-01", "2025-12-31", "Past"],
     ["2030-01-01", "2030-12-31", "Upcoming"],
   ])("labels %s through %s as %s independently of report balance", (periodStart, periodEnd, status) => {
-    const report = { figures: { ...monthlyComplianceAugust.report.figures, periodStart, periodEnd }, warnings: [] };
+    const report = { figures: { ...monthlyComplianceAugust.report.figures, periodStart, periodEnd, inProcessAsOf: status === "Past" ? periodEnd : undefined }, warnings: [] };
     const model = toMonthlyComplianceViewProps({ ...monthlyComplianceAugust, today: "2026-09-30", report });
     expect(model.periodStatus).toBe(status);
     const html = htmlOf(createElement(MonthlyComplianceView, { model }));
     expect(html).toContain(`>${status}</span>`);
     expect(html).toContain("Live figures");
     expect(html).toContain("not a saved filing");
-    if (status !== "Past") expect(html).not.toContain("Save filed snapshot");
+    if (status !== "Past") {
+      expect(html).not.toContain("Save filed snapshot");
+    }
     if (status === "Upcoming") expect(html).toContain("This period has not started");
   });
 

@@ -9,9 +9,10 @@ import { cn } from "@/lib/utils";
 /** The signed-in staff fixture's generated avatar. */
 export const MARIA = "/mock/maria.jpg";
 
-/** "Maria Alvarez" is MA, one name is its first letter, an address uses the local part. */
+/** "Maria Alvarez" is MA, one name is its first letter, an address uses the local part,
+ *  and a `Name <email>` identity label uses the name. */
 export function initialsOf(name: string) {
-  const words = name.split("@")[0].split(/[\s._-]+/).filter(Boolean);
+  const words = name.replace(/\s*<[^>]*>$/, "").split("@")[0].split(/[\s._-]+/).filter(Boolean);
   if (words.length === 0) return "";
   const letters = words.length > 1 ? words[0][0] + words[words.length - 1][0] : words[0][0];
   return letters.toUpperCase();

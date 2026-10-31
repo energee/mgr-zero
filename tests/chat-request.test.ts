@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseChatRequest, readChatRequest } from "@/lib/chat/request";
 
 const id = "00000000-0000-4000-8000-000000000001";
 
 describe("chat request boundary", () => {
+  afterEach(() => vi.unstubAllEnvs());
   it("accepts one bounded user text message with explicit scope", () => {
     expect(parseChatRequest({ id, breweryId: id, message: { id, role: "user", parts: [{ type: "text", text: "What needs attention?" }] } })).toMatchObject({
       id, breweryId: id, text: "What needs attention?",
@@ -19,7 +20,7 @@ describe("chat request boundary", () => {
   });
 
   it("rejects an oversized HTTP body before JSON parsing", async () => {
-    const request = new Request("http://localhost/api/chat", { method: "POST", body: " ".repeat(24 * 1024 + 1) });
+    const request = new Request("http://localhost/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: " ".repeat(24 * 1024 + 1) });
     await expect(readChatRequest(request)).rejects.toMatchObject({ status: 413 });
   });
 
@@ -28,7 +29,20 @@ describe("chat request boundary", () => {
       pull(controller) { controller.enqueue(new Uint8Array(24 * 1024 + 1)); },
       cancel: () => Promise.reject(new Error("cancel failed")),
     });
-    const request = new Request("http://localhost/api/chat", { method: "POST", body, duplex: "half" } as RequestInit);
+    const request = new Request("http://localhost/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body, duplex: "half" } as RequestInit);
     await expect(readChatRequest(request)).rejects.toMatchObject({ status: 413, code: "request_too_large" });
+  });
+
+  it("rejects a cross-site chat body before interpreting the message", async () => {
+    vi.stubEnv("APP_URL", "https://mgr.test");
+    const request = new Request("https://mgr.test/api/chat", {
+      method: "POST", headers: { origin: "https://attacker.invalid", "content-type": "application/json" }, body: "{}",
+    });
+    await expect(readChatRequest(request)).rejects.toMatchObject({ status: 403, code: "invalid_origin" });
+  });
+
+  it("rejects a chat body sent as a simple cross-site media type", async () => {
+    const request = new Request("https://mgr.test/api/chat", { method: "POST", headers: { "content-type": "text/plain" }, body: "{}" });
+    await expect(readChatRequest(request)).rejects.toMatchObject({ status: 415, code: "unsupported_media_type" });
   });
 });

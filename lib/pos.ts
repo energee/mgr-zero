@@ -119,7 +119,7 @@ function setLocationPresence(object: Record<string, unknown>, locationId: string
 export function prepareSquareCatalogPublication(source: SquarePublicationSource, current?: Record<string, unknown> | null) {
   const publishable = source.variations.filter((variation) => variation.present && variation.priceCents !== null);
   if (!source.externalItemId) {
-    if (publishable.length === 0) throw new Error("A new Square item must have a priced available variation");
+    if (publishable.length === 0) throw new SquareCatalogReadError("provider_invalid", "A new Square item must have a priced available variation");
     const itemId = `#mgr-item-${source.brandId}-${source.catalogGroup}`;
     return { object: {
       type: "ITEM", id: itemId, present_at_all_locations: false, present_at_location_ids: [source.locationId],
@@ -133,14 +133,14 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
     }, itemVersion: null, variationVersions: { versions: {} as Record<string, number>, changed: [] as string[] } };
   }
   if (!current || current.type !== "ITEM" || current.id !== source.externalItemId || current.is_deleted === true
-    || !Number.isSafeInteger(current.version)) throw new Error("Square catalog item changed or is unavailable");
+    || !Number.isSafeInteger(current.version)) throw new SquareCatalogReadError("provider_missing", "Square catalog item changed or is unavailable");
   const currentItemData = current.item_data as Record<string, unknown> | undefined;
   const currentVariations = currentItemData?.variations;
-  if (!Array.isArray(currentVariations)) throw new Error("Square catalog item has no writable variations");
+  if (!Array.isArray(currentVariations)) throw new SquareCatalogReadError("provider_invalid", "Square catalog item has no writable variations");
   const item = writableCatalogValue(current) as Record<string, unknown>;
   const itemData = item.item_data as Record<string, unknown> | undefined;
   const variations = itemData?.variations;
-  if (!itemData || !Array.isArray(variations)) throw new Error("Square catalog item has no writable variations");
+  if (!itemData || !Array.isArray(variations)) throw new SquareCatalogReadError("provider_invalid", "Square catalog item has no writable variations");
   const changed: Record<string, unknown>[] = [];
   const variationVersions: Record<string, number> = {};
   const changedVariationIds: string[] = [];
@@ -160,10 +160,10 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
     const variation = variations.find((entry) => !!entry && typeof entry === "object"
       && (entry as Record<string, unknown>).id === sourceVariation.externalVariationId) as Record<string, unknown> | undefined;
     if (!original || !variation || original.type !== "ITEM_VARIATION" || original.is_deleted === true
-      || !Number.isSafeInteger(original.version)) throw new Error("Square catalog variation changed or is unavailable");
+      || !Number.isSafeInteger(original.version)) throw new SquareCatalogReadError("provider_missing", "Square catalog variation changed or is unavailable");
     const before = JSON.stringify(writableCatalogValue(original));
     const variationData = variation.item_variation_data as Record<string, unknown> | undefined;
-    if (!variationData || variationData.item_id !== source.externalItemId) throw new Error("Square catalog ownership changed");
+    if (!variationData || variationData.item_id !== source.externalItemId) throw new SquareCatalogReadError("provider_invalid", "Square catalog ownership changed");
     variationVersions[sourceVariation.externalVariationId] = original.version as number;
     variationData.name = sourceVariation.format;
     if (sourceVariation.present && sourceVariation.priceCents !== null) {
@@ -216,7 +216,7 @@ class SquareProviderError extends Error {
 }
 
 class SquareCatalogReadError extends Error {
-  constructor(readonly code: "provider_missing" | "provider_invalid") { super("Square catalog item is unavailable"); }
+  constructor(readonly code: "provider_missing" | "provider_invalid", message = "Square catalog item is unavailable") { super(message); }
 }
 
 const terminalAuthorization = (status: number, data: unknown) => {
@@ -299,8 +299,6 @@ export class SquareClient {
   }
 
   revoke(accessToken: string) { return this.revokeToken({ access_token: accessToken, revoke_only_access_token: false }); }
-
-  revokeAccessToken(accessToken: string) { return this.revokeToken({ access_token: accessToken, revoke_only_access_token: true }); }
 
   /** Revokes every token this app holds for the seller, without a token (#640). Square accepts
    *  merchant_id in place of access_token: developer.squareup.com/reference/square/o-auth-api/revoke-token */
@@ -499,9 +497,10 @@ export async function publishSquareCatalogItem(
     let prepared: ReturnType<typeof prepareSquareCatalogPublication>;
     try { prepared = prepareSquareCatalogPublication(start.source, current); }
     catch (error) {
-      const code = error instanceof Error && /changed or is unavailable/.test(error.message) ? "provider_missing" : "provider_invalid";
-      await finishSquarePublication(ctx, start.attemptId, code, null);
-      throw new CommandError("Square no longer has the selected catalog item", 409, "conflict");
+      if (!(error instanceof SquareCatalogReadError)) throw error;
+      await finishSquarePublication(ctx, start.attemptId, error.code, null);
+      throw new CommandError(error.code === "provider_missing"
+        ? "Square no longer has the selected catalog item" : "Square catalog data is not writable", 409, "conflict");
     }
     await prepareSquarePublication(ctx, start.attemptId, JSON.stringify({
       idempotency_key: start.providerKey,
@@ -627,7 +626,7 @@ export async function syncSquareCatalogFacts(client: SquareClient, accessToken: 
 
 export async function beginSquareOAuth(ctx: Ctx, client: SquareClient, providerIntent: "connect" | "reconnect", requestId: string = randomUUID()) {
   if (!hasAnyRole(ctx.roles, ["admin"])) throw new CommandError("permission denied: brewery admin required", 403);
-  const state = oauthState(requestId, ctx.userId);
+  const state = oauthState();
   await unwrap(ctx.db.rpc("begin_square_oauth", {
     p_brewery: ctx.breweryId, p_redirect_uri: client.config.redirectUri, p_state_hash: sha256(state),
     p_provider_intent: providerIntent, p_request_id: requestId, p_requested_scopes: [...SQUARE_SCOPES],
@@ -677,7 +676,7 @@ export async function completeSquareOAuth(input: {
         await input.store.fail(claim.intentId, input.actorId, "unresolved", tokens.merchantId).catch(() => undefined);
         throw unavailable();
       }
-      const cleanup = await input.client.revokeAccessToken(tokens.accessToken).then(() => "confirmed" as const, () => "unresolved" as const);
+      const cleanup = await input.client.revokeMerchant(tokens.merchantId).then(() => "confirmed" as const, () => "unresolved" as const);
       await input.store.fail(claim.intentId, input.actorId, cleanup, tokens.merchantId).catch(() => undefined);
     }
     throw unavailable();
