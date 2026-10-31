@@ -84,7 +84,7 @@ describe("Square OAuth callback", () => {
         .mockResolvedValue(Response.json({ message: "body-secret", access_token: "access-secret" }, { status: 503 }));
       const fail = vi.fn().mockResolvedValue(undefined);
 
-      await expect(completeSquareOAuth({
+      const error = await completeSquareOAuth({
         request: new Request("https://mgr.test/callback?code=code-secret&state=state-secret"),
         actorId: "actor-1", selectedBreweryId: "brewery-1", redirectUri: squareConfig.redirectUri,
         client: new SquareClient(squareConfig, fetch),
@@ -92,7 +92,12 @@ describe("Square OAuth callback", () => {
           claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: [] }),
           complete: vi.fn(), fail,
         },
-      })).rejects.toBeInstanceOf(Error);
+      }).catch((failure: unknown) => failure);
+      expect(error).toBeInstanceOf(Error);
+      expect(error).toMatchObject({
+        name: expect.not.stringContaining("secret"),
+        message: expect.not.stringContaining("secret"),
+      });
 
       // Control flow is unchanged: no token was issued, so the not_required branch ran.
       expect(fail.mock.calls[0].slice(2)).toEqual(["not_required", null]);
