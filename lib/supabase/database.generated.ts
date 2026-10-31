@@ -4956,7 +4956,7 @@ isOneToOne: false
 { Args: { "p_actuals": Json,"p_brewery": string,"p_reason": string,"p_record": string,"p_request_id": string }; Returns: Json
                            },
 "correct_purchase_receipt":
-{ Args: { "p_brewery": string,"p_lines": Json,"p_reason": string,"p_receipt": string,"p_request_id": string }; Returns: Json
+{ Args: { "p_bin"?: string,"p_brewery": string,"p_lines": Json,"p_location"?: string,"p_reason": string,"p_receipt": string,"p_request_id": string }; Returns: Json
                            },
 "correct_reporting_basis":
 { Args: { "p_books_opened_on": string,"p_brewery": string,"p_expected_books_opened_on": string,"p_reason": string,"p_request_id": string }; Returns: Json
