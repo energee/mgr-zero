@@ -58,11 +58,16 @@ it("explains the global stock link in both inventory and live Locations", () => 
   expect(live).toContain('href="/inventory"');
 });
 
-it("uses the saved member name with email beneath, or the RPC's full-email fallback", () => {
-  expect(toTeamMemberRow({ userId: "ted", name: "Ted Brewer", email: "ted@demobrewing.com", roles: ["sales"] }, "ted").title).toBe("Ted Brewer");
-  expect(toTeamMemberRow({ userId: "ted", name: "ted@demobrewing.com", email: "ted@demobrewing.com", roles: ["sales"] }, "ted")).toEqual({
-    key: "ted", title: "ted@demobrewing.com", detail: "Sales", you: true,
+it("titles a member with the RPC's identity label and lists only the roles beneath", () => {
+  expect(toTeamMemberRow({ userId: "ted", name: "Ted Brewer <ted@demobrewing.com>", roles: ["sales"] }, "ted")).toEqual({
+    key: "ted", title: "Ted Brewer <ted@demobrewing.com>", detail: "Sales", you: true,
   });
-  for (const row of teamRoster.rows) expect(row.detail).toMatch(/^[^@]+@[^ ]+ · /);
+  expect(toTeamMemberRow({ userId: "ted", name: "ted@demobrewing.com", roles: ["sales"] })).toEqual({
+    key: "ted", title: "ted@demobrewing.com", detail: "Sales", you: false,
+  });
+  for (const row of teamRoster.rows) {
+    expect(row.title).toContain("@");
+    expect(row.detail).not.toContain("@");
+  }
 });
 

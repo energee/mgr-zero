@@ -70,7 +70,7 @@ describe("Save filed snapshot", () => {
 
 it("Remove member confirms before revoke_staff", () => {
   const onRemove = vi.fn(async () => true);
-  const html = renderToStaticMarkup(createElement(TeamMemberView, { name: "Dave Chen", email: "dave@example.com", savedRoles: ["brewer"], onRemove }));
+  const html = renderToStaticMarkup(createElement(TeamMemberView, { name: "Dave Chen <dave@example.com>", savedRoles: ["brewer"], onRemove }));
   const remove = buttons(html).find(button => button.includes("Remove Dave Chen"));
   expect(remove).toContain('aria-haspopup="dialog"');
   expect(onRemove).not.toHaveBeenCalled();

@@ -113,11 +113,10 @@ function correctionPayload(state: TaproomCorrectionState): TaproomCorrectionInpu
     if (!/^\d+$/.test(line.quantity)) throw new Error("Correct to whole packaged units.");
     const qtyCounted = Number(line.quantity);
     if (!Number.isSafeInteger(qtyCounted)) throw new Error("Correct to whole packaged units.");
-    if (qtyCounted < line.qty_counted) throw new Error("A count correction cannot reduce a recorded quantity.");
     if (qtyCounted > line.qty_before) throw new Error("A count correction cannot exceed the recorded stock before the count.");
     return qtyCounted === line.qty_counted ? [] : [{ lineId: line.id, qtyCounted }];
   });
-  if (corrections.length === 0) throw new Error("Please increase at least one counted quantity.");
+  if (corrections.length === 0) throw new Error("Please change at least one counted quantity.");
   return { countId: state.countId, corrections, reason };
 }
 

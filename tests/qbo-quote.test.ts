@@ -1,8 +1,10 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Client } from "pg";
+import { z } from "zod";
 import { runCommand } from "@/lib/commands/registry";
 import { quotePortalOrder } from "@/lib/commands/portal";
-import { QboOAuthClient } from "@/lib/qbo";
+import { QboOAuthClient, refreshQboCredentials } from "@/lib/qbo";
+import { readPortalQuoteTaxTokens } from "@/lib/supabase/integration-tokens";
 import "@/lib/commands/all";
 import {
   admin, asUser, makeBrewery, makeCustomerUser, makeStaffCtx,
@@ -13,6 +15,7 @@ describe("portal order quote", () => {
   let fixture: Awaited<ReturnType<typeof setup>>;
 
   beforeAll(async () => { fixture = await setup(); });
+  afterEach(() => { vi.restoreAllMocks(); });
 
   it("freezes the selected customer's price, deposit, addresses, and honest pending tax", async () => {
     const quote = await runCommand("portal_quote_order", {
@@ -112,6 +115,168 @@ describe("portal order quote", () => {
     ]));
   });
 
+  it.each([
+    { outcome: "success", calls: 3 }, { outcome: "retry_401", calls: 3 }, { outcome: "tax_500", calls: 1 },
+    { outcome: "invalid_grant", calls: 2 }, { outcome: "network", calls: 1 },
+  ] as const)(
+    "refreshes quote tax once on 401 and handles $outcome without losing the quote",
+    async ({ outcome, calls }) => {
+      const f = await setup();
+      const { config, connectionId } = await enableTax(f);
+      const logs = vi.spyOn(console, "error").mockImplementation(() => {});
+      const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (url, init) => {
+        if (String(url).includes("/tokens/bearer")) {
+          expect(String(init?.body)).toContain("tax-refresh");
+          return outcome === "invalid_grant"
+            ? new Response(JSON.stringify({ error: "invalid_grant", error_description: "provider-secret" }), { status: 400 })
+            : new Response(JSON.stringify({ access_token: "rotated-access", refresh_token: "rotated-refresh", expires_in: 3600 }), { status: 200 });
+        }
+        if (outcome === "network") throw new Error("Bearer tax-access provider-secret");
+        if (outcome === "tax_500") return new Response("provider-secret", { status: 500 });
+        if (new Headers(init?.headers).get("Authorization") === "Bearer rotated-access" && outcome === "success") return calculatedTax();
+        return new Response("provider-secret", { status: 401 });
+      });
+      const quote = await quotePortalOrder(f.ctx, quoteInput(f), crypto.randomUUID(), new QboOAuthClient(config, fetch));
+      expect(quote).toMatchObject(outcome === "success"
+        ? { taxStatus: "calculated", taxCents: 100, totalCents: 12300 }
+        : { taxStatus: "pending", amountBeforeTaxCents: 12200 });
+      expect(fetch).toHaveBeenCalledTimes(calls);
+      expect(logs).toHaveBeenCalledWith(outcome === "success" ? "portal_quote_tax_unauthorized" : "portal_quote_tax_failed", expect.any(Object));
+      expect(JSON.stringify(logs.mock.calls)).not.toMatch(/tax-access|tax-refresh|rotated-access|rotated-refresh|provider-secret/);
+      expect(sql(`select state from public.qbo_connections where id='${connectionId}'`))
+        .toEqual([outcome === "invalid_grant" ? "recovery_required" : "connected"]);
+      if (outcome === "success" || outcome === "retry_401") {
+        expect(sql(`select refresh_token from private.integration_tokens where connection_id='${connectionId}'`)).toEqual(["rotated-refresh"]);
+      }
+    },
+  );
+
+  it("limits quote refresh credentials and mutations to the live buyer claim", async () => {
+    const f = await setup();
+    const { config, connectionId } = await enableTax(f);
+    const result = await f.ctx.db.rpc("portal_quote_order", {
+      p_brewery: f.brewery.id, p_customer: f.customer.customerId, p_ship_to: f.customer.shipToId,
+      p_note: null, p_po: null, p_requested: null,
+      p_lines: [{ sku_id: f.catalog.skuId, qty: 2 }], p_request_id: crypto.randomUUID(),
+    });
+    expect(result.error).toBeNull();
+    const { quoteId } = z.object({ quoteId: z.string().uuid() }).parse(result.data);
+    const tokens = await readPortalQuoteTaxTokens(f.ctx, quoteId);
+    const args = { p_brewery: f.brewery.id, p_customer: f.customer.customerId, p_quote: quoteId,
+      p_actor: f.ctx.userId, p_connection: connectionId, p_expected_version: tokens.credentialVersion };
+    for (const denied of [
+      { ...args, p_actor: f.adminCtx.userId }, { ...args, p_customer: crypto.randomUUID() },
+      { ...args, p_brewery: crypto.randomUUID() }, { ...args, p_quote: crypto.randomUUID() },
+      { ...args, p_connection: crypto.randomUUID() },
+    ]) {
+      expect(await admin.rpc("lease_portal_quote_tax_refresh", { ...denied, p_lease: crypto.randomUUID() }))
+        .toMatchObject({ data: "unavailable", error: null });
+      expect(await admin.rpc("cas_portal_quote_tax_tokens", { ...denied, p_access_token: "forbidden",
+        p_refresh_token: "forbidden", p_received_at: new Date().toISOString(), p_access_seconds: 3600,
+        p_refresh_seconds: null, p_hard_seconds: null, p_lease: crypto.randomUUID() })).toMatchObject({ data: false, error: null });
+      expect(await admin.rpc("mark_portal_quote_tax_authorization_failed", denied)).toMatchObject({ data: false, error: null });
+    }
+    expect(await admin.rpc("cas_portal_quote_tax_tokens", { ...args, p_access_token: "forbidden",
+      p_refresh_token: "forbidden", p_received_at: new Date().toISOString(), p_access_seconds: 3600,
+      p_refresh_seconds: null, p_hard_seconds: null, p_lease: crypto.randomUUID() }))
+      .toMatchObject({ data: false, error: null });
+    expect((await f.ctx.db.rpc("read_portal_quote_tax_tokens", {
+      p_brewery: args.p_brewery, p_customer: args.p_customer, p_quote: quoteId, p_actor: args.p_actor,
+    })).error?.code).toBe("42501");
+    expect(sql(`select p.proname||':'||r.role from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+      cross join (values ('anon'),('authenticated'),('service_role')) r(role)
+      where n.nspname='public' and p.proname in ('read_portal_quote_tax_tokens','lease_portal_quote_tax_refresh',
+        'cas_portal_quote_tax_tokens','mark_portal_quote_tax_authorization_failed')
+      and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual([
+      "cas_portal_quote_tax_tokens:service_role", "lease_portal_quote_tax_refresh:service_role",
+      "mark_portal_quote_tax_authorization_failed:service_role", "read_portal_quote_tax_tokens:service_role",
+    ]);
+    sql(`update private.portal_order_quotes set expires_at=now()-interval '1 second' where id='${quoteId}'`);
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    await expect(refreshQboCredentials(f.ctx, new QboOAuthClient(config, fetch), tokens, quoteId)).rejects.toThrow("QuickBooks is unavailable");
+    expect(fetch).not.toHaveBeenCalled();
+    await expect(readPortalQuoteTaxTokens(f.ctx, quoteId)).rejects.toThrow("QuickBooks tax credentials unavailable");
+  });
+
+  it("shares the connection lease between concurrent quote refreshes", async () => {
+    const f = await setup();
+    const { config } = await enableTax(f);
+    const result = await f.ctx.db.rpc("portal_quote_order", {
+      p_brewery: f.brewery.id, p_customer: f.customer.customerId, p_ship_to: f.customer.shipToId,
+      p_note: null, p_po: null, p_requested: null,
+      p_lines: [{ sku_id: f.catalog.skuId, qty: 2 }], p_request_id: crypto.randomUUID(),
+    });
+    expect(result.error).toBeNull();
+    const { quoteId } = z.object({ quoteId: z.string().uuid() }).parse(result.data);
+    const tokens = await readPortalQuoteTaxTokens(f.ctx, quoteId);
+    const { promise, resolve: release } = Promise.withResolvers<Response>();
+    const fetch = vi.fn<typeof globalThis.fetch>(() => promise);
+    const client = new QboOAuthClient(config, fetch);
+    const holder = refreshQboCredentials(f.ctx, client, tokens, quoteId);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const waiter = refreshQboCredentials(f.ctx, client, tokens, quoteId);
+    release(new Response(JSON.stringify({ access_token: "winner-access", refresh_token: "winner-refresh", expires_in: 3600 }), { status: 200 }));
+    expect(await Promise.all([holder, waiter])).toEqual([
+      expect.objectContaining({ refreshToken: "winner-refresh" }), expect.objectContaining({ refreshToken: "winner-refresh" }),
+    ]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes once when two overlapping quotes fail on the same stale token", async () => {
+    const f = await setup();
+    const { config } = await enableTax(f);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    // Both quotes read the stale credential before either refreshes: the first
+    // 401 waits for the second to arrive, and the second 401 waits for the first
+    // quote to finish, so the second refresh starts after the credential rotated.
+    const bothStale = Promise.withResolvers<void>();
+    const firstDone = Promise.withResolvers<void>();
+    let stale = 0, refreshes = 0;
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (url, init) => {
+      if (String(url).includes("/tokens/bearer")) {
+        refreshes += 1;
+        return new Response(JSON.stringify({ access_token: `rotated-access-${refreshes}`, refresh_token: `rotated-refresh-${refreshes}`, expires_in: 3600 }), { status: 200 });
+      }
+      if (new Headers(init?.headers).get("Authorization") !== "Bearer tax-access") return calculatedTax();
+      stale += 1;
+      if (stale === 1) await bothStale.promise;
+      else { bothStale.resolve(); await firstDone.promise; }
+      return new Response("provider-secret", { status: 401 });
+    });
+    const client = new QboOAuthClient(config, fetch);
+    const quotes = [1, 2].map(() => quotePortalOrder(f.ctx, quoteInput(f), crypto.randomUUID(), client));
+    await Promise.race(quotes);
+    firstDone.resolve();
+    expect(await Promise.all(quotes)).toEqual([
+      expect.objectContaining({ taxStatus: "calculated", taxCents: 100 }),
+      expect.objectContaining({ taxStatus: "calculated", taxCents: 100 }),
+    ]);
+    expect(stale).toBe(2);
+    expect(refreshes).toBe(1);
+  });
+
+  it.each([200, 400])("finalizes an authorized refresh when the quote expires during provider response %s", async (status) => {
+    const f = await setup();
+    const { config, connectionId } = await enableTax(f);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (url) => {
+      if (!String(url).includes("/tokens/bearer")) return new Response("expired", { status: 401 });
+      // Intuit may retire the old refresh token after the quote's review window.
+      sql(`update private.portal_order_quotes set expires_at=now()-interval '1 second' where actor_id='${f.ctx.userId}'`);
+      return new Response(JSON.stringify(status === 200
+        ? { access_token: "late-access", refresh_token: "late-refresh", expires_in: 3600 }
+        : { error: "invalid_grant" }), { status });
+    });
+    await expect(quotePortalOrder(f.ctx, quoteInput(f), crypto.randomUUID(), new QboOAuthClient(config, fetch)))
+      .resolves.toMatchObject({ taxStatus: "pending", amountBeforeTaxCents: 12200 });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(sql(`select refresh_token from private.integration_tokens where connection_id='${connectionId}'`))
+      .toEqual([status === 200 ? "late-refresh" : "tax-refresh"]);
+    expect(sql(`select state from public.qbo_connections where id='${connectionId}'`))
+      .toEqual([status === 200 ? "connected" : "recovery_required"]);
+    expect(sql(`select refresh_lease is null from private.integration_tokens where connection_id='${connectionId}'`)).toEqual(["t"]);
+  });
+
   it("persists the reviewed deposit and invoices its frozen cents through the mapped QBO line", async () => {
     const quote = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as import("@/lib/mgr/review-order-view").PortalQuote;
     const submitted = await runCommand("portal_submit_quote", { quoteId: quote.quoteId }, fixture.ctx) as { order_id: string };
@@ -198,6 +363,35 @@ async function setup() {
   const db = await asUser(buyer.email);
   return { brewery, adminCtx, source, catalog, customer, poolId: pool.data!.id as string, ctx: { db, userId: buyer.id, breweryId: brewery.id, roles: ["customer" as const], customerId: customer.customerId } };
 }
+
+async function enableTax(f: {
+  brewery: { id: string }; source: { id: string };
+  customer: { customerId: string }; catalog: { skuId: string };
+}) {
+  const realm = `realm-${crypto.randomUUID()}`;
+  const connection = await admin.from("qbo_connections").insert({
+    brewery_id: f.brewery.id, realm_id: realm, state: "connected", credential_version: 1,
+    access_expires_at: new Date(Date.now() - 3600_000).toISOString(),
+    granted_scopes: ["com.intuit.quickbooks.accounting", "indirect-tax.tax-calculation.quickbooks"],
+    qbo_deposit_item_id: "deposit-item",
+  }).select("id").single();
+  expect(connection.error).toBeNull();
+  const connectionId = connection.data!.id;
+  sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token,credential_version)
+    values('${f.brewery.id}','qbo','${connectionId}','tax-access','tax-refresh',1)`);
+  expect((await admin.from("locations").update({ address: "10 Brewery Rd, Town, PA 19000" }).eq("id", f.source.id)).error).toBeNull();
+  expect((await admin.from("customers").update({ qbo_customer_id: "customer-item", qbo_realm_id: realm }).eq("id", f.customer.customerId)).error).toBeNull();
+  expect((await admin.from("skus").update({ qbo_item_id: "beer-item", qbo_realm_id: realm }).eq("id", f.catalog.skuId)).error).toBeNull();
+  return { connectionId, config: {
+    clientId: "client", clientSecret: "secret", redirectUri: "https://mgr.test/qbo",
+    apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com", taxApiBaseUrl: "https://qb-sandbox.api.intuit.com/graphql",
+  } };
+}
+
+const calculatedTax = () => new Response(JSON.stringify({ data: { indirectTaxCalculateSaleTransactionTax: { taxCalculation: {
+  taxTotals: { totalTaxAmountExcludingShipping: { value: "1.00", currency: "USD" } },
+  shipping: { taxAmount: { value: "0.00", currency: "USD" } },
+} } } }), { status: 200 });
 
 const quoteInput = (f: Awaited<ReturnType<typeof setup>>) => ({
   shipToId: f.customer.shipToId, requestedShipDate: "2026-10-10",
