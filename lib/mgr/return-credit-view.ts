@@ -27,6 +27,7 @@ export type ReturnCreditViewModel = {
   returnToId: string;
   returnToOptions: { id: string; label: string }[];
   reason: number;
+  returningBeer: boolean;
   creditInfo: string;
   tape: [string, string][];
   note: string;
@@ -83,18 +84,17 @@ export function returnQuantityError(qty: string, line: Pick<ReturnCreditLineView
   return whole ? `Enter a whole number of kegs from 0 to ${line.maxReturning}.` : `Enter a quantity from 0 to ${line.maxReturning}, with at most two decimal places.`;
 }
 
-/** Why Return shipment is withheld, or null when ready: every typed quantity
- *  valid (a bad line is named, never dropped from the return), at least one
- *  above zero, a reason, a return location, and the bin when beer comes back
- *  against a shipment (`binMissing`). */
-export function returnCreditReason({ lines, quantities, reason, locationId, binMissing }: {
-  lines: ReturnCreditLineView[]; quantities: Record<string, string>; reason: string; locationId: string; binMissing: boolean;
+/** Only beer needs a disposition; empty-keg check-in needs a destination but
+ * a refund on its own asks for neither. */
+export function returnCreditReason({ lines, quantities, reason, locationId, binMissing, returnEmptyKegs = false }: {
+  lines: ReturnCreditLineView[]; quantities: Record<string, string>; reason: string; locationId: string; binMissing: boolean; returnEmptyKegs?: boolean;
 }): string | null {
   const missing = lines.filter(line => returnQuantityError(quantities[line.key] ?? "", line)).map(line => `a valid quantity for ${line.name}`);
   if (!missing.length && !lines.some(line => Number(quantities[line.key]) > 0)) missing.push("a quantity to return");
-  if (!reason) missing.push("a reason");
-  if (!locationId) missing.push("a return location");
-  if (binMissing) missing.push("a return bin");
+  const returningBeer = lines.some(line => line.step !== "1" && Number(quantities[line.key]) > 0);
+  if (returningBeer && !reason) missing.push("a reason");
+  if ((returningBeer || returnEmptyKegs) && !locationId) missing.push("a return location");
+  if ((returningBeer || returnEmptyKegs) && binMissing) missing.push("a return bin");
   return submitReason(missing);
 }
 
@@ -109,6 +109,7 @@ export function toReturnCreditViewProps({
   const destName = from?.name ?? "—";
   const inv = docNo("INV", invoice.invoice_no, "Invoice");
   const creditCents = lines.reduce((n, l) => n + orderLineCents(Number(l.qty_returning), Number(l.unit_price_cents)), 0);
+  const returningBeer = lines.some(line => line.kind !== "keg_deposit" && Number(line.qty_returning) > 0);
   const tape: [string, string][] = [];
   for (const l of lines) {
     const qty = Number(l.qty_returning);
@@ -140,8 +141,9 @@ export function toReturnCreditViewProps({
     returnToId: destinationId,
     returnToOptions,
     reason: RETURN_REASONS.findIndex(entry => entry.id === reason),
+    returningBeer,
     creditInfo: `Credited at the price on ${inv}, not today’s price group.`,
-    tape: reason ? tape : [],
-    note: refusedDeliveryId ? "Check in only refused beer here. Return accepted beer separately from the invoice. Empty-keg asset returns are a different Keg fleet command." : "Empty-keg asset returns are a different Keg fleet command.",
+    tape: returningBeer && !reason ? [] : tape,
+    note: refusedDeliveryId ? "Check in only refused beer here. Return accepted beer separately from the invoice." : "Full kegs return their shells automatically. For a deposit-only refund, check in empty kegs here only if they are arriving now.",
   };
 }

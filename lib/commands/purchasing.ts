@@ -49,7 +49,9 @@ defineCommand({
     baseUom: z.enum(UOMS),
     purchaseUom: z.enum(UOMS),
     // Omitted on an edit keeps the factor the material had (#589); a new material defaults to 1.
-    purchaseUomFactor: z.number().positive().optional(),
+    // Four decimals, like a receipt count: receive_purchase_order refuses a count × factor
+    // past four base-unit decimals, so 453.59237 g per lb would refuse every whole-lb receipt.
+    purchaseUomFactor: z.number().positive().multipleOf(0.0001, "Base units per purchase unit takes at most four decimal places.").optional(),
     lotTracked: z.boolean().optional(),
     defaultVendorId: z.string().uuid().optional(),
     reorderPoint: z.number().nonnegative().optional(),
@@ -267,17 +269,18 @@ defineCommand({
 });
 
 const receiptCountLine = z.object({
-  poLineId: z.string().uuid(), qtyCounted: z.number().nonnegative(),
+  poLineId: z.string().uuid(), qtyCounted: z.number().nonnegative().multipleOf(0.0001, "A count takes at most four decimal places."),
   lotCode: z.string().trim().optional(), bestBy: isoDate.optional(),
 });
 
 defineCommand({
   name: "correct_purchase_receipt",
-  description: "Correct an unused purchase receipt with a reason: preserve the original facts, reverse its exact movements, and append replacement counts and lot facts atomically",
-  input: z.object({ receiptId: z.string().uuid(), reason: z.string().trim().min(1), lines: z.array(receiptCountLine).min(1) }),
+  description: "Correct a purchase receipt with a reason and receiving bin: preserve the original facts and downstream lot provenance, compensate its movements, and append replacement counts while preventing negative stock",
+  input: z.object({ receiptId: z.string().uuid(), reason: z.string().trim().min(1), locationId: z.string().uuid().optional(), binId: z.string().uuid().optional(), lines: z.array(receiptCountLine).min(1) }),
   roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_purchase_receipt", {
     p_brewery: ctx.breweryId, p_receipt: i.receiptId, p_reason: i.reason,
+    p_location: i.locationId ?? null, p_bin: i.binId ?? null,
     p_lines: i.lines.map(l => ({ po_line_id: l.poLineId, qty_counted: l.qtyCounted, lot_code: l.lotCode ?? null, best_by: l.bestBy ?? null })),
     p_request_id: execution.requestId,
   })),

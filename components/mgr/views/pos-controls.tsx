@@ -95,7 +95,8 @@ export function SquareSyncControls() {
 export function SquareLocationsControl({ rows, locations }: { rows: PosLocationRow[]; locations: { id: string; name: string }[] }) {
   const action = useCommandAction();
   return <SquareLocationsView rows={rows} locations={locations} busy={action.busy} error={action.error}
-    onSave={(row, mgrLocationId) => action.run("set_pos_location_mapping", { posLocationId: row.externalLocationId, mgrLocationId }, undefined, { target: row.externalLocationId })} />;
+    onSave={(row, mgrLocationId) => action.run("set_pos_location_mapping", { posLocationId: row.externalLocationId, mgrLocationId }, undefined, { target: row.externalLocationId })}
+    onRetire={row => action.run("retire_pos_location_mapping", { posLocationId: row.externalLocationId }, undefined, { target: row.externalLocationId })} />;
 }
 
 /** A publication's outcome. A confirmed publish reads out in the always-mounted
