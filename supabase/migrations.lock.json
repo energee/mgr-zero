@@ -236,5 +236,9 @@
   "20261030031200_set_order_pickup.sql": "4c4f9e838290b5a60a01fbb36a67b0aa10a8963dfbf9bcb1893c5e727aa85664",
   "20261030031210_remove_keep_owed.sql": "fd0665c3a161e2c4a13d654c7c247ce6a3fe35474af476a762added3f9033bc7",
   "20261030031220_portal_quote_tax_refresh.sql": "71c6c844debcc7bc1575558a5a5f3f65f2528c9f01cb4181bf875c6624092b07",
-  "20261030031230_qbo_reconciled_void_state.sql": "1c18ae33bc28386ac64447db7515e18d5bd5db43410fcd21be8e6da7a560e833"
+  "20261030031230_qbo_reconciled_void_state.sql": "1c18ae33bc28386ac64447db7515e18d5bd5db43410fcd21be8e6da7a560e833",
+  "20261030032500_packaging_output_corrections.sql": "9386c767f0031c0d10496e155815e781385d6c5a2599d97dc9f16237f87b810b",
+  "20261030032501_preserve_bidirectional_count_correction.sql": "0d496e5ce428efc9b233cb57de2062b23b7cd4d735f235643bdf508ab5ef8741",
+  "20261030032502_packaging_output_applied_snapshot.sql": "aa3729dfb25e2e56a9aaac897e2d0e1deba6628a9d13b8b603703d43365f1015",
+  "20261030032503_packaging_output_draw_rounding_guard.sql": "377fe4dcf35f8efeb79a998dc5ddf5cfd0b4619e7d9758a12fac6f89e7a6115b"
 }

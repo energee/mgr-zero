@@ -1897,6 +1897,50 @@ isOneToOne: false
       referencedColumns: ["id","brewery_id"]
     }
                   ]
+                },"packaging_output_corrections": {
+                  Row: {
+                    "brewery_id": string,"corrects_id": string | null,"created_at": string,"created_by": string,"id": string,"previous_bbl_drawn": number,"previous_outputs": NonNullable<Json>,"reason": string,"replacement_bbl_drawn": number,"replacement_outputs": NonNullable<Json>,"run_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "brewery_id": string,"corrects_id"?: string | null,"created_at"?: string,"created_by": string,"id"?: string,"previous_bbl_drawn": number,"previous_outputs": NonNullable<Json>,"reason": string,"replacement_bbl_drawn": number,"replacement_outputs": NonNullable<Json>,"run_id": string
+                  }
+                  Update: {
+                    "brewery_id"?: string,"corrects_id"?: string | null,"created_at"?: string,"created_by"?: string,"id"?: string,"previous_bbl_drawn"?: number,"previous_outputs"?: NonNullable<Json>,"reason"?: string,"replacement_bbl_drawn"?: number,"replacement_outputs"?: NonNullable<Json>,"run_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "packaging_output_corrections_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "packaging_output_corrections_corrects_id_brewery_id_fkey"
+      columns: ["corrects_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "packaging_output_corrections"
+      referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "packaging_output_corrections_run_id_brewery_id_fkey"
+      columns: ["run_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "packaging_run_requirements"
+      referencedColumns: ["run_id","brewery_id"]
+    },{
+      foreignKeyName: "packaging_output_corrections_run_id_brewery_id_fkey"
+      columns: ["run_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "packaging_run_yields"
+      referencedColumns: ["run_id","brewery_id"]
+    },{
+      foreignKeyName: "packaging_output_corrections_run_id_brewery_id_fkey"
+      columns: ["run_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "packaging_runs"
+      referencedColumns: ["id","brewery_id"]
+    }
+                  ]
                 },"packaging_run_consumptions": {
                   Row: {
                     "brewery_id": string,"id": string,"movement_id": string,"run_id": string
@@ -4906,6 +4950,9 @@ isOneToOne: false
 "correct_packaging_material_record":
 { Args: { "p_actuals": Json,"p_brewery": string,"p_reason": string,"p_record": string,"p_request_id": string }; Returns: Json
                            },
+"correct_packaging_run_outputs":
+{ Args: { "p_bbl_drawn": number,"p_bin": string,"p_brewery": string,"p_location": string,"p_outputs": Json,"p_previous": string,"p_reason": string,"p_request_id": string,"p_run": string }; Returns: Json
+                           },
 "correct_purchase_receipt":
 { Args: { "p_bin"?: string,"p_brewery": string,"p_lines": Json,"p_location"?: string,"p_reason": string,"p_receipt": string,"p_request_id": string }; Returns: Json
                            },
@@ -5127,6 +5174,9 @@ isOneToOne: false
 { Args: { "p_brewery": string,"p_outputs": Json }; Returns: Json
                            },
 "get_packaging_material_record":
+{ Args: { "p_brewery": string,"p_run": string }; Returns: Json
+                           },
+"get_packaging_output_corrections":
 { Args: { "p_brewery": string,"p_run": string }; Returns: Json
                            },
 "get_packaging_run_lot":
