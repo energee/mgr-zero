@@ -11,6 +11,13 @@ Confirmed orders without a requested ship date emit `pick_due` with `dueAt: null
 and detail `pick due · no ship date`. Null dates are always due and sort after
 dated work. Work and chat read this same projection.
 
+Outstanding refusals on invoice-at-ship shipments emit `refused_credit` for Admin
+and Sales, with a direct invoice-return `href` carrying `refusedDeliveryId`.
+The task is always due, survives route return, and clears only as those refused
+units are physically returned and credited. Work places it under Orders.
+On-delivery refusals retain the Warehouse/Admin `refused_return` check-in task.
+Both refusal reasons are Today/Work only; they do not add chat notifications.
+
 Notification `reason` is `submitted_order`, `pick_due`, `restock_due`,
 `delivery_next`, `fermentation_reading_overdue`, `invoice_question`, or
 `operations_digest`. A preference enables or mutes one reason for the calling
@@ -262,7 +269,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer, taproom
 
-Role-filtered work that is assigned, due, or overdue right now (submitted orders, picks, shipments and restocks due, the next delivery stop, fermentation readings overdue, buyer questions about invoices)
+Role-filtered work that is assigned, due, or overdue right now (submitted orders, picks, shipments and restocks due, the next delivery stop, refused beer awaiting check-in or Return and credit, fermentation readings overdue, buyer questions about invoices)
 
 | Field | Type | Required |
 | --- | --- | --- |
