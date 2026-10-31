@@ -44,7 +44,7 @@ describe("durable explicit taproom counts", () => {
     expect(state(f)).toEqual(before);
     const saved = await f.ctx.db.rpc("record_taproom_count", { ...input, p_lines: input.p_lines.map(line => ({ ...line, disposition: "sold" })) });
     expect(saved.error).toBeNull();
-    expect(saved.data).toMatchObject({ correction_eligible: false, lines: [{ movement_id: null }] });
+    expect(saved.data).toMatchObject({ correction_eligible: true, lines: [{ movement_id: null }] });
   });
 
   it("#814 preserves legacy command replay when sold is explicitly supplied", async () => {
@@ -117,7 +117,7 @@ describe("durable explicit taproom counts", () => {
       lines: [{ binId: f.location.binId, skuId: f.cat.skuId, lotId: null, qtyCounted: 7 }] };
     const saved = await runCommand("record_taproom_count", input, f.ctx) as { id: string; correction_eligible: boolean; lines: unknown[] };
     expect(saved.lines).toMatchObject([{ qty_before: 7, qty_counted: 7, movement_id: null }]);
-    expect(saved.correction_eligible).toBe(false);
+    expect(saved.correction_eligible).toBe(true);
     expect((await admin.from("taproom_counts").select("id").eq("id", saved.id)).data).toHaveLength(1);
     expect((await admin.from("inventory_movements").select("id").eq("brewery_id", f.brewery.id)).data).toHaveLength(1);
   });
@@ -331,6 +331,75 @@ it("corrects the latest mistaken-low count with frozen compensating and replacem
   expect(sql(`select to_jsonb(l)::text from public.taproom_count_lines l where id='${root.lines[0].id}'`)).toEqual([originalLine]);
 });
 
+it.each([5, 7])("#1639 corrects a mistaken-high %i count to 3 with one effective depletion", async (counted) => {
+  const f = await fixture();
+  const adminCtx = await makeStaffCtx(f.brewery.id, "admin");
+  const input = await args(f); input.p_lines[0].qty_counted = counted;
+  const saved = await f.ctx.db.rpc("record_taproom_count", input);
+  expect(saved.error).toBeNull(); assert(saved.data !== null);
+  const root = saved.data;
+  expect(root.correction_eligible).toBe(true);
+  const original = sql(`select to_jsonb(l)::text from public.taproom_count_lines l where id='${root.lines[0].id}'`);
+  if (counted < 7) {
+    expect((await admin.from("formats").update({ bbl_per_unit: .25 }).eq("id", f.cat.formatId)).error).toBeNull();
+    expect((await admin.from("sale_channels").update({ tax_treatment: "research" }).eq("brewery_id", f.brewery.id).eq("system_code", "taproom")).error).toBeNull();
+  }
+  const requestId = crypto.randomUUID();
+  const correction = { countId: root.id, corrections: [{ lineId: root.lines[0].id, qtyCounted: 3 }], reason: "Counted five but three remained" };
+  const corrected = await runCommand("correct_taproom_count", correction, adminCtx, { requestId, correlationId: crypto.randomUUID() }) as {
+    effective_id: string; observed_at: string; correction_eligible: boolean; lines: { qty_counted: number; bbl: number; movement_type: string }[];
+  };
+  expect(corrected).toMatchObject({ correction_eligible: false, observed_at: root.observed_at,
+    lines: [{ qty_counted: 3, bbl: -2, movement_type: "depletion" }] });
+  const movements = await admin.from("inventory_movements")
+    .select("qty,bbl,type,compensates_id,correction_source_id,tax_treatment").eq("ref", corrected.effective_id).order("qty", { ascending: false });
+  expect(movements.error).toBeNull();
+  expect(movements.data).toEqual(counted < 7 ? [
+    { qty: 2, bbl: 1, type: "depletion", compensates_id: root.lines[0].movement_id, correction_source_id: null, tax_treatment: "taxable" },
+    { qty: -4, bbl: -2, type: "depletion", compensates_id: null, correction_source_id: root.lines[0].movement_id, tax_treatment: "taxable" },
+  ] : [
+    { qty: -4, bbl: -2, type: "depletion", compensates_id: null, correction_source_id: null, tax_treatment: "taxable" },
+  ]);
+  expect(sql(`select sum(qty)::float8 from public.inventory_movements where brewery_id='${f.brewery.id}'`)).toEqual(["3"]);
+  expect(sql(`select to_jsonb(l)::text from public.taproom_count_lines l where id='${root.lines[0].id}'`)).toEqual(original);
+  expect(await runCommand("list_taproom_counts", { locationId: f.location.id }, f.ctx)).toMatchObject([
+    { id: root.id, effective_id: corrected.effective_id, observations: 1, depleted_units: 4 },
+  ]);
+  expect(await runCommand("get_taproom_variance", { locationId: f.location.id, weeks: 4 }, f.ctx)).toMatchObject({ periods: [{ actual_bbl: 2 }] });
+  const snapshot = await prepare(f);
+  expect(snapshot).toMatchObject({ prior_count: { id: corrected.effective_id }, lines: [{ qty_before: 3 }] });
+  expect(await runCommand("correct_taproom_count", correction, adminCtx, { requestId, correlationId: crypto.randomUUID() })).toEqual(corrected);
+  await expect(runCommand("correct_taproom_count", correction, adminCtx)).rejects.toThrow(/already corrected/);
+});
+
+it("#1639 refuses a lower correction when subsequent stock use cannot cover its delta", async () => {
+  const f = await fixture();
+  const input = await args(f); input.p_lines[0].qty_counted = 5;
+  const saved = await f.ctx.db.rpc("record_taproom_count", input);
+  expect(saved.error).toBeNull(); assert(saved.data !== null);
+  await movement(f, -4);
+  const adminCtx = await makeStaffCtx(f.brewery.id, "admin");
+  const before = state(f);
+  await expect(runCommand("correct_taproom_count", { countId: saved.data.id,
+    corrections: [{ lineId: saved.data.lines[0].id, qtyCounted: 3 }], reason: "Mistaken high count" }, adminCtx)).rejects.toThrow(/stock has been used/);
+  expect(state(f)).toEqual(before);
+});
+
+it("#1639 offers Correct count only while some line can still change", async () => {
+  const matched = await fixture();
+  const matching = await matched.ctx.db.rpc("record_taproom_count", await args(matched));
+  expect(matching.error).toBeNull(); assert(matching.data !== null);
+  expect(matching.data.correction_eligible).toBe(true);
+  await movement(matched, -7);
+  expect(await runCommand("get_taproom_count", { countId: matching.data.id }, matched.ctx)).toMatchObject({ correction_eligible: false });
+  const short = await fixture();
+  const input = await args(short); input.p_lines[0].qty_counted = 5;
+  const shortage = await short.ctx.db.rpc("record_taproom_count", input);
+  expect(shortage.error).toBeNull(); assert(shortage.data !== null);
+  await movement(short, -5);
+  expect(await runCommand("get_taproom_count", { countId: shortage.data.id }, short.ctx)).toMatchObject({ correction_eligible: true });
+});
+
 it("revalidates a committed correction when a root line is appended", async () => {
   const f = await fixture(); const adminCtx = await makeStaffCtx(f.brewery.id, "admin");
   const input = await args(f); input.p_lines[0].qty_counted = 2;
@@ -442,7 +511,7 @@ it("rejects invalid correction input, foreign provenance, later roots, and non-A
   assert(root !== null); assert(other.root !== null);
   const bad = [
     [{ line_id: root.lines[0].id, qty_counted: 2 }],
-    [{ line_id: root.lines[0].id, qty_counted: 1 }],
+    [{ line_id: root.lines[0].id, qty_counted: -1 }],
     [{ line_id: root.lines[0].id, qty_counted: 8 }],
     [{ line_id: root.lines[0].id, qty_counted: 4 }, { line_id: root.lines[0].id, qty_counted: 5 }],
     [{ line_id: other.root.lines[0].id, qty_counted: 4 }],
@@ -583,6 +652,10 @@ it("rejects incomplete or corrupted correction graphs at transaction commit", as
   await rejectAtCommit(async (client, id) => {
     await compensation(client, id); const movement = await replacement(client, id); await line(client, id, movement);
     await client.query("update public.inventory_movements set bbl=bbl+1 where id=$1", [movement]);
+  });
+  await rejectAtCommit(async (client, id) => {
+    const reversal = await compensation(client, id); const movement = await replacement(client, id); await line(client, id, movement);
+    await client.query("update public.inventory_movements set tax_treatment='research' where id=$1", [reversal]);
   });
   await rejectAtCommit(async (client, id) => {
     await compensation(client, id); const movement = await replacement(client, id); await line(client, id, movement);
