@@ -1,5 +1,5 @@
 // components/mgr/time-window-field.tsx — a time-of-day window as one two-thumb
-// range, behind E.window: quiet hours today, and anything else bounded by a
+// range, shared by screen views for quiet hours and anything else bounded by a
 // start and an end (delivery windows, taproom hours). One control instead of a
 // pair of clocks, so the window reads as a span and cannot be set to nothing.
 "use client";

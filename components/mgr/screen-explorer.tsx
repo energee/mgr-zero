@@ -138,7 +138,7 @@ export function ScreenExplorer() {
     // navigation. Work's rows sit in the filter's tabpanel and still navigate.
     if (el.closest("[data-chat-preview], [data-work-filter] [role=tablist], [data-preview-action]")
       || el.closest("[data-slot=dialog-content], [data-slot=sheet-content]")?.querySelector("form[data-preview-action]")) return;
-    // A unit switcher (E.qty's addon) is a tab bar by markup only: it chooses
+    // A unit switcher (Qty's addon) is a tab bar by markup only: it chooses
     // the unit of one number, so it must never filter the rows below it the way
     // a view switcher does. Harmless today only because every screen using one
     // happens to put its rows above the field; this keeps it that way.

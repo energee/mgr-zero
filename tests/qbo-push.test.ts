@@ -1,8 +1,9 @@
 import { assert } from "vitest";
 import { createHash } from "node:crypto";
+import { createServer } from "node:http";
 import { Client } from "pg";
-import { describe, expect, it, vi } from "vitest";
-import { completeQboOAuth, postReceiptBill, pushInvoiceToQbo, QboOAuthClient } from "@/lib/qbo";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { completeQboOAuth, postReceiptBill, pushInvoiceToQbo, QboOAuthClient, syncQboInvoices } from "@/lib/qbo";
 import {
   claimQboOAuth,
   completeQboOAuthStore,
@@ -23,6 +24,11 @@ const config = {
   apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com",
 };
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
+// The actionable 409s a pending push raises when QuickBooks holds a conflicting document.
+const changedDocument = (document: string) => ({ status: 409, code: "conflict",
+  message: `QuickBooks already has ${document} with different lines, due date, or payment options. Change it in QuickBooks to match MGR, or delete it there, then retry.` });
+const conflictingDocument = (document: string) => ({ status: 409, code: "conflict",
+  message: `QuickBooks already has ${document} for a different customer or date, or more than once. Fix or delete the conflicting copy in QuickBooks, then retry.` });
 
 async function pushFixture(kind: "invoice" | "credit_memo" = "invoice", role: "admin" | "sales" = "sales") {
   const brewery = await makeBrewery();
@@ -109,6 +115,138 @@ describe("QuickBooks durable outbound push", () => {
       .toEqual(["pushed:remote-1"]);
   });
 
+  it.each([
+    ["invoice", 333, "voided"], ["invoice", 333, "live"], ["invoice", 0, "live"],
+    ["credit_memo", 333, "live"],
+  ] as const)("preserves %s state after adopting a zeroed document from a lost push (%s cents)", async (kind, unitPrice, expectedState) => {
+    const f = await pushFixture(kind, "admin");
+    if (unitPrice === 0) {
+      expect((await admin.from("invoice_lines").update({ unit_price_cents: 0 })
+        .eq("invoice_id", f.invoice.id)).error).toBeNull();
+    }
+    const entityType = kind === "invoice" ? "Invoice" : "CreditMemo";
+    let remote: Record<string, unknown> | undefined;
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {
+      if (init?.method === "POST") {
+        remote = { ...JSON.parse(String(init.body)), Id: "void-before-recovery", SyncToken: "1",
+          TotalAmt: unitPrice * 3 / 100, Balance: unitPrice * 3 / 100, LinkedTxn: [] };
+        throw new TypeError("lost response after provider committed");
+      }
+      if (new URL(String(input)).pathname.endsWith("/query")) {
+        return Response.json({ QueryResponse: { [entityType]: [remote] } });
+      }
+      return Response.json({ [entityType]: remote });
+    });
+    const client = new QboOAuthClient(config, fetch);
+    const requestId = crypto.randomUUID();
+    await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, client)).rejects.toThrow("QuickBooks is unavailable");
+    assert(remote);
+    remote = { ...remote, SyncToken: "2", TotalAmt: expectedState === "voided" || unitPrice === 0 ? 0 : 9.99,
+      Balance: 0, TxnTaxDetail: { TotalTax: 0 }, PrivateNote: "Voided by accountant; private details" };
+    if (expectedState === "voided") {
+      remote.Line = (remote.Line as Record<string, unknown>[]).map(line => ({
+        ...line, Amount: 0, SalesItemLineDetail: {
+          ...(line.SalesItemLineDetail as Record<string, unknown>), Qty: 0, UnitPrice: 0,
+        },
+      }));
+    }
+    const result = await pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, client);
+    expect(result).toMatchObject({ status: "pushed", remoteId: "void-before-recovery" });
+    const state = () => sql(`select qbo_remote_state from public.invoices where id='${f.invoice.id}'`);
+    expect(state()).toEqual([expectedState]);
+    const saved = JSON.parse(sql(`select response::text from public.qbo_pushes where invoice_id='${f.invoice.id}'`)[0]);
+    expect(saved).toMatchObject({ TotalAmt: expectedState === "voided" || unitPrice === 0 ? 0 : 9.99, Balance: 0 });
+    expect(saved.PrivateNote).toBe(expectedState === "voided" ? "Voided" : undefined);
+    expect(JSON.stringify(saved)).not.toContain("private details");
+
+    expect(await syncQboInvoices(f.ctx, crypto.randomUUID(), client))
+      .toMatchObject({ synced: 1, voided: expectedState === "voided" ? 1 : 0 });
+    expect(state()).toEqual([expectedState]);
+    expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual(["POST", "GET", "GET"]);
+    const noFetch = vi.fn<typeof globalThis.fetch>();
+    const replayClient = new QboOAuthClient(config, noFetch);
+    expect(await pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, replayClient)).toEqual(result);
+    if (expectedState === "voided") {
+      await runCommand("write_off_invoice", { invoiceId: f.invoice.id, reason: "Provider void confirmed" }, f.ctx);
+      expect(sql(`select written_off_at is not null from public.invoices where id='${f.invoice.id}'`)).toEqual(["t"]);
+      expect(await pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, replayClient)).toEqual(result);
+      expect(state()).toEqual(["voided"]);
+    } else {
+      await expect(runCommand("write_off_invoice", { invoiceId: f.invoice.id, reason: "Not a voided invoice" }, f.ctx))
+        .rejects.toThrow(/only an invoice/);
+    }
+    expect(noFetch).not.toHaveBeenCalled();
+  });
+
+  it.each(["invoice", "credit_memo"] as const)("rejects changed frozen %s content without adopting or posting", async kind => {
+    const f = await pushFixture(kind);
+    const requestId = crypto.randomUUID();
+    const start = await f.ctx.db.rpc("start_qbo_push", {
+      p_brewery: f.brewery.id, p_invoice: f.invoice.id, p_new_attempt_reason: null, p_request_id: requestId,
+    });
+    expect(start.error).toBeNull();
+    assert(start.data && typeof start.data === "object" && !Array.isArray(start.data));
+    assert(typeof start.data.requestBody === "string");
+    const original = { ...JSON.parse(start.data.requestBody), Id: "existing", TotalAmt: 9.99, Balance: 0 };
+    for (const mismatch of ["doc", "customer", "date", "item", "amount", "qty", "price", "lines", "due", "ach", "card"] as const) {
+      if (kind === "credit_memo" && ["due", "ach", "card"].includes(mismatch)) continue;
+      const row = structuredClone(original);
+      if (mismatch === "doc") row.DocNumber = "0";
+      if (mismatch === "customer") row.CustomerRef.value = "other";
+      if (mismatch === "date") row.TxnDate = "2000-01-01";
+      if (mismatch === "item") row.Line[0].SalesItemLineDetail.ItemRef.value = "other";
+      if (mismatch === "amount") row.Line[0].Amount = 10;
+      if (mismatch === "qty") row.Line[0].SalesItemLineDetail.Qty = 30;
+      if (mismatch === "price") row.Line[0].SalesItemLineDetail.UnitPrice = 33.3;
+      if (mismatch === "lines") delete row.Line;
+      if (mismatch === "due") row.DueDate = "2000-01-01";
+      if (mismatch === "ach") row.AllowOnlineACHPayment = false;
+      if (mismatch === "card") row.AllowOnlineCreditCardPayment = false;
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json({
+        QueryResponse: { [kind === "invoice" ? "Invoice" : "CreditMemo"]: [row] },
+      }));
+      const document = `${kind === "invoice" ? "invoice" : "credit memo"} ${f.invoice.invoice_no}`;
+      // A row for another document number is an invalid answer, not a conflict staff can fix.
+      await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, new QboOAuthClient(config, fetch))).rejects.toMatchObject(
+        mismatch === "doc" ? { message: "QuickBooks is unavailable" }
+          : mismatch === "customer" || mismatch === "date" ? conflictingDocument(document) : changedDocument(document));
+      expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual(["GET"]);
+      expect(sql(`select status || ':' || coalesce(qbo_entity_id,'') from public.qbo_pushes where invoice_id='${f.invoice.id}'`))
+        .toEqual(["pending:"]);
+    }
+  });
+
+  it.each(["credit_memo", "missing-marker", "nonzero-total", "nonzero-balance", "item", "amount", "qty", "price"] as const)(
+    "rejects a zeroed positive document that is not an exact provider Invoice void: %s", async mismatch => {
+      const f = await pushFixture(mismatch === "credit_memo" ? "credit_memo" : "invoice");
+      const requestId = crypto.randomUUID();
+      const start = await f.ctx.db.rpc("start_qbo_push", {
+        p_brewery: f.brewery.id, p_invoice: f.invoice.id, p_new_attempt_reason: null, p_request_id: requestId,
+      });
+      expect(start.error).toBeNull();
+      assert(start.data && typeof start.data === "object" && !Array.isArray(start.data));
+      assert(typeof start.data.requestBody === "string");
+      const row = { ...JSON.parse(start.data.requestBody), Id: "not-a-matching-void", TotalAmt: 0, Balance: 0, PrivateNote: "Voided" };
+      row.Line[0].Amount = 0;
+      row.Line[0].SalesItemLineDetail.Qty = 0;
+      row.Line[0].SalesItemLineDetail.UnitPrice = 0;
+      if (mismatch === "missing-marker") row.PrivateNote = "";
+      if (mismatch === "nonzero-total") row.TotalAmt = 1;
+      if (mismatch === "nonzero-balance") row.Balance = 1;
+      if (mismatch === "item") row.Line[0].SalesItemLineDetail.ItemRef.value = "other";
+      if (mismatch === "amount") row.Line[0].Amount = 1;
+      if (mismatch === "qty") row.Line[0].SalesItemLineDetail.Qty = 1;
+      if (mismatch === "price") row.Line[0].SalesItemLineDetail.UnitPrice = 1;
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json({
+        QueryResponse: { [mismatch === "credit_memo" ? "CreditMemo" : "Invoice"]: [row] },
+      }));
+      await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, new QboOAuthClient(config, fetch)))
+        .rejects.toMatchObject(changedDocument(`${mismatch === "credit_memo" ? "credit memo" : "invoice"} ${f.invoice.invoice_no}`));
+      expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual(["GET"]);
+      expect(sql(`select status from public.qbo_pushes where invoice_id='${f.invoice.id}'`)).toEqual(["pending"]);
+    },
+  );
+
   it("queries even an original frozen request replay, then resends only its exact body and key when absent", async () => {
     const f = await pushFixture();
     const requestId = crypto.randomUUID();
@@ -191,7 +329,8 @@ describe("QuickBooks durable outbound push", () => {
       });
       // A different command request must reconcile the same pending snapshot too.
       await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, fetch)))
-        .rejects.toThrow("QuickBooks is unavailable");
+        .rejects.toMatchObject(["duplicate", "customer", "date"].includes(failure)
+          ? conflictingDocument(`invoice ${f.invoice.invoice_no}`) : { message: "QuickBooks is unavailable" });
       expect(fetch.mock.calls.map(([, init]) => init?.method)).toEqual(["GET"]);
       expect(sql(`select status from public.qbo_pushes where invoice_id='${f.invoice.id}'`)).toEqual(["pending"]);
     },
@@ -1405,5 +1544,47 @@ describe("QuickBooks receipt Bills", () => {
     expect(noFetch).not.toHaveBeenCalled();
     expect(receiptBillAttempts(f.brewery.id)).toEqual(frozen);
     expect(remote.posts).toHaveLength(1);
+  });
+});
+
+describe("QuickBooks pending transaction lookup deadlines", () => {
+  const nativeTimeout = AbortSignal.timeout.bind(AbortSignal);
+  let origin: string;
+  let stallBody = false;
+  const server = createServer((_request, response) => {
+    if (stallBody) {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.write('{"QueryResponse":');
+    }
+    // Otherwise leave headers pending to exercise native fetch cancellation.
+  });
+
+  beforeAll(async () => {
+    const { promise, resolve } = Promise.withResolvers<void>();
+    server.listen(0, "127.0.0.1", resolve);
+    await promise;
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("test server has no TCP address");
+    origin = `http://127.0.0.1:${address.port}`;
+  });
+  afterEach(() => vi.restoreAllMocks());
+  afterAll(async () => {
+    server.closeAllConnections();
+    const { promise, resolve, reject } = Promise.withResolvers<void>();
+    server.close(error => error ? reject(error) : resolve());
+    await promise;
+  });
+
+  it.each([
+    ["Invoice", "headers"], ["Invoice", "body"], ["CreditMemo", "headers"], ["CreditMemo", "body"],
+  ] as const)("aborts a %s reconciliation lookup with stalled %s", async (entityType, stalled) => {
+    stallBody = stalled === "body";
+    // Exercise the real native fetch abort without waiting the production 20 seconds.
+    vi.spyOn(AbortSignal, "timeout").mockImplementation(() => nativeTimeout(50));
+    const client = new QboOAuthClient({ ...config, apiBaseUrl: origin });
+    const body = JSON.stringify({ DocNumber: "42", CustomerRef: { value: "customer-42" }, TxnDate: "2026-10-30" });
+    await expect(client.findInvoice("realm", entityType, body, "access")).rejects.toMatchObject({
+      name: stalled === "body" ? expect.stringMatching(/^(Abort|Timeout)Error$/) : "TimeoutError",
+    });
   });
 });
