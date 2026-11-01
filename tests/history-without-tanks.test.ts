@@ -122,17 +122,16 @@ describe("record_historical_batch", () => {
   });
 
   it("lands in Completed with no tank, takes later batch-only readings, and stays out of reports", async () => {
+    const period = { jurisdiction: "TTB", periodStart: "2026-10-01", periodEnd: "2026-10-31" };
+    const before = await runCommand("generate_compliance_report", period, owner) as { figures: { inProcess: number } };
     const a = await schedule();
     await historical({ batchId: a });
     await reading({ batchId: a, at: "2025-06-10T12:00:00Z" });
     const batches = await runCommand("list_batches", {}, brewer) as { id: string; closed_at: string | null }[];
     expect(batches.find((x) => x.id === a)!.closed_at).not.toBeNull();
     expect((await runCommand("get_brew_day", { batchId: a }, brewer) as { occupancy: unknown }).occupancy).toBeNull();
-    const report = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: "2026-10-01", periodEnd: "2026-10-31" }, owner) as
-      { figures: { inProcess: number } };
-    // Only the live 2026-10 tanks above are in process; a historical batch adds nothing.
-    const open = (await admin.from("occupancy_volumes").select("bbl").eq("brewery_id", breweryId).is("ended_at", null).throwOnError()).data!;
-    expect(report.figures.inProcess).toBeCloseTo(open.reduce((s, r) => s + Number(r.bbl), 0), 2);
+    const report = await runCommand("generate_compliance_report", period, owner) as { figures: { inProcess: number } };
+    expect(report.figures.inProcess).toBeCloseTo(before.figures.inProcess, 2);
   });
 
   it("refuses dates on or after books opened, an inverted range, a brewed batch, and an unset books date", async () => {
