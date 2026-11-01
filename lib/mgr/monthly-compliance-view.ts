@@ -40,6 +40,7 @@ export type ComplianceFiguresViewModel = {
   balances: boolean;
   lines: string[][];
   inProcess: string;
+  inProcessAsOf?: string;
   packaged: string;
   removals: { key: string; title: string; bbl: string }[];
   cellarRemovals: { key: string; title: string; bbl: string }[];
@@ -78,6 +79,7 @@ function toComplianceFigures(figures: Report["figures"]): ComplianceFiguresViewM
     balances: figures.balances,
     lines: figures.lines.map((line) => [CLASS_LABEL[line.class], line.begin.toFixed(2), line.in.toFixed(2), line.out.toFixed(2), line.end.toFixed(2)]),
     inProcess: bblFixed(figures.inProcess),
+    inProcessAsOf: figures.inProcessAsOf ? formatDate(figures.inProcessAsOf) : undefined,
     packaged: bblFixed(figures.packaged),
     removals: Object.entries(figures.removals).map(([key, value]) => ({ key, title: label(key), bbl: removalBbl(key, value) })),
     cellarRemovals: Object.entries(figures.cellarRemovals ?? {}).map(([key, value]) => ({ key, title: `Cellar · ${label(key)}`, bbl: bblExact(value, 8) })),

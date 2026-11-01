@@ -4,8 +4,6 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { ContractsViewModel } from "@/lib/mgr/contracts-view";
 
-export type { ContractsViewModel };
-
 export function ContractsView({
   model,
   header,

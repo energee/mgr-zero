@@ -9,8 +9,6 @@ import { pastPlanWarning, plannedBarrelsError, type ScheduleBatchViewModel } fro
 import { useTouchedLines } from "@/lib/mgr/touched-lines";
 import { FieldDescription } from "@/components/ui/field";
 
-export type { ScheduleBatchViewModel };
-
 type Controls = Partial<Record<"recipeId" | "brandId" | "plannedBbl" | "date" | "note", (value: string) => void>>;
 
 function OptionalPick({ label, value, options, onChange, empty }: {

@@ -8,8 +8,6 @@ import { E } from "@/components/mgr/e";
 import { TabBar } from "@/components/mgr/qty";
 import type { ComplianceMonthsViewModel } from "@/lib/mgr/compliance-months-view";
 
-export type { ComplianceMonthsViewModel };
-
 export function ComplianceMonthsView({
   model,
   linkRows,

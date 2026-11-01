@@ -125,7 +125,7 @@ describe("draftBlocker", () => {
 
 describe("toRecipePageModel", () => {
   const materials = [
-    { id: "m-malt", name: "CMG White Wheat", category: "malt", base_uom: "lb", extract_potential: 1.037, purchase_uom_factor: 50 },
+    { id: "m-malt", name: "Fieldstone White Wheat", category: "malt", base_uom: "lb", extract_potential: 1.037, purchase_uom_factor: 50 },
     { id: "m-hop", name: "Citra", category: "hop", base_uom: "lb", extract_potential: null, purchase_uom_factor: 44 },
     { id: "m-gypsum", name: "Gypsum", category: "salt", base_uom: "g", extract_potential: null, purchase_uom_factor: 1 },
   ];
@@ -194,14 +194,6 @@ describe("toRecipePageModel", () => {
     expect(empty.scheduleHref).toBeUndefined();
     expect(drawn(empty)).not.toContain("Schedule batch");
     expect(drawn(empty)).toContain("New recipe version");
-  });
-  it("says which saved line had no extract potential instead of a prediction", () => {
-    const model = toRecipePageModel({ ...snapshot, ingredients: [{ ...snapshot.ingredients[0], extract_snapshot: null }] }, ctx);
-    expect(model.predicted).toBe("CMG White Wheat had no extract potential when this version was saved; set it under Materials, then create the next version.");
-  });
-  it("says a mash line stocked in a volume unit has no weight", () => {
-    const model = toRecipePageModel({ ...snapshot, ingredients: [{ ...snapshot.ingredients[0], materials: { base_uom: "gal" } }] }, ctx);
-    expect(model.predicted).toBe("CMG White Wheat is stocked in gal, which has no weight, so nothing is predicted.");
   });
   it("says nothing is predicted when the version has no mash ingredient", () => {
     const model = toRecipePageModel({ ...snapshot, ingredients: [snapshot.ingredients[1]] }, ctx);

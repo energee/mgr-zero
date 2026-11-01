@@ -97,7 +97,7 @@ it("links and unlinks own Slack identity with replay and refuses other people's 
   const staff = await makeStaffCtx(b.id, "taproom");
   const other = await makeStaffCtx(b.id, "taproom");
   const installation = (await ins("chat_installations", { brewery_id: b.id, provider: "slack", external_installation_id: crypto.randomUUID(), display_label: "Local fixture", state: "active", installer_user_id: staff.userId, token_store_key: crypto.randomUUID() })).id;
-  const proof = await issueChatLinkProof(admin, installation, "U-LINK");
+  const proof = await issueChatLinkProof(admin, installation, "U-LINK", "Morgan Slack");
   const requestId = crypto.randomUUID(); const execution = { requestId, correlationId: requestId };
   const linked = await runCommand("consume_chat_link_proof", { proof: proof.proof }, staff, execution);
   expect(await runCommand("consume_chat_link_proof", { proof: proof.proof }, staff, execution)).toEqual(linked);

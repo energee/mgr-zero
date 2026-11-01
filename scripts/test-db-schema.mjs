@@ -105,7 +105,7 @@ async function installIdentity() {
   console.log(`test-db: installed ${JSON.stringify(identity)}`);
 }
 
-/** Remove only disposable RPC signatures from generated application types.
+/** Remove disposable readiness RPC signatures and normalize whitespace-only generated lines.
  * @param {string} source
  */
 export async function stripIdentityTypes(source) {
@@ -125,7 +125,7 @@ export async function stripIdentityTypes(source) {
   }
   visit(file);
   for (const [start, end] of spans.reverse()) source = source.slice(0, start) + source.slice(end);
-  return source;
+  return source.replace(/^[\t ]+$/gm, "");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

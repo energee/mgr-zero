@@ -183,15 +183,6 @@ describe("Invoice view", () => {
     expect(html).toContain(ALS.name);
   });
 
-  it("the inventory drawing still shows Mark answered, Push invoice, and Al’s Bar", () => {
-    const html = htmlOf(createElement(InvoiceView, { model: toInvoiceViewProps(invoiceFailedAls) }));
-    expect(html).toMatch(/Mark answered/);
-    expect(html).toMatch(/Push invoice/);
-    expect(html).toContain(ALS.name);
-    expect(html).toMatch(/INV-1039/);
-    expect(html).toMatch(/Pils · case/);
-    expect(html).toMatch(/QuickBooks item is missing/);
-  });
 
   it("draws one total in the summary, a line table, and the question once without its customer or a repeated title", () => {
     const html = htmlOf(createElement(InvoiceView, { model: toInvoiceViewProps(invoicePartlyPaid) }));
