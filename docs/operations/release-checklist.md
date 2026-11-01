@@ -44,15 +44,33 @@ patch releases within the actual parent ranges (`ajv` requires `^3.0.1`;
 `@dotenvx/dotenvx` requires `^5.22.11`). After lock regeneration and a forced
 frozen install, `bun why` resolves those exact patched versions.
 
-On 2026-10-31, after `bun install --force --frozen-lockfile` with Bun 1.3.10,
-`bun audit --json` exited 1 with three affected packages. The production-only
-audit also exited 1, reporting `follow-redirects`; it is not dev-only.
+Before the redirect patch, on 2026-10-31 after a forced frozen install with
+Bun 1.3.10, `bun audit --json` exited 1 with three affected packages.
+The production-only audit also exited 1, reporting `follow-redirects`.
 
-| Current locked package / advisory | Reachability and disposition |
+On 2026-11-01, the owner approved an exact `follow-redirects` override from
+1.16.1 to 1.16.2, within Axios's `^1.16.0` dependency range. A forced frozen
+install retained the existing approved versions; lock regeneration changed
+only the redirect package and its override.
+`bun why` resolves the patched production chain:
+`@chat-adapter/slack@4.42.0` → `@slack/web-api@7.19.0` (also through
+`@slack/socket-mode@2.0.7`) → `axios@1.20.0` → `follow-redirects@1.16.2`.
+The patch fixes [GHSA-mrwp-f3q8-3g9p](https://github.com/advisories/GHSA-mrwp-f3q8-3g9p),
+the cross-realm sensitive-header redirect advisory. After this install,
+`bun audit --prod --json` exited 0 with `{}`; `bun audit --json` exited 1
+with only the two development-tooling packages below.
+
+The installed Slack client sets `maxRedirects: 0`; no matching MGR exploit
+path was established. The local native proof exercises the resolved package
+from the production dependency graph, not actual Slack traffic.
+Remove this override only when the upstream dependency floor excludes the
+vulnerable versions. Review newer advisories for a suitable patched version;
+do not simply drop the pin when another advisory appears.
+
+| Residual locked package / advisory | Reachability and disposition |
 | --- | --- |
 | `deepmerge@4.3.1`, [GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4) (low) | Development-only shadcn/registry merge APIs, as above. No patched release exists (`first_patched_version` is null; registry `latest` is 4.3.1), and a downgrade below the affected range is not an established fix. Do not accept untrusted merge objects. |
 | `minimatch@10.2.6` and nested `3.1.5`, [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) (moderate) | Development-only ESLint/config/plugins and shadcn → ts-morph. The advisory describes attacker-controlled glob amplification with `optimizationLevel >= 2`; no application/script import was found. The advisory marks versions below 11.0.1 affected. That major-version override is outside this approved change; keep untrusted glob patterns away from tooling. |
-| `follow-redirects@1.16.1`, [GHSA-mrwp-f3q8-3g9p](https://github.com/advisories/GHSA-mrwp-f3q8-3g9p) (high) | Production `@chat-adapter/slack` → `@slack/web-api@7.19.0` (also through socket-mode) → `axios@1.20.0`. Exploitation requires a cross-realm `sensitiveHeaders` array, a custom credential header, and a cross-origin redirect. The installed Slack client sets `maxRedirects: 0` and uses built-in `Authorization`; Axios also normalizes the custom-header array. The upstream report explicitly did not reproduce with Axios 1.20.0. No matching MGR call path was established, but the package remains flagged. Fixed in 1.16.2; that additional update is not authorized here. |
 
 `bun outdated` also reports newer direct dependencies. No broader upgrade
 was applied: this change retains the specifically approved versions and the
@@ -61,7 +79,7 @@ Slack client configuration, transport, or custom-header inputs change.
 
 This is not an advisory-free claim or release approval. Do not expose these
 tooling APIs to request input. Re-audit the eventual release SHA and retain
-the existing KaTeX override alongside the two approved patch overrides.
+the existing KaTeX override alongside the three approved patch overrides.
 
 Weekly Bun version-update PRs are configured alongside the existing Actions
 updates. Bun security updates are not supported by Dependabot; audit remains
