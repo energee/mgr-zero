@@ -92,6 +92,15 @@ describe("persona", () => {
     expect(needsFor("Customers")).toEqual(["admin", "sales"]);
   });
 
+  it.each(["Finished goods", "Finished goods empty"])("keeps %s readable by Warehouse without granting Brewer-only access", name => {
+    expect(deniedFor(["warehouse"], name)).toBe(false);
+    expect(deniedFor(["sales"], name)).toBe(false);
+    expect(deniedFor(["admin"], name)).toBe(false);
+    expect(deniedFor(["brewer"], name)).toBe(true);
+    expect(deniedFor(["brewer", "warehouse"], name)).toBe(false);
+    expect(deniedFor(["sales", "warehouse"], name)).toBe(false);
+  });
+
   it("refuses commands whose record says who may run them (the permission state)", () => {
     expect(needsFor("Confirm order")).toEqual(["admin", "sales"]);
     expect(deniedFor(["brewer"], "Confirm order")).toBe(true);

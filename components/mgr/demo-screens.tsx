@@ -29,9 +29,16 @@ export function asPersona(screen: Screen, persona: Persona, refused?: string): S
     const body = screen.body as ReactElement<ComponentProps<typeof ReceiptFixture>>;
     return { ...screen, body: cloneElement(body, { roles: persona.roles }) };
   }
-  if (screen.name === "Finished goods") {
+  if (screen.name === "Finished goods" || screen.name === "Finished goods empty") {
     const body = screen.body as ReactElement<ComponentProps<typeof FinishedGoodsView>>;
-    return { ...screen, body: cloneElement(body, { countHref: hasAnyRole(persona.roles, ["admin", "warehouse", "taproom"]) ? undefined : null }) };
+    const salesOrAdmin = hasAnyRole(persona.roles, ["admin", "sales"]);
+    const canMove = hasAnyRole(persona.roles, ["admin", "warehouse"]);
+    return { ...screen, body: cloneElement(body, {
+      model: !salesOrAdmin && body.props.model.valueLine !== undefined ? { ...body.props.model, valueLine: undefined } : body.props.model,
+      createAction: canMove ? body.props.createAction : null,
+      addSkuHref: salesOrAdmin ? body.props.addSkuHref : null,
+      countHref: hasAnyRole(persona.roles, ["admin", "warehouse", "taproom"]) ? undefined : null,
+    }) };
   }
   if (screen.name === "Orders") {
     const canWrite = hasAnyRole(persona.roles, ["admin", "sales"]);

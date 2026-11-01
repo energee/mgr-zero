@@ -292,8 +292,6 @@ export const INERT: (string | RegExp)[] = [
   "Saison swapped in",
   "Record inventory correction",
   "Release",
-  "Send reset link",
-  "Try again",
   "Retired",
   "Returned \u00b7 Ridgeline",
   "Reverse a movement",
@@ -408,7 +406,7 @@ export const isInertOn = (screen: Screen, label: string, to?: string | null) => 
   const draftSku = screen.name === "Edit draft" && (/^Line \d+ SKU$/.test(l) || l === "Pils - case" || l === "Stout - case");
   // The Ingredient sheet's material picker opens its own search; elsewhere "Material" opens Edit material.
   const ingredientMaterial = screen.name === "Ingredient" && l === "Material";
-  const replenishmentAction = screen.name === "Pars and allocation" && (
+  const replenishmentAction = ["Pars and allocation", "Release standing allocation"].includes(screen.name) && (
     ["Set taproom par", "Set standing allocation", "Review", "All shortfalls"].includes(l)
     || /^(Order \d+ · |Standing allocation · )/.test(l)
   );

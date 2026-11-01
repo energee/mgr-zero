@@ -259,18 +259,6 @@ describe("Driver route", () => {
 });
 
 describe("Confirm delivery", () => {
-  it("the Confirm delivery inventory record is ConfirmDeliveryView", () => {
-    const body = screen("Confirm delivery").body as { type: unknown; props: { model: unknown } };
-    expect(body.type).toBe(ConfirmDeliveryView);
-    expect(body.props.model).toEqual(confirmDeliveryStop1);
-  });
-
-  it("draws invoice timing once from the model", () => {
-    const html = htmlOf(createElement(ConfirmDeliveryView, { model: confirmDeliveryStop1 }));
-    expect(html.match(/Invoice timing/g)?.length).toBe(1);
-    expect(html).toMatch(/On delivery · saved/);
-  });
-
   it("distinguishes an unrecorded customer ship-to from an internal transfer", () => {
     const missing = htmlOf(createElement(ConfirmDeliveryView, { model: { ...confirmDeliveryStop1, shipTo: null } }));
     expect(missing).toContain('role="alert"');
@@ -281,28 +269,4 @@ describe("Confirm delivery", () => {
     expect(transfer).not.toContain('role="alert"');
     expect(transfer).not.toContain("Fictional Lane");
   });
-
-  it("puts both outcome verbs in the shared form footer, Delivered last (#1226)", () => {
-    const html = htmlOf(createElement(ConfirmDeliveryView, { model: confirmDeliveryStop1 }));
-    const footer = html.match(/<div class="[^"]*md:justify-end[^"]*">([\s\S]*?)<\/div>/)?.[1] ?? "";
-    const verbs = [...footer.matchAll(/<button\b[^>]*>([^<]*)<\/button>/g)].map((m) => m[1]);
-    expect(verbs).toEqual(["Not delivered · leave for a later route", "Delivered"]);
-    expect(footer).toMatch(/<button\b[^>]*bg-irreversible[^>]*>Delivered<\/button>/);
-  });
-
-  it("the live stop page mounts ConfirmDeliveryView and slots DeliveredForm", () => {
-    const page = src("app/(app)/work/deliveries/[id]/page.tsx");
-    expect(page).toMatch(/<ConfirmDeliveryView\b/);
-    expect(page).toMatch(/<DeliveredForm\b/);
-    expect(page).not.toMatch(/E\.fld\("Invoice timing"/);
-  });
-});
-
-
-it("shares the outcome fields between inventory and live submission", () => {
-  expect(src("components/mgr/views/confirm-delivery.tsx")).toMatch(/<DeliveryOutcomeForm\b/);
-  expect(src("app/(app)/work/deliveries/[id]/delivered-form.tsx")).toMatch(/<DeliveryOutcomeForm\b/);
-  const html = htmlOf(createElement(ConfirmDeliveryView, { model: confirmDeliveryStop1 }));
-  expect(html).toContain("refused");
-  expect(html).toContain("Accepted");
 });

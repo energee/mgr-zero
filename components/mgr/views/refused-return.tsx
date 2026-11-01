@@ -63,6 +63,6 @@ export function RefusedReturnFormView({ model, busy, error, onSubmit }: {
     </Fragment>)}
     {error && E.status(error, "w")}
     {invalid && E.status("Received quantity exceeds the outstanding refusal", "w")}
-    {E.btn(busy ? "Saving…" : "Check in refused beer", busy || invalid || !locationId || !selected.length || selected.some((e) => !e.binId) ? "irr disabled" : "irr", undefined, submit)}
+    {E.btn(busy ? "Saving…" : "Check in refused beer", busy || invalid || !locationId || !selected.length || selected.some((e) => !e.binId) ? "irr disabled" : "irr", undefined, submit, { "data-preview-action": onSubmit ? true : undefined })}
   </>;
 }

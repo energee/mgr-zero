@@ -50,9 +50,7 @@ export function QboConnectionView({ configured = true, reconnect = false, busy =
   </div>;
 }
 
-/** The ACH and card push defaults. A switch saves when tapped (#1509): the
- *  caller runs set_qbo_push_defaults with both values and owns them, so the
- *  inventory, which passes no onChange, draws inert switches. */
+/** The caller owns both payment defaults; each switch saves the pair on tap. */
 export function QboDefaultsView({ allowAch, allowCard, busy = false, disabled = false, error, onChange }: { allowAch: boolean; allowCard: boolean; busy?: boolean; disabled?: boolean; error?: string | null; onChange?: (ach: boolean, card: boolean) => void }) {
   const reasonId = useId();
   const accessibility = { "aria-describedby": disabled ? reasonId : undefined };
@@ -83,7 +81,7 @@ function missingEmailsDetail(count?: number) {
 
 /** `disconnect` is the row's Disconnect control; the live page passes the
  *  confirming dialog, and the inventory draws the plain verb (#1509). */
-export function AccountingView({ model, connection, disconnect, defaults, messages, sync }: { model: AccountingViewModel; connection?: ReactNode; disconnect?: ReactNode; defaults?: ReactNode; messages?: ReactNode; sync?: ReactNode }) {
+export function AccountingView({ model, connection, disconnect, defaults, messages, sync, onDefaultsChange }: { model: AccountingViewModel; connection?: ReactNode; disconnect?: ReactNode; defaults?: ReactNode; messages?: ReactNode; sync?: ReactNode; onDefaultsChange?: (ach: boolean, card: boolean) => void }) {
   return <>
     {E.back("Settings", "Accounting", undefined, model.backHref)}
     {E.ttl("QuickBooks")}{messages}
@@ -94,7 +92,7 @@ export function AccountingView({ model, connection, disconnect, defaults, messag
     {model.connected && <>{model.companyId && E.fld("Company ID", model.companyId)}{E.nav("Mappings", "Customers, SKUs and returnable-keg deposits", "", undefined, model.mappingsHref)}</>}
     {(model.connected || model.reconnect) && (sync !== undefined ? sync : <QboSyncView status={model.syncStatus} disabled={!model.connected} />)}
     {E.ttl("Push defaults")}
-    {defaults !== undefined ? defaults : model.defaults ? <QboDefaultsView {...model.defaults} disabled={!model.connected} /> : E.gated("Bank transfer (ACH) and card", "Connect QuickBooks to read and save the company's payment options.")}
+    {defaults !== undefined ? defaults : model.defaults ? <QboDefaultsView {...model.defaults} disabled={!model.connected} onChange={onDefaultsChange} /> : E.gated("Bank transfer (ACH) and card", "Connect QuickBooks to read and save the company's payment options.")}
     {E.row("Customers missing a portal login email", missingEmailsDetail(model.missingEmails), model.missingEmails !== 0 && E.act("Review", "primary", model.customersHref), model.missingEmails ? "w" : "")}
     {model.remoteRevocationUnresolved && E.note("Local access is disconnected. QuickBooks could not confirm remote revocation; reconnect to continue.", "alert")}
     {E.info("QuickBooks remains the accounting record. Connecting does not push existing invoices, and MGR never displays credentials.")}

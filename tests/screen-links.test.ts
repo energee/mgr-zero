@@ -165,14 +165,16 @@ describe("isInertOn", () => {
     expect(isInertOn(by("Today"), "Paid", "Invoice")).toBe(false);
   });
 
-  it("keeps replenishment quantity edits and reservation reviews local instead of opening unrelated screens", () => {
-    const screen = by("Pars and allocation");
-    for (const label of ["Set taproom par", "Set standing allocation", "Release", "Review"]) {
-      expect(isInertOn(screen, label), label).toBe(true);
-      expect(screen.to?.[label], label).toBeUndefined();
+  it("keeps replenishment quantity edits and reservation reviews local on both page states", () => {
+    for (const name of ["Pars and allocation", "Release standing allocation"]) {
+      const screen = by(name);
+      for (const label of ["Set taproom par", "Set standing allocation", "Release", "Review", "Order 999 · Example customer", "Standing allocation · Example taproom"]) {
+        expect(isInertOn(screen, label), `${name}: ${label}`).toBe(true);
+        expect(screen.to?.[label], `${name}: ${label}`).toBeUndefined();
+      }
+      expect(resolveTap(screen, "Create replenishment order")).toBe("Order");
+      expect(isInertOn(screen, "Review", "Order")).toBe(false);
     }
-    expect(resolveTap(screen, "Create replenishment order")).toBe("Order");
-    expect(isInertOn(screen, "Review", "Order")).toBe(false);
     expect(resolveTap(by("Finished goods"), "Shortfall", "/replenishment?sku=lantern-pils-case#shortfalls")).toBe("Pars and allocation");
   });
 

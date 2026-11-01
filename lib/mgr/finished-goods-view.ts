@@ -28,6 +28,11 @@ export type FinishedGoodsViewModel = {
   empty?: EmptyState;
 };
 
+export type FinishedGoodsMovements = {
+  rows: { key: string; title: string; detail: string; trailing: string; outbound: boolean }[];
+  links?: { label: string; href: string }[];
+};
+
 export type FinishedGoodsSku = {
   id: string;
   name: string;

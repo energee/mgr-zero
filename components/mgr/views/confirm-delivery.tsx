@@ -97,11 +97,10 @@ export function DeliveryOutcomeForm({ lines, transfer = false, initialSignedBy =
     {E.edit("Received by", signedBy, "text", receivedSuggestions, { onChange: setSignedBy, required: !fullRefusal })}
     {error && E.status(error, "w")}
     <CommandFormFooter>
-      {/* Inventory keeps the same action inert; the live adapter supplies the command. */}
-      {E.btn("Not delivered · leave for a later route", "g", undefined, onLeave ?? (() => {}))}
+      {E.btn("Not delivered · leave for a later route", "g", undefined, onLeave, { "data-preview-action": onLeave ? true : undefined })}
       {E.submit(fullRefusal ? "Record refusal" : hasRefusal ? "Record partial delivery" : "Delivered", {
         id: "confirm-delivery", type: "button", reason: outcome.reason, submitting: busy, onClick: submit,
-        className: IRREVERSIBLE,
+        className: IRREVERSIBLE, "data-preview-action": onSubmit ? true : undefined,
       })}
     </CommandFormFooter>
     </fieldset>

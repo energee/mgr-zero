@@ -360,7 +360,7 @@ export const E = {
    *  missing; the reason is printed beside it and linked by aria-describedby
    *  (#1122). `id` names the button, and the reason is `${id}-reason`. Other
    *  options are passed to the Button (variant, className, form). */
-  submit: (label: React.ReactNode, options: Omit<SubmitButtonProps, "label">) => <SubmitButton label={label} {...options} />,
+  submit: (label: React.ReactNode, options: Omit<SubmitButtonProps, "label"> & { "data-preview-action"?: boolean }) => <SubmitButton label={label} {...options} />,
   tape: (arr: [React.ReactNode, React.ReactNode?][]) => (
     <ol className="ml-1 flex flex-col gap-1 border-l-2 pl-3 font-mono text-xs text-muted-foreground">
       {arr.map(([a, b], i) => (
