@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 import { rememberOpener, returnToOpener } from "@/components/mgr/command-form";
 import { AppShell, type AppShellProps } from "@/components/mgr/app-shell";
-import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
+import { navFor, PORTAL_NAV, STAFF_NAV } from "@/lib/mgr/nav";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -45,8 +45,11 @@ describe("CommandForm focus return", () => {
   });
 });
 
-describe("skip link", () => {
-  const props: AppShellProps = { brand: "Demo Brewing", items: navFor(STAFF_NAV, ["admin"]), children: "body" };
+describe.each([
+  ["staff", navFor(STAFF_NAV, ["admin"])],
+  ["portal", PORTAL_NAV],
+] as const)("%s shell landmarks and skip link", (_audience, items) => {
+  const props: AppShellProps = { brand: "Demo Brewing", items, children: "body" };
   const html = renderToStaticMarkup(createElement(AppShell, props));
 
   it("is the first link, ahead of the sidebar", () => {
@@ -54,7 +57,16 @@ describe("skip link", () => {
     expect(html.indexOf("<a")).toBe(html.indexOf('<a href="#main"'));
   });
 
-  it("targets the main landmark", () => {
-    expect(html).toMatch(/<main[^>]*id="main"/);
+  it("targets focusable page content after the header controls", () => {
+    expect(html).toMatch(/<div[^>]*id="main"[^>]*tabindex="-1"[^>]*data-mgr-page-scroll=""/);
+    expect(html.match(/id="main"/g)).toHaveLength(1);
+    expect(html.indexOf('id="main"')).toBeGreaterThan(html.indexOf("</header>"));
+  });
+
+  it("exposes the header as a banner and the sidebar menu as primary navigation", () => {
+    expect(html).toMatch(/<header[^>]*role="banner"/);
+    const primaryNavigation = html.match(/<nav aria-label="Primary">[\s\S]*?<\/nav>/)?.[0];
+    expect(primaryNavigation).toContain(`href="${items[0].href}"`);
+    expect(primaryNavigation).toContain(items[0].label);
   });
 });

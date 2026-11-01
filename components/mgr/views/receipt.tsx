@@ -7,8 +7,6 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import type { ReceiptViewModel } from "@/lib/mgr/receipt-view";
 
-export type { ReceiptViewModel };
-
 export function ReceiptView({ model, onPostBill, busy = false, error }: {
   model: ReceiptViewModel; onPostBill?: () => Promise<boolean>; busy?: boolean; error?: string | null;
 }) {

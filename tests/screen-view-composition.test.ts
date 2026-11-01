@@ -18,23 +18,25 @@ const KNOWN_SURFACE_DEBT = [
 
 // Audited whole-body replacements, not action/message slots. Extend this
 // focused list as each flow is inspected; a view import alone misses these.
-const BODY_SLOTS: Record<string, string> = {
+const BODY_SLOTS: Record<string, readonly string[]> = {
   // CatalogView has no body-replacement slot left: `rowExtra` adds under a row
   // and cannot replace the rows, which tests/catalog-view.test.ts asserts.
-  ShopView: "catalog",
-  NewPoView: "form",
-  ReceivePoView: "review",
-  TeamView: "rows",
-  BatchesView: "list",
-  BrewDayView: "body",
-  RoutesView: "list",
-  RouteView: "form",
-  WorkView: "list",
-  InvoiceView: "qboGate",
-  BeerView: "navs",
-  ClosePackagingRunView: "lead",
-  KegFleetView: "list",
+  ShopView: ["catalog"],
+  NewPoView: ["form"],
+  ReceivePoView: ["review"],
+  TeamView: ["rows"],
+  BatchesView: ["list"],
+  BrewDayView: ["body"],
+  RoutesView: ["list"],
+  RouteView: ["form"],
+  WorkView: ["list"],
+  InvoiceView: ["qboGate", "accountingActions"],
+  BeerView: ["navs"],
+  ClosePackagingRunView: ["lead"],
+  KegFleetView: ["list"],
+  TransferDetailView: ["footer"],
 };
+const SHARED_SLOT_VIEWS: Record<string, string> = { "InvoiceView.accountingActions": "InvoiceAccountingActionsView" };
 const KNOWN_BODY_DEBT: string[] = [];
 
 function inventoryViews(node: ReactNode, out = new Set<string>()): Set<string> {
@@ -140,8 +142,12 @@ function slotPresentation(node: ts.Node): string[] {
   }
   const seen = new Set<ts.Node>();
   const violations = new Set<string>();
-  const scalar = (type: ts.Type): boolean => type.isUnion() ? type.types.every(scalar)
-    : Boolean(type.flags & (ts.TypeFlags.StringLike | ts.TypeFlags.NumberLike | ts.TypeFlags.BooleanLike | ts.TypeFlags.Null | ts.TypeFlags.Undefined | ts.TypeFlags.Void | ts.TypeFlags.Never));
+  const scalar = (type: ts.Type): boolean => {
+    if (type.isUnion()) return type.types.every(scalar);
+    if (type.flags & (ts.TypeFlags.StringLike | ts.TypeFlags.NumberLike | ts.TypeFlags.BooleanLike | ts.TypeFlags.Null | ts.TypeFlags.Undefined | ts.TypeFlags.Void | ts.TypeFlags.Never)) return true;
+    const item = type.getNumberIndexType();
+    return Boolean(item && scalar(item));
+  };
   function inspect(expression: ts.Node) {
     const file = expression.getSourceFile();
     if (file.isDeclarationFile || resolve(file.fileName).includes("/components/mgr/views/") || ts.isTypeNode(expression)) return;
@@ -149,6 +155,7 @@ function slotPresentation(node: ts.Node): string[] {
     seen.add(expression);
     if (ts.isJsxExpression(expression)) { if (expression.expression) inspect(expression.expression); return; }
     if (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression) || ts.isSatisfiesExpression(expression)) { inspect(expression.expression); return; }
+    if (ts.isVoidExpression(expression)) return;
     if (ts.isConditionalExpression(expression)) { inspect(expression.whenTrue); inspect(expression.whenFalse); return; }
     if (ts.isBinaryExpression(expression) && expression.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) { inspect(expression.right); return; }
     if (ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression)) {
@@ -164,6 +171,15 @@ function slotPresentation(node: ts.Node): string[] {
         else violations.add(`unresolved component ${tag}`);
       }
       if (ts.isJsxElement(expression)) expression.children.forEach(inspect);
+      return;
+    }
+    if (ts.isObjectLiteralExpression(expression)) {
+      for (const property of expression.properties) {
+        if (ts.isPropertyAssignment(property)) inspect(property.initializer);
+        else if (ts.isShorthandPropertyAssignment(property)) inspect(property.name);
+        else if (ts.isSpreadAssignment(property)) inspect(property.expression);
+        else inspect(property);
+      }
       return;
     }
     if (ts.isFunctionDeclaration(expression) || ts.isFunctionExpression(expression) || ts.isArrowFunction(expression)) {
@@ -205,7 +221,7 @@ function slotPresentation(node: ts.Node): string[] {
       if (scalar(checker.getTypeAtLocation(expression))) return;
       const call = expression.expression;
       if (ts.isPropertyAccessExpression(call) && declarations(call.expression).some(owner => resolve(owner.getSourceFile().fileName).endsWith("/components/mgr/e.tsx"))) {
-        if (/^(edit|fld|pick|searchPick|tbl|row|qty|stq)$/.test(call.name.text)) {
+        if (/^(edit|fld|pick|searchPick|sw|tbl|row|qty|stq)$/.test(call.name.text)) {
           violations.add(`inline E.${call.name.text}`);
           return;
         }
@@ -305,7 +321,7 @@ function slotPresentation(node: ts.Node): string[] {
  * Named-only entry files still need explicit route symbols to disambiguate them.
  * This discovery check does not prove prop/slot or surface configuration parity.
  */
-function mountedComponents(entry: string, bodyOverrides = new Set<string>(), actionOverrides?: Set<string>): Set<string> {
+function mountedComponents(entry: string, bodyOverrides = new Set<string>(), entryExport?: string, actionOverrides?: Set<string>): Set<string> {
   const components = new Set<string>();
   const visited = new Set<string>();
 
@@ -384,9 +400,21 @@ function mountedComponents(entry: string, bodyOverrides = new Set<string>(), act
         const imported = imports.get(tag);
         const name = imported?.imported === "default" ? tag : (imported?.imported ?? tag);
         components.add(name);
-        if (node.attributes.properties.some(attribute =>
-          ts.isJsxAttribute(attribute) && attribute.name.getText(file) === BODY_SLOTS[name])) {
-          bodyOverrides.add(`${name}.${BODY_SLOTS[name]}`);
+        const slots = BODY_SLOTS[name];
+        for (const attribute of node.attributes.properties) {
+          if (!ts.isJsxAttribute(attribute) || !slots?.includes(attribute.name.getText(file))) continue;
+          const slot = `${name}.${attribute.name.getText(file)}`;
+          const expected = SHARED_SLOT_VIEWS[slot];
+          const value = attribute.initializer;
+          const expression = value && ts.isJsxExpression(value) ? value.expression : undefined;
+          let child: ts.JsxOpeningElement | ts.JsxSelfClosingElement | undefined;
+          if (expression && ts.isJsxElement(expression)) child = expression.openingElement;
+          if (expression && ts.isJsxSelfClosingElement(expression)) child = expression;
+          const binding = child ? imports.get(child.tagName.getText(file)) : undefined;
+          // An authorized adapter may fill the slot only by mounting its shared drawing.
+          const shared = expected && binding?.path && (binding.imported === expected
+            || mountedComponents(binding.path, new Set(), binding.imported).has(expected));
+          if (!shared) bodyOverrides.add(slot);
         }
         // Slot inspection is type-checker work; only callers collecting action overrides need it.
         if (actionOverrides && name.endsWith("View")) {
@@ -420,7 +448,7 @@ function mountedComponents(entry: string, bodyOverrides = new Set<string>(), act
     for (const root of roots) walk(root);
   }
 
-  visit(resolve(entry));
+  visit(resolve(entry), entryExport);
   return components;
 }
 
@@ -466,7 +494,7 @@ function bodyViolations(expected: Set<string>, route: LiveRoute): string[] {
 function actionViolations(routes: LiveRoute[]): string[] {
   const slots = new Set<string>();
   for (const route of routes) {
-    for (const file of routeFiles(route)) mountedComponents(file, new Set(), slots);
+    for (const file of routeFiles(route)) mountedComponents(file, new Set(), undefined, slots);
   }
   return [...slots].sort();
 }
@@ -547,6 +575,15 @@ describe("screen/live component parity", () => {
     expect(mountedComponents("tests/fixtures/screen-parity/unused-reexport.tsx")).not.toContain("ExampleView");
   });
 
+  it("detects a transfer footer replacement even beside the shared document", () => {
+    const overrides = new Set<string>();
+    expect(mountedComponents("tests/fixtures/screen-parity/transfer-footer.tsx", overrides)).toContain("TransferDetailView");
+    expect([...overrides]).toEqual(["TransferDetailView.footer"]);
+    const liveOverrides = new Set<string>();
+    mountedComponents("app/(app)/transfers/[id]/page.tsx", liveOverrides);
+    expect([...liveOverrides]).not.toContain("TransferDetailView.footer");
+  });
+
   it("records audited whole-body slots even when the expected view is mounted", () => {
     const bypasses = mapped.flatMap(screen => bodyViolations(inventoryViews(screen.body), SCREEN_ROUTES.find(route => route.name === screen.name)!)).sort();
     expect(bypasses).toEqual(KNOWN_BODY_DEBT);
@@ -558,11 +595,12 @@ describe("screen/live component parity", () => {
 
   it("rejects independent forms and tables hidden in whole-footer/action slots", () => {
     const bypass = new Set<string>();
-    mountedComponents("tests/fixtures/screen-parity/action-bypass.tsx", new Set(), bypass);
+    mountedComponents("tests/fixtures/screen-parity/action-bypass.tsx", new Set(), undefined, bypass);
     expect([...bypass]).toContain("tests/fixtures/screen-parity/action-bypass.tsx: ExampleView.footer: inline E.edit");
     expect([...bypass]).toContain("tests/fixtures/screen-parity/action-bypass.tsx: ExampleView.action: inline table");
     expect([...bypass]).toContain("tests/fixtures/screen-parity/action-bypass.tsx: TodayView.footer: inline E.edit");
     expect([...bypass]).toContain("tests/fixtures/screen-parity/action-bypass.tsx: TodayView.footer: inline E.pick");
+    expect([...bypass]).toContain("tests/fixtures/screen-parity/action-bypass.tsx: TodayView.footer: inline E.sw");
     expect([...bypass]).toContain("tests/fixtures/screen-parity/action-bypass.tsx: TodayView.footer: inline table");
     expect([...bypass].filter(violation => violation.includes("unresolved"))).toEqual([]);
     const additional = actionViolations([{ name: "Probe", file: "tests/fixtures/screen-parity/action-delegated.tsx", additionalFiles: ["tests/fixtures/screen-parity/action-bypass.tsx"] }]);

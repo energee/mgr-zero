@@ -26,18 +26,18 @@ beforeAll(async () => {
   whId = (await seedLocation(breweryId)).id;
   ({ skuId } = await seedCatalog(breweryId, { product: "Old IPA", sku: "Old IPA case" }));
   ({ skuId: keg } = await seedCatalog(breweryId, { product: "Old Pils", sku: "Old Pils half", packageType: "keg", bblPerUnit: 0.5 }));
-  ({ customerId, shipToId } = await seedCustomer(breweryId, { name: "Sarene" }));
-  ({ shipToId: otherShipToId } = await seedCustomer(breweryId, { name: "Odyssey" }));
+  ({ customerId, shipToId } = await seedCustomer(breweryId, { name: "Cedar Distribution" }));
+  ({ shipToId: otherShipToId } = await seedCustomer(breweryId, { name: "River" }));
   await runCommand("set_one_way_keg_fee", { feeCents: 1000 }, owner);
   await runCommand("set_books_opened_on", { booksOpenedOn: "2026-10-01" }, owner);
 });
 
 describe("record_historical_order", () => {
   it("writes a shipped pickup order, its lines, a shipment and a paid not_synced invoice, with no stock or deposits", async () => {
-    const r = await record({ note: "Lolev block 12" });
+    const r = await record({ note: "Example Brewing block 12" });
     const order = (await admin.from("orders").select("kind, status, pickup, from_location_id, shipped_at, note, order_no")
       .eq("id", r.order_id).single().throwOnError()).data!;
-    expect(order).toMatchObject({ kind: "wholesale", status: "shipped", pickup: true, from_location_id: whId, note: "Lolev block 12", order_no: r.order_no });
+    expect(order).toMatchObject({ kind: "wholesale", status: "shipped", pickup: true, from_location_id: whId, note: "Example Brewing block 12", order_no: r.order_no });
     expect(order.shipped_at).not.toBeNull();
     const lines = (await admin.from("order_lines").select("sku_id, qty_ordered, qty_picked, qty_shipped, unit_price_cents, one_way_fee_cents")
       .eq("order_id", r.order_id).order("unit_price_cents").throwOnError()).data!;

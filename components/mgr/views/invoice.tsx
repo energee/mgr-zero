@@ -17,13 +17,12 @@ import { PriceSummary } from "@/components/mgr/views/price-summary";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { QboStaffInvoiceLinkView } from "./accounting";
+import { InvoiceAccountingActionsView } from "./invoice-accounting";
 import { PAYMENT_METHODS } from "@/lib/mgr/enums";
 import { PAYMENT_METHOD_LABEL, sentenceCase } from "@/lib/mgr/labels";
 import type { QboStaffInvoiceLink } from "@/lib/mgr/qbo-ui";
 import { invoicePaymentAmountError, type InvoicePaymentValue, type InvoicePaymentView, type InvoiceQuestionView, type InvoiceViewModel } from "@/lib/mgr/invoice-view";
 import { cn } from "@/lib/utils";
-
-export type { InvoiceViewModel };
 
 const H2 = "text-base font-semibold";
 const LEGEND = "text-xs text-muted-foreground";
@@ -84,7 +83,6 @@ export function InvoiceView({
   recordPayment,
   paymentAction,
   mappings = model.mappings,
-  pushDisabled = true,
   qbo,
   qboGate,
   quickbooks,
@@ -100,7 +98,6 @@ export function InvoiceView({
   /** The control on each unvoided payment. Omitted: the inert Void button; null: none. */
   paymentAction?: ReactNode | ((payment: InvoicePaymentView) => ReactNode);
   mappings?: InvoiceViewModel["mappings"];
-  pushDisabled?: boolean;
   /** Replaces the whole QuickBooks region; null draws none. */
   qbo?: ReactNode;
   /** A gate message while integration is unavailable. */
@@ -122,7 +119,7 @@ export function InvoiceView({
     return paymentAction !== undefined ? paymentAction : <Button variant="outline" size="sm" type="button">Void</Button>;
   };
   const actions = accountingActions !== undefined ? accountingActions
-    : mappingRows?.length ? E.btn("Push invoice to QuickBooks Online", pushDisabled ? "irr disabled" : "irr") : null;
+    : mappingRows?.length ? <InvoiceAccountingActionsView invoiceLabel={model.title} actions={["fix_mapping"]} /> : null;
   const showLink = Boolean(quickbooks || mappingRows?.length);
   const hasAccounting = qbo !== undefined ? qbo != null : Boolean(qboGate || quickbooks || mappingRows?.length || actions);
   const openCount = model.questions.filter((q) => !q.answered).length;

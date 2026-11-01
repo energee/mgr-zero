@@ -110,6 +110,7 @@ describe("Work chips", () => {
 describe("reported explorer flows", () => {
   it.each([
     ["Portal set password", "Save password", "Shop"],
+    ["Driver", "Resume", "Confirm delivery"],
     ["Menu", "Warehouse", "Menu"],
     ["Order history", "ORD-0231", "Order detail"],
     ["Order detail", "Orders", "Order history"],
@@ -127,6 +128,7 @@ describe("reported explorer flows", () => {
     ["Disconnect QuickBooks", "Disconnect QuickBooks", "Accounting"],
     ["Disconnect Slack", "Disconnect Slack", "Chat disconnected"],
     ["Disconnect Square", "Disconnect Square", "Point of sale"],
+    ["Square locations", "Retire mapping", "Square locations"],
     ["Point of sale", "Open Accounting", "Accounting"],
   ])("%s: %s → %s", (screen, tap, target) => {
     expect(resolveTap(by(screen), tap)).toBe(target);

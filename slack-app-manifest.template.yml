@@ -16,6 +16,7 @@ oauth_config:
       - chat:write
       - im:write
       - groups:read
+      - users:read
 settings:
   event_subscriptions:
     request_url: ${APP_URL}/api/webhooks/slack

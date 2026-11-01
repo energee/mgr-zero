@@ -26,6 +26,8 @@ function annotationSkeleton(source: string) {
   const parts: string[] = [];
   let cursor = 0;
   for (const [index, element] of array.elements.entries()) {
+    // Keep generated spreads immutable in the unmasked source slices.
+    if (ts.isSpreadElement(element)) continue;
     if (!ts.isObjectLiteralExpression(element)) throw new Error("Expected literal SCREENS records");
     const seen = new Set<string>();
     for (const property of element.properties) {

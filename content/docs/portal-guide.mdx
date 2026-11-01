@@ -35,9 +35,13 @@ Forgotten your password, or sign in without one? Select **Need a reset link?** A
 
 The header shows your customer account name. Navigation offers **Order**, **Orders**, **Invoices**, and **Account** as tabs along the bottom on a phone and a left rail on wider screens. **Order** is the shop. Open **Me** in the header to see the email you signed in with and account you represent, open **Guide** for this portal guide, **Change password**, or select **Sign out**. Me is a centered dialog at every screen size. It opens with keyboard focus on its **Me** title, so a stray Enter does not sign you out. Closing a form or dialog returns keyboard focus to the button that opened it. On every page, the first Tab stop is **Skip to main content**, which moves past the navigation to the page. Phone form panels sit above the bottom navigation; forms with pinned footer actions keep those actions visible while you scroll the fields. On a phone, actions such as **Pay invoice** span the column. On a wider screen they hug their label. If MGR says the credentials are incorrect, contact the brewery. A login that is not on any brewery or customer account shows **No brewery yet**; contact the brewery about access, then select **Sign out**. A staff login that is not on a customer account and opens a portal page shows **Portal is for customers** instead, with **Back to Today** and **Sign out**.
 
+Screen readers can jump to **Primary** navigation for the left rail or the banner for the header controls. **Skip to main content** moves keyboard focus directly into the scrollable page, past both the navigation and header controls.
+
 **Guide** opens in a new tab so your current portal page and entries remain in the original tab. Close the guide tab to return to that place, or select **Back to MGR** in the guide header to open the app.
 
 Scroll within the page to reach lower items and actions. The header and phone tabs stay outside that scrolling area.
+
+In an open drop-down list, use the arrow keys to move and Enter to choose. A tinted fill and a solid outline mark the active option in both light and dark themes.
 
 ## Shop [#shop]
 
@@ -52,6 +56,8 @@ The brewery's public taproom menu is a separate read-only website feed. Publishi
 3. Select **Change** beside the ship-to summary to open **Delivery details**, then choose **Ship to**. Your default address is selected for a new cart.
 4. Optionally enter **Requested date**, **PO number** and **Note** in Delivery details, select **Done**, then check the **Current catalog subtotal**. Clearing the requested date removes it from a saved draft. Shop states that tax and keg deposits are not in that subtotal, and that the brewery confirms the final invoice amounts and the requested delivery date. The date you enter is a request, not a commitment. A picked date reads like **Sep 10, 2026**.
 5. Select **Review order**. MGR takes a current server quote for the selected ship-to, fulfillment source, channel prices, and returnable-keg deposits. Review shows the deposit separately. When the brewery has entitled QuickBooks tax calculation configured, it also shows calculated **Tax** and **Estimated total**. Otherwise it says **Tax pending**: the subtotal and deposits are current, and the invoice supplies the final tax and total. Select **Place order** (the amount is marked **before tax** when tax is pending), or choose **Back to edit**. Changing a quantity in Review returns you to Shop and requires a fresh review before placing the order. **Save draft** on Shop saves without submitting. The brewery reviews submitted orders before they are confirmed.
+
+If QuickBooks needs to renew its authorization during review, MGR renews it and retries tax once automatically. If tax calculation remains unavailable, you can still place the order with **Tax pending**; the invoice supplies the final tax.
 
 <Screen name="Review order" />
 
@@ -88,7 +94,7 @@ From a shipped order, **Reorder** starts a new cart with still-active, currently
 | `confirmed` | Accepted by the brewery. Inventory is reserved. |
 | `picked` | The warehouse recorded quantities prepared for shipment. If the brewery adds a line or raises a quantity after picking, the order returns to `confirmed` until the new quantities are picked. |
 | `shipped` | The brewery recorded shipment. An invoice for positive shipped quantities is created at shipping, or, when the brewery chose invoicing on delivery, at delivery confirmation; a fully refused delivery creates none. |
-| `cancelled` | The brewery stopped the order. The reason appears in the timeline. |
+| `cancelled` | The brewery stopped the order. Contact the brewery for the cancellation reason. |
 
 ## Orders [#orders]
 
@@ -118,6 +124,11 @@ MGR does not offer an invoice PDF download.
 Status words remain visible independently of color. **Paid** and **Settled** use a success indicator. **Unpaid** and **Review** need attention and use a warning indicator; Unpaid alone does not mean overdue. **Voided**, **Deleted**, **Written off**, and **Credit** are neutral, not payment confirmations. Review means QuickBooks changes need review before online payment is available.
 
 **Invoices** lists invoice or credit-memo number, kind, total, and current payment state. An invoice's due date is frozen at issue time from your account's terms: Due on receipt, Net 15, or Net 30. Later term changes do not move that date; credit memos have no inferred due date. Previously undated invoices use the current account terms because historical terms were not recorded. A credit memo is a separate negative billing record created by the brewery for a correction, a return, or a keg deposit refund. With no billing records, the page says **No invoices yet**. Open a number to see the record: total, issue date, invoice due date when applicable, its status, and each line's quantity and amount. After QuickBooks sync, the list, detail, and linked order show the current QuickBooks total; the original line amounts remain visible as billing history and can differ after an accountant edit. An invoice changed by an accountant says **Review** and does not offer Pay until the brewery reviews the change. An invoice that QuickBooks reports as voided, deleted, or written off says **This invoice is not payable**; it does not show a due date or ask you to pay, regardless of any earlier paid status. A live zero-balance invoice with no positive cash payment says **Settled** and is not payable; this can happen when a credit covers the balance. A live invoice with a current positive QuickBooks balance offers **Pay invoice** and opens the payment handoff in a new tab. MGR first checks that the invoice still belongs to your account, asks QuickBooks for a fresh payment link, then checks the balance and your access again before redirecting. A not-yet-known balance leaves payment unavailable. A reversed payment can reopen an invoice: the next sync updates its paid status, and its current positive balance makes it payable again. MGR stops checking a paid invoice 90 days after it first sees it paid, so a later reversal does not show here. MGR never saves or displays the QuickBooks payment link. If the invoice, connection, or link is unavailable, the payment page tells you to contact the brewery instead. A number that is not yours shows **Not found**.
+
+Only choosing **Pay invoice** starts the payment handoff. Viewing the invoice,
+following a saved page URL, or a browser prefetch does not spend the handoff
+request budget or refresh the QuickBooks connection.
+
 
 Opening a payment handoff shares your signed-in account's request limit with other portal activity. If too many requests arrive within a minute, **Payment unavailable** appears without contacting QuickBooks. Wait a minute, reopen the invoice, and try **Pay invoice** once. This refusal does not submit a payment. If it is still unavailable, contact the brewery using the invoice question action; MGR does not show provider errors or payment-link secrets.
 

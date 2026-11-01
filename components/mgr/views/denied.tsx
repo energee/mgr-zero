@@ -3,8 +3,6 @@ import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { DeniedViewModel } from "@/lib/mgr/denied-view";
 
-export type { DeniedViewModel };
-
 export function DeniedView({
   model,
   actions,

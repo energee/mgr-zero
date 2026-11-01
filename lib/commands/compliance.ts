@@ -173,7 +173,7 @@ export type StateTransaction = { state: string; kind: string; eventDate: string;
 /** Per-state sums of the facts; computed by destinationStateTotals, not returned by the report. */
 export type StateTotal = { state: string; volumeBbl: number; outwardBbl: number; returnedBbl: number; adjustmentBbl: number; invoicedCents: number; creditedCents: number; salesCents: number };
 export type Report = {
-  figures: { stateTransactions?: StateTransaction[]; jurisdiction: string; periodStart: string; periodEnd: string; lines: ReportLine[]; removals: Record<string, number>; cellarRemovals: Record<string, number>; byState: Record<string, number>; packaged: number; inProcess: number; balances: boolean };
+  figures: { stateTransactions?: StateTransaction[]; jurisdiction: string; periodStart: string; periodEnd: string; lines: ReportLine[]; removals: Record<string, number>; cellarRemovals: Record<string, number>; byState: Record<string, number>; packaged: number; inProcess: number; inProcessAsOf?: string; balances: boolean };
   warnings: string[];
 };
 

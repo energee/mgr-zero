@@ -173,6 +173,32 @@ describe("Purchase orders", () => {
     expect(body.props.model).toEqual(receivePoSent);
   });
 
+  it("receiving and correction show editable actual unit costs and refuse invalid costs", () => {
+    for (const model of [receivePoSent, correctReceiptPo]) {
+      const html = htmlOf(createElement(ReceivePoView, { model }));
+      expect(html).toContain('aria-label="2-row · 55 lb bags unit cost"');
+      expect(html).toContain('value="28.50"');
+      for (const cost of ["-1", "21474836.48", "1e3", "not a price"]) {
+        expect(receiveReason({ ...model, lines: [{ key: "line", title: "Malt", detail: "", qty: 1, cost }] })).toContain("unit cost");
+      }
+      for (const cost of ["", "0", "12.34"]) {
+        expect(receiveReason({ ...model, closure: undefined, lines: [{ key: "line", title: "Malt", detail: "", qty: 1, cost }] })).toBeNull();
+      }
+    }
+  });
+
+  it("omits a blank-count line's invalid cost when receiving but requires it on correction", () => {
+    const lines = [
+      { key: "included", title: "Malt", detail: "", qty: "1", cost: "12.34" },
+      { key: "omitted", title: "Hops", detail: "", qty: "", cost: "-1" },
+    ];
+    expect(receiveReason({ ...receivePoSent, lines })).toBeNull();
+    const correcting = receiveReason({ ...correctReceiptPo, lines });
+    expect(correcting).toContain("a count for Hops");
+    expect(correcting).toContain("a unit cost");
+    expect(receiveReason({ ...receivePoSent, lines: lines.map(line => ({ ...line, qty: "1" })) })).toContain("a unit cost");
+  });
+
   it("submits closure through its own form, so Enter in the reason never submits the receipt or send form", () => {
     const html = htmlOf(createElement(ReceivePoView, { model: receivePoSent }));
     expect(html).toMatch(new RegExp(`<input[^>]*aria-label="Closure reason"[^>]*form="${CLOSURE_FORM_ID}"|<input[^>]*form="${CLOSURE_FORM_ID}"[^>]*aria-label="Closure reason"`));

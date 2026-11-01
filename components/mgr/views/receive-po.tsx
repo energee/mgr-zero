@@ -7,9 +7,9 @@ import { OrderQuantity } from "./new-order";
 import { CLOSURE_FORM_ID, receiveMode, receiveReason, type ReceivePoViewModel } from "@/lib/mgr/receive-po-view";
 import { submitReason } from "@/lib/mgr/submit-reason";
 
-export type { ReceivePoViewModel };
 export type ReceivePoControls = {
   quantity?: (id: string, value: string) => void; lot?: (id: string, value: string) => void;
+  cost?: (id: string, value: string) => void;
   bestBy?: (id: string, value: string) => void; location?: (id: string) => void;
   reason?: (value: string) => void; closureReason?: (value: string) => void;
   bin?: (id: string) => void; receivedOn?: (value: string) => void; sentVia?: (value: string) => void;
@@ -34,22 +34,28 @@ export function ReceivePoView({ model, controls = {}, messages, submitting = fal
     {model.note && E.fld("Note", model.note)}
     <fieldset disabled={submitting} className="flex flex-col gap-3">
       {correcting && E.edit("Correction reason", model.correctionReason ?? "", "text", undefined, { onChange: controls.reason, required: true })}
-      {mode === "receive" && model.locations && <>
+      {receiving && model.locations && <>
         <div className="grid grid-cols-2 gap-2">
           {E.pick("Received into", String(model.locationId ?? ""), [{ value: "", label: "Select location", disabled: true }, ...(model.locations.map(location => ({ value: location.id, label: location.name })))], { onChange: controls.location, required: true })}
           {E.pick("Bin", String(model.binId ?? ""), [{ value: "", label: "Select bin", disabled: true }, ...(model.bins?.map(bin => ({ value: bin.id, label: bin.name })) ?? [])], { onChange: controls.bin, required: true })}
         </div>
-        <DatePicker label="Received on" value={controls.receivedOn ? model.receivedOn ?? "" : undefined} defaultValue={model.receivedOn} onChange={controls.receivedOn} />
+        {correcting ? E.fld("Received on", model.receivedOn ?? "—") : <DatePicker label="Received on" value={controls.receivedOn ? model.receivedOn ?? "" : undefined} defaultValue={model.receivedOn} onChange={controls.receivedOn} />}
       </>}
       {(model.lines ?? []).map(line => <Fragment key={line.key}>
         {receiving ? E.line(line.title, line.detail,
           <OrderQuantity label={`${line.title} counted`} value={line.qty} onChange={controls.quantity && (value => controls.quantity?.(line.key, value))} />,
           line.warning ? "w" : line.ok ? "ok" : "",
-          line.lot !== undefined ? <>
-            {E.edit("Lot", line.lot, "text", line.lotOptions, { onChange: controls.lot ? value => controls.lot?.(line.key, value) : undefined, placeholder: "Lot code off the package", "aria-label": `${line.title} lot` })}
-            <DatePicker label="Best by" value={controls.bestBy ? line.bestBy ?? "" : undefined} defaultValue={line.bestBy} onChange={controls.bestBy && (value => controls.bestBy?.(line.key, value))} />
-            {line.note && E.note(line.note)}
-          </> : null,
+          <>
+            {E.edit("Unit cost ($)", line.cost ?? "", "number", undefined, {
+              onChange: controls.cost ? value => controls.cost?.(line.key, value) : undefined,
+              min: 0, step: "0.01", placeholder: "Optional", "aria-label": `${line.title} unit cost`,
+            })}
+            {line.lot !== undefined && <>
+              {E.edit("Lot", line.lot, "text", line.lotOptions, { onChange: controls.lot ? value => controls.lot?.(line.key, value) : undefined, placeholder: "Lot code off the package", "aria-label": `${line.title} lot` })}
+              <DatePicker label="Best by" value={controls.bestBy ? line.bestBy ?? "" : undefined} defaultValue={line.bestBy} onChange={controls.bestBy && (value => controls.bestBy?.(line.key, value))} />
+              {line.note && E.note(line.note)}
+            </>}
+          </>,
         ) : E.row(line.title, line.detail, String(line.qty))}
       </Fragment>)}
       {mode === "draft" && <>

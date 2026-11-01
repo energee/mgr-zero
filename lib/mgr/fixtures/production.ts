@@ -111,7 +111,7 @@ const mineralIngredients: BrewIngredient[] = ([
   { key: "rolled-oats", name: "Rolled Oats", materialId: "rolled-oats", stage: "mash", plan: 200, unit: "lb", packSize: 50, source: { lot: null, bin: "Dry storage / D1", materialId: "rolled-oats", locationId: "dry-storage", binId: "d1", lotId: null } },
   { key: "white-wheat", name: "Fieldstone White Wheat", materialId: "white-wheat", stage: "mash", plan: 200, unit: "lb", packSize: 50, source: { lot: "WW-0822", bin: "Malt room / A3", materialId: "white-wheat", locationId: "malt-room", binId: "a3", lotId: "ww-0822" } },
   { key: "crystals", name: "Brewer’s Crystals", materialId: "crystals", stage: "boil", plan: 110, unit: "lb", packSize: 55, source: { lot: "BC-0710", bin: "Dry storage / D2", materialId: "crystals", locationId: "dry-storage", binId: "d2", lotId: "bc-0710" } },
-  { key: "nelson", name: "Freestyle Nelson Sauvin 2026", materialId: "nelson", stage: "whirlpool", plan: 44, unit: "lb", packSize: 44, source: { lot: "NS-26-114", bin: "Hop freezer / F1", materialId: "nelson", locationId: "hop-freezer", binId: "f1", lotId: "ns-26-114" } },
+  { key: "nelson", name: "Valley Hops Nelson Sauvin 2026", materialId: "nelson", stage: "whirlpool", plan: 44, unit: "lb", packSize: 44, source: { lot: "NS-26-114", bin: "Hop freezer / F1", materialId: "nelson", locationId: "hop-freezer", binId: "f1", lotId: "ns-26-114" } },
 ] satisfies Omit<BrewIngredient, "packs" | "loose">[]).map(startAtPlan);
 
 const mineralVessels = [1, 2, 3, 4, 5, 6].map(n => ({ id: `fv${n}`, name: `FV${n}`, kind: "fermenter", capacity_bbl: 25.5 }));

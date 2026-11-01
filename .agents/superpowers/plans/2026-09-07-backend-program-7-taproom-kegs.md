@@ -52,7 +52,7 @@
 
 ```ts
 it("two locations of the same pool×size are independent balances", async () => {
-  const pool = await runCommand("create_keg_pool", { name: "Microstar", kind: "leased", vendorId }, adminCtx) as { id: string };
+  const pool = await runCommand("create_keg_pool", { name: "Kegline", kind: "leased", vendorId }, adminCtx) as { id: string };
   await runCommand("record_keg_event", {
     poolId: pool.id, kegSize: "sixth_bbl", qty: 36, reason: "acquired",
     locationId: taproomId, binId: tapBinId,
@@ -111,6 +111,6 @@ bunx tsc --noEmit && bun run lint
 
 ## Acceptance
 
-- [ ] Microstar 36 / 40 case reads back as two location rows
+- [ ] Kegline 36 / 40 case reads back as two location rows
 - [ ] Tap board still gated
 - [ ] Weekly count still gated

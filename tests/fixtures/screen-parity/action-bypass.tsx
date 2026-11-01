@@ -36,6 +36,7 @@ export default function IndependentSlots() {
   return <>
     <ExampleView footer={forms} action={<ControlAdapter control={IndependentTable} />} />
     <ForwardedToday footer={<form>{E.edit("Hidden Today field", "")}</form>} />
+    <TodayView footer={E.sw(false, "Independent setting")} />
     <RenderFooter render={value => <TodayView footer={value.footer} />} />
   </>;
 }

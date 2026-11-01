@@ -27,7 +27,7 @@ const pageState = vi.hoisted(() => ({
   calls: [] as string[],
 }));
 vi.mock("@/lib/brewery", () => ({
-  getActiveBrewery: async () => ({ id: "brewery", name: "Brewery", roles: pageState.roles, timeZone: "America/New_York" }),
+  getActiveBrewery: async () => ({ id: "brewery", name: "Brewery", roles: pageState.roles, timeZone: "America/New_York", gravityUnit: "plato", myGravityUnit: null }),
 }));
 vi.mock("@/lib/commands/context", () => ({
   buildContext: async () => ({ userId: "actor", breweryId: "brewery", roles: pageState.roles }),
@@ -40,12 +40,6 @@ vi.mock("@/lib/mgr/sidebar-state", () => ({ sidebarOpenFromCookie: async () => t
 vi.mock("@/app/(auth)/actions", () => ({ switchBrewery: async () => undefined }));
 vi.mock("@/lib/mgr/page-query", async importOriginal => ({
   ...(await importOriginal<typeof PageQuery>()),
-  // The staff layout's Me sheet reads the gravity unit as an enrichment.
-  optionalPageQuery: async (name: string) => {
-    pageState.calls.push(name);
-    if (name === "get_gravity_unit") return { brewery: "plato", mine: null, effective: "plato" };
-    throw new Error(`Unexpected optional page query: ${name}`);
-  },
   runPageQuery: async (name: string) => {
     pageState.calls.push(name);
     switch (name) {

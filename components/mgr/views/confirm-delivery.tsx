@@ -15,8 +15,6 @@ const REFUSAL_LABEL: Record<(typeof REFUSAL_REASONS)[number], string> = {
   customer_refused: "Customer refused", damaged: "Damaged in transit", wrong_item: "Wrong item", other: "Other",
 };
 
-export type { ConfirmDeliveryViewModel };
-
 export type DeliveryReadout =
   | { kind: "not_departed" | "not_assigned" }
   | { kind: "delivered"; receivedBy: string; outcome: string; transfer: boolean; invoice: string; refused: boolean; checkInHref?: string };
