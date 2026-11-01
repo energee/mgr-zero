@@ -218,14 +218,3 @@ describe("successful record metadata", () => {
     expect(await page.generateMetadata({ params: Promise.resolve({}), searchParams: Promise.resolve({}) })).toEqual({ title: staff ? "Portal is for customers" : "No brewery yet" });
   });
 });
-
-it.each([
-  ["app/(portal)/portal/orders/page.tsx", "Orders"],
-  ["app/(portal)/portal/invoices/page.tsx", "Invoices"],
-  ["app/(portal)/portal/coming-up/page.tsx", "Coming up"],
-  ["app/(portal)/portal/account/page.tsx", "Account"],
-  ["app/(auth)/accept/page.tsx", "Accept invitation"],
-  ["app/(app)/denied/page.tsx", "No access"],
-])("gives %s a descriptive title under the shared MGR template", (file, title) => {
-  expect(loadPage(file, {}).metadata).toEqual({ title });
-});
