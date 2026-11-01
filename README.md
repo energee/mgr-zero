@@ -247,10 +247,11 @@ and `bun audit --prod --json` during dependency and release reviews.
 
 The owner-approved #1667 overrides pin `fast-uri` 3.1.9 and
 `systeminformation` 5.33.16 within their parents' compatible ranges, alongside
-the existing KaTeX pin. The final local audit reports one low-severity,
-dev-only `deepmerge` advisory with no published fix, and no production
-advisories. Keep its CLI-input restrictions and the separate hosted-install
-gate in the [release checklist](docs/operations/release-checklist.md#dependency-hygiene--2026-10-30-1667).
+the existing KaTeX pin. The 2026-10-31 audit still reports `deepmerge` and
+`minimatch` in development tooling, plus `follow-redirects` in the production
+Slack dependency graph. These are not an advisory-free or release-ready
+claim. Exact prerequisites, fixed versions, and the declined hosted-install
+gate are in the [release checklist](docs/operations/release-checklist.md#dependency-hygiene--2026-10-30-1667).
 
 The review marketplace is checked out separately at an immutable commit and
 passed as a local directory. The pinned action's

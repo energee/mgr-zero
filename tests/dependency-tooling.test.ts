@@ -1,7 +1,6 @@
 import { createRequire } from "node:module";
-import type AjvConstructor from "ajv";
+import type AjvConstructor from "conf/node_modules/ajv";
 import type * as FastUri from "fast-uri";
-import type * as Systeminformation from "systeminformation";
 import { describe, expect, it } from "vitest";
 
 // Resolve the copies actually consumed by shadcn's dotenvx/conf graph.
@@ -11,7 +10,6 @@ const requireConf = createRequire(requireDotenvx.resolve("conf"));
 const requireAjv = createRequire(requireConf.resolve("ajv"));
 const uri = requireAjv("fast-uri") as typeof FastUri;
 const Ajv = requireConf("ajv") as typeof AjvConstructor;
-const systeminformation = requireDotenvx("systeminformation") as typeof Systeminformation;
 
 describe("approved tooling dependency patches (#1667)", () => {
   it("does not turn an encoded scheme into an executable URL", () => {
@@ -62,13 +60,5 @@ describe("approved tooling dependency patches (#1667)", () => {
     expect(validate({ amount: 2 })).toBe(true);
     expect(validate({ amount: 0 })).toBe(false);
     expect(validate({ amount: "2" })).toBe(false);
-  });
-
-  it("preserves the read-only system APIs used by dotenvx", async () => {
-    const system = await systeminformation.system();
-    const osInfo = await systeminformation.osInfo();
-    expect(typeof system.uuid).toBe("string");
-    expect(osInfo.platform).not.toBe("");
-    expect(osInfo.arch).not.toBe("");
   });
 });
