@@ -63,6 +63,7 @@ export const TODAY_VERB: Record<TodayItem["reason"], [string, "info" | "attentio
   restock_due: ["Put back", "attention"],
   delivery_next: ["Resume", "info"],
   refused_return: ["Check in", "attention"],
+  refused_credit: ["Return and credit", "attention"],
   fermentation_reading_overdue: ["Record", "info"],
   invoice_question: ["Answer", "info"],
 };

@@ -12,6 +12,7 @@ import "@/lib/commands/all";
 
 export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: string[] }[] = [
   { name: "Reverse movement", file: "app/(app)/inventory/reversal-form.tsx" },
+  { name: "Reattribute loss", file: "app/(app)/compliance/[period]/loss-review-form.tsx" },
   { name: "SKU detail", file: "app/(app)/inventory/[id]/page.tsx" },
   { name: "Invite staff", file: "app/(app)/settings/team/invite-form.tsx" },
   { name: "Team member", file: "app/(app)/settings/team/member-form.tsx" },
@@ -95,6 +96,14 @@ export const SCREEN_ROUTES: { name: string; file: string; additionalFiles?: stri
   { name: "Pick sheet", file: "app/(app)/pick/page.tsx" },
   { name: "Pars and allocation", file: "app/(app)/replenishment/page.tsx" },
   { name: "Invoice", file: "app/(app)/invoices/[id]/page.tsx" },
+  { name: "Invoice ready to push", file: "app/(app)/invoices/[id]/page.tsx" },
+  { name: "Invoice push result unknown", file: "app/(app)/invoices/[id]/page.tsx" },
+  { name: "Invoice deleted in QuickBooks", file: "app/(app)/invoices/[id]/page.tsx" },
+  { name: "Push invoice to QuickBooks", file: "app/(app)/settings/accounting/qbo-controls.tsx" },
+  { name: "Retry exact push", file: "app/(app)/settings/accounting/qbo-controls.tsx" },
+  { name: "Push corrected invoice", file: "app/(app)/settings/accounting/qbo-controls.tsx" },
+  { name: "Re-push deleted invoice", file: "app/(app)/settings/accounting/qbo-controls.tsx" },
+  { name: "Write off invoice", file: "app/(app)/settings/accounting/qbo-controls.tsx" },
   { name: "Record payment", file: "app/(app)/invoices/[id]/payment-form.tsx" },
   { name: "Void payment", file: "app/(app)/invoices/[id]/payment-form.tsx" },
   { name: "Invoices", file: "app/(app)/invoices/page.tsx" },

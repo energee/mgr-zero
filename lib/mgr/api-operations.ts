@@ -39,7 +39,7 @@ export const API_AREAS = [
   { slug: "delivery", title: "Delivery & routes", match: /(route|delivery|shipment|depart|refused)/ },
   { slug: "orders", title: "Orders & invoicing", match: /(order|invoice|pick|allocation|credit_memo|restock)/ },
   { slug: "customers", title: "Customers", match: /^(?!set_qbo_customer_mapping$)(?!list_qbo_customers$).*(customer|ship_to|portal_fulfillment)/ },
-  { slug: "inventory", title: "Inventory & locations", match: /^(?!list_pos_locations$)(?!set_pos_location_mapping$)(?!.*_invitation$).*(movement|on_hand|atp|bin|location|count|inventory|transfer)/ },
+  { slug: "inventory", title: "Inventory & locations", match: /^(?!list_pos_locations$)(?!(?:set|retire)_pos_location_mapping$)(?!.*_invitation$).*(movement|on_hand|atp|bin|location|count|inventory|transfer)/ },
   { slug: "team", title: "Team & brewery settings", match: /(staff|team|invite|invitation|brewery|provision|first_run|operating_defaults|books_opened|import_csv|gravity_unit|qbo|square|pos_)/ },
   { slug: "today", title: "Today & notifications", match: /(today|work|notification|shortfall|search_entities|beer_overview|snooze|quiet_hours|chat|preview_command)/ },
 ] as const;

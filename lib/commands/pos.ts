@@ -76,8 +76,8 @@ type PosSale = {
   source_order_id: string | null; source_line_id: string | null;
 };
 type NamedRelation = { name: string } | { name: string }[] | null;
-type PosExpectation = { sale_id: string; expected_bbl: number | null; serving_ounces: number | null; formats: NamedRelation; skus: NamedRelation };
-type PosSaleLocation = { connection_id: string; external_location_id: string; external_name: string | null; locations: NamedRelation };
+type PosExpectation = { sale_id: string; expected_bbl: number | null; serving_ounces: number | null; formats: NamedRelation; skus: NamedRelation; locations: NamedRelation };
+type PosSaleLocation = { connection_id: string; external_location_id: string; external_name: string | null };
 type PosCatalogVariation = { connection_id: string; external_variation_id: string; external_item_name: string | null; external_variation_name: string | null };
 type PosMapping = { connection_id: string; external_variation_id: string; ignored: boolean };
 type PosOrderVersion = { connection_id: string; external_order_id: string; source_version: number };
@@ -88,10 +88,10 @@ async function posSaleRows(ctx: Ctx, rows: PosSale[]) {
   const connectionIds = [...new Set(rows.map((row) => row.connection_id))];
   const [expectations, locations, catalog, mappings, orderVersions] = await Promise.all([
     completeRows<PosExpectation>("Square data", start => ctx.db.from("pos_sale_expectations")
-      .select("sale_id,expected_bbl,serving_ounces,brand_id,format_id,sku_id,brands(name),formats(name),skus(name)", { count: "exact" })
+      .select("sale_id,expected_bbl,serving_ounces,brand_id,format_id,sku_id,brands(name),formats(name),skus(name),locations(name)", { count: "exact" })
       .eq("brewery_id", ctx.breweryId).order("sale_id").range(start, start + PAGE_SIZE - 1)),
     completeRows<PosSaleLocation>("Square data", start => ctx.db.from("pos_locations")
-      .select("connection_id,external_location_id,external_name,locations(name)", { count: "exact" })
+      .select("connection_id,external_location_id,external_name", { count: "exact" })
       .eq("brewery_id", ctx.breweryId).in("connection_id", connectionIds).order("connection_id").order("external_location_id").range(start, start + PAGE_SIZE - 1)),
     completeRows<PosCatalogVariation>("Square data", start => ctx.db.from("pos_catalog_variations")
       .select("connection_id,external_item_id,external_variation_id,external_item_name,external_variation_name", { count: "exact" })
@@ -129,7 +129,7 @@ async function posSaleRows(ctx: Ctx, rows: PosSale[]) {
         ?? newestByOrder.get(`${row.connection_id}\0${row.external_order_id}`)),
       itemName: catalogRow?.external_item_name ?? row.external_item_id ?? "Unknown Square item",
       variationName: catalogRow?.external_variation_name ?? row.external_variation_id ?? "No catalog variation",
-      externalLocationId: row.external_location_id, locationName: relatedName(location?.locations ?? null) ?? location?.external_name ?? row.external_location_id ?? "Unknown location",
+      externalLocationId: row.external_location_id, locationName: relatedName(expectation?.locations ?? null) ?? location?.external_name ?? row.external_location_id ?? "Unknown location",
       soldAt: row.sold_at, quantity: row.source_quantity ?? (row.qty == null ? null : String(row.qty)), grossCents: row.gross_cents,
       sourceOrderId: row.source_order_id, sourceLineId: row.source_line_id, unsupportedReason: row.unsupported_reason,
       mappingStatus: row.fact_status === "unsupported" ? "unsupported" : row.fact_status === "removed" ? "removed"
@@ -222,11 +222,19 @@ defineQuery({
 });
 
 defineCommand({
-  name: "set_pos_location_mapping", description: "Map one observed Square location to one unclaimed MGR location; a pre-history remap clears its menu, and observed history prevents remapping",
+  name: "set_pos_location_mapping", description: "Map one observed Square location to one unclaimed MGR location; an unobserved remap clears its menu. Retire an observed mapping first to preserve historical attribution before replacing it",
   input: z.object({ posLocationId: z.string().trim().min(1), mgrLocationId: z.string().uuid() }), roles: ["admin"],
   handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_pos_location_mapping", {
     p_brewery: ctx.breweryId, p_external_location: input.posLocationId,
     p_location: input.mgrLocationId, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "retire_pos_location_mapping", description: "Retire one Square location's current MGR mapping and menu; preserve historical sales attribution and release the MGR location for a corrected mapping",
+  input: z.object({ posLocationId: z.string().trim().min(1) }), roles: ["admin"], requiresConfirmation: true,
+  handler: (ctx, input, execution) => unwrap(ctx.db.rpc("retire_pos_location_mapping", {
+    p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_request_id: execution.requestId,
   })),
 });
 

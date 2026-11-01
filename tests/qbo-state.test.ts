@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Client } from "pg";
-import { createElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { QboOAuthClient, syncQboInvoices } from "@/lib/qbo";
 import { beginQboInvoiceSync, completeQboInvoiceSync } from "@/lib/supabase/integration-tokens";
-import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
 import { invoiceBalanceCents, invoiceCurrentState, invoiceLedgerOwnsBalance } from "@/lib/mgr/invoice-state";
 import { qboInvoicePresentation } from "@/lib/mgr/qbo-ui";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
@@ -256,9 +253,11 @@ describe("QuickBooks current invoice state", () => {
     expect(success.lastSuccess.at).toBeTruthy();
     expect(success.lastSuccess.operator).toBeTruthy();
     expect(success.latestFailure).toBeNull();
-    // The operator reads as the staff member's full name, as other staff screens show it.
+    // An editable display name keeps the original account identity beside it.
     await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: "Pat Operator" } });
-    expect((await readStatus()).lastSuccess.operator).toBe("Pat Operator");
+    const namedOperator = (await readStatus()).lastSuccess.operator;
+    expect(namedOperator).toContain("Pat Operator");
+    expect(namedOperator).toContain(success.lastSuccess.operator);
     await admin.auth.admin.updateUserById(f.ctx.userId, { user_metadata: { full_name: "" } });
     const failedId = crypto.randomUUID();
     transport.mockRejectedValue(new Error("secret provider response"));
@@ -296,6 +295,35 @@ describe("QuickBooks current invoice state", () => {
     expect(fresh).toMatchObject({ synced: 1 });
     expect((await warehouse.db.rpc("get_qbo_sync_status", { p_brewery: f.brewery.id })).error).not.toBeNull();
     expect((await stranger.ctx.db.rpc("get_qbo_sync_status", { p_brewery: f.brewery.id })).error).not.toBeNull();
+  });
+
+  it("durably records a timed-out provider read without replacing successful invoice observations", async () => {
+    const f = await stateFixture();
+    const transport = vi.fn<typeof fetch>().mockResolvedValue(invoiceResponse());
+    const client = new QboOAuthClient(config, transport);
+    await syncQboInvoices(f.ctx, crypto.randomUUID(), client);
+    const before = await runCommand("get_qbo_sync_status", {}, f.ctx) as { lastSuccess: unknown };
+    const invoiceBefore = sql(`select qbo_remote_state || '|' || qbo_balance_cents from invoices where id='${f.invoice.id}'`);
+    const requestId = crypto.randomUUID();
+    transport.mockImplementation((_input, init) => {
+      const { promise, reject } = Promise.withResolvers<Response>();
+      init!.signal!.addEventListener("abort", () => reject(init!.signal!.reason), { once: true });
+      return promise;
+    });
+    const nativeTimeout = AbortSignal.timeout.bind(AbortSignal);
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation(ms => nativeTimeout(ms === 20_000 ? 10 : ms));
+    try {
+      await expect(syncQboInvoices(f.ctx, requestId, client)).rejects.toThrow("QuickBooks is unavailable");
+    } finally {
+      timeout.mockRestore();
+    }
+    expect(await runCommand("get_qbo_sync_status", {}, f.ctx)).toMatchObject({
+      lastSuccess: before.lastSuccess, latestFailure: { at: expect.any(String) }, retryRequestId: requestId,
+    });
+    expect(sql(`select qbo_remote_state || '|' || qbo_balance_cents from invoices where id='${f.invoice.id}'`)).toEqual(invoiceBefore);
+    transport.mockResolvedValue(invoiceResponse());
+    await expect(syncQboInvoices(f.ctx, requestId, client)).resolves.toMatchObject({ synced: 1 });
+    expect(await runCommand("get_qbo_sync_status", {}, f.ctx)).toMatchObject({ retryRequestId: null });
   });
 
   it("stores sync confirmation rather than invoice modification time after cash payment", async () => {
@@ -759,9 +787,6 @@ describe("QuickBooks current invoice state", () => {
         invoice: { ...invoice, ...state, total_cents: 10000 }, lines: [], brewery: { name: "Brewery", customer_phone: null },
       });
       expect(model).toMatchObject({ paid: false, paidOn: undefined, payable: false, status: state.status });
-      const html = renderToStaticMarkup(createElement(PortalInvoiceView, { model, footer: null }));
-      expect(html).toContain("This invoice is not payable.");
-      expect(html).not.toMatch(/still due|arrange payment|>Due</);
     }
     expect(toPortalInvoicesViewProps({ customerName: "Buyer", invoices: [{ ...invoice, invoice_lines: [{ amount_cents: 10000 }] }] }).rows[0])
       .toMatchObject({ detail: "voided", unpaid: false });
@@ -808,4 +833,24 @@ describe("who owns an invoice balance", () => {
     expect(invoiceBalanceCents({ ...neverPushed, was_pushed_to_qbo: true, qbo_balance_cents: undefined }, 10000)).toBeNull();
     expect(invoiceBalanceCents({ ...neverPushed, qbo_invoice_id: "qbo-1042", qbo_balance_cents: 2500 }, 10000)).toBe(2500);
   });
+});
+
+it("shows the account email beside an editable QuickBooks sync operator name", async () => {
+  const f = await stateFixture();
+  const requestId = crypto.randomUUID();
+  const account = await admin.auth.admin.getUserById(f.ctx.userId);
+  expect((await f.ctx.db.auth.updateUser({ data: { full_name: "Owner (Admin)" } })).error).toBeNull();
+  await beginQboInvoiceSync(f.ctx, requestId);
+  const email = account.data.user!.email!;
+  const latest = await runCommand("get_qbo_sync_status", {}, f.ctx) as { latest: { operator: string } };
+  expect(latest.latest.operator).toContain("Owner (Admin)");
+  expect(latest.latest.operator).toContain(email);
+  sql(`update private.qbo_invoice_sync_batches set failed_at=now() where actor_id='${f.ctx.userId}' and request_id='${requestId}'`);
+  const failed = await runCommand("get_qbo_sync_status", {}, f.ctx) as { latestFailure: { operator: string } };
+  expect(failed.latestFailure.operator).toContain("Owner (Admin)");
+  expect(failed.latestFailure.operator).toContain(email);
+  sql(`update private.qbo_invoice_sync_batches set completed_at=now() where actor_id='${f.ctx.userId}' and request_id='${requestId}'`);
+  const completed = await runCommand("get_qbo_sync_status", {}, f.ctx) as { lastSuccess: { operator: string } };
+  expect(completed.lastSuccess.operator).toContain("Owner (Admin)");
+  expect(completed.lastSuccess.operator).toContain(email);
 });

@@ -6,8 +6,6 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { KegBalanceViewModel } from "@/lib/mgr/keg-balance-view";
 
-export type { KegBalanceViewModel };
-
 export function KegBalanceView({
   model,
   footer,

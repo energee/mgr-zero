@@ -27,6 +27,7 @@ import {
 
 export const SQUARE_VERSION = "2026-08-19";
 export const SQUARE_SCOPES = ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"] as const;
+const SQUARE_REQUEST_TIMEOUT_MS = 20_000;
 
 export type SquareConfig = {
   applicationId: string;
@@ -118,7 +119,7 @@ function setLocationPresence(object: Record<string, unknown>, locationId: string
 export function prepareSquareCatalogPublication(source: SquarePublicationSource, current?: Record<string, unknown> | null) {
   const publishable = source.variations.filter((variation) => variation.present && variation.priceCents !== null);
   if (!source.externalItemId) {
-    if (publishable.length === 0) throw new Error("A new Square item must have a priced available variation");
+    if (publishable.length === 0) throw new SquareCatalogReadError("provider_invalid", "A new Square item must have a priced available variation");
     const itemId = `#mgr-item-${source.brandId}-${source.catalogGroup}`;
     return { object: {
       type: "ITEM", id: itemId, present_at_all_locations: false, present_at_location_ids: [source.locationId],
@@ -132,14 +133,14 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
     }, itemVersion: null, variationVersions: { versions: {} as Record<string, number>, changed: [] as string[] } };
   }
   if (!current || current.type !== "ITEM" || current.id !== source.externalItemId || current.is_deleted === true
-    || !Number.isSafeInteger(current.version)) throw new Error("Square catalog item changed or is unavailable");
+    || !Number.isSafeInteger(current.version)) throw new SquareCatalogReadError("provider_missing", "Square catalog item changed or is unavailable");
   const currentItemData = current.item_data as Record<string, unknown> | undefined;
   const currentVariations = currentItemData?.variations;
-  if (!Array.isArray(currentVariations)) throw new Error("Square catalog item has no writable variations");
+  if (!Array.isArray(currentVariations)) throw new SquareCatalogReadError("provider_invalid", "Square catalog item has no writable variations");
   const item = writableCatalogValue(current) as Record<string, unknown>;
   const itemData = item.item_data as Record<string, unknown> | undefined;
   const variations = itemData?.variations;
-  if (!itemData || !Array.isArray(variations)) throw new Error("Square catalog item has no writable variations");
+  if (!itemData || !Array.isArray(variations)) throw new SquareCatalogReadError("provider_invalid", "Square catalog item has no writable variations");
   const changed: Record<string, unknown>[] = [];
   const variationVersions: Record<string, number> = {};
   const changedVariationIds: string[] = [];
@@ -159,10 +160,10 @@ export function prepareSquareCatalogPublication(source: SquarePublicationSource,
     const variation = variations.find((entry) => !!entry && typeof entry === "object"
       && (entry as Record<string, unknown>).id === sourceVariation.externalVariationId) as Record<string, unknown> | undefined;
     if (!original || !variation || original.type !== "ITEM_VARIATION" || original.is_deleted === true
-      || !Number.isSafeInteger(original.version)) throw new Error("Square catalog variation changed or is unavailable");
+      || !Number.isSafeInteger(original.version)) throw new SquareCatalogReadError("provider_missing", "Square catalog variation changed or is unavailable");
     const before = JSON.stringify(writableCatalogValue(original));
     const variationData = variation.item_variation_data as Record<string, unknown> | undefined;
-    if (!variationData || variationData.item_id !== source.externalItemId) throw new Error("Square catalog ownership changed");
+    if (!variationData || variationData.item_id !== source.externalItemId) throw new SquareCatalogReadError("provider_invalid", "Square catalog ownership changed");
     variationVersions[sourceVariation.externalVariationId] = original.version as number;
     variationData.name = sourceVariation.format;
     if (sourceVariation.present && sourceVariation.priceCents !== null) {
@@ -215,7 +216,7 @@ class SquareProviderError extends Error {
 }
 
 class SquareCatalogReadError extends Error {
-  constructor(readonly code: "provider_missing" | "provider_invalid") { super("Square catalog item is unavailable"); }
+  constructor(readonly code: "provider_missing" | "provider_invalid", message = "Square catalog item is unavailable") { super(message); }
 }
 
 const terminalAuthorization = (status: number, data: unknown) => {
@@ -248,6 +249,10 @@ export class SquareClient {
     this.apiOrigin = config.environment === "sandbox" ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
   }
 
+  private request(input: Parameters<typeof fetch>[0], init: RequestInit) {
+    return this.fetcher(input, { ...init, signal: AbortSignal.timeout(SQUARE_REQUEST_TIMEOUT_MS) });
+  }
+
   authorizeUrl(state: string) {
     const url = new URL("/oauth2/authorize", this.oauthOrigin);
     url.searchParams.set("client_id", this.config.applicationId);
@@ -259,7 +264,7 @@ export class SquareClient {
 
   private async token(body: Record<string, unknown>): Promise<SquareTokens> {
     const receivedAt = new Date().toISOString();
-    const response = await this.fetcher(`${this.oauthOrigin}/oauth2/token`, {
+    const response = await this.request(`${this.oauthOrigin}/oauth2/token`, {
       method: "POST",
       headers: { "Square-Version": SQUARE_VERSION, "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ client_id: this.config.applicationId, client_secret: this.config.applicationSecret, ...body }),
@@ -284,7 +289,7 @@ export class SquareClient {
   }
 
   private async revokeToken(target: { access_token: string; revoke_only_access_token: boolean } | { merchant_id: string }) {
-    const response = await this.fetcher(`${this.oauthOrigin}/oauth2/revoke`, {
+    const response = await this.request(`${this.oauthOrigin}/oauth2/revoke`, {
       method: "POST",
       headers: { "Square-Version": SQUARE_VERSION, Authorization: `Client ${this.config.applicationSecret}`, "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ client_id: this.config.applicationId, ...target }),
@@ -295,14 +300,12 @@ export class SquareClient {
 
   revoke(accessToken: string) { return this.revokeToken({ access_token: accessToken, revoke_only_access_token: false }); }
 
-  revokeAccessToken(accessToken: string) { return this.revokeToken({ access_token: accessToken, revoke_only_access_token: true }); }
-
   /** Revokes every token this app holds for the seller, without a token (#640). Square accepts
    *  merchant_id in place of access_token: developer.squareup.com/reference/square/o-auth-api/revoke-token */
   revokeMerchant(merchantId: string) { return this.revokeToken({ merchant_id: merchantId }); }
 
   private async api(path: string, accessToken: string, init?: RequestInit) {
-    const response = await this.fetcher(`${this.apiOrigin}${path}`, {
+    const response = await this.request(`${this.apiOrigin}${path}`, {
       ...init,
       headers: { "Square-Version": SQUARE_VERSION, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
     });
@@ -391,7 +394,7 @@ export class SquareClient {
   }
 
   async retrieveCatalogObject(accessToken: string, objectId: string) {
-    const response = await this.fetcher(`${this.apiOrigin}/v2/catalog/object/${encodeURIComponent(objectId)}?include_related_objects=false`, {
+    const response = await this.request(`${this.apiOrigin}/v2/catalog/object/${encodeURIComponent(objectId)}?include_related_objects=false`, {
       headers: { "Square-Version": SQUARE_VERSION, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
     });
     const data = await response.json().catch(() => null) as Record<string, unknown> | null;
@@ -411,7 +414,7 @@ export class SquareClient {
   }
 
   async upsertCatalogObject(accessToken: string, requestBody: string) {
-    const response = await this.fetcher(`${this.apiOrigin}/v2/catalog/object`, {
+    const response = await this.request(`${this.apiOrigin}/v2/catalog/object`, {
       method: "POST",
       headers: { "Square-Version": SQUARE_VERSION, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
       body: requestBody,
@@ -494,9 +497,10 @@ export async function publishSquareCatalogItem(
     let prepared: ReturnType<typeof prepareSquareCatalogPublication>;
     try { prepared = prepareSquareCatalogPublication(start.source, current); }
     catch (error) {
-      const code = error instanceof Error && /changed or is unavailable/.test(error.message) ? "provider_missing" : "provider_invalid";
-      await finishSquarePublication(ctx, start.attemptId, code, null);
-      throw new CommandError("Square no longer has the selected catalog item", 409, "conflict");
+      if (!(error instanceof SquareCatalogReadError)) throw error;
+      await finishSquarePublication(ctx, start.attemptId, error.code, null);
+      throw new CommandError(error.code === "provider_missing"
+        ? "Square no longer has the selected catalog item" : "Square catalog data is not writable", 409, "conflict");
     }
     await prepareSquarePublication(ctx, start.attemptId, JSON.stringify({
       idempotency_key: start.providerKey,
@@ -622,7 +626,7 @@ export async function syncSquareCatalogFacts(client: SquareClient, accessToken: 
 
 export async function beginSquareOAuth(ctx: Ctx, client: SquareClient, providerIntent: "connect" | "reconnect", requestId: string = randomUUID()) {
   if (!hasAnyRole(ctx.roles, ["admin"])) throw new CommandError("permission denied: brewery admin required", 403);
-  const state = oauthState(requestId, ctx.userId);
+  const state = oauthState();
   await unwrap(ctx.db.rpc("begin_square_oauth", {
     p_brewery: ctx.breweryId, p_redirect_uri: client.config.redirectUri, p_state_hash: sha256(state),
     p_provider_intent: providerIntent, p_request_id: requestId, p_requested_scopes: [...SQUARE_SCOPES],
@@ -672,7 +676,7 @@ export async function completeSquareOAuth(input: {
         await input.store.fail(claim.intentId, input.actorId, "unresolved", tokens.merchantId).catch(() => undefined);
         throw unavailable();
       }
-      const cleanup = await input.client.revokeAccessToken(tokens.accessToken).then(() => "confirmed" as const, () => "unresolved" as const);
+      const cleanup = await input.client.revokeMerchant(tokens.merchantId).then(() => "confirmed" as const, () => "unresolved" as const);
       await input.store.fail(claim.intentId, input.actorId, cleanup, tokens.merchantId).catch(() => undefined);
     }
     throw unavailable();
@@ -748,6 +752,18 @@ const money = (value: unknown) => {
     ? String(row.amount) : null;
 };
 
+function invalidSquareOrder(externalOrderId: string | null, field: string): CommandError {
+  console.error("square sales order invalid:", {
+    orderId: externalOrderId?.slice(0, 192).replace(/[^A-Za-z0-9_-]/g, "_") ?? null,
+    field,
+  });
+  return new CommandError(
+    "Square returned an invalid order. The sales page was not imported; contact support before retrying.",
+    502,
+    "square_order_invalid",
+  );
+}
+
 function normalizeSquareOrders(
   rawOrders: unknown[], merchantId: string, locationIds: string[], window: { startsAt: string; endsAt: string },
 ) {
@@ -757,16 +773,25 @@ function normalizeSquareOrders(
     const order = raw && typeof raw === "object" ? raw as Record<string, unknown> : null;
     const externalOrderId = text(order?.id), externalLocationId = text(order?.location_id);
     const sourceVersion = finiteVersion(order?.version), soldAt = timestamp(order?.created_at), orderUpdatedAt = timestamp(order?.updated_at);
-    if (!externalOrderId || !externalLocationId || !locationIds.includes(externalLocationId) || sourceVersion === null
-      || !soldAt || !orderUpdatedAt || order?.state !== "COMPLETED" || Date.parse(soldAt) > Date.parse(orderUpdatedAt)
-      || Date.parse(orderUpdatedAt) < Date.parse(window.startsAt) || Date.parse(orderUpdatedAt) > Date.parse(window.endsAt)) throw unavailable();
+    if (!externalOrderId) throw invalidSquareOrder(null, "id");
+    if (!externalLocationId || !locationIds.includes(externalLocationId)) throw invalidSquareOrder(externalOrderId, "location_id");
+    if (sourceVersion === null) throw invalidSquareOrder(externalOrderId, "version");
+    if (!soldAt) throw invalidSquareOrder(externalOrderId, "created_at");
+    if (!orderUpdatedAt) throw invalidSquareOrder(externalOrderId, "updated_at");
+    if (order?.state !== "COMPLETED") throw invalidSquareOrder(externalOrderId, "state");
+    if (Date.parse(soldAt) > Date.parse(orderUpdatedAt)) throw invalidSquareOrder(externalOrderId, "created_at");
+    if (Date.parse(orderUpdatedAt) < Date.parse(window.startsAt) || Date.parse(orderUpdatedAt) > Date.parse(window.endsAt)) {
+      throw invalidSquareOrder(externalOrderId, "updated_at");
+    }
     const snapshot = { externalOrderId, sourceVersion, externalLocationId, soldAt, orderUpdatedAt };
     orders.push(snapshot);
     const identities = new Set<string>();
     const add = (rawLine: unknown, factKind: "sale" | "return", sourceOrderId: string | null) => {
       const row = rawLine && typeof rawLine === "object" ? rawLine as Record<string, unknown> : null;
       const externalLineId = text(row?.uid);
-      if (!externalLineId || identities.has(`${factKind}\0${externalLineId}`)) throw unavailable();
+      if (!externalLineId || identities.has(`${factKind}\0${externalLineId}`)) {
+        throw invalidSquareOrder(externalOrderId, factKind === "sale" ? "line_items.uid" : "returns.return_line_items.uid");
+      }
       identities.add(`${factKind}\0${externalLineId}`);
       const sourceQuantity = text(row?.quantity), externalVariationId = text(row?.catalog_object_id);
       const catalogVersion = finiteVersion(row?.catalog_version);
@@ -798,13 +823,15 @@ function normalizeSquareOrders(
       };
       facts.push({ ...fact, sourceHash: sha256(JSON.stringify({ merchantId, ...fact })) });
     };
-    if (order.line_items !== undefined && !Array.isArray(order.line_items)) throw unavailable();
+    if (order.line_items !== undefined && !Array.isArray(order.line_items)) throw invalidSquareOrder(externalOrderId, "line_items");
     for (const rawLine of order.line_items as unknown[] ?? []) add(rawLine, "sale", null);
-    if (order.returns !== undefined && !Array.isArray(order.returns)) throw unavailable();
+    if (order.returns !== undefined && !Array.isArray(order.returns)) throw invalidSquareOrder(externalOrderId, "returns");
     for (const rawReturn of order.returns as unknown[] ?? []) {
       const returned = rawReturn && typeof rawReturn === "object" ? rawReturn as Record<string, unknown> : null;
       const sourceOrderId = text(returned?.source_order_id);
-      if (returned?.return_line_items !== undefined && !Array.isArray(returned.return_line_items)) throw unavailable();
+      if (returned?.return_line_items !== undefined && !Array.isArray(returned.return_line_items)) {
+        throw invalidSquareOrder(externalOrderId, "returns.return_line_items");
+      }
       for (const rawLine of returned?.return_line_items as unknown[] ?? []) add(rawLine, "return", sourceOrderId);
     }
   }

@@ -18,23 +18,25 @@ const KNOWN_SURFACE_DEBT = [
 
 // Audited whole-body replacements, not action/message slots. Extend this
 // focused list as each flow is inspected; a view import alone misses these.
-const BODY_SLOTS: Record<string, string> = {
+const BODY_SLOTS: Record<string, readonly string[]> = {
   // CatalogView has no body-replacement slot left: `rowExtra` adds under a row
   // and cannot replace the rows, which tests/catalog-view.test.ts asserts.
-  ShopView: "catalog",
-  NewPoView: "form",
-  ReceivePoView: "review",
-  TeamView: "rows",
-  BatchesView: "list",
-  BrewDayView: "body",
-  RoutesView: "list",
-  RouteView: "form",
-  WorkView: "list",
-  InvoiceView: "qboGate",
-  BeerView: "navs",
-  ClosePackagingRunView: "lead",
-  KegFleetView: "list",
+  ShopView: ["catalog"],
+  NewPoView: ["form"],
+  ReceivePoView: ["review"],
+  TeamView: ["rows"],
+  BatchesView: ["list"],
+  BrewDayView: ["body"],
+  RoutesView: ["list"],
+  RouteView: ["form"],
+  WorkView: ["list"],
+  InvoiceView: ["qboGate", "accountingActions"],
+  BeerView: ["navs"],
+  ClosePackagingRunView: ["lead"],
+  KegFleetView: ["list"],
+  TransferDetailView: ["footer"],
 };
+const SHARED_SLOT_VIEWS: Record<string, string> = { "InvoiceView.accountingActions": "InvoiceAccountingActionsView" };
 const KNOWN_BODY_DEBT: string[] = [];
 
 function inventoryViews(node: ReactNode, out = new Set<string>()): Set<string> {
@@ -75,7 +77,7 @@ function earlyLayoutReturns(path: string): string[] {
  * Named-only entry files still need explicit route symbols to disambiguate them.
  * This discovery check does not prove prop/slot or surface configuration parity.
  */
-function mountedComponents(entry: string, bodyOverrides = new Set<string>()): Set<string> {
+function mountedComponents(entry: string, bodyOverrides = new Set<string>(), entryExport?: string): Set<string> {
   const components = new Set<string>();
   const visited = new Set<string>();
 
@@ -144,9 +146,21 @@ function mountedComponents(entry: string, bodyOverrides = new Set<string>()): Se
         const imported = imports.get(tag);
         const name = imported?.imported === "default" ? tag : (imported?.imported ?? tag);
         components.add(name);
-        if (node.attributes.properties.some(attribute =>
-          ts.isJsxAttribute(attribute) && attribute.name.getText(file) === BODY_SLOTS[name])) {
-          bodyOverrides.add(`${name}.${BODY_SLOTS[name]}`);
+        const slots = BODY_SLOTS[name];
+        for (const attribute of node.attributes.properties) {
+          if (!ts.isJsxAttribute(attribute) || !slots?.includes(attribute.name.getText(file))) continue;
+          const slot = `${name}.${attribute.name.getText(file)}`;
+          const expected = SHARED_SLOT_VIEWS[slot];
+          const value = attribute.initializer;
+          const expression = value && ts.isJsxExpression(value) ? value.expression : undefined;
+          let child: ts.JsxOpeningElement | ts.JsxSelfClosingElement | undefined;
+          if (expression && ts.isJsxElement(expression)) child = expression.openingElement;
+          if (expression && ts.isJsxSelfClosingElement(expression)) child = expression;
+          const binding = child ? imports.get(child.tagName.getText(file)) : undefined;
+          // An authorized adapter may fill the slot only by mounting its shared drawing.
+          const shared = expected && binding?.path && (binding.imported === expected
+            || mountedComponents(binding.path, new Set(), binding.imported).has(expected));
+          if (!shared) bodyOverrides.add(slot);
         }
         if (imported?.path) visit(imported.path, imported.imported);
         if (!imported) {
@@ -171,7 +185,7 @@ function mountedComponents(entry: string, bodyOverrides = new Set<string>()): Se
     for (const root of roots) walk(root);
   }
 
-  visit(resolve(entry));
+  visit(resolve(entry), entryExport);
   return components;
 }
 
@@ -234,6 +248,15 @@ describe("screen/live component parity", () => {
     expect(mountedComponents("tests/fixtures/screen-parity/unused-sibling.tsx")).not.toContain("ExampleView");
     expect(mountedComponents("tests/fixtures/screen-parity/lazy-delegated.tsx")).toContain("ExampleView");
     expect(mountedComponents("tests/fixtures/screen-parity/lazy-unused.tsx")).not.toContain("ExampleView");
+  });
+
+  it("detects a transfer footer replacement even beside the shared document", () => {
+    const overrides = new Set<string>();
+    expect(mountedComponents("tests/fixtures/screen-parity/transfer-footer.tsx", overrides)).toContain("TransferDetailView");
+    expect([...overrides]).toEqual(["TransferDetailView.footer"]);
+    const liveOverrides = new Set<string>();
+    mountedComponents("app/(app)/transfers/[id]/page.tsx", liveOverrides);
+    expect([...liveOverrides]).not.toContain("TransferDetailView.footer");
   });
 
   it("records audited whole-body slots even when the expected view is mounted", () => {

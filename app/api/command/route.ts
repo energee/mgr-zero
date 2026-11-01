@@ -23,6 +23,8 @@ import { MAX_COMMAND_BODY_BYTES } from "@/lib/commands/request-limits";
 import { readBoundedJson } from "@/lib/request-json";
 import { serverTiming, timeStage, type Stages } from "@/lib/server-timing";
 
+export const maxDuration = 300;
+
 // null = no Authorization header (use the cookie session); "" = a header that
 // is present but malformed, which must fail closed as 401 rather than fall
 // back to cookies — keep the null/"" distinction.

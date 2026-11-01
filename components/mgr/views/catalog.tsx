@@ -15,8 +15,6 @@ import { FormatsView, type FormatsViewModel } from "@/components/mgr/views/forma
 import { RecordTable } from "@/components/mgr/views/record-table";
 import { COLA_SLOT, ColaLabelImageView } from "@/components/mgr/views/cola-label-image";
 
-export type { CatalogViewModel };
-
 /** A link row; href null (live, not openable) draws it plain, undefined an inert tap. */
 const navRow = (title: string, subtitle: ReactNode, href: string | null | undefined) =>
   href === null ? E.row(title, subtitle) : E.nav(title, subtitle, "", undefined, href);

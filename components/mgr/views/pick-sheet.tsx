@@ -11,8 +11,6 @@ import { WORK_CHIPS, WORK_TABS } from "@/lib/mgr/work-view";
 import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
 import { plural } from "@/lib/mgr/plural";
 
-export type { PickSheetViewModel };
-
 const DATE_CHIPS = ["Wed 9/2", "Thu 9/3", "Fri 9/4"];
 
 export function PickSheetView({

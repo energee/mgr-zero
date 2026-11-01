@@ -97,7 +97,7 @@ Screens are the current focus. Screen, form, dialog, and entry-flow work
 number inputs in product screens. A screen-only change (no schema, RPC, or
 command touched) is proved by `bunx tsc --noEmit && bun run lint`, a look at
 the rendered page (step 4), and:
-`bunx vitest run tests/mgr-screens.test.ts tests/tap-coverage.test.ts tests/screen-links.test.ts tests/theme-contrast.test.ts tests/screen-persona.test.ts tests/design-docs.test.ts tests/docs.test.ts`.
+`bunx vitest run tests/mgr-screens.test.ts tests/tap-coverage.test.ts tests/screen-links.test.ts tests/theme-contrast.test.ts tests/screen-persona.test.ts tests/design-docs.test.ts tests/docs.test.ts tests/api-docs.test.ts`.
 
 ## Where to look
 

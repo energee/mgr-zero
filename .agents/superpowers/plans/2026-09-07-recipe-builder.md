@@ -26,7 +26,7 @@ TypeScript, vitest, bun.
 - **Setup, once.** A fresh worktree has empty `node_modules` and no env file:
 
       bun install --frozen-lockfile
-      cp /Users/tedslesinski/Repos/mgr-zero/.env.local .env.local
+      cp ../../../.env.local .env.local
 
   Three suites read `NEXT_PUBLIC_SUPABASE_URL` at import and fail without it.
   Never commit `.env.local`.
