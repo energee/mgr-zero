@@ -14,6 +14,7 @@ import { useEffect, useRef } from "react";
 import { E } from "@/components/mgr/e";
 import { ScopePick, type ScopeOption } from "@/components/mgr/scope-pick";
 import { SEARCH_MAX } from "@/lib/mgr/list-params";
+import { plural } from "@/lib/mgr/plural";
 
 /** One labeled pick: its options, the selected value, and (live) the href each opens. */
 export type ListScope = { label: string; value: string; options: ScopeOption[] };
@@ -50,7 +51,7 @@ export function ListControls({ search, scopes = [], resultCount }: {
           </div>
         ))}
       </div>
-      <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{resultCount === undefined ? "" : `${resultCount} results`}</p>
+      <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">{resultCount === undefined ? "" : plural(resultCount, "result")}</p>
       {/* The no-match copy says "Clear the search"; this is how. The other params stay. */}
       {search.value && <Link href={searchHref("", search.keep, "")} className="w-fit text-sm text-muted-foreground underline">Clear search</Link>}
     </div>

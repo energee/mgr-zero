@@ -49,7 +49,7 @@ export function BrewerySettingsFormView({ initial, onSave, busy = false, error =
           {E.edit("One-way keg fee ($)", values.oneWayKegFee, "number", undefined, { contextualLabels: true, onChange: (nextValue: string) => change("oneWayKegFee", nextValue), id: `${id}-oneWayKegFee`, min: 0, max: 21474836.47, step: 0.01, error: feeError, "aria-describedby": `${id}-oneWayKegFee-help` })}
           <FieldDescription id={`${id}-oneWayKegFee-help`}>Charged for each one-way keg shipped. Blank or 0 means no fee.</FieldDescription>
         </div>
-        <div className="flex min-w-0 flex-col gap-2 [&>[data-slot=button-group]]:w-full">
+        <div className="flex min-w-0 flex-col gap-2">
           {E.edit("Reading overdue after (hours)", values.hours, "number", undefined, { contextualLabels: true, required: true, id: `${id}-hours`, onChange: value => change("hours", value), min: 1, max: 168, step: 1, "aria-describedby": `${id}-hours-help` })}
           <FieldDescription id={`${id}-hours-help`}>Required: a whole number from 1 to 168. It cannot be blank or 0.</FieldDescription>
         </div>

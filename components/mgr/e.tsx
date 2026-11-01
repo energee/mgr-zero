@@ -72,9 +72,9 @@ const RowMedia = ({ icon, cls }: { icon: IconSvgElement | React.ReactElement; cl
 const TileContent = ({ n, s, g, w, f }: { n: React.ReactNode; s: React.ReactNode; g?: React.ReactNode; w?: 0 | 1; f?: number }) => {
   const full = f == null ? undefined : Math.round(Math.max(0, Math.min(f, 100)));
   return (<>
-    <span className="flex items-center gap-1.5 font-medium text-sm leading-none">{w ? <Dot cls="w" /> : null}{n}</span>
-    <span className="text-muted-foreground text-sm leading-normal">{s}</span>
-    {g ? <span className="text-muted-foreground text-sm leading-normal">{g}</span> : null}
+    <span className="flex max-w-full items-center gap-1.5 font-medium text-sm leading-none">{w ? <Dot cls="w" /> : null}{n}</span>
+    <span className="max-w-full text-muted-foreground text-sm leading-normal">{s}</span>
+    {g ? <span className="max-w-full text-muted-foreground text-sm leading-normal">{g}</span> : null}
     {full != null && <Progress value={full} aria-valuenow={full} aria-label="Fill" className="mt-1" />}
   </>);
 };
@@ -485,15 +485,14 @@ export const E = {
    *  region, so a screen reader hears the change politely. E.info and E.note
    *  default to static notes; only explicit errors use their alert role. */
   polite: (t: React.ReactNode) => (t ? <p className="text-sm text-muted-foreground">{t}</p> : null),
-
   /** Status tiles. `actions` sit under a tile's facts; with an `href` too, the facts stay the link. */
   tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?, string?, React.ReactNode?][]) => (
     <ItemGroup className="grid grid-cols-2 gap-2 md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]">
       {arr.map(([n, s, g, w, f, href, actions], i) => {
         const content = <TileContent {...{ n, s, g, w, f }} />;
-        const facts = href ? <Link href={href}>{content}</Link> : content;
+        const facts = href ? <Link href={href} className="flex min-w-0 max-w-full flex-col gap-0.5">{content}</Link> : content;
         return (
-          <Item key={i} variant="outline" size="sm" className="flex-col items-start gap-0.5" asChild>
+          <Item key={i} variant="outline" size="sm" className="min-w-0 flex-col items-start gap-0.5 wrap-anywhere" asChild>
             {actions ? <div>{facts}{actions}</div> : href ? facts : <button type="button">{content}</button>}
           </Item>
         );

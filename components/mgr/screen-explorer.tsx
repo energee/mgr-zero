@@ -133,15 +133,13 @@ export function ScreenExplorer() {
     // Native fields and their labels edit the shared form, never navigate its row.
     if ((e.target as HTMLElement).closest("input, select, textarea, label")) return;
     const el = (e.target as HTMLElement).closest<HTMLElement>("a, button, [data-slot=item]");
-    if (!el || el.matches("[data-slot=toggle-group-item], [role=radio]")) return;
+    if (!el || el.matches("[data-slot=toggle-group-item]")) return;
     // Shared previews and Work's filter tabs own their controls, not explorer
     // navigation. Work's rows sit in the filter's tabpanel and still navigate.
     if (el.closest("[data-chat-preview], [data-work-filter] [role=tablist], [data-preview-action]")
       || el.closest("[data-slot=dialog-content], [data-slot=sheet-content]")?.querySelector("form[data-preview-action]")) return;
-    // A unit switcher (Qty's addon) is a tab bar by markup only: it chooses
-    // the unit of one number, so it must never filter the rows below it the way
-    // a view switcher does. Harmless today only because every screen using one
-    // happens to put its rows above the field; this keeps it that way.
+    // An addon's unit choice belongs to its quantity, never to row filtering
+    // or inventory navigation.
     if (el.closest("[data-slot=input-group-addon]")) return;
     if (el.closest("[data-gated]")) return e.preventDefault();
     const link = el.closest("a");

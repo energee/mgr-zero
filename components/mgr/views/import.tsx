@@ -73,12 +73,13 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
   return <>
     {E.back("Settings", "Import", undefined, model.backHref)}
     <ol aria-label="Import progress" className="flex items-center gap-1 text-xs">
-      {["Upload", "Match columns", "Review", "Import"].map((label, index) => (
-        <li key={label} aria-current={index === step ? "step" : undefined} className={index < 3 ? "flex flex-1 items-center gap-1" : "flex items-center gap-1"}>
+      {["Upload", "Match columns", "Review", "Import"].map((label, index, steps) => {
+        const last = index === steps.length - 1;
+        return <li key={label} aria-current={index === step ? "step" : undefined} className={last ? "flex items-center gap-1" : "flex flex-1 items-center gap-1"}>
           <Badge variant={index === step ? "default" : "outline"}>{label}</Badge>
-          {index < 3 && <Separator className={index < step ? "flex-1 bg-primary" : "flex-1"} />}
-        </li>
-      ))}
+          {!last && <Separator className={index < step ? "flex-1 bg-primary" : "flex-1"} />}
+        </li>;
+      })}
     </ol>
     <FieldSet disabled={step !== 0 || busy} className="min-w-0 gap-0">
       <FieldLegend variant="label">What are you importing?</FieldLegend>

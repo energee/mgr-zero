@@ -1,6 +1,6 @@
 // components/mgr/qty.tsx — shared quantity controls and segmented tabs.
 // Views import Qty directly for a labeled quantity with a unit addon.
-// VolumeField composes Qty with TabBar for its unit choice; E.edit and E.stq
+// VolumeField composes Qty with radios for its unit choice; E.edit and E.stq
 // use StepQuantity, and E.tabs uses TabBar.
 "use client";
 import type { FieldControls } from "@/components/mgr/e";
@@ -130,9 +130,8 @@ export function Qty({
  *  so an empty state can centre), and it is not a Tab stop
  *  (tabIndex -1) because its rows hold their own focusable actions.
  *  Without `panel` the body below is drawn outside the bar and aria-controls
- *  points at nothing: tolerable for a drawing or a bar of links. As a unit
- *  switcher it also announces "tab 1 of 3" with no group name, since the input's
- *  only name is its label; the real app's unit choice wants a radiogroup. */
+ *  points at nothing: tolerable for a drawing or a bar of links. VolumeField
+ *  uses a named radiogroup for its unit choice instead. */
 export function TabBar({
   names,
   on,

@@ -11,7 +11,7 @@ export function TimezonePicker({ id, label, value, onChange, disabled = false }:
   id: string; label: string; value: string; onChange: (timezone: string) => void; disabled?: boolean;
 }) {
   const { anchor, props: search } = useComboboxSearch(timezoneLabel(value));
-  return <Field data-required className="min-w-0 gap-2">
+  return <Field className="min-w-0 gap-2">
     <FieldLabel htmlFor={id}>{label}</FieldLabel>
     <Combobox
       items={TIMEZONES.includes(value) ? TIMEZONES : [value, ...TIMEZONES]}

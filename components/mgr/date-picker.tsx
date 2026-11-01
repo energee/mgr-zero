@@ -47,7 +47,7 @@ export function DatePicker({ label, defaultValue = "", value, onChange, disabled
   const triggerId = React.useId();
 
   return (
-    <Field data-invalid={invalid} data-disabled={disabled} data-required={required}>
+    <Field data-invalid={invalid} data-disabled={disabled}>
       <FieldLabel id={labelId} className="whitespace-nowrap">{label}</FieldLabel>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
@@ -67,7 +67,7 @@ export function DatePicker({ label, defaultValue = "", value, onChange, disabled
             {isoDate ? formatDate(isoDate) : "Pick a date"}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="end">
+        <PopoverContent className="max-h-(--radix-popover-content-available-height) w-auto overflow-y-auto p-0" align="end">
           <Calendar mode="single" selected={date} onSelect={selectDate} defaultMonth={date} disabled={maxDate && { after: maxDate }} />
         </PopoverContent>
       </Popover>

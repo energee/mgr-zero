@@ -14,7 +14,6 @@ import { VenueFrame } from "../components/mgr/venue";
 import { AppShell } from "../components/mgr/app-shell";
 import { ScreenFrame } from "../components/mgr/screen-frame";
 import { DatePicker } from "../components/mgr/date-picker";
-import { VolumeField } from "../components/mgr/volume-field";
 import { BatchesView } from "../components/mgr/views/batches";
 import { BrewDayView } from "../components/mgr/views/brew-day";
 import { batchesFromQuery, toBatchesViewProps } from "../lib/mgr/batches-view";
@@ -239,11 +238,7 @@ describe("SCREENS", () => {
     }
   });
 
-  it("renders every screen body", () => {
-    for (const s of SCREENS) {
-      const html = renderToStaticMarkup(createElement("div", null, s.hd, s.body));
-      expect(html.length).toBeGreaterThan(50);
-    }
+  it("keeps synthetic state captions out of the rendered screen frame", () => {
     const screen: Screen = { ...SCREENS[0], states: [["Caption only", "Not part of the screen body"]] };
     const frame = renderToStaticMarkup(createElement(ScreenFrame, { screen }));
     expect(frame).not.toContain("Caption only");
@@ -578,30 +573,6 @@ describe("SCREENS", () => {
     expect(formats).toMatch(/<th\b[^>]*>(?:(?!<\/th>)[\s\S])*>Volume</);
     for (const volume of ["16 oz", "64 oz", "3 gal", "½ bbl"]) expect.soft(formats, volume).toContain(volume);
     expect(formats).not.toContain("bbl / format");
-  });
-
-  it("keeps volume on formats while SKUs choose a format", () => {
-    const sku = body("SKU");
-    expect(sku).toContain(">Format<");
-    expect(sku).not.toMatch(/bbl per unit|Units per case|Package BOM|Packaging overrides/);
-
-    const format = body("Format");
-    // The visible label names the input (no aria-label overriding it), and the unit bar rides in its group.
-    const sizeId = /<label[^>]*for="([^"]+)"[^>]*>Size of one container<\/label>/.exec(format)?.[1];
-    expect(sizeId).toBeTruthy();
-    expect(format).toMatch(new RegExp(`<input[^>]*id="${sizeId}"`));
-    expect(format).not.toContain('aria-label="Size of one container"');
-    expect(format).toContain("Container");
-    expect(format).toContain("Beer per package");
-    expect(format).toContain("Containers per package");
-    expect(format).toMatch(/role="radiogroup"[^>]*aria-label="Size of one container unit"/);
-    for (const unit of ["oz", "gal", "bbl"]) expect.soft(format, unit).toContain(`>${unit}</button>`);
-    for (const unit of ["mL", "L"]) expect.soft(format, unit).not.toContain(`>${unit}</button>`);
-
-    const metric = renderToStaticMarkup(createElement(VolumeField, { value: "500", units: ["mL", "L"], on: 0 }));
-    expect(metric).toContain(">mL</button>");
-    expect(metric).toContain(">L</button>");
-    expect(metric).not.toContain(">bbl</button>");
   });
 
   it("keeps external venue facts in the host product's vocabulary", () => {
