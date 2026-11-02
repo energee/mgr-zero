@@ -178,7 +178,7 @@ describe("per-form reasons", () => {
   });
 
   it("Pick sheet print is withheld while the sheet is empty (#1128)", () => {
-    expect(pickSheetPrintReason({ groups: [], empty: { title: "Nothing confirmed to pick", description: "" } })).toBe("Nothing to print yet.");
+    expect(pickSheetPrintReason({ groups: [], empty: { title: "Nothing confirmed to pick" } })).toBe("Nothing to print yet.");
     expect(pickSheetPrintReason({ groups: [{ key: "d", title: "d", rows: [], totals: [] }] })).toBeNull();
   });
 
@@ -458,10 +458,10 @@ describe("line errors in the views", () => {
     const model = { ...repackCase, parents: [], locations: [], parentSkuId: "", locationId: "", binId: "" };
     const own = html(createElement(RepackView, { model: { ...model, formatsHref: "/catalog" } }));
     expect(own).toMatch(/<a [^>]*href="\/catalog"[^>]*>Open Catalog<\/a>/);
-    expect(own).toContain("No SKU can be broken yet");
+    expect(own).toContain("No packages to repack");
     expect(own).not.toMatch(/<input\b|role="combobox"|Confirm repack/);
     const other = html(createElement(RepackView, { model: { ...model, formatsHref: null } }));
-    expect(other).toContain("An admin or sales member sets a format&#x27;s contents in Catalog.");
+    expect(other).toContain("No packages to repack");
     expect(other).not.toContain("Open Catalog");
   });
 });

@@ -58,7 +58,7 @@ describe("Transfers list", () => {
     expect(html).toMatch(/>New transfer</);
     expect(html.match(/>Receive</g)).toHaveLength(2);
     expect(html).toMatch(/TRF-0007/);
-    expect(html).toMatch(/between locations/);
+    expect(html).not.toMatch(/between locations/);
     expect(html).not.toMatch(/href="\/transfers\//);
     expect(html).not.toMatch(/→/);
   });

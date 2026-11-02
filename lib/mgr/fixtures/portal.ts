@@ -3,11 +3,10 @@
 // inventory literals ($150.00, $38.00, $42.00, $18.00, $62.00). Cart: 4 Hazy
 // kegs + 6 Pils cases = $828.00 merchandise; 4 × $30.00 = $120.00 deposit.
 import type { ComingUpSnapshot } from "@/lib/mgr/coming-up-view";
-import { LOC_WAREHOUSE, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT } from "./demo";
+import { LOC_WAREHOUSE, SKU_HAZY, SKU_PILS, SKU_STOUT } from "./demo";
 import type { ShopSnapshot } from "@/lib/mgr/shop-view";
 import type { ReviewOrderSnapshot } from "@/lib/mgr/review-order-view";
 
-const CUSTOMER_RIDGELINE = "00000000-0000-4000-8000-0000000000c1";
 const SHIP_MAIN = "00000000-0000-4000-8000-0000000000d1";
 const SHIP_DOCK = "00000000-0000-4000-8000-0000000000d2";
 const SKU_HAZY_CASE = "00000000-0000-4000-8000-0000000000a4";
@@ -25,7 +24,6 @@ const item = (
 
 /** Ridgeline Shop cart: 4 Hazy ½ bbl + 6 Pils cases, Main · 2026-09-09. */
 export const ridgelineShop: ShopSnapshot = {
-  customer: { id: CUSTOMER_RIDGELINE, name: RIDGELINE.name },
   shipTos: [
     { id: SHIP_MAIN, label: "Main", country: "US", address1: "", city: "Phoenixville", state: "PA", zip: "" },
     { id: SHIP_DOCK, label: "Dock", country: "US", address1: "", city: "Royersford", state: "PA", zip: "" },

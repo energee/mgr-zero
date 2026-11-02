@@ -46,7 +46,7 @@ export function RepackView({ model, footer, messages, onParent, onLocation, onBi
     : { text: BREAKS, label: "Open Catalog", href: model.formatsHref, to: "Catalog" };
   return <>
     {model.parents?.length === 0
-      ? E.blank({ title: "No packages to repack", description: noBreaks.text }, undefined,
+      ? E.blank({ title: "No packages to repack" }, undefined,
         noBreaks.label ? <span data-to="Catalog">{E.btn(noBreaks.label, "g", noBreaks.href)}</span> : undefined)
       : <fieldset disabled={submitting} className="flex flex-col gap-3">
       {model.parents ? pick(`${id}-break`, "Package to break down", model.parentSkuId, model.parents, onParent, false, noBreaks) : E.fld("Package to break down", model.parent)}

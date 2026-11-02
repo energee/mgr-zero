@@ -31,7 +31,7 @@ export default async function RoutesPage({ searchParams }: { searchParams: Promi
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const { routes, unassigned, anyReturned } = (await runCommand("list_routes", { status }, ctx)) as RouteList;
-  return <RoutesView model={toRoutesViewProps({ title: "Deliveries", subtitle: "", status, anyReturned, linked: true, rows: [
+  return <RoutesView model={toRoutesViewProps({ title: "Deliveries", status, anyReturned, linked: true, rows: [
     ...routes.map(route => ({
       key: route.id, title: (route.name ?? "Route") + " · " + formatDate(route.delivery_date),
       detail: route.departed_at ? (route.returned_at ? "Returned · " : "Departed · ") + route.stops.filter(stop => stop.delivered_at).length + " of " + route.stops.length + " delivered" : route.stops.length + (route.stops.length === 1 ? " stop · " : " stops · ") + driverLabel(route),
