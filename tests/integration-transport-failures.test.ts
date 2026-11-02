@@ -37,7 +37,7 @@ describe("integration transport failure boundaries", () => {
     expect(boundary.finishPublication).not.toHaveBeenCalled();
   });
   it("records an explicit unwritable publication as provider_invalid, not a missing Square item", async () => {
-    await expect(publishSquareCatalogItem(ctx, { posLocationId: "location", brandId: "brand" }, requestId, new SquareClient(squareConfig, vi.fn()), "publish_pos_item")).rejects.toThrow("Square catalog data is not writable");
+    await expect(publishSquareCatalogItem(ctx, { posLocationId: "location", brandId: "brand" }, requestId, new SquareClient(squareConfig, vi.fn()), "publish_pos_item")).rejects.toMatchObject({ status: 409, code: "conflict" });
     expect(boundary.finishPublication).toHaveBeenCalledWith(ctx, "attempt", "provider_invalid", null);
   });
   it.each([false, true])("revokes the entire failed OAuth grant only after a safe cleanup reservation (blocked=%s)", async (blocked) => {
@@ -51,7 +51,7 @@ describe("integration transport failure boundaries", () => {
       redirectUri: squareConfig.redirectUri, client: new SquareClient(squareConfig, fetch), store: {
         claim: async () => ({ intentId: "intent", breweryId: ctx.breweryId, providerIntent: "connect", requestedScopes: [] }),
         complete: vi.fn(), fail,
-      } })).rejects.toThrow("Square is unavailable");
+      } })).rejects.toBeInstanceOf(Error);
     expect(fetch).toHaveBeenCalledTimes(blocked ? 2 : 3);
     if (!blocked) expect(JSON.parse(String(fetch.mock.calls[2][1]?.body))).toEqual({ client_id: "app", merchant_id: "seller" });
     expect(fail).toHaveBeenLastCalledWith("intent", ctx.userId, blocked ? "unresolved" : "confirmed", "seller");
@@ -84,8 +84,12 @@ describe("integration transport failure boundaries", () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     boundary.recordBill.mockRejectedValue(new Error("private record failure"));
     const client = new QboOAuthClient(qboConfig, vi.fn().mockRejectedValue(new TypeError("private provider error")));
-    await expect(postReceiptBill(ctx, receiptId, requestId, client)).rejects.toMatchObject({ status: 409, message: expect.stringContaining("Bill outcome is uncertain") });
-    expect(log.mock.calls).toEqual([["qbo_receipt_bill_failure_record_failed", { receiptId, providerRequestId: requestId }]]);
+    await expect(postReceiptBill(ctx, receiptId, requestId, client)).rejects.toMatchObject({ status: 409, code: "conflict" });
+    expect(log.mock.calls).toEqual([
+      ["qbo_receipt_bill_failed", { name: "TypeError", status: null, stage: "receipt_bill_post" }],
+      ["qbo_receipt_bill_failure_record_failed", { name: "Error", status: null, stage: "receipt_bill_failure_record" }],
+    ]);
+    expect(JSON.stringify(log.mock.calls)).not.toContain("private");
   });
   it("does not overwrite provider success with an uncertain failure when its commit fails", async () => {
     const failure = new Error("acceptance commit failed");

@@ -55,7 +55,7 @@ const eslintConfig = defineConfig([
         message: "Use E.pick from @/components/mgr/e instead of a native select.",
       }, {
         selector: "JSXOpeningElement:has(JSXAttribute[name.name='type'][value.value='number']), JSXOpeningElement:has(JSXAttribute[name.name='type'] > JSXExpressionContainer > Literal[value='number'])",
-        message: "Use E.edit(label, value, 'number') or E.volume from @/components/mgr/e instead of a standalone numeric input.",
+        message: "Use E.edit(label, value, 'number') from @/components/mgr/e or VolumeField from @/components/mgr/volume-field instead of a standalone numeric input.",
       }],
     },
   },

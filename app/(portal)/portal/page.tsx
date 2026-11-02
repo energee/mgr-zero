@@ -38,6 +38,6 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
   if (saved && query.draft && saved.order.status !== "draft") redirect(`/portal/orders/${saved.order.id}`);
   const initial = saved ? reconcilePortalOrder(saved, items, shipToOptions, !query.draft) : undefined;
   return (
-    <Cart customerName={customer.customerName} key={`${account.membership.userId}:${customer.customerId}:${customer.breweryId}:${sourceId ?? "new"}`} items={items} fulfillmentSource={account.fulfillmentSource} shipTos={shipToOptions} initial={initial} scope={{ actorId: account.membership.userId, customerId: customer.customerId, breweryId: customer.breweryId }} />
+    <Cart key={`${account.membership.userId}:${customer.customerId}:${customer.breweryId}:${sourceId ?? "new"}`} items={items} fulfillmentSource={account.fulfillmentSource} shipTos={shipToOptions} initial={initial} scope={{ actorId: account.membership.userId, customerId: customer.customerId, breweryId: customer.breweryId }} />
   );
 }

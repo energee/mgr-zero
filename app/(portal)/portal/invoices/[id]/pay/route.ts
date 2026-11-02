@@ -3,7 +3,8 @@ import { createRequestAuthContext } from "@/lib/auth/request-context";
 import { signInPath } from "@/lib/auth/password";
 import { CommandError, type Ctx } from "@/lib/commands/registry";
 import { readAppUrl } from "@/lib/env/server-parser";
-import { QboOAuthClient, qboConfig, qboPaymentFailureCause, resolvePortalInvoicePayment } from "@/lib/qbo";
+import { QboOAuthClient, qboConfig, resolvePortalInvoicePayment } from "@/lib/qbo";
+import { integrationFailureCause } from "@/lib/integration-failure";
 import { assertTrustedOrigin } from "@/lib/request-json";
 
 const responseHeaders = {
@@ -43,8 +44,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     roles: ["customer"],
     customerId: membership.customerId,
   };
+  let stage = "payment_config";
   try {
-    const result = await resolvePortalInvoicePayment(ctx, id, new QboOAuthClient(qboConfig()));
+    const client = new QboOAuthClient(qboConfig());
+    stage = "payment_resolve";
+    const result = await resolvePortalInvoicePayment(ctx, id, client);
     if (result.kind === "redirect") {
       return new Response(null, { status: 302, headers: { ...responseHeaders, Location: result.url } });
     }
@@ -53,10 +57,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (error instanceof CommandError && error.status === 404) {
       return new Response("Invoice not found", { status: 404, headers: responseHeaders });
     }
-    // The buyer stays on Payment unavailable; staff get the cause (missing
-    // setup, a CommandError code, an error name) but never a provider body,
-    // which can contain credentials or bearer links.
-    console.error("qbo_payment_failed", qboPaymentFailureCause(error));
+    // Keep the buyer on Payment unavailable without logging credentials or bearer links.
+    console.error("qbo_payment_failed", integrationFailureCause(error, stage));
     return unavailable(id, "provider_unavailable");
   }
 }

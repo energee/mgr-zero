@@ -183,7 +183,7 @@ it("distinguishes a resolved missing-email review from an empty customer book", 
 
 // #994: an empty search is not an empty customer book.
 it("says no customers match, not no customers yet, when a search is on", () => {
-  expect(toCustomersViewProps({ customers: [], filtered: true }).empty).toEqual({ title: "No customers match", description: "Clear the search to see every customer." });
+  expect(toCustomersViewProps({ customers: [], filtered: true }).empty).toEqual({ title: "No customers match" });
   expect(toCustomersViewProps({ customers: [], missingPortalEmail: true, filtered: true }).empty?.title).toBe("No customers match");
   expect(toCustomersViewProps({ customers: [] }).empty?.title).toBe("No customers yet");
 });

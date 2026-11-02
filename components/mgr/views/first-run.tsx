@@ -16,7 +16,7 @@ export function FirstRunView({
 }) {
   return (
     <>
-      {E.hd(`Set up ${model.brewery}`, model.steps)}
+      {E.hd(`Set up ${model.brewery}`)}
       {steps ?? (
         <>
           {E.row("1 · Add locations", "inline form expanded", "in progress", "ok")}

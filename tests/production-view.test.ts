@@ -78,7 +78,6 @@ describe("cellar first-vessel setup (#1254)", () => {
     const model = { ...toCellarMapViewProps([], []), addHref: "/cellar/vessels/new", brewHref: "/batches" };
     const html = htmlOf(createElement(CellarMapView, { model }));
     expect(html).toContain("No vessels yet");
-    expect(html).toContain("Add your tanks to start tracking the cellar.");
     expect(html).toMatch(/data-slot="empty-content"[^]*?data-variant="default"[^]*?href="\/cellar\/vessels\/new"[^>]*>Add vessel<\/a>/);
     expect(html.match(/>Add vessel<\/a>/g)).toHaveLength(1);
     expect(html).not.toContain("Start a brew day in Batches");
@@ -89,7 +88,7 @@ describe("cellar first-vessel setup (#1254)", () => {
   it("keeps vessel creation admin-only even in the empty state", () => {
     const model = { ...toCellarMapViewProps([], []), addHref: null, brewHref: "/batches" };
     const html = htmlOf(createElement(CellarMapView, { model }));
-    expect(html).toContain("Add your tanks to start tracking the cellar.");
+    expect(html).toContain("No vessels yet");
     expect(html).not.toContain("Add vessel");
     expect(html).not.toContain("Start a brew day in Batches");
   });
@@ -627,7 +626,7 @@ it("explains a disabled cellar Reading instead of leaving a dead end (#715)", ()
 // #994: an empty search is not an empty recipe book.
 describe("Recipes search", () => {
   it("says no recipes match, not no recipes yet, when a search is on", () => {
-    expect(toRecipesViewProps({ recipes: [], filtered: true }).empty).toEqual({ title: "No recipes match", description: "Clear the search to see every recipe." });
+    expect(toRecipesViewProps({ recipes: [], filtered: true }).empty).toEqual({ title: "No recipes match" });
     expect(toRecipesViewProps({ recipes: [] }).empty?.title).toBe("No recipes yet");
   });
 });

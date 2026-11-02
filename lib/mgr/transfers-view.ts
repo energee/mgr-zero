@@ -50,7 +50,7 @@ export type TransfersSnapshot = {
 export function toTransfersViewProps({ transfers }: TransfersSnapshot): TransfersViewModel {
   return {
     title: "Transfers",
-    empty: transfers.length === 0 ? { title: "No transfers yet", description: "A transfer moves stock between two locations." } : undefined,
+    empty: transfers.length === 0 ? { title: "No transfers yet" } : undefined,
     workChips: WORK_CHIPS,
     workChipIndex: 2,
     workTabs: WORK_TABS,

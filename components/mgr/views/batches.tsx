@@ -83,7 +83,7 @@ export function BatchesView({ model, createAction, workHrefs, newVesselHref, com
   newVesselHref?: string | null;
 }) {
   return <>
-    {E.hd(model.title, "", createAction !== undefined ? createAction : E.btn("New batch"))}
+    {E.hd(model.title, createAction !== undefined ? createAction : E.btn("New batch"))}
     <WorkKindTabs chips={model.workChips} current={model.workChips[model.workChipIndex]} tabs={model.workTabs} hrefs={workHrefs} />
     {model.empty && !completedPagination?.firstHref && !cancelledPagination?.firstHref ? E.blank(model.empty) : <>
       {([["Planned", model.planned], ["Active", model.active]] as const).map(([title, rows]) => rows.length ? <Fragment key={title}>

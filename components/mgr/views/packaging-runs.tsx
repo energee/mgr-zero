@@ -56,7 +56,7 @@ function RecentTable({ rows }: { rows: PackagingRunRowView[] }) {
 
 export function PackagingRunsView({ model, actions, workHrefs, pagination }: { model: PackagingRunsViewModel; actions?: ReactNode; workHrefs?: Record<string, string>; pagination?: HistoryNavigationProps }) {
   return <>
-    {E.hd("Packaging", "", actions !== undefined ? actions : E.btn("Schedule run"))}
+    {E.hd("Packaging", actions !== undefined ? actions : E.btn("Schedule run"))}
     <WorkKindTabs chips={model.workChips} current={model.workChips[4]} tabs={model.workTabs} hrefs={workHrefs} />
     {model.empty && !pagination?.firstHref ? E.blank(model.empty) : <>
       {model.upcoming.length > 0 && <>{E.ttl("Upcoming")}<UpcomingTable rows={model.upcoming} /></>}

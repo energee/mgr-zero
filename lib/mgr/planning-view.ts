@@ -65,10 +65,7 @@ export type PlanningViewModel = {
 
 /** The live page asks only for short materials, so an empty list says nothing
  *  about whether any batch or run is planned (#1142). */
-const NOTHING_SHORT: EmptyState = {
-  title: "No material shortages",
-  description: "Planning lists only materials that planned or brewing batches, open packaging runs, or uncovered orders need beyond on hand and sent purchase orders. An empty list does not mean any work is scheduled.",
-};
+const NOTHING_SHORT: EmptyState = { title: "No material shortages" };
 
 /** Where the demand Planning counts is set up, under their nav labels; the
  *  empty state links to them. */
