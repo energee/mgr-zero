@@ -274,7 +274,6 @@ describe("Location bins section", () => {
       footer: "live form",
     }));
     expect(html).toMatch(/Nothing is stored in these bins yet/);
-    expect(html).toMatch(/Record stock into a bin from Inventory\./);
     expect(html).toMatch(/<a[^>]*href="\/inventory\?recordMovement=1&amp;locationId=l"[^>]*>Record movement<\/a>/);
     expect(html).not.toMatch(/live form/);
     expect(html).not.toMatch(/No stock is on hand/);

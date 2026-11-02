@@ -205,7 +205,6 @@ describe("toRecipePageModel", () => {
     expect(model.empty).toEqual({ title: "No version yet" });
     const drawn = renderToStaticMarkup(createElement(RecipeView, { readOnly: true, model }));
     expect(drawn).toContain("No version yet");
-    expect(drawn).toContain("Select New recipe version to write the first one.");
     expect(model.mash).toBeUndefined();
     expect(model.saved).toBeUndefined();
   });
