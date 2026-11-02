@@ -8,12 +8,16 @@ import { admin, channelId, ins, insertFixture, makeBrewery, makeStaffCtx, priceS
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import type { Report } from "@/lib/commands/compliance";
+import { periodRange } from "@/lib/compliance-period";
+import { breweryDate } from "@/lib/date-format";
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
 let breweryId: string, owner: Ctx;
 let wh: Awaited<ReturnType<typeof seedLocation>>;
 let skuId: string, exportChannel: string, wholesaleChannel: string;
-const PERIOD = { jurisdiction: "TTB", periodStart: "2026-10-01", periodEnd: "2026-10-31" };
+// The removals are stamped now(), so the report covers the brewery-local
+// month the test runs in; a fixed month stops matching once it ends.
+const PERIOD = { jurisdiction: "TTB", ...periodRange(breweryDate("America/New_York").slice(0, 7))! };
 
 beforeAll(async () => {
   breweryId = (await makeBrewery()).id;

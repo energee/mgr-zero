@@ -18,6 +18,7 @@ export const matrix = {
   vessels: "deny", batches: "deny", vessel_occupancies: "deny", transfers: "deny", volume_adjustments: "deny", volume_adjustment_reclassifications: "deny",
   fermentation_readings: "deny", material_movements: "deny", batch_additions: "deny", brew_records: "deny", brew_pulls: "deny", packaging_runs: "deny",
   lots: "deny", packaging_run_outputs: "deny", packaging_run_consumptions: "deny", packaging_material_records: "deny", packaging_material_actuals: "deny", material_contracts: "deny",
+  packaging_output_corrections: "deny",
   purchase_orders: "deny", purchase_order_lines: "deny", receipts: "deny", receipt_lines: "deny",
   material_counts: "deny", material_count_lines: "deny", orders: "deny", order_lines: "deny", order_deposit_lines: "deny", order_events: "deny",
   shipments: "deny", invoices: "deny", invoice_questions: "deny", invoice_lines: "deny", invoice_payments: "deny", invoice_payment_voids: "deny", keg_events: "deny",
@@ -56,6 +57,7 @@ const privilegedRead: Partial<Record<Table, true>> = {
   reporting_basis_corrections: true, report_basis_amendments: true,
   invoice_payments: true, invoice_payment_voids: true,
   cola_label_images: true,
+  packaging_output_corrections: true,
   pos_location_mapping_history: true,
 };
 export const day = "2026-09-08";
@@ -122,6 +124,8 @@ export async function fixtures() {
   await put("packaging_run_consumptions", { run_id: run.id, movement_id: consumption.id });
   const packagingRecord = await put("packaging_material_records", { run_id: run.id, planned: [], created_by: owner.id });
   await put("packaging_material_actuals", { record_id: packagingRecord.id, material_id: material.id, location_id: wh.id, bin_id: wh.binId, material_name: "Fixture material", unit: "lb", location_name: "Warehouse", bin_name: "Default", qty_used: 1, qty_loss: 0, qty_unused: 0, used_movement_id: consumption.id });
+  sql(`insert into public.packaging_output_corrections(brewery_id,run_id,reason,previous_bbl_drawn,replacement_bbl_drawn,previous_outputs,replacement_outputs,created_by)
+    values('${brewery.id}','${run.id}','Fixture correction',1,1,'[]','[]','${owner.id}')`, true);
   await put("material_contracts", { vendor_id: vendor.id, material_id: material.id, qty_committed: 100 });
   const po = await put("purchase_orders", { vendor_id: vendor.id, status: "sent", sent_via: "external", created_by: owner.id });
   const poLine = await put("purchase_order_lines", { po_id: po.id, material_id: material.id, qty_ordered: 1 });

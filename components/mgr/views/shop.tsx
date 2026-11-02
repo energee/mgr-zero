@@ -22,7 +22,7 @@ export function ShopView({ model, footer, comingUp, controls = {}, quantities, l
 }) {
   const [deliveryOpen, setDeliveryOpen] = useState(false);
   return <>
-    {E.hd("Order", model.customer)}
+    {E.hd("Order")}
     <fieldset disabled={locked} className="contents">
       {model.empty ? E.blank(model.empty) : model.groups.map(group => <Fragment key={group.product}>
         {E.ttl(group.product, brandAnchor(group.product))}
@@ -31,7 +31,7 @@ export function ShopView({ model, footer, comingUp, controls = {}, quantities, l
         </Fragment>)}
       </Fragment>)}
     </fieldset>
-    {comingUp !== undefined ? comingUp : E.gated("Coming up", "The brewery’s upcoming releases aren’t available here yet.")}
+    {comingUp !== undefined ? comingUp : E.nav("Coming up")}
     {footer !== undefined ? footer : <>
       {E.row("Ships from", model.source)}
       {E.row("Ship-to · requested date", model.shipToLine,

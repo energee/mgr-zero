@@ -1,6 +1,6 @@
 // lib/mgr/fixtures/portal-orders.ts — portal_orders / portal_order snapshots
 // for Order history and Order detail. Identities come from demo.ts.
-import { RIDGELINE, SKU_HAZY, SKU_PILS } from "./demo";
+import { SKU_HAZY, SKU_PILS } from "./demo";
 import type { PortalOrderSnapshot } from "@/lib/mgr/portal-order-view";
 import type { PortalOrdersSnapshot } from "@/lib/mgr/portal-orders-view";
 
@@ -27,7 +27,6 @@ const line = (
 
 /** Ridgeline's three history rows: confirmed ORD-0231, shipped ORD-0225, short ORD-0221. */
 export const portalOrdersList: PortalOrdersSnapshot = {
-  customerName: RIDGELINE.name,
   breweryName: "Demo Brewing",
   orders: [
     {

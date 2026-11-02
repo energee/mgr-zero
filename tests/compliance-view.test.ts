@@ -31,21 +31,10 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
 
 describe("Compliance months", () => {
-  it("says why no period is listed when the first one starts after the books opened (#987)", () => {
-    expect(noPeriodsYet("month", "2026-10-15", "2026-10-20")).toEqual({
-      title: "No monthly period yet",
-      description: "The books opened on Oct 15, 2026. Activity before that date is not reported in MGR. November 2026 is the first monthly period MGR can report, and it is listed here once it starts.",
-    });
-    const html = renderToStaticMarkup(createElement(ComplianceMonthsView, { model: { ...complianceMonthsDemo, months: [], empty: noPeriodsYet("quarter", "2026-10-15", "2026-10-20") } }));
-    expect(html).toMatch(/No quarterly period yet/);
-    expect(html).toMatch(/Q1 2027 is the first quarterly period/);
-  });
-
-  it("says the books open, not opened, while that day is still ahead (#1496)", () => {
-    expect(noPeriodsYet("month", "2026-11-01", "2026-10-26").description).toBe(
-      "The books open on Nov 1, 2026. Activity before that date is not reported in MGR. November 2026 is the first monthly period MGR can report, and it is listed here once it starts.",
-    );
-    expect(noPeriodsYet("month", "2026-11-01", "2026-11-01").description).toMatch(/^The books opened on Nov 1, 2026\./);
+  it("names the first period MGR will report when none is listed yet (#987)", () => {
+    expect(noPeriodsYet("month", "2026-10-15")).toEqual({ title: "First monthly period: November 2026" });
+    const html = renderToStaticMarkup(createElement(ComplianceMonthsView, { model: { ...complianceMonthsDemo, months: [], empty: noPeriodsYet("quarter", "2026-10-15") } }));
+    expect(html).toMatch(/First quarterly period: Q1 2027/);
   });
 
 

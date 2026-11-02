@@ -5,7 +5,6 @@ import { DEMO_TIME_ZONE } from "@/lib/mgr/fixtures/settings";
 import { NOTHING_WAITING, todayActions, toTodayViewProps, type TodayAction, type TodayRowView, type TodayViewModel } from "@/lib/mgr/today-view";
 import type { StaffRole } from "@/lib/commands/registry";
 
-const DATE = "Thu 9/3";
 
 /** The role's live quick actions, inert: the inventory keeps no live href. */
 const actions = (role: StaffRole): TodayAction[] => todayActions([role]).map(({ label }) => ({ label }));
@@ -19,13 +18,13 @@ const OVERDUE_PICK: TodayItem = {
   href: "/orders/ord-0228/pick", recipientRoles: ["warehouse"], assignedUserId: null,
 };
 const overduePick: TodayRowView = {
-  ...toTodayViewProps({ date: DATE, items: [OVERDUE_PICK], timeZone: DEMO_TIME_ZONE, now: new Date("2026-09-03T16:00:00Z") }).rows[0],
+  ...toTodayViewProps({ items: [OVERDUE_PICK], timeZone: DEMO_TIME_ZONE, now: new Date("2026-09-03T16:00:00Z") }).rows[0],
   href: undefined,
 };
 
 /** Invoice-now refusals go straight to Sales' return-and-credit task. */
 const refusedCredit: TodayRowView = {
-  ...toTodayViewProps({ date: DATE, items: [{
+  ...toTodayViewProps({ items: [{
     reason: "refused_credit", subjectType: "delivery", subjectId: "refused-1", sourceVersion: "1",
     safeLabel: "Refused beer to return and credit", customerName: null, detail: "Hillside Tavern · 2 units",
     dueAt: null, href: "/invoices/inv-1043/return?refusedDeliveryId=refused-1",
@@ -35,7 +34,6 @@ const refusedCredit: TodayRowView = {
 };
 
 export const todayWarehouse: TodayViewModel = {
-  date: DATE,
   actions: actions("warehouse"),
   rows: [
     { key: "pick", title: "3 orders ready", detail: "quantities default to ordered", verb: "Pick", tone: "info", warning: true, icon: "package" },
@@ -47,14 +45,12 @@ export const todayWarehouse: TodayViewModel = {
 };
 
 export const todayEmpty: TodayViewModel = {
-  date: DATE,
   actions: actions("warehouse"),
   empty: NOTHING_WAITING,
   rows: [],
 };
 
 export const todaySales: TodayViewModel = {
-  date: DATE,
   actions: actions("sales"),
   rows: [
     { key: "ord1", title: "ORD-0231 · Ridgeline", detail: "submitted · ships Sep 3, 2026", verb: "Confirm", tone: "success", warning: true, icon: "package" },
@@ -68,7 +64,6 @@ export const todaySales: TodayViewModel = {
 };
 
 export const todayBrewer: TodayViewModel = {
-  date: DATE,
   actions: actions("brewer"),
   rows: [
     { key: "fv3", title: "FV3 · Stout", detail: "reading overdue 31 h", verb: "Reading", tone: "info", warning: true, icon: "thermo" },
@@ -79,7 +74,6 @@ export const todayBrewer: TodayViewModel = {
 };
 
 export const todayDriver: TodayViewModel = toTodayViewProps({
-  date: DATE,
   timeZone: DEMO_TIME_ZONE,
   now: new Date("2026-09-03T16:00:00Z"),
   items: [{
@@ -90,7 +84,6 @@ export const todayDriver: TodayViewModel = toTodayViewProps({
 });
 
 export const todayTaproom: TodayViewModel = {
-  date: DATE,
   rows: [
     { key: "board", title: "Tap board", detail: "11 kegs on tap · last opened Thu 11:20am", verb: "Open", tone: "info", icon: "beer" },
     { key: "count", title: "Weekly count", detail: "last saved Sep 7 at 9:14pm", verb: "Count", tone: "info", icon: "task" },

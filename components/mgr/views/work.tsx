@@ -4,7 +4,7 @@ import { Fragment, useState, type ReactNode } from "react";
 import { DeliveryTruck01Icon, Package01Icon, Route01Icon, ThermometerIcon } from "@hugeicons/core-free-icons";
 import { E } from "@/components/mgr/e";
 import { TabBar } from "@/components/mgr/qty";
-import { filterWorkRows, WORK_LABELS, workEmpty, type WorkViewModel } from "@/lib/mgr/work-view";
+import { filterWorkRows, WORK_EMPTY, WORK_LABELS, type WorkViewModel } from "@/lib/mgr/work-view";
 
 const ICON = { package: Package01Icon, truck: DeliveryTruck01Icon, route: Route01Icon, thermometer: ThermometerIcon };
 
@@ -32,12 +32,12 @@ export function WorkView({
   }
   const newOrder = createAction !== undefined ? createAction : E.btn("New order", "g");
   const emptyAction = model.rows.length === 0 && (selected === "all" || selected === "orders") ? newOrder : undefined;
-  const list = rows.length === 0 ? E.blank(workEmpty(selected), undefined, emptyAction) : rows.map(row => <Fragment key={row.key}>
+  const list = rows.length === 0 ? E.blank(WORK_EMPTY, undefined, emptyAction) : rows.map(row => <Fragment key={row.key}>
     {E.row(row.title, row.detail, E.act(row.verb, row.tone, row.href), row.warning ? "w" : "", row.icon ? ICON[row.icon] : undefined)}
   </Fragment>);
   return (
     <>
-      {E.hd("Work", undefined, newOrder)}
+      {E.hd("Work", newOrder)}
       {/* Only filter chips control row panels; standalone task chips navigate
           through the same TabBar without changing the selected filter. */}
       <div data-work-filter className="flex flex-1 flex-col">

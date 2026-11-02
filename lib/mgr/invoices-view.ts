@@ -8,7 +8,7 @@ import { qboInvoicePresentation, type QboStaffInvoiceLink } from "./qbo-ui";
 import { hasAnyRole } from "./roles";
 import type { ScopeOption } from "@/components/mgr/scope-pick";
 
-export type InvoiceListRecord = { quickbooks_link?: QboStaffInvoiceLink | null; id: string; invoice_no: number | null; kind: "invoice" | "credit_memo"; due_on: string | null; paid_at: string | null; qbo_sync_status: "pending" | "pushed" | "push_failed" | "not_synced"; qbo_sync_error: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_balance_cents: number | null; qbo_cash_collected_cents: number; qbo_accountant_drift: boolean; written_off_at: string | null; subtotal_cents: number; total_cents: number; has_pending_qbo_push: boolean; qbo_invoice_id: string | null; local_paid_cents: number; was_pushed_to_qbo: boolean; customers: { name: string } | null };
+export type InvoiceListRecord = { quickbooks_link?: QboStaffInvoiceLink | null; id: string; invoice_no: number | null; kind: "invoice" | "credit_memo"; due_on: string | null; paid_at: string | null; qbo_sync_status: "pending" | "pushed" | "push_failed" | "not_synced"; qbo_sync_error: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_balance_cents: number | null; qbo_cash_collected_cents: number; qbo_accountant_drift: boolean; written_off_at: string | null; subtotal_cents: number; total_cents: number; has_pending_qbo_push: boolean; qbo_invoice_id: string | null; local_paid_cents: number; local_credit_cents: number; was_pushed_to_qbo: boolean; customers: { name: string } | null };
 
 /** One register row: source facts stay separate until the shared view renders them. */
 export type InvoiceListMoney = {
@@ -69,6 +69,9 @@ export type InvoiceListRow = {
 
 /** A ledger-owned invoice reads its paid state from MGR's payments (#1045). */
 function ledgerPaymentFact(inv: InvoiceListRecord, state: InvoiceCurrentState): string {
+  const balance = invoiceBalanceCents(inv, inv.total_cents)!;
+  if (balance < 0) return "Credit balance";
+  if (balance === 0 && inv.local_credit_cents > 0) return "Settled";
   if (inv.total_cents <= 0) return "No payment due";
   if (state === "paid") return "Paid";
   return inv.local_paid_cents > 0 ? "Partially paid" : "Unpaid";

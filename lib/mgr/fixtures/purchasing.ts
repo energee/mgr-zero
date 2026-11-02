@@ -15,7 +15,6 @@ import type { VendorsSnapshot } from "@/lib/mgr/vendors-view";
 
 export const purchaseOrdersWarehouse: PurchaseOrdersSnapshot = {
   title: "Purchase orders",
-  subtitle: "warehouse default",
   rows: [
     { key: "po142", title: "PO-0142 · Fictional Malt Supply", detail: "Sent Sep 7, 2026 · expected Sep 10, 2026", verb: "Receive", tone: "info" },
     { key: "po141", title: "PO-0141 · Fictional Hop Supply", detail: "Partially received · 1 line still due", verb: "Receive", tone: "info", warning: true },

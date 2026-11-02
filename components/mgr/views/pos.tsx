@@ -93,7 +93,7 @@ function LocationMappingRow({ row, locations, onSave, onRetire, busy }: {
 }) {
   const [locationId, pick] = useSavedPick(row, row.mgrLocationId, onSave);
   return <div className="flex flex-col gap-3 rounded-lg border p-3">
-    {E.hd(row.name, row.detail)}
+    {E.group(row.name)}
     <SelectField id={`pos-location-${row.externalLocationId}`} label="MGR location" value={locationId}
       options={locations.map(location => ({ value: location.id, label: location.name }))} onChange={pick} />
     {row.mgrLocationId && <details>
@@ -145,7 +145,7 @@ function VariationMappingRow({ row, targets, busy, onSave }: {
 }) {
   const [target, pick] = useSavedPick(row, row.target, onSave);
   return <div className="flex flex-col gap-3 rounded-lg border p-3">
-    {E.hd(row.label, row.detail)}
+    {E.group(row.label)}
     <SelectField id={`pos-variation-${row.externalVariationId}`} label="Mapping" value={target}
       options={[...targets, { value: "ignore", label: "Ignore this variation" }]} onChange={pick} />
     {busy && <p role="status" className="text-sm text-muted-foreground">Saving…</p>}

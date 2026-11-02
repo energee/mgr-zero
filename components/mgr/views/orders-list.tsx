@@ -75,7 +75,7 @@ export function OrdersView({
   const emptyAction = model.status === "all" && !model.customer && !pagination?.firstHref ? newOrder : undefined;
   return (
     <>
-      {E.hd("Orders", undefined, newOrder)}
+      {E.hd("Orders", newOrder)}
       <WorkKindTabs chips={WORK_CHIPS} current="orders" tabs={WORK_TABS} hrefs={workHrefs} />
       <div className="md:w-64">
         <ScopePick label="Status" value={model.status} options={model.statusOptions} />

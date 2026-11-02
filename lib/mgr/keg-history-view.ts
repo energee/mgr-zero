@@ -40,8 +40,8 @@ export function toKegHistoryViewProps(s: KegHistorySnapshot): KegHistoryViewMode
     customerOptions: s.customerOptions ?? [{ value: "all", label: "All customers" }],
     rows,
     empty: rows.length > 0 ? undefined
-      : filtered ? { title: "No matching events", description: "Widen the filter to see more of the keg's history." }
-      : { title: "No keg events yet", description: "Record a keg event to start the history.", action: "Record keg event", href: s.backHref && `${s.backHref}?recordEvent=1` },
+      : filtered ? { title: "No matching events" }
+      : { title: "No keg events yet", action: "Record keg event", href: s.backHref && `${s.backHref}?recordEvent=1` },
   };
 }
 

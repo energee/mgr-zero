@@ -7,7 +7,7 @@ import { fixtures, keys, matrix, type Fixture, type Row, type Table } from "./rl
 // Independent approval matrix, not derived from policy SQL or helper results.
 // Each entry below produces a real SELECT against nonempty own AND foreign fixtures.
 const groups = {
-  staff: ["allocations", "batch_additions", "batches", "brew_pulls", "brew_records", "breweries", "catalog_categories", "fermentation_readings", "format_bom", "inventory_movements", "keg_events", "material_contracts", "material_count_lines", "material_counts", "material_lots", "material_movements", "materials", "packaging_material_actuals", "packaging_material_records", "packaging_run_consumptions", "packaging_run_outputs", "packaging_runs", "price_groups", "purchase_order_lines", "purchase_orders", "receipt_lines", "receipts", "recipe_ingredients", "recipe_versions", "recipe_water_additions", "recipes", "styles", "transfers", "vendors", "vessel_occupancies", "vessels", "volume_adjustment_reclassifications", "volume_adjustments", "water_profiles"],
+  staff: ["allocations", "batch_additions", "batches", "brew_pulls", "brew_records", "breweries", "catalog_categories", "fermentation_readings", "format_bom", "inventory_movements", "keg_events", "material_contracts", "material_count_lines", "material_counts", "material_lots", "material_movements", "materials", "packaging_material_actuals", "packaging_material_records", "packaging_output_corrections", "packaging_run_consumptions", "packaging_run_outputs", "packaging_runs", "price_groups", "purchase_order_lines", "purchase_orders", "receipt_lines", "receipts", "recipe_ingredients", "recipe_versions", "recipe_water_additions", "recipes", "styles", "transfers", "vendors", "vessel_occupancies", "vessels", "volume_adjustment_reclassifications", "volume_adjustments", "water_profiles"],
   all: ["brands", "format_components", "formats", "keg_pools", "skus", "tap_intervals", "taproom_count_lines", "taproom_counts"],
   salesWarehouse: ["customers", "deliveries", "invoice_lines", "invoice_payment_voids", "invoice_payments", "invoices", "lots", "order_deposit_lines", "order_events", "order_lines", "orders", "routes", "sale_channels", "ship_tos", "shipments", "stock_transfer_lines", "stock_transfers"],
   // Every role reads COLA approvals; formula approvals stay Admin and Sales (#965).
@@ -115,11 +115,10 @@ describe("all staff-dependent RLS policies preserve multi-role union (#797)", { 
     } finally { await connection.query("reset role"); }
   }
 
-  it("classifies all 98 live staff policies and all four separate portal policies", () => {
+  it("classifies every live staff policy and all four separate portal policies", () => {
     const actual = sql(`select tablename||':'||policyname from pg_policies where schemaname='public'
       and coalesce(qual,'')||coalesce(with_check,'') ~ '(staff_roles?\\(|has_staff_role|is_staff_of|my_staff_brewery_ids|taproom_can)' order by 1`);
-    expect(policies).toHaveLength(98);
-    expect(new Set(policies.map(test => `${test.table}:${test.policy}`)).size).toBe(98);
+    expect(new Set(policies.map(test => `${test.table}:${test.policy}`)).size).toBe(policies.length);
     expect(actual).toEqual(policies.map(test => `${test.table}:${test.policy}`).sort());
     expect(sql(`select tablename||':'||policyname from pg_policies where schemaname='public'
       and not (coalesce(qual,'')||coalesce(with_check,'') ~ '(staff_roles?\\(|has_staff_role|is_staff_of|my_staff_brewery_ids|taproom_can)') order by 1`))
