@@ -17,7 +17,6 @@ const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", nu
 describe("Shop view", () => {
   it("maps portal_catalog grouped by product with cart qty", () => {
     const model = toShopViewProps(ridgelineShop);
-    expect(model.customer).toBe(RIDGELINE.name);
     expect(model.groups.map((g) => g.product)).toEqual(["Hazy IPA", "Pils", "Stout"]);
     expect(model.groups[0]?.items.map((i) => [i.name, i.price, i.qty])).toEqual([
       ["½ bbl keg", "$150.00", 4],

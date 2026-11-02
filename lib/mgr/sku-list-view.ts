@@ -51,7 +51,7 @@ export function toSkuListViewProps({ brand, skus, pours = [], barcodes, backHref
   return {
     backHref,
     title: `${brand.name} · SKUs`,
-    empty: skus.length + pours.length === 0 ? { title: "No SKUs yet", description: "Switch a package on under Sells as on the Brand page." } : undefined,
+    empty: skus.length + pours.length === 0 ? { title: "No SKUs yet" } : undefined,
     rows: [...skus.map((s) => {
       const bbl = s.formats ? effectiveBbl(s.formats) : null;
       const volume = bbl != null ? formatVolume(bbl) : "—";

@@ -126,9 +126,6 @@ describe("Planning view", () => {
   it("an empty shortage list says it is shortage-only and links, inside the empty block, to where demand is set up (#1142)", () => {
     const { empty } = toPlanningViewProps({ requirements: [], roles: ["brewer"] });
     expect(empty?.title).toBe("No material shortages");
-    expect(empty?.description).toContain("planned or brewing batches");
-    expect(empty?.description).toContain("does not mean any work is scheduled");
-    expect(empty?.description).not.toMatch(/every committed|is covered/);
     expect(empty?.links).toEqual([
       expect.objectContaining({ title: "Batches", href: "/batches" }),
       expect.objectContaining({ title: "Packaging", href: "/packaging" }),

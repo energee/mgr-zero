@@ -52,7 +52,7 @@ describe("portal cart messages (#904)", () => {
     const saved = JSON.stringify({ savedAt: Date.now(), fields: { shipToId: shipTo, poNumber: "", note: "", requestedShipDate: null }, lines: [{ skuId: items[0].skuId, name: "Pils Keg", qty }, { skuId: "gone", name: "Old IPA", qty: "1" }] });
     vi.stubGlobal("sessionStorage", { getItem: () => null });
     vi.stubGlobal("localStorage", { getItem: (key: string) => key === workingCartKey(scope) ? saved : null, setItem: () => {}, removeItem: () => {} });
-    return renderToStaticMarkup(createElement(Cart, { customerName: "River Market", items, shipTos: [{ id: shipTo, label: "Dock", country: "US" }], scope, fulfillmentSource: { id: "source", name: "Brewery" } }));
+    return renderToStaticMarkup(createElement(Cart, { items, shipTos: [{ id: shipTo, label: "Dock", country: "US" }], scope, fulfillmentSource: { id: "source", name: "Brewery" } }));
   }
   afterEach(() => { vi.unstubAllGlobals(); });
 

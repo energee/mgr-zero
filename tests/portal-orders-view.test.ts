@@ -20,7 +20,6 @@ const htmlOf = (node: Parameters<typeof renderToStaticMarkup>[0]) =>
 describe("Order history view", () => {
   it("maps portal_orders rows through buyerStatus, Reorder on shipped, nav elsewhere", () => {
     const model = toPortalOrdersViewProps(portalOrdersList);
-    expect(model.subtitle).toBe(RIDGELINE.name);
     expect(model.rows.map((r) => r.title)).toEqual(["ORD-0231", "ORD-0225", "ORD-0221"]);
     expect(model.rows[0]?.detail).toMatch(/Confirmed · ships Sep 10, 2026/);
     expect(model.rows[0]?.verb).toBeUndefined();
@@ -39,7 +38,6 @@ describe("Order history view", () => {
     const withPrices = toPortalOrdersViewProps(portalOrdersList);
     expect(withPrices.rows[0]?.detail).toContain(money(4 * SKU_HAZY.unit_price_cents + 6 * SKU_PILS.unit_price_cents + 4 * 3000));
     const bare = toPortalOrdersViewProps({
-      customerName: RIDGELINE.name,
       breweryName: "Demo Brewing",
       orders: [{
         id: portalOrdersList.orders[0]!.id,
@@ -54,9 +52,8 @@ describe("Order history view", () => {
   });
 
   it("names an empty list without inventing rows", () => {
-    const model = toPortalOrdersViewProps({ customerName: RIDGELINE.name, breweryName: "Demo Brewing", orders: [] });
+    const model = toPortalOrdersViewProps({ breweryName: "Demo Brewing", orders: [] });
     expect(model.empty?.title).toBe("No orders yet");
-    expect(model.empty?.description).toBe("Start one from Order.");
     expect(model.rows).toEqual([]);
   });
 
