@@ -53,7 +53,7 @@ export function toLocationBinsViewProps({
 }: LocationBinsSnapshot): LocationBinsViewModel {
   return {
     rows: bins.map((b) => ({ key: b.id, title: b.name, detail: binStockLabel(stock, b.id) })),
-    empty: stock?.length === 0 ? { title: "Nothing is stored in these bins yet", description: "Record stock into a bin from Inventory." } : undefined,
+    empty: stock?.length === 0 ? { title: "Nothing is stored in these bins yet" } : undefined,
     inventoryHref,
     // Only once some bin holds stock: with none, the empty state shows instead.
     moveUnavailable: stock !== undefined && stock.length > 0 && bins.length < 2 ? "Moving stock needs at least two bins at this location. Add a bin first." : null,

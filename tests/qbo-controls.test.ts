@@ -8,7 +8,7 @@ describe("QuickBooks control boundaries", () => {
       qbo_sync_status: "pushed", qbo_sync_error: null, qbo_remote_state: "live",
       qbo_balance_cents: 98000, qbo_cash_collected_cents: 0, qbo_accountant_drift: true,
       written_off_at: null, subtotal_cents: 98000, total_cents: 99000, has_pending_qbo_push: false,
-      qbo_invoice_id: "qbo-1042", local_paid_cents: 0, was_pushed_to_qbo: false,
+      qbo_invoice_id: "qbo-1042", local_paid_cents: 0, local_credit_cents: 0, was_pushed_to_qbo: false,
       customers: { name: "Ridgeline" }, quickbooks_link: { href: "https://app.qbo.intuit.com/app/invoice?txnId=7&companyId=9341", reason: null },
     }, ["admin"], true, "America/New_York");
     expect(row.accounting).toMatch(/review/i);

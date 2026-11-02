@@ -54,7 +54,7 @@ export function toKegReportViewProps(r: KegReport, timeZone: string, backHref?: 
     })),
     sizes: r.bySize.map((s) => ({ key: `${s.pool_id}-${s.keg_size}`, title: `${s.pool_name} ${SIZE_LABEL[s.keg_size] ?? s.keg_size}`, detail: `${s.out} of ${s.total} out`, trailing: `${pct(s.out, s.total)} utilized` })),
     empty: r.bySize.length ? undefined : r.activePools
-      ? { title: "No kegs recorded yet", description: "Record kegs acquired into a pool to see utilization.", action: "Record keg event", href: backHref && `${backHref}?recordEvent=1` }
-      : { title: "No keg pools", description: "Add a keg pool on Keg fleet, then record kegs acquired to see utilization.", action: "Open Keg fleet", href: backHref },
+      ? { title: "No kegs recorded yet", action: "Record keg event", href: backHref && `${backHref}?recordEvent=1` }
+      : { title: "No keg pools", action: "Open Keg fleet", href: backHref },
   };
 }

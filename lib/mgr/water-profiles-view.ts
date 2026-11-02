@@ -61,7 +61,7 @@ export function toWaterProfilesViewProps(s: { profiles: WaterProfile[]; back?: {
     backLabel: s.back?.label,
     backHref: s.back?.href,
     rows: s.profiles.map((p) => ({ key: p.id, title: p.name, detail: profileLine(p) })),
-    empty: s.profiles.length ? undefined : { title: "No water profiles yet", description: "Add a water profile with its mineral measurements. Profiles are not classified as source or target here; choose either role on a recipe’s Water sheet." },
+    empty: s.profiles.length ? undefined : { title: "No water profiles yet" },
   };
 }
 

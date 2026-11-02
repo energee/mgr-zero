@@ -23,7 +23,6 @@ export function submissionFailureMessage(message: string, draftId: string | null
 }
 
 type CartProps = {
-  customerName: string;
   items: CatalogItem[]; shipTos: ShipToOption[]; scope: PortalScope; fulfillmentSource: { id: string; name: string } | null;
   initial?: { fields: PortalFields; draftId: string | null; removed: string[] };
 };
@@ -32,7 +31,7 @@ export function Cart(props: CartProps) {
   const hydrated = useSyncExternalStore(subscribe, () => true, () => false);
   return hydrated ? <ReadyCart {...props} /> : E.info("Loading order recovery…");
 }
-function ReadyCart({ customerName, items, shipTos, scope, initial, fulfillmentSource }: CartProps) {
+function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartProps) {
   const router = useRouter();
   const [recovery] = useState(() => {
     try { return { attempt: restorePortalAttempt(sessionStorage.getItem(portalAttemptKey(scope)), scope), error: null }; }
@@ -127,7 +126,7 @@ function ReadyCart({ customerName, items, shipTos, scope, initial, fulfillmentSo
     {attempt && <Button type="button" disabled={busy} onClick={() => run(attempt.purpose)}>Retry order request</Button>}
   </>;
   const shopModel = toShopViewProps({
-    customer: { id: scope.customerId, name: customerName }, shipTos, shipToId: fields.shipToId,
+    shipTos, shipToId: fields.shipToId,
     requestedDate: fields.requestedShipDate ?? "", poNumber: fields.poNumber, note: fields.note,
     source: { name: fulfillmentSource?.name ?? "Not configured" },
     catalog: items.map(item => ({ ...item, qty: Number(qty[item.skuId] ?? 0) })),
@@ -135,7 +134,7 @@ function ReadyCart({ customerName, items, shipTos, scope, initial, fulfillmentSo
   shopModel.subtotal = unavailable.length ? "Unavailable for the pending request" : money(subtotal);
   shopModel.reviewVerb = `Review order · ${shopModel.subtotal}`;
   return <>
-    <ShopView model={shopModel} quantities={qty} locked={locked} disabled={disabled} preparing={busy} comingUp={<Link href="/portal/coming-up">{E.nav("Coming up", "what the brewery plans to brew next")}</Link>}
+    <ShopView model={shopModel} quantities={qty} locked={locked} disabled={disabled} preparing={busy} comingUp={<Link href="/portal/coming-up">{E.nav("Coming up")}</Link>}
       controls={{
         quantity: (id, value) => setQty(prev => ({ ...prev, [id]: value })),
         shipTo: shipToId => setFields(prev => ({ ...prev, shipToId })),

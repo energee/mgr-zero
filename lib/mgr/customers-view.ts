@@ -52,9 +52,9 @@ export function toCustomersViewProps({ customers, missingPortalEmail, filtered }
   return {
     missingPortalEmail,
     empty: customers.length > 0 ? undefined
-      : filtered ? { title: "No customers match", description: "Clear the search to see every customer." }
-      : missingPortalEmail ? { title: "All customers have a portal login email", description: "No customer accounts need an email added through portal access." }
-      : { title: "No customers yet", description: "Add the accounts you sell to so orders have somewhere to go." },
+      : filtered ? { title: "No customers match" }
+      : missingPortalEmail ? { title: "All customers have a portal login email" }
+      : { title: "No customers yet" },
     rows: customers.map((c) => ({
       key: c.id,
       title: nameWithAlias(c),

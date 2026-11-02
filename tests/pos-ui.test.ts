@@ -156,22 +156,22 @@ describe("POS UI truth", () => {
 
   it("turns a selling Square variation into a Menu row that knows its current choice", () => {
     const row = { externalItemId: "i", externalVariationId: "v", itemName: "Guest cider", variationName: "Pint" };
-    expect(toPosVariationRow({ ...row, disposition: "queued", skuId: null, formatId: null, mappingLabel: null }))
-      .toEqual({ externalItemId: "i", externalVariationId: "v", label: "Guest cider · Pint", detail: "Sold in Square · not from MGR", disposition: "queued", target: "" });
-    expect(toPosVariationRow({ ...row, disposition: "mapped", skuId: null, formatId: "f1", mappingLabel: "Pour · Pint" }))
-      .toMatchObject({ detail: "Pour · Pint", disposition: "mapped", target: "format:f1" });
-    expect(toPosVariationRow({ ...row, disposition: "mapped", skuId: "s1", formatId: null, mappingLabel: "SKU · Cider can" }))
+    expect(toPosVariationRow({ ...row, disposition: "queued", skuId: null, formatId: null }))
+      .toEqual({ externalItemId: "i", externalVariationId: "v", label: "Guest cider · Pint", disposition: "queued", target: "" });
+    expect(toPosVariationRow({ ...row, disposition: "mapped", skuId: null, formatId: "f1" }))
+      .toMatchObject({ disposition: "mapped", target: "format:f1" });
+    expect(toPosVariationRow({ ...row, disposition: "mapped", skuId: "s1", formatId: null }))
       .toMatchObject({ target: "sku:s1" });
-    expect(toPosVariationRow({ ...row, itemName: null, variationName: null, disposition: "ignored", skuId: null, formatId: null, mappingLabel: "Ignored" }))
-      .toMatchObject({ label: "v", detail: "Ignored", target: "ignore" });
+    expect(toPosVariationRow({ ...row, itemName: null, variationName: null, disposition: "ignored", skuId: null, formatId: null }))
+      .toMatchObject({ label: "v", target: "ignore" });
   });
 
   it("asks about queued Square items and lets a mapped or ignored one change, beside the one filled Publish verb", () => {
     const base = { locations: [], selectedLocationId: "taproom", locationName: "Taproom", binName: "Cold", channelName: "Taproom", items: [], excluded: [] };
     const quiet = renderToStaticMarkup(createElement(PosMenuView, { model: { ...base, externalItems: [] } }));
     expect(quiet).not.toContain("Also in Square");
-    const queued = { externalItemId: "i", externalVariationId: "v", label: "Guest cider · pint", detail: "Sold in Square · not from MGR", disposition: "queued" as const, target: "" };
-    const ignored = { externalItemId: "m", externalVariationId: "s", label: "Shirt · Large", detail: "Ignored", disposition: "ignored" as const, target: "ignore" };
+    const queued = { externalItemId: "i", externalVariationId: "v", label: "Guest cider · pint", disposition: "queued" as const, target: "" };
+    const ignored = { externalItemId: "m", externalVariationId: "s", label: "Shirt · Large", disposition: "ignored" as const, target: "ignore" };
     const selling = renderToStaticMarkup(createElement(PosMenuView, { model: { ...base, externalItems: [queued, ignored] },
       targets: [{ value: "format:pint", label: "Pour · House · pint" }] }));
     expect(selling).toMatch(/Also in Square[\s\S]*Guest cider · pint[\s\S]*Mapped or ignored[\s\S]*Shirt · Large/);
@@ -212,9 +212,7 @@ describe("Menu with no mapped Square location (#997)", () => {
 
   it.each([true, false])("offers no setup action when Square is not turned on (admin: %s, #1397)", (admin) => {
     const input = { admin, connected: false, configured: false, observed: 0 };
-    expect(toPosMenuSetup(input)).toEqual({
-      title: "Square isn’t connected", description: integrationUnavailableReason.square,
-    });
+    expect(toPosMenuSetup(input)).toEqual({ title: integrationUnavailableReason.square });
     const html = unmapped(input);
     expect(html).toContain(integrationUnavailableReason.square);
     expect(html).not.toContain('href="/settings/pos"');
@@ -229,9 +227,9 @@ describe("Menu with no mapped Square location (#997)", () => {
 
   it.each([0, 2])("sends an admin to connect Square when it is not connected, even with %i leftover locations (#1039)", (observed) => {
     const html = unmapped({ admin: true, connected: false, configured: true, observed });
-    expect(html).toContain("Connect Square, then map a Square location");
+    expect(html).toContain("Square isn’t connected");
     expect(html).toMatch(/href="\/settings\/pos"[^>]*>Set up Square/);
-    expect(html).not.toContain("none is mapped");
+    expect(html).not.toContain("No Square location mapped");
     expect(html).not.toContain("Also in Square");
     expect(html).not.toContain("One catalog");
     expect(html).not.toContain("No mapped Square location is available.");
@@ -239,7 +237,7 @@ describe("Menu with no mapped Square location (#997)", () => {
 
   it("titles an admin's disconnected Square as not connected, the same title Warehouse gets (#1087 review)", () => {
     expect(toPosMenuSetup({ admin: true, connected: false, configured: true, observed: 2 })).toEqual({
-      title: "Square isn’t connected", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" },
+      title: "Square isn’t connected", action: { label: "Set up Square", href: "/settings/pos" },
     });
     expect(toPosMenuSetup({ admin: false, connected: false, configured: true, observed: 2 }).title).toBe("Square isn’t connected");
   });
@@ -251,36 +249,35 @@ describe("Menu with no mapped Square location (#997)", () => {
 
   it("tells an admin that a connected Square has synced no locations yet, not that some were found (#1082 review)", () => {
     const html = unmapped({ admin: true, connected: true, configured: true, observed: 0 });
-    expect(html).toContain("Square is connected, but no locations are synced yet");
-    expect(html).not.toContain("were found");
+    expect(html).toContain("No Square locations yet");
+    expect(html).not.toContain("No Square location mapped");
     expect(html).toMatch(/href="\/settings\/pos"[^>]*>Set up Square/);
   });
 
   it("sends an admin to map a location when Square is connected and its locations synced", () => {
     const html = unmapped({ admin: true, connected: true, configured: true, observed: 2 });
     expect(html).not.toContain("Connect Square");
-    expect(html).toContain("none is mapped to an MGR location");
+    expect(html).toContain("No Square location mapped");
     expect(html).toMatch(/href="\/settings\/pos\/locations"[^>]*>Map Square locations/);
   });
 
   it("tells a non-admin that Square is disconnected, with no settings link (#1083)", () => {
     const html = unmapped({ admin: false, connected: false, configured: true, observed: 2 });
-    expect(html).toMatch(/Square isn’t connected<\/[^>]+>(?:(?!Square isn’t)[\s\S])*Ask an admin to connect Square\./);
-    expect(html).not.toContain("were found");
+    expect(html).toContain("Square isn’t connected");
     expect(html).not.toContain("/settings/pos");
     expect(html).not.toContain("Set up Square");
   });
 
   it("tells a non-admin that a connected Square has unmapped locations (#1083)", () => {
     const html = unmapped({ admin: false, connected: true, configured: true, observed: 2 });
-    expect(html).toContain("Square locations were found, but none is mapped to an MGR location. Ask an admin to map one.");
+    expect(html).toContain("No Square location mapped");
     expect(html).not.toContain("/settings/pos");
     expect(html).not.toContain("Map Square locations");
   });
 
   it("tells a non-admin that a connected Square has synced no location yet (#1083)", () => {
     const html = unmapped({ admin: false, connected: true, configured: true, observed: 0 });
-    expect(html).toContain("Square is connected, but no locations are synced yet. Ask an admin to sync and map one.");
+    expect(html).toContain("No Square locations yet");
     expect(html).not.toContain("/settings/pos");
   });
 

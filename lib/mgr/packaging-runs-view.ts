@@ -89,7 +89,7 @@ export function toPackagingRunsViewProps(runs: PackagingRunSnapshot[], timeZone:
   return {
     upcoming: runs.filter((run) => !finished(run)).map((run) => row(run, timeZone, today, hrefFor?.(run.id))),
     recent: runs.filter(finished).map((run) => row(run, timeZone, today, hrefFor?.(run.id))),
-    empty: runs.length === 0 ? { title: "No runs planned", description: "Select Schedule run to plan one: a date, a brand, and how many of each SKU." } : undefined,
+    empty: runs.length === 0 ? { title: "No runs planned" } : undefined,
     workChips: WORK_CHIPS,
     workTabs: WORK_TABS,
   };
