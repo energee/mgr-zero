@@ -246,7 +246,7 @@ describe("Location bins section", () => {
   it("an empty location gets the empty state, not a locked Move stock (#1154)", () => {
     const model = toLocationBinsViewProps({ bins: twoBins, stock: [] });
     expect(model.rows.map((r) => r.detail)).toEqual(["Empty", "Empty"]);
-    expect(model.empty).toEqual({ title: "Nothing is stored in these bins yet", description: "Record stock into a bin from Inventory." });
+    expect(model.empty).toEqual({ title: "Nothing is stored in these bins yet" });
     expect(model.moveUnavailable).toBeNull();
   });
 

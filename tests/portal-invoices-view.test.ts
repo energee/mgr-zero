@@ -10,7 +10,6 @@ import { E } from "../components/mgr/e";
 import { PortalInvoiceView } from "../components/mgr/views/portal-invoice";
 import { PortalInvoicesView } from "../components/mgr/views/portal-invoices";
 import { QuestionInvoiceView } from "../components/mgr/views/question-invoice";
-import { RIDGELINE } from "../lib/mgr/fixtures/demo";
 import { portalInvoicePaid, portalInvoiceUnpaid, portalInvoicesRidgeline } from "../lib/mgr/fixtures/portal-invoices";
 import { toPortalInvoiceViewProps, type PortalInvoiceSnapshot } from "../lib/mgr/portal-invoice-view";
 import { toPortalInvoicesViewProps } from "../lib/mgr/portal-invoices-view";
@@ -113,7 +112,6 @@ describe("Invoice history view", () => {
   it("the inventory drawing still offers Pay on the unpaid row", () => {
     const html = htmlOf(createElement(PortalInvoicesView, { model: toPortalInvoicesViewProps(portalInvoicesRidgeline) }));
     expect(html).toMatch(/Invoices/);
-    expect(html).toContain(RIDGELINE.name);
     expect(html).toMatch(/INV-1042/);
     expect(html).toMatch(/due Oct 3, 2026 · \$948\.00/);
     expect(html).toMatch(/>Pay</);

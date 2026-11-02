@@ -75,7 +75,7 @@ export function toPurchaseOrdersViewProps(s: PurchaseOrdersSnapshot): PurchaseOr
     title: s.title,
     rows,
     empty: s.empty ?? (rows.length === 0
-      ? { title: s.includeClosed ? "No purchase orders yet" : "No open purchase orders"}
+      ? { title: s.includeClosed ? "No purchase orders yet" : "No open purchase orders" }
       : undefined),
     workChips: WORK_CHIPS,
     workChipIndex: 5,

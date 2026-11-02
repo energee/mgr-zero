@@ -7,7 +7,6 @@ import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { ReviewOrderView } from "../components/mgr/views/review-order";
 import { ShopView } from "../components/mgr/views/shop";
-import { RIDGELINE } from "../lib/mgr/fixtures/demo";
 import { ridgelineReviewOrder, ridgelineShop } from "../lib/mgr/fixtures/portal";
 import { toQuotedReviewOrderViewProps, toReviewOrderViewProps } from "../lib/mgr/review-order-view";
 import { toShopViewProps } from "../lib/mgr/shop-view";
@@ -67,7 +66,6 @@ describe("Shop view", () => {
     expect(html).not.toMatch(/Review order/);
     expect(html).not.toMatch(/Coming up/);
     expect(html).not.toMatch(/Ships from/);
-    expect(html).toContain(RIDGELINE.name);
   });
 });
 

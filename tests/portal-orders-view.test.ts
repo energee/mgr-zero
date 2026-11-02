@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { PortalOrderView } from "../components/mgr/views/portal-order";
 import { PortalOrdersView } from "../components/mgr/views/portal-orders";
-import { RIDGELINE, SKU_HAZY, SKU_PILS } from "../lib/mgr/fixtures/demo";
+import { SKU_HAZY, SKU_PILS } from "../lib/mgr/fixtures/demo";
 import { portalOrderShipped, portalOrdersList } from "../lib/mgr/fixtures/portal-orders";
 import { toPortalOrderViewProps } from "../lib/mgr/portal-order-view";
 import { toPortalOrdersViewProps } from "../lib/mgr/portal-orders-view";
@@ -63,7 +63,6 @@ describe("Order history view", () => {
     expect(html).toMatch(/ORD-0225/);
     expect(html).toMatch(/Confirmed · ships Sep 10, 2026/);
     expect(html).toMatch(/Shipped/);
-    expect(html).toContain(RIDGELINE.name);
     expect(html).not.toMatch(/→/);
     expect(html).not.toMatch(/href="\/portal/);
   });

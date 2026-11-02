@@ -134,7 +134,7 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
   shopModel.subtotal = unavailable.length ? "Unavailable for the pending request" : money(subtotal);
   shopModel.reviewVerb = `Review order · ${shopModel.subtotal}`;
   return <>
-    <ShopView model={shopModel} quantities={qty} locked={locked} disabled={disabled} preparing={busy} comingUp={<Link href="/portal/coming-up">{E.nav("Coming up", "what the brewery plans to brew next")}</Link>}
+    <ShopView model={shopModel} quantities={qty} locked={locked} disabled={disabled} preparing={busy} comingUp={<Link href="/portal/coming-up">{E.nav("Coming up")}</Link>}
       controls={{
         quantity: (id, value) => setQty(prev => ({ ...prev, [id]: value })),
         shipTo: shipToId => setFields(prev => ({ ...prev, shipToId })),

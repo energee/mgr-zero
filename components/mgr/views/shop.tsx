@@ -31,7 +31,7 @@ export function ShopView({ model, footer, comingUp, controls = {}, quantities, l
         </Fragment>)}
       </Fragment>)}
     </fieldset>
-    {comingUp}
+    {comingUp !== undefined ? comingUp : E.nav("Coming up")}
     {footer !== undefined ? footer : <>
       {E.row("Ships from", model.source)}
       {E.row("Ship-to · requested date", model.shipToLine,
