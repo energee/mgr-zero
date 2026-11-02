@@ -92,7 +92,7 @@ it("warns about stale QuickBooks payments only with an actual previous connectio
 });
 
 it("does not describe a never-connected Square seller as a reconnect", () => {
-  expect(toPosMenuSetup({ admin: false, connected: false, configured: true, observed: 0 }).description).toBe("Ask an admin to connect Square.");
+  expect(toPosMenuSetup({ admin: false, connected: false, configured: true, observed: 0 })).toEqual({ title: "Square isn’t connected" });
   expect(renderToStaticMarkup(createElement(ConnectSquareView))).not.toContain("Reconnect Square");
   expect(renderToStaticMarkup(createElement(ConnectSquareView, { reconnect: true }))).toContain("Reconnect Square");
 });

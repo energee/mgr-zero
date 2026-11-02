@@ -25,7 +25,6 @@ export type TodayRowView = {
 export type TodayAction = { label: string; href?: string };
 
 export type TodayViewModel = {
-  date: string;
   actions?: TodayAction[];
   empty?: EmptyState;
   emptyVerb?: string;
@@ -69,7 +68,6 @@ export const TODAY_VERB: Record<TodayItem["reason"], [string, "info" | "attentio
 };
 
 export type TodaySnapshot = {
-  date: string;
   actions?: TodayAction[];
   empty?: EmptyState;
   emptyVerb?: string;
@@ -95,7 +93,7 @@ function dueText(dueAt: string, timeZone: string, now: Date): string {
   return due <= now ? `overdue since ${when}` : `due ${when}`;
 }
 
-export const NOTHING_WAITING: EmptyState = { title: "Nothing waiting", description: "Nothing needs your attention right now." };
+export const NOTHING_WAITING: EmptyState = { title: "Nothing waiting" };
 
 export function toTodayViewProps(s: TodaySnapshot): TodayViewModel {
   return { ...todayRows(s), ...(s.actions ? { actions: s.actions } : {}) };
@@ -103,11 +101,10 @@ export function toTodayViewProps(s: TodaySnapshot): TodayViewModel {
 
 function todayRows(s: TodaySnapshot): TodayViewModel {
   if (s.rows !== undefined) {
-    return { date: s.date, empty: s.empty, emptyVerb: s.emptyVerb, rows: s.rows };
+    return { empty: s.empty, emptyVerb: s.emptyVerb, rows: s.rows };
   }
   if (s.taproom) {
     return {
-      date: s.date,
       empty: s.empty,
       emptyVerb: s.emptyVerb,
       rows: s.taproom.map((row) => ({
@@ -123,7 +120,6 @@ function todayRows(s: TodaySnapshot): TodayViewModel {
   const items = s.items ?? [];
   if (items.length === 0) {
     return {
-      date: s.date,
       empty: s.empty ?? NOTHING_WAITING,
       emptyVerb: s.emptyVerb,
       rows: [],
@@ -132,7 +128,6 @@ function todayRows(s: TodaySnapshot): TodayViewModel {
   const now = s.now ?? new Date();
   const today = s.timeZone ? breweryDate(s.timeZone, now) : undefined;
   return {
-    date: s.date,
     rows: items.map((it) => {
       const [verb, tone] = TODAY_VERB[it.reason];
       if (it.dueAt && !s.timeZone) throw new Error(`toTodayViewProps: ${it.safeLabel} has a dueAt and needs the brewery time zone`);

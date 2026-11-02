@@ -73,9 +73,9 @@ function Register({ rows, recordPayment }: { rows: InvoiceListRow[]; recordPayme
 
 /** What an empty register says, by its filters. */
 function emptyRegister(status: InvoiceFilter | undefined, customer: string | undefined) {
-  if (status) return E.blank({ title: customer ? `No unpaid invoices for ${customer}` : "No unpaid invoices", description: "Every invoice here is paid, settled, written off or voided." });
-  if (customer) return E.blank({ title: `No invoices for ${customer}`, description: "Invoices show here after you ship this customer an order." });
-  return E.blank({ title: "No invoices yet", description: "Invoices show here after you ship an order. You can then push them to QuickBooks or record payments in MGR." });
+  if (status) return E.blank({ title: customer ? `No unpaid invoices for ${customer}` : "No unpaid invoices"});
+  if (customer) return E.blank({ title: `No invoices for ${customer}` });
+  return E.blank({ title: "No invoices yet" });
 }
 
 /** The staff Invoices register. `sync` is the manual sync control: the live
@@ -107,9 +107,5 @@ export function InvoicesView({ rows, backHref, connection, sync, pagination, sta
     {rows.length ? <Register rows={rows} recordPayment={recordPayment} /> : emptyRegister(status, customer?.name)}
     <HistoryNavigation {...pagination} />
     {(!connection || connection.connected) && quickbooks}
-    <div>
-      {E.gated("Email delivery status", "Unavailable")}
-      {E.polite("MGR can’t tell whether QuickBooks emailed an invoice.")}
-    </div>
   </>;
 }

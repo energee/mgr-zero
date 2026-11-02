@@ -55,7 +55,7 @@ function RecentTable({ rows }: { rows: PackagingRunRowView[] }) {
 
 export function PackagingRunsView({ model, actions, workHrefs }: { model: PackagingRunsViewModel; actions?: ReactNode; workHrefs?: Record<string, string> }) {
   return <>
-    {E.hd("Packaging", "", actions !== undefined ? actions : E.btn("Schedule run"))}
+    {E.hd("Packaging", actions !== undefined ? actions : E.btn("Schedule run"))}
     <WorkKindTabs chips={model.workChips} current={model.workChips[4]} tabs={model.workTabs} hrefs={workHrefs} />
     {model.empty ? E.blank(model.empty) : <>
       {model.upcoming.length > 0 && <>{E.ttl("Upcoming")}<UpcomingTable rows={model.upcoming} /></>}

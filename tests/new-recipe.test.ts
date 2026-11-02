@@ -242,10 +242,9 @@ describe("recipe form copy (#1139)", () => {
     expect(water).not.toContain("material · amount · stage");
   });
 
-  it("fermentation explains how to start planning an empty schedule (#1263)", () => {
+  it("fermentation names an empty schedule in one line (#1263)", () => {
     const schedule = html(createElement(FermentationScheduleView, { stages: [] }));
     expect(schedule).toContain("No stages yet");
-    expect(schedule).toContain("Add a stage to plan temperatures and timing.");
     expect(schedule).not.toContain("Add stage is the only action.");
   });
 
