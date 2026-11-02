@@ -66,10 +66,9 @@ describe("packaging views", () => {
 
   it("an empty list says how to plan a run, and a list with runs has no empty state (#1129)", () => {
     const model = toPackagingRunsViewProps([], DEMO_TIME_ZONE);
-    expect(model.empty).toEqual({ title: "No runs planned", description: expect.stringContaining("Schedule run") });
+    expect(model.empty).toEqual({ title: "No runs planned" });
     const html = htmlOf(createElement(PackagingRunsView, { model, actions: null }));
     expect(html).toContain("No runs planned");
-    expect(html).toContain(model.empty?.description);
     expect(toPackagingRunsViewProps(packagingRuns, DEMO_TIME_ZONE).empty).toBeUndefined();
   });
 

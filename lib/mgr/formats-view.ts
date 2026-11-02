@@ -76,7 +76,7 @@ export function toFormatsViewProps({ formats, components = formats.flatMap(forma
   return {
     backHref,
     headers: ["Format", "Basis", "Volume", "From"],
-    empty: formats.length === 0 ? { title: "No formats yet", description: "A format is a container a beer ships in: a 1/2 bbl keg, a 16 oz can." } : undefined,
+    empty: formats.length === 0 ? { title: "No formats yet" } : undefined,
     rows: formats.map((f) => {
       const volume = effectiveBbl(f);
       const name = f.brands ? `${f.brands.name} · ${f.name}` : f.name;

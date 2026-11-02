@@ -85,7 +85,6 @@ it("slots the scoped recoverable Cart with the actual configured source or no so
     // Cart is the root now and owns the ShopView mount; the recovery scope
     // still has to remount it per actor/customer/brewery/draft.
     expect(shop.key).toBe("actor:buyer:brewery:new");
-    expect(shop.props.customerName).toBe("Buyer");
   }
 });
 

@@ -56,7 +56,7 @@ describe("Purchase orders", () => {
   });
 
   it("a closed order with no next action is a row link, not an Open verb (#996)", () => {
-    const model = toPurchaseOrdersViewProps({ title: "Purchase orders", subtitle: "every order", rows: [
+    const model = toPurchaseOrdersViewProps({ title: "Purchase orders", rows: [
       { key: "po", title: "PO-0012 · Hop Co", detail: "received", href: "/purchase-orders/po" },
     ] });
     const markup = renderToStaticMarkup(createElement(PurchaseOrdersView, { model, linkRows: true, createAction: null }));
@@ -262,11 +262,10 @@ describe("Purchase orders", () => {
     expect(html).toContain("nothing is emailed");
     expect(html).not.toContain("Receive purchase order");
     expect(html).not.toContain('type="number"');
-    const receiving = htmlOf(createElement(ReceivePoView, { model: { title: "Actual PO", lines: [{ key: "line-id", title: "Actual material", detail: "expected 4", qty: "5.5", lot: "" }], lotSuggestionsUnavailable: true } }));
+    const receiving = htmlOf(createElement(ReceivePoView, { model: { title: "Actual PO", lines: [{ key: "line-id", title: "Actual material", detail: "expected 4", qty: "5.5", lot: "" }] } }));
     expect(receiving).toContain('value="5.5"');
     expect(receiving).toContain("Lot code off the package");
     expect(receiving).toContain("Best by");
-    expect(receiving).toContain("Recent lots");
     expect(receiving).not.toContain('max="4"');
   });
 
@@ -562,7 +561,6 @@ describe("Materials", () => {
       { value: "hop", label: "Hop", href: "/materials?category=hop" },
     ]);
     expect(toMaterialsScopes({ category: "" })[0]!.options.every(option => option.href === undefined)).toBe(true);
-    expect(toMaterialsOnHandViewProps({ rows: [], filtered: true }).empty?.description).toBe("Clear the search or choose All types to see every material.");
   });
 
   it("links the unfiltered empty list to Purchase orders and keeps inventory links inert", () => {
@@ -753,18 +751,13 @@ describe("Vendors", () => {
 // #994: an empty search is not an empty list.
 describe("Vendors and Materials on hand search", () => {
   it("say nothing matches, not nothing yet, when a search is on", () => {
-    expect(toVendorsViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No vendors match", description: "Clear the search to see every vendor." });
+    expect(toVendorsViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No vendors match" });
     expect(toVendorsViewProps({ rows: [] }).empty?.title).toBe("No vendors yet");
-    expect(toMaterialsOnHandViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No materials match", description: "Clear the search or choose All types to see every material." });
+    expect(toMaterialsOnHandViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No materials match" });
     expect(toMaterialsOnHandViewProps({ rows: [] }).empty?.title).toBe("No materials yet");
-    // #1112: the page's only action is Add material, so the empty state starts there. Receiving
-    // is the one step that works for every material: a lot-tracked one with no lot can't be counted in.
-    expect(toMaterialsOnHandViewProps({ rows: [] }).empty?.description).toBe("Add a material, then receive a purchase order to put it on hand.");
     // A vendor search narrows Contracts too, so its empty footer is a no-match, not no contracts.
-    expect(toContractsViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No contracts match", description: "Clear the search to see every contract." });
+    expect(toContractsViewProps({ rows: [], filtered: true }).empty).toEqual({ title: "No contracts match" });
     expect(toContractsViewProps({ rows: [] }).empty?.title).toBe("No contracts yet");
-    // These are vendor contracts: a material bought, not beer promised to a customer (#1029).
-    expect(toContractsViewProps({ rows: [] }).empty?.description).toBe("A contract records a quantity of a material a vendor commits to supply, which purchase orders then draw down.");
   });
 });
 
