@@ -1105,7 +1105,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Insert: {
-                    "brewery_id": string,"created_at"?: string,"customer_id": string,"due_on"?: string | null,"id"?: string,"invoice_no"?: number | null,"issued_on"?: string,"kind"?: Database["public"]['Enums']["invoice_kind"],"paid_at"?: string | null,"qbo_accountant_drift"?: boolean,"qbo_balance_cents"?: number | null,"qbo_cash_collected_cents"?: number,"qbo_idempotency_key"?: string,"qbo_invoice_id"?: string | null,"qbo_remote_state"?: Database["public"]['Enums']["qbo_remote_state"],"qbo_settled_at"?: string | null,"qbo_sync_error"?: string | null,"qbo_sync_generation"?: number,"qbo_sync_status"?: Database["public"]['Enums']["qbo_sync_status"],"qbo_sync_token"?: string | null,"qbo_tax_cents"?: number | null,"qbo_total_cents"?: number | null,"refused_delivery_id"?: string | null,"shipment_id"?: string | null,"written_off_at"?: string | null,"written_off_by"?: string | null,"written_off_reason"?: string | null
+                    "brewery_id": string,"created_at"?: string,"customer_id": string,"due_on"?: string | null,"id"?: string,"invoice_no"?: number | null,"issued_on": string,"kind"?: Database["public"]['Enums']["invoice_kind"],"paid_at"?: string | null,"qbo_accountant_drift"?: boolean,"qbo_balance_cents"?: number | null,"qbo_cash_collected_cents"?: number,"qbo_idempotency_key"?: string,"qbo_invoice_id"?: string | null,"qbo_remote_state"?: Database["public"]['Enums']["qbo_remote_state"],"qbo_settled_at"?: string | null,"qbo_sync_error"?: string | null,"qbo_sync_generation"?: number,"qbo_sync_status"?: Database["public"]['Enums']["qbo_sync_status"],"qbo_sync_token"?: string | null,"qbo_tax_cents"?: number | null,"qbo_total_cents"?: number | null,"refused_delivery_id"?: string | null,"shipment_id"?: string | null,"written_off_at"?: string | null,"written_off_by"?: string | null,"written_off_reason"?: string | null
                   }
                   Update: {
                     "brewery_id"?: string,"created_at"?: string,"customer_id"?: string,"due_on"?: string | null,"id"?: string,"invoice_no"?: number | null,"issued_on"?: string,"kind"?: Database["public"]['Enums']["invoice_kind"],"paid_at"?: string | null,"qbo_accountant_drift"?: boolean,"qbo_balance_cents"?: number | null,"qbo_cash_collected_cents"?: number,"qbo_idempotency_key"?: string,"qbo_invoice_id"?: string | null,"qbo_remote_state"?: Database["public"]['Enums']["qbo_remote_state"],"qbo_settled_at"?: string | null,"qbo_sync_error"?: string | null,"qbo_sync_generation"?: number,"qbo_sync_status"?: Database["public"]['Enums']["qbo_sync_status"],"qbo_sync_token"?: string | null,"qbo_tax_cents"?: number | null,"qbo_total_cents"?: number | null,"refused_delivery_id"?: string | null,"shipment_id"?: string | null,"written_off_at"?: string | null,"written_off_by"?: string | null,"written_off_reason"?: string | null
@@ -1377,7 +1377,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Insert: {
-                    "bin_id": string,"brewery_id": string,"counted_by": string,"counted_on"?: string,"created_at"?: string,"id"?: string,"location_id": string,"note"?: string | null
+                    "bin_id": string,"brewery_id": string,"counted_by": string,"counted_on": string,"created_at"?: string,"id"?: string,"location_id": string,"note"?: string | null
                   }
                   Update: {
                     "bin_id"?: string,"brewery_id"?: string,"counted_by"?: string,"counted_on"?: string,"created_at"?: string,"id"?: string,"location_id"?: string,"note"?: string | null
@@ -1891,6 +1891,50 @@ isOneToOne: false
       referencedColumns: ["run_id","brewery_id"]
     },{
       foreignKeyName: "packaging_material_records_run_id_brewery_id_fkey"
+      columns: ["run_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "packaging_runs"
+      referencedColumns: ["id","brewery_id"]
+    }
+                  ]
+                },"packaging_output_corrections": {
+                  Row: {
+                    "brewery_id": string,"corrects_id": string | null,"created_at": string,"created_by": string,"id": string,"previous_bbl_drawn": number,"previous_outputs": NonNullable<Json>,"reason": string,"replacement_bbl_drawn": number,"replacement_outputs": NonNullable<Json>,"run_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "brewery_id": string,"corrects_id"?: string | null,"created_at"?: string,"created_by": string,"id"?: string,"previous_bbl_drawn": number,"previous_outputs": NonNullable<Json>,"reason": string,"replacement_bbl_drawn": number,"replacement_outputs": NonNullable<Json>,"run_id": string
+                  }
+                  Update: {
+                    "brewery_id"?: string,"corrects_id"?: string | null,"created_at"?: string,"created_by"?: string,"id"?: string,"previous_bbl_drawn"?: number,"previous_outputs"?: NonNullable<Json>,"reason"?: string,"replacement_bbl_drawn"?: number,"replacement_outputs"?: NonNullable<Json>,"run_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "packaging_output_corrections_brewery_id_fkey"
+      columns: ["brewery_id"]
+isOneToOne: false
+      referencedRelation: "breweries"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "packaging_output_corrections_corrects_id_brewery_id_fkey"
+      columns: ["corrects_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "packaging_output_corrections"
+      referencedColumns: ["id","brewery_id"]
+    },{
+      foreignKeyName: "packaging_output_corrections_run_id_brewery_id_fkey"
+      columns: ["run_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "packaging_run_requirements"
+      referencedColumns: ["run_id","brewery_id"]
+    },{
+      foreignKeyName: "packaging_output_corrections_run_id_brewery_id_fkey"
+      columns: ["run_id","brewery_id"]
+isOneToOne: false
+      referencedRelation: "packaging_run_yields"
+      referencedColumns: ["run_id","brewery_id"]
+    },{
+      foreignKeyName: "packaging_output_corrections_run_id_brewery_id_fkey"
       columns: ["run_id","brewery_id"]
 isOneToOne: false
       referencedRelation: "packaging_runs"
@@ -2827,7 +2871,7 @@ isOneToOne: false
                   }
                   ComputedFields: never
                   Insert: {
-                    "bin_id"?: string | null,"brewery_id": string,"correction_reason"?: string | null,"corrects_receipt_id"?: string | null,"created_at"?: string,"id"?: string,"location_id"?: string | null,"note"?: string | null,"po_id": string,"qbo_bill_error"?: string | null,"qbo_bill_id"?: string | null,"qbo_bill_request_id"?: string | null,"qbo_bill_status"?: string | null,"received_by": string,"received_on"?: string
+                    "bin_id"?: string | null,"brewery_id": string,"correction_reason"?: string | null,"corrects_receipt_id"?: string | null,"created_at"?: string,"id"?: string,"location_id"?: string | null,"note"?: string | null,"po_id": string,"qbo_bill_error"?: string | null,"qbo_bill_id"?: string | null,"qbo_bill_request_id"?: string | null,"qbo_bill_status"?: string | null,"received_by": string,"received_on": string
                   }
                   Update: {
                     "bin_id"?: string | null,"brewery_id"?: string,"correction_reason"?: string | null,"corrects_receipt_id"?: string | null,"created_at"?: string,"id"?: string,"location_id"?: string | null,"note"?: string | null,"po_id"?: string,"qbo_bill_error"?: string | null,"qbo_bill_id"?: string | null,"qbo_bill_request_id"?: string | null,"qbo_bill_status"?: string | null,"received_by"?: string,"received_on"?: string
@@ -3866,7 +3910,7 @@ isOneToOne: false
                   ]
                 },"invoice_totals": {
                   Row: {
-                    "brewery_id": string | null,"collected_cents": number | null,"customer_id": string | null,"invoice_id": string | null,"kind": Database["public"]['Enums']["invoice_kind"] | null,"local_paid_cents": number | null,"paid_at": string | null,"qbo_balance_cents": number | null,"qbo_sync_status": Database["public"]['Enums']["qbo_sync_status"] | null,"qbo_tax_cents": number | null,"qbo_total_cents": number | null,"subtotal_cents": number | null
+                    "brewery_id": string | null,"collected_cents": number | null,"customer_id": string | null,"invoice_id": string | null,"kind": Database["public"]['Enums']["invoice_kind"] | null,"local_credit_cents": number | null,"local_paid_cents": number | null,"paid_at": string | null,"qbo_balance_cents": number | null,"qbo_sync_status": Database["public"]['Enums']["qbo_sync_status"] | null,"qbo_tax_cents": number | null,"qbo_total_cents": number | null,"subtotal_cents": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -4906,6 +4950,9 @@ isOneToOne: false
 "correct_packaging_material_record":
 { Args: { "p_actuals": Json,"p_brewery": string,"p_reason": string,"p_record": string,"p_request_id": string }; Returns: Json
                            },
+"correct_packaging_run_outputs":
+{ Args: { "p_bbl_drawn": number,"p_bin": string,"p_brewery": string,"p_location": string,"p_outputs": Json,"p_previous": string,"p_reason": string,"p_request_id": string,"p_run": string }; Returns: Json
+                           },
 "correct_purchase_receipt":
 { Args: { "p_bin"?: string,"p_brewery": string,"p_lines": Json,"p_location"?: string,"p_reason": string,"p_receipt": string,"p_request_id": string }; Returns: Json
                            },
@@ -5127,6 +5174,9 @@ isOneToOne: false
 { Args: { "p_brewery": string,"p_outputs": Json }; Returns: Json
                            },
 "get_packaging_material_record":
+{ Args: { "p_brewery": string,"p_run": string }; Returns: Json
+                           },
+"get_packaging_output_corrections":
 { Args: { "p_brewery": string,"p_run": string }; Returns: Json
                            },
 "get_packaging_run_lot":

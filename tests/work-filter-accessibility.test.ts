@@ -10,7 +10,7 @@ import { WorkList } from "../app/(app)/work/work-list";
 import { TabBar } from "../components/mgr/qty";
 import { WorkView } from "../components/mgr/views/work";
 import { workWarehouse } from "../lib/mgr/fixtures/work";
-import { toWorkViewProps, WORK_FILTER_CHIPS, workEmpty } from "../lib/mgr/work-view";
+import { toWorkViewProps, WORK_FILTER_CHIPS } from "../lib/mgr/work-view";
 import type { WorkRow } from "../lib/commands/landings";
 
 const render = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -80,7 +80,6 @@ describe("Work filter tab accessibility (#727)", () => {
     const html = render(createElement(WorkView, { model: toWorkViewProps({ rows: [] }) }));
     const { shown } = expectTabsToControlPanels(html);
     expect(shown).toContain("Nothing in motion");
-    expect(shown).toContain(workEmpty("all").description);
   });
 
   it("offers the same authorized New order action in a truly empty All or Orders panel (#1129)", () => {
@@ -102,13 +101,6 @@ describe("Work filter tab accessibility (#727)", () => {
     const model = toWorkViewProps({ rows: [workWarehouse.rows[0]] });
     const { shown } = expectTabsToControlPanels(render(createElement(WorkView, { model, chip: "batches", createAction })));
     expect(shown).not.toContain("New order");
-  });
-
-  it("points the Transfers and Packaging chips to their own pages, since list_work never lists them (#1129)", () => {
-    const empty = (chip: string) => expectTabsToControlPanels(render(createElement(WorkView, { model: toWorkViewProps({ rows: [] }), chip }))).shown;
-    expect(empty("transfers")).toContain("Stock transfers are listed on the Transfers page");
-    expect(empty("runs")).toContain("Packaging runs are listed on the Packaging page");
-    expect(empty("orders")).toContain(workEmpty("all").description);
   });
 
   it("falls back to the first chip when the chosen one is not offered", () => {

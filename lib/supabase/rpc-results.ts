@@ -19,7 +19,7 @@ export type TaproomCount = {
 };
 
 // record_invoice_payment and void_invoice_payment: the payment, its invoice, and
-// the invoice's balance after the write (total minus unvoided payments).
+// the signed balance after the write (total minus live credits and unvoided payments).
 type InvoicePaymentResult = { paymentId: string; invoiceId: string; balanceCents: number };
 
 export type RpcResults = {

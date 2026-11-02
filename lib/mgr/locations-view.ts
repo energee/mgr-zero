@@ -46,7 +46,7 @@ function detail(l: LocationsRowSnapshot): string {
 export function toLocationsViewProps({ locations, backHref }: LocationsSnapshot): LocationsViewModel {
   return {
     backHref,
-    empty: locations.length === 0 ? { title: "No locations yet", description: "Add the places you hold stock: the cellar, a taproom, a cold box." } : undefined,
+    empty: locations.length === 0 ? { title: "No locations yet" } : undefined,
     rows: locations.map((l) => ({
       key: l.id,
       title: l.name,
