@@ -1,7 +1,7 @@
 // lib/mgr/fixtures/portal-invoices.ts — portal_invoices / portal_invoice
 // snapshots for INV-1042 (unpaid $948) and INV-1037 (paid). Views own no
 // sample data: screens pass toXViewProps(snapshot).
-import { RIDGELINE, SKU_HAZY, SKU_PILS } from "./demo";
+import { SKU_HAZY, SKU_PILS } from "./demo";
 import type { PortalInvoiceSnapshot } from "@/lib/mgr/portal-invoice-view";
 import type { PortalInvoicesSnapshot } from "@/lib/mgr/portal-invoices-view";
 
@@ -62,7 +62,6 @@ export const portalInvoicePaid: PortalInvoiceSnapshot = {
 
 /** Ridgeline's portal_invoices list: unpaid INV-1042, paid INV-1037. */
 export const portalInvoicesRidgeline: PortalInvoicesSnapshot = {
-  customerName: RIDGELINE.name,
   invoices: [
     {
       id: portalInvoiceUnpaid.invoice.id,

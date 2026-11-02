@@ -15,7 +15,6 @@ import "@/lib/commands/all";
 import { FirstRunChecklist, showFirstRun, type FirstRun } from "./first-run";
 import { taproomTodayRows } from "@/lib/mgr/taproom-today";
 import type { TapInterval } from "@/lib/mgr/tap-board-state";
-import { formatDayHeader } from "@/lib/date-format";
 import { onlyRoles } from "@/lib/mgr/roles";
 import { navTitle } from "@/lib/mgr/nav";
 
@@ -24,7 +23,6 @@ export const metadata = { title: navTitle("/") };
 export default async function TodayPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const date = formatDayHeader(new Date(), brewery.timeZone);
   // Admin reads Today alongside the first-run state, not after it; a new brewery's Today is empty and cheap.
   const [state, adminItems] = brewery.roles.includes("admin")
     ? await Promise.all([runCommand("get_first_run_state", {}, ctx) as Promise<FirstRun>, runCommand("get_today", {}, ctx) as Promise<TodayItem[]>])
@@ -36,7 +34,7 @@ export default async function TodayPage() {
     if (!location) {
       return (
         <TodayView
-          model={toTodayViewProps({ date, empty: { title: "No taproom location is available", description: "Ask Admin to add one under Locations." }, emptyVerb: "Taproom stock", rows: [] })}
+          model={toTodayViewProps({ empty: { title: "No taproom location is available" }, emptyVerb: "Taproom stock", rows: [] })}
           emptyAction={E.btn("Taproom stock", "g", "/beer")}
         />
       );
@@ -46,8 +44,8 @@ export default async function TodayPage() {
       runCommand("list_taproom_counts", { locationId: location.id }, ctx) as Promise<{ counted_on: string; created_at: string }[]>,
       runCommand("get_taproom_variance", { locationId: location.id, weeks: 4 }, ctx) as Promise<{ as_of: string; reason: string | null; rows: { variance_bbl: number | null }[]; periods: { coverage_complete: boolean; reason: string | null }[] }>,
     ]);
-    return <TodayView model={toTodayViewProps({ date, taproom: taproomTodayRows(location, open, counts, report, brewery.timeZone) })} linkRows />;
+    return <TodayView model={toTodayViewProps({ taproom: taproomTodayRows(location, open, counts, report, brewery.timeZone) })} linkRows />;
   }
   const items = adminItems ?? (await runCommand("get_today", {}, ctx)) as TodayItem[];
-  return <TodayView model={toTodayViewProps({ date, items, timeZone: brewery.timeZone, actions: todayActions(brewery.roles) })} linkRows />;
+  return <TodayView model={toTodayViewProps({ items, timeZone: brewery.timeZone, actions: todayActions(brewery.roles) })} linkRows />;
 }

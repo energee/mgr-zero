@@ -46,8 +46,8 @@ export type VendorDetailViewModel = {
   materials: Rows<{ key: string; title: string; detail: string }>;
 };
 
-const NO_OPEN_ORDERS: EmptyState = { title: "No open purchase orders", description: "Drafted, sent and partly received orders from this vendor show here." };
-const NO_MATERIALS: EmptyState = { title: "No default materials", description: "A material names its default vendor on Materials on hand." };
+const NO_OPEN_ORDERS: EmptyState = { title: "No open purchase orders" };
+const NO_MATERIALS: EmptyState = { title: "No default materials" };
 
 const withEmpty = <Row>(rows: Row[], empty: EmptyState): Rows<Row> => ({ rows, empty: rows.length ? undefined : empty });
 
