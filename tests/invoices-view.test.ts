@@ -246,7 +246,6 @@ it("#1135 shows the sync only while QuickBooks is connected, and writes the emai
   expect(admin).not.toContain("live sync");
   expect(admin).toContain('href="/settings/accounting"');
   expect(admin).toContain("Payment status may be stale until QuickBooks is reconnected and synced.");
-  expect(admin).toContain("MGR can’t tell whether QuickBooks emailed an invoice.");
   expect(admin).not.toContain("invoice query");
   const sales = draw(false, false);
   expect(sales).not.toContain("live sync");
@@ -262,13 +261,10 @@ it("#1135 falls back to the shared sync view only while connected", () => {
   expect(draw(false)).not.toContain("Sync QuickBooks");
 });
 
-it("explains where invoices come from without requiring QuickBooks (#1261)", () => {
+it("draws an empty register without requiring QuickBooks (#1261)", () => {
   const html = renderToStaticMarkup(createElement(InvoicesView, { rows: [] }));
   expect(html).toContain("No invoices yet");
-  expect(html).toMatch(/Invoices show here after you ship an order/);
-  expect(html).toMatch(/push them to QuickBooks or record payments in MGR/);
-  expect(html).toContain("MGR can’t tell whether QuickBooks emailed an invoice.");
-  expect(html).toContain(">Unavailable<");
+  expect(html).not.toContain("Email delivery status");
 });
 
 describe("#1516 the register leads with its invoices", () => {
@@ -280,8 +276,7 @@ describe("#1516 the register leads with its invoices", () => {
 
   it("leaves an unknown balance out and labels only credit memos under the number", () => {
     const html = draw();
-    // Only the email-delivery note still reads Unavailable.
-    expect(html.match(/>Unavailable</g)).toHaveLength(1);
+    expect(html).not.toContain(">Unavailable<");
     expect(html).not.toMatch(/>Invoice</);
     expect(html).toContain(">Credit memo<");
   });

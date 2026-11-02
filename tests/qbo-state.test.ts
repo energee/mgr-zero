@@ -514,7 +514,7 @@ describe("QuickBooks current invoice state", () => {
     const portalDetail = await runCommand("portal_invoice", { invoiceId: f.invoice.id }, portalCtx) as Parameters<typeof toPortalInvoiceViewProps>[0];
     const { rows: portalList } = await runCommand("portal_invoices", {}, portalCtx) as { rows: Parameters<typeof toPortalInvoicesViewProps>[0]["invoices"] };
     expect(toPortalInvoiceViewProps(portalDetail)).toMatchObject({ total: "$105.00", payable: false, paid: false, status: "Review" });
-    expect(toPortalInvoicesViewProps({ customerName: "Buyer", invoices: portalList }).rows[0])
+    expect(toPortalInvoicesViewProps({ invoices: portalList }).rows[0])
       .toMatchObject({ total: "$105.00", unpaid: true });
     expect(toPortalOrderViewProps({
       ...portalOrderShipped,
@@ -788,7 +788,7 @@ describe("QuickBooks current invoice state", () => {
       });
       expect(model).toMatchObject({ paid: false, paidOn: undefined, payable: false, status: state.status });
     }
-    expect(toPortalInvoicesViewProps({ customerName: "Buyer", invoices: [{ ...invoice, invoice_lines: [{ amount_cents: 10000 }] }] }).rows[0])
+    expect(toPortalInvoicesViewProps({ invoices: [{ ...invoice, invoice_lines: [{ amount_cents: 10000 }] }] }).rows[0])
       .toMatchObject({ detail: "voided", unpaid: false });
   });
 });

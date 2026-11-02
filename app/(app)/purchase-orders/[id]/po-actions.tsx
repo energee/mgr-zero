@@ -46,7 +46,6 @@ export function ReceiveForm({ poId, lines, locations, bins, onHand, today, model
   const counted = open.filter(line => isCount(counts[line.id] ?? ""));
   const view: ReceivePoViewModel = {
     ...model, locationId, binId, locations, bins: binsHere, receivedOn, sentVia: via, correctionReason: reason, closureReason,
-    lotSuggestionsUnavailable: open.some(line => line.material?.lot_tracked),
     lines: open.map(line => ({
       key: line.id, title: line.material?.name ?? `Line ${line.id}`,
       detail: correcting ? `originally counted ${line.qty_counted} ${line.material?.purchase_uom ?? "purchase units"}` : poLineDetail(line),

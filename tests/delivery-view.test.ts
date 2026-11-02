@@ -71,8 +71,8 @@ describe("Routes", () => {
   });
 
   it("an empty Open list points at Returned when routes were returned, and says No routes yet only when none exist (#1486)", () => {
-    const empty = { title: "Deliveries", subtitle: "", rows: [] };
-    expect(toRoutesViewProps({ ...empty, anyReturned: true }).empty).toEqual({ title: "No open routes", description: "Returned routes are under Returned." });
+    const empty = { title: "Deliveries", rows: [] };
+    expect(toRoutesViewProps({ ...empty, anyReturned: true }).empty).toEqual({ title: "No open routes" });
     expect(toRoutesViewProps({ ...empty, anyReturned: false }).empty?.title).toBe("No routes yet");
     expect(toRoutesViewProps({ ...empty, status: "returned", anyReturned: false }).empty?.title).toBe("No returned routes");
   });
@@ -103,7 +103,7 @@ describe("Routes", () => {
   });
 
   it("an assigned route is a row link, not an Open verb; Resume and Assign stay verbs (#1026)", () => {
-    const model = toRoutesViewProps({ title: "Routes", subtitle: "", rows: [
+    const model = toRoutesViewProps({ title: "Routes", rows: [
       { key: "r", title: "Route C · 2026-09-12", detail: "2 stops · Dana", href: "/routes/r" },
       { key: "a", title: "Route A · 2026-09-10", detail: "departed", verb: "Resume", tone: "info", href: "/routes/a" },
     ] });
@@ -174,12 +174,9 @@ describe("Route", () => {
     expect(html).not.toContain("Delivery date");
     expect(html).not.toContain("Save route plan");
   });
-  it("explains empty route stops and links live users to Orders (#1258)", () => {
+  it("links live users to Orders from empty route stops (#1258)", () => {
     const model = { ...routeAPlan, stops: [], selection: {}, saved: false, ordersHref: "/orders" };
     const html = htmlOf(createElement(RouteView, { model }));
-    expect(html).toContain("confirm an order, pick its stock, then ship it");
-    expect(html).toContain("Shipped delivery orders appear here until assigned to a route");
-    expect(html).toContain("Pickup orders do not appear");
     expect(html).toMatch(/<a[^>]*href="\/orders"[^>]*>Open Orders<\/a>/);
     const inventory = htmlOf(createElement(RouteView, { model: { ...routeAPlan, stops: [] } }));
     expect(inventory).toContain("Open Orders");

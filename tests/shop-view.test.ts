@@ -7,7 +7,6 @@ import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { ReviewOrderView } from "../components/mgr/views/review-order";
 import { ShopView } from "../components/mgr/views/shop";
-import { RIDGELINE } from "../lib/mgr/fixtures/demo";
 import { ridgelineReviewOrder, ridgelineShop } from "../lib/mgr/fixtures/portal";
 import { toQuotedReviewOrderViewProps, toReviewOrderViewProps } from "../lib/mgr/review-order-view";
 import { toShopViewProps } from "../lib/mgr/shop-view";
@@ -17,7 +16,6 @@ const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", nu
 describe("Shop view", () => {
   it("maps portal_catalog grouped by product with cart qty", () => {
     const model = toShopViewProps(ridgelineShop);
-    expect(model.customer).toBe(RIDGELINE.name);
     expect(model.groups.map((g) => g.product)).toEqual(["Hazy IPA", "Pils", "Stout"]);
     expect(model.groups[0]?.items.map((i) => [i.name, i.price, i.qty])).toEqual([
       ["½ bbl keg", "$150.00", 4],
@@ -68,7 +66,6 @@ describe("Shop view", () => {
     expect(html).not.toMatch(/Review order/);
     expect(html).not.toMatch(/Coming up/);
     expect(html).not.toMatch(/Ships from/);
-    expect(html).toContain(RIDGELINE.name);
   });
 });
 

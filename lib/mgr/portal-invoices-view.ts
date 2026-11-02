@@ -19,13 +19,11 @@ export type PortalInvoicesRowView = {
 };
 
 export type PortalInvoicesViewModel = {
-  subtitle: string;
   rows: PortalInvoicesRowView[];
   empty?: EmptyState;
 };
 
 export type PortalInvoicesSnapshot = {
-  customerName: string;
   invoices: {
     id: string;
     invoice_no: number | null;
@@ -50,10 +48,9 @@ function invoiceDetail(inv: PortalInvoicesSnapshot["invoices"][number]): string 
 }
 
 /** Map a portal_invoices payload onto PortalInvoicesView. */
-export function toPortalInvoicesViewProps({ customerName, invoices }: PortalInvoicesSnapshot): PortalInvoicesViewModel {
+export function toPortalInvoicesViewProps({ invoices }: PortalInvoicesSnapshot): PortalInvoicesViewModel {
   return {
-    subtitle: customerName,
-    empty: invoices.length === 0 ? { title: "No invoices yet", description: "An invoice appears here once the brewery ships an order." } : undefined,
+    empty: invoices.length === 0 ? { title: "No invoices yet" } : undefined,
     rows: invoices.map((inv) => {
       const credit = inv.kind === "credit_memo";
       const state = invoiceCurrentState(inv);

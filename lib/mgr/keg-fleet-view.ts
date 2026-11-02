@@ -48,7 +48,7 @@ export type KegFleetViewModel = {
   eventUnavailable?: string | null;
 };
 
-const NO_POOLS: EmptyState = { title: "No keg pools yet", description: "A pool groups the kegs of one size and owner." };
+const NO_POOLS: EmptyState = { title: "No keg pools yet" };
 
 /** Identity but for the blank: the pools list is the only thing this screen
  *  can be empty of, and the words for that belong here, not in the page. */
