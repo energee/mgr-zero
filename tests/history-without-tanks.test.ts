@@ -7,6 +7,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { admin, ins, makeBrewery, makeStaffCtx } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+import { periodRange } from "@/lib/compliance-period";
+import { breweryDate } from "@/lib/date-format";
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
 let breweryId: string;
@@ -125,12 +127,15 @@ describe("record_historical_batch", () => {
     const a = await schedule();
     await historical({ batchId: a });
     await reading({ batchId: a, at: "2025-06-10T12:00:00Z" });
-    const batches = await runCommand("list_batches", {}, brewer) as { id: string; closed_at: string | null }[];
-    expect(batches.find((x) => x.id === a)!.closed_at).not.toBeNull();
+    const batches = await runCommand("list_batch_history", { status: "completed" }, brewer) as { rows: { id: string; closed_at: string | null }[] };
+    expect(batches.rows.find((x) => x.id === a)!.closed_at).not.toBeNull();
     expect((await runCommand("get_brew_day", { batchId: a }, brewer) as { occupancy: unknown }).occupancy).toBeNull();
-    const report = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: "2026-10-01", periodEnd: "2026-10-31" }, owner) as
+    // The current brewery-local month: tanks other tests fill are stamped now(),
+    // so a fixed month would miss them once it ends.
+    const month = periodRange(breweryDate("America/New_York").slice(0, 7))!;
+    const report = await runCommand("generate_compliance_report", { jurisdiction: "TTB", ...month }, owner) as
       { figures: { inProcess: number } };
-    // Only the live 2026-10 tanks above are in process; a historical batch adds nothing.
+    // Only live tanks are in process; a historical batch adds nothing.
     const open = (await admin.from("occupancy_volumes").select("bbl").eq("brewery_id", breweryId).is("ended_at", null).throwOnError()).data!;
     expect(report.figures.inProcess).toBeCloseTo(open.reduce((s, r) => s + Number(r.bbl), 0), 2);
   });

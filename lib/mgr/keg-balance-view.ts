@@ -34,6 +34,6 @@ export function toKegBalanceViewProps(s: KegBalanceSnapshot): KegBalanceViewMode
     kegs: s.kegs,
     deposits: s.deposits,
     rows,
-    empty: rows.length === 0 ? { title: "No kegs currently out", description: "Every keg in the fleet is back at the brewery." } : undefined,
+    empty: rows.length === 0 ? { title: "No kegs currently out" } : undefined,
   };
 }

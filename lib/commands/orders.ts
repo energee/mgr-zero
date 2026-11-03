@@ -447,15 +447,15 @@ defineQuery({
     const ids = invoices.map(inv => inv.id);
     const staffLinksPromise = invoiceStaffLinks(ctx, invoices);
     const [totals, pushes] = ids.length ? await Promise.all([
-      unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents, local_paid_cents").in("invoice_id", ids)) as PromiseLike<{ invoice_id: string; subtotal_cents: number; local_paid_cents: number }[]>,
+      unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents, local_paid_cents, local_credit_cents").in("invoice_id", ids)) as PromiseLike<{ invoice_id: string; subtotal_cents: number; local_paid_cents: number; local_credit_cents: number }[]>,
       invoicePushFacts(ctx, ids),
     ]) : [[], new Map<string, InvoicePushFacts>()];
     const staffLinks = await staffLinksPromise;
     const totalsById = new Map(totals.map(t => [t.invoice_id, t]));
     return { ...page, rows: invoices.map(inv => {
-      const { subtotal_cents = 0, local_paid_cents = 0 } = totalsById.get(inv.id) ?? {};
+      const { subtotal_cents = 0, local_paid_cents = 0, local_credit_cents = 0 } = totalsById.get(inv.id) ?? {};
       const push = pushes.get(inv.id);
-      return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents), local_paid_cents,
+      return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents), local_paid_cents, local_credit_cents,
         has_pending_qbo_push: push?.has_pending_push ?? false, was_pushed_to_qbo: push?.was_pushed ?? false, quickbooks_link: staffLinks.get(inv.id) ?? null };
     }) };
   },
@@ -466,7 +466,7 @@ defineQuery({
   roles: [...readRoles],
   input: z.object({ invoiceId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    const [invoice, invLines, pushes, paymentRows] = await Promise.all([
+    const [invoice, invLines, pushes, paymentRows, totals] = await Promise.all([
       unwrap(ctx.db.from("invoices").select("*, customers(id,name,qbo_customer_id,qbo_realm_id), shipments(orders(id, order_no))").eq("id", i.invoiceId).eq("brewery_id", ctx.breweryId).single()),
       completeRows("Invoice lines", start => ctx.db.from("invoice_lines").select("*, skus(name,qbo_item_id,qbo_realm_id)", { count: "exact" })
         .eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).order("kind").order("id").range(start, start + PAGE_SIZE - 1)),
@@ -477,6 +477,7 @@ defineQuery({
         .select("id, amount_cents, received_on, method, reference, invoice_payment_voids(reason)", { count: "exact" })
         .eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId)
         .order("received_on", { ascending: false }).order("id").range(start, start + PAGE_SIZE - 1)),
+      unwrap(ctx.db.from("invoice_totals").select("local_credit_cents").eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).single()),
     ]);
     if (!invoice) throw new Error("Invoice not found");
     const [staffLinks, lastPayment] = await Promise.all([
@@ -491,6 +492,7 @@ defineQuery({
     const push = pushes.get(invoice.id);
     return { invoice, lines: invLines, payments,
       localPaidCents: payments.reduce((sum, payment) => payment.void ? sum : sum + payment.amount_cents, 0),
+      localCreditCents: totals!.local_credit_cents!,
       hasPendingPush: push?.has_pending_push ?? false, wasPushedToQbo: push?.was_pushed ?? false,
       quickbooksLink: staffLinks.get(invoice.id) ?? null,
       lastPaymentMethod: (lastPayment as { method: PaymentMethod }[])[0]?.method ?? null };

@@ -7,7 +7,7 @@ import type { ComingUpViewModel } from "@/lib/mgr/coming-up-view";
 export function ComingUpView({ model, linkRows }: { model: ComingUpViewModel; linkRows?: boolean }) {
   return (
     <>
-      {E.hd("Coming up", model.brewery)}
+      {E.hd("Coming up")}
       {model.empty ? E.blank(model.empty) : model.rows.map((row) => (
         <Fragment key={row.key}>{E.nav(row.title, row.detail, row.warning ? "w" : "", undefined, linkRows ? row.href : undefined)}</Fragment>
       ))}

@@ -15,7 +15,7 @@ const emptyRepack = {
 
 it("explains the missing Repack prerequisite without downstream fields or a commit", () => {
   const html = renderToStaticMarkup(createElement(RepackView, { model: emptyRepack }));
-  expect(html).toContain("No SKU can be broken yet");
+  expect(html).toContain("No packages to repack");
   expect(html).toContain('href="/catalog"');
   expect(html).not.toMatch(/Location|Untracked stock|Packages to repack|Confirm repack/);
   expect(repackFooter(emptyRepack)).toBeNull();

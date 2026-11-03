@@ -23,10 +23,7 @@ export function RouteView({ model, controls, busy = false, error, onSave, onDepa
     if (patch.selection) controls?.selection?.(patch.selection);
   };
   const reason = routeReason(value);
-  const noStops = !model.stops?.length && E.blank({
-    title: "No stops ready for a route",
-    description: "In Orders, confirm an order, pick its stock, then ship it. Shipped delivery orders appear here until assigned to a route. Pickup orders do not appear. Picked stock transfers also appear here.",
-  }, undefined, E.act("Open Orders", "primary", model.ordersHref));
+  const noStops = !model.stops?.length && E.blank({ title: "No stops ready for a route" }, undefined, E.act("Open Orders", "primary", model.ordersHref));
   return <>
     {E.back("Deliveries", model.title, undefined, model.backHref, "Routes")}
     {noStops && !model.saved ? noStops : <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); if (!busy && !reason) onSave?.(); }}>

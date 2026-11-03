@@ -7,5 +7,4 @@ export type SearchViewModel = {
   placeholder: string;
   groups: PaletteGroup[];
   heading?: string;
-  sub?: string;
 };
