@@ -88,13 +88,13 @@ describe("Catalog view", () => {
 
   it("keeps a brand's staff-only alias apart from its name (brand-alias.md)", () => {
     // Pickers and the brand page title still join the two.
-    expect(nameWithAlias({ name: "Appaloosa", alias: "Animal #14" })).toBe("Appaloosa · Animal #14");
-    expect(nameWithAlias({ name: "Lupula", alias: null })).toBe("Lupula");
-    expect(nameWithAlias({ name: "Lupula" })).toBe("Lupula");
+    expect(nameWithAlias({ name: "Copper Kite", alias: "Field Notes #14" })).toBe("Copper Kite · Field Notes #14");
+    expect(nameWithAlias({ name: "Kestrel", alias: null })).toBe("Kestrel");
+    expect(nameWithAlias({ name: "Kestrel" })).toBe("Kestrel");
     const [first, second, third] = catalogBrands.brands;
-    const model = toCatalogViewProps({ ...catalogBrands, brands: [{ ...first!, alias: "Animal #14" }, { ...second!, alias: null }, { ...third!, alias: "" }] });
+    const model = toCatalogViewProps({ ...catalogBrands, brands: [{ ...first!, alias: "Field Notes #14" }, { ...second!, alias: null }, { ...third!, alias: "" }] });
     expect(model.brands.map(({ name, alias }) => [name, alias])).toEqual([
-      [first!.name, "Animal #14"],
+      [first!.name, "Field Notes #14"],
       [second!.name, undefined],
       [third!.name, undefined],
     ]);
@@ -102,7 +102,7 @@ describe("Catalog view", () => {
 
   it("draws brands as whole-linked table rows with the alias under Brand", () => {
     const [first, ...rest] = catalogBrands.brands;
-    const model = toCatalogViewProps({ ...catalogBrands, brands: [{ ...first!, alias: "Animal #14" }, ...rest] });
+    const model = toCatalogViewProps({ ...catalogBrands, brands: [{ ...first!, alias: "Field Notes #14" }, ...rest] });
     // Inventory brand rows are taps, never Catalog links (tests/mgr-screens.test.ts
     // resolves the tap), and the table preserves horizontal containment.
     const inert = htmlOf(createElement(CatalogView, { model }));
@@ -116,7 +116,7 @@ describe("Catalog view", () => {
       .map((m) => [m[1].match(/href="([^"]+)"/)?.[1], m[2]])
       .filter(([href]) => href?.startsWith("/catalog/brands/"));
     expect(links).toEqual([...model.brands, ...model.brands].map((b) => [b.href, b.name]));
-    expect(html.match(/Animal #14/g)).toHaveLength(2);
+    expect(html.match(/Field Notes #14/g)).toHaveLength(2);
     // The phone list labels every fact under its header and draws no box per record.
     const records = html.split(/data-slot="item"(?=[\s>])/).slice(1).filter((chunk) => /^[^>]*role="listitem"/.test(chunk));
     expect(records).toHaveLength(model.brands.length);
@@ -126,12 +126,12 @@ describe("Catalog view", () => {
   });
 
   it("the brand page carries and draws the alias field", () => {
-    const model = toBrandViewProps({ ...brandHazy, brand: { ...brandHazy.brand, alias: "Animal #14" } });
-    expect(model.alias).toBe("Animal #14");
+    const model = toBrandViewProps({ ...brandHazy, brand: { ...brandHazy.brand, alias: "Field Notes #14" } });
+    expect(model.alias).toBe("Field Notes #14");
     expect(toBrandViewProps(brandHazy).alias).toBe("");
     const html = renderToStaticMarkup(createElement(BrandView, { model }));
     expect(html).toContain("Alias");
-    expect(html).toContain("Animal #14");
+    expect(html).toContain("Field Notes #14");
     // What the alias is for stays visible while typing (#1131).
     expect(html).not.toContain('placeholder="Staff only"');
     expect(html).toMatch(/<input[^>]*aria-describedby="brand-alias-help"/);
@@ -445,8 +445,8 @@ describe("Brand view", () => {
   });
 
   it("titles the page with the saved name and alias, not the typed field", () => {
-    const model = toBrandViewProps({ ...brandHazy, brand: { ...brandHazy.brand, alias: "Animal #14" }, saved: { ...brandHazy.brand, alias: "Animal #14" } });
-    expect(model.title).toBe("Hazy IPA · Animal #14");
+    const model = toBrandViewProps({ ...brandHazy, brand: { ...brandHazy.brand, alias: "Field Notes #14" }, saved: { ...brandHazy.brand, alias: "Field Notes #14" } });
+    expect(model.title).toBe("Hazy IPA · Field Notes #14");
     expect(toBrandViewProps({ ...brandHazy, brand: { ...brandHazy.brand, name: "" }, saved: brandHazy.brand }).title).toBe("Hazy IPA");
     expect(toBrandViewProps({ ...brandHazy, brand: { ...brandHazy.brand, id: "" } }).title).toBe("New brand");
   });

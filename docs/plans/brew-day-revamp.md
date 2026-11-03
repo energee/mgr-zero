@@ -106,7 +106,7 @@ Each task writes its named test first and watches it fail. Rendering is checked 
    - Test: `tests/pack-qty.test.ts`. 110/55 → "2 × 55 lb"; 220/50 → "4 × 50 lb + 20 lb"; factor 1 → "1650 lb"; 4.4 packs × 50 → 220.
    - Types: `number` in, `string` / `number` out.
    - Done when the test passes and `tsc` is clean. Depends on nothing. *In progress in this PR.*
-2. **Inventory screens.** "Brew prep" (gated `SCHEMA-GATE` until task 4) and the revamped "Brew day" in `components/mgr/screens.tsx`, fixtures in `lib/mgr/fixtures/production.ts` (BAT-202 Mineral #6).
+2. **Inventory screens.** "Brew prep" (gated `SCHEMA-GATE` until task 4) and the revamped "Brew day" in `components/mgr/screens.tsx`, fixtures in `lib/mgr/fixtures/production.ts` (BAT-202 Quarry #6).
    - Test: the screen suite in AGENTS.md "Current focus: screens".
    - Depends on 1. *In progress in this PR.*
 3. **Receiving uses the pack math.** Replace the inline factor multiply in `po-actions.tsx:66` and `receipt-view.ts:104` with `packsToQty`.

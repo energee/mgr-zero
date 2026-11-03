@@ -5,17 +5,17 @@ import { toCatalogViewProps } from '../lib/mgr/catalog-view';
 describe('pours in the sellable SKU catalog', () => {
   const pour = { id: 'pour-id', name: 'Pint', ounces: 16 };
   it('puts a pour alongside packaged SKUs without inventing stock volume', () => {
-    const view = toSkuListViewProps({ brand: { id: 'brand', name: 'Lupula' }, skus: [], pours: [pour] });
+    const view = toSkuListViewProps({ brand: { id: 'brand', name: 'Kestrel' }, skus: [], pours: [pour] });
     expect(view.empty).toBeUndefined();
     expect(view.rows).toEqual([expect.objectContaining({ key: 'pour:pour-id', title: 'Pint', kind: 'poured', detail: '16 oz · pour · drawn from keg' })]);
     expect(view.rows[0].detail).not.toContain('bbl');
   });
   it('counts persisted packages including inactive SKUs, separately from poured serving identities', () => {
     const skus = [
-      { id: 'active-case', name: 'Lupula case', active: true, format_id: 'case', formats: { name: 'Case', bbl_per_unit: 0.1 } },
-      { id: 'inactive-half', name: 'Lupula half', active: false, format_id: 'half', formats: { name: 'Half', bbl_per_unit: 0.5 } },
+      { id: 'active-case', name: 'Kestrel case', active: true, format_id: 'case', formats: { name: 'Case', bbl_per_unit: 0.1 } },
+      { id: 'inactive-half', name: 'Kestrel half', active: false, format_id: 'half', formats: { name: 'Half', bbl_per_unit: 0.5 } },
     ];
-    const brand = { id: 'brand', name: 'Lupula', abv: 7, styles: null, skus, pours: [pour], colas: [] };
+    const brand = { id: 'brand', name: 'Kestrel', abv: 7, styles: null, skus, pours: [pour], colas: [] };
     const view = toCatalogViewProps({ brands: [brand], priceGroups: [] });
     expect(view.brands.map(({ key, skus }) => ({ key, skus }))).toEqual([{ key: 'brand', skus: '2' }]);
     const list = toSkuListViewProps({ brand, skus, pours: [pour] });
