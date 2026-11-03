@@ -3,7 +3,7 @@
 // (content/docs/screens.mdx, content/docs/integrations.mdx) can embed it in an iframe
 // at a real viewport width: the shell's phone/desktop split comes from viewport
 // breakpoints, so a frame rendered inline in a 390px box would still lay out as
-// desktop. Static: every index is built once; anything else 404s.
+// desktop. Valid indices are enumerated at build time; HTML gets a fresh nonce.
 import { notFound } from "next/navigation";
 import { FramePersona } from "@/components/mgr/frame-persona";
 import { SCREENS } from "@/components/mgr/screens";

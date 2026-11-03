@@ -14,12 +14,15 @@ it("sets global same-origin-compatible security headers", async () => {
   })]));
 });
 
-// #1491: the customer guides are built at deploy and skip the proxy, so no
-// server stage runs; the header says so instead of leaving the timing blank.
-it("marks the prerendered customer guides in Server-Timing", async () => {
-  const headers = await config.headers?.();
-  expect(headers).toEqual(expect.arrayContaining([{
-    source: "/docs/:path*",
-    headers: [{ key: "Server-Timing", value: "prerendered" }],
-  }]));
+it("denies unused browser capabilities on every route", async () => {
+  const rules = await config.headers?.();
+  const policy = rules?.find((rule) => rule.source === "/:path*")?.headers
+    .find((header) => header.key.toLowerCase() === "permissions-policy")?.value;
+  const permissions = new Map(policy?.split(",").map((entry) => {
+    const [capability, allowlist] = entry.trim().split("=");
+    return [capability, allowlist] as const;
+  }));
+  for (const capability of ["accelerometer", "camera", "display-capture", "geolocation", "gyroscope", "magnetometer", "microphone", "payment", "usb"]) {
+    expect(permissions.get(capability), capability).toBe("()");
+  }
 });

@@ -21,7 +21,7 @@ export function applyStoredTheme() {
 // The same function as inline script source; it reads only browser globals, so it runs standalone.
 export const THEME_BOOT = `(${applyStoredTheme})()`;
 
-export function ThemeBoot() {
+export function ThemeBoot({ nonce }: { nonce?: string }) {
   useLayoutEffect(applyStoredTheme, []);
   // This file is a Client Component, so the type check runs where the element
   // is built. The server sends an executable script. A browser render gets
@@ -29,6 +29,7 @@ export function ThemeBoot() {
   // run (Next's InlineScript pattern, docs/01-app/02-guides/preventing-flash-before-hydration.md).
   return (
     <script
+      nonce={nonce}
       type={typeof window === "undefined" ? "text/javascript" : "text/plain"}
       suppressHydrationWarning
       dangerouslySetInnerHTML={{ __html: THEME_BOOT }}

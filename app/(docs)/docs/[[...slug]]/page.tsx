@@ -1,6 +1,6 @@
 // app/(docs)/docs/[[...slug]]/page.tsx — renders one guide from lib/source.ts
-// with Fumadocs' page frame (title, description, table of contents). Static:
-// every page in content/docs is enumerated at build time; anything else 404s.
+// with Fumadocs' page frame (title, description, table of contents). Valid paths
+// are enumerated at build time; HTML renders per request for the script nonce.
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/layouts/docs/page";

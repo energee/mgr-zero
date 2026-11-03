@@ -30,17 +30,13 @@ const nextConfig: NextConfig = {
       { key: "X-Frame-Options", value: "SAMEORIGIN" },
       { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Permissions-Policy", value: "accelerometer=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()" },
     ],
   }, {
     // The global referrer policy is overwritten at the wire by this dedicated
     // broker rule, before a payment provider can receive a redirect.
     source: "/portal/invoices/:id/pay",
     headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
-  }, {
-    // The customer guides are built at deploy and skip the proxy, so no server
-    // stage runs: their load time is delivery and parsing (#1491).
-    source: "/docs/:path*",
-    headers: [{ key: "Server-Timing", value: "prerendered" }],
   }],
 };
 
