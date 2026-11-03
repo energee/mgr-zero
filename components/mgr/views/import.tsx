@@ -1,10 +1,13 @@
 "use client";
+import { plural } from "@/lib/mgr/plural";
 import { useState } from "react";
 import { E } from "@/components/mgr/e";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Attachment, AttachmentContent, AttachmentDescription, AttachmentTitle, AttachmentTrigger } from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { IMPORT_FIELDS, IMPORT_FIELD_LABELS, IMPORT_KINDS, IMPORT_ROW_CAP_LABEL, canReviewImport, importTemplateCsv, importTemplateName, readyImportRows, validateImportRows, type ImportKind, type ImportLookups, type ImportOutcome, type ImportResult } from "@/lib/import-csv";
 import { downloadCsv } from "@/lib/download-csv";
 import { importKindLabel, paymentTermLabel, sentenceCase } from "@/lib/mgr/labels";
@@ -70,7 +73,14 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
   if (fileRejected) fileState = "error";
   return <>
     {E.back("Settings", "Import", undefined, model.backHref)}
-    {E.stp(["Upload", "Match columns", "Review", "Import"], step)}
+    <ol aria-label="Import progress" className="flex items-center gap-1 text-xs">
+      {["Upload", "Match columns", "Review", "Import"].map((label, index) => (
+        <li key={label} aria-current={index === step ? "step" : undefined} className={index < 3 ? "flex flex-1 items-center gap-1" : "flex items-center gap-1"}>
+          <Badge variant={index === step ? "default" : "outline"}>{label}</Badge>
+          {index < 3 && <Separator className={index < step ? "flex-1 bg-primary" : "flex-1"} />}
+        </li>
+      ))}
+    </ol>
     <FieldSet disabled={step !== 0 || busy} className="min-w-0 gap-0">
       <FieldLegend variant="label">What are you importing?</FieldLegend>
       <ToggleGroup type="single" value={kind} onValueChange={value => { if (value) onKind?.(value as ImportKind); }} variant="outline" size="sm" className="flex-wrap justify-start">
@@ -85,12 +95,12 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
       {E.btn("Download template", "g", undefined, () => downloadCsv(importTemplateName(kind), importTemplateCsv(kind)))}
       <p className="text-sm text-muted-foreground">The template includes one incomplete example row, with a required cell left blank so it cannot be imported as downloaded. Delete the example and add your own records. Reference cells need your existing record names or IDs.</p>
       <Field data-invalid={fileRejected || undefined}><FieldLabel>CSV file</FieldLabel><Attachment state={fileState} className="w-full">
-        <AttachmentContent><AttachmentTitle>{model.fileName ?? "Choose a CSV file"}</AttachmentTitle><AttachmentDescription>{model.headers ? `${model.csvRowCount} ${model.csvRowCount === 1 ? "row" : "rows"} ready` : `.csv · up to ${IMPORT_ROW_CAP_LABEL} rows`}</AttachmentDescription></AttachmentContent>
+        <AttachmentContent><AttachmentTitle>{model.fileName ?? "Choose a CSV file"}</AttachmentTitle><AttachmentDescription>{model.headers ? `${plural(model.csvRowCount!, "row")} ready` : `.csv · up to ${IMPORT_ROW_CAP_LABEL} rows`}</AttachmentDescription></AttachmentContent>
         <AttachmentTrigger asChild aria-label="Choose CSV file"><label className="cursor-pointer"><input type="file" accept=".csv,text/csv" className="sr-only" aria-invalid={fileRejected || undefined} onChange={event => onFile?.(event.target.files?.[0])} /></label></AttachmentTrigger>
       </Attachment>{fileRejected && <FieldError>{model.error}</FieldError>}</Field>
       {/* Every column already matched by name: go straight to Review, matching stays one tap away (#1509). */}
       {model.headers && (canReview
-        ? <><Button onClick={() => onStep?.(2)}>Review {rows.length} {rows.length === 1 ? "row" : "rows"}</Button><Button variant="outline" onClick={() => onStep?.(1)}>Columns differ?</Button></>
+        ? <><Button onClick={() => onStep?.(2)}>Review {plural(rows.length, "row")}</Button><Button variant="outline" onClick={() => onStep?.(1)}>Columns differ?</Button></>
         : <Button onClick={() => onStep?.(1)}>Match columns</Button>)}
     </>}
     {step === 1 && <>
@@ -101,7 +111,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
         {field.values && <span className="text-sm text-muted-foreground">{choiceHint(field.name, field.values)}</span>}
       </Field>)}
       {!canReview && <p className="text-sm text-muted-foreground">Match every required field before continuing. State also needs a column when any row has a US address.</p>}
-      <Button disabled={!canReview || busy} onClick={() => { if (canReview) onStep?.(2); }}>Review {rows.length} {rows.length === 1 ? "row" : "rows"}</Button><Button variant="outline" onClick={() => onStep?.(0)}>Back to upload</Button>
+      <Button disabled={!canReview || busy} onClick={() => { if (canReview) onStep?.(2); }}>Review {plural(rows.length, "row")}</Button><Button variant="outline" onClick={() => onStep?.(0)}>Back to upload</Button>
     </>}
     {(step === 1 || step === 2) && <>
       {kind === "products_skus" && <p>For Format, use the name or ID of an existing packaged format. Create any missing format in Beer / Formats first. The Brand column is the brand name. An existing brand keeps its style and ABV; a new brand takes them from the row. Every row creates a SKU.</p>}
@@ -118,7 +128,7 @@ export function ImportView({ model, onKind, onFile, onStep, onMapping, onEdit, o
             : E.edit(`${IMPORT_FIELD_LABELS[field.name]}${field.required ? " *" : ""}`, row[field.name] ?? "", "text", undefined, { onChange: value => edit(index, field.name, value), "aria-label": `Row ${index + 1} ${IMPORT_FIELD_LABELS[field.name]}` })}
         </Field>)}</div>
       </details>)}
-      <Button disabled={!ready || busy} onClick={onCommit}>{kind === "opening_balances" ? "Post opening balances" : `Import ${ready} ${ready === 1 ? "row" : "rows"}`}</Button>
+      <Button disabled={!ready || busy} onClick={onCommit}>{kind === "opening_balances" ? "Post opening balances" : `Import ${plural(ready, "row")}`}</Button>
       <Button variant="outline" onClick={() => onStep?.(1)}>Back to matching columns</Button>
       {E.info("If the connection drops during the import, you can retry it without importing any row twice. To fix blocked rows later, import only those rows in a new batch.")}
     </>}

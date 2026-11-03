@@ -1,3 +1,4 @@
+import { PORTAL_BUYER } from "../components/mgr/screens";
 // tests/screen-persona.test.ts — the explorer's persona switch is a demo
 // user per role (lib/mgr/demo-personas.ts, kept apart from the app): the
 // shell draws that person, the rail filters to their role, Today is their
@@ -9,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 import { SCREENS } from "../components/mgr/screens";
 import { ScreenFrame } from "../components/mgr/screen-frame";
-import { deniedFor, homeFor, LANDINGS, needsFor, PERSONAS, personaFor, PORTAL_BUYER, roleGaps } from "../lib/mgr/demo-personas";
+import { deniedFor, homeFor, LANDINGS, needsFor, PERSONAS, personaFor, roleGaps } from "../lib/mgr/demo-personas";
 import { writeFileSync } from "node:fs";
 import { asPersona } from "../components/mgr/demo-screens";
 import { initialsOf } from "../components/mgr/user-avatar";

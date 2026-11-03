@@ -21,6 +21,7 @@ import { DeliveryOutcomeForm, type ConfirmDeliveryView, type DeliveryReadout } f
 import { DriverRouteView } from "@/components/mgr/views/driver-route";
 import { RefusedReturnStatusView, type RefusedReturnFormView } from "@/components/mgr/views/refused-return";
 import { driverRouteA } from "@/lib/mgr/fixtures/delivery";
+import type { TransferDetailView } from "@/components/mgr/views/transfer-detail";
 
 /** Reset submission stays on this card, just as the live Auth response does. */
 export function ResetPasswordFixture({ children }: { children: ReactElement<ComponentProps<typeof EntryView>> }) {
@@ -92,6 +93,21 @@ export function RefusedReturnFixture({ children }: { children: ReactElement<Comp
       }).filter(line => line.outstanding > 0),
     })),
   }) : <RefusedReturnStatusView />;
+}
+
+/** Receive and cancellation stay local while using the same transfer drawing. */
+export function TransferDetailFixture({ children }: { children: ReactElement<ComponentProps<typeof TransferDetailView>> }) {
+  const [model, setModel] = useState(children.props.model);
+  return cloneElement(children, {
+    model,
+    actions: {
+      onReceive: () => setModel(previous => ({ ...previous, status: "Received", received: true, nextVerb: undefined })),
+      onCancel: async reason => {
+        setModel(previous => ({ ...previous, status: "Cancelled", cancelReason: reason, nextVerb: undefined }));
+        return true;
+      },
+    },
+  });
 }
 
 /** Keeps the selected receipt and its current worksheet as distinct inventory states. */

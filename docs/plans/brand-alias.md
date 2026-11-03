@@ -100,8 +100,8 @@ Each one starts by writing its failing test.
      `lib/mgr/fixtures/catalog.ts` fixtures.
    - Deps: 1.
 5. **Pickers and the recipe brand picker.**
-   - TDD one shared label helper, `brandLabel(b)` = `name` or `name · alias`.
-     Search for an existing one first; reuse it in all four pickers.
+   - Reuse `nameWithAlias(b)` from `lib/mgr/labels.ts` for `name` or
+     `name · alias` in all four pickers.
    - Add the Brand `E.pick` in the recipe page's `parentForm`, saving through
      `set_recipe_brand`.
    - Update `screens.tsx` "Recipe" `writes`, and the fixtures.

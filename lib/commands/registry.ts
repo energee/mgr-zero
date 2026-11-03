@@ -7,6 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { breweryDate } from "@/lib/date-format";
 import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
 import { phoneError } from "@/lib/mgr/phone";
+import { PG_INT_MAX } from "@/lib/mgr/quantity-input";
 import type { InputIssue } from "./field-errors";
 
 export type StaffRole = (typeof STAFF_ROLES)[number];
@@ -156,9 +157,8 @@ export async function breweryToday(ctx: Ctx): Promise<string> {
   return breweryDate(timezone);
 }
 
-/** The largest Postgres `int`: the zod `.max()` for a number stored in an int column (#427), so an
- * oversized value is a 400 validation error rather than a 22003 overflow from the database. */
-export const PG_INT_MAX = 2_147_483_647;
+/** A calendar date, also rendered as date (YYYY-MM-DD) in the API reference. */
+export const isoDate = z.string().date();
 
 // A command's invalid_input message reaches the form or API caller as is, so a
 // number bound without its own message reads as an instruction with the limit

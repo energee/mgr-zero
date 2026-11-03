@@ -1,3 +1,4 @@
+import { PG_INT_MAX } from "@/lib/mgr/quantity-input";
 // lib/commands/search.ts — registered `search_entities`: one search across the
 // record kinds staff may read (SEARCH_KINDS). A document number (ORD-0231,
 // INV-1042, PO-0142, B-0012, RUN-0007, TRF-0003, L-240831-HZ) matches exactly
@@ -68,7 +69,7 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
   // The prefixes accept unbounded digits; a value past int4 would make Postgres
   // raise rather than simply not match, so it is no match here.
   const parsed = doc ? Number(q.match(doc[0])![1]) : null;
-  const n = parsed !== null && Number.isInteger(parsed) && parsed > 0 && parsed <= 2147483647 ? parsed : null;
+  const n = parsed !== null && Number.isInteger(parsed) && parsed > 0 && parsed <= PG_INT_MAX ? parsed : null;
   const hit = (id: string, label: string, detail: string, href: string, exact = false): SearchHit => ({ kind, id, label, detail, href, exact });
   const name = (embed: unknown) => (embed as { name: string } | null)?.name ?? "";
   switch (kind) {

@@ -5,7 +5,7 @@
 // are not inventory: a partial pull is just base units. Prep is saved as
 // brew_pulls through save_batch_pulls; nothing here moves stock.
 import { BREW_DAY_STAGES, INGREDIENT_STAGES, isBrewDayStage } from "./recipe-process-view";
-import { brewDayLines, brewSourceKey, fitsStock, observedProcess, plannedQty, soleSource, type BrewDayVessel, type BrewMaterialSource, type BrewPlan, type BrewPull, type BrewWaterAddition } from "./brew-day-view";
+import { brewDayLines, brewSourceKey, fitsStock, observedProcess, plannedIngredientQty, soleSource, type BrewDayVessel, type BrewMaterialSource, type BrewPlan, type BrewPull, type BrewWaterAddition } from "./brew-day-view";
 import { sentenceCase } from "./labels";
 import { materialSourceKey, type SourceIds } from "./material-source";
 import { fromPacks, splitPacks, withPacks } from "./pack-qty";
@@ -119,7 +119,7 @@ const lineSource = (s: BrewMaterialSource): BrewIngredient["source"] =>
  *  Prep is saved: a saved Prep leaves off only lines pulled to zero. */
 export function brewIngredients(plan: BrewPlan, pulls: BrewPull[], sources: BrewMaterialSource[], plannedBbl: number): BrewIngredient[] {
   return brewDayLines(plan).map(line => {
-    const row = { key: line.id, name: line.materialName, materialId: line.material_id, stage: line.stage, plan: plannedQty(line, plannedBbl), unit: line.unit, packSize: line.purchaseUomFactor ?? 1 };
+    const row = { key: line.id, name: line.materialName, materialId: line.material_id, stage: line.stage, plan: plannedIngredientQty(line, plannedBbl), unit: line.unit, packSize: line.purchaseUomFactor ?? 1 };
     const pull = pulls.find(saved => saved.recipe_ingredient_id === line.id);
     if (pull) return { ...row, source: lineSource(pull), ...packFields(pull.qty, row.packSize), confirmed: true };
     const only = soleSource(sources, line.material_id);

@@ -89,7 +89,7 @@ import { EntryView } from "@/components/mgr/views/entry";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
 import { FermentationReadingActionsView, FermentationReadingView, readingIdentity } from "@/components/mgr/views/fermentation-reading";
 import { FirstRunView } from "@/components/mgr/views/first-run";
-import { AccountingFixture, CatalogCategoriesFixture, ConfirmDeliveryFixture, FormatFixture, ReceiptFixture, RefusedReturnFixture, ResetPasswordFixture, RouteErrorFixture, WeeklyCountFixture } from "@/components/mgr/fixture-adapters";
+import { AccountingFixture, CatalogCategoriesFixture, ConfirmDeliveryFixture, FormatFixture, ReceiptFixture, RefusedReturnFixture, ResetPasswordFixture, RouteErrorFixture, TransferDetailFixture, WeeklyCountFixture } from "@/components/mgr/fixture-adapters";
 import { FormatView } from "@/components/mgr/views/format";
 import { DeleteFormatControl } from "@/components/mgr/views/delete-format";
 import { FormatsView } from "@/components/mgr/views/formats";
@@ -318,6 +318,7 @@ const SALT_OPTIONS: SaltMaterial[] = [
   { id: "gypsum", name: "Gypsum", salt: "gypsum" }, { id: "cacl", name: "Calcium chloride", salt: "calcium_chloride" }, { id: "epsom", name: "Epsom salt", salt: "epsom_salt" },
   { id: "lactic", name: "Lactic acid", salt: null }, { id: "phos", name: "Phosphoric acid", salt: null },
 ];
+/** The portal frames' buyer; staff frames use the selected staff persona. */
 export const PORTAL_BUYER = { name: "Jordan Lee", account: "Ridgeline Tap Room", email: "jordan@ridgelinetap.com" };
 
 export type Tab = "Today" | "Beer" | "Work" | "More";
@@ -396,10 +397,6 @@ export const INV = {
   creditMajor: "106",
   fee: "$9.48",
 } as const;
-
-// A rough remaining fill, wherever a keg comes off a tap.
-
-export { WORK_TABS } from "@/lib/mgr/work-view";
 
 // The states every screen can reach; a record with designed states lists its own instead.
 const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]];
@@ -1167,7 +1164,7 @@ export const SCREENS: Screen[] = [
     writes: "record_stock_transfer_pick · receive_stock_transfer [one RPC: paired location_transfer movements, no invoice] · cancel_stock_transfer",
     states: [["submitted", "Receive records the pick at the requested qty, then receives · no separate pick step"], ["picked", "Receive is irreversible"], ["received", "read-only tape · the stock has changed place"], ["cancelled", "the reason shows · picks released, nothing moved"], ["permission", "warehouse or admin required", 1]],
     spec: "Not Complete transfer: that ships a taproom replenishment order. Receive posts both ledger halves or neither. No invoice. Cancel transfer asks for a reason and is offered until the transfer is received: a pick never leaves the source bin, so cancelling releases the picks and moves nothing, which is how a transfer that can never balance at receipt is closed out.",
-    body: <TransferDetailView model={toTransferDetailViewProps(transferDetailSubmitted)} />,
+    body: <TransferDetailFixture><TransferDetailView model={toTransferDetailViewProps(transferDetailSubmitted)} /></TransferDetailFixture>,
   },
   {
     step: 5,

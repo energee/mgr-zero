@@ -9,15 +9,12 @@ import {
   staffRolesAt,
   type RequestAuthContext,
 } from "@/lib/auth/request-context";
-import { z } from "zod";
+import { isUuid } from "@/lib/uuid";
 import { publicEnv } from "@/lib/env/public";
 import { CommandError, unwrap } from "./registry";
 import type { Ctx, PreTenantCtx, OperationCtx } from "./registry";
 import type { CommandContextExpectation } from "./registry";
 
-const uuid = z.uuid();
-/** True for a canonical UUID string; shared by the command route and the bearer context. */
-export const isUuid = (value: string | undefined): value is string => value !== undefined && uuid.safeParse(value).success;
 
 const notMember = () => new CommandError("not a member of this brewery", 403, "not_member");
 

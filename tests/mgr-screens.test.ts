@@ -893,9 +893,6 @@ describe("SCREENS", () => {
     const inp = r(E.edit("Address", "", "text", undefined, { placeholder: "114 Bridge St" }));
     expect(inp).toMatch(/<label[^>]*>Address<\/label>/);
     expect(inp).toContain('placeholder="114 Bridge St"');
-    const search = r(E.search("Search customers"));
-    expect(search).toMatch(/type="search"/);
-    expect(search).not.toContain("<label");
     // No field is drawn label-beside-control any more.
     for (const s of SCREENS) expect.soft(body(s.name), s.name).not.toMatch(/data-slot="field"[^>]*data-orientation="horizontal"/);
     // Grids: cols pairs from md up; inline sizes to its count at every width.

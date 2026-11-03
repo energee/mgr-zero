@@ -68,7 +68,7 @@ export const brewDayLines = (plan: BrewPlan) =>
   (plan.ingredients ?? []).filter((row): row is BrewPlanIngredient & { stage: (typeof BREW_DAY_STAGES)[number] } => isBrewDayStage(row.stage));
 
 /** A line's planned amount for `volume` bbl, exact to the tick. */
-export const plannedQty = (row: BrewPlanIngredient, volume: number) => fromTicks(toTicks(row.per_bbl_qty * volume));
+export const plannedIngredientQty = (row: BrewPlanIngredient, volume: number) => fromTicks(toTicks(row.per_bbl_qty * volume));
 
 /** The one source holding this material; undefined when none or several do, so the brewer chooses. */
 export function soleSource(sources: BrewMaterialSource[], materialId: string): BrewMaterialSource | undefined {
@@ -79,7 +79,7 @@ export function soleSource(sources: BrewMaterialSource[], materialId: string): B
 export function brewPlanActuals(plan: BrewPlan, volume: number, sources: BrewMaterialSource[]): BrewActualDraft[] {
   return brewDayLines(plan).map(row => {
     const source = soleSource(sources, row.material_id);
-    return { key: row.id, recipeIngredientId: row.id, stage: row.stage, qty: String(plannedQty(row, volume)), source: source ? brewSourceKey(source) : "" };
+    return { key: row.id, recipeIngredientId: row.id, stage: row.stage, qty: String(plannedIngredientQty(row, volume)), source: source ? brewSourceKey(source) : "" };
   });
 }
 

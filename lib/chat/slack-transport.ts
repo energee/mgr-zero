@@ -59,7 +59,9 @@ export class SlackTransport implements ChatProviderTransport {
     try {
       info = await this.clientFor(installationId).conversationsInfo(destinationId);
     } catch (err) {
-      return { ok: false, reason: classifySlackError(err).code };
+      const classified = classifySlackError(err);
+      if (classified.retryable) throw err;
+      return { ok: false, reason: classified.code };
     }
     return checkSlackConversation(info);
   }

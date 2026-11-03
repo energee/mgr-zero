@@ -1,3 +1,4 @@
+import { PG_INT_MAX } from "@/lib/mgr/quantity-input";
 // The CSV map and its preview/command validation use the same field contract.
 import { z } from "zod";
 import { COUNTRY_CODES, CUSTOMER_TYPES, PAYMENT_TERMS, US_STATE_CODES } from "@/lib/mgr/enums";
@@ -126,7 +127,7 @@ export function validateImportRow(kind: ImportKind, row: Record<string, string>,
     if (f.type === "state" && !(US_STATE_CODES as readonly string[]).includes(value)) errors.push(`${label} must be a US state code, such as PA`);
     if (f.type === "country" && !(COUNTRY_CODES as readonly string[]).includes(value)) errors.push(`${label} must be a two-letter country code, such as JP`);
     if (["number", "positive", "cents"].includes(f.type ?? "")) {
-      if (!/^[+-]?[0-9]+(\.[0-9]+)?$/.test(value) || !Number.isFinite(Number(value)) || (f.type === "positive" && !openingQty.safeParse(Number(value)).success) || (f.type === "cents" && (!/^[0-9]+$/.test(value) || Number(value) > 2147483647))) errors.push(`${label} must be ${f.type === "positive" ? "a positive number with at most two decimal places" : f.type === "cents" ? "a whole number from 0 to 2,147,483,647 (100 cents = $1)" : "a decimal"}`);
+      if (!/^[+-]?[0-9]+(\.[0-9]+)?$/.test(value) || !Number.isFinite(Number(value)) || (f.type === "positive" && !openingQty.safeParse(Number(value)).success) || (f.type === "cents" && (!/^[0-9]+$/.test(value) || Number(value) > PG_INT_MAX))) errors.push(`${label} must be ${f.type === "positive" ? "a positive number with at most two decimal places" : f.type === "cents" ? "a whole number from 0 to 2,147,483,647 (100 cents = $1)" : "a decimal"}`);
     }
   }
   if (kind === "opening_balances" && references.binId && references.locationId && references.binId.location_id?.toLowerCase() !== references.locationId.id.toLowerCase()) errors.push("Bin must belong to Location");

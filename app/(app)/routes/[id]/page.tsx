@@ -1,3 +1,4 @@
+import { isUuid } from "@/lib/uuid";
 // app/(app)/routes/[id]/page.tsx — one route. Planned: the builder
 // (route-form.tsx → save_route, depart_route). Departed: the run (stops with
 // delivered times, Deliver on the next open stop, route-run.tsx →
@@ -7,7 +8,7 @@ import { DriverRouteView } from "@/components/mgr/views/driver-route";
 import { ReturnRouteView } from "@/components/mgr/views/return-route";
 import { getActiveBrewery } from "@/lib/brewery";
 import { formatDate } from "@/lib/date-format";
-import { buildContext, isUuid } from "@/lib/commands/context";
+import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { notFound } from "next/navigation";

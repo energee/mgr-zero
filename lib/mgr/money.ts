@@ -1,3 +1,4 @@
+import { PG_INT_MAX } from "@/lib/mgr/quantity-input";
 // lib/mgr/money.ts — cents to a display string, and a dollars field back to cents. Negatives (credit memos) get a
 // true minus sign ahead of the dollar sign, so a credit reads as a credit
 // wherever it is shown.
@@ -14,4 +15,4 @@ export const toCents = (dollars: string) => dollars === "" ? undefined : Math.ro
  *  (PG_INT_MAX cents). Returns the field message naming that limit, or undefined within it. `what` reads
  *  "a cost", "a fee" or "an amount". */
 export const centsMaxError = (dollars: string, what: string) =>
-  (toCents(dollars) ?? 0) > 2_147_483_647 ? `Enter ${what} no greater than $21,474,836.47.` : undefined;
+  (toCents(dollars) ?? 0) > PG_INT_MAX ? `Enter ${what} no greater than $21,474,836.47.` : undefined;

@@ -13,8 +13,6 @@ import { suggestPriceGroup, type PriceGroupSuggestion } from "./price-group-sugg
 import type { PriceGroupRow } from "./price-groups-view";
 import { expires, type RegistryRowView } from "./registry-rows";
 
-/** A brand as staff see it: its name, then its staff-only alias when it has one ("Appaloosa · Animal #14"). */
-export const brandLabel = nameWithAlias;
 
 /** A header badge: "w" is a warning; href makes it a jump link to its section. */
 export type BrandBadge = { key: string; label: string; tone: "" | "w"; href?: string };
@@ -137,7 +135,7 @@ export function toBrandViewProps({
   const badges = isNew ? [] : [...cola, { key: "group", label: group?.name ?? "Unpriced", tone: group ? "" : "w" } satisfies BrandBadge, ...category, ...skus];
   return {
     backHref,
-    title: isNew ? "New brand" : brandLabel(saved),
+    title: isNew ? "New brand" : nameWithAlias(saved),
     isNew,
     badges,
     name: brand.name,

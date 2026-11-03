@@ -20,7 +20,7 @@ import { plural } from "@/lib/mgr/plural";
 
 const PREVIEW_TABS: [ChatPreviewId, string][] = [["app-home", "App Home"], ["personal-dm", "Personal DM"], ["team-digest", "Team digest"], ["preferences", "Sample preferences"]];
 
-export function ChatPreviewGallery({ fixtures }: { fixtures: readonly ChatPreviewFixture[] }) {
+function ChatPreviewGallery({ fixtures }: { fixtures: readonly ChatPreviewFixture[] }) {
   const [selected, setSelected] = useState<ChatPreviewId>("app-home");
   const fixture = fixtures.find(item => item.id === selected);
   return <section data-chat-preview className="flex min-w-0 flex-col gap-4" aria-label="Preview surfaces">

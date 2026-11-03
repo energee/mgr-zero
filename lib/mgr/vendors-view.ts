@@ -1,6 +1,7 @@
 // lib/mgr/vendors-view.ts — view-model for the Vendors list. Each vendor from
 // list_vendors_and_contracts becomes one RecordTable row: name, status, the
 // typed lead time, the observed averages, and how many contracts it holds.
+import { plural } from "@/lib/mgr/plural";
 import type { EmptyState } from "./empty-state";
 import { PO_SENT_VIA } from "./purchase-orders-view";
 
@@ -53,7 +54,7 @@ const days = (n: number) => `${fmtVendorQty(n)} ${n === 1 ? "day" : "days"}`;
 /** One vendor's row; the vendor page reads its status and lead times from it too. */
 export function toVendorsRow(v: VendorsVendor): VendorsRowView {
   const observed = v.observed.map((o) =>
-    `${days(o.avg_lead_days)} over ${o.n} ${o.n === 1 ? "order" : "orders"} sent ${PO_SENT_VIA[o.sent_via] ?? o.sent_via}`);
+    `${days(o.avg_lead_days)} over ${plural(o.n, "order")} sent ${PO_SENT_VIA[o.sent_via] ?? o.sent_via}`);
   return {
     key: v.key,
     name: v.name,
