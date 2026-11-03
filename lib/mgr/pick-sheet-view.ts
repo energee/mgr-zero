@@ -63,7 +63,7 @@ export const pickSheetPrintReason = (model: PickSheetViewModel): string | null =
 
 export function toPickSheetViewProps({ orders }: PickSheetSnapshot): PickSheetViewModel {
   if (orders.length === 0) {
-    return { groups: [], empty: { title: "Nothing confirmed to pick", description: "Confirm an order to add its lines to the pick sheet." } };
+    return { groups: [], empty: { title: "Nothing confirmed to pick" } };
   }
   const grouped = Map.groupBy(orders, (o) => o.requested_ship_date ?? "Unscheduled");
   return {

@@ -13,7 +13,7 @@ export function showFirstRun(state: FirstRun): boolean {
 export function FirstRunChecklist({ brewery, state }: { brewery: string; state: FirstRun }) {
   return (
     <FirstRunView
-      model={{ brewery, steps: "5 steps" }}
+      model={{ brewery }}
       steps={
         <>
           {E.row("1 · Add locations", "warehouse, taproom, storage, or several at once", state.hasLocation ? "Done" : <LocationForm />, state.hasLocation ? "ok" : "")}

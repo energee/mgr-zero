@@ -17,10 +17,10 @@ const PAGE_QUERIES: Record<string, readonly string[]> = {
   "/work": ["list_work"],
   "/settings": ["get_brewery", "list_locations", "list_team_members"],
   "/recipes": ["list_recipes", "list_brands", "get_recipe", "list_materials", "get_gravity_unit"],
-  "/batches": ["list_batches", "list_brands", "list_recipes", "list_vessels", "get_brew_day"],
+  "/batches": ["list_batches", "list_batch_history", "list_brands", "list_recipes", "list_vessels", "get_brew_day"],
   "/cellar": ["list_occupancies", "list_vessels", "get_gravity_unit"],
   "/packaging": [
-    "list_packaging_runs", "list_brands", "list_occupancies", "list_locations", "list_bins", "list_skus",
+    "list_packaging_runs", "list_packaging_history", "list_brands", "list_occupancies", "list_locations", "list_bins", "list_skus",
     "get_packaging_run",
   ],
   "/materials": ["list_materials", "get_material_on_hand", "list_vendors", "list_locations", "list_bins"],

@@ -6,7 +6,6 @@ import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { E } from "@/components/mgr/e";
-import { NewPoView } from "@/components/mgr/views/new-po";
 import { submitReason } from "@/lib/mgr/submit-reason";
 import { draftLineErrors, orderFormReadiness, orderLineError, orderLineErrors } from "@/lib/order-form-rules";
 import { scheduleBatchReason } from "@/lib/mgr/schedule-batch-view";
@@ -178,7 +177,7 @@ describe("per-form reasons", () => {
   });
 
   it("Pick sheet print is withheld while the sheet is empty (#1128)", () => {
-    expect(pickSheetPrintReason({ groups: [], empty: { title: "Nothing confirmed to pick", description: "" } })).toBe("Nothing to print yet.");
+    expect(pickSheetPrintReason({ groups: [], empty: { title: "Nothing confirmed to pick" } })).toBe("Nothing to print yet.");
     expect(pickSheetPrintReason({ groups: [{ key: "d", title: "d", rows: [], totals: [] }] })).toBeNull();
   });
 
@@ -352,15 +351,6 @@ describe("field error", () => {
     expect(pick).toContain("Choose a customer.");
   });
 
-  it("a PO line quantity (E.edit number) marks itself and links its own message", () => {
-    const markup = html(createElement(NewPoView, { model: { vendor: "", expected: "", lines: [{ key: "a", title: "Material", detail: "", qty: "-4", cost: "" }] } }));
-    const input = markup.match(/<input\b[^>]*aria-label="Line 1 quantity"[^>]*>/)?.[0];
-    expect(input).toContain('aria-invalid="true"');
-    const errorId = input?.match(/\baria-describedby="([^"]+)"/)?.[1].split(" ").find(id => id.endsWith("-error"));
-    expect(errorId).toBeDefined();
-    expect(markup).toMatch(new RegExp(`id="${errorId}"[^>]*>Enter a quantity above zero\\.<`));
-  });
-
   it("a date links its message from the picker", () => {
     const markup = html(E.edit("Expected", "", "date", undefined, { id: "d", onChange: () => {}, error: "Enter a date." }));
     expect(markup).toMatch(/aria-describedby="d-error"/);
@@ -458,10 +448,10 @@ describe("line errors in the views", () => {
     const model = { ...repackCase, parents: [], locations: [], parentSkuId: "", locationId: "", binId: "" };
     const own = html(createElement(RepackView, { model: { ...model, formatsHref: "/catalog" } }));
     expect(own).toMatch(/<a [^>]*href="\/catalog"[^>]*>Open Catalog<\/a>/);
-    expect(own).toContain("No SKU can be broken yet");
+    expect(own).toContain("No packages to repack");
     expect(own).not.toMatch(/<input\b|role="combobox"|Confirm repack/);
     const other = html(createElement(RepackView, { model: { ...model, formatsHref: null } }));
-    expect(other).toContain("An admin or sales member sets a format&#x27;s contents in Catalog.");
+    expect(other).toContain("No packages to repack");
     expect(other).not.toContain("Open Catalog");
   });
 });

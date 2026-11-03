@@ -20,7 +20,7 @@ export function PurchaseOrdersView({
 }) {
   return (
     <>
-      {E.hd(model.title, model.subtitle, createAction !== undefined ? createAction : E.btn("New PO"))}
+      {E.hd(model.title, createAction !== undefined ? createAction : E.btn("New PO"))}
       <WorkKindTabs chips={model.workChips} current={model.workChips[model.workChipIndex]} tabs={model.workTabs} hrefs={workHrefs} />
       {model.empty ? E.blank(model.empty) : <PurchaseOrderRows rows={model.rows} linkRows={linkRows} />}
       {footer}

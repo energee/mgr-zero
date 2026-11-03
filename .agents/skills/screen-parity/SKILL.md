@@ -50,7 +50,8 @@ the shared primitive rather than drawing a local replacement. Preserve labels,
 bounds, required/disabled state, and callbacks.
 
 Do not add native `<select>`, standalone `<input type="number">`, or
-`<Input type="number">` to product screens. Lint rejects these. Numeric inputs
+`<Input type="number">` to product screens. Lint rejects these.
+The numeric diagnostic points to `E.edit` or the direct `VolumeField` import. Numeric inputs
 belong only inside the shared quantity implementation
 (`components/mgr/qty.tsx`), where native spinners are hidden. The Slack venue
 replica has a documented native-select exception; it is not a pattern for MGR

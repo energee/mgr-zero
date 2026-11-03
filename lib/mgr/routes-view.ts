@@ -21,7 +21,6 @@ export type RouteStatus = (typeof ROUTE_STATUSES)[number];
 
 export type RoutesViewModel = {
   title: string;
-  subtitle: string;
   status: RouteStatus;
   statusOptions: ScopeOption[];
   rows: RoutesRowView[];
@@ -33,7 +32,6 @@ export type RoutesViewModel = {
 
 export type RoutesSnapshot = {
   title: string;
-  subtitle: string;
   status?: RouteStatus;
   /** list_routes' anyReturned: an empty Open list then names Returned instead of "No routes yet". */
   anyReturned?: boolean;
@@ -55,9 +53,9 @@ export function routeNext(route: { departed_at: string | null; returned_at: stri
 }
 
 function emptyRoutes(status: RouteStatus, anyReturned: boolean | undefined): EmptyState {
-  if (status === "returned") return { title: "No returned routes", description: "A route moves here once it is returned." };
-  if (anyReturned) return { title: "No open routes", description: "Returned routes are under Returned." };
-  return { title: "No routes yet", description: "A route groups the day's deliveries into one run." };
+  if (status === "returned") return { title: "No returned routes" };
+  if (anyReturned) return { title: "No open routes" };
+  return { title: "No routes yet" };
 }
 
 export function toRoutesViewProps(s: RoutesSnapshot): RoutesViewModel {
@@ -66,7 +64,6 @@ export function toRoutesViewProps(s: RoutesSnapshot): RoutesViewModel {
   const link = (href: string) => (s.linked ? href : undefined);
   return {
     title: s.title,
-    subtitle: s.subtitle,
     status,
     statusOptions: [
       { value: "open", label: "Open", href: link("/routes") },

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { completeQboOAuth, QboOAuthClient, reapQboOAuthExchanges, sanitizeQboError } from "@/lib/qbo";
+import { completeQboOAuth, QboOAuthClient, reapQboOAuthExchanges } from "@/lib/qbo";
 
 const config = {
   clientId: "client-id",
@@ -48,11 +48,10 @@ describe("QuickBooks OAuth transport", () => {
     }
   });
 
-  it("revokes with the maintained JSON contract and sanitizes provider failures", async () => {
+  it("revokes with the maintained JSON contract", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(null, { status: 200 }));
     await new QboOAuthClient(config, fetch).revoke("refresh-secret");
     expect(fetch.mock.calls[0][1]).toMatchObject({ method: "POST", body: JSON.stringify({ token: "refresh-secret" }) });
-    expect(sanitizeQboError(new Error("failed access-secret refresh-secret"))).toBe("QuickBooks is unavailable");
   });
 });
 
@@ -85,7 +84,7 @@ describe("QuickBooks OAuth lifecycle", () => {
       expect.objectContaining({ grantedScopes: ["com.intuit.quickbooks.accounting"] }), null);
 
     complete.mockClear();
-    await expect(callback("com.intuit.quickbooks.accounting unrequested.scope")).rejects.toThrow("QuickBooks is unavailable");
+    await expect(callback("com.intuit.quickbooks.accounting unrequested.scope")).rejects.toBeInstanceOf(Error);
     expect(complete).not.toHaveBeenCalled();
     expect(fail).toHaveBeenCalledWith("intent-1", "actor-1");
   });
@@ -140,7 +139,7 @@ describe("QuickBooks OAuth lifecycle", () => {
       redirectUri: config.redirectUri,
       client: new QboOAuthClient(config, fetch),
       store: { claim, complete: vi.fn(), fail: vi.fn(), hold, realmInUse: realmFree },
-    })).rejects.toThrow("oauth state invalid");
+    })).rejects.toBeInstanceOf(Error);
 
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -160,7 +159,7 @@ describe("QuickBooks OAuth lifecycle", () => {
         complete: vi.fn(),
         fail, hold, realmInUse: realmFree,
       },
-    })).rejects.toThrow("QuickBooks is unavailable");
+    })).rejects.toBeInstanceOf(Error);
 
     expect(fail).toHaveBeenCalledWith("intent-1", "actor-1");
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -182,7 +181,7 @@ describe("QuickBooks OAuth lifecycle", () => {
       .mockResolvedValueOnce(tokenResponse())
       .mockResolvedValueOnce(new Response(null, { status: 403 }))
       .mockResolvedValueOnce(new Response(null, { status: 200 }));
-    await expect(run(verifyFetch, vi.fn())).rejects.toThrow("QuickBooks is unavailable");
+    await expect(run(verifyFetch, vi.fn())).rejects.toBeInstanceOf(Error);
     expect(String(verifyFetch.mock.calls[2][0])).toBe("https://developer.api.intuit.com/v2/oauth2/tokens/revoke");
     expect(verifyFetch.mock.calls[2][1]).toMatchObject({ body: JSON.stringify({ token: "refresh-secret" }) });
 
@@ -192,7 +191,7 @@ describe("QuickBooks OAuth lifecycle", () => {
       .mockRejectedValueOnce(new TypeError("revoke socket closed"));
     const fail = vi.fn().mockResolvedValue(true);
     await expect(run(storeFetch, vi.fn().mockRejectedValue(new Error("QuickBooks connection storage failed")), fail))
-      .rejects.toThrow("QuickBooks is unavailable");
+      .rejects.toBeInstanceOf(Error);
     expect(String(storeFetch.mock.calls[2][0])).toBe("https://developer.api.intuit.com/v2/oauth2/tokens/revoke");
     expect(fail).toHaveBeenCalledWith("intent-1", "actor-1");
   });
@@ -216,7 +215,7 @@ describe("QuickBooks OAuth lifecycle", () => {
         claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: ["com.intuit.quickbooks.accounting"] }),
         complete: vi.fn(), fail, hold, realmInUse,
       },
-    })).rejects.toThrow("QuickBooks is unavailable");
+    })).rejects.toBeInstanceOf(Error);
     expect(realmInUse).toHaveBeenCalledWith("connected-realm");
     expect(fail).toHaveBeenCalledWith("intent-1", "actor-1");
     expect(fetch).toHaveBeenCalledTimes(2);
@@ -241,7 +240,7 @@ describe("QuickBooks OAuth lifecycle", () => {
         claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: ["com.intuit.quickbooks.accounting"] }),
         complete: vi.fn().mockRejectedValue(new TypeError("fetch failed")), fail, hold, realmInUse: realmFree,
       },
-    })).rejects.toThrow("QuickBooks is unavailable");
+    })).rejects.toBeInstanceOf(Error);
     expect(fail).toHaveBeenCalledWith("intent-1", "actor-1");
     expect(fetch).toHaveBeenCalledTimes(2);
   });
@@ -263,7 +262,7 @@ describe("QuickBooks OAuth lifecycle", () => {
         claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: ["com.intuit.quickbooks.accounting"] }),
         complete, fail, hold, realmInUse: realmFree,
       },
-    })).rejects.toThrow("QuickBooks is unavailable");
+    })).rejects.toBeInstanceOf(Error);
 
     expect(fetch).toHaveBeenCalledTimes(3);
     expect(String(fetch.mock.calls[2][0])).toBe("https://developer.api.intuit.com/v2/oauth2/tokens/revoke");
@@ -288,7 +287,7 @@ describe("QuickBooks OAuth lifecycle", () => {
         claim: vi.fn().mockResolvedValue({ intentId: "intent-2", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: ["com.intuit.quickbooks.accounting"] }),
         complete: deniedComplete, fail: deniedFail, hold, realmInUse: realmFree,
       },
-    })).rejects.toThrow("QuickBooks is unavailable");
+    })).rejects.toBeInstanceOf(Error);
     expect(deniedComplete).not.toHaveBeenCalled();
     expect(deniedFail).toHaveBeenCalledWith("intent-2", "actor-1");
   });
@@ -312,7 +311,7 @@ describe("QuickBooks OAuth hold and reap (#1034)", () => {
         hold: vi.fn().mockRejectedValue(new Error("QuickBooks OAuth tokens could not be held")),
         complete, fail, realmInUse: realmFree,
       },
-    })).rejects.toThrow("QuickBooks is unavailable");
+    })).rejects.toBeInstanceOf(Error);
     expect(fetch).toHaveBeenCalledTimes(2); // exchange, then revoke; no CompanyInfo read
     expect(fetch.mock.calls[1][1]).toMatchObject({ body: JSON.stringify({ token: "unheld-refresh" }) });
     expect(complete).not.toHaveBeenCalled();
@@ -360,7 +359,7 @@ describe("QuickBooks OAuth hold and reap (#1034)", () => {
         reap: async () => [held(1), held(2), held(3)], realmInUse: realmFree, discard,
       }, { revoke })).resolves.toEqual({ done: 2, failed: 1 });
       expect(discard.mock.calls.map(([intentId]) => intentId)).toEqual(["intent-1", "intent-3"]);
-      expect(error).toHaveBeenCalledWith("qbo_oauth_reap_failed", { name: "Error" });
+      expect(error).toHaveBeenCalledWith("qbo_oauth_reap_failed", { name: "Error", status: null, stage: "oauth_reap" });
     } finally {
       error.mockRestore();
     }

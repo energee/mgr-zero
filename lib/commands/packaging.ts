@@ -11,6 +11,7 @@
 // `product_volume_requirements` (a view) reads these plans back as demand and
 // answers the brewhouse's question: what still has to be brewed?
 import { z } from "zod";
+import { historyInput, historyResult, newestFirst, type HistoryRow } from "./history";
 import { skuLabel } from "@/lib/mgr/finished-goods-view";
 import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, CommandError, type Ctx } from "./registry";
 
@@ -164,6 +165,35 @@ defineCommand({
   })),
 });
 
+defineQuery({
+  name: "get_packaging_output_corrections",
+  description: "Reasoned output correction history for a closed packaging run, including the previous and replacement counts and tank draw",
+  input: z.object({ runId: z.string().uuid() }),
+  roles: ["admin", "brewer", "warehouse"],
+  handler: (ctx, i) => unwrap(ctx.db.rpc("get_packaging_output_corrections", { p_brewery: ctx.breweryId, p_run: i.runId })),
+});
+
+defineCommand({
+  name: "correct_packaging_run_outputs",
+  description: "Correct an unused closed run's output quantities and barrels drawn with exact production reversals and replacements; refuses downstream stock use, completed batches and filed periods",
+  input: z.object({
+    runId: z.string().uuid(),
+    previousCorrectionId: z.string().uuid().nullable().describe("Latest output correction ID; null for the first correction"),
+    reason: z.string().trim().min(1),
+    bblDrawn: z.number().nonnegative(),
+    outputs: z.array(z.object({ skuId: z.string().uuid(), qtyActual: z.number().nonnegative().max(9_999_999_999.99) })),
+    locationId: z.string().uuid(),
+    binId: z.string().uuid(),
+  }),
+  roles: ["admin", "brewer", "warehouse"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_packaging_run_outputs", {
+    p_brewery: ctx.breweryId, p_run: i.runId, p_previous: i.previousCorrectionId,
+    p_reason: i.reason, p_bbl_drawn: i.bblDrawn,
+    p_outputs: i.outputs.map(row => ({ sku_id: row.skuId, qty_actual: row.qtyActual })),
+    p_location: i.locationId, p_bin: i.binId, p_request_id: execution.requestId,
+  })),
+});
+
 // `record_repack`: breaking a composed unit (a case) into the units it is
 // made of. It is a shape change, never a production or a removal, so the
 // RPC writes both FG ledger rows under one `ref` and refuses to commit
@@ -271,10 +301,7 @@ type RunRow = {
   bbl_drawn: number | null; note: string | null;
 };
 
-// Names for a set of brand ids, 100 ids per read. Embedded selects are avoided
-// throughout the command layer (see production.ts): every join here is an
-// explicit id -> name map, which keeps the composite-FK tables unambiguous.
-// production.ts shares this one.
+// Shared name lookup for packaging details and batch details, bounded to 100 ids per read.
 export async function brandNames(ctx: Ctx, ids: (string | null)[]) {
   const unique = [...new Set(ids.filter((v): v is string => !!v))];
   if (unique.length === 0) return new Map<string, string>();
@@ -309,28 +336,43 @@ async function plannedQty(ctx: Ctx, runIds: string[]) {
 
 const RUN_COLUMNS = "id, run_no, brand_id, occupancy_id, planned_on, started_at, closed_at, cancelled_at, bbl_drawn, note";
 
+/** Resolve display facts only for the runs returned on this page. */
+async function packagingListRows<T extends RunRow>(ctx: Ctx, runs: T[]) {
+  if (runs.length === 0) return [];
+  const [brands, vessels, qty] = await Promise.all([
+    brandNames(ctx, runs.map(r => r.brand_id)),
+    vesselNames(ctx, runs.map(r => r.occupancy_id)),
+    plannedQty(ctx, runs.map(r => r.id)),
+  ]);
+  return runs.map(r => ({
+    ...r,
+    brand_name: brands.get(r.brand_id) ?? null,
+    vessel_name: r.occupancy_id ? vessels.get(r.occupancy_id) ?? null : null,
+    qty_planned: qty.get(r.id) ?? 0,
+  }));
+}
+
 defineQuery({
   name: "list_packaging_runs",
-  description: "Packaging runs by planned date, newest first, with the brand each one packages, the tank it draws from and the units planned",
+  description: "Unfinished packaging runs by planned date, newest first, with brand, source tank and planned units. Use list_packaging_history for closed or cancelled runs.",
   input: z.object({}), roles: ["admin", "brewer", "warehouse"],
   handler: async (ctx) => {
-    // Paged past PostgREST's 1000-row cap (#759); id breaks planned_on ties so pages never overlap.
     const runs = await completeRows("Packaging runs", start => ctx.db.from("packaging_runs").select(RUN_COLUMNS, { count: "exact" })
-      .eq("brewery_id", ctx.breweryId).order("planned_on", { ascending: false }).order("id").range(start, start + PAGE_SIZE - 1)) as RunRow[];
-    if (runs.length === 0) return [];
+      .eq("brewery_id", ctx.breweryId).is("closed_at", null).is("cancelled_at", null)
+      .order("planned_on", { ascending: false }).order("id").range(start, start + PAGE_SIZE - 1)) as RunRow[];
+    return packagingListRows(ctx, runs);
+  },
+});
 
-    const [brands, vessels, qty] = await Promise.all([
-      brandNames(ctx, runs.map((r) => r.brand_id)),
-      vesselNames(ctx, runs.map((r) => r.occupancy_id)),
-      plannedQty(ctx, runs.map((r) => r.id)),
-    ]);
-
-    return runs.map((r) => ({
-      ...r,
-      brand_name: brands.get(r.brand_id) ?? null,
-      vessel_name: r.occupancy_id ? vessels.get(r.occupancy_id) ?? null : null,
-      qty_planned: qty.get(r.id) ?? 0,
-    }));
+defineQuery({
+  name: "list_packaging_history", description: "One page of closed or cancelled packaging runs, newest created first, with brand, source tank and planned units",
+  input: z.object(historyInput), roles: ["admin", "brewer", "warehouse"],
+  handler: async (ctx, i) => {
+    const q = ctx.db.from("packaging_runs").select(`${RUN_COLUMNS}, created_at`).eq("brewery_id", ctx.breweryId)
+      .or("closed_at.not.is.null,cancelled_at.not.is.null").limit(i.limit + 1);
+    const fetched = (await unwrap(newestFirst(q, i.cursor))) ?? [];
+    const page = historyResult(fetched as unknown as (RunRow & HistoryRow)[], i.limit);
+    return { ...page, rows: await packagingListRows(ctx, page.rows) };
   },
 });
 
