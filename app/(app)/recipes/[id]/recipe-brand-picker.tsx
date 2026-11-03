@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { NONE } from "@/components/ui/select";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
-import { brandLabel } from "@/lib/mgr/brand-view";
+import { nameWithAlias } from "@/lib/mgr/labels";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 
 type Brand = { id: string; name: string; alias?: string | null };
@@ -24,7 +24,7 @@ export function RecipeBrandPicker({ recipeId, brandId, brands }: {
   };
   return (
     <>
-      {E.pick("Brand · optional", brandId ?? NONE, [{ value: NONE, label: "Not decided" }, ...brands.map((b) => ({ value: b.id, label: brandLabel(b) }))], { onChange: pick })}
+      {E.pick("Brand · optional", brandId ?? NONE, [{ value: NONE, label: "Not decided" }, ...brands.map((b) => ({ value: b.id, label: nameWithAlias(b) }))], { onChange: pick })}
       {E.info("Saves when you pick. Batches already scheduled keep their brand.")}
       <CommandFormMessage error={error} />
     </>

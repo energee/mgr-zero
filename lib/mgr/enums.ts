@@ -6,9 +6,8 @@
 // the whole area — and drags the registry and its server-only dependencies
 // into a `"use client"` bundle. These are plain data with no imports, so the
 // forms and the shared views under `components/mgr/views/` can read them
-// directly. The command modules re-export them, so their zod `z.enum(...)`
-// schemas and the pickers stay one list. `tests/boundary.test.ts` holds the
-// rule.
+// directly. Commands import the same lists for their zod z.enum(...) schemas.
+// `tests/boundary.test.ts` holds the rule.
 //
 // The words operators read live elsewhere (`lib/mgr/keg-labels.ts`,
 // `sentenceCase` in `lib/mgr/labels.ts`); these are the stored values.

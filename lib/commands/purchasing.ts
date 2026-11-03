@@ -1,3 +1,4 @@
+import { MATERIAL_QTY_MAX, PG_INT_MAX } from "@/lib/mgr/quantity-input";
 // lib/commands/purchasing.ts — vendors, materials, contracts, purchase orders
 // (draft → edit → mark sent → receive), drafting POs from planning gaps, and material
 // cycle counts. Lead time is the vendor's (spec 2026-09-07 §3); open balance,
@@ -5,8 +6,7 @@
 // marking a PO sent is an attestation, so no email leaves here (§1).
 import { z } from "zod";
 import { email } from "@/lib/mgr/email";
-import { completeRows, defineCommand, defineQuery, cents, PAGE_SIZE, PG_INT_MAX, phone, unwrap, CommandError } from "./registry";
-import { isoDate } from "./packaging";
+import { isoDate, completeRows, defineCommand, defineQuery, cents, PAGE_SIZE, phone, unwrap, CommandError } from "./registry";
 import { MATERIAL_CATEGORIES, PAYMENT_TERMS } from "@/lib/mgr/enums";
 import { OPEN_PO_STATUSES } from "@/lib/mgr/receive-po-view";
 import { escapeRegex } from "@/lib/escape-regex";
@@ -78,7 +78,7 @@ defineCommand({
     id: z.string().uuid().optional(),
     vendorId: z.string().uuid(),
     materialId: z.string().uuid(),
-    qtyCommitted: z.number().positive().max(9_999_999_999.9999), // numeric(14,4)
+    qtyCommitted: z.number().positive().max(MATERIAL_QTY_MAX), // numeric(14,4)
     unitCostCents: cents.optional(),
     startsOn: isoDate.optional(),
     endsOn: isoDate.optional(),
@@ -204,7 +204,7 @@ defineQuery({
 
 const poLine = z.object({
   materialId: z.string().uuid(),
-  qtyOrdered: z.number().positive().max(9_999_999_999.9999), // numeric(14,4)
+  qtyOrdered: z.number().positive().max(MATERIAL_QTY_MAX), // numeric(14,4)
   unitCostCents: cents.optional(),
   contractId: z.string().uuid().optional(),
   expectedLotCode: z.string().trim().optional(),

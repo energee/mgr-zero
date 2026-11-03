@@ -1,3 +1,4 @@
+import { isUuid } from "@/lib/uuid";
 // app/(app)/inventory/page.tsx — Finished goods (screen record): sellable
 // beer by SKU with on hand, allocated and ATP, plus frozen-cost value for Admin/Sales, then the
 // movement ledger. Record movement opens movement-form.tsx, the one
@@ -12,7 +13,7 @@ import { E } from "@/components/mgr/e";
 import { sentenceCase } from "@/lib/mgr/labels";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
 import { getActiveBrewery } from "@/lib/brewery";
-import { buildContext, isUuid } from "@/lib/commands/context";
+import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand, requirePagePermission } from "@/lib/mgr/page-query";
 import { canRun } from "@/lib/commands/registry";
 import type { InventoryValue } from "@/lib/commands/inventory";

@@ -1,3 +1,4 @@
+import { isUuid } from "@/lib/uuid";
 // app/(app)/batches/[id]/page.tsx — one batch. A planned batch (not brewed,
 // not cancelled) has two tabs, switched by `?tab=` links (openBrewTab picks the
 // default: Brew day once Prep pulls are saved, else Prep). Prep (PrepForm →
@@ -18,7 +19,7 @@ import { brewedAsPlanned, brewPlanActuals, currentBrewRecords, type BrewPlan, ty
 import { brewIngredients, brewTargets, laterAdditions, openBrewTab, waterAdditionRows } from "@/lib/mgr/brew-prep-view";
 import { getActiveBrewery } from "@/lib/brewery";
 import { formatDate } from "@/lib/date-format";
-import { buildContext, isUuid } from "@/lib/commands/context";
+import { buildContext } from "@/lib/commands/context";
 import { breweryToday } from "@/lib/commands/registry";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";

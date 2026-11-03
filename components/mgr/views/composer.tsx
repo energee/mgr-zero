@@ -1,3 +1,4 @@
+import { plural } from "@/lib/mgr/plural";
 import { sentenceCase } from "@/lib/mgr/labels";
 import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -46,7 +47,7 @@ export function OfflineOutboxView({ rows, busy = false, notice, onDismissNotice,
       )}
       {rows.length > 0 && <div className="mt-3 flex flex-wrap justify-end gap-2">
         {retryable.length > 0 && <Button type="button" variant="outline" disabled={busy} onClick={onRetryAll}>Retry {retryable.length} waiting</Button>}
-        <Button type="button" variant="destructive" disabled={busy} onClick={onDiscardAll}>Discard {rows.length} queued reading{rows.length === 1 ? "" : "s"}</Button>
+        <Button type="button" variant="destructive" disabled={busy} onClick={onDiscardAll}>Discard {plural(rows.length, "queued reading")}</Button>
       </div>}
     </section>
   );

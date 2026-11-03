@@ -35,13 +35,11 @@ export function filterScreens({ q = "", area: a, surface }: Filter): Indexed[] {
 
 /** Everything the explorer keeps in the URL hash so a link reopens the same
  * view: `s` the inventory index, `p` the persona role, `q`/`a`/`f` the
- * search, area and surface filters. `#s<index>` is the form the first links used. */
+ * search, area and surface filters. */
 export type HashState = { s?: number; p?: string; q?: string; a?: string; f?: string; w?: string };
 const KEYS = ["p", "q", "a", "f", "w"] as const;
 
 export function parseHash(hash: string): HashState {
-  const legacy = /^#s(\d+)$/.exec(hash);
-  if (legacy) return { s: Number(legacy[1]) };
   const params = new URLSearchParams(hash.replace(/^#/, ""));
   const out: HashState = {};
   if (params.has("s")) out.s = Number(params.get("s"));

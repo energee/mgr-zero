@@ -1,6 +1,6 @@
 // lib/mgr/sku-view.ts — view-model for the SKU sheet. create_sku / list_skus
 // plus packaged formats and keg pools paint format, pool, active, and optional UPC.
-import { isNumber, numberNotationError, toTicks } from "./quantity-input";
+import { isNumber, numberNotationError, percent, toTicks } from "./quantity-input";
 import { submitReason } from "./submit-reason";
 import { UPC_NEED, upcError } from "./upc";
 
@@ -51,7 +51,7 @@ export function toSkuViewProps({ sku, formats, pools = [] }: SkuSnapshot): SkuVi
     formatOptions: formats.map((f) => f.name),
     active: sku?.active ?? true,
     upc: sku?.upc ?? "",
-    batchSharePercent: sku ? (sku.batch_share == null ? "" : String(Number((Number(sku.batch_share) * 100).toPrecision(15)))) : undefined,
+    batchSharePercent: sku ? (sku.batch_share == null ? "" : percent(sku.batch_share, 15)) : undefined,
     volumeInfo: VOLUME_INFO,
     showKegPool: (sku?.formats ?? selectedFormat)?.package_type === "keg",
     kegPool: sku?.keg_pool_id ?? "",

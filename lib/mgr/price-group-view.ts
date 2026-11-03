@@ -1,3 +1,4 @@
+import { PG_INT_MAX } from "@/lib/mgr/quantity-input";
 // lib/mgr/price-group-view.ts — view-model for one Price group row. Name,
 // position and cost ceiling come from list_price_groups, barcodes from
 // list_price_group_barcodes; the Prices line
@@ -8,7 +9,7 @@
 import { centsMaxError, dollarsInput, money } from "./money";
 import { plural } from "./plural";
 import { submitReason } from "./submit-reason";
-import { barcodeOf, byPosition, formatLabel, type PriceGroupRow, type PriceGroupsSnapshot } from "./price-groups-view";
+import { barcodeOf, byPosition, pricingFormatLabel, type PriceGroupRow, type PriceGroupsSnapshot } from "./price-groups-view";
 
 export type PriceGroupViewModel = {
   backHref?: string;
@@ -35,7 +36,7 @@ function pricesSummary(snapshot: PriceGroupsSnapshot, groupId: string): string {
   if (!first) return "none";
   const channel = snapshot.channels.find((c) => c.id === first.sale_channel_id)?.name ?? "";
   const format = snapshot.formats.find((f) => f.id === first.format_id);
-  const head = `${money(first.unit_price_cents)} on ${channel} · ${format ? formatLabel(format) : ""}`;
+  const head = `${money(first.unit_price_cents)} on ${channel} · ${format ? pricingFormatLabel(format) : ""}`;
   const rest = priced.length - 1;
   return rest > 0 ? `${head}, and ${plural(rest, "more cell")}` : head;
 }
@@ -63,7 +64,7 @@ export function toPriceGroupViewProps(snapshot: PriceGroupSnapshot): PriceGroupV
         id: f.id, name: f.name, ounces: f.ounces != null ? String(f.ounces) : "",
       })),
       barcodes: snapshot.formats.filter((f) => f.basis !== "poured").map((f) => ({
-        formatId: f.id, format: formatLabel(f),
+        formatId: f.id, format: pricingFormatLabel(f),
         upc: barcodeOf(snapshot.barcodes, group.id, f.id) ?? "",
       })),
     }),
@@ -83,7 +84,7 @@ export function priceGroupFieldErrors(fields: Pick<PriceGroupViewModel, "positio
   let positionError: string | undefined;
   if (/[eE]/.test(fields.position)) positionError = "Enter a decimal number without exponent notation.";
   else if (!Number.isInteger(position) || position < 1) positionError = "Enter a whole-number position of 1 or more.";
-  else if (position > 2_147_483_647) positionError = "Enter a position no greater than 2,147,483,647.";
+  else if (position > PG_INT_MAX) positionError = "Enter a position no greater than 2,147,483,647.";
   return {
     ...(positionError ? { position: positionError } : {}),
     ...(costCeiling && { costCeiling }),

@@ -29,7 +29,7 @@ const tapName = (tap: TapInterval) => tap.tap_number === null ? null : `Tap ${ta
 const closedAs = (tap: TapHistory) => tap.close_reason === "Kicked empty" && Number(tap.closing_fill) === 0 ? tap.close_reason : `${tap.close_reason} · ${fillLabel(CLOSING_FILLS, tap.closing_fill)}`;
 
 function fillChips<Fill extends number>(label: string, options: readonly (readonly [Fill, string])[], value: Fill, onChange: (fill: Fill) => void) {
-  return E.chips(options.map(([, text]) => text), options.findIndex(([fill]) => fill === value), false, { label, onChange: index => onChange(options[index][0]) });
+  return E.chips(options.map(([, text]) => text), options.findIndex(([fill]) => fill === value), { label, onChange: index => onChange(options[index][0]) });
 }
 
 const NO_KEG_SKUS = "No keg SKUs with a keg volume yet. Choose Guest keg under Identity to tap a guest without a packaged keg SKU.";

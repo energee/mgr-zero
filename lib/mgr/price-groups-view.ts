@@ -72,14 +72,14 @@ export const barcodeOf = (barcodes: PriceGroupBarcode[] | undefined, groupId: st
   groupId ? barcodes?.find((b) => b.price_group_id === groupId && b.format_id === formatId)?.upc : undefined;
 
 /** A format column's label: "Hazy · ½ bbl keg" when the format belongs to a brand. */
-export const formatLabel = (f: PriceGroupsSnapshot["formats"][number]) => f.brands ? `${f.brands.name} · ${f.name}` : f.name;
+export const pricingFormatLabel = (f: PriceGroupsSnapshot["formats"][number]) => f.brands ? `${f.brands.name} · ${f.name}` : f.name;
 
 /** One column per packaged format, then one per pour name; `formatId` says which format a group's cell prices. */
 function pricingColumns(formats: PriceGroupsSnapshot["formats"]) {
   const packaged = formats.filter((f) => f.basis !== "poured");
   const pours = Map.groupBy(formats.filter((f) => f.basis === "poured"), (f) => f.name);
   return [
-    ...packaged.map((f) => ({ label: formatLabel(f), header: formatLabel(f), formatId: (): string | null => f.id })),
+    ...packaged.map((f) => ({ label: pricingFormatLabel(f), header: pricingFormatLabel(f), formatId: (): string | null => f.id })),
     ...[...pours].map(([name, group]) => ({
       label: name,
       header: `Pour · ${name}`,

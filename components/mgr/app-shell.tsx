@@ -106,7 +106,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
         </header>
         {/* SidebarInset is already the <main> landmark; only page content scrolls. */}
         <div id="main" tabIndex={-1} data-mgr-page-scroll="" className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-4 outline-none md:px-8 md:py-6 print:overflow-visible">{children}</div>
-        <TabBar items={items} active={current} className="md:hidden" />
+        <PhoneNavigation items={items} active={current} className="md:hidden" />
       </SidebarInset>
     </SidebarProvider>
     </TooltipProvider>
@@ -114,7 +114,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
 }
 
 /** Phone navigation stays below chat (45) and modal forms (50). */
-export function TabBar({ items, active, className }: { items: readonly NavItem[]; active?: string; className?: string }) {
+function PhoneNavigation({ items, active, className }: { items: readonly NavItem[]; active?: string; className?: string }) {
   return (
     <nav
       aria-label="Tabs"

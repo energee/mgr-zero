@@ -8,7 +8,7 @@ import { docNo, trfNo } from "@/lib/mgr/doc-no";
 import { hasAnyRole } from "@/lib/mgr/roles";
 import { ROUTE_STATUSES } from "@/lib/mgr/routes-view";
 import type { TeamMember } from "./invites";
-import { breweryToday, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, rows, runCommand, unwrap } from "./registry";
+import { isoDate, breweryToday, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, rows, runCommand, unwrap } from "./registry";
 
 const ROLES = ["admin", "warehouse"] as const;
 const READ = ["admin", "warehouse", "sales"] as const;
@@ -19,7 +19,7 @@ defineCommand({
   name: "save_route", description: "Create or edit a delivery route and replace its stops (shipments or stock transfers) in one step; delivered stops must be kept and a departed route cannot change",
   roles: [...ROLES],
   input: z.object({
-    id: z.string().uuid().optional(), name: z.string().optional(), deliveryDate: z.string().date(),
+    id: z.string().uuid().optional(), name: z.string().optional(), deliveryDate: isoDate,
     driverUserId: z.string().uuid().optional(), vehicle: z.string().optional(), note: z.string().optional(), stops: z.array(stop),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("save_route", {
@@ -49,7 +49,7 @@ const transferDoc = (t: TransferRow): StopDoc => ({ id: t.id, kind: "transfer", 
 defineQuery({
   name: "list_routes", description: "Delivery routes (one route by id, one day, or by status: open, the default, is every route not yet returned; returned is every returned route, newest first) with their stops and their driver's roster email (null when no driver is assigned or the driver has left the team); whether any route has been returned; the shipped orders and picked transfers on no route; and the members who may drive, with their emails",
   roles: [...READ],
-  input: z.object({ id: z.string().uuid().optional(), date: z.string().date().optional(), status: z.enum(ROUTE_STATUSES).optional() }),
+  input: z.object({ id: z.string().uuid().optional(), date: isoDate.optional(), status: z.enum(ROUTE_STATUSES).optional() }),
   handler: async (ctx, i) => {
     const returned = i.status === "returned";
     let q = ctx.db.from("routes").select("*").eq("brewery_id", ctx.breweryId)

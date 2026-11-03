@@ -1,3 +1,4 @@
+import { sentenceCase } from "@/lib/mgr/labels";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -45,7 +46,7 @@ export default async function VesselPage({ params }: { params: Promise<{ id: str
   const occupancy = occupancies.find(occupancy => occupancy.vessel_id === id);
   const readings = occupancy ? await runPageQuery("list_fermentation_readings", { occupancyId: occupancy.occupancy_id }, ctx) as VesselReading[] : [];
   const model = {
-    title: vessel.name, backHref: "/cellar", name: vessel.name, type: vessel.kind[0].toUpperCase() + vessel.kind.slice(1), typeOptions: VESSEL_TYPES, capacity: String(vessel.capacity_bbl), retired: !vessel.active,
+    title: vessel.name, backHref: "/cellar", name: vessel.name, type: sentenceCase(vessel.kind), typeOptions: VESSEL_TYPES, capacity: String(vessel.capacity_bbl), retired: !vessel.active,
     occupancy: occupancy ? { title: `${occupancy.brand_name ?? "No brand yet"} · ${batNo(occupancy.batch_no)}`, detail: `${occupancy.bbl} / ${vessel.capacity_bbl} bbl`, href: `/batches/${occupancy.batch_id}` } : undefined,
     readingHref: occupancy ? `/cellar/${occupancy.occupancy_id}/reading` : undefined,
     readings: {

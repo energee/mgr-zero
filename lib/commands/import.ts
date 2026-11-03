@@ -5,7 +5,6 @@ import { IMPORT_KINDS, IMPORT_ROW_CAP, PRICE_REFERENCE_FIELDS, importRowKey, isI
 // Imports preserve raw batch identity while resolving existing references per atomic row.
 // Concurrent row RPCs per import. ponytail: fixed; raise it if a 5000-row import is still slow.
 const IMPORT_CONCURRENCY = 8;
-export { IMPORT_ROW_CAP } from "@/lib/import-csv";
 
 defineCommand({
   name: "import_csv",

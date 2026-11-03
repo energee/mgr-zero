@@ -6,8 +6,8 @@
 // chips so it reads the same model: live, a tapped chip and the preview
 // change together.
 import { E } from "@/components/mgr/e";
-import { BREWERY_UNITS, MINE_UNITS, type UnitsViewModel } from "@/lib/mgr/units-view";
-import type { GravityUnit } from "@/lib/mgr/gravity-unit";
+import { MINE_UNITS, type UnitsViewModel } from "@/lib/mgr/units-view";
+import { GRAVITY_UNITS, type GravityUnit } from "@/lib/mgr/gravity-unit";
 
 const NOT_CHANGED = "Readings are not changed.";
 
@@ -20,8 +20,8 @@ export function GravityUnitControls({ model, part, busy = false, onBrewery, onMi
   return <>
     {E.ttl("Gravity unit")}
     {brewery
-      ? E.chips(model.breweryOptions, model.breweryIndex, false, onBrewery ? { onChange: index => onBrewery(BREWERY_UNITS[index]), disabled: busy, label: "Brewery gravity unit" } : undefined)
-      : E.chips(model.mineOptions, model.mineIndex, false, onMine ? { onChange: index => onMine(MINE_UNITS[index]), disabled: busy, label: "Your gravity unit" } : undefined)}
+      ? E.chips(model.breweryOptions, model.breweryIndex, onBrewery ? { onChange: index => onBrewery(GRAVITY_UNITS[index]), disabled: busy, label: "Brewery gravity unit" } : undefined)
+      : E.chips(model.mineOptions, model.mineIndex, onMine ? { onChange: index => onMine(MINE_UNITS[index]), disabled: busy, label: "Your gravity unit" } : undefined)}
     <p className="text-sm text-muted-foreground">{brewery ? "What everyone here sees unless they choose their own under Me." : "Yours alone; it changes nothing for anyone else."} {NOT_CHANGED}</p>
     {!brewery && <p className="text-sm">{model.preview}</p>}
   </>;

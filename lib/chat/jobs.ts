@@ -11,7 +11,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { readAppUrl } from "@/lib/env/server-parser";
 import { sha256 } from "@/lib/hash";
-import { isUuid } from "@/lib/commands/context";
+import { isUuid } from "@/lib/uuid";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { paced } from "@/lib/chat/pacing";
 import { assertPortableNotification, NOTIFICATION_REASON_LABEL, type NotificationReason, type PortableNotification, type Occurrence } from "./contracts";
@@ -168,9 +168,10 @@ export async function runChatCallbackBatch({ limit = 25, now = new Date(), db = 
 const LEASE_SAFETY_MS = 5_000;
 
 // Leases due deliveries, re-checks everything from server state, then sends or
-// updates. Persists only provider ids and redacted codes. Only provider-send
-// failures are classified and retried; a failure to record an outcome is
-// logged and never resends or aborts the rest of the batch. One lease call
+// updates. Persists only provider ids and redacted codes. Provider-send and
+// destination-validation failures are classified and retried; a failure to
+// record an outcome is logged and never resends or aborts the rest of the
+// batch. One lease call
 // stamps every row with the same expiry, so once the lease is nearly spent the
 // batch stops; the rows it did not reach are left untouched and counted as
 // `expired`.
@@ -187,6 +188,12 @@ export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = 
     const stop = async (state: "suppressed" | "terminal", code: string) => {
       await unwrap(db.rpc("suppress_chat_delivery", { p_delivery: lease.id, p_lease: lease.lease_expires_at, p_state: state, p_error_code: code }));
       counts[state]++;
+      if (state === "terminal" && REAUTH_CODES.has(code)) {
+        // The delivery is already terminal; a flag failure must not retry it.
+        await unwrap(db.rpc("mark_chat_installation_reauthorization", { p_installation: lease.installation_id, p_failure_code: code })).catch((flagError) => {
+          console.error(`chat installation ${lease.installation_id} reauthorization flag (${code}) could not be recorded:`, flagError instanceof Error ? flagError.message : flagError);
+        });
+      }
     };
     const complete = async (ref: ProviderMessageRef, kind: "sent" | "updated") => {
       await unwrap(db.rpc("complete_chat_delivery", { p_delivery: lease.id, p_lease: lease.lease_expires_at, p_conversation_id: ref.conversationId, p_message_id: ref.messageId }));
@@ -223,7 +230,9 @@ export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = 
       if (!personal) {
         const check = await transport.validateDestination({ installationId, destinationId: ctx.destination.external_destination_id });
         if (!check.ok) {
-          await unwrap(db.rpc("block_notification_destination", { p_destination: ctx.destination.id, p_reason: check.reason }));
+          if (!REAUTH_CODES.has(check.reason)) {
+            await unwrap(db.rpc("block_notification_destination", { p_destination: ctx.destination.id, p_reason: check.reason }));
+          }
           await stop("terminal", check.reason); continue;
         }
       }
@@ -246,13 +255,6 @@ export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = 
           counts.retried++;
         } else {
           await stop("terminal", cls.code);
-          if (REAUTH_CODES.has(cls.code)) {
-            // The delivery is already terminal; only the installation flag is
-            // at stake, so log it here rather than as an unrecorded delivery.
-            await unwrap(db.rpc("mark_chat_installation_reauthorization", { p_installation: ctx.installation.id, p_failure_code: cls.code })).catch((flagError) => {
-              console.error(`chat installation ${ctx.installation.id} reauthorization flag (${cls.code}) could not be recorded:`, flagError instanceof Error ? flagError.message : flagError);
-            });
-          }
         }
       } catch (recordError) {
         // A stale lease (an overlapping run swept it) or a database failure:
