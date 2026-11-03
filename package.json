@@ -19,7 +19,7 @@
   "dependencies": {
     "@ai-sdk/react": "4.0.163",
     "@base-ui/react": "^1.9.0",
-    "@chat-adapter/slack": "^4.42.0",
+    "@chat-adapter/slack": "^4.43.0",
     "@chat-adapter/state-pg": "^4.42.0",
     "@hugeicons/core-free-icons": "^4.3.5",
     "@hugeicons/react": "^1.1.10",
