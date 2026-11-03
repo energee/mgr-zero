@@ -1,6 +1,8 @@
 // tests/doc-agent-watch.test.ts — the doc agents fail loudly and re-audit on a clock.
 // Dreaming failed 13 days running (9/29–10/11) on one allowlist line and nobody saw it.
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { parse as load } from "yaml";
@@ -29,12 +31,17 @@ describe("doc agent watch", () => {
     expect(watch.jobs["stale-dream"].permissions).toEqual({ contents: "read", issues: "write" });
   });
 
-  it("alerts for a different failed hosted worker while leaving repeat failures quiet", () => {
+  // Runs the failed-run step under bash with a fake gh. The job lookup prints
+  // FAILED_JOBS only from call number JOBS_READY_ON (default 1), counted in COUNT_FILE.
+  const runFailedRun = (env: Record<string, string>) => {
     const script = watch.jobs["failed-run"].steps![0].run!;
     const fakeGh = `
+      sleep() { :; }
       gh() {
         case "$1 $2" in
-          "api --paginate") printf '%s\\n' "$FAILED_JOBS" ;;
+          "api --paginate")
+            n=$(( $(cat "$COUNT_FILE" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$COUNT_FILE"
+            if [ "$n" -ge "\${JOBS_READY_ON:-1}" ]; then printf '%s\\n' "$FAILED_JOBS"; fi ;;
           "issue list") if [[ "$*" == *"$EXISTING_TITLE"* ]]; then echo 1598; fi ;;
           "issue create") echo "CREATE $*" ;;
           "issue comment") echo "COMMENT $*" ;;
@@ -42,15 +49,38 @@ describe("doc agent watch", () => {
         esac
       }
     `;
-    const result = spawnSync("bash", ["-e", "-c", fakeGh + script], {
+    const countFile = join(mkdtempSync(join(tmpdir(), "doc-agent-watch-")), "count");
+    return spawnSync("bash", ["-e", "-c", fakeGh + script], {
       encoding: "utf8",
       env: { ...process.env, NAME: "hosted jobs", GH_REPO: "test/repo", RUN_ID: "42", URL: "https://example.test/run/42",
-        CONCLUSION: "failure", FAILED_JOBS: "order-email\nretention", EXISTING_TITLE: "Hosted job failing: order-email" },
+        CONCLUSION: "failure", FAILED_JOBS: "", EXISTING_TITLE: "none", COUNT_FILE: countFile, ...env },
     });
+  };
+
+  it("alerts for a different failed hosted worker while leaving repeat failures quiet", () => {
+    const result = runFailedRun({ FAILED_JOBS: "order-email\nretention", EXISTING_TITLE: "Hosted job failing: order-email" });
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("hosted job order-email issue #1598 already open; not commenting");
     expect(result.stdout).toContain("CREATE issue create --title Hosted job failing: retention");
     expect(result.stdout).not.toContain("COMMENT");
+  });
+
+  it("retries an empty job list before naming a hosted failure", () => {
+    // #1699: the job list was empty just after the run completed, so an
+    // order-email 401 was filed as "workflow startup".
+    const raced = runFailedRun({ FAILED_JOBS: "order-email", JOBS_READY_ON: "3" });
+    expect(raced.status).toBe(0);
+    expect(raced.stdout).toContain("CREATE issue create --title Hosted job failing: order-email");
+    const empty = runFailedRun({});
+    expect(empty.status).toBe(0);
+    expect(empty.stdout).toContain("CREATE issue create --title Hosted job failing: hosted jobs");
+    expect(empty.stdout).not.toContain("workflow startup");
+  });
+
+  it("labels only a startup_failure run as workflow startup", () => {
+    const result = runFailedRun({ CONCLUSION: "startup_failure" });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("CREATE issue create --title Hosted job failing: workflow startup");
   });
 
   it("re-audits the guides and the API reference weekly, skipping an unchanged main", () => {

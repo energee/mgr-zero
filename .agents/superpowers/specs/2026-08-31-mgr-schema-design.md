@@ -844,8 +844,8 @@ every table, `security_invoker` views, pinned `search_path`.
 
 ### 16.1 `products` → `brands`
 
-A **brand** is the sellable identity — "Lupula", "Waves". A **batch** is a
-production instance — "Lupula 3". They were conflated because a batch usually
+A **brand** is the sellable identity — "Kestrel", "Tidewater". A **batch** is a
+production instance — "Kestrel 3". They were conflated because a batch usually
 becomes one brand, but a blend of two batches may ship as a third brand, and a
 batch's identity is not knowable at brew time.
 
@@ -854,7 +854,7 @@ Rename `products` → `brands` and every `product_id` → `brand_id` (`skus`,
 rename, not an alias — two names for one table is how drift starts.
 
 `brands.alias text` (optional, non-blank): a staff-only informal name beside the
-brand name, such as a series number ("Appaloosa", alias "Animal #14"). Staff
+brand name, such as a series number ("Copper Kite", alias "Field Notes #14"). Staff
 search matches it, and staff pickers and Catalog rows show "Name · Alias". It is
 never on the portal, Square, the public menu, or SKU names: brands has no
 customer policy, and those surfaces read `brands.name`. `upsert_brand` replaces
@@ -1142,10 +1142,10 @@ did not already enforce — it only forced the decision earlier than the busines
 makes it.
 
 Referenced by exactly one index and no function, view or TypeScript. Keep it as
-*intent* rather than dropping it: planning wants "this is meant to be Lupula",
+*intent* rather than dropping it: planning wants "this is meant to be Kestrel",
 and the gap between intent and outcome becomes queryable.
 
-Batches then need their own `code`, because "Lupula 3" is today derived from the
+Batches then need their own `code`, because "Kestrel 3" is today derived from the
 brand and that derivation breaks the moment a batch ships as something else.
 
 ### 16.10 `repack` — new movement type

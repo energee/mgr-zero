@@ -40,10 +40,18 @@ jobs:
           CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
-          if [ "$NAME" = "hosted jobs" ]; then
-            jobs=$(gh api --paginate "repos/$GH_REPO/actions/runs/$RUN_ID/jobs" --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure") | .name')
+          if [ "$NAME" = "hosted jobs" ] && [ "$CONCLUSION" = "startup_failure" ]; then
             # A startup failure may have no job records.
-            [ -n "$jobs" ] || jobs="workflow startup"
+            jobs="workflow startup"
+          elif [ "$NAME" = "hosted jobs" ]; then
+            # The job list can be empty just after the run completes (#1699), so retry.
+            for attempt in 1 2 3 4 5; do
+              jobs=$(gh api --paginate "repos/$GH_REPO/actions/runs/$RUN_ID/jobs" --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure") | .name')
+              [ -z "$jobs" ] || break
+              [ "$attempt" = 5 ] || sleep 10
+            done
+            # Still empty: name the workflow rather than guess a cause.
+            [ -n "$jobs" ] || jobs="$NAME"
           else
             jobs="$NAME"
           fi

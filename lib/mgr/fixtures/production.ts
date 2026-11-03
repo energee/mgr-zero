@@ -103,8 +103,8 @@ export const brewDayTurnsHazy: BrewDayViewModel = {
   })),
 };
 
-/** BAT-202 Mineral #6 v1, 22 bbl: its mash, boil and whirlpool ingredients, each starting at plan. */
-const mineralIngredients: BrewIngredient[] = ([
+/** BAT-202 Quarry #6 v1, 22 bbl: its mash, boil and whirlpool ingredients, each starting at plan. */
+const quarryIngredients: BrewIngredient[] = ([
   { key: "malted-oats", name: "Malted Oats", materialId: "malted-oats", stage: "mash", plan: 1650, unit: "lb", packSize: 55, source: { lot: "MO-2611", bin: "Malt room / A2", materialId: "malted-oats", locationId: "malt-room", binId: "a2", lotId: "mo-2611" } },
   { key: "pilsen", name: "Fieldstone Pilsen", materialId: "pilsen", stage: "mash", plan: 400, unit: "lb", packSize: 50, source: { lot: "BP-0918", bin: "Malt room / A1", materialId: "pilsen", locationId: "malt-room", binId: "a1", lotId: "bp-0918" } },
   { key: "chit", name: "Chit Malt", materialId: "chit", stage: "mash", plan: 220, unit: "lb", packSize: 50, source: null },
@@ -114,15 +114,15 @@ const mineralIngredients: BrewIngredient[] = ([
   { key: "nelson", name: "Valley Hops Nelson Sauvin 2026", materialId: "nelson", stage: "whirlpool", plan: 44, unit: "lb", packSize: 44, source: { lot: "NS-26-114", bin: "Hop freezer / F1", materialId: "nelson", locationId: "hop-freezer", binId: "f1", lotId: "ns-26-114" } },
 ] satisfies Omit<BrewIngredient, "packs" | "loose">[]).map(startAtPlan);
 
-const mineralVessels = [1, 2, 3, 4, 5, 6].map(n => ({ id: `fv${n}`, name: `FV${n}`, kind: "fermenter", capacity_bbl: 25.5 }));
+const quarryVessels = [1, 2, 3, 4, 5, 6].map(n => ({ id: `fv${n}`, name: `FV${n}`, kind: "fermenter", capacity_bbl: 25.5 }));
 
 /** Prep mid-pull: Fieldstone Pilsen came up 7.5 sacks, so it reads short. */
-export const brewPrepMineral: BrewPrepViewModel = {
-  title: "BAT-202 · Mineral #6 v1 · 22 bbl",
+export const brewPrepQuarry: BrewPrepViewModel = {
+  title: "BAT-202 · Quarry #6 v1 · 22 bbl",
   planned: "22 bbl · Oct 22, 2026",
   vesselId: "fv3",
-  vessels: mineralVessels,
-  ingredients: mineralIngredients.map(row => row.key === "pilsen" ? { ...row, packs: "7.5", loose: "0" } : row),
+  vessels: quarryVessels,
+  ingredients: quarryIngredients.map(row => row.key === "pilsen" ? { ...row, packs: "7.5", loose: "0" } : row),
   later: "Fermentation 1 · Dry hop 6",
 };
 
@@ -133,25 +133,25 @@ const chitStock = [
 ];
 
 /** The stock behind each sourced line, so a confirmed row reads green (timelineTone checks it against stock). */
-const lineStock = mineralIngredients.flatMap(row => row.source ? [{
+const lineStock = quarryIngredients.flatMap(row => row.source ? [{
   material_id: row.materialId, material_name: row.name, unit: row.unit, location_id: row.source.locationId, location_name: row.source.bin.split(" / ")[0],
   bin_id: row.source.binId, bin_name: row.source.bin.split(" / ")[1], lot_id: row.source.lotId, lot_code: row.source.lot, qty: 2000,
 }] : []);
 
 /** The recipe's one water addition, 40 g of gypsum in the mash, stocked in grams in one bin. */
 const gypsumStock = [{ material_id: "gypsum", material_name: "Gypsum", unit: "g", location_id: "dry-storage", location_name: "Dry storage", bin_id: "d3", bin_name: "D3", lot_id: null, lot_code: null, qty: 5000 }];
-const mineralWater = waterAdditionRows({ waterAdditions: [{ id: "gypsum-mash", material_id: "gypsum", materialName: "Gypsum", qty: 40, unit: "g", stage: "mash", baseUnit: "g" }] }, gypsumStock).rows;
+const quarryWater = waterAdditionRows({ waterAdditions: [{ id: "gypsum-mash", material_id: "gypsum", materialName: "Gypsum", qty: 40, unit: "g", stage: "mash", baseUnit: "g" }] }, gypsumStock).rows;
 
 /** Brew day mid-mash: the first two mash rows confirmed, so Mash is the open stage on a phone; the gypsum row waits. */
-export const brewTimelineMineral: BrewTimelineViewModel = {
-  title: brewPrepMineral.title,
-  planned: brewPrepMineral.planned,
+export const brewTimelineQuarry: BrewTimelineViewModel = {
+  title: brewPrepQuarry.title,
+  planned: brewPrepQuarry.planned,
   sources: [...lineStock, ...chitStock, ...gypsumStock],
-  ingredients: [...brewPrepMineral.ingredients.map(row => ({ ...row, confirmed: row.key === "malted-oats" || row.key === "pilsen" })), ...mineralWater],
+  ingredients: [...brewPrepQuarry.ingredients.map(row => ({ ...row, confirmed: row.key === "malted-oats" || row.key === "pilsen" })), ...quarryWater],
   targets: { mash: "152 °F · 60 min · pH 5.3", lauter: "pre-boil 25 bbl", boil: "60 min", whirlpool: "180 °F · 20 min", knockout: "66 °F" },
   process: { mashWaterGal: "620", targetMashPh: "5.3" },
   vesselId: "fv3",
-  vessels: mineralVessels,
+  vessels: quarryVessels,
   initialBbl: "22",
   brewedOn: "2026-10-22",
 };

@@ -36,9 +36,9 @@ Actual tenant mappings remain local and git-ignored.
 | `upsert_brand` command + RPC | `lib/commands/catalog.ts:27`; `00001_baseline.sql:3442` | **yes**: new `p_alias` |
 | CSV import calls `upsert_brand` positionally | `00001_baseline.sql:4099`, `20261012100700_import_resolve_names.sql:97` | `p_alias` defaults to null, so both keep working unchanged |
 | Brand page and form | `app/(app)/catalog/brands/[id]/brand-page.tsx`, `components/mgr/views/brand.tsx:59`, `lib/mgr/brand-view.ts:96` | **yes**: an Alias field (`E.edit`) |
-| Catalog brand row | `lib/mgr/catalog-view.ts:67` | **yes**: "Appaloosa · Animal #14" |
+| Catalog brand row | `lib/mgr/catalog-view.ts:67` | **yes**: "Copper Kite · Field Notes #14" |
 | Brand pickers | `new-recipe.tsx:32`, `recipes/new/page.tsx:24`, `new-batch-form.tsx:37`, `schedule-packaging-run-view.ts:63` | **yes**: the option label shows the alias |
-| `search_entities` | `lib/commands/search.ts` (no brand kind today) | **yes**: the `sku` and `batch` branches also match `brands.alias`, so "Animal #14" finds the SKUs and batches. No new kind. |
+| `search_entities` | `lib/commands/search.ts` (no brand kind today) | **yes**: the `sku` and `batch` branches also match `brands.alias`, so "Field Notes #14" finds the SKUs and batches. No new kind. |
 | `brandNames()` (batches, packaging runs) | `lib/commands/packaging.ts:258` | no: rows keep the name; the alias shows on brand surfaces |
 | Portal, Square/POS menu, public menu, SKU names (QBO, invoices) | `portal.ts:137`, `lib/pos.ts:77`, `get_published_pos_menu`, `00001_baseline.sql:3488` | **no**: they read `brands.name`, so a new column changes nothing there |
 | Portal customers reading `brands` rows directly | `customer_read on brands` was dropped by `20261012100800_portal_customer_columns.sql:25` | **no leak**: `brands` has only `staff_read`. The portal gets `brand_name` through security-definer projections (`portal_sku_price_rows`, `portal_schedule_rows`). A test proves a customer still reads no alias. |
@@ -88,7 +88,7 @@ Each one starts by writing its failing test.
    - Add the RPC to `rpc-allowlist` and `rls-taproom`, plus an `API_AREAS` check.
    - Deps: 1.
 3. **Search.**
-   - Test in the existing search test file: "Animal #14" finds the brand's SKU
+   - Test in the existing search test file: "Field Notes #14" finds the brand's SKU
      and batch.
    - Add an alias match to the `sku` and `batch` branches of `search.ts`.
    - Deps: 1.
@@ -139,6 +139,6 @@ so no policy change is needed. Task 1 keeps a test that a customer reads no alia
 ## Open question (default chosen; say if wrong)
 
 - **Alias on batch rows.** Default: no. Batch rows show the brand name, and the
-  alias appears on brand surfaces and in search. To show "Appaloosa · Animal #14"
+  alias appears on brand surfaces and in search. To show "Copper Kite · Field Notes #14"
   on /batches too, `brandNames()` would need the alias, which touches packaging
   rows as well.

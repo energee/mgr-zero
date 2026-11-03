@@ -88,8 +88,8 @@ implemented in `00001_baseline.sql` and later migrations; the schema design's §
 gives the per-subsection status. Holding it as a spec first meant each table was
 built once rather than migrated two or three times while the screens moved.
 
-**`product` → `brand`.** A batch is a production instance ("Lupula 3"); a brand
-is what you sell ("Lupula", and "Waves" when two batches blend). They were one
+**`product` → `brand`.** A batch is a production instance ("Kestrel 3"); a brand
+is what you sell ("Kestrel", and "Tidewater" when two batches blend). They were one
 word for two things. `brand` is what TTB grants label approval against, it is
 what actually gets renamed on a blend, and it does not collide with `sku` in
 speech. Rejected `label` — it collides with packaging materials.

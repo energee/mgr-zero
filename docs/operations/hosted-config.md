@@ -54,6 +54,8 @@ host passes it without an `APP_URL` of its own.
 Read-only inspection on 2026-10-30 for #1659 used
 `supabase config diff --project-ref uogrvqmrbmolvtftotsf --output-format json`.
 The remote Site URL was `https://mgr-zero-mgr8.vercel.app/`.
+The repository variable `MGR_URL` points at `mgr-zero.vercel.app` instead.
+Which host is canonical is not yet confirmed (#1617).
 The remote redirect allowlist contained exact root and `/auth/confirm` URLs,
 but also `https://mgr-zero-mgr8.vercel.app/**`,
 `https://mgr-*-zero-mgr8.vercel.app`, and

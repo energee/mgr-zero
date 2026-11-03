@@ -25,22 +25,22 @@ beforeAll(async () => {
 
 describe("brand alias", () => {
   it("saves and reads back; a blank alias is refused", async () => {
-    const b = await upsert({ name: "Appaloosa", alias: "Animal #14" });
-    expect(b.alias).toBe("Animal #14");
+    const b = await upsert({ name: "Copper Kite", alias: "Field Notes #14" });
+    expect(b.alias).toBe("Field Notes #14");
     const listed = await runCommand("list_brands", {}, owner) as Brand[];
-    expect(listed.find((x) => x.id === b.id)?.alias).toBe("Animal #14");
+    expect(listed.find((x) => x.id === b.id)?.alias).toBe("Field Notes #14");
     await expect(upsert({ name: "Blank alias", alias: "   " })).rejects.toThrow();
   });
 
   it("is replaced like every other field: an edit without it clears it", async () => {
-    const b = await upsert({ name: "Ocelot", alias: "Animal #15" });
-    expect((await upsert({ id: b.id, name: "Ocelot", alias: "Animal 15" })).alias).toBe("Animal 15");
-    expect((await upsert({ id: b.id, name: "Ocelot" })).alias).toBeNull();
+    const b = await upsert({ name: "Bluebird", alias: "Field Notes #15" });
+    expect((await upsert({ id: b.id, name: "Bluebird", alias: "Field Notes 15" })).alias).toBe("Field Notes 15");
+    expect((await upsert({ id: b.id, name: "Bluebird" })).alias).toBeNull();
   });
 
   it("a portal customer reads no brand row, so no alias", async () => {
-    const { brandId } = await seedCatalog(breweryId, { product: "Dalmatian", sku: "Dalmatian case" });
-    await upsert({ id: brandId, name: "Dalmatian", alias: "Animal #16" });
+    const { brandId } = await seedCatalog(breweryId, { product: "Night Heron", sku: "Night Heron case" });
+    await upsert({ id: brandId, name: "Night Heron", alias: "Field Notes #16" });
     const { customerId } = await seedCustomer(breweryId, { name: "Alias buyer" });
     const user = await makeCustomerUser(customerId);
     const db = await asUser(user.email);
@@ -49,10 +49,10 @@ describe("brand alias", () => {
   });
 
   it("staff search finds a brand's SKUs by its alias", async () => {
-    const { brandId } = await seedCatalog(breweryId, { product: "Sapphire", sku: "Sapphire case" });
-    await upsert({ id: brandId, name: "Sapphire", alias: "Rock/Mineral #1" });
-    const hits = await runCommand("search_entities", { q: "Rock/Mineral" }, owner) as { kind: string; label: string }[];
-    expect(hits).toContainEqual(expect.objectContaining({ kind: "sku", label: "Sapphire case" }));
+    const { brandId } = await seedCatalog(breweryId, { product: "Juniper", sku: "Juniper case" });
+    await upsert({ id: brandId, name: "Juniper", alias: "Trail/Ridge #1" });
+    const hits = await runCommand("search_entities", { q: "Trail/Ridge" }, owner) as { kind: string; label: string }[];
+    expect(hits).toContainEqual(expect.objectContaining({ kind: "sku", label: "Juniper case" }));
   });
 });
 

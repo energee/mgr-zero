@@ -212,7 +212,8 @@ hosted projects, obtain the approvals in the release checklist. Configure `NEXT_
 `POSTGRES_URL_NON_POOLING` in Production. Production builds run
 `scripts/vercel-build.sh` (the `vercel.json` build command), which pushes
 migrations with `supabase db push` before `next build`; a manual
-`bunx supabase db push` is only for a preview project or recovery. Then verify
+`bunx supabase db push` is only for recovery. The former Preview Supabase
+project no longer exists (#1616). Then verify
 login → catalog → inventory on the deployed URL. Follow the full [hosted release checklist](docs/operations/release-checklist.md)
 for approvals, environment separation, hosted advisors, smoke tests, and rollback evidence.
 
