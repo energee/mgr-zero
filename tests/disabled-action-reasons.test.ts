@@ -16,7 +16,7 @@ import { PackagingSourcePicker, PlanActions } from "../components/mgr/views/plan
 import { CycleCountView } from "../components/mgr/views/cycle-count";
 import { CellarMapView } from "../components/mgr/views/cellar-map";
 import { InviteView } from "../components/mgr/views/team-controls";
-import { brewPrepMineral, brewTimelineMineral } from "../lib/mgr/fixtures/production";
+import { brewPrepQuarry, brewTimelineQuarry } from "../lib/mgr/fixtures/production";
 import { cycleCountCans, receivePoSent } from "../lib/mgr/fixtures/purchasing";
 import { ReceivePoView } from "../components/mgr/views/receive-po";
 import { toCellarMapViewProps } from "../lib/mgr/cellar-map-view";
@@ -136,18 +136,18 @@ describe("Oct 25 recheck: withheld actions say why (#1122)", () => {
   });
 
   it("Record brew day names what is still open, even after every row is confirmed", () => {
-    const confirmed = { ...brewTimelineMineral, ingredients: brewTimelineMineral.ingredients.map(row => ({ ...row, confirmed: true })) };
+    const confirmed = { ...brewTimelineQuarry, ingredients: brewTimelineQuarry.ingredients.map(row => ({ ...row, confirmed: true })) };
     describedButton(html(createElement(BrewTimelineView, { model: confirmed })), "Record brew day", /^Still needed: a source for Chit Malt\.$/);
   });
 
   it("Done pulling names the ingredient without a source, as a tap that scrolls to its line (#1508)", () => {
-    const page = html(createElement(BrewPrepView, { model: brewPrepMineral }));
+    const page = html(createElement(BrewPrepView, { model: brewPrepQuarry }));
     const reasonId = page.match(/<button[^>]*aria-describedby="([^"]+)"[^>]*>Done pulling<\/button>/)?.[1];
     expect(page).toMatch(new RegExp(`<p id="${reasonId}"[^>]*><button type="button"[^>]*>Still needed: a source for Chit Malt\\.</button></p>`));
   });
 
   it("Materials with no stock are named once above the list, with no disabled Choose lot per line (#1508)", () => {
-    const page = html(createElement(BrewPrepView, { model: { ...brewPrepMineral, sources: [] } }));
+    const page = html(createElement(BrewPrepView, { model: { ...brewPrepQuarry, sources: [] } }));
     expect(page).toContain("No stock to choose a source from for Chit Malt.");
     expect(page).not.toContain(">Choose lot</button>");
   });

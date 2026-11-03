@@ -21,6 +21,11 @@ reuse its open issue without adding five-minute comments.
 Measured capacity, lease and burst drain times are in
 [worker capacity, 2026-10-23](worker-capacity-local-2026-10-23.md).
 Domain and provider credentials require user approval (#311).
+
+The sending domain needs SPF, DKIM and a DMARC record (gate E1 on #311).
+Start DMARC at `p=none` with a reporting address (`rua=mailto:…`).
+Check it read-only with `dig +short TXT _dmarc.<domain>`.
+On 2026-10-29 no DMARC record existed (#1620).
 Tests mock the provider and send no real mail.
 
 ## Failures and retries
@@ -37,6 +42,11 @@ The hosted-jobs workflow's `curl --fail-with-body` fails that run, so the existi
 workflow watcher can report it. Empty and partially successful batches return
 HTTP 200; partial failures remain visible in the counts and on each order.
 Fatal worker failures return a generic HTTP 500.
+
+A 401 from `/api/email/jobs/deliver` itself fails before any worker log.
+It means the deployed `ORDER_EMAIL_JOB_SECRET` is unset or differs from the
+GitHub secret (`lib/jobs/auth.ts`). Set the Vercel Production value equal to the
+GitHub secret, redeploy, and re-dispatch `hosted-jobs` (#1700).
 
 Use the log category to recover before the saved 23-hour cutoff:
 - `configuration` at the configuration stage: restore the worker's provider,

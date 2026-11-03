@@ -78,7 +78,7 @@ describe("searchColasByPermit", () => {
         return {
           status: 200,
           setCookie: ["JSESSIONID=abc123; Path=/colasonline; Secure"],
-          body: page(3, [row("1", "230001", "01/24/2023", "ARRAY"), row("2", "", "03/05/2024", "WAVES")], true),
+          body: page(3, [row("1", "230001", "01/24/2023", "ARRAY"), row("2", "", "03/05/2024", "TIDEWATER")], true),
         };
       }
       return { status: 200, setCookie: [], body: page(3, [row("3", "230009", "07/01/2023", "TIDE")], false) };

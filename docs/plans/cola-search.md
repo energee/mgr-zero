@@ -23,7 +23,7 @@ picking one fills the TTB ID, serial and approval date. Saving still goes throug
   expires 2027-12-10). Node/Bun `fetch` fails `UNABLE_TO_VERIFY_LEAF_SIGNATURE`;
   passing `[...tls.rootCertificates, intermediate]` as `ca` succeeds with
   verification on. Never `rejectUnauthorized: false`.
-- Fanciful names repeat (WAVES: 230003 and 230017) and one serial repeats
+- Fanciful names repeat (TIDEWATER: 230003 and 230017) and one serial repeats
   (230016 on two COLAs), so the user picks; nothing auto-matches.
 
 ## Decisions

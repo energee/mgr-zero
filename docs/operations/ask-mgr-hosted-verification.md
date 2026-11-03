@@ -70,7 +70,7 @@ Fill these before testing.
 
 | Field | How to read it |
 | --- | --- |
-| Environment | Preview or Production. Preview is Supabase `ugzhwxzictzvrzlacjmv`; Production is `uogrvqmrbmolvtftotsf` |
+| Environment | Production is Supabase `uogrvqmrbmolvtftotsf`. The Preview project `ugzhwxzictzvrzlacjmv` no longer exists (#1616) |
 | URL | The deployment URL opened in the browser |
 | Deployed SHA | Vercel dashboard → Deployments → the deployment's commit, or `vercel inspect <url>` |
 | Model | The effective model, resolved by the order above at the deployed SHA. The chat header does not show it |
@@ -96,9 +96,10 @@ Only `admin` and `warehouse` roles may run it, so use one of those accounts.
 Chat never commits by itself: only **Commit movement** records the preview.
 J6 writes one real +1 adjustment. Use the test brewery only.
 
-The live composer (`components/mgr/composer.tsx`) passes no `onDismiss` to
-the proposal card, so **Dismiss** may do nothing visible. The staff guide
-says Dismiss records nothing. If the card stays open, record it as a finding.
+The live composer (`components/mgr/composer-conversation.tsx`) passes
+`onDismiss` to the proposal card since #1437 (fixing #1422).
+**Dismiss** should close the card and record nothing.
+If the card stays open, record it as a finding.
 
 ## Step 4: expected failure if access is missing
 

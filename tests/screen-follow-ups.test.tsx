@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "@/components/mgr/screens";
-import { brewPrepMineral, brewTimelineMineral } from "@/lib/mgr/fixtures/production";
+import { brewPrepQuarry, brewTimelineQuarry } from "@/lib/mgr/fixtures/production";
 import { resolveTap } from "@/lib/mgr/screen-links";
 
 const screen = (name: string) => SCREENS.find(candidate => candidate.name === name)!;
 
 describe("screen parity follow-ups", () => {
   it("opens each fixture ingredient from prep and the brew timeline", () => {
-    for (const [name, ingredients] of [["Brew prep", brewPrepMineral.ingredients], ["Brew day timeline", brewTimelineMineral.ingredients]] as const) {
+    for (const [name, ingredients] of [["Brew prep", brewPrepQuarry.ingredients], ["Brew day timeline", brewTimelineQuarry.ingredients]] as const) {
       for (const ingredient of ingredients) {
         expect(resolveTap(screen(name), ingredient.name), `${name}: ${ingredient.name}`).toBe("Edit material");
       }
