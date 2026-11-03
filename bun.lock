@@ -7,8 +7,8 @@
       "dependencies": {
         "@ai-sdk/react": "4.0.163",
         "@base-ui/react": "^1.9.0",
-        "@chat-adapter/slack": "^4.42.0",
-        "@chat-adapter/state-pg": "^4.42.0",
+        "@chat-adapter/slack": "^4.44.0",
+        "@chat-adapter/state-pg": "^4.44.0",
         "@hugeicons/core-free-icons": "^4.3.5",
         "@hugeicons/react": "^1.1.10",
         "@lobehub/icons": "^6.0.0",
@@ -18,7 +18,7 @@
         "@tanstack/react-table": "9.3.1",
         "@vercel/speed-insights": "2.0.0",
         "ai": "7.0.159",
-        "chat": "^4.42.0",
+        "chat": "^4.44.0",
         "class-variance-authority": "^0.7.1",
         "cmdk": "^1.1.1",
         "cn": "0.5.0",
@@ -148,13 +148,13 @@
 
     "@cacheable/utils": ["@cacheable/utils@2.5.0", "", { "dependencies": { "hashery": "^1.5.1", "keyv": "^5.6.0" } }, "sha512-buipgOVDkkPXNR5+xBpDw7Zk2n1EvU7qBJCNUcL7rhQ//kfpOXPAvQ511Os0vpLYJ1pZnvudNytkQt2hst3wqA=="],
 
-    "@chat-adapter/catalog": ["@chat-adapter/catalog@4.42.0", "", {}, "sha512-JrsQaiUg3rJIgIcqXteuhgccmbzlwyv9LSBlUokDeX6nFD0I3nrn+msLiI381NYKpu6V/l8GrNWF9Y73JeyMcw=="],
+    "@chat-adapter/catalog": ["@chat-adapter/catalog@4.44.0", "", {}, "sha512-UtpW5mMgIjYBRDIgxJKh+tfnlFe0GjLsFG5MPPUDA5b/PggSOAt00TFr0xF6UIXXh1SaK3V1u3FiXyM2sdnaJQ=="],
 
-    "@chat-adapter/shared": ["@chat-adapter/shared@4.42.0", "", { "dependencies": { "chat": "4.42.0" } }, "sha512-/0yn3rT3BBEe+hFiSNibYEitATMA9IqIHQujvHr4+2DxZBzBK2zGSlb19L/ghYAAoK0NQqzkZ7P3flzSF1D9ew=="],
+    "@chat-adapter/shared": ["@chat-adapter/shared@4.44.0", "", { "dependencies": { "chat": "4.44.0" } }, "sha512-g6MmtkFLVE3Fn19Ly8e+3bZTAw5Kzh/2oP3qKRaVW0IPwVLDa2GRq/Q5fpGS+Xmzn2oqzpaHJrRuQRdWjLboqg=="],
 
-    "@chat-adapter/slack": ["@chat-adapter/slack@4.42.0", "", { "dependencies": { "@chat-adapter/shared": "4.42.0", "@slack/socket-mode": "^2.0.5", "@slack/web-api": "^7.18.0", "chat": "4.42.0" } }, "sha512-BVKbD8335RfUaCShJFrnnUmoomS9x8CxCx/L1bEFlCqYFU5FJJ6R9kXVagrzpSQObJaRAZ+NORUyQcd2jE2XKw=="],
+    "@chat-adapter/slack": ["@chat-adapter/slack@4.44.0", "", { "dependencies": { "@chat-adapter/shared": "4.44.0", "@slack/socket-mode": "^2.0.5", "@slack/web-api": "^7.18.0", "chat": "4.44.0" } }, "sha512-pY8QKy/cKjBX/m+h/j7zSSNfXYEiDTqu0wyjDMPyTg0T7WsDRZZZzdZD9I49cP9rZsr3k+5mb4zbyQMBmGRn+A=="],
 
-    "@chat-adapter/state-pg": ["@chat-adapter/state-pg@4.42.0", "", { "dependencies": { "chat": "4.42.0", "pg": "^8.20.0" } }, "sha512-ydrVkTdDKMxlmqKaRlhpDLoLz+XRxORWnJyZ11zUTyvNRUm8/1vAwU3GD8txuI/6BlQUEcgOyid/kY8yvkllLA=="],
+    "@chat-adapter/state-pg": ["@chat-adapter/state-pg@4.44.0", "", { "dependencies": { "chat": "4.44.0", "pg": "^8.20.0" } }, "sha512-/QPFKNjTsNj7sL7cEiJT7dD+sYYoh8BBwUtZRwn3nWK4iqRA834K9kWS71ceOZiaQmay19CDTUULQivMrpxkkg=="],
 
     "@date-fns/tz": ["@date-fns/tz@1.5.0", "", {}, "sha512-lwYN/vDPeNRULcepoE/LO2Pgx+7/RV+S9ARfbc9lr2DtGkOD7pAiruHvbR1RX3Qyf6ja47EWJDMsNK5vK08DJg=="],
 
@@ -1024,7 +1024,7 @@
 
     "character-reference-invalid": ["character-reference-invalid@2.0.1", "", {}, "sha512-iBZ4F4wRbyORVsu0jPV7gXkOsGYjGHPmAyv+HiHG8gi5PtC9KI2j1+v8/tlibRvjoWX027ypmG/n0HtO5t7unw=="],
 
-    "chat": ["chat@4.42.0", "", { "dependencies": { "@chat-adapter/catalog": "4.42.0", "@workflow/serde": "4.1.0-beta.2", "mdast-util-to-string": "^4.0.0", "remark-gfm": "^4.0.0", "remark-parse": "^11.0.0", "remark-stringify": "^11.0.0", "remend": "^1.2.1", "unified": "^11.0.5" }, "peerDependencies": { "ai": "^6.0.182 || ^7.0.0", "workflow": "^5.0.0-beta.35", "zod": "^3.0.0 || ^4.0.0" }, "optionalPeers": ["ai", "workflow", "zod"] }, "sha512-CXZyMG+qU9bX0nk8uO/cmZoI/yLu3kImdjS5BlCNYyE+Xi3umKwT8X8hrNaDA+ZyMzmkQJLYxdnN/HlPNIwl3A=="],
+    "chat": ["chat@4.44.0", "", { "dependencies": { "@chat-adapter/catalog": "4.44.0", "@workflow/serde": "4.1.0-beta.2", "mdast-util-to-string": "^4.0.0", "remark-gfm": "^4.0.0", "remark-parse": "^11.0.0", "remark-stringify": "^11.0.0", "remend": "^1.2.1", "unified": "^11.0.5" }, "peerDependencies": { "ai": "^6.0.182 || ^7.0.0", "workflow": "^5.0.0-beta.35", "zod": "^3.0.0 || ^4.0.0" }, "optionalPeers": ["ai", "workflow", "zod"] }, "sha512-DGVc9yV1ifOJFpe8Pz6BAoOBVT7/iI/7kkMuB+ZUrpyQ1iw1ElibxyvYBx7tEo1qPl6w510+Acvt1XSVPSgKjA=="],
 
     "chokidar": ["chokidar@5.0.0", "", { "dependencies": { "readdirp": "^5.0.0" } }, "sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw=="],
 

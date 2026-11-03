@@ -10,3 +10,9 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      # chat and its adapters pin each other's exact version; bumped apart they fail tsc.
+      chat-sdk:
+        patterns:
+          - "chat"
+          - "@chat-adapter/*"
