@@ -50,6 +50,7 @@ export const newTransferDraft: NewTransferSnapshot = {
 
 /** TRF-0007 submitted, Receive next. */
 export const transferDetailSubmitted: TransferDetailSnapshot = {
+  backHref: "#",
   transfer: {
     id: TRF_7,
     transfer_no: 7,
