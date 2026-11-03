@@ -1,6 +1,8 @@
 // tests/proxy.test.ts — verifies the proxy refreshes the session with one local claims check and its refresh cookies preserve no-cache response headers.
+import "next/dist/server/node-environment-baseline";
+import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const createServerClient = vi.hoisted(() => vi.fn());
 const getClaims = vi.hoisted(() => vi.fn());
@@ -39,19 +41,70 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe("Supabase proxy refresh", () => {
-  it("does not refresh sessions for the customer guides or their search", () => {
-    const matches = (path: string) => new RegExp(`^${config.matcher[0]}$`).test(path);
-    // /docs is the master chooser - the primary public entry point, not just a prefix.
-    expect(matches("/docs")).toBe(false);
-    expect(matches("/docs/staff-guide")).toBe(false);
-    expect(matches("/api/search")).toBe(false);
-    // #1403: the command route refreshes its own cookie session (buildRouteContext's
-    // getClaims), so the proxy would only add a second check and a second cold start.
-    expect(matches("/api/command")).toBe(false);
-    // The screen frames the docs embed are public like the docs themselves.
-    expect(matches("/screens/frame/0")).toBe(false);
-    expect(matches("/inventory")).toBe(true);
+  it.each([
+    "/api/search", "/api/command", "/_next/image", "/favicon.ico", "/icon.svg",
+  ])("skips the non-document endpoint %s", (url) => {
+    expect(unstable_doesMiddlewareMatch({ config, url })).toBe(false);
+  });
+
+  it.each(["script", "style", "image", "font"])("skips %s subresources without bypassing document requests", (destination) => {
+    expect(unstable_doesMiddlewareMatch({
+      config, url: "/_next/static/chunk.js", headers: { "sec-fetch-dest": destination },
+    })).toBe(false);
+  });
+
+  it.each([
+    "/docs", "/docs/staff-guide", "/screens/frame/0", "/inventory", "/login", "/portal/login",
+    "/missing.js", "/missing.html", "/docs/missing.js", "/api/search-missing",
+    "/favicon.ico-missing", "/_next/static/missing.js", "/mock/missing.jpg",
+  ])("protects potential HTML at %s regardless of its suffix", (url) => {
+    for (const destination of [undefined, "document", "iframe", "empty"]) {
+      const headers = destination ? { "sec-fetch-dest": destination } : undefined;
+      expect(unstable_doesMiddlewareMatch({ config, url, headers })).toBe(true);
+    }
+  });
+
+  it.each(["/docs", "/docs/staff-guide", "/screens/frame/0", "/mock/missing.jpg", "/_next/static/missing.js"])("protects public %s without a session check", async (path) => {
+    const response = await proxy(new NextRequest(`http://localhost:3000${path}`));
+    expect(createServerClient).not.toHaveBeenCalled();
+    expect(response.headers.get("content-security-policy")).toContain("'strict-dynamic'");
+    expect(response.headers.get("server-timing")).toBeNull();
+  });
+
+  it.each([false, true])("replaces caller nonces with fresh request/response CSP, including refresh=%s", async (refresh) => {
+    vi.stubEnv("NODE_ENV", "production");
+    if (!refresh) createServerClient.mockReturnValue({ auth: { getClaims: async () => ({ data: null, error: null }) } });
+    const request = () => new NextRequest("http://localhost:3000/login", {
+      headers: { "x-nonce": "attacker", "Content-Security-Policy": "script-src 'unsafe-inline'" },
+    });
+    const response = await proxy(request());
+    const nonce = response.headers.get("x-middleware-request-x-nonce");
+    expect(nonce).toMatch(/^[A-Za-z0-9+/=]+$/);
+    expect(nonce).not.toBe("attacker");
+    const csp = response.headers.get("content-security-policy");
+    const directives = new Map(csp!.split(";").map((directive) => {
+      const [name, ...sources] = directive.trim().split(/\s+/);
+      return [name, sources] as const;
+    }));
+    expect(directives.get("script-src")).toEqual(expect.arrayContaining([`'nonce-${nonce}'`, "'strict-dynamic'"]));
+    expect(directives.get("frame-ancestors")).toEqual(["'self'"]);
+    expect(directives.get("object-src")).toEqual(["'none'"]);
+    expect(directives.get("base-uri")).toEqual(["'self'"]);
+    expect(csp).not.toContain("'unsafe-inline'");
+    expect(csp).not.toContain("'unsafe-eval'");
+    expect(response.headers.get("x-middleware-request-content-security-policy")).toBe(csp);
+    const second = await proxy(request());
+    expect(second.headers.get("x-middleware-request-x-nonce")).not.toBe(nonce);
+  });
+
+  it("allows development debugging eval without permitting arbitrary inline scripts", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    const response = await proxy(new NextRequest("http://localhost:3000/login"));
+    expect(response.headers.get("content-security-policy")).toContain("'unsafe-eval'");
+    expect(response.headers.get("content-security-policy")).not.toContain("'unsafe-inline'");
   });
 
   it("forwards refreshed cookies through one current request override", async () => {
@@ -61,7 +114,7 @@ describe("Supabase proxy refresh", () => {
       })
     );
 
-    expect(response.headers.get("x-middleware-override-headers")?.split(",").map(value => value.trim())).toEqual(["cookie", "x-mgr-path"]);
+    expect(response.headers.get("x-middleware-override-headers")?.split(",").map(value => value.trim())).toContain("cookie");
     expect(response.headers.get("x-middleware-request-cookie")).toContain("sb-session=refreshed");
   });
 

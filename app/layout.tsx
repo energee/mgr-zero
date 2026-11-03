@@ -10,6 +10,7 @@
 // only logs them to the console.
 import type { Metadata, Viewport } from "next";
 import { Familjen_Grotesk, Instrument_Sans, JetBrains_Mono } from "next/font/google";
+import { headers } from "next/headers";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeBoot } from "@/components/mgr/theme-boot";
 import "./globals.css";
@@ -27,7 +28,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Request-time rendering keeps framework and theme scripts on the same nonce,
+  // including public docs and frames that previously used prerendered HTML.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html
       lang="en"
@@ -35,7 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
     >
       <head>
-        <ThemeBoot />
+        <ThemeBoot nonce={nonce} />
       </head>
       <body className="min-h-full flex flex-col">
         {children}

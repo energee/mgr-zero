@@ -62,6 +62,37 @@ open: the owner must approve the required exact callback origins and remove
 the wildcard entries. This inspection changed no hosted settings.
 
 
+## Browser security headers
+
+`proxy.ts` creates a fresh script nonce for each HTML request and supplies the
+same CSP to Next's renderer and the browser. Framework scripts and the theme
+boot script carry that nonce. Production does not allow inline scripts without
+a nonce or `eval`; development permits `eval` for Next's debugger only.
+`frame-ancestors 'self'` preserves same-origin documentation embeds.
+
+Public guides and screen frames still perform no session refresh. Their HTML
+now renders per request because a prerendered script nonce would be reused.
+Next's renderer keeps dynamic HTML private and non-cacheable; the proxy does
+not override route-owned caching. The published menu feed retains its public
+200/304 cache policy. MDX content and valid documentation/frame paths are still
+compiled and enumerated at build time.
+
+Document requests receive a nonce even when an unknown URL ends in a static
+file suffix. Browser script, style, image and font requests skip the proxy,
+as do the exact search, command, image-optimizer and icon endpoints.
+
+`next.config.ts` denies unused camera, microphone, geolocation, payment, USB,
+display-capture, accelerometer, gyroscope, and magnetometer browser features
+through `Permissions-Policy`. It retains the global frame, MIME-sniffing, and
+referrer protections.
+
+After an owner-approved deployment, inspect `/login`, `/portal/login`, `/docs`,
+and a `/screens/frame/` document. Confirm each document has a matching CSP and
+script nonce, two loads use different nonces, inline scripts without a nonce
+are blocked, and login, theme switching, docs search, and embedded frames still
+work without CSP violations. Local proof does not establish hosted enforcement;
+deployment and this read-only hosted check remain owner-controlled.
+
 ## Integration failure diagnostics
 
 QuickBooks, Square, and Slack OAuth failures keep their existing generic browser
