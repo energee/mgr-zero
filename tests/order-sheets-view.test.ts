@@ -86,8 +86,17 @@ describe("Pick view", () => {
       ["b", "Case", "Pils", 10, 7, "w"],
       ["a", "Half", "Hazy", 4, 4, "ok"],
     ]);
-    const cells = html(createElement(PickView, { model })).match(/<tr[\s\S]*?<\/tr>/g)!.slice(1).map((r) => r.match(/<td[^>]*>([\s\S]*?)<\/td>/)![1].replace(/<[^>]+>/g, ""));
-    expect(cells).toEqual(["Case", "", "Half"]);
+    const markup = html(createElement(PickView, { model }));
+    expect([...markup.matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1])).toEqual(["Case", "Half"]);
+    expect(markup).toContain("Ordered 10");
+  });
+
+  // A phone is narrower than four columns and a stepper: each line is a row
+  // with the count beside it, not a table that scrolls sideways.
+  it("draws lines as rows under format headings, not a table", () => {
+    const markup = html(createElement(PickView, { model: toPickViewProps(orderPick) }));
+    expect(markup).not.toContain("<table");
+    expect(markup.match(/data-row/g)).toHaveLength(orderPick.lines.length);
   });
 
   it("caps each pick field at the ordered quantity (#471)", () => {
