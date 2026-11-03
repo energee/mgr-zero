@@ -26,7 +26,7 @@ export default async function PortalOrdersPage({ searchParams }: { searchParams:
   const page = historyPage(records, "/portal/orders", cursor);
   return (
     <PortalOrdersView
-      model={toPortalOrdersViewProps({ customerName: customer.customerName, breweryName: customer.breweryName, orders: page.rows })}
+      model={toPortalOrdersViewProps({ breweryName: customer.breweryName, orders: page.rows })}
       pagination={page.pagination}
       linkRows
     />

@@ -19,7 +19,7 @@ import { ComposerDemo } from "@/components/mgr/composer-demo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
@@ -157,14 +157,10 @@ const emptyNote = (empty: PickEmpty, id?: string) => (
 
 export const E = {
   /** Page title. `action` is a list-create button (New order, New customer):
-   *  full-width under the title on the phone, on the title row from md up. */
-  hd: (t: React.ReactNode, r: React.ReactNode = "", action?: React.ReactNode) => {
-    const title = (
-      <div className="flex items-baseline justify-between gap-2">
-        <h1 className="text-lg font-semibold">{t}</h1>
-        <span className="text-xs text-muted-foreground">{r}</span>
-      </div>
-    );
+   *  full-width under the title on the phone, on the title row from md up.
+   *  No subtitle slot: a title that needs one is the wrong title. */
+  hd: (t: React.ReactNode, action?: React.ReactNode) => {
+    const title = <h1 className="text-lg font-semibold">{t}</h1>;
     if (!action) return title;
     return (
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -506,18 +502,15 @@ export const E = {
   tbl: (hd: React.ReactNode[], rows: React.ReactNode[][], align?: ("l" | "r")[], opts?: { sortable?: false; dense?: true }) => (
     <SortTable headers={hd} rows={rows} align={align} sortable={opts?.sortable} dense={opts?.dense} />
   ),
-  /** A blank list. A bare node is the whole message; an {@link EmptyState}
-   *  splits it into the fact and the sentence saying what to do next.
-   *  `action` sits centered under that sentence, not at the page's foot. */
+  /** A blank list: one line saying so, and the list's create action centered
+   *  under it, not at the page's foot. No helper sentence (lib/mgr/empty-state.ts). */
   blank: (t: React.ReactNode | EmptyState, icon?: IconSvgElement, action?: React.ReactNode) => {
-    const state = t && typeof t === "object" && "title" in t ? t as EmptyState : undefined;
-    const description = state ? state.description : t as React.ReactNode;
+    const title = t && typeof t === "object" && "title" in t ? (t as EmptyState).title : t as React.ReactNode;
     return (
       <Empty className="flex-1">
         <EmptyHeader>
           {icon && <EmptyMedia variant="icon"><Icon icon={icon} size={20} /></EmptyMedia>}
-          {state && <EmptyTitle>{state.title}</EmptyTitle>}
-          {description && <EmptyDescription>{description}</EmptyDescription>}
+          <EmptyTitle>{title}</EmptyTitle>
         </EmptyHeader>
         {action && <EmptyContent className="md:*:self-center">{action}</EmptyContent>}
       </Empty>
@@ -528,7 +521,8 @@ export const E = {
    *  to search as you type (components/mgr/list-controls.tsx); a drawing passes none. */
   search: (t = "Search", controls?: { name: string; defaultValue: string; maxLength: number; onChange?: React.ChangeEventHandler<HTMLInputElement> }) => <Input type="search" placeholder={t} aria-label={t} {...controls} />,
   stq: (v: number, label = "Quantity", controls?: FieldControls & { value: string }) => <StepQuantity label={label} defaultValue={String(v)} min={controls ? controls.min : 0} step={controls ? controls.step : 1} {...controls} required={controls ? controls.required !== false : false} />,
-  gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
+  /** A blocked action and the reason it is blocked; a feature that does not exist gets no row. */
+  gated: (t: React.ReactNode, why: React.ReactNode) => E.row(t, why, "", "dis", SquareLock01Icon),
   /** A row that opens something. `href` makes the whole row the link, as E.act
    *  and E.btn already do; `to` names the inventory destination when its label
    *  is not that screen's name. Fixtures leave both out unless a route is shown.

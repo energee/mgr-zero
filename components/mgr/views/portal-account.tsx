@@ -8,7 +8,7 @@ import type { PortalAccountViewModel } from "@/lib/mgr/portal-account-view";
 export function PortalAccountView({ model }: { model: PortalAccountViewModel }) {
   return (
     <>
-      {E.hd("Account", model.customer)}
+      {E.hd(model.customer)}
       {model.shipTos.map((s) => (
         <Fragment key={s.key}>{E.row(s.title, s.detail)}</Fragment>
       ))}

@@ -10,7 +10,7 @@ export function RoutesView({ model, createAction, workHrefs }: {
   model: RoutesViewModel; createAction?: ReactNode; workHrefs?: Record<string, string>;
 }) {
   return <>
-    {E.hd(model.title, model.subtitle, createAction !== undefined ? createAction : E.btn("New route"))}
+    {E.hd(model.title, createAction !== undefined ? createAction : E.btn("New route"))}
     <WorkKindTabs chips={model.workChips} current={model.workChips[model.workChipIndex]} tabs={model.workTabs} hrefs={workHrefs} />
     <div className="md:w-64">
       <ScopePick label="Status" value={model.status} options={model.statusOptions} />

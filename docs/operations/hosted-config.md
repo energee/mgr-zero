@@ -62,6 +62,29 @@ open: the owner must approve the required exact callback origins and remove
 the wildcard entries. This inspection changed no hosted settings.
 
 
+## Integration failure diagnostics
+
+QuickBooks, Square, and Slack OAuth failures keep their existing generic browser
+errors. Server diagnostics record only `{ name, status, stage }`. `status` is an
+integer provider HTTP status (including Slack SDK `statusCode`) or an existing
+local command status. Failures without either use `null`. `stage` identifies
+the local operation, such as `oauth_config`, `oauth_claim`, `oauth_exchange`,
+`oauth_verify_realm`, `oauth_store`, or `invoice_sync_read_retry`. A plain
+database claim error has no HTTP status.
+
+Search for `qbo_oauth_failed`, `qbo_oauth_callback_failed`,
+`square_oauth_failed`, `square_oauth_callback_failed`, or
+`slack_oauth_callback_failed` when a connection cannot finish. QuickBooks
+sanitization emits `qbo_unavailable`; Square transport and validation failures
+emit `square_provider_failed` or `square_unavailable`. A callback can emit both
+its specific operation failure and its final redirect failure.
+Bill provider and failure-record diagnostics use `qbo_receipt_bill_failed` and
+`qbo_receipt_bill_failure_record_failed`; quote tax diagnostics use
+`portal_quote_tax_unauthorized` and `portal_quote_tax_failed`. Their stages
+distinguish the initial read, credential refresh, retry, and failure recording.
+
+Messages, response bodies, stacks, callback URLs, OAuth codes and state, tokens,
+and bearer payment links are not included. Do not add them to support logs.
 
 ## Invitation delivery diagnostics
 
