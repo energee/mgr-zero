@@ -37,7 +37,7 @@
     "fumadocs-core": "^16.17.5",
     "fumadocs-mdx": "^15.4.7",
     "fumadocs-ui": "^16.17.5",
-    "lucide-react": "^1.58.0",
+    "lucide-react": "^1.65.0",
     "next": "16.4.2",
     "pg": "^8.23.1",
     "radix-ui": "^1.8.1",
