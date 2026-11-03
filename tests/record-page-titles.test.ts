@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { CommandError } from "@/lib/commands/registry";
-import { isUuid } from "@/lib/commands/context";
+import { isUuid } from "@/lib/uuid";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { navTitle } from "@/lib/mgr/nav";
 import { periodLabel, periodRange } from "@/lib/compliance-period";

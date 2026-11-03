@@ -2,7 +2,6 @@
 import "server-only";
 import { readServerEnv } from "./server-parser";
 
-export { readServerEnv, type ServerEnv } from "./server-parser";
 
 let serverEnv: ReturnType<typeof readServerEnv> | undefined;
 

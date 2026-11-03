@@ -11,7 +11,7 @@ import { chatModelFromSettings, gatewayLanguageModels, modelMatches, modelProvid
 import { canRun } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { composerProposal, movementFormHref, movementFormInstanceKey } from "@/lib/composer/state";
-import { isUuid } from "@/lib/commands/context";
+import { isUuid } from "@/lib/uuid";
 import { isComposerShortcut } from "@/components/mgr/composer";
 
 const ids = {

@@ -1,7 +1,8 @@
+import { PG_INT_MAX } from "@/lib/mgr/quantity-input";
 import { z } from "zod";
 import { BRAND_ABV } from "@/lib/mgr/brand-abv";
-import { cents, completeRows, defineCommand, defineQuery, latestOf, PAGE_SIZE, PG_INT_MAX, unwrap, CommandError, STAFF_ROLES } from "./registry";
-import { escapeRegex } from "@/lib/escape-regex";
+import { cents, completeRows, defineCommand, defineQuery, latestOf, PAGE_SIZE, unwrap, CommandError, STAFF_ROLES } from "./registry";
+import { quotedSearchPattern } from "@/lib/escape-regex";
 import { BRAND_SORTS } from "@/lib/mgr/enums";
 import { UPC_MESSAGE, UPC_PATTERN } from "@/lib/mgr/upc";
 
@@ -349,9 +350,7 @@ defineQuery({
     let brands = ctx.db.from("brands").select("*, styles(name), price_groups(name), skus(id, name, format_id, active, upc, keg_pool_id, container_source, batch_share), colas:brand_approvals(id, ttb_id, approved_on, image_url)")
       .eq("brewery_id", ctx.breweryId).eq("colas.kind", "cola");
     if (i.q) {
-      // An unanchored imatch is a case-insensitive contains. A PostgREST or() value is double-quoted,
-      // so commas and parentheses stay literal, and `"` and `\` (including escapeRegex's) are escaped again.
-      const pattern = `"${escapeRegex(i.q).replace(/["\\]/g, (c) => `\\${c}`)}"`;
+      const pattern = quotedSearchPattern(i.q);
       brands = brands.or(`name.imatch.${pattern},alias.imatch.${pattern}`);
     }
     if (i.category) brands = brands.eq("category", i.category);

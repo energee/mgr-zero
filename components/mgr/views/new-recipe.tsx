@@ -6,7 +6,7 @@
 // first version so one save creates both.
 "use client";
 
-import { brandLabel } from "@/lib/mgr/brand-view";
+import { nameWithAlias } from "@/lib/mgr/labels";
 import { useId, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { NONE } from "@/components/ui/select";
@@ -28,7 +28,7 @@ export function NewRecipeFieldsView({ brands, values, onChange, busy = false }: 
   return (
     <>
       {E.edit("Name", v.name, "text", undefined, { onChange: (nextValue: string) => set({ name: nextValue }), id: `${id}-name`, disabled: busy, required: true })}
-      {E.pick("Brand · optional", v.brandId || NONE, [{ value: NONE, label: "Not decided" }, ...(brands.map((b) => ({ value: b.id, label: brandLabel(b) })))], { onChange: (x) => set({ brandId: x === NONE ? "" : x }), disabled: busy })}
+      {E.pick("Brand · optional", v.brandId || NONE, [{ value: NONE, label: "Not decided" }, ...(brands.map((b) => ({ value: b.id, label: nameWithAlias(b) })))], { onChange: (x) => set({ brandId: x === NONE ? "" : x }), disabled: busy })}
       {E.edit("Note · optional", v.note, "text", undefined, { onChange: (nextValue: string) => set({ note: nextValue }), id: `${id}-note`, disabled: busy })}
       {E.info("Pick the brand this recipe brews, or leave it undecided. Packaging always asks for the brand.")}
     </>

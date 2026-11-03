@@ -32,7 +32,7 @@ export function ChannelView({
     <>
       {E.edit("Channel name", model.name, "text", undefined, { id: nameId, onChange: controls.name, required: Boolean(controls.name), error: nameError ?? undefined })}
       {E.ttl("Tax treatment")}
-      {E.chips(model.taxOptions, model.taxIndex, /* bright */ false, onTaxTreatment ? { onChange: index => onTaxTreatment(TAX_TREATMENTS[index]), label: "Tax treatment" } : undefined)}
+      {E.chips(model.taxOptions, model.taxIndex, onTaxTreatment ? { onChange: index => onTaxTreatment(TAX_TREATMENTS[index]), label: "Tax treatment" } : undefined)}
       <div role="status">{E.polite(model.taxHint)}</div>
       {E.info("Customers may override this. Sales without a customer take the channel default. A change applies to new sales only; filed months stay as they were.")}
       {messages}

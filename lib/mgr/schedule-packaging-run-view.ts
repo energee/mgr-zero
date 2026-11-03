@@ -2,7 +2,7 @@
 // model, and the pure adapter that builds it from the packaging page's reads
 // (list_brands, list_occupancies, list_skus) plus the form's draft. The
 // inventory fixture is lib/mgr/fixtures/packaging.ts.
-import { brandLabel } from "./brand-view";
+import { nameWithAlias } from "./labels";
 import { batNo } from "@/lib/mgr/doc-no";
 import { formatVolume } from "@/lib/volume";
 import { isPastDay } from "@/lib/date-format";
@@ -47,7 +47,7 @@ const bblPerUnit = (sku: ScheduleRunData["skus"][number]) =>
   sku.format_volume?.bbl_per_unit == null ? undefined : Number(sku.format_volume.bbl_per_unit);
 
 /** The planned count of a package, or 0 when the field is blank or not a number. */
-export const plannedQty = (value: string | undefined) => {
+export const plannedPackageQty = (value: string | undefined) => {
   const qty = Number(value);
   return value && isNumber(value) && qty > 0 ? qty : 0;
 };
@@ -69,7 +69,7 @@ export function scheduleRunReason(model: Pick<SchedulePackagingRunViewModel, "br
   const missing: string[] = [];
   if (!model.brandId) missing.push("a brand");
   if (!model.plannedOn) missing.push("a planned date");
-  if (!model.outputs.some((output) => plannedQty(output.qty) > 0)) missing.push("a positive planned output quantity");
+  if (!model.outputs.some((output) => plannedPackageQty(output.qty) > 0)) missing.push("a positive planned output quantity");
   if (model.outputs.some(output => packageQtyError(output.qty, output.whole))) missing.push("valid planned quantities (whole numbers for kegs)");
   return submitReason(missing);
 }
@@ -90,13 +90,13 @@ export function toSchedulePackagingRunView(data: ScheduleRunData, draft: Schedul
   const skus = data.skus.filter((sku) => sku.brand_id === draft.brandId);
   const occupancy = data.occupancies.find((o) => o.occupancy_id === draft.occupancyId);
   const tank = (o: ScheduleRunData["occupancies"][number]) => `${o.vessel_name ?? "—"} · ${o.brand_name ?? "no brand"}`;
-  const rows = skus.map((sku) => ({ qty: plannedQty(draft.qty[sku.id]), bblPerUnit: bblPerUnit(sku) }));
+  const rows = skus.map((sku) => ({ qty: plannedPackageQty(draft.qty[sku.id]), bblPerUnit: bblPerUnit(sku) }));
   const planned = rows.map(packageBbl);
   const drawn = plannedDrawBbl(rows);
   return {
     plannedOn: draft.plannedOn,
     brandId: draft.brandId,
-    brandOptions: data.brands.map((brand) => ({ value: brand.id, label: brandLabel(brand) })),
+    brandOptions: data.brands.map((brand) => ({ value: brand.id, label: nameWithAlias(brand) })),
     occupancyId: draft.occupancyId,
     sourceOptions: [{ value: "", label: "No source yet" }, ...data.occupancies.map((o) => ({ value: o.occupancy_id, label: `${tank(o)} · ${formatVolume(o.bbl)}` }))],
     source: occupancy ? tank(occupancy) : "",
