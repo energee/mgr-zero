@@ -118,6 +118,14 @@ describe("Monthly compliance view", () => {
     expect(toMonthlyComplianceViewProps(monthlyComplianceAugust).lines.map((line) => line[0])).toEqual(["Kegs", "Cans", "Bottles"]);
   });
 
+  // Eight columns do not fit a phone: there each state is a card of labeled
+  // figures, and the table shows from md up (RecordTable).
+  it("draws destination-state totals as labeled cards on a phone", () => {
+    const html = htmlOf(createElement(MonthlyComplianceView, { model: toMonthlyComplianceViewProps(monthlyComplianceAugust) }));
+    for (const header of ["Removed (bbl)", "Net (bbl)", "Net sales"]) expect(html).toMatch(new RegExp(`<dt[^>]*>${header.replace(/[()]/g, "\\$&")}</dt>`));
+    expect(html).toMatch(/<span class="[^"]*font-medium[^"]*">PA<\/span>/);
+  });
+
   it("names why Save is off beside it, in the same words as the step 2 notes (#1143, #1122)", () => {
     expect(toMonthlyComplianceViewProps(monthlyComplianceAugust).fileReason).toBeNull();
     const model = toMonthlyComplianceViewProps(monthlyComplianceUnbalanced);
