@@ -3,7 +3,7 @@
 import { Component, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { ComposerActivity } from "@/components/mgr/views/composer-conversation";
+import { ComposerActivity } from "@/components/mgr/views/composer";
 import { ComposerStripView } from "@/components/mgr/views/composer-strip";
 
 export class ComposerLoadBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {

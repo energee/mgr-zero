@@ -15,7 +15,6 @@ import { SearchPick, type SearchPickOption } from "@/components/mgr/search-pick"
 import { SortTable } from "@/components/mgr/sort-table";
 import { SubmitButton, type SubmitButtonProps } from "@/components/mgr/submit-button";
 import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
-import { ComposerDemo } from "@/components/mgr/composer-demo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,7 +26,6 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { StaffRole } from "@/lib/commands/registry";
 import type { EmptyState } from "@/lib/mgr/empty-state";
 import { rowLinkPrefetch } from "@/lib/mgr/row-link-prefetch";
 import { cn } from "@/lib/utils";
@@ -513,7 +511,6 @@ export const E = {
     return href ? <Link href={href} prefetch={rowLinkPrefetch(href)} data-to={to} className="block">{row}</Link> : row;
   },
   sp: () => <div className="flex-1" />,
-  comp: (roles: readonly StaffRole[] = ["admin"], container?: HTMLElement | null) => <ComposerDemo disabled={!roles.length} container={container} />,
 };
 
 function isPin(n: ReactNode) {

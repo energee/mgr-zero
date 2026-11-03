@@ -1,11 +1,21 @@
+import type { ReactNode } from "react";
 import { plural } from "@/lib/mgr/plural";
 import { sentenceCase } from "@/lib/mgr/labels";
 import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { E } from "@/components/mgr/e";
 import { DirectionIcon } from "@/components/mgr/icon";
 import type { ComposerEffect } from "@/lib/composer/state";
+
+/** Work in progress (setup, thinking, responding): a pulsing bar beside the
+ *  text, so a long wait reads as progress rather than a stuck page (#1105).
+ *  Kept out of composer-conversation.tsx so the shell's loading state does not
+ *  pull Streamdown into every page's first load. */
+export function ComposerActivity({ children }: { children: ReactNode }) {
+  return <div className="flex items-start gap-2 text-sm text-muted-foreground"><Skeleton aria-hidden className="mt-1.5 h-2 w-10 shrink-0 rounded-full bg-primary/40 motion-reduce:animate-none" /><p>{children}</p></div>;
+}
 
 export type OfflineOutboxRow = {
   id: string;

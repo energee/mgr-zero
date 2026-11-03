@@ -145,7 +145,8 @@ const pureTests = [
   "tests/sku-share-controls.test.ts",
   "tests/keyboard-focus.test.ts",
   "tests/material-count-sheet.test.ts",
-  "tests/row-link-prefetch.test.ts"
+  "tests/row-link-prefetch.test.ts",
+  "tests/client-bundle-imports.test.ts"
 ];
 
 export default defineConfig({

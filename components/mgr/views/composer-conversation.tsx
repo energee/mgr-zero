@@ -1,17 +1,10 @@
-import type { ReactNode } from "react";
 import { Streamdown } from "streamdown";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ComposerActivity } from "@/components/mgr/views/composer";
 
 const DISALLOWED_ELEMENTS = ["img"];
-
-/** Work in progress (setup, thinking, responding): a pulsing bar beside the
- *  text, so a long wait reads as progress rather than a stuck page (#1105). */
-export function ComposerActivity({ children }: { children: ReactNode }) {
-  return <div className="flex items-start gap-2 text-sm text-muted-foreground"><Skeleton aria-hidden className="mt-1.5 h-2 w-10 shrink-0 rounded-full bg-primary/40 motion-reduce:animate-none" /><p>{children}</p></div>;
-}
 
 export type ComposerConversationMessage = { id: string; role: "user" | "assistant"; content: string };
 
