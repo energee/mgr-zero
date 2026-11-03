@@ -221,6 +221,8 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     get_packaging_material_record: [B,readyRun.id],
     get_packaging_run_lot: [B,readyRun.id],
     correct_packaging_material_record: [B,R(),"Correction",[],R()],
+    get_packaging_output_corrections: [B,readyRun.id],
+    correct_packaging_run_outputs: [B,readyRun.id,null,"Correction",0,[],W,BIN,R()],
     close_packaging_run: [B,readyRun.id,0.0645,[{sku_id:SKU,qty_actual:1}],name,day,null,W,BIN,R(),[],"reviewed"],
     complete_batch: [B,f.batch.id,R(),1],
     reattribute_loss: [B,(await admin.from("volume_adjustments").select("id").eq("brewery_id", B).eq("reason", "loss").limit(1).single()).data!.id,0.01,"destruction",null,R()],

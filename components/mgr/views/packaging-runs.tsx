@@ -3,6 +3,7 @@ import { E } from "@/components/mgr/e";
 import type { PackagingRunRowView, PackagingRunsViewModel } from "@/lib/mgr/packaging-runs-view";
 import { RecordTable } from "@/components/mgr/views/record-table";
 import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
+import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 
 function UpcomingTable({ rows }: { rows: PackagingRunRowView[] }) {
   return <RecordTable
@@ -53,13 +54,14 @@ function RecentTable({ rows }: { rows: PackagingRunRowView[] }) {
   />;
 }
 
-export function PackagingRunsView({ model, actions, workHrefs }: { model: PackagingRunsViewModel; actions?: ReactNode; workHrefs?: Record<string, string> }) {
+export function PackagingRunsView({ model, actions, workHrefs, pagination }: { model: PackagingRunsViewModel; actions?: ReactNode; workHrefs?: Record<string, string>; pagination?: HistoryNavigationProps }) {
   return <>
-    {E.hd("Packaging", "", actions !== undefined ? actions : E.btn("Schedule run"))}
+    {E.hd("Packaging", actions !== undefined ? actions : E.btn("Schedule run"))}
     <WorkKindTabs chips={model.workChips} current={model.workChips[4]} tabs={model.workTabs} hrefs={workHrefs} />
-    {model.empty ? E.blank(model.empty) : <>
+    {model.empty && !pagination?.firstHref ? E.blank(model.empty) : <>
       {model.upcoming.length > 0 && <>{E.ttl("Upcoming")}<UpcomingTable rows={model.upcoming} /></>}
       {model.recent.length > 0 && <>{E.ttl("Recent")}<RecentTable rows={model.recent} /></>}
     </>}
+    <HistoryNavigation {...pagination} />
   </>;
 }

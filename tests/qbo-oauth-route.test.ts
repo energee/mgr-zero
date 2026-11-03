@@ -32,6 +32,7 @@ import { GET } from "@/app/api/integrations/qbo/oauth/route";
 
 describe("QuickBooks OAuth callback route", () => {
   beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
     session.breweryCookie = "brewery-1";
     session.roles = ["admin"];
     vi.stubEnv("QBO_CLIENT_ID", "client-id");
@@ -46,6 +47,7 @@ describe("QuickBooks OAuth callback route", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.clearAllMocks();
@@ -68,6 +70,10 @@ describe("QuickBooks OAuth callback route", () => {
     expect(lifecycle.complete).not.toHaveBeenCalled();
     expect(lifecycle.fail).toHaveBeenCalledWith("intent-1", "actor-1");
     expect(JSON.stringify([...response.headers])).not.toMatch(/access-secret|refresh-secret|secret-code/);
+    expect(console.error).toHaveBeenCalledWith("qbo_oauth_failed", {
+      name: "QboHttpError", status: 403, stage: "oauth_verify_realm",
+    });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toMatch(/access-secret|refresh-secret|secret-code/);
   });
 
   it("uses claimed scopes when the successful token response omits optional scope", async () => {
@@ -121,6 +127,7 @@ describe("QuickBooks OAuth callback route", () => {
     expect(lifecycle.exchangeState).toHaveBeenCalledWith(expect.stringMatching(/^[0-9a-f]{64}$/), "actor-1", "brewery-1");
     expect(fetch).not.toHaveBeenCalled();
     expect(lifecycle.complete).not.toHaveBeenCalled();
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it("returns to Accounting with no flag while the first callback for this state is still exchanging", async () => {
@@ -189,5 +196,37 @@ describe("QuickBooks OAuth callback route", () => {
     expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?error=oauth");
     expect(lifecycle.claim).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("logs missing configuration before any session or provider work", async () => {
+    vi.stubEnv("QBO_CLIENT_ID", undefined);
+    const response = await GET(new Request("https://mgr.test/api/integrations/qbo/oauth?code=code-secret"));
+    expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?error=oauth");
+    expect(console.error).toHaveBeenCalledWith("qbo_oauth_callback_failed", {
+      name: "Error", status: null, stage: "oauth_config",
+    });
+    expect(lifecycle.claim).not.toHaveBeenCalled();
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
+  });
+
+  it("logs database claim failures without their message", async () => {
+    lifecycle.claim.mockRejectedValueOnce(new Error("database-secret"));
+    const response = await GET(new Request("https://mgr.test/api/integrations/qbo/oauth?code=code-secret&state=state-secret&realmId=realm-1"));
+    expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?error=oauth");
+    expect(console.error).toHaveBeenCalledWith("qbo_oauth_callback_failed", {
+      name: "Error", status: null, stage: "oauth_claim",
+    });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
+  });
+
+  it.each([400, 503])("logs Intuit token HTTP %i without the body", async (status) => {
+    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValue(Response.json({ error: "body-secret" }, { status })));
+    const response = await GET(new Request("https://mgr.test/api/integrations/qbo/oauth?code=code-secret&state=state-secret&realmId=realm-1"));
+    expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?error=oauth");
+    expect(console.error).toHaveBeenCalledWith("qbo_oauth_failed", {
+      name: "QboHttpError", status, stage: "oauth_exchange",
+    });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
   });
 });

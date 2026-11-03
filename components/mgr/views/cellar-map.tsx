@@ -23,7 +23,7 @@ export function CellarMapView({ model, transfer, addition, complete }: { model: 
     {hasVessels
       ? E.tiles(model.tiles.map(tile => [tile.name, tile.detail, tile.reading, tile.warning ? 1 : 0, tile.fill, tile.href, tile.readingHref !== undefined && E.act("Reading", "info", tile.readingHref || undefined)]))
       : E.blank(
-        { title: "No vessels yet", description: "Add your tanks to start tracking the cellar." },
+        { title: "No vessels yet" },
         undefined,
         model.addHref !== null && E.btn("Add vessel", "p", model.addHref),
       )}
