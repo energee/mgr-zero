@@ -18,7 +18,7 @@ export function TransfersView({
 }) {
   return (
     <>
-      {E.hd(model.title, "between locations", createAction !== undefined ? createAction : E.btn("New transfer"))}
+      {E.hd(model.title, createAction !== undefined ? createAction : E.btn("New transfer"))}
       <WorkKindTabs chips={model.workChips} current={model.workChips[model.workChipIndex]} tabs={model.workTabs} hrefs={workHrefs} />
       {model.empty
         ? E.blank(model.empty)

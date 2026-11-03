@@ -4,6 +4,7 @@
 import { historyInput, historyResult, newestFirst, type HistoryRow } from "./history";
 import { z } from "zod";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
+import { integrationFailureCause } from "@/lib/integration-failure";
 import { isoDate, defineCommand, defineQuery, unwrap, CommandError, Ctx } from "./registry";
 import type { QboOAuthClient } from "@/lib/qbo";
 import type { Database } from "@/lib/supabase/database";
@@ -48,21 +49,25 @@ export async function quotePortalOrder(ctx: Ctx, i: z.infer<typeof quoteInput>, 
   const { readPortalQuoteTax, finishPortalQuoteTax } = await import("@/lib/supabase/integration-tokens");
   const claim = await readPortalQuoteTax(ctx, start.quoteId);
   if (!claim) return pending;
-  const { qboConfig, QboOAuthClient, QboHttpError, refreshQboCredentials, qboPaymentFailureCause } = await import("@/lib/qbo");
+  const { qboConfig, QboOAuthClient, QboHttpError, refreshQboCredentials } = await import("@/lib/qbo");
   let taxCents: number;
+  let stage = "quote_tax_config";
   try {
     if (!client) client = new QboOAuthClient(qboConfig());
+    stage = "quote_tax_read";
     try {
       taxCents = await client.calculateSalesTax(claim.input, claim.accessToken);
     } catch (error) {
       if (!(error instanceof QboHttpError) || error.status !== 401) throw error;
-      console.error("portal_quote_tax_unauthorized", qboPaymentFailureCause(error));
+      console.error("portal_quote_tax_unauthorized", integrationFailureCause(error, stage));
       // Refresh the credential that failed; if another quote already replaced it, this re-reads that one.
+      stage = "quote_tax_refresh";
       const tokens = await refreshQboCredentials(ctx, client, claim, start.quoteId);
+      stage = "quote_tax_read_retry";
       taxCents = await client.calculateSalesTax(claim.input, tokens.accessToken);
     }
   } catch (error) {
-    console.error("portal_quote_tax_failed", qboPaymentFailureCause(error));
+    console.error("portal_quote_tax_failed", integrationFailureCause(error, stage));
     // No tax or estimated total is asserted; submission revalidates the quote,
     // and the final invoice supplies tax when optional calculation is unavailable.
     return pending;

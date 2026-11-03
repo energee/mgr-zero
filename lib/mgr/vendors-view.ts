@@ -74,7 +74,7 @@ export function toVendorsViewProps(s: VendorsSnapshot): VendorsViewModel {
     materials: s.materials ?? "",
     contracts: s.contracts ?? "",
     empty: rows.length > 0 ? undefined
-      : s.filtered ? { title: "No vendors match", description: "Clear the search to see every vendor." }
-      : { title: "No vendors yet", description: "Add the suppliers you buy materials from." },
+      : s.filtered ? { title: "No vendors match" }
+      : { title: "No vendors yet" },
   };
 }

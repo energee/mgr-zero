@@ -7,6 +7,7 @@
 // material is retyped. `get_recipe` predicts OG/FG/ABV here in TypeScript
 // (lib/recipe-gravity.ts) — the schema stores assumptions, never results.
 import { z } from "zod";
+import { historyInput, historyResult, newestFirst, type HistoryRow } from "./history";
 import type { VesselReading } from "@/lib/mgr/vessel-detail-view";
 import { INGREDIENT_STAGES, scheduleDays, timedInDays, timingLimitMinutes } from "@/lib/mgr/recipe-process-view";
 import { fermentationReadingInput, fermentationReadingOfflinePolicy, MASH_PH_BOUNDS, READING_BOUNDS } from "@/lib/composer/offline-policy";
@@ -410,25 +411,27 @@ defineCommand({
   })),
 });
 
-// Brand, recipe and vessel are resolved with follow-up reads rather than
-// embedded joins: every one of them is optional on a batch, and PostgREST
-// embeds through the composite foreign keys read far less clearly than this.
+// Optional many-to-one embeds preserve batch plans without a brand or recipe.
 type BatchRow = {
   id: string; batch_no: number | null; intended_brand_id: string | null; recipe_version_id: string | null;
   planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null; cancelled_at: string | null;
   completion_adjustment_id: string | null; note: string | null;
+  brand: { name: string } | null; recipe_version: { recipe: { name: string } | null } | null;
 };
 
-// A batch names a recipe *version*; the human-readable name lives one hop
-// further out on the recipe itself.
-async function recipeNames(ctx: Ctx, batches: BatchRow[]) {
-  const ids = [...new Set(batches.map((b) => b.recipe_version_id).filter((v): v is string => !!v))];
-  if (ids.length === 0) return new Map<string, string>();
-  const versions = await inChunks(ids, async chunk => (await unwrap(ctx.db.from("recipe_versions").select("id, recipe_id").in("id", chunk))) ?? []);
-  const recipeIds = [...new Set(versions.map((v) => v.recipe_id as string))];
-  const recipes = await inChunks(recipeIds, async chunk => (await unwrap(ctx.db.from("recipes").select("id, name").in("id", chunk))) ?? []);
-  const byRecipe = new Map(recipes.map((r) => [r.id as string, r.name as string]));
-  return new Map(versions.map((v) => [v.id as string, byRecipe.get(v.recipe_id as string) ?? ""]));
+const BATCH_COLUMNS = "id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, closed_at, cancelled_at, completion_adjustment_id, note, brand:brands(name), recipe_version:recipe_versions(recipe:recipes(name))";
+
+/** Only brewed, unfinished batches need occupancy reads. History has no current vessels. */
+async function batchListRows<T extends BatchRow>(ctx: Ctx, batches: T[], readings = false) {
+  const activeIds = batches.filter(b => b.brewed_on && !b.closed_at && !b.cancelled_at).map(b => b.id);
+  const vessels = await openVessels(ctx, activeIds, readings);
+  return batches.map(({ brand, recipe_version, ...batch }) => ({
+    ...batch,
+    brand_name: brand?.name ?? null,
+    recipe_name: recipe_version?.recipe?.name ?? null,
+    vessel_name: vessels.get(batch.id)?.map(v => v.vessel_name).join(", ") || null,
+    active_occupancies: vessels.get(batch.id) ?? [],
+  }));
 }
 
 // The open occupancies (ended_at is null) are where a batch physically is; the
@@ -468,35 +471,33 @@ async function openVessels(ctx: Ctx, batchIds: string[], withReadings = false) {
 }
 
 defineQuery({
-  name: "list_batches", description: "Batches by planned date, newest first, with completion status and the brand, recipe, and current vessels and each open occupancy; readings adds each occupancy’s latest fermentation reading; open keeps only brewed batches not yet completed",
+  name: "list_batches", description: "Unfinished batches by planned date, newest first, with brand, recipe and current vessels; readings adds the latest reading only for brewed, unclosed batches. Use list_batch_history for completed or cancelled batches.",
   input: z.object({
-    readings: z.boolean().optional().describe("Add each open occupancy's latest fermentation reading"),
-    open: z.boolean().optional().describe("Keep only batches that were brewed and are not completed (the ones still in a tank)"),
+    readings: z.boolean().optional().describe("Add each active occupancy's latest fermentation reading"),
+    open: z.boolean().optional().describe("True keeps brewed, unclosed batches; false keeps unstarted plans; omitted returns both"),
   }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
-    // Paged past PostgREST's 1000-row cap (#759); id breaks planned_on ties so pages never overlap.
     const batches = await completeRows<BatchRow>("Batches", start => {
-      let q = ctx.db.from("batches")
-        .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, closed_at, cancelled_at, completion_adjustment_id, note", { count: "exact" })
-        .eq("brewery_id", ctx.breweryId);
-      if (i.open) q = q.not("brewed_on", "is", null).is("closed_at", null);
+      let q = ctx.db.from("batches").select(BATCH_COLUMNS, { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).is("closed_at", null).is("cancelled_at", null);
+      if (i.open === true) q = q.not("brewed_on", "is", null);
+      if (i.open === false) q = q.is("brewed_on", null);
       return q.order("planned_on", { ascending: false }).order("id").range(start, start + PAGE_SIZE - 1);
     });
-    if (batches.length === 0) return [];
+    return batchListRows(ctx, batches, i.readings);
+  },
+});
 
-    const [brands, recipes, vessels] = await Promise.all([
-      brandNames(ctx, batches.map((b) => b.intended_brand_id)),
-      recipeNames(ctx, batches),
-      openVessels(ctx, batches.map((b) => b.id), i.readings),
-    ]);
-
-    return batches.map((b) => ({
-      ...b,
-      brand_name: b.intended_brand_id ? brands.get(b.intended_brand_id) ?? null : null,
-      recipe_name: b.recipe_version_id ? recipes.get(b.recipe_version_id) ?? null : null,
-      vessel_name: vessels.get(b.id)?.map((v) => v.vessel_name).join(", ") || null,
-      active_occupancies: vessels.get(b.id) ?? [],
-    }));
+defineQuery({
+  name: "list_batch_history", description: "One page of completed or cancelled batches, newest created first, with brand and embedded recipe",
+  input: z.object({ status: z.enum(["completed", "cancelled"]), ...historyInput }), roles: ["admin", "brewer"],
+  handler: async (ctx, i) => {
+    let q = ctx.db.from("batches").select(`${BATCH_COLUMNS}, created_at`)
+      .eq("brewery_id", ctx.breweryId).limit(i.limit + 1);
+    q = i.status === "cancelled" ? q.not("cancelled_at", "is", null) : q.not("closed_at", "is", null).is("cancelled_at", null);
+    const fetched = (await unwrap(newestFirst(q, i.cursor))) ?? [];
+    const page = historyResult(fetched as unknown as (BatchRow & HistoryRow)[], i.limit);
+    return { ...page, rows: await batchListRows(ctx, page.rows) };
   },
 });
 

@@ -18,7 +18,7 @@ export function PortalInvoicesView({
 }) {
   return (
     <>
-      {E.hd("Invoices", model.subtitle)}
+      {E.hd("Invoices")}
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (

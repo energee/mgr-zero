@@ -319,8 +319,8 @@ describe("Keg event history", () => {
   });
 
   it("#1030 asks to widen the filter only when a filter is set", () => {
-    expect(toKegHistoryViewProps({}).empty).toEqual({ title: "No keg events yet", description: "Record a keg event to start the history.", action: "Record keg event" });
-    const widen = { title: "No matching events", description: "Widen the filter to see more of the keg's history." };
+    expect(toKegHistoryViewProps({}).empty).toEqual({ title: "No keg events yet", action: "Record keg event" });
+    const widen = { title: "No matching events" };
     expect(toKegHistoryViewProps({ pool: "sixth" }).empty).toEqual(widen);
     expect(toKegHistoryViewProps({ customer: "ridgeline" }).empty).toEqual(widen);
     expect(toKegHistoryViewProps({ rows: [{ key: "e", title: "Found", detail: "" }] }).empty).toBeUndefined();

@@ -331,8 +331,8 @@ describe("batch completion reconciliation", () => {
     expect(n(result.residualBbl)).toBe(0);
     expect((await complete(source.batchId)).adjustmentId).toBeNull();
 
-    const after = await runCommand("list_batches", {}, ctx) as { id: string; closed_at: string | null }[];
-    expect(after.find((batch) => batch.id === source.batchId)?.closed_at).not.toBeNull();
+    const after = await runCommand("list_batch_history", { status: "completed" }, ctx) as { rows: { id: string; closed_at: string | null }[] };
+    expect(after.rows.find((batch) => batch.id === source.batchId)?.closed_at).not.toBeNull();
   });
 
   // #431: a lossless full transfer leaves a zero baseline (1 in − 1 out). That is
@@ -452,6 +452,8 @@ describe("list_batches open", () => {
     expect(ids).not.toContain(done.batchId);
     expect(ids).not.toContain(planned.id);
     expect(open.every(b => b.brewed_on !== null && b.closed_at === null)).toBe(true);
-    expect((await runCommand("list_batches", {}, ctx) as { id: string }[]).map(b => b.id)).toEqual(expect.arrayContaining([live.batchId, done.batchId, planned.id]));
+    const unfinished = (await runCommand("list_batches", {}, ctx) as { id: string }[]).map(b => b.id);
+    expect(unfinished).toEqual(expect.arrayContaining([live.batchId, planned.id]));
+    expect(unfinished).not.toContain(done.batchId);
   });
 });

@@ -62,12 +62,7 @@ function toRow(m: MaterialsOnHandMaterial): MaterialsOnHandRowView {
 
 export function toMaterialsOnHandViewProps(s: MaterialsOnHandSnapshot): MaterialsOnHandViewModel {
   const rows = (s.rows ?? []).map(toRow);
-  const description = s.purchaseOrdersHref === null
-    ? "Add a material, then ask an Admin or Warehouse teammate to order and receive it."
-    : "Add a material, then receive a purchase order to put it on hand.";
-  const empty = rows.length > 0 ? undefined
-    : s.filtered ? { title: "No materials match", description: "Clear the search or choose All types to see every material." }
-    : { title: "No materials yet", description };
+  const empty = rows.length > 0 ? undefined : { title: s.filtered ? "No materials match" : "No materials yet" };
   const purchaseOrdersHref = s.purchaseOrdersHref === undefined ? "#" : s.purchaseOrdersHref;
   return { backHref: s.backHref, purchaseOrdersHref: s.filtered || rows.length ? undefined : purchaseOrdersHref, rows, empty };
 }

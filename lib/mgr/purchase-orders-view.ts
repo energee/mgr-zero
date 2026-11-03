@@ -19,7 +19,6 @@ export type PurchaseOrdersRowView = {
 
 export type PurchaseOrdersViewModel = {
   title: string;
-  subtitle: string;
   rows: PurchaseOrdersRowView[];
   empty?: EmptyState;
   workChips: string[];
@@ -29,7 +28,6 @@ export type PurchaseOrdersViewModel = {
 
 export type PurchaseOrdersSnapshot = {
   title: string;
-  subtitle: string;
   rows?: PurchaseOrdersRowView[];
   empty?: EmptyState;
   /** Closed orders included, so an empty list means there are none at all. */
@@ -76,10 +74,9 @@ export function toPurchaseOrdersViewProps(s: PurchaseOrdersSnapshot): PurchaseOr
   const rows = s.rows ?? [];
   return {
     title: s.title,
-    subtitle: s.subtitle,
     rows,
     empty: s.empty ?? (rows.length === 0
-      ? { title: s.includeClosed ? "No purchase orders yet" : "No open purchase orders", description: "Raise one to order materials from a vendor." }
+      ? { title: s.includeClosed ? "No purchase orders yet" : "No open purchase orders" }
       : undefined),
     workChips: WORK_CHIPS,
     workChipIndex: 5,

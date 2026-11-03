@@ -38,7 +38,6 @@ export type ReceivePoViewModel = {
   sentVia?: string;
   /** Where a draft's Edit draft goes (Edit PO); the inventory leaves it inert. */
   editHref?: string;
-  lotSuggestionsUnavailable?: boolean;
   history?: { key: string; label: string; detail: string; href?: string }[];
 };
 

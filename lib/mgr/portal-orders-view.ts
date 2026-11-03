@@ -17,7 +17,6 @@ export type PortalOrdersRowView = {
 };
 
 export type PortalOrdersViewModel = {
-  subtitle: string;
   rows: PortalOrdersRowView[];
   info: string;
   empty?: EmptyState;
@@ -32,7 +31,6 @@ export type PortalOrdersLineSnapshot = {
 };
 
 export type PortalOrdersSnapshot = {
-  customerName: string;
   breweryName: string;
   orders: {
     id: string;
@@ -57,10 +55,9 @@ function shortCopy(lines: PortalOrdersLineSnapshot[]): string | undefined {
 }
 
 /** Map a portal_orders payload onto PortalOrdersView. */
-export function toPortalOrdersViewProps({ customerName, breweryName, orders }: PortalOrdersSnapshot): PortalOrdersViewModel {
+export function toPortalOrdersViewProps({ breweryName, orders }: PortalOrdersSnapshot): PortalOrdersViewModel {
   return {
-    subtitle: customerName,
-    empty: orders.length === 0 ? { title: "No orders yet", description: "Start one from Order." } : undefined,
+    empty: orders.length === 0 ? { title: "No orders yet" } : undefined,
     info: `Need a change? Call ${breweryName}. Orders can’t be edited here after they’re placed.`,
     rows: orders.map((o) => {
       const adjusted = shortCopy(o.order_lines);

@@ -64,7 +64,6 @@ export function ReceivePoView({ model, controls = {}, messages, submitting = fal
       </>}
     </fieldset>
     {receiving && <>
-      {model.lotSuggestionsUnavailable && E.gated("Recent lots", "Recent lot suggestions are not returned by the purchase-order query. Read the lot code from the package.")}
       {E.tape(model.tape ?? [])}
       {model.info && E.info(model.info)}
     </>}

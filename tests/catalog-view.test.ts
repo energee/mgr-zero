@@ -189,7 +189,7 @@ describe("Catalog view", () => {
   // docs/plans/list-filters.md: an empty search is not an empty catalog.
   it("says no brands match, not no brands yet, when a filter is on", () => {
     const model = toCatalogViewProps({ ...catalogBrands, brands: [], filtered: true });
-    expect(model.empty).toEqual({ title: "No brands match", description: "Clear the search or category to see every brand." });
+    expect(model.empty).toEqual({ title: "No brands match" });
     expect(toCatalogViewProps({ ...catalogBrands, brands: [] }).empty?.title).toBe("No brands yet");
   });
 
@@ -635,10 +635,7 @@ describe("SKU list view", () => {
   });
 
   it("an empty brand points at Sells as on the Brand page", () => {
-    expect(toSkuListViewProps({ ...skuListHazy, skus: [], pours: [] }).empty).toEqual({
-      title: "No SKUs yet",
-      description: "Switch a package on under Sells as on the Brand page.",
-    });
+    expect(toSkuListViewProps({ ...skuListHazy, skus: [], pours: [] }).empty).toEqual({ title: "No SKUs yet" });
   });
 
   it("renders Add SKU, Edit, and the three packages", () => {

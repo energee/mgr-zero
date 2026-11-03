@@ -20,6 +20,7 @@ import { GET } from "@/app/api/integrations/square/oauth/route";
 
 describe("Square OAuth callback", () => {
   beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
     session.breweryCookie = "brewery-1";
     session.roles = ["admin"];
     vi.stubEnv("SQUARE_APPLICATION_ID", "sandbox-app");
@@ -29,7 +30,7 @@ describe("Square OAuth callback", () => {
     lifecycle.claim.mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect" });
     lifecycle.fail.mockResolvedValue(undefined);
   });
-  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
   it.each([
     ["wrong brewery", "brewery-2", "admin"],
@@ -45,6 +46,9 @@ describe("Square OAuth callback", () => {
     expect(response.headers.get("location")).toBe("https://mgr.test/settings/pos?error=oauth");
     expect(lifecycle.claim).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalledWith("square_oauth_callback_failed", {
+      name: "Error", status: null, stage: "oauth_session",
+    });
   });
 
   it("rejects invalid durable state before provider fetch", async () => {
@@ -79,5 +83,27 @@ describe("Square OAuth callback", () => {
       [{ id: "location-1", name: "Taproom", status: "ACTIVE" }],
     );
     expect(lifecycle.fail).not.toHaveBeenCalled();
+  });
+
+  it("classifies missing configuration before claiming OAuth state", async () => {
+    vi.stubEnv("SQUARE_APPLICATION_SECRET", undefined);
+    const response = await GET(new Request("https://mgr.test/api/integrations/square/oauth?code=code-secret"));
+    expect(response.headers.get("location")).toBe("https://mgr.test/settings/pos?error=oauth");
+    expect(console.error).toHaveBeenCalledWith("square_oauth_callback_failed", {
+      name: "Error", status: null, stage: "oauth_config",
+    });
+    expect(lifecycle.claim).not.toHaveBeenCalled();
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
+  });
+
+  it("logs provider failures with status and stage but no callback credentials", async () => {
+    vi.stubGlobal("fetch", vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValue(Response.json({ errors: [{ detail: "body-secret" }] }, { status: 403 })));
+    const response = await GET(new Request("https://mgr.test/api/integrations/square/oauth?code=code-secret&state=state-secret"));
+    expect(response.headers.get("location")).toBe("https://mgr.test/settings/pos?error=oauth");
+    expect(console.error).toHaveBeenCalledWith("square_oauth_failed", {
+      name: "Error", status: 403, stage: "oauth_exchange",
+    });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
   });
 });

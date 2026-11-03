@@ -67,7 +67,7 @@ export function toBatchesViewProps(s: BatchesSnapshot): BatchesViewModel {
     completed: s.completed,
     cancelled: s.cancelled,
     vessels: s.vessels,
-    empty: s.empty ?? ([planned, active, s.completed, s.cancelled].every(rows => !rows?.length) ? { title: "No batches yet", description: "Plan a batch to put a recipe on the brew schedule." } : undefined),
+    empty: s.empty ?? ([planned, active, s.completed, s.cancelled].every(rows => !rows?.length) ? { title: "No batches yet" } : undefined),
     workChips: WORK_CHIPS,
     workChipIndex: 3,
     workTabs: WORK_TABS,

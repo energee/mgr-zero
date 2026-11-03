@@ -872,7 +872,7 @@ describe("SCREENS", () => {
     // A New/Add/Create/Schedule on a list is a header action, not a second
     // full-width row between the title and the list. Form commits, in-form
     // Add line, and the first-run inline Add location stay in the body.
-    const hd = renderToStaticMarkup(E.hd("Work", "sales default", E.btn("New order")));
+    const hd = renderToStaticMarkup(E.hd("Work", E.btn("New order")));
     expect(hd).toContain("md:flex-row");
     expect(hd).toContain("md:justify-between");
     expect(hd).toContain("New order");
@@ -918,7 +918,7 @@ describe("SCREENS", () => {
     expect(r(E.row("Verb", "", E.act("Review")))).toMatch(/data-tap="/);
     expect(r(E.row("Switch", "", E.sw(true, "On")))).not.toMatch(/data-tap="/);
     expect(r(E.row("Stepper", "", E.stq(3)))).not.toMatch(/data-tap="/);
-    expect(r(E.gated("Later"))).toContain("data-gated");
+    expect(r(E.gated("Later", "Connect QuickBooks first"))).toContain("data-gated");
   });
 
   it("uses the control that does the job on view switchers and roles (#99)", () => {
