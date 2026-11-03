@@ -25,7 +25,6 @@ export type ShopShipTo = {
 };
 
 export type ShopSnapshot = {
-  customer: { id: string; name: string };
   shipTos: ShopShipTo[];
   shipToId: string;
   requestedDate: string;
@@ -50,7 +49,6 @@ export type ShopGroupView = {
 };
 
 export type ShopViewModel = {
-  customer: string;
   groups: ShopGroupView[];
   empty?: EmptyState;
   source: string;
@@ -84,7 +82,6 @@ export function shopCartTotals(catalog: ShopCatalogItem[], depositCentsPerKeg = 
 
 /** Map portal_catalog + get_portal_account plus cart qty onto ShopView. */
 export function toShopViewProps({
-  customer,
   shipTos,
   shipToId,
   requestedDate,
@@ -109,9 +106,8 @@ export function toShopViewProps({
   const shipTo = shipTos.find((s) => s.id === shipToId);
   const { merchandiseCents } = shopCartTotals(catalog, depositCentsPerKeg);
   return {
-    customer: customer.name,
     groups,
-    empty: catalog.length === 0 ? { title: "Nothing listed for wholesale yet", description: "Call the brewery." } : undefined,
+    empty: catalog.length === 0 ? { title: "Nothing listed for wholesale yet" } : undefined,
     source: source.name,
     shipToLine: `${shipTo?.label ?? "Ship-to"}${requestedDate ? ` · ${formatDate(requestedDate)}` : ""}`,
     depositInfo: "Tax and keg deposits are pending and are not included in the merchandise subtotal. The brewery confirms final invoice amounts and the requested delivery date.",

@@ -10,7 +10,6 @@ import { E } from "../components/mgr/e";
 import { PortalInvoiceView } from "../components/mgr/views/portal-invoice";
 import { PortalInvoicesView } from "../components/mgr/views/portal-invoices";
 import { QuestionInvoiceView } from "../components/mgr/views/question-invoice";
-import { RIDGELINE } from "../lib/mgr/fixtures/demo";
 import { portalInvoicePaid, portalInvoiceUnpaid, portalInvoicesRidgeline } from "../lib/mgr/fixtures/portal-invoices";
 import { toPortalInvoiceViewProps, type PortalInvoiceSnapshot } from "../lib/mgr/portal-invoice-view";
 import { toPortalInvoicesViewProps } from "../lib/mgr/portal-invoices-view";
@@ -43,7 +42,6 @@ it("question counts characters against the 2,000 limit so a long paste is not cu
 describe("Invoice history view", () => {
   it("maps portal_invoices rows, summing invoice_lines", () => {
     const model = toPortalInvoicesViewProps(portalInvoicesRidgeline);
-    expect(model.subtitle).toBe(RIDGELINE.name);
     expect(model.empty).toBeUndefined();
     expect(model.rows).toHaveLength(2);
     expect(model.rows[0]).toMatchObject({
@@ -64,14 +62,13 @@ describe("Invoice history view", () => {
   });
 
   it("names an empty list without inventing rows", () => {
-    const model = toPortalInvoicesViewProps({ customerName: RIDGELINE.name, invoices: [] });
+    const model = toPortalInvoicesViewProps({ invoices: [] });
     expect(model.empty?.title).toBe("No invoices yet");
     expect(model.rows).toEqual([]);
   });
 
   it("treats a credit memo as neutral money, not Pay or paid", () => {
     const model = toPortalInvoicesViewProps({
-      customerName: RIDGELINE.name,
       invoices: [{
         id: "cm-12",
         invoice_no: 12,
@@ -103,7 +100,7 @@ describe("Invoice history view", () => {
       qbo_total_cents: 10000,
       invoice_lines: [{ amount_cents: 10000 }],
     };
-    expect(toPortalInvoicesViewProps({ customerName: RIDGELINE.name, invoices: [invoice] }).rows[0])
+    expect(toPortalInvoicesViewProps({ invoices: [invoice] }).rows[0])
       .toMatchObject({ detail: "settled", unpaid: false, tone: "ok" });
     expect(toPortalInvoiceViewProps({
       invoice: { ...invoice, total_cents: 10000 },
@@ -115,7 +112,6 @@ describe("Invoice history view", () => {
   it("the inventory drawing still offers Pay on the unpaid row", () => {
     const html = htmlOf(createElement(PortalInvoicesView, { model: toPortalInvoicesViewProps(portalInvoicesRidgeline) }));
     expect(html).toMatch(/Invoices/);
-    expect(html).toContain(RIDGELINE.name);
     expect(html).toMatch(/INV-1042/);
     expect(html).toMatch(/due Oct 3, 2026 · \$948\.00/);
     expect(html).toMatch(/>Pay</);
@@ -162,7 +158,6 @@ describe("Portal invoice view", () => {
     expect(model).toMatchObject({ status, payable: status === "Unpaid" });
     if (status !== "Review") {
       const list = toPortalInvoicesViewProps({
-        customerName: RIDGELINE.name,
         invoices: [{ ...snapshot.invoice, invoice_lines: snapshot.lines }],
       });
       const row = list.rows[0];

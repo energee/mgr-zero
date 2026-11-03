@@ -15,7 +15,7 @@ export function SearchView({
 }) {
   return (
     <>
-      {model.heading ? E.hd(model.heading, model.sub) : null}
+      {model.heading ? E.hd(model.heading) : null}
       <Palette placeholder={model.placeholder} groups={model.groups} value={value} onValueChange={onValueChange} onSelect={onSelect} emptyMessage={emptyMessage} before={before} shouldFilter={shouldFilter} />
     </>
   );

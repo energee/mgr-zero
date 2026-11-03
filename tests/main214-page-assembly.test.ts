@@ -32,7 +32,7 @@ async function query(name: string, input?: { basis?: string; missingPortalEmail?
     case "get_customer": return { customer, shipTos: [shipTo, { ...shipTo, id: "back", label: "Back door", is_default: false }] };
     case "list_customer_users": return [{ userId: "user", email: "jo@buyer.test", createdAt: "2026-09-01T00:00:00Z" }];
     // One unpaid pushed invoice with a QuickBooks balance: Open balance reads $250.00 (#1585).
-    case "list_invoices": return { rows: [{ id: "inv", kind: "invoice", qbo_invoice_id: "qbo", paid_at: null, qbo_balance_cents: 25000, has_pending_qbo_push: false, was_pushed_to_qbo: true, local_paid_cents: 0, total_cents: 25000 }], nextCursor: null };
+    case "list_invoices": return { rows: [{ id: "inv", kind: "invoice", qbo_invoice_id: "qbo", paid_at: null, qbo_balance_cents: 25000, has_pending_qbo_push: false, was_pushed_to_qbo: true, local_paid_cents: 0, local_credit_cents: 0, total_cents: 25000 }], nextCursor: null };
     case "list_customers": state.customerInput = input ?? {}; return [customer];
     case "list_locations": return [{ id: "location", name: "Cold room", uses: ["warehouse"] }];
     case "list_bins": return [{ id: "bin", name: "Cold" }];
@@ -40,6 +40,7 @@ async function query(name: string, input?: { basis?: string; missingPortalEmail?
     // #994: the searched lists record their input and find nothing, so the no-match copy shows.
     case "list_recipes": case "list_vendors_and_contracts": case "list_materials": state.inputs[name] = input; return [];
     case "list_packaging_runs": case "list_occupancies": case "list_repack_parents": return [];
+    case "list_packaging_history": return { rows: [], nextCursor: null };
     case "list_vendors": case "get_material_on_hand": return [];
     case "list_routes": return { routes: [
       { id: "planned", name: "North loop", delivery_date: "2026-09-11", driver_user_id: "driver-1", driver_email: "sam@example.test", vehicle: null, note: null, departed_at: null, returned_at: null, stops: [] },

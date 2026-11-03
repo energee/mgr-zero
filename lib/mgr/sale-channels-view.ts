@@ -62,7 +62,7 @@ export function toSaleChannelsViewProps({ channels, backHref, canDelete = false 
   }));
   return {
     backHref,
-    empty: channels.length === 0 ? { title: "No sale channels yet", description: "A channel groups the customers that share a price list." } : undefined,
+    empty: channels.length === 0 ? { title: "No sale channels yet" } : undefined,
     rows,
   };
 }

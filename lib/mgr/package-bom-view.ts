@@ -24,7 +24,7 @@ export type PackageBomSnapshot = {
 
 export function toPackageBomViewProps({ lines }: PackageBomSnapshot): PackageBomViewModel {
   return {
-    empty: lines.length === 0 ? { title: "No packaging tracked", description: "This format consumes no tracked packaging materials." } : undefined,
+    empty: lines.length === 0 ? { title: "No packaging tracked" } : undefined,
     rows: lines.map((line, i) => ({
       key: line.id ?? line.material?.id ?? String(i),
       title: line.material?.name ?? "—",

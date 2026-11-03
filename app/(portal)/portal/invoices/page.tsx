@@ -14,12 +14,12 @@ type Invoice = { id: string; invoice_no: number | null; kind: "invoice" | "credi
 
 export default async function PortalInvoicesPage({ searchParams }: { searchParams: Promise<{ cursor?: string | string[] }> }) {
   const cursor = pageCursor((await searchParams).cursor);
-  const { customer, ctx } = await getPortalContext();
+  const { ctx } = await getPortalContext();
   const records = (await runCommand("portal_invoices", { cursor }, ctx)) as HistoryPage<Invoice & HistoryRow>;
   const page = historyPage(records, "/portal/invoices", cursor);
   return (
     <PortalInvoicesView
-      model={toPortalInvoicesViewProps({ customerName: customer.customerName, invoices: page.rows })}
+      model={toPortalInvoicesViewProps({ invoices: page.rows })}
       pagination={page.pagination}
       linkRows
     />

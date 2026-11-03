@@ -5,6 +5,28 @@ Q1–Q10 and the Design 2 reading; implemented on `feat/1045-local-payments`
 (PR #1162, to `main`). The Q9 follow-up is #1228. "Deviations" at the end lists
 where the implementation differs from the tasks below.
 
+## Credit-balance correction (#1627)
+
+This correction supersedes the original Q2 default and the Q1 statement that
+credit balances are QuickBooks-only. The approved payment cap still applies:
+an operator cannot record more cash than is due.
+
+For an MGR-owned invoice, the balance is its frozen line total minus unvoided
+payments minus live credit-memo lines linked by `credited_invoice_line_id`.
+Gross invoice totals and cash stay unchanged. A credit that closes the balance
+sets the existing closure marker, so the unpaid query and portal do not leave
+the invoice open. Staff distinguish **Settled** from cash-only **Paid**.
+Voiding a payment reopens only the net amount still due. A voided or deleted
+credit memo stops reducing that amount.
+
+Excess credit remains a signed negative balance in the register. Invoice detail
+labels its positive magnitude **Credit balance**. Neither view calls it overdue
+or offers another payment. Refund execution and applying credit to a different
+invoice remain outside this change; the UI and guide say explicitly that the
+credit is not proof of a refund. QuickBooks-owned balances remain authoritative
+and are never netted again locally.
+
+
 ## Goal
 
 Admin or Sales record a payment on an invoice that QuickBooks never received.

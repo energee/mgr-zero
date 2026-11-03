@@ -1,5 +1,6 @@
 import type { CommandFailureDetail } from "@/lib/commands/client";
 import { money } from "@/lib/mgr/money";
+import type { EmptyState } from "@/lib/mgr/empty-state";
 import { integrationUnavailableReason } from "@/lib/mgr/integration-availability";
 
 export type PublicationStatus = "requested" | "needs_snapshot" | "prepared" | "publishing" | "succeeded" | "rejected" | "superseded";
@@ -85,7 +86,6 @@ export function publicationNotice({ requestId, status, errorCode }: {
 export type PosLocationRow = {
   externalLocationId: string;
   name: string;
-  detail: string;
   mgrLocationId: string;
 };
 
@@ -98,7 +98,6 @@ export type PosVariationRow = {
   externalItemId: string;
   externalVariationId: string;
   label: string;
-  detail: string;
   disposition: "queued" | "mapped" | "ignored";
   target: string;
 };
@@ -106,7 +105,7 @@ export type PosVariationRow = {
 /** One `list_pos_variations` row, as Menu's "Also in Square" shows it. */
 export function toPosVariationRow(row: {
   externalItemId: string; externalVariationId: string; itemName: string | null; variationName: string | null;
-  disposition: PosVariationRow["disposition"]; skuId: string | null; formatId: string | null; mappingLabel: string | null;
+  disposition: PosVariationRow["disposition"]; skuId: string | null; formatId: string | null;
 }): PosVariationRow {
   let target = "";
   if (row.disposition === "ignored") target = "ignore";
@@ -115,7 +114,7 @@ export function toPosVariationRow(row: {
   return {
     externalItemId: row.externalItemId, externalVariationId: row.externalVariationId,
     label: [row.itemName, row.variationName].filter(Boolean).join(" · ") || row.externalVariationId,
-    detail: row.mappingLabel ?? "Sold in Square · not from MGR", disposition: row.disposition, target,
+    disposition: row.disposition, target,
   };
 }
 
@@ -158,7 +157,7 @@ export type PosMenuModel = {
 };
 
 /** The Menu's empty state. No action for unavailable, disconnected Square or roles that cannot open settings. */
-export type PosMenuSetup = { title: string; description: string; action?: { label: string; href?: string } };
+export type PosMenuSetup = EmptyState & { action?: { label: string; href?: string } };
 
 /**
  * Names the missing setup step when no Square location is mapped.
@@ -167,16 +166,12 @@ export type PosMenuSetup = { title: string; description: string; action?: { labe
  * and connected with observed locations means map. Only admins get settings links.
  */
 export function toPosMenuSetup({ admin, connected, configured, observed }: { admin: boolean; connected: boolean; configured: boolean; observed: number }): PosMenuSetup {
-  if (!connected && !configured) return { title: "Square isn’t connected", description: integrationUnavailableReason.square };
-  if (!connected) return admin
-    ? { title: "Square isn’t connected", description: "Connect Square, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" } }
-    : { title: "Square isn’t connected", description: "Ask an admin to connect Square." };
-  if (observed === 0) return admin
-    ? { title: "No Square locations yet", description: "Square is connected, but no locations are synced yet. Sync Square, then map a Square location to an MGR location.", action: { label: "Set up Square", href: "/settings/pos" } }
-    : { title: "No Square locations yet", description: "Square is connected, but no locations are synced yet. Ask an admin to sync and map one." };
-  return admin
-    ? { title: "No Square location mapped", description: "Square locations were found, but none is mapped to an MGR location.", action: { label: "Map Square locations", href: "/settings/pos/locations" } }
-    : { title: "No Square location mapped", description: "Square locations were found, but none is mapped to an MGR location. Ask an admin to map one." };
+  if (!connected && !configured) return { title: integrationUnavailableReason.square };
+  const setUp = { label: "Set up Square", href: "/settings/pos" };
+  if (!connected) return admin ? { title: "Square isn’t connected", action: setUp } : { title: "Square isn’t connected" };
+  if (observed === 0) return admin ? { title: "No Square locations yet", action: setUp } : { title: "No Square locations yet" };
+  const map = { label: "Map Square locations", href: "/settings/pos/locations" };
+  return admin ? { title: "No Square location mapped", action: map } : { title: "No Square location mapped" };
 }
 
 const price = (cents: number | null) => cents == null ? "No price" : money(cents);
