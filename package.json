@@ -21,7 +21,7 @@
     "@base-ui/react": "^1.9.0",
     "@chat-adapter/slack": "^4.44.0",
     "@chat-adapter/state-pg": "^4.44.0",
-    "@hugeicons/core-free-icons": "^4.3.5",
+    "@hugeicons/core-free-icons": "^4.4.0",
     "@hugeicons/react": "^1.1.10",
     "@lobehub/icons": "^6.0.0",
     "@supabase/ssr": "^0.12.7",
