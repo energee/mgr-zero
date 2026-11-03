@@ -88,7 +88,7 @@ import { EntryView } from "@/components/mgr/views/entry";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
 import { FermentationReadingActionsView, FermentationReadingView, readingIdentity } from "@/components/mgr/views/fermentation-reading";
 import { FirstRunView } from "@/components/mgr/views/first-run";
-import { CatalogCategoriesFixture, FormatFixture, ReceiptFixture, WeeklyCountFixture } from "@/components/mgr/fixture-adapters";
+import { CatalogCategoriesFixture, FormatFixture, ReceiptFixture, TransferDetailFixture, WeeklyCountFixture } from "@/components/mgr/fixture-adapters";
 import { FormatView } from "@/components/mgr/views/format";
 import { DeleteFormatControl } from "@/components/mgr/views/delete-format";
 import { FormatsView } from "@/components/mgr/views/formats";
@@ -1156,7 +1156,7 @@ export const SCREENS: Screen[] = [
     writes: "record_stock_transfer_pick · receive_stock_transfer [one RPC: paired location_transfer movements, no invoice] · cancel_stock_transfer",
     states: [["submitted", "Receive records the pick at the requested qty, then receives · no separate pick step"], ["picked", "Receive is irreversible"], ["received", "read-only tape · the stock has changed place"], ["cancelled", "the reason shows · picks released, nothing moved"], ["permission", "warehouse or admin required", 1]],
     spec: "Not Complete transfer: that ships a taproom replenishment order. Receive posts both ledger halves or neither. No invoice. Cancel transfer asks for a reason and is offered until the transfer is received: a pick never leaves the source bin, so cancelling releases the picks and moves nothing, which is how a transfer that can never balance at receipt is closed out.",
-    body: <TransferDetailView model={toTransferDetailViewProps(transferDetailSubmitted)} />,
+    body: <TransferDetailFixture><TransferDetailView model={toTransferDetailViewProps(transferDetailSubmitted)} /></TransferDetailFixture>,
   },
   {
     step: 5,
@@ -1804,11 +1804,11 @@ export const SCREENS: Screen[] = [
     name: "Batches",
     to: { Brew: "Brew prep", "New vessel": "New vessel" },
     job: "See planned and active batches with the next brew or cellar action",
-    reads: "list_batches · list_vessels · list_brands · list_recipes · get_gravity_unit",
+    reads: "list_batches · list_batch_history · list_vessels · list_brands · list_recipes · get_gravity_unit",
     writes: "none [scheduling happens on the New batch sheet; recording on Brew day or Fermentation reading; existing commands]",
     states: [["planned", "Brew is the next action and opens the brew-day page"], ["active", "each open occupancy is a line with its latest reading and its own Reading action"], ["completed", "closed batches stay available in their own group"], ["empty", "New batch and vessel setup remain available"], ["brewer", "New vessel hidden; vessels are admin-managed"], ["retired vessel", "listed as Inactive"]],
     spec: "The Work list with the Batches tab active. Each lifecycle group is a table on the desk and a list on the phone. The batch number is the link that opens a batch; only a planned batch adds Brew. A vessel name opens that vessel's page, editable only by an admin; New vessel shows only to an admin. The Vessels table lists retired vessels as Inactive. New batch opens the New batch sheet. Its Schedule batch returns here, and so does Brew day.",
-    body: <BatchesView model={toBatchesViewProps(batchesBrewer)} />,
+    body: <BatchesView model={toBatchesViewProps(batchesBrewer)} completedPagination={{ moreHref: "#" }} cancelledPagination={{ moreHref: "#" }} />,
   },
   {
     step: 7,
@@ -1923,11 +1923,11 @@ export const SCREENS: Screen[] = [
     name: "Packaging runs",
     to: { Resolve: "Close packaging run", Start: "Packaging plan", "Pick source": "Packaging plan" },
     job: "See what is planned, what is due and what closed, and schedule the next run",
-    reads: "list_packaging_runs · list_brands · list_occupancies · list_skus · list_locations · list_bins",
+    reads: "list_packaging_runs · list_packaging_history · list_brands · list_occupancies · list_skus · list_locations · list_bins",
     writes: "none [scheduling and closing happen on their own surfaces]",
     states: [["short", "a planned run whose materials fall short says so beneath its run number and its next action is Resolve, not Start"], ["overdue", "an unstarted active plan before brewery-local today is marked Overdue; finished runs never are"], ["due today", "the same run also appears in Today for the brewer"], ["closed", "finished runs stay under Recent, with optional lot, output, yield and loss only when supplied"], ["empty", "no runs planned: the empty state points at Schedule run"]],
     spec: "Reuse the responsive RecordTable register shared with Batches: sortable columns on desktop and labeled records on phones. Keep Upcoming and Recent separate. Upcoming shows run, brand, planned date, source, planned quantity and next action. Recent shows run, brand, status, finished date and planned quantity; lot, actual output, yield and loss appear only when supplied, never inferred from planned quantities. Dates for finished runs use the brewery timezone. Schedule run and Repack keep their existing forms. A run number opens its record; finished runs have no next action.",
-    body: <PackagingRunsView model={toPackagingRunsViewProps(packagingRuns, DEMO_TIME_ZONE)} />,
+    body: <PackagingRunsView model={toPackagingRunsViewProps(packagingRuns, DEMO_TIME_ZONE)} pagination={{ moreHref: "#" }} />,
   },
   {
     step: 8,

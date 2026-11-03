@@ -21,6 +21,7 @@ import { ScheduleRunForm } from "./schedule-run-form";
 import { RepackForm, type RepackParent } from "./repack-form";
 import { navTitle } from "@/lib/mgr/nav";
 import { breweryDate } from "@/lib/date-format";
+import { historyPage, pageCursor, type HistoryPage, type HistoryRow } from "@/lib/mgr/history-page";
 
 export const metadata = { title: navTitle("/packaging") };
 
@@ -35,20 +36,23 @@ type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 type Sku = ScheduleRunData["skus"][number];
 
-export default async function PackagingPage({ searchParams }: { searchParams: Promise<{ repack?: string }> }) {
-  const { repack } = await searchParams;
+export default async function PackagingPage({ searchParams }: { searchParams: Promise<{ repack?: string; cursor?: string | string[] }> }) {
+  const { repack, cursor: rawCursor } = await searchParams;
+  const cursor = pageCursor(rawCursor);
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const canRepack = brewery.roles.includes("admin") || brewery.roles.includes("warehouse");
-  const [runs, brands, occupancies, skus, locations, bins, parents] = (await Promise.all([
-    runCommand("list_packaging_runs", {}, ctx), runCommand("list_brands", {}, ctx), runCommand("list_occupancies", {}, ctx),
+  const [runs, recent, brands, occupancies, skus, locations, bins, parents] = (await Promise.all([
+    runCommand("list_packaging_runs", {}, ctx), runCommand("list_packaging_history", { cursor }, ctx),
+    runCommand("list_brands", {}, ctx), runCommand("list_occupancies", {}, ctx),
     runCommand("list_skus", {}, ctx),
     // Only the repack form needs these; a brewer never sees it.
     canRepack ? runCommand("list_locations", {}, ctx) : [], canRepack ? runCommand("list_bins", {}, ctx) : [],
     canRepack ? runCommand("list_repack_parents", {}, ctx) : [],
-  ])) as [Run[], Brand[], Occupancy[], Sku[], Location[], Bin[], RepackParent[]];
+  ])) as [Run[], HistoryPage<Run & HistoryRow>, Brand[], Occupancy[], Sku[], Location[], Bin[], RepackParent[]];
+  const page = historyPage(recent, "/packaging", cursor);
   return <PackagingRunsView
-    model={toPackagingRunsViewProps(runs, brewery.timeZone, (id) => `/packaging/${id}`)}
+    model={toPackagingRunsViewProps([...runs, ...page.rows], brewery.timeZone, (id) => `/packaging/${id}`)} pagination={page.pagination}
     workHrefs={workHrefsFor(brewery.roles)}
     actions={<div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skus} today={breweryDate(brewery.timeZone)} catalogHref={canRun(ctx, "create_sku") ? "/catalog" : null} />{canRepack ? <RepackForm autoOpen={repack === "1"} locations={locations} bins={bins} parents={parents} formatsHref={canRun(ctx, "create_composed_format") ? "/catalog" : null} /> : null}</div>}
   />;
