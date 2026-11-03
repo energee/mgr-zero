@@ -1,7 +1,7 @@
 // components/mgr/qty.tsx — shared quantity controls and segmented tabs.
 // Views import Qty directly for a labeled quantity with a unit addon.
 // VolumeField composes Qty with radios for its unit choice; E.edit and E.stq
-// use StepQuantity, and E.tabs uses TabBar.
+// use StepQuantity. Price groups import TabBar directly for channel tabs.
 "use client";
 import type { FieldControls } from "@/components/mgr/e";
 import { numberNotationError, stepQuantity } from "@/lib/mgr/quantity-input";

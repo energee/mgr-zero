@@ -104,6 +104,7 @@ jobs:
           # The action pushes with the Claude app token; GITHUB_TOKEN stays out of .git/config.
           persist-credentials: false
       - name: Run Claude /simplify
+        id: simplify
         uses: anthropics/claude-code-action@d70510b174a1244958df0b03166a54912811f3e6 # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -120,8 +121,31 @@ jobs:
       # The agent's run succeeds even when its push fails; fail the job instead,
       # since land-pr.sh reads this job's success as "simplify applied".
       - name: Simplify edits reached the PR branch
+        id: simplify-guard
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           [ -z "$(git status --porcelain)" ] || { echo "::error::uncommitted simplify edits"; git status --short; exit 1; }
           [ "$(git rev-parse HEAD)" = "$(git ls-remote origin "refs/heads/$HEAD_REF" | cut -f1)" ] || { echo "::error::simplify commit was not pushed"; exit 1; }
+      # Preserve only tracked jobs.ts status/diff; README documents privacy and
+      # retention. Collection/upload errors must leave the original failure fatal.
+      - name: Collect allowlisted simplify source diagnostic
+        id: simplify-diagnostic
+        if: failure() && (steps.simplify.outcome == 'failure' || steps.simplify-guard.outcome == 'failure')
+        shell: bash
+        run: |
+          git cat-file -e HEAD:lib/chat/jobs.ts
+          diagnostic_dir="$RUNNER_TEMP/simplify-source-diagnostic"
+          mkdir "$diagnostic_dir"
+          git status --porcelain=v1 --untracked-files=no --no-renames -- lib/chat/jobs.ts > "$diagnostic_dir/jobs.status"
+          git diff --no-ext-diff --no-textconv --no-renames --no-color --src-prefix=a/ --dst-prefix=b/ HEAD -- lib/chat/jobs.ts > "$diagnostic_dir/jobs.patch"
+      - name: Save allowlisted simplify source diagnostic
+        if: failure() && steps.simplify-diagnostic.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: simplify-jobs-source-diagnostic
+          if-no-files-found: error
+          retention-days: 1
+          path: |
+            ${{ runner.temp }}/simplify-source-diagnostic/jobs.status
+            ${{ runner.temp }}/simplify-source-diagnostic/jobs.patch

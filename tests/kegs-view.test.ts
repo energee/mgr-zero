@@ -1,3 +1,4 @@
+import { KegEventFields } from "@/components/mgr/views/keg-event-form";
 // tests/kegs-view.test.ts — Keg fleet, Customer keg balance, and Keg event
 // history. Views own no sample data. Live PoolForm / KegEventForm wrap the
 // shared KegPoolFields / KegEventFields in their command forms.
@@ -7,7 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { KegBalanceView } from "../components/mgr/views/keg-balance";
-import { KegEventFields, KegFleetView, KegPoolFields } from "../components/mgr/views/keg-fleet";
+import { KegFleetView, KegPoolFields } from "../components/mgr/views/keg-fleet";
 import { KegHistoryView } from "../components/mgr/views/keg-history";
 import { KEG_EVENT_REASONS } from "../lib/mgr/enums";
 import { kegBalanceRidgeline, kegFleet, kegHistoryLedger } from "../lib/mgr/fixtures/kegs";

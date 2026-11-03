@@ -1,10 +1,11 @@
+import { KegEventFields } from "@/components/mgr/views/keg-event-form";
 // tests/keg-move-gates.test.ts — #761: Keg fleet and Move stock share E
 // controls through the shared view, and an unavailable action says why.
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { KegFleetView, KegEventFields, KegPoolFields } from "@/components/mgr/views/keg-fleet";
+import { KegFleetView, KegPoolFields } from "@/components/mgr/views/keg-fleet";
 import { kegFleet } from "@/lib/mgr/fixtures/kegs";
 import { kegEventUnavailable, needsKegCustomer, toKegFleetViewProps, type KegPoolValue } from "@/lib/mgr/keg-fleet-view";
 import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";

@@ -1,4 +1,4 @@
-import { isUuid } from "@/lib/commands/context";
+import { isUuid } from "@/lib/uuid";
 import { sha256 } from "@/lib/hash";
 import { getPublishedMenu } from "@/lib/supabase/public-menu";
 

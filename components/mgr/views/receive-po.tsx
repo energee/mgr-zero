@@ -42,9 +42,9 @@ export function ReceivePoView({ model, controls = {}, messages, submitting = fal
         {correcting ? E.fld("Received on", model.receivedOn ?? "—") : <DatePicker label="Received on" value={controls.receivedOn ? model.receivedOn ?? "" : undefined} defaultValue={model.receivedOn} onChange={controls.receivedOn} />}
       </>}
       {(model.lines ?? []).map(line => <Fragment key={line.key}>
-        {receiving ? E.line(line.title, line.detail,
+        {receiving ? E.row(line.title, line.detail,
           <OrderQuantity label={`${line.title} counted`} value={line.qty} onChange={controls.quantity && (value => controls.quantity?.(line.key, value))} />,
-          line.warning ? "w" : line.ok ? "ok" : "",
+          line.warning ? "w" : line.ok ? "ok" : "", undefined,
           <>
             {E.edit("Unit cost ($)", line.cost ?? "", "number", undefined, {
               onChange: controls.cost ? value => controls.cost?.(line.key, value) : undefined,

@@ -15,6 +15,7 @@
 // With `lineEdit`, each line has ✕ and Add line appends a line that picks its
 // SKU: the live page adds, removes and adjusts lines in place
 // (order-lines-form.tsx, #1503).
+import { plural } from "@/lib/mgr/plural";
 import type { ComponentProps, ReactNode } from "react";
 import { OrderQuantity, OrderSkuPicker, PickupSwitch } from "./new-order";
 import { E } from "@/components/mgr/e";
@@ -162,7 +163,7 @@ export function OrderView({
       <section aria-labelledby="order-lines">
         <div className="flex items-baseline justify-between gap-3">
           <h2 id="order-lines" className={H2}>Ordered items</h2>
-          <span className={LEGEND}>{lineCount} {lineCount === 1 ? "line" : "lines"}</span>
+          <span className={LEGEND}>{plural(lineCount, "line")}</span>
         </div>
         <div className="mt-2 hidden md:block">
           <Table>

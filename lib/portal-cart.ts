@@ -1,3 +1,5 @@
+import { isoDate } from "@/lib/commands/registry";
+import { isUuid } from "@/lib/uuid";
 // lib/portal-cart.ts — pure decisions behind the portal cart's Save draft /
 // Submit buttons (app/(portal)/portal/cart.tsx), kept out of the component so
 // vitest can pin them down: which command syncs the cart to the database, when
@@ -30,7 +32,7 @@ import { z } from "zod";
 import { defaultShipToId } from "@/lib/order-form-rules";
 
 const scopeSchema = z.object({ actorId: z.string().uuid(), customerId: z.string().uuid(), breweryId: z.string().uuid() }).strict();
-const fieldsSchema = z.object({ shipToId: z.string().uuid(), poNumber: z.string(), note: z.string(), requestedShipDate: z.string().date().nullable(), lines: z.array(z.object({ skuId: z.string().uuid(), qty: z.number().int().positive() }).strict()).min(1) }).strict();
+const fieldsSchema = z.object({ shipToId: z.string().uuid(), poNumber: z.string(), note: z.string(), requestedShipDate: isoDate.nullable(), lines: z.array(z.object({ skuId: z.string().uuid(), qty: z.number().int().positive() }).strict()).min(1) }).strict();
 const identitySchema = z.object({ actorId: z.string().uuid(), customerId: z.string().uuid() }).strict();
 const createInputSchema = fieldsSchema.extend({ expectedIdentity: identitySchema });
 const submitInputSchema = z.object({ orderId: z.string().uuid(), expectedIdentity: identitySchema }).strict();
@@ -154,7 +156,7 @@ export async function executePortalAttempt(
   onStage(attempt);
   const result = await send(attempt.scope.breweryId, attempt.command, attempt.input, attempt.requestId, attempt.scope) as { order_id?: string };
   const id = "orderId" in attempt.input ? attempt.input.orderId : result?.order_id;
-  if (!id || !z.string().uuid().safeParse(id).success) throw new Error("Order response could not be confirmed. Retry the same request.");
+  if (!isUuid(id)) throw new Error("Order response could not be confirmed. Retry the same request.");
   if (attempt.purpose === "submit" && (attempt.command === "portal_create_order" || attempt.command === "portal_update_draft_order")) {
     return executePortalAttempt({ ...attempt, command: "portal_submit_order", input: { orderId: id, expectedIdentity: attempt.input.expectedIdentity }, requestId: crypto.randomUUID() }, storage, send, onStage);
   }

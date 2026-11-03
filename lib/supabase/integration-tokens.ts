@@ -2,7 +2,7 @@
 import "server-only";
 import { toJson } from "./json";
 import { canRun, CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
-import { isUuid } from "@/lib/commands/context";
+import { isUuid } from "@/lib/uuid";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasAnyRole, onlyRoles } from "@/lib/mgr/roles";
 import type { QboTokens, QboTaxInput } from "@/lib/qbo";

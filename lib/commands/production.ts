@@ -11,8 +11,8 @@ import { historyInput, historyResult, newestFirst, type HistoryRow } from "./his
 import type { VesselReading } from "@/lib/mgr/vessel-detail-view";
 import { INGREDIENT_STAGES, scheduleDays, timedInDays, timingLimitMinutes } from "@/lib/mgr/recipe-process-view";
 import { fermentationReadingInput, fermentationReadingOfflinePolicy, MASH_PH_BOUNDS, READING_BOUNDS } from "@/lib/composer/offline-policy";
-import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, CommandError, type Ctx, latestOf } from "./registry";
-import { brandNames, isoDate } from "./packaging";
+import { isoDate, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, CommandError, type Ctx, latestOf } from "./registry";
+import { brandNames } from "./packaging";
 import { recipeGravity } from "@/lib/recipe-gravity";
 import { escapeRegex } from "@/lib/escape-regex";
 import { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
@@ -21,7 +21,6 @@ import { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER
 // derives mash_temp_f. The option arrays live in lib/mgr/enums.ts so the shared
 // views can read them without importing this module and registering every
 // command in it.
-export { MASH_STEP_KINDS, FERMENTATION_STAGE_KINDS, WATER_ADDITION_STAGES, WATER_ADDITION_UNITS } from "@/lib/mgr/enums";
 // Process temperatures share the reading range, so a typo such as -500 °F is refused, not frozen into a recipe version
 // or brew record (#1476, #1478).
 const processTempF = z.number().min(READING_BOUNDS.tempF.min).max(READING_BOUNDS.tempF.max);

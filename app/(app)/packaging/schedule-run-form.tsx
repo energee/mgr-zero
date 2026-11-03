@@ -15,7 +15,7 @@ import { E } from "@/components/mgr/e";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { SchedulePackagingRunView } from "@/components/mgr/views/schedule-packaging-run";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { plannedQty, scheduleRunReason, toSchedulePackagingRunView, type ScheduleRunData, type ScheduleRunDraft } from "@/lib/mgr/schedule-packaging-run-view";
+import { plannedPackageQty, scheduleRunReason, toSchedulePackagingRunView, type ScheduleRunData, type ScheduleRunDraft } from "@/lib/mgr/schedule-packaging-run-view";
 
 export function ScheduleRunForm({ catalogHref, today, ...data }: ScheduleRunData & { catalogHref: string | null; today: string }) {
   const empty: ScheduleRunDraft = { brandId: "", occupancyId: "", plannedOn: today, qty: {} };
@@ -23,8 +23,8 @@ export function ScheduleRunForm({ catalogHref, today, ...data }: ScheduleRunData
   const change = (patch: Partial<ScheduleRunDraft>) => setDraft((prev) => ({ ...prev, ...patch }));
   const model = toSchedulePackagingRunView(data, draft, today);
   const outputs = model.outputs
-    .filter((output) => plannedQty(output.qty) > 0)
-    .map((output) => ({ skuId: output.key, qtyPlanned: plannedQty(output.qty) }));
+    .filter((output) => plannedPackageQty(output.qty) > 0)
+    .map((output) => ({ skuId: output.key, qtyPlanned: plannedPackageQty(output.qty) }));
   const form = useCommandForm("schedule_packaging_run", {
     build: () => ({ brandId: draft.brandId, plannedOn: draft.plannedOn, occupancyId: draft.occupancyId || undefined, outputs }),
     reset: () => setDraft(empty),

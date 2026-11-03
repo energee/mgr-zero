@@ -1,6 +1,6 @@
 // components/mgr/list-controls.tsx — the search, sort and filter strip above a
 // list (docs/plans/list-filters.md). The URL holds the state and the server
-// re-renders the narrowed list: search is E.search (shadcn Input) in a GET form
+// re-renders the narrowed list: search is a shadcn Input in a GET form
 // that also replaces the URL a moment after typing stops; a scope is a labeled
 // ScopePick whose options are links (Catalog's Sort and Category), sharing the
 // search's row on desk and sitting side by side under it on a phone.
@@ -11,7 +11,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { E } from "@/components/mgr/e";
+import { Input } from "@/components/ui/input";
 import { ScopePick, type ScopeOption } from "@/components/mgr/scope-pick";
 import { SEARCH_MAX } from "@/lib/mgr/list-params";
 import { plural } from "@/lib/mgr/plural";
@@ -62,7 +62,7 @@ export function ListControls({ search, scopes = [], resultCount }: {
 function SearchForm({ search, onType }: { search: ListSearch; onType?: (q: string) => void }) {
   return <form method="get" role="search" className="basis-full lg:basis-0 lg:grow">
     {Object.entries(search.keep).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
-    {E.search(search.label, { name: "q", defaultValue: search.value, maxLength: SEARCH_MAX, onChange: onType && (event => onType(event.target.value)) })}
+    <Input type="search" placeholder={search.label} aria-label={search.label} name="q" defaultValue={search.value} maxLength={SEARCH_MAX} onChange={onType && (event => onType(event.target.value))} />
   </form>;
 }
 

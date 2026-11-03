@@ -9,8 +9,7 @@ import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { ORDER_FILTERS, salesRoles, warehouseRoles } from "@/lib/mgr/order-status";
 import { hasAnyRole } from "@/lib/mgr/roles";
 import { PAYMENT_METHODS, REFUSAL_REASONS, type PaymentMethod } from "@/lib/mgr/enums";
-import { isoDate } from "./packaging";
-import { completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
+import { isoDate, completeRows, defineCommand, defineQuery, inChunks, PAGE_SIZE, unwrap, runCommand, CommandError } from "./registry";
 
 const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
 const readRoles = ["admin", "sales", "warehouse"] as const;
@@ -23,7 +22,7 @@ defineCommand({
     kind: z.enum(["wholesale", "taproom_transfer"]),
     customerId: z.string().uuid().optional(), shipToId: z.string().uuid().optional(),
     fromLocationId: z.string().uuid(), toLocationId: z.string().uuid().optional(),
-    requestedShipDate: z.string().date().optional(), poNumber: z.string().optional(), note: z.string().optional(),
+    requestedShipDate: isoDate.optional(), poNumber: z.string().optional(), note: z.string().optional(),
     // A pickup is collected at the brewery: never put on a route, invoiced when it ships.
     pickup: z.boolean().optional(),
     lines,
@@ -42,7 +41,7 @@ defineCommand({
   input: z.object({
     orderId: z.string().uuid(), shipToId: z.string().uuid().optional(),
     // Omitted preserves the saved date; explicit null clears it via the existing RPC.
-    requestedShipDate: z.string().date().nullable().optional(), poNumber: z.string().optional(), note: z.string().optional(),
+    requestedShipDate: isoDate.nullable().optional(), poNumber: z.string().optional(), note: z.string().optional(),
     // Omitted keeps the saved pickup flag.
     pickup: z.boolean().optional(),
     lines,
@@ -388,7 +387,7 @@ defineCommand({
 defineQuery({
   name: "daily_pick_sheet", description: "Confirmed/picked orders grouped by requested ship date with lines (each SKU with its brand name and staff alias, and format name)",
   roles: [...readRoles],
-  input: z.object({ date: z.string().date().optional() }),
+  input: z.object({ date: isoDate.optional() }),
   // Paged past PostgREST's 1000-row cap (#759); without a date this is every
   // confirmed/picked order. id breaks ship-date ties so pages never overlap.
   handler: (ctx, i) => completeRows("Pick sheet", start => {
