@@ -59,6 +59,18 @@ describe("production Slack client", () => {
     expect(classifySlackError(r.error)).toEqual({ retryable: true, code: "ratelimited", retryAfterMs: 2_000 });
   });
 
+  it("surfaces an HTTP 503 from channel validation without retrying internally", async () => {
+    behave = (_hit, res) => { res.writeHead(503).end("Service unavailable"); };
+    const slack = slackAdapter();
+    const r = await settle(() => slack.withBotToken(TOKEN,
+      () => slack.client.conversations.info({ token: TOKEN, channel: "C1" })), 5_000);
+    expect(r.settled).toBe("rejected");
+    expect(r.requests).toBe(1);
+    expect(r.ms).toBeLessThan(1_000);
+    expect(r.error).toMatchObject({ code: "slack_webapi_http_error", statusCode: 503 });
+    expect(classifySlackError(r.error)).toEqual({ retryable: true, code: "network" });
+  });
+
   it("abandons a hung request inside the lease margin", async () => {
     behave = () => {}; // hold the socket open
     // LEASE_SAFETY_MS (lib/chat/jobs.ts) is 5 s, and up to 1 s of it goes to pacing.
