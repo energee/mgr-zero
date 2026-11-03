@@ -18,7 +18,7 @@ import { RunClosedView } from "../components/mgr/views/run-closed";
 import { ScheduleBatchView } from "../components/mgr/views/schedule-batch";
 import { VesselDetailView } from "../components/mgr/views/vessel-detail";
 import {
-  batchesBrewer, brewDayHazy, brewDayTurnsHazy, brewPrepMineral, brewTimelineMineral, closePackagingRunHazy, recipeHazyV4, recipesList,
+  batchesBrewer, brewDayHazy, brewDayTurnsHazy, brewPrepQuarry, brewTimelineQuarry, closePackagingRunHazy, recipeHazyV4, recipesList,
   runClosedHazy, scheduleBatchHazy, vesselFv3, vesselNew, cellarTransferPils, cellarAdditionCitra,
 } from "../lib/mgr/fixtures/production";
 import { toBatchesViewProps, batchesFromQuery, type BatchListRow } from "../lib/mgr/batches-view";
@@ -252,7 +252,7 @@ describe("New batch sheet", () => {
 describe("Brew day view", () => {
   it("folds Change plan at the foot of both planned tabs, after the form that saves or records", () => {
     const planActions = createElement(PlanActions, { plannedOn: "2026-10-22" });
-    for (const html of [htmlOf(createElement(BrewPrepView, { model: brewPrepMineral, planActions })), htmlOf(createElement(BrewTimelineView, { model: brewTimelineMineral, planActions }))]) {
+    for (const html of [htmlOf(createElement(BrewPrepView, { model: brewPrepQuarry, planActions })), htmlOf(createElement(BrewTimelineView, { model: brewTimelineQuarry, planActions }))]) {
       for (const label of ["Reschedule or cancel", "Change plan", "Reschedule", "Cancel plan"]) expect(html).toContain(label);
       expect(html.search(/<summary[^>]*>Reschedule or cancel/)).toBeGreaterThan(html.lastIndexOf("</form>"));
       expect(html.indexOf("Planned")).toBeLessThan(html.indexOf("<form"));
@@ -262,7 +262,7 @@ describe("Brew day view", () => {
   });
   it("opens Change plan on an overdue plan, at the anchor the Batches row links to (#1582)", () => {
     const planActions = createElement(PlanActions, { plannedOn: "2026-10-22" });
-    for (const html of [htmlOf(createElement(BrewPrepView, { model: { ...brewPrepMineral, overdue: true }, planActions })), htmlOf(createElement(BrewTimelineView, { model: { ...brewTimelineMineral, overdue: true }, planActions }))]) {
+    for (const html of [htmlOf(createElement(BrewPrepView, { model: { ...brewPrepQuarry, overdue: true }, planActions })), htmlOf(createElement(BrewTimelineView, { model: { ...brewTimelineQuarry, overdue: true }, planActions }))]) {
       expect(html).toMatch(new RegExp(`<details(?=[^>]*\\bid="${CHANGE_PLAN_ID}")(?=[^>]*\\bopen)[^>]*><summary[^>]*>Reschedule or cancel`));
     }
   });
@@ -352,44 +352,44 @@ describe("Brew day view", () => {
   it("the Brew prep inventory record is BrewPrepView", () => {
     const body = screen("Brew prep").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(BrewPrepView);
-    expect(body.props.model).toEqual(brewPrepMineral);
+    expect(body.props.model).toEqual(brewPrepQuarry);
     expect((body.props as { planActions?: { type: unknown } }).planActions?.type).toBe(PlanActions);
   });
 
   it("links both tabs when live passes tab hrefs, and leaves them inert in the inventory", () => {
     const hrefs = { Prep: "/batches/b1?tab=prep", "Brew day": "/batches/b1?tab=brew-day" };
-    const prep = htmlOf(createElement(BrewPrepView, { model: brewPrepMineral, tabHrefs: hrefs }));
-    const timeline = htmlOf(createElement(BrewTimelineView, { model: brewTimelineMineral, tabHrefs: hrefs }));
+    const prep = htmlOf(createElement(BrewPrepView, { model: brewPrepQuarry, tabHrefs: hrefs }));
+    const timeline = htmlOf(createElement(BrewTimelineView, { model: brewTimelineQuarry, tabHrefs: hrefs }));
     for (const html of [prep, timeline]) {
       expect(html).toContain('href="/batches/b1?tab=prep"');
       expect(html).toContain('href="/batches/b1?tab=brew-day"');
     }
-    expect(htmlOf(createElement(BrewPrepView, { model: brewPrepMineral }))).not.toContain("?tab=");
+    expect(htmlOf(createElement(BrewPrepView, { model: brewPrepQuarry }))).not.toContain("?tab=");
   });
 
   it("Choose lot is left off a line whose material has no stock, which one note names instead (#1508)", () => {
-    const html = htmlOf(createElement(BrewPrepView, { model: { ...brewPrepMineral, sources: [] } }));
+    const html = htmlOf(createElement(BrewPrepView, { model: { ...brewPrepQuarry, sources: [] } }));
     expect(html).not.toContain(">Choose lot</button>");
     expect(html).toContain("No stock to choose a source from for Chit Malt.");
-    expect(htmlOf(createElement(BrewPrepView, { model: brewPrepMineral }))).toMatch(/<button(?![^>]*disabled="")[^>]*>Choose lot<\/button>/);
+    expect(htmlOf(createElement(BrewPrepView, { model: brewPrepQuarry }))).toMatch(/<button(?![^>]*disabled="")[^>]*>Choose lot<\/button>/);
   });
 
   it("the Brew day timeline inventory record is BrewTimelineView with Change plan", () => {
     const body = screen("Brew day timeline").body as { type: unknown; props: { model: unknown; planActions: { type: unknown } } };
     expect(body.type).toBe(BrewTimelineView);
-    expect(body.props.model).toEqual(brewTimelineMineral);
+    expect(body.props.model).toEqual(brewTimelineQuarry);
     expect(body.props.planActions.type).toBe(PlanActions);
   });
 
   it("draws the timeline's planned facts above the record form and Change plan after it, so their fields never submit it", () => {
-    const html = htmlOf(createElement(BrewTimelineView, { model: brewTimelineMineral, planActions: createElement(PlanActions, { plannedOn: "2026-10-22" }) }));
+    const html = htmlOf(createElement(BrewTimelineView, { model: brewTimelineQuarry, planActions: createElement(PlanActions, { plannedOn: "2026-10-22" }) }));
     expect(html.indexOf("22 bbl · Oct 22, 2026")).toBeLessThan(html.indexOf("<form"));
     expect(html.indexOf("Change plan")).toBeGreaterThan(html.lastIndexOf("</form>"));
     expect(html).not.toContain("Confirm no ingredients used");
   });
 
   it("offers Confirm no ingredients used on the timeline only when nothing is pulled", () => {
-    const none = { ...brewTimelineMineral, ingredients: brewTimelineMineral.ingredients.map(row => ({ ...row, packs: "0", loose: "0" })) };
+    const none = { ...brewTimelineQuarry, ingredients: brewTimelineQuarry.ingredients.map(row => ({ ...row, packs: "0", loose: "0" })) };
     expect(htmlOf(createElement(BrewTimelineView, { model: none }))).toContain("Confirm no ingredients used");
   });
 });

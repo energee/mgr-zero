@@ -79,10 +79,10 @@ describe("Pick view", () => {
   it("groups formats across brands without detaching quantities from their order lines", () => {
     const sku = (brand: string, format: string) => ({ name: `${brand} · ${format}`, brands: { name: brand }, formats: { name: format } });
     const at = (id: string, skus: (typeof orderPick.lines)[number]["skus"], ordered: number, picked: number | null) => ({ id, sku_id: id, qty_ordered: ordered, qty_picked: picked, skus });
-    const aliased = { name: "Appaloosa · Case", brands: { name: "Appaloosa", alias: "Animal #14" }, formats: { name: "Case" } };
+    const aliased = { name: "Copper Kite · Case", brands: { name: "Copper Kite", alias: "Field Notes #14" }, formats: { name: "Case" } };
     const model = toPickViewProps({ ...orderPick, lines: [at("a", sku("Hazy", "Half"), 4, null), at("b", sku("Pils", "Case"), 10, 7), at("c", aliased, 2, null)] });
     expect(model.lines.map((l) => [l.key, l.group, l.name, l.ordered, l.qty, l.tone])).toEqual([
-      ["c", "Case", "Appaloosa · Animal #14", 2, 2, "ok"],
+      ["c", "Case", "Copper Kite · Field Notes #14", 2, 2, "ok"],
       ["b", "Case", "Pils", 10, 7, "w"],
       ["a", "Half", "Hazy", 4, 4, "ok"],
     ]);

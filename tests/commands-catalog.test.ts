@@ -88,7 +88,7 @@ describe("list_brands filters", () => {
     ctx = await makeStaffCtx(brewery.id, "sales");
     // Created in this order, so "newest" is the reverse.
     await runCommand("upsert_brand", { name: "Amber", style: "Ale", abv: 5.2, category: "Core" }, ctx);
-    await runCommand("upsert_brand", { name: "Big Stout", style: "Stout", abv: 9.5, category: "Seasonal", alias: "Animal #14" }, ctx);
+    await runCommand("upsert_brand", { name: "Big Stout", style: "Stout", abv: 9.5, category: "Seasonal", alias: "Field Notes #14" }, ctx);
     await runCommand("upsert_brand", { name: "Crisp 100% Lager", style: "Lager", category: "Core" }, ctx);
   });
 
@@ -97,7 +97,7 @@ describe("list_brands filters", () => {
   });
   it("q matches anywhere in the name or alias, case-insensitively", async () => {
     expect(names(await runCommand("list_brands", { q: "stout" }, ctx))).toEqual(["Big Stout"]);
-    expect(names(await runCommand("list_brands", { q: "animal" }, ctx))).toEqual(["Big Stout"]);
+    expect(names(await runCommand("list_brands", { q: "field notes" }, ctx))).toEqual(["Big Stout"]);
   });
   it("q treats % and _ as literal text", async () => {
     expect(names(await runCommand("list_brands", { q: "100%" }, ctx))).toEqual(["Crisp 100% Lager"]);

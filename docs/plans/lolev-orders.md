@@ -324,11 +324,11 @@ on the `mgr_test` stack (`scripts/test-db.sh`). Every migration task ends with
    - Then `bun run docs:api`. Deps: none.
 6. **One-way keg fee.** `tests/one-way-keg-fee.test.ts`.
    - Test first:
-     - with `one_way_keg_fee_cents = 1000`, shipping 3 one-way sixtels adds a
-       `one_way_keg_fee` line, qty 3, $10.00, and no deposit line;
+     - with `one_way_keg_fee_cents = 500`, shipping 3 one-way sixtels adds a
+       `one_way_keg_fee` line, qty 3, $5.00, and no deposit line;
      - with `invoiceTiming: "on_delivery"`, 3 shipped and 1 refused gives a
        fee line of qty 2 on the invoice `confirm_delivery` writes;
-     - the fee changed to $12 between ship and delivery still invoices $10;
+     - the fee changed to $7 between ship and delivery still invoices $5;
      - a returnable sixtel line gets its deposit and no fee;
      - a full return credits the beer and leaves the fee uncredited;
      - fee 0 adds no line;
