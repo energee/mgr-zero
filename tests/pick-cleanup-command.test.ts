@@ -2,9 +2,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-const { push, refresh, notice } = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), notice: vi.fn() }));
+const { push, refresh } = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
-vi.mock("sonner", () => ({ toast: { error: notice } }));
 vi.mock("@/lib/brewery-provider", () => ({ useBrewery: () => "brewery", useCommandContext: () => ({ actorId: "actor", breweryId: "brewery" }) }));
 vi.mock("@/components/mgr/views/pick", () => ({ PickView: () => null }));
 vi.mock("@/components/mgr/views/short-pick", () => ({ ShortPickView: () => null }));
@@ -37,14 +36,13 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async () => ({ status: 200, json: async () => ({ ok: true, data: {} }) })));
 });
 afterEach(() => vi.unstubAllGlobals());
-it.each([false, true])("actual command run leaves or closes and refreshes after cleanup failure (short=%s)", async shortage => {
+it.each([false, true])("actual command run keeps the saved pick open and refreshes after cleanup failure (short=%s)", async shortage => {
   renderToStaticMarkup(createElement(Harness, { shortage }));
   submit({ preventDefault() {} });
-  // Done picking leaves Pick; a resolved Short closes its sheet and Pick refreshes in place.
+  // The command succeeded, but its cleanup warning must remain on the current surface.
   await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce());
-  if (shortage) { expect(close).toHaveBeenCalledOnce(); expect(push).not.toHaveBeenCalled(); }
-  else expect(push).toHaveBeenCalledWith("/orders/order");
-  expect(notice).toHaveBeenCalledOnce();
+  expect(close).not.toHaveBeenCalled();
+  expect(push).not.toHaveBeenCalled();
   expect(fetch).toHaveBeenCalledOnce();
   // Successful transport recovery was retired: no false "Retry saved request" remains.
   expect(sessionStorage.getItem('mgr-command-recovery-v1:["actor","brewery",null]')).toBeNull();

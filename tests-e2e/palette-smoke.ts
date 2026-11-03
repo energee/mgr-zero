@@ -12,7 +12,7 @@ function ab(...args: string[]) {
   return result.data;
 }
 const wait = (expression: string) => ab("wait", "--fn", `Boolean(${expression})`);
-const chooseScreen = (name: string) => ab("eval", `Array.from(document.querySelectorAll('[aria-label="Screens"] button')).find(x => x.textContent === ${JSON.stringify(name)}).click()`);
+const chooseScreen = (name: string) => ab("find", "role", "option", "click", "--name", name, "--exact");
 const heading = (name: string) => `Array.from(document.querySelectorAll('.screen-box h2')).some(x => x.textContent === ${JSON.stringify(name)})`;
 
 // Standalone frames exercise the shared controls without the explorer's tap routing.
@@ -75,9 +75,11 @@ try {
   ab("fill", "[cmdk-input]", "zzzz-no-match");
   wait("document.querySelector('[cmdk-empty]')?.textContent.includes('No matches')");
   ab("press", "Enter");
+  wait("Array.from(document.querySelectorAll('[role=status]')).some(x => x.textContent === '0 results')");
   assert(ab("eval", heading("Search")).result, "Enter with no matches must stay in Search");
   ab("fill", "[cmdk-input]", "Hazy");
   wait("document.querySelectorAll('[cmdk-item]').length === 2");
+  wait("Array.from(document.querySelectorAll('[role=status]')).some(x => x.textContent === '2 results')");
   ab("press", "ArrowDown");
   wait("document.querySelector('[cmdk-item][aria-selected=true]')?.textContent.includes('ORD-0231')");
   ab("press", "ArrowUp");
@@ -99,9 +101,12 @@ try {
   ab("click", "[cmdk-item]");
   wait("!document.querySelector('[cmdk-input]')");
   for (const mode of ["light", "dark"]) {
-    ab("eval", `localStorage.setItem('theme', ${JSON.stringify(mode)}); document.documentElement.classList.toggle('dark', ${mode === "dark"})`);
     ab("open", `${base}/docs/screens-explore`);
     wait("document.querySelector('[aria-label=Screens] button')");
+    if (ab("eval", "document.documentElement.classList.contains('dark')").result !== (mode === "dark")) {
+      ab("find", "role", "button", "click", "--name", `Switch to ${mode} mode`, "--exact");
+    }
+    wait(`document.documentElement.classList.contains('dark') === ${mode === "dark"}`);
     chooseScreen("Search");
     ab("fill", "[cmdk-input]", "Hazy");
     wait("document.querySelectorAll('[cmdk-item]').length === 2");
@@ -120,8 +125,7 @@ try {
     wait("!document.querySelector('[cmdk-input]')");
 
     openFrame("Edit material");
-    ab("focus", '[data-slot="select-trigger"][aria-label="Kind"]');
-    ab("press", "ArrowDown");
+    ab("find", "role", "combobox", "click", "--name", "Kind", "--exact");
     checkHighlight('[data-slot="select-item"][data-highlighted]');
     ab("press", "ArrowDown");
     checkHighlight('[data-slot="select-item"][data-highlighted]');

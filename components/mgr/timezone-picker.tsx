@@ -1,7 +1,7 @@
 "use client";
 
 import { useComboboxSearch, Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@/components/ui/combobox";
-import { Label } from "@/components/ui/label";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { timezoneLabel } from "@/lib/mgr/labels";
 
 const TIMEZONES = Intl.supportedValuesOf("timeZone");
@@ -11,8 +11,8 @@ export function TimezonePicker({ id, label, value, onChange, disabled = false }:
   id: string; label: string; value: string; onChange: (timezone: string) => void; disabled?: boolean;
 }) {
   const { anchor, props: search } = useComboboxSearch(timezoneLabel(value));
-  return <div className="flex min-w-0 flex-col gap-2">
-    <Label htmlFor={id}>{label}</Label>
+  return <Field className="min-w-0 gap-2">
+    <FieldLabel htmlFor={id}>{label}</FieldLabel>
     <Combobox
       items={TIMEZONES.includes(value) ? TIMEZONES : [value, ...TIMEZONES]}
       value={value}
@@ -30,5 +30,5 @@ export function TimezonePicker({ id, label, value, onChange, disabled = false }:
         <ComboboxList>{(timezone: string) => <ComboboxItem key={timezone} value={timezone}>{timezoneLabel(timezone)}</ComboboxItem>}</ComboboxList>
       </ComboboxContent>
     </Combobox>
-  </div>;
+  </Field>;
 }

@@ -1,6 +1,6 @@
 // components/mgr/qty.tsx — shared quantity controls and segmented tabs.
 // Views import Qty directly for a labeled quantity with a unit addon.
-// VolumeField composes Qty with TabBar for its unit choice; E.edit and E.stq
+// VolumeField composes Qty with radios for its unit choice; E.edit and E.stq
 // use StepQuantity. Price groups import TabBar directly for channel tabs.
 "use client";
 import type { FieldControls } from "@/components/mgr/e";
@@ -41,7 +41,7 @@ export function StepQuantity({ label, value, defaultValue, onChange, contextualL
     else field.value = next;
   };
   return <div className="flex flex-col gap-2"><ButtonGroup>
-    <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Decrease ${label}` : "Decrease"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.min !== undefined && Number(value) <= Number(attributes.min))} onClick={() => step(-1)}>−</Button>
+    <Button type="button" variant="outline" size="icon" data-preview-action aria-label={contextualLabels ? `Decrease ${label}` : "Decrease"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.min !== undefined && Number(value) <= Number(attributes.min))} onClick={() => step(-1)}>−</Button>
     {/* Grows with its digits (field-sizing) so a long quantity is not cut off (#493). */}
     {/* eslint-disable-next-line no-restricted-syntax -- Shared E numeric primitive; native spinners are hidden. */}
     <Input ref={input} type="number" inputMode="decimal" step="any" aria-label={label} {...attributes}
@@ -50,7 +50,7 @@ export function StepQuantity({ label, value, defaultValue, onChange, contextualL
       value={onChange ? value : undefined} defaultValue={onChange ? undefined : value ?? defaultValue}
       onChange={event => { notation.changed(event.target.value); onChange?.(event.target.value); }}
       className="w-auto min-w-14 field-sizing-content [appearance:textfield] text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
-    <Button type="button" variant="outline" size="icon" aria-label={contextualLabels ? `Increase ${label}` : "Increase"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.max !== undefined && Number(value) >= Number(attributes.max))} onClick={() => step(1)}>+</Button>
+    <Button type="button" variant="outline" size="icon" data-preview-action aria-label={contextualLabels ? `Increase ${label}` : "Increase"} disabled={Boolean(notation.error) || attributes.disabled || attributes.readOnly || Boolean(onChange && attributes.max !== undefined && Number(value) >= Number(attributes.max))} onClick={() => step(1)}>+</Button>
   </ButtonGroup>{notationError && <FieldError id={notation.errorId}>{notationError}</FieldError>}</div>;
 }
 
@@ -98,7 +98,10 @@ export function Qty({
             addon's default inline-end pr-2 would only double up as dead space past
             the last unit. A plain-text unit ("bbl", "SG · prior 1.021") has no
             inset of its own and keeps the padding. */}
-        {unit ? <InputGroupAddon align="inline-end" className="has-[>[data-slot=tabs]]:pr-0">{unit}</InputGroupAddon> : null}
+        {unit ? <InputGroupAddon align="inline-end" className="has-[>[data-slot=tabs]]:pr-0" onClick={event => {
+          // Radix radios bubble a click from their hidden form input; keep focus on the chosen radio.
+          if (!(event.target as HTMLElement).closest("button, input")) input.current?.focus();
+        }}>{unit}</InputGroupAddon> : null}
       </InputGroup>
       {notation.error && <FieldError id={notation.errorId}>{notation.error}</FieldError>}
     </Field>
@@ -127,9 +130,8 @@ export function Qty({
  *  so an empty state can centre), and it is not a Tab stop
  *  (tabIndex -1) because its rows hold their own focusable actions.
  *  Without `panel` the body below is drawn outside the bar and aria-controls
- *  points at nothing: tolerable for a drawing or a bar of links. As a unit
- *  switcher it also announces "tab 1 of 3" with no group name, since the input's
- *  only name is its label; the real app's unit choice wants a radiogroup. */
+ *  points at nothing: tolerable for a drawing or a bar of links. VolumeField
+ *  uses a named radiogroup for its unit choice instead. */
 export function TabBar({
   names,
   on,

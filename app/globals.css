@@ -302,3 +302,24 @@
     display: none;
   }
 }
+
+/* Keep inactive tabs readable without modifying the upstream shadcn primitive. */
+[data-slot="tabs-trigger"]:not([data-state="active"]) {
+  color: var(--foreground);
+}
+
+/* The same visible marker follows every shared required field label. */
+[data-slot="field"]:has(:required) > [data-slot="field-label"]::after,
+[data-slot="field"][data-required="true"] > [data-slot="field-label"]::after {
+  content: " (required)";
+  font-weight: normal;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

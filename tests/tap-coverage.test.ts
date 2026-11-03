@@ -22,7 +22,7 @@ const text = (h: string) => h.replace(/<[^>]+>/g, "")
   .replace(/&gt;/g, ">")
   .replace(/&amp;/g, "&")
   .replace(/\s+/g, " ").trim();
-const INERT_ATTR = /role="tab"|role="switch"|toggle-group-item|sidebar-trigger|select-trigger|sidebar-menu-button|data-gated|data-preview-action/;
+const INERT_ATTR = /role="tab"|role="radio"|role="switch"|toggle-group-item|sidebar-trigger|select-trigger|sidebar-menu-button|data-gated|data-preview-action/;
 const INERT_LABEL = /^[−+]$/;
 // The explorer's own rule, so the coverage report matches what a tap does:
 // a screen that maps an INERT label meant it, and that tap must resolve.
@@ -92,6 +92,11 @@ it("does not treat native select options in a row title as navigation", () => {
   const screen = SCREENS.find(s => s.name === "New PO")!;
   expect(taps(screen, '<div data-slot="item"><div data-slot="item-title"><select><option>Unknown material</option></select></div><button>Save draft</button></div>'))
     .toEqual([["Save draft", null, null]]);
+});
+
+it("treats unit radios as local choices rather than navigation", () => {
+  const screen = SCREENS.find(s => s.name === "Format")!;
+  expect(taps(screen, '<button role="radio" aria-checked="true">gal</button><button role="radio" aria-checked="false">bbl</button>')).toEqual([]);
 });
 
 it("uses a picker's field label for navigation instead of its selected value", () => {

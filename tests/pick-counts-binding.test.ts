@@ -1,8 +1,6 @@
 // Live Pick/Short callbacks retain unsaved counts without committing them first;
 // Short opens its sheet over Pick, so the working counts never leave the page.
 import { createElement } from "react";
-const notifications = vi.hoisted(() => ({ error: vi.fn() }));
-vi.mock("sonner", () => ({ toast: notifications }));
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
@@ -84,26 +82,34 @@ it("blocks another Done picking after commit while navigation is pending", () =>
   expect(action.run).toHaveBeenCalledOnce();
 });
 
-it("does not report committed Done picking as failed when draft removal throws", () => {
+it("keeps a committed pick open without repeating the command when draft cleanup fails", () => {
   renderToStaticMarkup(createElement(PickHarness));
+  pick.onQuantity!("other", "4");
   submit({ preventDefault() {} });
-  vi.stubGlobal("sessionStorage", { removeItem: () => { throw Error("blocked"); } });
+  const remove = vi.spyOn(sessionStorage, "removeItem").mockImplementation(() => { throw Error("blocked"); });
   const committed = action.run.mock.calls[0][2] as () => void;
   expect(committed).not.toThrow();
-  expect(action.push).toHaveBeenCalledWith("/orders/order");
-  expect(notifications.error).toHaveBeenCalled();
+  expect(action.push).not.toHaveBeenCalled();
+  submit({ preventDefault() {} });
+  expect(action.run).toHaveBeenCalledOnce();
+  const preventDefault = vi.fn();
+  back({ target: { closest: () => ({ getAttribute: () => snapshot.backHref }) } as unknown as Element, button: 0, preventDefault });
+  expect(preventDefault).not.toHaveBeenCalled();
+  expect(remove).toHaveBeenCalledOnce();
+  expect(action.setError).toHaveBeenCalledOnce();
 });
 
-it("does not report committed Short as failed when working-count cleanup throws", () => {
+it("keeps a committed Short open without repeating the command when draft cleanup fails", () => {
   renderToStaticMarkup(createElement(ShortHarness));
   submit({ preventDefault() {} });
-  expect(action.run).toHaveBeenCalledWith("resolve_short_pick", expect.objectContaining({ reason: "Fictional shortage" }), expect.any(Function));
-  vi.stubGlobal("sessionStorage", { getItem: () => { throw Error("blocked"); } });
+  vi.spyOn(sessionStorage, "getItem").mockImplementation(() => { throw Error("blocked"); });
   const committed = action.run.mock.calls[0][2] as () => void;
   expect(committed).not.toThrow();
-  expect(close).toHaveBeenCalledOnce();
+  expect(close).not.toHaveBeenCalled();
   expect(action.push).not.toHaveBeenCalled();
-  expect(notifications.error).toHaveBeenCalled();
+  submit({ preventDefault() {} });
+  expect(action.run).toHaveBeenCalledOnce();
+  expect(action.setError).toHaveBeenCalledOnce();
 });
 
 it.each(["metaKey", "ctrlKey", "shiftKey", "altKey"])("keeps working counts on a modified back click (%s)", modifier => {

@@ -6,11 +6,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { toast } from "sonner";
 import { useCommandContext } from "@/lib/brewery-provider";
 import { pickCountDraftKey, reconcileShortPick } from "@/lib/mgr/pick-counts";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { ShortPickView } from "@/components/mgr/views/short-pick";
+import { Button } from "@/components/ui/button";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { toShortPickViewProps, type ShortPickSnapshot } from "@/lib/mgr/short-pick-view";
 
@@ -20,7 +20,7 @@ export function ShortPickForm({ snapshot, onClose }: { snapshot: ShortPickSnapsh
   const key = pickCountDraftKey(useCommandContext(), snapshot.order.id);
   const [qty, setQty] = useState(String(snapshot.line.qty_picked ?? 0));
   const [reason, setReason] = useState("");
-  const { busy, error, run } = useCommandAction();
+  const { busy, error, setError, run } = useCommandAction();
   const model = toShortPickViewProps({ ...snapshot, line: { ...snapshot.line, qty_picked: Number(qty) } });
   const disabled = !reason.trim() || qty === "" || !Number.isFinite(Number(qty)) || Number(qty) <= 0 || model.missing <= 0;
   return <CommandForm open onOpenChange={open => { if (!open) onClose(); }} title={model.title}>
@@ -31,12 +31,15 @@ export function ShortPickForm({ snapshot, onClose }: { snapshot: ShortPickSnapsh
         () => {
           committed.current = true; setSaved(true);
           try { reconcileShortPick(sessionStorage, key, snapshot.line.id); }
-          catch { toast.error("Short pick saved, but working counts could not be updated. Check the saved quantities on Pick."); }
+          catch {
+            setError("Short pick saved, but working counts could not be updated. Check the saved quantities on Pick.");
+            return;
+          }
           onClose();
         });
     }}>
       <ShortPickView model={model} countedValue={qty} onCounted={setQty} reasonValue={reason} onReason={setReason}
-        submitting={busy || saved} disabled={disabled || saved} messages={<CommandFormMessage error={error} />} />
+        submitting={busy || saved} disabled={disabled || saved} messages={<><CommandFormMessage error={error} />{saved && error && <Button type="button" variant="outline" onClick={onClose}>Back to Pick</Button>}</>} />
     </form>
   </CommandForm>;
 }

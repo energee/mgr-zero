@@ -25,7 +25,6 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
     <Button
       variant="outline"
       onClick={toggle}
-      aria-pressed={dark}
       {...(compact ? { size: "icon-sm" as const, "aria-label": label, title: label } : { className: "w-full" })}
     >
       <Icon icon={dark ? Sun01Icon : Moon01Icon} />

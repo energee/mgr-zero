@@ -42,7 +42,10 @@ try {
   assert.notEqual(evaluate(`getComputedStyle(${panel}).display`), "none", "Escape must close only the foreground modal, not chat behind it");
 
   // A desktop user can focus the uncovered page before rotating to a modal phone layout.
-  evaluate('Array.from(document.querySelectorAll("button")).find(button => button.textContent.trim() === "Search").focus()');
+  for (let stops = 0; stops < 20 && evaluate("document.activeElement.textContent.trim()") !== "Search"; stops++) {
+    browser("press", "Shift+Tab");
+  }
+  assert.equal(evaluate("document.activeElement.textContent.trim()"), "Search", "Reverse Tab must reach the uncovered Search control");
   assert.equal(evaluate(`${panel}.contains(document.activeElement)`), false);
   browser("set", "viewport", "390", "844");
   wait(`${panel}.contains(document.activeElement)`);
@@ -78,9 +81,9 @@ try {
   browser("set", "viewport", "1280", "900");
   browser("open", `${base}/docs/screens-explore`);
   wait('document.querySelector("[aria-label=Screens] button")');
-  evaluate('Array.from(document.querySelectorAll("[aria-label=Screens] button")).find(button => button.textContent.trim() === "Composer answer").click()');
+  browser("find", "role", "option", "click", "--name", "Composer answer", "--exact");
   wait('document.querySelector("[aria-label=Screens] [aria-selected=true]")?.textContent.trim() === "Composer answer"');
-  browser("find", "role", "button", "click", "--name", "Ask MGR", "--exact");
+  wait(`getComputedStyle(${panel}).display !== "none"`);
   browser("fill", prompt, "Keep this explorer draft");
   browser("set", "viewport", "1024", "800");
   assert.equal(evaluate(`(() => { const box = document.querySelector(".screen-box").getBoundingClientRect(); const chat = ${panel}.getBoundingClientRect(); return chat.left >= box.left && chat.right <= box.right; })()`), true, "Chat must fit the explorer's containing block, not only the outer viewport");
