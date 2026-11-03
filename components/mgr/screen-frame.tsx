@@ -8,7 +8,7 @@ import { PORTAL_BUYER } from "@/components/mgr/screens";
 import { AppShell, PortalShell } from "@/components/mgr/app-shell";
 import { CommandForm } from "@/components/mgr/command-form";
 import { EntrySurface } from "@/components/mgr/entry-surface";
-import { E, splitPinned } from "@/components/mgr/e";
+import { splitPinned } from "@/components/mgr/e";
 import { MeSheet } from "@/components/mgr/me-sheet";
 import { MeView } from "@/components/mgr/views/me";
 import { PortalMeView } from "@/components/mgr/views/portal-me";
@@ -75,7 +75,7 @@ export function ScreenFrame({ screen: s, persona = PERSONAS[0], container }: { s
       brand="Demo Brewing"
       items={navFor(STAFF_NAV, persona.roles)}
       headerRight={<><Button variant="ghost" size="sm"><Icon icon={Search01Icon} />Search</Button>{me}</>}
-      composer={s.surface === "composer" ? <ComposerDemo initialOpen disabled={!persona.roles.length} container={container}>{s.body}</ComposerDemo> : E.comp(persona.roles, container)}
+      composer={s.surface === "composer" ? <ComposerDemo initialOpen disabled={!persona.roles.length} container={container}>{s.body}</ComposerDemo> : <ComposerDemo disabled={!persona.roles.length} container={container} />}
       active={s.tab}
     >
       {s.surface === "composer" ? null : body}

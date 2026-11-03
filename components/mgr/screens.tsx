@@ -18,7 +18,7 @@ import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // edit surface with empty values (Create brewery is the pattern), so New
 // customer, Add location, New PO, Add keg pool and New price group open the
 // records already here rather than earning frames of their own. And the
-// composer strip is staff shell chrome — screen-frame.tsx passes E.comp() to
+// composer strip is staff shell chrome — screen-frame.tsx passes ComposerDemo to
 // staff frames — so it is present under every staff frame without any
 // body naming it.
 //
