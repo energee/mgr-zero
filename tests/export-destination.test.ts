@@ -4,15 +4,20 @@
 // an export order may do that. The compliance report counts it under export
 // and gives it no Unassigned destination-state fact, before or after a return.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, channelId, ins, insertFixture, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, channelId, ins, insertFixture, makeBrewery, makeStaffCtx, priceSku, seedCatalog, seedLocation } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import type { Report } from "@/lib/commands/compliance";
+import { periodRange } from "@/lib/compliance-period";
+import { breweryDate } from "@/lib/date-format";
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
 let breweryId: string, owner: Ctx;
 let wh: Awaited<ReturnType<typeof seedLocation>>;
 let skuId: string, exportChannel: string, wholesaleChannel: string;
+// The removals are stamped now(), so the report covers the brewery-local
+// month the test runs in; a fixed month stops matching once it ends.
+const PERIOD = { jurisdiction: "TTB", ...periodRange(breweryDate("America/New_York").slice(0, 7))! };
 
 beforeAll(async () => {
   breweryId = (await makeBrewery()).id;
@@ -50,16 +55,7 @@ const ship = ({ orderId, lineId }: { orderId: string; lineId: string }) =>
 const removals = async (orderId: string) =>
   (await admin.from("inventory_movements").select("id, dest_state, dest_country, tax_treatment").eq("ref", orderId).eq("type", "sale_removal").throwOnError()).data!;
 
-const report = () => {
-  const period = JSON.parse(sql(`
-    select jsonb_build_object(
-      'periodStart', date_trunc('month', min(occurred_on))::date,
-      'periodEnd', (date_trunc('month', max(occurred_on)) + interval '1 month - 1 day')::date)::text
-    from inventory_movements
-    where brewery_id='${breweryId}'
-  `)[0]) as { periodStart: string; periodEnd: string };
-  return runCommand("generate_compliance_report", { jurisdiction: "TTB", ...period }, owner) as Promise<Report>;
-};
+const report = () => runCommand("generate_compliance_report", PERIOD, owner) as Promise<Report>;
 
 describe("export destination country", () => {
   let jp: { orderId: string; invoiceId: string; removalId: string };

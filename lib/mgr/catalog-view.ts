@@ -87,8 +87,8 @@ export function toCatalogViewProps({
   return {
     backHref,
     empty: brands.length > 0 ? undefined
-      : filtered ? { title: "No brands match", description: "Clear the search or category to see every brand." }
-      : { title: "No brands yet", description: "Add a brand, then add its SKUs (the sizes and packages you sell)." },
+      : filtered ? { title: "No brands match" }
+      : { title: "No brands yet" },
     showControls: brands.length > 0 || Boolean(filtered),
     brands: brands.map((b) => ({
       key: b.id,

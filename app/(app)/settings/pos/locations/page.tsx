@@ -18,7 +18,6 @@ export default async function SquareLocationsPage() {
   ]);
   const rows: PosLocationRow[] = observed.map(row => ({
     externalLocationId: row.externalLocationId, name: row.name ?? row.externalLocationId,
-    detail: `${row.status ?? "unknown"} · ${row.available ? "available" : "closed"}${row.mappingLabel ? ` · ${row.mappingLabel}` : " · needs mapping"}`,
     mgrLocationId: row.mgrLocationId ?? "",
   }));
   return <>{E.back("Point of sale", "Square locations", undefined, "/settings/pos")}<PosRouteSheet title="Square locations" backHref="/settings/pos"><SquareLocationsControl rows={rows} locations={locations} /></PosRouteSheet></>;

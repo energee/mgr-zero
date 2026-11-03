@@ -87,7 +87,6 @@ describe("Today view", () => {
       ["PO-0142 · Fictional Malt Supply", "Receive"],
       ["Next delivery · Ridgeline", "Resume"],
     ]);
-    expect(model.date).toBe("Thu 9/3");
   });
 
   it("names an empty list without inventing rows", () => {
@@ -101,7 +100,6 @@ describe("Today view", () => {
 
   it("maps get_today items through TODAY_VERB without inventing labels", () => {
     const model = toTodayViewProps({
-      date: "Fri 9/4",
       items: [{
         reason: "pick_due",
         subjectType: "order",
@@ -142,7 +140,7 @@ describe("Today view", () => {
 
   it("emptyAction and linkRows slot for live Today", () => {
     const html = htmlOf(createElement(TodayView, {
-      model: toTodayViewProps({ date: "Thu 9/3", empty: { title: "No taproom location is available", description: "Ask Admin." }, emptyVerb: "Taproom stock", rows: [] }),
+      model: toTodayViewProps({ empty: { title: "No taproom location is available" }, emptyVerb: "Taproom stock", rows: [] }),
       emptyAction: "MOVE",
       linkRows: true,
     }));
@@ -185,7 +183,6 @@ describe("Today view", () => {
 
   it("draws the driver inventory from the same next-stop facts as live Today (#1654)", () => {
     const model = toTodayViewProps({
-      date: "Thu 9/3",
       timeZone: "America/New_York",
       now: new Date("2026-09-03T16:00:00Z"),
       items: [{

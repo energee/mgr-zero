@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { InvoiceView, RecordPaymentView } from "../components/mgr/views/invoice";
-import { creditMemoAls, invoiceEditedInQbo, invoiceFailedAls, invoiceLocalPartlyPaid, invoicePartlyPaid } from "../lib/mgr/fixtures/invoice";
+import { creditMemoAls, invoiceEditedInQbo, invoiceFailedAls, invoiceLocalCreditBalance, invoiceLocalPartlyPaid, invoicePartlyPaid } from "../lib/mgr/fixtures/invoice";
 import { ALS } from "../lib/mgr/fixtures/demo";
 import { invoiceMappingRows, invoicePaymentAmountError, invoicePaymentReason, toInvoiceViewProps } from "../lib/mgr/invoice-view";
 import { invoiceIsCreditable } from "../lib/mgr/invoice-state";
@@ -15,6 +15,18 @@ import { invoiceIsCreditable } from "../lib/mgr/invoice-state";
 const htmlOf = (node: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(createElement("div", null, node));
 
 describe("Invoice view", () => {
+  it("caps payment at the credited balance and refuses payment after credit-only settlement", () => {
+    const snapshot = { ...invoiceFailedAls, localCreditCents: 7600 };
+    const model = toInvoiceViewProps(snapshot);
+    expect(model.paymentBalanceCents).toBe(53900);
+    const settled = toInvoiceViewProps({ ...snapshot, localCreditCents: 61500, invoice: { ...snapshot.invoice, paid_at: "2026-10-20T04:00:00Z" } });
+    expect(settled.paymentBalanceCents).toBeNull();
+  });
+
+  it("refuses payment when a paid invoice has excess credit", () => {
+    const model = toInvoiceViewProps(invoiceLocalCreditBalance);
+    expect(model.paymentBalanceCents).toBeNull();
+  });
   it("checks mappings in the current realm, deduplicates SKUs, and gates unavailable fixes", () => {
     const customer = { name: "Actual customer", qbo_customer_id: "00227", qbo_realm_id: "current" };
     const line = { id: "line1", kind: "sku", sku_id: "sku1", description: "Actual SKU", skus: { name: "Actual SKU", qbo_item_id: "009", qbo_realm_id: "old" } };
@@ -175,6 +187,7 @@ describe("Invoice view", () => {
       hasPendingPush: false,
       wasPushedToQbo: false,
       localPaidCents: 0,
+      localCreditCents: 0,
     });
     expect(model.mappings).toBeUndefined();
     const html = htmlOf(createElement(InvoiceView, { model }));

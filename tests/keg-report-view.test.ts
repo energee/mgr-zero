@@ -42,11 +42,11 @@ describe("toKegReportViewProps", () => {
   it("no pool at all is the add-a-pool empty state", () => {
     const m = toKegReportViewProps({ fleet: { out: 0, total: 0, utilization: null }, bySize: [], aging: [], customers: [], mismatches: [], activePools: 0 }, "America/New_York");
     expect(m.headline).toEqual(["—", "0 of 0 kegs out"]);
-    expect(m.empty).toEqual({ title: "No keg pools", description: "Add a keg pool on Keg fleet, then record kegs acquired to see utilization.", action: "Open Keg fleet" });
+    expect(m.empty).toEqual({ title: "No keg pools", action: "Open Keg fleet" });
   });
   it("a pool with no kegs acquired says to record them, not that no pool exists (#988)", () => {
     const m = toKegReportViewProps({ fleet: { out: 0, total: 0, utilization: null }, bySize: [], aging: [], customers: [], mismatches: [], activePools: 1 }, "America/New_York");
-    expect(m.empty).toEqual({ title: "No kegs recorded yet", description: "Record kegs acquired into a pool to see utilization.", action: "Record keg event" });
+    expect(m.empty).toEqual({ title: "No kegs recorded yet", action: "Record keg event" });
   });
   it("with a pool in service, the empty state's action opens Record keg event on Keg fleet (#1517)", () => {
     const model = toKegReportViewProps({ fleet: { out: 0, total: 0, utilization: null }, bySize: [], aging: [], customers: [], mismatches: [], activePools: 1 }, "America/New_York", "/kegs");

@@ -87,7 +87,7 @@ export function toFinishedGoodsViewProps({ skus, backHref, value }: FinishedGood
     // A zero total means no unit carries a cost (#1518): the line would only
     // read $0.00, so it shows once some stock is costed.
     valueLine: value?.cents ? `${money(value.cents)}${value.uncostedUnits ? ` · ${plural(value.uncostedUnits, "unit")} without cost` : ""}` : undefined,
-    empty: skus.length === 0 ? { title: "No finished goods yet", description: "Packaged stock appears here once a packaging run is recorded." } : undefined,
+    empty: skus.length === 0 ? { title: "No finished goods yet" } : undefined,
     rows: skus.map((s) => {
       const short = s.atp < 0;
       return {

@@ -36,19 +36,8 @@ export const WORK_TABS: Record<string, string> = {
   pick: "Pick sheet", replenishment: "Pars and allocation",
 };
 
-/** list_work never returns stock transfers or packaging runs, so those two
- *  chips' empty line sends the reader to the page that lists them. */
-const LISTED_ELSEWHERE: Record<string, string> = {
-  transfers: "Stock transfers are listed on the Transfers page, not here.",
-  runs: "Packaging runs are listed on the Packaging page, not here.",
-};
-
-/** What the Work list says when the chosen chip has no rows. Every other chip
- *  names no kind: each role sees only some kinds, so a list of kinds would
- *  promise rows that never come. */
-export function workEmpty(chip: string): EmptyState {
-  return { title: "Nothing in motion", description: LISTED_ELSEWHERE[chip] ?? "A row appears here when something needs your next step." };
-}
+/** What the Work list says when the chosen chip has no rows. */
+export const WORK_EMPTY: EmptyState = { title: "Nothing in motion" };
 
 export type WorkRowView = {
   key: string;

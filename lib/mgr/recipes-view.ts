@@ -31,8 +31,8 @@ export type RecipesSnapshot = {
   filtered?: boolean;
 };
 
-const NO_RECIPES: EmptyState = { title: "No recipes yet", description: "A recipe is the grain and hop bill a batch is brewed from." };
-const NO_MATCH: EmptyState = { title: "No recipes match", description: "Clear the search to see every recipe." };
+const NO_RECIPES: EmptyState = { title: "No recipes yet" };
+const NO_MATCH: EmptyState = { title: "No recipes match" };
 
 export function toRecipesViewProps(s: RecipesSnapshot): RecipesViewModel {
   const { backHref, createHref, waterProfilesHref, recipes } = s;

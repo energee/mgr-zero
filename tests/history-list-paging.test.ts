@@ -31,7 +31,7 @@ describe("history lists page past 1000 rows (#759)", () => {
   });
 
   it("list_packaging_runs returns every run with its brand, ties included", async () => {
-    const runs = many(n => ({ id: id(n), run_no: n, brand_id: id(0), occupancy_id: null, planned_on: day(0) }));
+    const runs = many(n => ({ id: id(n), run_no: n, brand_id: id(0), occupancy_id: null, planned_on: day(0), closed_at: null, cancelled_at: null }));
     const listed = await runCommand("list_packaging_runs", {}, context({
       packaging_runs: runs, brands: [{ id: id(0), name: "Pils", brewery_id: breweryId }],
     }, "warehouse")) as Row[];
@@ -52,15 +52,15 @@ describe("history lists page past 1000 rows (#759)", () => {
   });
 
   it("list_batches returns every batch, ties included", async () => {
-    const batches = many(n => ({ id: id(n), planned_on: day(0), brewed_on: null, closed_at: null, intended_brand_id: null, recipe_version_id: null }));
+    const batches = many(n => ({ id: id(n), planned_on: day(0), brewed_on: null, closed_at: null, cancelled_at: null, intended_brand_id: null, recipe_version_id: null }));
     expectAllOnce(await runCommand("list_batches", {}, context({ batches }, "brewer")) as Row[]);
   });
 
   it("list_batches({ open: true }) returns every brewed open batch and no closed or unbrewed one", async () => {
-    const batches = many(n => ({ id: id(n), planned_on: day(0), brewed_on: day(0), closed_at: null, intended_brand_id: null, recipe_version_id: null }));
+    const batches = many(n => ({ id: id(n), planned_on: day(0), brewed_on: day(0), closed_at: null, cancelled_at: null, intended_brand_id: null, recipe_version_id: null }));
     batches.push(
-      { brewery_id: breweryId, id: id(5000), planned_on: day(0), brewed_on: day(0), closed_at: `${day(1)}T00:00:00Z`, intended_brand_id: null, recipe_version_id: null },
-      { brewery_id: breweryId, id: id(5001), planned_on: day(0), brewed_on: null, closed_at: null, intended_brand_id: null, recipe_version_id: null },
+      { brewery_id: breweryId, id: id(5000), planned_on: day(0), brewed_on: day(0), closed_at: `${day(1)}T00:00:00Z`, cancelled_at: null, intended_brand_id: null, recipe_version_id: null },
+      { brewery_id: breweryId, id: id(5001), planned_on: day(0), brewed_on: null, closed_at: null, cancelled_at: null, intended_brand_id: null, recipe_version_id: null },
     );
     expectAllOnce(await runCommand("list_batches", { open: true }, context({ batches }, "brewer")) as Row[]);
   });

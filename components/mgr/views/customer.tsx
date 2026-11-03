@@ -150,7 +150,7 @@ export function CustomerView({
                 <p className="mt-1 text-sm text-muted-foreground">Buyer access to orders and invoices.</p>
               </div>
               {detail
-                ? ("portalUsers" in detail ? detail.portalUsers : E.gated("Portal users", "invitations aren’t available yet"))
+                ? ("portalUsers" in detail ? detail.portalUsers : null)
                 : E.act("Invite")}
             </div>
             {model.portalUsers.length ? <div className="flex flex-col gap-3">
