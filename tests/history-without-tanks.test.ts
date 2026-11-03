@@ -127,8 +127,8 @@ describe("record_historical_batch", () => {
     const a = await schedule();
     await historical({ batchId: a });
     await reading({ batchId: a, at: "2025-06-10T12:00:00Z" });
-    const batches = await runCommand("list_batches", {}, brewer) as { id: string; closed_at: string | null }[];
-    expect(batches.find((x) => x.id === a)!.closed_at).not.toBeNull();
+    const batches = await runCommand("list_batch_history", { status: "completed" }, brewer) as { rows: { id: string; closed_at: string | null }[] };
+    expect(batches.rows.find((x) => x.id === a)!.closed_at).not.toBeNull();
     expect((await runCommand("get_brew_day", { batchId: a }, brewer) as { occupancy: unknown }).occupancy).toBeNull();
     // The current brewery-local month: tanks other tests fill are stamped now(),
     // so a fixed month would miss them once it ends.
