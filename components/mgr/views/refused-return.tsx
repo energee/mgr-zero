@@ -11,6 +11,16 @@ export type RefusedReturnModel = {
 };
 export type RefusedReturnEntry = { qty: number; binId: string; damaged: boolean };
 
+export function RefusedReturnStatusView({ invoiceNow = false, returnHref }: { invoiceNow?: boolean; returnHref?: string | null }) {
+  return <>
+    {invoiceNow ? <>
+      {E.hd("Refused beer to check in")}
+      {E.note("This shipment was invoiced at ship. Admin or Sales records Return and credit when the beer physically returns.")}
+      {returnHref !== null && E.btn("Return and credit", "p", returnHref)}
+    </> : E.status("No refused beer awaiting check-in", "ok")}
+  </>;
+}
+
 /** Check-in's starting entries (#1504): a line with one shipped source starts
  *  with the refused quantity that source can cover, in the location's only bin
  *  when it has just one. A line with several sources waits for the user. */
@@ -53,6 +63,6 @@ export function RefusedReturnFormView({ model, busy, error, onSubmit }: {
     </Fragment>)}
     {error && E.status(error, "w")}
     {invalid && E.status("Received quantity exceeds the outstanding refusal", "w")}
-    {E.btn(busy ? "Saving…" : "Check in refused beer", busy || invalid || !locationId || !selected.length || selected.some((e) => !e.binId) ? "irr disabled" : "irr", undefined, submit)}
+    {E.btn(busy ? "Saving…" : "Check in refused beer", busy || invalid || !locationId || !selected.length || selected.some((e) => !e.binId) ? "irr disabled" : "irr", undefined, submit, { "data-preview-action": onSubmit ? true : undefined })}
   </>;
 }

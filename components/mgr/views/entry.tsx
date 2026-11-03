@@ -19,9 +19,9 @@ const INPUT_NAMES: Record<string, string> = {
   "Current password": "currentPassword", "Confirm new password": "confirmPassword",
 };
 
-function EntrySubmit({ label, pendingLabel }: { label: string; pendingLabel: string }) {
+function EntrySubmit({ label, pendingLabel, previewAction }: { label: string; pendingLabel: string; previewAction: boolean }) {
   const { pending } = useFormStatus();
-  return E.submit(label, { busy: pendingLabel, submitting: pending, "aria-busy": pending });
+  return E.submit(label, { busy: pendingLabel, submitting: pending, "aria-busy": pending, "data-preview-action": previewAction || undefined });
 }
 
 /** A live text link, or the inventory's inert one naming its screen. */
@@ -36,6 +36,7 @@ export function EntryView({
   extraAction,
   primaryHref,
   secondaryHref,
+  secondaryTo,
   linkHref,
   switchHref,
   hidden,
@@ -47,6 +48,7 @@ export function EntryView({
   extraAction?: (formData: FormData) => void | Promise<void>;
   primaryHref?: string | null;
   secondaryHref?: string;
+  secondaryTo?: string;
   linkHref?: string;
   /** Where model.switchLink goes live; without it the inventory link is inert. */
   switchHref?: string;
@@ -106,8 +108,8 @@ export function EntryView({
     primary = <Button asChild><Link href={primaryHref}>{model.primary}</Link></Button>;
   } else if (primaryHref !== null) {
     primary = model.pendingLabel
-      ? <EntrySubmit label={model.primary} pendingLabel={model.pendingLabel} />
-      : <Button type={action || emailLink || passwordChange ? "submit" : "button"}>{model.primary}</Button>;
+      ? <EntrySubmit label={model.primary} pendingLabel={model.pendingLabel} previewAction={Boolean(action)} />
+      : <Button type={action || emailLink || passwordChange ? "submit" : "button"} data-preview-action={action ? true : undefined}>{model.primary}</Button>;
   }
   const controls = (
     <FieldGroup>
@@ -118,7 +120,7 @@ export function EntryView({
       {primary ? <Field>{primary}</Field> : null}
       {model.secondary ? (
         <Field>
-          {secondaryHref ? <Button variant="outline" asChild><Link href={secondaryHref}>{model.secondary}</Link></Button> : secondaryAction || emailLink
+          {secondaryHref ? <Button variant="outline" asChild><Link href={secondaryHref} data-to={secondaryTo}>{model.secondary}</Link></Button> : secondaryAction || emailLink
             ? <Button type="submit" formAction={secondaryAction} formNoValidate={emailLink} onClick={emailLink ? (event) => {
               // The passwordless action validates email, not the required password.
               const email = event.currentTarget.form?.elements.namedItem("email") as HTMLInputElement;

@@ -8,13 +8,9 @@
 // re-render the children the server already sent, and they throw again (#445).
 "use client";
 
+import { RouteErrorView } from "@/components/mgr/views/route-error";
+
 export function RouteError({ error, retry }: { error: unknown; retry: () => void }) {
   const digest = error instanceof Error && "digest" in error ? String(error.digest) : undefined;
-  return (
-    <div className="flex flex-col gap-2 text-sm">
-      <p role="alert" className="text-destructive">Something went wrong loading this page.</p>
-      {digest && <p className="text-muted-foreground">Reference: {digest}</p>}
-      <button onClick={() => retry()} className="w-fit underline">Try again</button>
-    </div>
-  );
+  return <RouteErrorView reference={digest} onRetry={retry} />;
 }

@@ -13,9 +13,10 @@ describe("explorer parity", () => {
     const mapped = new Set(SCREEN_ROUTES.flatMap((route) => [route.file, ...(route.additionalFiles ?? [])]));
     const pages = readdirSync("app", { recursive: true })
       .map((file) => `app/${file}`)
-      .filter((file) => /^app\/\((app|auth|portal)\)\/.+\/page\.tsx$/.test(file))
+      .filter((file) => /^app\/\((app|auth|portal)\)\/(?:.+\/)?page\.tsx$/.test(file))
       .sort();
 
+    expect(pages).toContain("app/(app)/page.tsx");
     expect(pages.filter((page) => !mapped.has(page))).toEqual(knownRouteDebt);
   });
 
