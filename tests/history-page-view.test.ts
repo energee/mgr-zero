@@ -48,6 +48,18 @@ it("all four inventory/live views mount the same continuation control", () => {
   }
 });
 
+it("pages one batch group without discarding the other group's cursor", () => {
+  const completed = historyPage({ rows: [], nextCursor: "older-completed" }, "/batches", "current-completed", { cancelledCursor: "current-cancelled", recipe: "recipe" }, "completedCursor");
+  const more = new URL(completed.pagination.moreHref!, "http://localhost");
+  expect(more.searchParams.get("completedCursor")).toBe("older-completed");
+  expect(more.searchParams.get("cancelledCursor")).toBe("current-cancelled");
+  expect(more.searchParams.get("recipe")).toBe("recipe");
+  const newest = new URL(completed.pagination.firstHref!, "http://localhost");
+  expect(newest.searchParams.has("completedCursor")).toBe(false);
+  expect(newest.searchParams.get("cancelledCursor")).toBe("current-cancelled");
+});
+
+
 it("reads only a well-formed single cursor from the URL; anything else opens the newest page", () => {
   const cursor = "2026-09-20T12:00:00.123456+00:00~0b9f3c1e-7d1a-4c8e-9a51-2f6d8e4b7c10";
   expect(pageCursor(cursor)).toBe(cursor);

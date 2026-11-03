@@ -288,11 +288,29 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_occupancies", "input": {} }'
 ```
 
+## list_packaging_history [#list_packaging_history]
+
+`query` · admin, brewer, warehouse
+
+One page of closed or cancelled packaging runs, newest created first, with brand, source tank and planned units
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `limit` | integer | no |
+| `cursor` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_packaging_history", "input": {} }'
+```
+
 ## list_packaging_runs [#list_packaging_runs]
 
 `query` · admin, brewer, warehouse
 
-Packaging runs by planned date, newest first, with the brand each one packages, the tank it draws from and the units planned
+Unfinished packaging runs by planned date, newest first, with brand, source tank and planned units. Use list_packaging_history for closed or cancelled runs.
 
 Takes no input.
 

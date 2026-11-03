@@ -7,6 +7,7 @@ import { E } from "@/components/mgr/e";
 import { RecordTable } from "@/components/mgr/views/record-table";
 import type { BatchesRowView, BatchesViewModel, BatchOccupancyView, BatchVesselView } from "@/lib/mgr/batches-view";
 import { WorkKindTabs } from "@/components/mgr/views/work-kind-tabs";
+import { HistoryNavigation, type HistoryNavigationProps } from "./history-navigation";
 
 /** A brand or recipe the plan does not name, said in muted words instead of a blank. */
 const orMissing = (value: string | null, missing: string) => value ?? <span key={missing} className="text-muted-foreground">{missing}</span>;
@@ -75,26 +76,33 @@ function VesselTable({ vessels }: { vessels: BatchVesselView[] }) {
   />;
 }
 
-export function BatchesView({ model, createAction, workHrefs, newVesselHref }: {
+export function BatchesView({ model, createAction, workHrefs, newVesselHref, completedPagination, cancelledPagination, cancelledOpen }: {
   model: BatchesViewModel; createAction?: ReactNode; workHrefs?: Record<string, string>;
+  completedPagination?: HistoryNavigationProps; cancelledPagination?: HistoryNavigationProps; cancelledOpen?: boolean;
   /** null hides New vessel: vessels are admin-managed. */
   newVesselHref?: string | null;
 }) {
   return <>
     {E.hd(model.title, createAction !== undefined ? createAction : E.btn("New batch"))}
     <WorkKindTabs chips={model.workChips} current={model.workChips[model.workChipIndex]} tabs={model.workTabs} hrefs={workHrefs} />
-    {model.empty ? E.blank(model.empty) : <>
-      {([["Planned", model.planned], ["Active", model.active], ["Completed", model.completed ?? []]] as const).map(([title, rows]) => {
-        return rows.length ? <Fragment key={title}>
-          {E.ttl(title)}
-          <GroupTable rows={rows} />
-        </Fragment> : null;
-      })}
-      {!!model.cancelled?.length && <details className="rounded border p-3">
-        <summary className="cursor-pointer text-sm font-medium">Cancelled ({model.cancelled.length})</summary>
-        <div className="mt-3"><GroupTable rows={model.cancelled} /></div>
-      </details>}
+    {model.empty && !completedPagination?.firstHref && !cancelledPagination?.firstHref ? E.blank(model.empty) : <>
+      {([["Planned", model.planned], ["Active", model.active]] as const).map(([title, rows]) => rows.length ? <Fragment key={title}>
+        {E.ttl(title)}
+        <GroupTable rows={rows} />
+      </Fragment> : null)}
     </>}
+    {(!!model.completed?.length || completedPagination?.firstHref) && <section aria-label="Completed batches" className="grid gap-3">
+      {E.ttl("Completed")}
+      <GroupTable rows={model.completed ?? []} />
+      <HistoryNavigation {...completedPagination} />
+    </section>}
+    {(!!model.cancelled?.length || cancelledPagination?.firstHref) && <details open={cancelledOpen} className="rounded border p-3">
+      <summary className="cursor-pointer text-sm font-medium">Cancelled ({model.cancelled?.length ?? 0})</summary>
+      <div className="mt-3 grid gap-3">
+        <GroupTable rows={model.cancelled ?? []} />
+        <HistoryNavigation {...cancelledPagination} />
+      </div>
+    </details>}
     {model.vessels !== undefined && <section aria-label="Vessel setup" className="flex min-w-0 flex-col gap-3">
       {E.ttl("Vessels")}
       <p className="text-sm text-muted-foreground">Set up the tanks and other vessels used for brewing and cellar work.</p>

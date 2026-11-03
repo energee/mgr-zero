@@ -143,7 +143,7 @@ describe("portal invoice Pay route", () => {
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe("https://mgr.test/portal/invoices/invoice-1?payment=unavailable");
     expect(await response.text()).toBe("");
-    expect(console.error).toHaveBeenCalledWith("qbo_payment_failed", { name: "Error" });
+    expect(console.error).toHaveBeenCalledWith("qbo_payment_failed", { name: "Error", status: null, stage: "payment_resolve" });
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
   });
 
@@ -152,7 +152,7 @@ describe("portal invoice Pay route", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     state.transport.mockRejectedValue(new TypeError("bearer-secret is not a function"));
     expect((await pay()).status).toBe(303);
-    expect(console.error).toHaveBeenCalledWith("qbo_payment_failed", { name: "TypeError" });
+    expect(console.error).toHaveBeenCalledWith("qbo_payment_failed", { name: "TypeError", status: null, stage: "payment_resolve" });
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
   });
 
@@ -161,7 +161,7 @@ describe("portal invoice Pay route", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     state.setupMissing = true;
     expect((await pay()).status).toBe(303);
-    expect(console.error).toHaveBeenCalledWith("qbo_payment_failed", { name: "Error", message: "QuickBooks setup is unavailable" });
+    expect(console.error).toHaveBeenCalledWith("qbo_payment_failed", { name: "Error", status: null, stage: "payment_config" });
   });
 
   it("bounds repeated authorized requests before any additional provider read or refresh", async () => {
@@ -189,7 +189,7 @@ describe("portal invoice Pay route", () => {
     expect((await pay()).status).toBe(303);
     expect(state.transport).not.toHaveBeenCalled();
     expect(console.error).toHaveBeenCalledWith("qbo_payment_failed", {
-      name: "CommandError", status: 503, code: "admission_unavailable", message: "command admission unavailable",
+      name: "CommandError", status: 503, stage: "payment_resolve",
     });
   });
 
@@ -212,7 +212,7 @@ describe("portal invoice Pay route", () => {
     state.transport.mockRejectedValue(new Error("refresh-secret private-provider-detail"));
     expect((await pay()).status).toBe(303);
     expect(state.transport).toHaveBeenCalledOnce();
-    expect(console.error).toHaveBeenCalledWith("qbo_payment_refresh_failed", { name: "Error" });
+    expect(console.error).toHaveBeenCalledWith("qbo_payment_refresh_failed", { name: "Error", status: null, stage: "payment_refresh" });
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("secret");
   });
 
@@ -241,7 +241,7 @@ describe("portal invoice Pay route", () => {
     state.requests = 120;
     const response = await pay("foreign");
     expect(response.status).toBe(404);
-    expect(await response.text()).toBe("Invoice not found");
+    expect(await response.text()).not.toContain("secret");
     expect(state.admission).not.toHaveBeenCalled();
     expect(state.transport).not.toHaveBeenCalled();
   });
